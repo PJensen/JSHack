@@ -58,11 +58,11 @@ const GL = {
   SINK: '≋',
   POTION: '!',
   SCROLL: '?',
-  VOID:   ' '
-   ,GRASS: '.'
-   ,TREE: '♣' /* club symbol */
-   ,MOUNTAIN: '▲' /* black up-pointing triangle */
-   ,TOWN: '⛪' /* church as town marker */
+  VOID:   ' ',
+  GRASS: '.',
+  TREE: '♣',
+  MOUNTAIN: '▲',
+  TOWN: '⛪'
 };
 
 // Consolidated configuration object (extracted constants)
@@ -784,6 +784,16 @@ class Game {
           this.useInventoryIndex(idx);
         }
       }
+      // '.' pass / wait: consumes a turn but does not move
+      if (e.code === 'Period' || e.key === '.'){
+        if (this.invOpen || this.consoleOpen) {
+          // ignore when menus or console are open
+        } else {
+          if (this.inputQ.length < 32) this.inputQ.push({ type: 'wait' });
+          e.preventDefault();
+          return;
+        }
+      }
       // 'G' pick up (manual) in addition to auto-pick
       if (e.code==='Comma'){
         // NetHack default: ',' to pick up items
@@ -1017,6 +1027,9 @@ class Game {
         }
       } else if (ev.type === 'castActive'){
         if (this.castActiveSpell()) acted = true;
+      } else if (ev.type === 'wait'){
+        // Explicit wait / pass a turn: do nothing but count as an acted turn
+        acted = true;
       }
     }
 
@@ -1270,20 +1283,20 @@ class Game {
   // Small helper to draw a translucent stairs hint centered at the bottom
   _drawStairsHint(text){
     const ctx = this.r.ctx;
-    try {
-      const pad = 8;
-      ctx.save();
-      ctx.font = '14px monospace';
-      const w = Math.min(600, ctx.measureText(text).width + pad*2);
-      const x = Math.floor((this.r.canvas.width - w) / 2);
-      const y = this.r.canvas.height - 56;
-      // background
-      ctx.fillStyle = 'rgba(6,10,18,0.78)'; ctx.fillRect(x, y, w, 36);
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.strokeRect(x+0.5, y+0.5, w-1, 36-1);
-      ctx.fillStyle = '#dfe7ef'; ctx.textBaseline = 'middle';
-      ctx.fillText(text, x + pad, y + 18);
-      ctx.restore();
-    } catch(e){ /* ignore drawing failures */ }
+      try {
+        const pad = 8;
+        ctx.save();
+        ctx.font = '14px monospace';
+        const w = Math.min(600, ctx.measureText(text).width + pad*2);
+        const x = Math.floor((this.r.canvas.width - w) / 2);
+        const y = this.r.canvas.height - 156;
+        // background
+        ctx.fillStyle = 'rgba(6,10,18,0.78)'; ctx.fillRect(x, y, w, 36);
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.strokeRect(x+0.5, y+0.5, w-1, 36-1);
+        ctx.fillStyle = '#dfe7ef'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, x + pad, y + 18);
+        ctx.restore();
+      } catch(e){ /* ignore drawing failures */ }
   }
 
   renderInventory(){
