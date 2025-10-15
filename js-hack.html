@@ -46,18 +46,18 @@
 const GL = {
   WALL:   '█',
   FLOOR:  '·',
-  DOOR:   '╬',
+    DOOR:   '🚪',
   STAIRS: '<',
   WATER:  '≈',
   TRAP:   '^',
   PLAYER: '@',
   FOUNTAIN: '♨',
   ALTAR: '†',
-  THRONE: '♛',
-  GRAVE: '✝',
+    THRONE: '♛',
+    GRAVE: '⚰️',
   SINK: '≋',
-  POTION: '!',
-  SCROLL: '?',
+    POTION: '🧪',
+    SCROLL: '📜',
   VOID:   ' ',
   GRASS: '.',
   TREE: '🌲', 
@@ -2349,15 +2349,15 @@ function spawnMonsters(level){
 // Switched from JSONL string to plain JSON object for clarity / easier editing.
 // Each definition: id, name, short (HUD label), glyph, color, kind, rarity (1=common, higher=rarer), effect (mini DSL)
 const ITEM_DEFS = {
-  potion_healing: { id:"potion_healing", name:"Healing Potion", short:"HealPot", glyph:"!", color:"#ff4d6d", kind:"potion", rarity:1, effect:"heal 8 12" },
-  scroll_light:   { id:"scroll_light",   name:"Scroll of Light", short:"Light",   glyph:"?", color:"#ffd166", kind:"scroll",  rarity:1, effect:"reveal all" },
-  potion_minor:   { id:"potion_minor",   name:"Minor Potion",    short:"MinorHeal", glyph:"!", color:"#ff9aa2", kind:"potion", rarity:2, effect:"heal 4 6; status regen 4 2" },
+  potion_healing: { id:"potion_healing", name:"Healing Potion", short:"HealPot", glyph:"🧪", color:"#ff4d6d", kind:"potion", rarity:1, effect:"heal 8 12" },
+  scroll_light:   { id:"scroll_light",   name:"Scroll of Light", short:"Light",   glyph:"📜", color:"#ffd166", kind:"scroll",  rarity:1, effect:"reveal all" },
+  potion_minor:   { id:"potion_minor",   name:"Minor Potion",    short:"MinorHeal", glyph:"🧪", color:"#ff9aa2", kind:"potion", rarity:2, effect:"heal 4 6; status regen 4 2" },
   // Example scripted item using inline JS (evaluated in a constrained helper).
   // Damages all visible monsters for 5 HP.
-  scroll_blast:   { id:"scroll_blast",   name:"Scroll of Blasting", short:"Blast",  glyph:"?", color:"#ffa600", kind:"scroll", rarity:2,
+  scroll_blast:   { id:"scroll_blast",   name:"Scroll of Blasting", short:"Blast",  glyph:"📜", color:"#ffa600", kind:"scroll", rarity:2,
     script: "// Scroll of Blasting: damages all visible monsters & creates a ripple\nconst originX=player.x, originY=player.y;\nconst dmg=5;\nlet hits=0, kills=0;\ngame.spawnRipple(originX, originY, {maxR:9, life:0.7, color:'#ff9d1e'});\nfor (const m of level.monsters){ if(!m.dead && game.visibleNow.has(`${m.x},${m.y}`)){ m.hp -= dmg; hits++; game.addFloatText(m.x, m.y, `-${dmg}`, { color:'#ffa94d', dmg }); if(m.hp<=0){ m.dead=true; kills++; game.addFloatText(m.x, m.y, '✖', { color:'#ffffff', life:0.9, scaleStart:1.2, scaleEnd:0.6 }); } } }\nreturn kills?`A concussive wave annihilates ${kills} monster${kills>1?'s':''}!`:(hits?`A concussive wave batters ${hits} foe${hits>1?'s':''}.`:'A concussive wave ripples outward.');" },
   // Spellbook (learn lightning spell)
-  book_lightning: { id:"book_lightning", name:"Spellbook of Lightning", short:"BoltBook", glyph:"?", color:"#80f7ff", kind:"book", rarity:2, effect:"learn lightning" },
+  book_lightning: { id:"book_lightning", name:"Spellbook of Lightning", short:"BoltBook", glyph:"📖", color:"#80f7ff", kind:"book", rarity:2, effect:"learn lightning" },
   // Gold: stackable currency represented by '$' and carries an amount
   gold_coin: { id:'gold_coin', name:'Gold', short:'Gold', glyph:'$', color:'#ffd24d', kind:'gold', rarity:1, stackable:true, value:1 }
 };
