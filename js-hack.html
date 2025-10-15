@@ -1122,6 +1122,11 @@ class Game {
       // HUD note
       this.r.ctx.font = '12px monospace'; this.r.ctx.fillStyle = '#cfd3dc';
       this.r.ctx.fillText('OVERWORLD (O to toggle). Towns = ⛪. Step on town to enter dungeon.', 6, 6);
+      // Stairs hint in overworld when standing on a stair tile
+      const hereOW = this.overworld.glyphAt(this.overworldPlayer.x, this.overworldPlayer.y);
+      if (hereOW === GL.STAIRS){
+        this._drawStairsHint('Press Enter to descend, Down to descend');
+      }
       ctx.restore();
       return;
     }
@@ -1243,6 +1248,25 @@ class Game {
       ctx2.restore();
     }
     ctx.restore();
+  }
+
+  // Small helper to draw a translucent stairs hint centered at the bottom
+  _drawStairsHint(text){
+    const ctx = this.r.ctx;
+    try {
+      const pad = 8;
+      ctx.save();
+      ctx.font = '14px monospace';
+      const w = Math.min(600, ctx.measureText(text).width + pad*2);
+      const x = Math.floor((this.r.canvas.width - w) / 2);
+      const y = this.r.canvas.height - 56;
+      // background
+      ctx.fillStyle = 'rgba(6,10,18,0.78)'; ctx.fillRect(x, y, w, 36);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.strokeRect(x+0.5, y+0.5, w-1, 36-1);
+      ctx.fillStyle = '#dfe7ef'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, x + pad, y + 18);
+      ctx.restore();
+    } catch(e){ /* ignore drawing failures */ }
   }
 
   renderInventory(){
