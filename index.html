@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>JS-hack</title>
+		<style>
+			html, body { height: 100%; margin: 0; background: #0b0e16; color: #9fb; }
+			body { display: grid; place-items: center; overflow: hidden; }
+			canvas { width: 100vw; height: 100vh; display: block; image-rendering: pixelated; }
+			.hint { position: fixed; bottom: 8px; right: 12px; font: 12px/1.2 system-ui, sans-serif; opacity: 0.6; }
+		</style>
+	</head>
+	<body>
+		<canvas id="stage"></canvas>
+		<div class="hint">JS-Hack</div>
+		<script type="module" src="./src/main.js"></script>
+	</body>
+</html>
+

@@ -1,0 +1,13 @@
+export { Position } from './Position.js';
+export { ActiveEffects } from './ActiveEffects.js';
+export { Consumable } from './Consumable.js';
+export { ItemInfo } from './ItemInfo.js';
+export { Material } from './Material.js';
+export { DamageSpec } from './DamageSpec.js';
+export { Player } from './Player.js';
+export { Potion } from './Potion.js';
+export { Anatomy, buildHumanoidAnatomy } from './Anatomy.js';
+export { Physiology } from './Physiology.js';
+export { Resistances } from './Resistences.js';
+export { Wounds } from './Wounds.js';
+export { DrinkIntent } from './Intents/DrinkIntent.js';

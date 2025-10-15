@@ -1,0 +1,832 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>JS‑Hack Glyph FX Builder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{--bg:#0b0f13;--panel:#07100d;--muted:#9fd7aa;--accent:#73c08a}
+  html,body{height:100%;margin:0;background:var(--bg);color:#d8f6de;font:13px/1.4 system-ui,-apple-system,Segoe UI,Roboto, sans-serif}
+  .wrap{display:grid;grid-template-columns:320px 1fr 500px;gap:12px;height:100vh;padding:12px;box-sizing:border-box}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border:1px solid rgba(36,69,55,0.5);border-radius:10px;padding:12px;box-sizing:border-box}
+  .left{display:flex;flex-direction:column;gap:8px}
+  .preset-list{flex:1;overflow:auto;border-radius:6px;padding:6px;background:#071a12}
+  .preset{padding:8px;border-radius:6px;margin-bottom:6px;cursor:pointer;border:1px solid transparent}
+  .preset.active{background:linear-gradient(90deg,#113921,#072414);border-color:#2d8b5a}
+  .controls{display:flex;gap:6px;flex-wrap:wrap}
+  input[type=text],input[type=number]{width:100%;padding:6px;border-radius:6px;border:1px solid #244537;background:transparent;color:var(--muted)}
+  .row input[type=range]{width:100%}
+  select{width:100%;padding:6px;border-radius:6px;border:1px solid #244537;background:#0b1713;color:var(--muted)}
+  label.row{display:grid;grid-template-columns:1fr 110px;gap:8px;align-items:center}
+  button{background:#082214;border:1px solid #244537;color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
+  button.warn{background:#3b1b1b;border-color:#7b3b3b}
+  .center{display:flex;flex-direction:column;gap:8px;align-items:center}
+  #viewport{width:100%;height:100%;display:block;background:linear-gradient(180deg,#07120f,#04100c);border-radius:8px}
+  .hud{display:flex;gap:8px;align-items:center}
+  .editor{height:100%;display:flex;flex-direction:column}
+  textarea{width:100%;height:60vh;background:#04120e;color:#d8f6de;border:1px solid #123826;padding:8px;border-radius:8px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace}
+  .meta{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .small{font-size:12px;color:#9fbfa0}
+  .footer{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .line{height:1px;background:rgba(160,220,180,0.06);margin:8px 0}
+  .error{color:#ff9b9b;background:#3b1010;padding:6px;border-radius:6px}
+  .kbd{background:#081a13;padding:4px 6px;border-radius:4px;border:1px solid #123826}
+  .tests{margin-top:8px;background:#071a12;border:1px solid #244537;border-radius:8px;padding:8px;max-height:180px;overflow:auto}
+  .pass{color:#87e39a}.fail{color:#ff9b9b}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .sectionTitle{margin-top:6px;font-weight:600}
+</style>
+<div class="wrap">
+  <div class="panel left">
+    <div style="display:flex;gap:8px;align-items:center">
+      <strong>FX Presets</strong>
+      <div style="flex:1"></div>
+      <button id="newBtn">New</button>
+    </div>
+    <div class="preset-list panel" id="presetList"></div>
+    <div class="line"></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="presetName" placeholder="preset name" type="text">
+      <button id="saveBtn">Save</button>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button id="deleteBtn" class="warn">Delete</button>
+      <button id="exportBtn">Export</button>
+      <button id="importBtn">Import</button>
+      <button id="runTestsBtn" title="Run built-in self-tests">Run Tests</button>
+    </div>
+    <div class="tests" id="tests"></div>
+
+    <div class="line"></div>
+    <div class="sectionTitle">Envelope</div>
+    <div class="grid2">
+      <label class="row">Onset (ms)<input id="envOnMs" type="number" min="0" step="10" value="200"></label>
+      <label class="row">Steady (ms)<input id="envSteadyMs" type="number" min="0" step="10" value="400"></label>
+      <label class="row">Comedown (ms)<input id="envOffMs" type="number" min="0" step="10" value="200"></label>
+      <label class="row">Easing
+        <select id="envEase">
+          <option value="linear" selected>linear</option>
+          <option value="quad">quadratic</option>
+          <option value="exp">exponential</option>
+        </select>
+      </label>
+      <label class="row">Hold at steady<input type="checkbox" id="envHoldSteady"></label>
+      <label class="row">Apply globally<input type="checkbox" id="envGlobal" checked></label>
+      <label class="row">Scale Max<input id="envScale" type="number" step="0.01" value="0.12"></label>
+      <label class="row">Jitter Max<input id="envJitter" type="number" step="0.5" value="4"></label>
+    </div>
+    <div class="small">Ramp in → optional steady → ramp out using the chosen easing. Hold keeps gain at 1 after onset.</div>
+
+    <div class="line"></div>
+    <div class="small">Hints</div>
+  <div class="small">Effect signature: <code>ctx, glyph, x, y, size, t, dt, seed, baselineY, env?</code></div>
+  <div class="small">Return nothing — draw on <code>ctx</code>. Baseline is authoritative. env has phase, gain, u, and helpers.</div>
+  </div>
+
+  <div class="panel center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="hud"><strong>Preview — Glyph FX Builder</strong><div style="width:10px"></div><span class="small">Play to animate; envelope simulates turn time.</span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="small">Seed <input id="seed" class="kbd" value="1" style="width:60px"></label>
+        <label class="small">Size <input id="size" class="kbd" value="64" style="width:60px"></label>
+        <label class="small">Grid <input id="grid" class="kbd" value="8" style="width:40px"></label>
+        <button id="play">Play</button>
+        <button id="step">Step</button>
+      </div>
+    </div>
+    <canvas id="viewport"></canvas>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <div class="small">Baseline is drawn in <span style="color:var(--accent)">green</span> and labelled.</div>
+      <div class="small">Glyph: <input id="glyphInput" value="@" style="width:40px" class="kbd"></div>
+    </div>
+  </div>
+
+  <div class="panel editor">
+    <div class="meta">
+      <strong>Effect Implementation</strong>
+      <div style="flex:1"></div>
+      <div class="small">Errors:</div>
+    </div>
+    <textarea id="editor">// Example preset: wobble + outline (peak-centric)
+// ctx, glyph, x, y, size, t, dt, seed, baselineY, env (optional)
+(function draw(ctx, glyph, x, y, size, t, dt, seed, baselineY, env){
+  ctx.save();
+  const wob = Math.sin(t*6 + seed*10) * (size*0.06);
+  ctx.translate(x + wob, y);
+  const g = ctx.createRadialGradient(0,-size*0.2,2,0,0,size*0.9);
+  g.addColorStop(0, 'rgba(255,255,255,0.95)');
+  g.addColorStop(1, 'rgba(100,220,170,0.9)');
+  ctx.fillStyle = g;
+  ctx.font = size + 'px monospace';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(glyph, -size/2, 0);
+  ctx.lineWidth = Math.max(1, size*0.06);
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.strokeText(glyph, -size/2, 0);
+  ctx.restore();
+})(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);</textarea>
+    <div class="line"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="compile">Compile</button>
+      <button id="apply">Apply</button>
+      <div style="flex:1"></div>
+      <div class="small">Quick examples included in presets on first load.</div>
+    </div>
+    <div id="error" class="error" style="display:none;margin-top:8px"></div>
+    <div class="footer">
+      <div class="small">This tool injects your function into the preview render pipeline only — it's intentionally permissive for fast experimentation. Be careful with infinite loops.</div>
+    </div>
+  </div>
+</div>
+<script>
+// =============================
+// Globals & DOM
+// =============================
+const LS_KEY = 'jshack_fx_presets_v1';
+const presetListEl = document.getElementById('presetList');
+const editorEl = document.getElementById('editor');
+const presetNameEl = document.getElementById('presetName');
+const viewport = document.getElementById('viewport');
+const ctx = viewport.getContext('2d');
+const testsEl = document.getElementById('tests');
+let presets = {}; let activeId = null; let compiledFn = null;
+let t = 0, playing = false, last = performance.now();
+let seed = Number(document.getElementById('seed').value) || 1;
+let glyph = document.getElementById('glyphInput').value || '@';
+let size = Number(document.getElementById('size').value) || 64;
+let gridCount = Number(document.getElementById('grid').value) || 8;
+
+// Envelope UI refs (simple ms/ease)
+const envGlobalEl = document.getElementById('envGlobal');
+const envOnMsEl = document.getElementById('envOnMs');
+const envSteadyMsEl = document.getElementById('envSteadyMs');
+const envOffMsEl = document.getElementById('envOffMs');
+const envEaseEl = document.getElementById('envEase');
+const envHoldEl = document.getElementById('envHoldSteady');
+const envScaleEl = document.getElementById('envScale');
+const envJitterEl = document.getElementById('envJitter');
+
+// Playback helpers
+function restartAndPlay(){ t=0; playing=true; last=performance.now(); const playBtn=document.getElementById('play'); if(playBtn) playBtn.textContent='Pause'; requestAnimationFrame(applyAndDraw); }
+
+// =============================
+// Storage & Presets
+// =============================
+function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(presets)); }
+function loadLocal(){ try{ const raw = localStorage.getItem(LS_KEY); presets = raw ? JSON.parse(raw) : {}; }catch(e){ presets = {}; } }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function makeDefaultPresets(){
+  return {
+    // Original starter uses whatever is in the editor by default
+    'wobble':{name:'Wobble Glow', code: editorEl.value},
+    // Slightly richer ripple with env awareness
+    'ripple':{name:'Rippling Ink', code: `
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      ctx.save();
+      const a = env? Math.min(1, env.gain*1.05) : 1;
+      const wobX = Math.sin(t*3+seed)*size*0.03;
+      const wobY = Math.cos(t*2+seed)*size*0.02;
+      ctx.translate(x + wobX, y + wobY);
+      ctx.font = size+'px monospace';
+      ctx.textBaseline='alphabetic';
+      // trailing ripples
+      for(let i=4;i>0;i--){
+        const k = i*0.9;
+        ctx.globalAlpha = a*(0.08 + i*0.14);
+        ctx.fillStyle = 'rgba(8,16,12,1)';
+        ctx.fillText(glyph, -size/2 + Math.sin(i+t*2+seed)*i, 0 + Math.cos(i+t*1.4+seed)*i);
+      }
+      // inky main glyph
+      ctx.globalAlpha = a;
+      ctx.fillStyle='rgba(180,255,200,0.95)';
+      ctx.fillText(glyph,-size/2,0);
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // Glitch that intensifies near onset/comedown using env.gain curve
+    'glitch':{name:'Glitch Slice', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      ctx.save();
+      ctx.font=size+'px monospace';
+      ctx.textBaseline='alphabetic';
+      const g = env? env.gain:1;
+      const off = (Math.sin(t*40+seed)*6) * (0.6 + 0.4*g);
+      // base
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle='rgba(255,255,255,0.95)';
+      ctx.fillText(glyph,-size/2,0);
+      // chroma slices
+      ctx.globalCompositeOperation='lighter';
+      ctx.globalAlpha = 0.55*g;
+      ctx.fillStyle='rgba(255,0,120,1)';
+      ctx.fillText(glyph,-size/2+off,2);
+      ctx.fillStyle='rgba(0,160,255,1)';
+      ctx.fillText(glyph,-size/2-off,-2);
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Neon Pulse — soft glow + outline
+    'neonPulse':{name:'Neon Pulse', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      ctx.save();
+      const pul = 0.5 + 0.5*Math.sin(t*4 + seed);
+      const a = env? Math.min(1, env.gain*1.1) : 1;
+      ctx.font = size+'px monospace';
+      ctx.textBaseline='alphabetic';
+      ctx.lineWidth = Math.max(1, size*0.06);
+      ctx.strokeStyle = 'rgba(80,255,200,0.9)';
+      ctx.shadowColor = 'rgba(80,255,200,1)';
+      ctx.shadowBlur = size*(0.18 + 0.25*pul)*a;
+      ctx.globalAlpha = 0.85*a;
+      ctx.strokeText(glyph, x - size/2, y);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.35*a;
+      ctx.fillStyle = 'rgba(10,30,24,1)';
+      ctx.fillText(glyph, x - size/2, y);
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Ember Flicker — warm gradient + tiny embers
+    'emberFlicker':{name:'Ember Flicker', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      function rand(i){return (Math.sin(seed*997 + i*12.9898 + t*23.233)*43758.5453)%1;}
+      ctx.save();
+      const a = env? env.gain:1;
+      ctx.font=size+'px monospace';
+      ctx.textBaseline='alphabetic';
+      const g=ctx.createLinearGradient(0,y-size,0,y);
+      g.addColorStop(0,'rgba(255,240,120,'+(0.8*a)+')');
+      g.addColorStop(1,'rgba(255,120,40,'+(0.9*a)+')');
+      ctx.fillStyle=g;
+      ctx.globalAlpha=0.95*a;
+      ctx.fillText(glyph,x-size/2,y);
+      // embers
+      ctx.globalAlpha=0.7*a;
+      for(let i=0;i<6;i++){
+        const r=rand(i);
+        const ex=x - size*0.3 + r*size*0.6;
+        const ey=y - size*0.5 + rand(i+1)*size*0.5;
+        const rad=size*(0.02+0.02*rand(i+2));
+        ctx.fillStyle='rgba(255,200,120,'+(0.5+0.5*rand(i+3))*a+')';
+        ctx.beginPath(); ctx.arc(ex,ey,rad,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Shockwave Ring — expanding ring from baseline
+    'shockwaveRing':{name:'Shockwave Ring', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      ctx.save();
+      const u = env? env.u: (0.5+0.5*Math.sin(t));
+      const a = env? env.gain:1;
+      const r = size*(0.3 + 0.9*u);
+      ctx.globalAlpha = 0.8*a;
+      ctx.strokeStyle = 'rgba(160,240,220,1)';
+      ctx.lineWidth = Math.max(1, size*(0.06*(1.0-u)));
+      ctx.beginPath(); ctx.arc(x, y - size*0.5, r, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Afterimage Trail — simple fading echoes along motion
+    'afterimageTrail':{name:'Afterimage Trail', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      ctx.save();
+      ctx.font=size+'px monospace';
+      ctx.textBaseline='alphabetic';
+      const a = env? env.gain:1;
+      const trail=5;
+      for(let i=trail;i>=0;i--){
+        const k=i/trail;
+        const offX=Math.sin(t*3+seed)*size*0.05*k*trail;
+        const offY=Math.cos(t*2+seed)*size*0.03*k*trail;
+        ctx.globalAlpha=(0.15+0.15*k)*a;
+        ctx.fillStyle='rgba(180,240,220,1)';
+        ctx.fillText(glyph,(x - size/2)-offX,y-offY);
+      }
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Rain Drip — subtle downward streaks over glyph
+    'rainDrip':{name:'Rain Drip', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      function rand(i){return (Math.sin(seed*137 + i*78.233 + t*11.17)*43758.5453)%1;}
+      ctx.save();
+      ctx.font=size+'px monospace'; ctx.textBaseline='alphabetic';
+      const a = env? env.gain:1;
+      ctx.globalAlpha=0.9*a;
+      ctx.fillStyle='rgba(210,240,255,0.95)';
+      ctx.fillText(glyph, x - size/2, y);
+      // drips
+      ctx.globalAlpha=0.35*a;
+      ctx.strokeStyle='rgba(160,210,255,1)';
+      for(let i=0;i<6;i++){
+        const rx = x - size*0.35 + rand(i)*size*0.7;
+        const len = size*(0.08 + 0.18*rand(i+1));
+        const ph = (t*2 + rand(i+2))%1;
+        const sy = y - size*0.6 + ph*size*0.9;
+        ctx.beginPath(); ctx.moveTo(rx, sy-len); ctx.lineTo(rx, sy); ctx.stroke();
+      }
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Arc Electric — zig-zag lightning across glyph
+    'arcElectric':{name:'Arc Electric', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      function rand(i){return (Math.sin(seed*911 + i*12.7 + t*33.17)*43758.5453)%1;}
+      ctx.save();
+      const a = env? Math.min(1, env.gain*1.1):1;
+      const left = x - size*0.55, right = x + size*0.55, midY = y - size*0.35;
+      ctx.globalAlpha = 0.85*a; ctx.strokeStyle='rgba(120,200,255,1)';
+      ctx.lineWidth = Math.max(1, size*0.025);
+      ctx.beginPath();
+      ctx.moveTo(left, midY + (rand(0)-0.5)*size*0.1);
+      const segments=6;
+      for(let i=1;i<segments;i++){
+        const u=i/segments; const px=left + (right-left)*u; const py=midY + (rand(i)-0.5)*size*0.25;
+        ctx.lineTo(px, py);
+      }
+      ctx.lineTo(right, midY + (rand(segments)-0.5)*size*0.1);
+      ctx.stroke();
+      // faint glow
+      ctx.globalAlpha = 0.25*a; ctx.lineWidth = Math.max(1, size*0.06); ctx.stroke();
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `}
+    ,
+    // New: Ash Decay — glyph chars, crumbles, and falls as ash
+    'ashDecay':{name:'Ash Decay', code:`
+    (function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){
+      // Progress through the turn controls decay amount
+      const u = env? env.u : ((Math.sin(t*0.5)*0.5+0.5));
+      const a = env? env.gain : 1;
+
+      ctx.save();
+      ctx.font = size+'px monospace';
+      ctx.textBaseline = 'alphabetic';
+
+      // 1) Char the glyph using multiply (darken to charcoal)
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.65 * a;
+      const g = ctx.createLinearGradient(0, y - size, 0, y);
+      g.addColorStop(0, '#666');
+      g.addColorStop(1, '#222');
+      ctx.fillStyle = g;
+      ctx.fillText(glyph, x - size/2, y);
+
+      // 2) Erode the glyph using destination-out circles based on u
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalAlpha = 1.0; // full punch-out
+      // Increase density and radius with progress
+      const pits = Math.floor(30 + 140 * u);
+      for(let i=0;i<pits;i++){
+        // quick, deterministic hash-based jitter
+        const r1 = Math.sin(seed*997 + (i+1)*13.37 + t*2.17) * 43758.5453;
+        const r2 = Math.sin(seed*419 + (i+3)*7.11  + t*1.31) * 21942.1371;
+        const rx = ((r1 % 1) + 1) % 1; // [0,1)
+        const ry = ((r2 % 1) + 1) % 1;
+        const px = x - size*0.50 + rx*size;        // within glyph bbox
+        const py = y - size*0.92 + ry*size*0.95;   // baseline aligned
+        const base = 0.006 + 0.016 * (((Math.sin(i*17 + seed*3)*0.5)+0.5));
+        const rad = size * base * (0.6 + 1.2*u);
+        ctx.beginPath();
+        ctx.arc(px, py, rad, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      // 3) Faint soot edge highlight (screen)
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.18 * a * (1.0 - u);
+      ctx.strokeStyle = 'rgba(255,200,120,0.8)';
+      ctx.lineWidth = Math.max(1, size*0.05);
+      ctx.strokeText(glyph, x - size/2, y);
+
+      // 4) Falling ash below the glyph
+      ctx.globalCompositeOperation = 'source-over';
+      const ashN = 10 + Math.floor(20*u);
+      for(let i=0;i<ashN;i++){
+        const phase = ((t*0.65 + seed*0.13 + i*0.17) % 1 + 1) % 1; // [0,1)
+        const jitter = Math.sin(seed*19 + i*31.7 + t*2.1)*size*0.02;
+        const ax = x - size*0.35 + (((Math.sin(seed*7 + i*5.3)*0.5)+0.5))*size*0.7 + jitter;
+        const top = y - size*0.2;
+        const ay = top + phase*size*0.9;
+        const sdot = size * (0.008 + 0.012 * (((Math.sin(i*97+seed*5)*0.5)+0.5)));
+        const gray = 150 + Math.floor(60 * (((Math.sin(i*3.1+seed*2.7)*0.5)+0.5)));
+        ctx.globalAlpha = 0.6 * a * (0.7 + 0.3*Math.sin(i+seed));
+        ctx.fillStyle = 'rgba('+gray+','+gray+','+gray+',1)';
+        ctx.fillRect(ax, ay, sdot, sdot);
+      }
+
+      // 5) Wispy smoke rising (very subtle)
+      ctx.globalAlpha = 0.15 * a * (0.3 + 0.7*u);
+      ctx.fillStyle = 'rgba(200,220,210,1)';
+      for(let i=0;i<3;i++){
+        const ph = ((t*0.35 + i*0.21 + seed*0.07) % 1 + 1) % 1;
+        const sx = x - size*0.25 + i*size*0.25 + Math.sin(t*1.1 + i)*size*0.03;
+        const sy = y - size*0.6 - ph*size*0.7;
+        const rr = size*(0.05 + 0.08*(1-ph));
+        ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI*2); ctx.fill();
+      }
+
+      ctx.restore();
+    })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);
+    `},
+    // New: Aegis Ward — protective rotating hex + ring and baseline ward
+    'aegis':{name:'Aegis Ward', code:`
+    (function draw(ctx, glyph, x, y, size, t, dt, seed, baselineY, env) {
+      ctx.save();
+
+      // ----- stable placement (baseline anchored) -----
+      ctx.translate(x, y);
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = size + 'px monospace';
+
+      // ----- parameters -----
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3.2 + seed * 7.1);    // soft breathing
+      const spin  = t * 1.4 + seed * 2.0;                           // ward rotation
+      const rCore = size * (0.58 + 0.05 * pulse);                   // shield radius
+      const rRing = rCore * (1.22 + 0.03 * Math.sin(t * 2.1 + seed));
+      const a = env ? Math.min(1, env.gain) : 1;                    // envelope gain
+
+      // ----- subtle baseline "floor" to ground the effect -----
+      // faint gold line and bloom just at the baseline to signal impenetrability
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const floorGrad = ctx.createLinearGradient(0, -2, 0, 6);
+      floorGrad.addColorStop(0, 'rgba(255,240,180,0.10)');
+      floorGrad.addColorStop(1, 'rgba(255,220,120,0.0)');
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(-size * 0.7, 0, size * 1.4, 6);
+
+  ctx.globalAlpha = (0.35 + 0.25 * pulse) * a;
+      ctx.strokeStyle = 'rgba(255,230,160,0.55)';
+      ctx.lineWidth = Math.max(1, size * 0.025);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.7, 0.5);
+      ctx.lineTo(size * 0.7, 0.5);
+      ctx.stroke();
+      ctx.restore();
+
+      // ----- soft inner aura -----
+      ctx.save();
+      const aura = ctx.createRadialGradient(0, -size * 0.25, 2, 0, 0, rCore * 1.05);
+      aura.addColorStop(0, 'rgba(255,255,255,' + (0.10 + 0.10 * pulse) + ')');
+      aura.addColorStop(1, 'rgba(240,225,160,' + (0.15 + 0.15 * pulse) + ')');
+      ctx.fillStyle = aura;
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.9 * a;
+      ctx.beginPath();
+      ctx.arc(0, -size * 0.25, rCore * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // ----- refractive outer ring (subtle lensing look) -----
+  ctx.save();
+  ctx.globalAlpha = 0.6 * a;
+      ctx.lineWidth = Math.max(1, size * 0.035);
+      ctx.strokeStyle = 'rgba(255,245,180,' + (0.35 + 0.25 * pulse) + ')';
+      ctx.beginPath();
+      ctx.arc(0, -size * 0.25, rRing, 0, Math.PI * 2);
+      ctx.stroke();
+      // faint chroma fringe
+  ctx.globalAlpha = 0.25 * a;
+      ctx.strokeStyle = 'rgba(120,220,255,' + (0.25 * pulse) + ')';
+      ctx.beginPath();
+      ctx.arc(0, -size * 0.25, rRing * 1.02, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // ----- rotating hex ward -----
+      ctx.save();
+      ctx.translate(0, -size * 0.25);
+      ctx.rotate(spin);
+      const sides = 6;
+      const hexR  = rCore * 0.82;
+      ctx.globalAlpha = (0.45 + 0.25 * pulse) * a;
+      ctx.lineWidth = Math.max(1, size * 0.02);
+      ctx.strokeStyle = 'rgba(255,235,170,0.9)';
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * Math.PI * 2;
+        const px = Math.cos(a) * hexR;
+        const py = Math.sin(a) * hexR;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // small ward runes on vertices
+      ctx.globalAlpha = 0.7 * a;
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * Math.PI * 2;
+        const px = Math.cos(a) * hexR;
+        const py = Math.sin(a) * hexR;
+        const s = 1 + 0.4 * Math.sin(t * 6 + seed * 5 + i);
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(0.8, size * 0.015) * s, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,220,0.85)';
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // ----- glyph echoes (protective afterimage) -----
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 3; i >= 1; i--) {
+        const k = i / 3;
+        ctx.globalAlpha = (0.08 + 0.08 * k * (0.6 + 0.4 * pulse)) * a;
+        ctx.fillStyle = 'rgba(255,240,190,0.7)';
+        const ox = Math.sin(t * (7 + i) + seed * 3.1) * size * 0.02 * i;
+        const oy = Math.cos(t * (5.5 + i) + seed * 2.2) * size * 0.016 * i;
+        ctx.fillText(glyph, -size / 2 + ox, oy);
+      }
+      ctx.restore();
+
+      // ----- main invulnerable glyph -----
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,245,200,' + ( (0.8 + 0.2 * pulse) * a ) + ')';
+  ctx.shadowBlur  = 6 + 18 * pulse;
+  ctx.globalAlpha = a;
+      ctx.fillStyle   = 'hsl(' + (50 + 10 * pulse) + ', 100%, ' + (90 - 5 * pulse) + '%)'; // warm white-gold
+      ctx.fillText(glyph, -size / 2, 0);
+      ctx.restore();
+
+      // ----- quick specular spark sweeping around the ring -----
+      ctx.save();
+      ctx.translate(0, -size * 0.25);
+      const sweepA = (t * 2.6 + seed) % (Math.PI * 2);
+      const sx = Math.cos(sweepA) * rRing, sy = Math.sin(sweepA) * rRing;
+  ctx.globalAlpha = (0.35 + 0.35 * pulse) * a;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, size * 0.05, size * 0.015, sweepA, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.restore();
+  })(ctx, glyph, x, y, size, t, dt, seed, baselineY, env);
+    `}
+  };
+}
+function ensureDefaults(){
+  loadLocal();
+  const defaults = makeDefaultPresets();
+  if(!Object.keys(presets).length){
+    presets = defaults;
+    saveLocal();
+  } else {
+    // Non-destructive hydrate: add any missing default presets
+    let added=0;
+    for(const k of Object.keys(defaults)){
+      if(!(k in presets)){
+        presets[k] = defaults[k];
+        added++;
+      }
+    }
+    if(added>0) saveLocal();
+  }
+}
+ensureDefaults();
+
+function renderPresetList(){
+  presetListEl.innerHTML='';
+  for(const id of Object.keys(presets)){
+    const p = presets[id];
+    const el = document.createElement('div');
+    el.className='preset'+(id===activeId? ' active':'');
+    el.textContent = p.name || id;
+    el.onclick = ()=>{
+      // Load to reset state, then immediately start playback
+      loadPreset(id);
+      restartAndPlay();
+    };
+    presetListEl.appendChild(el);
+  }
+}
+
+function loadPreset(id){ const p = presets[id]; if(!p) return; activeId = id; presetNameEl.value = p.name; editorEl.value = p.code; 
+  // Ready state reset
+  glyph='@'; document.getElementById('glyphInput').value='@'; playing=false; t=0; last=performance.now();
+  const playBtn=document.getElementById('play'); if(playBtn) playBtn.textContent='Play';
+  const errorEl=document.getElementById('error'); if(errorEl){ errorEl.style.display='none'; errorEl.textContent=''; }
+  renderPresetList(); compileFromEditor(); paint(t,0); }
+
+function savePreset(){ const name=(presetNameEl.value||'unnamed').trim(); if(!name) return alert('Give the preset a name'); const id=activeId||uid(); presets[id]={name, code: editorEl.value}; activeId=id; saveLocal(); renderPresetList(); }
+function deletePreset(){ if(!activeId) return alert('No preset selected'); if(!confirm('Delete preset "'+(presets[activeId].name||'')+'"?')) return; delete presets[activeId]; activeId=null; saveLocal(); renderPresetList(); }
+function exportPresets(){ const blob=new Blob([JSON.stringify(presets,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='jshack_fx_presets.json'; a.click(); URL.revokeObjectURL(url); }
+function importPresets(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const j=JSON.parse(ev.target.result); presets=Object.assign({},presets,j); saveLocal(); renderPresetList(); alert('Imported '+Object.keys(j).length+' presets'); }catch(err){ alert('Invalid JSON'); } }; r.readAsText(f); }; inp.click(); }
+
+// =============================
+// Compiler (backtick-safe)
+// =============================
+function compileFromEditor(){
+  const src = editorEl.value; const errorEl = document.getElementById('error'); errorEl.style.display='none';
+  try{
+    const body = '"use strict";\ntry{\n' + src + '\n}catch(e){throw e;}';
+    compiledFn = new Function('ctx','glyph','x','y','size','t','dt','seed','baselineY','env', body);
+    compiledFn(ctx,'@',0,0,16,0,0,1,0, null); // smoke
+  }catch(e){ compiledFn=null; errorEl.style.display='block'; errorEl.textContent='Compile error: '+(e&&e.message?e.message:e); }
+}
+
+// =============================
+// Envelope math (ms + easing) & helpers
+// =============================
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+function easeShape(x, type){
+  x = clamp01(x);
+  switch(type){
+    case 'quad': // smooth but simple
+      return x<0.5 ? 2*x*x : 1 - Math.pow(-2*x+2,2)/2;
+    case 'exp': // stronger ease-in/out
+      if(x===0||x===1) return x; 
+      return x<0.5 ? (Math.pow(2, 20*x-10))/2 : (2 - Math.pow(2, -20*x+10))/2;
+    case 'linear':
+    default:
+      return x;
+  }
+}
+function getEnvelopeParams(){
+  const onMs = Math.max(0, Number(envOnMsEl.value)||0);
+  const steadyMs = Math.max(0, Number(envSteadyMsEl.value)||0);
+  const offMs = Math.max(0, Number(envOffMsEl.value)||0);
+  const ease = (envEaseEl.value||'linear');
+  const hold = !!envHoldEl.checked;
+  const totalMs = onMs + steadyMs + offMs;
+  return {onMs, steadyMs, offMs, ease, hold, totalMs};
+}
+
+function hash(n){ n|=0; n = (n ^ 61) ^ (n>>>16); n = n + (n<<3); n = n ^ (n>>>4); n = n * 0x27d4eb2d; n = n ^ (n>>>15); return n>>>0; }
+function noise01(seed, x){ const n = hash((seed*73856093 ^ (x*1e6|0))|0); return ( (Math.sin(n)*43758.5453) % 1 + 1 ) % 1; }
+
+function buildEnv(uNorm, size, seed){
+  // uNorm is [0,1) over the full cycle (on+steady+off) if not holding,
+  // or time-normalized until onset if holding steady (see paint).
+  const {onMs, steadyMs, offMs, ease, hold, totalMs} = getEnvelopeParams();
+  const on = totalMs>0 ? onMs/Math.max(1,totalMs) : (onMs>0?1:0);
+  const pk = totalMs>0 ? steadyMs/Math.max(1,totalMs) : 0;
+  const off = totalMs>0 ? offMs/Math.max(1,totalMs) : (offMs>0?1:0);
+
+  let phase='onset', uLocal=0, gain=1;
+  if(onMs===0 && offMs===0){
+    // Always on (or steady)
+    phase = pk>0 || hold ? 'steady' : 'peak';
+    uLocal = 1; gain = 1;
+  } else if(uNorm < on){
+    phase='onset'; uLocal = on>0 ? (uNorm/on) : 1; gain = easeShape(uLocal, ease);
+  } else if(uNorm < on+pk || hold){
+    phase='steady'; uLocal = pk>0 ? (uNorm-on)/Math.max(1e-6, pk) : 1; gain=1;
+  } else {
+    phase='comedown'; uLocal = off>0 ? (uNorm-on-pk)/off : 1; gain = 1 - easeShape(uLocal, ease);
+  }
+  gain = clamp01(gain);
+
+  const scaleMax = Number(envScaleEl.value)||0; // as factor (e.g., 0.12)
+  const jitterMax = Number(envJitterEl.value)||0; // in pixels
+  // bell-shaped jitter centered near end of onset
+  const bellCenter = on; const bellWidth = Math.max(1e-6, on*0.75);
+  const bell = Math.max(0, 1 - Math.abs((uNorm - bellCenter) / bellWidth) );
+  const jitter = jitterMax * bell * 0.8;
+  const bias = Math.sin(Math.PI * clamp01(uNorm));
+  const scale = 1 + scaleMax * gain;
+  const jx = (noise01(seed, uNorm + 0.13)-0.5) * 2 * jitter;
+  const jy = (noise01(seed, uNorm + 0.71)-0.5) * 2 * jitter;
+  return {phase,u:uNorm,uLocal,gain,scale,jitter,bias,jx,jy,on,pk,off};
+}
+
+// Composite caps (limit 2) — kept for future stacking preview
+const CAP = { gain: 1.25, scale: 1.25, jitter: 0.12 };
+function compositeChannels(a,b,size){
+  const g = Math.min(CAP.gain, (a?.gain||0) + (b?.gain||0));
+  const s = Math.min(CAP.scale, 1 + ((a?.scale||1)-1) + ((b?.scale||1)-1));
+  const j = Math.min(size*CAP.jitter, (a?.jitter||0) + (b?.jitter||0));
+  const jx = Math.max(-j, Math.min(j, (a?.jx||0)+(b?.jx||0)));
+  const jy = Math.max(-j, Math.min(j, (a?.jy||0)+(b?.jy||0)));
+  return {gain:g, scale:s, jitter:j, jx, jy};
+}
+
+// =============================
+// Render loop
+// =============================
+function applyAndDraw(now){ const d=(now-last)/1000; last=now; if(playing) t+=d; paint(t,d); if(playing) requestAnimationFrame(applyAndDraw); }
+
+function paint(tnow, dt){
+  // resize
+  const DPR=Math.max(1, window.devicePixelRatio||1);
+  const w=viewport.clientWidth, h=viewport.clientHeight;
+  if(viewport.width!==w*DPR||viewport.height!==h*DPR){ viewport.width=Math.floor(w*DPR); viewport.height=Math.floor(h*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); }
+
+  // clear
+  ctx.clearRect(0,0,viewport.width/DPR, viewport.height/DPR);
+
+  const cols=Math.max(1,gridCount); const rows=cols;
+  const cellW=viewport.width/DPR/cols; const cellH=viewport.height/DPR/rows;
+  const baselineRatio=0.6;
+
+  // Compute envelope time → normalized u
+  const {onMs, steadyMs, offMs, hold, totalMs} = getEnvelopeParams();
+  const totalSec = totalMs/1000;
+  let u = 0;
+  if(totalMs<=0){
+    u = 1; // always on
+  } else if(hold){
+    // Once we pass onset, stay in steady
+    const onsetSec = onMs/1000;
+    if(tnow < onsetSec){ u = clamp01(tnow/Math.max(1e-6,onsetSec)) * (onMs/totalMs); }
+    else { u = (onMs/totalMs) + Math.min(steadyMs/Math.max(1,totalMs), 1); }
+  } else {
+    const cyc = (tnow % Math.max(1e-3,totalSec)) / Math.max(1e-3,totalSec);
+    u = cyc;
+  }
+
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const cx=(c+0.5)*cellW; const cy=(r+baselineRatio)*cellH;
+      // baseline line
+      ctx.save(); ctx.beginPath(); ctx.moveTo(c*cellW+4, cy); ctx.lineTo((c+1)*cellW-4, cy); ctx.strokeStyle='rgba(115,192,138,0.9)'; ctx.lineWidth=1; ctx.stroke(); ctx.font='11px system-ui'; ctx.fillStyle='rgba(160,220,180,0.6)'; ctx.fillText('baseline', c*cellW+6, cy-6); ctx.restore();
+
+      // 1) Always draw the plain glyph FIRST (effect-from-nothing principle)
+      ctx.save();
+      const s=size;
+      ctx.font = s+'px monospace';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = 'white';
+      ctx.fillText(glyph, cx - s/2, cy);
+      ctx.restore();
+
+      // 2) Build env for the effect overlay
+      const env = buildEnv(u, size, seed + (r*cols+c));
+
+      // 3) Draw the effect OVERLAY only (ramping alpha/transform) — base glyph stays untouched
+      ctx.save();
+      if(envGlobalEl.checked){
+        // Baseline-anchored scale, then jitter
+        ctx.translate(cx, cy);
+        ctx.scale(env.scale, env.scale);
+        ctx.translate(-cx, -cy);
+        ctx.translate(env.jx, env.jy);
+        ctx.globalAlpha *= env.gain; // 0 at start/end ⇒ invisible; peak ⇒ visible
+      } else {
+        ctx.globalAlpha *= env.gain;
+      }
+      try{
+        if(compiledFn){
+          compiledFn(ctx, glyph, cx, cy, s, tnow, dt, seed + (r*cols+c), cy, env);
+        }
+      }catch(e){ const er=document.getElementById('error'); er.style.display='block'; er.textContent='Runtime error: '+(e&&e.message?e.message:e); compiledFn=null; }
+      ctx.restore();
+    }
+  }
+}
+
+// =============================
+// Tests (updated)
+// =============================
+function logTest(name, pass, detail){ const line=document.createElement('div'); line.innerHTML=`<span class="${pass?'pass':'fail'}">${pass?'✔':'✖'}</span> <strong>${name}</strong> ${detail?('<span class="small">— '+detail+'</span>'):''}`; testsEl.appendChild(line); }
+async function runTests(){
+  testsEl.innerHTML='';
+  // T1: backticks compile
+  try{ const original=editorEl.value; const codeWithBackticks = "(function draw(ctx,glyph,x,y,size,t,dt,seed,baselineY,env){ const s = `tick:${'${'}t{'}'}`; ctx.save(); ctx.font=size+'px monospace'; ctx.fillText(glyph, -size/2, 0); ctx.restore(); })(ctx,glyph,x,y,size,t,dt,seed,baselineY,env);"; editorEl.value=codeWithBackticks; compileFromEditor(); logTest('Compile backticks', !!compiledFn); editorEl.value=original; compileFromEditor(); }catch(e){ logTest('Compile backticks', false, e.message); }
+  // T2: preset switch ready state
+  try{ const idA=activeId||Object.keys(presets)[0]; const idB=Object.keys(presets).find(i=>i!==idA) || (presets[uid()]={name:'Tmp',code:editorEl.value}, Object.keys(presets).slice(-1)[0]); document.getElementById('glyphInput').value='#'; glyph='#'; playing=true; loadPreset(idB); const pass=(document.getElementById('glyphInput').value==='@') && !playing && t===0; logTest('Preset switch → ready state', pass);}catch(e){ logTest('Preset switch → ready state', false, e.message); }
+  // T3: localStorage round-trip
+  try{ const testId=uid(); presets[testId]={name:'_test_', code:'(function(){})()'}; saveLocal(); const before=JSON.stringify(presets); presets={}; loadLocal(); logTest('localStorage round-trip', before===JSON.stringify(presets)); }catch(e){ logTest('localStorage round-trip', false, e.message); }
+  // T4: compile smoke draw
+  try{ compileFromEditor(); compiledFn(ctx,'@',0,0,16,0,0,1,0,null); logTest('Compile + smoke draw', true); }catch(e){ logTest('Compile + smoke draw', false, e.message); }
+  // T5: envelope gain bounds
+  try{ let ok=true; for(let i=0;i<=10;i++){ const u=i/10; const env=buildEnv(u,64,123); if(env.gain<0||env.gain>1) ok=false; } logTest('Envelope gain bounds', ok);}catch(e){ logTest('Envelope gain bounds', false, e.message); }
+  // T6: onset ms mapping (shorter onset → higher early gain)
+  try{ envOnMsEl.value=100; envSteadyMsEl.value=0; envOffMsEl.value=400; envEaseEl.value='linear'; envHoldEl.checked=false; const envFast=buildEnv(0.1,64,1); envOnMsEl.value=600; const envSlow=buildEnv(0.1,64,1); const ok = envFast.gain > envSlow.gain; logTest('Onset ms affects early gain', ok);}catch(e){ logTest('Onset ms affects early gain', false, e.message); }
+  // T7: comedown ms mapping (shorter comedown → lower late gain)
+  try{ envOnMsEl.value=200; envSteadyMsEl.value=0; envOffMsEl.value=100; const envShort=buildEnv(0.9,64,1); envOffMsEl.value=600; const envLong=buildEnv(0.9,64,1); const ok = envShort.gain < envLong.gain; logTest('Comedown ms affects late gain', ok);}catch(e){ logTest('Comedown ms affects late gain', false, e.message); }
+}
+
+// =============================
+// Wire UI
+// =============================
+renderPresetList();
+if(Object.keys(presets).length) loadPreset(Object.keys(presets)[0]);
+
+window.addEventListener('resize', ()=>{ paint(t, 0); });
+
+document.getElementById('compile').onclick = ()=>{ compileFromEditor(); paint(t,0); };
+document.getElementById('apply').onclick = ()=>{ compileFromEditor(); restartAndPlay(); };
+
+document.getElementById('saveBtn').onclick = savePreset;
+document.getElementById('newBtn').onclick = ()=>{ activeId=null; presetNameEl.value='New Preset'; editorEl.value='// paste your effect function here\n'; glyph='@'; document.getElementById('glyphInput').value='@'; playing=false; t=0; last=performance.now(); const playBtn=document.getElementById('play'); if(playBtn) playBtn.textContent='Play'; compileFromEditor(); paint(t,0); };
+document.getElementById('deleteBtn').onclick = deletePreset;
+document.getElementById('exportBtn').onclick = exportPresets;
+document.getElementById('importBtn').onclick = importPresets;
+document.getElementById('runTestsBtn').onclick = runTests;
+
+document.getElementById('play').onclick = ()=>{ restartAndPlay(); };
+
+document.getElementById('step').onclick = ()=>{ t += 1/30; paint(t, 1/30); };
+
+document.getElementById('seed').onchange = e=>{ seed = Number(e.target.value) || 1; restartAndPlay(); };
+document.getElementById('glyphInput').onchange = e=>{ glyph = e.target.value || '@'; restartAndPlay(); };
+document.getElementById('size').onchange = e=>{ size = Number(e.target.value)||64; restartAndPlay(); };
+document.getElementById('grid').onchange = e=>{ gridCount = Math.max(1, Number(e.target.value)||4); restartAndPlay(); };
+
+[envGlobalEl, envOnMsEl, envSteadyMsEl, envOffMsEl, envEaseEl, envHoldEl, envScaleEl, envJitterEl].forEach(el=>{ el.addEventListener('change', ()=> restartAndPlay()); });
+
+// initial paint
+compileFromEditor(); paint(t,0);
+</script>

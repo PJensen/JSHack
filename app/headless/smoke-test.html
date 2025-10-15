@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ecs-js Headless Runner</title>
+<style>
+  :root { color-scheme: dark }
+  html,body { margin:0; height:100%; background:#0b0f13; color:#d8f6de; font:13px/1.4 system-ui }
+  #wrap { display:grid; grid-template-rows:auto 1fr; height:100% }
+  #controls { padding:10px; background:#000a; display:flex; gap:10px; align-items:center }
+  button { background:#113; color:#cfd; border:1px solid #355; border-radius:6px; padding:6px 10px; cursor:pointer }
+  pre { margin:0; padding:10px; overflow:auto; font-family:monospace; background:#0f1816; }
+</style>
+
+<div id="wrap">
+  <div id="controls">
+    <button id="btnStep">Step</button>
+    <button id="btnAuto">Auto-Run</button>
+    <button id="btnHit">Mace → Slime</button>
+    <span id="status"></span>
+  </div>
+  <pre id="log"></pre>
+</div>
+
+<script type="module">
+import { createHeadless } from './smoke-test.js';
+import * as Archetypes from '../../src/rules/archetypes/index.js';
+import * as Components from '../../src/rules/components/index.js';
+import { createFrom } from '../../src/lib/ecs-js/archetype.js';
+
+// --- init sim ---
+const sim = createHeadless({ seed: 1337 });
+const w = sim.world;
+
+// spawn a raider and a slime
+const raider = createFrom(w, Archetypes.Raider);
+const slime = createFrom(w, Archetypes.Slime);
+
+const log = document.getElementById('log');
+const status = document.getElementById('status');
+
+function append(msg){
+  log.textContent += msg + '\n';
+  log.scrollTop = log.scrollHeight;
+}
+
+// event hooks
+sim.on('wound', e => append(`💥 ${w.getName?.(e.entity) || 'entity'} wounded: ${JSON.stringify(e.wound)}`));
+sim.on('woundTick', e => append(`🩸 tick ${e.entity} ${e.wounds.length} wounds`));
+sim.on('effectsChanged', e => append(`✨ effectsChanged ${e.entity} → ${e.effects.map(x=>x.key).join(',')}`));
+
+// buttons
+document.getElementById('btnStep').onclick = () => {
+  sim.step();
+  status.textContent = `turn ${w.step}`;
+};
+
+let autoTimer = null;
+document.getElementById('btnAuto').onclick = (ev) => {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; ev.target.textContent='Auto-Run'; return; }
+  ev.target.textContent='Stop';
+  autoTimer = setInterval(()=>{ sim.step(); status.textContent=`turn ${w.step}`; }, 200);
+};
+
+document.getElementById('btnHit').onclick = () => {
+  sim.attack(slime, [{ kind:'kinetic', dose:500, unit:'J', mode:'blunt' }]);
+  append('🪓 Raider smashes slime with a mace!');
+};
+
+// startup
+append('Headless world ready.');
+append('Click “Step” to advance turns, or “Auto-Run” for continuous ticks.');
+</script>
