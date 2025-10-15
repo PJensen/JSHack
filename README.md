@@ -2,6 +2,12 @@
 
 A lightweight, standalone web application for experimenting with JavaScript, HTML, and CSS—all in a single file.
 
+## Project Overview
+- **Single file:** All code lives in `js-hack.html` (markup, styles, and scripts).
+- **No frameworks:** Pure HTML, CSS, and JavaScript. No React, Vue, Angular, or build tools.
+- **No backend:** 100% client-side; just open the HTML file in your browser.
+- **No dependencies:** No npm, package managers, or external scripts (unless you add CDN links).
+
 ## Features
 
 - **Unicode Canvas Roguelike:** Play a classic roguelike rendered on an HTML5 canvas using Unicode glyphs for walls, floors, doors, stairs, and entities.
@@ -15,12 +21,6 @@ A lightweight, standalone web application for experimenting with JavaScript, HTM
 - **No Dependencies:** Everything runs in a single HTML file—just open and play!
 
 You can add a screenshot below this section to showcase the game in action.
-
-## Project Overview
-- **Single file:** All code lives in `js-hack.html` (markup, styles, and scripts).
-- **No frameworks:** Pure HTML, CSS, and JavaScript. No React, Vue, Angular, or build tools.
-- **No backend:** 100% client-side; just open the HTML file in your browser.
-- **No dependencies:** No npm, package managers, or external scripts (unless you add CDN links).
 
 ## Getting Started
 1. Clone the repository:
