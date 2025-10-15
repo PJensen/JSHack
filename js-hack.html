@@ -1248,6 +1248,8 @@ class Game {
       ctx2.restore();
     }
     ctx.restore();
+    // Draw Game Over modal on top if player died
+    if (this.gameOver){ try { this.renderGameOver(); } catch(e){} }
   }
 
   // Small helper to draw a translucent stairs hint centered at the bottom
@@ -1333,6 +1335,67 @@ class Game {
     ctx.font = '12px monospace'; ctx.fillStyle = '#9fb3c8';
     ctx.fillText('Enter: use/equip  E: equip/unequip  D: drop  Esc: close', x + pad, y + h - 26);
     ctx.restore();
+  }
+
+  // Render a full-screen Game Over modal which reuses the same blur snapshot technique
+  renderGameOver(){
+    const ctx = this.r.ctx;
+    try {
+      const w0 = this.r.canvas.width, h0 = this.r.canvas.height;
+      const off = document.createElement('canvas'); off.width = w0; off.height = h0;
+      const offCtx = off.getContext('2d'); offCtx.drawImage(this.r.canvas, 0, 0, w0, h0);
+      ctx.save();
+      if ('filter' in ctx){
+        ctx.filter = 'blur(4px)'; ctx.drawImage(off, 0, 0, w0, h0); ctx.filter = 'none';
+      } else {
+        ctx.drawImage(off, 0, 0, w0, h0);
+        ctx.fillStyle = 'rgba(0,0,0,0.56)'; ctx.fillRect(0,0,w0,h0);
+      }
+      ctx.restore();
+    } catch(e){ ctx.save(); ctx.fillStyle='rgba(0,0,0,0.56)'; ctx.fillRect(0,0,this.r.canvas.width,this.r.canvas.height); ctx.restore(); }
+
+    const boxW = 520; const boxH = 160;
+    const x = Math.floor((this.r.canvas.width - boxW) / 2);
+    const y = Math.floor((this.r.canvas.height - boxH) / 2);
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,10,18,0.94)'; ctx.fillRect(x, y, boxW, boxH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.strokeRect(x+0.5, y+0.5, boxW-1, boxH-1);
+    ctx.font = '28px monospace'; ctx.fillStyle = '#ffd1d1'; ctx.textBaseline = 'top';
+    ctx.fillText('GAME OVER', x + 24, y + 18);
+    ctx.font = '14px monospace'; ctx.fillStyle = '#cfd3dc';
+    const deathLine = `You died at depth ${this.dungeon.depth} (${this.player.x},${this.player.y})`;
+    ctx.fillText(deathLine, x + 24, y + 64);
+    // show cause if recorded in last tombstone (best-effort)
+    try {
+      const tombs = JSON.parse(localStorage.getItem('jshack.tombstones') || '[]');
+      if (tombs && tombs.length){
+        const last = tombs[tombs.length-1];
+        if (last && last.cause){ ctx.fillText(`Cause: ${last.cause}`, x + 24, y + 90); }
+      }
+    } catch(e){}
+    ctx.font = '12px monospace'; ctx.fillStyle = '#9fb3c8';
+    ctx.fillText('This screen blocks input. Refresh the page to restart.', x + 24, y + boxH - 36);
+    ctx.restore();
+  }
+
+  // Save a minimal tombstone to localStorage for later review.
+  recordTombstone(cause){
+    try {
+      const key = 'jshack.tombstones';
+      const raw = localStorage.getItem(key);
+      const arr = raw ? JSON.parse(raw) : [];
+      const rec = {
+        name: this.player.name || 'You',
+        time: (new Date()).toISOString(),
+        depth: this.dungeon.depth || 1,
+        x: this.player.x, y: this.player.y,
+        cause: (typeof cause === 'string' && cause.length) ? cause : 'unknown'
+      };
+      arr.push(rec);
+      // keep it small
+      while (arr.length > 64) arr.shift();
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch(e){ /* ignore storage failures */ }
   }
 
   log(msg){
@@ -1457,6 +1520,7 @@ class Game {
       if (defender.hp <= 0){
         defender.dead = true;
         this.log('You die... Game over.');
+        try { this.recordTombstone(`hit by ${attacker.name}`); } catch(e){}
         this.gameOver = true;
       }
     } else if (attacker === this.player){
@@ -2480,7 +2544,7 @@ function tickEntityStatuses(game, ent){
       if (s.def.onExpire){ const em = s.def.onExpire(ent, game, s); if (em) msgs.push(em); }
       ent.statuses = ent.statuses.filter(x=>x!==s);
     }
-    if (ent===game.player && ent.hp<=0 && !ent.dead){ ent.dead = true; game.log('You succumb...'); game.gameOver = true; break; }
+  if (ent===game.player && ent.hp<=0 && !ent.dead){ ent.dead = true; game.log('You succumb...'); try { game.recordTombstone('status'); } catch(e){}; game.gameOver = true; break; }
   }
   for (const m of msgs) game.log(m);
   if (ent===game.player) game.updateHUD();
