@@ -59,6 +59,10 @@ const GL = {
   POTION: '!',
   SCROLL: '?',
   VOID:   ' '
+   ,GRASS: '.'
+   ,TREE: '♣' /* club symbol */
+   ,MOUNTAIN: '▲' /* black up-pointing triangle */
+   ,TOWN: '⛪' /* church as town marker */
 };
 
 // Consolidated configuration object (extracted constants)
@@ -98,6 +102,40 @@ function mulberry32(a){
 }
 // Small helper for integer RNG ranges (inclusive)
 const randInt = (rng, min, max) => min + Math.floor(rng() * (max - min + 1));
+
+/* =================== Simple 2D Perlin noise (small, seeded) =================== */
+function fade(t){ return t * t * t * (t * (t * 6 - 15) + 10); }
+function lerp(a,b,t){ return a + t * (b - a); }
+function grad(hash, x, y){
+  // 8 gradient directions (approximate)
+  const h = hash & 7;
+  switch(h){
+    case 0: return  x + y;
+    case 1: return -x + y;
+    case 2: return  x - y;
+    case 3: return -x - y;
+    case 4: return  x;
+    case 5: return -x;
+    case 6: return  y;
+    default: return -y;
+  }
+}
+function perlin2(x, y, perm){
+  const xi = Math.floor(x) & 255;
+  const yi = Math.floor(y) & 255;
+  const xf = x - Math.floor(x);
+  const yf = y - Math.floor(y);
+  const u = fade(xf), v = fade(yf);
+  const aa = perm[perm[xi] + yi];
+  const ab = perm[perm[xi] + yi + 1];
+  const ba = perm[perm[xi + 1] + yi];
+  const bb = perm[perm[xi + 1] + yi + 1];
+  const x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u);
+  const x2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u);
+  const vres = lerp(x1, x2, v);
+  // perlin result typically in range approx [-1,1]
+  return Math.max(-1, Math.min(1, vres));
+}
 
 /* =================== PRIMITIVES =================== */
 class Tile {
@@ -382,6 +420,75 @@ class Dungeon {
   }
 }
 
+/* =================== OVERWORLD (simple prototype) =================== */
+class Overworld {
+  constructor(w,h,seed){
+    this.w = w; this.h = h; this.seed = seed >>> 0;
+    this.rng = mulberry32((this.seed ^ 0x9e3779b1) >>> 0);
+    this.tiles = Array.from({length:h}, _=> Array.from({length:w}, ()=> GL.GRASS));
+    // Build a simple permutation table for Perlin noise seeded by overworld seed
+    this.perm = new Uint8Array(512);
+    const p = new Uint8Array(256);
+    // initialize 0..255
+    for (let i=0;i<256;i++) p[i]=i;
+    // shuffle using simple seeded RNG based on this.seed
+    let s = this.seed >>> 0;
+    function seededRand(){ s = (s * 1664525 + 1013904223) >>> 0; return (s >>> 0) / 4294967296; }
+    for (let i=255;i>0;i--){ const j = Math.floor(seededRand()*(i+1)); const t=p[i]; p[i]=p[j]; p[j]=t; }
+    for (let i=0;i<512;i++) this.perm[i] = p[i & 255];
+    this.generate();
+    // optional dungeon entrance coords
+    this.dungeonEntrance = null; // {x,y}
+  }
+  generate(){
+    // Simple procedural scatter: grass, trees, mountains, towns. Deterministic via rng.
+  // Base scatter for large features (trees/mountains/towns). Fine-grain grass will be shaded at render-time by Perlin noise.
+    for (let y=0;y<this.h;y++){
+      for (let x=0;x<this.w;x++){
+        const r = this.rng();
+        if (r < 0.06) this.tiles[y][x] = GL.TREE;
+        else if (r < 0.085) this.tiles[y][x] = GL.MOUNTAIN;
+        else this.tiles[y][x] = GL.GRASS;
+      }
+    }
+  // NOTE: Grass rendering uses Perlin noise at render-time to select one of these shade glyphs:
+  // ░ (U+2591) light, ▒ (U+2592) medium, ▓ (U+2593) dark, █ (U+2588) full block.
+  // Tweak the `scale` value in the overworld rendering loop to change patch size, and
+  // adjust thresholds near where nv (normalized noise) is compared to distribute shades.
+    // Place a few towns at spaced intervals
+    const townCount = 4 + Math.floor(this.rng()*4);
+    for (let i=0;i<townCount;i++){
+      const tx = Math.floor(this.rng()*(this.w-8)) + 4;
+      const ty = Math.floor(this.rng()*(this.h-6)) + 3;
+      this.tiles[ty][tx] = GL.TOWN;
+      // clear small plaza
+      for (let oy=-1; oy<=1; oy++) for (let ox=-2; ox<=2; ox++){
+        const xx=tx+ox, yy=ty+oy; if (xx>=0&&yy>=0&&xx<this.w&&yy<this.h) this.tiles[yy][xx]=GL.GRASS;
+      }
+    }
+  }
+  glyphAt(x,y){ if (x<0||y<0||x>=this.w||y>=this.h) return GL.VOID; return this.tiles[y][x]; }
+
+  // Place a dungeon entrance (represented as GL.STAIRS) near supplied coords if possible.
+  placeDungeonEntrance(nearX, nearY, maxDist=6){
+    // try to find a nearby grass tile within maxDist; prefer exact spot then expanding ring
+    for (let d=0; d<=maxDist; d++){
+      for (let dy=-d; dy<=d; dy++){
+        for (let dx=-d; dx<=d; dx++){
+          if (Math.abs(dx)!==d && Math.abs(dy)!==d) continue; // ring only
+          const x = nearX + dx, y = nearY + dy;
+          if (x<0||y<0||x>=this.w||y>=this.h) continue;
+          if (this.tiles[y][x] === GL.GRASS){ this.tiles[y][x] = GL.STAIRS; this.dungeonEntrance = {x,y}; return this.dungeonEntrance; }
+        }
+      }
+    }
+    // fallback: place at center
+    const cx = Math.floor(this.w/2), cy = Math.floor(this.h/2);
+    this.tiles[cy][cx] = GL.STAIRS; this.dungeonEntrance = {x:cx,y:cy}; return this.dungeonEntrance;
+  }
+}
+
+
 /* =================== RENDERER (canvas) =================== */
 class Renderer {
   constructor(canvas, cols, rows){
@@ -456,10 +563,13 @@ class Game {
   this.depthEl = document.getElementById('depth');
   this.hpEl = document.getElementById('hp');
     this.r = new Renderer(this.term, COLS, ROWS);
-
     // dungeon & player
     this.dungeon = new Dungeon();
     this.level = this.dungeon.enter(1);
+  // Overworld mode & generator (simple prototype)
+  this.overworld = new Overworld(120, 56, this.dungeon.baseSeed);
+  // Start in overworld by default and place player there near center
+  this.inOverworld = true;
     this.player = new Entity('You', this.level.upX, this.level.upY, GL.PLAYER, {
       maxHp: 20, hp:20, attack:4, defense:1, critChance:0.12, critMult:1.5, fg:'#ffffff', ai:null
     });
@@ -469,13 +579,15 @@ class Game {
     this.activeSpellIndex = -1;
 
     this.recalcDerived(this.player);
-
+  // move player to overworld start
+  this.overworldPlayer = { x: Math.floor(this.overworld.w/2), y: Math.floor(this.overworld.h/2) };
+  // message log (ring buffer) - must exist before any this.log() calls
+  this.msgLog = new MessageLog(80); // keep last 80 messages
   // inventory (array of {def, qty}) maintains order discovered
   this.inventory = [];
-
-  // message log (ring buffer)
-  this.msgLog = new MessageLog(80); // keep last 80 messages
-  this.log(`You descend to depth ${this.dungeon.depth}.`);
+  // Place a dungeon entrance nearby the overworld player
+  const entr = this.overworld.placeDungeonEntrance(this.overworldPlayer.x + 2, this.overworldPlayer.y);
+  if (entr) this.log('You stand on a grassy plain. A small dungeon entrance lies nearby.');
 
     // camera & visibility
     this.camX = 0; this.camY = 0;
@@ -501,6 +613,15 @@ class Game {
     // initial FOV
     this.recomputeFOV();
     this.justArrived = true;
+
+  // place player on overworld start if desired (keeps dungeon start as default)
+  this.overworldPlayer = { x: Math.floor(this.overworld.w/2), y: Math.floor(this.overworld.h/2) };
+
+  // In-game console (toggle with backquote/tilde). Animated slide and blur like inventory.
+  this.consoleOpen = false;
+  this.consoleAnim = 0; // 0..1 animation progress
+  this.consoleInput = '';
+  this.consoleCursorBlink = 0;
 
     // start loop
     this.lastTs = 0;
@@ -540,6 +661,17 @@ class Game {
         this.updateDebugPanel();
         return;
       }
+      // Toggle overworld: O key
+      if (e.code === 'KeyO'){
+        this.inOverworld = !this.inOverworld;
+        if (this.inOverworld){
+          this.log('You step out onto the overworld. (O to return)');
+        } else {
+          this.log('You return to the dungeon.');
+        }
+        this.recomputeFOV();
+        return;
+      }
       // Auto-pickup toggle: F2
       if (e.code === 'F2'){
         e.preventDefault();
@@ -547,6 +679,13 @@ class Game {
         try { localStorage.setItem('jshack.autoPickup', this.autoPickup ? '1' : '0'); } catch(_){}
         this.log(`Auto-pickup ${this.autoPickup ? 'enabled' : 'disabled'}. (F2)`);
         this.updateHUD();
+        return;
+      }
+      // Toggle console: Backquote (~ when shifted)
+      if (e.code === 'Backquote'){
+        e.preventDefault();
+        this.consoleOpen = !this.consoleOpen;
+        if (this.consoleOpen){ this.consoleAnim = 0; this.consoleCursorBlink = 0; this.consoleInput = ''; }
         return;
       }
       if (this.invOpen){
@@ -559,6 +698,48 @@ class Game {
         if (e.code==='KeyE'){ this.toggleEquipSelected(); return; }
         if (e.code==='KeyD'){ this.dropSelected(); return; }
       }
+  if (this.consoleOpen){
+        // Console input handling
+        if (e.code === 'Escape'){ this.consoleOpen = false; return; }
+        if (e.code === 'Enter'){
+          // Execute command (for now simply log and clear)
+          const cmd = this.consoleInput.trim();
+          if (cmd) this.log(`> ${cmd}`);
+          this.consoleInput = '';
+          return;
+        }
+        // Backspace
+        if (e.code === 'Backspace'){
+          this.consoleInput = this.consoleInput.slice(0,-1);
+          return;
+        }
+        // Printable keys: append character (ignore modifiers except shift)
+        if (e.key && e.key.length === 1){
+          // Avoid capturing movement keys when console open
+          this.consoleInput += e.key;
+          return;
+        }
+      }
+      // If console/inventory aren't open, allow explicit stair actions:
+      if (!this.invOpen && !this.consoleOpen){
+        if (e.code === 'Enter'){
+          // Ascend (climb up / return to overworld when appropriate)
+          if (this.inputQ.length < 32) this.inputQ.push({ type: 'ascend' });
+          return;
+        }
+        // Down keys: try to descend when standing on stairs; otherwise fall back to normal movement handling
+        const downKeys = ['ArrowDown','KeyS','KeyJ'];
+        if (downKeys.includes(e.code)){
+          if (this.inOverworld){
+            const g = this.overworld.glyphAt(this.overworldPlayer.x, this.overworldPlayer.y);
+            if (g === GL.STAIRS){ if (this.inputQ.length < 32) this.inputQ.push({ type: 'descend' }); return; }
+          } else {
+            const g = this.level.map.glyphAt(this.player.x, this.player.y);
+            if (g === GL.STAIRS){ if (this.inputQ.length < 32) this.inputQ.push({ type: 'descend' }); return; }
+          }
+        }
+      }
+
       const mv = KEY_TO_MOVE[e.code];
       if (mv){
         if (this.invOpen) return; // ignore movement when inventory open
@@ -658,6 +839,18 @@ class Game {
     if (this.justArrived) { this.justArrived = false; return; }
     const here = this.level.map.glyphAt(this.player.x, this.player.y);
     if (here === GL.STAIRS){
+      // If this dungeon level has a backToOverworld mapping (we came from overworld), ascend back
+      if (this.level && this.level.backToOverworld && this.level.backToOverworld.x === this.player.x && this.level.backToOverworld.y === this.player.y){
+        // Return player to overworld at recorded coords
+        this.inOverworld = true;
+        this.overworldPlayer.x = this.level.backToOverworld.owX;
+        this.overworldPlayer.y = this.level.backToOverworld.owY;
+        this.log('You climb back to the surface.');
+        // Keep dungeon state intact (so re-entering later returns you to same level)
+        this.recomputeFOV();
+        return;
+      }
+      // default: descend deeper
       this.level = this.dungeon.enter(this.dungeon.depth + 1);
       this.player.x = this.level.upX; this.player.y = this.level.upY;
       this.justArrived = true;
@@ -691,38 +884,145 @@ class Game {
     const ev = this.inputQ.shift();
     let acted = false;
     if (ev){
-      if (ev.type==='move'){
-        const nx = this.player.x + ev.dx, ny = this.player.y + ev.dy;
-        // Door opening: if destination is a closed door (glyph DOOR) turn it into floor first (costs move)
-        if (this.level.map.inBounds(nx,ny)){
-          const g = this.level.map.glyphAt(nx,ny);
-          if (g === GL.DOOR){
-            this.level.map.t[ny][nx] = FLOOR();
-            this.log('You open the door.');
+      // Handle explicit ascend/descend actions
+      if (ev.type === 'ascend'){
+        // If in overworld and standing on overworld stairs, enter dungeon (descend)
+        if (this.inOverworld){
+          const g = this.overworld.glyphAt(this.overworldPlayer.x, this.overworldPlayer.y);
+          if (g === GL.STAIRS){
+            // same behavior as stepping on stairs but explicit
+            this.inOverworld = false;
+            this.level = this.dungeon.enter(1);
+            this.player.x = this.level.upX; this.player.y = this.level.upY;
+            try {
+              const entr = this.overworld && this.overworld.dungeonEntrance ? this.overworld.dungeonEntrance : null;
+              if (entr && this.level && this.level.map && this.level.map.inBounds(this.level.upX, this.level.upY)){
+                this.level.map.t[this.level.upY][this.level.upX] = STAIR();
+                this.level.backToOverworld = { x: this.level.upX, y: this.level.upY, owX: entr.x, owY: entr.y };
+              }
+            } catch(e){}
+            this.recomputeFOV();
+            this.log('You descend through the earth into the dungeon.');
+            acted = true;
+          }
+        } else {
+          // In dungeon: if standing on stairs and mapping exists, ascend to overworld
+          const g = this.level.map.glyphAt(this.player.x, this.player.y);
+          if (g === GL.STAIRS){
+            if (this.level && this.level.backToOverworld && this.level.backToOverworld.x === this.player.x && this.level.backToOverworld.y === this.player.y){
+              this.inOverworld = true;
+              this.overworldPlayer.x = this.level.backToOverworld.owX;
+              this.overworldPlayer.y = this.level.backToOverworld.owY;
+              this.log('You climb back to the surface.');
+              this.recomputeFOV();
+              acted = true;
+            } else {
+              // If no mapping, explicit ascend should move up one dungeon level if possible
+              const newDepth = Math.max(1, this.dungeon.depth - 1);
+              this.level = this.dungeon.enter(newDepth);
+              this.player.x = this.level.upX; this.player.y = this.level.upY;
+              this.recomputeFOV();
+              this.log(`You climb up to depth ${this.dungeon.depth}.`);
+              acted = true;
+            }
           }
         }
-        // Monster present -> melee
-        const ent = this.entityAt(nx,ny);
-        if (ent && ent !== this.player && !ent.dead){
-          this.melee(this.player, ent);
-          acted = true;
-        } else if (this.level.map.isWalkable(nx,ny) && !this.isOccupied(nx,ny)){
-          this.player.x = nx; this.player.y = ny; acted = true;
+      }
+      if (ev.type === 'descend'){
+        // Descend explicitly: if in overworld, enter dungeon (same as stepping on overworld stair)
+        if (this.inOverworld){
+          const g = this.overworld.glyphAt(this.overworldPlayer.x, this.overworldPlayer.y);
+          if (g === GL.STAIRS){
+            this.inOverworld = false;
+            this.level = this.dungeon.enter(1);
+            this.player.x = this.level.upX; this.player.y = this.level.upY;
+            try {
+              const entr = this.overworld && this.overworld.dungeonEntrance ? this.overworld.dungeonEntrance : null;
+              if (entr && this.level && this.level.map && this.level.map.inBounds(this.level.upX, this.level.upY)){
+                this.level.map.t[this.level.upY][this.level.upX] = STAIR();
+                this.level.backToOverworld = { x: this.level.upX, y: this.level.upY, owX: entr.x, owY: entr.y };
+              }
+            } catch(e){}
+            this.recomputeFOV();
+            this.log('You descend through the earth into the dungeon.');
+            acted = true;
+          }
+        } else {
+          // In dungeon: if standing on stairs, descend deeper
+          const g = this.level.map.glyphAt(this.player.x, this.player.y);
+          if (g === GL.STAIRS){
+            this.level = this.dungeon.enter(this.dungeon.depth + 1);
+            this.player.x = this.level.upX; this.player.y = this.level.upY;
+            this.justArrived = true;
+            this.recomputeFOV();
+            this.flash();
+            this.log(`You descend to depth ${this.dungeon.depth}.`);
+            acted = true;
+          }
         }
-        // Auto-pickup immediately on move (before monsters take their turns)
-        if (acted && this.autoPickup){
-          try { this.pickupItemsAtPlayer(); } catch(e){ /* ignore errors */ }
+      }
+      if (ev.type === 'move'){
+        if (this.inOverworld){
+          const nx = this.overworldPlayer.x + ev.dx;
+          const ny = this.overworldPlayer.y + ev.dy;
+          if (nx >= 0 && ny >= 0 && nx < this.overworld.w && ny < this.overworld.h){
+            this.overworldPlayer.x = nx; this.overworldPlayer.y = ny; acted = true;
+            const g = this.overworld.glyphAt(nx, ny);
+              if (g === GL.TOWN){
+              // Enter town -> switch back to dungeon at depth 1
+              this.inOverworld = false;
+              this.level = this.dungeon.enter(1);
+                this.player.x = this.level.upX; this.player.y = this.level.upY;
+              this.recomputeFOV();
+              this.log('You enter the town and descend into the dungeon.');
+              } else if (g === GL.STAIRS){
+                // Enter dungeon via overworld entrance
+                    this.inOverworld = false;
+                    // Use a shallow depth (1) or maybe random nearby dungeon; reuse existing enter behavior
+                    this.level = this.dungeon.enter(1);
+                    // place player at level.upX/upY
+                    this.player.x = this.level.upX; this.player.y = this.level.upY;
+                    // If we have the overworld entrance coords, register a back-to-overworld stair at the arrival tile
+                    try {
+                      const entr = this.overworld && this.overworld.dungeonEntrance ? this.overworld.dungeonEntrance : null;
+                      if (entr && this.level && this.level.map && this.level.map.inBounds(this.level.upX, this.level.upY)){
+                        // mark the dungeon tile visually as stairs and remember mapping back to overworld
+                        this.level.map.t[this.level.upY][this.level.upX] = STAIR();
+                        this.level.backToOverworld = { x: this.level.upX, y: this.level.upY, owX: entr.x, owY: entr.y };
+                      }
+                    } catch(e){ /* ignore mapping failures */ }
+                    this.recomputeFOV();
+                    this.log('You descend through the earth into the dungeon.');
+            }
+          }
+        } else {
+          const nx = this.player.x + ev.dx, ny = this.player.y + ev.dy;
+          // Door opening: if destination is a closed door (glyph DOOR) turn it into floor first (costs move)
+          if (this.level.map.inBounds(nx,ny)){
+            const g = this.level.map.glyphAt(nx,ny);
+            if (g === GL.DOOR){ this.level.map.t[ny][nx] = FLOOR(); this.log('You open the door.'); }
+          }
+          // Monster present -> melee
+          const ent = this.entityAt(nx,ny);
+          if (ent && ent !== this.player && !ent.dead){ this.melee(this.player, ent); acted = true; }
+          else if (this.level.map.isWalkable(nx,ny) && !this.isOccupied(nx,ny)){ this.player.x = nx; this.player.y = ny; acted = true; }
+          // Auto-pickup immediately on move (before monsters take their turns)
+          if (acted && this.autoPickup){ try { this.pickupItemsAtPlayer(); } catch(e){ /* ignore errors */ } }
         }
-      } else if (ev.type==='castActive'){
+      } else if (ev.type === 'castActive'){
         if (this.castActiveSpell()) acted = true;
       }
     }
 
     if (acted){
       this.turn++;
-      this.monsterTurns();
-      this.tryDescendIfOnStairs();
-      this.recomputeFOV();
+      // Only run dungeon monster AI when player is inside the dungeon.
+      if (!this.inOverworld){
+        this.monsterTurns();
+        // Only tick statuses while in the dungeon; while traveling overworld we pause timed effects
+        tickStatuses(this);
+        this.recomputeFOV();
+      }
       // Interact with notable environment tiles when you arrive
       const g = this.level.map.glyphAt(this.player.x, this.player.y);
       if (g === GL.FOUNTAIN){
@@ -767,12 +1067,64 @@ class Game {
     this.updateRipples(dt);
     this.updateFloatText(dt);
     this.updateLightFlashes(dt);
+
+    // Console animation & cursor
+    if (this.consoleOpen){
+      this.consoleAnim = Math.min(1, this.consoleAnim + dt * 6); // slide in quickly
+    } else {
+      this.consoleAnim = Math.max(0, this.consoleAnim - dt * 6);
+    }
+    this.consoleCursorBlink = (this.consoleCursorBlink + dt) % 1.0;
   }
 
   render(){
     const ctx = this.r.ctx;
     this.r.clear();
     ctx.save();
+    // Overworld rendering path (simple, full-screen scaled grid)
+    if (this.inOverworld){
+      // Draw overworld centered on overworldPlayer with a camera sized to COLSxROWS
+      const halfW = Math.floor(COLS/2), halfH = Math.floor(ROWS/2);
+      let camX = this.overworldPlayer.x - halfW, camY = this.overworldPlayer.y - halfH;
+      camX = Math.max(0, Math.min(camX, this.overworld.w - COLS));
+      camY = Math.max(0, Math.min(camY, this.overworld.h - ROWS));
+      for (let sy=0; sy<ROWS; sy++){
+        const y = camY + sy;
+        for (let sx=0; sx<COLS; sx++){
+          const x = camX + sx;
+          let g = this.overworld.glyphAt(x,y) || GL.VOID;
+          // If grass, compute Perlin noise at world position to select ASCII shade 176/177/178
+          if (g === GL.GRASS){
+            // noise scale controls patch size
+            const scale = 0.14; // tweakable: larger -> smoother patches
+            const n = perlin2(x * scale, y * scale, this.overworld.perm);
+            // normalize to 0..1
+            const nv = (n + 1) * 0.5;
+            // Map into four shade characters: ░(U+2591) light, ▒(U+2592) medium, ▓(U+2593) dark, █(U+2588) full
+            let ch, fg;
+            if (nv < 0.25){ ch = '\u2591'; fg = '#9fe7a8'; } // light
+            else if (nv < 0.55){ ch = '\u2592'; fg = '#7fdc7f'; } // medium
+            else if (nv < 0.82){ ch = '\u2593'; fg = '#4fb54a'; } // dark
+            else { ch = '\u2588'; fg = '#2f8f2a'; } // full block
+            this.r.drawCell(sx, sy, ch, fg);
+          } else {
+            let fg = '#b7d7b0';
+            if (g === GL.TREE) fg = '#77a366';
+            else if (g === GL.MOUNTAIN) fg = '#c0c0c0';
+            else if (g === GL.TOWN) fg = '#ffd1d1';
+            this.r.drawCell(sx, sy, g, fg);
+          }
+        }
+      }
+      // draw overworld player
+      const px = this.overworldPlayer.x - camX, py = this.overworldPlayer.y - camY;
+      if (px>=0 && py>=0 && px<COLS && py<ROWS) this.r.drawCell(px, py, GL.PLAYER, '#ffffff');
+      // HUD note
+      this.r.ctx.font = '12px monospace'; this.r.ctx.fillStyle = '#cfd3dc';
+      this.r.ctx.fillText('OVERWORLD (O to toggle). Towns = ⛪. Step on town to enter dungeon.', 6, 6);
+      ctx.restore();
+      return;
+    }
     // Camera shake translation (small sub-tile jitter)
     if (this.shake.ttl > 0 && this.shake.mag > 0){
       const ox = (Math.random()*2-1) * this.shake.mag * CELL_W * 0.15;
@@ -857,6 +1209,39 @@ class Game {
     this.renderMessages();
     // Inventory overlay (if open)
     this.renderInventory();
+    // Console overlay (slide from top, with blur)
+    if (this.consoleAnim > 0){
+      const ctx2 = this.r.ctx;
+      try {
+        const w0 = this.r.canvas.width, h0 = this.r.canvas.height;
+        const off = document.createElement('canvas'); off.width = w0; off.height = h0;
+        const offCtx = off.getContext('2d'); offCtx.drawImage(this.r.canvas, 0, 0, w0, h0);
+        ctx2.save();
+        if ('filter' in ctx2){ ctx2.filter = 'blur(4px)'; ctx2.drawImage(off, 0, 0, w0, h0); ctx2.filter = 'none'; }
+        else { ctx2.drawImage(off, 0, 0, w0, h0); ctx2.fillStyle='rgba(0,0,0,0.36)'; ctx2.fillRect(0,0,w0,h0); }
+        ctx2.restore();
+      } catch(e){ /* ignore blur failures */ }
+
+      const w = Math.min(880, this.r.canvas.width - 40);
+      const h = 120;
+      const x = Math.floor((this.r.canvas.width - w) / 2);
+      // slide from -h to centerY by consoleAnim
+      const targetY = 40;
+      const y = -h + (targetY + h) * this.consoleAnim;
+
+      ctx2.save();
+      ctx2.fillStyle = 'rgba(6,10,18,0.94)'; ctx2.fillRect(x, y, w, h);
+      ctx2.strokeStyle = 'rgba(255,255,255,0.06)'; ctx2.strokeRect(x+0.5, y+0.5, w-1, h-1);
+      ctx2.font = '14px monospace'; ctx2.fillStyle = '#cfd3dc'; ctx2.textBaseline = 'top';
+      ctx2.fillText('Console (tilde/backquote to toggle). Enter to run.', x + 12, y + 8);
+      const inputY = y + 36;
+      ctx2.font = '16px monospace'; ctx2.fillStyle = '#e6f2ff';
+      const display = this.consoleInput;
+      let cursor = ' ';
+      if (this.consoleAnim >= 1){ cursor = (this.consoleCursorBlink < 0.5) ? '█' : ' '; }
+      ctx2.fillText('> ' + display + cursor, x + 12, inputY);
+      ctx2.restore();
+    }
     ctx.restore();
   }
 
@@ -1458,7 +1843,6 @@ class Game {
       if (this.gameOver) break;
       basicMonsterAI(this, m);
     }
-    tickStatuses(this);
   }
 
   /* -------- Items & Inventory -------- */
@@ -2309,7 +2693,36 @@ function attemptMoveMonster(game, m, dx, dy){
 }
 
 /* =================== BOOT =================== */
-(() => { new Game(); })();
+(() => {
+  try {
+    const game = new Game();
+    // Wrap update/render to report exceptions to debug panel
+    const origUpdate = game.update.bind(game);
+    const origRender = game.render.bind(game);
+    game.update = function(dt){ try { return origUpdate(dt); } catch(e){ reportError(e); throw e; } };
+    game.render = function(){ try { return origRender(); } catch(e){ reportError(e); throw e; } };
+  } catch (e){
+    reportError(e);
+    throw e;
+  }
+})();
+
+function reportError(e){
+  try {
+    console.error('Unhandled error', e);
+    const panel = document.getElementById('debug-panel');
+    if (panel){
+      panel.style.display = 'block';
+      const msg = e && e.message ? e.message : String(e);
+      const stack = e && e.stack ? '\n\n' + e.stack : '';
+      panel.textContent = `ERROR: ${msg}${stack}`;
+    } else {
+      alert(`ERROR: ${e && e.message ? e.message : String(e)}`);
+    }
+  } catch(err){ console.error('reportError failed', err); }
+}
+
+window.onerror = function(message, source, lineno, colno, error){ try{ reportError(error || message); } catch(e){} };
 </script>
 </body>
 </html>
