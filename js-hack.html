@@ -1,0 +1,2152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Unicode Canvas Roguelike — Rooms & Corridors</title>
+<style>
+  :root { color-scheme: dark; }
+  html,body { height:100%; margin:0; }
+  body { display:grid; place-items:center; background:#0b0d12; color:#cfd3dc;
+         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  #wrap { padding:8px; background:#0f1320; border:1px solid #263042; border-radius:10px;
+          box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  #hud { font-size:12px; opacity:.85; margin-top:6px; text-align:center; }
+  #resource-bars { margin-top:4px; display:flex; gap:12px; justify-content:center; }
+  .bar { position:relative; width:220px; height:10px; background:#1b2734; border:1px solid #2e3d50; border-radius:4px; overflow:hidden; }
+  .bar-fill { position:absolute; left:0; top:0; height:100%; background:linear-gradient(90deg,#1e6fb0,#33c5ff); box-shadow:0 0 4px #33c5ff80 inset; transition:width .18s ease, filter .25s linear; }
+  .bar-label { position:absolute; left:0; top:0; width:100%; height:100%; font-size:10px; display:flex; align-items:center; justify-content:center; pointer-events:none; color:#d9edf7; text-shadow:0 1px 2px #000; }
+  .bar.overuse .bar-fill { filter:hue-rotate(40deg) brightness(1.2); }
+  /* Health bar specific palette */
+  #health-bar .bar-fill { background:linear-gradient(90deg,#a91e2c,#ff515c); box-shadow:0 0 4px #ff515c80 inset; }
+  #health-bar .bar-label { color:#ffe3e3; }
+  /* Mana bar keeps its existing (original shared) gradient; override explicitly for clarity */
+  #mana-bar .bar-fill { background:linear-gradient(90deg,#1e6fb0,#33c5ff); box-shadow:0 0 4px #33c5ff80 inset; }
+  canvas { image-rendering: pixelated; display:block; }
+  #debug-panel { font-size:11px; line-height:1.3; font-family:monospace; white-space:pre; background:rgba(15,20,32,0.82); border:1px solid #2e3d50; padding:6px 8px; border-radius:6px; position:absolute; top:6px; left:6px; max-width:320px; color:#bcd2e8; pointer-events:none; -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); display:none; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="term" width="960" height="528" aria-label="unicode canvas console"></canvas>
+  <div id="hud">@=you • █=wall • ·=floor • ╬=door • &lt;=stairs down • Depth: <span id="depth">1</span> • HP: <span id="hp">?</span> <span id="hud-extra"></span></div>
+  <div id="resource-bars">
+  <div class="bar" id="health-bar"><div class="bar-fill" id="health-bar-fill"></div><div class="bar-label" id="health-bar-label">Health</div></div>
+  <div class="bar" id="mana-bar"><div class="bar-fill" id="mana-bar-fill"></div><div class="bar-label" id="mana-bar-label">Mana</div></div>
+  </div>
+  <div id="debug-panel"></div>
+  </div>
+
+<script>
+/* =================== CONFIG / GLYPHS =================== */
+const GL = {
+  WALL:   '█',
+  FLOOR:  '·',
+  DOOR:   '╬',
+  STAIRS: '<',
+  WATER:  '≈',
+  TRAP:   '^',
+  PLAYER: '@',
+  POTION: '!',
+  SCROLL: '?',
+  VOID:   ' '
+};
+
+// Consolidated configuration object (extracted constants)
+const CONFIG = {
+  COLS: 60,
+  ROWS: 22,
+  CELL_W: 16,
+  CELL_H: 24,
+  FONT_OFFSET: 6,
+  BASE_W: 80,
+  BASE_H: 40,
+  MAX_ROOMS: 12,
+  ROOM_W_MIN: 5,
+  ROOM_W_MAX: 12,
+  ROOM_H_MIN: 4,
+  ROOM_H_MAX: 8,
+  FOV_RADIUS: 12
+};
+// Legacy aliases to minimize refactor surface
+const COLS = CONFIG.COLS, ROWS = CONFIG.ROWS;
+const CELL_W = CONFIG.CELL_W, CELL_H = CONFIG.CELL_H;
+const FONT = `${CONFIG.CELL_H - CONFIG.FONT_OFFSET}px monospace`;
+const BASE_W = CONFIG.BASE_W, BASE_H = CONFIG.BASE_H;
+const MAX_ROOMS = CONFIG.MAX_ROOMS;
+const ROOM_W_MIN = CONFIG.ROOM_W_MIN, ROOM_W_MAX = CONFIG.ROOM_W_MAX;
+const ROOM_H_MIN = CONFIG.ROOM_H_MIN, ROOM_H_MAX = CONFIG.ROOM_H_MAX;
+const FOV_RADIUS = CONFIG.FOV_RADIUS;
+
+/* =================== RNG (seeded) =================== */
+function mulberry32(a){
+  return function(){
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+}
+// Small helper for integer RNG ranges (inclusive)
+const randInt = (rng, min, max) => min + Math.floor(rng() * (max - min + 1));
+
+/* =================== PRIMITIVES =================== */
+class Tile {
+  constructor(glyph, walkable=true, blocksLight=false) {
+    this.g = glyph;
+    this.walk = walkable;
+    this.block = blocksLight;
+  }
+}
+class Entity {
+  constructor(name, x, y, glyph, opts={}) {
+    this.name = name; this.x = x; this.y = y; this.g = glyph;
+    this.maxHp = opts.maxHp ?? 1;
+    this.hp = opts.hp ?? this.maxHp;
+    this.attack = opts.attack ?? 1;
+    this.defense = opts.defense ?? 0;
+    // Base critical stats (chance expressed 0..1, multiplier >=1)
+    this.critChance = opts.critChance ?? 0; // e.g. 0.12 = 12%
+    this.critMult = opts.critMult ?? 1.5;   // default multiplier
+    this.fg = opts.fg || '#ffffff';
+    this.ai = opts.ai || null; // 'basic' etc
+    this.dead = false;
+    this.blocks = opts.blocks ?? true; // blocks movement
+    this.statuses = []; // timed status effects
+    // Equipment & derived stats
+    this.equipment = { weapon:null, armor:null, ring1:null, ring2:null };
+    this.attackDerived = this.attack;
+    this.defenseDerived = this.defense;
+    this.maxHpDerived = this.maxHp;
+    this.critChanceDerived = this.critChance;
+    this.critMultDerived = this.critMult;
+  }
+}
+// Lightweight item record
+let _nextItemUid = 1;
+class Item {
+  constructor(def, x, y, opts={}){
+    this.uid = _nextItemUid++;
+    this.id = def.id; this.name = def.name; this.g = def.glyph; this.fg = def.color;
+    this.kind = def.kind; this.effect = def.effect; this.slot = def.slot || null; // equip slot if any
+    this.bonuses = def.bonuses ? {...def.bonuses} : {}; // flat bonuses (attack, defense, maxHp)
+    this.rarity = def.rarityName || 'common';
+    this.affixes = opts.affixes ? opts.affixes.slice() : []; // array of {key}
+    this.x = x; this.y = y;
+    this.stackable = !!def.stackable;
+  }
+}
+const WALL  = () => new Tile(GL.WALL,false,true);
+const FLOOR = () => new Tile(GL.FLOOR,true,false);
+// Closed doors now block light until opened; they become FLOOR when opened.
+const DOOR  = () => new Tile(GL.DOOR,true,true);
+const STAIR = () => new Tile(GL.STAIRS,true,false);
+const WATER = () => new Tile(GL.WATER,true,false);
+const TRAP  = () => new Tile(GL.TRAP,true,false);
+
+/* =================== MAP =================== */
+class GameMap {
+  constructor(w,h){
+    this.w=w; this.h=h;
+    this.t = Array.from({length:h}, _=> Array.from({length:w}, _=> WALL()));
+  }
+  inBounds(x,y){ return x>=0 && x<this.w && y>=0 && y<this.h; }
+  isWalkable(x,y){ return this.inBounds(x,y) && this.t[y][x].walk; }
+  blocksLight(x,y){ return !this.inBounds(x,y) || this.t[y][x].block; }
+  glyphAt(x,y){ return this.inBounds(x,y) ? this.t[y][x].g : GL.VOID; }
+}
+
+/* -------- Rect helper for rooms -------- */
+class Rect {
+  constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; }
+  get x2(){ return this.x + this.w - 1; }
+  get y2(){ return this.y + this.h - 1; }
+  center(){ return [ (this.x + this.x2)>>1, (this.y + this.y2)>>1 ]; }
+  intersects(other){
+    return !(this.x > other.x2+1 || this.x2 < other.x-1 ||
+             this.y > other.y2+1 || this.y2 < other.y-1);
+  }
+}
+
+/* -------- Level generator: Rooms + Corridors + Doors -------- */
+function generateDungeonLevel(rng, width, height){
+  const map = new GameMap(width, height);
+
+  // Keep a solid border
+  for (let y=0;y<height;y++){
+    for (let x=0;x<width;x++){
+      if (x===0||y===0||x===width-1||y===height-1) map.t[y][x] = WALL();
+    }
+  }
+
+  const rooms = [];
+  for (let i=0; i<MAX_ROOMS; i++){
+    const rw = ROOM_W_MIN + Math.floor(rng()*(ROOM_W_MAX-ROOM_W_MIN+1));
+    const rh = ROOM_H_MIN + Math.floor(rng()*(ROOM_H_MAX-ROOM_H_MIN+1));
+    const rx = 1 + Math.floor(rng()*(width - rw - 2));
+    const ry = 1 + Math.floor(rng()*(height - rh - 2));
+    const room = new Rect(rx, ry, rw, rh);
+
+    if (rooms.some(r => r.intersects(room))) continue;
+    carveRoom(map, room);
+    rooms.push(room);
+
+    // Connect to previous room center
+    if (rooms.length > 1){
+      const [prevCx, prevCy] = rooms[rooms.length-2].center();
+      const [cx, cy] = room.center();
+      // Tunnel L-shape: random order
+      if (rng() < 0.5){
+        carveHTunnel(map, prevCx, cx, prevCy);
+        carveVTunnel(map, prevCy, cy, cx);
+      } else {
+        carveVTunnel(map, prevCy, cy, prevCx);
+        carveHTunnel(map, prevCx, cx, cy);
+      }
+    }
+  }
+
+  // Doors pass: turn certain wall cells at room edges into doors
+  placeDoors(map);
+
+  // Sprinkle terrain variants (water pools & traps) inside rooms/corridors.
+  // Low probabilities keep map readable. Deterministic via rng.
+  for (let y=2; y<height-2; y++){
+    for (let x=2; x<width-2; x++){
+      const t = map.t[y][x];
+      if (t.g !== GL.FLOOR) continue;
+      const r = rng();
+      if (r < 0.002){ // ~0.2%
+        map.t[y][x] = WATER();
+      } else if (r < 0.004){ // next 0.2%
+        map.t[y][x] = TRAP();
+      }
+    }
+  }
+
+  // Spawn & stairs:
+  // Player spawn = center of first room (fallback if none)
+  let spawnX = 6, spawnY = 6;
+  if (rooms.length){
+    [spawnX, spawnY] = rooms[0].center();
+  }
+
+  // Stairs = center of a distant room
+  let stairX = spawnX, stairY = spawnY, bestD = -1;
+  for (const r of rooms){
+    const [cx, cy] = r.center();
+    const d = Math.abs(cx - spawnX) + Math.abs(cy - spawnY);
+    if (d > bestD){ bestD = d; stairX = cx; stairY = cy; }
+  }
+  map.t[stairY][stairX] = STAIR();
+
+  return { map, rooms, spawnX, spawnY, stairX, stairY };
+}
+
+function carveRoom(map, rect){
+  for (let y=rect.y; y<=rect.y2; y++){
+    for (let x=rect.x; x<=rect.x2; x++){
+      map.t[y][x] = FLOOR();
+    }
+  }
+}
+function carveHTunnel(map, x1, x2, y){
+  const [a,b] = x1 < x2 ? [x1,x2] : [x2,x1];
+  for (let x=a; x<=b; x++) if (map.inBounds(x,y)) map.t[y][x] = FLOOR();
+}
+function carveVTunnel(map, y1, y2, x){
+  const [a,b] = y1 < y2 ? [y1,y2] : [y2,y1];
+  for (let y=a; y<=b; y++) if (map.inBounds(x,y)) map.t[y][x] = FLOOR();
+}
+
+/* Heuristic door placement:
+   For each inner wall tile, if it separates two walkable tiles in one axis
+   and is walled in the perpendicular axis, mark as a door. */
+function placeDoors(map){
+  for (let y=1; y<map.h-1; y++){
+    for (let x=1; x<map.w-1; x++){
+      const t = map.t[y][x];
+      if (t.g !== GL.WALL) continue;
+
+      const up = map.t[y-1][x], down = map.t[y+1][x];
+      const left = map.t[y][x-1], right = map.t[y][x+1];
+
+      const vertPass = up.walk && down.walk && !left.walk && !right.walk;
+      const horizPass= left.walk && right.walk && !up.walk && !down.walk;
+
+      // Avoid placing multiple doors in long corridors: require at least
+      // one adjacent of the pass pair to be part of a room-ish area
+      if (vertPass || horizPass){
+        // Light extra check: prefer door if at least one diagonal is wall,
+        // which reduces doors in the middle of corridors
+        const diagWalls =
+          Number(!map.t[y-1][x-1].walk) + Number(!map.t[y-1][x+1].walk) +
+          Number(!map.t[y+1][x-1].walk) + Number(!map.t[y+1][x+1].walk);
+        if (diagWalls >= 2){
+          // Additional heuristic: avoid placing doors immediately adjacent to existing doors
+          if (map.t[y][x-1].g!==GL.DOOR && map.t[y][x+1].g!==GL.DOOR && map.t[y-1][x].g!==GL.DOOR && map.t[y+1][x].g!==GL.DOOR){
+            map.t[y][x] = DOOR();
+          }
+        }
+      }
+    }
+  }
+}
+
+/* =================== LEVEL & DUNGEON =================== */
+class Level {
+  constructor(depth, map, upstairsX, upstairsY, stairX, stairY, rng){
+    this.depth = depth;
+    this.map = map;
+    this.upX = upstairsX; this.upY = upstairsY;    // arrival
+    this.stairX = stairX; this.stairY = stairY;    // '<' location
+    this.entities = [];
+  this.monsters = []; // convenience filtered view
+    this.items = [];   // loose ground items
+    this.seen = Array.from({length:map.h}, _=> Array(map.w).fill(false));
+    this.rng = rng;
+    // Track which notable features (like doors / stairs) have already generated a discovery message
+    this.loggedFeatures = new Set();
+    // Transient visual effect instances (lightning, etc.)
+    this.effects = [];
+  }
+}
+
+class Dungeon {
+  constructor(seed=0xC0FFEE){
+    this.baseSeed = seed >>> 0;
+    this.levels = new Map();
+    this.depth = 1;
+  }
+  get depthStr(){ return `${this.depth}`; }
+
+  getOrGen(depth){
+    if (this.levels.has(depth)) return this.levels.get(depth);
+
+    const rng = mulberry32((this.baseSeed + depth * 9973) >>> 0);
+
+    // Vary dimensions slightly for flavor
+    const w = BASE_W + ((depth % 3) - 1) * 4;
+    const h = BASE_H + (((depth+1) % 3) - 1) * 2;
+
+    const { map, spawnX, spawnY, stairX, stairY } = generateDungeonLevel(rng, w, h);
+
+    const level = new Level(depth, map, spawnX, spawnY, stairX, stairY, rng);
+    // Populate monsters deterministically using level.rng
+    spawnMonsters(level);
+    // Populate items
+    spawnItems(level);
+    // Generate equipment items (a few per depth)
+    spawnEquipment(level);
+    this.levels.set(depth, level);
+    return level;
+  }
+
+  enter(depth){
+    this.depth = depth;
+    return this.getOrGen(depth);
+  }
+}
+
+/* =================== RENDERER (canvas) =================== */
+class Renderer {
+  constructor(canvas, cols, rows){
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.cols=cols; this.rows=rows;
+    canvas.width = cols * CELL_W;
+    canvas.height= rows * CELL_H;
+    this.ctx.font = FONT;
+    this.ctx.textBaseline = 'top';
+    this.ctx.imageSmoothingEnabled = false;
+  }
+  clear(bg="#0f1320"){ this.ctx.fillStyle = bg; this.ctx.fillRect(0,0,this.canvas.width,this.canvas.height); }
+  drawCell(x,y, ch, fg="#cfd3dc", bg=null){
+    const px = x*CELL_W, py = y*CELL_H;
+    if (bg){ this.ctx.fillStyle = bg; this.ctx.fillRect(px,py,CELL_W,CELL_H); }
+    this.ctx.fillStyle = fg;
+    this.ctx.fillText(ch, px, py);
+  }
+}
+
+/* =================== FOV (LOS ray casting) =================== */
+// Bitmask-based FOV (fills provided Uint8Array; returns keys for compatibility with legacy code paths)
+function computeFOVBitmask(map, ox, oy, radius, mask){
+  const w = map.w; const keys=[];
+  const setVis=(x,y)=>{ const idx=y*w+x; if (!mask[idx]){ mask[idx]=1; keys.push(`${x},${y}`);} };
+  setVis(ox,oy);
+  for (let dy=-radius; dy<=radius; dy++){
+    for (let dx=-radius; dx<=radius; dx++){
+      const x=ox+dx, y=oy+dy;
+      if (!map.inBounds(x,y)) continue;
+      if (dx*dx + dy*dy > radius*radius) continue;
+      let los=true;
+      for (const [lx,ly] of bresenhamLine(ox,oy,x,y)){
+        if (lx===ox && ly===oy) continue;
+        if (map.blocksLight(lx,ly)){
+          if (lx===x && ly===y) setVis(lx,ly); // see blocking cell itself
+          los=false; break;
+        }
+      }
+      if (los) setVis(x,y);
+    }
+  }
+  return keys;
+}
+function* bresenhamLine(x0,y0,x1,y1){
+  let dx = Math.abs(x1-x0), sx = x0<x1 ? 1 : -1;
+  let dy = -Math.abs(y1-y0), sy = y0<y1 ? 1 : -1;
+  let err = dx + dy;
+  let x=x0, y=y0;
+  while (!(x===x1 && y===y1)){
+    const e2 = 2*err;
+    if (e2 >= dy){ err += dy; x += sx; }
+    if (e2 <= dx){ err += dx; y += sy; }
+    yield [x,y];
+  }
+}
+
+/* =================== INPUT =================== */
+const KEY_TO_MOVE = {
+  'ArrowUp':[0,-1],'KeyW':[0,-1],'KeyK':[0,-1],
+  'ArrowDown':[0,1],'KeyS':[0,1],'KeyJ':[0,1],
+  'ArrowLeft':[-1,0],'KeyA':[-1,0],'KeyH':[-1,0],
+  'ArrowRight':[1,0],'KeyD':[1,0],'KeyL':[1,0],
+};
+
+/* =================== GAME (Input → Sim → Render) =================== */
+class Game {
+  constructor(){
+    // canvas
+    this.term = document.getElementById('term');
+  this.depthEl = document.getElementById('depth');
+  this.hpEl = document.getElementById('hp');
+    this.r = new Renderer(this.term, COLS, ROWS);
+
+    // dungeon & player
+    this.dungeon = new Dungeon();
+    this.level = this.dungeon.enter(1);
+    this.player = new Entity('You', this.level.upX, this.level.upY, GL.PLAYER, {
+      maxHp: 20, hp:20, attack:4, defense:1, critChance:0.12, critMult:1.5, fg:'#ffffff', ai:null
+    });
+    // Mana / spell system
+    this.player.maxMana = 30; this.player.mana = 30; this.player.manaRegen = 3; // per 10 turns baseline (regen expressed per second later)
+    this.spells = []; // array of { id, name, cost, cast:fn }
+    this.activeSpellIndex = -1;
+
+    this.recalcDerived(this.player);
+
+  // inventory (array of {def, qty}) maintains order discovered
+  this.inventory = [];
+
+  // message log (ring buffer)
+  this.msgLog = new MessageLog(80); // keep last 80 messages
+  this.log(`You descend to depth ${this.dungeon.depth}.`);
+
+    // camera & visibility
+    this.camX = 0; this.camY = 0;
+  this.visibleMask = new Uint8Array(this.level.map.w * this.level.map.h);
+  this.visibleKeys = [];
+  this.visibleNow = { has:(k)=>{ const [x,y]=k.split(',').map(Number); return this.level.map.inBounds(x,y) && !!this.visibleMask[y*this.level.map.w + x]; }, [Symbol.iterator]:()=> this.visibleKeys.values() };
+  this.gameOver = false;
+  // Telemetry for A* path builds (shown only in debug mode)
+  this.astarStats = { builds:0, totalExp:0, lastExp:0 };
+  this.debugMode = false; // toggled via F9
+  this.debugPanelEl = document.getElementById('debug-panel');
+
+    // loop/input
+    this.inputQ = [];
+    this._bindKeys();
+
+    // initial FOV
+    this.recomputeFOV();
+    this.justArrived = true;
+
+    // start loop
+    this.lastTs = 0;
+  // Turn counter (increments on each player action that advances monsters)
+  this.turn = 0;
+    // floating combat text particles
+    this.fct = []; // each: {x,y, text, color, life, ttl, vy, vx, scaleStart, scaleEnd}
+  // radial ripple effects (area visuals) each: {x,y, maxR, life, age, color}
+  this.ripples = [];
+  // Temporary illumination flashes (from lightning etc.): array of {cells:Set, ttl}
+  this.lightFlashes = [];
+    // Camera shake state: {mag, ttl}
+    this.shake = {mag:0, ttl:0};
+    const loop = (ts)=>{
+      this.update((ts - this.lastTs) / 1000);
+      this.render();
+      this.lastTs = ts;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  _bindKeys(){
+    window.addEventListener('keydown', e=>{
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+      // Quick spawn items: F8 drops a batch of debug items (no debug mode change)
+      if (e.code === 'F8'){
+        e.preventDefault();
+        try { this.spawnDebugItems(12); } catch(err){ console.error('spawnDebugItems failed', err); }
+        return;
+      }
+
+      // Debug mode toggle: use F9
+      if (e.code === 'F9'){
+        e.preventDefault();
+        this.debugMode = !this.debugMode;
+        this.updateDebugPanel();
+        return;
+      }
+      if (this.invOpen){
+        // Inventory navigation mode
+        if (e.code==='Escape'){ this.invOpen=false; return; }
+        // Up or left -> move selection up; Down or right -> move selection down
+        if (e.code==='ArrowDown' || e.code==='KeyJ' || e.code==='ArrowRight'){ this.invSel = Math.min(this.inventory.length-1, this.invSel+1); return; }
+        if (e.code==='ArrowUp' || e.code==='KeyK' || e.code==='ArrowLeft'){ this.invSel = Math.max(0, this.invSel-1); return; }
+        if (e.code==='Enter'){ this.activateInventorySelection(); return; }
+        if (e.code==='KeyE'){ this.toggleEquipSelected(); return; }
+        if (e.code==='KeyD'){ this.dropSelected(); return; }
+      }
+      const mv = KEY_TO_MOVE[e.code];
+      if (mv){
+        if (this.invOpen) return; // ignore movement when inventory open
+        // Cap queue length to avoid runaway growth if window loses focus with key held
+        if (this.inputQ.length < 32) this.inputQ.push({type:'move', dx:mv[0], dy:mv[1]});
+      }
+      // Cast lightning (simple offensive ability) – counts as a turn
+      if (e.code==='KeyF'){
+        if (this.inputQ.length < 32) this.inputQ.push({type:'castActive'});
+      }
+      // Spell selection: Tab = next, Shift+Tab = previous
+      if (e.code==='Tab'){
+        // Prevent browser focus change / cycling
+        e.preventDefault();
+        if (!this.spells.length){
+          this.log('You have not learned any spells.');
+        } else {
+          const before = this.activeSpellIndex;
+          if (e.shiftKey){
+            this.activeSpellIndex = (this.activeSpellIndex - 1 + this.spells.length) % this.spells.length;
+          } else {
+            this.activeSpellIndex = (this.activeSpellIndex + 1) % this.spells.length;
+          }
+          if (this.spells.length > 1 && this.activeSpellIndex !== before){
+            const act = this.spells[this.activeSpellIndex];
+            if (act) this.log(`Selected spell: ${act.name}`);
+          }
+          // If only one spell, still ensure index valid
+          if (this.activeSpellIndex < 0) this.activeSpellIndex = 0;
+          this.updateHUD();
+        }
+        return; // Do not fall through further handling
+      }
+      // Use item via number key (Digit1..Digit9)
+      if (e.code.startsWith('Digit')){
+        const idx = +e.code.slice(5) - 1;
+        if (!isNaN(idx) && idx>=0){
+          this.useInventoryIndex(idx);
+        }
+      }
+      // 'G' pick up (manual) in addition to auto-pick
+      if (e.code==='Comma'){
+        // NetHack default: ',' to pick up items
+        this.pickupItemsAtPlayer();
+      }
+      if (e.code==='KeyI'){
+        this.invOpen = !this.invOpen;
+        if (this.invOpen){ this.invSel = 0; }
+      }
+    }, {passive:false});
+  }
+
+  centerCameraOn(ent){
+    const halfW = Math.floor(COLS/2), halfH = Math.floor(ROWS/2);
+    let cx = ent.x - halfW, cy = ent.y - halfH;
+    cx = Math.max(0, Math.min(cx, this.level.map.w - COLS));
+    cy = Math.max(0, Math.min(cy, this.level.map.h - ROWS));
+    this.camX = cx; this.camY = cy;
+  }
+
+  recomputeFOV(){
+    this.visibleMask.fill(0);
+    this.visibleKeys = computeFOVBitmask(this.level.map, this.player.x, this.player.y, CONFIG.FOV_RADIUS, this.visibleMask);
+    for (const key of this.visibleKeys){
+      const [x,y] = key.split(',').map(n=>+n);
+      if (!this.level.map.inBounds(x,y)) continue;
+      const firstTime = !this.level.seen[y][x];
+      if (firstTime) {
+        const g = this.level.map.glyphAt(x,y);
+        if (g === GL.STAIRS && !this.level.loggedFeatures.has(`stair:${x},${y}`)){
+          this.log('You spot the stairs leading deeper.');
+          this.level.loggedFeatures.add(`stair:${x},${y}`);
+        } else if (g === GL.DOOR && !this.level.loggedFeatures.has(`door:${x},${y}`)) {
+          this.log('You discover a door.');
+          this.level.loggedFeatures.add(`door:${x},${y}`);
+        }
+      }
+      this.level.seen[y][x] = true;
+    }
+    this.centerCameraOn(this.player);
+    this.depthEl.textContent = this.dungeon.depthStr;
+    this.updateHUD();
+  }
+
+  isVisible(x,y){ return this.level.map.inBounds(x,y) && !!this.visibleMask[y*this.level.map.w + x]; }
+
+  tryDescendIfOnStairs(){
+    if (this.justArrived) { this.justArrived = false; return; }
+    const here = this.level.map.glyphAt(this.player.x, this.player.y);
+    if (here === GL.STAIRS){
+      this.level = this.dungeon.enter(this.dungeon.depth + 1);
+      this.player.x = this.level.upX; this.player.y = this.level.upY;
+      this.justArrived = true;
+      this.recomputeFOV();
+      this.flash();
+      this.log(`You descend to depth ${this.dungeon.depth}.`);
+    }
+  }
+
+  flash(){
+    const ctx = this.r.ctx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0,0,this.r.canvas.width,this.r.canvas.height);
+    ctx.restore();
+  }
+
+  /* ---- Input → Sim → Render ---- */
+  update(dt){
+    if (this.gameOver) return;
+
+    // Regenerate mana continuously
+    this.regenMana(dt);
+
+    // Decay camera shake
+    if (this.shake.ttl > 0){
+      this.shake.ttl -= dt;
+      if (this.shake.ttl <= 0){ this.shake.ttl = 0; this.shake.mag = 0; }
+    }
+
+    const ev = this.inputQ.shift();
+    let acted = false;
+    if (ev){
+      if (ev.type==='move'){
+        const nx = this.player.x + ev.dx, ny = this.player.y + ev.dy;
+        // Door opening: if destination is a closed door (glyph DOOR) turn it into floor first (costs move)
+        if (this.level.map.inBounds(nx,ny)){
+          const g = this.level.map.glyphAt(nx,ny);
+          if (g === GL.DOOR){
+            this.level.map.t[ny][nx] = FLOOR();
+            this.log('You open the door.');
+          }
+        }
+        // Monster present -> melee
+        const ent = this.entityAt(nx,ny);
+        if (ent && ent !== this.player && !ent.dead){
+          this.melee(this.player, ent);
+          acted = true;
+        } else if (this.level.map.isWalkable(nx,ny) && !this.isOccupied(nx,ny)){
+          this.player.x = nx; this.player.y = ny; acted = true;
+        }
+      } else if (ev.type==='castActive'){
+        if (this.castActiveSpell()) acted = true;
+      }
+    }
+
+    if (acted){
+      this.turn++;
+      this.monsterTurns();
+      this.tryDescendIfOnStairs();
+      this.recomputeFOV();
+    }
+
+    // Effects & particles update
+    this.updateLightningEffectsTime(dt);
+    this.updateRipples(dt);
+    this.updateFloatText(dt);
+    this.updateLightFlashes(dt);
+  }
+
+  render(){
+    const ctx = this.r.ctx;
+    this.r.clear();
+    ctx.save();
+    // Camera shake translation (small sub-tile jitter)
+    if (this.shake.ttl > 0 && this.shake.mag > 0){
+      const ox = (Math.random()*2-1) * this.shake.mag * CELL_W * 0.15;
+      const oy = (Math.random()*2-1) * this.shake.mag * CELL_H * 0.15;
+      ctx.translate(ox, oy);
+    }
+    // Draw tiles within viewport
+    for (let sy=0; sy<ROWS; sy++){
+      const y = this.camY + sy;
+      if (y<0 || y>=this.level.map.h) continue;
+      for (let sx=0; sx<COLS; sx++){
+        const x = this.camX + sx;
+        if (x<0 || x>=this.level.map.w) continue;
+        const idx = y*this.level.map.w + x;
+        const visible = !!this.visibleMask[idx] || this.lightFlashes.some(f=>f.cells.has(`${x},${y}`));
+        const seen = this.level.seen[y][x] || visible;
+        if (!seen) continue; // unexplored -> skip (black)
+        const g = this.level.map.glyphAt(x,y);
+        let fg = '#88909c'; // dim default
+        if (visible){
+          switch(g){
+            case GL.WALL: fg = '#b2b8c2'; break;
+            case GL.FLOOR: fg = '#c2c7d1'; break;
+            case GL.DOOR: fg = '#f4c276'; break;
+            case GL.STAIRS: fg = '#b8e2ff'; break;
+            case GL.WATER: fg = '#4fb3ff'; break;
+            case GL.TRAP: fg = '#ff8f8f'; break;
+            default: fg = '#cfd3dc';
+          }
+        } else {
+          if (g === GL.WALL) fg = '#56606c';
+          else if (g === GL.FLOOR) fg = '#444a52';
+          else if (g === GL.DOOR) fg = '#7e6032';
+          else if (g === GL.STAIRS) fg = '#5d7585';
+          else if (g === GL.WATER) fg = '#2e6a99';
+          else if (g === GL.TRAP) fg = '#6a3a3a';
+        }
+        this.r.drawCell(sx, sy, g, fg);
+      }
+    }
+    // Ripple effects under entities/items
+    this.renderRipples();
+    // Items
+    for (const it of this.level.items){
+      if (!this.isVisible(it.x,it.y)) continue;
+      const ix = it.x - this.camX, iy = it.y - this.camY;
+      if (ix>=0 && iy>=0 && ix<COLS && iy<ROWS){
+        this.r.drawCell(ix, iy, it.g, it.fg || '#ff8af0');
+      }
+    }
+    // Monsters
+    for (const m of this.level.monsters){
+      if (m.dead) continue;
+      if (!this.isVisible(m.x,m.y)) continue;
+      const mx = m.x - this.camX, my = m.y - this.camY;
+      if (mx>=0 && my>=0 && mx<COLS && my<ROWS){
+        this.r.drawCell(mx, my, m.g, m.fg || '#ff6666');
+      }
+    }
+    // Player
+    if (this.isVisible(this.player.x, this.player.y)){
+      const sx = this.player.x - this.camX, sy = this.player.y - this.camY;
+      if (sx>=0 && sy>=0 && sx<COLS && sy<ROWS){
+        this.r.drawCell(sx, sy, this.player.g, '#ffffff');
+      }
+    }
+    // Lightning effects
+    this.renderLightningEffects();
+    // Floating combat text
+    this.renderFloatText();
+    // Messages overlay
+    this.renderMessages();
+    // Inventory overlay (if open)
+    this.renderInventory();
+    ctx.restore();
+  }
+
+  renderInventory(){
+    if (!this.invOpen) return;
+    const ctx = this.r.ctx;
+    const items = this.inventory;
+    // Robust blur: copy current canvas into an offscreen canvas and draw it back with a blur filter.
+    try {
+      const w0 = this.r.canvas.width, h0 = this.r.canvas.height;
+      const off = document.createElement('canvas');
+      off.width = w0; off.height = h0;
+      const offCtx = off.getContext('2d');
+      // snapshot current rendered frame
+      offCtx.drawImage(this.r.canvas, 0, 0, w0, h0);
+      ctx.save();
+      if ('filter' in ctx){
+        ctx.filter = 'blur(4px)';
+        ctx.drawImage(off, 0, 0, w0, h0);
+        ctx.filter = 'none';
+      } else {
+        // fallback: a subtle darkening rectangle to separate modal
+        ctx.drawImage(off, 0, 0, w0, h0);
+        ctx.fillStyle = 'rgba(0,0,0,0.36)';
+        ctx.fillRect(0,0,w0,h0);
+      }
+      ctx.restore();
+    } catch(e){
+      // final fallback: dark overlay
+      ctx.save(); ctx.fillStyle='rgba(0,0,0,0.36)'; ctx.fillRect(0,0,this.r.canvas.width,this.r.canvas.height); ctx.restore();
+    }
+
+    const w = 420, h = Math.min(320, 24 + items.length * 20 + 40);
+    const x = Math.floor((this.r.canvas.width - w) / 2);
+    const y = Math.floor((this.r.canvas.height - h) / 2);
+    ctx.save();
+    // backdrop
+    ctx.fillStyle = 'rgba(6,10,18,0.92)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.strokeRect(x+0.5, y+0.5, w-1, h-1);
+    ctx.font = '14px monospace';
+    ctx.fillStyle = '#cfd3dc';
+    ctx.textBaseline = 'top';
+    const pad = 12;
+    ctx.fillText('Inventory', x + pad, y + pad - 2);
+    // list area
+    const listY = y + pad + 18;
+    for (let i=0;i<items.length;i++){
+      const slot = items[i];
+      const iy = listY + i*20;
+      // highlight selected
+      if (i === this.invSel){
+        ctx.fillStyle = 'rgba(120,160,200,0.12)';
+        ctx.fillRect(x + pad - 6, iy - 2, w - pad*2 + 12, 20);
+      }
+      // item text
+      ctx.fillStyle = '#dfe7ef';
+      const label = slot.inst ? slot.inst.name : (slot.def ? slot.def.name : 'Unknown');
+      const eq = (slot.inst && this.isEquipped(slot.inst)) ? ' *' : '';
+      const qty = (!slot.inst && slot.qty>1) ? ` x${slot.qty}` : '';
+      ctx.fillText(`${i+1}. ${label}${eq}${qty}`, x + pad, iy);
+    }
+    // help text
+    ctx.font = '12px monospace'; ctx.fillStyle = '#9fb3c8';
+    ctx.fillText('Enter: use/equip  E: equip/unequip  D: drop  Esc: close', x + pad, y + h - 26);
+    ctx.restore();
+  }
+
+  log(msg){
+    this.msgLog.push(msg);
+  }
+
+  updateHUD(){
+    if (this.hpEl){
+      this.hpEl.textContent = `${Math.max(0,this.player.hp)}/${this.player.maxHpDerived}`;
+    }
+    // Health bar visual
+    const hpFill = document.getElementById('health-bar-fill');
+    const hpLabel = document.getElementById('health-bar-label');
+    if (hpFill){
+      const maxHpEff = this.player.maxHpDerived || this.player.maxHp || 1;
+      const hpPct = Math.max(0, Math.min(1, this.player.hp / maxHpEff));
+      hpFill.style.width = (hpPct*100).toFixed(1)+'%';
+      // Slightly pulse saturation/brightness with remaining health (lower health -> dimmer)
+      hpFill.style.filter = `saturate(${0.7 + hpPct*0.5}) brightness(${0.75 + hpPct*0.35})`;
+      if (hpLabel) hpLabel.textContent = `HP ${Math.max(0,Math.floor(this.player.hp))}/${maxHpEff}`;
+    }
+    // Mana display appended after HP inside same HUD line (reusing existing elements)
+    let manaSpan = document.getElementById('mana');
+    if (!manaSpan){
+      const hud = document.getElementById('hud');
+      if (hud){
+        manaSpan = document.createElement('span');
+        manaSpan.id = 'mana';
+        hud.appendChild(document.createTextNode(' • Mana: '));
+        hud.appendChild(manaSpan);
+      }
+    }
+    if (manaSpan){ manaSpan.textContent = `${Math.floor(this.player.mana)}/${this.player.maxMana}`; }
+    // Mana bar visual
+    const barFill = document.getElementById('mana-bar-fill');
+    const barLabel = document.getElementById('mana-bar-label');
+    if (barFill){
+      const pct = Math.max(0, Math.min(1, this.player.mana / this.player.maxMana));
+      barFill.style.width = (pct*100).toFixed(1)+'%';
+      barFill.style.filter = `saturate(${0.8 + pct*0.4}) brightness(${0.85 + pct*0.3})`;
+      if (barLabel) barLabel.textContent = `Mana ${Math.floor(this.player.mana)}/${this.player.maxMana}`;
+    }
+    // Update inventory & status in dedicated extra span without recreating base elements
+    const extra = document.getElementById('hud-extra');
+    if (extra){
+      const invStr = this.inventory.map((slot,i)=>{
+        if (slot.inst){
+          const eq = this.isEquipped(slot.inst) ? '*' : '';
+          return `[${i+1}]${eq}${slot.inst.name}`;
+        }
+        return `[${i+1}]${slot.def.short || slot.def.name}${slot.qty>1?`x${slot.qty}`:''}`;
+      }).join(' ');
+      const statusStr = this.player.statuses.map(s=>`${s.name}${s.potency?`+${s.potency}`:''}(${s.remaining})`).join(' ');
+      let txt = '';
+      if (invStr) txt += ` • Inv: ${invStr}`;
+      if (statusStr) txt += ` • Status: ${statusStr}`;
+      const critPct = Math.round((this.player.critChanceDerived || 0) * 1000) / 10; // one decimal
+      txt += ` • Atk:${this.player.attackDerived} Def:${this.player.defenseDerived} Crit:${critPct}%`;
+      if (this.spells.length){
+        const act = this.spells[this.activeSpellIndex];
+        if (act){ txt += ` • Spell:${act.name}(${act.cost})`; }
+      }
+      extra.textContent = txt;
+    }
+    // Update debug panel (separate from main HUD)
+    this.updateDebugPanel();
+  }
+  updateDebugPanel(){
+    if (!this.debugPanelEl) return;
+    if (!this.debugMode){ this.debugPanelEl.style.display='none'; return; }
+    const visCount = this.visibleKeys.length;
+    const avgExp = this.astarStats.builds ? (this.astarStats.totalExp / this.astarStats.builds).toFixed(1) : 0;
+    const player = this.player;
+    const statuses = player.statuses.map(s=>`${s.name}:${s.remaining}`).join(', ') || 'none';
+    const lines = [
+      `DEBUG MODE (F9 to toggle)`,
+      `Depth: ${this.dungeon.depth} Player: (${player.x},${player.y}) HP:${player.hp}/${player.maxHpDerived} Mana:${Math.floor(this.player.mana)}/${this.player.maxMana}`,
+      `Visible tiles: ${visCount}`,
+      `Monsters: total ${this.level.monsters.length} alive ${this.level.monsters.filter(m=>!m.dead).length}`,
+      `A*: builds ${this.astarStats.builds} last ${this.astarStats.lastExp} avg ${avgExp}`,
+      `Turn: ${this.turn}`,
+      `Statuses: ${statuses}`
+    ];
+    this.debugPanelEl.textContent = lines.join('\n');
+    this.debugPanelEl.style.display='block';
+  }
+
+  isOccupied(x,y){
+    if (this.player.x===x && this.player.y===y && !this.player.dead) return true;
+    return this.level.monsters.some(m=>!m.dead && m.x===x && m.y===y && m.blocks);
+  }
+  entityAt(x,y){
+    if (this.player.x===x && this.player.y===y) return this.player;
+    return this.level.monsters.find(m=>!m.dead && m.x===x && m.y===y);
+  }
+  melee(attacker, defender){
+    // Build pre-hit event allowing affixes to modify damage
+    const evt = { attacker, defender, baseAttack: attacker.attackDerived ?? attacker.attack, damage: attacker.attackDerived ?? attacker.attack, canceled:false };
+    // Critical hit system (supports equipment bonuses)
+    let crit = false;
+    const critChance = attacker.critChanceDerived ?? attacker.critChance ?? 0;
+    const critMult = attacker.critMultDerived ?? attacker.critMult ?? 1.5;
+    if (critChance > 0 && this.level.rng() < critChance){
+      crit = true;
+      evt.damage = Math.max(1, Math.floor(evt.damage * critMult));
+    }
+    emitEvent('onBeforeHit', evt, this);
+    if (evt.canceled) return;
+    const pre = evt.damage;
+    const raw = Math.max(1, pre - (defender.defenseDerived ?? defender.defense));
+    defender.hp -= raw;
+    // Spawn floating damage text (only if tile visible to player for readability)
+    const visible = this.visibleNow.has(`${defender.x},${defender.y}`) || this.visibleNow.has(`${attacker.x},${attacker.y}`);
+    if (visible){
+      const color = crit ? '#ffd84c' : (attacker===this.player ? '#ff6666' : '#ff8888');
+      this.addFloatText(defender.x, defender.y, `-${raw}`, { color, crit, dmg:raw });
+    }
+    if (defender === this.player){
+      this.log(`${attacker.name}${crit? ' critically':''} hits you for ${raw}.`);
+      if (defender.hp <= 0){
+        defender.dead = true;
+        this.log('You die... Game over.');
+        this.gameOver = true;
+      }
+    } else if (attacker === this.player){
+      if (defender.hp <= 0){
+        defender.dead = true;
+        this.log(`You${crit?' critically':''} slay the ${defender.name.toLowerCase()}.`);
+        if (visible) this.addFloatText(defender.x, defender.y, `✖`, { color:'#ffffff', dmg:raw, life:0.9, scaleStart:1.2, scaleEnd:0.6 });
+      } else {
+        this.log(`You${crit?' critically':''} hit the ${defender.name.toLowerCase()} for ${raw}.`);
+      }
+    } else {
+      if (defender.hp <= 0){
+        defender.dead = true;
+        this.log(`${attacker.name} kills ${defender.name}.`);
+      } else {
+        this.log(`${attacker.name} hits ${defender.name} for ${raw}.`);
+      }
+    }
+    emitEvent('onHit', { attacker, defender, damage: raw }, this);
+    emitEvent('onDamaged', { attacker, defender, damage: raw }, this);
+    if (defender.dead){ emitEvent('onKill', { killer:attacker, victim:defender }, this); }
+    if (defender === this.player) this.updateHUD();
+  }
+
+  /* -------- Floating Combat Text -------- */
+  addFloatText(x, y, text, opts={}){
+    // world coords (tile space); text displayed if within camera view when rendered
+    const life = opts.life || 0.9; // seconds
+    const scaleBase = opts.crit ? 1.3 : 1.0;
+    // Additional scaling relative to damage magnitude (dmg optional)
+    const dmg = opts.dmg || 0;
+    const magScale = dmg ? Math.min(2.2, 0.7 + dmg / 10) : 1;
+    const scaleStart = opts.scaleStart || (scaleBase * magScale);
+    const scaleEnd = opts.scaleEnd || (0.75 * scaleBase);
+    // Batching: if damage (or heal) text already exists this frame at same tile & same sign, accumulate
+    const isNumber = /^[-+]?\d+$/.test(text);
+    if (isNumber){
+      const sign = text.startsWith('-') ? -1 : 1;
+      const existing = this.fct.find(p=>p.batch && p.x0===x && p.y0===y && p.sign===sign && p.justSpawned);
+      if (existing){
+        const val = parseInt(text,10);
+        existing.value += val;
+        existing.text = (sign>0?'+':'') + existing.value;
+        // Recompute scaling with new magnitude
+        const ndmg = Math.abs(existing.value);
+        const nMagScale = Math.min(2.2, 0.7 + ndmg / 10);
+        existing.scaleStart = Math.max(existing.scaleStart, scaleBase * nMagScale);
+        return;
+      }
+    }
+    this.fct.push({
+      x, y, x0:x, y0:y, text,
+      color: opts.color || '#ffffff',
+      life, ttl: life,
+      vy: -0.8 - Math.random()*0.3,
+      vx: (Math.random()*0.4 - 0.2),
+      scaleStart, scaleEnd,
+      batch: isNumber,
+      value: isNumber ? parseInt(text,10) : null,
+      sign: isNumber ? (text.startsWith('-')?-1:1) : 0,
+      justSpawned: true
+    });
+  }
+
+  /* -------- Ripple Effects (expanding ring) -------- */
+  spawnRipple(x, y, opts={}){
+    this.ripples.push({
+      x, y,
+      maxR: opts.maxR || 8,
+      life: opts.life || 0.6,
+      age: 0,
+      color: opts.color || '#ffa600'
+    });
+  }
+  updateRipples(dt){
+    if (!this.ripples.length) return;
+    for (const r of this.ripples){ r.age += dt; }
+    this.ripples = this.ripples.filter(r=> r.age < r.life);
+  }
+  renderRipples(){
+    if (!this.ripples.length) return;
+    const ctx = this.r.ctx;
+    ctx.save();
+    for (const r of this.ripples){
+      const prog = r.age / r.life;
+      const radius = r.maxR * prog;
+      const alpha = 1 - prog;
+      ctx.globalAlpha = alpha * 0.55;
+      // iterate tiles in bounding box of current ring
+      const minX = Math.floor(r.x - radius - 1), maxX = Math.ceil(r.x + radius + 1);
+      const minY = Math.floor(r.y - radius - 1), maxY = Math.ceil(r.y + radius + 1);
+      for (let ty=minY; ty<=maxY; ty++){
+        for (let tx=minX; tx<=maxX; tx++){
+          if (tx<0||ty<0||tx>=this.level.map.w||ty>=this.level.map.h) continue;
+          const dx = tx - r.x, dy = ty - r.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+            if (Math.abs(dist - radius) < 0.5){
+              // Line-of-sight check so ripple doesn't pass through walls
+              let blocked = false;
+              for (const [lx,ly] of bresenhamLine(r.x, r.y, tx, ty)){
+                if (this.level.map.blocksLight(lx,ly)){
+                  if (!(lx===tx && ly===ty)) { blocked = true; break; }
+                }
+              }
+              if (blocked) continue;
+              const vx = tx - this.camX, vy = ty - this.camY;
+              if (vx>=0 && vy>=0 && vx<COLS && vy<ROWS){
+                // subtle floor glyph ripple: draw a faint colored dot
+                this.r.drawCell(vx, vy, '.', r.color, null);
+              }
+            }
+        }
+      }
+    }
+    ctx.restore();
+  }
+  updateFloatText(dt){
+    if (!this.fct.length) return;
+    for (const p of this.fct){
+      p.ttl -= dt;
+      p.y += p.vy * dt;
+      p.x += p.vx * dt;
+      p.justSpawned = false;
+    }
+    this.fct = this.fct.filter(p=>p.ttl>0);
+  }
+  renderFloatText(){
+    if (!this.fct.length) return;
+    const ctx = this.r.ctx;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    for (const p of this.fct){
+      // Only draw if within current camera frustum (with small margin)
+      const sx = (p.x - this.camX) * CELL_W + CELL_W/2;
+      const sy = (p.y - this.camY) * CELL_H + CELL_H/2;
+      if (sx < -20 || sy < -20 || sx > this.r.canvas.width + 20 || sy > this.r.canvas.height + 20) continue;
+      // Quadratic easing for fade: alpha = (ttl/life)^2
+      const lin = Math.max(0, p.ttl / p.life);
+      const alpha = lin * lin;
+      const t = 1 - lin; // progress (unchanged for scale interpolation)
+      const scale = p.scaleStart + (p.scaleEnd - p.scaleStart) * t;
+      const fontPx = Math.max(10, Math.round((CELL_H-8) * scale));
+      ctx.globalAlpha = alpha;
+      ctx.font = `${fontPx}px monospace`;
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, sx, sy);
+    }
+    ctx.restore();
+  }
+  /* -------- Lightning Effect (procedural bolt) -------- */
+  castLightning(){
+    // Choose nearest visible living monster within a max radius
+    const maxDist2 = 20*20;
+    let best=null, bestD2=Infinity;
+    for (const m of this.level.monsters){
+      if (m.dead) continue;
+      const key = `${m.x},${m.y}`;
+      if (!this.visibleNow.has(key)) continue;
+      const dx = m.x - this.player.x, dy = m.y - this.player.y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < bestD2 && d2 <= maxDist2){ best=m; bestD2=d2; }
+    }
+    if (best){
+      const chains = this.spawnLightning(this.player.x, this.player.y, best.x, best.y, { chain:true, maxChains:3 });
+      this.log(`You unleash a crackling bolt at the ${best.name.toLowerCase()}${chains>1?` (chains to ${chains} foes)`:''}!`);
+    } else {
+      // No target: create a short burst around player
+      this.spawnLightningBurst(this.player.x, this.player.y, 6);
+      this.log('Sparks arc outward around you.');
+    }
+  }
+  /* -------- Spells -------- */
+  learnSpell(spell){
+    if (this.spells.some(s=>s.id===spell.id)) return false;
+    this.spells.push(spell);
+    if (this.activeSpellIndex === -1) this.activeSpellIndex = 0;
+    this.updateHUD();
+    return true;
+  }
+  castActiveSpell(){
+    if (this.activeSpellIndex < 0 || this.activeSpellIndex >= this.spells.length) { this.log('No spell selected.'); return false; }
+    const sp = this.spells[this.activeSpellIndex];
+    if (this.player.mana < sp.cost){ this.log('Not enough mana.'); return false; }
+    // Spend mana and cast
+    this.player.mana -= sp.cost;
+    this.updateHUD();
+    try { sp.cast(this); } catch(e){ this.log(`Spell fizzles (${e.message}).`); }
+    return true;
+  }
+  regenMana(dt){
+    // Simple continuous regen: manaRegen per 5s baseline
+    const perSec = (this.player.manaRegen || 3) / 5; // regen value repurposed
+    this.player.mana = Math.min(this.player.maxMana, this.player.mana + perSec * dt);
+  }
+  spawnLightning(x0,y0,x1,y1, opts={}){
+    const path = this.genLightningPath(x0,y0,x1,y1);
+    if (!path.length) return 0;
+    // Lightning effect now uses time in seconds (previously frame counters ~6 frames ≈0.1s)
+    const DURATION = 0.12; // seconds
+    const eff = { type:'lightning', cells:path, ttl:DURATION, ttlMax:DURATION, applied:false, origin:{x:x0,y:y0}, target:{x:x1,y:y1}, chainIndex: opts.chainIndex||0 };
+    this.level.effects.push(eff);
+    // Camera shake subtle
+    this.addShake(0.6, 0.15);
+    // Chain logic: find additional nearby monsters from target point sequentially
+    let totalChains = 1;
+    if (opts.chain && (opts.maxChains||0) > 1){
+      const used = new Set([`${x1},${y1}`]);
+      let curX = x1, curY = y1;
+      for (let c=2; c<=opts.maxChains; c++){
+        // search for nearest unused visible monster within radius that is not dead
+        let next=null, bestD2=Infinity;
+        const radius=10;
+        for (const m of this.level.monsters){
+          if (m.dead) continue;
+          const key = `${m.x},${m.y}`;
+          if (used.has(key)) continue;
+          const dx = m.x - curX, dy = m.y - curY; const d2 = dx*dx + dy*dy;
+          if (d2 <= radius*radius){
+            // ensure unobstructed-ish (line of sight from previous target) for plausibility
+            if (hasLine(this.level.map, curX, curY, m.x, m.y) && d2 < bestD2){
+              bestD2 = d2; next = m;
+            }
+          }
+        }
+        if (!next) break;
+        used.add(`${next.x},${next.y}`);
+        totalChains++;
+        this.spawnLightning(curX, curY, next.x, next.y, { chain:true, maxChains:0, chainIndex:c });
+        curX = next.x; curY = next.y;
+      }
+    }
+    return totalChains;
+  }
+  spawnLightningBurst(x,y,rays=6){
+    for (let i=0;i<rays;i++){
+      const ang = (Math.PI*2/rays)*i + this.level.rng()*0.5;
+      const len = 2 + (this.level.rng()*3|0);
+      const tx = Math.max(0, Math.min(this.level.map.w-1, x + Math.round(Math.cos(ang)*len)));
+      const ty = Math.max(0, Math.min(this.level.map.h-1, y + Math.round(Math.sin(ang)*len)));
+      this.spawnLightning(x,y,tx,ty);
+    }
+  }
+  genLightningPath(x0,y0,x1,y1){
+    // Start with straight Bresenham line, then jitter interior points perpendicular to main axis
+    const base = Array.from(bresenhamLine(x0,y0,x1,y1));
+    if (!base.length) return [];
+    const out = [{x:x0,y:y0}];
+    const dxTot = x1 - x0, dyTot = y1 - y0;
+    const horiz = Math.abs(dxTot) >= Math.abs(dyTot);
+    for (let i=0;i<base.length;i++){
+      let [x,y] = base[i];
+      if (!(x===x0 && y===y0) && !(x===x1 && y===y1)){
+        if (this.level.rng() < 0.6){
+          if (horiz){ y += (this.level.rng()<0.5?-1:1); }
+          else { x += (this.level.rng()<0.5?-1:1); }
+          if (!this.level.map.inBounds(x,y)) continue; // skip if out of bounds
+        }
+      }
+      const last = out[out.length-1];
+      if (!last || last.x!==x || last.y!==y) out.push({x,y});
+    }
+    return out;
+  }
+  applyLightningDamage(eff){
+    const hitCells = new Set(eff.cells.map(c=>c.x+','+c.y));
+    // Illumination flash: mark these cells for a brief frame (0.12s) and also seen
+    this.lightFlashes.push({ cells: hitCells, ttl:0.12 });
+    for (const key of hitCells){
+      const [x,y] = key.split(',').map(Number);
+      if (this.level.map.inBounds(x,y)) this.level.seen[y][x] = true;
+    }
+    const ox = eff.origin.x, oy = eff.origin.y;
+    const tx = eff.target.x, ty = eff.target.y;
+    const totalDist = Math.max(1, Math.hypot(tx-ox, ty-oy));
+    const baseDamageNear = 7; // damage near origin
+    const attenuation = 0.25; // Beer-Lambert constant k (higher -> faster drop)
+    const critBase = 0.1; // base crit chance at origin
+    const critBoost = 0.35; // additive potential increase at max distance (approaches)
+    for (const m of this.level.monsters){
+      if (m.dead) continue;
+      if (!hitCells.has(m.x+','+m.y)) continue;
+      // Use distance from origin for damage & distance from target for branch differentiation
+      const dist = Math.max(0, Math.hypot(m.x-ox, m.y-oy));
+      // Beer-Lambert: I(d) = I0 * e^{-k d}
+      const dmgFloat = baseDamageNear * Math.exp(-attenuation * (dist/Math.max(1,totalDist)) * totalDist * 0.6);
+      const dmg = Math.max(1, Math.round(dmgFloat));
+      const critChance = Math.min(0.95, critBase + critBoost * (dist / totalDist));
+      let final = dmg; let crit=false;
+      if (this.level.rng() < critChance){ crit=true; final = Math.round(final * 1.5); }
+      m.hp -= final;
+      this.addFloatText(m.x, m.y, `-${final}`, { color: crit ? '#fff59e' : '#9ff', dmg:final, crit });
+      if (m.hp <= 0){
+        m.dead = true;
+        this.addFloatText(m.x, m.y, '✖', { color:'#ffffff', life:0.9, scaleStart:1.2, scaleEnd:0.6 });
+        this.log(`The ${m.name.toLowerCase()} is electrocuted!`);
+      }
+    }
+    eff.applied = true;
+  }
+  updateLightningEffects(){
+    // replaced by dt-aware version; kept for backward compatibility if called without dt
+    this.updateLightningEffectsTime(1/60);
+  }
+  updateLightningEffects(dt){ this.updateLightningEffectsTime(dt); }
+  updateLightningEffectsTime(dt){
+    if (!this.level.effects.length) return;
+    for (let i=this.level.effects.length-1;i>=0;i--){
+      const eff = this.level.effects[i];
+      if (eff.type==='lightning'){
+        if (!eff.applied) this.applyLightningDamage(eff);
+        eff.ttl -= dt;
+        if (eff.ttl <= 0) this.level.effects.splice(i,1);
+      }
+    }
+  }
+  renderLightningEffects(){
+    if (!this.level.effects.length) return;
+    const ctx = this.r.ctx;
+    ctx.save();
+    for (const eff of this.level.effects){
+      if (eff.type !== 'lightning') continue;
+      const alpha = eff.ttl / eff.ttlMax;
+      const cells = eff.cells;
+      for (let i=0;i<cells.length;i++){
+        const c = cells[i];
+        const sx = c.x - this.camX, sy = c.y - this.camY;
+        if (sx<0||sy<0||sx>=COLS||sy>=ROWS) continue;
+        // Determine glyph by local connectivity for crude shaping
+        let ch = '*';
+        const prev = cells[i-1], next = cells[i+1];
+        if (!prev || !next){ ch = '•'; }
+        else if (prev.x===next.x){ ch='│'; }
+        else if (prev.y===next.y){ ch='─'; }
+        else { ch='┼'; }
+        const jitter = 0.85 + Math.random()*0.3;
+        const segColor = `rgba(${Math.floor(170*jitter)},${Math.floor(255*jitter)},255,${(alpha*alpha).toFixed(3)})`;
+        this.r.drawCell(sx, sy, ch, segColor, null);
+      }
+    }
+    ctx.restore();
+  }
+  updateLightFlashes(dt){
+    if (!this.lightFlashes.length) return;
+    for (const f of this.lightFlashes){ f.ttl -= dt; }
+    this.lightFlashes = this.lightFlashes.filter(f=>f.ttl>0);
+  }
+  addShake(mag, dur){
+    if (!this.shake.maxTtl || dur > this.shake.maxTtl) this.shake.maxTtl = dur;
+    if (mag > this.shake.mag){ this.shake.mag = mag; this.shake.ttl = dur; }
+    else { this.shake.ttl = Math.max(this.shake.ttl, dur); }
+  }
+  monsterTurns(){
+    for (const m of this.level.monsters){
+      if (m.dead) continue;
+      if (this.gameOver) break;
+      basicMonsterAI(this, m);
+    }
+    tickStatuses(this);
+  }
+
+  /* -------- Items & Inventory -------- */
+  pickupItemsAtPlayer(){
+    const itemsHere = this.level.items.filter(it=>it.x===this.player.x && it.y===this.player.y);
+    if (!itemsHere.length) return;
+    for (const it of itemsHere){
+      this.addToInventory(it);
+      this.log(`You pick up ${article(it.name)}.`);
+    }
+    // remove picked items
+    this.level.items = this.level.items.filter(it=>!(it.x===this.player.x && it.y===this.player.y));
+    this.updateHUD();
+  }
+  addToInventory(it){
+    if (it.stackable){
+      const existing = this.inventory.find(slot=>!slot.inst && slot.def.id===it.id);
+      if (existing) existing.qty += 1; else this.inventory.push({def:itemDefs.get(it.id), qty:1, inst:null});
+    } else {
+      this.inventory.push({inst:it, def:itemDefs.get(it.id), qty:1});
+    }
+  }
+  useInventoryIndex(idx){
+    const slot = this.inventory[idx];
+    if (!slot){ this.log('No item in that slot.'); return; }
+    if (slot.inst){
+      if (slot.inst.slot){
+        this.toggleEquipItem(slot.inst);
+      } else {
+        this.useItem(slot, idx);
+      }
+    } else { this.useItem(slot, idx); }
+  }
+  useItem(slot, idx){
+    const def = slot.def;
+    if (!def){ this.log('That item is strangely inert.'); return; }
+    const resultMsg = executeItemEffect(this, def);
+    if (resultMsg){ this.log(resultMsg); }
+    slot.qty -= 1;
+    if (slot.qty <= 0) this.inventory.splice(idx,1);
+    this.updateHUD();
+  }
+
+  isEquipped(item){
+    return Object.values(this.player.equipment).some(eq=>eq && eq.uid===item.uid);
+  }
+  toggleEquipItem(item){
+    if (!item.slot){ this.log('Cannot equip that.'); return; }
+    // Map ring slots: choose first free else ring1
+    let slotName = item.slot;
+    if (item.slot === 'ring'){
+      slotName = this.player.equipment.ring1 ? (this.player.equipment.ring2 ? 'ring1' : 'ring2') : 'ring1';
+      // If already equipped in either slot, unequip it
+      if (this.player.equipment.ring1 && this.player.equipment.ring1.uid===item.uid) slotName='ring1';
+      if (this.player.equipment.ring2 && this.player.equipment.ring2.uid===item.uid) slotName='ring2';
+    }
+    // If currently equipped in the resolved slot, unequip
+    if (this.player.equipment[slotName] && this.player.equipment[slotName].uid===item.uid){
+      this.player.equipment[slotName] = null;
+      this.log(`You unequip ${item.name}.`);
+      emitEvent('onUnequip', { entity:this.player, item }, this);
+      this.recalcDerived(this.player);
+      this.updateHUD();
+      return;
+    }
+    // If slot occupied by different item, unequip & leave in inventory (already there)
+    if (this.player.equipment[slotName]){
+      const old = this.player.equipment[slotName];
+      this.log(`You remove ${old.name}.`);
+      emitEvent('onUnequip', { entity:this.player, item:old }, this);
+    }
+    this.player.equipment[slotName] = item;
+    this.log(`You equip ${item.name}.`);
+    emitEvent('onEquip', { entity:this.player, item }, this);
+    this.recalcDerived(this.player);
+    this.updateHUD();
+  }
+  toggleEquipSelected(){
+    const slot = this.inventory[this.invSel]; if (!slot || !slot.inst) return;
+    if (!slot.inst.slot){ this.log('Not equippable.'); return; }
+    this.toggleEquipItem(slot.inst);
+  }
+  dropSelected(){
+    const slot = this.inventory[this.invSel]; if (!slot) return;
+    if (slot.inst){
+      const item = slot.inst;
+      if (this.isEquipped(item)){
+        // Unequip first
+        Object.keys(this.player.equipment).forEach(k=>{ if (this.player.equipment[k] && this.player.equipment[k].uid===item.uid) this.player.equipment[k]=null; });
+        emitEvent('onUnequip', { entity:this.player, item }, this);
+        this.recalcDerived(this.player);
+      }
+      item.x = this.player.x; item.y = this.player.y;
+      this.level.items.push(item);
+      this.inventory.splice(this.invSel,1);
+      this.log(`You drop ${item.name}.`);
+    } else {
+      // stackable drop 1
+      slot.qty -=1;
+      const def = slot.def;
+      const newItem = new Item(def, this.player.x, this.player.y);
+      newItem.stackable = true;
+      this.level.items.push(newItem);
+      if (slot.qty<=0) this.inventory.splice(this.invSel,1);
+      this.log(`You drop ${def.name}.`);
+    }
+    if (this.invSel >= this.inventory.length) this.invSel = Math.max(0,this.inventory.length-1);
+    this.updateHUD();
+  }
+
+  // Debug helper: spawn N random items near the player for testing
+  spawnDebugItems(n){
+    const rng = this.level.rng;
+    const defs = Array.from(itemDefs.values()).concat(Object.values(EQUIP_DEFS));
+    const spawned = [];
+    let attempts = 0;
+    while (spawned.length < n && attempts++ < n*20){
+      const def = defs[Math.floor(rng()*defs.length)];
+      const x = Math.max(1, Math.min(this.level.map.w-2, this.player.x + (Math.floor(rng()*7)-3)));
+      const y = Math.max(1, Math.min(this.level.map.h-2, this.player.y + (Math.floor(rng()*7)-3)));
+      if (!this.level.map.isWalkable(x,y)) continue;
+      if (this.level.items.some(it=>it.x===x && it.y===y)) continue;
+      // Normalize def shape for Item constructor
+      const base = (def.id && def.kind) ? def : (ITEM_DEFS[def.id] || def);
+      const inst = new Item(base, x, y);
+      // For equipment, possibly add a simple affix for variety
+      if (inst.kind==='equip' && rng() < 0.4){
+        const keys = Object.keys(AFFIX_DEFS).filter(k=> AFFIX_DEFS[k].slots.includes(inst.slot));
+        if (keys.length) inst.affixes.push({ key: keys[Math.floor(rng()*keys.length)] });
+      }
+      this.level.items.push(inst);
+      spawned.push(inst);
+    }
+    this.log(`(debug) spawned ${spawned.length} items nearby.`);
+    this.updateHUD();
+    return spawned.length;
+  }
+  activateInventorySelection(){
+    const slot = this.inventory[this.invSel]; if (!slot) return;
+    if (slot.inst){
+      if (slot.inst.slot) this.toggleEquipItem(slot.inst); else this.useItem(slot, this.invSel);
+    } else { this.useItem(slot, this.invSel); }
+  }
+
+  recalcDerived(ent){
+    // Reset to base
+    ent.attackDerived = ent.attack;
+    ent.defenseDerived = ent.defense;
+    ent.maxHpDerived = ent.maxHp;
+    ent.critChanceDerived = ent.critChance || 0;
+    ent.critMultDerived = ent.critMult || 1.5;
+    // Aggregation context for passive affixes
+    const addBonus = (k,v)=>{
+      if (k==='attack') ent.attackDerived += v;
+      else if (k==='defense') ent.defenseDerived += v;
+      else if (k==='maxHp') ent.maxHpDerived += v;
+      else if (k==='critChance') ent.critChanceDerived += v; // v is additive fraction (e.g., 0.08)
+      else if (k==='critMult') ent.critMultDerived += v;     // additive to multiplier (rare)
+    };
+    const eachItem = [];
+    for (const slot of ['weapon','armor','ring1','ring2']){
+      const it = ent.equipment[slot]; if (it) eachItem.push(it);
+    }
+    for (const it of eachItem){
+      for (const [k,v] of Object.entries(it.bonuses)) addBonus(k,v);
+    }
+    // Passive affixes
+    for (const it of eachItem){
+      for (const aff of it.affixes){
+        const def = AFFIX_DEFS[aff.key];
+        if (def && def.passive){
+          try { def.passive({ entity: ent, addBonus }); } catch(e){ /* ignore */ }
+        }
+      }
+    }
+    // Clamp critical stats to sane bounds
+    if (ent.critChanceDerived < 0) ent.critChanceDerived = 0;
+    if (ent.critChanceDerived > 0.95) ent.critChanceDerived = 0.95; // hard cap 95%
+    if (ent.critMultDerived < 1.1) ent.critMultDerived = 1.1;
+    // Clamp HP if max reduced
+    if (ent.hp > ent.maxHpDerived) ent.hp = ent.maxHpDerived;
+  }
+
+  renderMessages(){
+    const ctx = this.r.ctx;
+    const lines = this.msgLog.recent(4);
+    if (!lines.length) return;
+    const pad = 6;
+    const lineH = 14;
+    ctx.save();
+    ctx.font = '12px monospace';
+    ctx.textBaseline = 'top';
+    // background panel dimensions
+    const panelW = this.r.canvas.width; // full width for simplicity
+    const panelH = lineH * lines.length + pad*2;
+    const y = this.r.canvas.height - panelH; // bottom
+    ctx.fillStyle = 'rgba(10,14,24,0.72)';
+    ctx.fillRect(0, y, panelW, panelH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.strokeRect(0.5, y+0.5, panelW-1, panelH-1);
+    ctx.fillStyle = '#b7bcc6';
+    lines.forEach((ln,i)=> ctx.fillText(ln, pad, y + pad + i*lineH));
+    ctx.restore();
+  }
+}
+
+/* -------- Message Log (ring buffer) -------- */
+class MessageLog {
+  constructor(max=50){ this.max=max; this.lines=[]; }
+  push(s){
+    if (!s) return;
+    this.lines.push(s);
+    if (this.lines.length > this.max) this.lines.splice(0, this.lines.length - this.max);
+  }
+  recent(n){ return this.lines.slice(-n); }
+}
+
+/* -------- Monster Generation & AI -------- */
+const MONSTER_DEFS = [
+  { name:'Goblin', glyph:'g', fg:'#7cc55b', maxHp:6, attack:3, defense:0 },
+  { name:'Kobold', glyph:'k', fg:'#c5a45b', maxHp:5, attack:2, defense:0 },
+  { name:'Orc', glyph:'o', fg:'#6bb2d9', maxHp:10, attack:4, defense:1 },
+  { name:'Slime', glyph:'s', fg:'#57d5c4', maxHp:8, attack:2, defense:0 }
+];
+
+function spawnMonsters(level){
+  const rng = level.rng;
+  // Number of monsters scales with depth
+  const num = 4 + Math.floor(rng()*3) + level.depth; // small scaling
+  let safety = 500;
+  while (level.monsters.length < num && safety-- > 0){
+    const def = MONSTER_DEFS[Math.floor(rng()*MONSTER_DEFS.length)];
+    const x = 1 + Math.floor(rng()*(level.map.w-2));
+    const y = 1 + Math.floor(rng()*(level.map.h-2));
+    if (!level.map.isWalkable(x,y)) continue;
+    if (x===level.upX && y===level.upY) continue; // don't spawn on player arrival
+    if (level.monsters.some(m=>m.x===x && m.y===y)) continue;
+    const m = new Entity(def.name, x, y, def.glyph, {
+      maxHp:def.maxHp, hp:def.maxHp, attack:def.attack, defense:def.defense,
+      fg:def.fg, ai:'basic', blocks:true
+    });
+    level.entities.push(m);
+    level.monsters.push(m);
+  }
+}
+
+/* -------- Item Definitions & Spawning -------- */
+// Switched from JSONL string to plain JSON object for clarity / easier editing.
+// Each definition: id, name, short (HUD label), glyph, color, kind, rarity (1=common, higher=rarer), effect (mini DSL)
+const ITEM_DEFS = {
+  potion_healing: { id:"potion_healing", name:"Healing Potion", short:"HealPot", glyph:"!", color:"#ff4d6d", kind:"potion", rarity:1, effect:"heal 8 12" },
+  scroll_light:   { id:"scroll_light",   name:"Scroll of Light", short:"Light",   glyph:"?", color:"#ffd166", kind:"scroll",  rarity:1, effect:"reveal all" },
+  potion_minor:   { id:"potion_minor",   name:"Minor Potion",    short:"MinorHeal", glyph:"!", color:"#ff9aa2", kind:"potion", rarity:2, effect:"heal 4 6; status regen 4 2" },
+  // Example scripted item using inline JS (evaluated in a constrained helper).
+  // Damages all visible monsters for 5 HP.
+  scroll_blast:   { id:"scroll_blast",   name:"Scroll of Blasting", short:"Blast",  glyph:"?", color:"#ffa600", kind:"scroll", rarity:2,
+    script: "// Scroll of Blasting: damages all visible monsters & creates a ripple\nconst originX=player.x, originY=player.y;\nconst dmg=5;\nlet hits=0, kills=0;\ngame.spawnRipple(originX, originY, {maxR:9, life:0.7, color:'#ff9d1e'});\nfor (const m of level.monsters){ if(!m.dead && game.visibleNow.has(`${m.x},${m.y}`)){ m.hp -= dmg; hits++; game.addFloatText(m.x, m.y, `-${dmg}`, { color:'#ffa94d', dmg }); if(m.hp<=0){ m.dead=true; kills++; game.addFloatText(m.x, m.y, '✖', { color:'#ffffff', life:0.9, scaleStart:1.2, scaleEnd:0.6 }); } } }\nreturn kills?`A concussive wave annihilates ${kills} monster${kills>1?'s':''}!`:(hits?`A concussive wave batters ${hits} foe${hits>1?'s':''}.`:'A concussive wave ripples outward.');" },
+  // Spellbook (learn lightning spell)
+  book_lightning: { id:"book_lightning", name:"Spellbook of Lightning", short:"BoltBook", glyph:"?", color:"#80f7ff", kind:"book", rarity:2, effect:"learn lightning" },
+};
+
+// Equipment base definitions (rarity weight managed later). rarity: numeric base chance divisor; rarityName used for affix counts.
+const EQUIP_DEFS = {
+  sword_plain:   { id:'sword_plain', name:'Short Sword', glyph:')', color:'#e8e2b0', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{attack:2} },
+  dagger_quick:  { id:'dagger_quick', name:'Dagger', glyph:')', color:'#f7d794', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{attack:1} },
+  axe_heavy:     { id:'axe_heavy', name:'Axe', glyph:')', color:'#e0c070', kind:'equip', slot:'weapon', rarity:2, rarityName:'magic', bonuses:{attack:3} },
+  leather_armor: { id:'leather_armor', name:'Leather Armor', glyph:'[', color:'#c49c66', kind:'equip', slot:'armor', rarity:1, rarityName:'common', bonuses:{defense:1} },
+  chain_armor:   { id:'chain_armor', name:'Chainmail', glyph:'[', color:'#b0c4de', kind:'equip', slot:'armor', rarity:2, rarityName:'magic', bonuses:{defense:2} },
+  ring_health:   { id:'ring_health', name:'Ring of Health', glyph:'=', color:'#ffb347', kind:'equip', slot:'ring', rarity:2, rarityName:'magic', bonuses:{maxHp:5} },
+  ring_precision:{ id:'ring_precision', name:'Ring of Precision', glyph:'=', color:'#b3e6ff', kind:'equip', slot:'ring', rarity:2, rarityName:'magic', bonuses:{critChance:0.08} }
+};
+
+// Affix definitions: triggers can be onBeforeHit, onHit, onDamaged, onKill, onEquip, onUnequip
+// passive(ctx) executed during derived stat recalculation.
+const AFFIX_DEFS = {
+  thorns1: { name:'Thorns I', slots:['armor'], triggers:['onDamaged'], script:(ctx)=>{ ctx.retaliate(2); }, weight:30 },
+  vamp1:   { name:'Vampiric I', slots:['weapon'], triggers:['onHit'], script:(ctx)=>{ ctx.healAttacker(Math.max(1, Math.floor(ctx.damage/3))); }, weight:20 },
+  fierce:  { name:'Fierce', slots:['weapon'], triggers:['onBeforeHit'], script:(ctx)=>{ ctx.damage += 1; }, weight:25 },
+  guard1:  { name:'Guarded', slots:['armor'], passive:(ctx)=>{ ctx.addBonus('defense',1); }, triggers:[], weight:25 },
+  life1:   { name:'Healthy', slots:['armor','ring'], passive:(ctx)=>{ ctx.addBonus('maxHp',5); }, triggers:[], weight:22 }
+};
+
+function spawnEquipment(level){
+  const rng = level.rng;
+  const defs = Object.values(EQUIP_DEFS);
+  // number of equipment items modest
+  const num = 1 + Math.floor(rng()*2) + Math.floor(level.depth/3);
+  let safety=300;
+  while (level.items.filter(i=>i.kind==='equip').length < num && safety-- > 0){
+    const def = weightedRandom(defs, d=>1/(d.rarity||1), rng);
+    const x = 1 + Math.floor(rng()*(level.map.w-2));
+    const y = 1 + Math.floor(rng()*(level.map.h-2));
+    if (!level.map.isWalkable(x,y)) continue;
+    if ((x===level.upX && y===level.upY) || (x===level.stairX && y===level.stairY)) continue;
+    if (level.monsters.some(m=>m.x===x && m.y===y)) continue;
+    if (level.items.some(it=>it.x===x && it.y===y)) continue;
+    // Determine affix count by rarityName
+    const rarityName = def.rarityName || 'common';
+    const baseAff = rarityName==='rare'?2 : (rarityName==='magic'?1:0);
+    let affixes = [];
+    if (baseAff>0){
+      const pool = Object.entries(AFFIX_DEFS).filter(([k,a])=> a.slots.includes(def.slot));
+      for (let i=0;i<baseAff;i++){
+        if (!pool.length) break;
+        const picked = weightedRandom(pool, pair=>pair[1].weight||1, rng);
+        affixes.push({ key:picked[0] });
+      }
+    }
+    const inst = new Item(def, x, y, { affixes });
+    level.items.push(inst);
+  }
+}
+
+// Map (id -> def) convenience
+const itemDefs = new Map(Object.values(ITEM_DEFS).map(o=>[o.id,o]));
+
+function spawnItems(level){
+  const rng = level.rng;
+  // Number of items: modest scaling
+  const num = 3 + Math.floor(rng()*2) + Math.floor(level.depth/2);
+  const defs = Array.from(itemDefs.values());
+  let safety = 400;
+  while (level.items.length < num && safety-- > 0){
+    const def = weightedRandom(defs, d=>1/(d.rarity||1), rng);
+    const x = 1 + Math.floor(rng()*(level.map.w-2));
+    const y = 1 + Math.floor(rng()*(level.map.h-2));
+    if (!level.map.isWalkable(x,y)) continue;
+    if ((x===level.upX && y===level.upY) || (x===level.stairX && y===level.stairY)) continue;
+    if (level.monsters.some(m=>m.x===x && m.y===y)) continue;
+    if (level.items.some(it=>it.x===x && it.y===y)) continue;
+    level.items.push(new Item(def, x, y));
+  }
+}
+
+function weightedRandom(arr, weightFn, rng){
+  const weights = arr.map(weightFn);
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = rng()*total;
+  for (let i=0;i<arr.length;i++){
+    r -= weights[i];
+    if (r<=0) return arr[i];
+  }
+  return arr[arr.length-1];
+}
+
+// Execute effect DSL: commands: heal min max; reveal all|radius
+// -------- Status Definitions --------
+const STATUS_DEFS = {
+  poison: {
+    id:'poison', name:'Poison', kind:'debuff', stackMode:'refresh',
+    onTick:(ent, game, s)=>{
+      if (ent.dead) return null;
+      const dmg = s.potency || 2;
+      const floor = dmg>=999 ? 0 : 1; // soft poison cannot kill below 1
+      const before = ent.hp;
+      ent.hp = Math.max(floor, ent.hp - dmg);
+      if (ent === game.player) game.updateHUD();
+      if (before !== ent.hp) return `${ent===game.player? 'Poison':'The '+ent.name.toLowerCase()+' is poisoned'} for ${before-ent.hp}.`;
+      return null;
+    },
+    onExpire:(ent, game)=> ent.dead ? null : (ent===game.player? 'The poison fades.' : `The ${ent.name.toLowerCase()} recovers from poison.`)
+  },
+  regen: {
+    id:'regen', name:'Regen', kind:'buff', stackMode:'refresh',
+    onTick:(ent, game, s)=>{
+      if (ent.dead) return null;
+      const amt = s.potency || 2;
+      const before = ent.hp;
+      ent.hp = Math.min(ent.maxHp, ent.hp + amt);
+      if (ent === game.player && before!==ent.hp) game.updateHUD();
+      if (before!==ent.hp) return `${ent===game.player? 'Regeneration':'The '+ent.name.toLowerCase()+' regenerates'} ${ent.hp-before} HP.`;
+      return null;
+    },
+    onExpire:(ent, game)=> ent===game.player? 'Your vitality returns to normal.' : null
+  }
+};
+
+// Execute item effect (DSL / script). DSL supports multiple ';' separated commands.
+function executeItemEffect(game, def){
+  if (def.script || (def.effect && def.effect.startsWith('js:'))){
+    const code = def.script || def.effect.slice(3).trim();
+    return runItemScript(game, def, code);
+  }
+  const raw = (def.effect||'').trim();
+  if (!raw) return 'Nothing seems to happen...';
+  const cmds = raw.split(';').map(s=>s.trim()).filter(Boolean);
+  const msgs = [];
+  for (const c of cmds){
+    const m = processEffectCommand(game, def, c);
+    if (m) msgs.push(m);
+  }
+  return msgs.join(' ');
+}
+
+function processEffectCommand(game, def, cmdStr){
+  const parts = cmdStr.split(/\s+/);
+  const cmd = parts[0];
+  if (cmd==='heal'){
+    const min = parseInt(parts[1]||'0',10);
+    const max = parseInt(parts[2]||parts[1]||'0',10);
+    const lo = Math.min(min,max), hi=Math.max(min,max);
+    const amt = lo + Math.floor(game.level.rng() * (hi-lo+1));
+    const before = game.player.hp;
+    game.player.hp = Math.min(game.player.maxHp, game.player.hp + amt);
+    game.updateHUD();
+    const healed = game.player.hp - before;
+    if (healed>0){
+      game.addFloatText(game.player.x, game.player.y, `+${healed}`, { color:'#4ef58a', heal:true, dmg:-healed });
+      return `You quaff the ${def.name.toLowerCase()} and recover ${healed} HP.`;
+    }
+    return 'You feel no different.';
+  }
+  if (cmd==='reveal'){
+    if (parts[1]==='all'){
+      for (let y=0;y<game.level.map.h;y++) for (let x=0;x<game.level.map.w;x++) game.level.seen[y][x] = true;
+      game.recomputeFOV();
+      return `The ${def.name.toLowerCase()} glows, revealing the dungeon!`;
+    }
+  }
+  if (cmd==='learn'){
+    const spellId = parts[1];
+    if (!spellId) return null;
+    if (spellId==='lightning'){
+      const spell = { id:'lightning', name:'Lightning', cost:7, cast:(g)=> g.castLightning() };
+      const learned = game.learnSpell(spell);
+      return learned ? 'You study the glyphs and learn Lightning.' : 'You already know that spell.';
+    }
+    return `You cannot decipher the ${spellId} spell.`;
+  }
+  if (cmd==='status'){
+    const id = parts[1];
+    const dur = parseInt(parts[2]||'0',10) || 0;
+    const pot = parseInt(parts[3]||'0',10) || 0;
+    if (!id || dur<=0) return null;
+    const applied = applyStatus(game.player, id, {duration:dur, potency:pot}, game);
+    if (applied){
+      if (applied.kind==='buff'){
+        game.addFloatText(game.player.x, game.player.y, applied.name, { color:'#66c2ff', life:1.2, scaleStart:1.1, scaleEnd:0.8 });
+      }
+      return `${applied.kind==='buff'?'You gain':'You suffer'} ${applied.name}${pot?` (${pot})`:''}.`;
+    }
+    return null;
+  }
+  return null;
+}
+
+function article(name){
+  const c = name[0].toLowerCase();
+  if ('aeiou'.includes(c)) return 'an ' + name; else return 'a ' + name;
+}
+
+// Eval-based scripting helper. Intentionally minimalist; provides a small API surface.
+// WARNING: Using eval / new Function is unsafe if untrusted content can reach here.
+// In this local single-file toy roguelike, we accept the risk for flexibility.
+function runItemScript(game, def, code){
+  let resultMsg = 'Nothing seems to happen...';
+  // Snapshot before state for auto messaging if script silent
+  const beforePlayerHp = game.player.hp;
+  const beforeLiving = game.level.monsters.filter(m=>!m.dead).length;
+  const api = {
+    game,
+    level: game.level,
+    player: game.player,
+    rng: game.level.rng,
+    log: (m)=> game.log(m),
+    GL,
+    // Utility helpers exposed to scripts
+    heal: (amt)=>{ const before=game.player.hp; game.player.hp=Math.min(game.player.maxHp, game.player.hp+amt); return game.player.hp-before; },
+    damageVisible: (amt)=>{ let hits=0,kills=0; for(const m of game.level.monsters){ if(!m.dead && game.visibleNow.has(`${m.x},${m.y}`)){ m.hp-=amt; hits++; if(m.hp<=0){ m.dead=true; kills++; } } } return {hits,kills}; },
+    spawnRipple: (x,y,opts)=> game.spawnRipple(x,y,opts||{}),
+    addFloatText: (x,y,text,opts)=> game.addFloatText(x,y,text,opts||{})
+  };
+  try {
+    // Wrap code to allow returns without needing explicit function wrapper.
+    const fn = new Function('api', `"use strict"; const {game,level,player,rng,log,GL,heal,damageVisible} = api; ${code}`);
+    const ret = fn(api);
+    if (typeof ret === 'string' && ret) resultMsg = ret; else if (ret && ret.msg) resultMsg = ret.msg;
+  } catch (e){
+    resultMsg = `The ${def.name.toLowerCase()} fizzles (${e.message}).`;
+  }
+  // Auto-generate a message if state changed and script was silent
+  const afterLiving = game.level.monsters.filter(m=>!m.dead).length;
+  if (resultMsg === 'Nothing seems to happen...'){
+    if (afterLiving < beforeLiving){
+      const kills = beforeLiving - afterLiving;
+      resultMsg = `The ${def.name.toLowerCase()} affects your foes (${kills} defeated).`;
+    } else if (game.player.hp > beforePlayerHp){
+      resultMsg = `You feel renewed (+${game.player.hp - beforePlayerHp} HP).`;
+    } else if (game.player.hp < beforePlayerHp){
+      resultMsg = `You feel weakened (${beforePlayerHp - game.player.hp} damage).`;
+    }
+  }
+  // Spawn healing float text if healed
+  if (game.player.hp > beforePlayerHp){
+    const healed = game.player.hp - beforePlayerHp;
+    game.addFloatText(game.player.x, game.player.y, `+${healed}`, { color:'#4ef58a', heal:true, dmg:-healed });
+  }
+  game.updateHUD();
+  return resultMsg;
+}
+
+/* =================== EVENT & AFFIX DISPATCH =================== */
+// Central event emitter: collects affixes on involved entities & executes in deterministic order.
+function emitEvent(name, data, game){
+  // Collect entities possibly having affixes: attacker, defender, player (if global), etc.
+  const involved = [];
+  if (data.attacker) involved.push(data.attacker);
+  if (data.defender && data.defender!==data.attacker) involved.push(data.defender);
+  if (data.entity && !involved.includes(data.entity)) involved.push(data.entity);
+  const affixEntries = [];
+  const slotOrder = ['weapon','armor','ring1','ring2'];
+  for (const ent of involved){
+    if (!ent.equipment) continue;
+    for (const slot of slotOrder){
+      const it = ent.equipment[slot]; if (!it) continue;
+      if (!it.affixes) continue;
+      for (let i=0;i<it.affixes.length;i++){
+        const aff = it.affixes[i];
+        const def = AFFIX_DEFS[aff.key]; if (!def) continue;
+        if (def.triggers && !def.triggers.includes(name)) continue;
+        affixEntries.push({ ent, slot, it, aff, def });
+      }
+    }
+  }
+  // Deterministic order: slot order, then entity name, then item uid, then affix key
+  affixEntries.sort((a,b)=>{
+    const so = slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot); if (so) return so;
+    if (a.ent!==b.ent){ return (a.ent.name < b.ent.name)?-1:1; }
+    if (a.it.uid !== b.it.uid) return a.it.uid - b.it.uid;
+    if (a.aff.key < b.aff.key) return -1; if (a.aff.key > b.aff.key) return 1; return 0;
+  });
+  let chain = 0;
+  for (const entry of affixEntries){
+    if (chain++ > 64) { game.log('Effect chain limit reached.'); break; }
+    try {
+      const ctx = buildAffixContext(name, data, entry, game);
+      if (entry.def.script) entry.def.script(ctx);
+    } catch(e){ /* swallow */ }
+  }
+}
+function buildAffixContext(name, data, entry, game){
+  const { ent, it } = entry;
+  return {
+    event:name,
+    attacker: data.attacker,
+    defender: data.defender,
+    entity: ent,
+    item: it,
+    damage: data.damage,
+    set damage(v){ data.damage = v; },
+    get canceled(){ return !!data.canceled; },
+    set canceled(v){ data.canceled = v; },
+    retaliate:(amt)=>{
+      if (!data.defender || !data.attacker) return;
+      if (entry.ent !== data.defender) return; // only defender retaliates
+      if (data.attacker.dead || data.defender.dead) return;
+      // Simple retaliation: deal damage ignoring defense (flat)
+      data.attacker.hp -= amt;
+      game.log(`${data.defender.name}'s ${entry.def.name} thorns ${data.attacker.name} (${amt}).`);
+      if (data.attacker.hp <=0){ data.attacker.dead=true; game.log(`${data.attacker.name} dies.`); }
+      if (data.attacker===game.player) game.updateHUD();
+    },
+  healAttacker:(amt)=>{ if (data.attacker && !data.attacker.dead){ const before=data.attacker.hp; data.attacker.hp = Math.min(data.attacker.maxHpDerived||data.attacker.maxHp, data.attacker.hp+amt); if (data.attacker===game.player){ const healed = data.attacker.hp - before; if (healed>0) game.addFloatText(game.player.x, game.player.y, `+${healed}`, { color:'#4ef58a', heal:true, dmg:-healed }); game.updateHUD(); } } },
+    addBonus:(k,v)=>{},
+    log:(m)=> game.log(m),
+    addStatus:(target,id,dur,pot)=>{ applyStatus(target,id,{duration:dur,potency:pot}, game); },
+  };
+}
+
+// -------- Status helpers --------
+function applyStatus(ent, id, opts, game){
+  const def = STATUS_DEFS[id];
+  if (!def) return null;
+  const existing = ent.statuses.find(s=>s.id===id);
+  const duration = opts.duration ?? opts.remaining ?? 0;
+  const potency = opts.potency ?? def.basePotency ?? 0;
+  if (duration<=0) return null;
+  if (!existing){
+    const inst = { id:def.id, name:def.name, kind:def.kind||'neutral', remaining:duration, potency, stackMode:def.stackMode||'refresh', def };
+    ent.statuses.push(inst);
+    if (def.onApply) def.onApply(ent, game, inst);
+    return inst;
+  }
+  switch(existing.stackMode){
+    case 'refresh':
+      existing.remaining = Math.max(existing.remaining, duration);
+      if (potency>existing.potency) existing.potency = potency; return existing;
+    case 'stack':
+      existing.potency += potency; existing.remaining = Math.max(existing.remaining, duration); return existing;
+    case 'max':
+      if (potency>existing.potency){ existing.potency=potency; existing.remaining=duration; } return existing;
+    case 'ignore':
+    default:
+      return existing;
+  }
+}
+
+function tickStatuses(game){
+  tickEntityStatuses(game, game.player);
+  for (const m of game.level.monsters){ if (!m.dead) tickEntityStatuses(game, m); }
+}
+function tickEntityStatuses(game, ent){
+  if (!ent.statuses.length || ent.dead) return;
+  const msgs = [];
+  for (const s of [...ent.statuses]){
+    if (s.def.onTick){
+      const m = s.def.onTick(ent, game, s); if (m) msgs.push(m);
+    }
+    s.remaining -= 1;
+    if (s.remaining <= 0){
+      if (s.def.onExpire){ const em = s.def.onExpire(ent, game, s); if (em) msgs.push(em); }
+      ent.statuses = ent.statuses.filter(x=>x!==s);
+    }
+    if (ent===game.player && ent.hp<=0 && !ent.dead){ ent.dead = true; game.log('You succumb...'); game.gameOver = true; break; }
+  }
+  for (const m of msgs) game.log(m);
+  if (ent===game.player) game.updateHUD();
+}
+
+function basicMonsterAI(game, m){
+  // Enhanced AI using A* pathfinding with last-seen target memory.
+  // 1. If monster can currently see player, update lastSeen and pursue.
+  // 2. If cannot see but has lastSeen coordinate not yet reached, path toward it.
+  // 3. If adjacent to player, attack.
+  // 4. If no path/target, small chance to wander.
+
+  if (m.dead) return;
+
+  const px = game.player.x, py = game.player.y;
+  const dx = px - m.x, dy = py - m.y;
+  const dist2 = dx*dx + dy*dy;
+  const canSee = dist2 <= (FOV_RADIUS*FOV_RADIUS) && hasLine(game.level.map, m.x, m.y, px, py);
+
+  if (canSee){
+    m.lastSeen = {x:px, y:py};
+  }
+
+  // Adjacent attack (use Manhattan distance)
+  if (Math.abs(dx) + Math.abs(dy) === 1){
+    game.melee(m, game.player);
+    return;
+  }
+
+  // Decide current target: player if visible else lastSeen (if exists and not yet reached)
+  const target = canSee ? {x:px, y:py} : (m.lastSeen && !(m.x===m.lastSeen.x && m.y===m.lastSeen.y) ? m.lastSeen : null);
+
+  if (target){
+    const tgtKey = target.x+','+target.y;
+    const needRepath = !m.pathCache || !m.pathCache.length || m.pathTarget !== tgtKey;
+    // Check if first step blocked (monster sat there or tile changed)
+    let blocked = false;
+    if (!needRepath && m.pathCache.length){
+      const [nx,ny] = m.pathCache[0];
+      if (!game.level.map.isWalkable(nx,ny) || game.level.monsters.some(o=>o!==m && !o.dead && o.x===nx && o.y===ny)) blocked = true;
+    }
+    // Incremental repair: if target changed by exactly one tile from previous pathTarget
+    // and we still have a viable path to the old target (last element), just append new target.
+    if (!blocked && m.pathCache && m.pathCache.length && m.pathTarget && m.pathTarget !== tgtKey && canSee){
+      const [oldTx, oldTy] = m.pathTarget.split(',').map(Number);
+      if (Math.abs(oldTx - target.x) + Math.abs(oldTy - target.y) === 1){
+        const last = m.pathCache[m.pathCache.length - 1];
+        if (last[0] === oldTx && last[1] === oldTy){
+          // Append new target tile if walkable
+          if (game.level.map.isWalkable(target.x, target.y)){
+            m.pathCache.push([target.x, target.y]);
+            m.pathTarget = tgtKey;
+          }
+        }
+      }
+    }
+    // Pathfinding throttle: only rebuild if needed or blocked or target changed or turn quota expired
+    const targetChanged = m.lastTargetKey !== tgtKey;
+    const mustRepath = needRepath || blocked || targetChanged || game.turn >= (m.nextPathTurn ?? 0);
+    if (mustRepath){
+      const res = aStarFullPath(
+        game,
+        game.level.map,
+        m.x, m.y,
+        target.x, target.y,
+        (x,y)=> game.level.monsters.some(o=>o!==m && !o.dead && o.x===x && o.y===y),
+        (x,y)=> { // costFn: monsters mildly avoid doors/water/traps
+          const g = game.level.map.glyphAt(x,y);
+          switch(g){
+            case GL.DOOR: return 3; // unopened door (will open)
+            case GL.WATER: return 5; // slow water
+            case GL.TRAP: return 6; // avoid trap strongly
+            default: return 1;
+          }
+        }
+      );
+      if (res){
+        m.pathCache = res.path; // array of [x,y] excluding start
+        m.pathTarget = tgtKey;
+        m.lastPathExp = res.expansions;
+        game.astarStats.builds++; game.astarStats.lastExp = res.expansions; game.astarStats.totalExp += res.expansions;
+        m.lastTargetKey = tgtKey;
+        m.nextPathTurn = game.turn + 2; // wait at least 2 turns before next path rebuild (unless target changes)
+      } else {
+        m.pathCache = [];
+        if (!canSee && m.lastSeen) m.lastSeen = null; // give up
+      }
+    }
+    // Clamp overly long paths (safety; should rarely trigger on small maps)
+    if (m.pathCache && m.pathCache.length > 120){
+      m.pathCache.length = 120;
+    }
+    if (m.pathCache && m.pathCache.length){
+      const [nx,ny] = m.pathCache[0];
+      if (!game.level.monsters.some(o=>o!==m && !o.dead && o.x===nx && o.y===ny)){
+        attemptMoveMonster(game, m, nx - m.x, ny - m.y);
+        m.pathCache.shift();
+        if (!canSee && m.lastSeen && m.x===m.lastSeen.x && m.y===m.lastSeen.y) m.lastSeen = null;
+        return;
+      }
+    }
+  }
+
+  // Fallback behaviors: if canSee, try greedy Bresenham; else random wander
+  if (canSee){
+    const line = Array.from(bresenhamLine(m.x, m.y, px, py));
+    if (line.length){
+      const [nx,ny] = line[0];
+      attemptMoveMonster(game, m, nx - m.x, ny - m.y);
+      return;
+    }
+  }
+
+  // random wander (reduced rate when actively pursuing)
+  if (game.level.rng() < 0.15){
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    const [wx,wy] = dirs[Math.floor(game.level.rng()*dirs.length)];
+    attemptMoveMonster(game, m, wx, wy);
+  }
+}
+
+function hasLine(map, x0,y0,x1,y1){
+  for (const [x,y] of bresenhamLine(x0,y0,x1,y1)){
+    if (x===x1 && y===y1) return true; // reached
+    if (map.blocksLight(x,y)) return false;
+  }
+  return true;
+}
+// -------- A* Pathfinding (4-direction) --------
+// Returns [dx,dy] for the first step from (sx,sy) toward (tx,ty) or null if no path.
+function aStarNextStep(map, sx, sy, tx, ty, isBlockedFn, costFn){
+  if (sx===tx && sy===ty) return null;
+  const key = (x,y)=> x+','+y;
+  const open = [];
+  const g = new Map();
+  const f = new Map();
+  const came = new Map();
+  const h = (x,y)=> Math.abs(x-tx) + Math.abs(y-ty); // Manhattan heuristic (4-dir)
+  const startK = key(sx,sy);
+  g.set(startK, 0); f.set(startK, h(sx,sy));
+  open.push({x:sx,y:sy,f:f.get(startK)});
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  let foundK = null;
+  let expansions = 0;
+  while (open.length){
+    // Pop lowest f (tiny lists -> linear scan is fine)
+    let bi=0; for (let i=1;i<open.length;i++) if (open[i].f < open[bi].f) bi = i;
+    const cur = open.splice(bi,1)[0];
+    const ck = key(cur.x,cur.y);
+    if (cur.x===tx && cur.y===ty){ foundK = ck; break; }
+    if (++expansions > 4000) break; // safety guard
+    for (const [dx,dy] of dirs){
+      const nx = cur.x + dx, ny = cur.y + dy;
+      if (!map.inBounds(nx,ny) || !map.isWalkable(nx,ny)) continue;
+      if (isBlockedFn && isBlockedFn(nx,ny)) continue;
+      const nk = key(nx,ny);
+      const stepCost = costFn ? costFn(nx,ny) : 1;
+      const tentative = g.get(ck) + stepCost;
+      if (tentative < (g.get(nk) ?? Infinity)){
+        came.set(nk, ck);
+        g.set(nk, tentative);
+        const nf = tentative + h(nx,ny);
+        f.set(nk, nf);
+        if (!open.some(o=>o.x===nx && o.y===ny)) open.push({x:nx,y:ny,f:nf});
+      }
+    }
+  }
+  if (!foundK) return null;
+  // Reconstruct to first step
+  let curK = foundK; let prevK = came.get(curK);
+  while (prevK && prevK !== startK){ curK = prevK; prevK = came.get(curK); }
+  const [fx,fy] = curK.split(',').map(Number);
+  return [fx - sx, fy - sy];
+}
+// Returns full path (array of [x,y] coords excluding start, including target) or null
+// Also returns expansions count for telemetry.
+function aStarFullPath(game, map, sx, sy, tx, ty, isBlockedFn, costFn){
+  if (sx===tx && sy===ty) return { path: [], expansions:0 };
+  const key = (x,y)=> x+','+y;
+  const open = [];
+  const g = new Map();
+  const f = new Map();
+  const came = new Map();
+  const h = (x,y)=> Math.abs(x-tx) + Math.abs(y-ty);
+  const startK = key(sx,sy);
+  g.set(startK,0); f.set(startK, h(sx,sy));
+  open.push({x:sx,y:sy,f:f.get(startK)});
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  let foundK=null; let expansions=0;
+  const MAX_EXP = 5000; // cap to prevent worst-case spirals; track if hit
+  while (open.length){
+    let bi=0; for (let i=1;i<open.length;i++) if (open[i].f < open[bi].f) bi=i;
+    const cur = open.splice(bi,1)[0];
+    const ck = key(cur.x,cur.y);
+    if (cur.x===tx && cur.y===ty){ foundK = ck; break; }
+    if (++expansions > MAX_EXP){ break; }
+    for (const [dx,dy] of dirs){
+      const nx = cur.x + dx, ny = cur.y + dy;
+      if (!map.inBounds(nx,ny) || !map.isWalkable(nx,ny)) continue;
+      if (isBlockedFn && isBlockedFn(nx,ny)) continue;
+      const nk = key(nx,ny);
+      const stepCost = costFn ? costFn(nx,ny) : 1;
+      const tentative = g.get(ck) + stepCost;
+      if (tentative < (g.get(nk) ?? Infinity)){
+        came.set(nk, ck);
+        g.set(nk, tentative);
+        const nf = tentative + h(nx,ny);
+        f.set(nk, nf);
+        if (!open.some(o=>o.x===nx && o.y===ny)) open.push({x:nx,y:ny,f:nf});
+      }
+    }
+  }
+  if (!foundK) return null;
+  // Reconstruct full path (reverse)
+  const rev = [];
+  let curK = foundK;
+  while (curK && curK !== startK){
+    const [cx,cy] = curK.split(',').map(Number);
+    rev.push([cx,cy]);
+    curK = came.get(curK);
+  }
+  rev.reverse();
+  return { path: rev, expansions };
+}
+function attemptMoveMonster(game, m, dx, dy){
+  const nx = m.x + dx, ny = m.y + dy;
+  if (!game.level.map.isWalkable(nx,ny)) return;
+  if (game.player.x===nx && game.player.y===ny){
+    game.melee(m, game.player);
+    return;
+  }
+  if (game.level.monsters.some(o=>o!==m && !o.dead && o.x===nx && o.y===ny)) return; // occupied
+  m.x = nx; m.y = ny;
+}
+
+/* =================== BOOT =================== */
+(() => { new Game(); })();
+</script>
+</body>
+</html>
