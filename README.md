@@ -2,6 +2,20 @@
 
 A lightweight, standalone web application for experimenting with JavaScript, HTML, and CSS—all in a single file.
 
+## Features
+
+- **Unicode Canvas Roguelike:** Play a classic roguelike rendered on an HTML5 canvas using Unicode glyphs for walls, floors, doors, stairs, and entities.
+- **Procedural Dungeon Generation:** Each level is generated with rooms, corridors, doors, water, and traps using deterministic seeded randomization.
+- **Player & Entities:** Move your character (`@`) through the dungeon, encountering monsters, items, and equipment.
+- **Resource Bars:** Visual health and mana bars update in real time.
+- **HUD & Debug Panel:** On-screen HUD displays controls, stats, and dungeon depth. Optional debug panel for advanced inspection.
+- **Turn-Based Gameplay:** Navigate using keyboard controls; each action advances the game turn.
+- **Inventory & Equipment:** Collect items, equip gear, and use consumables.
+- **Stairs & Depth:** Descend deeper into the dungeon via stairs (`<`), with each floor offering new layouts and challenges.
+- **No Dependencies:** Everything runs in a single HTML file—just open and play!
+
+You can add a screenshot below this section to showcase the game in action.
+
 ## Project Overview
 - **Single file:** All code lives in `js-hack.html` (markup, styles, and scripts).
 - **No frameworks:** Pure HTML, CSS, and JavaScript. No React, Vue, Angular, or build tools.
