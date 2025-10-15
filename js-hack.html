@@ -1368,25 +1368,77 @@ class Game {
     if (!this.level.effects.length) return;
     const ctx = this.r.ctx;
     ctx.save();
+    // helper: draw a glowing polyline in world (tile) coords
+    const drawGlowLine = (points, tAlpha)=>{
+      if (!points || points.length < 2) return;
+      // Convert tile coords to pixel centers
+      const toPx = p => ({ x: (p.x - this.camX) * CELL_W + CELL_W/2, y: (p.y - this.camY) * CELL_H + CELL_H/2 });
+      const pxPoints = points.map(toPx);
+      // Outer glow (broad, faint)
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pxPoints[0].x, pxPoints[0].y);
+      for (let i=1;i<pxPoints.length;i++) ctx.lineTo(pxPoints[i].x, pxPoints[i].y);
+      ctx.strokeStyle = `rgba(120,200,255,${0.08 * tAlpha})`;
+      ctx.lineWidth = 18;
+      ctx.shadowColor = 'rgba(100,180,255,0.12)';
+      ctx.shadowBlur = 18;
+      ctx.stroke();
+
+      // Mid glow
+      ctx.beginPath();
+      ctx.moveTo(pxPoints[0].x, pxPoints[0].y);
+      for (let i=1;i<pxPoints.length;i++) ctx.lineTo(pxPoints[i].x, pxPoints[i].y);
+      ctx.strokeStyle = `rgba(160,220,255,${0.28 * tAlpha})`;
+      ctx.lineWidth = 8;
+      ctx.shadowColor = `rgba(180,245,255,${0.18 * tAlpha})`;
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+
+      // Core bright line with small jitter for electricity feel
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      // Draw short segmented jittered core
+      for (let i=0;i<pxPoints.length;i++){
+        const p = pxPoints[i];
+        const jitter = (i===0 || i===pxPoints.length-1) ? 0 : (Math.random()*6-3) * Math.max(0.1, tAlpha);
+        const x = p.x + jitter, y = p.y + (Math.random()*4-2) * Math.max(0.1, tAlpha);
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle = `rgba(230,255,255,${0.9 * tAlpha})`;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Sparks at endpoints
+      const ends = [pxPoints[0], pxPoints[pxPoints.length-1]];
+      for (const e of ends){
+        const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, 12);
+        grad.addColorStop(0, `rgba(255,255,220,${0.95 * tAlpha})`);
+        grad.addColorStop(0.6, `rgba(160,220,255,${0.35 * tAlpha})`);
+        grad.addColorStop(1, `rgba(160,220,255,0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill();
+      }
+    };
+
     for (const eff of this.level.effects){
       if (eff.type !== 'lightning') continue;
-      const alpha = eff.ttl / eff.ttlMax;
-      const cells = eff.cells;
-      for (let i=0;i<cells.length;i++){
-        const c = cells[i];
+      const alpha = Math.max(0, Math.min(1, eff.ttl / eff.ttlMax));
+      // Convert tile path (eff.cells) to a filtered series of points (collapse consecutive duplicates)
+      const raw = eff.cells || [];
+      const pts = [];
+      for (let i=0;i<raw.length;i++){
+        const c = raw[i];
+        // skip points outside camera frustum to reduce overdraw
         const sx = c.x - this.camX, sy = c.y - this.camY;
-        if (sx<0||sy<0||sx>=COLS||sy>=ROWS) continue;
-        // Determine glyph by local connectivity for crude shaping
-        let ch = '*';
-        const prev = cells[i-1], next = cells[i+1];
-        if (!prev || !next){ ch = '•'; }
-        else if (prev.x===next.x){ ch='│'; }
-        else if (prev.y===next.y){ ch='─'; }
-        else { ch='┼'; }
-        const jitter = 0.85 + Math.random()*0.3;
-        const segColor = `rgba(${Math.floor(170*jitter)},${Math.floor(255*jitter)},255,${(alpha*alpha).toFixed(3)})`;
-        this.r.drawCell(sx, sy, ch, segColor, null);
+        if (sx < -2 || sy < -2 || sx > COLS+2 || sy > ROWS+2) continue;
+        // occasionally split long spans into mid-points for smoother curves
+        const last = pts[pts.length-1];
+        if (!last || last.x !== c.x || last.y !== c.y) pts.push({x:c.x, y:c.y});
       }
+      if (!pts.length) continue;
+      drawGlowLine(pts, alpha);
     }
     ctx.restore();
   }
