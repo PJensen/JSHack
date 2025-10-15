@@ -1,0 +1,16 @@
+# Node, Python, and OS junk
+node_modules/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# System files
+*.swp
+*.swo
+
+# Ignore Copilot instructions
+.github/copilot-instructions.md
