@@ -181,6 +181,8 @@ class Item {
     this.affixes = opts.affixes ? opts.affixes.slice() : []; // array of {key}
     this.x = x; this.y = y;
     this.stackable = !!def.stackable;
+    // For currency / coin piles we store an explicit amount
+    this.amount = (typeof opts.amount === 'number') ? opts.amount : (def && def.kind === 'gold' ? (def.value || 1) : undefined);
   }
 }
 const WALL  = () => new Tile(GL.WALL,false,true);
@@ -573,6 +575,8 @@ class Game {
     this.player = new Entity('You', this.level.upX, this.level.upY, GL.PLAYER, {
       maxHp: 20, hp:20, attack:4, defense:1, critChance:0.12, critMult:1.5, fg:'#ffffff', ai:null
     });
+    // Track gold (currency)
+    this.player.gold = 0;
     // Mana / spell system
     this.player.maxMana = 30; this.player.mana = 30; this.player.manaRegen = 3; // per 10 turns baseline (regen expressed per second later)
     this.spells = []; // array of { id, name, cost, cast:fn }
@@ -906,9 +910,10 @@ class Game {
             acted = true;
           }
         } else {
-          // In dungeon: if standing on stairs and mapping exists, ascend to overworld
+          // In dungeon: using Enter on stairs should prefer the natural direction of this tile ('<' = down)
           const g = this.level.map.glyphAt(this.player.x, this.player.y);
           if (g === GL.STAIRS){
+            // If this stair is the recorded overworld return, go up to overworld
             if (this.level && this.level.backToOverworld && this.level.backToOverworld.x === this.player.x && this.level.backToOverworld.y === this.player.y){
               this.inOverworld = true;
               this.overworldPlayer.x = this.level.backToOverworld.owX;
@@ -917,12 +922,13 @@ class Game {
               this.recomputeFOV();
               acted = true;
             } else {
-              // If no mapping, explicit ascend should move up one dungeon level if possible
-              const newDepth = Math.max(1, this.dungeon.depth - 1);
-              this.level = this.dungeon.enter(newDepth);
+              // Default for dungeon stairs ('<') is to descend deeper
+              this.level = this.dungeon.enter(this.dungeon.depth + 1);
               this.player.x = this.level.upX; this.player.y = this.level.upY;
+              this.justArrived = true;
               this.recomputeFOV();
-              this.log(`You climb up to depth ${this.dungeon.depth}.`);
+              this.flash();
+              this.log(`You descend to depth ${this.dungeon.depth}.`);
               acted = true;
             }
           }
@@ -1206,6 +1212,15 @@ class Game {
         this.r.drawCell(sx, sy, this.player.g, '#ffffff');
       }
     }
+    // Stairs hint (dungeon): show when standing on a stairs tile
+    try {
+      const hereDungeon = this.level.map.glyphAt(this.player.x, this.player.y);
+      if (hereDungeon === GL.STAIRS){
+        const isSurfaceStair = !!(this.level && this.level.backToOverworld && this.level.backToOverworld.x === this.player.x && this.level.backToOverworld.y === this.player.y);
+        const hint = isSurfaceStair ? 'Press Enter to return to surface; Down to descend' : 'Press Enter or Down to descend';
+        this._drawStairsHint(hint);
+      }
+    } catch(e) { /* ignore hint failures */ }
     // Lightning effects
     this.renderLightningEffects();
     // Floating combat text
@@ -1429,6 +1444,18 @@ class Game {
       }
     }
     if (manaSpan){ manaSpan.textContent = `${Math.floor(this.player.mana)}/${this.player.maxMana}`; }
+    // Gold display
+    let goldSpan = document.getElementById('gold');
+    if (!goldSpan){
+      const hud = document.getElementById('hud');
+      if (hud){
+        goldSpan = document.createElement('span');
+        goldSpan.id = 'gold';
+        hud.appendChild(document.createTextNode(' • Gold: '));
+        hud.appendChild(goldSpan);
+      }
+    }
+  if (goldSpan){ goldSpan.textContent = `${this.player.gold || 0}`; goldSpan.style.color = '#ffd86b'; }
     // Mana bar visual
     const barFill = document.getElementById('mana-bar-fill');
     const barLabel = document.getElementById('mana-bar-label');
@@ -1528,6 +1555,8 @@ class Game {
         defender.dead = true;
         this.log(`You${crit?' critically':''} slay the ${defender.name.toLowerCase()}.`);
         if (visible) this.addFloatText(defender.x, defender.y, `✖`, { color:'#ffffff', dmg:raw, life:0.9, scaleStart:1.2, scaleEnd:0.6 });
+        // maybe drop gold from this slain monster
+        try { this.maybeDropGold(defender); } catch(e){}
       } else {
         this.log(`You${crit?' critically':''} hit the ${defender.name.toLowerCase()} for ${raw}.`);
       }
@@ -1817,6 +1846,7 @@ class Game {
         m.dead = true;
         this.addFloatText(m.x, m.y, '✖', { color:'#ffffff', life:0.9, scaleStart:1.2, scaleEnd:0.6 });
         this.log(`The ${m.name.toLowerCase()} is electrocuted!`);
+        try { this.maybeDropGold(m); } catch(e){}
       }
     }
     eff.applied = true;
@@ -1938,14 +1968,29 @@ class Game {
     const itemsHere = this.level.items.filter(it=>it.x===this.player.x && it.y===this.player.y);
     if (!itemsHere.length) return;
     for (const it of itemsHere){
-      this.addToInventory(it);
-      this.log(`You pick up ${article(it.name)}.`);
+      // If item is gold, increase player's gold amount instead of inventory
+      if (it.kind === 'gold'){
+        // amount may be stored on item.amount or default to 1
+        const amt = (typeof it.amount === 'number') ? it.amount : (it.def && it.def.value) ? it.def.value : 1;
+        this.player.gold = (this.player.gold || 0) + amt;
+        this.addFloatText(this.player.x, this.player.y, `+${amt}g`, { color:'#ffd86b' });
+        this.log(`You pick up ${amt} gold.`);
+      } else {
+        this.addToInventory(it);
+        this.log(`You pick up ${article(it.name)}.`);
+      }
     }
     // remove picked items
     this.level.items = this.level.items.filter(it=>!(it.x===this.player.x && it.y===this.player.y));
     this.updateHUD();
   }
   addToInventory(it){
+    if (it.kind === 'gold'){
+      // Shouldn't reach here normally; prefer direct pickup handling for gold.
+      const amt = (typeof it.amount === 'number') ? it.amount : (it.def && it.def.value) ? it.def.value : 1;
+      this.player.gold = (this.player.gold || 0) + amt;
+      return;
+    }
     if (it.stackable){
       const existing = this.inventory.find(slot=>!slot.inst && slot.def.id===it.id);
       if (existing) existing.qty += 1; else this.inventory.push({def:itemDefs.get(it.id), qty:1, inst:null});
@@ -2067,6 +2112,27 @@ class Game {
     this.log(`(debug) spawned ${spawned.length} items nearby.`);
     this.updateHUD();
     return spawned.length;
+  }
+
+  // Possibly spawn gold at a monster's corpse when it dies.
+  maybeDropGold(monster){
+    if (!monster || monster === this.player) return;
+    // Chance scales with depth: base 35% + 6% per depth, capped
+    const base = 0.35, perDepth = 0.06;
+    const chance = Math.min(0.9, base + perDepth * (this.dungeon.depth || 1));
+    if (this.level.rng() < chance){
+      // Amount randomized: 1 .. (depth*3 + 2)
+      const maxAmt = Math.max(1, Math.floor((this.dungeon.depth || 1) * 3 + 2));
+      const amt = 1 + Math.floor(this.level.rng() * maxAmt);
+      const def = itemDefs.get('gold_coin');
+      if (def){
+        const inst = new Item(def, monster.x, monster.y, { amount: amt });
+        this.level.items.push(inst);
+        // small visual hint
+        this.addFloatText(monster.x, monster.y, `$${amt}`, { color:'#ffd86b' });
+        this.log(`The ${monster.name.toLowerCase()} drops ${amt} gold.`);
+      }
+    }
   }
   activateInventorySelection(){
     const slot = this.inventory[this.invSel]; if (!slot) return;
@@ -2190,6 +2256,8 @@ const ITEM_DEFS = {
     script: "// Scroll of Blasting: damages all visible monsters & creates a ripple\nconst originX=player.x, originY=player.y;\nconst dmg=5;\nlet hits=0, kills=0;\ngame.spawnRipple(originX, originY, {maxR:9, life:0.7, color:'#ff9d1e'});\nfor (const m of level.monsters){ if(!m.dead && game.visibleNow.has(`${m.x},${m.y}`)){ m.hp -= dmg; hits++; game.addFloatText(m.x, m.y, `-${dmg}`, { color:'#ffa94d', dmg }); if(m.hp<=0){ m.dead=true; kills++; game.addFloatText(m.x, m.y, '✖', { color:'#ffffff', life:0.9, scaleStart:1.2, scaleEnd:0.6 }); } } }\nreturn kills?`A concussive wave annihilates ${kills} monster${kills>1?'s':''}!`:(hits?`A concussive wave batters ${hits} foe${hits>1?'s':''}.`:'A concussive wave ripples outward.');" },
   // Spellbook (learn lightning spell)
   book_lightning: { id:"book_lightning", name:"Spellbook of Lightning", short:"BoltBook", glyph:"?", color:"#80f7ff", kind:"book", rarity:2, effect:"learn lightning" },
+  // Gold: stackable currency represented by '$' and carries an amount
+  gold_coin: { id:'gold_coin', name:'Gold', short:'Gold', glyph:'$', color:'#ffd24d', kind:'gold', rarity:1, stackable:true, value:1 }
 };
 
 // Equipment base definitions (rarity weight managed later). rarity: numeric base chance divisor; rarityName used for affix counts.
@@ -2254,14 +2322,31 @@ function spawnItems(level){
   const defs = Array.from(itemDefs.values());
   let safety = 400;
   while (level.items.length < num && safety-- > 0){
-    const def = weightedRandom(defs, d=>1/(d.rarity||1), rng);
+    // Occasionally spawn coin piles instead of regular items
+    let def;
+    if (rng() < 0.28){ // ~28% chance to spawn some gold instead
+      def = itemDefs.get('gold_coin');
+    } else {
+      def = weightedRandom(defs, d=>1/(d.rarity||1), rng);
+    }
     const x = 1 + Math.floor(rng()*(level.map.w-2));
     const y = 1 + Math.floor(rng()*(level.map.h-2));
     if (!level.map.isWalkable(x,y)) continue;
     if ((x===level.upX && y===level.upY) || (x===level.stairX && y===level.stairY)) continue;
     if (level.monsters.some(m=>m.x===x && m.y===y)) continue;
     if (level.items.some(it=>it.x===x && it.y===y)) continue;
-    level.items.push(new Item(def, x, y));
+    if (def && def.kind === 'gold_coin'){
+      // coin pile amount varies with depth; add extra variance
+      const depthFactor = Math.max(1, level.depth);
+      // base between 1 and depthFactor*2
+      const base = 1 + Math.floor(rng() * (depthFactor * 2));
+      // extra random multiplier to allow occasional large piles
+      const extra = Math.floor(Math.pow(rng(), 0.8) * (depthFactor * 3));
+      const amt = Math.max(1, base + extra);
+      level.items.push(new Item(def, x, y, { amount: amt }));
+    } else {
+      level.items.push(new Item(def, x, y));
+    }
   }
 }
 
