@@ -458,6 +458,12 @@ class Game {
     this.inputQ = [];
     this._bindKeys();
 
+    // Auto-pickup persisted setting (default: enabled)
+    try {
+      const v = localStorage.getItem('jshack.autoPickup');
+      this.autoPickup = (v === null) ? true : (v === '1');
+    } catch(e){ this.autoPickup = true; }
+
     // initial FOV
     this.recomputeFOV();
     this.justArrived = true;
@@ -498,6 +504,15 @@ class Game {
         e.preventDefault();
         this.debugMode = !this.debugMode;
         this.updateDebugPanel();
+        return;
+      }
+      // Auto-pickup toggle: F2
+      if (e.code === 'F2'){
+        e.preventDefault();
+        this.autoPickup = !this.autoPickup;
+        try { localStorage.setItem('jshack.autoPickup', this.autoPickup ? '1' : '0'); } catch(_){}
+        this.log(`Auto-pickup ${this.autoPickup ? 'enabled' : 'disabled'}. (F2)`);
+        this.updateHUD();
         return;
       }
       if (this.invOpen){
@@ -650,6 +665,10 @@ class Game {
           acted = true;
         } else if (this.level.map.isWalkable(nx,ny) && !this.isOccupied(nx,ny)){
           this.player.x = nx; this.player.y = ny; acted = true;
+        }
+        // Auto-pickup immediately on move (before monsters take their turns)
+        if (acted && this.autoPickup){
+          try { this.pickupItemsAtPlayer(); } catch(e){ /* ignore errors */ }
         }
       } else if (ev.type==='castActive'){
         if (this.castActiveSpell()) acted = true;
@@ -868,7 +887,7 @@ class Game {
         return `[${i+1}]${slot.def.short || slot.def.name}${slot.qty>1?`x${slot.qty}`:''}`;
       }).join(' ');
       const statusStr = this.player.statuses.map(s=>`${s.name}${s.potency?`+${s.potency}`:''}(${s.remaining})`).join(' ');
-      let txt = '';
+  let txt = '';
       if (invStr) txt += ` • Inv: ${invStr}`;
       if (statusStr) txt += ` • Status: ${statusStr}`;
       const critPct = Math.round((this.player.critChanceDerived || 0) * 1000) / 10; // one decimal
@@ -877,6 +896,8 @@ class Game {
         const act = this.spells[this.activeSpellIndex];
         if (act){ txt += ` • Spell:${act.name}(${act.cost})`; }
       }
+      // Auto-pickup indicator
+      txt += ` • Auto-pickup:${this.autoPickup? 'On' : 'Off'}`;
       extra.textContent = txt;
     }
     // Update debug panel (separate from main HUD)
