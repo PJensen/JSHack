@@ -51,6 +51,11 @@ const GL = {
   WATER:  '≈',
   TRAP:   '^',
   PLAYER: '@',
+  FOUNTAIN: '♨',
+  ALTAR: '†',
+  THRONE: '♛',
+  GRAVE: '✝',
+  SINK: '≋',
   POTION: '!',
   SCROLL: '?',
   VOID:   ' '
@@ -147,6 +152,11 @@ const DOOR  = () => new Tile(GL.DOOR,true,true);
 const STAIR = () => new Tile(GL.STAIRS,true,false);
 const WATER = () => new Tile(GL.WATER,true,false);
 const TRAP  = () => new Tile(GL.TRAP,true,false);
+const FOUNTAIN = () => new Tile(GL.FOUNTAIN,true,false);
+const ALTAR = () => new Tile(GL.ALTAR,true,true);
+const THRONE = () => new Tile(GL.THRONE,false,true);
+const GRAVE = () => new Tile(GL.GRAVE,false,true);
+const SINK = () => new Tile(GL.SINK,true,false);
 
 /* =================== MAP =================== */
 class GameMap {
@@ -220,9 +230,13 @@ function generateDungeonLevel(rng, width, height){
       const t = map.t[y][x];
       if (t.g !== GL.FLOOR) continue;
       const r = rng();
-      if (r < 0.002){ // ~0.2%
+      if (r < 0.0015){ // small chance: fountain
+        map.t[y][x] = FOUNTAIN();
+      } else if (r < 0.003){ // small chance: sink
+        map.t[y][x] = SINK();
+      } else if (r < 0.0045){ // water
         map.t[y][x] = WATER();
-      } else if (r < 0.004){ // next 0.2%
+      } else if (r < 0.006){ // trap
         map.t[y][x] = TRAP();
       }
     }
@@ -243,6 +257,22 @@ function generateDungeonLevel(rng, width, height){
     if (d > bestD){ bestD = d; stairX = cx; stairY = cy; }
   }
   map.t[stairY][stairX] = STAIR();
+
+  // Place a few classic environment features inside some rooms: altar, throne, grave
+  // Try to put at most one special feature per room, preserve walkability rules
+  for (const room of rooms){
+    if (rng() < 0.22){
+      // choose candidate tile inside room
+      const cx = room.x + 1 + Math.floor(rng() * Math.max(1, room.w - 2));
+      const cy = room.y + 1 + Math.floor(rng() * Math.max(1, room.h - 2));
+      if (!map.inBounds(cx,cy)) continue;
+      if (map.t[cy][cx].g !== GL.FLOOR) continue;
+      const pick = rng();
+      if (pick < 0.35) map.t[cy][cx] = ALTAR();
+      else if (pick < 0.7) map.t[cy][cx] = THRONE();
+      else map.t[cy][cx] = GRAVE();
+    }
+  }
 
   return { map, rooms, spawnX, spawnY, stairX, stairY };
 }
@@ -601,9 +631,18 @@ class Game {
         if (g === GL.STAIRS && !this.level.loggedFeatures.has(`stair:${x},${y}`)){
           this.log('You spot the stairs leading deeper.');
           this.level.loggedFeatures.add(`stair:${x},${y}`);
-        } else if (g === GL.DOOR && !this.level.loggedFeatures.has(`door:${x},${y}`)) {
+          } else if (g === GL.DOOR && !this.level.loggedFeatures.has(`door:${x},${y}`)) {
           this.log('You discover a door.');
           this.level.loggedFeatures.add(`door:${x},${y}`);
+        } else if (g === GL.FOUNTAIN && !this.level.loggedFeatures.has(`fountain:${x},${y}`)){
+          this.log('You notice a fountain here.');
+          this.level.loggedFeatures.add(`fountain:${x},${y}`);
+        } else if (g === GL.ALTAR && !this.level.loggedFeatures.has(`altar:${x},${y}`)){
+          this.log('An altar stands in this room.');
+          this.level.loggedFeatures.add(`altar:${x},${y}`);
+        } else if ((g === GL.THRONE || g === GL.GRAVE) && !this.level.loggedFeatures.has(`feature:${x},${y}`)){
+          this.log('You find something notable here.');
+          this.level.loggedFeatures.add(`feature:${x},${y}`);
         }
       }
       this.level.seen[y][x] = true;
@@ -684,6 +723,43 @@ class Game {
       this.monsterTurns();
       this.tryDescendIfOnStairs();
       this.recomputeFOV();
+      // Interact with notable environment tiles when you arrive
+      const g = this.level.map.glyphAt(this.player.x, this.player.y);
+      if (g === GL.FOUNTAIN){
+        const key = `fountain_use:${this.player.x},${this.player.y}`;
+        if (!this.level.loggedFeatures.has(key)){
+          const heal = Math.min(3, Math.max(1, Math.floor(this.player.maxHpDerived * 0.08)));
+          this.player.hp = Math.min(this.player.maxHpDerived, this.player.hp + heal);
+          this.player.mana = Math.min(this.player.maxMana, this.player.mana + 6);
+          this.addFloatText(this.player.x, this.player.y, `+${heal}`, { color:'#4ef58a', heal:true });
+          this.log('You drink from the fountain: a little life returns to you.');
+          this.level.loggedFeatures.add(key);
+          this.updateHUD();
+        } else {
+          this.log('The fountain trickles quietly.');
+        }
+      } else if (g === GL.ALTAR){
+        const key = `altar_seen:${this.player.x},${this.player.y}`;
+        if (!this.level.loggedFeatures.has(key)){
+          if (this.level.rng() < 0.5){
+            const heal = 6;
+            this.player.hp = Math.min(this.player.maxHpDerived, this.player.hp + heal);
+            this.addFloatText(this.player.x, this.player.y, `+${heal}`, { color:'#4ef58a', heal:true });
+            this.log('You receive a blessing from the altar.');
+          } else {
+            applyStatus(this.player, 'poison', { duration:6, potency:2 }, this);
+            this.log('A cold dread passes over you — the altar curses you.');
+          }
+          this.level.loggedFeatures.add(key);
+          this.updateHUD();
+        } else {
+          this.log('The altar is silent.');
+        }
+      } else if (g === GL.SINK){
+        this.player.mana = Math.min(this.player.maxMana, this.player.mana + 3);
+        this.log('You splash at the sink and feel a spark of focus.');
+        this.updateHUD();
+      }
     }
 
     // Effects & particles update
@@ -724,6 +800,11 @@ class Game {
             case GL.STAIRS: fg = '#b8e2ff'; break;
             case GL.WATER: fg = '#4fb3ff'; break;
             case GL.TRAP: fg = '#ff8f8f'; break;
+            case GL.FOUNTAIN: fg = '#9fe6ff'; break;
+            case GL.ALTAR: fg = '#ffd1e8'; break;
+            case GL.THRONE: fg = '#f2d78a'; break;
+            case GL.GRAVE: fg = '#d7d7d7'; break;
+            case GL.SINK: fg = '#9ad7c6'; break;
             default: fg = '#cfd3dc';
           }
         } else {
@@ -733,6 +814,11 @@ class Game {
           else if (g === GL.STAIRS) fg = '#5d7585';
           else if (g === GL.WATER) fg = '#2e6a99';
           else if (g === GL.TRAP) fg = '#6a3a3a';
+          else if (g === GL.FOUNTAIN) fg = '#5fa8bf';
+          else if (g === GL.ALTAR) fg = '#7f5f6f';
+          else if (g === GL.THRONE) fg = '#7a6a4a';
+          else if (g === GL.GRAVE) fg = '#8a8a8a';
+          else if (g === GL.SINK) fg = '#5f8f82';
         }
         this.r.drawCell(sx, sy, g, fg);
       }
