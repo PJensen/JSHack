@@ -437,6 +437,8 @@ class Overworld {
       elevPersist: 0.55,
       elevLacun: 2.0,
       mountainThresh: 0.62, // > elev -> mountain
+      // Sea level: below this elevation becomes water
+      seaLevel: 0.32,
       // Moisture controls forests/trees
       moistScale: 0.09,
       moistOct: 3,
@@ -481,8 +483,10 @@ class Overworld {
         // Slight ridge transform for craggier peaks
         const ridge = Math.pow(elev, 1.35);
         const moist = fbm01(x + 1000, y - 777, P.moistScale, P.moistOct, P.moistPersist, P.moistLacun);
-        // Mountains at high elevation
-        if (ridge > P.mountainThresh){
+        // Water at low elevation (sea/lakes)
+        if (elev < P.seaLevel){
+          this.tiles[y][x] = GL.WATER;
+        } else if (ridge > P.mountainThresh){
           this.tiles[y][x] = GL.MOUNTAIN;
         } else if (moist > P.treeThresh && elev >= P.treeElevMin && elev <= P.treeElevMax){
           this.tiles[y][x] = GL.TREE;
@@ -1043,7 +1047,14 @@ class Game {
           const nx = this.overworldPlayer.x + ev.dx;
           const ny = this.overworldPlayer.y + ev.dy;
           if (nx >= 0 && ny >= 0 && nx < this.overworld.w && ny < this.overworld.h){
-            this.overworldPlayer.x = nx; this.overworldPlayer.y = ny; acted = true;
+            const dest = this.overworld.glyphAt(nx, ny);
+            // Block impassable water and mountains in overworld movement
+            if (dest === GL.WATER || dest === GL.MOUNTAIN){
+              // optional: small message only occasionally to avoid spam
+              if (this.turn % 7 === 0) this.log(dest===GL.WATER? 'The water is too deep to cross.' : 'The mountains are impassable.');
+            } else {
+              this.overworldPlayer.x = nx; this.overworldPlayer.y = ny; acted = true;
+            }
             const g = this.overworld.glyphAt(nx, ny);
               if (g === GL.TOWN){
               // Enter town -> switch back to dungeon at depth 1
@@ -1191,6 +1202,7 @@ class Game {
             let fg = '#b7d7b0';
             if (g === GL.TREE) fg = '#77a366';
             else if (g === GL.MOUNTAIN) fg = '#c0c0c0';
+            else if (g === GL.WATER) fg = '#4fb3ff';
             else if (g === GL.TOWN) fg = '#ffd1d1';
             this.r.drawCell(sx, sy, g, fg);
           }
