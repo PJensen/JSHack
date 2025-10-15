@@ -429,6 +429,23 @@ class Overworld {
     this.w = w; this.h = h; this.seed = seed >>> 0;
     this.rng = mulberry32((this.seed ^ 0x9e3779b1) >>> 0);
     this.tiles = Array.from({length:h}, _=> Array.from({length:w}, ()=> GL.GRASS));
+    // Tunable noise params for clustering
+    this.params = {
+      // Elevation controls mountains
+      elevScale: 0.06,
+      elevOct: 3,
+      elevPersist: 0.55,
+      elevLacun: 2.0,
+      mountainThresh: 0.62, // > elev -> mountain
+      // Moisture controls forests/trees
+      moistScale: 0.09,
+      moistOct: 3,
+      moistPersist: 0.55,
+      moistLacun: 2.0,
+      treeThresh: 0.58, // > moist AND within elevation band -> trees
+      treeElevMin: 0.12,
+      treeElevMax: 0.70
+    };
     // Build a simple permutation table for Perlin noise seeded by overworld seed
     this.perm = new Uint8Array(512);
     const p = new Uint8Array(256);
@@ -444,26 +461,59 @@ class Overworld {
     this.dungeonEntrance = null; // {x,y}
   }
   generate(){
-    // Simple procedural scatter: grass, trees, mountains, towns. Deterministic via rng.
-  // Base scatter for large features (trees/mountains/towns). Fine-grain grass will be shaded at render-time by Perlin noise.
+    // fBM helpers (fractal Brownian motion over Perlin) returning [0,1]
+    const fbm01 = (x, y, scale, oct, persist, lacun) => {
+      let amp = 1, freq = scale, sum = 0, ampSum = 0;
+      for (let i=0;i<oct;i++){
+        sum += amp * perlin2(x * freq, y * freq, this.perm);
+        ampSum += amp; amp *= persist; freq *= lacun;
+      }
+      // perlin2 is in [-1,1]; fBM sum is in [-ampSum, ampSum] approximately
+      const norm = sum / (ampSum || 1);
+      return 0.5 * (norm + 1);
+    };
+
+    const P = this.params;
+    // First pass: classify terrain by elevation & moisture for clustering
     for (let y=0;y<this.h;y++){
       for (let x=0;x<this.w;x++){
-        const r = this.rng();
-        if (r < 0.06) this.tiles[y][x] = GL.TREE;
-        else if (r < 0.085) this.tiles[y][x] = GL.MOUNTAIN;
-        else this.tiles[y][x] = GL.GRASS;
+        const elev = fbm01(x, y, P.elevScale, P.elevOct, P.elevPersist, P.elevLacun);
+        // Slight ridge transform for craggier peaks
+        const ridge = Math.pow(elev, 1.35);
+        const moist = fbm01(x + 1000, y - 777, P.moistScale, P.moistOct, P.moistPersist, P.moistLacun);
+        // Mountains at high elevation
+        if (ridge > P.mountainThresh){
+          this.tiles[y][x] = GL.MOUNTAIN;
+        } else if (moist > P.treeThresh && elev >= P.treeElevMin && elev <= P.treeElevMax){
+          this.tiles[y][x] = GL.TREE;
+        } else {
+          this.tiles[y][x] = GL.GRASS;
+        }
       }
     }
-  // NOTE: Grass rendering uses Perlin noise at render-time to select one of these shade glyphs:
-  // ░ (U+2591) light, ▒ (U+2592) medium, ▓ (U+2593) dark, █ (U+2588) full block.
-  // Tweak the `scale` value in the overworld rendering loop to change patch size, and
-  // adjust thresholds near where nv (normalized noise) is compared to distribute shades.
-    // Place a few towns at spaced intervals
+
+    // NOTE: Grass rendering uses Perlin noise at render-time to select shade glyphs (see renderer).
+
+    // Town placement: prefer plains (grass, moderate moisture, non-mountain)
     const townCount = 4 + Math.floor(this.rng()*4);
-    for (let i=0;i<townCount;i++){
+    let attempts = 0, placed = 0;
+    while (placed < townCount && attempts++ < townCount * 200){
       const tx = Math.floor(this.rng()*(this.w-8)) + 4;
       const ty = Math.floor(this.rng()*(this.h-6)) + 3;
-      this.tiles[ty][tx] = GL.TOWN;
+      if (this.tiles[ty][tx] !== GL.GRASS) continue;
+      // Check local suitability and avoid crowding mountains/forests too tightly
+      const elev = fbm01(tx, ty, P.elevScale, P.elevOct, P.elevPersist, P.elevLacun);
+      const moist = fbm01(tx + 1000, ty - 777, P.moistScale, P.moistOct, P.moistPersist, P.moistLacun);
+      if (elev > P.mountainThresh - 0.06) continue;
+      if (moist > P.treeThresh + 0.08) continue;
+      // Ensure plaza area doesn't include mountains
+      let ok = true;
+      for (let oy=-1; oy<=1 && ok; oy++) for (let ox=-2; ox<=2 && ok; ox++){
+        const xx=tx+ox, yy=ty+oy; if (xx<0||yy<0||xx>=this.w||yy>=this.h) { ok=false; break; }
+        if (this.tiles[yy][xx] === GL.MOUNTAIN) ok = false;
+      }
+      if (!ok) continue;
+      this.tiles[ty][tx] = GL.TOWN; placed++;
       // clear small plaza
       for (let oy=-1; oy<=1; oy++) for (let ox=-2; ox<=2; ox++){
         const xx=tx+ox, yy=ty+oy; if (xx>=0&&yy>=0&&xx<this.w&&yy<this.h) this.tiles[yy][xx]=GL.GRASS;
@@ -676,6 +726,16 @@ class Game {
         }
         this.recomputeFOV();
         return;
+      }
+      // Reroll overworld noise: N key (when in overworld)
+      if (e.code === 'KeyN'){
+        if (this.inOverworld){
+          // derive a new seed (deterministic-ish from base plus time jitter)
+          const newSeed = ((this.dungeon.baseSeed * 2654435761) ^ (Date.now()>>>0)) >>> 0;
+          this.regenOverworld(newSeed);
+          this.log('You feel the world shift around you. (Overworld rerolled)');
+          return;
+        }
       }
       // Auto-pickup toggle: F2
       if (e.code === 'F2'){
@@ -1141,7 +1201,7 @@ class Game {
       if (px>=0 && py>=0 && px<COLS && py<ROWS) this.r.drawCell(px, py, GL.PLAYER, '#ffffff');
       // HUD note
       this.r.ctx.font = '12px monospace'; this.r.ctx.fillStyle = '#cfd3dc';
-      this.r.ctx.fillText('OVERWORLD (O to toggle). Towns = ⛪. Step on town to enter dungeon.', 6, 6);
+      this.r.ctx.fillText('OVERWORLD (O to toggle). Towns = ⛪. Step on town to enter dungeon. N: reroll overworld.', 6, 6);
       // Stairs hint in overworld when standing on a stair tile
       const hereOW = this.overworld.glyphAt(this.overworldPlayer.x, this.overworldPlayer.y);
       if (hereOW === GL.STAIRS){
@@ -1279,6 +1339,22 @@ class Game {
     ctx.restore();
     // Draw Game Over modal on top if player died
     if (this.gameOver){ try { this.renderGameOver(); } catch(e){} }
+  }
+
+  // Rebuild the overworld with a new seed and keep the player near center
+  regenOverworld(seed){
+    try {
+      const oldOW = this.overworld;
+      this.overworld = new Overworld(oldOW.w, oldOW.h, seed >>> 0);
+      // center player and place a new dungeon entrance nearby
+      this.overworldPlayer = { x: Math.floor(this.overworld.w/2), y: Math.floor(this.overworld.h/2) };
+      const entr = this.overworld.placeDungeonEntrance(this.overworldPlayer.x + 2, this.overworldPlayer.y);
+      // If current dungeon level has a return mapping, update it to the new entrance
+      if (this.level){
+        this.level.backToOverworld = this.level.backToOverworld || { x:this.level.upX, y:this.level.upY };
+        if (entr) { this.level.backToOverworld.owX = entr.x; this.level.backToOverworld.owY = entr.y; }
+      }
+    } catch(e){ console.warn('regenOverworld failed', e); }
   }
 
   // Small helper to draw a translucent stairs hint centered at the bottom

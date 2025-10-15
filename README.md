@@ -11,6 +11,7 @@ A lightweight, standalone web application for experimenting with JavaScript, HTM
 ## Features
 
 - **Unicode Canvas Roguelike:** Play a classic roguelike rendered on an HTML5 canvas using Unicode glyphs for walls, floors, doors, stairs, and entities.
+- **Overworld with Noise-based Biomes:** The overworld uses small, seeded Perlin fBM fields to cluster mountains (elevation) and forests (moisture), producing cleaner regions.
 - **Procedural Dungeon Generation:** Each level is generated with rooms, corridors, doors, water, and traps using deterministic seeded randomization.
 - **Player & Entities:** Move your character (`@`) through the dungeon, encountering monsters, items, and equipment.
 - **Resource Bars:** Visual health and mana bars update in real time.
@@ -29,6 +30,8 @@ You can add a screenshot below this section to showcase the game in action.
    ```
 2. Open `js-hack.html` in your favorite web browser.
 3. Start hacking! Edit `js-hack.html` directly to add features, styles, or scripts.
+
+Tip: While in the overworld (press O), press N to reroll the world with a fresh noise seed.
 
 ## Developer Workflow
 - **Edit:** Make changes directly in `js-hack.html`.
