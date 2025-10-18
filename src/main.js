@@ -9,7 +9,7 @@ import { World, defineComponent, defineTag, Not, startLoop, runSelfTests } from 
 import { makeRegistry, serializeWorld, applySnapshot } from './ecs/serialization.js';
 
 // Prefer the explicit id used in index.html but fall back to the first <canvas>
-const canvas = document.getElementById('canvas') || document.querySelector('canvas');
+const canvas = document.getElementById('terminal') || document.querySelector('canvas');
 if (!canvas) {
   // Fail fast with a clear message to help contributors debug the HTML entrypoint.
   throw new Error('Canvas element not found. Ensure index.html contains <canvas id="canvas">');
