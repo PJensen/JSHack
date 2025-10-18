@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>JS-Hack — Mobile UX Sketch v2</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d12;
+    --panel: #0f1320;
+    --panel-2: #12192a;
+    --accent-1: #1b2734;
+    --accent-2: #2e3d50;
+    --text: #cfd3dc;
+    --text-soft: #bcd2e8;
+    --pad: clamp(6px, 2.2vw, 12px);
+    --radius: 12px;
+    --btn-radius: 12px;
+    --font: clamp(12px, 2.8vw, 15px);
+    --font-small: clamp(10px, 2.2vw, 13px);
+  }
+  html, body { height:100%; margin:0; overflow:hidden; overscroll-behavior:none; }
+  body {
+    display:grid; place-items:center; background:var(--bg); color:var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    touch-action: manipulation;
+  }
+  #wrap {
+    width:100vw; height:100dvh; max-width:820px;
+    display:flex; flex-direction:column;
+    background:var(--panel); border:1px solid var(--accent-2); border-radius:var(--radius);
+    box-shadow:0 10px 40px rgba(0,0,0,.5); overflow:hidden;
+  }
+  /* Header */
+  #header {
+    display:flex; gap:8px; align-items:center; justify-content:space-between;
+    padding:var(--pad); background:var(--panel);
+    border-bottom:1px solid var(--accent-2);
+    font-size:var(--font);
+  }
+  #seed { opacity:.7; font-size:var(--font-small); }
+  /* Tabs (Game / Inventory) */
+  #tabs { display:flex; gap:6px; padding:6px var(--pad); background:var(--panel); border-bottom:1px solid var(--accent-2); }
+  .tab {
+    padding:6px 12px; background:var(--accent-1); border:1px solid var(--accent-2);
+    border-bottom:none; border-radius:10px 10px 0 0; cursor:pointer; user-select:none;
+    font-size:var(--font);
+  }
+  .tab.active { background:#263042; color:#e8f1ff; }
+  .keyhint { margin-left:auto; opacity:.7; font-size:var(--font-small); align-self:center; }
+  /* Views container */
+  #views { position:relative; flex:1; overflow:hidden; background:var(--panel); }
+  .view {
+    position:absolute; inset:0; display:none; padding:var(--pad);
+  }
+  .view.active { display:block; }
+  /* Canvas area */
+  #stage-wrap {
+    position:relative; width:100%; height:100%;
+    display:grid; place-items:center;
+  }
+  #stage {
+    width:100%; height:auto; max-height:100%;
+    image-rendering: pixelated; border:1px solid var(--accent-2); border-radius:10px;
+    background:var(--panel);
+    touch-action:none; /* let us handle pinch/pan */
+  }
+  /* HUD bars */
+  #hud {
+    position:absolute; top:8px; left:8px; right:8px; display:flex; gap:8px;
+    font-size:var(--font-small); pointer-events:none;
+  }
+  .bar { position:relative; flex:1; height:12px; background:#111a29; border:1px solid var(--accent-2); border-radius:6px; overflow:hidden; }
+  .bar > .fill { position:absolute; inset:0; width:80%; background:linear-gradient(90deg,#a91e2c,#ff515c); }
+  .bar.mana > .fill { width:60%; background:linear-gradient(90deg,#1e6fb0,#33c5ff); }
+  .bar > .label { position:absolute; inset:0; display:grid; place-items:center; color:#ffe3e3; text-shadow:0 1px 1px #000; }
+  .bar.mana > .label { color:#d9edf7; }
+  /* Zoom controls */
+  #zoomCtl {
+    position:absolute; right:10px; bottom:90px; display:flex; flex-direction:column; gap:6px;
+  }
+  .zbtn {
+    width:40px; height:40px; display:grid; place-items:center;
+    background:var(--accent-1); border:1px solid var(--accent-2); border-radius:10px; user-select:none;
+  }
+  /* Bottom controls */
+  #thumb {
+    display:flex; gap:10px; align-items:center; justify-content:space-between;
+    padding:var(--pad); background:var(--panel); border-top:1px solid var(--accent-2);
+  }
+  .dpad {
+    display:grid; grid-template-columns:48px 48px 48px; grid-template-rows:48px 48px 48px; gap:6px;
+  }
+  .btn, .padbtn {
+    background:var(--accent-1); border:1px solid var(--accent-2); color:var(--text); border-radius:var(--btn-radius);
+    width:48px; height:48px; display:grid; place-items:center; font-size:20px; user-select:none;
+    touch-action: manipulation;
+  }
+  .btn:active, .padbtn:active { filter:brightness(1.2); }
+  .invis { visibility:hidden; }
+  .actions { display:flex; gap:8px; }
+  .actions .btn { width:auto; padding:10px 14px; height:48px; font-size:16px; }
+  .pill { border-radius:999px; }
+  /* Panels */
+  .panel { border:1px solid var(--accent-2); border-radius:10px; background:var(--panel-2); padding:var(--pad); height:100%; overflow:auto; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .muted { opacity:.85; font-size:var(--font-small); }
+  /* Overlays */
+  .overlay {
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.35); backdrop-filter: blur(2px);
+  }
+  .overlay.active { display:flex; }
+  .sheet {
+    width:min(92vw, 560px); max-height:72vh; overflow:auto;
+    background:var(--panel-2); border:1px solid var(--accent-2); border-radius:12px; padding:12px;
+  }
+  .sheet h3 { margin:0 0 8px 0; font-size:16px; }
+  .closeX { float:right; cursor:pointer; opacity:.8; }
+  .logbox {
+    height:48vh; overflow:auto; border:1px solid var(--accent-2); border-radius:8px; padding:8px; background:#0b1220; line-height:1.35;
+  }
+  .tag { color:#9ad7c6; }
+  .spell { display:flex; align-items:center; justify-content:space-between; padding:8px; border:1px solid var(--accent-2); border-radius:8px; margin-bottom:8px; background:#162133; cursor:pointer; }
+  .spell.active { outline:2px solid #33c5ff; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="header">
+      <div><strong>JS-Hack</strong></div>
+      <div id="seed">seed 0xC0FFEE</div>
+    </div>
+
+    <div id="tabs" role="tablist" aria-label="Views">
+      <div class="tab active" role="tab" aria-selected="true" tabindex="0" data-target="game">Game</div>
+      <div class="tab" role="tab" aria-selected="false" tabindex="-1" data-target="inventory">Inventory</div>
+      <div class="keyhint">Swipe • Tab/Shift+Tab</div>
+    </div>
+
+    <div id="views">
+      <!-- Game -->
+      <section id="view-game" class="view active" role="tabpanel" aria-labelledby="tab-game">
+        <div id="stage-wrap">
+          <canvas id="stage" width="720" height="396" aria-label="game canvas"></canvas>
+          <div id="hud">
+            <div class="bar"><div class="fill" id="hpFill"></div><div class="label" id="hpLabel">HP 20/25</div></div>
+            <div class="bar mana"><div class="fill" id="mpFill"></div><div class="label" id="mpLabel">Mana 18/30</div></div>
+          </div>
+          <div id="zoomCtl">
+            <div class="zbtn" id="zoomIn">＋</div>
+            <div class="zbtn" id="zoomOut">－</div>
+          </div>
+        </div>
+      </section>
+      <!-- Inventory -->
+      <section id="view-inventory" class="view" role="tabpanel" aria-labelledby="tab-inventory">
+        <div class="panel">
+          <div class="grid2">
+            <div>
+              <strong>Equipment</strong><br>
+              • Weapon: Rusty Sword<br>
+              • Armor: Patchwork Vest<br>
+              • Ring: Copper Band<br>
+              <div class="muted" style="margin-top:6px;">Tap an item to equip (mock).</div>
+            </div>
+            <div>
+              <strong>Stats</strong><br>
+              HP 20/25 • Mana 18/30<br>
+              ATK 4 • DEF 1 • Crit 12%
+            </div>
+          </div>
+          <hr style="border:0;border-top:1px solid var(--accent-2); margin:10px 0;">
+          <div>
+            <strong>Backpack</strong><br>
+            1. 🧪 Minor Potion x2<br>
+            2. 📜 Scroll of Spark<br>
+            3. 💰 Gold x37
+          </div>
+        </div>
+      </section>
+
+      <!-- Log Overlay -->
+      <div id="logOverlay" class="overlay" aria-modal="true" role="dialog">
+        <div class="sheet">
+          <div class="closeX" id="logClose">✕</div>
+          <h3>Event Log</h3>
+          <div class="logbox" id="logbox"></div>
+        </div>
+      </div>
+
+      <!-- Spell Picker Overlay -->
+      <div id="spellOverlay" class="overlay" aria-modal="true" role="dialog">
+        <div class="sheet">
+          <div class="closeX" id="spellClose">✕</div>
+          <h3>Select Spell</h3>
+          <div id="spellList"></div>
+          <div class="muted">Tip: long-press 🎯 to open this quickly.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="thumb">
+      <div class="dpad" aria-label="Movement">
+        <div class="padbtn invis"></div>
+        <div class="padbtn" data-mv="up">⬆️</div>
+        <div class="padbtn invis"></div>
+        <div class="padbtn" data-mv="left">⬅️</div>
+        <div class="padbtn" data-mv="wait">•</div>
+        <div class="padbtn" data-mv="right">➡️</div>
+        <div class="padbtn invis"></div>
+        <div class="padbtn" data-mv="down">⬇️</div>
+        <div class="padbtn invis"></div>
+      </div>
+      <div class="actions">
+        <div class="btn pill" id="castBtn">🎯 Cast</div>
+        <div class="btn pill" id="invBtn">🎒 Inv</div>
+        <div class="btn pill" id="logBtn">📜 Log</div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+/* =============== TABS + SWIPE (Game/Inventory) =============== */
+const tabs = Array.from(document.querySelectorAll('.tab'));
+let tabIndex = 0;
+function activate(i, via='click'){
+  const prev = tabIndex;
+  tabIndex = (i + tabs.length) % tabs.length;
+  tabs.forEach((t,j)=>{
+    const active = j === tabIndex;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', active ? 'true' : 'false');
+    t.tabIndex = active ? 0 : -1;
+    const view = document.getElementById('view-' + t.dataset.target);
+    if (view) view.classList.toggle('active', active);
+  });
+  if (via !== 'swipe') tabs[tabIndex].focus({ preventScroll:true });
+}
+tabs.forEach((t,i)=> t.addEventListener('click', ()=>activate(i)));
+window.addEventListener('keydown', (e)=>{
+  if (e.code === 'Tab'){ e.preventDefault(); activate(tabIndex + (e.shiftKey ? -1 : +1)); }
+});
+// swipe
+(function attachSwipe(el){
+  let sx=0, sy=0, dx=0, dy=0, dragging=false;
+  el.addEventListener('touchstart', (e)=>{ const t=e.touches[0]; sx=t.clientX; sy=t.clientY; dragging=true; dx=dy=0; }, {passive:true});
+  el.addEventListener('touchmove', (e)=>{ if (!dragging) return; const t=e.touches[0]; dx=t.clientX-sx; dy=t.clientY-sy; }, {passive:true});
+  el.addEventListener('touchend', ()=>{ if (!dragging) return; dragging=false; if (Math.abs(dx)>40 && Math.abs(dx)>Math.abs(dy)) activate(tabIndex + (dx<0?+1:-1), 'swipe'); }, {passive:true});
+})(document.getElementById('views'));
+
+/* =============== CANVAS + TILE VIEWPORT ZOOM =============== */
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const TILE_W = 16, TILE_H = 24;
+const WORLD_COLS = 96, WORLD_ROWS = 56;   // world size
+let viewCols = 40, viewRows = 22;         // viewport tile size (zoom target)
+const minView = 18, maxView = 56;         // limits
+let px = 5, py = 5;                       // player tile
+ctx.font = (TILE_H - 6) + 'px monospace'; ctx.textBaseline = 'top';
+
+function draw(){
+  // compute scale to fit exactly viewCols x viewRows in canvas interior
+  const marginX = 10, marginY = 10;
+  const availW = canvas.width - marginX*2, availH = canvas.height - marginY*2;
+  const scaleX = availW / (viewCols * TILE_W);
+  const scaleY = availH / (viewRows * TILE_H);
+  const scale = Math.min(scaleX, scaleY);
+  const drawW = viewCols * TILE_W * scale;
+  const drawH = viewRows * TILE_H * scale;
+  const offX = Math.floor((canvas.width - drawW)/2);
+  const offY = Math.floor((canvas.height - drawH)/2);
+
+  ctx.fillStyle = '#0f1320'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(offX, offY);
+  ctx.scale(scale, scale);
+
+  // compute viewport around player
+  const halfC = Math.floor(viewCols/2), halfR = Math.floor(viewRows/2);
+  let vx0 = Math.max(0, px - halfC), vy0 = Math.max(0, py - halfR);
+  let vx1 = Math.min(WORLD_COLS-1, vx0 + viewCols - 1);
+  let vy1 = Math.min(WORLD_ROWS-1, vy0 + viewRows - 1);
+  // adjust to keep full window when near edges
+  vx0 = Math.max(0, Math.min(vx0, WORLD_COLS - viewCols));
+  vy0 = Math.max(0, Math.min(vy0, WORLD_ROWS - viewRows));
+
+  // grid
+  for (let y=0;y<viewRows;y++){
+    for (let x=0;x<viewCols;x++){
+      ctx.fillStyle = ((x+y)&1) ? '#121a2b' : '#0f1625';
+      ctx.fillRect(x*TILE_W, y*TILE_H, TILE_W, TILE_H);
+    }
+  }
+  // player if inside
+  const sx = px - vx0, sy = py - vy0;
+  if (sx>=0 && sy>=0 && sx<viewCols && sy<viewRows){
+    ctx.fillStyle = '#cfd3dc';
+    ctx.fillText('@', sx*TILE_W, sy*TILE_H);
+  }
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function move(dx,dy){ px = clamp(px+dx, 0, WORLD_COLS-1); py = clamp(py+dy, 0, WORLD_ROWS-1); logEvent(`Move ${dx},${dy}`); }
+function zoom(delta){
+  // adjust viewCols/Rows symmetrically
+  viewCols = clamp(viewCols + delta, minView, maxView);
+  viewRows = clamp(Math.round(viewCols * (22/40)), Math.round(minView*(22/40)), Math.round(maxView*(22/40))); // keep aspect similar
+  logEvent(`Viewport ${viewCols}×${viewRows}`);
+}
+document.getElementById('zoomIn').addEventListener('click', ()=> zoom(-4));
+document.getElementById('zoomOut').addEventListener('click', ()=> zoom(+4));
+
+// Pinch zoom
+let pinchStartDist = 0, pinchStartView = 0;
+canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('pointerup', onPointerUp);
+canvas.addEventListener('pointercancel', onPointerUp);
+let pointers = new Map();
+function onPointerDown(e){ canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, {x:e.clientX, y:e.clientY}); }
+function onPointerMove(e){
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pointers.size === 2){
+    const [a,b] = Array.from(pointers.values());
+    const dist = Math.hypot(a.x-b.x, a.y-b.y);
+    if (!pinchStartDist){ pinchStartDist = dist; pinchStartView = viewCols; }
+    const diff = dist - pinchStartDist;
+    if (Math.abs(diff) > 10){
+      const steps = Math.round(diff / 30);
+      viewCols = clamp(pinchStartView - steps*2, minView, maxView);
+      viewRows = clamp(Math.round(viewCols * (22/40)), Math.round(minView*(22/40)), Math.round(maxView*(22/40)));
+    }
+  }
+}
+function onPointerUp(e){
+  if (pointers.has(e.pointerId)) pointers.delete(e.pointerId);
+  if (pointers.size < 2){ pinchStartDist = 0; }
+}
+
+/* =============== LOG OVERLAY =============== */
+const logOverlay = document.getElementById('logOverlay');
+const logBtn = document.getElementById('logBtn');
+document.getElementById('logClose').addEventListener('click', ()=> logOverlay.classList.remove('active'));
+logBtn.addEventListener('click', ()=> logOverlay.classList.add('active'));
+const logbox = document.getElementById('logbox');
+function logEvent(msg){
+  const el = document.createElement('div');
+  el.innerHTML = `<span class="tag">[${new Date().toLocaleTimeString()}]</span> ${msg}.`;
+  logbox.appendChild(el); logbox.scrollTop = logbox.scrollHeight;
+}
+
+/* =============== D-Pad + Actions =============== */
+document.querySelectorAll('.padbtn').forEach(btn=>{
+  const mv = btn.dataset.mv; if (!mv) return;
+  btn.addEventListener('click', ()=>{
+    if (mv==='up') move(0,-1);
+    else if (mv==='down') move(0,1);
+    else if (mv==='left') move(-1,0);
+    else if (mv==='right') move(1,0);
+    else if (mv==='wait') logEvent('You wait');
+  });
+});
+document.getElementById('invBtn').addEventListener('click', ()=> activate(1));
+
+/* =============== Cast Button: Tap = cast, Long-press = spell picker =============== */
+const castBtn = document.getElementById('castBtn');
+const spellOverlay = document.getElementById('spellOverlay');
+const spellClose = document.getElementById('spellClose');
+const spellListEl = document.getElementById('spellList');
+const spells = [
+  { id:'spark', name:'Spark', cost:4 },
+  { id:'bolt',  name:'Bolt',  cost:8 },
+  { id:'shield',name:'Shield',cost:6 },
+];
+let activeSpell = 'spark';
+
+function renderSpells(){
+  spellListEl.innerHTML = '';
+  for (const s of spells){
+    const row = document.createElement('div');
+    row.className = 'spell' + (s.id===activeSpell ? ' active':''); 
+    row.innerHTML = `<div>${s.name}</div><div class="muted">cost ${s.cost}</div>`;
+    row.addEventListener('click', ()=>{ activeSpell = s.id; renderSpells(); spellOverlay.classList.remove('active'); logEvent('Selected '+s.name); });
+    spellListEl.appendChild(row);
+  }
+}
+renderSpells();
+
+let longTimer = null, longFired = false;
+function startLong(e){
+  clearTimeout(longTimer); longFired = false;
+  longTimer = setTimeout(()=>{ longFired = true; spellOverlay.classList.add('active'); }, 550);
+}
+function endLong(e){
+  clearTimeout(longTimer);
+  if (!longFired){ // short tap -> cast
+    const spell = spells.find(s=>s.id===activeSpell);
+    logEvent(`You cast <strong>${spell.name}</strong>`);
+    // nudge mana bar mock
+    const mp = document.getElementById('mpFill');
+    const cur = parseFloat(mp.style.width)||60; mp.style.width = Math.max(0, cur - (spell.cost/30*100)) + '%';
+  }
+}
+castBtn.addEventListener('mousedown', startLong);
+castBtn.addEventListener('touchstart', startLong, {passive:true});
+castBtn.addEventListener('mouseup', endLong);
+castBtn.addEventListener('touchend', endLong, {passive:true});
+spellClose.addEventListener('click', ()=> spellOverlay.classList.remove('active'));
+
+/* Keyboard fallback */
+window.addEventListener('keydown', (e)=>{
+  if (e.key === 'ArrowUp') move(0,-1);
+  else if (e.key === 'ArrowDown') move(0,1);
+  else if (e.key === 'ArrowLeft') move(-1,0);
+  else if (e.key === 'ArrowRight') move(1,0);
+});
+/* ambient ticker */
+setInterval(()=>{ logEvent('Slime takes <strong>'+(1+Math.floor(Math.random()*6))+'</strong> damage'); }, 1500);
+</script>
+</body>
+</html>

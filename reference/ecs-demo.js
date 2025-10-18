@@ -5,8 +5,8 @@
   - Pure ES modules, no bundler. Works by opening index.html directly or serving.
 */
 
-import { World, defineComponent, defineTag, Not, startLoop, runSelfTests } from './ecs/core.js';
-import { makeRegistry, serializeWorld, applySnapshot } from './ecs/serialization.js';
+import { World, defineComponent, defineTag, Not, startLoop, runSelfTests } from '../src/ecs/core.js';
+import { makeRegistry, serializeWorld, applySnapshot } from '../src/ecs/serialization.js';
 
 // Prefer the explicit id used in index.html but fall back to the first <canvas>
 const canvas = document.getElementById('canvas') || document.querySelector('canvas');
