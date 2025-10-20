@@ -7,6 +7,7 @@
 
 import { World, defineComponent, defineTag, Not, startLoop, runSelfTests } from './ecs/core.js';
 import { makeRegistry, serializeWorld, applySnapshot } from './ecs/serialization.js';
+import { spawnPlayer, Position } from './player.js';
 
 // Prefer the explicit id used in index.html (#stage) but fall back to the first <canvas>
 const canvas = document.getElementById('stage') || document.getElementById('terminal') || document.querySelector('canvas');
@@ -178,6 +179,23 @@ function enableTouchUI(){
   const buttons = touchUi.querySelectorAll('.dpad .btn');
   // indices: 0..8, center index 4 is wait
   buttons.forEach((btn, idx)=>{
+    // Visual pressed state & activation handlers
+    const press = ()=> btn.classList.add('pressed');
+    const release = ()=> btn.classList.remove('pressed');
+
+    btn.addEventListener('pointerdown', (ev)=>{ press(); /* keep pressed until pointerup/cancel */ });
+    btn.addEventListener('pointerup', (ev)=>{ release(); });
+    btn.addEventListener('pointercancel', (ev)=>{ release(); });
+    btn.addEventListener('mouseleave', (ev)=>{ release(); });
+
+    // Support keyboard activation (Enter / Space) on focusable buttons
+    btn.addEventListener('keydown', (ev)=>{
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); press(); }
+    });
+    btn.addEventListener('keyup', (ev)=>{
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); release(); btn.click(); }
+    });
+
     btn.addEventListener('click', ()=>{
       // center is wait, corners/edges map to directions
       const synthKey = (()=>{
@@ -204,7 +222,10 @@ function enableTouchUI(){
 }
 
 // Show touch UI when appropriate
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0){ enableTouchUI(); }
+// Show touch UI on touch devices, or allow forcing it via URL for desktop testing.
+const url = new URL(location.href);
+const forceTouch = url.hash === '#touch' || url.searchParams.get('touch') === '1';
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0 || forceTouch){ enableTouchUI(); }
 
 /* Swipe detector: open inventory on swipe-left
    - listens on the canvas (#stage) for pointer/touch gestures
@@ -248,6 +269,7 @@ window.JS_HOOKS = {
   openSpellList: ()=> showOverlay('spell'),
   openLog: ()=> showOverlay('log'),
   closeOverlays,
+  enableTouchUI: ()=> enableTouchUI(),
   useHealingItem: ()=> toast('useHealingItem: Not implemented'),
   autoCastCurrentSpell: ()=> toast('autoCastCurrentSpell: Not implemented'),
   descendIfPossible: ()=> toast('descendIfPossible: Not implemented'),
@@ -286,25 +308,39 @@ for (let y = 0; y < MAP_H; y++){
   }
 }
 
-// Player state (tile coords)
-const player = { x: Math.floor(MAP_W/2), y: Math.floor(MAP_H/2) };
+// Player entity and state (stored as ECS components)
+const playerStartX = Math.floor(MAP_W/2), playerStartY = Math.floor(MAP_H/2);
+const playerId = spawnPlayer(world, playerStartX, playerStartY);
+
+function getPlayerPos(){
+  const p = world.get(playerId, Position);
+  if (!p) return { x: playerStartX, y: playerStartY };
+  return p;
+}
+
+function setPlayerPos(x, y){
+  // use world.set to mark Changed and update safely
+  world.set(playerId, Position, { x: Math.floor(x), y: Math.floor(y) });
+}
 
 // Simple camera that centers on player but clamps to map bounds
 const camera = { x: 0, y: 0 };
 function updateCamera(){
   const cols = Math.ceil(window.innerWidth / TILE_SIZE);
   const rows = Math.ceil(window.innerHeight / TILE_SIZE);
-  camera.x = Math.max(0, Math.min(MAP_W - cols, Math.floor(player.x - cols/2)));
-  camera.y = Math.max(0, Math.min(MAP_H - rows, Math.floor(player.y - rows/2)));
+  const p = getPlayerPos();
+  camera.x = Math.max(0, Math.min(MAP_W - cols, Math.floor(p.x - cols/2)));
+  camera.y = Math.max(0, Math.min(MAP_H - rows, Math.floor(p.y - rows/2)));
 }
 updateCamera();
 
 // Movement: try to step player by dx,dy if target tile is floor
 function tryMove(dx, dy){
-  const nx = player.x + dx, ny = player.y + dy;
+  const p = getPlayerPos();
+  const nx = p.x + dx, ny = p.y + dy;
   if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) return false;
   if (map[ny][nx] === TILE.WALL) return false;
-  player.x = nx; player.y = ny; updateCamera(); return true;
+  setPlayerPos(nx, ny); updateCamera(); return true;
 }
 
 // Movement handler for arrow keys
@@ -358,8 +394,9 @@ world.system((w, dtOrAlpha) => {
   }
 
   // Draw player
-  const playerScreenX = (player.x - startX) * TILE_SIZE + TILE_SIZE/2;
-  const playerScreenY = (player.y - startY) * TILE_SIZE + TILE_SIZE/2;
+  const p = getPlayerPos();
+  const playerScreenX = (p.x - startX) * TILE_SIZE + TILE_SIZE/2;
+  const playerScreenY = (p.y - startY) * TILE_SIZE + TILE_SIZE/2;
   ctx.fillStyle = '#4fc3f7'; ctx.font = `${TILE_SIZE}px system-ui, monospace`;
   ctx.fillText('@', playerScreenX, playerScreenY);
 

@@ -48,6 +48,9 @@
     .touch-ui{position:fixed;left:12px;bottom:12px;z-index:60;display:flex;gap:12px;align-items:end}
     .touch-ui .dpad{width:120px;height:120px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;padding:8px}
     .touch-ui .btn{background:rgba(255,255,255,0.02);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+  /* Pressed / active feedback for touch controls */
+  .touch-ui .btn.pressed{background:rgba(79,195,247,0.12);color:var(--accent);transform:translateY(1px);box-shadow:inset 0 0 6px rgba(79,195,247,0.06)}
+  .touch-ui .btn:active{transform:translateY(1px)}
 
     /* Small screens: slightly larger HUD spacing */
     @media (max-width:520px){
@@ -83,32 +86,7 @@
     <div id="spellOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Spells">
       <button class="close" aria-label="Close">✕</button>
       <h3>Spells</h3>
-      <div class="panel-body">
-        <p class="muted">Choose a spell to cast.</p>
-        <ul id="spellList" style="list-style:none;padding:0;margin:12px 0;display:grid;gap:8px">
-          <li class="spell-item" data-id="fireball" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)">
-            <div>
-              <strong>Fireball</strong>
-              <div style="font-size:12px;color:var(--muted)">Deals area fire damage</div>
-            </div>
-            <div><button class="cast-btn" data-id="fireball" aria-label="Cast Fireball">Cast</button></div>
-          </li>
-          <li class="spell-item" data-id="heal" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)">
-            <div>
-              <strong>Heal</strong>
-              <div style="font-size:12px;color:var(--muted)">Restore HP to target</div>
-            </div>
-            <div><button class="cast-btn" data-id="heal" aria-label="Cast Heal">Cast</button></div>
-          </li>
-          <li class="spell-item" data-id="blink" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)">
-            <div>
-              <strong>Blink</strong>
-              <div style="font-size:12px;color:var(--muted)">Short-range teleport</div>
-            </div>
-            <div><button class="cast-btn" data-id="blink" aria-label="Cast Blink">Cast</button></div>
-          </li>
-        </ul>
-      </div>
+      <div class="panel-body"><p class="muted">Not implemented</p></div>
     </div>
     <div id="logOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Combat Log">
       <button class="close" aria-label="Close">✕</button>
@@ -121,10 +99,20 @@
 
   <div id="touch-ui" class="touch-ui hidden" aria-hidden="true">
     <div class="dpad" aria-hidden="true">
-      <!-- 3x3 grid; content intentionally empty for skeleton -->
-      <div class="btn"></div><div class="btn"></div><div class="btn"></div>
-      <div class="btn"></div><div class="btn">•</div><div class="btn"></div>
-      <div class="btn"></div><div class="btn"></div><div class="btn"></div>
+      <!-- 3x3 grid; use Unicode arrows to indicate direction affordances.
+           Buttons are ordered left-to-right, top-to-bottom (indices 0..8).
+           Index mapping in src/main.js: 1=Up, 3=Left, 4=Center(wait), 5=Right, 7=Down -->
+      <div class="btn" aria-hidden="true"></div>
+      <div class="btn" role="button" tabindex="0" aria-label="Up" title="Up">▲</div>
+      <div class="btn" aria-hidden="true"></div>
+
+      <div class="btn" role="button" tabindex="0" aria-label="Left" title="Left">◀</div>
+      <div class="btn" role="button" tabindex="0" aria-label="Wait" title="Wait">•</div>
+      <div class="btn" role="button" tabindex="0" aria-label="Right" title="Right">▶</div>
+
+      <div class="btn" aria-hidden="true"></div>
+      <div class="btn" role="button" tabindex="0" aria-label="Down" title="Down">▼</div>
+      <div class="btn" aria-hidden="true"></div>
     </div>
     <div class="actions" aria-hidden="true">
       <div class="btn">Cast</div>
