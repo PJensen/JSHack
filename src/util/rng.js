@@ -15,6 +15,20 @@ export function mulberry32(seed) {
   };
 }
 
+// Convenience: create a named RNG object with common helpers bound
+export function createRng(seed){
+  const gen = mulberry32(seed >>> 0);
+  return {
+    seed: seed >>> 0,
+    next: gen,
+    float: (a=0,b=1) => rngFloat(gen, a, b),
+    int: (a,b) => rngInt(gen, a, b),
+    choice: (arr) => rngChoice(gen, arr),
+    shuffle: (arr) => rngShuffle(gen, arr),
+    shuffleInPlace: (arr) => rngShuffleInPlace(gen, arr),
+  };
+}
+
 // Simple string -> numeric seed helper (js stable hash)
 export function seedFromString(str) {
   // FNV-1a 32-bit hash
@@ -44,12 +58,31 @@ export function rngChoice(rng, arr) {
 }
 
 export function rngShuffle(rng, array) {
-  // Fisher-Yates in-place
+  // Return a new shuffled array (non-mutating) using Fisher-Yates.
+  const out = array.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+  }
+  return out;
+}
+
+// In-place variant provided for callers who rely on mutation.
+export function rngShuffleInPlace(rng, array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    const tmp = array[i];
-    array[i] = array[j];
-    array[j] = tmp;
+    const tmp = array[i]; array[i] = array[j]; array[j] = tmp;
   }
   return array;
+}
+
+// Tiny self-test helper (returns true when basic invariants hold)
+export function rngSelfTest(){
+  const s = 123456789;
+  const r = mulberry32(s);
+  // deterministic first values (regression check)
+  const v0 = Math.floor(r() * 1e9);
+  const r2 = mulberry32(s);
+  const v1 = Math.floor(r2() * 1e9);
+  return v0 === v1;
 }
