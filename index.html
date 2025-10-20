@@ -83,7 +83,32 @@
     <div id="spellOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Spells">
       <button class="close" aria-label="Close">✕</button>
       <h3>Spells</h3>
-      <div class="panel-body"><p class="muted">Not implemented</p></div>
+      <div class="panel-body">
+        <p class="muted">Choose a spell to cast.</p>
+        <ul id="spellList" style="list-style:none;padding:0;margin:12px 0;display:grid;gap:8px">
+          <li class="spell-item" data-id="fireball" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)">
+            <div>
+              <strong>Fireball</strong>
+              <div style="font-size:12px;color:var(--muted)">Deals area fire damage</div>
+            </div>
+            <div><button class="cast-btn" data-id="fireball" aria-label="Cast Fireball">Cast</button></div>
+          </li>
+          <li class="spell-item" data-id="heal" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)">
+            <div>
+              <strong>Heal</strong>
+              <div style="font-size:12px;color:var(--muted)">Restore HP to target</div>
+            </div>
+            <div><button class="cast-btn" data-id="heal" aria-label="Cast Heal">Cast</button></div>
+          </li>
+          <li class="spell-item" data-id="blink" style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)">
+            <div>
+              <strong>Blink</strong>
+              <div style="font-size:12px;color:var(--muted)">Short-range teleport</div>
+            </div>
+            <div><button class="cast-btn" data-id="blink" aria-label="Cast Blink">Cast</button></div>
+          </li>
+        </ul>
+      </div>
     </div>
     <div id="logOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Combat Log">
       <button class="close" aria-label="Close">✕</button>
