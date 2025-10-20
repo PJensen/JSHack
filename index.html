@@ -13,16 +13,99 @@
   <!-- Minimal inlined favicon to avoid 404 noise when serving locally -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b1020'/%3E%3Ctext x='50%25' y='50%25' font-size='10' fill='%23fff' text-anchor='middle' alignment-baseline='central'%3EJS%3C/text%3E%3C/svg%3E">
   <style>
-    /* Dark background, canvas fills viewport. Keep minimal so it's a readable skeleton. */
+    /* UX skeleton styles: full-screen map + floating overlays */
+    :root{
+      --bg:#0b1020; --fg:#ddd; --muted:#9aa3b2; --accent:#4fc3f7; --overlay-bg:rgba(4,8,16,0.72);
+    }
     html,body{height:100%;margin:0}
-    body{background:#0b1020;color:#ddd;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
-    #canvas{display:block;width:100vw;height:100vh}
-    .hidden{display:none}
+    body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
+
+    /* Canvas (map) fills the entire viewport and sits at z-index 0 */
+    canvas#stage{position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none;background:transparent;z-index:0}
+
+    /* Generic hidden helper */
+    .hidden{display:none!important;visibility:hidden!important}
+
+    /* Title bar (mirrors document.title) */
+    #titleBar{position:fixed;left:12px;top:12px;padding:6px 10px;border-radius:8px;background:var(--overlay-bg);backdrop-filter: blur(4px);color:var(--fg);font-weight:600;z-index:60;pointer-events:auto}
+
+    /* HUD: small floating bars (top-right) */
+    #hud{position:fixed;right:12px;top:12px;display:flex;flex-direction:column;gap:8px;z-index:60}
+    .hud-bar{min-width:160px;padding:6px 10px;border-radius:8px;background:var(--overlay-bg);display:flex;align-items:center;gap:8px;color:var(--fg);cursor:pointer}
+    .hud-bar .fill{height:8px;background:#2b3340;border-radius:4px;flex:1;overflow:hidden;position:relative}
+    .hud-bar .fill::after{content:'';position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(90deg,var(--accent),#2be2b0);transform-origin:left;}
+    #hpLabel,#mpLabel{font-size:13px;color:var(--muted);white-space:nowrap}
+
+    /* Overlays: centered modal panels */
+    .overlay{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);min-width:280px;max-width:90vw;max-height:80vh;padding:14px;border-radius:12px;background:linear-gradient(180deg,rgba(8,12,20,0.98),rgba(6,8,14,0.92));box-shadow:0 8px 30px rgba(0,0,0,0.6);color:var(--fg);z-index:80;overflow:auto}
+    .overlay .close{position:absolute;right:10px;top:8px;background:transparent;border:0;color:var(--muted);font-size:18px;cursor:pointer}
+
+    /* Toast (bottom-center) */
+    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:100;pointer-events:none;max-width:90vw}
+    #toast .msg{display:inline-block;padding:8px 12px;border-radius:999px;background:var(--overlay-bg);color:var(--fg);backdrop-filter: blur(4px);box-shadow:0 6px 18px rgba(0,0,0,0.45)}
+
+    /* Touch UI placeholders (shown only on touch devices via script/media query) */
+    .touch-ui{position:fixed;left:12px;bottom:12px;z-index:60;display:flex;gap:12px;align-items:end}
+    .touch-ui .dpad{width:120px;height:120px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;padding:8px}
+    .touch-ui .btn{background:rgba(255,255,255,0.02);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+
+    /* Small screens: slightly larger HUD spacing */
+    @media (max-width:520px){
+      .hud-bar{min-width:140px}
+      .touch-ui{left:10px;bottom:10px}
+    }
   </style>
 </head>
 <body>
   <!-- Canvas used by the demo. Render at devicePixelRatio from ./src/main.js -->
-  <canvas id="canvas" width="800" height="600" aria-label="Hack-JS"></canvas>
+  <canvas id="stage" width="800" height="600" aria-label="Game stage"></canvas>
+
+  <!-- UX skeleton: floating overlays, HUD, and touch UI (stubs) -->
+  <div id="titleBar" aria-hidden="false">JS-Hack</div>
+
+  <div id="hud" aria-hidden="false">
+    <div id="hp" class="hud-bar" role="button" tabindex="0" aria-label="Health">
+      <div id="hpFill" class="fill" style="--pct:100%"></div>
+      <span id="hpLabel">HP 100/100</span>
+    </div>
+    <div id="mp" class="hud-bar" role="button" tabindex="0" aria-label="Mana">
+      <div id="mpFill" class="fill" style="--pct:100%"></div>
+      <span id="mpLabel">MP 30/30</span>
+    </div>
+  </div>
+
+  <div id="overlays">
+    <div id="invOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Inventory">
+      <button class="close" aria-label="Close">✕</button>
+      <h3>Inventory</h3>
+      <div class="panel-body"><p class="muted">Not implemented</p></div>
+    </div>
+    <div id="spellOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Spells">
+      <button class="close" aria-label="Close">✕</button>
+      <h3>Spells</h3>
+      <div class="panel-body"><p class="muted">Not implemented</p></div>
+    </div>
+    <div id="logOverlay" class="overlay hidden" role="dialog" aria-hidden="true" aria-label="Combat Log">
+      <button class="close" aria-label="Close">✕</button>
+      <h3>Combat Log</h3>
+      <div class="panel-body"><p class="muted">Not implemented</p></div>
+    </div>
+  </div>
+
+  <div id="toast" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="touch-ui" class="touch-ui hidden" aria-hidden="true">
+    <div class="dpad" aria-hidden="true">
+      <!-- 3x3 grid; content intentionally empty for skeleton -->
+      <div class="btn"></div><div class="btn"></div><div class="btn"></div>
+      <div class="btn"></div><div class="btn">•</div><div class="btn"></div>
+      <div class="btn"></div><div class="btn"></div><div class="btn"></div>
+    </div>
+    <div class="actions" aria-hidden="true">
+      <div class="btn">Cast</div>
+      <div class="btn">Inv</div>
+    </div>
+  </div>
 
   <!-- Helpful note for contributors -->
   <noscript>
