@@ -420,6 +420,34 @@ window.runEcsTests = () => { try{ runSelfTests(); }catch(e){ console.warn(e); } 
 // Start the main loop. renderEveryFrame=false is fine because render systems run in tick.
 const stop = startLoop(world, { fixed: 1/60, maxSubSteps: 5 });
 
+// --- Click/touch-to-move: move player based on pointer position relative to center ---
+canvas.addEventListener('pointerdown', (e) => {
+  // Get pointer position relative to canvas
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  // Center of canvas (player is always rendered at center)
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  // Compute deltas
+  const dx = x - cx;
+  const dy = y - cy;
+  // Move in direction of largest delta
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx < 0) {
+      tryMove(-1, 0); // left
+    } else if (dx > 0) {
+      tryMove(1, 0); // right
+    }
+  } else {
+    if (dy < 0) {
+      tryMove(0, -1); // up
+    } else if (dy > 0) {
+      tryMove(0, 1); // down
+    }
+  }
+});
+
 // Console instructions for contributors
 console.log('ECS demo started. See `world` and `serializeWorld()` on window.');
 
