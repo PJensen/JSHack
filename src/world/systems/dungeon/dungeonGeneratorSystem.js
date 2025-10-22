@@ -1,12 +1,11 @@
 // dungeonGeneratorSystem.js
-// System: dungeonGeneratorSystem
-// Purpose: Generates dungeon layouts and populates DungeonLevel and Tile components for dungeon entities.
-// ECS conventions: Data in components, logic in systems. No external dependencies.
+// Purpose: Generates simple dungeon tiles for entities with Dungeon + DungeonLevel
+// Normalized to core World API (world.query/create/add/get/set)
 
-import { defineSystem, getEntitiesWithComponents, addComponent, getComponent, setComponent } from '../../../lib/ecs/core.js';
 import { Dungeon } from '../../components/Dungeon.js';
 import { DungeonLevel } from '../../components/DungeonLevel.js';
 import { Tile } from '../../components/Tile.js';
+import { Position } from '../../components/Position.js';
 
 // Simple random dungeon generator (rectangular room with random walls)
 function generateDungeonLevel(width, height) {
@@ -29,30 +28,23 @@ function generateDungeonLevel(width, height) {
 }
 
 export function dungeonGeneratorSystem(world) {
-    // Find all entities with Dungeon and DungeonLevel, but no Tile (not yet generated)
-    const entities = getEntitiesWithComponents(world, [Dungeon, DungeonLevel]);
-    for (const eid of entities) {
-        // Only generate if not already generated
-        if (!getComponent(world, Tile, eid)) {
-            const dungeonLevel = getComponent(world, DungeonLevel, eid);
-            const width = dungeonLevel.width || 20;
-            const height = dungeonLevel.height || 10;
-            const tiles = generateDungeonLevel(width, height);
-            // Assign a Tile component for each tile
-            for (const tile of tiles) {
-                const tileEid = world.createEntity();
-                addComponent(world, Tile, tileEid);
-                setComponent(world, Tile, tileEid, {
-                    x: tile.x,
-                    y: tile.y,
-                    type: tile.type,
-                    parent: eid, // Link to dungeon level entity
-                });
-            }
-            // Mark as generated (optional: set a flag on DungeonLevel)
-            dungeonLevel.generated = true;
+    // For each dungeon level, if not generated, create a simple map of tiles
+    for (const [eid, dng, lvl] of world.query(Dungeon, DungeonLevel)) {
+        if (lvl.generated) continue;
+        const width = lvl.width || 41;
+        const height = lvl.height || 41;
+        const tiles = generateDungeonLevel(width, height);
+        for (const t of tiles) {
+            const tid = world.create();
+            world.add(tid, Position, { x: t.x, y: t.y });
+            world.add(tid, Tile, {
+                glyph: t.type === 'wall' ? '#' : t.type === 'door' ? '+' : '.',
+                walkable: t.type !== 'wall',
+                blocksLight: t.type === 'wall'
+            });
+            // Optionally link to parent via a component or tag if needed
         }
+        // mark as generated
+        world.set(eid, DungeonLevel, { generated: true });
     }
 }
-
-defineSystem('dungeonGeneratorSystem', dungeonGeneratorSystem);

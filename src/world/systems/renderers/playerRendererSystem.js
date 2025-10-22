@@ -3,14 +3,13 @@
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import Glyph from '../../components/Glyph.js';
-import { RenderContext } from '../../components/RenderContext.js';
 import { getRenderContext } from './renderingUtils.js';
 
 export function playerRendererSystem(world) {
-  // Get render target (first one)
-  const ctxRec = getRenderContext(world);
-  if (!ctxRec) return;
-  const { ctx, W, H } = ctxRec;
+  // Get render context component
+  const rc = getRenderContext(world);
+  if (!rc) return;
+  const { ctx, W, H, font } = rc;
   // Determine whether any matching entities exist (no noisy logging)
   const count = world.query(Position, Player).count ? world.query(Position, Player).count() : 0;
 
@@ -19,7 +18,7 @@ export function playerRendererSystem(world) {
   // found matching player entity
     ctx.save();
     ctx.translate(W / 2, H / 2);
-    ctx.font = '32px monospace';
+    ctx.font = font || '18px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = (glyph && (glyph.fg || glyph.color)) || '#fff';
@@ -33,7 +32,7 @@ export function playerRendererSystem(world) {
     console.warn('playerRendererSystem: no player entity found with Position+Glyph+Player — drawing fallback @');
     ctx.save();
     ctx.translate(W / 2, H / 2);
-    ctx.font = '32px monospace';
+    ctx.font = font || '18px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#f8f';

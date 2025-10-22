@@ -9,6 +9,7 @@ import Glyph from './world/components/Glyph.js';
 // --- Setup canvas ---
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+canvas.style.imageRendering = 'pixelated';
 const W = canvas.width;
 const H = canvas.height;
 
@@ -37,6 +38,7 @@ import { renderPostProcessingSystem } from './world/systems/renderers/postProces
 import { RenderContext } from './world/components/RenderContext.js';
 import { cameraSystem } from './world/systems/cameraSystem.js';
 import { Camera } from './world/components/Camera.js';
+import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGeneratorSystem.js';
 
 // --- Context object for rendering ---
 const renderContext = { ctx, W, H };
@@ -45,7 +47,19 @@ const renderContext = { ctx, W, H };
 // Set the shared renderContext for renderer modules to read
 // Create a RenderTarget entity to hold canvas/context info for render systems
 const rt = world.create();
-world.add(rt, RenderContext, { canvas, ctx, cols: 41, rows: 41, cellW: 16, cellH: 16 });
+world.add(rt, RenderContext, {
+	canvas,
+	ctx,
+	W: canvas.width,
+	H: canvas.height,
+	font: '18px monospace',
+	cols: 41,
+	rows: 41,
+	cellW: 16,
+	cellH: 16,
+	bg: '#0f1320',
+	pixelated: true
+});
 // Cache the RenderContext entity id on the world for fast access in render loops
 world.renderContextId = rt;
 
@@ -61,6 +75,8 @@ try { setSystemOrder('render', [renderTilesSystem, renderItemsSystem, renderEffe
 
 // Register camera system in 'update' so camera follows player
 world.system(cameraSystem, 'update');
+// Register dungeon generator (no-op until Dungeon/DungeonLevel entities exist)
+world.system(dungeonGeneratorSystem, 'update');
 
 // Add a Camera entity to hold viewport settings
 const camEntity = world.create();

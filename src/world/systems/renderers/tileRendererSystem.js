@@ -1,13 +1,12 @@
 // Tile Renderer System
 // Responsible for rendering the tilemap/background layer
 // Assumes existence of tile, position, and visibility components
-import { RenderContext } from '../../components/RenderContext.js';
 import { getRenderContext } from './renderingUtils.js';
 
 export function renderTilesSystem(world) {
-        const ctxRec = getRenderContext(world);
-        if (!ctxRec) return;
-        const { ctx, W, H } = ctxRec;
+    const rc = getRenderContext(world);
+    if (!rc) return;
+    const { ctx, W, H } = rc;
         // Very small demo map: build a 41x41 tile map centered around 0,0
         const cols = 41, rows = 41;
         const tileSize = 16;

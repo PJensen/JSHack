@@ -2,13 +2,12 @@
 // Responsible for rendering items on the map
 // Assumes existence of item, position, and visibility components
 
-import { RenderContext } from '../../components/RenderContext.js';
 import { getRenderContext } from './renderingUtils.js';
 
 export function renderItemsSystem(world) {
-    const ctxRec = getRenderContext(world);
-    if (!ctxRec) return;
-    const { ctx, W, H } = ctxRec;
+    const rc = getRenderContext(world);
+    if (!rc) return;
+    const { ctx, W, H } = rc;
     // ...implementation for item rendering...
     // Example: iterate over all item entities and draw them
 }
