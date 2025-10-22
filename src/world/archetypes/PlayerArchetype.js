@@ -1,5 +1,5 @@
 import { defineArchetype } from '../../lib/ecs/archetype.js';
-import Glyph from '../components/Glyph.js';
+import { Glyph } from '../components/Glyph.js';
 import { Score } from '../components/Score.js';
 import { MapView } from '../components/MapView.js';
 import { Camera } from '../components/Camera.js';
@@ -11,8 +11,8 @@ import { Position } from '../components/Position.js';
 import { Inventory } from '../components/Inventory.js';
 import { Gold } from '../components/Gold.js';
 import { Status } from '../components/Status.js';
-import Alignment from '../components/Alignment.js';
-import Deity from '../components/Deity.js';
+import { Alignment} from '../components/Alignment.js';
+import { Deity } from '../components/Deity.js';
 
 // PlayerArchetype: basic player entity template using archetype steps
 export const PlayerArchetype = defineArchetype('Player',

@@ -14,5 +14,6 @@ export function projectileSystem(world, dt) {
     }
     pos.x += vx * dt;
     pos.y += vy * dt;
+    try { world.markChanged(id, Position); } catch(e) { /* ignore */ }
   }
 }

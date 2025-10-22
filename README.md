@@ -1,59 +1,59 @@
-# JSHack
+# JS-Hack
 
-A lightweight, standalone web application for experimenting with JavaScript, HTML, and CSS—all in a single file.
+A hackable, zero-dependency, browser-based like engine built with pure JavaScript and a Entity-Component-System (ECS) architecture. Designed for experimentation and exploration.
 
-## Project Overview
-- **Single file:** All code lives in `js-hack.html` (markup, styles, and scripts).
-- **No frameworks:** Pure HTML, CSS, and JavaScript. No React, Vue, Angular, or build tools.
-- **No backend:** 100% client-side; just open the HTML file in your browser.
-- **No dependencies:** No npm, package managers, or external scripts (unless you add CDN links).
+## Prime Directives
 
-## Features
+- **Pure ES Modules**: No build step, no bundler. Works by opening `index.html` directly or serving via a static server.
+- **ECS Architecture**: Composable ECS core with archetypes, systems, and components.
+- **Deterministic**: Seeded RNG for reproducible runs and debugging. 0xC0FFEE
+- **Hackable**: Modular codebase, easy to inspect and extend. One file = one idea.
+- **Mobile-Friendly**: Responsive UX skeleton for desktop and mobile.
+- **Shims, Adapters and Compatibility:** Never try to make something backwards compatible. Just re-work it.
+- - **Logging:** Never spam log messages. 
 
-- **Unicode Canvas Roguelike:** Play a classic roguelike rendered on an HTML5 canvas using Unicode glyphs for walls, floors, doors, stairs, and entities.
-- **Overworld with Noise-based Biomes:** The overworld uses small, seeded Perlin fBM fields to cluster mountains (elevation) and forests (moisture), producing cleaner regions.
-- **Procedural Dungeon Generation:** Each level is generated with rooms, corridors, doors, water, and traps using deterministic seeded randomization.
-- **Player & Entities:** Move your character (`@`) through the dungeon, encountering monsters, items, and equipment.
-- **Resource Bars:** Visual health and mana bars update in real time.
-- **HUD & Debug Panel:** On-screen HUD displays controls, stats, and dungeon depth. Optional debug panel for advanced inspection.
-- **Turn-Based Gameplay:** Navigate using keyboard controls; each action advances the game turn.
-- **Inventory & Equipment:** Collect items, equip gear, and use consumables.
-- **Stairs & Depth:** Descend deeper into the dungeon via stairs (`<`), with each floor offering new layouts and challenges.
-- **No Dependencies:** Everything runs in a single HTML file—just open and play!
+## Quick Start
 
-You can add a screenshot below this section to showcase the game in action.
+1. **Clone or Download** this repository.
+2. **Open `index.html`** in your browser _or_ serve the folder with a static server:
 
-## Getting Started
-1. Clone the repository:
-   ```powershell
-   git clone https://github.com/PJensen/JSHack.git
-   ```
-2. Open `js-hack.html` in your favorite web browser.
-3. Start hacking! Edit `js-hack.html` directly to add features, styles, or scripts.
+	```sh
+	# Python 3.x
+	python -m http.server 8000
+	# or use any static server
+	```
+3. Play in your browser! No build or install required.
 
-Tip: While in the overworld (press O), press N to reroll the world with a fresh noise seed.
+## Project Structure
 
-## Developer Workflow
-- **Edit:** Make changes directly in `js-hack.html`.
-- **Test:** Refresh your browser to see updates instantly.
-- **Debug:** Use browser developer tools (F12) for inspection and debugging.
+- `index.html` — Main entry point for the game.
+- `src/` — Source code (ECS core, systems, components, utilities).
+- `reference/` — Demos and implementation references.
+- `world/` — Game-specific archetypes, components, data, and systems.
 
-## Conventions
-- Use `<script>` and `<style>` tags inside the HTML file for all logic and styling.
-- Keep features self-contained and easy to understand.
-- Add external libraries only if absolutely necessary (via CDN in `<head>`).
+## How It Works
 
-## Example: Adding a Feature
-```html
-<!-- At the end of js-hack.html -->
-<script>
-  // Your new JavaScript code here
-</script>
-```
+- The game boots from `src/main.js`, which sets up the canvas and ECS world.
+- All logic is organized into ES modules. Systems iterate over entities with matching components.
+- Archetypes provide prefab-like entity creation.
+- No frameworks, no transpilers, no dependencies.
+
+## Development
+
+- Edit or add modules in `src/` or `world/` to extend the game.
+- Use the reference demos in `reference/` for learning or testing ECS features.
+- All code is MIT licensed and intended for learning, hacking, and rapid prototyping.
+
+## Contributing
+
+Contributions, bug reports, and suggestions are welcome! Please open an issue or submit a pull request.
 
 ## License
-MIT
 
+MIT License. See [LICENSE](LICENSE) for details.
+
+## Banned Words, Concepts and Tools
+
+- "game", "sprite", "assets", "toy"
+- "node", "typescript", ".t.ds"
 ---
-
-Have fun hacking! If you add something cool, consider submitting a pull request or opening an issue to share your ideas.

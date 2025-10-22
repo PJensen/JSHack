@@ -1,8 +1,8 @@
-// Game-wide constants and configuration
+// Constants and configuration
 // Keep values small and documented to maintain determinism across runs.
 
 // RNG: default seed used when none provided. Use a numeric seed for mulberry32.
-export const DEFAULT_SEED = 123456789; // integer seed (0..2^32-1)
+export const DEFAULT_SEED = 0xC0FFEE; // integer seed (0..2^32-1)
 
 // Grid and rendering constants
 export const COLS = 80; // number of cells horizontally

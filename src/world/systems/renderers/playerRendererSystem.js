@@ -2,7 +2,7 @@
 // Draws the player at the center of the canvas
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
-import Glyph from '../../components/Glyph.js';
+import { Glyph } from '../../components/Glyph.js';
 import { getRenderContext } from './renderingUtils.js';
 
 export function playerRendererSystem(world) {

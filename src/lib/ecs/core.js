@@ -189,7 +189,7 @@ export class World {
     if (this._inTick){
       if (this.strict) throw new Error('destroy: structural mutation during tick (strict)');
       if (this._debug) console.debug('[ECS] defer destroy');
-      this.command(()=> this.destroy(id));
+      this.command(['destroy', id]);
       return null;
     }
     for (const [ckey, store] of this._store){
@@ -218,10 +218,11 @@ export class World {
     if (this._inTick){
       if (this.strict) throw new Error('add: structural mutation during tick (strict)');
       if (this._debug) console.debug('[ECS] defer add');
-      this.command(()=> this.add(id, Comp, data));
+      this.command(['add', id, Comp, data]);
       return null;
     }
-    const rec = Object.assign({}, Comp.defaults, data);
+  // Create a fresh instance by deep-cloning defaults then applying data
+  const rec = Object.assign({}, deepClone(Comp.defaults), deepClone(data || {}));
     // Component validation (optional)
     if (typeof Comp.validate === 'function' && !Comp.validate(rec)) {
       throw new Error(`Validation failed for component ${Comp.name}`);
@@ -255,7 +256,7 @@ export class World {
     if (this._inTick){
       if (this.strict) throw new Error('remove: structural mutation during tick (strict)');
       if (this._debug) console.debug('[ECS] defer remove');
-      this.command(()=> this.remove(id, Comp));
+      this.command(['remove', id, Comp]);
       return null;
     }
     const ok = this._mapFor(Comp).delete(id);
@@ -268,7 +269,7 @@ export class World {
     if (this._inTick){
       if (this.strict) throw new Error('set: mutation during tick (strict)');
       if (this._debug) console.debug('[ECS] defer set');
-      this.command(()=> this.set(id, Comp, patch));
+      this.command(['set', id, Comp, patch]);
       return null;
     }
     const rec = this.get(id, Comp);
@@ -288,7 +289,8 @@ export class World {
     if (this._inTick){
       if (this.strict) throw new Error('mutate: mutation during tick (strict)');
       if (this._debug) console.debug('[ECS] defer mutate');
-      this.command(()=> this.mutate(id, Comp, fn));
+      // mutate includes a function callback; keep fn in the tuple
+      this.command(['mutate', id, Comp, fn]);
       return null;
     }
     const rec = this.get(id, Comp);
@@ -506,10 +508,38 @@ export class World {
       if (typeof this.onPhase === 'function') try{ this.onPhase(ph, ms, this); }catch(e){ console.warn('onPhase error', e); }
     }
     // flush deferred commands (in order submitted)
-    if (this._cmd.length){
-      if (this._debug) console.debug(`[ECS] flushing ${this._cmd.length} deferred op(s)`);
-      for (const f of this._cmd) try{ f(); } catch(e){ console.warn('cmd error', e); }
+  if (this._cmd.length){
+      // Copy-and-clear: clear the live queue before running so commands
+      // queued during execution are processed on the next flush. This
+      // prevents unbounded growth if commands continually re-queue.
+      const cmds = this._cmd.slice();
       this._cmd.length = 0;
+      if (this._debug) console.debug(`[ECS] flushing ${cmds.length} deferred op(s)`);
+
+      // Safety guard: if an extremely large number of commands is queued,
+      // process a bounded chunk this frame and defer the remainder to the
+      // next tick to avoid long blocking loops and potential OOM.
+      const MAX_PROCESS = 1000;
+      if (cmds.length > MAX_PROCESS){
+        console.warn(`[ECS] large command batch (${cmds.length}) — processing first ${MAX_PROCESS} commands and deferring the rest to next tick`);
+      }
+
+      const limit = Math.min(cmds.length, MAX_PROCESS);
+      for (let i = 0; i < limit; i++){
+        const f = cmds[i];
+        try{
+          // Backwards compatible: allow functions, but prefer compact op tuples
+          if (typeof f === 'function') f();
+          else if (Array.isArray(f)) this._applyOp(f);
+        } catch(e){ console.warn('cmd error', e); }
+      }
+
+      // If there are remaining commands, push them back onto the live queue
+      // so they'll be processed on the next flush (preserves submission order).
+      if (cmds.length > limit){
+        this._cmd.push(...cmds.slice(limit));
+        if (this._debug) console.debug(`[ECS] deferred ${cmds.length - limit} remaining command(s) to next tick`);
+      }
     }
     // clear change tags for next frame
     this._changed.clear();
@@ -520,7 +550,22 @@ export class World {
   }
 
   /** Defer a mutation until after current tick (safe during iteration). */
-  command(fn){ if (this._debug) console.debug('[ECS] command queued'); this._cmd.push(fn); return this; }
+  // command accepts either a function (legacy) or a compact op tuple to
+  // avoid allocating closures per-op. Tuple form: ['op', ...args]
+  // Supported ops: ['destroy', id], ['add', id, Comp, data], ['remove', id, Comp], ['set', id, Comp, patch], ['mutate', id, Comp, fn]
+  command(fnOrOp){ if (this._debug) console.debug('[ECS] command queued'); this._cmd.push(fnOrOp); return this; }
+
+  // Internal: apply a compact op tuple. Kept minimal and mirrors public APIs.
+  _applyOp(op){
+    const t = op[0];
+    try{
+      if (t === 'destroy') return this.destroy(op[1]);
+      if (t === 'add') return this.add(op[1], op[2], op[3]);
+      if (t === 'remove') return this.remove(op[1], op[2]);
+      if (t === 'set') return this.set(op[1], op[2], op[3]);
+      if (t === 'mutate') return this.mutate(op[1], op[2], op[3]);
+    }catch(e){ console.warn('applyOp error', e); }
+  }
 
   /*** Events ***/
   on(event, fn){ if (!this._ev.has(event)) this._ev.set(event, new Set()); this._ev.get(event).add(fn); return ()=>this.off(event, fn); }
@@ -546,7 +591,10 @@ export class World {
       this._suspendInvalidate = prevSuspend || (this._batchDepth>0);
       if (!this._suspendInvalidate && (this._pendingInvalidate || this._cmd.length)){
         // apply any queued commands (should be rare outside ticks) and invalidate caches once
-        if (this._cmd.length){ for (const f of this._cmd) { try{ f(); } catch(e){ console.warn('cmd error', e); } } this._cmd.length=0; }
+        if (this._cmd.length){
+          for (const f of this._cmd) { try{ if (typeof f === 'function') f(); else if (Array.isArray(f)) this._applyOp(f); } catch(e){ console.warn('cmd error', e); } }
+          this._cmd.length=0;
+        }
         this._invalidateCaches();
       }
     }
@@ -763,4 +811,34 @@ function makeSoAStore(Comp){
     entityIds(){ const arr = Array.from(present.values()); arr.sort((a,b)=>a-b); return arr; },
     fast
   };
+}
+
+/**
+ * Lightweight deep clone used for component default copying.
+ * Uses structuredClone when available, otherwise falls back to a
+ * recursive copy for Arrays and plain Objects. This keeps component
+ * instances free from shared nested references (e.g., arrays/objects).
+ */
+function deepClone(v){
+  // Prefer structuredClone when possible, but it will throw on functions and
+  // other non-clonable values. If it fails, fall back to a safe recursive
+  // copier that preserves functions by reference.
+  if (typeof structuredClone === 'function'){
+    try { return structuredClone(v); } catch (e) { /* fallback below */ }
+  }
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(deepClone);
+  // Only deep-clone plain objects (i.e. `{}`) to avoid breaking host objects
+  // like CanvasRenderingContext2D, HTMLCanvasElement, etc. Preserve those
+  // by reference so methods such as ctx.save() remain available.
+  const proto = Object.getPrototypeOf(v);
+  const isPlainObject = proto === Object.prototype || proto === null;
+  if (!isPlainObject) return v; // preserve host/non-plain objects by reference
+
+  const out = {};
+  for (const k of Object.keys(v)){
+    const val = v[k];
+    out[k] = deepClone(val);
+  }
+  return out;
 }

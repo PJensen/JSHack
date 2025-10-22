@@ -6,6 +6,7 @@ import { Dungeon } from '../../components/Dungeon.js';
 import { DungeonLevel } from '../../components/DungeonLevel.js';
 import { Tile } from '../../components/Tile.js';
 import { Position } from '../../components/Position.js';
+import { CONFIG } from '../../../config.js';
 
 // Simple random dungeon generator (rectangular room with random walls)
 function generateDungeonLevel(width, height) {
@@ -31,8 +32,13 @@ export function dungeonGeneratorSystem(world) {
     // For each dungeon level, if not generated, create a simple map of tiles
     for (const [eid, dng, lvl] of world.query(Dungeon, DungeonLevel)) {
         if (lvl.generated) continue;
-        const width = lvl.width || 41;
-        const height = lvl.height || 41;
+    // Clamp requested level sizes to a safe maximum to avoid creating
+    // tens of thousands of entities and causing OOM.
+    const requestedW = lvl.width || 41;
+    const requestedH = lvl.height || 41;
+    const MAX_DIM = Math.max(41, Math.max(CONFIG.cols || 80, CONFIG.rows || 48) * 4); // allow somewhat larger than viewport
+    const width = Math.min(requestedW, MAX_DIM);
+    const height = Math.min(requestedH, MAX_DIM);
         const tiles = generateDungeonLevel(width, height);
         for (const t of tiles) {
             const tid = world.create();

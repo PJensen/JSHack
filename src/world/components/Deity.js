@@ -7,8 +7,10 @@ import { defineComponent } from '../../lib/ecs/core.js';
 // Example deity: 'Zeus', 'Athena', 'None', etc.
 // Value is a string or enum-like value.
 
-const Deity = defineComponent('Deity', {
+export const Deity = defineComponent('Deity', {
   name: '', // e.g., 'Zeus', 'Athena', etc.
+  alignment: '', // e.g., 'Good', 'Neutral', 'Evil'
+  prayersAnswered: 0, // number of prayers answered by this deity
 });
 
 export default Deity;

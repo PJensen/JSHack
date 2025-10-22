@@ -157,7 +157,12 @@ export function cloneFrom(world, sourceId, comps=null){
     const id = world.create();
     for (const Comp of all){
       const src = world.get(sourceId, Comp);
-      if (src) world.add(id, Comp, { ...src });
+      if (src) {
+        // Let World.add() perform the deep-clone/copy; it handles functions and
+        // other non-serializable values robustly. Passing the raw object keeps
+        // behavior consistent with direct creation paths.
+        world.add(id, Comp, src);
+      }
     }
     return id;
   });

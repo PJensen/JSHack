@@ -18,7 +18,7 @@ export const GoodEvilAxis = Object.freeze({
 });
 
 // Two-axis alignment: law/chaos and good/evil
-const Alignment = defineComponent('Alignment', {
+export const Alignment = defineComponent('Alignment', {
   lawChaos: LawChaosAxis.NEUTRAL, // 'lawful', 'neutral', or 'chaotic'
   goodEvil: GoodEvilAxis.NEUTRAL  // 'good', 'neutral', or 'evil'
 });

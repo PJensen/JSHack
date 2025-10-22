@@ -4,5 +4,6 @@ import { defineComponent } from '../../lib/ecs/core.js';
 
 export const Position = defineComponent('Position', {
   x: 0,
-  y: 0
+  y: 0,
+  validate: (value) => Number.isInteger(value.x) && Number.isInteger(value.y)
 });
