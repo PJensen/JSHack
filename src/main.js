@@ -14,8 +14,21 @@ if (!canvas) {
 }
 const ctx = canvas.getContext('2d', { alpha: false });
 canvas.style.imageRendering = 'pixelated';
-const W = canvas.width;
-const H = canvas.height;
+
+// Ensure the canvas backing store matches the displayed CSS size and DPR to avoid stretching
+const CELL_W = 16, CELL_H = 16; // square cells by default
+function setupCanvasSize() {
+	const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+	const cssW = Math.floor(window.innerWidth || canvas.clientWidth || 800);
+	const cssH = Math.floor(window.innerHeight || canvas.clientHeight || 600);
+	canvas.style.width = cssW + 'px';
+	canvas.style.height = cssH + 'px';
+	canvas.width = cssW * dpr;
+	canvas.height = cssH * dpr;
+	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+	return { dpr, cssW, cssH };
+}
+let { dpr, cssW, cssH } = setupCanvasSize();
 
 // --- Create ECS world ---
 const world = new World();
@@ -46,8 +59,8 @@ import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGenerator
 import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
 import { projectileSystem } from './world/systems/projectileSystem.js';
 
-// --- Context object for rendering ---
-const renderContext = { ctx, W, H };
+// --- Context object for rendering (kept for potential module sharing) ---
+const renderContext = { ctx };
 
 // --- Register render systems in ECS (directly, no wrappers) ---
 // Set the shared renderContext for renderer modules to read
@@ -56,13 +69,13 @@ const rt = world.create();
 world.add(rt, RenderContext, {
 	canvas,
 	ctx,
-	W: canvas.width,
-	H: canvas.height,
+	W: cssW, // CSS pixel space (ctx is scaled by DPR)
+	H: cssH,
 	font: '18px monospace',
-	cols: 41,
-	rows: 41,
-	cellW: 16,
-	cellH: 16,
+	cols: Math.max(1, Math.floor(cssW / CELL_W)),
+	rows: Math.max(1, Math.floor(cssH / CELL_H)),
+	cellW: CELL_W,
+	cellH: CELL_H,
 	bg: '#0f1320',
 	pixelated: true
 });
@@ -93,3 +106,18 @@ world.add(camEntity, Camera, { x: 0, y: 0, cols: 21, rows: 21 });
 
 // --- Start ECS main loop ---
 startLoop(world);
+
+// Keep canvas/resolution in sync with viewport to avoid stretching and keep tiles square
+window.addEventListener('resize', () => {
+	({ dpr, cssW, cssH } = setupCanvasSize());
+	try {
+		world.set(rt, RenderContext, {
+			W: cssW,
+			H: cssH,
+			cols: Math.max(1, Math.floor(cssW / CELL_W)),
+			rows: Math.max(1, Math.floor(cssH / CELL_H))
+		});
+	} catch (e) {
+		// If this races during startup, it's safe to ignore; next frame will update.
+	}
+});
