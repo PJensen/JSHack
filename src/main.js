@@ -7,8 +7,12 @@ import { Position } from './world/components/Position.js';
 import Glyph from './world/components/Glyph.js';
 
 // --- Setup canvas ---
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+// Matches <canvas id="stage"> in index.html
+const canvas = document.getElementById('stage');
+if (!canvas) {
+	throw new Error('Canvas element with id="stage" not found. Ensure index.html has <canvas id="stage">.');
+}
+const ctx = canvas.getContext('2d', { alpha: false });
 canvas.style.imageRendering = 'pixelated';
 const W = canvas.width;
 const H = canvas.height;
