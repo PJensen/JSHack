@@ -39,6 +39,8 @@ import { RenderContext } from './world/components/RenderContext.js';
 import { cameraSystem } from './world/systems/cameraSystem.js';
 import { Camera } from './world/components/Camera.js';
 import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGeneratorSystem.js';
+import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
+import { projectileSystem } from './world/systems/projectileSystem.js';
 
 // --- Context object for rendering ---
 const renderContext = { ctx, W, H };
@@ -77,6 +79,9 @@ try { setSystemOrder('render', [renderTilesSystem, renderItemsSystem, renderEffe
 world.system(cameraSystem, 'update');
 // Register dungeon generator (no-op until Dungeon/DungeonLevel entities exist)
 world.system(dungeonGeneratorSystem, 'update');
+// Register projectile motion and lifetime cleanup
+world.system(projectileSystem, 'update');
+world.system(lifetimeSystem, 'late');
 
 // Add a Camera entity to hold viewport settings
 const camEntity = world.create();
