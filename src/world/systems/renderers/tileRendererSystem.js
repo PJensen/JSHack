@@ -22,13 +22,20 @@ export function renderTilesSystem(world) {
     const ox = Math.floor((W - cols * cellW) / 2);
     const oy = Math.floor((H - rows * cellH) / 2);
 
+    // Shift grid by half a cell so the center of the screen aligns to the
+    // center of a tile (especially important when cols/rows are even).
+    // This ensures the player (rendered at W/2,H/2) sits in the middle of a square
+    // and matches item (gold) placements.
+    const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
+    const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
+
     ctx.save();
     // Clear background
     ctx.fillStyle = '#222';
     ctx.fillRect(0, 0, W, H);
 
     // Draw a simple checkerboard floor in the visible viewport
-    ctx.translate(ox, oy);
+    ctx.translate(ox + halfShiftX, oy + halfShiftY);
     for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
             const worldX = startX + x;
