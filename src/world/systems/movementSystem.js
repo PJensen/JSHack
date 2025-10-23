@@ -14,6 +14,8 @@ export function movementSystem(world) {
         x: pos.x + intent.dx,
         y: pos.y + intent.dy
       });
+      // One-shot movement: clear intent so we only move once per keypress
+      world.set(id, InputIntent, { dx: 0, dy: 0 });
     }
   }
 }

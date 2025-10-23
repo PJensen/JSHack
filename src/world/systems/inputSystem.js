@@ -5,11 +5,27 @@ import { InputIntent } from '../components/InputIntent.js';
 
 // Track keys pressed this frame
 const keysPressed = new Set();
+// Edge-triggered movement: set true on keydown for movement keys, consumed next update
+let edgeMoveRequested = false;
+
+function isMovementKey(key){
+  const k = key.toLowerCase();
+  return (
+    k === 'w' || k === 'a' || k === 's' || k === 'd' ||
+    k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright' ||
+    k === '8' || k === '2' || k === '4' || k === '6' ||
+    k === '7' || k === '9' || k === '1' || k === '3' ||
+    k === 'h' || k === 'j' || k === 'k' || k === 'l' ||
+    k === 'y' || k === 'u' || k === 'b' || k === 'n'
+  );
+}
 
 // Setup keyboard listeners (call once during init)
 export function setupInputListeners() {
   window.addEventListener('keydown', (e) => {
     keysPressed.add(e.key.toLowerCase());
+    // Edge-trigger: only set once per keydown so movement is one cell per press
+    if (isMovementKey(e.key)) edgeMoveRequested = true;
     
     // Prevent arrow keys from scrolling the page
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
@@ -19,6 +35,7 @@ export function setupInputListeners() {
   
   window.addEventListener('keyup', (e) => {
     keysPressed.delete(e.key.toLowerCase());
+    // No special handling on keyup; next keydown will trigger a new step
   });
 }
 
@@ -57,13 +74,13 @@ export function inputSystem(world) {
     dx = Math.max(-1, Math.min(1, dx));
     dy = Math.max(-1, Math.min(1, dy));
     
-    // Log when we have input
-    if (dx !== 0 || dy !== 0) {
+    // Only emit intent on edge (keydown). This makes movement one tile per press.
+    if (edgeMoveRequested && (dx !== 0 || dy !== 0)) {
       console.log(`Input: dx=${dx}, dy=${dy}`);
+      world.set(id, InputIntent, { dx, dy });
+      // consume the edge; movementSystem will clear the intent after applying
+      edgeMoveRequested = false;
     }
-    
-    // Use world.set() as intended by the ECS
-    world.set(id, InputIntent, { dx, dy });
     
     // Only process first player
     break;

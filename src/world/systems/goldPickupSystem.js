@@ -4,6 +4,8 @@ import { Position } from '../components/Position.js';
 import { Player } from '../components/Player.js';
 import { Gold } from '../components/Gold.js';
 
+import { spawnFloatText } from '../../world/systems/effects/spawner.js';
+
 export function goldPickupSystem(world) {
   // Find the player and their position
   let playerId = null, playerPos = null, playerData = null;
@@ -23,6 +25,8 @@ export function goldPickupSystem(world) {
       if (gained <= 0) { world.destroy(gid); continue; }
       world.set(playerId, Player, { gold: current + gained });
       try { console.log(`Picked up ${gained} gold. Total: ${current + gained}`); } catch(e){}
+
+      spawnFloatText(world, playerPos.x, playerPos.y, `+${gained} gold`, { color: '#ffd700', ttl: 1.5 });
 
       // Remove the gold entity
       world.destroy(gid);
