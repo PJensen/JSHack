@@ -207,6 +207,15 @@ world.system(movementSystem, 'update');
 // Register gold pickup handler (after movement so we resolve collisions this frame)
 world.system(goldPickupSystem, 'update');
 
+// UI/Effects: respond to gold pickup events by spawning a float text indicator
+try {
+	world.on('gold:pickup', (ev) => {
+		if (!ev || typeof ev.amount !== 'number') return;
+		const x = ev.x ?? 0, y = ev.y ?? 0;
+		spawnFloatText(world, x, y, `+${ev.amount}`, { color: '#ffd700', ttl: 1.5, batch: true });
+	});
+} catch (e) { /* ignore in constrained runtimes */ }
+
 // Register camera system in 'update' so camera follows player
 world.system(cameraSystem, 'update');
 
