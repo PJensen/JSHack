@@ -290,6 +290,13 @@ window.addEventListener('resize', () => {
 			cols: Math.max(1, Math.floor(cssW / CELL_W)),
 			rows: Math.max(1, Math.floor(cssH / CELL_H))
 		});
+		// Keep Camera viewport in sync with RenderContext so camera centering matches renderers
+		try{
+			const rc = world.get(rt, RenderContext);
+			if (rc && typeof rc.cols === 'number' && typeof rc.rows === 'number'){
+				world.set(camEntity, Camera, { cols: rc.cols, rows: rc.rows });
+			}
+		}catch(e){ /* ignore if camera not yet created */ }
 	} catch (e) {
 		// If this races during startup, it's safe to ignore; next frame will update.
 	}

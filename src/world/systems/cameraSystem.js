@@ -9,9 +9,25 @@ export function cameraSystem(world, dt){
   for (const [id, pos] of world.query(Position, Player)){
     // ensure there's a Camera singleton (we'll look for any entity with Camera)
     for (const [cid, cam] of world.query(Camera)){
+      // Determine the active viewport size in tiles from RenderContext when available,
+      // falling back to the Camera component's own cols/rows. This keeps all renderers
+      // in agreement and avoids mismatches that push effects off-screen.
+      let vCols = cam.cols, vRows = cam.rows;
+      try {
+        const rcId = world.renderContextId;
+        if (rcId && world.has(rcId, RenderContext)){
+          const rc = world.getInstance(rcId, RenderContext) || world.get(rcId, RenderContext);
+          if (rc){
+            // Prefer integer viewport tile counts if provided on RC
+            if (typeof rc.cols === 'number') vCols = rc.cols;
+            if (typeof rc.rows === 'number') vRows = rc.rows;
+          }
+        }
+      } catch(e){ /* ignore */ }
+
       // center cam at player (cam.x,y represent top-left in tiles)
-      cam.x = Math.floor(pos.x - cam.cols / 2);
-      cam.y = Math.floor(pos.y - cam.rows / 2);
+      cam.x = Math.floor(pos.x - (vCols / 2));
+      cam.y = Math.floor(pos.y - (vRows / 2));
       // Mirror camera position into the shared RenderContext so renderers don't need
       // to separately locate Camera entities. This keeps render path read-only and
       // avoids systems reaching into world globals.
