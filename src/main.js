@@ -221,6 +221,39 @@ try {
 		const dxTiles = ((rx * 2 - 1) * jitterPx) / CELL_W;
 		const dyTiles = (((ry * 2 - 1) * jitterPx) - 4) / CELL_H; // slight bias upward
 		spawnFloatText(world, x + dxTiles, y + dyTiles, `+${ev.amount}`, { color: '#ffd700', ttl: 1.5, batch: true });
+
+		// Dumb nightly delight: when gold is picked up, spawn another gold in a random location.
+		try {
+			// Prefer a random tile within the current viewport so it's visible.
+			let nx = x, ny = y;
+			const rcId = world.renderContextId;
+			const rc = rcId ? world.get(rcId, RenderContext) : null;
+			if (rc && typeof rc.cols === 'number' && typeof rc.rows === 'number'){
+				const cols = Math.max(1, rc.cols|0);
+				const rows = Math.max(1, rc.rows|0);
+				const camX = rc.camX|0;
+				const camY = rc.camY|0;
+				// simple attempts to avoid spawning right on the player tile
+				for (let i=0;i<8;i++){
+					const ux = (typeof r === 'function' ? r() : Math.random());
+					const uy = (typeof r === 'function' ? r() : Math.random());
+					nx = camX + ((ux * cols) | 0);
+					ny = camY + ((uy * rows) | 0);
+					if (nx !== x || ny !== y) break;
+				}
+			} else {
+				// Fallback: random offset around pickup location
+				const R = 6;
+				nx = x + (((typeof r === 'function' ? r() : Math.random()) * (2*R+1))|0) - R;
+				ny = y + (((typeof r === 'function' ? r() : Math.random()) * (2*R+1))|0) - R;
+				if (nx === x && ny === y) ny += 1; // nudge off the player tile
+			}
+			const e = world.create();
+			world.add(e, Position, { x: nx, y: ny });
+			const amt = 5 + (((typeof r === 'function' ? r() : Math.random()) * 46) | 0); // 5..50
+			world.add(e, Gold, { amount: amt });
+			world.add(e, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
+		} catch (spawnErr) { /* ignore spawn issues for this dumb nightly feature */ }
 		// // Subtle gold sparkle burst
 		// spawnParticleBurst(world, {
 		// 	x, y,
