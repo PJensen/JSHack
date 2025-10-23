@@ -87,6 +87,20 @@ if (!world.has(playerId, Position)) world.add(playerId, Position, { x: 0, y: 0 }
 if (!world.has(playerId, Player)) world.add(playerId, Player, { });
 if (!world.has(playerId, Glyph)) world.add(playerId, Glyph, { char: '@', fg: '#fff', color: '#fff' });
 
+// --- Sprinkle some gold around the player ---
+import { Gold } from './world/components/Gold.js';
+const goldPositions = [
+	{ x: -2, y: -2 }, { x: 2, y: -2 }, { x: -2, y: 2 }, { x: 2, y: 2 },
+	{ x: -3, y: 0 }, { x: 3, y: 0 }, { x: 0, y: -3 }, { x: 0, y: 3 },
+	{ x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }
+];
+goldPositions.forEach(pos => {
+	const goldEntity = world.create();
+	world.add(goldEntity, Position, { x: pos.x, y: pos.y });
+	world.add(goldEntity, Gold, { amount: Math.floor(Math.random() * 50) + 10 });
+	world.add(goldEntity, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
+});
+
 // --- Import renderer systems ---
 import { setSystemOrder } from './lib/ecs/systems.js';
 import { playerRendererSystem } from './world/systems/renderers/playerRendererSystem.js';
