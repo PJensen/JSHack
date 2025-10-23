@@ -1,3 +1,5 @@
+// Rendering Utilities
+// READONLY: This utility performs no mutations - only reads world state
 import { RenderContext } from '../../components/RenderContext.js';
 
 /**

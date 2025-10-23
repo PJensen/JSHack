@@ -1,5 +1,6 @@
 // Player Renderer System
 // Draws the player at the center of the canvas
+// READONLY: This renderer performs no mutations - only reads world state and draws to canvas
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { Glyph } from '../../components/Glyph.js';

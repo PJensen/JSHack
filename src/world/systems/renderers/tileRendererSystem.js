@@ -1,6 +1,7 @@
 // Tile Renderer System
 // Responsible for rendering the tilemap/background layer
 // Assumes existence of tile, position, and visibility components
+// READONLY: This renderer performs no mutations - only reads world state and draws to canvas
 import { getRenderContext } from './renderingUtils.js';
 
 export function renderTilesSystem(world) {

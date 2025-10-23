@@ -1,6 +1,7 @@
 // Item Renderer System
 // Responsible for rendering items on the map
 // Assumes existence of item, position, and visibility components
+// READONLY: This renderer performs no mutations - only reads world state and draws to canvas
 
 import { getRenderContext } from './renderingUtils.js';
 import { Position } from '../../components/Position.js';

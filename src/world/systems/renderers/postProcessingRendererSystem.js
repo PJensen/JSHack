@@ -1,6 +1,7 @@
 // Post Processing Renderer System
 // Responsible for post-processing effects (lighting, overlays, etc.)
 // Assumes existence of render target and effect components
+// READONLY: This renderer performs no mutations - only reads world state and draws to canvas
 
 import { RenderContext } from '../../components/RenderContext.js';
 import { getRenderContext } from './renderingUtils.js';

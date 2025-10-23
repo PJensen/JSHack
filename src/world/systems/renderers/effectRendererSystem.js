@@ -1,6 +1,7 @@
 // Effect Renderer System
 // Responsible for rendering effects (particles, animations, etc.)
 // Assumes existence of effect, position, and visibility components
+// READONLY: This renderer performs no mutations - only reads world state and draws to canvas
 
 import { getRenderContext } from './renderingUtils.js';
 import { Effect } from '../../components/Effect.js';
