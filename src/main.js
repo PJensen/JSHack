@@ -135,7 +135,8 @@ world.renderContextId = rt;
 try{
 	const rc = world.get(rt, RenderContext);
 	console.assert(rc && rc.particleSystem, 'RenderContext.particleSystem missing — particle effects may not render');
-	if (!rc || !rc.particleSystem) console.warn('RenderContext has no particleSystem; spawnParticleBurst will create one on demand.');
+	// Warning commented out to reduce console noise
+	// if (!rc || !rc.particleSystem) console.warn('RenderContext has no particleSystem; spawnParticleBurst will create one on demand.');
 }catch(e){ /* ignore in constrained runtimes */ }
 
 // Ensure DevState singleton exists and assert presence (dev-only)

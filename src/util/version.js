@@ -5,10 +5,11 @@ export async function loadVersion() {
     const text = (await res.text()).trim();
     window.VERSION = text;
   } catch {
-    console.warn('VERSION file not found; defaulting to dev');
+    // Silently default to 'dev' to reduce console noise
     window.VERSION = 'dev';
   }
-  console.log('Loaded version:', window.VERSION);
+  // Optional: uncomment to see version on startup
+  // console.log('Loaded version:', window.VERSION);
 }
 
 // Start loading the version but do not use top-level await.

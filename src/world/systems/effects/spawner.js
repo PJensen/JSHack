@@ -58,9 +58,8 @@ export function spawnParticleBurst(world, opts = {}){
   // Ensure a particle system exists attached to the shared RenderContext
   const rc = getRenderContext(world);
   if (!rc){
-    // If no RenderContext yet (very early startup), drop the burst and warn.
+    // If no RenderContext yet (very early startup), drop the burst silently.
     // We require the RenderContext to host the particle pool to keep runtime state in ECS.
-    console.warn('spawnParticleBurst: RenderContext not ready — skipping particle burst');
     return;
   } else {
     // RenderContext should have a particleSystem created at startup; if missing, create here.

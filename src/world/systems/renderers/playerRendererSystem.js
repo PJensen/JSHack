@@ -29,7 +29,7 @@ export function playerRendererSystem(world) {
 
   // Fallback: if query didn't find the player, draw a default '@' so the canvas isn't empty
   if (!drew) {
-    console.warn('playerRendererSystem: no player entity found with Position+Glyph+Player — drawing fallback @');
+    // Silently draw fallback to reduce console noise (only warn in debug builds)
     ctx.save();
     ctx.translate(W / 2, H / 2);
     ctx.font = font || '18px monospace';

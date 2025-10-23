@@ -41,9 +41,9 @@ export function particlePoolCleanupSystem(world) {
     const reserve = Math.max(512, Math.floor(pool.capacity * 0.25));
     const trimmed = pool.trim(reserve);
     
-    // Optional: log cleanup for debugging
-    if (trimmed > 0) {
-      console.log(`[ParticlePool] Trimmed ${trimmed} particles. Stats:`, stats);
-    }
+    // Optional: log cleanup for debugging (disabled by default to reduce console noise)
+    // if (trimmed > 0) {
+    //   console.log(`[ParticlePool] Trimmed ${trimmed} particles. Stats:`, stats);
+    // }
   }
 }

@@ -521,7 +521,7 @@ export class World {
       // next tick to avoid long blocking loops and potential OOM.
       const MAX_PROCESS = 1000;
       if (cmds.length > MAX_PROCESS){
-        console.warn(`[ECS] large command batch (${cmds.length}) — processing first ${MAX_PROCESS} commands and deferring the rest to next tick`);
+        if (this._debug) console.warn(`[ECS] large command batch (${cmds.length}) — processing first ${MAX_PROCESS} commands and deferring the rest to next tick`);
       }
 
       const limit = Math.min(cmds.length, MAX_PROCESS);
