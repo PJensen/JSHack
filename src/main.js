@@ -137,7 +137,7 @@ import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
 import { projectileSystem } from './world/systems/projectileSystem.js';
 import { effectLifetimeSystem } from './world/systems/effects/effectLifetimeSystem.js';
 import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem.js';
-import { spawnFloatText } from './world/systems/effects/spawner.js';
+import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spawner.js';
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
@@ -213,6 +213,18 @@ try {
 		if (!ev || typeof ev.amount !== 'number') return;
 		const x = ev.x ?? 0, y = ev.y ?? 0;
 		spawnFloatText(world, x, y, `+${ev.amount}`, { color: '#ffd700', ttl: 1.5, batch: true });
+		// // Subtle gold sparkle burst
+		// spawnParticleBurst(world, {
+		// 	x, y,
+		// 	count: 10,
+		// 	spread: Math.PI * 2,
+		// 	speed: 1.2,
+		// 	life: 0.6,
+		// 	color: '#ffd700',
+		// 	size: 0.9,
+		// 	sizeEnd: 0.1,
+		// 	ay: -0.6
+		// });
 	});
 } catch (e) { /* ignore in constrained runtimes */ }
 
