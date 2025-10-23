@@ -34,8 +34,8 @@ export function dungeonSystem(world) {
         if (lvl.generated) continue;
     // Clamp requested level sizes to a safe maximum to avoid creating
     // tens of thousands of entities and causing OOM.
-    const requestedW = lvl.width || 41;
-    const requestedH = lvl.height || 41;
+    const requestedW = lvl.width || 120;
+    const requestedH = lvl.height || 120;
     const MAX_DIM = Math.max(41, Math.max(CONFIG.cols || 80, CONFIG.rows || 48) * 4); // allow somewhat larger than viewport
     const width = Math.min(requestedW, MAX_DIM);
     const height = Math.min(requestedH, MAX_DIM);

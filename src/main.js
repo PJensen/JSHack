@@ -87,6 +87,10 @@ if (!world.has(playerId, Position)) world.add(playerId, Position, { x: 0, y: 0 }
 if (!world.has(playerId, Player)) world.add(playerId, Player, { });
 if (!world.has(playerId, Glyph)) world.add(playerId, Glyph, { char: '@', fg: '#fff', color: '#fff' });
 
+// Add InputIntent component for player input
+import { InputIntent } from './world/components/InputIntent.js';
+world.add(playerId, InputIntent, { dx: 0, dy: 0 });
+
 // --- Sprinkle some gold around the player ---
 import { Gold } from './world/components/Gold.js';
 const goldPositions = [
@@ -112,12 +116,14 @@ import { RenderContext } from './world/components/RenderContext.js';
 import { createParticleSystem } from './world/systems/effects/particleSystem.js';
 import { cameraSystem } from './world/systems/cameraSystem.js';
 import { Camera } from './world/components/Camera.js';
-import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGeneratorSystem.js';
+import { dungeonSystem } from './world/systems/dungeon/dungeonSystem.js';
 import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
 import { projectileSystem } from './world/systems/projectileSystem.js';
 import { effectLifetimeSystem } from './world/systems/effects/effectLifetimeSystem.js';
 import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem.js';
 import { spawnFloatText } from './world/systems/effects/spawner.js';
+import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
+import { movementSystem } from './world/systems/movementSystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -173,14 +179,23 @@ world.system(renderPostProcessingSystem, 'render');
 // Explicit ordering ensures predictable render sequence
 try { setSystemOrder('render', [renderTilesSystem, renderItemsSystem, renderEffectsSystem, playerRendererSystem, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
 
+// Register input system (captures keyboard input, translates to InputIntent)
+setupInputListeners(); // Initialize keyboard event listeners
+
+world.system(inputSystem, 'update');
+
+// Register movement system (processes InputIntent and updates Position)
+world.system(movementSystem, 'update');
+
 // Register camera system in 'update' so camera follows player
 world.system(cameraSystem, 'update');
 
 // Register dungeon generator (no-op until Dungeon/DungeonLevel entities exist)
-world.system(dungeonGeneratorSystem, 'update');
+world.system(dungeonSystem, 'update');
 
 // Register projectile motion and lifetime cleanup
 world.system(projectileSystem, 'update');
+
 // Tick VFX lifetimes
 world.system(effectLifetimeSystem, 'update');
 
