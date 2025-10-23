@@ -5,8 +5,8 @@
 export const DEFAULT_SEED = 0xC0FFEE; // integer seed (0..2^32-1)
 
 // Grid and rendering constants
-export const COLS = 80; // number of cells horizontally
-export const ROWS = 48; // number of cells vertically
+export const COLS = 120; // number of cells horizontally
+export const ROWS = 120; // number of cells vertically
 export const CELL_W = 8; // cell width in CSS pixels (render scale)
 export const CELL_H = 8; // cell height in CSS pixels
 

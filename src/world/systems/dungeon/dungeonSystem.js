@@ -36,7 +36,7 @@ export function dungeonSystem(world) {
     // tens of thousands of entities and causing OOM.
     const requestedW = lvl.width || 120;
     const requestedH = lvl.height || 120;
-    const MAX_DIM = Math.max(41, Math.max(CONFIG.cols || 80, CONFIG.rows || 48) * 4); // allow somewhat larger than viewport
+    const MAX_DIM = Math.max(81, Math.max(CONFIG.cols || 80, CONFIG.rows || 48) * 4); // allow somewhat larger than viewport
     const width = Math.min(requestedW, MAX_DIM);
     const height = Math.min(requestedH, MAX_DIM);
         const tiles = generateDungeonLevel(width, height);

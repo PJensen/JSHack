@@ -91,19 +91,35 @@ if (!world.has(playerId, Glyph)) world.add(playerId, Glyph, { char: '@', fg: '#f
 import { InputIntent } from './world/components/InputIntent.js';
 world.add(playerId, InputIntent, { dx: 0, dy: 0 });
 
-// --- Sprinkle some gold around the player ---
+// --- Sprinkle some gold randomly around the player (deterministic via world.rand) ---
 import { Gold } from './world/components/Gold.js';
-const goldPositions = [
-	{ x: -2, y: -2 }, { x: 2, y: -2 }, { x: -2, y: 2 }, { x: 2, y: 2 },
-	{ x: -3, y: 0 }, { x: 3, y: 0 }, { x: 0, y: -3 }, { x: 0, y: 3 },
-	{ x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }
-];
-goldPositions.forEach(pos => {
-	const goldEntity = world.create();
-	world.add(goldEntity, Position, { x: pos.x, y: pos.y });
-	world.add(goldEntity, Gold, { amount: Math.floor(Math.random() * 50) + 10 });
-	world.add(goldEntity, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
-});
+{
+	// Spawn N piles of gold within a radius around the player's current position
+	const playerPos = world.get(playerId, Position) || { x: 0, y: 0 };
+	const NUM_PILES = 18;
+	const RADIUS = 5; // in tiles (Chebyshev distance)
+	const used = new Set(); // keys like "x,y"
+
+	let attempts = 0, created = 0;
+	while (created < NUM_PILES && attempts < NUM_PILES * 10) {
+		attempts++;
+		const dx = (world.rand() * (2 * RADIUS + 1) | 0) - RADIUS;
+		const dy = (world.rand() * (2 * RADIUS + 1) | 0) - RADIUS;
+		if (dx === 0 && dy === 0) continue; // not on the player
+		const x = playerPos.x + dx;
+		const y = playerPos.y + dy;
+		const k = x + ',' + y;
+		if (used.has(k)) continue;
+		used.add(k);
+
+		const goldEntity = world.create();
+		world.add(goldEntity, Position, { x, y });
+		const amount = 5 + ((world.rand() * 46) | 0); // 5..50
+		world.add(goldEntity, Gold, { amount });
+		world.add(goldEntity, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
+		created++;
+	}
+}
 
 // --- Import renderer systems ---
 import { setSystemOrder } from './lib/ecs/systems.js';
@@ -124,6 +140,7 @@ import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem
 import { spawnFloatText } from './world/systems/effects/spawner.js';
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
+import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -186,6 +203,9 @@ world.system(inputSystem, 'update');
 
 // Register movement system (processes InputIntent and updates Position)
 world.system(movementSystem, 'update');
+
+// Register gold pickup handler (after movement so we resolve collisions this frame)
+world.system(goldPickupSystem, 'update');
 
 // Register camera system in 'update' so camera follows player
 world.system(cameraSystem, 'update');

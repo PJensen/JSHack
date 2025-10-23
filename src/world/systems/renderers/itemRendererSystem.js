@@ -27,8 +27,10 @@ export function renderItemsSystem(world) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // Render all entities with Gold + Position + Glyph
+    // Render all entities with Gold + Position + Glyph (exclude the player entity)
     for (const [id, pos, glyph, gold] of world.query(Position, Glyph, Gold)) {
+        // Skip rendering if this entity is the player (players may also have Gold component)
+        if (world.has(id, Player)) continue;
         // Calculate screen position relative to centered player
         const dx = pos.x - playerX;
         const dy = pos.y - playerY;

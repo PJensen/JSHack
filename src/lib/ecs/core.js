@@ -525,13 +525,19 @@ export class World {
       }
 
       const limit = Math.min(cmds.length, MAX_PROCESS);
-      for (let i = 0; i < limit; i++){
-        const f = cmds[i];
-        try{
-          // Backwards compatible: allow functions, but prefer compact op tuples
-          if (typeof f === 'function') f();
-          else if (Array.isArray(f)) this._applyOp(f);
-        } catch(e){ console.warn('cmd error', e); }
+      // Temporarily mark out of tick so queued ops apply immediately instead of re-queuing
+      const prevInTick = this._inTick; this._inTick = false;
+      try{
+        for (let i = 0; i < limit; i++){
+          const f = cmds[i];
+          try{
+            // Backwards compatible: allow functions, but prefer compact op tuples
+            if (typeof f === 'function') f();
+            else if (Array.isArray(f)) this._applyOp(f);
+          } catch(e){ console.warn('cmd error', e); }
+        }
+      } finally {
+        this._inTick = prevInTick;
       }
 
       // If there are remaining commands, push them back onto the live queue
