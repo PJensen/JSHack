@@ -7,30 +7,36 @@ import { getRenderContext } from './renderingUtils.js';
 export function renderTilesSystem(world) {
     const rc = getRenderContext(world);
     if (!rc) return;
-    const { ctx, W, H } = rc;
-        // Very small demo map: build a 41x41 tile map centered around 0,0
-        const cols = 41, rows = 41;
-        const tileSize = 16;
+    const { ctx, W, H, cellW = 16, cellH = 16 } = rc;
+    // Use the viewport size from RenderContext so all renderers agree
+    const cols = Math.max(1, rc.cols || Math.floor(W / cellW));
+    const rows = Math.max(1, rc.rows || Math.floor(H / cellH));
 
-        // Find camera (use first Camera component if present)
-        let camX = -Math.floor(cols/2), camY = -Math.floor(rows/2);
-        const cam = world.query; // placeholder to avoid unused warnings
+    // Top-left world tile based on camera (defaults to centering around 0,0)
+    const camX = (rc.camX ?? -Math.floor(cols / 2));
+    const camY = (rc.camY ?? -Math.floor(rows / 2));
+    const startX = camX;
+    const startY = camY;
 
-        // draw a simple checkerboard floor + border walls
-        const startX = -Math.floor(cols/2);
-        const startY = -Math.floor(rows/2);
-        ctx.save();
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0,0,W,H);
-        ctx.translate((W - cols*tileSize)/2, (H - rows*tileSize)/2);
-        for (let y=0;y<rows;y++){
-            for (let x=0;x<cols;x++){
-                const worldX = startX + x;
-                const worldY = startY + y;
-                const isWall = (Math.abs(worldX) === Math.floor(cols/2)) || (Math.abs(worldY) === Math.floor(rows/2));
-                ctx.fillStyle = isWall ? '#444' : ((x+y)%2 ? '#2a2a2a' : '#303030');
-                ctx.fillRect(x*tileSize, y*tileSize, tileSize, tileSize);
-            }
+    // Center the tile grid in the canvas (CSS pixel space)
+    const ox = Math.floor((W - cols * cellW) / 2);
+    const oy = Math.floor((H - rows * cellH) / 2);
+
+    ctx.save();
+    // Clear background
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw a simple checkerboard floor in the visible viewport
+    ctx.translate(ox, oy);
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            const worldX = startX + x;
+            const worldY = startY + y;
+            const isDark = ((worldX + worldY) & 1) !== 0;
+            ctx.fillStyle = isDark ? '#2a2a2a' : '#303030';
+            ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
         }
-        ctx.restore();
+    }
+    ctx.restore();
 }

@@ -11,7 +11,7 @@ import { getGlobalParticlePool } from '../../effects/particlePool.js';
 export function renderEffectsSystem(world){
     const rc = getRenderContext(world);
     if (!rc) return;
-    const { ctx, W, H, cellW, cellH, canvas } = rc;
+    const { ctx, W, H, cellW, cellH, cols = 0, rows = 0, canvas } = rc;
 
     ctx.save();
     ctx.textBaseline = 'middle';
@@ -20,16 +20,23 @@ export function renderEffectsSystem(world){
     // Camera reference. Many renderers keep camera on world or RenderContext
     const cam = world.camera || world.cam || null;
 
+    // Align with tileRenderer grid: center the tile viewport in the canvas.
+    // This makes world-tile coordinates render at the same on-screen positions
+    // across all renderers (tiles, items, effects, player overlays, etc.).
+    const ox = Math.floor((W - (cols * cellW)) / 2);
+    const oy = Math.floor((H - (rows * cellH)) / 2);
+
     for (const [id, eff] of world.query(Effect)){
         if (!eff.type) continue;
         if (eff.type === 'float_text'){
             const d = eff.data || {};
             const pos = eff.pos || d.pos || { x:0, y:0 };
-            // Convert world tile to screen pixels (center)
-            const sx = (pos.x - (rc.camX || 0)) * cellW + cellW/2;
-            const sy = (pos.y - (rc.camY || 0)) * cellH + cellH/2;
-            // Cull if offscreen (with small margin)
-            if (sx < -40 || sy < -40 || sx > canvas.width + 40 || sy > canvas.height + 40) continue;
+            // Convert world tile to screen pixels (center), including viewport offset.
+            const sx = ox + (pos.x - (rc.camX || 0)) * cellW + cellW/2;
+            const sy = oy + (pos.y - (rc.camY || 0)) * cellH + cellH/2;
+            // Cull if offscreen (with small margin) in CSS pixel space (W/H),
+            // since ctx coordinates after DPR transform are in CSS pixels.
+            if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
 
             const ttl = eff.ttl || 0;
             const ttlMax = eff.ttlMax || 1;
@@ -58,11 +65,11 @@ export function renderEffectsSystem(world){
             if (!p.alive) return;
             
             // Convert world coordinates to screen pixels
-            const sx = (p.x - (rc.camX || 0)) * cellW + cellW / 2;
-            const sy = (p.y - (rc.camY || 0)) * cellH + cellH / 2;
+            const sx = ox + (p.x - (rc.camX || 0)) * cellW + cellW / 2;
+            const sy = oy + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
             
             // Cull particles outside viewport (with margin)
-            if (sx < -40 || sy < -40 || sx > canvas.width + 40 || sy > canvas.height + 40) {
+            if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) {
                 return;
             }
             
@@ -109,10 +116,10 @@ export function renderEffectsSystem(world){
             // assume particles are in world coordinates (tile coords)
             ps.forEach(p => {
                 if (!p.alive) return;
-                const sx = (p.x - (rc.camX || 0)) * cellW + cellW/2;
-                const sy = (p.y - (rc.camY || 0)) * cellH + cellH/2;
+                const sx = ox + (p.x - (rc.camX || 0)) * cellW + cellW/2;
+                const sy = oy + (p.y - (rc.camY || 0)) * cellH + cellH/2;
                 // cull small margin
-                if (sx < -40 || sy < -40 || sx > canvas.width + 40 || sy > canvas.height + 40) return;
+                if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) return;
 
                 const life = Math.max(0, p.life || 0);
                 const lifeMax = p.lifeMax || 1;

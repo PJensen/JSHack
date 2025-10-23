@@ -212,7 +212,15 @@ try {
 	world.on('gold:pickup', (ev) => {
 		if (!ev || typeof ev.amount !== 'number') return;
 		const x = ev.x ?? 0, y = ev.y ?? 0;
-		spawnFloatText(world, x, y, `+${ev.amount}`, { color: '#ffd700', ttl: 1.5, batch: true });
+		// Nudge the float text a few pixels near the player so it feels anchored.
+		// Convert small pixel jitter to tile units so effectRenderer mapping stays consistent.
+		const r = (typeof world.rand === 'function' ? world.rand() : Math.random);
+		const rx = (typeof r === 'function' ? r() : Math.random());
+		const ry = (typeof r === 'function' ? r() : Math.random());
+		const jitterPx = 6; // ~6px radius jitter
+		const dxTiles = ((rx * 2 - 1) * jitterPx) / CELL_W;
+		const dyTiles = (((ry * 2 - 1) * jitterPx) - 4) / CELL_H; // slight bias upward
+		spawnFloatText(world, x + dxTiles, y + dyTiles, `+${ev.amount}`, { color: '#ffd700', ttl: 1.5, batch: true });
 		// // Subtle gold sparkle burst
 		// spawnParticleBurst(world, {
 		// 	x, y,
