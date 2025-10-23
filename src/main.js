@@ -141,6 +141,17 @@ import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spaw
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
+// Lighting systems
+import { FlickerSystem } from './world/systems/lighting/FlickerSystem.js';
+import { ShadowCastSystem } from './world/systems/lighting/ShadowCastSystem.js';
+import { SpecularFieldSystem } from './world/systems/lighting/SpecularFieldSystem.js';
+import { ensureCameraLighting } from './world/singletons/CameraLighting.js';
+import { TileLightingRenderer } from './world/render/TileLightingRenderer.js';
+import { EntityLightingRenderer } from './world/render/EntityLightingRenderer.js';
+import { BloomRenderer } from './world/render/BloomRenderer.js';
+import { Light } from './world/components/Light.js';
+import { Emissive } from './world/components/Emissive.js';
+import { Material } from './world/components/Material.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -188,13 +199,19 @@ try{
 
 // register renderers in order: tiles first, then items/effects, player, post-processing
 world.system(renderTilesSystem, 'render');
+// Lighting background pass overlays tiles with tone-mapped light
+world.system(TileLightingRenderer, 'render');
 world.system(renderItemsSystem, 'render');
 world.system(renderEffectsSystem, 'render');
+// Modulate entities with lighting/specular
+world.system(EntityLightingRenderer, 'render');
 world.system(playerRendererSystem, 'render');
+// Optional bloom pass
+world.system(BloomRenderer, 'render');
 world.system(renderPostProcessingSystem, 'render');
 
 // Explicit ordering ensures predictable render sequence
-try { setSystemOrder('render', [renderTilesSystem, renderItemsSystem, renderEffectsSystem, playerRendererSystem, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
+try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
 
 // Register input system (captures keyboard input, translates to InputIntent)
 setupInputListeners(); // Initialize keyboard event listeners
@@ -206,6 +223,11 @@ world.system(movementSystem, 'update');
 
 // Register gold pickup handler (after movement so we resolve collisions this frame)
 world.system(goldPickupSystem, 'update');
+
+// Lighting systems ordering in update/late phases
+world.system(FlickerSystem, 'update');
+world.system(ShadowCastSystem, 'update');
+world.system(SpecularFieldSystem, 'late');
 
 // UI/Effects: respond to gold pickup events by spawning a float text indicator
 try {
@@ -303,6 +325,29 @@ world.system(garbageCollectionSystem, 'late');
 const camEntity = world.create();
 
 world.add(camEntity, Camera, { x: 0, y: 0, cols: 21, rows: 21 });
+
+// Create camera lighting singleton
+try{ ensureCameraLighting(world); }catch(e){ /* ignore */ }
+
+// --- Demo lighting entities: Torch and Lava tile ---
+try{
+	const ppos = world.get(playerId, Position) || { x:0, y:0 };
+	// Torch near player
+	const torch = world.create();
+	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
+	world.add(torch, Light, { kind:'point', color:[1.0,0.6,0.2], radius:6, intensity:4, flickerSeed:42, castsShadows:true });
+	world.add(torch, Emissive, { color:[1.0,0.4,0.1], strength:2, radius:1 });
+
+	// Give player a basic material so specular is visible
+	if (!world.has(playerId, Material)){
+		world.add(playerId, Material, { albedo:[0.9,0.9,1.0], roughness:0.5, metalness:0.1, specular:0.5 });
+	}
+
+	// Lava emissive tile
+	const lava = world.create();
+	world.add(lava, Position, { x: ppos.x - 4, y: ppos.y + 2 });
+	world.add(lava, Emissive, { color:[1.0,0.3,0.0], strength:3, radius:1 });
+}catch(e){ /* ignore demo spawn errors */ }
 
 // --- Start ECS main loop ---
 startLoop(world);
