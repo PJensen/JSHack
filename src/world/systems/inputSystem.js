@@ -5,8 +5,11 @@ import { InputIntent } from '../components/InputIntent.js';
 
 // Track keys pressed this frame
 const keysPressed = new Set();
-// Edge-triggered movement: set true on keydown for movement keys, consumed next update
+// Edge-triggered movement: set true on keydown/touchstart for movement, consumed next update
 let edgeMoveRequested = false;
+// Pending one-shot movement from a touch gesture (cardinalized)
+let pendingTouch = null; // { dx, dy }
+let touchActive = false;
 
 function isMovementKey(key){
   const k = key.toLowerCase();
@@ -37,6 +40,37 @@ export function setupInputListeners() {
     keysPressed.delete(e.key.toLowerCase());
     // No special handling on keyup; next keydown will trigger a new step
   });
+
+  // Quick and simple touch controls: tap left/right/up/down of canvas center to move one cell
+  const canvas = document.getElementById('stage');
+  if (canvas) {
+    const onTouchStart = (e) => {
+      try { e.preventDefault(); } catch(_) {}
+      if (touchActive) return; // one move per touch
+      const t = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches && e.changedTouches[0]);
+      if (!t) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = t.clientX - cx;
+      const dy = t.clientY - cy;
+      // Cardinalize: choose the dominant axis
+      let move = { dx: 0, dy: 0 };
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        move.dx = dx < 0 ? -1 : 1;
+      } else {
+        move.dy = dy < 0 ? -1 : 1;
+      }
+      pendingTouch = move;
+      edgeMoveRequested = true; // trigger one-shot move
+      touchActive = true;
+    };
+    const onTouchEnd = () => { touchActive = false; };
+    const opts = { passive: false };
+    canvas.addEventListener('touchstart', onTouchStart, opts);
+    canvas.addEventListener('touchend', onTouchEnd, opts);
+    canvas.addEventListener('touchcancel', onTouchEnd, opts);
+  }
 }
 
 export function inputSystem(world) {
@@ -73,6 +107,12 @@ export function inputSystem(world) {
     // Clamp to -1, 0, or 1 (in case multiple keys map to same direction)
     dx = Math.max(-1, Math.min(1, dx));
     dy = Math.max(-1, Math.min(1, dy));
+
+    // If no keyboard direction, check pending touch gesture
+    if (dx === 0 && dy === 0 && pendingTouch) {
+      dx = pendingTouch.dx | 0;
+      dy = pendingTouch.dy | 0;
+    }
     
     // Only emit intent on edge (keydown). This makes movement one tile per press.
     if (edgeMoveRequested && (dx !== 0 || dy !== 0)) {
@@ -80,6 +120,7 @@ export function inputSystem(world) {
       world.set(id, InputIntent, { dx, dy });
       // consume the edge; movementSystem will clear the intent after applying
       edgeMoveRequested = false;
+      pendingTouch = null;
     }
     
     // Only process first player
