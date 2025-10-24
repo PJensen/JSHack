@@ -91,7 +91,7 @@ import { Tile } from './world/components/Tile.js';
 		const wx = wallX0 + dx;
 		const wallId = world.create();
 		world.add(wallId, Position, { x: wx, y: wallY });
-		world.add(wallId, Glyph, { char: '#', fg: '#888', bg: '#222' });
+		world.add(wallId, Glyph, { char: '#', fg: '#ffffffff', bg: '#000000ff' });
 		// Make this wall block light and movement
 		world.add(wallId, Tile, { glyph: '#', walkable: false, blocksLight: true });
 		world.add(wallId, Occluder, { opacity: 1.0, thickness: 1.0 });
@@ -110,17 +110,17 @@ import { Tile } from './world/components/Tile.js';
 	for (let i = 0; i < LEG_LEN; i++) {
 		const e = world.create();
 		world.add(e, Position, { x: cx + i, y: cy });
-		world.add(e, Glyph, { char: '#', fg: '#aaa', bg: '#333' });
+		world.add(e, Glyph, { char: '#', fg: '#ffffffff', bg: '#333' });
 		world.add(e, Tile, { glyph: '#', walkable: false, blocksLight: true });
-		world.add(e, Occluder, { opacity: 1.0, thickness: 1.0 });
+		world.add(e, Occluder, { opacity: 1.0, thickness: 10.0 });
 	}
 	// Vertical leg: downward from the corner
 	for (let j = 1; j < LEG_LEN; j++) { // start at 1 to avoid duplicating the corner
 		const e = world.create();
 		world.add(e, Position, { x: cx, y: cy + j });
-		world.add(e, Glyph, { char: '#', fg: '#aaa', bg: '#333' });
+		world.add(e, Glyph, { char: '#', fg: '#b10000ff', bg: '#333' });
 		world.add(e, Tile, { glyph: '#', walkable: false, blocksLight: true });
-		world.add(e, Occluder, { opacity: 1.0, thickness: 1.0 });
+		world.add(e, Occluder, { opacity: 1.0, thickness: 10.0 });
 	}
 }
 
@@ -163,6 +163,12 @@ import { Gold } from './world/components/Gold.js';
 		const amount = 5 + ((world.rand() * 46) | 0); // 5..50
 		world.add(goldEntity, Gold, { amount });
 		world.add(goldEntity, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
+		// Very small light source and subtle glow on gold
+		// try {
+		// 	const goldColor = [1.0, 0.84, 0.0]; // approx #ffd700 in linear-ish
+		// 	world.add(goldEntity, Emissive, { color: goldColor, strength: 0.5, radius: 0 });
+		// 	world.add(goldEntity, Light, { kind: 'point', color: goldColor, radius: 2, intensity: 0.03, castsShadows: false });
+		// } catch(e) { /* ignore if lighting components unavailable */ }
 		created++;
 	}
 }
@@ -343,6 +349,12 @@ try {
 			const amt = 5 + (((typeof r === 'function' ? r() : Math.random()) * 46) | 0); // 5..50
 			world.add(e, Gold, { amount: amt });
 			world.add(e, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
+			// // Very small light source and subtle glow on gold
+			// try {
+			// 	const goldColor = [1.0, 0.84, 0.0];
+			// 	world.add(e, Emissive, { color: goldColor, strength: 0.5, radius: 0 });
+			// 	world.add(e, Light, { kind: 'point', color: goldColor, radius: 0.5, intensity: 0.005, castsShadows: false });
+			// } catch(_) { /* ignore */ }
 		} catch (spawnErr) { /* ignore spawn issues for this dumb nightly feature */ }
 		// // Subtle gold sparkle burst
 		// spawnParticleBurst(world, {
@@ -397,24 +409,58 @@ world.add(camEntity, Camera, { x: 0, y: 0, cols: 21, rows: 21 });
 // Create camera lighting singleton
 try{ ensureCameraLighting(world); }catch(e){ /* ignore */ }
 
+
 // --- Demo lighting entities: Torch and Lava tile ---
 try{
 	const ppos = world.get(playerId, Position) || { x:0, y:0 };
-	// Torch near player
+	// Torch near player (legacy demo)
 	const torch = world.create();
- 	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
-	world.add(torch, Light, { kind:'point', color:[1.0,0.6,0.2], radius:6, intensity:4, flickerSeed:42, castsShadows:true });
-	world.add(torch, Emissive, { color:[1.0,0.4,0.1], strength:2, radius:1 });
+	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
+	world.add(torch, Light, { kind:'point', color:[1.0,0.6,0.2], radius:4, intensity:0.01, flickerSeed:42, castsShadows:true });
+	world.add(torch, Emissive, { color:[1.0,0.4,0.1], strength:0.5, radius:1 });
 
 	// Give player a basic material so specular is visible
 	if (!world.has(playerId, Material)){
-		world.add(playerId, Material, { albedo:[0.9,0.9,1.0], roughness:0.5, metalness:0.1, specular:0.5 });
+		world.add(playerId, Material, { albedo:[0.9,0.9,1.0], roughness:0.7, metalness:0.1, specular:0.5 });
 	}
 
 	// Lava emissive tile
 	const lava = world.create();
 	world.add(lava, Position, { x: ppos.x - 4, y: ppos.y + 2 });
 	world.add(lava, Emissive, { color:[1.0,0.3,0.0], strength:3, radius:1 });
+
+	// --- Line of torches of different types ---
+	// Torch types: vary color, glyph, light radius/intensity, emissive, material
+	const torchTypes = [
+		// Classic yellow torch
+		{ glyph: { char: '†', fg: '#ffb300' }, light: { color: [1.0, 0.8, 0.2], radius: 5, intensity: 0.04 }, emissive: { color: [1.0, 0.7, 0.2], strength: 0.7, radius: 1 }, material: { albedo: [1, 0.9, 0.5], roughness: 0.6, metalness: 0.0, specular: 0.3 } },
+		// Blue magical torch (different glyph, higher intensity)
+		{ glyph: { char: '*', fg: '#00e5ff' }, light: { color: [0.2, 0.8, 1.0], radius: 6, intensity: 0.08 }, emissive: { color: [0.2, 0.7, 1.0], strength: 1.2, radius: 2 }, material: { albedo: [0.7, 0.9, 1.0], roughness: 0.3, metalness: 0.2, specular: 0.7 } },
+		// Green eerie torch (smaller, dimmer, different glyph)
+		{ glyph: { char: '!', fg: '#00ff90' }, light: { color: [0.2, 1.0, 0.6], radius: 3, intensity: 0.03 }, emissive: { color: [0.2, 1.0, 0.6], strength: 0.5, radius: 1 }, material: { albedo: [0.7, 1, 0.8], roughness: 0.8, metalness: 0.0, specular: 0.2 } },
+		// Red hellfire torch (large, very bright, unique glyph)
+		{ glyph: { char: '¥', fg: '#ff1744' }, light: { color: [1.0, 0.2, 0.2], radius: 8, intensity: 0.12 }, emissive: { color: [1.0, 0.2, 0.2], strength: 2.0, radius: 2 }, material: { albedo: [1, 0.5, 0.5], roughness: 0.4, metalness: 0.1, specular: 0.8 } },
+		// White holy torch (tall, wide, very soft)
+		{ glyph: { char: '|', fg: '#fffde7' }, light: { color: [1.0, 1.0, 0.95], radius: 10, intensity: 0.06 }, emissive: { color: [1.0, 1.0, 0.95], strength: 1.5, radius: 3 }, material: { albedo: [1, 1, 0.95], roughness: 0.2, metalness: 0.0, specular: 0.9 } },
+		// Purple arcane torch (flickery, small, different glyph)
+		{ glyph: { char: '¤', fg: '#d500f9' }, light: { color: [0.7, 0.2, 1.0], radius: 4, intensity: 0.07 }, emissive: { color: [0.7, 0.2, 1.0], strength: 0.9, radius: 1 }, material: { albedo: [0.9, 0.7, 1.0], roughness: 0.7, metalness: 0.3, specular: 0.5 } },
+		// Orange pumpkin torch (round, warm, unique glyph)
+		{ glyph: { char: '◉', fg: '#ff9100' }, light: { color: [1.0, 0.55, 0.1], radius: 7, intensity: 0.09 }, emissive: { color: [1.0, 0.55, 0.1], strength: 1.3, radius: 2 }, material: { albedo: [1, 0.7, 0.3], roughness: 0.5, metalness: 0.0, specular: 0.4 } },
+	];
+	// // Arrange torches in a horizontal line (same y, varying x)
+	// const torchY = ppos.y - 3;
+	// const torchX0 = ppos.x - Math.floor(torchTypes.length / 2);
+	// const spacing = 10; // tiles between torches
+	// for (let i = 0; i < torchTypes.length; ++i) {
+	// 	const t = torchTypes[i];
+	// 	const tid = world.create();
+	// 	world.add(tid, Position, { x: torchX0 + i * spacing, y: torchY });
+	// 	world.add(tid, Glyph, t.glyph);
+	// 	world.add(tid, Light, Object.assign({ kind: 'point', flickerSeed: 100 + i, castsShadows: true }, t.light));
+	// 	world.add(tid, Emissive, Object.assign({ radius: t.emissive.radius }, t.emissive));
+	// 	world.add(tid, Material, t.material);
+	// }
+
 }catch(e){ /* ignore demo spawn errors */ }
 
 // --- Start ECS main loop ---

@@ -86,6 +86,7 @@ export function EntityDropShadowRenderer(world){
   for (let j=0;j<count;j++){
     const i = (start + j) % n;
     const [eid, pos, glyph] = ents[i];
+    if (glyph.char == null) continue;
 
     const tx = pos.x - camX + 0.5;
     const ty = pos.y - camY + 0.5;
@@ -121,7 +122,7 @@ export function EntityDropShadowRenderer(world){
       const oyPx = dy * offPx;
 
       // draw the shadow glyph at offset position with a cheap two-tap softness
-      const ch = glyph.char || '@';
+      const ch = glyph.char;
       const prevFill = ctx.fillStyle;
       ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha))})`;
       ctx.fillText(ch, sx + oxPx, sy + oyPx);
