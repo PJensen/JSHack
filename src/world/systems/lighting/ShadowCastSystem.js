@@ -40,6 +40,9 @@ function buildOcclusionGrid(world, minX, minY, maxX, maxY){
 function castLightRays(world, lg, rc, occ, light){
   const cols = rc.cols|0, rows = rc.rows|0;
   const camX = rc.camX|0, camY = rc.camY|0;
+  // Map world tile space -> light grid space
+  const scaleX = (lg.w / Math.max(1, cols));
+  const scaleY = (lg.h / Math.max(1, rows));
   const originX = (light.x!=null?light.x:(world.getInstance(light.__id, Position)?.x||0));
   const originY = (light.y!=null?light.y:(world.getInstance(light.__id, Position)?.y||0));
   const Lrgb = toRGB(light.color);
@@ -79,10 +82,10 @@ function castLightRays(world, lg, rc, occ, light){
       const kQ = (light.falloff && light.falloff.kQ) || 1;
       const atten = effI / (1 + kL*Math.sqrt(d2) + kQ*d2);
       const rgb = [Lrgb[0]*atten*T, Lrgb[1]*atten*T, Lrgb[2]*atten*T];
-      // map to grid coords
-      const gx = (wx - camX);
-      const gy = (wy - camY);
-      if (gx>=-1 && gy>=-1 && gx<cols+1 && gy<rows+1){ addLight(lg, gx, gy, rgb); }
+  // Map to light grid coords (align with how sampleLight is addressed in renderers)
+  const gx = (wx - camX) * scaleX;
+  const gy = (wy - camY) * scaleY;
+  if (gx>=-1 && gy>=-1 && gx<lg.w+1 && gy<lg.h+1){ addLight(lg, gx, gy, rgb); }
 
       if (!castsShadows){ // if no shadows, just march a few steps and stop
         if (d2 > r2max*0.9) break;
@@ -146,15 +149,19 @@ export function ShadowCastSystem(world){
   // add emissives (no shadows)
   for (const [id, pos, em] of world.query(Position, Emissive)){
     const rgb = toRGB(em.color);
-    const gx = (pos.x - rc.camX) * (half?0.5:1) + 0.5;
-    const gy = (pos.y - rc.camY) * (half?0.5:1) + 0.5;
+    // Map tile center to light grid coords using the same scale as sampling
+    const scaleX = lg.w / Math.max(1, cols);
+    const scaleY = lg.h / Math.max(1, rows);
+    const gx = ((pos.x - rc.camX) + 0.5) * scaleX;
+    const gy = ((pos.y - rc.camY) + 0.5) * scaleY;
     addLight(lg, gx, gy, [rgb[0]*em.strength, rgb[1]*em.strength, rgb[2]*em.strength]);
     // tiny kernel if radius>0
     if (em.radius>0){
       for (let dy=-em.radius; dy<=em.radius; dy++){
         for (let dx=-em.radius; dx<=em.radius; dx++){
           if (dx===0 && dy===0) continue;
-          addLight(lg, gx+dx, gy+dy, [rgb[0]*em.strength*0.5, rgb[1]*em.strength*0.5, rgb[2]*em.strength*0.5]);
+          // Spread kernel in light-grid space
+          addLight(lg, gx + dx*scaleX, gy + dy*scaleY, [rgb[0]*em.strength*0.5, rgb[1]*em.strength*0.5, rgb[2]*em.strength*0.5]);
         }
       }
     }
