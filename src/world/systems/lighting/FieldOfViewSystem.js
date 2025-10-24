@@ -54,6 +54,9 @@ export function FieldOfViewSystem(world){
   let vis = rc.visibleMask;
   if (!vis || vis.length !== cols*rows){ vis = new Uint8Array(cols*rows); }
   vis.fill(0);
+  let visW = rc.visibleWeight;
+  if (!(visW instanceof Float32Array) || visW.length !== cols*rows){ visW = new Float32Array(cols*rows); }
+  visW.fill(0);
   
   // Simple ray-cast FOV from eye; correct DDA stepping to avoid 
   // plus-shaped artifacts and keep the eye centered.
@@ -63,6 +66,14 @@ export function FieldOfViewSystem(world){
   if (eyeX>=camX && eyeY>=camY && eyeX<camX+cols && eyeY<camY+rows){
     vis[(eyeY-camY)*cols + (eyeX-camX)] = 1;
   }
+  // Distance falloff near boundary (soften edge)
+  const edgeStart = 0.75; // start fading at 75% of radius
+  const edgeWidth = 1.0 - edgeStart; // fade to 0 at 100%
+  const smoothstep = (e0, e1, x)=>{
+    const t = Math.max(0, Math.min(1, (x - e0) / Math.max(1e-6, e1 - e0)));
+    return t*t*(3 - 2*t);
+  };
+
   for (let i=0;i<rays;i++){
     const a = (i / rays) * twoPi;
     const dx = Math.cos(a), dy = Math.sin(a);
@@ -90,7 +101,14 @@ export function FieldOfViewSystem(world){
       const ddx = wx - eyeX, ddy = wy - eyeY;
       const d2 = ddx*ddx + ddy*ddy; if (d2 > R*R) break;
       const vx = cx - camX, vy = cy - camY;
-      if (vx>=0 && vy>=0 && vx<cols && vy<rows){ vis[vy*cols + vx] = 1; }
+      if (vx>=0 && vy>=0 && vx<cols && vy<rows){
+        const d = Math.sqrt(d2) / R; // 0 at eye, 1 at max radius
+        const fade = 1 - smoothstep(edgeStart, 1.0, d); // 1 in center -> 0 at edge
+        const w = Math.max(0, Math.min(1, T * fade));
+        const idx = vy*cols + vx;
+        if (w > visW[idx]) visW[idx] = w; // keep strongest contribution
+        if (!vis[idx] && w > 0.02) vis[idx] = 1; // binary mask for fast gate
+      }
 
       // Step to next cell boundary (Amanatides & Woo)
       if (tMaxX < tMaxY){
@@ -113,5 +131,5 @@ export function FieldOfViewSystem(world){
   }
 
   // Persist to RenderContext so renderers can use it; also stash fov center/radius
-  world.set(rcId, RenderContext, { visibleMask: vis, fovCenter:[eyeX, eyeY], fovRadius: R });
+  world.set(rcId, RenderContext, { visibleMask: vis, visibleWeight: visW, fovCenter:[eyeX, eyeY], fovRadius: R });
 }

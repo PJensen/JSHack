@@ -44,20 +44,24 @@ export function TileLightingRenderer(world){
   const ox = Math.floor((W - cols * cellW) / 2);
   const oy = Math.floor((H - rows * cellH) / 2);
   ctx.translate(ox, oy);
-  // Optional FOV gating: if rc.visibleMask exists, dim tiles outside FOV slightly
-  const vis = rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows ? rc.visibleMask : null;
+  // Optional FOV gating: if rc.visibleWeight exists, blend brightness smoothly near the edge
+  const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
+  const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
+  const outsideDim = 0.2; // brightness outside FOV
   for (let y=0;y<rows;y++){
     for (let x=0;x<cols;x++){
       const gx = (x + 0.5) * scaleX;
       const gy = (y + 0.5) * scaleY;
       const L = sampleLight(lg, gx, gy);
       const mapped = gammaCorrect(toneMap(L, exposure), gamma);
-      if (vis){
-        const v = vis[y*cols + x] ? 1 : 0.2; // 20% brightness outside FOV
-        ctx.fillStyle = toHex([mapped[0]*v, mapped[1]*v, mapped[2]*v]);
-      } else {
-        ctx.fillStyle = toHex(mapped);
+      let factor = 1;
+      if (visW){
+        const w = visW[y*cols + x];
+        factor = outsideDim + (1 - outsideDim) * Math.max(0, Math.min(1, w));
+      } else if (vis){
+        factor = vis[y*cols + x] ? 1 : outsideDim;
       }
+      ctx.fillStyle = toHex([mapped[0]*factor, mapped[1]*factor, mapped[2]*factor]);
       ctx.fillRect(x*cellW, y*cellH, cellW, cellH);
     }
   }

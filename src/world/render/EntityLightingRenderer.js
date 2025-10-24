@@ -36,6 +36,11 @@ export function EntityLightingRenderer(world){
   const prevOp = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'multiply';
   ctx.font = font || '18px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
+  // Optional FOV weights from RenderContext for smooth dimming near sight edges
+  const visW = (rc && rc.visibleWeight instanceof Float32Array) ? rc.visibleWeight : null;
+  const vis = (!visW && rc && rc.visibleMask instanceof Uint8Array) ? rc.visibleMask : null;
+  const outsideDim = 0.2;
+
   for (const [id, pos, glyph] of world.query(Position, Glyph)){
     const mx = Math.floor((pos.x - camX));
     const my = Math.floor((pos.y - camY));
@@ -70,7 +75,16 @@ export function EntityLightingRenderer(world){
       (m.albedo[2] || 1)*diff*L[2] + specTint[2]*specPow*L[2]*(m.specular ?? 0.2)
     ];
 
-    const mapped = gammaCorrect(toneMap(rgb, exposure), gamma);
+    let mapped = gammaCorrect(toneMap(rgb, exposure), gamma);
+    // Apply smooth FOV fade to glyph
+    let factor = 1;
+    if (visW){
+      const idx = my*cols + mx; const w = visW[idx] || 0;
+      factor = outsideDim + (1 - outsideDim) * Math.max(0, Math.min(1, w));
+    } else if (vis){
+      const idx = my*cols + mx; factor = vis[idx] ? 1 : outsideDim;
+    }
+    mapped = [mapped[0]*factor, mapped[1]*factor, mapped[2]*factor];
     ctx.fillStyle = toHex(mapped);
     const ch = (glyph.char || '@');
     ctx.fillText(ch, mx*cellW + cellW*0.5, my*cellH + cellH*0.5);
