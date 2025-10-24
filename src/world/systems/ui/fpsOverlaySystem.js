@@ -22,16 +22,17 @@ export function fpsOverlaySystem(world){
     if (typeof ctx.setTransform === 'function') ctx.setTransform(1,0,0,1,0,0);
     ctx.globalAlpha = 1.0;
     ctx.font = '12px monospace';
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     // background pill for readability
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    const padX = 6, padY = 4; const boxW = 80, boxH = 20;
-    ctx.fillRect(8, 8, boxW, boxH);
+    const boxW = 80, boxH = 20;
+    const centerX = W * 0.5;
+    ctx.fillRect(centerX - boxW/2, 8, boxW, boxH);
     // color by FPS
     const c = ema >= 58 ? '#0f0' : ema >= 45 ? '#ff0' : '#f66';
     ctx.fillStyle = c;
-    ctx.fillText(`FPS ${(ema).toFixed(1)}`, 12, 10);
+    ctx.fillText(`FPS ${(ema).toFixed(1)}`, centerX, 10);
   } finally {
     ctx.restore();
     ctx.font = prevFont; ctx.fillStyle = prevFill; ctx.globalAlpha = prevAlpha; ctx.textAlign = prevAlign; ctx.textBaseline = prevBase;
