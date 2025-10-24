@@ -73,10 +73,27 @@ let { dpr, cssW, cssH } = setupCanvasSize();
 const world = new World();
 world.storeMode = 'map'; // use Map storage for flexibility
 
+
 // --- Create player entity from archetype ---
 const playerId = createFrom(world, PlayerArchetype, {
 	Position: { x: 0, y: 0 }
 });
+
+// --- Add a short occluding wall (4 tiles wide) in front of the player ---
+import { Occluder } from './world/components/Occluder.js';
+{
+	const playerPos = world.get(playerId, Position) || { x: 0, y: 0 };
+	// Place wall 1 tile in front of player (assuming +y is "down")
+	const wallY = playerPos.y + 1;
+	const wallX0 = playerPos.x - 2;
+	for (let dx = 0; dx < 4; ++dx) {
+		const wx = wallX0 + dx;
+		const wallId = world.create();
+		world.add(wallId, Position, { x: wx, y: wallY });
+		world.add(wallId, Glyph, { char: '#', fg: '#888', bg: '#222' });
+		world.add(wallId, Occluder, { opacity: 1.0, thickness: 1.0 });
+	}
+}
 
 // PlayerArchetype in this repo doesn't materialize component steps in a form
 // compatible with our archetype helper, so ensure the entity has the
@@ -147,11 +164,13 @@ import { ShadowCastSystem } from './world/systems/lighting/ShadowCastSystem.js';
 import { SpecularFieldSystem } from './world/systems/lighting/SpecularFieldSystem.js';
 import { ensureCameraLighting } from './world/singletons/CameraLighting.js';
 import { TileLightingRenderer } from './world/render/TileLightingRenderer.js';
+import { SmoothLightGlowRenderer } from './world/render/SmoothLightGlowRenderer.js';
 import { EntityLightingRenderer } from './world/render/EntityLightingRenderer.js';
 import { BloomRenderer } from './world/render/BloomRenderer.js';
 import { Light } from './world/components/Light.js';
 import { Emissive } from './world/components/Emissive.js';
 import { Material } from './world/components/Material.js';
+import { FieldOfViewSystem } from './world/systems/lighting/FieldOfViewSystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -201,6 +220,8 @@ try{
 world.system(renderTilesSystem, 'render');
 // Lighting background pass overlays tiles with tone-mapped light
 world.system(TileLightingRenderer, 'render');
+// Add smooth additive glow for lights (soft halos)
+world.system(SmoothLightGlowRenderer, 'render');
 world.system(renderItemsSystem, 'render');
 world.system(renderEffectsSystem, 'render');
 // Modulate entities with lighting/specular
@@ -211,7 +232,7 @@ world.system(BloomRenderer, 'render');
 world.system(renderPostProcessingSystem, 'render');
 
 // Explicit ordering ensures predictable render sequence
-try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
+try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, SmoothLightGlowRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
 
 // Register input system (captures keyboard input, translates to InputIntent)
 setupInputListeners(); // Initialize keyboard event listeners
@@ -226,6 +247,8 @@ world.system(goldPickupSystem, 'update');
 
 // Lighting systems ordering in update/late phases
 world.system(FlickerSystem, 'update');
+// Compute FOV mask separate from lighting so renderers can gate visibility
+world.system(FieldOfViewSystem, 'update');
 world.system(ShadowCastSystem, 'update');
 world.system(SpecularFieldSystem, 'late');
 
