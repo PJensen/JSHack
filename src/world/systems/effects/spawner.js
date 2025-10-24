@@ -1,6 +1,6 @@
 import { Effect } from '../../components/Effect.js';
 import { createParticleSystem } from './particleSystem.js';
-import { getRenderContext } from '../renderers/renderingUtils.js';
+import { getRenderContext } from '../render/utils.js';
 import { RenderContext } from '../../components/RenderContext.js';
 
 // Convenience helper to spawn common effects

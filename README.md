@@ -2,6 +2,10 @@
 
 A hackable, zero-dependency, browser-based like engine built with pure JavaScript and a Entity-Component-System (ECS) architecture. Designed for experimentation and exploration.
 
+## Building
+
+`./build.ps1`
+
 ## Prime Directives
 
 - **Pure ES Modules**: No build step, no bundler. Works by opening `index.html` directly or serving via a static server.

@@ -175,11 +175,18 @@ import { Gold } from './world/components/Gold.js';
 
 // --- Import renderer systems ---
 import { setSystemOrder } from './lib/ecs/systems.js';
-import { playerRendererSystem } from './world/systems/renderers/playerRendererSystem.js';
-import { renderTilesSystem } from './world/systems/renderers/tileRendererSystem.js';
-import { renderItemsSystem } from './world/systems/renderers/itemRendererSystem.js';
-import { renderEffectsSystem } from './world/systems/renderers/effectRendererSystem.js';
-import { renderPostProcessingSystem } from './world/systems/renderers/postProcessingRendererSystem.js';
+import {
+	playerRenderSystem,
+	tileRenderSystem,
+	itemRenderSystem,
+	effectRenderSystem,
+	postProcessingRenderSystem,
+	tileLightingRenderSystem,
+	glowRenderSystem,
+	shadowRenderSystem,
+	entityLightingRenderSystem,
+	bloomRenderSystem
+} from './world/systems/render/index.js';
 import { RenderContext } from './world/components/RenderContext.js';
 import { createParticleSystem } from './world/systems/effects/particleSystem.js';
 import { cameraSystem } from './world/systems/cameraSystem.js';
@@ -198,11 +205,7 @@ import { FlickerSystem } from './world/systems/lighting/FlickerSystem.js';
 import { ShadowCastSystem } from './world/systems/lighting/ShadowCastSystem.js';
 import { SpecularFieldSystem } from './world/systems/lighting/SpecularFieldSystem.js';
 import { ensureCameraLighting } from './world/singletons/CameraLighting.js';
-import { TileLightingRenderer } from './world/render/TileLightingRenderer.js';
-import { SmoothLightGlowRenderer } from './world/render/SmoothLightGlowRenderer.js';
-import { EntityLightingRenderer } from './world/render/EntityLightingRenderer.js';
-import { EntityDropShadowRenderer } from './world/render/EntityDropShadowRenderer.js';
-import { BloomRenderer } from './world/render/BloomRenderer.js';
+// Render lighting passes consolidated under systems/render
 import { Light } from './world/components/Light.js';
 import { Emissive } from './world/components/Emissive.js';
 import { Material } from './world/components/Material.js';
@@ -264,26 +267,38 @@ try{
 }catch(e){ /* ignore in constrained runtimes */ }
 
 // register renderers in order: tiles first, lighting background, drop-shadows, then items/effects, player, post-processing
-world.system(renderTilesSystem, 'render');
+world.system(tileRenderSystem, 'render');
 // Lighting background pass overlays tiles with tone-mapped light
-world.system(TileLightingRenderer, 'render');
+world.system(tileLightingRenderSystem, 'render');
 // Add smooth additive glow for lights (soft halos)
-world.system(SmoothLightGlowRenderer, 'render');
+world.system(glowRenderSystem, 'render');
 // Draw per-light drop shadows for entities (beneath glyphs)
-world.system(EntityDropShadowRenderer, 'render');
-world.system(renderItemsSystem, 'render');
-world.system(renderEffectsSystem, 'render');
+world.system(shadowRenderSystem, 'render');
+world.system(itemRenderSystem, 'render');
+world.system(effectRenderSystem, 'render');
 // Modulate entities with lighting/specular
-world.system(EntityLightingRenderer, 'render');
-world.system(playerRendererSystem, 'render');
+world.system(entityLightingRenderSystem, 'render');
+world.system(playerRenderSystem, 'render');
 // Optional bloom pass
-world.system(BloomRenderer, 'render');
-world.system(renderPostProcessingSystem, 'render');
+world.system(bloomRenderSystem, 'render');
+world.system(postProcessingRenderSystem, 'render');
 // HUD/UI overlays
 world.system(fpsOverlaySystem, 'render');
 
 // Explicit ordering ensures predictable render sequence
-try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, SmoothLightGlowRenderer, EntityDropShadowRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem, fpsOverlaySystem]); } catch (e) { /* ignore */ }
+try { setSystemOrder('render', [
+	tileRenderSystem,
+	tileLightingRenderSystem,
+	glowRenderSystem,
+	shadowRenderSystem,
+	itemRenderSystem,
+	effectRenderSystem,
+	entityLightingRenderSystem,
+	playerRenderSystem,
+	bloomRenderSystem,
+	postProcessingRenderSystem,
+	fpsOverlaySystem
+]); } catch (e) { /* ignore */ }
 
 // Register input system (captures keyboard input, translates to InputIntent)
 setupInputListeners(); // Initialize keyboard event listeners

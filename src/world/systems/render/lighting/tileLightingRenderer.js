@@ -1,7 +1,7 @@
-// TileLightingRenderer: shades tiles using LightGrid diffuse
-import { RenderContext } from '../components/RenderContext.js';
-import { LightGrid, sampleLight } from '../singletons/LightGrid.js';
-import { CameraLighting } from '../singletons/CameraLighting.js';
+// Tile Lighting Render System: shades tiles using LightGrid diffuse
+import { RenderContext } from '../../../components/RenderContext.js';
+import { LightGrid, sampleLight } from '../../../singletons/LightGrid.js';
+import { CameraLighting } from '../../../singletons/CameraLighting.js';
 
 function toneMap(rgb, exposure){
   const e = exposure||1;
@@ -18,36 +18,29 @@ function toHex(rgb){
   return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
 }
 
-export function TileLightingRenderer(world){
-  // fetch rc
+export function tileLightingRenderSystem(world){
   const rcId = world.renderContextId; if (!rcId) return;
   const rc = world.get(rcId, RenderContext); if (!rc) return;
   const { ctx, W, H, cellW=16, cellH=16 } = rc;
   const cols = Math.max(1, rc.cols|0), rows = Math.max(1, rc.rows|0);
-  const camX = rc.camX|0, camY = rc.camY|0;
 
-  // find light grid
   let lgId = 0; for (const e of world.alive){ if (world.has(e, LightGrid)) { lgId = e; break; } }
   if (!lgId) return; const lg = world.get(lgId, LightGrid);
   if (!lg || !lg.r) return;
 
-  // camera exposure
   let clId = 0; for (const e of world.alive){ if (world.has(e, CameraLighting)) { clId = e; break; } }
   const cl = clId? world.get(clId, CameraLighting) : null;
   const exposure = cl?.exposure ?? 1.0; const gamma = cl?.gamma ?? 2.2;
 
-  // mapping from world->grid space
   const scaleX = lg.w / cols; const scaleY = lg.h / rows;
 
   ctx.save();
-  // draw per visible tile rect colored by tone-mapped light (diffuse with neutral albedo)
   const ox = Math.floor((W - cols * cellW) / 2);
   const oy = Math.floor((H - rows * cellH) / 2);
   ctx.translate(ox, oy);
-  // Optional FOV gating: if rc.visibleWeight exists, blend brightness smoothly near the edge
   const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
   const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
-  const outsideDim = 0.2; // brightness outside FOV
+  const outsideDim = 0.2;
   for (let y=0;y<rows;y++){
     for (let x=0;x<cols;x++){
       const gx = (x + 0.5) * scaleX;
