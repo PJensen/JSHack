@@ -22,9 +22,15 @@ export function EntityDropShadowRenderer(world){
   const rc = world.get(rcId, RenderContext); if (!rc) return;
   const { ctx, font } = rc;
   const { cols, rows, camX, camY, cellW, cellH, W, H, ox, oy } = getViewport(rc);
+  // Match tile/lighting renderers: apply half-cell shift for even viewport sizes
+  const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
+  const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
 
   // Gather active lights within/near the viewport
   const lights = [];
+  // Screen center in our local transform
+  const cx = ox + halfShiftX + cols * cellW * 0.5;
+  const cy = oy + halfShiftY + rows * cellH * 0.5;
   for (const [lid, lt] of world.query(Light)){
     if (lt && lt.active === false) continue;
     const pos = world.get(lid, Position) || { x: lt.x ?? 0, y: lt.y ?? 0 };
@@ -34,16 +40,23 @@ export function EntityDropShadowRenderer(world){
     if (lx < camX-4 || ly < camY-4 || lx > camX+cols+4 || ly > camY+rows+4) continue;
     const intensity = (lt.intensityEff != null ? lt.intensityEff : (lt.intensity || 1));
     const radius = Math.max(0.5, lt.radius || 6);
-    lights.push({ x: lx, y: ly, intensity, radius });
+    // Precompute screen coords and camera-center distance for sorting
+    const slx = ox + halfShiftX + (lx - camX + 0.5) * cellW;
+    const sly = oy + halfShiftY + (ly - camY + 0.5) * cellH;
+    const d2 = (slx - cx)*(slx - cx) + (sly - cy)*(sly - cy);
+    lights.push({ x: lx, y: ly, intensity, radius, slx, sly, d2 });
   }
   if (lights.length === 0) return;
+  // Sort lights by proximity to camera center and keep only a few for perf
+  const maxLights = Math.max(1, rc.shadowMaxLights ?? 2);
+  lights.sort((a,b)=> a.d2 - b.d2);
+  const useLights = lights.slice(0, maxLights);
 
   // Shadow tuning (can be overridden via RenderContext)
   const shadowAlpha = rc.shadowAlpha ?? 0.42;
   const shadowScale = rc.shadowOffsetScale ?? 0.85; // how long the offset is in cells before distance scaling
   const maxPx = rc.shadowMaxPx ?? Math.max(cellW, cellH) * 1.35;
-  const blurScale = rc.shadowBlurScale ?? 0.35; // how much blur per (intensity * radius)
-  const maxBlurPx = rc.shadowMaxBlurPx ?? Math.max(cellW, cellH) * 0.9;
+  const softPass = rc.shadowSoftPass ?? true; // draw a faint second pass for faux softness
 
   ctx.save();
   ctx.font = font || '18px monospace';
@@ -63,13 +76,13 @@ export function EntityDropShadowRenderer(world){
     // Cull offscreen
     if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) continue;
 
-    const sx = ox + tx * cellW;
-    const sy = oy + ty * cellH;
+  const sx = ox + halfShiftX + tx * cellW;
+  const sy = oy + halfShiftY + ty * cellH;
 
     // For each light, draw a shadow copy offset away from the light
-    for (const l of lights){
-      const lx = ox + (l.x - camX + 0.5) * cellW;
-      const ly = oy + (l.y - camY + 0.5) * cellH;
+    for (const l of useLights){
+      const lx = l.slx;
+      const ly = l.sly;
       let dx = sx - lx;
       let dy = sy - ly;
       const dist = Math.hypot(dx, dy) || 1;
@@ -86,27 +99,15 @@ export function EntityDropShadowRenderer(world){
       const oxPx = dx * offPx;
       const oyPx = dy * offPx;
 
-      // Blur amount scales with light strength and radius (stylized softness)
-      const blurPx = Math.min(maxBlurPx, Math.max(0, blurScale * l.radius * intensityFactor * (cellAvg / 16)));
-
-      // draw the shadow glyph at offset position with optional blur
-      // keep alpha low; draw blurred pass then a faint core for contact
+      // draw the shadow glyph at offset position with a cheap two-tap softness
       const ch = glyph.char || '@';
       const prevFill = ctx.fillStyle;
-      const prevFilter = ctx.filter;
       ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha))})`;
-      if (blurPx > 0.25) {
-        ctx.filter = `blur(${blurPx.toFixed(2)}px)`;
-        ctx.fillText(ch, sx + oxPx, sy + oyPx);
-        // subtle core for crisper look
-        ctx.filter = 'none';
-        ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha * 0.5))})`;
-        ctx.fillText(ch, sx + oxPx * 0.94, sy + oyPx * 0.94);
-      } else {
-        ctx.filter = 'none';
-        ctx.fillText(ch, sx + oxPx, sy + oyPx);
+      ctx.fillText(ch, sx + oxPx, sy + oyPx);
+      if (softPass) {
+        ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha * 0.45))})`;
+        ctx.fillText(ch, sx + oxPx * 0.92, sy + oyPx * 0.92);
       }
-      ctx.filter = prevFilter;
       ctx.fillStyle = prevFill;
     }
   }

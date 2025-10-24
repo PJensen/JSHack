@@ -12,17 +12,17 @@ import { Player } from '../../components/Player.js';
 export function renderItemsSystem(world) {
     const rc = getRenderContext(world);
     if (!rc) return;
-    const { ctx, W, H, cellW, cellH, font } = rc;
+    const { ctx, W, H, cellW=16, cellH=16, font } = rc;
+    const cols = Math.max(1, rc.cols|0), rows = Math.max(1, rc.rows|0);
+    const camX = rc.camX|0, camY = rc.camY|0;
+    const ox = Math.floor((W - cols * cellW) / 2);
+    const oy = Math.floor((H - rows * cellH) / 2);
+    const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
+    const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
     
-    // Get player position to use as camera center
-    let playerX = 0, playerY = 0;
-    for (const [id, pos] of world.query(Position, Player)) {
-        playerX = pos.x;
-        playerY = pos.y;
-        break; // use first player
-    }
-    
+    // Align to tile grid like other renderers
     ctx.save();
+    ctx.translate(ox + halfShiftX, oy + halfShiftY);
     ctx.font = font || '16px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -31,14 +31,15 @@ export function renderItemsSystem(world) {
     for (const [id, pos, glyph, gold] of world.query(Position, Glyph, Gold)) {
         // Skip rendering if this entity is the player (players may also have Gold component)
         if (world.has(id, Player)) continue;
-        // Calculate screen position relative to centered player
-        const dx = pos.x - playerX;
-        const dy = pos.y - playerY;
-        const screenX = W / 2 + dx * cellW;
-        const screenY = H / 2 + dy * cellH;
-        
-        ctx.fillStyle = glyph.fg || glyph.color || '#ffd700';
-        ctx.fillText(glyph.char || '$', screenX, screenY);
+    // Calculate screen position using camera and tile center mapping
+    const mx = (pos.x - camX);
+    const my = (pos.y - camY);
+    // Cull quickly if off visible grid
+    if (mx < -1 || my < -1 || mx > cols+1 || my > rows+1) continue;
+    const screenX = mx * cellW + cellW * 0.5;
+    const screenY = my * cellH + cellH * 0.5;
+    ctx.fillStyle = glyph.fg || glyph.color || '#ffd700';
+    ctx.fillText(glyph.char || '$', screenX, screenY);
     }
     
     ctx.restore();

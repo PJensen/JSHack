@@ -16,6 +16,7 @@ function normalize(v){ const l=Math.hypot(v[0],v[1])||1; return [v[0]/l,v[1]/l];
 function mix(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
 
 export function EntityLightingRenderer(world){
+  // return;
   const rcId = world.renderContextId; if (!rcId) return; const rc = world.get(rcId, RenderContext); if (!rc) return;
   const { ctx, W, H, cellW=16, cellH=16, font } = rc;
   const cols = Math.max(1, rc.cols|0), rows = Math.max(1, rc.rows|0);
@@ -28,10 +29,12 @@ export function EntityLightingRenderer(world){
   const exposure = cl?.exposure ?? 1.0; const gamma = cl?.gamma ?? 2.2;
   const scaleX = lg.w / cols; const scaleY = lg.h / rows;
 
-  // center camera grid like other renderers
+  // center camera grid like tile renderer (apply half-cell shift for even viewports)
   const ox = Math.floor((W - cols * cellW) / 2);
   const oy = Math.floor((H - rows * cellH) / 2);
-  ctx.save(); ctx.translate(ox, oy);
+  const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
+  const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
+  ctx.save(); ctx.translate(ox + halfShiftX, oy + halfShiftY);
   // Multiply so lighting modulates existing glyphs drawn by base renderers
   const prevOp = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'multiply';
   ctx.font = font || '18px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -86,8 +89,8 @@ export function EntityLightingRenderer(world){
     }
     mapped = [mapped[0]*factor, mapped[1]*factor, mapped[2]*factor];
     ctx.fillStyle = toHex(mapped);
-    const ch = (glyph.char || '@');
-    ctx.fillText(ch, mx*cellW + cellW*0.5, my*cellH + cellH*0.5);
+  const ch = (glyph.char || '@');
+  ctx.fillText(ch, mx*cellW + cellW*0.5, my*cellH + cellH*0.5);
   }
 
   ctx.globalCompositeOperation = prevOp; ctx.restore();

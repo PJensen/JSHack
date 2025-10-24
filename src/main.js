@@ -225,8 +225,8 @@ world.add(rt, RenderContext, {
 	shadowOffsetScale: 0.85,
 	shadowAlpha: 0.42,
 	shadowMaxPx: Math.max(CELL_W, CELL_H) * 1.35,
-	shadowBlurScale: 0.35,
-	shadowMaxBlurPx: Math.max(CELL_W, CELL_H) * 0.9
+	shadowSoftPass: true,
+	shadowMaxLights: 2
 	,
 	// pre-create particle pool so renderers can rely on it immediately
 	particleSystem: createParticleSystem({ poolSize: 512 })
@@ -395,7 +395,7 @@ try{
 	const ppos = world.get(playerId, Position) || { x:0, y:0 };
 	// Torch near player
 	const torch = world.create();
-	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
+ 	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
 	world.add(torch, Light, { kind:'point', color:[1.0,0.6,0.2], radius:6, intensity:4, flickerSeed:42, castsShadows:true });
 	world.add(torch, Emissive, { color:[1.0,0.4,0.1], strength:2, radius:1 });
 
