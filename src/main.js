@@ -195,6 +195,7 @@ import { ensureCameraLighting } from './world/singletons/CameraLighting.js';
 import { TileLightingRenderer } from './world/render/TileLightingRenderer.js';
 import { SmoothLightGlowRenderer } from './world/render/SmoothLightGlowRenderer.js';
 import { EntityLightingRenderer } from './world/render/EntityLightingRenderer.js';
+import { EntityDropShadowRenderer } from './world/render/EntityDropShadowRenderer.js';
 import { BloomRenderer } from './world/render/BloomRenderer.js';
 import { Light } from './world/components/Light.js';
 import { Emissive } from './world/components/Emissive.js';
@@ -219,7 +220,13 @@ world.add(rt, RenderContext, {
 	cellW: CELL_W,
 	cellH: CELL_H,
 	bg: '#0f1320',
-	pixelated: true
+	pixelated: true,
+	// Shadow tuning for EntityDropShadowRenderer
+	shadowOffsetScale: 0.85,
+	shadowAlpha: 0.42,
+	shadowMaxPx: Math.max(CELL_W, CELL_H) * 1.35,
+	shadowBlurScale: 0.35,
+	shadowMaxBlurPx: Math.max(CELL_W, CELL_H) * 0.9
 	,
 	// pre-create particle pool so renderers can rely on it immediately
 	particleSystem: createParticleSystem({ poolSize: 512 })
@@ -245,12 +252,14 @@ try{
 	console.assert(dev, 'DevState singleton not created');
 }catch(e){ /* ignore in constrained runtimes */ }
 
-// register renderers in order: tiles first, then items/effects, player, post-processing
+// register renderers in order: tiles first, lighting background, drop-shadows, then items/effects, player, post-processing
 world.system(renderTilesSystem, 'render');
 // Lighting background pass overlays tiles with tone-mapped light
 world.system(TileLightingRenderer, 'render');
 // Add smooth additive glow for lights (soft halos)
 world.system(SmoothLightGlowRenderer, 'render');
+// Draw per-light drop shadows for entities (beneath glyphs)
+world.system(EntityDropShadowRenderer, 'render');
 world.system(renderItemsSystem, 'render');
 world.system(renderEffectsSystem, 'render');
 // Modulate entities with lighting/specular
@@ -261,7 +270,7 @@ world.system(BloomRenderer, 'render');
 world.system(renderPostProcessingSystem, 'render');
 
 // Explicit ordering ensures predictable render sequence
-try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, SmoothLightGlowRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
+try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, SmoothLightGlowRenderer, EntityDropShadowRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
 
 // Register input system (captures keyboard input, translates to InputIntent)
 setupInputListeners(); // Initialize keyboard event listeners
