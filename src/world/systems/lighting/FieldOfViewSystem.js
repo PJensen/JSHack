@@ -55,41 +55,58 @@ export function FieldOfViewSystem(world){
   if (!vis || vis.length !== cols*rows){ vis = new Uint8Array(cols*rows); }
   vis.fill(0);
   
-  // Simple ray-cast FOV from eye; mark visible until opacity accumulates beyond threshold
-  const rays = 256; // enough for smooth-ish edges
+  // Simple ray-cast FOV from eye; correct DDA stepping to avoid 
+  // plus-shaped artifacts and keep the eye centered.
+  const rays = 360; // per-degree; increase if you want smoother edges
   const twoPi = Math.PI * 2;
+  // Always reveal the eye tile itself
+  if (eyeX>=camX && eyeY>=camY && eyeX<camX+cols && eyeY<camY+rows){
+    vis[(eyeY-camY)*cols + (eyeX-camX)] = 1;
+  }
   for (let i=0;i<rays;i++){
     const a = (i / rays) * twoPi;
     const dx = Math.cos(a), dy = Math.sin(a);
-    let x = eyeX + 0.5, y = eyeY + 0.5;
+    // Handle degenerate directions by clamping inverse
+    const invDx = dx !== 0 ? 1/dx : 1e9;
+    const invDy = dy !== 0 ? 1/dy : 1e9;
     let T = 1.0; // transmittance along ray
-    // DDA across tile grid
-    const stepX = dx>0 ? 1 : -1; const stepY = dy>0 ? 1 : -1;
-    let tMaxX = ((Math.floor(x) + (dx>0?1:0)) - x) / (dx||1e-6);
-    let tMaxY = ((Math.floor(y) + (dy>0?1:0)) - y) / (dy||1e-6);
-    const tDeltaX = Math.abs(1/(dx||1e-6)); const tDeltaY = Math.abs(1/(dy||1e-6));
-    let cx = Math.floor(x), cy = Math.floor(y);
-    for (let steps=0; steps < R*4; steps++){
+    // Start in the cell containing the eye
+    let cx = Math.floor(eyeX);
+    let cy = Math.floor(eyeY);
+    const ox = eyeX + 0.5;
+    const oy = eyeY + 0.5;
+    const stepX = dx>0 ? 1 : -1;
+    const stepY = dy>0 ? 1 : -1;
+    // Distance to first vertical/horizontal boundary
+    let tMaxX = ((dx>0 ? (cx+1) : cx) - ox) * invDx;
+    let tMaxY = ((dy>0 ? (cy+1) : cy) - oy) * invDy;
+    const tDeltaX = Math.abs(invDx);
+    const tDeltaY = Math.abs(invDy);
+
+    // March until max radius or fully occluded
+    for(;;){
+      // Mark current cell within radius
       const wx = cx + 0.5, wy = cy + 0.5;
       const ddx = wx - eyeX, ddy = wy - eyeY;
       const d2 = ddx*ddx + ddy*ddy; if (d2 > R*R) break;
-      // Map to viewport coords
       const vx = cx - camX, vy = cy - camY;
       if (vx>=0 && vy>=0 && vx<cols && vy<rows){ vis[vy*cols + vx] = 1; }
 
-      // advance
-      if (tMaxX < tMaxY){ x += tMaxX*dx; y += tMaxX*dy; tMaxX = tDeltaX; cx += stepX; }
-      else { x += tMaxY*dx; y += tMaxY*dy; tMaxY = tDeltaY; cy += stepY; }
+      // Step to next cell boundary (Amanatides & Woo)
+      if (tMaxX < tMaxY){
+        tMaxX += tDeltaX; cx += stepX;
+      } else {
+        tMaxY += tDeltaY; cy += stepY;
+      }
 
-      // apply occlusion
-      const ox = cx, oy = cy;
-      const inside = (ox>=occ.minX && ox<occ.minX+occ.W && oy>=occ.minY && oy<occ.minY+occ.H);
+      // Apply occlusion of the cell we just entered
+      const inside = (cx>=occ.minX && cx<occ.minX+occ.W && cy>=occ.minY && cy<occ.minY+occ.H);
       if (inside){
-        const op = occ.op[occ.idx(ox,oy)];
+        const op = occ.op[occ.idx(cx,cy)];
         if (op > 0){
           const stepLen = 1; const thickness = 1;
           T *= Math.exp(-op * stepLen * thickness);
-          if (T < 0.05) break; // essentially fully blocked
+          if (T < 0.05) break; // fully blocked along this ray
         }
       }
     }
