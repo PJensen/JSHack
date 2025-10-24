@@ -57,6 +57,10 @@ export function EntityDropShadowRenderer(world){
   const shadowScale = rc.shadowOffsetScale ?? 0.85; // how long the offset is in cells before distance scaling
   const maxPx = rc.shadowMaxPx ?? Math.max(cellW, cellH) * 1.35;
   const softPass = rc.shadowSoftPass ?? true; // draw a faint second pass for faux softness
+  const maxEntitiesPerFrame = Math.max(1, rc.shadowMaxEntitiesPerFrame ?? 80);
+  // Distance cutoff (in tiles). Prefer explicit config; else derive ~FOV radius (half the larger axis)
+  const fallbackRadius = Math.max(cols, rows) * 0.5;
+  const maxDistTiles = Math.max(1, rc.shadowMaxDistanceTiles ?? Math.floor(fallbackRadius));
 
   ctx.save();
   ctx.font = font || '18px monospace';
@@ -64,23 +68,40 @@ export function EntityDropShadowRenderer(world){
   ctx.textBaseline = 'middle';
   ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha))})`;
 
-  // Render shadows for player and items (exclude tiles/walls)
+  // Build list of eligible entities (player/items only) and apply round-robin cap
+  const ents = [];
   for (const [eid, pos, glyph] of world.query(Position, Glyph)){
-    // Skip non-targets if you want only player/items: require Player or Gold
-    const isPlayer = world.has(eid, Player);
-    const isGold = world.has(eid, Gold);
-    if (!isPlayer && !isGold) continue;
+    if (!world.has(eid, Player) && !world.has(eid, Gold)) continue;
+    ents.push([eid, pos, glyph]);
+  }
+  const n = ents.length;
+  if (n === 0) { ctx.restore?.(); return; }
+  let start = (rc.shadowRRIndex|0) % n;
+  if (start < 0) start = 0;
+  const count = Math.min(n, maxEntitiesPerFrame);
+  // Advance index for next frame (store back on rc)
+  rc.shadowRRIndex = (start + count) % Math.max(1, n);
+
+  // Render shadows for selected entities
+  for (let j=0;j<count;j++){
+    const i = (start + j) % n;
+    const [eid, pos, glyph] = ents[i];
 
     const tx = pos.x - camX + 0.5;
     const ty = pos.y - camY + 0.5;
     // Cull offscreen
-    if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) continue;
+    if (tx < -1 || ty < -1 || tx > cols+1 || ty > rows+1) continue;
 
-  const sx = ox + halfShiftX + tx * cellW;
-  const sy = oy + halfShiftY + ty * cellH;
+    const sx = ox + halfShiftX + tx * cellW;
+    const sy = oy + halfShiftY + ty * cellH;
 
-    // For each light, draw a shadow copy offset away from the light
+    // For each light, draw a shadow copy offset away from the light if within max distance
     for (const l of useLights){
+      // Distance in tiles between entity and light
+      const dxT = (pos.x - l.x);
+      const dyT = (pos.y - l.y);
+      const dTiles = Math.hypot(dxT, dyT);
+      if (dTiles > maxDistTiles) continue;
       const lx = l.slx;
       const ly = l.sly;
       let dx = sx - lx;

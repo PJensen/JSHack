@@ -201,6 +201,7 @@ import { Light } from './world/components/Light.js';
 import { Emissive } from './world/components/Emissive.js';
 import { Material } from './world/components/Material.js';
 import { FieldOfViewSystem } from './world/systems/lighting/FieldOfViewSystem.js';
+import { fpsOverlaySystem } from './world/systems/ui/fpsOverlaySystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -226,7 +227,11 @@ world.add(rt, RenderContext, {
 	shadowAlpha: 0.42,
 	shadowMaxPx: Math.max(CELL_W, CELL_H) * 1.35,
 	shadowSoftPass: true,
-	shadowMaxLights: 2
+	shadowMaxLights: 2,
+	shadowMaxEntitiesPerFrame: 80,
+	// If not set, renderer derives from viewport ~ half the larger axis
+	// shadowMaxDistanceTiles: 12,
+	showFps: true
 	,
 	// pre-create particle pool so renderers can rely on it immediately
 	particleSystem: createParticleSystem({ poolSize: 512 })
@@ -268,9 +273,11 @@ world.system(playerRendererSystem, 'render');
 // Optional bloom pass
 world.system(BloomRenderer, 'render');
 world.system(renderPostProcessingSystem, 'render');
+// HUD/UI overlays
+world.system(fpsOverlaySystem, 'render');
 
 // Explicit ordering ensures predictable render sequence
-try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, SmoothLightGlowRenderer, EntityDropShadowRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem]); } catch (e) { /* ignore */ }
+try { setSystemOrder('render', [renderTilesSystem, TileLightingRenderer, SmoothLightGlowRenderer, EntityDropShadowRenderer, renderItemsSystem, renderEffectsSystem, EntityLightingRenderer, playerRendererSystem, BloomRenderer, renderPostProcessingSystem, fpsOverlaySystem]); } catch (e) { /* ignore */ }
 
 // Register input system (captures keyboard input, translates to InputIntent)
 setupInputListeners(); // Initialize keyboard event listeners
