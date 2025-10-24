@@ -81,6 +81,7 @@ const playerId = createFrom(world, PlayerArchetype, {
 
 // --- Add a short occluding wall (4 tiles wide) in front of the player ---
 import { Occluder } from './world/components/Occluder.js';
+import { Tile } from './world/components/Tile.js';
 {
 	const playerPos = world.get(playerId, Position) || { x: 0, y: 0 };
 	// Place wall 1 tile in front of player (assuming +y is "down")
@@ -91,7 +92,35 @@ import { Occluder } from './world/components/Occluder.js';
 		const wallId = world.create();
 		world.add(wallId, Position, { x: wx, y: wallY });
 		world.add(wallId, Glyph, { char: '#', fg: '#888', bg: '#222' });
+		// Make this wall block light and movement
+		world.add(wallId, Tile, { glyph: '#', walkable: false, blocksLight: true });
 		world.add(wallId, Occluder, { opacity: 1.0, thickness: 1.0 });
+	}
+}
+
+// --- Add an impassable L-shaped wall 5 tiles from the player ---
+{
+	const p = world.get(playerId, Position) || { x: 0, y: 0 };
+	// Define the L corner exactly 5 tiles to the right of the player
+	const cx = p.x + 5;
+	const cy = p.y + 0;
+	const LEG_LEN = 5; // number of tiles including the corner
+
+	// Horizontal leg: to the right from the corner
+	for (let i = 0; i < LEG_LEN; i++) {
+		const e = world.create();
+		world.add(e, Position, { x: cx + i, y: cy });
+		world.add(e, Glyph, { char: '#', fg: '#aaa', bg: '#333' });
+		world.add(e, Tile, { glyph: '#', walkable: false, blocksLight: true });
+		world.add(e, Occluder, { opacity: 1.0, thickness: 1.0 });
+	}
+	// Vertical leg: downward from the corner
+	for (let j = 1; j < LEG_LEN; j++) { // start at 1 to avoid duplicating the corner
+		const e = world.create();
+		world.add(e, Position, { x: cx, y: cy + j });
+		world.add(e, Glyph, { char: '#', fg: '#aaa', bg: '#333' });
+		world.add(e, Tile, { glyph: '#', walkable: false, blocksLight: true });
+		world.add(e, Occluder, { opacity: 1.0, thickness: 1.0 });
 	}
 }
 
