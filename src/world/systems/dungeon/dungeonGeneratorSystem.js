@@ -476,7 +476,7 @@ export function dungeonGeneratorSystem(world){
         const height = Math.max(10, requestedH|0);
 
         const rng = typeof world.rand === 'function' ? world.rand : Math.random;
-    const { map, spawnX, spawnY } = generateDungeonLevel(rng, width, height);
+    const { map, rooms, spawnX, spawnY } = generateDungeonLevel(rng, width, height);
 
                 // Note: Avoid creating per-cell tile entities to keep the world lightweight.
                 // Rendering and movement will consult MapView instead.
@@ -527,7 +527,59 @@ export function dungeonGeneratorSystem(world){
                 spawn: { x: spawnX, y: spawnY },
             });
 
-            // Place a torch in the starting room (offset by +1 x to avoid player tile)
+            // Place torches throughout rooms (in addition to the starter torch), configurable
+            try{
+                const TORCHES_ENABLED = !!(CONFIG.torchesEnabled ?? true);
+                if (TORCHES_ENABLED && Array.isArray(rooms)){
+                    const roomTorchChance = Math.max(0, Math.min(1, CONFIG.roomTorchChance ?? 0.7));
+                    const maxTorchesPerRoom = Math.max(0, (CONFIG.maxTorchesPerRoom ?? 2)|0);
+                    const bigRoomExtraTorches = Math.max(0, (CONFIG.bigRoomExtraTorches ?? 1)|0);
+                    const bigArea = Math.max(20, (CONFIG.bigRoomArea ?? 60)|0);
+                    const avoidSpawnRadius = Math.max(0, (CONFIG.torchAvoidSpawnRadius ?? 1)|0);
+
+                    // simple helper to avoid placing on spawn
+                    const tooCloseToSpawn = (x,y)=> (Math.abs((spawnX|0)-x) + Math.abs((spawnY|0)-y)) <= avoidSpawnRadius;
+
+                    const used = new Set();
+                    const pushIfFree = (x,y)=>{
+                        const k = x+","+y; if (used.has(k)) return false; used.add(k); return true;
+                    };
+
+                    for (const r of rooms){
+                        // Decide how many to place in this room
+                        let toPlace = 0;
+                        if (rng() < roomTorchChance) toPlace = 1;
+                        if ((r.w * r.h) >= bigArea) toPlace = Math.min(maxTorchesPerRoom + bigRoomExtraTorches, Math.max(toPlace, 1 + ((rng()*2)|0)));
+                        toPlace = Math.min(toPlace, maxTorchesPerRoom + bigRoomExtraTorches);
+                        if (toPlace <= 0) continue;
+
+                        // Candidate positions: corners and midpoints on inner perimeter
+                        const [cx, cy] = r.center();
+                        const cand = [
+                            [r.x, r.y], [r.x2, r.y], [r.x, r.y2], [r.x2, r.y2],
+                            [r.x, cy], [r.x2, cy], [cx, r.y], [cx, r.y2]
+                        ];
+                        // Shuffle candidates deterministically-ish with rng
+                        for (let i=cand.length-1;i>0;i--){ const j=(rng()* (i+1))|0; const tmp=cand[i]; cand[i]=cand[j]; cand[j]=tmp; }
+
+                        for (const [tx,ty] of cand){
+                            if (toPlace<=0) break;
+                            if (!map.inBounds(tx,ty)) continue;
+                            const cell = map.t[ty][tx];
+                            if (!cell || !cell.walkable) continue; // we only place on floor
+                            // avoid spawn tile
+                            if (tooCloseToSpawn(tx,ty)) continue;
+                            if (!pushIfFree(tx,ty)) continue;
+                            createDeferred(world, TorchArchetype, {
+                                Position: { x: tx, y: ty }
+                            });
+                            toPlace--;
+                        }
+                    }
+                }
+            }catch(_){ /* ignore torch placement errors */ }
+
+            // Ensure at least one starter torch near spawn (offset by +1 x to avoid player tile)
             try{
                 createDeferred(world, TorchArchetype, {
                     Position: { x: (spawnX | 0) + 1, y: (spawnY | 0) }
