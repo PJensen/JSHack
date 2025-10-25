@@ -15,20 +15,43 @@ function buildOcclusionGrid(world, minX, minY, maxX, maxY){
   const op = new Float32Array(W*H);
   const idx = (x,y)=> (y-minY)*W + (x-minX);
   
-  // First pass: check MapView for wall glyphs (dungeon tiles)
-  for (const [mvid, mv] of world.query(MapView)){
-    const glyphAt = mv && mv.glyphAt;
-    if (typeof glyphAt !== 'function') break;
-    for (let y=minY; y<=maxY; y++){
-      for (let x=minX; x<=maxX; x++){
-        const g = glyphAt(x,y) || '';
-        // Walls block sight (█ and other blocking glyphs)
-        if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
-          op[idx(x,y)] = 1.0;
+  // First pass: consult the designated MapView for opaque cells
+  let mv = null;
+  try {
+    const mvId = world.mapViewId;
+    if (mvId) mv = world.get(mvId, MapView);
+    if (!mv) { for (const [_id, _mv] of world.query(MapView)) { mv = _mv; break; } }
+  } catch(_) { /* ignore */ }
+  if (mv){
+    const opaqueAt = mv.opaqueAt;
+    if (typeof opaqueAt === 'function'){
+      for (let y=minY; y<=maxY; y++){
+        for (let x=minX; x<=maxX; x++){
+          if (opaqueAt(x,y)) op[idx(x,y)] = 1.0;
+        }
+      }
+    } else if (typeof mv.tileAt === 'function'){
+      const tileAt = mv.tileAt;
+      for (let y=minY; y<=maxY; y++){
+        for (let x=minX; x<=maxX; x++){
+          const t = tileAt(x,y);
+          if (t && t.blocksLight) op[idx(x,y)] = 1.0;
+        }
+      }
+    } else {
+      const glyphAt = mv.glyphAt;
+      if (typeof glyphAt === 'function'){
+        for (let y=minY; y<=maxY; y++){
+          for (let x=minX; x<=maxX; x++){
+            const g = glyphAt(x,y) || '';
+            // Walls and solid features block sight
+            if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
+              op[idx(x,y)] = 1.0;
+            }
+          }
         }
       }
     }
-    break; // only one MapView
   }
   
   // Second pass: Position+Tile entities (manually placed walls)
@@ -80,7 +103,8 @@ export function FieldOfViewSystem(world){
   
   // Simple ray-cast FOV from eye; correct DDA stepping to avoid 
   // plus-shaped artifacts and keep the eye centered.
-  const rays = 360; // per-degree; increase if you want smoother edges
+  // Number of FOV rays: prefer RenderContext or CONFIG override; default 720 for softer edges
+  const rays = Math.max(8, (rc.fovRays ?? CONFIG.fovRays ?? 720) | 0);
   const twoPi = Math.PI * 2;
   // Always reveal the eye tile itself
   if (eyeX>=camX && eyeY>=camY && eyeX<camX+cols && eyeY<camY+rows){
@@ -116,10 +140,17 @@ export function FieldOfViewSystem(world){
 
     // March until max radius or fully occluded
     for(;;){
-      // Mark current cell within radius
+      // Current cell center and range check
       const wx = cx + 0.5, wy = cy + 0.5;
       const ddx = wx - eyeX, ddy = wy - eyeY;
       const d2 = ddx*ddx + ddy*ddy; if (d2 > R*R) break;
+
+      // Read opacity for current cell (treat >0.5 as hard wall)
+      let opCurr = 0;
+      const insideCurr = (cx>=occ.minX && cx<occ.minX+occ.W && cy>=occ.minY && cy<occ.minY+occ.H);
+      if (insideCurr) opCurr = occ.op[occ.idx(cx,cy)] || 0;
+
+      // Accumulate visibility at current cell within viewport
       const vx = cx - camX, vy = cy - camY;
       if (vx>=0 && vy>=0 && vx<cols && vy<rows){
         const d = Math.sqrt(d2) / R; // 0 at eye, 1 at max radius
@@ -130,22 +161,21 @@ export function FieldOfViewSystem(world){
         if (!vis[idx] && w > 0.02) vis[idx] = 1; // binary mask for fast gate
       }
 
+      // If this cell is opaque, stop casting past it (wall remains visible)
+      if (opCurr > 0.5) break;
+
+      // Otherwise apply partial attenuation (for semi-opaque effects)
+      if (opCurr > 0){
+        const stepLen = 1; const thickness = 1;
+        T *= Math.exp(-opCurr * stepLen * thickness);
+        if (T < 0.05) break;
+      }
+
       // Step to next cell boundary (Amanatides & Woo)
       if (tMaxX < tMaxY){
         tMaxX += tDeltaX; cx += stepX;
       } else {
         tMaxY += tDeltaY; cy += stepY;
-      }
-
-      // Apply occlusion of the cell we just entered
-      const inside = (cx>=occ.minX && cx<occ.minX+occ.W && cy>=occ.minY && cy<occ.minY+occ.H);
-      if (inside){
-        const op = occ.op[occ.idx(cx,cy)];
-        if (op > 0){
-          const stepLen = 1; const thickness = 1;
-          T *= Math.exp(-op * stepLen * thickness);
-          if (T < 0.05) break; // fully blocked along this ray
-        }
       }
     }
   }

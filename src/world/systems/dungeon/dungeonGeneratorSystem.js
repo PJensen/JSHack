@@ -240,7 +240,24 @@ export function dungeonGeneratorSystem(world){
                             if (x < 0 || y < 0 || x >= map.w || y >= map.h) return null;
                             return map.t[y][x];
                         };
-                        mvRec.w = map.w; mvRec.h = map.h; mvRec.glyphAt = glyphAt; mvRec.tileAt = tileAt;
+                        // Precompute an opacity grid for fast lookups
+                        let opaque = null;
+                        try{
+                            opaque = new Uint8Array(map.w * map.h);
+                            for (let y=0; y<map.h; y++){
+                                for (let x=0; x<map.w; x++){
+                                    const t = map.t[y][x];
+                                    opaque[y*map.w + x] = (t && t.blocksLight) ? 1 : 0;
+                                }
+                            }
+                        }catch(_){}
+                        const opaqueAt = (x, y) => {
+                            if (x < 0 || y < 0 || x >= map.w || y >= map.h) return true; // out of bounds = opaque
+                            if (opaque) return !!opaque[y*map.w + x];
+                            const t = map.t[y][x];
+                            return !!(t && t.blocksLight);
+                        };
+                        mvRec.w = map.w; mvRec.h = map.h; mvRec.glyphAt = glyphAt; mvRec.tileAt = tileAt; mvRec.opaqueAt = opaqueAt;
                         mvRec.visibleMask = null; mvRec.seenMask = null;
                         if (mvId) world.markChanged(mvId, MapView);
                     }

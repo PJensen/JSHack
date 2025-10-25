@@ -8,6 +8,8 @@ export const MapView = defineComponent('MapView', {
   w: 0,
   h: 0,
   glyphAt: null, // function(x,y)
+  tileAt: null,  // function(x,y) -> { glyph, walkable, blocksLight } | null
+  opaqueAt: null, // function(x,y) -> boolean (true if blocksLight)
   visibleMask: null, // Uint8Array
   seenMask: null // Uint8Array
 });

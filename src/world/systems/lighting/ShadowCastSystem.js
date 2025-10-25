@@ -1,6 +1,7 @@
 // ShadowCastSystem: builds LightGrid from Lights and Emissives
 import { Position } from '../../components/Position.js';
 import { Tile } from '../../components/Tile.js';
+import { MapView } from '../../components/MapView.js';
 import { Light } from '../../components/Light.js';
 import { Emissive } from '../../components/Emissive.js';
 import { RenderContext } from '../../components/RenderContext.js';
@@ -28,6 +29,28 @@ function buildOcclusionGrid(world, minX, minY, maxX, maxY){
   const H = maxY - minY + 1;
   const op = new Float32Array(W*H);
   const idx = (x,y)=> (y-minY)*W + (x-minX);
+  // Prefer MapView opaqueAt/tileAt for dungeon tiles
+  let mv = null;
+  try{
+    const mvId = world.mapViewId; if (mvId) mv = world.get(mvId, MapView);
+    if (!mv){ for (const [_id,_mv] of world.query(MapView)){ mv = _mv; break; } }
+  }catch(_){ /* ignore */ }
+  if (mv){
+    if (typeof mv.opaqueAt === 'function'){
+      for (let y=minY; y<=maxY; y++){
+        for (let x=minX; x<=maxX; x++){
+          if (mv.opaqueAt(x,y)) op[idx(x,y)] = 1.0;
+        }
+      }
+    } else if (typeof mv.tileAt === 'function'){
+      for (let y=minY; y<=maxY; y++){
+        for (let x=minX; x<=maxX; x++){
+          const t = mv.tileAt(x,y);
+          if (t && t.blocksLight) op[idx(x,y)] = 1.0;
+        }
+      }
+    }
+  }
   for (const [id, pos, tile] of world.query(Position, Tile)){
     const x = pos.x|0, y = pos.y|0;
     if (x<minX||x>maxX||y<minY||y>maxY) continue;
@@ -104,6 +127,8 @@ function castLightRays(world, lg, rc, occ, light){
       if (inside){
         const op = occ.op[occ.idx(ox,oy)];
         if (op > 0){
+          // Hard walls: stop immediately when sufficiently opaque
+          if (op > 0.5) break;
           const stepLen = 1; // tiles
           const thickness = 1; // could read Occluder.thickness
           T *= Math.exp(-op * stepLen * thickness);
