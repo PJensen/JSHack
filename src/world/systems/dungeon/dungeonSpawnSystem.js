@@ -17,9 +17,11 @@ export function dungeonSpawnSystem(world){
 
     // Move first player to spawn
     let applied = false;
+    let spawnedX = lvl.spawn.x | 0;
+    let spawnedY = lvl.spawn.y | 0;
     for (const [pid, pos] of world.query(Position, Player)){
-      pos.x = lvl.spawn.x | 0;
-      pos.y = lvl.spawn.y | 0;
+      pos.x = spawnedX;
+      pos.y = spawnedY;
       applied = true;
       break;
     }
@@ -42,8 +44,8 @@ export function dungeonSpawnSystem(world){
               if (typeof rc.rows === 'number') rows = rc.rows|0;
             }
           }
-          cam.x = Math.floor(pos.x - cols/2);
-          cam.y = Math.floor(pos.y - rows/2);
+          cam.x = Math.floor(spawnedX - cols/2);
+          cam.y = Math.floor(spawnedY - rows/2);
           // Mirror to RC for renderers this same frame
           if (rcId){
             const rc = world.getInstance(rcId, RenderContext) || world.get(rcId, RenderContext);

@@ -71,7 +71,7 @@ function setupCanvasSize() {
 let { dpr, cssW, cssH } = setupCanvasSize();
 
 // --- Create ECS world ---
-const world = new World();
+const world = new World({ seed: 0xC0FFEE });
 world.storeMode = 'map'; // use Map storage for flexibility
 
 
