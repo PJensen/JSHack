@@ -45,7 +45,7 @@ export function effectRenderSystem(world) {
       const scaleEnd = (d.scaleEnd !== undefined) ? d.scaleEnd : 0.75;
       const scale = scaleStart + (scaleEnd - scaleStart) * t;
 
-      const fontPx = Math.max(10, Math.round((cellH - 8) * scale));
+      const fontPx = Math.max(10, Math.round((cellH - 8) * scale * 1.5));
       ctx.globalAlpha = alpha;
       ctx.font = `${fontPx}px monospace`;
       ctx.fillStyle = d.color || '#ffffff';
