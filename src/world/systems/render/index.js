@@ -6,6 +6,7 @@ export { playerRenderSystem } from './core/playerRenderer.js';
 export { tileRenderSystem } from './core/tileRenderer.js';
 export { tileGlyphRenderSystem } from './core/tileGlyphRenderer.js';
 export { itemRenderSystem } from './core/itemRenderer.js';
+export { actorRenderSystem } from './core/actorRenderer.js';
 export { effectRenderSystem } from './core/effectRenderer.js';
 
 // Lighting

@@ -187,6 +187,7 @@ import {
 	tileRenderSystem,
 	tileGlyphRenderSystem,
 	itemRenderSystem,
+		actorRenderSystem,
 	effectRenderSystem,
 	postProcessingRenderSystem,
 	tileLightingRenderSystem,
@@ -316,6 +317,8 @@ world.system(glowRenderSystem, 'render');
 // Draw per-light drop shadows for entities (beneath glyphs)
 world.system(shadowRenderSystem, 'render');
 world.system(itemRenderSystem, 'render');
+// Draw base-colored actors (non-player, non-item) before lighting modulation
+world.system(actorRenderSystem, 'render');
 world.system(effectRenderSystem, 'render');
 // Modulate entities with lighting/specular
 world.system(entityLightingRenderSystem, 'render');
@@ -336,6 +339,7 @@ try { setSystemOrder('render', [
 	// glowRenderSystem,
 	shadowRenderSystem,
 	itemRenderSystem,
+	actorRenderSystem,
 	effectRenderSystem,
 	entityLightingRenderSystem,
 	playerRenderSystem,

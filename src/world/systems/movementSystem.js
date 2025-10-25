@@ -38,7 +38,18 @@ export function movementSystem(world) {
             // Out-of-bounds or missing tile: treat as blocked (void)
             if (!tile) { blocked = true; break outer; }
             if (tile.walkable === false) { blocked = true; break outer; }
-            // Tile exists and is walkable: done (no need to scan entities)
+            // Tile exists and is walkable: also check entity colliders at destination
+            for (const [bid, bpos] of world.query(Position)) {
+              if (bid === id) continue;
+              if (bpos.x === nx && bpos.y === ny) {
+                const c = world.get(bid, Collider);
+                if (c && c.solid === true) { blocked = true; break; }
+                const t = world.get(bid, Tile);
+                if (t && t.walkable === false) { blocked = true; break; }
+                const o = world.get(bid, Occluder);
+                if (o && (o.opacity ?? 1) > 0.5) { blocked = true; break; }
+              }
+            }
             break outer;
           }
           // 2) Fallback to glyph-based blocking if provided
@@ -50,7 +61,18 @@ export function movementSystem(world) {
             if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
               blocked = true; break outer;
             }
-            // otherwise walkable (including '·', '🚪', '^', '>')
+            // otherwise walkable (including '·', '🚪', '^', '>'); still check entity colliders
+            for (const [bid, bpos] of world.query(Position)) {
+              if (bid === id) continue;
+              if (bpos.x === nx && bpos.y === ny) {
+                const c = world.get(bid, Collider);
+                if (c && c.solid === true) { blocked = true; break; }
+                const t = world.get(bid, Tile);
+                if (t && t.walkable === false) { blocked = true; break; }
+                const o = world.get(bid, Occluder);
+                if (o && (o.opacity ?? 1) > 0.5) { blocked = true; break; }
+              }
+            }
             break outer;
           }
           // If this MapView doesn't expose tile/glyph, fall through to entity scan

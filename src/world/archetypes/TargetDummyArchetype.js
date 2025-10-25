@@ -9,11 +9,11 @@ import { Monster } from '../components/Monster.js';
 // Minimal components so existing renderers can draw it and future combat can target it.
 export const TargetDummyArchetype = defineArchetype('TargetDummy',
   [Position, (p)=> ({ x: p?.Position?.x ?? 0, y: p?.Position?.y ?? 0 })],
-  [Glyph,    (p)=> ({ char: p?.Glyph?.char ?? 'T', fg: p?.Glyph?.fg ?? '#cccccc', color: p?.Glyph?.color ?? (p?.Glyph?.fg ?? '#cccccc') })],
+  // Default to a unicode zombie; overrideable. Use a readable green if not using emoji fonts.
+  [Glyph,    (p)=> ({ char: p?.Glyph?.char ?? '🧟', fg: p?.Glyph?.fg ?? '#9cff57', color: p?.Glyph?.color ?? (p?.Glyph?.fg ?? '#9cff57') })],
   [Health,   (p)=> ({ maxHp: p?.Health?.maxHp ?? 1000, hp: p?.Health?.hp ?? (p?.Health?.maxHp ?? 1000) })],
-  // Keep passable by default so you can stand on the same tile to attack during early bring-up.
-  // Set solid:true later if desired once entity collision with MapView tiles is unified.
-  [Collider, (p)=> ({ solid: p?.Collider?.solid ?? false, blocksSight: p?.Collider?.blocksSight ?? false })],
+  // Make it solid by default; movementSystem will respect entity colliders even on walkable tiles.
+  [Collider, (p)=> ({ solid: p?.Collider?.solid ?? true, blocksSight: p?.Collider?.blocksSight ?? false })],
   // Tag as Monster so future systems can filter/select combat targets, but leave AI null/absent.
   [Monster,  (p)=> ({ ai: p?.Monster?.ai ?? null })]
 );
