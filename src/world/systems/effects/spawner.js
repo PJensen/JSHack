@@ -25,27 +25,43 @@ export function spawnFloatText(world, x, y, text, opts={}){
 
   const e = world.create();
   const life = opts.life || 0.9;
-  const scaleBase = opts.crit ? 1.3 : 1.0;
+  const scaleBase = (opts.scaleBase !== undefined) ? opts.scaleBase : (opts.crit ? 1.3 : 1.0);
   const dmg = (typeof opts.dmg === 'number' && isFinite(opts.dmg)) ? Math.max(0, opts.dmg) : 0;
-  const magScale = dmg ? Math.min(2.2, 0.7 + (dmg / 10)) : 1;
+  const dmgScaleBase = (opts.dmgScaleBase !== undefined) ? opts.dmgScaleBase : 0.7;
+  const dmgScalePer  = (opts.dmgScalePer  !== undefined) ? opts.dmgScalePer  : (1/10);
+  const dmgScaleMax  = (opts.dmgScaleMax  !== undefined) ? opts.dmgScaleMax  : 2.2;
+  const magScale = dmg ? Math.min(dmgScaleMax, dmgScaleBase + (dmg * dmgScalePer)) : 1;
   const scaleStart = (opts.scaleStart !== undefined) ? opts.scaleStart : (scaleBase * magScale);
-  const scaleEnd = (opts.scaleEnd !== undefined) ? opts.scaleEnd : (0.75 * scaleBase);
+  const scaleEnd   = (opts.scaleEnd   !== undefined) ? opts.scaleEnd   : (0.75 * scaleBase);
   // Compute initial motion
   const rng = (typeof world.rand === 'function') ? world.rand.bind(world) : Math.random;
   let vx = 0, vy = 0;
   if (typeof opts.vx === 'number' || typeof opts.vy === 'number'){
     vx = opts.vx || 0; vy = opts.vy || 0;
-  } else if (dmg > 0){
-    // Damage: bias up with angular spread; speed scales with damage
-    const angle = (-Math.PI/2) + ((rng()*2 - 1) * (Math.PI/3)); // up ±60°
-    const speed = Math.min(3.0, 0.6 + Math.sqrt(dmg) * 0.18);
-    vx = Math.cos(angle) * speed;
-    vy = Math.sin(angle) * speed; // mostly negative (up)
   } else {
-    // Gold/other: gentle drift upward
-    vx = (rng()*0.4 - 0.2);
-    vy = (-0.8 - rng()*0.3);
+    const preset = (opts.motionPreset || (opts.motion && opts.motion.preset)) || (dmg > 0 ? 'damage' : 'gentle');
+    if (preset === 'damage'){
+      const angleCenterRad = (opts.angleCenterRad ?? opts.motion?.angleCenterRad ?? (-Math.PI/2));
+      const angleSpreadRad = (opts.angleSpreadRad ?? opts.motion?.angleSpreadRad ?? (Math.PI/3));
+      const speedBase      = (opts.speedBase      ?? opts.motion?.speedBase      ?? 0.6);
+      const speedPerSqrtDmg= (opts.speedPerSqrtDmg?? opts.motion?.speedPerSqrtDmg?? 0.18);
+      const speedMax       = (opts.speedMax       ?? opts.motion?.speedMax       ?? 3.0);
+      const angle = angleCenterRad + ((rng()*2 - 1) * angleSpreadRad);
+      const speed = Math.max(0, Math.min(speedMax, speedBase + Math.sqrt(dmg) * speedPerSqrtDmg));
+      vx = Math.cos(angle) * speed;
+      vy = Math.sin(angle) * speed;
+    } else {
+      const gentleVxMin  = (opts.gentleVxMin  ?? opts.motion?.gentleVxMin  ?? -0.2);
+      const gentleVxMax  = (opts.gentleVxMax  ?? opts.motion?.gentleVxMax  ?? 0.2);
+      const gentleVyBase = (opts.gentleVyBase ?? opts.motion?.gentleVyBase ?? -0.8);
+      const gentleVyJitter=(opts.gentleVyJitter?? opts.motion?.gentleVyJitter?? 0.3);
+      vx = (rng() * (gentleVxMax - gentleVxMin)) + gentleVxMin;
+      vy = (gentleVyBase - (rng() * gentleVyJitter));
+    }
   }
+  const ax = (opts.ax ?? opts.motion?.ax ?? 0);
+  const ay = (opts.ay ?? opts.motion?.ay ?? -0.45);
+  const dragPerFrame = (opts.dragPerFrame ?? opts.motion?.dragPerFrame);
   world.add(e, Effect, {
     type: 'float_text',
     ttl: life,
@@ -54,8 +70,12 @@ export function spawnFloatText(world, x, y, text, opts={}){
     data: {
       text: String(text),
       color: opts.color || '#ffffff',
-      vx,
-      vy,
+  vx,
+  vy,
+  ax,
+  ay,
+  ...(typeof dragPerFrame === 'number' ? { dragPerFrame } : {}),
+  motionPreset: (opts.motionPreset || opts.motion?.preset) || (dmg > 0 ? 'damage' : 'gentle'),
       scaleStart,
       scaleEnd,
       batch: opts.batch || false,

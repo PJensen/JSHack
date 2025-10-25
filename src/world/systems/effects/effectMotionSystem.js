@@ -3,9 +3,8 @@ import { Effect } from '../../components/Effect.js';
 // Update motion for float_text effects: integrate simple velocity with gentle upward lift and drag.
 export function effectMotionSystem(world, dt){
   if (!dt || dt <= 0) return;
-  // Per-second drag factor tuned for ~60 FPS; convert to frame-rate independent
-  const dragPerFrame = 0.985; // closer to 1 = less drag
-  const drag = Math.pow(dragPerFrame, dt * 60);
+  // Base drag-per-frame at 60 FPS (closer to 1 = less drag). Allow per-effect override via d.dragPerFrame.
+  const defaultDragPerFrame = 0.985;
   for (const [id, eff] of world.query(Effect)){
     if (!eff || eff.type !== 'float_text') continue;
     if (!eff.data) eff.data = {};
@@ -17,6 +16,11 @@ export function effectMotionSystem(world, dt){
     // Allow per-effect acceleration overrides; default to a small upward lift
     const ax = (typeof d.ax === 'number') ? d.ax : 0;
     const ay = (typeof d.ay === 'number') ? d.ay : -0.45;
+    // Per-effect drag override
+    const dragPerFrame = (typeof d.dragPerFrame === 'number' && d.dragPerFrame > 0 && d.dragPerFrame < 1)
+      ? d.dragPerFrame
+      : defaultDragPerFrame;
+    const drag = Math.pow(dragPerFrame, dt * 60);
 
     // Integrate velocity
     vx += ax * dt;
