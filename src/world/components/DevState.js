@@ -4,5 +4,5 @@ import { defineComponent } from '../../lib/ecs/core.js';
 export const DevState = defineComponent('DevState', {
   effectQuality: 'high',
   effectDebugInit: false,
-  fovOnlyRender: false  // F6: Only render tiles within FOV
+  fovOnlyRender: true  // F6: Only render tiles within FOV (enabled by default)
 });

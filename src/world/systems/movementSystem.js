@@ -24,7 +24,11 @@ export function movementSystem(world) {
           const glyphAt = mv && mv.glyphAt;
           if (typeof glyphAt !== 'function') break;
           const g = glyphAt(nx, ny) || '';
-          // Treat common glyphs: walls and certain features block, doors/traps/stairs/floors allow
+          // Void space (empty) is not walkable
+          if (g === '') {
+            blocked = true; break outer;
+          }
+          // Walls and certain features block movement
           // Glyphs from dungeonGeneratorSystem: '█','·','🚪','≈','^','⛲','🕳','⎈','♛','†','>'
           if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
             blocked = true; break outer;

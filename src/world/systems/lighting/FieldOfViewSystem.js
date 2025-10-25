@@ -6,6 +6,7 @@ import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { Tile } from '../../components/Tile.js';
 import { Occluder } from '../../components/Occluder.js';
+import { MapView } from '../../components/MapView.js';
 import { CONFIG } from '../../../config.js';
 
 function buildOcclusionGrid(world, minX, minY, maxX, maxY){
@@ -13,14 +14,33 @@ function buildOcclusionGrid(world, minX, minY, maxX, maxY){
   const H = maxY - minY + 1;
   const op = new Float32Array(W*H);
   const idx = (x,y)=> (y-minY)*W + (x-minX);
+  
+  // First pass: check MapView for wall glyphs (dungeon tiles)
+  for (const [mvid, mv] of world.query(MapView)){
+    const glyphAt = mv && mv.glyphAt;
+    if (typeof glyphAt !== 'function') break;
+    for (let y=minY; y<=maxY; y++){
+      for (let x=minX; x<=maxX; x++){
+        const g = glyphAt(x,y) || '';
+        // Walls block sight (█ and other blocking glyphs)
+        if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
+          op[idx(x,y)] = 1.0;
+        }
+      }
+    }
+    break; // only one MapView
+  }
+  
+  // Second pass: Position+Tile entities (manually placed walls)
   // Prefer Occluder.opacity if present; fallback to Tile.blocksLight
-  // We walk tiles; entities with Occluder component are also considered via Position.
   for (const [id, pos, tile] of world.query(Position, Tile)){
     const x = pos.x|0, y = pos.y|0;
     if (x<minX||x>maxX||y<minY||y>maxY) continue;
     const o = tile.blocksLight ? 1 : 0;
     op[idx(x,y)] = Math.max(op[idx(x,y)], o);
   }
+  
+  // Third pass: Position+Occluder entities (override with explicit occlusion)
   for (const [id, pos, occ] of world.query(Position, Occluder)){
     const x = pos.x|0, y = pos.y|0;
     if (x<minX||x>maxX||y<minY||y>maxY) continue;

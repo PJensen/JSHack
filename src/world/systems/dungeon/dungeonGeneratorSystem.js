@@ -36,6 +36,7 @@ function makeTile(type){
         case 'throne': return { glyph: GLYPH.THRONE, walk: false, light: false };
         case 'grave': return { glyph: GLYPH.GRAVE, walk: false, light: false };
         case 'stair': return { glyph: GLYPH.STAIR, walk: true,  light: false };
+        case 'void': return { glyph: '', walk: false, light: false }; // empty void space
         default: return { glyph: GLYPH.FLOOR, walk: true, light: false };
     }
 }
@@ -62,6 +63,30 @@ function carveVTunnel(map, y1, y2, x){
     for (let y=a; y<=b; y++){ if (map.inBounds(x,y)) map.t[y][x] = makeTile('floor'); }
 }
 
+// Place walls adjacent to floors (but not replacing floors)
+function placeWalls(map){
+    for (let y=0; y<map.h; y++){
+        for (let x=0; x<map.w; x++){
+            const t = map.t[y][x];
+            // Skip if already floor/door or other feature
+            if (t.glyph !== '') continue;
+            // Check if adjacent to floor
+            let adjFloor = false;
+            for (let dy=-1; dy<=1; dy++){
+                for (let dx=-1; dx<=1; dx++){
+                    if (dx===0 && dy===0) continue;
+                    const nx = x + dx, ny = y + dy;
+                    if (!map.inBounds(nx, ny)) continue;
+                    const nt = map.t[ny][nx];
+                    if (nt.walk) { adjFloor = true; break; }
+                }
+                if (adjFloor) break;
+            }
+            if (adjFloor) map.t[y][x] = makeTile('wall');
+        }
+    }
+}
+
 function placeDoors(map){
     for (let y=1; y<map.h-1; y++){
         for (let x=1; x<map.w-1; x++){
@@ -86,7 +111,7 @@ function placeDoors(map){
 }
 
 function makeGameMap(w,h){
-    const t = Array.from({length:h}, ()=>Array.from({length:w}, ()=>makeTile('wall')));
+    const t = Array.from({length:h}, ()=>Array.from({length:w}, ()=>makeTile('void')));
     return {
         w, h, t,
         inBounds(x,y){ return x>=0 && y>=0 && x<w && y<h; }
@@ -127,6 +152,9 @@ function generateDungeonLevel(rng, width, height){
             }
         }
     }
+
+    // Place walls around carved areas
+    placeWalls(map);
 
     // Doors pass
     placeDoors(map);
