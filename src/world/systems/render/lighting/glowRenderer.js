@@ -40,6 +40,10 @@ export function glowRenderSystem(world){
   const prevOp = ctx.globalCompositeOperation;
   ctx.globalCompositeOperation = 'lighter';
 
+  const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
+  const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
+  const outsideDim = 0.2;
+
   for (const [id, lt] of world.query(Light)){
     if (!lt.active) continue;
     const pos = world.get(id, Position);
@@ -54,7 +58,17 @@ export function glowRenderSystem(world){
     const radiusTiles = Math.max(0.5, lt.radius || 6);
     const radiusPx = radiusTiles * basePx * 0.95;
 
-    const intensity = (lt.intensityEff != null ? lt.intensityEff : (lt.intensity || 1));
+    let intensity = (lt.intensityEff != null ? lt.intensityEff : (lt.intensity || 1));
+    // Gate glow by FOV visibility at light's tile center to avoid halos through walls
+    const mx = (lx - camX) | 0; const my = (ly - camY) | 0;
+    if (mx>=0 && my>=0 && mx<cols && my<rows){
+      if (visW){
+        const w = visW[my*cols + mx] || 0;
+        intensity *= outsideDim + (1 - outsideDim) * Math.max(0, Math.min(1, w));
+      } else if (vis){
+        intensity *= (vis[my*cols + mx] ? 1 : outsideDim);
+      }
+    }
     const rgb = toRGB(lt.color);
 
     let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radiusPx);

@@ -24,6 +24,11 @@ export function shadowRenderSystem(world){
   const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
   const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
 
+  // FOV gating (optional): modulate shadow alpha based on visibility at entity tile
+  const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
+  const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
+  const outsideDim = 0.2;
+
   const lights = [];
   const cx = ox + halfShiftX + cols * cellW * 0.5;
   const cy = oy + halfShiftY + rows * cellH * 0.5;
@@ -104,11 +109,19 @@ export function shadowRenderSystem(world){
       const oyPx = dy * offPx;
 
       const ch = glyph.char;
+      // Adjust shadow alpha by FOV visibility at the entity's tile
+      let alpha = shadowAlpha;
+      const mx = (pos.x - camX) | 0; const my = (pos.y - camY) | 0;
+      if (mx>=0 && my>=0 && mx<cols && my<rows){
+        if (visW){ const w = visW[my*cols + mx] || 0; alpha *= outsideDim + (1 - outsideDim) * Math.max(0, Math.min(1, w)); }
+        else if (vis){ alpha *= (vis[my*cols + mx] ? 1 : outsideDim); }
+      }
+
       const prevFill = ctx.fillStyle;
-      ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha))})`;
+      ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
       ctx.fillText(ch, sx + oxPx, sy + oyPx);
       if (softPass) {
-        ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, shadowAlpha * 0.45))})`;
+        ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha * 0.45))})`;
         ctx.fillText(ch, sx + oxPx * 0.92, sy + oyPx * 0.92);
       }
       ctx.fillStyle = prevFill;
