@@ -19,10 +19,13 @@ export function playerRenderSystem(world) {
 
   const ox = Math.floor((W - cols * cellW) / 2);
   const oy = Math.floor((H - rows * cellH) / 2);
+  const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
+  const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
   const cx = cellW * 0.5;
   const cy = cellH * 0.5;
 
   ctx.save();
+  ctx.translate(ox + halfShiftX, oy + halfShiftY);
   ctx.font = font || '18px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -30,8 +33,10 @@ export function playerRenderSystem(world) {
   for (const [id, pos, glyph] of world.query(Position, Glyph, Player)) {
     const x = pos.x | 0, y = pos.y | 0;
     if (x < camX || x >= camX + cols || y < camY || y >= camY + rows) continue;
-    const sx = ox + (x - camX) * cellW + cx;
-    const sy = oy + (y - camY) * cellH + cy;
+    const mx = (x - camX);
+    const my = (y - camY);
+    const sx = mx * cellW + cx;
+    const sy = my * cellH + cy;
     ctx.fillStyle = (glyph && (glyph.fg || glyph.color)) || '#fff';
     ctx.fillText((glyph && glyph.char) || '@', sx, sy);
     // Only one player

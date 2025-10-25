@@ -205,7 +205,7 @@ export function dungeonGeneratorSystem(world){
                     }
                     if (mvRec){
                         const glyphAt = (x, y) => {
-                            if (x < 0 || y < 0 || x >= map.w || y >= map.h) return GLYPH.WALL;
+                            if (x < 0 || y < 0 || x >= map.w || y >= map.h) return '';
                             return map.t[y][x].glyph;
                         };
                         mvRec.w = map.w; mvRec.h = map.h; mvRec.glyphAt = glyphAt;

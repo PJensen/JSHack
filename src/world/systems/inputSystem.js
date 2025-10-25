@@ -2,6 +2,7 @@
 // Captures keyboard input and translates it to InputIntent for the player
 import { Player } from '../components/Player.js';
 import { InputIntent } from '../components/InputIntent.js';
+import { DevState } from '../components/DevState.js';
 
 // Track keys pressed this frame
 const keysPressed = new Set();
@@ -10,6 +11,9 @@ let edgeMoveRequested = false;
 // Pending one-shot movement from a touch gesture (cardinalized)
 let pendingTouch = null; // { dx, dy }
 let touchActive = false;
+
+// Track which dev keys were pressed last frame to detect edges
+const lastFrameDevKeys = new Set();
 
 function isMovementKey(key){
   const k = key.toLowerCase();
@@ -74,6 +78,23 @@ export function setupInputListeners() {
 }
 
 export function inputSystem(world) {
+  // Handle dev toggle keys (F6, etc.)
+  const devKeyPressed = (key) => keysPressed.has(key) && !lastFrameDevKeys.has(key);
+  
+  // F6: Toggle FOV-only rendering
+  if (devKeyPressed('f6')) {
+    for (const [id, dev] of world.query(DevState)) {
+      dev.fovOnlyRender = !dev.fovOnlyRender;
+      console.log(`FOV-only rendering: ${dev.fovOnlyRender ? 'ON' : 'OFF'}`);
+      world.markChanged(id, DevState);
+      break;
+    }
+  }
+  
+  // Update dev key tracking for next frame
+  lastFrameDevKeys.clear();
+  if (keysPressed.has('f6')) lastFrameDevKeys.add('f6');
+  
   // Find the player entity and update their InputIntent based on keys pressed
   for (const [id] of world.query(Player)) {
     let dx = 0, dy = 0;

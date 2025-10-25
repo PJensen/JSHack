@@ -5,6 +5,7 @@ import { getRenderContext } from '../utils.js';
 import { MapView } from '../../../components/MapView.js';
 import { Position } from '../../../components/Position.js';
 import { Tile } from '../../../components/Tile.js';
+import { DevState } from '../../../components/DevState.js';
 
 export function tileGlyphRenderSystem(world){
   const rc = getRenderContext(world);
@@ -14,6 +15,14 @@ export function tileGlyphRenderSystem(world){
   const rows = Math.max(1, rc.rows || Math.floor(H / cellH));
   const camX = (rc.camX|0);
   const camY = (rc.camY|0);
+
+  // Check if FOV-only rendering is enabled
+  let fovOnly = false;
+  for (const [id, dev] of world.query(DevState)) {
+    fovOnly = !!dev.fovOnlyRender;
+    break;
+  }
+  const visMask = fovOnly ? rc.visibleMask : null;
 
   const ox = Math.floor((W - cols * cellW) / 2);
   const oy = Math.floor((H - rows * cellH) / 2);
@@ -40,6 +49,18 @@ export function tileGlyphRenderSystem(world){
     
     for (let y=minY; y<maxY; y++){
       for (let x=minX; x<maxX; x++){
+        // FOV check: skip tiles not in visible mask
+        if (visMask) {
+          const vx = x - camX;
+          const vy = y - camY;
+          if (vx >= 0 && vy >= 0 && vx < cols && vy < rows) {
+            const idx = vy * cols + vx;
+            if (!visMask[idx]) continue; // not visible, skip
+          } else {
+            continue; // out of viewport
+          }
+        }
+        
         const g = glyphAt(x,y) || '';
         // Skip rendering void/empty tiles (already black background)
         if (!g || g === ' ') continue;
@@ -70,6 +91,18 @@ export function tileGlyphRenderSystem(world){
   for (const [id, pos, tile] of world.query(Position, Tile)){
     const x = pos.x|0, y = pos.y|0;
     if (x < minX || x >= maxX || y < minY || y >= maxY) continue;
+    
+    // FOV check for manually placed tiles
+    if (visMask) {
+      const vx = x - camX;
+      const vy = y - camY;
+      if (vx >= 0 && vy >= 0 && vx < cols && vy < rows) {
+        const idx = vy * cols + vx;
+        if (!visMask[idx]) continue;
+      } else {
+        continue;
+      }
+    }
     
     const mx = (x - camX);
     const my = (y - camY);
