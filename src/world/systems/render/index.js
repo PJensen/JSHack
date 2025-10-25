@@ -17,3 +17,4 @@ export { bloomRenderSystem } from './lighting/bloomRenderer.js';
 
 // Post-processing
 export { postProcessingRenderSystem } from './post-processing/postProcessingRenderer.js';
+export { hallucinationPostProcessRenderer } from './post-processing/hallucinationPostProcessRenderer.js';

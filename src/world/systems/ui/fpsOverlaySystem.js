@@ -5,7 +5,7 @@ import { RenderContext } from '../../components/RenderContext.js';
 export function fpsOverlaySystem(world){
   const rcId = world.renderContextId; if (!rcId) return;
   const rc = world.get(rcId, RenderContext); if (!rc || rc.showFps === false) return;
-  const ctx = rc.ctx; if (!ctx) return;
+  const ctx = rc.presentCtx || rc.ctx; if (!ctx) return;
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const last = rc._fps_last_ts || now;
   const dt = Math.max(1e-6, now - last);

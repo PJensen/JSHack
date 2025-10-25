@@ -70,6 +70,12 @@ function setupCanvasSize() {
 }
 let { dpr, cssW, cssH } = setupCanvasSize();
 
+// Create a backbuffer canvas and mirror the DPR transform so we can post-process cheaply
+const back = document.createElement('canvas');
+back.width = canvas.width; back.height = canvas.height;
+const backCtx = back.getContext('2d', { alpha: false });
+backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
 // --- Create ECS world ---
 const world = new World({ seed: 0xC0FFEE });
 world.storeMode = 'map'; // use Map storage for flexibility
@@ -189,6 +195,8 @@ import {
 	entityLightingRenderSystem,
 	bloomRenderSystem
 } from './world/systems/render/index.js';
+// Import hallucination post-process directly to avoid any stale index.js cache issues
+import { hallucinationPostProcessRenderer } from './world/systems/render/post-processing/hallucinationPostProcessRenderer.js';
 import { RenderContext } from './world/components/RenderContext.js';
 import { createParticleSystem } from './world/systems/effects/particleSystem.js';
 import { cameraSystem } from './world/systems/cameraSystem.js';
@@ -218,6 +226,8 @@ import { Material } from './world/components/Material.js';
 import { FieldOfViewSystem } from './world/systems/lighting/FieldOfViewSystem.js';
 import { fpsOverlaySystem } from './world/systems/ui/fpsOverlaySystem.js';
 import { fogOfWarSystem } from './world/systems/fogOfWarSystem.js';
+import { Hallucination } from './world/components/Hallucination.js';
+import { hallucinationSystem } from './world/systems/effects/hallucinationSystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -227,8 +237,13 @@ const renderContext = { ctx };
 // Create a RenderTarget entity to hold canvas/context info for render systems
 const rt = world.create();
 world.add(rt, RenderContext, {
-	canvas,
-	ctx,
+	// Renderers draw to the backbuffer; we present to the on-screen canvas at the end
+	canvas: back,
+	ctx: backCtx,
+	backCanvas: back,
+	backCtx: backCtx,
+	presentCanvas: canvas,
+	presentCtx: ctx,
 	W: cssW, // CSS pixel space (ctx is scaled by DPR)
 	H: cssH,
 	font: '18px monospace',
@@ -284,6 +299,10 @@ try{
 	const devId = ensureDev();
 	const dev = world.get(devId, DevState);
 	console.assert(dev, 'DevState singleton not created');
+	// Default to low effect quality to minimize perf impact unless explicitly set
+	if (!dev.effectQuality){
+		world.set(devId, DevState, { effectQuality: 'low' });
+	}
 }catch(e){ /* ignore in constrained runtimes */ }
 
 // register renderers in order: tiles first, lighting background, drop-shadows, then items/effects, player, post-processing
@@ -303,6 +322,8 @@ world.system(entityLightingRenderSystem, 'render');
 world.system(playerRenderSystem, 'render');
 // Optional bloom pass
 world.system(bloomRenderSystem, 'render');
+// Hallucination post-process (runs after main scene, before generic post-processing/UI)
+world.system(hallucinationPostProcessRenderer, 'render');
 world.system(postProcessingRenderSystem, 'render');
 // HUD/UI overlays
 world.system(fpsOverlaySystem, 'render');
@@ -319,6 +340,7 @@ try { setSystemOrder('render', [
 	entityLightingRenderSystem,
 	playerRenderSystem,
 	bloomRenderSystem,
+	hallucinationPostProcessRenderer,
 	postProcessingRenderSystem,
 	fpsOverlaySystem
 ]); } catch (e) { /* ignore */ }
@@ -330,6 +352,9 @@ world.system(inputSystem, 'update');
 
 // Register movement system (processes InputIntent and updates Position)
 world.system(movementSystem, 'update');
+
+// Update hallucination timeline after movement/input
+world.system(hallucinationSystem, 'update');
 
 // Register gold pickup handler (after movement so we resolve collisions this frame)
 world.system(goldPickupSystem, 'update');
@@ -524,6 +549,27 @@ try {
 	spawnFloatText(world, 2, 3, '+8', { color:'#fff59e', dmg:8, crit:true });
 } catch(e) { /* ignore in non-demo contexts */ }
 
+// Demo: attach an initial Hallucination to the player so the effect is visible
+try {
+		if (!world.has(playerId, Hallucination)){
+			world.add(playerId, Hallucination, {
+				onsetSec: 2.0,
+				sustainSec: 6.0,
+				comedownSec: 4.0,
+				strength: 1.0,
+				hueMaxDeg: 120,
+				saturationBoost: 1.8,
+				aberrationMaxPx: 6,
+				wobbleAmpPx: 10,
+				wobbleFreqHz: 1.3,
+				vignetteStrength: 0.35,
+				kaleidoAt: 0.7,
+				trailAlpha: 0.0,
+				loop: false
+			});
+		}
+} catch(_) { /* ignore in constrained runtimes */ }
+
 // Keep canvas/resolution in sync with viewport to avoid stretching and keep tiles square
 window.addEventListener('resize', () => {
 	({ dpr, cssW, cssH } = setupCanvasSize());
@@ -534,6 +580,17 @@ window.addEventListener('resize', () => {
 			cols: Math.max(1, Math.floor(cssW / CELL_W)),
 			rows: Math.max(1, Math.floor(cssH / CELL_H))
 		});
+		// Resize the backbuffer to match the visible canvas backing size and reapply DPR transform
+		try{
+			const rc = world.get(rt, RenderContext);
+			if (rc && rc.backCanvas && rc.presentCanvas){
+				rc.backCanvas.width = rc.presentCanvas.width;
+				rc.backCanvas.height = rc.presentCanvas.height;
+				if (rc.backCtx && typeof rc.backCtx.setTransform === 'function'){
+					rc.backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+				}
+			}
+		}catch(e){ /* ignore */ }
 		// Keep Camera viewport in sync with RenderContext so camera centering matches renderers
 		try{
 			const rc = world.get(rt, RenderContext);
