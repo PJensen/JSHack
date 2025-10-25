@@ -26,18 +26,18 @@ const GLYPH = {
 
 function makeTile(type){
     switch(type){
-        case 'wall': return { glyph: GLYPH.WALL, walk: false, light: true };
-        case 'door': return { glyph: GLYPH.DOOR, walk: true,  light: false };
-        case 'water': return { glyph: GLYPH.WATER, walk: false, light: false };
-        case 'trap': return { glyph: GLYPH.TRAP, walk: true,  light: false };
-        case 'fountain': return { glyph: GLYPH.FOUNTAIN, walk: false, light: false };
-        case 'sink': return { glyph: GLYPH.SINK, walk: false, light: false };
-        case 'altar': return { glyph: GLYPH.ALTAR, walk: false, light: false };
-        case 'throne': return { glyph: GLYPH.THRONE, walk: false, light: false };
-        case 'grave': return { glyph: GLYPH.GRAVE, walk: false, light: false };
-        case 'stair': return { glyph: GLYPH.STAIR, walk: true,  light: false };
-        case 'void': return { glyph: '', walk: false, light: false }; // empty void space
-        default: return { glyph: GLYPH.FLOOR, walk: true, light: false };
+        case 'wall': return { glyph: GLYPH.WALL, walkable: false, blocksLight: true };
+        case 'door': return { glyph: GLYPH.DOOR, walkable: true,  blocksLight: false };
+        case 'water': return { glyph: GLYPH.WATER, walkable: false, blocksLight: false };
+        case 'trap': return { glyph: GLYPH.TRAP, walkable: true,  blocksLight: false };
+        case 'fountain': return { glyph: GLYPH.FOUNTAIN, walkable: false, blocksLight: false };
+        case 'sink': return { glyph: GLYPH.SINK, walkable: false, blocksLight: false };
+        case 'altar': return { glyph: GLYPH.ALTAR, walkable: false, blocksLight: false };
+        case 'throne': return { glyph: GLYPH.THRONE, walkable: false, blocksLight: false };
+        case 'grave': return { glyph: GLYPH.GRAVE, walkable: false, blocksLight: false };
+        case 'stair': return { glyph: GLYPH.STAIR, walkable: true,  blocksLight: false };
+        case 'void': return { glyph: '', walkable: false, blocksLight: false }; // empty void space
+        default: return { glyph: GLYPH.FLOOR, walkable: true, blocksLight: false };
     }
 }
 
@@ -78,7 +78,7 @@ function placeWalls(map){
                     const nx = x + dx, ny = y + dy;
                     if (!map.inBounds(nx, ny)) continue;
                     const nt = map.t[ny][nx];
-                    if (nt.walk) { adjFloor = true; break; }
+                    if (nt.walkable) { adjFloor = true; break; }
                 }
                 if (adjFloor) break;
             }
@@ -94,13 +94,13 @@ function placeDoors(map){
             if (t.glyph !== GLYPH.WALL) continue;
             const up = map.t[y-1][x], down = map.t[y+1][x];
             const left = map.t[y][x-1], right = map.t[y][x+1];
-            const upWalk = !!up.walk, downWalk = !!down.walk, leftWalk = !!left.walk, rightWalk = !!right.walk;
+            const upWalk = !!up.walkable, downWalk = !!down.walkable, leftWalk = !!left.walkable, rightWalk = !!right.walkable;
             const vertPass = upWalk && downWalk && !leftWalk && !rightWalk;
             const horizPass= leftWalk && rightWalk && !upWalk && !downWalk;
             if (vertPass || horizPass){
                 const diagWalls =
-                    Number(!(map.t[y-1][x-1].walk)) + Number(!(map.t[y-1][x+1].walk)) +
-                    Number(!(map.t[y+1][x-1].walk)) + Number(!(map.t[y+1][x+1].walk));
+                    Number(!(map.t[y-1][x-1].walkable)) + Number(!(map.t[y-1][x+1].walkable)) +
+                    Number(!(map.t[y+1][x-1].walkable)) + Number(!(map.t[y+1][x+1].walkable));
                 if (diagWalls >= 2){
                     const noAdjDoor = (map.t[y][x-1].glyph!==GLYPH.DOOR && map.t[y][x+1].glyph!==GLYPH.DOOR && map.t[y-1][x].glyph!==GLYPH.DOOR && map.t[y+1][x].glyph!==GLYPH.DOOR);
                     if (noAdjDoor) map.t[y][x] = makeTile('door');
@@ -236,7 +236,11 @@ export function dungeonGeneratorSystem(world){
                             if (x < 0 || y < 0 || x >= map.w || y >= map.h) return '';
                             return map.t[y][x].glyph;
                         };
-                        mvRec.w = map.w; mvRec.h = map.h; mvRec.glyphAt = glyphAt;
+                        const tileAt = (x, y) => {
+                            if (x < 0 || y < 0 || x >= map.w || y >= map.h) return null;
+                            return map.t[y][x];
+                        };
+                        mvRec.w = map.w; mvRec.h = map.h; mvRec.glyphAt = glyphAt; mvRec.tileAt = tileAt;
                         mvRec.visibleMask = null; mvRec.seenMask = null;
                         if (mvId) world.markChanged(mvId, MapView);
                     }

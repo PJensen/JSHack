@@ -17,26 +17,46 @@ export function movementSystem(world) {
       const ny = pos.y + intent.dy;
 
       // Check for blocking at destination
-      // Fast path: MapView walkability by glyph
+      // Prefer MapView tile data (walkable) from the designated MapView; fallback to glyphs/entities
       let blocked = false;
       outer: {
-        for (const [mvid, mv] of world.query(MapView)){
-          const glyphAt = mv && mv.glyphAt;
-          if (typeof glyphAt !== 'function') break;
-          const g = glyphAt(nx, ny) || '';
-          // Void space (empty) is not walkable
-          if (g === '') {
-            blocked = true; break outer;
+        // Select primary MapView if registered
+        let mv = null;
+        try {
+          const mvId = world.mapViewId;
+          if (mvId) mv = world.get(mvId, MapView);
+          if (!mv) {
+            for (const [_id, _mv] of world.query(MapView)) { mv = _mv; break; }
           }
-          // Walls and certain features block movement
-          // Glyphs from dungeonGeneratorSystem: '█','·','🚪','≈','^','⛲','🕳','⎈','♛','†','>'
-          if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
-            blocked = true; break outer;
+        } catch (_) { /* ignore */ }
+
+        if (mv) {
+          // 1) Tile-based walkability
+          const tileAt = mv.tileAt;
+          if (typeof tileAt === 'function') {
+            const tile = tileAt(nx, ny);
+            // Out-of-bounds or missing tile: treat as blocked (void)
+            if (!tile) { blocked = true; break outer; }
+            if (tile.walkable === false) { blocked = true; break outer; }
+            // Tile exists and is walkable: done (no need to scan entities)
+            break outer;
           }
-          // otherwise walkable (including '·', '🚪', '^', '>')
-          break outer;
+          // 2) Fallback to glyph-based blocking if provided
+          const glyphAt = mv.glyphAt;
+          if (typeof glyphAt === 'function') {
+            const g = glyphAt(nx, ny) || '';
+            if (g === '') { blocked = true; break outer; } // void/out-of-bounds
+            // Walls and certain features block movement
+            if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
+              blocked = true; break outer;
+            }
+            // otherwise walkable (including '·', '🚪', '^', '>')
+            break outer;
+          }
+          // If this MapView doesn't expose tile/glyph, fall through to entity scan
         }
-        // Fallback: scan entities at destination
+
+        // 3) Fallback: scan entities at destination
         for (const [bid, bpos] of world.query(Position)) {
           if (bid === id) continue; // don't collide with self
           if (bpos.x === nx && bpos.y === ny) {
