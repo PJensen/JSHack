@@ -48,10 +48,10 @@ export const TorchArchetype = defineArchetype('Torch',
     lifeJitter: p?.Emitter?.lifeJitter ?? 0.35,
     size: p?.Emitter?.size ?? 0.7,
     sizeEnd: p?.Emitter?.sizeEnd ?? 0.1,
-    color: p?.Emitter?.color ?? (p?.Glyph?.fg || p?.Glyph?.color || '#ffa500'),
+    color: p?.Emitter?.color ?? (p?.Glyph?.fg || p?.Glyph?.color || '#c24225ff'),
 
     // Slight offset above the glyph origin
-    offsetX: p?.Emitter?.offsetX ?? 0,
-    offsetY: p?.Emitter?.offsetY ?? -0.2,
+    offsetX: p?.Emitter?.offsetX ?? -0.5,
+    offsetY: p?.Emitter?.offsetY ?? -1.2,
   })],
 );
