@@ -9,7 +9,7 @@ import { Emissive } from '../components/Emissive.js';
 // TorchArchetype: a passable torch with warm light, high flicker, and upward spark emitter
 export const TorchArchetype = defineArchetype('Torch',
   [Position, (p)=> ({ x: p?.Position?.x ?? 0, y: p?.Position?.y ?? 0 })],
-  [Glyph,    (p)=> ({ char: p?.Glyph?.char ?? '🔥', fg: p?.Glyph?.fg ?? '#ffb300', color: p?.Glyph?.color ?? '#ffb300' })],
+  [Glyph,    (p)=> ({ char: p?.Glyph?.char ?? '🕯️', fg: p?.Glyph?.fg ?? '#ffb300', color: p?.Glyph?.color ?? '#ffb300' })],
   // Passable helper tile + collider
   [Tile,     (p)=> ({ glyph: p?.Tile?.glyph ?? ' ', walkable: true, blocksLight: false })],
   [Collider, (_)=> ({ solid: false, blocksSight: false })],

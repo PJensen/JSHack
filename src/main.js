@@ -198,6 +198,7 @@ import { dungeonSpawnSystem } from './world/systems/dungeon/dungeonSpawnSystem.j
 import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
 import { projectileSystem } from './world/systems/projectileSystem.js';
 import { effectLifetimeSystem } from './world/systems/effects/effectLifetimeSystem.js';
+import { emitterSystem } from './world/systems/effects/emitterSystem.js';
 import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem.js';
 import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spawner.js';
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
@@ -425,6 +426,8 @@ world.system(effectLifetimeSystem, 'update');
 
 // Update global particle system each tick so particles age and return to the pool.
 // Without this, spawned particles are never updated/released and will grow unbounded.
+// Spawn particles from emitters before updating the pool so new particles also advance this frame.
+world.system(emitterSystem, 'update');
 world.system(function particleUpdateSystem(world, dt){
 	try{
 		const rcId = world.renderContextId;
