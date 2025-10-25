@@ -7,6 +7,7 @@ import { PlayerArchetype } from './world/archetypes/PlayerArchetype.js';
 import { Player } from './world/components/Player.js';
 import { Position } from './world/components/Position.js';
 import { Glyph } from './world/components/Glyph.js';
+import { MapView } from './world/components/MapView.js';
 
 // --- Setup canvas ---
 // Matches <canvas id="stage"> in index.html
@@ -178,6 +179,7 @@ import { setSystemOrder } from './lib/ecs/systems.js';
 import {
 	playerRenderSystem,
 	tileRenderSystem,
+	tileGlyphRenderSystem,
 	itemRenderSystem,
 	effectRenderSystem,
 	postProcessingRenderSystem,
@@ -191,7 +193,8 @@ import { RenderContext } from './world/components/RenderContext.js';
 import { createParticleSystem } from './world/systems/effects/particleSystem.js';
 import { cameraSystem } from './world/systems/cameraSystem.js';
 import { Camera } from './world/components/Camera.js';
-import { dungeonSystem } from './world/systems/dungeon/dungeonSystem.js';
+import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGeneratorSystem.js';
+import { dungeonSpawnSystem } from './world/systems/dungeon/dungeonSpawnSystem.js';
 import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
 import { projectileSystem } from './world/systems/projectileSystem.js';
 import { effectLifetimeSystem } from './world/systems/effects/effectLifetimeSystem.js';
@@ -200,6 +203,8 @@ import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spaw
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
+import { Dungeon } from './world/components/Dungeon.js';
+import { DungeonLevel } from './world/components/DungeonLevel.js';
 // Lighting systems
 import { FlickerSystem } from './world/systems/lighting/FlickerSystem.js';
 import { ShadowCastSystem } from './world/systems/lighting/ShadowCastSystem.js';
@@ -248,6 +253,13 @@ world.add(rt, RenderContext, {
 // Cache the RenderContext entity id on the world for fast access in render loops
 world.renderContextId = rt;
 
+// Pre-create a MapView entity so generation can update it in-place during update (no deferral)
+try{
+	const mv = world.create();
+	world.add(mv, MapView, { w: 0, h: 0, glyphAt: null, visibleMask: null, seenMask: null });
+	world.mapViewId = mv;
+}catch(e){ /* ignore */ }
+
 // Startup assertion: ensure the RenderContext has a particleSystem instance so renderers can rely on it.
 try{
 	const rc = world.get(rt, RenderContext);
@@ -270,6 +282,8 @@ try{
 world.system(tileRenderSystem, 'render');
 // Lighting background pass overlays tiles with tone-mapped light
 world.system(tileLightingRenderSystem, 'render');
+// Draw tile glyphs after lighting so they remain visible
+world.system(tileGlyphRenderSystem, 'render');
 // Add smooth additive glow for lights (soft halos)
 world.system(glowRenderSystem, 'render');
 // Draw per-light drop shadows for entities (beneath glyphs)
@@ -289,7 +303,8 @@ world.system(fpsOverlaySystem, 'render');
 try { setSystemOrder('render', [
 	tileRenderSystem,
 	tileLightingRenderSystem,
-	glowRenderSystem,
+	tileGlyphRenderSystem,
+	// glowRenderSystem,
 	shadowRenderSystem,
 	itemRenderSystem,
 	effectRenderSystem,
@@ -390,7 +405,16 @@ try {
 world.system(cameraSystem, 'update');
 
 // Register dungeon generator (no-op until Dungeon/DungeonLevel entities exist)
-world.system(dungeonSystem, 'update');
+world.system(dungeonGeneratorSystem, 'update');
+// After generation, place the player at the computed spawn point (run once)
+world.system(dungeonSpawnSystem, 'update');
+
+// Ensure a Dungeon + DungeonLevel entity exists to trigger generation
+try{
+	const d = world.create();
+	world.add(d, Dungeon, { level: 1, name: 'Depth 1' });
+	world.add(d, DungeonLevel, { depth: 1 });
+}catch(e){ /* ignore creation issues in constrained runtimes */ }
 
 // Register projectile motion and lifetime cleanup
 world.system(projectileSystem, 'update');

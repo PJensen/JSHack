@@ -4,6 +4,7 @@ export { getRenderContext } from './utils.js';
 // Core renderers
 export { playerRenderSystem } from './core/playerRenderer.js';
 export { tileRenderSystem } from './core/tileRenderer.js';
+export { tileGlyphRenderSystem } from './core/tileGlyphRenderer.js';
 export { itemRenderSystem } from './core/itemRenderer.js';
 export { effectRenderSystem } from './core/effectRenderer.js';
 

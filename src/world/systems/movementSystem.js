@@ -6,6 +6,7 @@ import { Player } from '../components/Player.js';
 import { Tile } from '../components/Tile.js';
 import { Occluder } from '../components/Occluder.js';
 import { Collider } from '../components/Collider.js';
+import { MapView } from '../components/MapView.js';
 
 export function movementSystem(world) {
   // Process all entities with Position and InputIntent
@@ -15,18 +16,33 @@ export function movementSystem(world) {
       const nx = pos.x + intent.dx;
       const ny = pos.y + intent.dy;
 
-      // Check for blocking tiles/entities at destination
+      // Check for blocking at destination
+      // Fast path: MapView walkability by glyph
       let blocked = false;
-      for (const [bid, bpos] of world.query(Position)) {
-        if (bid === id) continue; // don't collide with self
-        if (bpos.x === nx && bpos.y === ny) {
-          // If target has a non-walkable Tile, a solid Collider, or an Occluder with opacity ~1, block movement
-          const t = world.get(bid, Tile);
-          if (t && t.walkable === false) { blocked = true; break; }
-          const c = world.get(bid, Collider);
-          if (c && c.solid === true) { blocked = true; break; }
-          const o = world.get(bid, Occluder);
-          if (o && (o.opacity ?? 1) > 0.5) { blocked = true; break; }
+      outer: {
+        for (const [mvid, mv] of world.query(MapView)){
+          const glyphAt = mv && mv.glyphAt;
+          if (typeof glyphAt !== 'function') break;
+          const g = glyphAt(nx, ny) || '';
+          // Treat common glyphs: walls and certain features block, doors/traps/stairs/floors allow
+          // Glyphs from dungeonGeneratorSystem: '█','·','🚪','≈','^','⛲','🕳','⎈','♛','†','>'
+          if (g === '█' || g === '≈' || g === '⛲' || g === '🕳' || g === '⎈' || g === '♛' || g === '†') {
+            blocked = true; break outer;
+          }
+          // otherwise walkable (including '·', '🚪', '^', '>')
+          break outer;
+        }
+        // Fallback: scan entities at destination
+        for (const [bid, bpos] of world.query(Position)) {
+          if (bid === id) continue; // don't collide with self
+          if (bpos.x === nx && bpos.y === ny) {
+            const t = world.get(bid, Tile);
+            if (t && t.walkable === false) { blocked = true; break; }
+            const c = world.get(bid, Collider);
+            if (c && c.solid === true) { blocked = true; break; }
+            const o = world.get(bid, Occluder);
+            if (o && (o.opacity ?? 1) > 0.5) { blocked = true; break; }
+          }
         }
       }
 

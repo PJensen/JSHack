@@ -1,5 +1,5 @@
-// Tile Render System
-// Renders the tile/background layer aligned to the viewport grid
+// Tile Background Render System
+// Renders a checkerboard background aligned to the viewport grid.
 // READONLY: performs no mutations — only reads world state and draws to canvas
 import { getRenderContext } from '../utils.js';
 
@@ -24,6 +24,7 @@ export function tileRenderSystem(world) {
   ctx.fillStyle = '#222';
   ctx.fillRect(0, 0, W, H);
 
+  // Background checkerboard only (no glyphs; glyphs are drawn in tileGlyphRenderSystem)
   ctx.translate(ox + halfShiftX, oy + halfShiftY);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -34,5 +35,6 @@ export function tileRenderSystem(world) {
       ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
     }
   }
+
   ctx.restore();
 }
