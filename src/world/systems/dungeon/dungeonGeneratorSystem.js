@@ -49,6 +49,22 @@ class Rect {
     constructor(x, y, w, h){ this.x=x|0; this.y=y|0; this.w=w|0; this.h=h|0; this.x2=this.x+this.w-1; this.y2=this.y+this.h-1; }
     center(){ return [ (this.x + this.x2) >> 1, (this.y + this.y2) >> 1 ]; }
     intersects(other){ return !(this.x2 < other.x || this.x > other.x2 || this.y2 < other.y || this.y > other.y2); }
+    // Pick a point on the edge of this room that faces (tx,ty)
+    edgeToward(tx, ty){
+        // Find clamped target within rect bounds to determine which edge is "closest"
+        const cx = Math.max(this.x, Math.min(this.x2, tx|0));
+        const cy = Math.max(this.y, Math.min(this.y2, ty|0));
+        // Compute distance to each edge from clamped point
+        const dxL = Math.abs(cx - this.x);
+        const dxR = Math.abs(this.x2 - cx);
+        const dyT = Math.abs(cy - this.y);
+        const dyB = Math.abs(this.y2 - cy);
+        // Choose the nearest edge, but push 1 tile outside so corridor starts outside the room
+        if (dxL <= dxR && dxL <= dyT && dxL <= dyB) return [this.x-1, cy];
+        if (dxR <= dyT && dxR <= dyB) return [this.x2+1, cy];
+        if (dyT <= dyB) return [cx, this.y-1];
+        return [cx, this.y2+1];
+    }
 }
 
 function carveRoom(map, rect){
@@ -65,6 +81,28 @@ function carveHTunnel(map, x1, x2, y){
 function carveVTunnel(map, y1, y2, x){
     const a = Math.min(y1, y2), b = Math.max(y1, y2);
     for (let y=a; y<=b; y++){ if (map.inBounds(x,y)) map.t[y][x] = makeTile('floor'); }
+}
+
+// Wide corridors: carve a band of floors around the line
+function carveHTunnelWide(map, x1, x2, y, w){
+    const a = Math.min(x1, x2), b = Math.max(x1, x2);
+    const half = Math.max(0, Math.floor((w|0)/2));
+    for (let x=a; x<=b; x++){
+        for (let dy=-half; dy<=half; dy++){
+            const yy = y + dy;
+            if (map.inBounds(x, yy)) map.t[yy][x] = makeTile('floor');
+        }
+    }
+}
+function carveVTunnelWide(map, y1, y2, x, w){
+    const a = Math.min(y1, y2), b = Math.max(y1, y2);
+    const half = Math.max(0, Math.floor((w|0)/2));
+    for (let y=a; y<=b; y++){
+        for (let dx=-half; dx<=half; dx++){
+            const xx = x + dx;
+            if (map.inBounds(xx, y)) map.t[y][xx] = makeTile('floor');
+        }
+    }
 }
 
 // Place walls adjacent to floors (but not replacing floors)
@@ -127,32 +165,74 @@ function generateDungeonLevel(rng, width, height){
     // No border walls - rooms are islands in the void
 
     const rooms = [];
-    const MAX_ROOMS = CONFIG.roomMax || 8;
-    const ROOM_W_MIN = CONFIG.roomMinSize || 4;
-    const ROOM_W_MAX = CONFIG.roomMaxSize || 12;
-    const ROOM_H_MIN = CONFIG.roomMinSize || 4;
-    const ROOM_H_MAX = CONFIG.roomMaxSize || 12;
+    // Compact defaults: more, smaller rooms, closer together
+    const MAX_ROOMS = (CONFIG.roomMaxCompact ?? CONFIG.roomMax ?? 18) | 0;
+    const ROOM_W_MIN = (CONFIG.roomMinSizeCompact ?? 3) | 0;
+    const ROOM_W_MAX = (CONFIG.roomMaxSizeCompact ?? 8) | 0;
+    const ROOM_H_MIN = (CONFIG.roomMinSizeCompact ?? 3) | 0;
+    const ROOM_H_MAX = (CONFIG.roomMaxSizeCompact ?? 8) | 0;
+    const CORRIDOR_W_MIN = (CONFIG.corridorMinWidth ?? 2) | 0;
+    const CORRIDOR_W_MAX = (CONFIG.corridorMaxWidth ?? 5) | 0;
 
     for (let i=0; i<MAX_ROOMS; i++){
         const rw = ROOM_W_MIN + Math.floor(rng() * (ROOM_W_MAX - ROOM_W_MIN + 1));
         const rh = ROOM_H_MIN + Math.floor(rng() * (ROOM_H_MAX - ROOM_H_MIN + 1));
-        const rx = 1 + Math.floor(rng() * (width - rw - 2));
-        const ry = 1 + Math.floor(rng() * (height - rh - 2));
+        // Bias placement toward the center using a triangular distribution
+        const uX = (rng() + rng()) * 0.5; // 0..1 peaking at 0.5
+        const uY = (rng() + rng()) * 0.5;
+        const rx = 1 + Math.floor(uX * (width - rw - 2));
+        const ry = 1 + Math.floor(uY * (height - rh - 2));
         const room = new Rect(rx, ry, rw, rh);
         if (rooms.some(r => r.intersects(room))) continue;
         carveRoom(map, room);
         rooms.push(room);
 
-        // Connect to previous room center with an L-shaped tunnel (random order)
+        // Connect to the nearest existing room to keep corridors short
         if (rooms.length > 1){
-            const [prevCx, prevCy] = rooms[rooms.length-2].center();
             const [cx, cy] = room.center();
-            if (rng() < 0.5){
-                carveHTunnel(map, prevCx, cx, prevCy);
-                carveVTunnel(map, prevCy, cy, cx);
-            } else {
-                carveVTunnel(map, prevCy, cy, prevCx);
-                carveHTunnel(map, prevCx, cx, cy);
+            let best = null, bestDist = 1e9;
+            for (let j=0; j<rooms.length-1; j++){
+                const [px, py] = rooms[j].center();
+                const dx = px - cx, dy = py - cy;
+                const d2 = dx*dx + dy*dy;
+                if (d2 < bestDist){ bestDist = d2; best = rooms[j]; }
+            }
+            const cw = Math.max(CORRIDOR_W_MIN, Math.min(CORRIDOR_W_MAX, 2 + ((rng()* (CORRIDOR_W_MAX - CORRIDOR_W_MIN + 1))|0)));
+            if (best){
+                const [sx, sy] = room.edgeToward(...best.center());
+                const [tx, ty] = best.edgeToward(sx, sy);
+                if (rng() < 0.5){
+                    carveHTunnelWide(map, sx, tx, sy, cw);
+                    carveVTunnelWide(map, sy, ty, tx, cw);
+                } else {
+                    carveVTunnelWide(map, sy, ty, sx, cw);
+                    carveHTunnelWide(map, sx, tx, ty, cw);
+                }
+            }
+            // Occasionally add a secondary short connection for a maze-like feel
+            if (rng() < 0.33 && rooms.length > 2){
+                // Pick among last few rooms to keep it local
+                const startJ = Math.max(0, rooms.length - 5);
+                const cand = rooms.slice(startJ, rooms.length-1);
+                let alt = null, altDist = 1e9;
+                for (const r of cand){
+                    const [px, py] = r.center();
+                    const dx = px - cx, dy = py - cy;
+                    const d2 = dx*dx + dy*dy;
+                    if (d2 < altDist){ altDist = d2; alt = r; }
+                }
+                if (alt && altDist < 200){ // only if quite close
+                    const w2 = Math.max(CORRIDOR_W_MIN, Math.min(CORRIDOR_W_MAX, 2 + ((rng()* (CORRIDOR_W_MAX - CORRIDOR_W_MIN + 1))|0)));
+                    const [sx2, sy2] = room.edgeToward(...alt.center());
+                    const [tx2, ty2] = alt.edgeToward(sx2, sy2);
+                    if (rng() < 0.5){
+                        carveHTunnelWide(map, sx2, tx2, sy2, w2);
+                        carveVTunnelWide(map, sy2, ty2, tx2, w2);
+                    } else {
+                        carveVTunnelWide(map, sy2, ty2, sx2, w2);
+                        carveHTunnelWide(map, sx2, tx2, ty2, w2);
+                    }
+                }
             }
         }
     }
