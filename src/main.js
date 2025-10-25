@@ -212,6 +212,7 @@ import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem
 import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spawner.js';
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
+import { combatSystem } from './world/systems/combatSystem.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
 import { Dungeon } from './world/components/Dungeon.js';
 import { DungeonLevel } from './world/components/DungeonLevel.js';
@@ -356,6 +357,9 @@ world.system(inputSystem, 'update');
 
 // Register movement system (processes InputIntent and updates Position)
 world.system(movementSystem, 'update');
+
+// Resolve queued melee attacks after movement attempts for bump-to-attack
+world.system(combatSystem, 'update');
 
 // Update hallucination timeline after movement/input
 world.system(hallucinationSystem, 'update');

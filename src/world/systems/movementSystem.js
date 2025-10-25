@@ -7,6 +7,9 @@ import { Tile } from '../components/Tile.js';
 import { Occluder } from '../components/Occluder.js';
 import { Collider } from '../components/Collider.js';
 import { MapView } from '../components/MapView.js';
+import { Monster } from '../components/Monster.js';
+import { Health } from '../components/Health.js';
+import { MeleeAttack } from '../components/MeleeAttack.js';
 
 export function movementSystem(world) {
   // Process all entities with Position and InputIntent
@@ -18,7 +21,8 @@ export function movementSystem(world) {
 
       // Check for blocking at destination
       // Prefer MapView tile data (walkable) from the designated MapView; fallback to glyphs/entities
-      let blocked = false;
+  let blocked = false;
+  let blockedByEntity = null;
       outer: {
         // Select primary MapView if registered
         let mv = null;
@@ -43,7 +47,7 @@ export function movementSystem(world) {
               if (bid === id) continue;
               if (bpos.x === nx && bpos.y === ny) {
                 const c = world.get(bid, Collider);
-                if (c && c.solid === true) { blocked = true; break; }
+                if (c && c.solid === true) { blocked = true; blockedByEntity = bid; break; }
                 const t = world.get(bid, Tile);
                 if (t && t.walkable === false) { blocked = true; break; }
                 const o = world.get(bid, Occluder);
@@ -66,7 +70,7 @@ export function movementSystem(world) {
               if (bid === id) continue;
               if (bpos.x === nx && bpos.y === ny) {
                 const c = world.get(bid, Collider);
-                if (c && c.solid === true) { blocked = true; break; }
+                if (c && c.solid === true) { blocked = true; blockedByEntity = bid; break; }
                 const t = world.get(bid, Tile);
                 if (t && t.walkable === false) { blocked = true; break; }
                 const o = world.get(bid, Occluder);
@@ -85,7 +89,7 @@ export function movementSystem(world) {
             const t = world.get(bid, Tile);
             if (t && t.walkable === false) { blocked = true; break; }
             const c = world.get(bid, Collider);
-            if (c && c.solid === true) { blocked = true; break; }
+            if (c && c.solid === true) { blocked = true; blockedByEntity = bid; break; }
             const o = world.get(bid, Occluder);
             if (o && (o.opacity ?? 1) > 0.5) { blocked = true; break; }
           }
@@ -94,6 +98,19 @@ export function movementSystem(world) {
 
       if (!blocked) {
         world.set(id, Position, { x: nx, y: ny });
+      } else if (blockedByEntity != null) {
+        // If the mover is the Player and the blocking entity is a Monster or has Health, enqueue a melee attack
+        const isPlayer = !!world.get(id, Player);
+        if (isPlayer) {
+          const isMonster = !!world.get(blockedByEntity, Monster);
+          const hasHealth = !!world.get(blockedByEntity, Health);
+          if (isMonster || hasHealth) {
+            try {
+              const atkEnt = world.create();
+              world.add(atkEnt, MeleeAttack, { attacker: id, target: blockedByEntity, x: nx, y: ny });
+            } catch(_) { /* ignore if creation fails */ }
+          }
+        }
       }
       // One-shot movement: clear intent whether or not we moved
       world.set(id, InputIntent, { dx: 0, dy: 0 });
