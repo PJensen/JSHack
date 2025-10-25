@@ -40,7 +40,8 @@ export function tileLightingRenderSystem(world){
   ctx.translate(ox, oy);
   const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
   const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
-  const outsideDim = 0.2;
+  // Outside-FOV dim factor: default to 0 (fully hide light outside FOV); can be overridden via RenderContext.fovOutsideDim
+  const outsideDim = (rc.fovOutsideDim != null) ? rc.fovOutsideDim : 0.0;
   for (let y=0;y<rows;y++){
     for (let x=0;x<cols;x++){
       const gx = (x + 0.5) * scaleX;

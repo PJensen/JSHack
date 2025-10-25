@@ -42,7 +42,8 @@ export function glowRenderSystem(world){
 
   const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
   const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
-  const outsideDim = 0.2;
+  // Outside-FOV dim factor: default to 0 (no halo outside FOV). Override via RenderContext.fovOutsideDim
+  const outsideDim = (rc.fovOutsideDim != null) ? rc.fovOutsideDim : 0.0;
 
   for (const [id, lt] of world.query(Light)){
     if (!lt.active) continue;

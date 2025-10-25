@@ -38,7 +38,8 @@ export function entityLightingRenderSystem(world){
 
   const visW = (rc && rc.visibleWeight instanceof Float32Array) ? rc.visibleWeight : null;
   const vis = (!visW && rc && rc.visibleMask instanceof Uint8Array) ? rc.visibleMask : null;
-  const outsideDim = 0.2;
+  // Outside-FOV dim factor: default 0 (hide entities' lighting outside FOV). Override via RenderContext.fovOutsideDim
+  const outsideDim = (rc && rc.fovOutsideDim != null) ? rc.fovOutsideDim : 0.0;
 
   for (const [id, pos, glyph] of world.query(Position, Glyph)){
     const mx = Math.floor((pos.x - camX));

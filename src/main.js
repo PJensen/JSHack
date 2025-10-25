@@ -237,6 +237,8 @@ world.add(rt, RenderContext, {
 	cellH: CELL_H,
 	bg: '#0f1320',
 	pixelated: true,
+	// Do not render lighting outside the current FOV (0 = fully hidden, 0.2 = dimly visible)
+	fovOutsideDim: 0.0,
 	// Shadow tuning for EntityDropShadowRenderer
 	shadowOffsetScale: 0.85,
 	shadowAlpha: 0.42,
