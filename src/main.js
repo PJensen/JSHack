@@ -408,6 +408,7 @@ world.system(cameraSystem, 'update');
 world.system(dungeonGeneratorSystem, 'update');
 // After generation, place the player at the computed spawn point (run once)
 world.system(dungeonSpawnSystem, 'update');
+// After player spawn is known, place a single torch in the starting room (run once)
 
 // Ensure a Dungeon + DungeonLevel entity exists to trigger generation
 try{

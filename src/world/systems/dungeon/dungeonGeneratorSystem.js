@@ -8,6 +8,9 @@ import { Tile } from '../../components/Tile.js';
 import { Position } from '../../components/Position.js';
 import { MapView } from '../../components/MapView.js';
 import { CONFIG } from '../../../config.js';
+// Torch factory for starting room
+import { createDeferred } from '../../../lib/ecs/archetype.js';
+import { TorchArchetype } from '../../archetypes/TorchArchetype.js';
 
 // Glyph mapping (minimal set requested)
 const GLYPH = {
@@ -217,7 +220,7 @@ export function dungeonGeneratorSystem(world){
         const height = Math.max(10, requestedH|0);
 
         const rng = typeof world.rand === 'function' ? world.rand : Math.random;
-        const { map, spawnX, spawnY } = generateDungeonLevel(rng, width, height);
+    const { map, spawnX, spawnY } = generateDungeonLevel(rng, width, height);
 
                 // Note: Avoid creating per-cell tile entities to keep the world lightweight.
                 // Rendering and movement will consult MapView instead.
@@ -267,5 +270,13 @@ export function dungeonGeneratorSystem(world){
             world.set(eid, DungeonLevel, {
                 spawn: { x: spawnX, y: spawnY },
             });
+
+            // Place a torch in the starting room (offset by +1 x to avoid player tile)
+            try{
+                createDeferred(world, TorchArchetype, {
+                    Position: { x: (spawnX | 0) + 1, y: (spawnY | 0) }
+                    // Glyph/Light/Emissive: use archetype defaults
+                });
+            }catch(e){ /* skip torch creation errors without crashing generation */ }
     }
 }
