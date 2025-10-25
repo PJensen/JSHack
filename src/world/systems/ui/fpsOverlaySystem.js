@@ -21,7 +21,7 @@ export function fpsOverlaySystem(world){
     // Ensure no translation scaling leaks in
     if (typeof ctx.setTransform === 'function') ctx.setTransform(1,0,0,1,0,0);
     ctx.globalAlpha = 1.0;
-    ctx.font = '12px monospace';
+    ctx.font = '48px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     // background pill for readability

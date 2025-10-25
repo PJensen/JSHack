@@ -11,6 +11,7 @@ import { CONFIG } from '../../../config.js';
 // Torch factory for starting room
 import { createDeferred } from '../../../lib/ecs/archetype.js';
 import { TorchArchetype } from '../../archetypes/TorchArchetype.js';
+import { TargetDummyArchetype } from '../../archetypes/TargetDummyArchetype.js';
 
 // Glyph mapping (minimal set requested)
 const WALL_GLYPH = CONFIG.wallGlyph || '█';
@@ -586,5 +587,38 @@ export function dungeonGeneratorSystem(world){
                     // Glyph/Light/Emissive: use archetype defaults
                 });
             }catch(e){ /* skip torch creation errors without crashing generation */ }
+
+            // Place a single Target Dummy in the first room near the spawn point
+            try{
+                const tryPositions = [];
+                // Prefer a few tiles away from spawn so it's visible but not overlapping
+                const offsets = [
+                    [2, 0], [-2, 0], [0, 2], [0, -2],
+                    [1, 1], [1, -1], [-1, 1], [-1, -1],
+                    [3, 0], [0, 3], [-3, 0], [0, -3]
+                ];
+                for (const [dx, dy] of offsets){ tryPositions.push([ (spawnX|0)+dx, (spawnY|0)+dy ]); }
+                // Fallback: room center +1 on X
+                tryPositions.push([ (spawnX|0)+1, (spawnY|0) ]);
+
+                let placed = false;
+                for (const [tx, ty] of tryPositions){
+                    if (!map.inBounds(tx, ty)) continue;
+                    // Only place on floor/walkable tiles
+                    const t = map.t[ty][tx];
+                    if (!t || t.walkable === false) continue;
+                    // Avoid the exact spawn tile
+                    if ((tx|0) === (spawnX|0) && (ty|0) === (spawnY|0)) continue;
+                    createDeferred(world, TargetDummyArchetype, {
+                        Position: { x: tx, y: ty },
+                        Glyph: { char: 'T', fg: '#cccccc' },
+                        Health: { maxHp: 1000, hp: 1000 },
+                        // Collider left passable by default in archetype; can override here if needed
+                    });
+                    placed = true; break;
+                }
+                // If no suitable tile found, silently skip to avoid generation failure
+                void placed;
+            }catch(_){ /* ignore dummy placement errors */ }
     }
 }
