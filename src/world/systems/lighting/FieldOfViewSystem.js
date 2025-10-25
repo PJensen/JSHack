@@ -182,4 +182,28 @@ export function FieldOfViewSystem(world){
 
   // Persist to RenderContext so renderers can use it; also stash fov center/radius
   world.set(rcId, RenderContext, { visibleMask: vis, visibleWeight: visW, fovCenter:[eyeX, eyeY], fovRadius: R });
+
+  // Also update MapView.seenMask so fog-of-war renderers can draw "remembered" tiles
+  try {
+    let mvId = world.mapViewId || 0; let mv = null;
+    if (mvId) mv = world.get(mvId, MapView);
+    if (!mv){ for (const [id, _mv] of world.query(MapView)){ mvId = id; mv = _mv; break; } }
+    if (mv && (mv.w|0) > 0 && (mv.h|0) > 0){
+      const w = mv.w|0, h = mv.h|0;
+      let seen = mv.seenMask;
+      if (!(seen instanceof Uint8Array) || seen.length !== w*h){
+        seen = new Uint8Array(w*h);
+      }
+      // Mark tiles currently visible as seen, mapping viewport coords back to map coords
+      for (let vy=0; vy<rows; vy++){
+        for (let vx=0; vx<cols; vx++){
+          const idx = vy*cols + vx;
+          if (!vis[idx]) continue;
+          const mx = camX + vx; const my = camY + vy;
+          if (mx>=0 && my>=0 && mx<w && my<h){ seen[my*w + mx] = 1; }
+        }
+      }
+      world.set(mvId, MapView, { seenMask: seen });
+    }
+  } catch(_) { /* non-fatal if MapView absent */ }
 }

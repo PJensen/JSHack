@@ -17,6 +17,10 @@ export function effectRenderSystem(world) {
   const ox = Math.floor((W - (cols * cellW)) / 2);
   const oy = Math.floor((H - (rows * cellH)) / 2);
 
+  // FOV gating: effects and particles are hidden outside current FOV
+  const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
+  const vis = (!visW && rc.visibleMask instanceof Uint8Array && rc.visibleMask.length === cols*rows) ? rc.visibleMask : null;
+
   for (const [id, eff] of world.query(Effect)) {
     if (!eff.type) continue;
     if (eff.type === 'float_text') {
@@ -26,7 +30,12 @@ export function effectRenderSystem(world) {
       const sy = oy + (pos.y - (rc.camY || 0)) * cellH + cellH / 2;
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
 
-      const ttl = eff.ttl || 0;
+  // Skip if not in visible FOV
+  const vx = (pos.x - (rc.camX||0))|0; const vy = (pos.y - (rc.camY||0))|0;
+  if (visW){ const w = visW[(vy*cols + vx) | 0] || 0; if (w <= 0.02) continue; }
+  else if (vis){ if (!vis[(vy*cols + vx) | 0]) continue; }
+
+  const ttl = eff.ttl || 0;
       const ttlMax = eff.ttlMax || 1;
       const lin = Math.max(0, ttl / ttlMax);
       const alpha = lin * lin;
@@ -53,7 +62,12 @@ export function effectRenderSystem(world) {
       const sy = oy + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) return;
 
-      const lifeRatio = Math.max(0, Math.min(1, p.life / p.lifeMax));
+  // Skip if not in visible FOV (use particle tile position)
+  const vx = (p.x - (rc.camX||0))|0; const vy = (p.y - (rc.camY||0))|0;
+  if (visW){ const w = visW[(vy*cols + vx) | 0] || 0; if (w <= 0.02) return; }
+  else if (vis){ if (!vis[(vy*cols + vx) | 0]) return; }
+
+  const lifeRatio = Math.max(0, Math.min(1, p.life / p.lifeMax));
       const progress = 1 - lifeRatio;
       const currentSize = p.size + (p.sizeEnd - p.size) * progress;
       const pixelSize = Math.max(1, Math.round(currentSize * cellH * 0.5));
@@ -91,7 +105,12 @@ export function effectRenderSystem(world) {
       const sy = oy + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) return;
 
-      const life = Math.max(0, p.life || 0);
+  // Skip if not in visible FOV
+  const vx2 = (p.x - (rc.camX||0))|0; const vy2 = (p.y - (rc.camY||0))|0;
+  if (visW){ const w2 = visW[(vy2*cols + vx2) | 0] || 0; if (w2 <= 0.02) return; }
+  else if (vis){ if (!vis[(vy2*cols + vx2) | 0]) return; }
+
+  const life = Math.max(0, p.life || 0);
       const lifeMax = p.lifeMax || 1;
       const t = 1 - (life / lifeMax);
       const alpha = Math.max(0, Math.min(1, life / lifeMax));

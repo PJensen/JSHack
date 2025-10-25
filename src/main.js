@@ -217,6 +217,7 @@ import { Emissive } from './world/components/Emissive.js';
 import { Material } from './world/components/Material.js';
 import { FieldOfViewSystem } from './world/systems/lighting/FieldOfViewSystem.js';
 import { fpsOverlaySystem } from './world/systems/ui/fpsOverlaySystem.js';
+import { fogOfWarSystem } from './world/systems/fogOfWarSystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -239,6 +240,10 @@ world.add(rt, RenderContext, {
 	pixelated: true,
 	// Do not render lighting outside the current FOV (0 = fully hidden, 0.2 = dimly visible)
 	fovOutsideDim: 0.0,
+	// Dim factor for remembered (seen) tiles when not currently visible
+	fovSeenDim: 0.08,
+	// Optional blur (in CSS px) for seen-but-not-visible tiles to suggest memory (default 0 for perf)
+	fogSeenBlurPx: 0.0,
 	// Shadow tuning for EntityDropShadowRenderer
 	shadowOffsetScale: 0.85,
 	shadowAlpha: 0.42,
@@ -335,6 +340,8 @@ world.system(FlickerSystem, 'update');
 world.system(FieldOfViewSystem, 'update');
 world.system(ShadowCastSystem, 'update');
 world.system(SpecularFieldSystem, 'late');
+// Fog-of-war maintenance (clear on demand via DevState.fogReset)
+world.system(fogOfWarSystem, 'update');
 
 // UI/Effects: respond to gold pickup events by spawning a float text indicator
 try {

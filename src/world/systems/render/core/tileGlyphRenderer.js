@@ -16,13 +16,22 @@ export function tileGlyphRenderSystem(world){
   const camX = (rc.camX|0);
   const camY = (rc.camY|0);
 
-  // Check if FOV-only rendering is enabled
+  // Check if FOV-only rendering is enabled; we still draw seen tiles (dim)
   let fovOnly = false;
-  for (const [id, dev] of world.query(DevState)) {
-    fovOnly = !!dev.fovOnlyRender;
-    break;
-  }
-  const visMask = fovOnly ? rc.visibleMask : null;
+  for (const [id, dev] of world.query(DevState)) { fovOnly = !!dev.fovOnlyRender; break; }
+  const visMask = rc.visibleMask instanceof Uint8Array ? rc.visibleMask : null;
+  // Pull seenMask from MapView for fog-of-war memory
+  let seenMask = null, mapW = 0, mapH = 0;
+  try{
+    let mv = null; const mvId = world.mapViewId;
+    if (mvId) mv = world.get(mvId, MapView);
+    if (!mv){ for (const [_id,_mv] of world.query(MapView)){ mv = _mv; break; } }
+    if (mv && (mv.w|0)>0 && (mv.h|0)>0 && (mv.seenMask instanceof Uint8Array)){
+      seenMask = mv.seenMask; mapW = mv.w|0; mapH = mv.h|0;
+    }
+  }catch(_){ /* ignore */ }
+  const seenDim = (rc.fovSeenDim != null) ? rc.fovSeenDim : 0.08; // darker default for seen-but-not-visible
+  const seenBlurPx = (rc.fogSeenBlurPx != null) ? rc.fogSeenBlurPx : 0.0; // default 0 for performance; opt-in if desired
 
   const ox = Math.floor((W - cols * cellW) / 2);
   const oy = Math.floor((H - rows * cellH) / 2);
@@ -49,17 +58,12 @@ export function tileGlyphRenderSystem(world){
     
     for (let y=minY; y<maxY; y++){
       for (let x=minX; x<maxX; x++){
-        // FOV check: skip tiles not in visible mask
-        if (visMask) {
-          const vx = x - camX;
-          const vy = y - camY;
-          if (vx >= 0 && vy >= 0 && vx < cols && vy < rows) {
-            const idx = vy * cols + vx;
-            if (!visMask[idx]) continue; // not visible, skip
-          } else {
-            continue; // out of viewport
-          }
-        }
+        // FOV/Fog: decide visibility state for this map tile
+        const vx = x - camX; const vy = y - camY;
+        let isVisible = false; let isSeen = false;
+        if (vx>=0 && vy>=0 && vx<cols && vy<rows && visMask){ isVisible = !!visMask[vy*cols + vx]; }
+        if (!isVisible && seenMask && x>=0 && y>=0 && x<mapW && y<mapH){ isSeen = !!seenMask[y*mapW + x]; }
+        if (fovOnly && !isVisible && !isSeen) continue; // hard skip unknown tiles
         
         const g = glyphAt(x,y) || '';
         // Skip rendering void/empty tiles (already black background)
@@ -74,7 +78,14 @@ export function tileGlyphRenderSystem(world){
         else if (g === '█') ctx.fillStyle = '#e0e0e0';
         else if (g === '🚪') ctx.fillStyle = '#8b4513';
         else ctx.fillStyle = '#767676ff';
-        ctx.fillText(g, screenX, screenY);
+        if (!isVisible && isSeen){
+          const prevA = ctx.globalAlpha; const prevF = ctx.filter || 'none';
+          ctx.globalAlpha = Math.max(0, Math.min(1, seenDim));
+          if (seenBlurPx > 0) ctx.filter = `blur(${seenBlurPx}px)`;
+          ctx.fillText(g, screenX, screenY);
+          ctx.globalAlpha = prevA; ctx.filter = prevF;
+        }
+  else { ctx.fillText(g, screenX, screenY); }
       }
     }
     ctx.restore();
@@ -92,17 +103,12 @@ export function tileGlyphRenderSystem(world){
     const x = pos.x|0, y = pos.y|0;
     if (x < minX || x >= maxX || y < minY || y >= maxY) continue;
     
-    // FOV check for manually placed tiles
-    if (visMask) {
-      const vx = x - camX;
-      const vy = y - camY;
-      if (vx >= 0 && vy >= 0 && vx < cols && vy < rows) {
-        const idx = vy * cols + vx;
-        if (!visMask[idx]) continue;
-      } else {
-        continue;
-      }
-    }
+    // FOV/Fog for manual tiles
+    const vx = x - camX; const vy = y - camY;
+    let isVisible = false; let isSeen = false;
+    if (vx>=0 && vy>=0 && vx<cols && vy<rows && visMask){ isVisible = !!visMask[vy*cols + vx]; }
+    if (!isVisible && seenMask && x>=0 && y>=0 && x<mapW && y<mapH){ isSeen = !!seenMask[y*mapW + x]; }
+    if (fovOnly && !isVisible && !isSeen) continue; // unknown -> skip
     
     const mx = (x - camX);
     const my = (y - camY);
@@ -113,7 +119,14 @@ export function tileGlyphRenderSystem(world){
     if (g === '·') ctx.fillStyle = '#b0b0b0';
     else if (g === '█' || g === '#') ctx.fillStyle = '#e0e0e0';
     else ctx.fillStyle = '#c0c0c0';
-    ctx.fillText(g, screenX, screenY);
+    if (!isVisible && isSeen){
+      const prevA = ctx.globalAlpha; const prevF = ctx.filter || 'none';
+      ctx.globalAlpha = Math.max(0, Math.min(1, seenDim));
+      if (seenBlurPx > 0) ctx.filter = `blur(${seenBlurPx}px)`;
+      ctx.fillText(g, screenX, screenY);
+      ctx.globalAlpha = prevA; ctx.filter = prevF;
+    }
+  else { ctx.fillText(g, screenX, screenY); }
   }
   ctx.restore();
 }

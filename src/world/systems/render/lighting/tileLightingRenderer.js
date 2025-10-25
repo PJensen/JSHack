@@ -1,6 +1,7 @@
 // Tile Lighting Render System: shades tiles using LightGrid diffuse
 import { RenderContext } from '../../../components/RenderContext.js';
 import { LightGrid, sampleLight } from '../../../singletons/LightGrid.js';
+import { MapView } from '../../../components/MapView.js';
 import { CameraLighting } from '../../../singletons/CameraLighting.js';
 
 function toneMap(rgb, exposure){
@@ -33,6 +34,18 @@ export function tileLightingRenderSystem(world){
   const exposure = cl?.exposure ?? 1.0; const gamma = cl?.gamma ?? 2.2;
 
   const scaleX = lg.w / cols; const scaleY = lg.h / rows;
+  // Optional fog-of-war memory from MapView
+  let seenMask = null, mapW = 0, mapH = 0;
+  try{
+    let mv = null; const mvId = world.mapViewId;
+    if (mvId) mv = world.get(mvId, MapView);
+    if (!mv){ for (const [_id,_mv] of world.query(MapView)){ mv = _mv; break; } }
+    if (mv && (mv.w|0)>0 && (mv.h|0)>0 && (mv.seenMask instanceof Uint8Array)){
+      seenMask = mv.seenMask; mapW = mv.w|0; mapH = mv.h|0;
+    }
+  }catch(_){ /* ignore */ }
+  const seenDim = (rc.fovSeenDim != null) ? rc.fovSeenDim : 0.08;
+  const seenBlurPx = (rc.fogSeenBlurPx != null) ? rc.fogSeenBlurPx : 0.0;
 
   ctx.save();
   const ox = Math.floor((W - cols * cellW) / 2);
@@ -49,14 +62,31 @@ export function tileLightingRenderSystem(world){
       const L = sampleLight(lg, gx, gy);
       const mapped = gammaCorrect(toneMap(L, exposure), gamma);
       let factor = 1;
+      let seenOnly = false;
+      const idx = y*cols + x;
       if (visW){
-        const w = visW[y*cols + x];
+        const w = visW[idx];
         factor = outsideDim + (1 - outsideDim) * Math.max(0, Math.min(1, w));
+        if (w <= 0.001 && seenMask){
+          const mx = (rc.camX|0) + x; const my = (rc.camY|0) + y;
+          if (mx>=0 && my>=0 && mx<mapW && my<mapH && seenMask[my*mapW + mx]) { factor = seenDim; seenOnly = true; }
+        }
       } else if (vis){
-        factor = vis[y*cols + x] ? 1 : outsideDim;
+        const v = vis[idx] ? 1 : 0;
+        if (v){ factor = 1; }
+        else if (seenMask){
+          const mx = (rc.camX|0) + x; const my = (rc.camY|0) + y;
+          if (mx>=0 && my>=0 && mx<mapW && my<mapH && seenMask[my*mapW + mx]) { factor = seenDim; seenOnly = true; }
+          else { factor = outsideDim; }
+        } else {
+          factor = outsideDim;
+        }
       }
       ctx.fillStyle = toHex([mapped[0]*factor, mapped[1]*factor, mapped[2]*factor]);
+      const prevF = ctx.filter || 'none';
+      if (seenOnly && seenBlurPx > 0) ctx.filter = `blur(${seenBlurPx}px)`;
       ctx.fillRect(x*cellW, y*cellH, cellW, cellH);
+      if (seenOnly && seenBlurPx > 0) ctx.filter = prevF;
     }
   }
   ctx.restore();
