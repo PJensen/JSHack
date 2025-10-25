@@ -41,4 +41,14 @@ export const CONFIG = {
   roomMaxSize: ROOM_MAX_SIZE,
   roomMinSize: ROOM_MIN_SIZE,
   ticksPerSecond: TICKS_PER_SECOND,
+  // Glyph used for walls. Safe default is '█'. You can set to '⬛' if it renders single-width
+  // in your chosen font to minimize gaps.
+  wallGlyph: '▉',
 };
+
+// const WALLS = [
+//   "█","▓","▒","░",
+//   "■","▪","◼","⬛","▮","▉","▊","▋",
+//   "▀","▄","▌","▐",
+//   "▙","▛","▜","▟"
+// ];

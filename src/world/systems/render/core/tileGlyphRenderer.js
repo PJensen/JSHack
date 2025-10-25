@@ -64,16 +64,16 @@ export function tileGlyphRenderSystem(world){
         const g = glyphAt(x,y) || '';
         // Skip rendering void/empty tiles (already black background)
         if (!g || g === ' ') continue;
-        
+          
         const mx = (x - camX);
         const my = (y - camY);
         const screenX = mx * cellW + cx;
         const screenY = my * cellH + cy;
         
-        if (g === '·') ctx.fillStyle = '#b0b0b0';
+        if (g === '·') ctx.fillStyle = '#464646ff';
         else if (g === '█') ctx.fillStyle = '#e0e0e0';
         else if (g === '🚪') ctx.fillStyle = '#8b4513';
-        else ctx.fillStyle = '#c0c0c0';
+        else ctx.fillStyle = '#767676ff';
         ctx.fillText(g, screenX, screenY);
       }
     }

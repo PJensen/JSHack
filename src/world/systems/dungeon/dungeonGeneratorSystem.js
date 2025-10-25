@@ -13,8 +13,9 @@ import { createDeferred } from '../../../lib/ecs/archetype.js';
 import { TorchArchetype } from '../../archetypes/TorchArchetype.js';
 
 // Glyph mapping (minimal set requested)
+const WALL_GLYPH = CONFIG.wallGlyph || '█';
 const GLYPH = {
-    WALL: '█',
+    WALL: WALL_GLYPH,
     FLOOR: '·',
     DOOR: '🚪',
     WATER: '≈',
@@ -34,7 +35,7 @@ function makeTile(type){
         case 'water': return { glyph: GLYPH.WATER, walkable: false, blocksLight: false };
         case 'trap': return { glyph: GLYPH.TRAP, walkable: true,  blocksLight: false };
         case 'fountain': return { glyph: GLYPH.FOUNTAIN, walkable: false, blocksLight: false };
-        case 'sink': return { glyph: GLYPH.SINK, walkable: false, blocksLight: false };
+        case 'sink': return { glyph: GLYPH.SINK, walkable: true, blocksLight: false };
         case 'altar': return { glyph: GLYPH.ALTAR, walkable: false, blocksLight: false };
         case 'throne': return { glyph: GLYPH.THRONE, walkable: false, blocksLight: false };
         case 'grave': return { glyph: GLYPH.GRAVE, walkable: false, blocksLight: false };
