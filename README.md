@@ -4,7 +4,7 @@ A hackable, zero-dependency, browser-based like engine built with pure JavaScrip
 
 ## Building
 
-`./build.ps1`
+Execute `./build.ps1` to check for errors
 
 ## Prime Directives
 

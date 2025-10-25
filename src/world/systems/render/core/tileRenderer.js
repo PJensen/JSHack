@@ -1,40 +1,16 @@
 // Tile Background Render System
-// Renders a checkerboard background aligned to the viewport grid.
+// Renders background for dungeon tiles (solid color, no borders)
 // READONLY: performs no mutations — only reads world state and draws to canvas
 import { getRenderContext } from '../utils.js';
 
 export function tileRenderSystem(world) {
   const rc = getRenderContext(world);
   if (!rc) return;
-  const { ctx, W, H, cellW = 16, cellH = 16 } = rc;
-  const cols = Math.max(1, rc.cols || Math.floor(W / cellW));
-  const rows = Math.max(1, rc.rows || Math.floor(H / cellH));
+  const { ctx, W, H } = rc;
 
-  const camX = (rc.camX ?? -Math.floor(cols / 2));
-  const camY = (rc.camY ?? -Math.floor(rows / 2));
-  const startX = camX;
-  const startY = camY;
-
-  const ox = Math.floor((W - cols * cellW) / 2);
-  const oy = Math.floor((H - rows * cellH) / 2);
-  const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
-  const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
-
+  // Clear to solid background (no viewport boundaries, no checkerboard)
   ctx.save();
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = rc.bg || '#0f1320';
   ctx.fillRect(0, 0, W, H);
-
-  // Background checkerboard only (no glyphs; glyphs are drawn in tileGlyphRenderSystem)
-  ctx.translate(ox + halfShiftX, oy + halfShiftY);
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const worldX = startX + x;
-      const worldY = startY + y;
-      const isDark = ((worldX + worldY) & 1) !== 0;
-      ctx.fillStyle = isDark ? '#2a2a2a' : '#303030';
-      ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
-    }
-  }
-
   ctx.restore();
 }

@@ -440,10 +440,10 @@ world.system(lifetimeSystem, 'late');
 // Run garbage collector to clean Dead entities and trim pools
 world.system(garbageCollectionSystem, 'late');
 
-// Add a Camera entity to hold viewport settings
+// Add a Camera entity to hold viewport settings (use full RenderContext size)
 const camEntity = world.create();
-
-world.add(camEntity, Camera, { x: 0, y: 0, cols: 21, rows: 21 });
+const rcData = world.get(rt, RenderContext);
+world.add(camEntity, Camera, { x: 0, y: 0, cols: rcData.cols, rows: rcData.rows });
 
 // Create camera lighting singleton
 try{ ensureCameraLighting(world); }catch(e){ /* ignore */ }

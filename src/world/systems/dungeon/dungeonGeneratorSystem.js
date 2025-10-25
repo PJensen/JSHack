@@ -86,7 +86,7 @@ function placeDoors(map){
 }
 
 function makeGameMap(w,h){
-    const t = Array.from({length:h}, ()=>Array.from({length:w}, ()=>makeTile('floor')));
+    const t = Array.from({length:h}, ()=>Array.from({length:w}, ()=>makeTile('wall')));
     return {
         w, h, t,
         inBounds(x,y){ return x>=0 && y>=0 && x<w && y<h; }
@@ -95,12 +95,7 @@ function makeGameMap(w,h){
 
 function generateDungeonLevel(rng, width, height){
     const map = makeGameMap(width, height);
-    // Keep a solid border
-    for (let y=0; y<height; y++){
-        for (let x=0; x<width; x++){
-            if (x===0 || y===0 || x===width-1 || y===height-1) map.t[y][x] = makeTile('wall');
-        }
-    }
+    // No border walls - rooms are islands in the void
 
     const rooms = [];
     const MAX_ROOMS = CONFIG.roomMax || 8;
@@ -158,14 +153,7 @@ function generateDungeonLevel(rng, width, height){
     let spawnX = 6, spawnY = 6;
     if (rooms.length){ [spawnX, spawnY] = rooms[0].center(); }
 
-    // Stairs at most distant room center
-    let stairX = spawnX, stairY = spawnY, bestD = -1;
-    for (const r of rooms){
-        const [cx, cy] = r.center();
-        const d = Math.abs(cx - spawnX) + Math.abs(cy - spawnY);
-        if (d > bestD){ bestD = d; stairX = cx; stairY = cy; }
-    }
-    if (map.inBounds(stairX, stairY)) map.t[stairY][stairX] = makeTile('stair');
+    // No stairs (per user request)
 
     // One special feature per some rooms
     for (const room of rooms){
@@ -181,7 +169,7 @@ function generateDungeonLevel(rng, width, height){
         }
     }
 
-    return { map, rooms, spawnX, spawnY, stairX, stairY };
+    return { map, rooms, spawnX, spawnY };
 }
 
 export function dungeonGeneratorSystem(world){
@@ -194,12 +182,11 @@ export function dungeonGeneratorSystem(world){
         // allowed and avoids deferral; we don't rely on Changed(DungeonLevel) here.
         if (lvl) lvl.generated = true;
 
-        // Dimensions: derive from CONFIG, clamp to a sane cap
+        // Dimensions: derive from CONFIG or use reasonable defaults
         const requestedW = (lvl && lvl.width) || (CONFIG.cols || 80);
         const requestedH = (lvl && lvl.height) || (CONFIG.rows || 48);
-        const MAX_DIM = 256; // hard cap to avoid OOM
-        const width = Math.max(10, Math.min(requestedW|0, MAX_DIM));
-        const height = Math.max(10, Math.min(requestedH|0, MAX_DIM));
+        const width = Math.max(10, requestedW|0);
+        const height = Math.max(10, requestedH|0);
 
         const rng = typeof world.rand === 'function' ? world.rand : Math.random;
         const { map, spawnX, spawnY } = generateDungeonLevel(rng, width, height);
