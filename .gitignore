@@ -14,3 +14,4 @@ Thumbs.db
 
 # Ignore Copilot instructions
 .github/copilot-instructions.md
+build.ps1

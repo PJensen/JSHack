@@ -141,6 +141,7 @@ import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spaw
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
+import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGeneratorSystem.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -274,6 +275,7 @@ world.system(cameraSystem, 'update');
 
 // Register dungeon generator (no-op until Dungeon/DungeonLevel entities exist)
 world.system(dungeonSystem, 'update');
+world.system(dungeonGeneratorSystem, 'update');
 
 // Register projectile motion and lifetime cleanup
 world.system(projectileSystem, 'update');
