@@ -22,7 +22,10 @@ export const TorchArchetype = defineArchetype('Torch',
     intensity: p?.Light?.intensity ?? 0.07,
     castsShadows: p?.Light?.castsShadows ?? true,
     flickerSeed: p?.Light?.flickerSeed ?? 1337,
-    pulse: p?.Light?.pulse ?? { periodMs: 480, min: 0.65, max: 2.35 }
+    // More random (less “breathing”) flicker using value-noise; subtle pulse optional via overrides
+    flicker: p?.Light?.flicker ?? { amplitude: 0.8, periodMs: 80, octaves: 4 },
+    // Disable heavy pulse by default; override via params to re-enable
+    pulse: p?.Light?.pulse
   })],
   // Small emissive core for glow pass
   [Emissive, (p)=> ({ color: p?.Emissive?.color ?? [1.0, 0.45, 0.15], strength: p?.Emissive?.strength ?? 1.2, radius: p?.Emissive?.radius ?? 1 })],
