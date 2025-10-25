@@ -26,10 +26,26 @@ export function spawnFloatText(world, x, y, text, opts={}){
   const e = world.create();
   const life = opts.life || 0.9;
   const scaleBase = opts.crit ? 1.3 : 1.0;
-  const dmg = opts.dmg || 0;
-  const magScale = dmg ? Math.min(2.2, 0.7 + dmg / 10) : 1;
-  const scaleStart = opts.scaleStart || (scaleBase * magScale);
-  const scaleEnd = opts.scaleEnd || (0.75 * scaleBase);
+  const dmg = (typeof opts.dmg === 'number' && isFinite(opts.dmg)) ? Math.max(0, opts.dmg) : 0;
+  const magScale = dmg ? Math.min(2.2, 0.7 + (dmg / 10)) : 1;
+  const scaleStart = (opts.scaleStart !== undefined) ? opts.scaleStart : (scaleBase * magScale);
+  const scaleEnd = (opts.scaleEnd !== undefined) ? opts.scaleEnd : (0.75 * scaleBase);
+  // Compute initial motion
+  const rng = (typeof world.rand === 'function') ? world.rand.bind(world) : Math.random;
+  let vx = 0, vy = 0;
+  if (typeof opts.vx === 'number' || typeof opts.vy === 'number'){
+    vx = opts.vx || 0; vy = opts.vy || 0;
+  } else if (dmg > 0){
+    // Damage: bias up with angular spread; speed scales with damage
+    const angle = (-Math.PI/2) + ((rng()*2 - 1) * (Math.PI/3)); // up ±60°
+    const speed = Math.min(3.0, 0.6 + Math.sqrt(dmg) * 0.18);
+    vx = Math.cos(angle) * speed;
+    vy = Math.sin(angle) * speed; // mostly negative (up)
+  } else {
+    // Gold/other: gentle drift upward
+    vx = (rng()*0.4 - 0.2);
+    vy = (-0.8 - rng()*0.3);
+  }
   world.add(e, Effect, {
     type: 'float_text',
     ttl: life,
@@ -38,8 +54,8 @@ export function spawnFloatText(world, x, y, text, opts={}){
     data: {
       text: String(text),
       color: opts.color || '#ffffff',
-      vx: opts.vx || (Math.random()*0.4 - 0.2),
-      vy: opts.vy || (-0.8 - Math.random()*0.3),
+      vx,
+      vy,
       scaleStart,
       scaleEnd,
       batch: opts.batch || false,

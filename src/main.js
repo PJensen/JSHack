@@ -207,6 +207,7 @@ import { dungeonSpawnSystem } from './world/systems/dungeon/dungeonSpawnSystem.j
 import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
 import { projectileSystem } from './world/systems/projectileSystem.js';
 import { effectLifetimeSystem } from './world/systems/effects/effectLifetimeSystem.js';
+import { effectMotionSystem } from './world/systems/effects/effectMotionSystem.js';
 import { emitterSystem } from './world/systems/effects/emitterSystem.js';
 import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem.js';
 import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spawner.js';
@@ -465,6 +466,9 @@ world.system(projectileSystem, 'update');
 
 // Tick VFX lifetimes
 world.system(effectLifetimeSystem, 'update');
+
+// Move float text effects (simple velocity with gentle upward lift)
+world.system(effectMotionSystem, 'update');
 
 // Update global particle system each tick so particles age and return to the pool.
 // Without this, spawned particles are never updated/released and will grow unbounded.
