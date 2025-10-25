@@ -26,14 +26,12 @@ function isMovementKey(key){
 // Setup keyboard listeners (call once during init)
 export function setupInputListeners() {
   window.addEventListener('keydown', (e) => {
-    const key = e.key.toLowerCase();
-    const wasDown = keysPressed.has(key);
-    keysPressed.add(key);
-    // Edge-trigger: only on first keydown (ignore auto-repeat)
-    if (!wasDown && !e.repeat && isMovementKey(key)) edgeMoveRequested = true;
+    keysPressed.add(e.key.toLowerCase());
+    // Edge-trigger: only set once per keydown so movement is one cell per press
+    if (isMovementKey(e.key)) edgeMoveRequested = true;
     
     // Prevent arrow keys from scrolling the page
-    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
       e.preventDefault();
     }
   });
@@ -118,6 +116,7 @@ export function inputSystem(world) {
     
     // Only emit intent on edge (keydown). This makes movement one tile per press.
     if (edgeMoveRequested && (dx !== 0 || dy !== 0)) {
+      console.log(`Input: dx=${dx}, dy=${dy}`);
       world.set(id, InputIntent, { dx, dy });
       // consume the edge; movementSystem will clear the intent after applying
       edgeMoveRequested = false;
