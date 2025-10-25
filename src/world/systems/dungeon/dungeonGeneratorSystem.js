@@ -83,6 +83,67 @@ function carveVTunnel(map, y1, y2, x){
     for (let y=a; y<=b; y++){ if (map.inBounds(x,y)) map.t[y][x] = makeTile('floor'); }
 }
 
+// Carve an irregular cavern inside a bounding rect using simple cellular automata
+function carveCavernRoom(map, rect, rng, opts={}){
+    const w = rect.w|0, h = rect.h|0;
+    if (w < 3 || h < 3){ carveRoom(map, rect); return; }
+    const density = Math.max(0.05, Math.min(0.95, opts.density ?? 0.45)); // probability of initial wall
+    const iters = Math.max(1, (opts.iterations ?? 3)|0);
+    // local grid: 1 = wall, 0 = open
+    const grid = new Uint8Array(w * h);
+    for (let y=0;y<h;y++){
+        for (let x=0;x<w;x++){
+            const atEdge = (x===0||y===0||x===w-1||y===h-1);
+            grid[y*w+x] = atEdge ? 1 : (rng() < density ? 1 : 0);
+        }
+    }
+    const next = new Uint8Array(grid.length);
+    const idx = (x,y)=>y*w+x;
+    for (let it=0; it<iters; it++){
+        for (let y=1;y<h-1;y++){
+            for (let x=1;x<w-1;x++){
+                let walls=0;
+                for (let dy=-1; dy<=1; dy++){
+                    for (let dx=-1; dx<=1; dx++){
+                        if (dx===0 && dy===0) continue;
+                        walls += grid[idx(x+dx, y+dy)] ? 1 : 0;
+                    }
+                }
+                // Classic cave rule: >=5 neighbor walls -> wall, else open
+                next[idx(x,y)] = (walls >= 5) ? 1 : 0;
+            }
+        }
+        // keep edges as walls
+        for (let x=0;x<w;x++){ next[idx(x,0)]=1; next[idx(x,h-1)]=1; }
+        for (let y=0;y<h;y++){ next[idx(0,y)]=1; next[idx(w-1,y)]=1; }
+        grid.set(next);
+    }
+    // Carve open cells into the map
+    for (let y=0;y<h;y++){
+        for (let x=0;x<w;x++){
+            if (grid[idx(x,y)]===0){
+                const gx = rect.x + x, gy = rect.y + y;
+                if (map.inBounds(gx, gy)) map.t[gy][gx] = makeTile('floor');
+            }
+        }
+    }
+}
+
+// Carve a symmetric arena: normal room with a symmetric grid of single-tile columns
+function carveArenaRoom(map, rect, rng, opts={}){
+    carveRoom(map, rect);
+    const spacing = Math.max(3, (opts.columnSpacing ?? 4)|0);
+    const margin = Math.max(2, (opts.columnMargin ?? 2)|0);
+    if (rect.w < margin*2+1 || rect.h < margin*2+1) return;
+    for (let y = rect.y + margin; y <= rect.y2 - margin; y += spacing){
+        for (let x = rect.x + margin; x <= rect.x2 - margin; x += spacing){
+            if (!map.inBounds(x,y)) continue;
+            // Only place a column over floor to avoid punching into void; keep symmetry deterministic
+            if (map.t[y][x].walkable){ map.t[y][x] = makeTile('wall'); }
+        }
+    }
+}
+
 // Wide corridors: carve a band of floors around the line
 function carveHTunnelWide(map, x1, x2, y, w){
     const a = Math.min(x1, x2), b = Math.max(x1, x2);
@@ -235,6 +296,19 @@ function generateDungeonLevel(rng, width, height){
     const MAX_SEG_LEN = Math.max(3, (CONFIG.maxCorridorSegmentLen ?? 7) | 0);
     const POCKET_CHANCE = Math.max(0, Math.min(1, CONFIG.corridorPocketChance ?? 0.0));
 
+    // Feature toggles
+    const ENABLE_CAVERN = !!(CONFIG.cavernRoomsEnabled ?? true);
+    const ENABLE_ARENA  = !!(CONFIG.arenaRoomsEnabled ?? true);
+    const CAVERN_CHANCE = Math.max(0, Math.min(1, CONFIG.cavernRoomChance ?? 0.18));
+    const ARENA_CHANCE  = Math.max(0, Math.min(1, CONFIG.arenaRoomChance ?? 0.12));
+    const CAVERN_DENSITY = Math.max(0.1, Math.min(0.9, CONFIG.cavernDensity ?? 0.45));
+    const CAVERN_ITERS   = Math.max(1, (CONFIG.cavernIterations ?? 3)|0);
+    const ARENA_COLUMN_SPACING = Math.max(3, (CONFIG.arenaColumnSpacing ?? 4)|0);
+    const ARENA_COLUMN_MARGIN  = Math.max(2, (CONFIG.arenaColumnMargin ?? 2)|0);
+    const SINGLE_COLUMNS = !!(CONFIG.singleColumnsInRooms ?? true);
+    const SINGLE_COLUMN_CHANCE = Math.max(0, Math.min(1, CONFIG.singleColumnChance ?? 0.3));
+    const SINGLE_COLUMN_MIN_AREA = Math.max(16, (CONFIG.singleColumnMinArea ?? 40)|0);
+
     for (let i=0; i<MAX_ROOMS; i++){
         // Sample base room size with a slight bias to middle using triangular dist
         const uw = (rng()+rng())*0.5;
@@ -261,7 +335,25 @@ function generateDungeonLevel(rng, width, height){
         const ry = 1 + Math.floor(uY * (height - rh - 2));
         const room = new Rect(rx, ry, rw, rh);
         if (rooms.some(r => r.intersects(room))) continue;
-        carveRoom(map, room);
+        // Decide room kind
+        let kind = 'rect';
+        if (ENABLE_CAVERN && rng() < CAVERN_CHANCE) kind = 'cavern';
+        else if (ENABLE_ARENA && rng() < ARENA_CHANCE) kind = 'arena';
+
+        if (kind === 'cavern') carveCavernRoom(map, room, rng, { density: CAVERN_DENSITY, iterations: CAVERN_ITERS });
+        else if (kind === 'arena') carveArenaRoom(map, room, rng, { columnSpacing: ARENA_COLUMN_SPACING, columnMargin: ARENA_COLUMN_MARGIN });
+        else carveRoom(map, room);
+
+        // Optional single-tile columns in larger rooms to add tactical cover
+        if (SINGLE_COLUMNS && (room.w * room.h) >= SINGLE_COLUMN_MIN_AREA && rng() < SINGLE_COLUMN_CHANCE){
+            const colsToPlace = 1 + ((rng()*2)|0); // 1..2
+            for (let k=0;k<colsToPlace;k++){
+                const cx = room.x + 1 + ((rng() * Math.max(1, room.w - 2))|0);
+                const cy = room.y + 1 + ((rng() * Math.max(1, room.h - 2))|0);
+                if (!map.inBounds(cx, cy)) continue;
+                if (map.t[cy][cx].walkable){ map.t[cy][cx] = makeTile('wall'); }
+            }
+        }
         rooms.push(room);
 
         // Connect to the nearest existing room to keep corridors short
