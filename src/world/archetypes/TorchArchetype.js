@@ -54,7 +54,7 @@ export const TorchArchetype = defineArchetype('Torch',
     color: p?.Emitter?.color ?? (p?.Glyph?.fg || p?.Glyph?.color || '#c24225ff'),
 
     // Slight offset above the glyph origin
-    offsetX: p?.Emitter?.offsetX ?? -0.5,
+    offsetX: p?.Emitter?.offsetX ?? 0,
     offsetY: p?.Emitter?.offsetY ?? -1.2,
   })],
 );
