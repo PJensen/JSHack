@@ -128,11 +128,10 @@
   <!-- Entry module: must be a native ES module and use relative imports with extensions. -->
 <script>
   // Example: generate a cache-busting version string
-  const v = '20251025AA'; // You can generate this however you want
   const hash = new Date().getTime().toString(16);
   const script = document.createElement('script');
   script.type = 'module';
-  script.src = `./src/main.js?v=${v}&md5=${md5}`;
+  script.src = `./src/main.js?v=${hash}`;
   document.body.appendChild(script);
 </script>
 </body>
