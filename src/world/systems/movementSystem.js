@@ -140,17 +140,16 @@ export function movementSystem(world) {
       if (!blocked) {
         world.set(id, Position, { x: nx, y: ny });
       } else if (blockedByEntity != null) {
-        // If the mover is the Player and the blocking entity is a Monster or has Health, enqueue a melee attack
+        // If mover is Player or Monster and target is attackable, enqueue a melee attack
         const isPlayer = !!world.get(id, Player);
-        if (isPlayer) {
-          const isMonster = !!world.get(blockedByEntity, Monster);
-          const hasHealth = !!world.get(blockedByEntity, Health);
-          if (isMonster || hasHealth) {
-            try {
-              const atkEnt = world.create();
-              world.add(atkEnt, MeleeAttack, { attacker: id, target: blockedByEntity, x: nx, y: ny });
-            } catch(_) { /* ignore if creation fails */ }
-          }
+        const isMonsterMover = !!world.get(id, Monster);
+        const targetIsMonster = !!world.get(blockedByEntity, Monster);
+        const targetHasHealth = !!world.get(blockedByEntity, Health);
+        if ((isPlayer && (targetIsMonster || targetHasHealth)) || (isMonsterMover && targetHasHealth)) {
+          try {
+            const atkEnt = world.create();
+            world.add(atkEnt, MeleeAttack, { attacker: id, target: blockedByEntity, x: nx, y: ny });
+          } catch(_) { /* ignore if creation fails */ }
         }
       }
       // One-shot movement: clear intent whether or not we moved

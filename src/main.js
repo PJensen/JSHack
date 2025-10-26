@@ -8,6 +8,7 @@ import { Player } from './world/components/Player.js';
 import { Position } from './world/components/Position.js';
 import { Glyph } from './world/components/Glyph.js';
 import { MapView } from './world/components/MapView.js';
+import { Collider } from './world/components/Collider.js';
 
 // --- Setup canvas ---
 // Matches <canvas id="stage"> in index.html
@@ -146,6 +147,8 @@ import { Tile } from './world/components/Tile.js';
 if (!world.has(playerId, Position)) world.add(playerId, Position, { x: 0, y: 0 });
 if (!world.has(playerId, Player)) world.add(playerId, Player, { });
 if (!world.has(playerId, Glyph)) world.add(playerId, Glyph, { char: '@', fg: '#fff', color: '#fff' });
+// Ensure the player is solid so monsters cannot move onto the same tile
+if (!world.has(playerId, Collider)) world.add(playerId, Collider, { solid: true, blocksSight: false });
 
 // Add InputIntent component for player input
 import { InputIntent } from './world/components/InputIntent.js';
@@ -223,6 +226,8 @@ import { ftPreset } from './world/systems/effects/floatTextPresets.js';
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
 import { combatSystem } from './world/systems/combatSystem.js';
+import { monsterSpawnSystem } from './world/systems/monsterSpawnSystem.js';
+import { monsterAISystem } from './world/systems/monsterAISystem.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
 import { Dungeon } from './world/components/Dungeon.js';
 import { DungeonLevel } from './world/components/DungeonLevel.js';
@@ -490,6 +495,11 @@ world.system(dungeonGeneratorSystem, 'update');
 // After generation, place the player at the computed spawn point (run once)
 world.system(dungeonSpawnSystem, 'update');
 // After player spawn is known, place a single torch in the starting room (run once)
+
+// Spawn monsters once after dungeon generation is complete (post player spawn for spacing)
+world.system(monsterSpawnSystem, 'update');
+// Monster AI: emit intents before movement (but after potential spawns)
+world.system(monsterAISystem, 'update');
 
 // Ensure a Dungeon + DungeonLevel entity exists to trigger generation
 try{
