@@ -150,6 +150,7 @@ export function ShadowCastSystem(world){
   const gh = half ? Math.max(1, (rows/2)|0) : rows;
   const lgId = ensureLightGrid(world, gw, gh);
   const lg = world.get(lgId, LightGrid);
+  if (!lg) return; // creation may be deferred mid-tick; try next frame
   lg.halfRes = half;
   clearLightGrid(lg);
 

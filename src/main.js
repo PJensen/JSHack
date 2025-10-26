@@ -235,6 +235,7 @@ import { fpsOverlaySystem } from './world/systems/ui/fpsOverlaySystem.js';
 import { fogOfWarSystem } from './world/systems/fogOfWarSystem.js';
 import { Hallucination } from './world/components/Hallucination.js';
 import { hallucinationSystem } from './world/systems/effects/hallucinationSystem.js';
+import { LightGrid } from './world/singletons/LightGrid.js';
 
 // --- Context object for rendering (kept for potential module sharing) ---
 const renderContext = { ctx };
@@ -282,6 +283,26 @@ world.add(rt, RenderContext, {
 });
 // Cache the RenderContext entity id on the world for fast access in render loops
 world.renderContextId = rt;
+
+// Pre-create a LightGrid singleton so lighting systems never need to add during a tick
+try{
+	const rc0 = world.get(rt, RenderContext);
+	const half = true; // keep in sync with ShadowCastSystem default
+	const gw = Math.max(1, (half ? (rc0.cols/2)|0 : rc0.cols|0));
+	const gh = Math.max(1, (half ? (rc0.rows/2)|0 : rc0.rows|0));
+	const lgEntity = world.create();
+	world.add(lgEntity, LightGrid, {
+		w: gw,
+		h: gh,
+		r: new Float32Array(gw*gh),
+		g: new Float32Array(gw*gh),
+		b: new Float32Array(gw*gh),
+		ambient: [0.02,0.02,0.03],
+		dirty: true,
+		halfRes: half
+	});
+	world.lightGridId = lgEntity;
+}catch(e){ /* ignore if early startup constraints */ }
 
 // Pre-create a MapView entity so generation can update it in-place during update (no deferral)
 try{

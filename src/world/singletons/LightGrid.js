@@ -18,7 +18,12 @@ export function ensureLightGrid(world, w, h){
   // simple approach: first entity with LightGrid
   let id = 0;
   for (const e of world.alive){ if (world.has(e, LightGrid)) { id = e; break; } }
-  if (!id) { id = world.create(); world.add(id, LightGrid, {}); }
+  if (!id) {
+    // Create the singleton entity. Adding the component during a tick will defer;
+    // callers must tolerate a null get() this frame. We harden downstream users.
+    id = world.create();
+    world.add(id, LightGrid, {});
+  }
   const lg = world.get(id, LightGrid);
   if (lg.w !== w || lg.h !== h || !lg.r || lg.r.length !== w*h){
     world.set(id, LightGrid, {
@@ -39,6 +44,8 @@ export function clearLightGrid(lg){
 }
 
 export function addLight(lg, x, y, rgb){
+  if (!lg || !lg.r || !lg.g || !lg.b) return;
+  if (!rgb) return;
   // x,y in grid coords; bilinear distribute to 4 neighbors for smoother result
   const gx = Math.max(0, Math.min(lg.w-1, x));
   const gy = Math.max(0, Math.min(lg.h-1, y));
@@ -55,6 +62,7 @@ export function addLight(lg, x, y, rgb){
 }
 
 export function sampleLight(lg, x, y){
+  if (!lg || !lg.r || !lg.g || !lg.b) return [0,0,0];
   // bilinear sample; x,y in grid space
   const gx = Math.max(0, Math.min(lg.w-1, x));
   const gy = Math.max(0, Math.min(lg.h-1, y));
