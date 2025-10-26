@@ -33,7 +33,7 @@ export function ftPreset(name, { text, color, seed } = { text: '' }) {
       arc: 0.6             // 0..1: widen angle and add slight sideways curvature
     });
     case 'Pulse':   return base({ size: 0.9, energy: 0.1, rise: 0.8 });
-    case 'Pop':     return base({ size: 0.9, energy: 0.2, life: 0.8 });
+    case 'Pop':     return base({ size: 0.9, energy: 0.2, life: 0.8, life: 2 });
     case 'Echo':    return base({ size: 1.0, energy: 0.05, life: 1.3, rise: 0.6 });
     case 'Shatter': return base({ size: 1.6, energy: 0.9, life: 0.9 });
     case 'Feather': return base({ size: 0.95, energy: 0.0, rise: 0.5, life: 1.2 });

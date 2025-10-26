@@ -786,6 +786,21 @@ export function dungeonGeneratorSystem(world){
                 });
             }catch(e){ /* skip torch creation errors without crashing generation */ }
 
+            // Ensure at least one starter fountain near spawn (offset by +2 x if floor)
+            try{
+                const fx = (spawnX | 0) + 2, fy = (spawnY | 0);
+                if (map.inBounds(fx, fy)){
+                    const t = map.t[fy][fx];
+                    // Only convert if it's a normal floor to avoid clobbering doors/features
+                    if (t && t.walkable && t.glyph === GLYPH.FLOOR){
+                        map.t[fy][fx] = makeTile('fountain');
+                        createDeferred(world, FountainArchetype, {
+                            Position: { x: fx, y: fy }
+                        });
+                    }
+                }
+            }catch(_){ /* skip starter fountain errors */ }
+
             // Place a single Target Dummy in the first room near the spawn point
             try{
                 const tryPositions = [];

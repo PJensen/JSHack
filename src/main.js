@@ -623,26 +623,26 @@ try {
 	spawnFloatText(world, 2, 3, ftPreset('Pulse', { text: '+8', color:'#fff59e' }));
 } catch(e) { /* ignore in non-demo contexts */ }
 
-// Demo: attach an initial Hallucination to the player so the effect is visible
-try {
-		if (!world.has(playerId, Hallucination)){
-			world.add(playerId, Hallucination, {
-				onsetSec: 2.0,
-				sustainSec: 6.0,
-				comedownSec: 4.0,
-				strength: 1.0,
-				hueMaxDeg: 120,
-				saturationBoost: 1.8,
-				aberrationMaxPx: 6,
-				wobbleAmpPx: 10,
-				wobbleFreqHz: 1.3,
-				vignetteStrength: 0.35,
-				kaleidoAt: 0.7,
-				trailAlpha: 0.0,
-				loop: false
-			});
-		}
-} catch(_) { /* ignore in constrained runtimes */ }
+// // Demo: attach an initial Hallucination to the player so the effect is visible
+// try {
+// 		if (!world.has(playerId, Hallucination)){
+// 			world.add(playerId, Hallucination, {
+// 				onsetSec: 2.0,
+// 				sustainSec: 6.0,
+// 				comedownSec: 4.0,
+// 				strength: 0.2,
+// 				hueMaxDeg: 120,
+// 				saturationBoost: 1.8,
+// 				aberrationMaxPx: 6,
+// 				wobbleAmpPx: 10,
+// 				wobbleFreqHz: 1.3,
+// 				vignetteStrength: 0.35,
+// 				kaleidoAt: 0.7,
+// 				trailAlpha: 0.0,
+// 				loop: false
+// 			});
+// 		}
+// } catch(_) { /* ignore in constrained runtimes */ }
 
 // Keep canvas/resolution in sync with viewport to avoid stretching and keep tiles square
 window.addEventListener('resize', () => {

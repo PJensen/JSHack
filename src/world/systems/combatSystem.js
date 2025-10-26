@@ -13,6 +13,7 @@ import { CombatStats } from '../components/CombatStats.js';
 import { MeleeAttack } from '../components/MeleeAttack.js';
 import { spawnFloatText, spawnParticleBurst } from './effects/spawner.js';
 import { ftPreset } from './effects/floatTextPresets.js';
+import { Hallucination } from '../components/Hallucination.js';
 
 function rand01(world){
   try { return typeof world.rand === 'function' ? world.rand() : Math.random(); }
@@ -113,6 +114,26 @@ export function combatSystem(world){
       continue;
     }
 
+    // // Additional fumble chance when the attacker is hallucinating: scales with intensity.
+    // // This increases the chance to miss while hallucinating, as requested.
+    // try {
+    //   const h = world.get(attacker, Hallucination);
+    //   if (h){
+    //     const intensity = Math.max(0, Math.min(1, (typeof h.intensity === 'number' ? h.intensity : (typeof h.strength === 'number' ? h.strength : 0))));
+    //     const extraMissAtFull = 0.35; // 35% extra miss chance at full intensity (tunable)
+    //     if (intensity > 0 && hit.d20 !== 20){
+    //       const p = intensity * extraMissAtFull;
+    //       if (rand01(world) < p){
+    //         // Treat as miss due to hallucination
+    //         try { spawnFloatText(world, tPos.x, tPos.y, ftPreset('Pop', { text: 'miss', color: '#aa8' })); } catch(_){ }
+    //         try { world.emit('combat:miss', { attacker, target, reason: 'hallucination', d20: hit.d20, total: hit.total, targetAC: hit.targetAC }); } catch(_){ }
+    //         try { world.destroy(eid); } catch(_){ }
+    //         continue;
+    //       }
+    //     }
+    //   }
+    // } catch(_){ }
+
     const mitigation = computeDefenseMitigation(world, target);
     const finalDmg = Math.max(1, hit.damage - mitigation);
 
@@ -143,6 +164,14 @@ export function combatSystem(world){
         targetHp: newHp
       });
     } catch(_){ }
+
+    // Extensible on-hit callback: if the attacker has Monster.onHit, invoke it
+    try {
+      const mon = world.get(attacker, Monster);
+      if (mon && typeof mon.onHit === 'function'){
+        mon.onHit(world, attacker, target);
+      }
+    } catch(_){ /* ignore proc application errors */ }
 
     if (newHp <= 0){
       applyDeath(world, target);

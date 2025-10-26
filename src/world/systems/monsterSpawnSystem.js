@@ -71,7 +71,8 @@ export function monsterSpawnSystem(world){
         Glyph: { char: (def.glyph || def.name?.[0] || 'm'), fg: def.fg || '#f55' },
         Health: { maxHp: def.maxHp ?? 6, hp: def.maxHp ?? 6 },
         CombatStats: { atkMin, atkMax, defense: def.defense|0 },
-        Monster: { ai: 'basic', visionRange: 12 }
+        // Pass through callback so combat can invoke on successful hits
+        Monster: { ai: 'basic', visionRange: 12, name: def.name, onHit: def.onHit || null }
       });
 
       placed++;

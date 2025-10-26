@@ -22,16 +22,18 @@ export const FountainArchetype = defineArchetype('Fountain',
     burstCount: p?.Emitter?.burstCount ?? 0,
 
     angle: p?.Emitter?.angle ?? (-Math.PI / 2),
-    spread: p?.Emitter?.spread ?? (Math.PI / 12),
-    speed: p?.Emitter?.speed ?? 1.0,
-    speedJitter: p?.Emitter?.speedJitter ?? 0.35,
+    // Wider fan for fountain spray
+    spread: p?.Emitter?.spread ?? (Math.PI / 6),
+    speed: p?.Emitter?.speed ?? 1.15,
+    speedJitter: p?.Emitter?.speedJitter ?? 0.3,
     vx: p?.Emitter?.vx ?? 0,
     vy: p?.Emitter?.vy ?? 0,
     ax: p?.Emitter?.ax ?? 0,
-    ay: p?.Emitter?.ay ?? -0.5,              // upward acceleration (tile coords y+ down => negative is up)
+    // Gravity: positive is downward in our coord system; combine with upward initial velocity for an arc
+    ay: p?.Emitter?.ay ?? 1.5,
 
     life: p?.Emitter?.life ?? 0.9,
-    lifeJitter: p?.Emitter?.lifeJitter ?? 0.25,
+    lifeJitter: p?.Emitter?.lifeJitter ?? 0.3,
     size: p?.Emitter?.size ?? 0.6,
     sizeEnd: p?.Emitter?.sizeEnd ?? 0.2,
     color: p?.Emitter?.color ?? '#66ccffff',  // cool blue with alpha

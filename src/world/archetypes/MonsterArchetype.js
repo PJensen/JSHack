@@ -24,7 +24,16 @@ export const MonsterArchetype = defineArchetype('Monster',
     bg:   p?.Glyph?.bg   ?? null,
     color:p?.Glyph?.color?? (p?.Glyph?.fg ?? '#f55')
   })],
-  [Monster,  (p) => ({ ai: p?.Monster?.ai ?? 'basic', visionRange: p?.Monster?.visionRange ?? 12, nextActAt: p?.Monster?.nextActAt ?? 0 })],
+  // Preserve any extra fields passed via spawn (e.g., name, onHit callbacks)
+  [Monster,  (p) => {
+    const M = p?.Monster || {};
+    return {
+      ...M,
+      ai: M.ai ?? 'basic',
+      visionRange: M.visionRange ?? 12,
+      nextActAt: M.nextActAt ?? 0
+    };
+  }],
   [AI,       (p) => ({ type: p?.AI?.type ?? 'basic' })],
   [Health,   (p) => ({ maxHp: p?.Health?.maxHp ?? 6, hp: p?.Health?.hp ?? (p?.Health?.maxHp ?? 6) })],
   [CombatStats, (p) => ({
