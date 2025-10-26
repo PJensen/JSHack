@@ -2,91 +2,104 @@ import { Effect } from '../../components/Effect.js';
 import { createParticleSystem } from './particleSystem.js';
 import { getRenderContext } from '../render/utils.js';
 import { RenderContext } from '../../components/RenderContext.js';
+import { ftPreset } from './floatTextPresets.js';
 
 // Convenience helper to spawn common effects
-export function spawnFloatText(world, x, y, text, opts={}){
+export function spawnFloatText(world, x, y, a, b = {}){
+  // Supports both legacy signature (x,y,text,opts) and new spec (x,y,spec)
+  const spec = (typeof a === 'string' || typeof a === 'number')
+    ? { ...(b || {}), text: String(a) }
+    : (a || {});
+
   // Safety caps to avoid unbounded effect entity creation (OOM)
   const MAX_FLOAT_TEXT = 512; // max simultaneous float text effects
   const MAX_TOTAL_EFFECTS = 2048; // safety cap for all effects
   try{
     const activeFloat = world.query(Effect, { where: (eff) => eff && eff.type === 'float_text' }).count();
     if (activeFloat >= MAX_FLOAT_TEXT){
-      // drop low-priority float texts when we're at capacity
-      if (opts && opts.batch) return null;
-      // otherwise skip silently
+      if (spec && spec.batch) return null; // drop low-priority float texts when we're at capacity
       return null;
     }
     const totalEff = world.query(Effect).count();
     if (totalEff >= MAX_TOTAL_EFFECTS){
-      // avoid creating more global effects when we're overloaded
       return null;
     }
-  } catch(e){ /* if counting fails, fall through and attempt to spawn */ }
+  } catch(_) { /* ignore count errors */ }
 
   const e = world.create();
-  const life = opts.life || 0.9;
-  const scaleBase = (opts.scaleBase !== undefined) ? opts.scaleBase : (opts.crit ? 1.3 : 1.0);
-  const dmg = (typeof opts.dmg === 'number' && isFinite(opts.dmg)) ? Math.max(0, opts.dmg) : 0;
-  const dmgScaleBase = (opts.dmgScaleBase !== undefined) ? opts.dmgScaleBase : 0.7;
-  const dmgScalePer  = (opts.dmgScalePer  !== undefined) ? opts.dmgScalePer  : (1/10);
-  const dmgScaleMax  = (opts.dmgScaleMax  !== undefined) ? opts.dmgScaleMax  : 2.2;
-  const magScale = dmg ? Math.min(dmgScaleMax, dmgScaleBase + (dmg * dmgScalePer)) : 1;
-  const scaleStart = (opts.scaleStart !== undefined) ? opts.scaleStart : (scaleBase * magScale);
-  const scaleEnd   = (opts.scaleEnd   !== undefined) ? opts.scaleEnd   : (0.75 * scaleBase);
-  // Compute initial motion
-  const rng = (typeof world.rand === 'function') ? world.rand.bind(world) : Math.random;
-  let vx = 0, vy = 0;
-  if (typeof opts.vx === 'number' || typeof opts.vy === 'number'){
-    vx = opts.vx || 0; vy = opts.vy || 0;
-  } else {
-    const preset = (opts.motionPreset || (opts.motion && opts.motion.preset)) || (dmg > 0 ? 'damage' : 'gentle');
-    if (preset === 'damage'){
-      const angleCenterRad = (opts.angleCenterRad ?? opts.motion?.angleCenterRad ?? (-Math.PI/2));
-      const angleSpreadRad = (opts.angleSpreadRad ?? opts.motion?.angleSpreadRad ?? (Math.PI/3));
-      const speedBase      = (opts.speedBase      ?? opts.motion?.speedBase      ?? 0.6);
-      const speedPerSqrtDmg= (opts.speedPerSqrtDmg?? opts.motion?.speedPerSqrtDmg?? 0.18);
-      const speedMax       = (opts.speedMax       ?? opts.motion?.speedMax       ?? 3.0);
-      const angle = angleCenterRad + ((rng()*2 - 1) * angleSpreadRad);
-      const speed = Math.max(0, Math.min(speedMax, speedBase + Math.sqrt(dmg) * speedPerSqrtDmg));
-      vx = Math.cos(angle) * speed;
-      vy = Math.sin(angle) * speed;
-    } else {
-      const gentleVxMin  = (opts.gentleVxMin  ?? opts.motion?.gentleVxMin  ?? -0.2);
-      const gentleVxMax  = (opts.gentleVxMax  ?? opts.motion?.gentleVxMax  ?? 0.2);
-      const gentleVyBase = (opts.gentleVyBase ?? opts.motion?.gentleVyBase ?? -0.8);
-      const gentleVyJitter=(opts.gentleVyJitter?? opts.motion?.gentleVyJitter?? 0.3);
-      vx = (rng() * (gentleVxMax - gentleVxMin)) + gentleVxMin;
-      vy = (gentleVyBase - (rng() * gentleVyJitter));
-    }
-  }
-  const ax = (opts.ax ?? opts.motion?.ax ?? 0);
-  const ay = (opts.ay ?? opts.motion?.ay ?? -0.45);
-  const dragPerFrame = (opts.dragPerFrame ?? opts.motion?.dragPerFrame);
+
+  // Map new spec to internal parameters
+  const text = String(spec.text ?? '');
+  const color = spec.color || '#ffffff';
+  const life = (typeof spec.life === 'number') ? spec.life : 1.0;
+  const size = clamp((typeof spec.size === 'number') ? spec.size : 1.0, 0, 2);
+  const energy = clamp((typeof spec.energy === 'number') ? spec.energy : 0.2, 0, 1);
+  const rise = clamp((typeof spec.rise === 'number') ? spec.rise : 1.0, -1, 2);
+  const reduceMotion = !!spec.reduceMotion;
+  const seed = (spec.seed == null) ? null : Number(spec.seed);
+
+  // Scale and overshoot mapping (size controls both)
+  const baseScale = 1.0 + (size - 1.0) * 0.4; // gentle size mapping
+  const overshoot = (reduceMotion ? 0.05 : 0.15) + size * (reduceMotion ? 0.02 : 0.08);
+  const scaleStart = (spec.scaleStart !== undefined) ? spec.scaleStart : (baseScale + overshoot);
+  const scaleEnd   = (spec.scaleEnd   !== undefined) ? spec.scaleEnd   : (baseScale);
+
+  // Motion mapping (energy controls aggression: speed, jitter)
+  const r = rand01(world, seed);
+  const speed = reduceMotion ? 0.05 : lerp(0.08, 0.9, energy);
+  const angle = (r() * Math.PI * 0.3) - (Math.PI * 0.15); // slight sideways variation
+  let vx = Math.cos(angle) * speed * 0.5 * (r() * 0.6 + 0.7);
+  let vy = -Math.abs(Math.sin(angle) * speed) - (0.25 + energy * 0.55) * rise;
+  if (reduceMotion){ vx *= 0.3; vy *= 0.3; }
+  // Upward acceleration to maintain drift; small drag tuned by energy
+  const ax = 0;
+  const ay = -(0.10 + 0.20 * rise) * (reduceMotion ? 0.3 : 1.0);
+  const dragPerFrame = reduceMotion ? 0.995 : (0.992 - energy * 0.02);
+
+  // Jitter parameters for renderer-side readable motion
+  const jitterAmpPx = reduceMotion ? 0 : (energy * 4 * (0.8 + size * 0.4));
+  const j = seededJitter(seed, r);
+
   world.add(e, Effect, {
     type: 'float_text',
     ttl: life,
     ttlMax: life,
     pos: { x, y },
     data: {
-      text: String(text),
-      color: opts.color || '#ffffff',
-  vx,
-  vy,
-  ax,
-  ay,
-  ...(typeof dragPerFrame === 'number' ? { dragPerFrame } : {}),
-  motionPreset: (opts.motionPreset || opts.motion?.preset) || (dmg > 0 ? 'damage' : 'gentle'),
+      text,
+      color,
+      vx, vy, ax, ay,
+      dragPerFrame,
       scaleStart,
       scaleEnd,
-      batch: opts.batch || false,
-      value: (/^[-+]?\d+$/.test(String(text)) ? parseInt(text,10) : null),
-      sign: (String(text).startsWith('-')? -1 : 1),
+      jitterAmpPx,
+      jitter: j,
       justSpawned: true
     },
-    layer: opts.layer || 'top',
-    priority: opts.priority || 0
+    layer: spec.layer || 'top',
+    priority: spec.priority || 0
   });
   return e;
+}
+
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function lerp(a, b, t){ return a + (b - a) * t; }
+function rand01(world, seed){
+  if (seed == null){
+    const f = (typeof world.rand === 'function') ? world.rand.bind(world) : Math.random;
+    return () => f();
+  }
+  // Deterministic PRNG (LCG)
+  let s = (seed >>> 0) || 1;
+  return () => { s = (1664525 * s + 1013904223) >>> 0; return (s & 0xfffffff) / 0xfffffff; };
+}
+function seededJitter(seed, r){
+  const rand = r || (() => Math.random());
+  const phaseX = rand() * Math.PI * 2;
+  const phaseY = rand() * Math.PI * 2;
+  const freqX = 3 + rand() * 3; // 3..6 Hz relative to life progression
+  const freqY = 2 + rand() * 2; // 2..4 Hz
+  return { phaseX, phaseY, freqX, freqY };
 }
 
 // Spawn a particle burst using the particle system attached to world.

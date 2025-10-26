@@ -12,6 +12,7 @@ import { Collider } from '../components/Collider.js';
 import { CombatStats } from '../components/CombatStats.js';
 import { MeleeAttack } from '../components/MeleeAttack.js';
 import { spawnFloatText, spawnParticleBurst } from './effects/spawner.js';
+import { ftPreset } from './effects/floatTextPresets.js';
 
 function rand01(world){
   try { return typeof world.rand === 'function' ? world.rand() : Math.random(); }
@@ -90,7 +91,8 @@ export function combatSystem(world){
     // Spawn float text for damage
     try {
       const color = isCrit ? '#ffd1a1' : '#ff6e6e';
-      spawnFloatText(world, tPos.x, tPos.y, `-${finalDmg}`, { color, dmg: finalDmg, crit: isCrit, batch: true });
+      const presetName = isCrit ? 'Shatter' : 'Feather';
+      spawnFloatText(world, tPos.x, tPos.y, ftPreset(presetName, { text: `-${finalDmg}`, color }));
       // Optional subtle particles on crit
       if (isCrit){
         spawnParticleBurst(world, { x: tPos.x, y: tPos.y, count: 12, speed: 0.8, life: 0.4, color: '#ffa07a', size: 0.8, sizeEnd: 0.1, ay: -0.4 });

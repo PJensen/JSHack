@@ -211,6 +211,7 @@ import { effectMotionSystem } from './world/systems/effects/effectMotionSystem.j
 import { emitterSystem } from './world/systems/effects/emitterSystem.js';
 import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem.js';
 import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spawner.js';
+import { ftPreset } from './world/systems/effects/floatTextPresets.js';
 import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
 import { movementSystem } from './world/systems/movementSystem.js';
 import { combatSystem } from './world/systems/combatSystem.js';
@@ -390,7 +391,7 @@ try {
 		const jitterPx = 6; // ~6px radius jitter
 		const dxTiles = ((rx * 2 - 1) * jitterPx) / CELL_W;
 		const dyTiles = (((ry * 2 - 1) * jitterPx) - 4) / CELL_H; // slight bias upward
-		spawnFloatText(world, x + dxTiles, y + dyTiles, `+${ev.amount}`, { color: '#ffd700', ttl: 1.5, batch: true });
+		spawnFloatText(world, x + dxTiles, y + dyTiles, ftPreset('Pop', { text: `+${ev.amount}`, color: '#ffd700' }));
 
 		// Dumb nightly delight: when gold is picked up, spawn another gold in a random location.
 		try {
@@ -557,8 +558,8 @@ startLoop(world);
 
 // Demo: spawn some float text near player so we can immediately see effects
 try {
-	spawnFloatText(world, 2, 2, '-5', { color:'#9ff', dmg:5, batch:true });
-	spawnFloatText(world, 2, 3, '+8', { color:'#fff59e', dmg:8, crit:true });
+	spawnFloatText(world, 2, 2, ftPreset('Punch', { text: '-5', color:'#9ff' }));
+	spawnFloatText(world, 2, 3, ftPreset('Pulse', { text: '+8', color:'#fff59e' }));
 } catch(e) { /* ignore in non-demo contexts */ }
 
 // // Demo: attach an initial Hallucination to the player so the effect is visible

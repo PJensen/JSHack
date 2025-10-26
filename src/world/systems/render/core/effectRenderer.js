@@ -45,11 +45,21 @@ export function effectRenderSystem(world) {
       const scaleEnd = (d.scaleEnd !== undefined) ? d.scaleEnd : 0.75;
       const scale = scaleStart + (scaleEnd - scaleStart) * t;
 
+      // Subtle readable jitter based on preset energy; decays with life
+      const jAmp = Math.max(0, (d.jitterAmpPx || 0) * lin);
+      let jx = 0, jy = 0;
+      if (jAmp > 0 && d.jitter) {
+        const jp = d.jitter;
+        const w = Math.PI * 2;
+        jx = Math.sin((jp.phaseX || 0) + t * w * (jp.freqX || 3)) * jAmp;
+        jy = Math.cos((jp.phaseY || 0) + t * w * (jp.freqY || 2.5)) * jAmp;
+      }
+
       const fontPx = Math.max(10, Math.round((cellH - 8) * scale * 1.5));
       ctx.globalAlpha = alpha;
       ctx.font = `${fontPx}px monospace`;
       ctx.fillStyle = d.color || '#ffffff';
-      ctx.fillText(d.text || '', sx, sy);
+      ctx.fillText(d.text || '', sx + jx, sy + jy);
       ctx.globalAlpha = 1.0;
     }
   }
