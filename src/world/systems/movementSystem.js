@@ -10,6 +10,9 @@ import { MapView } from '../components/MapView.js';
 import { Monster } from '../components/Monster.js';
 import { Health } from '../components/Health.js';
 import { MeleeAttack } from '../components/MeleeAttack.js';
+import { Door } from '../components/Door.js';
+import { Glyph } from '../components/Glyph.js';
+import { Interactable } from '../components/Interactable.js';
 
 export function movementSystem(world) {
   // Process all entities with Position and InputIntent
@@ -20,10 +23,39 @@ export function movementSystem(world) {
       const ny = pos.y + intent.dy;
 
       // Check for blocking at destination
-      // Prefer MapView tile data (walkable) from the designated MapView; fallback to glyphs/entities
+      // First: handle Door ECS entities at the destination (consume turn to open if closed)
+      // Then: Prefer MapView tile data for general walkability; fallback to glyphs/entities
   let blocked = false;
   let blockedByEntity = null;
       outer: {
+        // Quick door check via ECS entities
+        for (const [did, dpos, d] of world.query(Position, Door)){
+          if ((dpos.x|0) === (nx|0) && (dpos.y|0) === (ny|0)){
+            // Found a door entity at destination
+            if (d && d.state !== 'open'){
+              // Open the door: update Door, Collider, Glyph and MapView tile (if present)
+              try { world.set(did, Door, { state: 'open' }); } catch(_){}
+              try { world.set(did, Collider, { solid: false, blocksSight: false }); } catch(_){}
+              try { world.set(did, Glyph, { char: '/', fg: '#8b4513', color: '#8b4513' }); } catch(_){}
+              // Sync MapView tile representation for renderers depending on tiles
+              try{
+                let mv = null; const mvId = world.mapViewId; if (mvId) mv = world.get(mvId, MapView);
+                if (!mv){ for (const [_id,_mv] of world.query(MapView)){ mv = _mv; break; } }
+                const tileAt = mv && mv.tileAt;
+                if (typeof tileAt === 'function'){
+                  const t = tileAt(nx, ny);
+                  if (t){ t.state = 'open'; t.walkable = true; t.blocksLight = false; t.glyph = '/'; }
+                }
+              }catch(_){}
+              blocked = true; // consume this turn to open
+              break outer;
+            }
+            // If already open, ensure it doesn't block
+            try{ const c = world.get(did, Collider); if (c){ c.solid = false; c.blocksSight = false; } }catch(_){}
+            break; // continue into tile checks (should pass walkable)
+          }
+        }
+
         // Select primary MapView if registered
         let mv = null;
         try {
@@ -41,13 +73,12 @@ export function movementSystem(world) {
             const tile = tileAt(nx, ny);
             // Out-of-bounds or missing tile: treat as blocked (void)
             if (!tile) { blocked = true; break outer; }
-            // If this is a closed door, open it in-place and proceed
+            // If this is a closed door tile but no door entity was found, open the tile (legacy fallback)
             if (tile.type === 'door' && (tile.state !== 'open')) {
-              // Open the door, but do not move through on the same turn
               tile.state = 'open';
               tile.walkable = true;
               tile.blocksLight = false;
-              tile.glyph = '/'; // rendering reads glyph; logic reads type/state
+              tile.glyph = '/';
               blocked = true; // consume the turn to open
               break outer;
             }

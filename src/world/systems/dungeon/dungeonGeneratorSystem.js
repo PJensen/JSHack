@@ -12,6 +12,7 @@ import { CONFIG } from '../../../config.js';
 import { createDeferred } from '../../../lib/ecs/archetype.js';
 import { TorchArchetype } from '../../archetypes/TorchArchetype.js';
 import { TargetDummyArchetype } from '../../archetypes/TargetDummyArchetype.js';
+import { DoorArchetype } from '../../archetypes/DoorArchetype.js';
 
 // Glyph mapping (minimal set requested)
 const WALL_GLYPH = CONFIG.wallGlyph || '█';
@@ -511,6 +512,29 @@ function generateDungeonLevel(rng, width, height){
 
     // Doors pass
     placeDoors(map);
+
+    // After doors are placed on the tile map, instantiate ECS Door entities at matching positions
+    try{
+        for (let y=1; y<height-1; y++){
+            for (let x=1; x<width-1; x++){
+                const t = map.t[y][x];
+                if (!t || t.type !== 'door') continue;
+                // Infer orientation from neighboring walkables: vertical if up/down walkable, else horizontal
+                const up = map.t[y-1][x], down = map.t[y+1][x];
+                const left = map.t[y][x-1], right = map.t[y][x+1];
+                const upWalk = !!(up && up.walkable), downWalk = !!(down && down.walkable);
+                const leftWalk = !!(left && left.walkable), rightWalk = !!(right && right.walkable);
+                const orientation = (upWalk && downWalk && !leftWalk && !rightWalk) ? 'v'
+                                   : (!upWalk && !downWalk && leftWalk && rightWalk) ? 'h'
+                                   : null;
+                createDeferred(world, DoorArchetype, {
+                    Position: { x, y },
+                    Door: { state: t.state === 'open' ? 'open' : 'closed', orientation },
+                    // Collider/Glyph default to closed door; MapView still holds the tile glyph for rendering
+                });
+            }
+        }
+    }catch(_){ /* door entity creation should not crash generation */ }
 
     // Sprinkle terrain variants inside rooms/corridors
     for (let y=2; y<height-2; y++){

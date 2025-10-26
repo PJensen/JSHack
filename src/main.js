@@ -80,7 +80,7 @@ try { backCtx.imageSmoothingEnabled = false; } catch(_) {}
 	backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 // --- Create ECS world ---
-const world = new World({ seed: 0xC0FFEE });
+const world = new World({ seed: 0xC1FFEE });
 world.storeMode = 'map'; // use Map storage for flexibility
 
 
