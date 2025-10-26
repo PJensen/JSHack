@@ -15,19 +15,31 @@ import { Glyph } from '../components/Glyph.js';
 import { Interactable } from '../components/Interactable.js';
 
 export function movementSystem(world) {
+  // To prevent same-tick stacking when component updates are deferred until post-tick,
+  // reserve destinations we approve this frame. Monsters cannot enter tiles already
+  // reserved by other monsters in this system run.
+  const reservedMonster = new Set(); // keys: "x,y"
+
   // Process all entities with Position and InputIntent
   for (const [id, pos, intent] of world.query(Position, InputIntent)) {
     // If there's movement intent, update position
     if (intent.dx !== 0 || intent.dy !== 0) {
       const nx = pos.x + intent.dx;
       const ny = pos.y + intent.dy;
+      const destKey = nx + ',' + ny;
 
       // Check for blocking at destination
       // First: handle Door ECS entities at the destination (consume turn to open if closed)
       // Then: Prefer MapView tile data for general walkability; fallback to glyphs/entities
   let blocked = false;
   let blockedByEntity = null;
+      const moverIsMonster = !!world.get(id, Monster);
       outer: {
+        // Same-tick reservation check: monsters cannot target an already claimed tile
+        if (!!world.get(id, Monster) && reservedMonster.has(destKey)) {
+          blocked = true; // someone already claimed this tile this tick
+          break outer;
+        }
         // Quick door check via ECS entities
         for (const [did, dpos, d] of world.query(Position, Door)){
           if ((dpos.x|0) === (nx|0) && (dpos.y|0) === (ny|0)){
@@ -88,6 +100,8 @@ export function movementSystem(world) {
               if (bid === id) continue;
               if (bpos.x === nx && bpos.y === ny) {
                 const c = world.get(bid, Collider);
+                // Monsters cannot stack: any monster blocks other monsters regardless of Collider
+                if (moverIsMonster && !!world.get(bid, Monster)) { blocked = true; blockedByEntity = bid; break; }
                 if (c && c.solid === true) { blocked = true; blockedByEntity = bid; break; }
                 const t = world.get(bid, Tile);
                 if (t && t.walkable === false) { blocked = true; break; }
@@ -111,6 +125,8 @@ export function movementSystem(world) {
               if (bid === id) continue;
               if (bpos.x === nx && bpos.y === ny) {
                 const c = world.get(bid, Collider);
+                // Monsters cannot stack: any monster blocks other monsters regardless of Collider
+                if (moverIsMonster && !!world.get(bid, Monster)) { blocked = true; blockedByEntity = bid; break; }
                 if (c && c.solid === true) { blocked = true; blockedByEntity = bid; break; }
                 const t = world.get(bid, Tile);
                 if (t && t.walkable === false) { blocked = true; break; }
@@ -130,6 +146,8 @@ export function movementSystem(world) {
             const t = world.get(bid, Tile);
             if (t && t.walkable === false) { blocked = true; break; }
             const c = world.get(bid, Collider);
+            // Monsters cannot stack: any monster blocks other monsters regardless of Collider
+            if (moverIsMonster && !!world.get(bid, Monster)) { blocked = true; blockedByEntity = bid; break; }
             if (c && c.solid === true) { blocked = true; blockedByEntity = bid; break; }
             const o = world.get(bid, Occluder);
             if (o && (o.opacity ?? 1) > 0.5) { blocked = true; break; }
@@ -139,6 +157,8 @@ export function movementSystem(world) {
 
       if (!blocked) {
         world.set(id, Position, { x: nx, y: ny });
+        // Record reservation so later monsters in this pass can't claim same tile
+        if (moverIsMonster) reservedMonster.add(destKey);
       } else if (blockedByEntity != null) {
         // If mover is Player or Monster and target is attackable, enqueue a melee attack
         const isPlayer = !!world.get(id, Player);
