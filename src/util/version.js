@@ -9,7 +9,7 @@ export async function loadVersion() {
     window.VERSION = 'dev';
   }
   // Optional: uncomment to see version on startup
-  // console.log('Loaded version:', window.VERSION);
+  console.log('Loaded version:', window.VERSION);
 }
 
 // Start loading the version but do not use top-level await.

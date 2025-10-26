@@ -19,29 +19,51 @@ function rand01(world){
   catch(_) { return Math.random(); }
 }
 
-function computeAttackRoll(world, attackerId){
+function rollD20(world){ return 1 + ((rand01(world) * 20) | 0); }
+
+function computeHitAndDamage(world, attackerId, targetId){
   // Defaults
-  let atkMin = 3, atkMax = 6, critChance = 0.1, critMult = 1.5;
-  // Pull CombatStats if present
-  const cs = world.get(attackerId, CombatStats);
-  if (cs){
-    if (typeof cs.atkMin === 'number') atkMin = cs.atkMin;
-    if (typeof cs.atkMax === 'number') atkMax = cs.atkMax;
-    if (typeof cs.critChance === 'number') critChance = cs.critChance;
-    if (typeof cs.critMult === 'number') critMult = cs.critMult;
+  let atkMin = 3, atkMax = 6, attackBonus = 0, critChance = 0.1, critMult = 1.5;
+  let targetAC = 10;
+  // Pull attacker stats
+  const a = world.get(attackerId, CombatStats);
+  if (a){
+    if (typeof a.atkMin === 'number') atkMin = a.atkMin;
+    if (typeof a.atkMax === 'number') atkMax = a.atkMax;
+    if (typeof a.attackBonus === 'number') attackBonus = a.attackBonus;
+    if (typeof a.critChance === 'number') critChance = a.critChance;
+    if (typeof a.critMult === 'number') critMult = a.critMult;
   }
-  // Add equipment-derived attack bonuses
-  const eq = world.get(attackerId, Equipment);
-  if (eq && typeof eq.attackDerived === 'number'){
-    atkMin += eq.attackDerived|0;
-    atkMax += eq.attackDerived|0;
+  // Pull defender stats
+  const d = world.get(targetId, CombatStats);
+  if (d){
+    if (typeof d.armorClass === 'number') targetAC = d.armorClass;
+  }
+  // Equipment-derived adjustments
+  const eqA = world.get(attackerId, Equipment);
+  if (eqA && typeof eqA.attackDerived === 'number'){
+    atkMin += eqA.attackDerived|0;
+    atkMax += eqA.attackDerived|0;
   }
   // Ensure sane bounds
   if (atkMax < atkMin) atkMax = atkMin;
+
+  const d20 = rollD20(world);
+  const natural = d20;
+  const total = d20 + (attackBonus|0);
+  // Critical: natural 20 always hits and crits; natural 1 always misses
+  let hit = false, crit = false;
+  if (natural === 1) { hit = false; }
+  else if (natural === 20) { hit = true; crit = true; }
+  else { hit = total >= (targetAC|0); }
+
+  if (!hit) return { hit:false, crit:false, damage:0, d20:natural, total, targetAC };
+
   const base = atkMin + ((rand01(world) * (atkMax - atkMin + 1)) | 0);
-  const isCrit = rand01(world) < Math.max(0, Math.min(1, critChance));
-  const dmg = Math.max(0, Math.floor(isCrit ? base * critMult : base));
-  return { dmg, isCrit };
+  const rolledCrit = !crit && (rand01(world) < Math.max(0, Math.min(1, critChance)));
+  crit = crit || rolledCrit;
+  const dmg = Math.max(0, Math.floor(crit ? base * critMult : base));
+  return { hit:true, crit, damage:dmg, d20:natural, total, targetAC };
 }
 
 function computeDefenseMitigation(world, targetId){
@@ -80,9 +102,19 @@ export function combatSystem(world){
     if (!tHealth){ try{ world.destroy(eid); }catch(_){ } continue; }
     const tPos = world.get(target, Position) || { x: atk.x ?? 0, y: atk.y ?? 0 };
 
-    const { dmg, isCrit } = computeAttackRoll(world, attacker);
+    const hit = computeHitAndDamage(world, attacker, target);
+    if (!hit.hit){
+      // Miss feedback (subtle)
+      try {
+        spawnFloatText(world, tPos.x, tPos.y, ftPreset('Pop', { text: 'miss', color: '#aaa' }));
+      } catch(_){}
+      try{ world.emit('combat:miss', { attacker, target, d20: hit.d20, total: hit.total, targetAC: hit.targetAC }); }catch(_){ }
+      try{ world.destroy(eid); }catch(_){ }
+      continue;
+    }
+
     const mitigation = computeDefenseMitigation(world, target);
-    const finalDmg = Math.max(1, dmg - mitigation);
+    const finalDmg = Math.max(1, hit.damage - mitigation);
 
     // Apply damage
     const newHp = Math.max(0, (tHealth.hp|0) - finalDmg);
@@ -90,9 +122,9 @@ export function combatSystem(world){
 
     // Spawn float text for damage
     try {
-      const color = isCrit ? '#ff0000ff' : '#981e1eff';
-      const presetName = isCrit ? 'Arc' : 'Arc';
-      const value = isCrit ? finalDmg * 2 : finalDmg;
+      const color = hit.crit ? '#ff0000ff' : '#981e1eff';
+      const presetName = hit.crit ? 'Arc' : 'Arc';
+      const value = hit.crit ? finalDmg * 2 : finalDmg;
       // Provide numeric value so base size scales with damage (spawner applies diminishing returns)
       spawnFloatText(world, tPos.x, tPos.y, 
         ftPreset(presetName, { text: `-${finalDmg}`, color, value: value }));
@@ -107,7 +139,7 @@ export function combatSystem(world){
       world.emit('combat:hit', {
         attacker, target,
         damage: finalDmg,
-        crit: isCrit,
+        crit: hit.crit,
         targetHp: newHp
       });
     } catch(_){ }

@@ -13,8 +13,16 @@ import { MeleeAttack } from '../components/MeleeAttack.js';
 import { Door } from '../components/Door.js';
 import { Glyph } from '../components/Glyph.js';
 import { Interactable } from '../components/Interactable.js';
+import { TurnState } from '../components/TurnState.js';
 
 export function movementSystem(world) {
+  // Only process movers matching the active phase
+  let phase = 'player';
+  try {
+    const tid = world.turnStateId | 0;
+    const ts = tid ? world.get(tid, TurnState) : null;
+    if (ts && ts.phase) phase = ts.phase;
+  } catch(_) { phase = 'player'; }
   // To prevent same-tick stacking when component updates are deferred until post-tick,
   // reserve destinations we approve this frame. Monsters cannot enter tiles already
   // reserved by other monsters in this system run.
@@ -22,6 +30,9 @@ export function movementSystem(world) {
 
   // Process all entities with Position and InputIntent
   for (const [id, pos, intent] of world.query(Position, InputIntent)) {
+    // Gate by phase: player moves only on player phase; monsters only on monsters phase
+    if (phase === 'player' && !world.get(id, Player)) { continue; }
+    if (phase === 'monsters' && !world.get(id, Monster)) { continue; }
     // If there's movement intent, update position
     if (intent.dx !== 0 || intent.dy !== 0) {
       const nx = pos.x + intent.dx;
@@ -59,6 +70,8 @@ export function movementSystem(world) {
                   if (t){ t.state = 'open'; t.walkable = true; t.blocksLight = false; t.glyph = '/'; }
                 }
               }catch(_){}
+              // Opening a door consumes a turn
+              try { world.emit('turn:action', { actor: id, kind: 'open-door', x: nx, y: ny }); } catch(_) {}
               blocked = true; // consume this turn to open
               break outer;
             }
@@ -91,6 +104,7 @@ export function movementSystem(world) {
               tile.walkable = true;
               tile.blocksLight = false;
               tile.glyph = '/';
+              try { world.emit('turn:action', { actor: id, kind: 'open-door', x: nx, y: ny }); } catch(_) {}
               blocked = true; // consume the turn to open
               break outer;
             }
@@ -157,6 +171,8 @@ export function movementSystem(world) {
 
       if (!blocked) {
         world.set(id, Position, { x: nx, y: ny });
+        // Emit a turn action for the mover (consumes one action)
+        try { world.emit('turn:action', { actor: id, kind: 'move', x: nx, y: ny }); } catch(_) {}
         // Record reservation so later monsters in this pass can't claim same tile
         if (moverIsMonster) reservedMonster.add(destKey);
       } else if (blockedByEntity != null) {
@@ -170,6 +186,8 @@ export function movementSystem(world) {
             const atkEnt = world.create();
             world.add(atkEnt, MeleeAttack, { attacker: id, target: blockedByEntity, x: nx, y: ny });
           } catch(_) { /* ignore if creation fails */ }
+          // Emit action when we decide to attack (bump-to-attack)
+          try { world.emit('turn:action', { actor: id, kind: 'attack', target: blockedByEntity, x: nx, y: ny }); } catch(_) {}
         }
       }
       // One-shot movement: clear intent whether or not we moved

@@ -42,6 +42,17 @@ Execute `./build.ps1` to check for errors
 - Archetypes provide prefab-like entity creation.
 - No frameworks, no transpilers, no dependencies.
 
+## Turn and Combat Rules
+
+- Strict turns: player acts, then all monsters act, then back to player; one action per entity per round.
+- Player input is only accepted on the player's turn; monster AI only runs on the monsters' turn.
+- Actions that consume a turn include: moving one tile, opening a door, or initiating a melee attack.
+- Melee attacks use DnD-like resolution:
+	- Roll d20 + attackBonus vs target's armorClass; natural 1 always misses, natural 20 always crits.
+	- On hit, roll damage from atkMin..atkMax; crits multiply damage by critMult.
+	- Optional flat mitigation from defense is applied after damage.
+	- Defaults come from `CombatStats` and can be modified by equipment.
+
 ## Development
 
 - Edit or add modules in `src/` or `world/` to extend the game.

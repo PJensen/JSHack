@@ -228,6 +228,8 @@ import { movementSystem } from './world/systems/movementSystem.js';
 import { combatSystem } from './world/systems/combatSystem.js';
 import { monsterSpawnSystem } from './world/systems/monsterSpawnSystem.js';
 import { monsterAISystem } from './world/systems/monsterAISystem.js';
+import { turnSystem } from './world/systems/turn/turnSystem.js';
+import { TurnState } from './world/components/TurnState.js';
 import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
 import { Dungeon } from './world/components/Dungeon.js';
 import { DungeonLevel } from './world/components/DungeonLevel.js';
@@ -324,6 +326,13 @@ try{
 	const mv = world.create();
 	world.add(mv, MapView, { w: 0, h: 0, glyphAt: null, visibleMask: null, seenMask: null });
 	world.mapViewId = mv;
+}catch(e){ /* ignore */ }
+
+// Pre-create TurnState singleton so systems can gate by phase immediately
+try{
+	const ts = world.create();
+	world.add(ts, TurnState, { phase: 'player', round: 1 });
+	world.turnStateId = ts;
 }catch(e){ /* ignore */ }
 
 // Startup assertion: ensure the RenderContext has a particleSystem instance so renderers can rely on it.
@@ -503,6 +512,9 @@ world.system(dungeonSpawnSystem, 'update');
 world.system(monsterSpawnSystem, 'update');
 // Monster AI: emit intents before movement (but after potential spawns)
 world.system(monsterAISystem, 'update');
+
+// Flip player/monster phases at the end of the frame for clean turns
+world.system(turnSystem, 'late');
 
 // Ensure a Dungeon + DungeonLevel entity exists to trigger generation
 try{

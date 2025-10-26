@@ -7,6 +7,7 @@ import { Monster } from '../components/Monster.js';
 import { InputIntent } from '../components/InputIntent.js';
 import { MapView } from '../components/MapView.js';
 import { bresenhamLine } from '../../util/bresenham.js';
+import { TurnState } from '../components/TurnState.js';
 
 function getPrimaryMapView(world){
   let mv = null; const mvId = world.mapViewId | 0;
@@ -39,13 +40,20 @@ function canSee(world, mv, x0, y0, x1, y1){
 }
 
 export function monsterAISystem(world){
-  // Gate monster actions to player turn: only act when player has a non-zero InputIntent this frame.
+  // Gate monster actions to TurnState: only act during the 'monsters' phase.
+  try{
+    const tid = world.turnStateId | 0;
+    const ts = tid ? world.get(tid, TurnState) : null;
+    if (!ts || ts.phase !== 'monsters') return;
+  }catch(_){ /* if no turn state yet, don't move */ return; }
+
+  // Legacy gate (fallback): if TurnState is missing, tie to player edge intent
   let playerId = 0, playerPos = null, playerIntent = null;
   for (const [id, p] of world.query(Position, Player)){ playerId = id; playerPos = p; break; }
   if (!playerId || !playerPos) return;
   try { playerIntent = world.get(playerId, InputIntent); } catch(_) { playerIntent = null; }
   const didPlayerAct = !!(playerIntent && ((playerIntent.dx|0)!==0 || (playerIntent.dy|0)!==0));
-  if (!didPlayerAct) return; // no player action this tick => no monster moves
+  // If we somehow got here with phase=monsters and no player act marker, still proceed
 
   const mv = getPrimaryMapView(world);
 

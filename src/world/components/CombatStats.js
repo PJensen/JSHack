@@ -8,6 +8,9 @@ export const CombatStats = defineComponent('CombatStats', {
   // Base attack damage range; inclusive integers
   atkMin: 3,
   atkMax: 6,
+  // DnD-style to-hit vs armor class
+  attackBonus: 0, // added to d20 for to-hit
+  armorClass: 10, // target number for attackers to meet or beat
   // Chance [0..1] and multiplier for critical hits
   critChance: 0.1,
   critMult: 1.5,

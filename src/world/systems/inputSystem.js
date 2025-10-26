@@ -3,6 +3,7 @@
 import { Player } from '../components/Player.js';
 import { InputIntent } from '../components/InputIntent.js';
 import { DevState } from '../components/DevState.js';
+import { TurnState } from '../components/TurnState.js';
 
 // Track keys pressed this frame
 const keysPressed = new Set();
@@ -23,7 +24,9 @@ function isMovementKey(key){
     k === '8' || k === '2' || k === '4' || k === '6' ||
     k === '7' || k === '9' || k === '1' || k === '3' ||
     k === 'h' || k === 'j' || k === 'k' || k === 'l' ||
-    k === 'y' || k === 'u' || k === 'b' || k === 'n'
+    k === 'y' || k === 'u' || k === 'b' || k === 'n' ||
+    // Wait/Rest keys: '.' (period) and '5' (numpad center)
+    k === '.' || k === '5'
   );
 }
 
@@ -78,6 +81,19 @@ export function setupInputListeners() {
 }
 
 export function inputSystem(world) {
+  // Only accept input on player's turn
+  let phase = 'player';
+  try{
+    const tid = world.turnStateId | 0;
+    const ts = tid ? world.get(tid, TurnState) : null;
+    if (ts && ts.phase) phase = ts.phase;
+  }catch(_){ phase = 'player'; }
+  if (phase !== 'player') {
+    // Clear edge trigger if any keys were pressed; we only move on our turn
+    lastFrameDevKeys.clear();
+    if (keysPressed.has('f6')) lastFrameDevKeys.add('f6');
+    return;
+  }
   // Handle dev toggle keys (F6, etc.)
   const devKeyPressed = (key) => keysPressed.has(key) && !lastFrameDevKeys.has(key);
   
@@ -114,6 +130,7 @@ export function inputSystem(world) {
     if (keysPressed.has('9')) { dx += 1; dy -= 1; }
     if (keysPressed.has('1')) { dx -= 1; dy += 1; }
     if (keysPressed.has('3')) { dx += 1; dy += 1; }
+  // '5' is wait: handled below when dx=dy=0
     
     // Vi keys (hjkl + yubn for diagonals)
     if (keysPressed.has('k')) dy -= 1;
@@ -140,6 +157,12 @@ export function inputSystem(world) {
       console.log(`Input: dx=${dx}, dy=${dy}`);
       world.set(id, InputIntent, { dx, dy });
       // consume the edge; movementSystem will clear the intent after applying
+      edgeMoveRequested = false;
+      pendingTouch = null;
+    }
+    // Wait/Rest action: edge '.' or '5' with no movement
+    else if (edgeMoveRequested && (dx === 0 && dy === 0) && (keysPressed.has('.') || keysPressed.has('5'))){
+      try { world.emit('turn:action', { actor: id, kind: 'wait' }); } catch(_) {}
       edgeMoveRequested = false;
       pendingTouch = null;
     }
