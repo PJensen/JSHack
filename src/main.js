@@ -189,6 +189,7 @@ import {
 	playerRenderSystem,
 	tileRenderSystem,
 	tileGlyphRenderSystem,
+	wallGeometryRenderSystem,
 	itemRenderSystem,
 		actorRenderSystem,
 	effectRenderSystem,
@@ -265,6 +266,10 @@ world.add(rt, RenderContext, {
 	fovOutsideDim: 0.0,
 	// Dim factor for remembered (seen) tiles when not currently visible
 	fovSeenDim: 0.08,
+	// Wall geometry renderer tuning
+	wallEdgePx: 1,
+	wallFillAlpha: 0.12,
+	wallBaseColor: '#c8c8c8',
 	// Optional blur (in CSS px) for seen-but-not-visible tiles to suggest memory (default 0 for perf)
 	fogSeenBlurPx: 0.0,
 	// Shadow tuning for EntityDropShadowRenderer
@@ -337,8 +342,10 @@ try{
 world.system(tileRenderSystem, 'render');
 // Lighting background pass overlays tiles with tone-mapped light
 world.system(tileLightingRenderSystem, 'render');
-// Draw tile glyphs after lighting so they remain visible
+// Draw tile glyphs after lighting
 world.system(tileGlyphRenderSystem, 'render');
+// Geometry-based wall edges (lit) after glyphs so edges are visible on top
+world.system(wallGeometryRenderSystem, 'render');
 // Add smooth additive glow for lights (soft halos)
 world.system(glowRenderSystem, 'render');
 // Draw per-light drop shadows for entities (beneath glyphs)
@@ -363,6 +370,7 @@ try { setSystemOrder('render', [
 	tileRenderSystem,
 	tileLightingRenderSystem,
 	tileGlyphRenderSystem,
+	wallGeometryRenderSystem,
 	// glowRenderSystem,
 	shadowRenderSystem,
 	itemRenderSystem,
