@@ -242,24 +242,76 @@ function placeWalls(map){
 }
 
 function placeDoors(map){
+    // Heuristic: only place a door where a corridor meets a room (reduce doors at bends/intersections)
+    const isWalk = (x,y)=> map.inBounds(x,y) && !!map.t[y][x] && !!map.t[y][x].walkable;
+    const isFloorGlyph = (x,y)=> map.inBounds(x,y) && map.t[y][x] && map.t[y][x].glyph === GLYPH.FLOOR;
+    const countCardinalWalk = (x,y)=> (isWalk(x, y-1) ? 1:0) + (isWalk(x, y+1) ? 1:0) + (isWalk(x-1, y) ? 1:0) + (isWalk(x+1, y) ? 1:0);
+    const isCorridor = (x,y)=>{
+        // corridor = exactly 2 cardinal walkable and they are opposite
+        const n = isWalk(x, y-1), s = isWalk(x, y+1), w = isWalk(x-1, y), e = isWalk(x+1, y);
+        const cnt = (n?1:0)+(s?1:0)+(w?1:0)+(e?1:0);
+        if (cnt !== 2) return false;
+        return (n && s) || (w && e);
+    };
+    const isRoomTile = (x,y)=>{
+        // room-like = 3 or 4 cardinal walkables, or 2 but not opposite (corner inside a room)
+        const n = isWalk(x, y-1), s = isWalk(x, y+1), w = isWalk(x-1, y), e = isWalk(x+1, y);
+        const cnt = (n?1:0)+(s?1:0)+(w?1:0)+(e?1:0);
+        if (cnt >= 3) return true;
+        if (cnt === 2) return (n && e) || (e && s) || (s && w) || (w && n);
+        return false;
+    };
+
+    // Optional density clamp to avoid pathological cases
+    let placed = 0;
+    const maxDoors = Math.floor((map.w * map.h) * 0.01); // at most 1% of tiles become doors
+
     for (let y=1; y<map.h-1; y++){
         for (let x=1; x<map.w-1; x++){
             const t = map.t[y][x];
             if (t.glyph !== GLYPH.WALL) continue;
+            // Cardinal neighbors
             const up = map.t[y-1][x], down = map.t[y+1][x];
             const left = map.t[y][x-1], right = map.t[y][x+1];
             const upWalk = !!up.walkable, downWalk = !!down.walkable, leftWalk = !!left.walkable, rightWalk = !!right.walkable;
-            const vertPass = upWalk && downWalk && !leftWalk && !rightWalk;
-            const horizPass= leftWalk && rightWalk && !upWalk && !downWalk;
-            if (vertPass || horizPass){
-                const diagWalls =
-                    Number(!(map.t[y-1][x-1].walkable)) + Number(!(map.t[y-1][x+1].walkable)) +
-                    Number(!(map.t[y+1][x-1].walkable)) + Number(!(map.t[y+1][x+1].walkable));
-                if (diagWalls >= 2){
-                    const noAdjDoor = (map.t[y][x-1].glyph!==GLYPH.DOOR && map.t[y][x+1].glyph!==GLYPH.DOOR && map.t[y-1][x].glyph!==GLYPH.DOOR && map.t[y+1][x].glyph!==GLYPH.DOOR);
-                    if (noAdjDoor) map.t[y][x] = makeTile('door');
-                }
+            const vertWall = !leftWalk && !rightWalk && upWalk && downWalk;
+            const horizWall = !upWalk && !downWalk && leftWalk && rightWalk;
+
+            if (!(vertWall || horizWall)) continue;
+
+            // Classify the two opposing walkable sides to ensure corridor-to-room transition
+            let corridorSide = false, roomSide = false;
+            if (vertWall){
+                corridorSide = isCorridor(x, y-1) || isCorridor(x, y+1);
+                roomSide = isRoomTile(x, y-1) || isRoomTile(x, y+1);
+            } else if (horizWall){
+                corridorSide = isCorridor(x-1, y) || isCorridor(x+1, y);
+                roomSide = isRoomTile(x-1, y) || isRoomTile(x+1, y);
             }
+            if (!(corridorSide && roomSide)) continue;
+
+            // Prefer placing where the adjacent walkable cells are plain floors (avoid chaining via newly placed doors)
+            if (vertWall){
+                if (!isFloorGlyph(x, y-1) && !isFloorGlyph(x, y+1)) continue;
+            } else {
+                if (!isFloorGlyph(x-1, y) && !isFloorGlyph(x+1, y)) continue;
+            }
+
+            // Avoid intersections: door should be at a narrow chokepoint with exactly 2 card walkables around it
+            const aroundWalk = countCardinalWalk(x-1, y) + countCardinalWalk(x+1, y) + countCardinalWalk(x, y-1) + countCardinalWalk(x, y+1);
+            if (aroundWalk > 10) continue; // rough guard against busy intersections
+
+            // No adjacent doors to avoid rows of doors
+            const noAdjDoor = (
+                map.t[y][x-1].glyph!==GLYPH.DOOR && map.t[y][x+1].glyph!==GLYPH.DOOR &&
+                map.t[y-1][x].glyph!==GLYPH.DOOR && map.t[y+1][x].glyph!==GLYPH.DOOR
+            );
+            if (!noAdjDoor) continue;
+
+            // Place the door, respecting the max density
+            map.t[y][x] = makeTile('door');
+            placed++;
+            if (placed >= maxDoors) return; // stop early if too many
         }
     }
 }
