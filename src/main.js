@@ -567,7 +567,11 @@ try{
 	// Torch near player (legacy demo)
 	const torch = world.create();
 	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
-	world.add(torch, Light, { kind:'point', color:[1.0,0.6,0.2], radius:4, intensity:0.01, flickerSeed:42, castsShadows:true });
+	world.add(torch, Light, {
+		kind:'point', color:[1.0,0.6,0.2], radius:5, intensity:0.05, flickerSeed:42, castsShadows:true,
+		flicker: { style:'torch', amplitude:0.5, hiMs:33, midMs:110, lowMs:420, wHi:0.5, wMid:0.35, wLow:0.15, gamma:1.25,
+				   radiusAmp:0.14, tintAmp:0.28, sputterPerSec:0.5, sputterDrop:0.3, surgePerSec:0.2, surgeAmp:0.15 }
+	});
 	world.add(torch, Emissive, { color:[1.0,0.4,0.1], strength:0.5, radius:1 });
 
 	// Give player a basic material so specular is visible

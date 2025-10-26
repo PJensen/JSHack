@@ -68,8 +68,8 @@ function castLightRays(world, lg, rc, occ, light){
   const scaleY = (lg.h / Math.max(1, rows));
   const originX = (light.x!=null?light.x:(world.getInstance(light.__id, Position)?.x||0));
   const originY = (light.y!=null?light.y:(world.getInstance(light.__id, Position)?.y||0));
-  const Lrgb = toRGB(light.color);
-  const radius = Math.max(0.1, light.radius || 6);
+  const Lrgb = toRGB(light.colorEff || light.color);
+  const radius = Math.max(0.1, (light.radiusEff != null ? light.radiusEff : light.radius) || 6);
   const castsShadows = (light.castsShadows !== false);
   // choose ray count
   const N = light.rays || 48;

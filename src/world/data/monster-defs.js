@@ -26,7 +26,7 @@ export const MONSTER_DEFS = [
         if (!world.has(targetId, Player)) return;
         // 10% chance
         const r = typeof world.rand === 'function' ? world.rand() : Math.random();
-        if (r > 0.98) return;
+        if (r > 0.1) return;
         // Apply or refresh Hallucination with the provided flavor
         const params = {
           onsetSec: 2.0,
@@ -36,7 +36,7 @@ export const MONSTER_DEFS = [
           hueMaxDeg: 120,
           saturationBoost: 1.8,
           aberrationMaxPx: 6,
-          wobbleAmpPx: 2,
+          wobbleAmpPx: 2.5,
           wobbleFreqHz: 1.3,
           vignetteStrength: 0.35,
           kaleidoAt: 0.7,

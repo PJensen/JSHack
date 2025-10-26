@@ -17,13 +17,26 @@ export const TorchArchetype = defineArchetype('Torch',
   // Warm point light with strong variation via pulse + flicker
   [Light,    (p)=> ({
     kind: 'point',
-    color: p?.Light?.color ?? [1.0, 0.55, 0.18],
-    radius: p?.Light?.radius ?? 1,
-    intensity: p?.Light?.intensity ?? 0.02,
+    color: p?.Light?.color ?? [1.0, 0.25, 0.18],
+    radius: p?.Light?.radius ?? 3,
+    intensity: p?.Light?.intensity ?? 0.10,
     castsShadows: p?.Light?.castsShadows ?? true,
     flickerSeed: p?.Light?.flickerSeed ?? 1337,
-    // More random (less “breathing”) flicker using value-noise; subtle pulse optional via overrides
-    flicker: p?.Light?.flicker ?? { amplitude: 0.8, periodMs: 80, octaves: 4 },
+    // Torch-style flicker: multi-band smooth noise with rare sputter/surge events
+    flicker: p?.Light?.flicker ?? {
+      style: 'torch',
+      amplitude: 1.2, // multiplier around base intensity (1±amp)
+      speed: 0.4,
+      hiMs: 33, midMs: 110, lowMs: 420,
+      wHi: 0.5, wMid: 0.35, wLow: 0.15,
+      gamma: 1.25,
+      radiusAmp: 0.14,
+      tintAmp: 0.28,
+      sputterPerSec: 0.5,  // average half per second short dips
+      sputterDrop: 0.35,
+      surgePerSec: 0.25,   // occasional small flares
+      surgeAmp: 0.18
+    },
     // Disable heavy pulse by default; override via params to re-enable
     pulse: p?.Light?.pulse
   })],

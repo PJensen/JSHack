@@ -70,7 +70,7 @@ export function glowRenderSystem(world){
         intensity *= (vis[my*cols + mx] ? 1 : outsideDim);
       }
     }
-    const rgb = toRGB(lt.color);
+  const rgb = toRGB(lt.colorEff || lt.color);
 
     let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radiusPx);
     grad.addColorStop(0.0, rgba([rgb[0]*0.47, rgb[1]*0.78, rgb[2]*1.0], 0.20 * intensity));
