@@ -35,29 +35,41 @@ export function spawnFloatText(world, x, y, a, b = {}){
   const size = clamp((typeof spec.size === 'number') ? spec.size : 1.0, 0, 2);
   const energy = clamp((typeof spec.energy === 'number') ? spec.energy : 0.2, 0, 1);
   const rise = clamp((typeof spec.rise === 'number') ? spec.rise : 1.0, -1, 2);
+  const arc = clamp((typeof spec.arc === 'number') ? spec.arc : 0.0, 0, 1); // 0..1 widens sideways drift and adds curvature
   const reduceMotion = !!spec.reduceMotion;
   const seed = (spec.seed == null) ? null : Number(spec.seed);
 
   // Scale and overshoot mapping (size controls both)
   const baseScale = 1.0 + (size - 1.0) * 0.4; // gentle size mapping
   const overshoot = (reduceMotion ? 0.05 : 0.15) + size * (reduceMotion ? 0.02 : 0.08);
+  // Allow explicit scaleStart/End to override the default overshoot-shrink behavior
   const scaleStart = (spec.scaleStart !== undefined) ? spec.scaleStart : (baseScale + overshoot);
   const scaleEnd   = (spec.scaleEnd   !== undefined) ? spec.scaleEnd   : (baseScale);
 
   // Motion mapping (energy controls aggression: speed, jitter)
   const r = rand01(world, seed);
   const speed = reduceMotion ? 0.05 : lerp(0.08, 0.9, energy);
-  const angle = (r() * Math.PI * 0.3) - (Math.PI * 0.15); // slight sideways variation
+  // Angle range widens with arc, but allow explicit override via spec.angleRange (in PI units)
+  const angleRangePi = (spec.angleRange != null) ? clamp(spec.angleRange, 0, 1.2) : lerp(0.3, 1.0, arc);
+  const angle = (r() * Math.PI * angleRangePi) - (Math.PI * angleRangePi * 0.5);
   let vx = Math.cos(angle) * speed * 0.5 * (r() * 0.6 + 0.7);
   let vy = -Math.abs(Math.sin(angle) * speed) - (0.25 + energy * 0.55) * rise;
   if (reduceMotion){ vx *= 0.3; vy *= 0.3; }
   // Upward acceleration to maintain drift; small drag tuned by energy
-  const ax = 0;
+  // Add slight sideways curvature proportional to arc and sign of initial angle.
+  // Allow explicit override: spec.arcCurvature for magnitude, spec.arcDir for direction (-1|+1)
+  const sideSign = (spec.arcDir === -1 || spec.arcDir === 1)
+    ? spec.arcDir
+    : (angle === 0 ? (r() < 0.5 ? -1 : 1) : Math.sign(angle));
+  const curvature = (typeof spec.arcCurvature === 'number') ? clamp(spec.arcCurvature, 0, 0.3) : (arc * 0.06);
+  const ax = (reduceMotion ? 0 : sideSign * curvature);
   const ay = -(0.10 + 0.20 * rise) * (reduceMotion ? 0.3 : 1.0);
   const dragPerFrame = reduceMotion ? 0.995 : (0.992 - energy * 0.02);
 
   // Jitter parameters for renderer-side readable motion
-  const jitterAmpPx = reduceMotion ? 0 : (energy * 4 * (0.8 + size * 0.4));
+  const jitterAmpPx = (spec.jitterAmpPx !== undefined)
+    ? Math.max(0, Number(spec.jitterAmpPx) || 0)
+    : (reduceMotion ? 0 : (energy * 4 * (0.8 + size * 0.4)));
   const j = seededJitter(seed, r);
 
   world.add(e, Effect, {

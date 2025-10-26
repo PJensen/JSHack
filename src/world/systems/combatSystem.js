@@ -91,7 +91,7 @@ export function combatSystem(world){
     // Spawn float text for damage
     try {
       const color = isCrit ? '#ffd1a1' : '#ff6e6e';
-      const presetName = isCrit ? 'Shatter' : 'Feather';
+      const presetName = isCrit ? 'Shatter' : 'Arc';
       spawnFloatText(world, tPos.x, tPos.y, ftPreset(presetName, { text: `-${finalDmg}`, color }));
       // Optional subtle particles on crit
       if (isCrit){
