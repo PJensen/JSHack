@@ -242,6 +242,7 @@ import { Emissive } from './world/components/Emissive.js';
 import { Material } from './world/components/Material.js';
 import { FieldOfViewSystem } from './world/systems/lighting/FieldOfViewSystem.js';
 import { fpsOverlaySystem } from './world/systems/ui/fpsOverlaySystem.js';
+import { healthBarDomSystem } from './world/systems/ui/healthBarDomSystem.js';
 import { fogOfWarSystem } from './world/systems/fogOfWarSystem.js';
 import { Hallucination } from './world/components/Hallucination.js';
 import { hallucinationSystem } from './world/systems/effects/hallucinationSystem.js';
@@ -373,6 +374,7 @@ world.system(hallucinationPostProcessRenderer, 'render');
 world.system(postProcessingRenderSystem, 'render');
 // HUD/UI overlays
 world.system(fpsOverlaySystem, 'render');
+world.system(healthBarDomSystem, 'render');
 
 // Explicit ordering ensures predictable render sequence
 try { setSystemOrder('render', [
@@ -390,7 +392,8 @@ try { setSystemOrder('render', [
 	bloomRenderSystem,
 	hallucinationPostProcessRenderer,
 	postProcessingRenderSystem,
-	fpsOverlaySystem
+	fpsOverlaySystem,
+	healthBarDomSystem
 ]); } catch (e) { /* ignore */ }
 
 // Register input system (captures keyboard input, translates to InputIntent)

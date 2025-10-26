@@ -18,8 +18,8 @@ export const TorchArchetype = defineArchetype('Torch',
   [Light,    (p)=> ({
     kind: 'point',
     color: p?.Light?.color ?? [1.0, 0.55, 0.18],
-    radius: p?.Light?.radius ?? 3,
-    intensity: p?.Light?.intensity ?? 0.07,
+    radius: p?.Light?.radius ?? 1,
+    intensity: p?.Light?.intensity ?? 0.02,
     castsShadows: p?.Light?.castsShadows ?? true,
     flickerSeed: p?.Light?.flickerSeed ?? 1337,
     // More random (less “breathing”) flicker using value-noise; subtle pulse optional via overrides
