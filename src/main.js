@@ -16,7 +16,11 @@ if (!canvas) {
 	throw new Error('Canvas element with id="stage" not found. Ensure index.html has <canvas id="stage">.');
 }
 const ctx = canvas.getContext('2d', { alpha: false });
-canvas.style.imageRendering = 'pixelated';
+		canvas.style.imageRendering = 'pixelated'; 
+
+		// Ensure rasterized look for backbuffer as well
+		// (Some browsers support imageRendering on canvas elements, not contexts)
+		// This is cheap and works for both onscreen and offscreen canvases
 
 // Ensure the canvas backing store matches the displayed CSS size and DPR to avoid stretching
 // and avoid unbounded backing sizes on very large viewports / high-DPR displays which
@@ -74,7 +78,8 @@ let { dpr, cssW, cssH } = setupCanvasSize();
 const back = document.createElement('canvas');
 back.width = canvas.width; back.height = canvas.height;
 const backCtx = back.getContext('2d', { alpha: false });
-backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+	back.style.imageRendering = 'pixelated';
+	backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 // --- Create ECS world ---
 const world = new World({ seed: 0xC0FFEE });
