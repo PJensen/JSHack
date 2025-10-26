@@ -17,6 +17,8 @@ if (!canvas) {
 }
 const ctx = canvas.getContext('2d', { alpha: false });
 		canvas.style.imageRendering = 'pixelated'; 
+// Disable all smoothing to keep hard pixel edges on all browsers
+try { ctx.imageSmoothingEnabled = false; } catch(_) {}
 
 		// Ensure rasterized look for backbuffer as well
 		// (Some browsers support imageRendering on canvas elements, not contexts)
@@ -32,45 +34,40 @@ const MAX_BACKING_WIDTH = 8192;
 const MAX_BACKING_HEIGHT = 8192;
 
 function setupCanvasSize() {
-	// Use the devicePixelRatio as a hint for backing resolution, but clamp
-	// the final backing pixel dimensions so we never allocate a canvas
-	// larger than MAX_BACKING_* which can cause Out-Of-Memory in some browsers.
+	// Use integer DPR to avoid fractional scaling seams, and align CSS size to tile grid
 	const rawDpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-	const cssW = Math.floor(window.innerWidth || canvas.clientWidth || 800);
-	const cssH = Math.floor(window.innerHeight || canvas.clientHeight || 600);
+
+	const vw = Math.floor(window.innerWidth || canvas.clientWidth || 800);
+	const vh = Math.floor(window.innerHeight || canvas.clientHeight || 600);
+
+	// Align CSS size to whole tiles to prevent partial columns/rows on mobile
+	const cols = Math.max(1, Math.floor(vw / CELL_W));
+	const rows = Math.max(1, Math.floor(vh / CELL_H));
+	const cssW = cols * CELL_W;
+	const cssH = rows * CELL_H;
 
 	canvas.style.width = cssW + 'px';
 	canvas.style.height = cssH + 'px';
 
-	// Desired backing size in physical pixels
-	const desiredW = cssW * rawDpr;
-	const desiredH = cssH * rawDpr;
+	// Choose the largest integer DPR that fits within MAX_BACKING_* caps
+	const maxDprByW = Math.max(1, Math.floor(MAX_BACKING_WIDTH / Math.max(1, cssW)));
+	const maxDprByH = Math.max(1, Math.floor(MAX_BACKING_HEIGHT / Math.max(1, cssH)));
+	const allowedMaxIntDpr = Math.max(1, Math.min(maxDprByW, maxDprByH));
+	const effectiveDpr = Math.max(1, Math.min(rawDpr, allowedMaxIntDpr));
 
-	// Clamp backing size to configured maximums
-	const backingW = Math.min(desiredW, MAX_BACKING_WIDTH);
-	const backingH = Math.min(desiredH, MAX_BACKING_HEIGHT);
+	const backingW = cssW * effectiveDpr;
+	const backingH = cssH * effectiveDpr;
 
-	// Compute the actual DPR that will be used (may be fractional when CSS size
-	// exceeds MAX_BACKING_* even at DPR=1). Use the backing->CSS ratio so the
-	// canvas is rendered at the correct visual size while preventing huge
-	// backing buffers.
-	const actualDprW = backingW / Math.max(1, cssW);
-	const actualDprH = backingH / Math.max(1, cssH);
-	const actualDpr = Math.min(actualDprW, actualDprH);
+	// Apply exact backing size; these are integers by construction
+	canvas.width = Math.max(1, backingW);
+	canvas.height = Math.max(1, backingH);
 
-	if (actualDpr < rawDpr) {
-		console.warn(`Reduced backing DPR from ${rawDpr} -> ${actualDpr.toFixed(3)} to avoid excessive canvas size (${backingW}x${backingH}).`);
-	}
+	// Map CSS pixels -> backing pixels with integer scale
+	ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
+	try { ctx.imageSmoothingEnabled = false; } catch(_) {}
 
-	// Apply integer canvas dimensions (round to avoid fractional pixel sizes)
-	canvas.width = Math.max(1, Math.round(backingW));
-	canvas.height = Math.max(1, Math.round(backingH));
-
-	// Set transform to map CSS pixels -> backing pixels using actual DPR
-	ctx.setTransform(actualDpr, 0, 0, actualDpr, 0, 0);
-
-	// Return the effective DPR (may be fractional) along with CSS sizes
-	return { dpr: actualDpr, cssW, cssH };
+	// Return effective integer DPR and aligned CSS sizes
+	return { dpr: effectiveDpr, cssW, cssH };
 }
 let { dpr, cssW, cssH } = setupCanvasSize();
 
@@ -79,6 +76,7 @@ const back = document.createElement('canvas');
 back.width = canvas.width; back.height = canvas.height;
 const backCtx = back.getContext('2d', { alpha: false });
 	back.style.imageRendering = 'pixelated';
+try { backCtx.imageSmoothingEnabled = false; } catch(_) {}
 	backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 // --- Create ECS world ---
@@ -606,6 +604,7 @@ window.addEventListener('resize', () => {
 				rc.backCanvas.height = rc.presentCanvas.height;
 				if (rc.backCtx && typeof rc.backCtx.setTransform === 'function'){
 					rc.backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+					try { rc.backCtx.imageSmoothingEnabled = false; } catch(_) {}
 				}
 			}
 		}catch(e){ /* ignore */ }
