@@ -43,7 +43,7 @@ export const CONFIG = {
   ticksPerSecond: TICKS_PER_SECOND,
   // Glyph used for walls. Safe default is '█'. You can set to '⬛' if it renders single-width
   // in your chosen font to minimize gaps.
-  wallGlyph: '·',
+  wallGlyph: '▉',
 };
 
 // const WALLS = [
