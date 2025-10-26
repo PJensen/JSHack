@@ -90,13 +90,16 @@ export function combatSystem(world){
 
     // Spawn float text for damage
     try {
-      const color = isCrit ? '#ffd1a1' : '#ff6e6e';
-      const presetName = isCrit ? 'Shatter' : 'Arc';
-      spawnFloatText(world, tPos.x, tPos.y, ftPreset(presetName, { text: `-${finalDmg}`, color }));
+      const color = isCrit ? '#ff0000ff' : '#981e1eff';
+      const presetName = isCrit ? 'Arc' : 'Arc';
+      const value = isCrit ? finalDmg * 2 : finalDmg;
+      // Provide numeric value so base size scales with damage (spawner applies diminishing returns)
+      spawnFloatText(world, tPos.x, tPos.y, 
+        ftPreset(presetName, { text: `-${finalDmg}`, color, value: value }));
       // Optional subtle particles on crit
-      if (isCrit){
-        spawnParticleBurst(world, { x: tPos.x, y: tPos.y, count: 12, speed: 0.8, life: 0.4, color: '#ffa07a', size: 0.8, sizeEnd: 0.1, ay: -0.4 });
-      }
+      // if (isCrit){
+      //   spawnParticleBurst(world, { x: tPos.x, y: tPos.y, count: 12, speed: 0.8, life: 0.4, color: '#ffa07a', size: 0.8, sizeEnd: 0.1, ay: -0.4 });
+      // }
     } catch(_){ /* effects optional */ }
 
     // Emit event for other systems/UI

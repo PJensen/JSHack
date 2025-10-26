@@ -39,12 +39,37 @@ export function spawnFloatText(world, x, y, a, b = {}){
   const reduceMotion = !!spec.reduceMotion;
   const seed = (spec.seed == null) ? null : Number(spec.seed);
 
+  // Determine numeric magnitude from provided value or from text (e.g., "-12")
+  let magnitudeValue = null;
+  if (typeof spec.value === 'number' && isFinite(spec.value)) {
+    magnitudeValue = Math.abs(spec.value);
+  } else if (spec.text != null) {
+    const s = String(spec.text);
+    const m = s.match(/-?\d+/);
+    if (m) {
+      const parsed = parseInt(m[0], 10);
+      if (!isNaN(parsed)) magnitudeValue = Math.abs(parsed);
+    }
+  }
+
+  // Map numeric magnitude to a scale multiplier with diminishing returns
+  function magnitudeToScale(n){
+    if (!(n > 0)) return 1;
+    // 1..~2.0 range using log curve; big hits feel bigger without breaking layout
+    const log = Math.log10(n + 1);
+    return clamp(1 + log * 0.35, 0.85, 2.0);
+  }
+  const magScale = (spec.scaleByValue === false) ? 1 : magnitudeToScale(magnitudeValue);
+
   // Scale and overshoot mapping (size controls both)
   const baseScale = 1.0 + (size - 1.0) * 0.4; // gentle size mapping
   const overshoot = (reduceMotion ? 0.05 : 0.15) + size * (reduceMotion ? 0.02 : 0.08);
   // Allow explicit scaleStart/End to override the default overshoot-shrink behavior
-  const scaleStart = (spec.scaleStart !== undefined) ? spec.scaleStart : (baseScale + overshoot);
-  const scaleEnd   = (spec.scaleEnd   !== undefined) ? spec.scaleEnd   : (baseScale);
+  let scaleStart = (spec.scaleStart !== undefined) ? spec.scaleStart : (baseScale + overshoot);
+  let scaleEnd   = (spec.scaleEnd   !== undefined) ? spec.scaleEnd   : (baseScale);
+  // Apply magnitude scaling to both start and end scales
+  scaleStart *= magScale;
+  scaleEnd   *= magScale;
 
   // Motion mapping (energy controls aggression: speed, jitter)
   const r = rand01(world, seed);
