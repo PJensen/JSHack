@@ -14,8 +14,11 @@ export function effectRenderSystem(world) {
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
 
+  // Center the tile grid and apply half-cell shift for even viewports
   const ox = Math.floor((W - (cols * cellW)) / 2);
   const oy = Math.floor((H - (rows * cellH)) / 2);
+  const halfShiftX = (cols % 2 === 0) ? -cellW / 2 : 0;
+  const halfShiftY = (rows % 2 === 0) ? -cellH / 2 : 0;
 
   // FOV gating: effects and particles are hidden outside current FOV
   const visW = (rc.visibleWeight instanceof Float32Array && rc.visibleWeight.length === cols*rows) ? rc.visibleWeight : null;
@@ -26,8 +29,8 @@ export function effectRenderSystem(world) {
     if (eff.type === 'float_text') {
       const d = eff.data || {};
       const pos = eff.pos || d.pos || { x: 0, y: 0 };
-      const sx = ox + (pos.x - (rc.camX || 0)) * cellW + cellW / 2;
-      const sy = oy + (pos.y - (rc.camY || 0)) * cellH + cellH / 2;
+  const sx = ox + halfShiftX + (pos.x - (rc.camX || 0)) * cellW + cellW / 2;
+  const sy = oy + halfShiftY + (pos.y - (rc.camY || 0)) * cellH + cellH / 2;
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
 
   // Skip if not in visible FOV
@@ -68,8 +71,8 @@ export function effectRenderSystem(world) {
   if (particlePool && particlePool.count > 0) {
     particlePool.forEach(p => {
       if (!p.alive) return;
-      const sx = ox + (p.x - (rc.camX || 0)) * cellW + cellW / 2;
-      const sy = oy + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
+  const sx = ox + halfShiftX + (p.x - (rc.camX || 0)) * cellW + cellW / 2;
+  const sy = oy + halfShiftY + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) return;
 
   // Skip if not in visible FOV (use particle tile position)
@@ -111,8 +114,8 @@ export function effectRenderSystem(world) {
   if (ps) {
     ps.forEach(p => {
       if (!p.alive) return;
-      const sx = ox + (p.x - (rc.camX || 0)) * cellW + cellW / 2;
-      const sy = oy + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
+  const sx = ox + halfShiftX + (p.x - (rc.camX || 0)) * cellW + cellW / 2;
+  const sy = oy + halfShiftY + (p.y - (rc.camY || 0)) * cellH + cellH / 2;
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) return;
 
   // Skip if not in visible FOV
