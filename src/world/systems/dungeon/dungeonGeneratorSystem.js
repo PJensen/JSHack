@@ -276,7 +276,7 @@ function placeDoors(map){
 
     // Optional density clamp to avoid pathological cases
     let placed = 0;
-    const maxDoors = Math.floor((map.w * map.h) * 0.01); // at most 1% of tiles become doors
+    const maxDoors = Math.floor((map.w * map.h) * 0.10); // at most 1% of tiles become doors
 
     for (let y=1; y<map.h-1; y++){
         for (let x=1; x<map.w-1; x++){
@@ -366,11 +366,12 @@ function makeGameMap(w,h){
     };
 }
 
-function generateDungeonLevel(rng, width, height){
+function generateDungeonLevel(world, rng, width, height){
     const map = makeGameMap(width, height);
     // No border walls - rooms are islands in the void
 
     const rooms = [];
+    const hallLinks = []; // track primary/secondary hallway connections for door placement
     // Compact defaults: rooms clustered, with a mix of small and a few larger combat rooms
     const MAX_ROOMS = (CONFIG.roomMaxCompact ?? CONFIG.roomMax ?? 20) | 0;
     const ROOM_W_MIN = (CONFIG.roomMinSizeCompact ?? 4) | 0;
@@ -476,6 +477,8 @@ function generateDungeonLevel(rng, width, height){
                     branchWidth: CORRIDOR_W_MIN,
                     pocketChance: POCKET_CHANCE
                 });
+                // Track this hallway link for door placement at entries/exits
+                hallLinks.push({ sx, sy, tx, ty, w: cw });
             }
             // Occasionally add a secondary short connection for a maze-like feel
             if (rng() < 0.33 && rooms.length > 2){
@@ -502,6 +505,7 @@ function generateDungeonLevel(rng, width, height){
                         branchWidth: CORRIDOR_W_MIN,
                         pocketChance: POCKET_CHANCE * 0.5
                     });
+                    hallLinks.push({ sx: sx2, sy: sy2, tx: tx2, ty: ty2, w: w2 });
                 }
             }
         }
@@ -511,7 +515,81 @@ function generateDungeonLevel(rng, width, height){
     placeWalls(map);
 
     // Doors pass
-    placeDoors(map);
+    // Prefer deterministic door placement using hallway links. Optionally run
+    // heuristic wall-scanning if enabled in CONFIG.
+    if (CONFIG.useHeuristicDoorPlacement === true) {
+        placeDoors(map);
+    }
+
+    // Ensure at least N% of hallways have doors at entries and exits by explicitly
+    // placing door tiles on the corridor cells adjacent to each connected room.
+    // This works with our "floors-islands + outer walls" model by putting the door
+    // on corridor tiles just outside rooms, spanning the full corridor width.
+    (function ensureHallwayDoorsAtEnds(){
+        if (!hallLinks.length) return;
+        const coverage = Math.max(0, Math.min(1, CONFIG.hallwayDoorCoverage ?? 0.5));
+        const target = Math.max(1, Math.ceil(hallLinks.length * coverage));
+        // Shuffle links using rng for deterministic variety
+        const links = hallLinks.slice();
+        for (let i = links.length - 1; i > 0; i--){
+            const j = (rng() * (i + 1)) | 0;
+            const tmp = links[i]; links[i] = links[j]; links[j] = tmp;
+        }
+        const picked = links.slice(0, target);
+        const isWalk = (x,y)=> (x>=0 && y>=0 && x<map.w && y<map.h && !!map.t[y][x] && !!map.t[y][x].walkable);
+        const setDoor = (x,y)=>{
+            if (x<0||y<0||x>=map.w||y>=map.h) return false;
+            const t = map.t[y][x];
+            if (!t) return false;
+            // Only convert plain floor-like tiles; don't overwrite features
+            if (t.type === 'door') return true;
+            if (t.walkable !== true) return false;
+            map.t[y][x] = makeTile('door');
+            return true;
+        };
+        const detectOrientationAt = (x,y)=>{
+            const up = isWalk(x, y-1), down = isWalk(x, y+1), left = isWalk(x-1, y), right = isWalk(x+1, y);
+            const cnt = (up?1:0)+(down?1:0)+(left?1:0)+(right?1:0);
+            if (cnt === 2){
+                if (up && down && !left && !right) return 'v';
+                if (left && right && !up && !down) return 'h';
+            }
+            // Ambiguous: look ahead 2 tiles to bias
+            const vRun = (isWalk(x, y-1)?1:0) + (isWalk(x, y-2)?1:0) + (isWalk(x, y+1)?1:0) + (isWalk(x, y+2)?1:0);
+            const hRun = (isWalk(x-1, y)?1:0) + (isWalk(x-2, y)?1:0) + (isWalk(x+1, y)?1:0) + (isWalk(x+2, y)?1:0);
+            return vRun >= hRun ? 'v' : 'h';
+        };
+        const isCorridorCell = (cx,cy)=>{
+            if (!isWalk(cx,cy)) return false;
+            const n = isWalk(cx, cy-1), s = isWalk(cx, cy+1), w = isWalk(cx-1, cy), e = isWalk(cx+1, cy);
+            const cnt = (n?1:0)+(s?1:0)+(w?1:0)+(e?1:0);
+            return cnt === 2 && ((n && s) || (w && e));
+        };
+        const corridorWidthAt = (x,y)=>{
+            if (!isCorridorCell(x,y)) return Number.POSITIVE_INFINITY;
+            const ori = detectOrientationAt(x,y);
+            if (ori === 'v'){
+                // Vertical corridor: width measured horizontally
+                let width = 1, lx = x-1, rx = x+1;
+                while (isCorridorCell(lx, y)) { width++; lx--; }
+                while (isCorridorCell(rx, y)) { width++; rx++; }
+                return width;
+            } else {
+                // Horizontal corridor: width measured vertically
+                let width = 1, ty = y-1, by = y+1;
+                while (isCorridorCell(x, ty)) { width++; ty--; }
+                while (isCorridorCell(x, by)) { width++; by++; }
+                return width;
+            }
+        };
+        for (const link of picked){
+            // Only place doors at single-width corridor endpoints
+            const wA = corridorWidthAt(link.sx|0, link.sy|0);
+            const wB = corridorWidthAt(link.tx|0, link.ty|0);
+            if (wA === 1) setDoor(link.sx|0, link.sy|0);
+            if (wB === 1) setDoor(link.tx|0, link.ty|0);
+        }
+    })();
 
     // After doors are placed on the tile map, instantiate ECS Door entities at matching positions
     try{
@@ -594,7 +672,7 @@ export function dungeonGeneratorSystem(world){
         const height = Math.max(10, requestedH|0);
 
         const rng = typeof world.rand === 'function' ? world.rand : Math.random;
-    const { map, rooms, spawnX, spawnY } = generateDungeonLevel(rng, width, height);
+        const { map, rooms, spawnX, spawnY } = generateDungeonLevel(world, rng, width, height);
 
                 // Note: Avoid creating per-cell tile entities to keep the world lightweight.
                 // Rendering and movement will consult MapView instead.

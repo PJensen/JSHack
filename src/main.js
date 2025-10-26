@@ -27,7 +27,11 @@ try { ctx.imageSmoothingEnabled = false; } catch(_) {}
 // Ensure the canvas backing store matches the displayed CSS size and DPR to avoid stretching
 // and avoid unbounded backing sizes on very large viewports / high-DPR displays which
 // can cause out-of-memory crashes in some browsers/platforms.
-const CELL_W = 16, CELL_H = 16; // square cells by default
+// Global zoom: scale all visual tiles/glyphs by this factor (1.0 = 100%).
+const ZOOM_SCALE = 1.5; // 150% zoom
+const BASE_CELL_W = 16, BASE_CELL_H = 16; // square cells by default
+const CELL_W = Math.max(1, Math.round(BASE_CELL_W * ZOOM_SCALE));
+const CELL_H = Math.max(1, Math.round(BASE_CELL_H * ZOOM_SCALE));
 // Maximum allowed backing size (in physical pixels) for width/height. Tweak if your
 // target devices safely support larger canvases.
 const MAX_BACKING_WIDTH = 8192;
@@ -80,7 +84,7 @@ try { backCtx.imageSmoothingEnabled = false; } catch(_) {}
 	backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 // --- Create ECS world ---
-const world = new World({ seed: 0xC1FFEE });
+const world = new World({ seed: 0x80085 }); // arbitrary default seed // new Date().getMilliseconds()
 world.storeMode = 'map'; // use Map storage for flexibility
 
 
@@ -255,7 +259,7 @@ world.add(rt, RenderContext, {
 	presentCtx: ctx,
 	W: cssW, // CSS pixel space (ctx is scaled by DPR)
 	H: cssH,
-	font: '18px monospace',
+	font: `${Math.max(1, Math.round(18 * ZOOM_SCALE))}px monospace`,
 	cols: Math.max(1, Math.floor(cssW / CELL_W)),
 	rows: Math.max(1, Math.floor(cssH / CELL_H)),
 	cellW: CELL_W,

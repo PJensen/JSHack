@@ -44,6 +44,13 @@ export const CONFIG = {
   // Glyph used for walls. Safe default is '█'. You can set to '⬛' if it renders single-width
   // in your chosen font to minimize gaps.
   wallGlyph: '#', // 
+  // Door placement controls
+  // Target fraction of hallways that get doors at BOTH ends (0..1)
+  hallwayDoorCoverage: 0.9,
+  // Prefer deterministic door placement using hallway links. If true, we rely on hallway
+  // endpoints for door placement and skip heuristic wall-scanning. If false, the legacy
+  // heuristic may also add doors in walls based on local topology.
+  useHeuristicDoorPlacement: true,
 };
 
 // const WALLS = [
