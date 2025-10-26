@@ -18,7 +18,8 @@ const WALL_GLYPH = CONFIG.wallGlyph || '█';
 const GLYPH = {
     WALL: WALL_GLYPH,
     FLOOR: '·',
-    DOOR: '🚪',
+    DOOR: '+',      // closed door
+    DOOR_OPEN: '/', // open door
     WATER: '≈',
     TRAP: '^',
     FOUNTAIN: '⛲',
@@ -31,18 +32,19 @@ const GLYPH = {
 
 function makeTile(type){
     switch(type){
-        case 'wall': return { glyph: GLYPH.WALL, walkable: false, blocksLight: true };
-        case 'door': return { glyph: GLYPH.DOOR, walkable: true,  blocksLight: false };
-        case 'water': return { glyph: GLYPH.WATER, walkable: false, blocksLight: false };
-        case 'trap': return { glyph: GLYPH.TRAP, walkable: true,  blocksLight: false };
-        case 'fountain': return { glyph: GLYPH.FOUNTAIN, walkable: false, blocksLight: false };
-        case 'sink': return { glyph: GLYPH.SINK, walkable: true, blocksLight: false };
-        case 'altar': return { glyph: GLYPH.ALTAR, walkable: false, blocksLight: false };
-        case 'throne': return { glyph: GLYPH.THRONE, walkable: false, blocksLight: false };
-        case 'grave': return { glyph: GLYPH.GRAVE, walkable: false, blocksLight: false };
-        case 'stair': return { glyph: GLYPH.STAIR, walkable: true,  blocksLight: false };
-        case 'void': return { glyph: '', walkable: false, blocksLight: false }; // empty void space
-        default: return { glyph: GLYPH.FLOOR, walkable: true, blocksLight: false };
+        case 'wall': return { type: 'wall', glyph: GLYPH.WALL, walkable: false, blocksLight: true };
+        case 'door': return { type: 'door', state: 'closed', glyph: GLYPH.DOOR, walkable: false, blocksLight: true };
+        case 'door-open': return { type: 'door', state: 'open', glyph: GLYPH.DOOR_OPEN, walkable: true, blocksLight: false };
+        case 'water': return { type: 'water', glyph: GLYPH.WATER, walkable: false, blocksLight: false };
+        case 'trap': return { type: 'trap', glyph: GLYPH.TRAP, walkable: true,  blocksLight: false };
+        case 'fountain': return { type: 'fountain', glyph: GLYPH.FOUNTAIN, walkable: false, blocksLight: false };
+        case 'sink': return { type: 'sink', glyph: GLYPH.SINK, walkable: true, blocksLight: false };
+        case 'altar': return { type: 'altar', glyph: GLYPH.ALTAR, walkable: false, blocksLight: false };
+        case 'throne': return { type: 'throne', glyph: GLYPH.THRONE, walkable: false, blocksLight: false };
+        case 'grave': return { type: 'grave', glyph: GLYPH.GRAVE, walkable: false, blocksLight: false };
+        case 'stair': return { type: 'stair', glyph: GLYPH.STAIR, walkable: true,  blocksLight: false };
+        case 'void': return { type: 'void', glyph: '', walkable: false, blocksLight: false }; // empty void space
+        default: return { type: 'floor', glyph: GLYPH.FLOOR, walkable: true, blocksLight: false };
     }
 }
 
@@ -244,7 +246,16 @@ function placeWalls(map){
 function placeDoors(map){
     // Heuristic: only place a door where a corridor meets a room (reduce doors at bends/intersections)
     const isWalk = (x,y)=> map.inBounds(x,y) && !!map.t[y][x] && !!map.t[y][x].walkable;
-    const isFloorGlyph = (x,y)=> map.inBounds(x,y) && map.t[y][x] && map.t[y][x].glyph === GLYPH.FLOOR;
+    // Use walkability instead of glyph to avoid coupling to visual wall/floor characters
+    // Treat any walkable, non-door tile as a floor-equivalent for placement preference
+    const isPlainFloor = (x,y)=> {
+        if (!map.inBounds(x,y)) return false;
+        const t = map.t[y][x];
+        if (!t) return false;
+        if (!t.walkable) return false;
+        // avoid using a door tile as the floor-side anchor
+        return t.type !== 'door';
+    };
     const countCardinalWalk = (x,y)=> (isWalk(x, y-1) ? 1:0) + (isWalk(x, y+1) ? 1:0) + (isWalk(x-1, y) ? 1:0) + (isWalk(x+1, y) ? 1:0);
     const isCorridor = (x,y)=>{
         // corridor = exactly 2 cardinal walkable and they are opposite
@@ -292,9 +303,9 @@ function placeDoors(map){
 
             // Prefer placing where the adjacent walkable cells are plain floors (avoid chaining via newly placed doors)
             if (vertWall){
-                if (!isFloorGlyph(x, y-1) && !isFloorGlyph(x, y+1)) continue;
+                if (!isPlainFloor(x, y-1) && !isPlainFloor(x, y+1)) continue;
             } else {
-                if (!isFloorGlyph(x-1, y) && !isFloorGlyph(x+1, y)) continue;
+                if (!isPlainFloor(x-1, y) && !isPlainFloor(x+1, y)) continue;
             }
 
             // Avoid intersections: door should be at a narrow chokepoint with exactly 2 card walkables around it
@@ -303,8 +314,10 @@ function placeDoors(map){
 
             // No adjacent doors to avoid rows of doors
             const noAdjDoor = (
-                map.t[y][x-1].glyph!==GLYPH.DOOR && map.t[y][x+1].glyph!==GLYPH.DOOR &&
-                map.t[y-1][x].glyph!==GLYPH.DOOR && map.t[y+1][x].glyph!==GLYPH.DOOR
+                (map.t[y][x-1].glyph!==GLYPH.DOOR && map.t[y][x-1].glyph!==GLYPH.DOOR_OPEN) &&
+                (map.t[y][x+1].glyph!==GLYPH.DOOR && map.t[y][x+1].glyph!==GLYPH.DOOR_OPEN) &&
+                (map.t[y-1][x].glyph!==GLYPH.DOOR && map.t[y-1][x].glyph!==GLYPH.DOOR_OPEN) &&
+                (map.t[y+1][x].glyph!==GLYPH.DOOR && map.t[y+1][x].glyph!==GLYPH.DOOR_OPEN)
             );
             if (!noAdjDoor) continue;
 
@@ -312,6 +325,34 @@ function placeDoors(map){
             map.t[y][x] = makeTile('door');
             placed++;
             if (placed >= maxDoors) return; // stop early if too many
+        }
+    }
+
+    // Fallback: if none placed by the strict heuristic, relax criteria and try a few
+    if (placed === 0){
+        const target = Math.max(3, Math.floor((map.w + map.h) * 0.02)); // small handful
+        for (let y=1; y<map.h-1 && placed < target; y++){
+            for (let x=1; x<map.w-1 && placed < target; x++){
+                const t = map.t[y][x]; if (!t || t.glyph !== GLYPH.WALL) continue;
+                // Opposite-side walkables (doorway slit)
+                const up = map.t[y-1][x], down = map.t[y+1][x];
+                const left = map.t[y][x-1], right = map.t[y][x+1];
+                const upWalk = !!up.walkable, downWalk = !!down.walkable;
+                const leftWalk = !!left.walkable, rightWalk = !!right.walkable;
+                const vertDoor = !leftWalk && !rightWalk && upWalk && downWalk;
+                const horizDoor = !upWalk && !downWalk && leftWalk && rightWalk;
+                if (!(vertDoor || horizDoor)) continue;
+                // avoid adjacent doors
+                const noAdjDoor = (
+                    (map.t[y][x-1].glyph!==GLYPH.DOOR && map.t[y][x-1].glyph!==GLYPH.DOOR_OPEN) &&
+                    (map.t[y][x+1].glyph!==GLYPH.DOOR && map.t[y][x+1].glyph!==GLYPH.DOOR_OPEN) &&
+                    (map.t[y-1][x].glyph!==GLYPH.DOOR && map.t[y-1][x].glyph!==GLYPH.DOOR_OPEN) &&
+                    (map.t[y+1][x].glyph!==GLYPH.DOOR && map.t[y+1][x].glyph!==GLYPH.DOOR_OPEN)
+                );
+                if (!noAdjDoor) continue;
+                map.t[y][x] = makeTile('door');
+                placed++;
+            }
         }
     }
 }
@@ -552,20 +593,8 @@ export function dungeonGeneratorSystem(world){
                             if (x < 0 || y < 0 || x >= map.w || y >= map.h) return null;
                             return map.t[y][x];
                         };
-                        // Precompute an opacity grid for fast lookups
-                        let opaque = null;
-                        try{
-                            opaque = new Uint8Array(map.w * map.h);
-                            for (let y=0; y<map.h; y++){
-                                for (let x=0; x<map.w; x++){
-                                    const t = map.t[y][x];
-                                    opaque[y*map.w + x] = (t && t.blocksLight) ? 1 : 0;
-                                }
-                            }
-                        }catch(_){}
                         const opaqueAt = (x, y) => {
                             if (x < 0 || y < 0 || x >= map.w || y >= map.h) return true; // out of bounds = opaque
-                            if (opaque) return !!opaque[y*map.w + x];
                             const t = map.t[y][x];
                             return !!(t && t.blocksLight);
                         };

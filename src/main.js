@@ -268,7 +268,7 @@ world.add(rt, RenderContext, {
 	fovSeenDim: 0.08,
 	// Wall geometry renderer tuning
 	wallEdgePx: 1,
-	wallFillAlpha: 0.12,
+	wallFillAlpha: 0.0,
 	wallBaseColor: '#c8c8c8',
 	// Optional blur (in CSS px) for seen-but-not-visible tiles to suggest memory (default 0 for perf)
 	fogSeenBlurPx: 0.0,

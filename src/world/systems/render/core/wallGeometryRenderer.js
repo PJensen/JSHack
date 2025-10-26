@@ -72,7 +72,7 @@ export function wallGeometryRenderSystem(world){
 
   // Determine walls via MapView first
   const mvOpaque = (mv && typeof mv.opaqueAt === 'function') ? mv.opaqueAt : null;
-  const mvTileAt = (!mvOpaque && mv && typeof mv.tileAt === 'function') ? mv.tileAt : null;
+  const mvTileAt = (mv && typeof mv.tileAt === 'function') ? mv.tileAt : null;
   const mvGlyphAt = (!mvOpaque && !mvTileAt && mv && typeof mv.glyphAt === 'function') ? mv.glyphAt : null;
 
   const wallSet = new Set(); // keys "x,y" for walls within viewport + 1 ring
@@ -86,14 +86,24 @@ export function wallGeometryRenderSystem(world){
   if (mvOpaque){
     for (let y=sy; y<=ey; y++){
       for (let x=sx; x<=ex; x++){
-        if (mvOpaque(x,y)) add(x,y);
+        if (mvOpaque(x,y)) {
+          // If we can classify the tile, skip doors so door glyphs remain visible (not drawn as walls)
+          if (mvTileAt){
+            const t = mvTileAt(x,y);
+            if (t && t.type === 'door') continue;
+          }
+          add(x,y);
+        }
       }
     }
   } else if (mvTileAt){
     for (let y=sy; y<=ey; y++){
       for (let x=sx; x<=ex; x++){
         const t = mvTileAt(x,y);
-        if (t && (t.blocksLight || (t.walkable === false))) add(x,y);
+        if (t && (t.blocksLight || (t.walkable === false))) {
+          if (t.type === 'door') continue; // treat door tiles as non-wall for geometry overlay
+          add(x,y);
+        }
       }
     }
   } else if (mvGlyphAt){

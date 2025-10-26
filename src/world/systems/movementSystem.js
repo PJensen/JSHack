@@ -41,6 +41,16 @@ export function movementSystem(world) {
             const tile = tileAt(nx, ny);
             // Out-of-bounds or missing tile: treat as blocked (void)
             if (!tile) { blocked = true; break outer; }
+            // If this is a closed door, open it in-place and proceed
+            if (tile.type === 'door' && (tile.state !== 'open')) {
+              // Open the door, but do not move through on the same turn
+              tile.state = 'open';
+              tile.walkable = true;
+              tile.blocksLight = false;
+              tile.glyph = '/'; // rendering reads glyph; logic reads type/state
+              blocked = true; // consume the turn to open
+              break outer;
+            }
             if (tile.walkable === false) { blocked = true; break outer; }
             // Tile exists and is walkable: also check entity colliders at destination
             for (const [bid, bpos] of world.query(Position)) {
@@ -56,7 +66,7 @@ export function movementSystem(world) {
             }
             break outer;
           }
-          // 2) Fallback to glyph-based blocking if provided
+          // 2) Fallback to glyph-based blocking if provided (legacy)
           const glyphAt = mv.glyphAt;
           if (typeof glyphAt === 'function') {
             const g = glyphAt(nx, ny) || '';

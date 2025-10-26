@@ -109,10 +109,10 @@ export function tileGlyphRenderSystem(world){
         const screenY = my * cellH + cy;
         
         // Base albedo by glyph
-        let base = '#767676ff';
-        if (g === '·') base = '#464646ff';
-        else if (g === '█') base = '#e0e0e0';
-        else if (g === '🚪') base = '#8b4513';
+  let base = '#767676ff';
+  if (g === '·') base = '#464646ff';
+  else if (g === '█' || g === '#') base = '#e0e0e0';
+  else if (g === '+' || g === '/') base = '#8b4513';
 
         // Apply lighting if LightGrid present
         if (lg && lg.r){
@@ -186,10 +186,11 @@ export function tileGlyphRenderSystem(world){
     const screenX = mx * cellW + cx;
     const screenY = my * cellH + cy;
     
-    const g = tile.glyph || '.';
-    let base = '#c0c0c0';
-    if (g === '·') base = '#b0b0b0';
-    else if (g === '█' || g === '#') base = '#e0e0e0';
+  const g = tile.glyph || '.';
+  let base = '#c0c0c0';
+  if (g === '·') base = '#b0b0b0';
+  else if (g === '█' || g === '#') base = '#e0e0e0';
+  else if (g === '+' || g === '/') base = '#8b4513';
 
     if (lg && lg.r){
       const vx = x - camX; const vy = y - camY;
