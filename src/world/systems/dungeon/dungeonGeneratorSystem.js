@@ -11,6 +11,7 @@ import { CONFIG } from '../../../config.js';
 // Torch factory for starting room
 import { createDeferred } from '../../../lib/ecs/archetype.js';
 import { TorchArchetype } from '../../archetypes/TorchArchetype.js';
+import { FountainArchetype } from '../../archetypes/FountainArchetype.js';
 import { TargetDummyArchetype } from '../../archetypes/TargetDummyArchetype.js';
 import { DoorArchetype } from '../../archetypes/DoorArchetype.js';
 
@@ -613,6 +614,20 @@ function generateDungeonLevel(world, rng, width, height){
             }
         }
     }catch(_){ /* door entity creation should not crash generation */ }
+
+    // After terrain sprinkling, instantiate ECS Fountain entities at matching fountain tiles
+    try{
+        for (let y=1; y<height-1; y++){
+            for (let x=1; x<width-1; x++){
+                const t = map.t[y][x];
+                if (!t || t.type !== 'fountain') continue;
+                createDeferred(world, FountainArchetype, {
+                    Position: { x, y },
+                    // Glyph defaults to '⛲'; Collider/Emitter configured in archetype
+                });
+            }
+        }
+    }catch(_){ /* fountain entity creation should not crash generation */ }
 
     // Sprinkle terrain variants inside rooms/corridors
     for (let y=2; y<height-2; y++){
