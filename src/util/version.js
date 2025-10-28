@@ -1,13 +1,11 @@
+/**
+ * Loads the application version from the VERSION file and sets it on window. 
+ */
 export async function loadVersion() {
-  try {
-    const res = await fetch('VERSION');
-    if (!res.ok) throw new Error('not ok');
-    const text = (await res.text()).trim();
-    window.VERSION = text;
-  } catch {
-    // Silently default to 'dev' to reduce console noise
-    window.VERSION = 'dev';
-  }
+  const res = await fetch('VERSION');
+  if (!res.ok) throw new Error('not ok');
+  const text = (await res.text()).trim();
+  window.VERSION = text;
   // Optional: uncomment to see version on startup
   console.log('Loaded version:', window.VERSION);
 }

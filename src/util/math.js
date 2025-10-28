@@ -19,8 +19,3 @@ export function approxEqual(a, b, eps = 1e-6) {
 export function sign(n) {
   return n < 0 ? -1 : n > 0 ? 1 : 0;
 }
-
-// rng-aware range helper using a provided RNG function
-export function rngRange(rng, lo, hi) {
-  return Math.floor(rng() * (hi - lo + 1)) + lo;
-}

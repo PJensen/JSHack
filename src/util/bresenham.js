@@ -15,20 +15,3 @@ export function* bresenhamLine(x0, y0, x1, y1){
     yield [x, y];
   }
 }
-
-// TODO: this shoudl be re-enabled once we have a proper map structure; ideally in some system
-// // map is expected to implement blocksLight(x,y) or a similar predicate
-// export function hasLine(map, x0, y0, x1, y1){
-//   for (const [x,y] of bresenhamLine(x0,y0,x1,y1)){
-//     if (x === x1 && y === y1) return true;
-//     if (typeof map.blocksLight === 'function'){
-//       if (map.blocksLight(x,y)) return false;
-//     } else if (map && map.inBounds){
-//       // fallback: if map provides tiles as map.t[y][x] with .block truthy
-//       try {
-//         if (map.t && map.t[y] && map.t[y][x] && map.t[y][x].block) return false;
-//       } catch(e){ /* ignore and continue */ }
-//     }
-//   }
-//   return true;
-// }

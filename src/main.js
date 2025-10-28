@@ -1,683 +1,185 @@
-// --- ECS imports ---
-import './util/version.js';
+// main.js — externalized from index.html inline module
+import { World, defineComponent, registerSystem, composeScheduler, runSystems } from "./lib/ecs-js/index.js";
+import { createEmitterSystem, particlePoolUpdateSystem, renderPooledParticlesSystem, spawnParticleBurst } from "./effects/particles/spawner.js";
+import { getGlobalParticlePool } from "./effects/particles/particlePool.js";
+import { Position, Glyph, Glow, Emitter, C as Components } from "./components/index.js";
 
-import { World, startLoop } from './lib/ecs/core.js';
-import { createFrom } from './lib/ecs/archetype.js';
-import { PlayerArchetype } from './world/archetypes/PlayerArchetype.js';
-import { Player } from './world/components/Player.js';
-import { Position } from './world/components/Position.js';
-import { Glyph } from './world/components/Glyph.js';
-import { MapView } from './world/components/MapView.js';
-import { Collider } from './world/components/Collider.js';
-
-// --- Setup canvas ---
-// Matches <canvas id="stage"> in index.html
-const canvas = document.getElementById('stage');
-if (!canvas) {
-	throw new Error('Canvas element with id="stage" not found. Ensure index.html has <canvas id="stage">.');
-}
-const ctx = canvas.getContext('2d', { alpha: false });
-		canvas.style.imageRendering = 'pixelated'; 
-// Disable all smoothing to keep hard pixel edges on all browsers
-try { ctx.imageSmoothingEnabled = false; } catch(_) {}
-
-		// Ensure rasterized look for backbuffer as well
-		// (Some browsers support imageRendering on canvas elements, not contexts)
-		// This is cheap and works for both onscreen and offscreen canvases
-
-// Ensure the canvas backing store matches the displayed CSS size and DPR to avoid stretching
-// and avoid unbounded backing sizes on very large viewports / high-DPR displays which
-// can cause out-of-memory crashes in some browsers/platforms.
-// Global zoom: scale all visual tiles/glyphs by this factor (1.0 = 100%).
-const ZOOM_SCALE = 1.5; // 150% zoom
-const BASE_CELL_W = 16, BASE_CELL_H = 16; // square cells by default
-const CELL_W = Math.max(1, Math.round(BASE_CELL_W * ZOOM_SCALE));
-const CELL_H = Math.max(1, Math.round(BASE_CELL_H * ZOOM_SCALE));
-// Maximum allowed backing size (in physical pixels) for width/height. Tweak if your
-// target devices safely support larger canvases.
-const MAX_BACKING_WIDTH = 8192;
-const MAX_BACKING_HEIGHT = 8192;
-
-function setupCanvasSize() {
-	// Use integer DPR to avoid fractional scaling seams, and align CSS size to tile grid
-	const rawDpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-
-	const vw = Math.floor(window.innerWidth || canvas.clientWidth || 800);
-	const vh = Math.floor(window.innerHeight || canvas.clientHeight || 600);
-
-	// Align CSS size to whole tiles to prevent partial columns/rows on mobile
-	const cols = Math.max(1, Math.floor(vw / CELL_W));
-	const rows = Math.max(1, Math.floor(vh / CELL_H));
-	const cssW = cols * CELL_W;
-	const cssH = rows * CELL_H;
-
-	canvas.style.width = cssW + 'px';
-	canvas.style.height = cssH + 'px';
-
-	// Choose the largest integer DPR that fits within MAX_BACKING_* caps
-	const maxDprByW = Math.max(1, Math.floor(MAX_BACKING_WIDTH / Math.max(1, cssW)));
-	const maxDprByH = Math.max(1, Math.floor(MAX_BACKING_HEIGHT / Math.max(1, cssH)));
-	const allowedMaxIntDpr = Math.max(1, Math.min(maxDprByW, maxDprByH));
-	const effectiveDpr = Math.max(1, Math.min(rawDpr, allowedMaxIntDpr));
-
-	const backingW = cssW * effectiveDpr;
-	const backingH = cssH * effectiveDpr;
-
-	// Apply exact backing size; these are integers by construction
-	canvas.width = Math.max(1, backingW);
-	canvas.height = Math.max(1, backingH);
-
-	// Map CSS pixels -> backing pixels with integer scale
-	ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
-	try { ctx.imageSmoothingEnabled = false; } catch(_) {}
-
-	// Return effective integer DPR and aligned CSS sizes
-	return { dpr: effectiveDpr, cssW, cssH };
-}
-let { dpr, cssW, cssH } = setupCanvasSize();
-
-// Create a backbuffer canvas and mirror the DPR transform so we can post-process cheaply
-const back = document.createElement('canvas');
-back.width = canvas.width; back.height = canvas.height;
-const backCtx = back.getContext('2d', { alpha: false });
-	back.style.imageRendering = 'pixelated';
-try { backCtx.imageSmoothingEnabled = false; } catch(_) {}
-	backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-// --- Create ECS world ---
-const world = new World({ seed: 0x80085 }); // arbitrary default seed // new Date().getMilliseconds()
-world.storeMode = 'map'; // use Map storage for flexibility
-
-
-// --- Create player entity from archetype ---
-const playerId = createFrom(world, PlayerArchetype, {
-	Position: { x: 0, y: 0 }
-});
-
-// --- Add a short occluding wall (4 tiles wide) in front of the player ---
-import { Occluder } from './world/components/Occluder.js';
-import { Tile } from './world/components/Tile.js';
-{
-	const playerPos = world.get(playerId, Position) || { x: 0, y: 0 };
-	// Place wall 1 tile in front of player (assuming +y is "down")
-	const wallY = playerPos.y + 1;
-	const wallX0 = playerPos.x - 2;
-	for (let dx = 0; dx < 4; ++dx) {
-		const wx = wallX0 + dx;
-		const wallId = world.create();
-		world.add(wallId, Position, { x: wx, y: wallY });
-		world.add(wallId, Glyph, { char: '#', fg: '#ffffffff', bg: '#000000ff' });
-		// Make this wall block light and movement
-		world.add(wallId, Tile, { glyph: '#', walkable: false, blocksLight: true });
-		world.add(wallId, Occluder, { opacity: 1.0, thickness: 1.0 });
-	}
-}
-
-// --- Add an impassable L-shaped wall 5 tiles from the player ---
-{
-	const p = world.get(playerId, Position) || { x: 0, y: 0 };
-	// Define the L corner exactly 5 tiles to the right of the player
-	const cx = p.x + 5;
-	const cy = p.y + 0;
-	const LEG_LEN = 5; // number of tiles including the corner
-
-	// Horizontal leg: to the right from the corner
-	for (let i = 0; i < LEG_LEN; i++) {
-		const e = world.create();
-		world.add(e, Position, { x: cx + i, y: cy });
-		world.add(e, Glyph, { char: '#', fg: '#ffffffff', bg: '#333' });
-		world.add(e, Tile, { glyph: '#', walkable: false, blocksLight: true });
-		world.add(e, Occluder, { opacity: 1.0, thickness: 10.0 });
-	}
-	// Vertical leg: downward from the corner
-	for (let j = 1; j < LEG_LEN; j++) { // start at 1 to avoid duplicating the corner
-		const e = world.create();
-		world.add(e, Position, { x: cx, y: cy + j });
-		world.add(e, Glyph, { char: '#', fg: '#b10000ff', bg: '#333' });
-		world.add(e, Tile, { glyph: '#', walkable: false, blocksLight: true });
-		world.add(e, Occluder, { opacity: 1.0, thickness: 10.0 });
-	}
-}
-
-// PlayerArchetype in this repo doesn't materialize component steps in a form
-// compatible with our archetype helper, so ensure the entity has the
-// components the renderer expects by adding them explicitly.
-// Ensure essential components exist (some older archetypes or callers may
-// omit certain components); add only when missing.
-if (!world.has(playerId, Position)) world.add(playerId, Position, { x: 0, y: 0 });
-if (!world.has(playerId, Player)) world.add(playerId, Player, { });
-if (!world.has(playerId, Glyph)) world.add(playerId, Glyph, { char: '@', fg: '#fff', color: '#fff' });
-// Ensure the player is solid so monsters cannot move onto the same tile
-if (!world.has(playerId, Collider)) world.add(playerId, Collider, { solid: true, blocksSight: false });
-
-// Add InputIntent component for player input
-import { InputIntent } from './world/components/InputIntent.js';
-world.add(playerId, InputIntent, { dx: 0, dy: 0 });
-
-// --- Sprinkle some gold randomly around the player (deterministic via world.rand) ---
-import { Gold } from './world/components/Gold.js';
-{
-	// Spawn N piles of gold within a radius around the player's current position
-	const playerPos = world.get(playerId, Position) || { x: 0, y: 0 };
-	const NUM_PILES = 18;
-	const RADIUS = 5; // in tiles (Chebyshev distance)
-	const used = new Set(); // keys like "x,y"
-
-	let attempts = 0, created = 0;
-	while (created < NUM_PILES && attempts < NUM_PILES * 10) {
-		attempts++;
-		const dx = (world.rand() * (2 * RADIUS + 1) | 0) - RADIUS;
-		const dy = (world.rand() * (2 * RADIUS + 1) | 0) - RADIUS;
-		if (dx === 0 && dy === 0) continue; // not on the player
-		const x = playerPos.x + dx;
-		const y = playerPos.y + dy;
-		const k = x + ',' + y;
-		if (used.has(k)) continue;
-		used.add(k);
-
-		const goldEntity = world.create();
-		world.add(goldEntity, Position, { x, y });
-		const amount = 5 + ((world.rand() * 46) | 0); // 5..50
-		world.add(goldEntity, Gold, { amount });
-		world.add(goldEntity, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
-		// Very small light source and subtle glow on gold
-		// try {
-		// 	const goldColor = [1.0, 0.84, 0.0]; // approx #ffd700 in linear-ish
-		// 	world.add(goldEntity, Emissive, { color: goldColor, strength: 0.5, radius: 0 });
-		// 	world.add(goldEntity, Light, { kind: 'point', color: goldColor, radius: 2, intensity: 0.03, castsShadows: false });
-		// } catch(e) { /* ignore if lighting components unavailable */ }
-		created++;
-	}
-}
-
-// --- Import renderer systems ---
-import { setSystemOrder } from './lib/ecs/systems.js';
-import {
-	playerRenderSystem,
-	tileRenderSystem,
-	tileGlyphRenderSystem,
-	wallGeometryRenderSystem,
-	itemRenderSystem,
-		actorRenderSystem,
-	effectRenderSystem,
-	postProcessingRenderSystem,
-	tileLightingRenderSystem,
-	glowRenderSystem,
-	shadowRenderSystem,
-	entityLightingRenderSystem,
-	bloomRenderSystem
-} from './world/systems/render/index.js';
-// Import hallucination post-process directly to avoid any stale index.js cache issues
-import { hallucinationPostProcessRenderer } from './world/systems/render/post-processing/hallucinationPostProcessRenderer.js';
-import { RenderContext } from './world/components/RenderContext.js';
-import { createParticleSystem } from './world/systems/effects/particleSystem.js';
-import { cameraSystem } from './world/systems/cameraSystem.js';
-import { Camera } from './world/components/Camera.js';
-import { dungeonGeneratorSystem } from './world/systems/dungeon/dungeonGeneratorSystem.js';
-import { dungeonSpawnSystem } from './world/systems/dungeon/dungeonSpawnSystem.js';
-import { lifetimeSystem } from './world/systems/lifetimeSystem.js';
-import { projectileSystem } from './world/systems/projectileSystem.js';
-import { effectLifetimeSystem } from './world/systems/effects/effectLifetimeSystem.js';
-import { effectMotionSystem } from './world/systems/effects/effectMotionSystem.js';
-import { emitterSystem } from './world/systems/effects/emitterSystem.js';
-import { garbageCollectionSystem } from './world/systems/garbageCollectionSystem.js';
-import { spawnFloatText, spawnParticleBurst } from './world/systems/effects/spawner.js';
-import { ftPreset } from './world/systems/effects/floatTextPresets.js';
-import { inputSystem, setupInputListeners } from './world/systems/inputSystem.js';
-import { movementSystem } from './world/systems/movementSystem.js';
-import { combatSystem } from './world/systems/combatSystem.js';
-import { monsterSpawnSystem } from './world/systems/monsterSpawnSystem.js';
-import { monsterAISystem } from './world/systems/monsterAISystem.js';
-import { turnSystem } from './world/systems/turn/turnSystem.js';
-import { TurnState } from './world/components/TurnState.js';
-import { goldPickupSystem } from './world/systems/goldPickupSystem.js';
-import { Dungeon } from './world/components/Dungeon.js';
-import { DungeonLevel } from './world/components/DungeonLevel.js';
-// Lighting systems
-import { FlickerSystem } from './world/systems/lighting/FlickerSystem.js';
-import { ShadowCastSystem } from './world/systems/lighting/ShadowCastSystem.js';
-import { SpecularFieldSystem } from './world/systems/lighting/SpecularFieldSystem.js';
-import { ensureCameraLighting } from './world/singletons/CameraLighting.js';
-// Render lighting passes consolidated under systems/render
-import { Light } from './world/components/Light.js';
-import { Emissive } from './world/components/Emissive.js';
-import { Material } from './world/components/Material.js';
-import { FieldOfViewSystem } from './world/systems/lighting/FieldOfViewSystem.js';
-import { fpsOverlaySystem } from './world/systems/ui/fpsOverlaySystem.js';
-import { healthBarDomSystem } from './world/systems/ui/healthBarDomSystem.js';
-import { fogOfWarSystem } from './world/systems/fogOfWarSystem.js';
-import { Hallucination } from './world/components/Hallucination.js';
-import { hallucinationSystem } from './world/systems/effects/hallucinationSystem.js';
-import { LightGrid } from './world/singletons/LightGrid.js';
-
-// --- Context object for rendering (kept for potential module sharing) ---
-const renderContext = { ctx };
-
-// --- Register render systems in ECS (directly, no wrappers) ---
-// Set the shared renderContext for renderer modules to read
-// Create a RenderTarget entity to hold canvas/context info for render systems
-const rt = world.create();
-world.add(rt, RenderContext, {
-	// Renderers draw to the backbuffer; we present to the on-screen canvas at the end
-	canvas: back,
-	ctx: backCtx,
-	backCanvas: back,
-	backCtx: backCtx,
-	presentCanvas: canvas,
-	presentCtx: ctx,
-	W: cssW, // CSS pixel space (ctx is scaled by DPR)
-	H: cssH,
-	font: `${Math.max(1, Math.round(18 * ZOOM_SCALE))}px monospace`,
-	cols: Math.max(1, Math.floor(cssW / CELL_W)),
-	rows: Math.max(1, Math.floor(cssH / CELL_H)),
-	cellW: CELL_W,
-	cellH: CELL_H,
-	bg: '#0f1320',
-	pixelated: true,
-	// Do not render lighting outside the current FOV (0 = fully hidden, 0.2 = dimly visible)
-	fovOutsideDim: 0.0,
-	// Dim factor for remembered (seen) tiles when not currently visible
-	fovSeenDim: 0.08,
-	// Wall geometry renderer tuning
-	wallEdgePx: 1,
-	wallFillAlpha: 0.0,
-	wallBaseColor: '#c8c8c8',
-	// Optional blur (in CSS px) for seen-but-not-visible tiles to suggest memory (default 0 for perf)
-	fogSeenBlurPx: 0.0,
-	// Shadow tuning for EntityDropShadowRenderer
-	shadowOffsetScale: 0.85,
-	shadowAlpha: 0.42,
-	shadowMaxPx: Math.max(CELL_W, CELL_H) * 1.35,
-	shadowSoftPass: true,
-	shadowMaxLights: 2,
-	shadowMaxEntitiesPerFrame: 80,
-	// If not set, renderer derives from viewport ~ half the larger axis
-	// shadowMaxDistanceTiles: 12,
-	showFps: true
-	,
-	// pre-create particle pool so renderers can rely on it immediately
-	particleSystem: createParticleSystem({ poolSize: 512 })
-});
-// Cache the RenderContext entity id on the world for fast access in render loops
-world.renderContextId = rt;
-
-// Pre-create a LightGrid singleton so lighting systems never need to add during a tick
-try{
-	const rc0 = world.get(rt, RenderContext);
-	const half = true; // keep in sync with ShadowCastSystem default
-	const gw = Math.max(1, (half ? (rc0.cols/2)|0 : rc0.cols|0));
-	const gh = Math.max(1, (half ? (rc0.rows/2)|0 : rc0.rows|0));
-	const lgEntity = world.create();
-	world.add(lgEntity, LightGrid, {
-		w: gw,
-		h: gh,
-		r: new Float32Array(gw*gh),
-		g: new Float32Array(gw*gh),
-		b: new Float32Array(gw*gh),
-		ambient: [0.02,0.02,0.03],
-		dirty: true,
-		halfRes: half
-	});
-	world.lightGridId = lgEntity;
-}catch(e){ /* ignore if early startup constraints */ }
-
-// Pre-create a MapView entity so generation can update it in-place during update (no deferral)
-try{
-	const mv = world.create();
-	world.add(mv, MapView, { w: 0, h: 0, glyphAt: null, visibleMask: null, seenMask: null });
-	world.mapViewId = mv;
-}catch(e){ /* ignore */ }
-
-// Pre-create TurnState singleton so systems can gate by phase immediately
-try{
-	const ts = world.create();
-	world.add(ts, TurnState, { phase: 'player', round: 1 });
-	world.turnStateId = ts;
-}catch(e){ /* ignore */ }
-
-// Startup assertion: ensure the RenderContext has a particleSystem instance so renderers can rely on it.
-try{
-	const rc = world.get(rt, RenderContext);
-	console.assert(rc && rc.particleSystem, 'RenderContext.particleSystem missing — particle effects may not render');
-	// Warning commented out to reduce console noise
-	// if (!rc || !rc.particleSystem) console.warn('RenderContext has no particleSystem; spawnParticleBurst will create one on demand.');
-}catch(e){ /* ignore in constrained runtimes */ }
-
-// Ensure DevState singleton exists and assert presence (dev-only)
-import { makeSingleton } from './lib/ecs/core.js';
-import { DevState } from './world/components/DevState.js';
-try{
-	const [_c, ensureDev] = makeSingleton(world, DevState);
-	const devId = ensureDev();
-	const dev = world.get(devId, DevState);
-	console.assert(dev, 'DevState singleton not created');
-	// Default to low effect quality to minimize perf impact unless explicitly set
-	if (!dev.effectQuality){
-		world.set(devId, DevState, { effectQuality: 'low' });
-	}
-}catch(e){ /* ignore in constrained runtimes */ }
-
-// register renderers in order: tiles first, lighting background, drop-shadows, then items/effects, player, post-processing
-world.system(tileRenderSystem, 'render');
-// Lighting background pass overlays tiles with tone-mapped light
-world.system(tileLightingRenderSystem, 'render');
-// Draw tile glyphs after lighting
-world.system(tileGlyphRenderSystem, 'render');
-// Geometry-based wall edges (lit) after glyphs so edges are visible on top
-world.system(wallGeometryRenderSystem, 'render');
-// Add smooth additive glow for lights (soft halos)
-world.system(glowRenderSystem, 'render');
-// Draw per-light drop shadows for entities (beneath glyphs)
-world.system(shadowRenderSystem, 'render');
-world.system(itemRenderSystem, 'render');
-// Draw base-colored actors (non-player, non-item) before lighting modulation
-world.system(actorRenderSystem, 'render');
-world.system(effectRenderSystem, 'render');
-// Modulate entities with lighting/specular
-world.system(entityLightingRenderSystem, 'render');
-world.system(playerRenderSystem, 'render');
-// Optional bloom pass
-world.system(bloomRenderSystem, 'render');
-// Hallucination post-process (runs after main scene, before generic post-processing/UI)
-world.system(hallucinationPostProcessRenderer, 'render');
-world.system(postProcessingRenderSystem, 'render');
-// HUD/UI overlays
-world.system(fpsOverlaySystem, 'render');
-world.system(healthBarDomSystem, 'render');
-
-// Explicit ordering ensures predictable render sequence
-try { setSystemOrder('render', [
-	tileRenderSystem,
-	tileLightingRenderSystem,
-	tileGlyphRenderSystem,
-	wallGeometryRenderSystem,
-	// glowRenderSystem,
-	shadowRenderSystem,
-	itemRenderSystem,
-	actorRenderSystem,
-	effectRenderSystem,
-	entityLightingRenderSystem,
-	playerRenderSystem,
-	bloomRenderSystem,
-	hallucinationPostProcessRenderer,
-	postProcessingRenderSystem,
-	fpsOverlaySystem,
-	healthBarDomSystem
-]); } catch (e) { /* ignore */ }
-
-// Register input system (captures keyboard input, translates to InputIntent)
-setupInputListeners(); // Initialize keyboard event listeners
-
-world.system(inputSystem, 'update');
-
-// Register movement system (processes InputIntent and updates Position)
-world.system(movementSystem, 'update');
-
-// Resolve queued melee attacks after movement attempts for bump-to-attack
-world.system(combatSystem, 'update');
-
-// Update hallucination timeline after movement/input
-world.system(hallucinationSystem, 'update');
-
-// Register gold pickup handler (after movement so we resolve collisions this frame)
-world.system(goldPickupSystem, 'update');
-
-// Lighting systems ordering in update/late phases
-world.system(FlickerSystem, 'update');
-// Compute FOV mask separate from lighting so renderers can gate visibility
-world.system(FieldOfViewSystem, 'update');
-world.system(ShadowCastSystem, 'update');
-world.system(SpecularFieldSystem, 'late');
-// Fog-of-war maintenance (clear on demand via DevState.fogReset)
-world.system(fogOfWarSystem, 'update');
-
-// UI/Effects: respond to gold pickup events by spawning a float text indicator
+// --- Canvas & sizing ---
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d", { alpha: false });
 try {
-	world.on('gold:pickup', (ev) => {
-		if (!ev || typeof ev.amount !== 'number') return;
-		const x = ev.x ?? 0, y = ev.y ?? 0;
-		// Nudge the float text a few pixels near the player so it feels anchored.
-		// Convert small pixel jitter to tile units so effectRenderer mapping stays consistent.
-		const r = (typeof world.rand === 'function' ? world.rand() : Math.random);
-		const rx = (typeof r === 'function' ? r() : Math.random());
-		const ry = (typeof r === 'function' ? r() : Math.random());
-		const jitterPx = 6; // ~6px radius jitter
-		const dxTiles = ((rx * 2 - 1) * jitterPx) / CELL_W;
-		const dyTiles = (((ry * 2 - 1) * jitterPx) - 4) / CELL_H; // slight bias upward
-		spawnFloatText(world, x + dxTiles, y + dyTiles, ftPreset('Pop', { text: `+${ev.amount}`, color: '#ffd700' }));
+  ctx.imageSmoothingEnabled = false;
+} catch {}
 
-		// Dumb nightly delight: when gold is picked up, spawn another gold in a random location.
-		try {
-			// Prefer a random tile within the current viewport so it's visible.
-			let nx = x, ny = y;
-			const rcId = world.renderContextId;
-			const rc = rcId ? world.get(rcId, RenderContext) : null;
-			if (rc && typeof rc.cols === 'number' && typeof rc.rows === 'number'){
-				const cols = Math.max(1, rc.cols|0);
-				const rows = Math.max(1, rc.rows|0);
-				const camX = rc.camX|0;
-				const camY = rc.camY|0;
-				// simple attempts to avoid spawning right on the player tile
-				for (let i=0;i<8;i++){
-					const ux = (typeof r === 'function' ? r() : Math.random());
-					const uy = (typeof r === 'function' ? r() : Math.random());
-					nx = camX + ((ux * cols) | 0);
-					ny = camY + ((uy * rows) | 0);
-					if (nx !== x || ny !== y) break;
-				}
-			} else {
-				// Fallback: random offset around pickup location
-				const R = 6;
-				nx = x + (((typeof r === 'function' ? r() : Math.random()) * (2*R+1))|0) - R;
-				ny = y + (((typeof r === 'function' ? r() : Math.random()) * (2*R+1))|0) - R;
-				if (nx === x && ny === y) ny += 1; // nudge off the player tile
-			}
-			const e = world.create();
-			world.add(e, Position, { x: nx, y: ny });
-			const amt = 5 + (((typeof r === 'function' ? r() : Math.random()) * 46) | 0); // 5..50
-			world.add(e, Gold, { amount: amt });
-			world.add(e, Glyph, { char: '$', fg: '#ffd700', color: '#ffd700' });
-			// // Very small light source and subtle glow on gold
-			// try {
-			// 	const goldColor = [1.0, 0.84, 0.0];
-			// 	world.add(e, Emissive, { color: goldColor, strength: 0.5, radius: 0 });
-			// 	world.add(e, Light, { kind: 'point', color: goldColor, radius: 0.5, intensity: 0.005, castsShadows: false });
-			// } catch(_) { /* ignore */ }
-		} catch (spawnErr) { /* ignore spawn issues for this dumb nightly feature */ }
-		// // Subtle gold sparkle burst
-		// spawnParticleBurst(world, {
-		// 	x, y,
-		// 	count: 10,
-		// 	spread: Math.PI * 2,
-		// 	speed: 1.2,
-		// 	life: 0.6,
-		// 	color: '#ffd700',
-		// 	size: 0.9,
-		// 	sizeEnd: 0.1,
-		// 	ay: -0.6
-		// });
-	});
-} catch (e) { /* ignore in constrained runtimes */ }
+function resize() {
+  const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  const cssW = Math.max(1, window.innerWidth | 0);
+  const cssH = Math.max(1, window.innerHeight | 0);
+  canvas.style.width = cssW + "px";
+  canvas.style.height = cssH + "px";
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+addEventListener("resize", resize);
 
-// Register camera system in 'update' so camera follows player
-world.system(cameraSystem, 'update');
+// --- ECS setup ---
+const world = new World({ seed: 0xa77a77 });
+world.ctx = ctx; // stash for render system
 
-// Register dungeon generator (no-op until Dungeon/DungeonLevel entities exist)
-world.system(dungeonGeneratorSystem, 'update');
-// After generation, place the player at the computed spawn point (run once)
-world.system(dungeonSpawnSystem, 'update');
-// After player spawn is known, place a single torch in the starting room (run once)
+// --- Components ---
+// Centralized in src/components; also available via namespace object `Components` if desired.
+// Particles now use a pooled system (non-ECS). The Emitter component drives it.
 
-// Spawn monsters once after dungeon generation is complete (post player spawn for spacing)
-world.system(monsterSpawnSystem, 'update');
-// Monster AI: emit intents before movement (but after potential spawns)
-world.system(monsterAISystem, 'update');
+// --- Entity: big glowing @ in the center ---
+const at = world.create();s
+world.add(at, Position, { x: 0, y: 0 }); // center in NDC; resolved in render
+world.add(at, Glyph, { char: '@' });
+world.add(at, Glow, { });
 
-// Flip player/monster phases at the end of the frame for clean turns
-world.system(turnSystem, 'late');
-
-// Ensure a Dungeon + DungeonLevel entity exists to trigger generation
-try{
-	const d = world.create();
-	world.add(d, Dungeon, { level: 1, name: 'Depth 1' });
-	world.add(d, DungeonLevel, { depth: 1 });
-}catch(e){ /* ignore creation issues in constrained runtimes */ }
-
-// Register projectile motion and lifetime cleanup
-world.system(projectileSystem, 'update');
-
-// Tick VFX lifetimes
-world.system(effectLifetimeSystem, 'update');
-
-// Move float text effects (simple velocity with gentle upward lift)
-world.system(effectMotionSystem, 'update');
-
-// Update global particle system each tick so particles age and return to the pool.
-// Without this, spawned particles are never updated/released and will grow unbounded.
-// Spawn particles from emitters before updating the pool so new particles also advance this frame.
-world.system(emitterSystem, 'update');
-world.system(function particleUpdateSystem(world, dt){
-	try{
-		const rcId = world.renderContextId;
-		if (!rcId) return;
-		const rc = world.get(rcId, RenderContext);
-		const ps = rc && rc.particleSystem;
-		if (!ps || typeof ps.update !== 'function') return;
-		ps.update(dt);
-	}catch(e){ console.warn('particleUpdateSystem error', e); }
-}, 'update');
-
-// Register lifetime system in 'late' to clean up expired entities after other updates
-world.system(lifetimeSystem, 'late');
-// Run garbage collector to clean Dead entities and trim pools
-world.system(garbageCollectionSystem, 'late');
-
-// Add a Camera entity to hold viewport settings (use full RenderContext size)
-const camEntity = world.create();
-const rcData = world.get(rt, RenderContext);
-world.add(camEntity, Camera, { x: 0, y: 0, cols: rcData.cols, rows: rcData.rows });
-
-// Create camera lighting singleton
-try{ ensureCameraLighting(world); }catch(e){ /* ignore */ }
-
-
-// --- Demo lighting entities: Torch and Lava tile ---
-try{
-	const ppos = world.get(playerId, Position) || { x:0, y:0 };
-	// Torch near player (legacy demo)
-	const torch = world.create();
-	world.add(torch, Position, { x: ppos.x + 3, y: ppos.y });
-	world.add(torch, Light, {
-		kind:'point', color:[1.0,0.6,0.2], radius:5, intensity:0.05, flickerSeed:42, castsShadows:true,
-		flicker: { style:'torch', amplitude:0.5, hiMs:33, midMs:110, lowMs:420, wHi:0.5, wMid:0.35, wLow:0.15, gamma:1.25,
-				   radiusAmp:0.14, tintAmp:0.28, sputterPerSec:0.5, sputterDrop:0.3, surgePerSec:0.2, surgeAmp:0.15 }
-	});
-	world.add(torch, Emissive, { color:[1.0,0.4,0.1], strength:0.5, radius:1 });
-
-	// Give player a basic material so specular is visible
-	if (!world.has(playerId, Material)){
-		world.add(playerId, Material, { albedo:[0.9,0.9,1.0], roughness:0.7, metalness:0.1, specular:0.5 });
-	}
-
-	// Lava emissive tile
-	const lava = world.create();
-	world.add(lava, Position, { x: ppos.x - 4, y: ppos.y + 2 });
-	world.add(lava, Emissive, { color:[1.0,0.3,0.0], strength:3, radius:1 });
-
-	// --- Line of torches of different types ---
-	// Torch types: vary color, glyph, light radius/intensity, emissive, material
-	const torchTypes = [
-		// Classic yellow torch
-		{ glyph: { char: '†', fg: '#ffb300' }, light: { color: [1.0, 0.8, 0.2], radius: 5, intensity: 0.04 }, emissive: { color: [1.0, 0.7, 0.2], strength: 0.7, radius: 1 }, material: { albedo: [1, 0.9, 0.5], roughness: 0.6, metalness: 0.0, specular: 0.3 } },
-		// Blue magical torch (different glyph, higher intensity)
-		{ glyph: { char: '*', fg: '#00e5ff' }, light: { color: [0.2, 0.8, 1.0], radius: 6, intensity: 0.08 }, emissive: { color: [0.2, 0.7, 1.0], strength: 1.2, radius: 2 }, material: { albedo: [0.7, 0.9, 1.0], roughness: 0.3, metalness: 0.2, specular: 0.7 } },
-		// Green eerie torch (smaller, dimmer, different glyph)
-		{ glyph: { char: '!', fg: '#00ff90' }, light: { color: [0.2, 1.0, 0.6], radius: 3, intensity: 0.03 }, emissive: { color: [0.2, 1.0, 0.6], strength: 0.5, radius: 1 }, material: { albedo: [0.7, 1, 0.8], roughness: 0.8, metalness: 0.0, specular: 0.2 } },
-		// Red hellfire torch (large, very bright, unique glyph)
-		{ glyph: { char: '¥', fg: '#ff1744' }, light: { color: [1.0, 0.2, 0.2], radius: 8, intensity: 0.12 }, emissive: { color: [1.0, 0.2, 0.2], strength: 2.0, radius: 2 }, material: { albedo: [1, 0.5, 0.5], roughness: 0.4, metalness: 0.1, specular: 0.8 } },
-		// White holy torch (tall, wide, very soft)
-		{ glyph: { char: '|', fg: '#fffde7' }, light: { color: [1.0, 1.0, 0.95], radius: 10, intensity: 0.06 }, emissive: { color: [1.0, 1.0, 0.95], strength: 1.5, radius: 3 }, material: { albedo: [1, 1, 0.95], roughness: 0.2, metalness: 0.0, specular: 0.9 } },
-		// Purple arcane torch (flickery, small, different glyph)
-		{ glyph: { char: '¤', fg: '#d500f9' }, light: { color: [0.7, 0.2, 1.0], radius: 4, intensity: 0.07 }, emissive: { color: [0.7, 0.2, 1.0], strength: 0.9, radius: 1 }, material: { albedo: [0.9, 0.7, 1.0], roughness: 0.7, metalness: 0.3, specular: 0.5 } },
-		// Orange pumpkin torch (round, warm, unique glyph)
-		{ glyph: { char: '◉', fg: '#ff9100' }, light: { color: [1.0, 0.55, 0.1], radius: 7, intensity: 0.09 }, emissive: { color: [1.0, 0.55, 0.1], strength: 1.3, radius: 2 }, material: { albedo: [1, 0.7, 0.3], roughness: 0.5, metalness: 0.0, specular: 0.4 } },
-	];
-	// // Arrange torches in a horizontal line (same y, varying x)
-	// const torchY = ppos.y - 3;
-	// const torchX0 = ppos.x - Math.floor(torchTypes.length / 2);
-	// const spacing = 10; // tiles between torches
-	// for (let i = 0; i < torchTypes.length; ++i) {
-	// 	const t = torchTypes[i];
-	// 	const tid = world.create();
-	// 	world.add(tid, Position, { x: torchX0 + i * spacing, y: torchY });
-	// 	world.add(tid, Glyph, t.glyph);
-	// 	world.add(tid, Light, Object.assign({ kind: 'point', flickerSeed: 100 + i, castsShadows: true }, t.light));
-	// 	world.add(tid, Emissive, Object.assign({ radius: t.emissive.radius }, t.emissive));
-	// 	world.add(tid, Material, t.material);
-	// }
-
-}catch(e){ /* ignore demo spawn errors */ }
-
-// --- Start ECS main loop ---
-startLoop(world);
-
-// Demo: spawn some float text near player so we can immediately see effects
-try {
-	spawnFloatText(world, 2, 2, ftPreset('Punch', { text: '-5', color:'#9ff' }));
-	spawnFloatText(world, 2, 3, ftPreset('Pulse', { text: '+8', color:'#fff59e' }));
-} catch(e) { /* ignore in non-demo contexts */ }
-
-// // Demo: attach an initial Hallucination to the player so the effect is visible
-// try {
-// 		if (!world.has(playerId, Hallucination)){
-// 			world.add(playerId, Hallucination, {
-// 				onsetSec: 2.0,
-// 				sustainSec: 6.0,
-// 				comedownSec: 4.0,
-// 				strength: 0.2,
-// 				hueMaxDeg: 120,
-// 				saturationBoost: 1.8,
-// 				aberrationMaxPx: 6,
-// 				wobbleAmpPx: 10,
-// 				wobbleFreqHz: 1.3,
-// 				vignetteStrength: 0.35,
-// 				kaleidoAt: 0.7,
-// 				trailAlpha: 0.0,
-// 				loop: false
-// 			});
-// 		}
-// } catch(_) { /* ignore in constrained runtimes */ }
-
-// Keep canvas/resolution in sync with viewport to avoid stretching and keep tiles square
-window.addEventListener('resize', () => {
-	({ dpr, cssW, cssH } = setupCanvasSize());
-	try {
-		world.set(rt, RenderContext, {
-			W: cssW,
-			H: cssH,
-			cols: Math.max(1, Math.floor(cssW / CELL_W)),
-			rows: Math.max(1, Math.floor(cssH / CELL_H))
-		});
-		// Resize the backbuffer to match the visible canvas backing size and reapply DPR transform
-		try{
-			const rc = world.get(rt, RenderContext);
-			if (rc && rc.backCanvas && rc.presentCanvas){
-				rc.backCanvas.width = rc.presentCanvas.width;
-				rc.backCanvas.height = rc.presentCanvas.height;
-				if (rc.backCtx && typeof rc.backCtx.setTransform === 'function'){
-					rc.backCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-					try { rc.backCtx.imageSmoothingEnabled = false; } catch(_) {}
-				}
-			}
-		}catch(e){ /* ignore */ }
-		// Keep Camera viewport in sync with RenderContext so camera centering matches renderers
-		try{
-			const rc = world.get(rt, RenderContext);
-			if (rc && typeof rc.cols === 'number' && typeof rc.rows === 'number'){
-				world.set(camEntity, Camera, { cols: rc.cols, rows: rc.rows });
-			}
-		}catch(e){ /* ignore if camera not yet created */ }
-	} catch (e) {
-		// If this races during startup, it's safe to ignore; next frame will update.
-	}
+// Attach an emitter to the glyph entity to match previous visuals (omni light sparkle)
+world.add(at, Emitter, {
+  enabled: true,
+  continuous: true,
+  rate: 22,               // ~particles/sec (boosted for visibility)
+  burstCount: 0,
+  angle: 0,
+  spread: Math.PI * 2,    // omni
+  speed: 30,              // px/sec for continuous emission
+  speedJitter: 0.6,
+  vx: 0,
+  vy: 0,
+  ax: 0,
+  ay: 0,                  // no gravity in UI sparkle
+  life: 1.6,
+  lifeJitter: 0.4,
+  size: 2.6,
+  sizeEnd: 0.2,
+  color: "#8cf",
+  offsetX: 0,
+  offsetY: 0,
 });
+
+// --- Systems ---
+// Emitter-driven pooled particles (inject the exact component refs used by this world)
+const emitterSystem = createEmitterSystem({ Position, Emitter });
+
+function renderSystem(w) {
+  const ctx = w.ctx;
+  const W = ctx.canvas.width / (ctx.getTransform().a || 1);
+  const H = ctx.canvas.height / (ctx.getTransform().d || 1);
+  // background (draw using current DPR transform so we cover full backing store)
+  ctx.save();
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#0b0e16");
+  g.addColorStop(1, "#0a0c14");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  // center coordinates (CSS px)
+  const cx = W * 0.5,
+    cy = H * 0.5;
+
+  // fetch components (single glyph)
+  const row = [...w.query(Position, Glyph, Glow)][0];
+  if (!row) return;
+  const [id, pos, glyph, glow] = row;
+
+  // dynamic font size based on viewport
+  const size = Math.max(
+    16,
+    Math.floor(Math.min(W, H) * (glyph.baseScale || 0.7))
+  );
+  const font = `${glyph.weight || "900"} ${size}px ${
+    glyph.family || "monospace"
+  }`;
+
+  // compute pulse using real time (decoupled from simulation time)
+  const tSec = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const pulse = 1 + (glow.pulse || 0) * Math.sin((glow.speedHz || 0.6) * tSec * Math.PI * 2);
+  const intensity = (glow.intensity || 1) * Math.max(0, pulse);
+
+  // draw glow layers (additive)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = font;
+  ctx.globalCompositeOperation = "lighter";
+  const glowColor = glow.color || "#6cf";
+  const layers = 7;
+  for (let i = 0; i < layers; i++) {
+    const t = i / (layers - 1);
+    const blur = (glow.blurBase + t * (glow.blurMax - glow.blurBase)) * intensity;
+    const alpha = 0.08 * (1 - t) * intensity;
+    ctx.shadowBlur = blur;
+    ctx.shadowColor = glowColor;
+    ctx.fillStyle = `rgba(102, 204, 255, ${alpha.toFixed(3)})`; // approx #6cf
+    ctx.fillText(glyph.char || "@", pos.x, pos.y);
+  }
+  // core glyph
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = glyph.fg || "#e8f7ff";
+  ctx.fillText(glyph.char || "@", pos.x, pos.y);
+
+  // subtle inner stroke for crispness
+  ctx.lineWidth = Math.max(1, size * 0.02);
+  ctx.strokeStyle = "rgba(20, 3, 3, 0.1)";
+  ctx.strokeText(glyph.char || "@", pos.x, pos.y);
+  ctx.restore();
+
+  // pooled particles (additive small dots), centered like the glyph
+  renderPooledParticlesSystem(w, 0, { cx, cy, mode: 'lighter', alphaScale: 0.9 });
+
+  // Debug HUD: show particle count (top-left)
+  try {
+    const stats = getGlobalParticlePool().getStats();
+    const rows = [...w.query(Position, Emitter)];
+    const emitters = rows.length;
+    const em = rows[0]?.[2];
+    const acc = em ? em._acc.toFixed(2) : '0.00';
+    const rate = em ? em.rate : 0;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#9cf';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`particles: ${stats.active}/${stats.total}  emitters: ${emitters}  rate:${rate} acc:${acc}`, 8, 8);
+    ctx.restore();
+  } catch {}
+}
+
+// Register systems and scheduler
+// Simulation systems go under "update" (turn-based / step-driven)
+// Real-time effects (emitters + particle pool) go under "fx" and are run outside world.tick
+registerSystem(emitterSystem, "fx");
+
+// Ensure pool integration runs after emission for the frame
+registerSystem(particlePoolUpdateSystem, "fx", { after: [emitterSystem] });
+
+// Only run the simulation phase inside world.tick; visuals are driven in the frame loop
+world.setScheduler(composeScheduler("update"));
+
+// --- Render Loop --- (as requested)
+let last = performance.now();
+function frame(now) {
+  // Real-time delta in seconds for FX systems
+  const dtSec = Math.max(0, (now - last) / 1000);
+  last = now;
+
+  // Advance simulation in fixed/step terms; here we keep sim paused (0) unless you drive it
+  world.tick(0);
+
+  // Run real-time effects (emitters + particle integration) against seconds
+  runSystems("fx", world, dtSec);
+
+  // Render current world state + particles
+  renderSystem(world);
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
