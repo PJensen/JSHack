@@ -17,6 +17,7 @@ export const Actions = Object.freeze({
   // Display-directed UI
   OpenInventory: "display.openInventory", // payload: {}
   OpenMessageLog: "display.openMessageLog", // payload: {}
+  Zoom: "display.zoom", // payload: { factor:number } (pinch scale delta)
 });
 
 // Default routing from action → sink
@@ -27,6 +28,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.CastActiveSpell]: Sinks.rules,
   [Actions.OpenInventory]: Sinks.display,
   [Actions.OpenMessageLog]: Sinks.display,
+  [Actions.Zoom]: Sinks.display,
 });
 
 // Utility to build an action object

@@ -12,7 +12,9 @@ export class InputManager {
     this.target = targetEl || window;
     this.handlers = new Set();
     this.hotspots = new Map(); // id -> { element, action }
-    this._pointer = null; // { id, x0,y0,t0, lastX,lastY }
+  this._pointer = null; // { id, x0,y0,t0, lastX,lastY }
+  this._multi = new Map(); // pointerId -> { x,y }
+  this._pinch = null; // { id1,id2, d0 }
     this._canvas = options.canvas || null;
 
     this._onKeyDown = (e) => this._handleKeyDown(e);
@@ -99,24 +101,67 @@ export class InputManager {
   }
 
   _handlePointerDown(e) {
-    if (this._pointer) return; // single-pointer gestures only
     const rect = (this._canvas || this.target).getBoundingClientRect?.() || { left: 0, top: 0 };
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    this._pointer = { id: e.pointerId, x0: x, y0: y, t0: performance.now(), lastX: x, lastY: y };
+
+    // Track in multi map
+    this._multi.set(e.pointerId, { x, y });
+
+    if (this._multi.size === 2) {
+      // Enter pinch mode
+      const ids = Array.from(this._multi.keys());
+      const a = this._multi.get(ids[0]);
+      const b = this._multi.get(ids[1]);
+      const d0 = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      this._pinch = { id1: ids[0], id2: ids[1], d0 };
+      this._pointer = null; // cancel single-pointer tap/drag
+      return;
+    }
+
+    if (!this._pointer && this._multi.size === 1) {
+      this._pointer = { id: e.pointerId, x0: x, y0: y, t0: performance.now(), lastX: x, lastY: y };
+    }
   }
 
   _handlePointerMove(e) {
+    const rect = (this._canvas || this.target).getBoundingClientRect?.() || { left: 0, top: 0 };
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (this._multi.has(e.pointerId)) this._multi.set(e.pointerId, { x, y });
+
+    if (this._pinch) {
+      const a = this._multi.get(this._pinch.id1);
+      const b = this._multi.get(this._pinch.id2);
+      if (!a || !b) return;
+      const d = Math.hypot(b.x - a.x, b.y - a.y) || this._pinch.d0;
+      const factor = d / (this._pinch.d0 || 1);
+      // Emit zoom deltas around 1.0 (avoid huge jumps)
+      if (Number.isFinite(factor) && factor > 0) {
+        this._emit(makeAction(Actions.Zoom, { factor }));
+        // Update baseline to allow smooth continuous pinch
+        this._pinch.d0 = d;
+      }
+      return;
+    }
+
     const p = this._pointer;
     if (!p || p.id !== e.pointerId) return;
-    const rect = (this._canvas || this.target).getBoundingClientRect?.() || { left: 0, top: 0 };
-    p.lastX = e.clientX - rect.left;
-    p.lastY = e.clientY - rect.top;
+    p.lastX = x; p.lastY = y;
   }
 
   _handlePointerUp(e) {
+    // Update multi map
+    this._multi.delete(e.pointerId);
+
+    // End pinch if one of the fingers lifted
+    if (this._pinch && (e.pointerId === this._pinch.id1 || e.pointerId === this._pinch.id2)) {
+      this._pinch = null;
+    }
+
+    // Handle single-pointer tap/swipe
     const p = this._pointer;
-    if (!p || p.id !== e.pointerId) return;
+    if (!p || p.id !== e.pointerId) { return; }
     this._pointer = null;
 
     const rect = (this._canvas || this.target).getBoundingClientRect?.();

@@ -19,20 +19,24 @@ export function makeRulesDispatcher(world, getActorId) {
       case "rules.move": {
         const { dx = 0, dy = 0 } = action.payload || {};
         world?.add?.(actorId, MoveIntent, { dx, dy });
+        world?.tick?.(1);
         break;
       }
       case "rules.wait": {
         world?.add?.(actorId, WaitIntent, {});
+        world?.tick?.(1);
         break;
       }
       case "rules.drinkPotion": {
         const { itemId = 0, targetId = actorId } = action.payload || {};
         world?.add?.(actorId, DrinkIntent, { itemId, targetId });
+        world?.tick?.(1);
         break;
       }
       case "rules.castActiveSpell": {
         const { spellId = 0, targetId = actorId } = action.payload || {};
         world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
+        world?.tick?.(1);
         break;
       }
     }

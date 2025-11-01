@@ -3,7 +3,9 @@
 
 // ---- Imports ---------------------------------------------------------------
 // rules/ (app owns lifecycle only; no display code here)
-import { World } from "./rules/world.js";            // or your app-owned rulesApi
+import { World } from "./lib/ecs-js/index.js";            // ECS World
+import { configureWorld } from "../app/rules/scheduler.js";
+import { playerEntity } from "./rules/utils/queries.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera } from "./display/camera/controller.js";
@@ -15,6 +17,9 @@ import { ParticleFX } from "./display/fx/particles/particles.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
 import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
+// simple UI overlays
+import { initOverlays } from "./display/ui/overlay.js";
+import { Inventory, ItemInfo } from "./rules/components/index.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -34,14 +39,18 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
+// ---- App wires rules/ (no display logic here) ------------------------------
+const world = new World({ seed: 0xa77a77 });
+try { configureWorld(world); } catch {}
+// Only app/scenes step the sim (deterministic). We’ll keep it paused here.
+function stepSim(_dtTurns = 0) { world.step?.(_dtTurns) /* or world.tick(… ) */ }
+
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
 try {
   const rulesHandler = makeRulesDispatcher(
-    // world may or may not conform yet; guard calls inside dispatcher
     /** @type any */(world),
-    // Try to resolve the controlled actor id; return 0 if unknown
-    () => (world && world.playerId) ? world.playerId : 0
+    () => (playerEntity(world)?.id || 0)
   );
 
   const displayHandler = (action) => {
@@ -52,22 +61,58 @@ try {
       case "display.openMessageLog":
         window.dispatchEvent(new CustomEvent("ui:openMessageLog"));
         break;
+      case "display.zoom": {
+        const f = Math.max(0.5, Math.min(1.5, Number(action.payload?.factor) || 1));
+        const next = Math.max(0.25, Math.min(4, (cam.targetScale || cam.scale || 1) * f));
+        zoomTo(cam, next);
+        break;
+      }
       default:
-        // no-op
         break;
     }
   };
 
   setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers });
 } catch (err) {
-  // Keep playable even if input wiring fails in early bring-up
   console?.warn?.("input setup skipped:", err);
 }
 
-// ---- App wires rules/ (no display logic here) ------------------------------
-const world = new World({ seed: 0xa77a77 });
-// Only app/scenes step the sim (deterministic). We’ll keep it paused here.
-function stepSim(_dtTurns = 0) { world.step?.(_dtTurns) /* or world.tick(… ) */ }
+// ---- Display UI overlays + data feeds -------------------------------------
+initOverlays();
+
+// Provide inventory data to overlay when requested
+addEventListener('ui:requestInventoryData', () => {
+  const p = playerEntity(world);
+  const items = [];
+  if (p) {
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        const info = world.get(id, ItemInfo);
+        if (info) items.push({ id, type: info.type, description: info.description, count: info.count });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items } }));
+});
+
+// Provide message log entries (placeholder until rules log is wired)
+addEventListener('ui:requestMessageLogData', () => {
+  const entries = [];
+  window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
+});
+
+// When user clicks an inventory item to drink
+addEventListener('ui:requestDrink', (e) => {
+  const itemId = e.detail?.itemId;
+  if (!Number.isInteger(itemId)) return;
+  // Re-emit through input pipeline by calling displayHandler? We can directly enqueue a rules action:
+  try {
+    const action = { type: 'rules.drinkPotion', payload: { itemId } };
+    const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+    rulesHandler(action);
+  } catch {}
+});
 
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
@@ -162,12 +207,13 @@ function frame(now) {
   stepSim(0);
 
   // Advance display-only systems
-  fx.step(dtSec, origins);
+  try { fx.step(dtSec); } catch {}
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
 
   // Render
-  render(view);
+  // Fallback render with empty view until bridge provides snapshots
+  try { render({ entities: [] }); } catch {}
 
   requestAnimationFrame(frame);
 }
