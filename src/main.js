@@ -5,9 +5,6 @@
 // rules/ (app owns lifecycle only; no display code here)
 import { World } from "./rules/world.js";            // or your app-owned rulesApi
 
-// bridge/ reader to build read-only DTO snapshots for display
-import { build as buildWorldView } from "./bridge/readers/world_view.js";
-
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera } from "./display/camera/controller.js";
 import { updateShake, startShake } from "./display/camera/shake.js";
@@ -130,25 +127,6 @@ function frame(now) {
 
   // Sim step is scene-controlled; keep paused or call with fixed dt if desired.
   stepSim(0);
-
-  // Build read-only snapshot for display
-  const view = buildWorldView(world); // { turn, seed, player, entities, emissives, ... }
-
-  // Drive particle emitters from semantic data (e.g., emissives) — display-only
-  const origins = [];
-  for (const em of view.emissives) {
-    // ensure a display-side emitter bound to this semantic id
-    fx.ensureEmitter(em.id, {
-      continuous: true, rate: 16,
-      angle: -Math.PI/2, spread: Math.PI/6,
-      speed: 1.2, speedJitter: 0.45,
-      ax: 0, ay: -0.6,
-      life: 0.9, lifeJitter: 0.25,
-      size: 0.9, sizeEnd: 0.12,
-      color: "#ffa500" // warm
-    });
-    origins.push({ key: em.id, x: em.x, y: em.y });
-  }
 
   // Advance display-only systems
   fx.step(dtSec, origins);
