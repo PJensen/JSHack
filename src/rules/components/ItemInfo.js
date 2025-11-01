@@ -11,8 +11,8 @@ export const ItemInfo = defineComponent(
     slot: "", // intended equipment or container slot, e.g. "hand", "bag"
     weight: 0, // numeric weight (for encumbrance or turn cost)
     value: 0, // optional numeric value for trade/scoring
-    stackable: false, // optional: can this be stacked in inventory?
     description: "", // flavor text description of the item
+    count: 1, // stacking count; >=1 for any item entity
   },
   {
     validate(rec) {
@@ -28,10 +28,10 @@ export const ItemInfo = defineComponent(
         throw new Error(
           "ItemInfo.validate(): value must be a non-negative number"
         );
-      if (typeof rec.stackable !== "boolean")
-        throw new Error("ItemInfo.validate(): stackable must be a boolean");
       if (typeof rec.description !== "string")
         throw new Error("ItemInfo.validate(): description must be a string");
+      if (!Number.isFinite(rec.count) || rec.count < 1)
+        throw new Error("ItemInfo.validate(): count must be >= 1");
       return true;
     },
   }
