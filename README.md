@@ -59,6 +59,17 @@ Execute `./build.ps1` to check for errors
 - Use the reference demos in `reference/` for learning or testing ECS features.
 - All code is MIT licensed and intended for learning, hacking, and rapid prototyping.
 
+## Effects & Status (rules/)
+
+- Active effects are stored in `ActiveEffects.effects` on an entity as records like `{ key, turnsLeft, potency?, stacks?, onsetLeft? }`.
+- The `effectSystem` runs each tick and applies gameplay results:
+	- `poison` and `burn` deal damage over time to `Vitality.hp`.
+	- `regeneration` heals each tick up to `Vitality.maxHp`.
+	- `stun` sets a status flag (no movement/AI gating yet).
+- Current statuses are mirrored into `Status.statuses` each tick (e.g., `poisoned`, `burning`). When an entity has no effects, statuses clear automatically.
+
+Example: Apply poison to the player for 3 turns at 2 damage per tick by pushing `{ key:'poison', turnsLeft:3, potency:2 }` into the player's `ActiveEffects.effects`. On each world tick, hp will drop by 2 until the effect expires, and the `poisoned` status will appear during the duration.
+
 ## Contributing
 
 Contributions, bug reports, and suggestions are welcome! Please open an issue or submit a pull request.

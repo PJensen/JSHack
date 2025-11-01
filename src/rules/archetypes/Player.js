@@ -4,6 +4,8 @@ import { Player } from "../components/Player.js";
 import { Inventory } from "../components/Inventory.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Physiology } from "../components/Physiology.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Vitality } from "../components/Vitality.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -11,7 +13,9 @@ export const PlayerArchetype = defineArchetype(
   [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
   [Inventory, (p) => ({ capacity: p.capacity ?? 20, weightLimit: p.weightLimit ?? null, items: [] })],
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
-  [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })]
+  [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
+  [ActiveEffects, { effects: [] }],
+  [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })]
 );
 
 export function createPlayer(world, params = {}) {
