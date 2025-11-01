@@ -14,5 +14,8 @@ export { Wounds } from './Wounds.js';
 export { DrinkIntent } from './Intents/DrinkIntent.js';
 export { PickupIntent } from './Intents/PickupIntent.js';
 export { DropIntent } from './Intents/DropIntent.js';
+export { MoveIntent } from './Intents/MoveIntent.js';
+export { WaitIntent } from './Intents/WaitIntent.js';
+export { CastSpellIntent } from './Intents/CastSpellIntent.js';
 export { Status } from './Status.js';
 export { Vitality } from './Vitality.js';

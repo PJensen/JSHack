@@ -12,6 +12,9 @@ import { zoomTo, jumpTo } from "./display/camera/utils.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
 import { ParticleFX } from "./display/fx/particles/particles.js";
+// input wiring (display-only router)
+import { setupInput } from "./display/input/InputRouter.js";
+import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -30,6 +33,36 @@ function resize() {
 }
 addEventListener("resize", resize);
 resize();
+
+// ---- Input setup (display/input → rules/display) ---------------------------
+const inputDisposers = [];
+try {
+  const rulesHandler = makeRulesDispatcher(
+    // world may or may not conform yet; guard calls inside dispatcher
+    /** @type any */(world),
+    // Try to resolve the controlled actor id; return 0 if unknown
+    () => (world && world.playerId) ? world.playerId : 0
+  );
+
+  const displayHandler = (action) => {
+    switch (action.type) {
+      case "display.openInventory":
+        window.dispatchEvent(new CustomEvent("ui:openInventory"));
+        break;
+      case "display.openMessageLog":
+        window.dispatchEvent(new CustomEvent("ui:openMessageLog"));
+        break;
+      default:
+        // no-op
+        break;
+    }
+  };
+
+  setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers });
+} catch (err) {
+  // Keep playable even if input wiring fails in early bring-up
+  console?.warn?.("input setup skipped:", err);
+}
 
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });

@@ -1,3 +1,4 @@
+import { defineComponent } from "../../../lib/ecs-js/index.js";
 /**
  * MoveIntent — request for an actor to move one tile in a direction.
  * actor entity holds this component for one tick; systems will consume and remove it.

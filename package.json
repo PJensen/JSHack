@@ -4,6 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node ./tests/inventory.mjs"
+  "test": "npm run test:inventory && npm run test:effects",
+  "test:inventory": "node ./tests/inventory.mjs",
+  "test:effects": "node ./tests/effects.mjs"
   }
 }
