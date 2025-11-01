@@ -21,6 +21,12 @@ import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
 import { Inventory, ItemInfo } from "./rules/components/index.js";
+import { buildWorldView } from "./bridge/schema/worldView.js";
+import { createFrom } from "./lib/ecs-js/archetype.js";
+import { createPlayer } from "./rules/archetypes/Player.js";
+import { HealthPotion } from "./rules/archetypes/Items.js";
+import { Position } from "./rules/components/Position.js";
+import { followEntity } from "./display/camera/follow.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -45,6 +51,18 @@ const world = new World({ seed: 0xa77a77 });
 try { configureWorld(world); } catch {}
 // Only app/scenes step the sim (deterministic). We’ll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { try { world.tick(dtTurns); } catch {} } }
+
+// ---- Demo scene: ensure a player exists and a couple items around ----------
+try {
+  if (!playerEntity(world)) {
+    const pid = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+    // drop a couple of health potions on the ground
+    const p1 = createFrom(world, HealthPotion, {});
+    world.add(p1, Position, { x: 2, y: 0 });
+    const p2 = createFrom(world, HealthPotion, {});
+    world.add(p2, Position, { x: -2, y: 0 });
+  }
+} catch {}
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -236,8 +254,13 @@ function frame(now) {
   updateShake(cam, dtSec);
 
   // Render
-  // Fallback render with empty view until bridge provides snapshots
-  try { render({ entities: [] }); } catch {}
+  const view = buildWorldView(world);
+  // keep camera centered on player if present
+  if (view.player) {
+    // Directly set follow target at player world coords
+    followEntity(cam, view.player.pos, dtSec, 6.0);
+  }
+  render(view);
 
   requestAnimationFrame(frame);
 }
