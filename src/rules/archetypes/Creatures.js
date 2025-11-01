@@ -1,91 +1,123 @@
-import { defineArchetype } from "../../lib/ecs-js/archetype.js";
-import { Anatomy, buildHumanoidAnatomy } from "../components/Anatomy.js";
-import { Resistances }      from "../components/Resistences.js";
-import { Physiology }       from "../components/Physiology.js";
-import { Faction }          from "../components/Faction.js";
-import { NamedIdentity }          from "../components/NamedIdentity.js";
+import { defineArchetype, withOverrides } from "../../lib/ecs-js/archetype.js";
+import { Position } from "../components/Position.js";
+import { Anatomy } from "../components/Anatomy.js";
+import { buildHumanoidAnatomyUltraLite, buildHumanoidAnatomyLite, buildHumanoidAnatomyFull as buildHumanoidAnatomy } from "../components/Anatomy.js";
+import { Resistances } from "../components/Resistences.js";
+import { Physiology } from "../components/Physiology.js";
+import { Faction } from "../components/Faction.js";
+import { Alignment } from "../components/Alignment.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Collider } from "../components/Collider.js";
+import { Inventory } from "../components/Inventory.js";
+import { Equipment } from "../components/Equipment.js";
+import { Wounds } from "../components/Wounds.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 
+/**
+ * Consolidated creature archetypes
+ * - Creature: baseline with broadly useful components and param-driven defaults
+ * - Human:    Creature with humanoid anatomy and human-like defaults
+ * - Monster:  Creature with hostile faction and slightly tougher defaults
+ * - Other:    Creature for non-humanoids; anatomy defaults to none unless provided
+ */
 
-export const Raider = defineArchetype(
-  "Raider",
-  [Resistances, {
-    kinetic:   { DR: 8,  bluntMult: 1.0, slashMult: 0.9, pierceMult: 1.0 },
-    thermal:   { igniteC: Infinity, burnMult: 1.0 },
-    chemical:  { acidMult: 1.0, baseMult: 1.0, solventMult: 1.0, toxMult: 1.0 },
-    electric:  { ohms: 900, fibrillationA: 0.03 },
-    radiation: { alpha: 1.0, beta: 1.0, gamma: 1.1, neutron: 1.0 }
-  }],
-  [Physiology, { sizeClass: "M", massKg: 78, kineticTriageDiv: 290, painMult: 0.95 }],
-  [Faction, { key: "enemy" }],
-  [NamedIdentity, { name: "Raider", identity: "raider" }],
+const defaultResist = {
+  kinetic:   { DR: 0,  bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0 },
+  thermal:   { igniteC: Infinity, burnMult: 1.0 },
+  chemical:  { acidMult: 1.0, baseMult: 1.0, solventMult: 1.0, toxMult: 1.0 },
+  electric:  { ohms: Infinity, fibrillationA: 0.03 },
+  radiation: { alpha: 1.0, beta: 1.0, gamma: 1.0, neutron: 1.0 },
+};
+
+function resolveAnatomyParts(p) {
+  // User may pass: anatomy.parts (explicit), anatomyKind, or humanoid=true
+  const kind = p.anatomyKind || (p.humanoid ? "humanoid-ultralite" : null);
+  if (p.anatomy && Array.isArray(p.anatomy.parts)) return p.anatomy.parts;
+  switch (kind) {
+    case "humanoid-ultralite": return buildHumanoidAnatomyUltraLite();
+    case "humanoid-lite":      return buildHumanoidAnatomyLite();
+    case "humanoid-full":      return buildHumanoidAnatomy();
+    default:                    return [];
+  }
+}
+
+export const Creature = defineArchetype(
+  "Creature",
+  // Spatial (optional via params; defaults to 0,0)
+  [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+  // Identity & grouping
+  [NamedIdentity, (p) => ({ name: p.name ?? "Creature", identity: p.identity ?? (p.kind ?? "creature") })],
+  [Faction, (p) => ({ key: p.faction ?? p.factionKey ?? "neutral" })],
+  [Alignment, (p) => ({ lawChaos: p.lawChaos ?? "neutral", goodEvil: p.goodEvil ?? "neutral" })],
+  // Body & durability
+  [Anatomy, (p) => ({ parts: resolveAnatomyParts(p) })],
+  [Physiology, (p) => ({
+    sizeClass: p.sizeClass ?? "M",
+    massKg: p.massKg ?? 80,
+    kineticTriageDiv: p.kineticTriageDiv ?? 300,
+    painMult: p.painMult ?? 1.0,
+    bleedBaseMl: p.bleedBaseMl ?? 5000,
+  })],
+  [Resistances, (p) => ({
+    kinetic:   { ...defaultResist.kinetic,   ...(p.resistances?.kinetic   ?? {}) },
+    thermal:   { ...defaultResist.thermal,   ...(p.resistances?.thermal   ?? {}) },
+    chemical:  { ...defaultResist.chemical,  ...(p.resistances?.chemical  ?? {}) },
+    electric:  { ...defaultResist.electric,  ...(p.resistances?.electric  ?? {}) },
+    radiation: { ...defaultResist.radiation, ...(p.resistances?.radiation ?? {}) },
+  })],
+  // Gameplay utility
+  [Collider, (p) => ({ solid: p.solid ?? true, blocksSight: p.blocksSight ?? false })],
+  [Inventory, (p) => ({ items: [], capacity: p.capacity ?? 0, weightLimit: p.weightLimit ?? null })],
+  [Equipment, (p) => ({
+    weapon: p.weapon ?? null,
+    armor: p.armor ?? null,
+    ring1: p.ring1 ?? null,
+    ring2: p.ring2 ?? null,
+    attackDerived: 0, defenseDerived: 0, maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,
+  })],
+  [Wounds, { list: [] }],
+  [ActiveEffects, { list: [] }],
 );
 
-export const Orc = defineArchetype(
-  "Orc",
-  [Resistances, {
-    kinetic:   { DR: 18, bluntMult: 0.85, slashMult: 0.9, pierceMult: 0.95 },
-    thermal:   { igniteC: Infinity, burnMult: 0.9 },
-    chemical:  { acidMult: 1.2, baseMult: 1.1, solventMult: 1.1, toxMult: 0.9 },
-    electric:  { ohms: 800, fibrillationA: 0.04 },
-    radiation: { alpha: 0.9, beta: 0.9, gamma: 1.0, neutron: 1.0 }
-  }],
-  [Physiology, { sizeClass: "L", massKg: 110, kineticTriageDiv: 360, painMult: 0.7, bleedBaseMl: 6500 }],
-  [Faction, { key: "enemy" }],
-  [NamedIdentity, { name: "Ocr", identity: "orc" }],
-);
+// Human (humanoid defaults, neutral faction)
+export const Human = withOverrides(Creature, {
+  Anatomy: (p) => ({ parts: resolveAnatomyParts({ ...p, humanoid: p.humanoid ?? true }) }),
+  Physiology: (p) => ({
+    sizeClass: p.sizeClass ?? "M",
+    massKg: p.massKg ?? 78,
+    kineticTriageDiv: p.kineticTriageDiv ?? 290,
+    painMult: p.painMult ?? 1.0,
+    bleedBaseMl: p.bleedBaseMl ?? 5000,
+  }),
+  Resistances: (p) => ({
+    kinetic:   { DR: 4,  bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0, ...(p.resistances?.kinetic ?? {}) },
+    thermal:   { igniteC: Infinity, burnMult: 1.0, ...(p.resistances?.thermal ?? {}) },
+    chemical:  { acidMult: 1.0, baseMult: 1.0, solventMult: 1.0, toxMult: 1.0, ...(p.resistances?.chemical ?? {}) },
+    electric:  { ohms: 1200, fibrillationA: 0.03, ...(p.resistances?.electric ?? {}) },
+    radiation: { alpha: 1.0, beta: 1.0, gamma: 1.0, neutron: 1.0, ...(p.resistances?.radiation ?? {}) },
+  }),
+  Faction: (p) => ({ key: p.faction ?? p.factionKey ?? "neutral" }),
+  NamedIdentity: (p) => ({ name: p.name ?? "Human", identity: p.identity ?? "human" }),
+});
 
-// ---------- SMALL ANIMALS ----------
-export const Rat = defineArchetype("Rat", [
-  [Resistances, {
-    kinetic:   { DR: 1,  bluntMult: 1.2, slashMult: 1.1, pierceMult: 1.0 },
-    thermal:   { igniteC: Infinity, burnMult: 1.2 },
-    chemical:  { acidMult: 1.1, baseMult: 1.1, solventMult: 1.1, toxMult: 1.2 },
-    electric:  { ohms: 1200, fibrillationA: 0.02 },
-    radiation: { alpha: 1.0, beta: 1.0, gamma: 1.2, neutron: 1.1 }
-  }],
-  [Physiology, { sizeClass: "XS", massKg: 0.4, kineticTriageDiv: 120, painMult: 1.2, bleedBaseMl: 30 }],
-  [Faction, { key: "neutral" }],
-  [NamedIdentity, { name: "Rat", identity: "rat" }],  
-]);
+// Monster (hostile by default; anatomy configurable via params)
+export const Monster = withOverrides(Creature, {
+  Faction: (p) => ({ key: p.faction ?? p.factionKey ?? "enemy" }),
+  NamedIdentity: (p) => ({ name: p.name ?? "Monster", identity: p.identity ?? "monster" }),
+  Resistances: (p) => ({
+    kinetic:   { DR: 8,  bluntMult: 0.95, slashMult: 0.95, pierceMult: 1.0, ...(p.resistances?.kinetic ?? {}) },
+    thermal:   { igniteC: Infinity, burnMult: 0.95, ...(p.resistances?.thermal ?? {}) },
+    chemical:  { acidMult: 1.0, baseMult: 1.0, solventMult: 1.0, toxMult: 1.0, ...(p.resistances?.chemical ?? {}) },
+    electric:  { ohms: 900, fibrillationA: 0.04, ...(p.resistances?.electric ?? {}) },
+    radiation: { alpha: 1.0, beta: 1.0, gamma: 1.0, neutron: 1.0, ...(p.resistances?.radiation ?? {}) },
+  }),
+});
 
-// ---------- NON-HUMANOID (AMORPHOUS / UNDEAD / CONSTRUCT) ----------
-export const Slime = defineArchetype("Slime", [
-  [Resistances, {
-    kinetic:   { DR: 30, bluntMult: 0.30, slashMult: 0.9,  pierceMult: 0.6 },
-    thermal:   { igniteC: Infinity, burnMult: 1.1 },
-    chemical:  { acidMult: 0.6, baseMult: 0.6, solventMult: 0.4, toxMult: 0.8 },
-    electric:  { ohms: 200, fibrillationA: 0.00 },
-    radiation: { alpha: 0.8, beta: 1.0, gamma: 1.2, neutron: 1.0 }
-  }],
-  [Physiology, { sizeClass:"M", massKg: 50, kineticTriageDiv: 400, painMult: 0.2, bleedBaseMl: 0 }],
-  [Faction, { key: "neutral" }],
-  [NamedIdentity, { name: "Slime Mold", identity: "slime-mold" }]
-]);
+// Other (non-humanoid baseline; anatomy empty unless provided)
+export const Other = withOverrides(Creature, {
+  Anatomy: (p) => ({ parts: resolveAnatomyParts({ ...p, anatomyKind: p.anatomyKind ?? null }) }),
+  NamedIdentity: (p) => ({ name: p.name ?? "Creature", identity: p.identity ?? (p.kind ?? "creature") }),
+});
 
-export const Skeleton = defineArchetype("Skeleton", [
-  [Resistances, {
-    kinetic:   { DR: 10, bluntMult: 1.4, slashMult: 0.5, pierceMult: 0.4 }, // blunt smashes, edges glance
-    thermal:   { igniteC: Infinity, burnMult: 0.2 },
-    chemical:  { acidMult: 1.3, baseMult: 1.3, solventMult: 0.5, toxMult: 0.0 },
-    electric:  { ohms: Infinity, fibrillationA: 999 },
-    radiation: { alpha: 0.8, beta: 0.8, gamma: 0.8, neutron: 0.8 }
-  }],
-  [Physiology, { sizeClass:"M", massKg: 25, kineticTriageDiv: 220, painMult: 0.0, bleedBaseMl: 0 }],
-  [Faction, { key: "enemy" }],
-  [NamedIdentity, { value: "Skeleton" }],
-  [NamedIdentity, { name: "Skeleton", identity: "skeleton" }],  
-]);
-
-// ---------- HEAVY CONSTRUCT ----------
-export const StoneGolem = defineArchetype("StoneGolem", [
-  [Resistances, {
-    kinetic:   { DR: 80, bluntMult: 0.6,  slashMult: 0.2, pierceMult: 0.3 },
-    thermal:   { igniteC: Infinity, burnMult: 0.3 },
-    chemical:  { acidMult: 0.8, baseMult: 1.3, solventMult: 0.2, toxMult: 0.0 },
-    electric:  { ohms: 5000, fibrillationA: 999 },
-    radiation: { alpha: 0.5, beta: 0.5, gamma: 0.6, neutron: 0.7 }
-  }],
-  [Physiology, { sizeClass:"XL", massKg: 600, kineticTriageDiv: 900, painMult: 0.0, bleedBaseMl: 0 }],
-  [Faction, { key: "enemy" }],
-  [NamedIdentity, { name: "Stone Golem", identity: "stone-golem" }]
-]);
+// Back-compat shims (optional): export a HumanoidBase if callers expect it
+export const HumanoidBase = Human;
