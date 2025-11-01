@@ -19,6 +19,7 @@ import { setupInput } from "./display/input/InputRouter.js";
 import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
+import { initHUD } from "./display/ui/hud.js";
 import { Inventory, ItemInfo } from "./rules/components/index.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
@@ -43,7 +44,7 @@ resize();
 const world = new World({ seed: 0xa77a77 });
 try { configureWorld(world); } catch {}
 // Only app/scenes step the sim (deterministic). We’ll keep it paused here.
-function stepSim(_dtTurns = 0) { world.step?.(_dtTurns) /* or world.tick(… ) */ }
+function stepSim(dtTurns = 0) { if (dtTurns > 0) { try { world.tick(dtTurns); } catch {} } }
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -79,6 +80,7 @@ try {
 
 // ---- Display UI overlays + data feeds -------------------------------------
 initOverlays();
+initHUD();
 
 // Provide inventory data to overlay when requested
 addEventListener('ui:requestInventoryData', () => {
@@ -98,9 +100,31 @@ addEventListener('ui:requestInventoryData', () => {
 
 // Provide message log entries (placeholder until rules log is wired)
 addEventListener('ui:requestMessageLogData', () => {
-  const entries = [];
+  const entries = messageLog.slice();
   window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
 });
+
+// Active spell button click → cast
+addEventListener('ui:castActiveSpell', () => {
+  try {
+    const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+    rulesHandler({ type: 'rules.castActiveSpell', payload: {} });
+  } catch {}
+});
+
+// Basic app-side message log collector (bridge-free for now)
+const messageLog = [];
+function log(msg) {
+  messageLog.push(msg);
+  if (messageLog.length > 50) messageLog.shift();
+}
+try {
+  world.on('drank', ({ actor, itemId, target }) => log(`Entity ${actor} drank item ${itemId} on ${target||actor}`));
+  world.on('castSpell', ({ actor, spellId, targetId }) => log(`Entity ${actor} cast spell ${spellId||'active'} on ${targetId||actor}`));
+  world.on('damage', ({ id, amount }) => log(`Entity ${id} took ${amount} damage`));
+  world.on('healed', ({ id, amount }) => log(`Entity ${id} healed ${amount}`));
+  world.on('died', ({ id }) => log(`Entity ${id} died`));
+} catch {}
 
 // When user clicks an inventory item to drink
 addEventListener('ui:requestDrink', (e) => {
@@ -203,7 +227,7 @@ function frame(now) {
   const dtSec = Math.max(0, (now - last) / 1000);
   last = now;
 
-  // Sim step is scene-controlled; keep paused or call with fixed dt if desired.
+  // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
 
   // Advance display-only systems

@@ -132,5 +132,14 @@ export function buildHumanoidAnatomyLite({
   return normalizeVolumes(parts);
 }
 
-/** FULL — your original per-digit builder can stay, gated behind a flag when you truly need it. */
-export { buildHumanoidAnatomy as buildHumanoidAnatomyFull };
+/**
+ * FULL — placeholder for a more granular builder.
+ * For now, alias to Lite to avoid breaking imports.
+ */
+export { buildHumanoidAnatomyLite as buildHumanoidAnatomyFull };
+
+// Back-compat: provide a default builder expected by components/index.js
+export function buildHumanoidAnatomy(opts = {}) {
+  // Default to UltraLite for performance; switch to Lite based on opts if needed later
+  return buildHumanoidAnatomyUltraLite();
+}

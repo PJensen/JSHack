@@ -5,8 +5,8 @@ import { composeScheduler, registerSystem, clearSystems } from "../../src/lib/ec
 import { drinkSystem } from "../../src/rules/systems/drinkSystem.js";
 import { itemPickupSystem } from "../../src/rules/systems/itemPickupSystem.js";
 import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";
-import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
 import { projectileSystem } from "../../src/rules/systems/projectileSystem.js";
+import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
 import { effectSystem } from "../../src/rules/systems/effectSystem.js";
 import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
@@ -20,8 +20,8 @@ export function configureWorld(world) {
   registerSystem(drinkSystem, 'intents');
   registerSystem(itemPickupSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
-  registerSystem(interactionSystem, 'intents');
   registerSystem(projectileSystem, 'intents');
+  registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
 
   // Phase: effects (per-turn effects resolution)
