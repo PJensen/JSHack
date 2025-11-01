@@ -68,6 +68,16 @@ function ensurePanel(kind) {
     border: '1px solid #2d3b52', borderRadius: '8px', padding: '12px',
     background: '#0b0e16', boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
   });
+  // Close button
+  const close = document.createElement('button');
+  close.textContent = '×';
+  Object.assign(close.style, {
+    position: 'absolute', right: '6px', top: '6px', width: '28px', height: '28px',
+    border: '1px solid #2d3b52', borderRadius: '6px', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  close.addEventListener('click', () => hide(panel));
+  inner.appendChild(close);
   panel.appendChild(inner);
   root.appendChild(panel);
   panel._inner = inner;

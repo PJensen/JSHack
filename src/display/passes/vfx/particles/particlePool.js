@@ -5,7 +5,7 @@
 // - ParticleFX manager to wire multiple emitters by key (e.g., entity id)
 // - Optional deterministic RNG via seed (visual-only determinism)
 
-import { makeRng } from '../../../util/rng.js';
+import { makeRng } from '../../../../shared/utils/rng.js';
 
 export class ParticlePool {
   constructor(capacity = 4096) {

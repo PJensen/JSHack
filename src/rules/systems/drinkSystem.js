@@ -42,12 +42,14 @@ export function drinkSystem(world) {
 
     // 2) immediate channels (beneficial or harmful)
     if (pot.channels?.length) {
-      const spec = world.getOrAdd(target, DamageSpec, { channels: [] });
-      spec.channels.push(...pot.channels);
+      let spec = world.get(target, DamageSpec);
+      if (!spec) { try { world.add(target, DamageSpec, { channels: [] }); spec = world.get(target, DamageSpec); } catch {} }
+      if (spec) spec.channels.push(...pot.channels);
     }
 
     // 3) staged effects with stacking policies
-    const ae = world.getOrAdd(target, ActiveEffects, { effects: [] });
+  let ae = world.get(target, ActiveEffects);
+  if (!ae) { try { world.add(target, ActiveEffects, { effects: [] }); ae = world.get(target, ActiveEffects); } catch {} }
     for (const e of pot.effects) {
       const existing = ae.effects.filter((x) => x.key === e.key);
       if (e.stack === "refresh" && existing.length) {

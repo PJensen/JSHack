@@ -13,7 +13,7 @@ import { updateShake, startShake } from "./display/camera/shake.js";
 import { zoomTo, jumpTo } from "./display/camera/utils.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
-import { ParticleFX } from "./display/fx/particles/particles.js";
+import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
 import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
@@ -123,7 +123,7 @@ function worldToScreen({ x, y, size = 1 }) {
 }
 
 // ---- Particle FX (display-only) -------------------------------------------
-const fx = new ParticleFX({ capacity: 4096, seedBase: world.seed >>> 0 });
+const fx = new ParticleFX({ capacity: 4096, seedBase: (world.seed >>> 0) });
 fx.ctx = ctx;
 fx.worldToScreen = worldToScreen;
 
