@@ -1,16 +1,15 @@
 import { defineArchetype } from "../Archetype.js";
 import { Position } from "../components/Position.js";
 import { DoorState } from "../components/DoorState.js";
-import { Terrain } from "../components/Terrain.js";
+import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
-import { Wood } from "./BaseMaterial.js";
 
 export const Door = defineArchetype("Door",
   [Position, (p) => ({ x: p.x, y: p.y })],
   [Material, { kind: "wood" }],
   [DoorState, { open: false, locked: false }],
-  [Terrain, { walkable: false, opaque: true }],
+  [Collider, { solid: true, blocksSight: true }],
   [Interactable, { action: "toggleDoor" }],
 );
 
