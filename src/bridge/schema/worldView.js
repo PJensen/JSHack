@@ -7,6 +7,7 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Terrain } from "../../rules/components/Terrain.js";
 import { DoorState } from "../../rules/components/DoorState.js";
 import { Collider } from "../../rules/components/Collider.js";
+import { Status } from "../../rules/components/Status.js";
 
 export function buildWorldView(world) {
 	const view = {
@@ -39,7 +40,19 @@ export function buildWorldView(world) {
 			kind = ident?.identity || ident?.name || "default";
 		}
 
-		const rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [] };
+			const rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [] };
+			// Project select status types into tags for display-only logic
+			const stat = world.get(id, Status);
+			if (stat && Array.isArray(stat.statuses)) {
+				for (const s of stat.statuses) {
+					const t = String(s.type || '').toLowerCase();
+					if (!t) continue;
+					// Whitelist: only expose a small set as tags to keep display contract tidy
+					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating') {
+						rec.tags.push(t);
+					}
+				}
+			}
 		view.entities.push(rec);
 		if (isPlayer) view.player = { id, pos: { x: pos.x, y: pos.y } };
 

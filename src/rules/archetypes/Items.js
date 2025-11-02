@@ -25,3 +25,16 @@ export const HealthPotion = defineArchetype(
     }],
     [NamedIdentity, p => ({ name: p.name ?? "Health Potion" })],
 );
+
+// Currency stack (Gold) — zero weight, stackable via ItemInfo.count
+export const GoldStack = defineArchetype(
+    "GoldStack",
+    [ItemInfo, {
+        type: "currency",
+        description: "Gold coins",
+        weight: 0,
+        value: 1, // per coin
+        count: 1,
+    }],
+    [NamedIdentity, p => ({ name: p.name ?? "Gold", identity: "gold" })],
+);

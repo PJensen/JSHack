@@ -198,7 +198,6 @@ export class InputManager {
 
     // Tap: short press without large movement
     if (dt <= TAP_MS) {
-      const leftHalf = p.x0 < width * 0.5;
       // If active-spell hotspot exists and tap is on it, prefer casting
       const activeSpellEl = document.getElementById?.("active-spell");
       if (activeSpellEl) {
@@ -212,9 +211,20 @@ export class InputManager {
         }
       }
 
-      // Otherwise, left/right tap → move
-      if (leftHalf) this._emit(makeAction(Actions.Move, { dx: -1, dy: 0 }));
-      else this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 }));
+      // Otherwise, choose cardinal move based on which axis is farther from screen center
+      const cx = width * 0.5;
+      const cy = height * 0.5;
+      const dx0 = p.x0 - cx;
+      const dy0 = p.y0 - cy;
+      if (Math.abs(dx0) >= Math.abs(dy0)) {
+        // Horizontal
+        if (dx0 < 0) this._emit(makeAction(Actions.Move, { dx: -1, dy: 0 }));
+        else this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 }));
+      } else {
+        // Vertical
+        if (dy0 < 0) this._emit(makeAction(Actions.Move, { dx: 0, dy: -1 }));
+        else this._emit(makeAction(Actions.Move, { dx: 0, dy: 1 }));
+      }
     }
   }
 }

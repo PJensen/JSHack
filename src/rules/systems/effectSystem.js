@@ -53,6 +53,12 @@ export function effectSystem(world) {
 
             // Apply effect
             switch (key) {
+                case 'invuln':
+                case 'invulnerable': {
+                    // No direct HP change; reflect status for bridge/display and for other systems to check if needed
+                    upsertStatus(nextStatuses, { type: 'invulnerable', duration: e.turnsLeft, potency, stacks });
+                    break;
+                }
                 case 'poison':
                 case 'poisoned': {
                     const dmg = Math.max(0, potency * stacks);

@@ -25,12 +25,14 @@ import { Inventory, ItemInfo } from "./rules/components/index.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
-import { HealthPotion } from "./rules/archetypes/Items.js";
+import { HealthPotion, GoldStack } from "./rules/archetypes/Items.js";
 import { FloorTile, WallTile } from "./rules/archetypes/Tiles.js";
 import { Door } from "./rules/archetypes/Door.js";
 import { Monster } from "./rules/archetypes/Creatures.js";
 import { Position } from "./rules/components/Position.js";
 import { followEntity } from "./display/camera/follow.js";
+import { ActiveEffects } from "./rules/components/ActiveEffects.js";
+import { createRng } from "./lib/ecs-js/rng.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -89,12 +91,34 @@ try {
   if (!playerEntity(world)) {
     createPlayer(world, { x: 0, y: 0, name: "Hero" });
   }
+  // Apply 10-turn invulnerability to the player at start
+  try {
+    const pe = playerEntity(world);
+    if (pe) {
+      const ae = world.get(pe.id, ActiveEffects);
+      if (ae && Array.isArray(ae.effects)) {
+        ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
+      } else {
+        world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
+      }
+    }
+  } catch {}
 
   // Drop a couple of health potions on the floor
   const p1 = createFrom(world, HealthPotion, {});
   world.add(p1, Position, { x: 2, y: 0 });
   const p2 = createFrom(world, HealthPotion, {});
   world.add(p2, Position, { x: -2, y: 0 });
+
+  // Spawn a stack of gold (currency) using deterministic RNG
+  try {
+    const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
+    const coins = rng.int(12, 47);
+    const gold = createFrom(world, GoldStack, {});
+    world.add(gold, Position, { x: 1, y: 1 });
+    // set stack size
+    world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
+  } catch {}
 
   // Spawn a few monsters that will chase the player
   createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
@@ -232,12 +256,14 @@ const palette = {
   wall: { glyph: "#", fg: "#99a", glow: "#667" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
+  gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
 };
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
+let _fxTime = 0; // display-side time accumulator for simple glyph FX
 function render(worldView) {
   const tf = ctx.getTransform();
   const W = canvas.width / (tf.a || 1);
@@ -292,6 +318,19 @@ function render(worldView) {
     ctx.shadowBlur = 0;
     ctx.fillStyle = look.fg;
     ctx.fillText(look.glyph, e.pos.x, e.pos.y);
+
+    // Glyph-FX: show an invulnerability shimmer ring when tagged
+    if (Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(160,255,255,0.9)';
+      ctx.lineWidth = 0.08; // world units
+      const r = 0.45 + 0.06 * Math.sin(_fxTime * 6.0);
+      ctx.beginPath();
+      ctx.arc(e.pos.x, e.pos.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // Particles (already in world space)
@@ -322,6 +361,7 @@ function frame(now) {
   // Update FX FPS (exponential moving average for stability)
   const instFps = dtSec > 0 ? (1 / dtSec) : 0;
   _fpsEMA = _fpsEMA ? (_fpsEMA * 0.9 + instFps * 0.1) : instFps;
+  _fxTime += dtSec;
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
