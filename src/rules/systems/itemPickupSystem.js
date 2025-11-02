@@ -27,7 +27,7 @@ function findStackTarget(world, inv, itemId) {
     }
     return 0;
 }
-
+    
 function findStackTargetByIdentity(world, inv, identity) {
     if (!identity) return 0;
     for (const id of inv.items) {
