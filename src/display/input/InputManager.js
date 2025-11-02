@@ -12,9 +12,9 @@ export class InputManager {
     this.target = targetEl || window;
     this.handlers = new Set();
     this.hotspots = new Map(); // id -> { element, action }
-  this._pointer = null; // { id, x0,y0,t0, lastX,lastY }
-  this._multi = new Map(); // pointerId -> { x,y }
-  this._pinch = null; // { id1,id2, d0 }
+    this._pointer = null; // { id, x0,y0,t0, lastX,lastY }
+    this._multi = new Map(); // pointerId -> { x,y }
+    this._pinch = null; // { id1,id2, d0 }
     this._canvas = options.canvas || null;
 
     this._onKeyDown = (e) => this._handleKeyDown(e);
@@ -37,7 +37,7 @@ export class InputManager {
   }
 
   registerHotspot(id, element, action) {
-    if (!element) return () => {};
+    if (!element) return () => { };
     const rec = { element, action };
     this.hotspots.set(id, rec);
     const click = (ev) => {
@@ -52,7 +52,7 @@ export class InputManager {
   }
 
   _emit(action) {
-    for (const h of this.handlers) try { h(action); } catch {}
+    for (const h of this.handlers) try { h(action); } catch { }
   }
 
   _bind() {
@@ -107,6 +107,13 @@ export class InputManager {
     if (key?.toLowerCase() === "q") {
       e.preventDefault();
       this._emit(makeAction(Actions.DrinkPotion));
+      return;
+    }
+
+    // Pickup item (',' for get)
+    if (key === ",") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.PickupItem));
       return;
     }
   }

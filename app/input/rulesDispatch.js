@@ -2,7 +2,8 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent } from "../../src/rules/components/index.js";
+import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, Position, ItemInfo } from "../../src/rules/components/index.js";
+import { itemsAt } from "../../src/rules/utils/queries.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.
@@ -36,6 +37,34 @@ export function makeRulesDispatcher(world, getActorId) {
       case "rules.castActiveSpell": {
         const { spellId = 0, targetId = actorId } = action.payload || {};
         world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.pickupItem": {
+        // Determine which item to pick up: prefer payload.itemId; otherwise choose a ground item at actor's tile.
+        const { itemId = 0, count = null } = action.payload || {};
+        let targetId = 0;
+
+        if (Number.isInteger(itemId) && itemId > 0) {
+          targetId = itemId;
+        } else {
+          const pos = world?.get?.(actorId, Position);
+          if (!pos) break;
+          const ids = itemsAt(world, pos.x, pos.y);
+          if (!ids || ids.length === 0) break;
+          // Prefer non-currency items when multiple are present; fall back to any item (incl. currency)
+          const nonCurrency = ids.filter((id) => {
+            const info = world.get(id, ItemInfo);
+            return info && info.type !== "currency";
+          });
+          targetId = (nonCurrency[0] ?? ids[0]) || 0;
+        }
+
+        if (!targetId) break;
+
+        const intent = { targetId };
+        if (Number.isFinite(count) && count > 0) intent.count = count;
+        world?.add?.(actorId, PickupIntent, intent);
         world?.tick?.(1);
         break;
       }

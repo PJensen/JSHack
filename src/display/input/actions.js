@@ -18,14 +18,19 @@ export const Actions = Object.freeze({
   OpenInventory: "display.openInventory", // payload: {}
   OpenMessageLog: "display.openMessageLog", // payload: {}
   Zoom: "display.zoom", // payload: { factor:number } (pinch scale delta)
+  PickupItem: "rules.pickupItem", // payload: {}
 });
 
 // Default routing from action → sink
 export const defaultActionSinks = Object.freeze({
+  // Rules-directed intents
   [Actions.Move]: Sinks.rules,
   [Actions.Wait]: Sinks.rules,
   [Actions.DrinkPotion]: Sinks.rules,
+  [Actions.PickupItem]: Sinks.rules,
   [Actions.CastActiveSpell]: Sinks.rules,
+
+  // Display-directed UI actions
   [Actions.OpenInventory]: Sinks.display,
   [Actions.OpenMessageLog]: Sinks.display,
   [Actions.Zoom]: Sinks.display,
