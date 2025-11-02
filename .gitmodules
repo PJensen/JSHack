@@ -1,3 +1,4 @@
 [submodule "src/lib/ecs-js"]
 	path = src/lib/ecs-js
 	url = https://github.com/PJensen/ecs-js.git
+	branch = main
