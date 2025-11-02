@@ -18,6 +18,7 @@ export { DropIntent } from './Intents/DropIntent.js';
 export { MoveIntent } from './Intents/MoveIntent.js';
 export { WaitIntent } from './Intents/WaitIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';
+export { AttackIntent } from './Intents/AttackIntent.js';
 export { Status } from './Status.js';
 export { Vitality } from './Vitality.js';
 export { Settings } from './Settings.js';

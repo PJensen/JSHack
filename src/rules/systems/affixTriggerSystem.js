@@ -1,0 +1,52 @@
+// src/rules/systems/affixTriggerSystem.js
+// Installs event listeners that dispatch affix scripts on equipment for both attacker and defender contexts.
+
+import { Equipment } from '../components/Equipment.js';
+import { ItemInfo } from '../components/ItemInfo.js';
+import { AFFIX_DEFS } from '../data/affixes.js';
+import { Vitality } from '../components/Vitality.js';
+
+function eachAffix(world, entityId, cb) {
+  const eq = world.get(entityId, Equipment);
+  if (!eq) return;
+  for (const slotId of [eq.weapon, eq.armor, eq.ring1, eq.ring2]) {
+    if (!Number.isInteger(slotId)) continue;
+    const info = world.get(slotId, ItemInfo);
+    if (!info || !Array.isArray(info.affixes)) continue;
+    for (const aId of info.affixes) {
+      const a = AFFIX_DEFS[aId];
+      if (a) cb(a, slotId);
+    }
+  }
+}
+
+function makeCtx(world, base) {
+  // Attach helpers directly to the base object so scripts can mutate base.damage
+  base.addBonus = (k, v) => { if (k === 'damage') base.damage += v; };
+  base.retaliate = (amount) => {
+    const t = world.get(base.attacker, Vitality);
+    if (!t) return;
+    t.hp = Math.max(0, t.hp - Math.max(0, amount|0));
+  };
+  base.heal = (entity, amount) => {
+    const vit = world.get(entity, Vitality);
+    if (!vit) return;
+    vit.hp = Math.min(vit.maxHp, vit.hp + Math.max(0, amount|0));
+  };
+  base.healAttacker = (amount) => {
+    const vit = world.get(base.attacker, Vitality);
+    if (!vit) return;
+    vit.hp = Math.min(vit.maxHp, vit.hp + Math.max(0, amount|0));
+  };
+  return base;
+}
+
+export function installAffixTriggers(world) {
+  // Handle defender-side reactions on damage. Attacker-side hooks are applied by combatSystem for determinism.
+  world.on('damaged', ({ target, amount, source }) => {
+    const base = { attacker: source, defender: target, weaponId: 0, damage: amount, world };
+    const ctxT = makeCtx(world, base);
+    // defender affixes with onDamaged
+    eachAffix(world, target, (a) => { if (a.triggers?.includes('onDamaged') && typeof a.script === 'function') a.script(ctxT); });
+  });
+}

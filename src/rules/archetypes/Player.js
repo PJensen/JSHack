@@ -7,6 +7,7 @@ import { Physiology } from "../components/Physiology.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
 import { Settings } from "../components/Settings.js";
+import { Equipment } from "../components/Equipment.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -18,6 +19,7 @@ export const PlayerArchetype = defineArchetype(
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })]
   , [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })]
+  , [Equipment, {}]
 );
 
 export function createPlayer(world, params = {}) {
@@ -28,6 +30,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Inventory, { capacity: params.capacity ?? 20, weightLimit: params.weightLimit ?? null, items: [] });
     world.add(id, NamedIdentity, { name: params.name ?? "Player", identity: params.identity ?? "player" });
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
+    world.add(id, Equipment, {});
     return id;
   })();
 }

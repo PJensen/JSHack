@@ -13,10 +13,14 @@ import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
 import { movementSystem } from "../../src/rules/systems/movementSystem.js";
+import { combatSystem } from "../../src/rules/systems/combatSystem.js";
+import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
 
 export function configureWorld(world) {
-  // Optional: clear previous registry on hot reload
-  try { clearSystems(); } catch {}
+  clearSystems();
+
+  // Install affix event listeners once per world
+  installAffixTriggers(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -28,6 +32,7 @@ export function configureWorld(world) {
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
   registerSystem(movementSystem, 'intents');
+  registerSystem(combatSystem, 'intents');
   // Run pickup after movement so stepping onto items can pick them up immediately
   registerSystem(itemPickupSystem, 'intents');
 

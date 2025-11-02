@@ -64,75 +64,67 @@ try { configureWorld(world); } catch {}
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { try { world.tick(dtTurns); } catch {} } }
 
 // ---- Demo scene: ensure a player exists and a couple items around ----------
-try {
-  // Build a small dungeon room (10x10) centered at (0,0)
-  const W = 10, H = 10;
-  const ox = -((W - 1) >> 1), oy = -((H - 1) >> 1);
-  // Door at the bottom wall center (compute before tile loop to skip placing a wall there)
-  const doorPos = { x: 0, y: oy + (H - 1) };
+// Build a small dungeon room (10x10) centered at (0,0)
+const W = 10, H = 10;
+const ox = -((W - 1) >> 1), oy = -((H - 1) >> 1);
+// Door at the bottom wall center (compute before tile loop to skip placing a wall there)
+const doorPos = { x: 0, y: oy + (H - 1) };
 
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const gx = ox + x, gy = oy + y;
-      const isBorder = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
-      if (isBorder) {
-        // Skip wall at the intended door location
-        if (gx === doorPos.x && gy === doorPos.y) continue;
-        const tid = createFrom(world, WallTile, { x: gx, y: gy });
-        void tid;
-      } else {
-        const tid = createFrom(world, FloorTile, { x: gx, y: gy });
-        void tid;
-      }
+for (let y = 0; y < H; y++) {
+  for (let x = 0; x < W; x++) {
+    const gx = ox + x, gy = oy + y;
+    const isBorder = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
+    if (isBorder) {
+      if (gx === doorPos.x && gy === doorPos.y) continue;
+      createFrom(world, WallTile, { x: gx, y: gy });
+    } else {
+      createFrom(world, FloorTile, { x: gx, y: gy });
     }
   }
-  // Add a single door at the bottom wall center
-  createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
+}
+// Add a single door at the bottom wall center
+createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
 
-  // Ensure a player exists at room center
-  if (!playerEntity(world)) {
-    createPlayer(world, { x: 0, y: 0, name: "Hero" });
-  }
-  // Apply 10-turn invulnerability to the player at start
-  try {
-    const pe = playerEntity(world);
-    if (pe) {
-      const ae = world.get(pe.id, ActiveEffects);
-      if (ae && Array.isArray(ae.effects)) {
-        ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
-      } else {
-        world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
-      }
+// Ensure a player exists at room center
+if (!playerEntity(world)) {
+  createPlayer(world, { x: 0, y: 0, name: "Hero" });
+}
+// Apply 10-turn invulnerability to the player at start
+{
+  const pe = playerEntity(world);
+  if (pe) {
+    const ae = world.get(pe.id, ActiveEffects);
+    if (ae && Array.isArray(ae.effects)) {
+      ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
+    } else {
+      world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
     }
-  } catch {}
+  }
+}
 
-  // Drop a couple of health potions on the floor
-  const p1 = createFrom(world, HealthPotion, {});
-  world.add(p1, Position, { x: 2, y: 0 });
-  const p2 = createFrom(world, HealthPotion, {});
-  world.add(p2, Position, { x: -2, y: 0 });
+// Drop a couple of health potions on the floor
+const p1 = createFrom(world, HealthPotion, {});
+world.add(p1, Position, { x: 2, y: 0 });
+const p2 = createFrom(world, HealthPotion, {});
+world.add(p2, Position, { x: -2, y: 0 });
 
-  // Spawn a stack of gold (currency) using deterministic RNG
-  try {
-    const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
-    const coins = rng.int(12, 47);
-    const gold = createFrom(world, GoldStack, {});
-    world.add(gold, Position, { x: 1, y: 1 });
-    // set stack size
-    world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
-  } catch {}
+// Spawn a stack of gold (currency) using deterministic RNG
+{
+  const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
+  const coins = rng.int(12, 47);
+  const gold = createFrom(world, GoldStack, {});
+  world.add(gold, Position, { x: 1, y: 1 });
+  world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
+}
 
-  // Spawn a few monsters that will chase the player
-  createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
-  createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
-  createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
+// Spawn a few monsters that will chase the player
+createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
+createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
+createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
 
-  // Drop a sample equipment item to validate palette wiring
-  try {
-    const eq = buildEquipmentItem(world, 'sword_plain', {});
-    world.add(eq, Position, { x: -1, y: 1 });
-  } catch {}
-} catch {}
+// Drop a sample equipment item to validate palette wiring
+const eq = buildEquipmentItem(world, 'sword_plain', {});
+world.add(eq, Position, { x: -1, y: 1 });
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
