@@ -1,4 +1,4 @@
-import { defineArchetype } from '../Archetype.js';
+import { defineArchetype } from '../../lib/ecs-js/archetype.js';
 import { Position } from '../components/Position.js';
 import { Terrain } from '../components/Terrain.js';
 

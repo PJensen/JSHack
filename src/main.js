@@ -26,6 +26,9 @@ import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
 import { HealthPotion } from "./rules/archetypes/Items.js";
+import { FloorTile, WallTile } from "./rules/archetypes/Tiles.js";
+import { Door } from "./rules/archetypes/Door.js";
+import { Monster } from "./rules/archetypes/Creatures.js";
 import { Position } from "./rules/components/Position.js";
 import { followEntity } from "./display/camera/follow.js";
 
@@ -58,14 +61,45 @@ function stepSim(dtTurns = 0) { if (dtTurns > 0) { try { world.tick(dtTurns); } 
 
 // ---- Demo scene: ensure a player exists and a couple items around ----------
 try {
-  if (!playerEntity(world)) {
-    const pid = createPlayer(world, { x: 0, y: 0, name: "Hero" });
-    // drop a couple of health potions on the ground
-    const p1 = createFrom(world, HealthPotion, {});
-    world.add(p1, Position, { x: 2, y: 0 });
-    const p2 = createFrom(world, HealthPotion, {});
-    world.add(p2, Position, { x: -2, y: 0 });
+  // Build a small dungeon room (21x13) centered at (0,0)
+  const W = 21, H = 13;
+  const ox = -((W - 1) >> 1), oy = -((H - 1) >> 1);
+  // Door at the bottom wall center (compute before tile loop to skip placing a wall there)
+  const doorPos = { x: 0, y: oy + (H - 1) };
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const gx = ox + x, gy = oy + y;
+      const isBorder = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
+      if (isBorder) {
+        // Skip wall at the intended door location
+        if (gx === doorPos.x && gy === doorPos.y) continue;
+        const tid = createFrom(world, WallTile, { x: gx, y: gy });
+        void tid;
+      } else {
+        const tid = createFrom(world, FloorTile, { x: gx, y: gy });
+        void tid;
+      }
+    }
   }
+  // Add a single door at the bottom wall center
+  createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
+
+  // Ensure a player exists at room center
+  if (!playerEntity(world)) {
+    createPlayer(world, { x: 0, y: 0, name: "Hero" });
+  }
+
+  // Drop a couple of health potions on the floor
+  const p1 = createFrom(world, HealthPotion, {});
+  world.add(p1, Position, { x: 2, y: 0 });
+  const p2 = createFrom(world, HealthPotion, {});
+  world.add(p2, Position, { x: -2, y: 0 });
+
+  // Spawn a few monsters that will chase the player
+  createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
+  createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
+  createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
 } catch {}
 
 // ---- Input setup (display/input → rules/display) ---------------------------
@@ -146,6 +180,11 @@ try {
   world.on('damage', ({ id, amount }) => log(`Entity ${id} took ${amount} damage`));
   world.on('healed', ({ id, amount }) => log(`Entity ${id} healed ${amount}`));
   world.on('died', ({ id }) => log(`Entity ${id} died`));
+  world.on('interaction', ({ action, result }) => {
+    if (action === 'toggleDoor') {
+      log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`);
+    }
+  });
 } catch {}
 
 // When user clicks an inventory item to drink
@@ -178,7 +217,15 @@ fx.worldToScreen = worldToScreen;
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = {
+  // Actors
   player: { glyph: "@", fg: "#e8f7ff", glow: "#6cf" },
+  monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },
+  // Tiles
+  floor: { glyph: ".", fg: "#446", glow: "#224" },
+  wall: { glyph: "#", fg: "#99a", glow: "#667" },
+  door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
+  door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
+  // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
 };
 
@@ -203,8 +250,15 @@ function render(worldView) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  for (const e of worldView.entities) {
-    const look = palette[e.kind] || palette.default;
+  // Draw tiles first, then actors/items for layering
+  const isTileKind = (k) => k === 'floor' || k === 'wall' || (typeof k === 'string' && k.startsWith('door_'));
+  const tiles = worldView.entities.filter(e => isTileKind(e.kind));
+  const others = worldView.entities.filter(e => !isTileKind(e.kind));
+
+  const drawList = [...tiles, ...others];
+  for (const e of drawList) {
+    const k = (typeof e.kind === 'string') ? e.kind : 'default';
+    const look = palette[k] || palette.default;
     const size = 28; // tile→px heuristic; feel free to derive from camera.scale
     ctx.font = `900 ${size}px monospace`;
 

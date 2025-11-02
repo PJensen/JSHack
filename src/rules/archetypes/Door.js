@@ -1,4 +1,4 @@
-import { defineArchetype } from "../Archetype.js";
+import { defineArchetype } from "../../lib/ecs-js/archetype.js";
 import { Position } from "../components/Position.js";
 import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";

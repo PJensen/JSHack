@@ -10,12 +10,16 @@ import { interactionSystem } from "../../src/rules/systems/interactionSystem.js"
 import { effectSystem } from "../../src/rules/systems/effectSystem.js";
 import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
+import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
+import { movementSystem } from "../../src/rules/systems/movementSystem.js";
 
 export function configureWorld(world) {
   // Optional: clear previous registry on hot reload
   try { clearSystems(); } catch {}
 
   // Phase: intents (consume queued intents)
+  // Producers first (AI), then consumers (movement, interactions, etc.)
+  registerSystem(aiChaseSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(itemPickupSystem, 'intents');
@@ -23,6 +27,7 @@ export function configureWorld(world) {
   registerSystem(projectileSystem, 'intents');
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
+  registerSystem(movementSystem, 'intents');
 
   // Phase: effects (per-turn effects resolution)
   registerSystem(effectSystem, 'effects');

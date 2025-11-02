@@ -1,6 +1,8 @@
 // src/rules/systems/interactionSystem.js
 import { Interactable } from "../components/Interactable.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
+import { DoorState } from "../components/DoorState.js";
+import { Collider } from "../components/Collider.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -9,8 +11,19 @@ export function InteractionSystem(world, actor, targetId) {
 
     switch (inter.action) {
         case "toggleDoor":
-            world.emit("interaction", { actor, targetId, action: "toggleDoor" });
-            // actual door logic handled by a DoorSystem or rule function
+            {
+                // Toggle DoorState and update Collider.solid/blocksSight accordingly
+                const ds = world.get(targetId, DoorState);
+                if (ds?.locked) {
+                    world.emit?.("interaction", { actor, targetId, action: "toggleDoor", result: "locked" });
+                    break;
+                }
+                const nowOpen = !(ds?.open);
+                if (ds) world.set(targetId, DoorState, { open: nowOpen });
+                const col = world.get(targetId, Collider);
+                if (col) world.set(targetId, Collider, { solid: !nowOpen, blocksSight: !nowOpen });
+                world.emit?.("interaction", { actor, targetId, action: "toggleDoor", result: nowOpen ? "opened" : "closed" });
+            }
             break;
 
         case "openChest":
