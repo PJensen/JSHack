@@ -4,5 +4,10 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * key: string (stable key, e.g. "neutral", "player", "enemy")
  */
 export const Faction = defineComponent("Faction", { key: "neutral" }, {
-  validate(rec){ if (typeof rec.key !== "string" || !rec.key) throw new Error("Faction.key"); }
+  validate(rec){
+    if (typeof rec.key !== "string" || rec.key.length === 0) {
+      throw new Error("Faction.key");
+    }
+    return true;
+  }
 });

@@ -20,6 +20,7 @@ export const Anatomy = defineComponent(
     validate(rec) {
       if (!Array.isArray(rec.parts))
         throw new Error("Anatomy.parts must be an array");
+      return true;
     },
   }
 );
