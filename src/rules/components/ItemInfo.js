@@ -13,6 +13,10 @@ export const ItemInfo = defineComponent(
     value: 0, // optional numeric value for trade/scoring
     description: "", // flavor text description of the item
     count: 1, // stacking count; >=1 for any item entity
+    bonuses: {}, // flat bonuses: { attack, defense, maxHp, critChance, critMult, ... }
+    rarity: 1,
+    rarityName: "common",
+    affixes: [], // list of affix ids applied to this item (rules/data/affixes)
   },
   {
     validate(rec) {
@@ -32,6 +36,14 @@ export const ItemInfo = defineComponent(
         throw new Error("ItemInfo.validate(): description must be a string");
       if (!Number.isFinite(rec.count) || rec.count < 1)
         throw new Error("ItemInfo.validate(): count must be >= 1");
+      if (rec.bonuses && typeof rec.bonuses !== 'object')
+        throw new Error("ItemInfo.validate(): bonuses must be an object");
+      if (!Number.isFinite(rec.rarity) || rec.rarity < 1)
+        throw new Error("ItemInfo.validate(): rarity must be >= 1");
+      if (typeof rec.rarityName !== 'string')
+        throw new Error("ItemInfo.validate(): rarityName must be a string");
+      if (!Array.isArray(rec.affixes))
+        throw new Error("ItemInfo.validate(): affixes must be an array");
       return true;
     },
   }

@@ -4,9 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-  "test": "npm run test:inventory && npm run test:effects && npm run test:equipment",
+  "test": "npm run test:inventory && npm run test:effects && npm run test:equipment && npm run test:equipmentSystem",
   "test:inventory": "node ./tests/inventory.mjs",
   "test:effects": "node ./tests/effects.mjs",
-  "test:equipment": "node ./tests/equipment.mjs"
+  "test:equipment": "node ./tests/equipment.mjs",
+  "test:equipmentSystem": "node ./tests/equipmentSystem.mjs"
   }
 }

@@ -1,0 +1,65 @@
+// src/rules/systems/equipmentSystem.js
+// Recompute derived stats from equipped items and passive affixes.
+// Keeps results on Equipment component; other systems may consume them.
+
+import { Equipment } from '../components/Equipment.js';
+import { ItemInfo } from '../components/ItemInfo.js';
+import { AFFIX_DEFS } from '../data/affixes.js';
+
+function emptyDerived() {
+  return {
+    attackDerived: 0,
+    defenseDerived: 0,
+    maxHpDerived: 0,
+    critChanceDerived: 0,
+    critMultDerived: 0
+  };
+}
+
+function applyBonuses(acc, bonuses) {
+  if (!bonuses) return;
+  if (Number.isFinite(bonuses.attack)) acc.attackDerived += bonuses.attack;
+  if (Number.isFinite(bonuses.defense)) acc.defenseDerived += bonuses.defense;
+  if (Number.isFinite(bonuses.maxHp)) acc.maxHpDerived += bonuses.maxHp;
+  if (Number.isFinite(bonuses.critChance)) acc.critChanceDerived += bonuses.critChance;
+  if (Number.isFinite(bonuses.critMult)) acc.critMultDerived += bonuses.critMult;
+}
+
+function runAffixPassives(ctx, affixIds) {
+  for (const aId of affixIds || []) {
+    const a = AFFIX_DEFS[aId];
+    if (!a || typeof a.passive !== 'function') continue;
+    a.passive(ctx);
+  }
+}
+
+export function equipmentSystem(world) {
+  for (const [id, eq] of world.query(Equipment)) {
+    const d = emptyDerived();
+
+    // equip slots contain entity ids of items
+    const slots = [eq.weapon, eq.armor, eq.ring1, eq.ring2];
+    for (const itemId of slots) {
+      if (!Number.isInteger(itemId)) continue;
+      const info = world.get(itemId, ItemInfo);
+      if (!info) continue;
+      // base item bonuses
+      applyBonuses(d, info.bonuses);
+      // passive affixes
+      const ctx = {
+        addBonus: (k, v) => { if (k in d) d[k] += v; else if (k === 'attack') d.attackDerived += v; else if (k === 'defense') d.defenseDerived += v; else if (k === 'maxHp') d.maxHpDerived += v; else if (k === 'critChance') d.critChanceDerived += v; else if (k === 'critMult') d.critMultDerived += v; },
+        entityId: id,
+        itemId,
+        world
+      };
+      runAffixPassives(ctx, info.affixes);
+    }
+
+    // write back results
+    eq.attackDerived = d.attackDerived;
+    eq.defenseDerived = d.defenseDerived;
+    eq.maxHpDerived = d.maxHpDerived;
+    eq.critChanceDerived = d.critChanceDerived;
+    eq.critMultDerived = d.critMultDerived;
+  }
+}

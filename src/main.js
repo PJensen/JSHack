@@ -32,7 +32,8 @@ import { Monster } from "./rules/archetypes/Creatures.js";
 import { Position } from "./rules/components/Position.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
-import { equipmentPaletteEntries, buildEquipmentItem } from "./rules/data/equipmentLoader.js";
+import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
+import { buildPalette } from "./display/palette/index.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
@@ -254,24 +255,7 @@ fx.worldToScreen = worldToScreen;
 // fx.ensureEmitter(playerId, preset);
 
 // ---- Visual mappings (display contract) ------------------------------------
-const palette = {
-  // Actors
-  player: { glyph: "@", fg: "#e8f7ff", glow: "#6cf" },
-  monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },
-  // Tiles
-  floor: { glyph: ".", fg: "#446", glow: "#224" },
-  wall: { glyph: "#", fg: "#99a", glow: "#667" },
-  door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
-  door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
-  gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
-  // Fallback
-  default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
-};
-
-// Augment palette with equipment visuals (app-side wiring; keeps separation intact)
-try {
-  Object.assign(palette, equipmentPaletteEntries());
-} catch {}
+const palette = buildPalette();
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;

@@ -8,6 +8,7 @@ import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";
 import { projectileSystem } from "../../src/rules/systems/projectileSystem.js";
 import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
 import { effectSystem } from "../../src/rules/systems/effectSystem.js";
+import { equipmentSystem } from "../../src/rules/systems/equipmentSystem.js";
 import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
@@ -30,7 +31,8 @@ export function configureWorld(world) {
   // Run pickup after movement so stepping onto items can pick them up immediately
   registerSystem(itemPickupSystem, 'intents');
 
-  // Phase: effects (per-turn effects resolution)
+  // Phase: effects (derived first, then per-turn effects)
+  registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');

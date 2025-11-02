@@ -26,45 +26,24 @@ export function buildEquipmentItem(world, equipId, opts = {}) {
   const base = getEquipmentDef(equipId);
   if (!base) throw new Error(`Unknown equipment id: ${equipId}`);
   const id = world.create();
-  try {
-    world.add(id, NamedIdentity, { name: base.name, identity: base.id });
-  } catch {}
-  try {
-    const info = {
-      type: 'equip',
-      slot: base.slot || '',
-      weight: Number(base.weight || 1),
-      value: Number(base.value || 0),
-      description: base.desc || base.name || '',
-      count: 1,
-      // Carry bonuses and rarity on the item record to enable future systems to derive effects
-      bonuses: base.bonuses || {},
-      rarity: base.rarity || 1,
-      rarityName: base.rarityName || 'common',
-    };
-    world.add(id, ItemInfo, info);
-  } catch {}
+  world.add(id, NamedIdentity, { name: base.name, identity: base.id });
+  const info = {
+    type: 'equip',
+    slot: base.slot || '',
+    weight: Number(base.weight || 1),
+    value: Number(base.value || 0),
+    description: base.desc || base.name || '',
+    count: 1,
+    // Carry bonuses and rarity on the item record to enable future systems to derive effects
+    bonuses: base.bonuses || {},
+    rarity: base.rarity || 1,
+    rarityName: base.rarityName || 'common',
+    affixes: Array.isArray(opts.affixes) ? opts.affixes.slice() : [],
+  };
+  world.add(id, ItemInfo, info);
   // Attach script reference when supplied (for onEquip/onHit, etc.)
   if (typeof base.script === 'function') {
-    try { world.add(id, ScriptRef, { ref: base.script, params: { from: base.id } }); } catch {}
+    world.add(id, ScriptRef, { ref: base.script, params: { from: base.id } });
   }
   return id;
-}
-
-/**
- * equipmentPaletteEntries()
- * Produces a mapping suitable for display palettes keyed by identity.
- * Returns only visual fields (glyph, fg) and ignores gameplay data.
- * Intended to be consumed from app/display wiring, not rules.
- */
-export function equipmentPaletteEntries() {
-  const out = Object.create(null);
-  for (const rec of Object.values(EQUIP_DEFS)) {
-    const key = rec.id;
-    if (!key) continue;
-    const glyph = rec.glyph || '•';
-    const fg = rec.color || '#cfe8ff';
-    out[key] = { glyph, fg, glow: fg };
-  }
-  return out;
 }
