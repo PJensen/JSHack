@@ -92,6 +92,17 @@ export class InputManager {
       this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 }));
       return;
     }
+    // Move up / down
+    if (code === "ArrowUp" || key === "w" || key === "k") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Move, { dx: 0, dy: -1 }));
+      return;
+    }
+    if (code === "ArrowDown" || key === "s" || key === "j") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Move, { dx: 0, dy: 1 }));
+      return;
+    }
     // Drink potion (common roguelike: 'q' for quaff)
     if (key?.toLowerCase() === "q") {
       e.preventDefault();

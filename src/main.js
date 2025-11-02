@@ -237,16 +237,21 @@ const palette = {
 };
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
+let _bgGradH = 0; let _bgGrad = null;
 function render(worldView) {
   const tf = ctx.getTransform();
   const W = canvas.width / (tf.a || 1);
   const H = canvas.height / (tf.d || 1);
 
-  // Background
+  // Background (cache gradient by height to avoid per-frame allocations)
   ctx.save();
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#0b0e16"); g.addColorStop(1, "#0a0c14");
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (!_bgGrad || _bgGradH !== H) {
+    _bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    _bgGrad.addColorStop(0, "#0b0e16");
+    _bgGrad.addColorStop(1, "#0a0c14");
+    _bgGradH = H;
+  }
+  ctx.fillStyle = _bgGrad; ctx.fillRect(0, 0, W, H);
   ctx.restore();
 
   // Camera transform for world-space draws
@@ -263,21 +268,20 @@ function render(worldView) {
   const others = worldView.entities.filter(e => !isTileKind(e.kind));
 
   const drawList = [...tiles, ...others];
+  // Set glyph height in world units once per frame (pre-transform px). With camera.scale=TILE_PX,
+  // 1px here becomes TILE_PX on screen, matching tile size.
+  ctx.font = `900 1px monospace`;
   for (const e of drawList) {
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
     const look = palette[k] || palette.default;
-  // Set glyph height in world units (pre-transform px). With camera.scale=TILE_PX,
-  // 1px here becomes TILE_PX on screen, matching tile size.
-  const size = 1;
-  ctx.font = `900 ${size}px monospace`;
 
     // glow layers (lighter)
     ctx.globalCompositeOperation = "lighter";
-    const layers = 5;
+    const layers = 3; // reduced from 5 for performance
     for (let i = 0; i < layers; i++) {
       const t = i / (layers - 1);
-      const alpha = 0.06 * (1 - t);
-      ctx.shadowBlur = 10 + t * 24;
+      const alpha = 0.08 * (1 - t);
+      ctx.shadowBlur = 8 + t * 14;
       ctx.shadowColor = look.glow;
       ctx.fillStyle = `rgba(102,204,255,${alpha.toFixed(3)})`;
       ctx.fillText(look.glyph, e.pos.x, e.pos.y);
@@ -303,14 +307,21 @@ function render(worldView) {
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   const s = fx.stats();
   ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8);
+  const fps = (_fpsEMA || 0).toFixed(0).padStart(2, " ");
+  ctx.fillText(`fx fps: ${fps}`, 8, 24);
   ctx.restore();
 }
 
 // ---- Frame loop (FXClock) --------------------------------------------------
 let last = performance.now();
+let _fpsEMA = 0; // FX FPS (EMA)
 function frame(now) {
   const dtSec = Math.max(0, (now - last) / 1000);
   last = now;
+
+  // Update FX FPS (exponential moving average for stability)
+  const instFps = dtSec > 0 ? (1 / dtSec) : 0;
+  _fpsEMA = _fpsEMA ? (_fpsEMA * 0.9 + instFps * 0.1) : instFps;
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
@@ -342,5 +353,5 @@ addEventListener("keydown", (e) => {
   if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
   if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }
   if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, TILE_PX); e.preventDefault(); return; }
-  if ((key || "").toLowerCase() === "s") { startShake(cam, 6, 0.35); e.preventDefault(); return; }
+  if ((key || "").toLowerCase() === "x") { startShake(cam, 6, 0.35); e.preventDefault(); return; }
 });
