@@ -32,6 +32,7 @@ import { Monster } from "./rules/archetypes/Creatures.js";
 import { Position } from "./rules/components/Position.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
+import { equipmentPaletteEntries, buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
@@ -124,6 +125,12 @@ try {
   createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
   createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
   createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
+
+  // Drop a sample equipment item to validate palette wiring
+  try {
+    const eq = buildEquipmentItem(world, 'sword_plain', {});
+    world.add(eq, Position, { x: -1, y: 1 });
+  } catch {}
 } catch {}
 
 // ---- Input setup (display/input → rules/display) ---------------------------
@@ -260,6 +267,11 @@ const palette = {
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
 };
+
+// Augment palette with equipment visuals (app-side wiring; keeps separation intact)
+try {
+  Object.assign(palette, equipmentPaletteEntries());
+} catch {}
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
