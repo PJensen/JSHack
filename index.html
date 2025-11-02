@@ -2,12 +2,29 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 		<title>JS-hack</title>
 		<style>
-			html, body { height: 100%; margin: 0; background: #0b0e16; color: #9fb; }
-			body { display: grid; place-items: center; overflow: hidden; }
-			canvas { width: 100vw; height: 100vh; display: block; image-rendering: pixelated; }
+			html, body {
+				height: 100%; width: 100%; margin: 0;
+				background: #0b0e16; color: #9fb;
+				overflow: hidden; /* hide scrollbars */
+				overflow-x: hidden; overflow-y: hidden;
+				scrollbar-width: none; /* firefox */
+				-ms-overflow-style: none; /* IE/Edge */
+				touch-action: none; /* disable browser gestures */
+				overscroll-behavior: none; /* disable pull-to-refresh/back-forward swipe */
+				user-select: none; -webkit-user-select: none; -ms-user-select: none;
+				-webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+			}
+			html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+			body { display: grid; place-items: center; }
+			canvas {
+				width: 100vw; height: 100vh; display: block;
+				image-rendering: pixelated; image-rendering: crisp-edges;
+				touch-action: none; -ms-touch-action: none;
+				-webkit-user-drag: none; user-select: none; outline: none;
+			}
 			.hint { position: fixed; bottom: 8px; right: 12px; font: 12px/1.2 system-ui, sans-serif; opacity: 0.6; }
 		</style>
 	</head>

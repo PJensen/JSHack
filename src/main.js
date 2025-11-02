@@ -16,6 +16,7 @@ import { zoomTo, jumpTo } from "./display/camera/utils.js";
 import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
+import { enableInputLockdown } from "./display/input/lockdown.js";
 import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
@@ -32,6 +33,9 @@ import { followEntity } from "./display/camera/follow.js";
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d", { alpha: false });
 try { ctx.imageSmoothingEnabled = false; } catch {}
+
+// Lock down browser-driven inputs/scroll/zoom so the app fully controls them
+enableInputLockdown({ canvas });
 
 function resize() {
   const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
