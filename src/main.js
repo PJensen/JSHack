@@ -61,8 +61,8 @@ function stepSim(dtTurns = 0) { if (dtTurns > 0) { try { world.tick(dtTurns); } 
 
 // ---- Demo scene: ensure a player exists and a couple items around ----------
 try {
-  // Build a small dungeon room (21x13) centered at (0,0)
-  const W = 21, H = 13;
+  // Build a small dungeon room (10x10) centered at (0,0)
+  const W = 10, H = 10;
   const ox = -((W - 1) >> 1), oy = -((H - 1) >> 1);
   // Door at the bottom wall center (compute before tile loop to skip placing a wall there)
   const doorPos = { x: 0, y: oy + (H - 1) };
@@ -120,7 +120,10 @@ try {
         break;
       case "display.zoom": {
         const f = Math.max(0.5, Math.min(1.5, Number(action.payload?.factor) || 1));
-        const next = Math.max(0.25, Math.min(4, (cam.targetScale || cam.scale || 1) * f));
+        const minS = TILE_PX * 0.5;
+        const maxS = TILE_PX * 4.0;
+        const current = (cam.targetScale || cam.scale || TILE_PX);
+        const next = Math.max(minS, Math.min(maxS, current * f));
         zoomTo(cam, next);
         break;
       }
@@ -201,6 +204,10 @@ addEventListener('ui:requestDrink', (e) => {
 
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
+// Use tile-sized world units: 1 world unit == 1 tile on screen
+const TILE_PX = 28;
+cam.scale = TILE_PX;
+cam.targetScale = TILE_PX;
 function worldToScreen({ x, y, size = 1 }) {
   const sx = (x - cam.x) * cam.scale + canvas.width / (ctx.getTransform().a || 1) * 0.5;
   const sy = (y - cam.y) * cam.scale + canvas.height / (ctx.getTransform().d || 1) * 0.5;
@@ -259,8 +266,10 @@ function render(worldView) {
   for (const e of drawList) {
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
     const look = palette[k] || palette.default;
-    const size = 28; // tile→px heuristic; feel free to derive from camera.scale
-    ctx.font = `900 ${size}px monospace`;
+  // Set glyph height in world units (pre-transform px). With camera.scale=TILE_PX,
+  // 1px here becomes TILE_PX on screen, matching tile size.
+  const size = 1;
+  ctx.font = `900 ${size}px monospace`;
 
     // glow layers (lighter)
     ctx.globalCompositeOperation = "lighter";
@@ -330,8 +339,8 @@ addEventListener("keydown", (e) => {
   const zoomIn  = key === "+" || key === "=" || code === "Equal" || code === "NumpadAdd";
   const zoomOut = key === "-" || key === "_" || code === "Minus" || code === "NumpadSubtract";
 
-  if (zoomIn)  { zoomTo(cam, Math.min(4, cam.targetScale * 1.2)); e.preventDefault(); return; }
-  if (zoomOut) { zoomTo(cam, Math.max(0.25, cam.targetScale / 1.2)); e.preventDefault(); return; }
-  if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, 1); e.preventDefault(); return; }
+  if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
+  if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }
+  if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, TILE_PX); e.preventDefault(); return; }
   if ((key || "").toLowerCase() === "s") { startShake(cam, 6, 0.35); e.preventDefault(); return; }
 });
