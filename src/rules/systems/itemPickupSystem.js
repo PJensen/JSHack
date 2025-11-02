@@ -3,6 +3,8 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
+import { Settings } from "../components/Settings.js";
+import { Player } from "../components/Player.js";
 
 // Helper: sum inventory weight
 function inventoryWeight(world, inv) {
@@ -26,7 +28,17 @@ function findStackTarget(world, inv, itemId) {
     return 0;
 }
 
+function findStackTargetByIdentity(world, inv, identity) {
+    if (!identity) return 0;
+    for (const id of inv.items) {
+        const n = world.get(id, NamedIdentity);
+        if (n && n.identity === identity) return id;
+    }
+    return 0;
+}
+
 export function itemPickupSystem(world) {
+    // Explicit pickups via intent
     for (const [actor, intent, pos, inv] of world.query(PickupIntent, Position, Inventory)) {
         const itemId = intent.targetId;
         const itemPos = world.get(itemId, Position);
@@ -95,5 +107,41 @@ export function itemPickupSystem(world) {
         }
 
         world.remove(actor, PickupIntent);
+    }
+}
+
+// Post-move auto-pickup pass (registered in 'effects' phase)
+export function autoPickupPostMoveSystem(world) {
+    for (const [id, _pos, inv] of world.query(Position, Inventory)) {
+        if (!world.has(id, Player)) continue;
+        const set = world.get(id, Settings);
+        const enable = (set?.autoPickup !== false);
+        if (!enable) continue;
+        const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
+        const pos = world.get(id, Position);
+        if (!pos) continue;
+        const candidates = [];
+        for (const [itemId] of world.query(Position)) {
+            const ipos = world.get(itemId, Position);
+            if (!ipos || ipos.x !== pos.x || ipos.y !== pos.y) continue;
+            const info = world.get(itemId, ItemInfo);
+            if (!info || !info.type || !kinds.includes(info.type)) continue;
+            candidates.push(itemId);
+        }
+        for (const itemId of candidates) {
+            const info = world.get(itemId, ItemInfo);
+            if (!info) continue;
+            const takeCount = info.count || 1;
+            const name = world.get(itemId, NamedIdentity);
+            const stackTarget = findStackTargetByIdentity(world, inv, name?.identity);
+            if (stackTarget) {
+                world.mutate(stackTarget, ItemInfo, (r) => { r.count = (r.count || 1) + takeCount; });
+                world.destroy(itemId);
+            } else {
+                try { world.remove(itemId, Position); } catch {}
+                inv.items.push(itemId);
+            }
+            try { world.emit && world.emit('item:pickup', { actor: id, itemId, count: takeCount }); } catch {}
+        }
     }
 }

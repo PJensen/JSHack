@@ -19,3 +19,4 @@ export { WaitIntent } from './Intents/WaitIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';
 export { Status } from './Status.js';
 export { Vitality } from './Vitality.js';
+export { Settings } from './Settings.js';

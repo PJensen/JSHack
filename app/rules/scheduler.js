@@ -3,8 +3,7 @@
 
 import { composeScheduler, registerSystem, clearSystems } from "../../src/lib/ecs-js/index.js";
 import { drinkSystem } from "../../src/rules/systems/drinkSystem.js";
-import { itemPickupSystem } from "../../src/rules/systems/itemPickupSystem.js";
-import { autoPickupSystem } from "../../src/rules/systems/autoPickupSystem.js";
+import { itemPickupSystem, autoPickupPostMoveSystem } from "../../src/rules/systems/itemPickupSystem.js";
 import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";
 import { projectileSystem } from "../../src/rules/systems/projectileSystem.js";
 import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
@@ -23,17 +22,18 @@ export function configureWorld(world) {
   registerSystem(aiChaseSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(drinkSystem, 'intents');
-  registerSystem(itemPickupSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
   registerSystem(projectileSystem, 'intents');
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
   registerSystem(movementSystem, 'intents');
-  // Auto-pickup should occur after movement so stepping onto currency picks it up immediately
-  registerSystem(autoPickupSystem, 'intents');
+  // Run pickup after movement so stepping onto items can pick them up immediately
+  registerSystem(itemPickupSystem, 'intents');
 
   // Phase: effects (per-turn effects resolution)
   registerSystem(effectSystem, 'effects');
+  // Post-move auto-pickup runs after intents, within the same tick
+  registerSystem(autoPickupPostMoveSystem, 'effects');
 
   // Compose scheduler: order of phases matters
   world.setScheduler(composeScheduler('intents', 'effects'));

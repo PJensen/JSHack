@@ -6,6 +6,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Physiology } from "../components/Physiology.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
+import { Settings } from "../components/Settings.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -16,6 +17,7 @@ export const PlayerArchetype = defineArchetype(
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })]
+  , [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })]
 );
 
 export function createPlayer(world, params = {}) {

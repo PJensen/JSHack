@@ -346,8 +346,8 @@ function render(worldView) {
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   const s = fx.stats();
   ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8);
-  const fps = (_fpsEMA || 0).toFixed(0).padStart(2, " ");
-  ctx.fillText(`fx fps: ${fps}`, 8, 24);
+  const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
+  ctx.fillText(`fx fps: ${fpsInt}`, 8, 24);
   ctx.restore();
 }
 

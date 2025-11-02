@@ -6,6 +6,10 @@ import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { Terrain } from "../components/Terrain.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
+import { Inventory } from "../components/Inventory.js";
+import { ItemInfo } from "../components/ItemInfo.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Settings } from "../components/Settings.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
 
 function key(x, y) { return `${x},${y}`; }
@@ -49,6 +53,48 @@ export function movementSystem(world) {
         const from = { x: pos.x, y: pos.y };
         world.set(actor, Position, { x: nx, y: ny });
         world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
+
+        // Immediate auto-pickup for actors with Settings.autoPickup (defaults true)
+        // Focused on currency to avoid unexpected heavy pickups.
+        const inv = world.get(actor, Inventory);
+        const set = world.get(actor, Settings);
+        const enable = (set?.autoPickup !== false);
+        if (inv && enable) {
+          const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
+          // collect item ids on the new tile that match types
+          const toTake = [];
+          for (const [itemId, ipos] of world.query(Position)) {
+            if (ipos.x !== nx || ipos.y !== ny) continue;
+            const info = world.get(itemId, ItemInfo);
+            if (!info || !info.type || !kinds.includes(info.type)) continue;
+            toTake.push(itemId);
+          }
+          for (const itemId of toTake) {
+            const info = world.get(itemId, ItemInfo);
+            if (!info) continue;
+            const count = info.count || 1;
+            const ident = world.get(itemId, NamedIdentity)?.identity;
+            // find existing stack by identity
+            let stackTarget = 0;
+            for (const id of inv.items) {
+              const n = world.get(id, NamedIdentity);
+              if (n && n.identity === ident) { stackTarget = id; break; }
+            }
+            if (stackTarget) {
+              world.mutate(stackTarget, ItemInfo, (r) => { r.count = (r.count || 1) + count; });
+              world.destroy(itemId);
+            } else {
+              // capacity gate: allow if capacity not set or there's room
+              if (inv.capacity == null || inv.items.length < inv.capacity) {
+                try { world.remove(itemId, Position); } catch {}
+                inv.items.push(itemId);
+              } else {
+                // no capacity — skip silently for now
+              }
+            }
+            try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch {}
+          }
+        }
       }
     } catch {}
     // Consume the intent regardless
