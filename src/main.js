@@ -373,7 +373,7 @@ function render(worldView) {
   }
 
   // Particles (already in world space)
-  fx.render({ mode: "lighter", alphaScale: 0.9 });
+  fx.render({ mode: "lighter", alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
 
   ctx.restore();
 
@@ -447,3 +447,6 @@ function getCachedView() {
   }
   return _cachedView;
 }
+
+// Cache FOV between frames; recompute when world turn changes or player moves.
+// (FOV/Lightmask were removed per request; focusing strictly on tuning existing features.)
