@@ -44,38 +44,64 @@ import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d", { alpha: false });
 ctx.imageSmoothingEnabled = false;
+// Optional backbuffer to mirror DPR and present once per frame (reduces state churn)
+const back = document.createElement('canvas');
+const bctx = back.getContext('2d', { alpha: false });
+bctx.imageSmoothingEnabled = false;
 
 // Lock down browser-driven inputs/scroll/zoom so the app fully controls them
 enableInputLockdown({ canvas });
 
 // Quality/perf controls
 const PERF = (() => {
-  const params = new URLSearchParams(window.location.search);
-  const q = (params.get('quality') || localStorage.getItem('jshack.quality') || 'auto').toLowerCase();
+  const params = new URLSearchParams(window.location.search || '');
+  // Mobile-first defaults: fast without any URL args
+  const q = (params.get('quality') || (typeof localStorage !== 'undefined' ? localStorage.getItem('jshack.quality') : '') || 'low').toLowerCase();
   // Cap DPR on mobile/high-DPR screens to avoid excessive fill-rate costs
-  const autoCap = (window.devicePixelRatio || 1) > 2 ? 2 : 1.5;
-  const dprCap = Number(params.get('dprCap')) || Number(localStorage.getItem('jshack.dprCap')) || autoCap;
+  const defaultCap = 1.5; // mobile-first
+  const dprCapArg = Number(params.get('dprCap')) || Number((typeof localStorage !== 'undefined' && localStorage.getItem('jshack.dprCap')) || 0);
+  const dprCap = Number.isFinite(dprCapArg) && dprCapArg > 0 ? dprCapArg : defaultCap;
   const isLow = q === 'low';
   const isHigh = q === 'high';
   return {
     quality: q,
     dprCap: isHigh ? 3 : (isLow ? 1 : dprCap),
     glowLayers: isLow ? 0 : 2,
-    particleCapacity: isLow ? 1024 : 4096,
+    particleCapacity: isLow ? 512 : 4096,
+    // Default to snap camera (no perceived lag); can override via ?cameraLerp=number
+    cameraLerp: (params.get('cameraLerp') !== null ? Number(params.get('cameraLerp')) : 0)
   };
 })();
 
+// Use tile-sized world units: 1 world unit == 1 tile on screen
+const TILE_PX = 28;
+
+let _cssW = 0, _cssH = 0, _dpr = 1;
 function resize() {
-  // Limit device pixel ratio to reduce pixel workload on mobile
-  const rawDpr = Math.max(1, window.devicePixelRatio || 1);
-  const dpr = Math.max(1, Math.min(PERF.dprCap, Math.floor(rawDpr)));
-  const cssW = Math.max(1, window.innerWidth | 0);
-  const cssH = Math.max(1, window.innerHeight | 0);
+  // Limit device pixel ratio and align CSS size to tile grid to avoid fractional resampling
+  const rawDpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  const maxCap = Math.max(1, Math.floor(PERF.dprCap || 1));
+  const dpr = Math.max(1, Math.min(rawDpr, maxCap));
+
+  const vw = Math.max(1, (window.innerWidth | 0));
+  const vh = Math.max(1, (window.innerHeight | 0));
+  const cols = Math.max(1, Math.floor(vw / TILE_PX));
+  const rows = Math.max(1, Math.floor(vh / TILE_PX));
+  const cssW = cols * TILE_PX;
+  const cssH = rows * TILE_PX;
+
   canvas.style.width = cssW + "px";
   canvas.style.height = cssH + "px";
   canvas.width = cssW * dpr;
   canvas.height = cssH * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Backbuffer mirrors visible canvas size and DPR transform
+  back.width = canvas.width;
+  back.height = canvas.height;
+  bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  _cssW = cssW; _cssH = cssH; _dpr = dpr;
 }
 addEventListener("resize", resize);
 resize();
@@ -277,10 +303,9 @@ addEventListener('ui:requestDrink', (e) => {
 
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
-// Use tile-sized world units: 1 world unit == 1 tile on screen
-const TILE_PX = 28;
 cam.scale = TILE_PX;
 cam.targetScale = TILE_PX;
+if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
 function worldToScreen({ x, y, size = 1 }) {
   const sx = (x - cam.x) * cam.scale + canvas.width / (ctx.getTransform().a || 1) * 0.5;
   const sy = (y - cam.y) * cam.scale + canvas.height / (ctx.getTransform().d || 1) * 0.5;
@@ -289,7 +314,7 @@ function worldToScreen({ x, y, size = 1 }) {
 
 // ---- Particle FX (display-only) -------------------------------------------
 const fx = new ParticleFX({ capacity: PERF.particleCapacity, seedBase: (world.seed >>> 0) });
-fx.ctx = ctx;
+fx.ctx = bctx;
 // Avoid expensive per-particle transforms: draw in world units under camera transform
 fx.worldToScreen = (p) => ({ x: p.x, y: p.y, size: p.size });
 
@@ -304,24 +329,23 @@ const glyphAtlas = createGlyphAtlas(palette, { glowLayers: PERF.glowLayers, size
 let _bgGradH = 0; let _bgGrad = null;
 let _fxTime = 0; // display-side time accumulator for simple glyph FX
 function render(worldView) {
-  const tf = ctx.getTransform();
-  const W = canvas.width / (tf.a || 1);
-  const H = canvas.height / (tf.d || 1);
+  const W = _cssW;
+  const H = _cssH;
 
   // Background (cache gradient by height to avoid per-frame allocations)
-  ctx.save();
+  bctx.save();
   if (!_bgGrad || _bgGradH !== H) {
-    _bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    _bgGrad = bctx.createLinearGradient(0, 0, 0, H);
     _bgGrad.addColorStop(0, "#0b0e16");
     _bgGrad.addColorStop(1, "#0a0c14");
     _bgGradH = H;
   }
-  ctx.fillStyle = _bgGrad; ctx.fillRect(0, 0, W, H);
-  ctx.restore();
+  bctx.fillStyle = _bgGrad; bctx.fillRect(0, 0, W, H);
+  bctx.restore();
 
   // Camera transform for world-space draws
-  ctx.save();
-  applyCamera(ctx, cam, canvas);
+  bctx.save();
+  applyCamera(bctx, cam, back);
 
   // Draw entities (glyph-based, mapped from kind/tags)
   ctx.textAlign = "center";
@@ -346,8 +370,8 @@ function render(worldView) {
     const e = worldView.entities[i];
     if (!isTileKind(e.kind)) continue;
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-    const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    drawKind(glyphAtlas, ctx, k, e.pos.x, e.pos.y);
+  const k = (typeof e.kind === 'string') ? e.kind : 'default';
+  drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
   }
 
   // Pass 2: non-tiles
@@ -355,26 +379,32 @@ function render(worldView) {
     const e = worldView.entities[i];
     if (isTileKind(e.kind)) continue;
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-    const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    drawKind(glyphAtlas, ctx, k, e.pos.x, e.pos.y);
+  const k = (typeof e.kind === 'string') ? e.kind : 'default';
+  drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
     // Glyph-FX: show an invulnerability shimmer ring when tagged
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = 'rgba(160,255,255,0.9)';
-      ctx.lineWidth = 0.08; // world units
+      bctx.save();
+      bctx.globalCompositeOperation = 'lighter';
+      bctx.strokeStyle = 'rgba(160,255,255,0.9)';
+      bctx.lineWidth = 0.08; // world units
       const r = 0.45 + 0.06 * Math.sin(_fxTime * 6.0);
-      ctx.beginPath();
-      ctx.arc(e.pos.x, e.pos.y, r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      bctx.beginPath();
+      bctx.arc(e.pos.x, e.pos.y, r, 0, Math.PI * 2);
+      bctx.stroke();
+      bctx.restore();
     }
   }
 
   // Particles (already in world space)
   fx.render({ mode: "lighter", alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
 
+  bctx.restore();
+
+  // Present backbuffer once (reset transform to identity for exact pixel copy)
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(back, 0, 0);
   ctx.restore();
 
   // HUD
@@ -388,6 +418,27 @@ function render(worldView) {
     ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8);
     const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
     ctx.fillText(`fx fps: ${fpsInt}`, 8, 24);
+
+    // Optional rules profiler overlay (top 3 systems by last tick duration)
+    const prof = /** @type any */ (window).__JSHACK_RULES_PROF;
+    if (prof && prof.lastTick) {
+      const t = prof.lastTick;
+      ctx.fillText(`rules dt: ${t.totalMs.toFixed(2)}ms`, 8, 40);
+      // flatten systems with phase labels
+      const all = [];
+      for (const ph of Object.keys(t.phases)) {
+        const p = t.phases[ph];
+        for (let i = 0; i < p.systems.length; i++) {
+          const srec = p.systems[i];
+          all.push({ ph, name: srec.name, ms: srec.ms });
+        }
+      }
+      all.sort((a,b)=>b.ms - a.ms);
+      for (let i = 0; i < Math.min(3, all.length); i++) {
+        const r = all[i];
+        ctx.fillText(`${r.ph}: ${r.name} ${r.ms.toFixed(2)}ms`, 8, 56 + i*14);
+      }
+    }
     ctx.restore();
   }
 }

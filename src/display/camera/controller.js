@@ -29,11 +29,12 @@ export function applyCamera(ctx, cam, canvas) {
   const baseY = m?.d || 1;
   const sx = baseX * cam.scale;
   const sy = baseY * cam.scale;
-  ctx.setTransform(
-    sx, 0, 0, sy,
-    canvas.width / 2  - cam.x * sx + cam.shakeX * baseX,
-    canvas.height / 2 - cam.y * sy + cam.shakeY * baseY
-  );
+  let tx = canvas.width / 2  - cam.x * sx + cam.shakeX * baseX;
+  let ty = canvas.height / 2 - cam.y * sy + cam.shakeY * baseY;
+  // Pixel-snapping translation avoids subpixel blur and improves mobile perf
+  tx = Math.round(tx);
+  ty = Math.round(ty);
+  ctx.setTransform(sx, 0, 0, sy, tx, ty);
 }
 
 export function worldToScreen(cam, wx, wy, canvas) {

@@ -1,7 +1,7 @@
 // app/rules/scheduler.js
 // Register rules systems into phases and set the world scheduler.
 
-import { composeScheduler, registerSystem, clearSystems } from "../../src/lib/ecs-js/index.js";
+import { composeScheduler, registerSystem, clearSystems, getOrderedSystems } from "../../src/lib/ecs-js/index.js";
 import { drinkSystem } from "../../src/rules/systems/drinkSystem.js";
 import { itemPickupSystem, autoPickupPostMoveSystem } from "../../src/rules/systems/itemPickupSystem.js";
 import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";
@@ -43,5 +43,50 @@ export function configureWorld(world) {
   registerSystem(autoPickupPostMoveSystem, 'effects');
 
   // Compose scheduler: order of phases matters
-  world.setScheduler(composeScheduler('intents', 'effects'));
+  const baseScheduler = composeScheduler('intents', 'effects');
+  const profEnabled = shouldProfileRules();
+  if (!profEnabled) {
+    world.setScheduler(baseScheduler);
+    return;
+  }
+
+  // Build profiled scheduler: measure per system and per phase using high-res timer
+  const phases = ['intents', 'effects'];
+  const phaseSystems = Object.create(null);
+  for (const ph of phases) phaseSystems[ph] = getOrderedSystems(ph);
+
+  world.setScheduler((w, dt) => {
+    const perf = getRulesProfilerState();
+    const tick = { phases: {}, totalMs: 0 };
+    let tickStart = performance.now();
+
+    for (const ph of phases) {
+      const list = phaseSystems[ph];
+      let phStart = performance.now();
+      const sysTimes = [];
+      for (let i = 0; i < list.length; i++) {
+        const fn = list[i];
+        const s0 = performance.now();
+        fn(w, dt);
+        const s1 = performance.now();
+        sysTimes.push({ name: fn.name || `sys${i}`, ms: s1 - s0 });
+      }
+      const phEnd = performance.now();
+      tick.phases[ph] = { totalMs: phEnd - phStart, systems: sysTimes };
+    }
+
+    tick.totalMs = performance.now() - tickStart;
+    perf.lastTick = tick;
+  });
+}
+
+function shouldProfileRules() {
+  const params = new URLSearchParams(window.location.search || '');
+  const v = (params.get('rulesProfile') || (typeof localStorage !== 'undefined' ? localStorage.getItem('jshack.rulesProfile') : '0') || '0');
+  return v === '1' || v === 'true' || v === 'on';
+}
+
+function getRulesProfilerState() {
+  const w = /** @type any */(window);
+  return (w.__JSHACK_RULES_PROF ||= { enabled: true, lastTick: null });
 }

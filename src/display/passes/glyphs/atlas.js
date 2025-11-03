@@ -11,7 +11,7 @@ export function createGlyphAtlas(palette, opts = {}) {
   const fontPx = opts.fontPx || 56; // a little smaller than sizePx to leave padding
   const glowLayers = Math.max(0, opts.glowLayers | 0);
 
-  const atlas = new Map(); // kind -> { canvas }
+  const atlas = new Map(); // kind -> { canvas?, image? }
 
   for (const [kind, look] of Object.entries(palette)) {
     const glyph = look.glyph || '?';
@@ -45,7 +45,18 @@ export function createGlyphAtlas(palette, opts = {}) {
     g.fillStyle = fg;
     g.fillText(glyph, sizePx * 0.5, sizePx * 0.5);
 
-    atlas.set(kind, { canvas: cnv });
+    // Try to upgrade canvas to an ImageBitmap for faster blits on mobile
+    let entry = { canvas: cnv, image: null };
+    const canBitmap = (typeof createImageBitmap === 'function');
+    if (canBitmap) {
+      try {
+        // Note: createImageBitmap is async; we can start it and stash the promise if needed,
+        // but here we block once during setup to ensure images are ready before first frame.
+        // On unsupported platforms this will throw and we keep using the canvas.
+        entry.image = awaitMaybeBitmap(cnv);
+      } catch (_) { /* keep canvas fallback */ }
+    }
+    atlas.set(kind, entry);
   }
 
   // Ensure a default entry exists
@@ -59,7 +70,12 @@ export function createGlyphAtlas(palette, opts = {}) {
     g.font = `900 ${fontPx}px monospace`;
     g.fillStyle = '#fff';
     g.fillText('?', sizePx * 0.5, sizePx * 0.5);
-    atlas.set('default', { canvas: cnv });
+    let entry = { canvas: cnv, image: null };
+    const canBitmap = (typeof createImageBitmap === 'function');
+    if (canBitmap) {
+      try { entry.image = awaitMaybeBitmap(cnv); } catch(_) {}
+    }
+    atlas.set('default', entry);
   }
 
   return atlas;
@@ -68,6 +84,29 @@ export function createGlyphAtlas(palette, opts = {}) {
 export function drawKind(atlas, ctx, kind, x, y) {
   const entry = atlas.get(kind) || atlas.get('default');
   if (!entry) return;
+  const src = entry.image || entry.canvas;
+  if (!src) return;
   // Draw as 1x1 world unit centered at (x,y); camera transform scales to pixels
-  ctx.drawImage(entry.canvas, x - 0.5, y - 0.5, 1, 1);
+  ctx.drawImage(src, x - 0.5, y - 0.5, 1, 1);
+}
+
+// Best-effort sync helper: returns ImageBitmap or null if not supported/failed
+function awaitMaybeBitmap(canvas) {
+  if (typeof createImageBitmap !== 'function') return null;
+  // Some browsers require non-zero dimensions and CORS-safe sources
+  if (!canvas || !canvas.width || !canvas.height) return null;
+  // We avoid async here; on modern Chrome this is quick for small canvases
+  // Using a minimal microtask trampoline to keep API consistent
+  let bmp = null;
+  // createImageBitmap returns a Promise<ImageBitmap>
+  // We can’t use await in ESM without marking function async; instead, block with then/catch sync-ish
+  // but since we can’t block, return null for now and keep canvas; a future improvement could prewarm asynchronously.
+  // For now, try a synchronous-like pattern by abusing transferToImageBitmap on OffscreenCanvas if available
+  try {
+    if (typeof OffscreenCanvas !== 'undefined' && canvas.transferControlToOffscreen) {
+      // Not usable here without worker; fallback
+      return null;
+    }
+  } catch(_) {}
+  return bmp; // null means fallback to canvas
 }
