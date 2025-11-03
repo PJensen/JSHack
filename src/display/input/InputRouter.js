@@ -21,9 +21,10 @@ export function setupInput(opts = {}) {
     displayHandler = null,
     actionSinks = defaultActionSinks,
     onDispose = null,
+    touchFeedback = true,
   } = opts;
 
-  const mgr = new InputManager(window, { canvas });
+  const mgr = new InputManager(window, { canvas, touchFeedback });
 
   const off = mgr.onAction((action) => {
     const sink = actionSinks[action.type] || null;

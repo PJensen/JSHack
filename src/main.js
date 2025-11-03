@@ -228,7 +228,7 @@ const inputDisposers = [];
     }
   };
 
-  setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers });
+  setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers, touchFeedback: true });
 }
 
 // ---- Display UI overlays + data feeds -------------------------------------
