@@ -6,6 +6,8 @@ import { Actions, makeAction } from "./actions.js";
 
 const TAP_MS = 260; // max duration for a tap
 const SWIPE_MIN_PX = 40; // min distance to qualify as a swipe
+const DOUBLE_TAP_MS = 260; // max gap between taps to count as a double-tap
+const DOUBLE_TAP_MAX_DIST = 28; // max movement (px) between taps to still count as double-tap
 
 export class InputManager {
   constructor(targetEl, options = {}) {
@@ -16,6 +18,11 @@ export class InputManager {
     this._multi = new Map(); // pointerId -> { x,y }
     this._pinch = null; // { id1,id2, d0 }
     this._canvas = options.canvas || null;
+
+  // Double-tap tracking
+  this._lastTap = null; // { t:number, x:number, y:number }
+  this._singleTapTimer = 0; // timeout id for deferring single-tap action
+  this._pendingSingleAction = null; // cached action to fire if no double-tap follows
 
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
@@ -29,6 +36,7 @@ export class InputManager {
     this._unbind();
     this.handlers.clear();
     this.hotspots.clear();
+    if (this._singleTapTimer) { clearTimeout(this._singleTapTimer); this._singleTapTimer = 0; }
   }
 
   onAction(handler) {
@@ -219,20 +227,53 @@ export class InputManager {
         }
       }
 
-      // Otherwise, choose cardinal move based on which axis is farther from screen center
+      // Compute the would-be single-tap movement action (deferred to detect double-tap)
       const cx = width * 0.5;
       const cy = height * 0.5;
       const dx0 = p.x0 - cx;
       const dy0 = p.y0 - cy;
+      let singleTapAction = null;
       if (Math.abs(dx0) >= Math.abs(dy0)) {
         // Horizontal
-        if (dx0 < 0) this._emit(makeAction(Actions.Move, { dx: -1, dy: 0 }));
-        else this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 }));
+        singleTapAction = (dx0 < 0)
+          ? makeAction(Actions.Move, { dx: -1, dy: 0 })
+          : makeAction(Actions.Move, { dx: 1, dy: 0 });
       } else {
         // Vertical
-        if (dy0 < 0) this._emit(makeAction(Actions.Move, { dx: 0, dy: -1 }));
-        else this._emit(makeAction(Actions.Move, { dx: 0, dy: 1 }));
+        singleTapAction = (dy0 < 0)
+          ? makeAction(Actions.Move, { dx: 0, dy: -1 })
+          : makeAction(Actions.Move, { dx: 0, dy: 1 });
       }
+
+      // Double-tap detection (canvas/world taps only): if a prior tap occurred nearby and soon, treat as pickup
+      const now = performance.now();
+      if (this._lastTap) {
+        const dtap = now - this._lastTap.t;
+        const ddx = p.x0 - this._lastTap.x;
+        const ddy = p.y0 - this._lastTap.y;
+        const dist2 = ddx * ddx + ddy * ddy;
+        if (dtap <= DOUBLE_TAP_MS && dist2 <= (DOUBLE_TAP_MAX_DIST * DOUBLE_TAP_MAX_DIST)) {
+          // It's a double-tap: cancel pending single action (if any) and open pickup chooser
+          if (this._singleTapTimer) { clearTimeout(this._singleTapTimer); this._singleTapTimer = 0; }
+          this._pendingSingleAction = null;
+          this._lastTap = null;
+          this._emit(makeAction(Actions.OpenPickupChooser));
+          return;
+        }
+      }
+
+      // Not a double-tap yet — defer the single-tap action briefly to allow a second tap
+      this._lastTap = { t: now, x: p.x0, y: p.y0 };
+      this._pendingSingleAction = singleTapAction;
+      if (this._singleTapTimer) { clearTimeout(this._singleTapTimer); }
+      this._singleTapTimer = setTimeout(() => {
+        // No second tap: commit the single-tap action
+        if (this._pendingSingleAction) this._emit(this._pendingSingleAction);
+        this._pendingSingleAction = null;
+        this._singleTapTimer = 0;
+        this._lastTap = null;
+      }, DOUBLE_TAP_MS + 10);
+      return;
     }
   }
 }

@@ -28,6 +28,23 @@ Execute `./build.ps1` to check for errors
 	```
 3. Play in your browser! No build or install required.
 
+## Controls
+
+- Keyboard
+	- Arrow keys / WASD / HJKL: Move
+	- . (period): Wait a turn
+	- , (comma): Open pickup chooser for items underfoot
+	- Q: Drink a potion (from inventory UI)
+	- +/- or Numpad +/-: Zoom in/out; 0: Reset camera
+	- X: Quick camera shake (demo)
+
+- Touch / Pointer
+	- Single tap: Move toward the tapped screen side (cardinal)
+	- Double tap (quick): Pick up items underfoot (opens chooser if multiple)
+	- Pinch: Zoom in/out
+	- Swipe right: Open inventory
+	- Swipe down: Open message log
+
 ## Project Structure
 
 - `index.html` — Main entry point for the game.
