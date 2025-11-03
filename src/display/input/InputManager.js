@@ -110,10 +110,11 @@ export class InputManager {
       return;
     }
 
-    // Pickup item (',' for get)
+    // Pickup chooser (',' for get)
     if (key === ",") {
       e.preventDefault();
-      this._emit(makeAction(Actions.PickupItem));
+      // Open chooser in display; chooser will submit specific items to rules
+      this._emit(makeAction(Actions.OpenPickupChooser));
       return;
     }
   }

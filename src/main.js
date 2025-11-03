@@ -21,7 +21,10 @@ import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
-import { Inventory, ItemInfo } from "./rules/components/index.js";
+import { Inventory } from "./rules/components/Inventory.js";
+import { ItemInfo } from "./rules/components/ItemInfo.js";
+import { NamedIdentity } from "./rules/components/NamedIdentity.js";
+import { Position } from "./rules/components/Position.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
@@ -29,12 +32,12 @@ import { HealthPotion, GoldStack } from "./rules/archetypes/Items.js";
 import { FloorTile, WallTile } from "./rules/archetypes/Tiles.js";
 import { Door } from "./rules/archetypes/Door.js";
 import { Monster } from "./rules/archetypes/Creatures.js";
-import { Position } from "./rules/components/Position.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { buildPalette } from "./display/palette/index.js";
 import { createRng } from "./lib/ecs-js/rng.js";
+import { itemsAt } from "./rules/utils/queries.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -122,9 +125,11 @@ createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "mo
 createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
 createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
 
-// Drop a sample equipment item to validate palette wiring
-const eq = buildEquipmentItem(world, 'sword_plain', {});
-world.add(eq, Position, { x: -1, y: 1 });
+// Drop a sample equipment stack (sword + shield) to validate picker & palette wiring
+const eqSword = buildEquipmentItem(world, 'sword_plain', {});
+const eqShield = buildEquipmentItem(world, 'shield_wood', {});
+world.add(eqSword, Position, { x: -1, y: 1 });
+world.add(eqShield, Position, { x: -1, y: 1 });
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -149,6 +154,27 @@ try {
         const current = (cam.targetScale || cam.scale || TILE_PX);
         const next = Math.max(minS, Math.min(maxS, current * f));
         zoomTo(cam, next);
+        break;
+      }
+      case "display.openPickupChooser": {
+        // Gather items at player's position. Open chooser only when there are >1 items.
+        const p = playerEntity(world);
+        if (!p) break;
+        const ids = itemsAt(world, p.pos.x, p.pos.y);
+        if (ids.length === 0) {
+          break;
+        }
+        if (ids.length === 1) {
+          const only = ids[0];
+          rulesHandler({ type: 'rules.pickupItem', payload: { itemId: only } });
+        } else {
+          const items = ids.map((id) => {
+            const info = world.get(id, ItemInfo);
+            const name = world.get(id, NamedIdentity);
+            return { id, type: info?.type || 'item', name: name?.name || info?.type || 'item', count: info?.count || 1 };
+          });
+          window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
+        }
         break;
       }
       default:
@@ -193,6 +219,18 @@ addEventListener('ui:castActiveSpell', () => {
     const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
     rulesHandler({ type: 'rules.castActiveSpell', payload: {} });
   } catch {}
+});
+
+// When user selects items from the pickup chooser overlay
+addEventListener('ui:requestPickup', (e) => {
+  const arr = e.detail?.itemIds;
+  if (!Array.isArray(arr) || !arr.length) return;
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  for (const id of arr) {
+    if (Number.isInteger(id) && id > 0) {
+      rulesHandler({ type: 'rules.pickupItem', payload: { itemId: id } });
+    }
+  }
 });
 
 // Basic app-side message log collector (bridge-free for now)

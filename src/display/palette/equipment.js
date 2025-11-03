@@ -9,5 +9,5 @@ export const equipmentPalette = {
   ...weapons,
   ...armor,
   ...rings,
-  shield_wood:   { glyph:"🛡️", fg:"#deb887", glow:"#deb887" }
+  shield_wood:   { glyph:"[", fg:"#614116ff", glow:"#deb887" }
 };

@@ -5,6 +5,7 @@ export function initOverlays() {
   const root = ensureRoot();
   const inv = ensurePanel('inventory');
   const log = ensurePanel('messageLog');
+  const pick = ensurePanel('pickup');
 
   window.addEventListener('ui:openInventory', () => {
     show(inv);
@@ -17,7 +18,7 @@ export function initOverlays() {
     window.dispatchEvent(new CustomEvent('ui:requestMessageLogData'));
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { hide(inv); hide(log); }
+    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); }
   });
 
   // Data feeds
@@ -28,6 +29,13 @@ export function initOverlays() {
   window.addEventListener('ui:messageLogData', (e) => {
     const entries = e.detail?.entries || [];
     renderMessageLog(log, entries);
+  });
+
+  // Open pickup chooser: expects items array [{ id, name, type, count }]
+  window.addEventListener('ui:openPickupChooser', (e) => {
+    const items = e.detail?.items || [];
+    renderPickupChooser(pick, items);
+    show(pick);
   });
 
   return { root, inv, log };
@@ -149,4 +157,97 @@ function renderMessageLog(panel, entries) {
 
 function sanitize(s) {
   return (s ?? '').toString().replace(/[<>]/g, '');
+}
+
+function renderPickupChooser(panel, items) {
+  const el = panel._inner;
+  el.innerHTML = '';
+  const title = document.createElement('div');
+  title.textContent = 'Pick up what?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(nothing here)';
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '6px';
+
+  const selections = new Set();
+
+  for (const it of items) {
+    const row = document.createElement('label');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      padding: '6px 8px', border: '1px solid #2d3b52', borderRadius: '6px',
+      background: '#0f1421'
+    });
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.addEventListener('change', () => {
+      if (cb.checked) selections.add(it.id); else selections.delete(it.id);
+    });
+    const name = document.createElement('span');
+    name.style.color = '#9cf';
+    name.textContent = sanitize(it.name || it.type || 'item');
+    const desc = document.createElement('span');
+    desc.style.opacity = '0.85';
+    desc.textContent = `x${it.count ?? 1}`;
+
+    row.appendChild(cb);
+    row.appendChild(name);
+    row.appendChild(desc);
+    list.appendChild(row);
+  }
+
+  el.appendChild(list);
+
+  const actions = document.createElement('div');
+  actions.style.display = 'flex';
+  actions.style.gap = '8px';
+  actions.style.marginTop = '10px';
+
+  const btnPickSel = document.createElement('button');
+  btnPickSel.textContent = 'Pick Selected';
+  decorateButton(btnPickSel);
+  btnPickSel.addEventListener('click', () => {
+    const ids = Array.from(selections);
+    if (!ids.length) return;
+    window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
+    hide(panel);
+  });
+
+  const btnPickAll = document.createElement('button');
+  btnPickAll.textContent = 'Pick All';
+  decorateButton(btnPickAll);
+  btnPickAll.addEventListener('click', () => {
+    const ids = items.map(i => i.id);
+    if (!ids.length) return;
+    window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
+    hide(panel);
+  });
+
+  const btnCancel = document.createElement('button');
+  btnCancel.textContent = 'Cancel';
+  decorateButton(btnCancel);
+  btnCancel.addEventListener('click', () => hide(panel));
+
+  actions.appendChild(btnPickSel);
+  actions.appendChild(btnPickAll);
+  actions.appendChild(btnCancel);
+  el.appendChild(actions);
+}
+
+function decorateButton(btn) {
+  Object.assign(btn.style, {
+    padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+  });
 }
