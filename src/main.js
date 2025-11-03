@@ -38,17 +38,37 @@ import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { buildPalette } from "./display/palette/index.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 import { itemsAt } from "./rules/utils/queries.js";
+import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d", { alpha: false });
-try { ctx.imageSmoothingEnabled = false; } catch {}
+ctx.imageSmoothingEnabled = false;
 
 // Lock down browser-driven inputs/scroll/zoom so the app fully controls them
 enableInputLockdown({ canvas });
 
+// Quality/perf controls
+const PERF = (() => {
+  const params = new URLSearchParams(window.location.search);
+  const q = (params.get('quality') || localStorage.getItem('jshack.quality') || 'auto').toLowerCase();
+  // Cap DPR on mobile/high-DPR screens to avoid excessive fill-rate costs
+  const autoCap = (window.devicePixelRatio || 1) > 2 ? 2 : 1.5;
+  const dprCap = Number(params.get('dprCap')) || Number(localStorage.getItem('jshack.dprCap')) || autoCap;
+  const isLow = q === 'low';
+  const isHigh = q === 'high';
+  return {
+    quality: q,
+    dprCap: isHigh ? 3 : (isLow ? 1 : dprCap),
+    glowLayers: isLow ? 0 : 2,
+    particleCapacity: isLow ? 1024 : 4096,
+  };
+})();
+
 function resize() {
-  const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  // Limit device pixel ratio to reduce pixel workload on mobile
+  const rawDpr = Math.max(1, window.devicePixelRatio || 1);
+  const dpr = Math.max(1, Math.min(PERF.dprCap, Math.floor(rawDpr)));
   const cssW = Math.max(1, window.innerWidth | 0);
   const cssH = Math.max(1, window.innerHeight | 0);
   canvas.style.width = cssW + "px";
@@ -62,9 +82,9 @@ resize();
 
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });
-try { configureWorld(world); } catch {}
+configureWorld(world);
 // Only app/scenes step the sim (deterministic). We’ll keep it paused here.
-function stepSim(dtTurns = 0) { if (dtTurns > 0) { try { world.tick(dtTurns); } catch {} } }
+function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 
 // ---- Demo scene: ensure a player exists and a couple items around ----------
 // Build a small dungeon room (10x10) centered at (0,0)
@@ -133,7 +153,7 @@ world.add(eqShield, Position, { x: -1, y: 1 });
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
-try {
+{
   const rulesHandler = makeRulesDispatcher(
     /** @type any */(world),
     () => (playerEntity(world)?.id || 0)
@@ -183,8 +203,6 @@ try {
   };
 
   setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers });
-} catch (err) {
-  console?.warn?.("input setup skipped:", err);
 }
 
 // ---- Display UI overlays + data feeds -------------------------------------
@@ -215,10 +233,8 @@ addEventListener('ui:requestMessageLogData', () => {
 
 // Active spell button click → cast
 addEventListener('ui:castActiveSpell', () => {
-  try {
-    const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-    rulesHandler({ type: 'rules.castActiveSpell', payload: {} });
-  } catch {}
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler({ type: 'rules.castActiveSpell', payload: {} });
 });
 
 // When user selects items from the pickup chooser overlay
@@ -239,29 +255,24 @@ function log(msg) {
   messageLog.push(msg);
   if (messageLog.length > 50) messageLog.shift();
 }
-try {
-  world.on('drank', ({ actor, itemId, target }) => log(`Entity ${actor} drank item ${itemId} on ${target||actor}`));
-  world.on('castSpell', ({ actor, spellId, targetId }) => log(`Entity ${actor} cast spell ${spellId||'active'} on ${targetId||actor}`));
-  world.on('damage', ({ id, amount }) => log(`Entity ${id} took ${amount} damage`));
-  world.on('healed', ({ id, amount }) => log(`Entity ${id} healed ${amount}`));
-  world.on('died', ({ id }) => log(`Entity ${id} died`));
-  world.on('interaction', ({ action, result }) => {
-    if (action === 'toggleDoor') {
-      log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`);
-    }
-  });
-} catch {}
+world.on('drank', ({ actor, itemId, target }) => log(`Entity ${actor} drank item ${itemId} on ${target||actor}`));
+world.on('castSpell', ({ actor, spellId, targetId }) => log(`Entity ${actor} cast spell ${spellId||'active'} on ${targetId||actor}`));
+world.on('damage', ({ id, amount }) => log(`Entity ${id} took ${amount} damage`));
+world.on('healed', ({ id, amount }) => log(`Entity ${id} healed ${amount}`));
+world.on('died', ({ id }) => log(`Entity ${id} died`));
+world.on('interaction', ({ action, result }) => {
+  if (action === 'toggleDoor') {
+    log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`);
+  }
+});
 
 // When user clicks an inventory item to drink
 addEventListener('ui:requestDrink', (e) => {
   const itemId = e.detail?.itemId;
   if (!Number.isInteger(itemId)) return;
-  // Re-emit through input pipeline by calling displayHandler? We can directly enqueue a rules action:
-  try {
-    const action = { type: 'rules.drinkPotion', payload: { itemId } };
-    const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-    rulesHandler(action);
-  } catch {}
+  const action = { type: 'rules.drinkPotion', payload: { itemId } };
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler(action);
 });
 
 // ---- Display camera (resource) ---------------------------------------------
@@ -277,15 +288,17 @@ function worldToScreen({ x, y, size = 1 }) {
 }
 
 // ---- Particle FX (display-only) -------------------------------------------
-const fx = new ParticleFX({ capacity: 4096, seedBase: (world.seed >>> 0) });
+const fx = new ParticleFX({ capacity: PERF.particleCapacity, seedBase: (world.seed >>> 0) });
 fx.ctx = ctx;
-fx.worldToScreen = worldToScreen;
+// Avoid expensive per-particle transforms: draw in world units under camera transform
+fx.worldToScreen = (p) => ({ x: p.x, y: p.y, size: p.size });
 
 // Optionally attach an emitter to a stable key (e.g., player id) later
 // fx.ensureEmitter(playerId, preset);
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
+const glyphAtlas = createGlyphAtlas(palette, { glowLayers: PERF.glowLayers, sizePx: 64, fontPx: 56 });
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
@@ -314,39 +327,39 @@ function render(worldView) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Draw tiles first, then actors/items for layering
+  // Draw tiles first, then actors/items for layering without per-frame array allocs
   const isTileKind = (k) => k === 'floor' || k === 'wall' || (typeof k === 'string' && k.startsWith('door_'));
-  const tiles = worldView.entities.filter(e => isTileKind(e.kind));
-  const others = worldView.entities.filter(e => !isTileKind(e.kind));
 
-  const drawList = [...tiles, ...others];
   // Set glyph height in world units once per frame (pre-transform px). With camera.scale=TILE_PX,
   // 1px here becomes TILE_PX on screen, matching tile size.
-  ctx.font = `900 1px monospace`;
-  for (const e of drawList) {
+  // We now use pre-rendered glyph bitmaps; font is not used for entities.
+  // Compute simple view bounds in world units for culling
+  const viewHalfW = W * 0.5 / (cam.scale || 1);
+  const viewHalfH = H * 0.5 / (cam.scale || 1);
+  const vx0 = cam.x - viewHalfW - 1; // add small margin
+  const vy0 = cam.y - viewHalfH - 1;
+  const vx1 = cam.x + viewHalfW + 1;
+  const vy1 = cam.y + viewHalfH + 1;
+
+  // Pass 1: tiles
+  for (let i = 0; i < worldView.entities.length; i++) {
+    const e = worldView.entities[i];
+    if (!isTileKind(e.kind)) continue;
+    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    const look = palette[k] || palette.default;
+    drawKind(glyphAtlas, ctx, k, e.pos.x, e.pos.y);
+  }
 
-    // glow layers (lighter)
-    ctx.globalCompositeOperation = "lighter";
-    const layers = 3; // reduced from 5 for performance
-    for (let i = 0; i < layers; i++) {
-      const t = i / (layers - 1);
-      const alpha = 0.08 * (1 - t);
-      ctx.shadowBlur = 8 + t * 14;
-      ctx.shadowColor = look.glow;
-      ctx.fillStyle = `rgba(102,204,255,${alpha.toFixed(3)})`;
-      ctx.fillText(look.glyph, e.pos.x, e.pos.y);
-    }
-
-    // core glyph
-    ctx.globalCompositeOperation = "source-over";
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = look.fg;
-    ctx.fillText(look.glyph, e.pos.x, e.pos.y);
+  // Pass 2: non-tiles
+  for (let i = 0; i < worldView.entities.length; i++) {
+    const e = worldView.entities[i];
+    if (isTileKind(e.kind)) continue;
+    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
+    const k = (typeof e.kind === 'string') ? e.kind : 'default';
+    drawKind(glyphAtlas, ctx, k, e.pos.x, e.pos.y);
 
     // Glyph-FX: show an invulnerability shimmer ring when tagged
-    if (Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = 'rgba(160,255,255,0.9)';
@@ -365,16 +378,18 @@ function render(worldView) {
   ctx.restore();
 
   // HUD
-  ctx.save();
-  ctx.globalCompositeOperation = "source-over";
-  ctx.fillStyle = "#9cf";
-  ctx.font = "12px monospace";
-  ctx.textAlign = "left"; ctx.textBaseline = "top";
-  const s = fx.stats();
-  ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8);
-  const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
-  ctx.fillText(`fx fps: ${fpsInt}`, 8, 24);
-  ctx.restore();
+  if (PERF.quality !== 'low') {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#9cf";
+    ctx.font = "12px monospace";
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    const s = fx.stats();
+    ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8);
+    const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
+    ctx.fillText(`fx fps: ${fpsInt}`, 8, 24);
+    ctx.restore();
+  }
 }
 
 // ---- Frame loop (FXClock) --------------------------------------------------
@@ -393,12 +408,12 @@ function frame(now) {
   stepSim(0);
 
   // Advance display-only systems
-  try { fx.step(dtSec); } catch {}
+  if (PERF.particleCapacity > 0) fx.step(dtSec);
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
 
   // Render
-  const view = buildWorldView(world);
+  const view = getCachedView();
   // keep camera centered on player if present
   if (view.player) {
     // Directly set follow target at player world coords
@@ -421,3 +436,14 @@ addEventListener("keydown", (e) => {
   if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, TILE_PX); e.preventDefault(); return; }
   if ((key || "").toLowerCase() === "x") { startShake(cam, 6, 0.35); e.preventDefault(); return; }
 });
+
+// Cache WorldView per rules step; if the sim hasn't advanced, reuse the view
+let _cachedView = null; let _cachedStep = -1;
+function getCachedView() {
+  const step = world.step | 0;
+  if (!_cachedView || step !== _cachedStep) {
+    _cachedView = buildWorldView(world);
+    _cachedStep = step;
+  }
+  return _cachedView;
+}

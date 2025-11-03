@@ -18,6 +18,20 @@ Execute `./build.ps1` to check for errors
 
 ## Quick Start
 
+### Performance/Quality controls
+
+Mobile GPUs have limited fill-rate. The renderer now exposes a few conservative switches that keep visuals consistent while reducing per-frame work:
+
+- URL params (or matching localStorage keys) — set once and reload:
+	- `?quality=low|auto|high` — presets for glow layers and particle capacity
+	- `?dprCap=<number>` — caps devicePixelRatio used for the canvas (default auto: 1.5–2 on high-DPR devices)
+
+Examples:
+
+- `index.html?quality=low` — disables glyph glow, halves particle pool, caps DPR to 1
+- `index.html?dprCap=2` — keeps crispness but avoids 3×/4× DPR overload on phones
+
+These controls operate entirely in display/ and do not affect deterministic rules/.
 1. **Clone or Download** this repository.
 2. **Open `index.html`** in your browser _or_ serve the folder with a static server:
 

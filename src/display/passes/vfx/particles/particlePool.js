@@ -77,6 +77,7 @@ export class ParticlePool {
   render(ctx, worldToScreen, opts = {}) {
     const mode = opts.mode || 'lighter';
     const alphaScale = opts.alphaScale ?? 0.95;
+    const shape = opts.shape || 'circle'; // 'circle' | 'rect'
     ctx.save();
     ctx.globalCompositeOperation = mode;
 
@@ -88,11 +89,15 @@ export class ParticlePool {
 
       ctx.globalAlpha = alpha;
       ctx.fillStyle = `rgb(${this.r[i]|0},${this.g[i]|0},${this.b[i]|0})`;
-
-      // Simple round sprite (fast). Swap with glyph/atlas draw if desired.
-      ctx.beginPath();
-      ctx.arc(P.x, P.y, P.size*0.5, 0, Math.PI*2);
-      ctx.fill();
+      if (shape === 'rect') {
+        const r = P.size * 0.5;
+        ctx.fillRect(P.x - r, P.y - r, P.size, P.size);
+      } else {
+        // Circle
+        ctx.beginPath();
+        ctx.arc(P.x, P.y, P.size*0.5, 0, Math.PI*2);
+        ctx.fill();
+      }
     }
 
     ctx.globalAlpha = 1;
