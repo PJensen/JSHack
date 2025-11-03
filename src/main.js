@@ -323,7 +323,7 @@ fx.worldToScreen = (p) => ({ x: p.x, y: p.y, size: p.size });
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
-const glyphAtlas = createGlyphAtlas(palette, { glowLayers: PERF.glowLayers, sizePx: 64, fontPx: 56 });
+const glyphAtlas = createGlyphAtlas(palette, { glowLayers: PERF.glowLayers, sizePx: (PERF.quality==='low'?32:64), fontPx: (PERF.quality==='low'?28:56) });
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
@@ -397,7 +397,7 @@ function render(worldView) {
   }
 
   // Particles (already in world space)
-  fx.render({ mode: "lighter", alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
+  fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
 
   bctx.restore();
 

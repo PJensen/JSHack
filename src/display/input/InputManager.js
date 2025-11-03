@@ -18,6 +18,7 @@ export class InputManager {
     this._multi = new Map(); // pointerId -> { x,y }
     this._pinch = null; // { id1,id2, d0 }
     this._canvas = options.canvas || null;
+    this._rect = null; // cached bounding rect for pointer math
 
   // Double-tap tracking
   this._lastTap = null; // { t:number, x:number, y:number }
@@ -28,6 +29,7 @@ export class InputManager {
     this._onPointerDown = (e) => this._handlePointerDown(e);
     this._onPointerMove = (e) => this._handlePointerMove(e);
     this._onPointerUp = (e) => this._handlePointerUp(e);
+    this._onResize = () => this._updateRect();
 
     this._bind();
   }
@@ -70,6 +72,8 @@ export class InputManager {
     el.addEventListener("pointermove", this._onPointerMove, { passive: true });
     el.addEventListener("pointerup", this._onPointerUp, { passive: true });
     el.addEventListener("pointercancel", this._onPointerUp, { passive: true });
+    window.addEventListener("resize", this._onResize, { passive: true });
+    this._updateRect();
   }
 
   _unbind() {
@@ -79,6 +83,17 @@ export class InputManager {
     el.removeEventListener("pointermove", this._onPointerMove);
     el.removeEventListener("pointerup", this._onPointerUp);
     el.removeEventListener("pointercancel", this._onPointerUp);
+    window.removeEventListener("resize", this._onResize);
+  }
+
+  _updateRect() {
+    const el = this._canvas || this.target;
+    // Reading getBoundingClientRect can trigger layout; call sparingly
+    if (el && typeof el.getBoundingClientRect === 'function') {
+      this._rect = el.getBoundingClientRect();
+    } else {
+      this._rect = { left: 0, top: 0, width: el?.width || window.innerWidth, height: el?.height || window.innerHeight };
+    }
   }
 
   _handleKeyDown(e) {
@@ -128,9 +143,11 @@ export class InputManager {
   }
 
   _handlePointerDown(e) {
-    const rect = (this._canvas || this.target).getBoundingClientRect?.() || { left: 0, top: 0 };
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!this._rect) this._updateRect();
+    const rect = this._rect || { left: 0, top: 0 };
+    const hasOffset = (typeof e.offsetX === 'number' && typeof e.offsetY === 'number');
+    const x = hasOffset ? e.offsetX : (e.clientX - rect.left);
+    const y = hasOffset ? e.offsetY : (e.clientY - rect.top);
 
     // Track in multi map
     this._multi.set(e.pointerId, { x, y });
@@ -152,10 +169,15 @@ export class InputManager {
   }
 
   _handlePointerMove(e) {
-    const rect = (this._canvas || this.target).getBoundingClientRect?.() || { left: 0, top: 0 };
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    if (this._multi.has(e.pointerId)) this._multi.set(e.pointerId, { x, y });
+    if (!this._rect) this._updateRect();
+    const rect = this._rect || { left: 0, top: 0 };
+    const hasOffset = (typeof e.offsetX === 'number' && typeof e.offsetY === 'number');
+    const x = hasOffset ? e.offsetX : (e.clientX - rect.left);
+    const y = hasOffset ? e.offsetY : (e.clientY - rect.top);
+    if (this._multi.has(e.pointerId)) {
+      const m = this._multi.get(e.pointerId);
+      m.x = x; m.y = y; // mutate existing to avoid allocations
+    }
 
     if (this._pinch) {
       const a = this._multi.get(this._pinch.id1);
@@ -163,8 +185,8 @@ export class InputManager {
       if (!a || !b) return;
       const d = Math.hypot(b.x - a.x, b.y - a.y) || this._pinch.d0;
       const factor = d / (this._pinch.d0 || 1);
-      // Emit zoom deltas around 1.0 (avoid huge jumps)
-      if (Number.isFinite(factor) && factor > 0) {
+      // Emit zoom deltas with deadzone around 1.0 to reduce action spam
+      if (Number.isFinite(factor) && factor > 0 && Math.abs(factor - 1) > 0.02) {
         this._emit(makeAction(Actions.Zoom, { factor }));
         // Update baseline to allow smooth continuous pinch
         this._pinch.d0 = d;
@@ -191,7 +213,8 @@ export class InputManager {
     if (!p || p.id !== e.pointerId) { return; }
     this._pointer = null;
 
-    const rect = (this._canvas || this.target).getBoundingClientRect?.();
+  if (!this._rect) this._updateRect();
+  const rect = this._rect;
     const width = rect?.width || (this._canvas?.width ?? window.innerWidth);
     const height = rect?.height || (this._canvas?.height ?? window.innerHeight);
 
