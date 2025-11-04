@@ -130,9 +130,13 @@ export function combatSystem(world) {
         const hitCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         world.emit('hit', hitCtx);
         let hasVamp = false;
-    forEachAffix(world, attacker, /** @param {any} a */ (a) => { if (a.triggers?.includes('onHit') && typeof a.script === 'function') { a.script(hitCtx); if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true; } });
+        // Attacker on-hit affixes (e.g., vampiric)
+        forEachAffix(world, attacker, /** @param {any} a */ (a) => { if (a.triggers?.includes('onHit') && typeof a.script === 'function') { a.script(hitCtx); if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true; } });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+        // Defender on-hit reactions (e.g., Thorns)
+        const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
+        forEachAffix(world, defender, /** @param {any} a */ (a) => { if (a.triggers?.includes('onHit') && typeof a.script === 'function') a.script(defCtx); });
 
         // Invulnerability gate: if defender has 'invulnerable' status active, nullify damage
         const stat = world.get(defender, Status);
@@ -142,7 +146,7 @@ export function combatSystem(world) {
             world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
         }
 
-        if (finalDmg > 0) {
+    if (finalDmg > 0) {
             defVit.hp = Math.max(0, defVit.hp - finalDmg);
             world.emit('damaged', { target: defender, amount: finalDmg, source: attacker, critical: isCrit });
             if (defVit.hp <= 0) world.emit('died', { id: defender, killer: attacker });

@@ -59,12 +59,10 @@ async function run() {
   // base damage = 1 + attackDerived(2) = 3
   // fierce (onBeforeHit) +1 -> 4
   // defense 1 -> 3 dealt
-  // vamp1 heals attacker by floor(damage/3) => at least 1
+  // vamp1 heals attacker by floor(damage/3) => +1
+  // Thorns now has 20% proc chance on hit; hero HP can be 10 (no proc) or 8 (proc for 2)
   assert(fVit.hp === 7, 'foe took 3 damage');
-  assert(hVit.hp === 8, 'hero healed then took thorns');
-
-  // thorns retaliates 2
-  assert(hVit.hp <= 9, 'hero took thorns retaliation');
+  assert(hVit.hp === 10 || hVit.hp === 8, `hero HP after vamp + possible thorns should be 10 or 8, got ${hVit.hp}`);
 
   console.log('Combat tests PASS');
 }

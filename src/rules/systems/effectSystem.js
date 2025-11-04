@@ -100,6 +100,11 @@ export function effectSystem(world) {
                     upsertStatus(nextStatuses, { type: 'stunned', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
+                case 'thorns': {
+                    // Purely visual status to indicate a thorns proc this turn
+                    upsertStatus(nextStatuses, { type: 'thorns', duration: e.turnsLeft, potency, stacks });
+                    break;
+                }
                 default: {
                     // Fallback: optional callback dispatch by name (future-friendly)
                     if (e.cbKey && typeof effectCallbacks[e.cbKey] === 'function') {

@@ -785,6 +785,37 @@ function render(worldView) {
       bctx.stroke();
       bctx.restore();
     }
+
+    // Glyph-FX: simple green thorn spikes ring when wearing Thorns gear
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('thorns')) {
+      /** @type {CanvasRenderingContext2D} */
+      const g = /** @type any */ (bctx);
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      const cx = e.pos.x, cy = e.pos.y;
+      // soft inner glow
+      g.fillStyle = 'rgba(120,255,120,0.10)';
+      g.beginPath(); g.arc(cx, cy, 0.36, 0, Math.PI * 2); g.fill();
+      // spikes
+      const n = 8; // keep it subtle
+      const base = 0.30; const out = 0.52;
+      const wob = 0.02 * Math.sin(_fxTime * 5.0);
+      g.lineWidth = 0.06;
+      g.strokeStyle = 'rgba(120,255,120,0.85)';
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + _fxTime * 0.8; // slow rotation
+        const x0 = cx + Math.cos(a) * base;
+        const y0 = cy + Math.sin(a) * base;
+        const x1 = cx + Math.cos(a) * (out + wob);
+        const y1 = cy + Math.sin(a) * (out + wob);
+        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      }
+      // faint outer ring
+      g.strokeStyle = 'rgba(120,255,160,0.35)';
+      g.lineWidth = 0.05;
+      g.beginPath(); g.arc(cx, cy, out + 0.02, 0, Math.PI * 2); g.stroke();
+      g.restore();
+    }
   }
 
   // Spell bolt VFX (world-space additive glow)
@@ -987,7 +1018,10 @@ function updateCombatHUD() {
     pushAffixes(Number(eq.ring1||0));
     pushAffixes(Number(eq.ring2||0));
   }
-  const affixNames = affixIds.map((id) => (AFFIX_DEFS?.[id]?.name) || id);
+  // Do not show Thorns as a persistent affix chip; it should only appear in Status when it procs
+  const affixNames = affixIds
+    .filter((id) => !/^thorns/i.test(String(id)))
+    .map((id) => (AFFIX_DEFS?.[id]?.name) || id);
   const affixSig = affixNames.join('|');
   if (_lastCombatHud.weaponId !== wid || _lastCombatHud.atk !== atk || _lastCombatHud.def !== def || _lastCombatHud.statusSig !== statusSig || _lastCombatHud.affixSig !== affixSig) {
     _lastCombatHud = { weaponId: wid, atk, def, statusSig, affixSig };
