@@ -2,7 +2,8 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, Position, ItemInfo } from "../../src/rules/components/index.js";
+import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, Position, ItemInfo } from "../../src/rules/components/index.js";
+import { UseIntent } from "../../src/rules/components/Intents/UseIntent.js";
 import { itemsAt } from "../../src/rules/utils/queries.js";
 
 /**
@@ -37,6 +38,20 @@ export function makeRulesDispatcher(world, getActorId) {
       case "rules.castActiveSpell": {
         const { spellId = 0, targetId = actorId } = action.payload || {};
         world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.equipItem": {
+        const { itemId = 0 } = action.payload || {};
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+        world?.add?.(actorId, EquipIntent, { itemId });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.useItem": {
+        const { itemId = 0, targetId = actorId } = action.payload || {};
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+        world?.add?.(actorId, UseIntent, { itemId, targetId });
         world?.tick?.(1);
         break;
       }

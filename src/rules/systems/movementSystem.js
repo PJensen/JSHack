@@ -11,13 +11,18 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Settings } from "../components/Settings.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
+import { AttackIntent } from "../components/Intents/AttackIntent.js";
+import { Vitality } from "../components/Vitality.js";
 
+/** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
 
+/** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
   // Build occupancy and terrain maps for quick blocking checks
   const blocking = new Map(); // key(x,y) -> true if non-walkable terrain or solid collider present
   const interactables = new Map(); // key(x,y) -> entity id with Interactable
+  const occupants = new Map(); // key(x,y) -> entity id (first seen) for quick bump-checks
 
   for (const [id, pos] of world.query(Position)) {
     const ter = world.get(id, Terrain);
@@ -31,6 +36,9 @@ export function movementSystem(world) {
     if (world.has(id, Interactable)) {
       interactables.set(key(pos.x, pos.y), id);
     }
+    // record an occupant for potential bump-attack; prefer first seen
+    const kk = key(pos.x, pos.y);
+    if (!occupants.has(kk)) occupants.set(kk, id);
   }
 
   for (const [actor, intent] of world.query(MoveIntent)) {
@@ -47,8 +55,23 @@ export function movementSystem(world) {
         const targetId = interactables.get(k);
         if (targetId) {
           world.add(actor, InteractIntent, { targetId });
+        } else {
+          // Cheap bump-attack: prefer a target with Vitality in the destination cell.
+          let target = 0;
+          for (const [eid, p] of world.query(Position)) {
+            if (p.x !== nx || p.y !== ny) continue;
+            // Avoid terrain tiles
+            if (world.get(eid, Terrain)) continue;
+            // Prefer living targets
+            if (world.get(eid, Vitality)) { target = eid; break; }
+            // Fallback to any non-terrain occupant if no living found yet
+            if (!target) target = eid;
+          }
+          if (Number.isInteger(target) && target > 0 && target !== actor) {
+            try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+          }
         }
-        // blocked: do nothing (no movement)
+        // blocked: movement is consumed
       } else {
         const from = { x: pos.x, y: pos.y };
         world.set(actor, Position, { x: nx, y: ny });
@@ -62,7 +85,7 @@ export function movementSystem(world) {
         if (inv && enable) {
           const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
           // collect item ids on the new tile that match types
-          const toTake = [];
+            const toTake = [];
           for (const [itemId, ipos] of world.query(Position)) {
             if (ipos.x !== nx || ipos.y !== ny) continue;
             const info = world.get(itemId, ItemInfo);
@@ -81,7 +104,7 @@ export function movementSystem(world) {
               if (n && n.identity === ident) { stackTarget = id; break; }
             }
             if (stackTarget) {
-              world.mutate(stackTarget, ItemInfo, (r) => { r.count = (r.count || 1) + count; });
+              world.mutate(stackTarget, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count || 1) + count; });
               world.destroy(itemId);
             } else {
               // capacity gate: allow if capacity not set or there's room

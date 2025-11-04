@@ -82,6 +82,10 @@
 	<!-- Entry module: must be a native ES module and use relative imports with extensions. -->
 	<script>
 		const hash = new Date().getTime().toString(16);
+		// Register a dev service worker to bust module cache on mobile
+		if ('serviceWorker' in navigator) {
+			try { navigator.serviceWorker.register(`./sw.js?v=${hash}`); } catch {}
+		}
 		const script = document.createElement('script');
 		script.type = 'module';
 		script.src = `./src/main.js?v=${hash}`;

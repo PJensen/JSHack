@@ -59,6 +59,12 @@ These controls operate entirely in display/ and do not affect deterministic rule
 	- Swipe right: Open inventory
 	- Swipe down: Open message log
 
+## Mobile-friendly item pickups
+
+When you walk over a non-currency item, a WoW-style tooltip appears near the bottom. Tap it to pick up the item. If multiple items are on the tile, tapping opens a simple chooser.
+
+Manual pickups respect a per-actor `Settings.pickupRange` (in tiles; default 1). This allows adjacent pickups on touch devices without precise stepping.
+
 ## Project Structure
 
 - `index.html` — Main entry point for the game.
@@ -100,6 +106,10 @@ These controls operate entirely in display/ and do not affect deterministic rule
 - Current statuses are mirrored into `Status.statuses` each tick (e.g., `poisoned`, `burning`). When an entity has no effects, statuses clear automatically.
 
 Example: Apply poison to the player for 3 turns at 2 damage per tick by pushing `{ key:'poison', turnsLeft:3, potency:2 }` into the player's `ActiveEffects.effects`. On each world tick, hp will drop by 2 until the effect expires, and the `poisoned` status will appear during the duration.
+
+## End-of-turn cleanup
+
+- A dedicated `cleanup` phase runs at the end of each world tick. It currently removes any entity with `Vitality.hp <= 0` to prevent "dead men walking" in subsequent turns. Systems can react to deaths (events, affixes, VFX, logging) earlier in the tick; removal is deferred until this phase to keep ordering deterministic.
 
 ## Contributing
 

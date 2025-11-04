@@ -13,6 +13,7 @@ export const Actions = Object.freeze({
   Wait: "rules.wait", // payload: {}
   DrinkPotion: "rules.drinkPotion", // payload: { itemId?:number, targetId?:number }
   CastActiveSpell: "rules.castActiveSpell", // payload: { spellId?:number, targetId?:number }
+  EquipItem: "rules.equipItem", // payload: { itemId:number }
 
   // Display-directed UI
   OpenInventory: "display.openInventory", // payload: {}
@@ -32,6 +33,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.DrinkPotion]: Sinks.rules,
   [Actions.PickupItem]: Sinks.rules,
   [Actions.CastActiveSpell]: Sinks.rules,
+  [Actions.EquipItem]: Sinks.rules,
 
   // Display-directed UI actions
   [Actions.OpenInventory]: Sinks.display,

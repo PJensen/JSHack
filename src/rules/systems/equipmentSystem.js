@@ -38,7 +38,7 @@ export function equipmentSystem(world) {
     const d = emptyDerived();
 
     // equip slots contain entity ids of items
-    const slots = [eq.weapon, eq.armor, eq.ring1, eq.ring2];
+    const slots = [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2];
     for (const itemId of slots) {
       if (!Number.isInteger(itemId)) continue;
       const info = world.get(itemId, ItemInfo);

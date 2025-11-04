@@ -39,6 +39,7 @@ export function buildEquipmentItem(world, equipId, opts = {}) {
     rarity: base.rarity || 1,
     rarityName: base.rarityName || 'common',
     affixes: Array.isArray(opts.affixes) ? opts.affixes.slice() : [],
+    damageDice: base.damageDice || null,
   };
   world.add(id, ItemInfo, info);
   // Attach script reference when supplied (for onEquip/onHit, etc.)

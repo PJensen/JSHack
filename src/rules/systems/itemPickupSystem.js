@@ -45,9 +45,14 @@ export function itemPickupSystem(world) {
         const info = world.get(itemId, ItemInfo);
         if (!itemPos || !info) { world.remove(actor, PickupIntent); continue; }
 
-        // must be at same tile
-        if (itemPos.x !== pos.x || itemPos.y !== pos.y) {
-            // targetId mismatch/no-op
+        // must be within pickup range (default 0 = same tile)
+        const set = world.get(actor, Settings);
+        const maxRange = Math.max(0, Number(set?.pickupRange ?? 0));
+        const dx = Math.abs((itemPos.x|0) - (pos.x|0));
+        const dy = Math.abs((itemPos.y|0) - (pos.y|0));
+        const dist = dx + dy; // Manhattan distance on grid
+        if (dist > maxRange) {
+            try { world.emit && world.emit('item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } }); } catch {}
             world.remove(actor, PickupIntent);
             continue;
         }

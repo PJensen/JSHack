@@ -8,6 +8,8 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
 import { Settings } from "../components/Settings.js";
 import { Equipment } from "../components/Equipment.js";
+import { Mana } from "../components/Mana.js";
+import { Brain } from "../components/Brain.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -17,9 +19,11 @@ export const PlayerArchetype = defineArchetype(
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [ActiveEffects, { effects: [] }],
-  [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })]
-  , [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })]
-  , [Equipment, {}]
+  [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
+  [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })],
+  [Equipment, {}],
+  [Mana, {}],
+  [Brain, {}]
 );
 
 export function createPlayer(world, params = {}) {
@@ -31,6 +35,10 @@ export function createPlayer(world, params = {}) {
     world.add(id, NamedIdentity, { name: params.name ?? "Player", identity: params.identity ?? "player" });
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
     world.add(id, Equipment, {});
+    world.add(id, ActiveEffects, { effects: [] });
+    world.add(id, Vitality, { maxHp: params.maxHp ?? 10, hp: params.hp ?? (params.maxHp ?? 10) });
+    world.add(id, Settings, { autoPickup: params.autoPickup ?? true, autoPickupKinds: params.autoPickupKinds ?? ['currency'] });
+    world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
     return id;
   })();
 }

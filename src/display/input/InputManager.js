@@ -61,6 +61,21 @@ export class InputManager {
 
   _handleKeyDown(e) {
     const { key, code } = e;
+    // If any UI panel is open, ignore movement/consumable bindings to let UI handle keys
+    try {
+      const openPanels = Array.from(document.querySelectorAll('.ui-panel')).filter(p => p && p.style.display === 'block');
+      if (openPanels.length) {
+        // Allow UI overlays to consume keys like arrows/enter without moving the player
+        return;
+      }
+    } catch {}
+
+    // Open Inventory: 'i'
+    if (key?.toLowerCase() === 'i') {
+      e.preventDefault();
+      this._emit(makeAction(Actions.OpenInventory));
+      return;
+    }
     // Wait intent: '.' (period)
     if (key === ".") {
       e.preventDefault();
