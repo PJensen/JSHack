@@ -242,10 +242,15 @@ createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "mo
 createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
 createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
 
-// Drop a sample equipment stack (sword + shield) to validate picker & palette wiring
+// Drop a sample equipment stack (sword + armor) to validate picker & palette wiring
 // Start with a slightly nastier sword: add a damage-boosting affix
 const eqSword = buildEquipmentItem(world, 'sword_plain', { affixes: ['fierce'] });
 world.add(eqSword, Position, { x: -3, y: -3 });
+
+// Place a chestpiece with Thorns affix in the bottom-left corner of the room (inside the walls)
+// Use the room bounds (ox, oy, W, H) defined above: bottom-left interior tile is (ox+1, oy+H-2)
+const thornArmor = buildEquipmentItem(world, 'chain_armor', { affixes: ['thorns1'] });
+world.add(thornArmor, Position, { x: ox + 1, y: oy + H - 2 });
 
 // // Add an Iron Pickaxe in the demo room
 // const eqPickaxe = buildEquipmentItem(world, 'iron_pickaxe', {});

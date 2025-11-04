@@ -77,7 +77,7 @@ export function combatSystem(world) {
         const df = world.get(defender, Faction)?.key || '';
         if (af && df && af === df) {
             // treat as immune (same faction)
-            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
+            // world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
             world.remove(attacker, AttackIntent);
             continue;
         }
