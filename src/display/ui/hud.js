@@ -57,9 +57,12 @@ export function initHUD() {
   defenseLine.style.fontSize = '12px'; defenseLine.style.color = '#cfe8ff';
   const statusRow = document.createElement('div');
   Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
+  const affixRow = document.createElement('div');
+  Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
   combatBox.appendChild(weaponLine); 
   combatBox.appendChild(defenseLine); 
   combatBox.appendChild(statusRow);
+  combatBox.appendChild(affixRow);
   vitals.appendChild(combatBox);
   root.appendChild(vitals);
 
@@ -129,7 +132,8 @@ export function initHUD() {
     const e = ev;
     const weapon = e?.detail?.weapon || null;
     const defense = Number(e?.detail?.defense ?? 0);
-    const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
+  const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
+  const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
 
     // Weapon line
     if (weapon && weapon.name) {
@@ -158,6 +162,20 @@ export function initHUD() {
         chip.style.color = '#e8ffff';
       }
       statusRow.appendChild(chip);
+    }
+
+    // Affix chips (equipped gear effects)
+    affixRow.innerHTML = '';
+    if (affixes.length) {
+      for (const name of affixes) {
+        const chip = document.createElement('div');
+        chip.textContent = String(name);
+        Object.assign(chip.style, {
+          fontSize: '11px', padding: '2px 6px', borderRadius: '999px',
+          background: 'rgba(180,120,255,0.15)', color: '#e6d6ff', border: '1px solid #3b2d52'
+        });
+        affixRow.appendChild(chip);
+      }
     }
   });
 

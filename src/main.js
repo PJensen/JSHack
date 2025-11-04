@@ -39,6 +39,7 @@ import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
 import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { getSpell } from "./rules/data/spells.js";
+import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 import { itemsAt } from "./rules/utils/queries.js";
@@ -958,7 +959,7 @@ function updateVitalsHUD() {
 }
 
 // --- Combat HUD feed (weapon, defense, statuses) -------------------------
-let _lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: '' };
+let _lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: '', affixSig: '' };
 function updateCombatHUD() {
   const pe = playerEntity(world);
   if (!pe) return;
@@ -972,13 +973,30 @@ function updateCombatHUD() {
   const dmgDice = wInfo?.damageDice || '';
   const statuses = Array.isArray(st?.effects) ? st.effects.map((e) => ({ key: String(e.key||e.type||'').toLowerCase(), turns: Number(e.turnsLeft||e.duration||0) })) : [];
   const statusSig = statuses.map(s=>`${s.key}:${s.turns}`).join('|');
-  if (_lastCombatHud.weaponId !== wid || _lastCombatHud.atk !== atk || _lastCombatHud.def !== def || _lastCombatHud.statusSig !== statusSig) {
-    _lastCombatHud = { weaponId: wid, atk, def, statusSig };
+
+  // Collect equipped affix names for HUD display
+  const affixIds = [];
+  const pushAffixes = (id) => {
+    const info = id ? world.get(id, ItemInfo) : null;
+    const arr = info && Array.isArray(info.affixes) ? info.affixes : [];
+    for (const a of arr) affixIds.push(String(a));
+  };
+  if (eq) {
+    pushAffixes(Number(eq.weapon||0));
+    pushAffixes(Number(eq.armor||0));
+    pushAffixes(Number(eq.ring1||0));
+    pushAffixes(Number(eq.ring2||0));
+  }
+  const affixNames = affixIds.map((id) => (AFFIX_DEFS?.[id]?.name) || id);
+  const affixSig = affixNames.join('|');
+  if (_lastCombatHud.weaponId !== wid || _lastCombatHud.atk !== atk || _lastCombatHud.def !== def || _lastCombatHud.statusSig !== statusSig || _lastCombatHud.affixSig !== affixSig) {
+    _lastCombatHud = { weaponId: wid, atk, def, statusSig, affixSig };
     try {
       window.dispatchEvent(new CustomEvent('ui:updateCombatHUD', { detail: {
         weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk } : null,
         defense: def,
-        statuses
+        statuses,
+        affixes: affixNames
       }}));
     } catch {}
   }
