@@ -224,16 +224,16 @@ if (pe) {
 
 // Drop a couple of health potions on the floor
 const p1 = createFrom(world, HealthPotion, {});
-world.add(p1, Position, { x: 2, y: 0 });
+world.add(p1, Position, { x: 4, y: 0 });
 const p2 = createFrom(world, HealthPotion, {});
-world.add(p2, Position, { x: -2, y: 0 });
+world.add(p2, Position, { x: -3, y: 0 });
 
 // Spawn a stack of gold (currency) using deterministic RNG
 {
   const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
   const coins = rng.int(12, 47);
   const gold = createFrom(world, GoldStack, {});
-  world.add(gold, Position, { x: 1, y: 1 });
+  world.add(gold, Position, { x: -1, y: -1 });
   world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
 }
 
@@ -245,7 +245,7 @@ createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity:
 // Drop a sample equipment stack (sword + shield) to validate picker & palette wiring
 // Start with a slightly nastier sword: add a damage-boosting affix
 const eqSword = buildEquipmentItem(world, 'sword_plain', { affixes: ['fierce'] });
-world.add(eqSword, Position, { x: -1, y: 1 });
+world.add(eqSword, Position, { x: -3, y: -3 });
 
 // // Add an Iron Pickaxe in the demo room
 // const eqPickaxe = buildEquipmentItem(world, 'iron_pickaxe', {});
@@ -457,9 +457,13 @@ world.on('spell:unknown', ({ actor, spellId }) => {
 world.on('spell:oom', ({ actor, spellId, need, have }) => {
   log(`Not enough mana to cast [${String(spellId||'spell')}] (need ${need}, have ${have}).`);
 });
-world.on('damage', ({ id, amount }) => {
+// Legacy generic damage hook (spells and DoTs may emit this)
+world.on('damage', ({ id, amount, source, critical, crit }) => {
   const who = nameOfEntity(id);
-  log(`${who} takes ${amount} damage.`);
+  const atk = Number(source||0) ? nameOfEntity(source) : null;
+  const critTxt = (critical || crit) ? ' (CRIT!)' : '';
+  if (atk) log(`${atk} hits ${who} for ${amount}${critTxt}.`);
+  else log(`${who} takes ${amount} damage${critTxt}.`);
 });
 world.on('healed', ({ id, amount }) => {
   const who = nameOfEntity(id);
@@ -474,9 +478,10 @@ world.on('died', ({ id }) => {
   log(`${who} dies.`);
 });
 // Floating text hooks: damage and gold pickups
-world.on('damaged', ({ target, amount, critical, crit }) => {
+// Deterministic combat damage (from combatSystem)
+world.on('damaged', ({ target, amount, critical, crit, source }) => {
   const t = Number(target||0) || 0;
-  const pos = world.get(t, Position);
+  const pos = /** @type any */ (world.get(t, Position));
   const pe = playerEntity(world);
   const isPlayer = !!pe && pe.id === t;
   if (pos && Number.isFinite(amount)) {
@@ -484,6 +489,21 @@ world.on('damaged', ({ target, amount, critical, crit }) => {
     const col = isPlayer ? '#ff6060' : '#ffd966';
     ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
   }
+  // Message log: "A hits B for N (CRIT!)"
+  const defName = nameOfEntity(target);
+  const atkName = nameOfEntity(source);
+  const critTxt = (critical || crit) ? ' (CRIT!)' : '';
+  // Try to include weapon label if attacker has one
+  let weaponLabel = '';
+  if (Number(source||0)) {
+    const eq = /** @type any */ (world.get(Number(source||0), Equipment));
+    const wid = Number(eq?.weapon || 0);
+    if (wid) {
+      const wname = /** @type any */ (world.get(wid, NamedIdentity))?.name;
+      if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
+    }
+  }
+  log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`);
 });
 world.on('damage', ({ id, amount, at, critical, crit }) => {
   const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : world.get(Number(id||0), Position);
@@ -495,12 +515,17 @@ world.on('damage', ({ id, amount, at, critical, crit }) => {
   }
 });
 // Generic status text UX hook (optional): kind='miss'|'immune'|...
-world.on('status', ({ id, kind, at, text }) => {
+world.on('status', ({ id, kind, at, text, source }) => {
   const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : world.get(Number(id||0), Position);
   if (!pos) return;
   const style = (String(kind||'')).toLowerCase() === 'miss' ? 'miss' : ((String(kind||'')).toLowerCase() === 'immune' ? 'immune' : 'status');
   const label = String(text || kind || '').toUpperCase() || (style === 'miss' ? 'MISS' : (style === 'immune' ? 'IMMUNE' : 'STATUS'));
   try { ftext.addStatus(pos.x, pos.y, label, { style }); } catch {}
+  // Verbose log for combat statuses when we have participants
+  const tgt = nameOfEntity(id);
+  const src = Number(source||0) ? nameOfEntity(source) : null;
+  if (style === 'miss' && src) log(`${src} misses ${tgt}.`);
+  if (style === 'immune' && src) log(`${src} can't hurt ${tgt}.`);
 });
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
@@ -838,6 +863,7 @@ function frame(now) {
 
   // Update vitals HUD if changed (lightweight per-frame check)
   updateVitalsHUD();
+  updateCombatHUD();
 
   // Render
   const view = getCachedView();
@@ -923,6 +949,33 @@ function updateVitalsHUD() {
   if (hp !== _lastVitals.hp || maxHp !== _lastVitals.maxHp || m.mana !== _lastVitals.mana || m.maxMana !== _lastVitals.maxMana) {
     _lastVitals = { hp, maxHp, mana: m.mana, maxMana: m.maxMana };
     try { window.dispatchEvent(new CustomEvent('ui:updateVitals', { detail: _lastVitals })); } catch {}
+  }
+}
+
+// --- Combat HUD feed (weapon, defense, statuses) -------------------------
+let _lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: '' };
+function updateCombatHUD() {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const eq = /** @type any */ (world.get(pe.id, Equipment));
+  const st = /** @type any */ (world.get(pe.id, ActiveEffects));
+  const wid = Number(eq?.weapon || 0);
+  const atk = Number(eq?.attackDerived || 0);
+  const def = Number(eq?.defenseDerived || 0);
+  const wInfo = wid ? world.get(wid, ItemInfo) : null;
+  const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : '';
+  const dmgDice = wInfo?.damageDice || '';
+  const statuses = Array.isArray(st?.effects) ? st.effects.map((e) => ({ key: String(e.key||e.type||'').toLowerCase(), turns: Number(e.turnsLeft||e.duration||0) })) : [];
+  const statusSig = statuses.map(s=>`${s.key}:${s.turns}`).join('|');
+  if (_lastCombatHud.weaponId !== wid || _lastCombatHud.atk !== atk || _lastCombatHud.def !== def || _lastCombatHud.statusSig !== statusSig) {
+    _lastCombatHud = { weaponId: wid, atk, def, statusSig };
+    try {
+      window.dispatchEvent(new CustomEvent('ui:updateCombatHUD', { detail: {
+        weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk } : null,
+        defense: def,
+        statuses
+      }}));
+    } catch {}
   }
 }
 

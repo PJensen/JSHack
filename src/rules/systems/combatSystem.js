@@ -66,8 +66,8 @@ export function combatSystem(world) {
         const apos = world.get(attacker, Position);
         const dpos = world.get(defender, Position);
         if (!apos || !dpos || (Math.abs((apos.x|0) - (dpos.x|0)) + Math.abs((apos.y|0) - (dpos.y|0))) !== 1) {
-            // Out of range: treat as miss and consume intent
-            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS' });
+            // Out of range: silently consume intent without emitting a MISS far away
+            // (prevents confusing "MISS" feedback when monsters are not adjacent)
             world.remove(attacker, AttackIntent);
             continue;
         }
@@ -76,8 +76,8 @@ export function combatSystem(world) {
         const af = world.get(attacker, Faction)?.key || '';
         const df = world.get(defender, Faction)?.key || '';
         if (af && df && af === df) {
-            // treat as miss/immune
-            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE' });
+            // treat as immune (same faction)
+            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
             world.remove(attacker, AttackIntent);
             continue;
         }
@@ -96,8 +96,8 @@ export function combatSystem(world) {
         const isNat1 = d20 === 1;
 
         if (!isCrit && (isNat1 || totalToHit < armorClass)) {
-            // Miss
-            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS' });
+            // Miss (include attacker for better UX logging)
+            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
             world.remove(attacker, AttackIntent);
             continue;
         }
@@ -139,7 +139,7 @@ export function combatSystem(world) {
         const isInvuln = !!(stat && Array.isArray(stat.statuses) && stat.statuses.some(s => String(s.type).toLowerCase() === 'invulnerable' && (s.duration|0) > 0));
         if (isInvuln) {
             finalDmg = 0;
-            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE' });
+            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
         }
 
         if (finalDmg > 0) {
@@ -147,7 +147,8 @@ export function combatSystem(world) {
             world.emit('damaged', { target: defender, amount: finalDmg, source: attacker, critical: isCrit });
             if (defVit.hp <= 0) world.emit('died', { id: defender, killer: attacker });
         } else {
-            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS' });
+            // Zero damage after modifiers → treat as miss/blocked; include attacker for logs
+            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
         }
 
         world.remove(attacker, AttackIntent);
