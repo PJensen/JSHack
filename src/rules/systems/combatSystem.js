@@ -7,6 +7,8 @@ import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
 import { Player } from '../components/Player.js';
+import { Status } from '../components/Status.js';
+import { Position } from '../components/Position.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 
@@ -59,6 +61,16 @@ export function combatSystem(world) {
         const atkVit = world.get(attacker, Vitality);
         const defVit = world.get(defender, Vitality);
         if (!atkVit || !defVit) { world.remove(attacker, AttackIntent); continue; }
+
+        // Range gate: only allow melee from orthogonal adjacency (no diagonals, no ranged)
+        const apos = world.get(attacker, Position);
+        const dpos = world.get(defender, Position);
+        if (!apos || !dpos || (Math.abs((apos.x|0) - (dpos.x|0)) + Math.abs((apos.y|0) - (dpos.y|0))) !== 1) {
+            // Out of range: treat as miss and consume intent
+            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS' });
+            world.remove(attacker, AttackIntent);
+            continue;
+        }
 
         // Friendly fire prevention: same faction cannot harm each other (assumption per request)
         const af = world.get(attacker, Faction)?.key || '';
@@ -121,6 +133,14 @@ export function combatSystem(world) {
     forEachAffix(world, attacker, /** @param {any} a */ (a) => { if (a.triggers?.includes('onHit') && typeof a.script === 'function') { a.script(hitCtx); if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true; } });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+
+        // Invulnerability gate: if defender has 'invulnerable' status active, nullify damage
+        const stat = world.get(defender, Status);
+        const isInvuln = !!(stat && Array.isArray(stat.statuses) && stat.statuses.some(s => String(s.type).toLowerCase() === 'invulnerable' && (s.duration|0) > 0));
+        if (isInvuln) {
+            finalDmg = 0;
+            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE' });
+        }
 
         if (finalDmg > 0) {
             defVit.hp = Math.max(0, defVit.hp - finalDmg);

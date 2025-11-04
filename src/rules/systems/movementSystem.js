@@ -20,7 +20,7 @@ function key(x, y) { return `${x},${y}`; }
 /** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
   // Build occupancy and terrain maps for quick blocking checks
-  const blocking = new Map(); // key(x,y) -> true if non-walkable terrain or solid collider present
+  const blocking = new Map(); // key(x,y) -> true if non-walkable terrain, solid collider, or living occupant present
   const interactables = new Map(); // key(x,y) -> entity id with Interactable
   const occupants = new Map(); // key(x,y) -> entity id (first seen) for quick bump-checks
 
@@ -31,6 +31,11 @@ export function movementSystem(world) {
     }
     const col = world.get(id, Collider);
     if (col && col.solid) {
+      blocking.set(key(pos.x, pos.y), true);
+    }
+    // Treat any living entity as blocking by default (prevents walking through monsters)
+    const vit = world.get(id, Vitality);
+    if (vit && (vit.hp ?? 0) > 0) {
       blocking.set(key(pos.x, pos.y), true);
     }
     if (world.has(id, Interactable)) {
@@ -67,7 +72,9 @@ export function movementSystem(world) {
             // Fallback to any non-terrain occupant if no living found yet
             if (!target) target = eid;
           }
-          if (Number.isInteger(target) && target > 0 && target !== actor) {
+          // Only allow bump-attacks from orthogonal adjacency (no diagonals)
+          const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
+          if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
             try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
           }
         }
@@ -76,6 +83,8 @@ export function movementSystem(world) {
         const from = { x: pos.x, y: pos.y };
         world.set(actor, Position, { x: nx, y: ny });
         world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
+        // Reserve the destination so subsequent movers in this tick can't step into the same tile
+        blocking.set(k, true);
 
         // Immediate auto-pickup for actors with Settings.autoPickup (defaults true)
         // Focused on currency to avoid unexpected heavy pickups.
@@ -108,7 +117,9 @@ export function movementSystem(world) {
               world.destroy(itemId);
             } else {
               // capacity gate: allow if capacity not set or there's room
-              if (inv.capacity == null || inv.items.length < inv.capacity) {
+              // Special case: currency ignores capacity so monsters can hoard gold even with capacity 0
+              const ignoreCapacity = info.type === 'currency';
+              if (ignoreCapacity || inv.capacity == null || inv.items.length < inv.capacity) {
                 try { world.remove(itemId, Position); } catch {}
                 inv.items.push(itemId);
               } else {

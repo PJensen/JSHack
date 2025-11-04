@@ -4,7 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-  "test": "npm run test:inventory && npm run test:effects && npm run test:equipment && npm run test:equipIntent && npm run test:equipmentSystem && npm run test:combat && npm run test:validate && npm run test:learnSpell && npm run test:castSpell && npm run test:sanity",
+  "test": "npm run test:blockMonsters && npm run test:invuln && npm run test:monsterPickupDrop && npm run test:inventory && npm run test:effects && npm run test:equipment && npm run test:equipIntent && npm run test:equipmentSystem && npm run test:combat && npm run test:validate && npm run test:learnSpell && npm run test:castSpell && npm run test:sanity",
+  "test:blockMonsters": "node ./tests/blockMonsters.mjs",
+  "test:invuln": "node ./tests/invuln.mjs",
+  "test:monsterPickupDrop": "node ./tests/monsterPickupDrop.mjs",
   "test:inventory": "node ./tests/inventory.mjs",
   "test:effects": "node ./tests/effects.mjs",
   "test:equipment": "node ./tests/equipment.mjs",

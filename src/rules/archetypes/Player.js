@@ -10,6 +10,7 @@ import { Settings } from "../components/Settings.js";
 import { Equipment } from "../components/Equipment.js";
 import { Mana } from "../components/Mana.js";
 import { Brain } from "../components/Brain.js";
+import { Collider } from "../components/Collider.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -20,6 +21,8 @@ export const PlayerArchetype = defineArchetype(
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
+  // Make player a solid collider so others cannot move through and vice versa
+  [Collider, (p) => ({ solid: p.solid ?? true, blocksSight: p.blocksSight ?? false })],
   [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })],
   [Equipment, {}],
   [Mana, {}],
