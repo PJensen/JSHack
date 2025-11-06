@@ -11,6 +11,9 @@ import { Equipment } from "../components/Equipment.js";
 import { Mana } from "../components/Mana.js";
 import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
+import { BoundingCircle } from "../components/BoundingCircle.js";
+import { Facing } from "../components/Facing.js";
+import { Anatomy, buildHumanoidAnatomy } from "../components/Anatomy.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -19,6 +22,18 @@ export const PlayerArchetype = defineArchetype(
   [Inventory, (p) => ({ capacity: p.capacity ?? 20, weightLimit: p.weightLimit ?? null, items: [] })],
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
+  [BoundingCircle, (p) => ({ radius: p.radius ?? 0.55 })],
+  [Facing, (p) => {
+    const fx = Number.isFinite(p.facing?.x) ? p.facing.x : 1;
+    const fy = Number.isFinite(p.facing?.y) ? p.facing.y : 0;
+    const mag = Math.hypot(fx, fy) || 1;
+    return { x: fx / mag, y: fy / mag };
+  }],
+  [Anatomy, (p) => ({
+    parts: Array.isArray(p.anatomy?.parts) ? p.anatomy.parts : buildHumanoidAnatomy(),
+    strideDistance: Number.isFinite(p.strideDistance) ? p.strideDistance : (Number.isFinite(p.anatomy?.strideDistance) ? p.anatomy.strideDistance : 1),
+    reachDistance: Number.isFinite(p.reachDistance) ? p.reachDistance : (Number.isFinite(p.anatomy?.reachDistance) ? p.anatomy.reachDistance : 1.25),
+  })],
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
   // Make player a solid collider so others cannot move through and vice versa
@@ -37,6 +52,14 @@ export function createPlayer(world, params = {}) {
     world.add(id, Inventory, { capacity: params.capacity ?? 20, weightLimit: params.weightLimit ?? null, items: [] });
     world.add(id, NamedIdentity, { name: params.name ?? "Player", identity: params.identity ?? "player" });
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
+    world.add(id, BoundingCircle, { radius: params.radius ?? 0.55 });
+    const fx = Number.isFinite(params.facing?.x) ? params.facing.x : 1;
+    const fy = Number.isFinite(params.facing?.y) ? params.facing.y : 0;
+    const mag = Math.hypot(fx, fy) || 1;
+    world.add(id, Facing, { x: fx / mag, y: fy / mag });
+    const stride = Number.isFinite(params.strideDistance) ? params.strideDistance : 1;
+    const reach = Number.isFinite(params.reachDistance) ? params.reachDistance : 1.25;
+    world.add(id, Anatomy, { parts: buildHumanoidAnatomy(), strideDistance: stride, reachDistance: reach });
     world.add(id, Equipment, {});
     world.add(id, ActiveEffects, { effects: [] });
     world.add(id, Vitality, { maxHp: params.maxHp ?? 10, hp: params.hp ?? (params.maxHp ?? 10) });

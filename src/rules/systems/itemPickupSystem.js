@@ -5,6 +5,10 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Settings } from "../components/Settings.js";
 import { Player } from "../components/Player.js";
+import { Anatomy } from "../components/Anatomy.js";
+import { BoundingCircle } from "../components/BoundingCircle.js";
+
+const EPS = 1e-6;
 
 // Helper: sum inventory weight
 function inventoryWeight(world, inv) {
@@ -45,13 +49,15 @@ export function itemPickupSystem(world) {
         const info = world.get(itemId, ItemInfo);
         if (!itemPos || !info) { world.remove(actor, PickupIntent); continue; }
 
-        // must be within pickup range (default 0 = same tile)
+        const anatomy = world.get(actor, Anatomy);
+        const reach = Math.max(0, anatomy?.reachDistance ?? 1);
+        const radius = Math.max(0, world.get(actor, BoundingCircle)?.radius ?? 0.5);
         const set = world.get(actor, Settings);
-        const maxRange = Math.max(0, Number(set?.pickupRange ?? 0));
-        const dx = Math.abs((itemPos.x|0) - (pos.x|0));
-        const dy = Math.abs((itemPos.y|0) - (pos.y|0));
-        const dist = dx + dy; // Manhattan distance on grid
-        if (dist > maxRange) {
+        const extraRange = Math.max(0, Number(set?.pickupRange ?? 0));
+        const itemRadius = Math.max(0, world.get(itemId, BoundingCircle)?.radius ?? 0);
+        const centerDist = Math.max(0, Math.hypot(itemPos.x - pos.x, itemPos.y - pos.y) - itemRadius);
+        const maxRange = reach + radius + extraRange;
+        if (centerDist > maxRange + EPS) {
             try { world.emit && world.emit('item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } }); } catch {}
             world.remove(actor, PickupIntent);
             continue;
@@ -125,12 +131,20 @@ export function autoPickupPostMoveSystem(world) {
         const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
         const pos = world.get(id, Position);
         if (!pos) continue;
+        const anatomy = world.get(id, Anatomy);
+        const reach = Math.max(0, anatomy?.reachDistance ?? 1);
+        const radius = Math.max(0, world.get(id, BoundingCircle)?.radius ?? 0.5);
+        const extraRange = Math.max(0, Number(set?.pickupRange ?? 0));
+        const maxReach = reach + radius + extraRange;
         const candidates = [];
         for (const [itemId] of world.query(Position)) {
             const ipos = world.get(itemId, Position);
-            if (!ipos || ipos.x !== pos.x || ipos.y !== pos.y) continue;
+            if (!ipos) continue;
             const info = world.get(itemId, ItemInfo);
             if (!info || !info.type || !kinds.includes(info.type)) continue;
+            const itemRadius = Math.max(0, world.get(itemId, BoundingCircle)?.radius ?? 0);
+            const dist = Math.max(0, Math.hypot(ipos.x - pos.x, ipos.y - pos.y) - itemRadius);
+            if (dist > maxReach + EPS) continue;
             candidates.push(itemId);
         }
         for (const itemId of candidates) {

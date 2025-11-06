@@ -26,6 +26,7 @@ import { createHudFeeds } from "./main/ui/hudFeeds.js";
 import { populateDemoScene } from "./main/scene/demoScene.js";
 import { createActiveSpellController } from "./main/spells/activeSpellController.js";
 import { setupWorldEventHandlers } from "./main/world/worldEvents.js";
+import { GeometryKernel } from "./rules/environment/GeometryKernel.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -57,6 +58,21 @@ const PERF = (() => {
 
 // Use tile-sized world units: 1 world unit == 1 tile on screen
 const TILE_PX = 28;
+
+const TAU = Math.PI * 2;
+const WALL_THICKNESS = 0.45;
+const FOV_RAY_COUNT = 96;
+const FOV_MIN_DISTANCE = 6;
+const FOV_MAX_DISTANCE = 24;
+
+const dungeonRenderState = {
+  versionKey: null,
+  primitives: [],
+  dots: [],
+  kernel: null,
+  mbr: null,
+  options: null,
+};
 
 let _cssW = 0, _cssH = 0, _dpr = 1;
 function resize() {
@@ -163,6 +179,14 @@ function render(worldView) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  const dungeonState = ensureDungeonRenderState(worldView.dungeon);
+  if (dungeonState.primitives.length > 0) {
+    drawDungeon(bctx, palette, glyphAtlas, dungeonState);
+    drawFovCone(bctx, dungeonState, worldView, palette);
+  }
+
+  drawBoundingCircles(bctx, worldView.entities, palette);
+
   const isTileKind = (k) => k === "floor" || k === "wall" || (typeof k === "string" && k.startsWith("door_"));
 
   const viewHalfW = W * 0.5 / (cam.scale || 1);
@@ -268,6 +292,370 @@ function render(worldView) {
     }
     ctx.restore();
   }
+}
+
+function ensureDungeonRenderState(dungeon) {
+  if (!dungeon || !dungeon.hasData || !Array.isArray(dungeon.primitives) || dungeon.primitives.length === 0) {
+    dungeonRenderState.versionKey = null;
+    dungeonRenderState.primitives.length = 0;
+    dungeonRenderState.dots.length = 0;
+    dungeonRenderState.kernel = null;
+    dungeonRenderState.mbr = null;
+    dungeonRenderState.options = null;
+    return dungeonRenderState;
+  }
+
+  const versionKey = `${dungeon.seed}|${dungeon.mbrVersion}|${dungeon.moveVersion}|${dungeon.occlVersion}|${dungeon.primitives.length}`;
+  if (versionKey !== dungeonRenderState.versionKey) {
+    dungeonRenderState.versionKey = versionKey;
+    dungeonRenderState.primitives = dungeon.primitives.map((p) => ({ ...p }));
+    dungeonRenderState.mbr = dungeon.mbr ? { ...dungeon.mbr } : null;
+    dungeonRenderState.options = dungeon.options ? { ...dungeon.options } : null;
+
+    const kernelPrims = dungeon.primitives.map((p) => ({ ...p }));
+    const kernelOpts = { ...(dungeon.options || {}), seed: dungeon.seed };
+    dungeonRenderState.kernel = new GeometryKernel(kernelOpts);
+    dungeonRenderState.kernel.deserialize({
+      seed: dungeon.seed,
+      options: kernelOpts,
+      moveVersion: dungeon.moveVersion,
+      occlVersion: dungeon.occlVersion,
+      mbr: dungeon.mbr,
+      primitives: kernelPrims,
+    });
+
+    computeDungeonDots(dungeonRenderState);
+  }
+
+  return dungeonRenderState;
+}
+
+function computeDungeonDots(state) {
+  state.dots = [];
+  const kernel = state.kernel;
+  const mbr = state.mbr;
+  if (!kernel || !mbr) return;
+
+  const minX = Math.floor(mbr.minX);
+  const maxX = Math.ceil(mbr.maxX);
+  const minY = Math.floor(mbr.minY);
+  const maxY = Math.ceil(mbr.maxY);
+  for (let y = minY; y < maxY; y++) {
+    for (let x = minX; x < maxX; x++) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      if (kernel.distanceMove(px, py) > 0.25) {
+        state.dots.push({ x: px, y: py });
+      }
+    }
+  }
+}
+
+function drawDungeon(ctx, palette, glyphAtlas, state) {
+  if (!state || state.primitives.length === 0) return;
+  const wallFill = palette.wall?.glow || "#1f232c";
+  const wallHighlight = palette.wall?.fg || "#8e96ab";
+  const floorFill = palette.floor?.glow || "#1c2029";
+  const floorAccent = palette.floor?.fg || "#576072";
+
+  ctx.save();
+  ctx.lineJoin = "round";
+
+  for (let i = 0; i < state.primitives.length; i++) {
+    const prim = state.primitives[i];
+    switch (prim.type) {
+      case "box":
+        drawRectRing(ctx, prim.cx, prim.cy, prim.hx, prim.hy, prim.rot || 0, wallFill, wallHighlight);
+        break;
+      case "square": {
+        const cx = (prim.ax + prim.bx) * 0.5;
+        const cy = (prim.ay + prim.by) * 0.5;
+        const len = Math.hypot(prim.bx - prim.ax, prim.by - prim.ay);
+        drawRectRing(ctx, cx, cy, len * 0.5, prim.halfW || prim.halfWidth || 0, prim.rot || Math.atan2(prim.by - prim.ay, prim.bx - prim.ax), wallFill, wallHighlight);
+        break;
+      }
+      case "circle":
+        drawCircleRing(ctx, prim.cx, prim.cy, prim.r, wallFill, wallHighlight);
+        break;
+      case "capsule":
+      case "rectslot": {
+        const cx = (prim.ax + prim.bx) * 0.5;
+        const cy = (prim.ay + prim.by) * 0.5;
+        const len = Math.hypot(prim.bx - prim.ax, prim.by - prim.ay);
+        const halfLen = len * 0.5;
+        const rot = Math.atan2(prim.by - prim.ay, prim.bx - prim.ax);
+        drawCapsuleRing(ctx, cx, cy, halfLen, prim.r, rot, wallFill, wallHighlight);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  for (let i = 0; i < state.primitives.length; i++) {
+    const prim = state.primitives[i];
+    switch (prim.type) {
+      case "box":
+        drawRectFill(ctx, prim.cx, prim.cy, prim.hx, prim.hy, prim.rot || 0, floorFill, floorAccent);
+        break;
+      case "square": {
+        const cx = (prim.ax + prim.bx) * 0.5;
+        const cy = (prim.ay + prim.by) * 0.5;
+        const len = Math.hypot(prim.bx - prim.ax, prim.by - prim.ay);
+        drawRectFill(ctx, cx, cy, len * 0.5, prim.halfW || prim.halfWidth || 0, prim.rot || Math.atan2(prim.by - prim.ay, prim.bx - prim.ax), floorFill, floorAccent);
+        break;
+      }
+      case "circle":
+        drawCircleFill(ctx, prim.cx, prim.cy, prim.r, floorFill, floorAccent);
+        break;
+      case "capsule":
+      case "rectslot": {
+        const cx = (prim.ax + prim.bx) * 0.5;
+        const cy = (prim.ay + prim.by) * 0.5;
+        const len = Math.hypot(prim.bx - prim.ax, prim.by - prim.ay);
+        const halfLen = len * 0.5;
+        const rot = Math.atan2(prim.by - prim.ay, prim.bx - prim.ax);
+        drawCapsuleFill(ctx, cx, cy, halfLen, prim.r, rot, floorFill, floorAccent);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  if (glyphAtlas && state.dots.length > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    for (let i = 0; i < state.dots.length; i++) {
+      const dot = state.dots[i];
+      drawKind(glyphAtlas, ctx, "floor", dot.x, dot.y);
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawRectRing(ctx, cx, cy, hx, hy, rot, wallFill, wallHighlight) {
+  if (!(hx > 0 && hy > 0)) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
+  ctx.fillStyle = wallFill;
+  ctx.beginPath();
+  ctx.rect(-hx - WALL_THICKNESS, -hy - WALL_THICKNESS, (hx + WALL_THICKNESS) * 2, (hy + WALL_THICKNESS) * 2);
+  ctx.rect(-hx, -hy, hx * 2, hy * 2);
+  ctx.fill("evenodd");
+  if (wallHighlight) {
+    ctx.strokeStyle = wallHighlight;
+    ctx.lineWidth = 0.12;
+    ctx.strokeRect(-hx, -hy, hx * 2, hy * 2);
+  }
+  ctx.restore();
+}
+
+function drawRectFill(ctx, cx, cy, hx, hy, rot, floorFill, floorAccent) {
+  if (!(hx > 0 && hy > 0)) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
+  ctx.fillStyle = floorFill;
+  ctx.fillRect(-hx, -hy, hx * 2, hy * 2);
+  if (floorAccent) {
+    ctx.strokeStyle = floorAccent;
+    ctx.lineWidth = 0.08;
+    ctx.strokeRect(-hx + 0.05, -hy + 0.05, hx * 2 - 0.1, hy * 2 - 0.1);
+  }
+  ctx.restore();
+}
+
+function drawCircleRing(ctx, cx, cy, radius, wallFill, wallHighlight) {
+  if (!(radius > 0)) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = wallFill;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + WALL_THICKNESS, 0, TAU);
+  ctx.arc(0, 0, radius, 0, TAU, true);
+  ctx.fill("evenodd");
+  if (wallHighlight) {
+    ctx.strokeStyle = wallHighlight;
+    ctx.lineWidth = 0.12;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCircleFill(ctx, cx, cy, radius, floorFill, floorAccent) {
+  if (!(radius > 0)) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = floorFill;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, TAU);
+  ctx.fill();
+  if (floorAccent) {
+    ctx.strokeStyle = floorAccent;
+    ctx.lineWidth = 0.08;
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(0, radius - 0.05), 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function capsulePath(ctx, halfLen, radius) {
+  ctx.moveTo(-halfLen, -radius);
+  ctx.lineTo(halfLen, -radius);
+  ctx.arc(halfLen, 0, radius, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-halfLen, radius);
+  ctx.arc(-halfLen, 0, radius, Math.PI / 2, -Math.PI / 2);
+  ctx.closePath();
+}
+
+function drawCapsuleRing(ctx, cx, cy, halfLen, radius, rot, wallFill, wallHighlight) {
+  if (!(radius > 0)) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
+  ctx.fillStyle = wallFill;
+  ctx.beginPath();
+  capsulePath(ctx, halfLen + WALL_THICKNESS, radius + WALL_THICKNESS);
+  ctx.moveTo(-halfLen, -radius);
+  capsulePath(ctx, halfLen, radius);
+  ctx.fill("evenodd");
+  if (wallHighlight) {
+    ctx.strokeStyle = wallHighlight;
+    ctx.lineWidth = 0.12;
+    ctx.beginPath();
+    capsulePath(ctx, halfLen, radius);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCapsuleFill(ctx, cx, cy, halfLen, radius, rot, floorFill, floorAccent) {
+  if (!(radius > 0)) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
+  ctx.fillStyle = floorFill;
+  ctx.beginPath();
+  capsulePath(ctx, halfLen, radius);
+  ctx.fill();
+  if (floorAccent) {
+    ctx.strokeStyle = floorAccent;
+    ctx.lineWidth = 0.08;
+    ctx.beginPath();
+    capsulePath(ctx, halfLen, Math.max(0, radius - 0.05));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBoundingCircles(ctx, entities, palette) {
+  if (!Array.isArray(entities) || entities.length === 0) return;
+  const playerGlow = palette?.player?.glow || "#6cf";
+  const otherTone = palette?.floor?.fg || "#556";
+
+  ctx.save();
+  for (let i = 0; i < entities.length; i++) {
+    const ent = entities[i];
+    const radius = Number(ent?.radius) || 0;
+    if (radius <= 0) continue;
+    const reach = Number(ent?.reach) || 0;
+    const isPlayer = ent.kind === "player";
+    const baseFill = hexToRgba(isPlayer ? playerGlow : otherTone, isPlayer ? 0.22 : 0.12);
+    const baseStroke = isPlayer ? hexToRgba(playerGlow, 0.95) : "rgba(210,220,235,0.55)";
+
+    ctx.fillStyle = baseFill;
+    ctx.strokeStyle = baseStroke;
+    ctx.lineWidth = isPlayer ? 0.14 : 0.1;
+    ctx.beginPath();
+    ctx.arc(ent.pos.x, ent.pos.y, radius, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+
+    if (reach > 0) {
+      ctx.setLineDash([0.22, 0.28]);
+      ctx.strokeStyle = isPlayer ? "rgba(255,240,200,0.9)" : "rgba(255,190,180,0.6)";
+      ctx.lineWidth = isPlayer ? 0.1 : 0.08;
+      ctx.beginPath();
+      ctx.arc(ent.pos.x, ent.pos.y, radius + reach, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  ctx.restore();
+}
+
+function drawFovCone(ctx, state, worldView, palette) {
+  const kernel = state?.kernel;
+  const player = worldView?.player;
+  if (!kernel || !player) return;
+
+  const facing = player.facing || { x: 1, y: 0 };
+  const origin = player.pos || { x: 0, y: 0 };
+  const rawAngle = player.fov?.angle ?? (Math.PI * 0.75);
+  const angle = Math.max(0.1, Math.min(Math.PI * 2, rawAngle));
+  const desiredDist = player.fov?.distance ?? 12;
+  const distance = Math.min(FOV_MAX_DISTANCE, Math.max(FOV_MIN_DISTANCE, desiredDist));
+  const rayCount = FOV_RAY_COUNT;
+  const baseAngle = Math.atan2(facing.y, facing.x);
+  const halfAngle = angle * 0.5;
+
+  const points = [];
+  for (let i = 0; i <= rayCount; i++) {
+    const t = rayCount === 0 ? 0 : i / rayCount;
+    const ang = baseAngle - halfAngle + angle * t;
+    const dirx = Math.cos(ang);
+    const diry = Math.sin(ang);
+    const ray = kernel.raycastOccl(origin, { x: dirx, y: diry }, distance);
+    let travel = Math.min(distance, Number.isFinite(ray?.t) ? ray.t : distance);
+    if (ray?.hit) travel = Math.max(0, travel - 0.1);
+    points.push({ x: origin.x + dirx * travel, y: origin.y + diry * travel });
+  }
+
+  if (points.length < 2) return;
+  const glow = palette.player?.glow || "#6cf";
+  const fillStyle = hexToRgba(glow, 0.2);
+  const strokeStyle = hexToRgba(glow, 0.85);
+
+  ctx.save();
+  ctx.fillStyle = fillStyle;
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = 0.12;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(origin.x, origin.y);
+  for (let i = 0; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function hexToRgba(hex, alpha = 1) {
+  if (!hex) return `rgba(255,255,255,${alpha})`;
+  let h = hex.trim();
+  if (h.startsWith("#")) h = h.slice(1);
+  if (h.length === 3) {
+    const r = parseInt(h[0] + h[0], 16);
+    const g = parseInt(h[1] + h[1], 16);
+    const b = parseInt(h[2] + h[2], 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  if (h.length === 6) {
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return `rgba(255,255,255,${alpha})`;
 }
 
 // ---- Frame loop (FXClock) --------------------------------------------------

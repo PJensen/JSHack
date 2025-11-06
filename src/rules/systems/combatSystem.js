@@ -9,6 +9,8 @@ import { Faction } from '../components/Faction.js';
 import { Player } from '../components/Player.js';
 import { Status } from '../components/Status.js';
 import { Position } from '../components/Position.js';
+import { BoundingCircle } from '../components/BoundingCircle.js';
+import { Anatomy } from '../components/Anatomy.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 
@@ -62,12 +64,15 @@ export function combatSystem(world) {
         const defVit = world.get(defender, Vitality);
         if (!atkVit || !defVit) { world.remove(attacker, AttackIntent); continue; }
 
-        // Range gate: only allow melee from orthogonal adjacency (no diagonals, no ranged)
         const apos = world.get(attacker, Position);
         const dpos = world.get(defender, Position);
-        if (!apos || !dpos || (Math.abs((apos.x|0) - (dpos.x|0)) + Math.abs((apos.y|0) - (dpos.y|0))) !== 1) {
-            // Out of range: silently consume intent without emitting a MISS far away
-            // (prevents confusing "MISS" feedback when monsters are not adjacent)
+        if (!apos || !dpos) { world.remove(attacker, AttackIntent); continue; }
+
+        const attackerRadius = world.get(attacker, BoundingCircle)?.radius ?? 0.5;
+        const defenderRadius = world.get(defender, BoundingCircle)?.radius ?? 0.5;
+        const reach = Math.max(0, world.get(attacker, Anatomy)?.reachDistance ?? 1);
+        const centerDist = Math.hypot(dpos.x - apos.x, dpos.y - apos.y);
+        if ((centerDist - (attackerRadius + defenderRadius)) > reach + 1e-3) {
             world.remove(attacker, AttackIntent);
             continue;
         }

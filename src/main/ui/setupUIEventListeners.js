@@ -73,7 +73,20 @@ export function setupUIEventListeners(world, deps) {
     }
   };
 
-  setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers, touchFeedback: true });
+  const getPointerOrigin = () => {
+    const pe = playerEntity(world);
+    return pe ? { x: pe.pos.x, y: pe.pos.y } : null;
+  };
+
+  setupInput({
+    canvas,
+    rulesHandler,
+    displayHandler,
+    onDispose: inputDisposers,
+    touchFeedback: true,
+    camera: cam,
+    getPointerOrigin,
+  });
 
   addEventListener("ui:requestInventoryData", () => {
     const p = playerEntity(world);

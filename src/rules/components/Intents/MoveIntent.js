@@ -1,16 +1,19 @@
 import { defineComponent } from "../../../lib/ecs-js/index.js";
 /**
- * MoveIntent — request for an actor to move one tile in a direction.
- * actor entity holds this component for one tick; systems will consume and remove it.
+ * MoveIntent — request for an actor to move within the analytic world.
  * Fields:
- * - dx: horizontal movement (e.g. -1, 0, 1)
- * - dy: vertical movement (e.g. -1, 0, 1)
+ * - dx, dy: desired direction vector (need not be unit length)
+ * - distance?: optional override for stride distance this tick
  */
 export const MoveIntent = defineComponent("MoveIntent", {
     dx: 0,
     dy: 0,
+    distance: null,
 }, {
     validate(rec) {
-        return Number.isInteger(rec.dx) && Number.isInteger(rec.dy)
+        const dxOk = Number.isFinite(rec.dx);
+        const dyOk = Number.isFinite(rec.dy);
+        const distOk = rec.distance == null || (Number.isFinite(rec.distance) && rec.distance >= 0);
+        return dxOk && dyOk && distOk;
     }
 });

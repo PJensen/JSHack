@@ -22,18 +22,11 @@ export function aiChaseSystem(world) {
     // If already has a MoveIntent (e.g., set externally), skip
     if (world.has(id, MoveIntent)) continue;
 
-    const dx0 = Math.sign(playerPos.x - pos.x) | 0;
-    const dy0 = Math.sign(playerPos.y - pos.y) | 0;
+    const vx = playerPos.x - pos.x;
+    const vy = playerPos.y - pos.y;
+    const mag = Math.hypot(vx, vy);
+    if (mag <= 1e-4) continue;
 
-    // Prefer axis with bigger distance; fallback to the other axis
-    const ax = Math.abs(playerPos.x - pos.x);
-    const ay = Math.abs(playerPos.y - pos.y);
-    let dx = 0, dy = 0;
-    if (ax >= ay) { dx = dx0; dy = 0; } else { dy = dy0; dx = 0; }
-
-    // If both zero (same tile), do nothing
-    if ((dx | dy) === 0) continue;
-
-    try { world.add(id, MoveIntent, { dx, dy }); } catch {}
+    try { world.add(id, MoveIntent, { dx: vx, dy: vy }); } catch {}
   }
 }

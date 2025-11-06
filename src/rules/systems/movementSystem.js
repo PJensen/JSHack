@@ -1,49 +1,43 @@
 // src/rules/systems/movementSystem.js
-// Consumes MoveIntent, applies grid-based movement with simple collision.
+// Consumes MoveIntent and applies analytic movement against the geometry kernel.
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { Terrain } from "../components/Terrain.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
-import { Inventory } from "../components/Inventory.js";
-import { ItemInfo } from "../components/ItemInfo.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Settings } from "../components/Settings.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Vitality } from "../components/Vitality.js";
+import { BoundingCircle } from "../components/BoundingCircle.js";
+import { Facing } from "../components/Facing.js";
+import { Anatomy } from "../components/Anatomy.js";
+import { getGeometryKernel } from "../environment/worldGeometry.js";
 
-/** @param {number} x @param {number} y */
-function key(x, y) { return `${x},${y}`; }
+const EPS = 1e-4;
 
 /** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
-  // Build occupancy and terrain maps for quick blocking checks
-  const blocking = new Map(); // key(x,y) -> true if non-walkable terrain, solid collider, or living occupant present
-  const interactables = new Map(); // key(x,y) -> entity id with Interactable
-  const occupants = new Map(); // key(x,y) -> entity id (first seen) for quick bump-checks
+  const kernel = getGeometryKernel(world);
+
+  /** @type {Map<number, {id:number,x:number,y:number,radius:number,solid:boolean,interactable:boolean,alive:boolean}>} */
+  const colliderMap = new Map();
 
   for (const [id, pos] of world.query(Position)) {
-    const ter = world.get(id, Terrain);
-    if (ter && !ter.walkable) {
-      blocking.set(key(pos.x, pos.y), true);
-    }
-    const col = world.get(id, Collider);
-    if (col && col.solid) {
-      blocking.set(key(pos.x, pos.y), true);
-    }
-    // Treat any living entity as blocking by default (prevents walking through monsters)
+    if (!pos) continue;
+    const collider = world.get(id, Collider);
     const vit = world.get(id, Vitality);
-    if (vit && (vit.hp ?? 0) > 0) {
-      blocking.set(key(pos.x, pos.y), true);
-    }
-    if (world.has(id, Interactable)) {
-      interactables.set(key(pos.x, pos.y), id);
-    }
-    // record an occupant for potential bump-attack; prefer first seen
-    const kk = key(pos.x, pos.y);
-    if (!occupants.has(kk)) occupants.set(kk, id);
+    const alive = !!(vit && (vit.hp ?? 0) > 0);
+    const solid = !!(collider?.solid) || alive;
+    const radius = Math.max(0, world.get(id, BoundingCircle)?.radius ?? (solid ? 0.5 : 0));
+    colliderMap.set(id, {
+      id,
+      x: pos.x,
+      y: pos.y,
+      radius,
+      solid,
+      interactable: world.has(id, Interactable),
+      alive,
+    });
   }
 
   for (const [actor, intent] of world.query(MoveIntent)) {
@@ -51,87 +45,106 @@ export function movementSystem(world) {
       const pos = world.get(actor, Position);
       if (!pos) { world.remove(actor, MoveIntent); continue; }
 
-      const nx = pos.x + (intent.dx | 0);
-      const ny = pos.y + (intent.dy | 0);
-      const k = key(nx, ny);
+      const anatomy = world.get(actor, Anatomy);
+      const stride = Number.isFinite(intent.distance)
+        ? Math.max(0, intent.distance)
+        : Math.max(0, anatomy?.strideDistance ?? 1);
+      const actorRadius = Math.max(0, world.get(actor, BoundingCircle)?.radius ?? 0.5);
 
-      if (blocking.get(k)) {
-        // If there's an interactable (e.g., door), try to interact on bump instead of moving.
-        const targetId = interactables.get(k);
-        if (targetId) {
-          world.add(actor, InteractIntent, { targetId });
-        } else {
-          // Cheap bump-attack: prefer a target with Vitality in the destination cell.
-          let target = 0;
-          for (const [eid, p] of world.query(Position)) {
-            if (p.x !== nx || p.y !== ny) continue;
-            // Avoid terrain tiles
-            if (world.get(eid, Terrain)) continue;
-            // Prefer living targets
-            if (world.get(eid, Vitality)) { target = eid; break; }
-            // Fallback to any non-terrain occupant if no living found yet
-            if (!target) target = eid;
-          }
-          // Only allow bump-attacks from orthogonal adjacency (no diagonals)
-          const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
-          if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
-            try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
-          }
-        }
-        // blocked: movement is consumed
-      } else {
-        const from = { x: pos.x, y: pos.y };
-        world.set(actor, Position, { x: nx, y: ny });
-        world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
-        // Reserve the destination so subsequent movers in this tick can't step into the same tile
-        blocking.set(k, true);
+      const dx = Number.isFinite(intent.dx) ? intent.dx : 0;
+      const dy = Number.isFinite(intent.dy) ? intent.dy : 0;
+      const mag = Math.hypot(dx, dy);
+      if (mag <= EPS || stride <= EPS) {
+        world.remove(actor, MoveIntent);
+        continue;
+      }
+      const dirx = dx / mag;
+      const diry = dy / mag;
 
-        // Immediate auto-pickup for actors with Settings.autoPickup (defaults true)
-        // Focused on currency to avoid unexpected heavy pickups.
-        const inv = world.get(actor, Inventory);
-        const set = world.get(actor, Settings);
-        const enable = (set?.autoPickup !== false);
-        if (inv && enable) {
-          const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
-          // collect item ids on the new tile that match types
-            const toTake = [];
-          for (const [itemId, ipos] of world.query(Position)) {
-            if (ipos.x !== nx || ipos.y !== ny) continue;
-            const info = world.get(itemId, ItemInfo);
-            if (!info || !info.type || !kinds.includes(info.type)) continue;
-            toTake.push(itemId);
-          }
-          for (const itemId of toTake) {
-            const info = world.get(itemId, ItemInfo);
-            if (!info) continue;
-            const count = info.count || 1;
-            const ident = world.get(itemId, NamedIdentity)?.identity;
-            // find existing stack by identity
-            let stackTarget = 0;
-            for (const id of inv.items) {
-              const n = world.get(id, NamedIdentity);
-              if (n && n.identity === ident) { stackTarget = id; break; }
-            }
-            if (stackTarget) {
-              world.mutate(stackTarget, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count || 1) + count; });
-              world.destroy(itemId);
-            } else {
-              // capacity gate: allow if capacity not set or there's room
-              // Special case: currency ignores capacity so monsters can hoard gold even with capacity 0
-              const ignoreCapacity = info.type === 'currency';
-              if (ignoreCapacity || inv.capacity == null || inv.items.length < inv.capacity) {
-                try { world.remove(itemId, Position); } catch {}
-                inv.items.push(itemId);
-              } else {
-                // no capacity — skip silently for now
-              }
-            }
-            try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch {}
-          }
+      const desired = { x: pos.x + dirx * stride, y: pos.y + diry * stride };
+      let dest = { ...desired };
+      let hitGeometry = false;
+
+      if (kernel) {
+        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius);
+        dest = sweep.point;
+        hitGeometry = !!sweep.hit;
+      }
+
+      const actorData = colliderMap.get(actor) || {
+        id: actor,
+        x: pos.x,
+        y: pos.y,
+        radius: actorRadius,
+        solid: true,
+        interactable: world.has(actor, Interactable),
+        alive: true,
+      };
+      actorData.radius = actorRadius;
+      actorData.x = pos.x;
+      actorData.y = pos.y;
+      actorData.solid = true;
+      colliderMap.set(actor, actorData);
+
+      let blockedBy = null;
+      for (const other of colliderMap.values()) {
+        if (other.id === actor) continue;
+        if (!other.solid) continue;
+        const minDist = actorRadius + other.radius;
+        if (minDist <= 0) continue;
+        const dist = Math.hypot(dest.x - other.x, dest.y - other.y);
+        if (dist < minDist - EPS) {
+          blockedBy = other;
+          break;
         }
       }
+
+      if (blockedBy) {
+        const fx = world.get(actor, Facing);
+        if (fx) {
+          world.set(actor, Facing, { x: dirx, y: diry });
+        } else {
+          try { world.add(actor, Facing, { x: dirx, y: diry }); } catch {}
+        }
+
+        if (blockedBy.interactable) {
+          try { world.add(actor, InteractIntent, { targetId: blockedBy.id }); } catch {}
+        } else if (blockedBy.alive) {
+          const reach = Math.max(0, anatomy?.reachDistance ?? 1);
+          const centerDist = Math.hypot(blockedBy.x - pos.x, blockedBy.y - pos.y);
+          const effectiveReach = reach + actorRadius + blockedBy.radius;
+          if (centerDist <= effectiveReach + 1e-3) {
+            try { world.add(actor, AttackIntent, { targetId: blockedBy.id }); } catch {}
+          }
+        }
+
+        world.remove(actor, MoveIntent);
+        continue;
+      }
+
+      const delta = Math.hypot(dest.x - pos.x, dest.y - pos.y);
+      if (delta <= EPS) {
+        if (hitGeometry) {
+          const fx = world.get(actor, Facing);
+          if (fx) world.set(actor, Facing, { x: dirx, y: diry });
+        }
+        world.remove(actor, MoveIntent);
+        continue;
+      }
+
+      world.set(actor, Position, { x: dest.x, y: dest.y });
+      world.emit?.("moved", { id: actor, from: { x: pos.x, y: pos.y }, to: { x: dest.x, y: dest.y } });
+      actorData.x = dest.x;
+      actorData.y = dest.y;
+      colliderMap.set(actor, actorData);
+
+      const fx = world.get(actor, Facing);
+      if (fx) {
+        world.set(actor, Facing, { x: dirx, y: diry });
+      } else {
+        try { world.add(actor, Facing, { x: dirx, y: diry }); } catch {}
+      }
     } catch {}
-    // Consume the intent regardless
     try { world.remove(actor, MoveIntent); } catch {}
   }
 }
