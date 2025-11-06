@@ -27,3 +27,4 @@ export { Vitality } from './Vitality.js';
 export { Settings } from './Settings.js';
 export { ScriptRef } from './ScriptRef.js';
 export { UseIntent } from './Intents/UseIntent.js';
+export { DungeonGeometry } from './DungeonGeometry.js';
