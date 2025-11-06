@@ -1,9 +1,11 @@
-import { playerEntity, itemsAt } from "../../rules/utils/queries.js";
+import { playerEntity } from "../../rules/utils/queries.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { Position } from "../../rules/components/Position.js";
 import { Settings } from "../../rules/components/Settings.js";
+import { Anatomy } from "../../rules/components/Anatomy.js";
+import { BoundingCircle } from "../../rules/components/BoundingCircle.js";
 import { getSpell } from "../../rules/data/spells.js";
 
 function bracketizeName(str) {
@@ -281,32 +283,46 @@ export function setupWorldEventHandlers(world, deps) {
   world.on("moved", ({ id, to }) => {
     const pe = playerEntity(world);
     if (!pe || pe.id !== id) return;
-    const ids = itemsAt(world, to.x, to.y);
-    const nonCurrency = ids.filter((eid) => {
-      const info = world.get(eid, ItemInfo);
-      return info && info.type !== "currency";
-    });
-    if (!nonCurrency.length) {
+
+    const playerSettings = world.get(id, Settings);
+    const anatomy = world.get(id, Anatomy);
+    const reach = Math.max(0, anatomy?.reachDistance ?? 1);
+    const radius = Math.max(0, world.get(id, BoundingCircle)?.radius ?? 0.5);
+    const extraRange = Math.max(0, Number(playerSettings?.pickupRange ?? 0));
+    const maxReach = reach + radius + extraRange;
+
+    /** @type {Array<{ id:number, info:any, name:any, distance:number }>} */
+    const nearby = [];
+    for (const [eid, pos, info] of world.query(Position, ItemInfo)) {
+      if (!pos) continue;
+      if (!info || info.type === "currency") continue;
+      const itemRadius = Math.max(0, world.get(eid, BoundingCircle)?.radius ?? 0);
+      const dist = Math.max(0, Math.hypot(pos.x - to.x, pos.y - to.y) - itemRadius);
+      if (dist > maxReach) continue;
+      nearby.push({ id: eid, info, name: world.get(eid, NamedIdentity), distance: dist });
+    }
+
+    if (!nearby.length) {
       try { window.dispatchEvent(new CustomEvent("ui:hideGroundItem")); } catch {}
       return;
     }
-    if (nonCurrency.length > 1) {
-      const items = nonCurrency.map((eid) => {
-        const info = world.get(eid, ItemInfo);
-        const name = world.get(eid, NamedIdentity);
-        return { id: eid, type: info?.type || "item", name: name?.name || info?.type || "item", count: info?.count || 1 };
-      });
+
+    nearby.sort((a, b) => a.distance - b.distance);
+
+    if (nearby.length > 1) {
+      const items = nearby.map(({ id: eid, info, name }) => ({
+        id: eid,
+        type: info?.type || "item",
+        name: name?.name || info?.type || "item",
+        count: info?.count || 1,
+      }));
       try {
         window.dispatchEvent(new CustomEvent("ui:showGroundItem", { detail: { mode: "multi", count: items.length, items } }));
       } catch {}
       return;
     }
-    const itemId = nonCurrency[0];
-    const info = world.get(itemId, ItemInfo);
-    const name = world.get(itemId, NamedIdentity);
-    const peEntity = playerEntity(world);
-    const set = peEntity ? world.get(peEntity.id, Settings) : null;
-    const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
+
+    const { id: itemId, info, name } = nearby[0];
     const affixes = Array.isArray(info?.affixes) ? info.affixes.slice() : [];
     const bonuses = info?.bonuses && typeof info.bonuses === "object" ? { ...info.bonuses } : {};
     const payload = {
@@ -320,7 +336,7 @@ export function setupWorldEventHandlers(world, deps) {
         bonuses,
         affixes,
       },
-      pickupRange,
+      pickupRange: maxReach,
     };
     try { window.dispatchEvent(new CustomEvent("ui:showGroundItem", { detail: payload })); } catch {}
   });
