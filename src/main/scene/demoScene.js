@@ -13,6 +13,7 @@ import { Vitality } from "../../rules/components/Vitality.js";
 import { buildEquipmentItem } from "../../rules/data/equipmentLoader.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { generateRectRoom } from "../../rules/environment/dungeonGenerator.js";
+import { LightSource } from "../../rules/components/LightSource.js";
 
 const ROOM_WIDTH = 11;
 const ROOM_HEIGHT = 11;
@@ -30,6 +31,7 @@ export function populateDemoScene(world) {
 
   ensurePlayer(world, room.center);
   grantInitialShield(world);
+  placeTorch(world, room);
   placeSpellbook(world, room);
   setPlayerStats(world);
   dropPotions(world, room);
@@ -78,6 +80,23 @@ function placeSpellbook(world, room) {
     count: 1,
     rarity: 1,
     rarityName: "rare",
+  });
+}
+
+function placeTorch(world, room) {
+  const { center, halfWidth, halfHeight } = room;
+  const torch = world.create();
+  const offsetX = center.x + (halfWidth - 1.2);
+  const offsetY = center.y - (halfHeight - 1.2);
+  world.add(torch, NamedIdentity, { name: "Wall Torch", identity: "torch" });
+  world.add(torch, Position, { x: offsetX, y: offsetY });
+  world.add(torch, LightSource, {
+    radius: 7.5,
+    intensity: 1.0,
+    color: "#ffb36b",
+    flicker: 0.45,
+    style: "torch",
+    emitter: "torch",
   });
 }
 

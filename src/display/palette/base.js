@@ -11,6 +11,7 @@ export const basePalette = {
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
   gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
+  torch: { glyph: "🕯️", fg: "#ffd8a8", glow: "#ffb347" },
   // Potions
   potion_health: { glyph: "🧪", fg: "#66ff99", glow: "#5cff9a" },
   // Spellbooks

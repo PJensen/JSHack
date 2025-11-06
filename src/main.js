@@ -17,6 +17,8 @@ import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 import { FloatText } from "./display/passes/vfx/text/floatText.js";
 import { buildPalette } from "./display/palette/index.js";
+import { collectLightSources } from "./display/lighting/sources/index.js";
+import { renderEmissiveLights } from "./display/lighting/renderEmissiveLights.js";
 
 // display overlays & UI bridges
 import { setupUIEventListeners } from "./main/ui/setupUIEventListeners.js";
@@ -79,6 +81,9 @@ const dungeonRenderState = {
   mbr: null,
   options: null,
 };
+
+const _lightEmitterKeys = new Set();
+let _particleOrigins = [];
 
 let _cssW = 0, _cssH = 0, _dpr = 1;
 function resize() {
@@ -255,6 +260,10 @@ function render(worldView) {
       g.restore();
     }
   }
+
+  const lights = collectLightSources(worldView, { quality: PERF.quality });
+  renderEmissiveLights(bctx, dungeonState.kernel, lights, { x0: vx0, y0: vy0, x1: vx1, y1: vy1 }, _fxTime, { quality: PERF.quality });
+  _particleOrigins = syncLightEmitters(lights, fx, _fxTime);
 
   if (bctx) {
     worldEvents.drawBoltEffects(bctx);
@@ -645,6 +654,86 @@ function drawFovCone(ctx, state, worldView, palette) {
   ctx.restore();
 }
 
+function syncLightEmitters(lights, fx, time) {
+  const origins = [];
+  if (!Array.isArray(lights) || !fx) return origins;
+  const seen = new Set();
+  for (let i = 0; i < lights.length; i++) {
+    const light = lights[i];
+    if (light?.emitter !== "torch") continue;
+    const key = `torch:${light.id ?? i}`;
+    seen.add(key);
+    const emitter = fx.ensureEmitter(key, {
+      continuous: true,
+      rate: 16,
+      spread: Math.PI / 12,
+      speed: 0.65,
+      speedJitter: 0.45,
+      life: 0.9,
+      lifeJitter: 0.45,
+      size: 0.55,
+      sizeEnd: 0.18,
+      angle: -Math.PI / 2,
+      ax: 0,
+      ay: -0.6,
+      color: light.color || "#ffb347",
+      alpha0: 0.9,
+      alpha1: 0,
+      offsetX: 0,
+      offsetY: -0.2,
+    });
+    const rgb = parseRgb(light.color || "#ffb347");
+    emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+    emitter.offsetX = 0;
+    emitter.offsetY = -0.35;
+    const seed = hashToUnit(light.id ?? `${light.x},${light.y}`);
+    const wobble = Math.sin((time || 0) * 5.2 + seed * 9.1) * 0.2 + Math.sin((time || 0) * 3.3 + seed * 13.7) * 0.15;
+    const flicker = 1 + wobble;
+    emitter.rate = 14 + flicker * 6;
+    emitter.size = 0.5 + flicker * 0.25;
+    emitter.life = 0.8 + flicker * 0.25;
+    emitter.spread = Math.PI / 16 + Math.abs(Math.sin((time || 0) * 2.1 + seed * 7.3)) * Math.PI / 48;
+    origins.push({ key, x: light.x, y: light.y });
+  }
+  for (const key of _lightEmitterKeys) {
+    if (!seen.has(key)) fx.removeEmitter(key);
+  }
+  _lightEmitterKeys.clear();
+  for (const key of seen) _lightEmitterKeys.add(key);
+  return origins;
+}
+
+function parseRgb(hex) {
+  if (typeof hex !== "string") return { r: 255, g: 180, b: 120 };
+  let h = hex.trim();
+  if (h.startsWith("#")) h = h.slice(1);
+  if (h.length === 3) {
+    return {
+      r: parseInt(h[0] + h[0], 16) || 255,
+      g: parseInt(h[1] + h[1], 16) || 180,
+      b: parseInt(h[2] + h[2], 16) || 120,
+    };
+  }
+  if (h.length === 6) {
+    return {
+      r: parseInt(h.slice(0, 2), 16) || 255,
+      g: parseInt(h.slice(2, 4), 16) || 180,
+      b: parseInt(h.slice(4, 6), 16) || 120,
+    };
+  }
+  return { r: 255, g: 180, b: 120 };
+}
+
+function hashToUnit(key) {
+  const s = String(key);
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
 function hexToRgba(hex, alpha = 1) {
   if (!hex) return `rgba(255,255,255,${alpha})`;
   let h = hex.trim();
@@ -677,7 +766,7 @@ function frame(now) {
 
   stepSim(0);
 
-  if (PERF.particleCapacity > 0) fx.step(dtSec);
+  if (PERF.particleCapacity > 0) fx.step(dtSec, _particleOrigins);
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   worldEvents.updateBoltFx(dtSec);
