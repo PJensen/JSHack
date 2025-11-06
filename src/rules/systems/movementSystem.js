@@ -14,6 +14,7 @@ import { Anatomy } from "../components/Anatomy.js";
 import { getGeometryKernel } from "../environment/worldGeometry.js";
 
 const EPS = 1e-4;
+const SLIDE_EPS = 1e-3;
 
 /** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
@@ -61,18 +62,51 @@ export function movementSystem(world) {
       const dirx = dx / mag;
       const diry = dy / mag;
 
-      const applySweep = (target) => {
-        if (!kernel) {
-          return { point: { x: target.x, y: target.y }, hit: false };
-        }
-        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, target, actorRadius);
-        return { point: sweep.point, hit: !!sweep.hit };
-      };
-
       const desired = { x: pos.x + dirx * stride, y: pos.y + diry * stride };
-      let sweepResult = applySweep(desired);
-      let dest = { ...sweepResult.point };
-      let hitGeometry = sweepResult.hit;
+      let dest = { ...desired };
+      let hitGeometry = false;
+
+      if (kernel) {
+        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius);
+        dest = { ...sweep.point };
+        hitGeometry = !!sweep.hit;
+
+        if (sweep.hit && sweep.normal) {
+          const nLen = Math.hypot(sweep.normal.x, sweep.normal.y);
+          if (nLen > EPS) {
+            const nx = sweep.normal.x / nLen;
+            const ny = sweep.normal.y / nLen;
+            const dirDot = dirx * nx + diry * ny;
+            if (dirDot < -EPS) {
+              const tangx = dirx - dirDot * nx;
+              const tangy = diry - dirDot * ny;
+              const tangLen = Math.hypot(tangx, tangy);
+              const remainingFrac = 1 - Math.max(0, Math.min(1, sweep.t ?? 1));
+              const remainingDist = stride * remainingFrac;
+              if (tangLen > EPS && remainingDist > EPS) {
+                const tx = tangx / tangLen;
+                const ty = tangy / tangLen;
+                const slideStart = {
+                  x: dest.x + nx * SLIDE_EPS,
+                  y: dest.y + ny * SLIDE_EPS,
+                };
+                const slideTarget = {
+                  x: slideStart.x + tx * remainingDist,
+                  y: slideStart.y + ty * remainingDist,
+                };
+                const slideSweep = kernel.sweepCapsule(slideStart, slideTarget, actorRadius);
+                const candidate = { ...slideSweep.point };
+                const movedPrev = Math.hypot(dest.x - pos.x, dest.y - pos.y);
+                const movedCandidate = Math.hypot(candidate.x - pos.x, candidate.y - pos.y);
+                if (movedCandidate > movedPrev + EPS) {
+                  dest = candidate;
+                  hitGeometry = hitGeometry || !!slideSweep.hit;
+                }
+              }
+            }
+          }
+        }
+      }
 
       const actorData = colliderMap.get(actor) || {
         id: actor,
@@ -88,31 +122,6 @@ export function movementSystem(world) {
       actorData.y = pos.y;
       actorData.solid = true;
       colliderMap.set(actor, actorData);
-
-      let delta = Math.hypot(dest.x - pos.x, dest.y - pos.y);
-      if (delta <= EPS && hitGeometry) {
-        const axisDirs = [];
-        if (Math.abs(dirx) > EPS) axisDirs.push({ x: dirx, y: 0 });
-        if (Math.abs(diry) > EPS) axisDirs.push({ x: 0, y: diry });
-        axisDirs.sort((a, b) => Math.abs(b.x || b.y) - Math.abs(a.x || a.y));
-        for (const axis of axisDirs) {
-          const axisMag = Math.hypot(axis.x, axis.y);
-          if (axisMag <= EPS) continue;
-          const axisStride = stride * axisMag;
-          const axisDirx = axisMag > 0 ? axis.x / axisMag : 0;
-          const axisDiry = axisMag > 0 ? axis.y / axisMag : 0;
-          const axisTarget = { x: pos.x + axisDirx * axisStride, y: pos.y + axisDiry * axisStride };
-          sweepResult = applySweep(axisTarget);
-          const candidate = sweepResult.point;
-          const candidateDelta = Math.hypot(candidate.x - pos.x, candidate.y - pos.y);
-          if (candidateDelta > EPS) {
-            dest = { ...candidate };
-            hitGeometry = sweepResult.hit;
-            delta = candidateDelta;
-            break;
-          }
-        }
-      }
 
       let blockedBy = null;
       for (const other of colliderMap.values()) {
@@ -150,6 +159,7 @@ export function movementSystem(world) {
         continue;
       }
 
+      const delta = Math.hypot(dest.x - pos.x, dest.y - pos.y);
       if (delta <= EPS) {
         if (hitGeometry) {
           const fx = world.get(actor, Facing);
