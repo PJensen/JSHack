@@ -3,68 +3,70 @@ import { playerEntity } from "../../rules/utils/queries.js";
 import { createPlayer } from "../../rules/archetypes/Player.js";
 import { HealthPotion, GoldStack } from "../../rules/archetypes/Items.js";
 import { FloorTile, WallTile } from "../../rules/archetypes/Tiles.js";
-import { Door } from "../../rules/archetypes/Door.js";
 import { Monster } from "../../rules/archetypes/Creatures.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
+import { Facing } from "../../rules/components/Facing.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { Mana } from "../../rules/components/Mana.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { buildEquipmentItem } from "../../rules/data/equipmentLoader.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
-import { ensureGeometryKernel } from "../../rules/environment/worldGeometry.js";
+import { generateRectRoom } from "../../rules/environment/dungeonGenerator.js";
 
-const ROOM_WIDTH = 10;
-const ROOM_HEIGHT = 10;
+const ROOM_WIDTH = 11;
+const ROOM_HEIGHT = 11;
 
 /**
  * Populate a small demo scene with a player, tiles, and items.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function populateDemoScene(world) {
-  const originX = -((ROOM_WIDTH - 1) >> 1);
-  const originY = -((ROOM_HEIGHT - 1) >> 1);
-  const doorPos = { x: 0, y: originY + (ROOM_HEIGHT - 1) };
+  const { room } = generateRectRoom(world, {
+    width: ROOM_WIDTH,
+    height: ROOM_HEIGHT,
+    name: "Demo Room",
+  });
 
-  const kernel = ensureGeometryKernel(world);
-  kernel.clear();
-
-  buildRoom(world, kernel, originX, originY, doorPos);
-  ensurePlayer(world);
+  buildRoom(world, room);
+  ensurePlayer(world, room.center);
   grantInitialShield(world);
-  placeSpellbook(world);
+  placeSpellbook(world, room);
   setPlayerStats(world);
-  dropPotions(world);
-  dropGold(world);
-  spawnMonsters(world, originX, originY);
-  dropEquipment(world, originX, originY);
+  dropPotions(world, room);
+  dropGold(world, room);
+  spawnMonsters(world, room);
+  dropEquipment(world, room);
 }
 
-function buildRoom(world, kernel, ox, oy, doorPos) {
-  const carveFlags = { affectsMove: true, affectsOccl: true };
-  for (let y = 0; y < ROOM_HEIGHT; y++) {
-    for (let x = 0; x < ROOM_WIDTH; x++) {
-      const gx = ox + x;
-      const gy = oy + y;
-      const isBorder = (x === 0 || y === 0 || x === ROOM_WIDTH - 1 || y === ROOM_HEIGHT - 1);
+function buildRoom(world, room) {
+  const { origin, width, height } = room;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const gx = origin.x + x;
+      const gy = origin.y + y;
+      const isBorder = (x === 0 || y === 0 || x === width - 1 || y === height - 1);
       if (isBorder) {
-        if (gx === doorPos.x && gy === doorPos.y) continue;
         createFrom(world, WallTile, { x: gx, y: gy });
       } else {
         createFrom(world, FloorTile, { x: gx, y: gy });
-        kernel.carveCircle(gx, gy, 0.6, carveFlags);
       }
     }
   }
-  kernel.carveCircle(doorPos.x, doorPos.y, 0.6, carveFlags);
-  createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
 }
 
-function ensurePlayer(world) {
-  if (!playerEntity(world)) {
-    createPlayer(world, { x: 0, y: 0, name: "Hero" });
+function ensurePlayer(world, center) {
+  const existing = playerEntity(world);
+  if (existing) {
+    world.set(existing.id, Position, { x: center.x, y: center.y });
+    const facing = world.get(existing.id, Facing);
+    if (facing) {
+      world.set(existing.id, Facing, { x: 1, y: 0 });
+    }
+    return;
   }
+  createPlayer(world, { x: center.x, y: center.y, name: "Hero" });
 }
 
 function grantInitialShield(world) {
@@ -80,10 +82,11 @@ function grantInitialShield(world) {
   }
 }
 
-function placeSpellbook(world) {
+function placeSpellbook(world, room) {
+  const { center } = room;
   const book = world.create();
   world.add(book, NamedIdentity, { name: "Spellbook of Lightning", identity: "book_lightning" });
-  world.add(book, Position, { x: 4, y: 4 });
+  world.add(book, Position, { x: center.x + 2, y: center.y + 1.5 });
   world.add(book, ItemInfo, {
     type: "learn",
     slot: "brain",
@@ -103,31 +106,39 @@ function setPlayerStats(world) {
   world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
 }
 
-function dropPotions(world) {
+function dropPotions(world, room) {
+  const { center } = room;
   const p1 = createFrom(world, HealthPotion, {});
-  world.add(p1, Position, { x: 4, y: 0 });
+  world.add(p1, Position, { x: center.x + 2.5, y: center.y });
   const p2 = createFrom(world, HealthPotion, {});
-  world.add(p2, Position, { x: -3, y: 0 });
+  world.add(p2, Position, { x: center.x - 2.5, y: center.y });
 }
 
-function dropGold(world) {
+function dropGold(world, room) {
+  const { center } = room;
   const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
   const coins = rng.int(12, 47);
   const gold = createFrom(world, GoldStack, {});
-  world.add(gold, Position, { x: -1, y: -1 });
+  world.add(gold, Position, { x: center.x - 1, y: center.y - 1 });
   world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
 }
 
-function spawnMonsters(world, ox, oy) {
-  createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
-  createFrom(world, Monster, { x: ox + ROOM_WIDTH - 3, y: oy + 2, name: "Goblin", identity: "monster" });
-  createFrom(world, Monster, { x: ox + 2, y: oy + ROOM_HEIGHT - 3, name: "Goblin", identity: "monster" });
+function spawnMonsters(world, room) {
+  const { center, halfWidth, halfHeight } = room;
+  const leftX = center.x - (halfWidth - 1.5);
+  const rightX = center.x + (halfWidth - 1.5);
+  const topY = center.y - (halfHeight - 1.5);
+  const bottomY = center.y + (halfHeight - 1.5);
+  createFrom(world, Monster, { x: leftX, y: topY, name: "Goblin", identity: "monster" });
+  createFrom(world, Monster, { x: rightX, y: topY, name: "Goblin", identity: "monster" });
+  createFrom(world, Monster, { x: center.x, y: bottomY, name: "Goblin", identity: "monster" });
 }
 
-function dropEquipment(world, ox, oy) {
+function dropEquipment(world, room) {
+  const { center, halfWidth, halfHeight } = room;
   const eqSword = buildEquipmentItem(world, "sword_plain", { affixes: ["fierce"] });
-  world.add(eqSword, Position, { x: -3, y: -3 });
+  world.add(eqSword, Position, { x: center.x - (halfWidth - 2), y: center.y - (halfHeight - 2) });
 
   const thornArmor = buildEquipmentItem(world, "chain_armor", { affixes: ["thorns1"] });
-  world.add(thornArmor, Position, { x: ox + 1, y: oy + ROOM_HEIGHT - 2 });
+  world.add(thornArmor, Position, { x: center.x + (halfWidth - 2), y: center.y + (halfHeight - 2) });
 }

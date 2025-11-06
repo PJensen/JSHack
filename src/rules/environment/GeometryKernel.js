@@ -364,18 +364,21 @@ export class GeometryKernel {
     };
   }
 
-  serialize() {
-    const payload = {
+  snapshot() {
+    return {
       seed: this.seed,
-      options: this.options,
+      options: { ...this.options },
       nextId: this.nextId,
-      mbr: this.mbr,
+      mbr: this.mbr ? boundsCopy(this.mbr) : null,
       mbrVersion: this.mbrVersion,
       moveVersion: this.moveVersion,
       occlVersion: this.occlVersion,
       primitives: this.primitives.map((p) => clonePrimitiveData(p)),
     };
-    return JSON.stringify(payload);
+  }
+
+  serialize() {
+    return JSON.stringify(this.snapshot());
   }
 
   deserialize(json) {
