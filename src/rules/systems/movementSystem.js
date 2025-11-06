@@ -14,6 +14,7 @@ import { Anatomy } from "../components/Anatomy.js";
 import { getGeometryKernel } from "../environment/worldGeometry.js";
 
 const EPS = 1e-4;
+const SLIDE_EPS = 1e-3;
 
 /** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
@@ -67,8 +68,44 @@ export function movementSystem(world) {
 
       if (kernel) {
         const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius);
-        dest = sweep.point;
+        dest = { ...sweep.point };
         hitGeometry = !!sweep.hit;
+
+        if (sweep.hit && sweep.normal) {
+          const nLen = Math.hypot(sweep.normal.x, sweep.normal.y);
+          if (nLen > EPS) {
+            const nx = sweep.normal.x / nLen;
+            const ny = sweep.normal.y / nLen;
+            const dirDot = dirx * nx + diry * ny;
+            if (dirDot < -EPS) {
+              const tangx = dirx - dirDot * nx;
+              const tangy = diry - dirDot * ny;
+              const tangLen = Math.hypot(tangx, tangy);
+              const remainingFrac = 1 - Math.max(0, Math.min(1, sweep.t ?? 1));
+              const remainingDist = stride * remainingFrac;
+              if (tangLen > EPS && remainingDist > EPS) {
+                const tx = tangx / tangLen;
+                const ty = tangy / tangLen;
+                const slideStart = {
+                  x: dest.x + nx * SLIDE_EPS,
+                  y: dest.y + ny * SLIDE_EPS,
+                };
+                const slideTarget = {
+                  x: slideStart.x + tx * remainingDist,
+                  y: slideStart.y + ty * remainingDist,
+                };
+                const slideSweep = kernel.sweepCapsule(slideStart, slideTarget, actorRadius);
+                const candidate = { ...slideSweep.point };
+                const movedPrev = Math.hypot(dest.x - pos.x, dest.y - pos.y);
+                const movedCandidate = Math.hypot(candidate.x - pos.x, candidate.y - pos.y);
+                if (movedCandidate > movedPrev + EPS) {
+                  dest = candidate;
+                  hitGeometry = hitGeometry || !!slideSweep.hit;
+                }
+              }
+            }
+          }
+        }
       }
 
       const actorData = colliderMap.get(actor) || {

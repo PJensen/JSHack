@@ -47,12 +47,18 @@ const PERF = (() => {
   const dprCap = Number.isFinite(dprCapArg) && dprCapArg > 0 ? dprCapArg : defaultCap;
   const isLow = q === "low";
   const isHigh = q === "high";
+  const fovRayArg = Number(params.get("fovRays")) || Number((typeof localStorage !== "undefined" && localStorage.getItem("jshack.fovRays")) || 0);
+  const defaultRays = isLow ? 96 : 192;
+  const fovRayCount = Number.isFinite(fovRayArg) && fovRayArg > 0
+    ? Math.max(32, Math.min(512, Math.floor(fovRayArg)))
+    : defaultRays;
   return {
     quality: q,
     dprCap: isHigh ? 3 : (isLow ? 1 : dprCap),
     glowLayers: isLow ? 0 : 2,
     particleCapacity: isLow ? 512 : 4096,
-    cameraLerp: (params.get("cameraLerp") !== null ? Number(params.get("cameraLerp")) : 0)
+    cameraLerp: (params.get("cameraLerp") !== null ? Number(params.get("cameraLerp")) : 0),
+    fovRayCount,
   };
 })();
 
@@ -61,7 +67,7 @@ const TILE_PX = 28;
 
 const TAU = Math.PI * 2;
 const WALL_THICKNESS = 0.45;
-const FOV_RAY_COUNT = 96;
+const FOV_RAY_COUNT = PERF.fovRayCount;
 const FOV_MIN_DISTANCE = 6;
 const FOV_MAX_DISTANCE = 24;
 
