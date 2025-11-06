@@ -61,15 +61,18 @@ export function movementSystem(world) {
       const dirx = dx / mag;
       const diry = dy / mag;
 
-      const desired = { x: pos.x + dirx * stride, y: pos.y + diry * stride };
-      let dest = { ...desired };
-      let hitGeometry = false;
+      const applySweep = (target) => {
+        if (!kernel) {
+          return { point: { x: target.x, y: target.y }, hit: false };
+        }
+        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, target, actorRadius);
+        return { point: sweep.point, hit: !!sweep.hit };
+      };
 
-      if (kernel) {
-        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius);
-        dest = sweep.point;
-        hitGeometry = !!sweep.hit;
-      }
+      const desired = { x: pos.x + dirx * stride, y: pos.y + diry * stride };
+      let sweepResult = applySweep(desired);
+      let dest = { ...sweepResult.point };
+      let hitGeometry = sweepResult.hit;
 
       const actorData = colliderMap.get(actor) || {
         id: actor,
@@ -85,6 +88,31 @@ export function movementSystem(world) {
       actorData.y = pos.y;
       actorData.solid = true;
       colliderMap.set(actor, actorData);
+
+      let delta = Math.hypot(dest.x - pos.x, dest.y - pos.y);
+      if (delta <= EPS && hitGeometry) {
+        const axisDirs = [];
+        if (Math.abs(dirx) > EPS) axisDirs.push({ x: dirx, y: 0 });
+        if (Math.abs(diry) > EPS) axisDirs.push({ x: 0, y: diry });
+        axisDirs.sort((a, b) => Math.abs(b.x || b.y) - Math.abs(a.x || a.y));
+        for (const axis of axisDirs) {
+          const axisMag = Math.hypot(axis.x, axis.y);
+          if (axisMag <= EPS) continue;
+          const axisStride = stride * axisMag;
+          const axisDirx = axisMag > 0 ? axis.x / axisMag : 0;
+          const axisDiry = axisMag > 0 ? axis.y / axisMag : 0;
+          const axisTarget = { x: pos.x + axisDirx * axisStride, y: pos.y + axisDiry * axisStride };
+          sweepResult = applySweep(axisTarget);
+          const candidate = sweepResult.point;
+          const candidateDelta = Math.hypot(candidate.x - pos.x, candidate.y - pos.y);
+          if (candidateDelta > EPS) {
+            dest = { ...candidate };
+            hitGeometry = sweepResult.hit;
+            delta = candidateDelta;
+            break;
+          }
+        }
+      }
 
       let blockedBy = null;
       for (const other of colliderMap.values()) {
@@ -122,7 +150,6 @@ export function movementSystem(world) {
         continue;
       }
 
-      const delta = Math.hypot(dest.x - pos.x, dest.y - pos.y);
       if (delta <= EPS) {
         if (hitGeometry) {
           const fx = world.get(actor, Facing);
