@@ -22,9 +22,16 @@ export function setupInput(opts = {}) {
     actionSinks = defaultActionSinks,
     onDispose = null,
     touchFeedback = true,
+    camera = null,
+    getPointerOrigin = null,
   } = opts;
 
-  const mgr = new InputManager(window, { canvas, touchFeedback });
+  const mgr = new InputManager(window, {
+    canvas,
+    touchFeedback,
+    camera,
+    getPointerOrigin,
+  });
 
   const off = mgr.onAction((action) => {
     const sink = actionSinks[action.type] || null;
