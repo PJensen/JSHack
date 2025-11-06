@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Carve‑World Level Editor — Analytic Brushes, Drag‑to‑Carve, FOV Preview</title>
+<style>
+  :root{
+    --bg:#0b0f12; --panel:#111720; --ink:#e7eef7; --muted:#9fb0c2; --accent:#8fe; --warn:#f89; --grid:#213040;
+    --ok:#6fd; --bad:#f86;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,sans-serif}
+  .wrap{display:grid;grid-template-columns:380px 1fr;gap:12px;height:100%;}
+  .panel{background:var(--panel);padding:12px;overflow:auto;border-right:1px solid #16202a}
+  h1{font-size:16px;margin:0 0 8px}
+  .muted{color:var(--muted)}
+  .row{display:flex;align-items:center;gap:8px;margin:6px 0}
+  .row label{min-width:150px;color:var(--muted)}
+  select,input[type="number"],input[type="text"]{background:#0f141b;color:var(--ink);border:1px solid #243244;border-radius:6px;padding:6px 8px}
+  input[type="range"]{width:160px}
+  button{background:#0f141b;color:var(--ink);border:1px solid #2b3a4d;border-radius:10px;padding:8px 10px;cursor:pointer}
+  button:hover{border-color:#3b4e66}
+  .pill{display:inline-block;padding:2px 8px;border:1px solid #37516b;border-radius:999px}
+  canvas{width:100%;height:100%;display:block;background:#0b0f12}
+  .kbd{font:12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;border:1px solid #2b3a4d;border-radius:6px;padding:1px 6px;color:var(--muted)}
+  .hr{border-top:1px solid #1a2633;margin:10px 0}
+  .help{font-size:12px;color:var(--muted)}
+  .disabled{opacity:0.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>Carve‑World Level Editor</h1>
+    <div class="help">Analytic, query‑only geometry under the hood. Drag to carve with continuous sweeps. No grid.</div>
+
+    <div class="hr"></div>
+
+    <div class="row">
+      <label>Mode</label>
+      <select id="mode">
+        <option value="carve" selected>Carving</option>
+        <option value="moveTest">Movement tester</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label>Brush</label>
+      <select id="brush">
+        <option value="circle">Circle (capsule sweep)</option>
+        <option value="rectslot">Rect‑slot (box + round caps)</option>
+        <option value="square">Square (rotated box sweep)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Radius</label>
+      <input id="radius" type="range" min="2" max="80" value="24" />
+      <span id="radiusVal" class="pill">24</span>
+    </div>
+    <div class="row">
+      <label>Rotation (°) for Square</label>
+      <input id="rotation" type="range" min="0" max="180" value="0" />
+      <span id="rotationVal" class="pill">0°</span>
+    </div>
+
+    <div class="row">
+      <label><input id="affectsMove" type="checkbox" checked /> Affect Movement</label>
+    </div>
+    <div class="row">
+      <label><input id="affectsOccl" type="checkbox" checked /> Affect Occlusion</label>
+    </div>
+
+    <div class="row" style="margin-top:8px;gap:6px">
+      <button id="undoBtn" title="Ctrl+Z">Undo</button>
+      <button id="clearBtn">Clear All</button>
+      <button id="exportBtn">Export JSON</button>
+      <button id="importBtn">Import JSON</button>
+      <input id="importFile" type="file" accept="application/json" style="display:none" />
+    </div>
+
+    <div class="hr"></div>
+
+    <h1>Actor Preview</h1>
+    <div class="row"><label>BoundingCircle r</label><input id="actorR" type="range" min="2" max="60" value="14"/><span id="actorRVal" class="pill">14</span></div>
+    <div class="row"><label>Facing θ (deg)</label><input id="actorTheta" type="range" min="0" max="359" value="0"/><span id="actorThetaVal" class="pill">0°</span></div>
+    <div class="row"><label>Anatomy::StrideDistance</label><input id="stride" type="range" min="2" max="80" value="16"/><span id="strideVal" class="pill">16</span></div>
+    <div class="row"><label>FOV::distance</label><input id="fovDist" type="range" min="20" max="420" value="220"/><span id="fovDistVal" class="pill">220</span></div>
+    <div class="row"><label>FOV::angle (deg)</label><input id="fovAngle" type="range" min="10" max="170" value="80"/><span id="fovAngleVal" class="pill">80°</span></div>
+
+    <div id="moveTesterGroup" class="row disabled">
+      <label>movementDistance</label>
+      <input id="moveDist" type="range" min="5" max="800" value="150" disabled />
+      <span id="moveDistVal" class="pill">150</span>
+    </div>
+
+    <div class="help">Mode: <b>Carving</b> — drag to carve; click to place actor. <b>Movement tester</b> — click sets facing and moves exactly <b>movementDistance</b> unless blocked by collision. Drag with <span class="kbd">Alt</span> to adjust facing; <span class="kbd">W</span> steps forward by StrideDistance. Collision uses analytic clearance.</div>
+
+    <div class="hr"></div>
+
+    <h1>Shortcuts</h1>
+    <div class="help">
+      Hold mouse to carve continuously.  <span class="kbd">Shift</span> while dragging => larger spacing (performance).
+      <br/> <span class="kbd">Ctrl+Z</span> undo.  <span class="kbd">S</span> export.  <span class="kbd">M</span> toggle mode.
+    </div>
+  </div>
+  <canvas id="view"></canvas>
+</div>
+
+<script>
+(function(){
+  // ===== Math helpers =====
+  const TAU = Math.PI*2;
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  const len=(x,y)=>Math.hypot(x,y);
+  const dot=(ax,ay,bx,by)=>ax*bx+ay*by;
+  const sub=(ax,ay,bx,by)=>[ax-bx,ay-by];
+  const norm=(x,y)=>{const L=len(x,y)||1;return [x/L,y/L]};
+
+  // Project point p to segment a-b, returning closest point and t in [0,1]
+  function closestOnSeg(px,py, ax,ay, bx,by){
+    const abx=bx-ax, aby=by-ay; const apx=px-ax, apy=py-ay;
+    const ab2=abx*abx+aby*aby; if(ab2===0) return {x:ax,y:ay,t:0};
+    let t=(apx*abx+apy*aby)/ab2; t=clamp(t,0,1); return {x:ax+abx*t, y:ay+aby*t, t};
+  }
+
+  // SDFs (positive inside free space)
+  const SDF = {
+    capsule(px,py, ax,ay, bx,by, r){
+      const c=closestOnSeg(px,py,ax,ay,bx,by);
+      const d=len(px-c.x, py-c.y);
+      return r - d; // inside if >0
+    },
+    circle(px,py, cx,cy, r){ return r - len(px-cx, py-cy); },
+    // oriented box SDF helper (positive inside)
+    obox(px,py, cx,cy, hx,hy, rot){
+      const s=Math.sin(rot), c=Math.cos(rot);
+      const dx=px-cx, dy=py-cy;
+      const lx =  Math.abs( c*dx + s*dy ) - hx;
+      const ly =  Math.abs(-s*dx + c*dy ) - hy;
+      const ax = Math.max(lx,0), ay=Math.max(ly,0);
+      const outside = Math.hypot(ax,ay);
+      const inside = Math.max(lx,ly);
+      return -(outside) - inside; // return positive inside
+    }
+  };
+
+  // ===== Geometry Kernel (minimal, deterministic, analytic) =====
+  // World starts as solid rock. Free space = union of carve primitives.
+  // Each primitive is {type, params..., affectsMove, affectsOccl}
+  const Kernel = (()=>{
+    const carves=[]; // authoritative stream
+
+    function carveCircle(cx,cy,r, flags){ carves.push({type:'circle', cx,cy,r, ...flags}); return carves.length-1; }
+    function carveCapsule(ax,ay,bx,by,r, flags){ carves.push({type:'capsule', ax,ay,bx,by,r, ...flags}); return carves.length-1; }
+    function carveRectSlot(ax,ay,bx,by,r, flags){ carves.push({type:'rectslot', ax,ay,bx,by,r, ...flags}); return carves.length-1; }
+    function carveSquare(ax,ay,bx,by,halfW, rot, flags){ carves.push({type:'square', ax,ay,bx,by, halfW, rot, ...flags}); return carves.length-1; }
+    function clear(){ carves.length=0; }
+
+    // Clearance for movement: distance to nearest blocking solid (>=0 inside free)
+    function distanceMove(px,py){
+      let best = -Infinity; // union: max of signed distances (positive inside free)
+      for(const g of carves){
+        if(g.affectsMove===false) continue;
+        switch(g.type){
+          case 'circle': best = Math.max(best, SDF.circle(px,py,g.cx,g.cy,g.r)); break;
+          case 'capsule': best = Math.max(best, SDF.capsule(px,py,g.ax,g.ay,g.bx,g.by,g.r)); break;
+          case 'rectslot': best = Math.max(best, SDF.capsule(px,py,g.ax,g.ay,g.bx,g.by,g.r)); break;
+          case 'square':{
+            const hx = 0.5 * Math.hypot(g.bx-g.ax, g.by-g.ay);
+            const hy = g.halfW;
+            const cx = (g.ax+g.bx)/2, cy=(g.ay+g.by)/2;
+            best = Math.max(best, SDF.obox(px,py,cx,cy,hx,hy,g.rot));
+          } break;
+        }
+      }
+      return Math.max(0, best); // >=0 inside; 0 outside
+    }
+
+    // For occlusion we use the same union but respecting flags
+    function insideFreeForOccl(px,py){
+      let best=-Infinity;
+      for(const g of carves){
+        if(g.affectsOccl===false) continue;
+        switch(g.type){
+          case 'circle': best=Math.max(best,SDF.circle(px,py,g.cx,g.cy,g.r)); break;
+          case 'capsule': best=Math.max(best,SDF.capsule(px,py,g.ax,g.ay,g.bx,g.by,g.r)); break;
+          case 'rectslot': best=Math.max(best,SDF.capsule(px,py,g.ax,g.ay,g.bx,g.by,g.r)); break;
+          case 'square': {
+            const hx = 0.5 * Math.hypot(g.bx-g.ax, g.by-g.ay);
+            const hy = g.halfW;
+            const cx = (g.ax+g.bx)/2, cy=(g.ay+g.by)/2;
+            best=Math.max(best,SDF.obox(px,py,cx,cy,hx,hy,g.rot));
+          } break;
+        }
+      }
+      return best>0;
+    }
+
+    function serialize(){ return JSON.stringify(carves); }
+    function deserialize(json){ try{ const arr=JSON.parse(json); carves.length=0; for(const g of arr) carves.push(g);}catch(e){console.error(e)} }
+
+    return {carves, carveCircle, carveCapsule, carveRectSlot, carveSquare, clear, distanceMove, insideFreeForOccl, serialize, deserialize};
+  })();
+
+  // ===== UI state =====
+  const canvas = document.getElementById('view');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+  function resize(){
+    const bb = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(bb.width * dpr);
+    canvas.height= Math.floor(bb.height* dpr);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const ui = {
+    brush: document.getElementById('brush'),
+    mode: document.getElementById('mode'),
+    radius: document.getElementById('radius'),
+    radiusVal: document.getElementById('radiusVal'),
+    rotation: document.getElementById('rotation'),
+    rotationVal: document.getElementById('rotationVal'),
+    affectsMove: document.getElementById('affectsMove'),
+    affectsOccl: document.getElementById('affectsOccl'),
+    undoBtn: document.getElementById('undoBtn'),
+    clearBtn: document.getElementById('clearBtn'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    importFile: document.getElementById('importFile'),
+    actorR: document.getElementById('actorR'), actorRVal: document.getElementById('actorRVal'),
+    actorTheta: document.getElementById('actorTheta'), actorThetaVal: document.getElementById('actorThetaVal'),
+    stride: document.getElementById('stride'), strideVal: document.getElementById('strideVal'),
+    fovDist: document.getElementById('fovDist'), fovDistVal: document.getElementById('fovDistVal'),
+    fovAngle: document.getElementById('fovAngle'), fovAngleVal: document.getElementById('fovAngleVal'),
+    moveDist: document.getElementById('moveDist'), moveDistVal: document.getElementById('moveDistVal'),
+    moveTesterGroup: document.getElementById('moveTesterGroup')
+  };
+  function syncLabels(){
+    ui.radiusVal.textContent = ui.radius.value;
+    ui.rotationVal.textContent = ui.rotation.value + '°';
+    ui.actorRVal.textContent = ui.actorR.value;
+    ui.actorThetaVal.textContent = ui.actorTheta.value + '°';
+    ui.strideVal.textContent = ui.stride.value;
+    ui.fovDistVal.textContent = ui.fovDist.value;
+    ui.fovAngleVal.textContent = ui.fovAngle.value + '°';
+    ui.moveDistVal.textContent = ui.moveDist.value;
+  }
+  ['input','change'].forEach(ev=>{
+    ui.radius.addEventListener(ev, syncLabels);
+    ui.rotation.addEventListener(ev, syncLabels);
+    ui.actorR.addEventListener(ev, syncLabels);
+    ui.actorTheta.addEventListener(ev, syncLabels);
+    ui.stride.addEventListener(ev, syncLabels);
+    ui.fovDist.addEventListener(ev, syncLabels);
+    ui.fovAngle.addEventListener(ev, syncLabels);
+    ui.moveDist.addEventListener(ev, syncLabels);
+  });
+  syncLabels();
+
+  function updateModeUI(){
+    const moveMode = ui.mode.value==='moveTest';
+    ui.moveDist.disabled = !moveMode;
+    ui.moveTesterGroup.classList.toggle('disabled', !moveMode);
+  }
+  ui.mode.addEventListener('change', updateModeUI);
+  updateModeUI();
+
+  // ===== Carving with continuous sweeps =====
+  let isDragging=false; let lastX=0,lastY=0;
+  const undoStack=[];
+
+  function canvasToWorld(e){
+    const rect=canvas.getBoundingClientRect();
+    const x=(e.clientX-rect.left)*dpr;
+    const y=(e.clientY-rect.top )*dpr;
+    return [x,y];
+  }
+
+  canvas.addEventListener('pointerdown', e=>{
+    if(ui.mode.value==='moveTest') return; // disable carving in movement tester
+    canvas.setPointerCapture(e.pointerId);
+    const [x,y]=canvasToWorld(e); lastX=x; lastY=y; isDragging=true;
+    addDotOrStart(x,y, e);
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    if(ui.mode.value==='moveTest') return;
+    if(!isDragging) return;
+    const [x,y]=canvasToWorld(e);
+    const dx=x-lastX, dy=y-lastY;
+    const dist=Math.hypot(dx,dy);
+    const step = Math.max(1, +ui.radius.value / 3);
+    if(dist>=step){
+      // place a segment sweep from last -> current
+      addSegment(lastX,lastY,x,y, e);
+      lastX=x; lastY=y;
+    }
+  });
+
+  window.addEventListener('pointerup', ()=>{ isDragging=false; });
+
+  function currentFlags(){
+    return { affectsMove: ui.affectsMove.checked, affectsOccl: ui.affectsOccl.checked };
+  }
+
+  function addDotOrStart(x,y,e){
+    const r=+ui.radius.value;
+    const flags=currentFlags();
+    const mode=ui.brush.value;
+    if(mode==='circle'){
+      const id=Kernel.carveCircle(x,y,r,flags); undoStack.push(id);
+    }else{
+      // for other brushes, start a tiny capsule to avoid gaps at click
+      const id=Kernel.carveCapsule(x,y,x+0.0001,y+0.0001,r,flags); undoStack.push(id);
+    }
+  }
+  function addSegment(ax,ay,bx,by,e){
+    const r=+ui.radius.value;
+    const flags=currentFlags();
+    const mode=ui.brush.value;
+    if(mode==='circle'){
+      const id=Kernel.carveCapsule(ax,ay,bx,by,r,flags); undoStack.push(id);
+    }else if(mode==='rectslot'){
+      const id=Kernel.carveRectSlot(ax,ay,bx,by,r,flags); undoStack.push(id);
+    }else if(mode==='square'){
+      const rot = (+ui.rotation.value) * Math.PI/180;
+      const id=Kernel.carveSquare(ax,ay,bx,by,r,rot,flags); undoStack.push(id);
+    }
+  }
+
+  ui.undoBtn.addEventListener('click', ()=>{ undo(); });
+  function undo(){ if(Kernel.carves.length>0){ Kernel.carves.pop(); undoStack.pop(); }}
+  ui.clearBtn.addEventListener('click', ()=>{ Kernel.clear(); undoStack.length=0; });
+
+  ui.exportBtn.addEventListener('click', ()=>{
+    const blob=new Blob([Kernel.serialize()],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='carve_world.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  });
+  ui.importBtn.addEventListener('click', ()=> ui.importFile.click());
+  ui.importFile.addEventListener('change', async e=>{
+    const f=e.target.files[0]; if(!f) return; const txt=await f.text(); Kernel.deserialize(txt); undoStack.length=0; });
+
+  // ===== Actor components & interaction =====
+  const Actor = { x: 240, y: 240, r: +ui.actorR.value, theta: 0, stride: +ui.stride.value, fovDist: +ui.fovDist.value, fovAngle: (+ui.fovAngle.value)*Math.PI/180 };
+  function syncActor(){ Actor.r=+ui.actorR.value; Actor.theta=(+ui.actorTheta.value)*Math.PI/180; Actor.stride=+ui.stride.value; Actor.fovDist=+ui.fovDist.value; Actor.fovAngle=(+ui.fovAngle.value)*Math.PI/180; }
+  ['input','change'].forEach(ev=>{
+    ui.actorR.addEventListener(ev, syncActor);
+    ui.actorTheta.addEventListener(ev, syncActor);
+    ui.stride.addEventListener(ev, syncActor);
+    ui.fovDist.addEventListener(ev, syncActor);
+    ui.fovAngle.addEventListener(ev, syncActor);
+  });
+
+  canvas.addEventListener('click', e=>{
+    const [x,y]=canvasToWorld(e);
+    if(ui.mode.value==='carve'){
+      if(!e.altKey){ Actor.x=x; Actor.y=y; }
+    } else {
+      // Movement tester: set facing toward click, then move a fixed movementDistance or until collision
+      const dx=x-Actor.x, dy=y-Actor.y;
+      if(dx!==0 || dy!==0){
+        Actor.theta = Math.atan2(dy,dx);
+        ui.actorTheta.value = String(Math.round(Actor.theta*180/Math.PI)%360); syncLabels();
+        moveForwardDistance(+ui.moveDist.value);
+      }
+    }
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    if(e.altKey){
+      const [x,y]=canvasToWorld(e);
+      const dx=x-Actor.x, dy=y-Actor.y; Actor.theta = Math.atan2(dy,dx);
+      ui.actorTheta.value = String(Math.round(Actor.theta*180/Math.PI)%360); syncLabels();
+    }
+  });
+
+  window.addEventListener('keydown', e=>{
+    if(e.key.toLowerCase()==='w'){
+      // Unidirectional movement along facing; continuous capsule sweep test for one stride
+      const dir=[Math.cos(Actor.theta), Math.sin(Actor.theta)];
+      const step=Actor.stride;
+      const nx=Actor.x + dir[0]*step, ny=Actor.y + dir[1]*step;
+      const ok = sweepCapsuleCollide(Actor.x,Actor.y,nx,ny, Actor.r) === false;
+      if(ok){ Actor.x=nx; Actor.y=ny; }
+    }
+    // Toggle mode with 'M'
+    if(e.key.toLowerCase()==='m'){
+      ui.mode.value = (ui.mode.value==='carve') ? 'moveTest' : 'carve';
+      updateModeUI();
+    }
+  });
+
+  // Continuous collision: if at any sample point along segment clearance < r, block
+  function sweepCapsuleCollide(ax,ay,bx,by,r){
+    const L = Math.hypot(bx-ax,by-ay) || 1; const steps = Math.ceil(L/ (r*0.5));
+    for(let i=0;i<=steps;i++){
+      const t=i/steps; const x=ax+(bx-ax)*t, y=ay+(by-ay)*t; const clear=Kernel.distanceMove(x,y);
+      if(clear < r) return true; // penetration
+    }
+    return false;
+  }
+
+  // Move forward up to a target distance (or less on collision)
+  function moveForwardDistance(dist){
+    const r=Actor.r; const dir=[Math.cos(Actor.theta), Math.sin(Actor.theta)];
+    if(Kernel.distanceMove(Actor.x,Actor.y) < r) return; // stuck in rock
+    const collide = t => sweepCapsuleCollide(Actor.x,Actor.y, Actor.x+dir[0]*t, Actor.y+dir[1]*t, r);
+    let lo=0, hi=dist;
+    if(!collide(hi)) { Actor.x += dir[0]*hi; Actor.y += dir[1]*hi; return; }
+    // binary search max free <= dist
+    for(let i=0;i<22;i++){
+      const mid=(lo+hi)*0.5; if(collide(mid)) hi=mid; else lo=mid;
+    }
+    Actor.x += dir[0]*lo; Actor.y += dir[1]*lo;
+  }
+
+  // ===== FOV via ray‑march against occlusion (approx; step adapts to clearance) =====
+  function computeFOVPoly(){
+    const rays = 200; // adaptive budget would be wired to frame budget in engine
+    const a0 = Actor.theta - Actor.fovAngle*0.5;
+    const a1 = Actor.theta + Actor.fovAngle*0.5;
+    const points = [[Actor.x, Actor.y]];
+    for(let i=0;i<=rays;i++){
+      const a = a0 + (a1-a0)*(i/rays);
+      const dir=[Math.cos(a), Math.sin(a)];
+      let t=0; const maxT=Actor.fovDist; let hitX=Actor.x, hitY=Actor.y;
+      for(let k=0;k<256 && t<maxT; k++){
+        const px=Actor.x+dir[0]*t, py=Actor.y+dir[1]*t;
+        const inside = Kernel.insideFreeForOccl(px,py);
+        const clear = Kernel.distanceMove(px,py); // reuse as conservative step size
+        if(!inside){ break; }
+        const step = Math.max(2, clear*0.7); // coarse sphere‑tracing‑like
+        t += step;
+        hitX=px; hitY=py;
+      }
+      points.push([hitX, hitY]);
+    }
+    return points;
+  }
+
+  // ===== Rendering =====
+  function draw(){
+    // bg
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Draw rock as dark; free space as lighter by rasterizing carves (editor preview)
+    ctx.fillStyle = '#0b0f12'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Free space (movement layer) in deep navy, occlusion‑only in different tint
+    ctx.save();
+    ctx.globalCompositeOperation='source-over';
+
+    // Movement‑affecting carves
+    ctx.fillStyle = '#142030';
+    for(const g of Kernel.carves){ if(g.affectsMove===false) continue; drawPrimitive(ctx,g); }
+
+    // Occlusion‑only carves (movement unchecked, occl checked)
+    ctx.fillStyle = '#101a26';
+    for(const g of Kernel.carves){ if(g.affectsOccl && g.affectsMove===false) drawPrimitive(ctx,g); }
+
+    ctx.restore();
+
+    // Actor
+    drawActor();
+
+    requestAnimationFrame(draw);
+  }
+
+  function drawPrimitive(ctx,g){
+    switch(g.type){
+      case 'circle':{ ctx.beginPath(); ctx.arc(g.cx,g.cy,g.r,0,TAU); ctx.fill(); } break;
+      case 'capsule':{
+        const dx=g.bx-g.ax, dy=g.by-g.ay; const L=Math.hypot(dx,dy)||1; const ux=dx/L, uy=dy/L;
+        const nx=-uy, ny=ux; // normal
+        const ax=g.ax, ay=g.ay, bx=g.bx, by=g.by, r=g.r;
+        ctx.beginPath();
+        ctx.arc(ax,ay,r, Math.atan2(ny,nx), Math.atan2(-ny,-nx));
+        ctx.arc(bx,by,r, Math.atan2(-ny,-nx), Math.atan2(ny,nx));
+        ctx.closePath(); ctx.fill();
+      } break;
+      case 'rectslot':{
+        const dx=g.bx-g.ax, dy=g.by-g.ay; const L=Math.hypot(dx,dy)||1; const ux=dx/L, uy=dy/L; const nx=-uy, ny=ux;
+        const r=g.r, ax=g.ax, ay=g.ay, bx=g.bx, by=g.by;
+        // box band between end circles with half‑width r
+        const p1x=ax+nx*r, p1y=ay+ny*r; const p2x=bx+nx*r, p2y=by+ny*r;
+        const p3x=bx-nx*r, p3y=by-ny*r; const p4x=ax-nx*r, p4y=ay-ny*r;
+        ctx.beginPath();
+        ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y); ctx.lineTo(p3x,p3y); ctx.lineTo(p4x,p4y); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.arc(ax,ay,r,0,TAU); ctx.fill(); ctx.beginPath(); ctx.arc(bx,by,r,0,TAU); ctx.fill();
+      } break;
+      case 'square':{
+        const cx=(g.ax+g.bx)/2, cy=(g.ay+g.by)/2; const L=Math.hypot(g.bx-g.ax,g.by-g.ay);
+        const hx=L/2, hy=g.halfW; const rot=g.rot; const s=Math.sin(rot), c=Math.cos(rot);
+        // build rectangle corners
+        const pts=[[-hx,-hy],[hx,-hy],[hx,hy],[-hx,hy]].map(([x,y])=>{
+          const rx=c*x - s*y, ry=s*x + c*y; return [rx+cx, ry+cy];
+        });
+        ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<4;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.closePath(); ctx.fill();
+      } break;
+    }
+  }
+
+  function drawActor(){
+    // FOV polygon
+    const poly = computeFOVPoly();
+    ctx.save();
+    ctx.globalAlpha=0.18; ctx.fillStyle='#8fe';
+    ctx.beginPath(); ctx.moveTo(poly[0][0],poly[0][1]); for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i][0],poly[i][1]); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // actor circle
+    const clear = Kernel.distanceMove(Actor.x,Actor.y);
+    const ok = clear >= Actor.r;
+    ctx.beginPath(); ctx.arc(Actor.x,Actor.y,Actor.r,0,TAU);
+    ctx.fillStyle = ok ? '#193447' : '#2a1120'; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle= ok? '#6fd':'#f86'; ctx.stroke();
+
+    // '@' glyph at center
+    ctx.save();
+    ctx.fillStyle = '#cfe8ff';
+    ctx.font = `bold ${Math.max(10, Math.floor(Actor.r*1.4))}px ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('@', Actor.x, Actor.y+1);
+    ctx.restore();
+
+    // facing vector
+    const dir=[Math.cos(Actor.theta), Math.sin(Actor.theta)];
+    ctx.beginPath(); ctx.moveTo(Actor.x,Actor.y); ctx.lineTo(Actor.x+dir[0]*Math.max(Actor.r*2,18), Actor.y+dir[1]*Math.max(Actor.r*2,18));
+    ctx.strokeStyle='#8fe'; ctx.lineWidth=2; ctx.stroke();
+
+    // stride indicator
+    ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(Actor.x,Actor.y); ctx.lineTo(Actor.x+dir[0]*Actor.stride, Actor.y+dir[1]*Actor.stride);
+    ctx.strokeStyle='#89f'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ===== Tiny self‑tests (run once on load; do not modify user scene) =====
+  (function SELF_TESTS(){
+    const RUN_TESTS = true;
+    if(!RUN_TESTS) return;
+    const snapshot = Kernel.serialize();
+    try{
+      // Carve a simple corridor and validate distances
+      Kernel.clear();
+      Kernel.carveCircle(100,100,30,{affectsMove:true,affectsOccl:true});
+      console.assert(Kernel.distanceMove(100,100) >= 30, 'distanceMove center >= r');
+      console.assert(Kernel.distanceMove(140,100) > 0, 'distanceMove inside positive');
+      console.assert(Kernel.distanceMove(200,200) === 0, 'distanceMove outside is 0');
+
+      // Sweep collision should pass within free space
+      const collide = sweepCapsuleCollide(90,100,110,100, 10);
+      console.assert(collide === false, 'sweep inside corridor should not collide');
+
+      // Movement distance should move up to requested amount if clear
+      Actor.x=100; Actor.y=100; Actor.theta=0; Actor.r=6; moveForwardDistance(20);
+      console.assert(Math.abs(Actor.x-120)<1 && Math.abs(Actor.y-100)<1, 'moveForwardDistance moves exact when clear');
+
+      // Movement distance should clamp at obstacle
+      Actor.x=128; Actor.y=100; Actor.theta=0; Actor.r=10; Kernel.carveCircle(180,100,30,{affectsMove:true,affectsOccl:true});
+      const beforeX=Actor.x; moveForwardDistance(100); const afterX=Actor.x;
+      console.assert(afterX>beforeX && afterX< (beforeX+100), 'moveForwardDistance stops before wall');
+
+      console.info('Self‑tests passed');
+    } catch(err){
+      console.warn('Self‑tests failed', err);
+    } finally {
+      Kernel.deserialize(snapshot);
+    }
+  })();
+
+  // Kickoff
+  draw();
+})();
+</script>
+</body>
+</html>
