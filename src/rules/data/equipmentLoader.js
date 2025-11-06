@@ -7,7 +7,7 @@ import { EQUIP_DEFS, getEquipmentDef } from './equipment.js';
 import { AFFIX_DEFS } from './affixes.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
-import { ScriptRef } from '../components/ScriptRef.js';
+import { ScriptRef } from '../../lib/ecs-js/index.js';
 
 /**
  * listEquipment()
@@ -43,8 +43,8 @@ export function buildEquipmentItem(world, equipId, opts = {}) {
   };
   world.add(id, ItemInfo, info);
   // Attach script reference when supplied (for onEquip/onHit, etc.)
-  if (typeof base.script === 'function') {
-    world.add(id, ScriptRef, { ref: base.script, params: { from: base.id } });
+  if (typeof base.script === 'string' && base.script) {
+    world.add(id, ScriptRef, { key: base.script, params: { from: base.id } });
   }
   return id;
 }

@@ -5,6 +5,7 @@ import { Equipment } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { Vitality } from '../components/Vitality.js';
+import { runScript, ScriptVerb } from '../scripting.js';
 
 function eachAffix(world, entityId, cb) {
   const eq = world.get(entityId, Equipment);
@@ -47,6 +48,10 @@ export function installAffixTriggers(world) {
     const base = { attacker: source, defender: target, weaponId: 0, damage: amount, world };
     const ctxT = makeCtx(world, base);
     // defender affixes with onDamaged
-    eachAffix(world, target, (a) => { if (a.triggers?.includes('onDamaged') && typeof a.script === 'function') a.script(ctxT); });
+    eachAffix(world, target, (a) => {
+      if (a.triggers?.includes('onDamaged') && a.script) {
+        runScript(a.script, ScriptVerb.AffixOnDamaged, world, ctxT);
+      }
+    });
   });
 }

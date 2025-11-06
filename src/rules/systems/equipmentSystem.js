@@ -5,6 +5,7 @@
 import { Equipment } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
+import { runScript, ScriptVerb } from '../scripting.js';
 
 function emptyDerived() {
   return {
@@ -25,11 +26,11 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.critMult)) acc.critMultDerived += bonuses.critMult;
 }
 
-function runAffixPassives(ctx, affixIds) {
+function runAffixPassives(world, ctx, affixIds) {
   for (const aId of affixIds || []) {
     const a = AFFIX_DEFS[aId];
-    if (!a || typeof a.passive !== 'function') continue;
-    a.passive(ctx);
+    if (!a || !a.passive) continue;
+    runScript(a.passive, ScriptVerb.AffixPassive, world, ctx);
   }
 }
 
@@ -52,7 +53,7 @@ export function equipmentSystem(world) {
         itemId,
         world
       };
-      runAffixPassives(ctx, info.affixes);
+      runAffixPassives(world, ctx, info.affixes);
     }
 
     // write back results
