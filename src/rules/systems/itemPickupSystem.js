@@ -117,6 +117,7 @@ export function itemPickupSystem(world) {
 
 // Post-move auto-pickup pass (registered in 'effects' phase)
 export function autoPickupPostMoveSystem(world) {
+    const EPS = 1e-6;
     for (const [id, _pos, inv] of world.query(Position, Inventory)) {
         if (!world.has(id, Player)) continue;
         const set = world.get(id, Settings);
@@ -128,7 +129,7 @@ export function autoPickupPostMoveSystem(world) {
         const candidates = [];
         for (const [itemId] of world.query(Position)) {
             const ipos = world.get(itemId, Position);
-            if (!ipos || ipos.x !== pos.x || ipos.y !== pos.y) continue;
+            if (!ipos || Math.abs(ipos.x - pos.x) > EPS || Math.abs(ipos.y - pos.y) > EPS) continue;
             const info = world.get(itemId, ItemInfo);
             if (!info || !info.type || !kinds.includes(info.type)) continue;
             candidates.push(itemId);

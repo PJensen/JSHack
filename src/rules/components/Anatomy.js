@@ -15,11 +15,15 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  */
 export const Anatomy = defineComponent(
   "Anatomy",
-  { parts: [] },
+  { parts: [], strideDistance: 1, reachDistance: 1 },
   {
     validate(rec) {
       if (!Array.isArray(rec.parts))
         throw new Error("Anatomy.parts must be an array");
+      if (!Number.isFinite(rec.strideDistance) || rec.strideDistance <= 0)
+        throw new Error("Anatomy.strideDistance must be a positive number");
+      if (!Number.isFinite(rec.reachDistance) || rec.reachDistance < 0)
+        throw new Error("Anatomy.reachDistance must be a non-negative number");
       return true;
     },
   }

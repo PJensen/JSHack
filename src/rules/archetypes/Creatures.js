@@ -8,6 +8,8 @@ import { Faction } from "../components/Faction.js";
 import { Alignment } from "../components/Alignment.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Collider } from "../components/Collider.js";
+import { BoundingCircle } from "../components/BoundingCircle.js";
+import { Facing } from "../components/Facing.js";
 import { Inventory } from "../components/Inventory.js";
 import { Equipment } from "../components/Equipment.js";
 import { Wounds } from "../components/Wounds.js";
@@ -42,6 +44,31 @@ function resolveAnatomyParts(p) {
   }
 }
 
+function resolveStride(p, fallback = 1) {
+  if (Number.isFinite(p.strideDistance)) return p.strideDistance;
+  if (Number.isFinite(p.anatomy?.strideDistance)) return p.anatomy.strideDistance;
+  return fallback;
+}
+
+function resolveReach(p, fallback = 1) {
+  if (Number.isFinite(p.reachDistance)) return p.reachDistance;
+  if (Number.isFinite(p.anatomy?.reachDistance)) return p.anatomy.reachDistance;
+  return fallback;
+}
+
+function resolveFacing(p) {
+  const fx = Number.isFinite(p.facing?.x) ? p.facing.x : 1;
+  const fy = Number.isFinite(p.facing?.y) ? p.facing.y : 0;
+  const mag = Math.hypot(fx, fy) || 1;
+  return { x: fx / mag, y: fy / mag };
+}
+
+function resolveRadius(p, fallback = 0.55) {
+  if (Number.isFinite(p.radius)) return p.radius;
+  if (Number.isFinite(p.colliderRadius)) return p.colliderRadius;
+  return fallback;
+}
+
 export const Creature = defineArchetype(
   "Creature",
   // Spatial (optional via params; defaults to 0,0)
@@ -51,7 +78,11 @@ export const Creature = defineArchetype(
   [Faction, (p) => ({ key: p.faction ?? p.factionKey ?? "neutral" })],
   [Alignment, (p) => ({ lawChaos: p.lawChaos ?? "neutral", goodEvil: p.goodEvil ?? "neutral" })],
   // Body & durability
-  [Anatomy, (p) => ({ parts: resolveAnatomyParts(p) })],
+  [Anatomy, (p) => ({
+    parts: resolveAnatomyParts(p),
+    strideDistance: resolveStride(p, 1),
+    reachDistance: resolveReach(p, 1.0),
+  })],
   [Physiology, (p) => ({
     sizeClass: p.sizeClass ?? "M",
     massKg: p.massKg ?? 80,
@@ -59,6 +90,8 @@ export const Creature = defineArchetype(
     painMult: p.painMult ?? 1.0,
     bleedBaseMl: p.bleedBaseMl ?? 5000,
   })],
+  [BoundingCircle, (p) => ({ radius: resolveRadius(p) })],
+  [Facing, (p) => resolveFacing(p)],
   [Resistances, (p) => ({
     kinetic:   { ...defaultResist.kinetic,   ...(p.resistances?.kinetic   ?? {}) },
     thermal:   { ...defaultResist.thermal,   ...(p.resistances?.thermal   ?? {}) },
@@ -83,7 +116,11 @@ export const Creature = defineArchetype(
 
 // Human (humanoid defaults, neutral faction)
 export const Human = withOverrides(Creature, {
-  Anatomy: (p) => ({ parts: resolveAnatomyParts({ ...p, humanoid: p.humanoid ?? true }) }),
+  Anatomy: (p) => ({
+    parts: resolveAnatomyParts({ ...p, humanoid: p.humanoid ?? true }),
+    strideDistance: resolveStride(p, 1),
+    reachDistance: resolveReach(p, 1.0),
+  }),
   Physiology: (p) => ({
     sizeClass: p.sizeClass ?? "M",
     massKg: p.massKg ?? 78,
@@ -106,6 +143,11 @@ export const Human = withOverrides(Creature, {
 export const Monster = withOverrides(Creature, {
   Faction: (p) => ({ key: p.faction ?? p.factionKey ?? "enemy" }),
   NamedIdentity: (p) => ({ name: p.name ?? "Monster", identity: p.identity ?? "monster" }),
+  Anatomy: (p) => ({
+    parts: resolveAnatomyParts(p),
+    strideDistance: resolveStride(p, 1.1),
+    reachDistance: resolveReach(p, 1.25),
+  }),
   Resistances: (p) => ({
     kinetic:   { DR: 8,  bluntMult: 0.95, slashMult: 0.95, pierceMult: 1.0, ...(p.resistances?.kinetic ?? {}) },
     thermal:   { igniteC: Infinity, burnMult: 0.95, ...(p.resistances?.thermal ?? {}) },
@@ -117,7 +159,11 @@ export const Monster = withOverrides(Creature, {
 
 // Other (non-humanoid baseline; anatomy empty unless provided)
 export const Other = withOverrides(Creature, {
-  Anatomy: (p) => ({ parts: resolveAnatomyParts({ ...p, anatomyKind: p.anatomyKind ?? null }) }),
+  Anatomy: (p) => ({
+    parts: resolveAnatomyParts({ ...p, anatomyKind: p.anatomyKind ?? null }),
+    strideDistance: resolveStride(p, 1),
+    reachDistance: resolveReach(p, 1.0),
+  }),
   NamedIdentity: (p) => ({ name: p.name ?? "Creature", identity: p.identity ?? (p.kind ?? "creature") }),
 });
 

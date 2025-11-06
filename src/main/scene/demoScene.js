@@ -13,6 +13,7 @@ import { Mana } from "../../rules/components/Mana.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { buildEquipmentItem } from "../../rules/data/equipmentLoader.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
+import { ensureGeometryKernel } from "../../rules/environment/worldGeometry.js";
 
 const ROOM_WIDTH = 10;
 const ROOM_HEIGHT = 10;
@@ -26,7 +27,10 @@ export function populateDemoScene(world) {
   const originY = -((ROOM_HEIGHT - 1) >> 1);
   const doorPos = { x: 0, y: originY + (ROOM_HEIGHT - 1) };
 
-  buildRoom(world, originX, originY, doorPos);
+  const kernel = ensureGeometryKernel(world);
+  kernel.clear();
+
+  buildRoom(world, kernel, originX, originY, doorPos);
   ensurePlayer(world);
   grantInitialShield(world);
   placeSpellbook(world);
@@ -37,7 +41,8 @@ export function populateDemoScene(world) {
   dropEquipment(world, originX, originY);
 }
 
-function buildRoom(world, ox, oy, doorPos) {
+function buildRoom(world, kernel, ox, oy, doorPos) {
+  const carveFlags = { affectsMove: true, affectsOccl: true };
   for (let y = 0; y < ROOM_HEIGHT; y++) {
     for (let x = 0; x < ROOM_WIDTH; x++) {
       const gx = ox + x;
@@ -48,9 +53,11 @@ function buildRoom(world, ox, oy, doorPos) {
         createFrom(world, WallTile, { x: gx, y: gy });
       } else {
         createFrom(world, FloorTile, { x: gx, y: gy });
+        kernel.carveCircle(gx, gy, 0.6, carveFlags);
       }
     }
   }
+  kernel.carveCircle(doorPos.x, doorPos.y, 0.6, carveFlags);
   createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
 }
 
