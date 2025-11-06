@@ -13,6 +13,7 @@ import { BoundingCircle } from '../components/BoundingCircle.js';
 import { Anatomy } from '../components/Anatomy.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
+import { runScript, ScriptVerb } from '../scripting.js';
 
 /** @param {import('../../lib/ecs-js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
@@ -128,7 +129,11 @@ export function combatSystem(world) {
         // Pre-hit hooks
         const ctx = attachHelpers(world, { attacker, defender, weaponId: weaponId || 0, damage: dmg, world });
         world.emit('beforeHit', ctx);
-    forEachAffix(world, attacker, /** @param {any} a */ (a) => { if (a.triggers?.includes('onBeforeHit') && typeof a.script === 'function') a.script(ctx); });
+        forEachAffix(world, attacker, /** @param {any} a */ (a) => {
+            if (a.triggers?.includes('onBeforeHit') && a.script) {
+                runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
+            }
+        });
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -136,12 +141,21 @@ export function combatSystem(world) {
         world.emit('hit', hitCtx);
         let hasVamp = false;
         // Attacker on-hit affixes (e.g., vampiric)
-        forEachAffix(world, attacker, /** @param {any} a */ (a) => { if (a.triggers?.includes('onHit') && typeof a.script === 'function') { a.script(hitCtx); if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true; } });
+        forEachAffix(world, attacker, /** @param {any} a */ (a) => {
+            if (a.triggers?.includes('onHit') && a.script) {
+                runScript(a.script, ScriptVerb.AffixOnHit, world, hitCtx);
+                if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true;
+            }
+        });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-        forEachAffix(world, defender, /** @param {any} a */ (a) => { if (a.triggers?.includes('onHit') && typeof a.script === 'function') a.script(defCtx); });
+        forEachAffix(world, defender, /** @param {any} a */ (a) => {
+            if (a.triggers?.includes('onHit') && a.script) {
+                runScript(a.script, ScriptVerb.AffixOnHit, world, defCtx);
+            }
+        });
 
         // Invulnerability gate: if defender has 'invulnerable' status active, nullify damage
         const stat = world.get(defender, Status);

@@ -26,8 +26,8 @@ export function validateAffixes(AFFIX_DEFS) {
     if (typeof rec.name !== 'string' || !rec.name) throw new Error(`affix ${id}: name required`);
     if (!Array.isArray(rec.slots) || rec.slots.length === 0) throw new Error(`affix ${id}: slots required`);
     if (!Array.isArray(rec.triggers)) throw new Error(`affix ${id}: triggers must be array`);
-    if (rec.script && typeof rec.script !== 'function') throw new Error(`affix ${id}: script must be function`);
-    if (rec.passive && typeof rec.passive !== 'function') throw new Error(`affix ${id}: passive must be function`);
+    if (rec.script && typeof rec.script !== 'string') throw new Error(`affix ${id}: script must be string`);
+    if (rec.passive && typeof rec.passive !== 'string') throw new Error(`affix ${id}: passive must be string`);
   }
   return true;
 }
