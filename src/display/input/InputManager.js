@@ -3,6 +3,7 @@
 // This module is display-only and must not import rules.
 
 import { Actions, makeAction } from "./actions.js";
+import { screenToWorld } from "../camera/controller.js";
 
 export class InputManager {
   constructor(targetEl, options = {}) {
@@ -10,6 +11,10 @@ export class InputManager {
     this.handlers = new Set();
     this.hotspots = new Map(); // id -> { element, action }
     this._canvas = options.canvas || null;
+    this._camera = options.camera || null;
+    this._getPointerOrigin = typeof options.getPointerOrigin === "function"
+      ? options.getPointerOrigin
+      : null;
 
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
@@ -128,31 +133,59 @@ export class InputManager {
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Convert to canvas center coordinates
-    const centerX = rect.width * 0.5;
-    const centerY = rect.height * 0.5;
-    
-    const dx = x - centerX;
-    const dy = y - centerY;
-    
-    // Determine direction based on which quadrant/region was tapped
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal movement
-      if (dx > 0) {
-        this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 })); // Right
-      } else {
-        this._emit(makeAction(Actions.Move, { dx: -1, dy: 0 })); // Left
-      }
-    } else {
-      // Vertical movement
-      if (dy > 0) {
-        this._emit(makeAction(Actions.Move, { dx: 0, dy: 1 })); // Down
-      } else {
-        this._emit(makeAction(Actions.Move, { dx: 0, dy: -1 })); // Up
+    const scaleX = rect.width ? (canvas.width / rect.width) : 1;
+    const scaleY = rect.height ? (canvas.height / rect.height) : 1;
+    const sx = (e.clientX - rect.left) * scaleX;
+    const sy = (e.clientY - rect.top) * scaleY;
+
+    let wx = null;
+    let wy = null;
+
+    if (this._camera) {
+      const worldPos = screenToWorld(this._camera, sx, sy, canvas);
+      wx = worldPos[0];
+      wy = worldPos[1];
+    }
+
+    let origin = null;
+    if (this._getPointerOrigin) {
+      try {
+        origin = this._getPointerOrigin() || null;
+      } catch {
+        origin = null;
       }
     }
+
+    if (!origin && this._camera) {
+      origin = { x: this._camera.x || 0, y: this._camera.y || 0 };
+    }
+
+    if (!origin) {
+      // Fallback: assume center of the canvas represents the actor.
+      const centerX = canvas.width * 0.5;
+      const centerY = canvas.height * 0.5;
+      const dx = (sx - centerX);
+      const dy = (sy - centerY);
+      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
+      this._emit(makeAction(Actions.Move, { dx, dy }));
+      return;
+    }
+
+    if (wx === null || wy === null) {
+      // Without camera conversion, fall back to canvas space relative vector.
+      const centerX = canvas.width * 0.5;
+      const centerY = canvas.height * 0.5;
+      const dx = (sx - centerX);
+      const dy = (sy - centerY);
+      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
+      this._emit(makeAction(Actions.Move, { dx, dy }));
+      return;
+    }
+
+    const dx = wx - origin.x;
+    const dy = wy - origin.y;
+    if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return;
+
+    this._emit(makeAction(Actions.Move, { dx, dy }));
   }
 }
