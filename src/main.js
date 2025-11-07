@@ -17,6 +17,8 @@ import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 import { FloatText } from "./display/passes/vfx/text/floatText.js";
 import { buildPalette } from "./display/palette/index.js";
+import { collectLightSources } from "./display/lighting/sources/index.js";
+import { renderEmissiveLights } from "./display/lighting/renderEmissiveLights.js";
 
 // display overlays & UI bridges
 import { setupUIEventListeners } from "./main/ui/setupUIEventListeners.js";
@@ -79,6 +81,9 @@ const dungeonRenderState = {
   mbr: null,
   options: null,
 };
+
+const _lightEmitterKeys = new Set();
+let _particleOrigins = [];
 
 let _cssW = 0, _cssH = 0, _dpr = 1;
 function resize() {
@@ -186,9 +191,10 @@ function render(worldView) {
   ctx.textBaseline = "middle";
 
   const dungeonState = ensureDungeonRenderState(worldView.dungeon);
+  const fovPolygon = samplePlayerFovPolygon(dungeonState.kernel, worldView.player, FOV_RAY_COUNT);
   if (dungeonState.primitives.length > 0) {
     drawDungeon(bctx, palette, glyphAtlas, dungeonState);
-    drawFovCone(bctx, dungeonState, worldView, palette);
+    drawFovCone(bctx, dungeonState, worldView, palette, fovPolygon);
   }
 
   drawBoundingCircles(bctx, worldView.entities, palette);
@@ -202,18 +208,32 @@ function render(worldView) {
   const vx1 = cam.x + viewHalfW + 1;
   const vy1 = cam.y + viewHalfH + 1;
 
+  const visibleActors = [];
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
-    if (!isTileKind(e.kind)) continue;
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-    const k = (typeof e.kind === "string") ? e.kind : "default";
-    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    if (isTileKind(e.kind)) {
+      const k = (typeof e.kind === "string") ? e.kind : "default";
+      drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    } else {
+      visibleActors.push(e);
+    }
   }
 
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
-    if (isTileKind(e.kind)) continue;
-    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
+  const lights = collectLightSources(worldView, { quality: PERF.quality });
+  const fovLight = fovPolygon ? { ...fovPolygon, color: palette.player?.glow || "#6cf" } : null;
+  renderEmissiveLights(
+    bctx,
+    dungeonState.kernel,
+    lights,
+    { x0: vx0, y0: vy0, x1: vx1, y1: vy1 },
+    _fxTime,
+    { quality: PERF.quality, fov: fovLight }
+  );
+  _particleOrigins = syncLightEmitters(lights, fx, _fxTime);
+
+  for (let i = 0; i < visibleActors.length; i++) {
+    const e = visibleActors[i];
     const k = (typeof e.kind === "string") ? e.kind : "default";
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
@@ -597,34 +617,14 @@ function drawBoundingCircles(ctx, entities, palette) {
   ctx.restore();
 }
 
-function drawFovCone(ctx, state, worldView, palette) {
+function drawFovCone(ctx, state, worldView, palette, polygon) {
   const kernel = state?.kernel;
   const player = worldView?.player;
-  if (!kernel || !player) return;
+  const fov = polygon || samplePlayerFovPolygon(kernel, player, FOV_RAY_COUNT);
+  if (!fov) return;
 
-  const facing = player.facing || { x: 1, y: 0 };
-  const origin = player.pos || { x: 0, y: 0 };
-  const rawAngle = player.fov?.angle ?? (Math.PI * 0.75);
-  const angle = Math.max(0.1, Math.min(Math.PI * 2, rawAngle));
-  const desiredDist = player.fov?.distance ?? 12;
-  const distance = Math.min(FOV_MAX_DISTANCE, Math.max(FOV_MIN_DISTANCE, desiredDist));
-  const rayCount = FOV_RAY_COUNT;
-  const baseAngle = Math.atan2(facing.y, facing.x);
-  const halfAngle = angle * 0.5;
-
-  const points = [];
-  for (let i = 0; i <= rayCount; i++) {
-    const t = rayCount === 0 ? 0 : i / rayCount;
-    const ang = baseAngle - halfAngle + angle * t;
-    const dirx = Math.cos(ang);
-    const diry = Math.sin(ang);
-    const ray = kernel.raycastOccl(origin, { x: dirx, y: diry }, distance);
-    let travel = Math.min(distance, Number.isFinite(ray?.t) ? ray.t : distance);
-    if (ray?.hit) travel = Math.max(0, travel - 0.1);
-    points.push({ x: origin.x + dirx * travel, y: origin.y + diry * travel });
-  }
-
-  if (points.length < 2) return;
+  const { origin, points } = fov;
+  if (!origin || !points || points.length < 2) return;
   const glow = palette.player?.glow || "#6cf";
   const fillStyle = hexToRgba(glow, 0.2);
   const strokeStyle = hexToRgba(glow, 0.85);
@@ -643,6 +643,116 @@ function drawFovCone(ctx, state, worldView, palette) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
+
+function samplePlayerFovPolygon(kernel, player, rayCount = 0) {
+  if (!kernel || !player) return null;
+  const facing = player.facing || { x: 1, y: 0 };
+  const origin = player.pos || { x: 0, y: 0 };
+  const rawAngle = player.fov?.angle ?? (Math.PI * 0.75);
+  const angle = Math.max(0.1, Math.min(Math.PI * 2, rawAngle));
+  const desiredDist = player.fov?.distance ?? 12;
+  const distance = Math.min(FOV_MAX_DISTANCE, Math.max(FOV_MIN_DISTANCE, desiredDist));
+  const rays = Math.max(1, rayCount | 0);
+  const baseAngle = Math.atan2(facing.y, facing.x);
+  const halfAngle = angle * 0.5;
+
+  const points = [];
+  let maxDistance = 0;
+  for (let i = 0; i <= rays; i++) {
+    const t = rays === 0 ? 0 : i / rays;
+    const ang = baseAngle - halfAngle + angle * t;
+    const dirx = Math.cos(ang);
+    const diry = Math.sin(ang);
+    const ray = kernel.raycastOccl(origin, { x: dirx, y: diry }, distance);
+    let travel = Math.min(distance, Number.isFinite(ray?.t) ? ray.t : distance);
+    if (ray?.hit) travel = Math.max(0, travel - 0.1);
+    if (travel > maxDistance) maxDistance = travel;
+    points.push({ x: origin.x + dirx * travel, y: origin.y + diry * travel });
+  }
+
+  if (points.length < 2) return null;
+  return { origin, points, maxDistance: Math.max(maxDistance, distance * 0.85) };
+}
+
+function syncLightEmitters(lights, fx, time) {
+  const origins = [];
+  if (!Array.isArray(lights) || !fx) return origins;
+  const seen = new Set();
+  for (let i = 0; i < lights.length; i++) {
+    const light = lights[i];
+    if (light?.emitter !== "torch") continue;
+    const key = `torch:${light.id ?? i}`;
+    seen.add(key);
+    const emitter = fx.ensureEmitter(key, {
+      continuous: true,
+      rate: 16,
+      spread: Math.PI / 12,
+      speed: 0.65,
+      speedJitter: 0.45,
+      life: 0.9,
+      lifeJitter: 0.45,
+      size: 0.55,
+      sizeEnd: 0.18,
+      angle: -Math.PI / 2,
+      ax: 0,
+      ay: -0.6,
+      color: light.color || "#ffb347",
+      alpha0: 0.9,
+      alpha1: 0,
+      offsetX: 0,
+      offsetY: -0.2,
+    });
+    const rgb = parseRgb(light.color || "#ffb347");
+    emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+    emitter.offsetX = 0;
+    emitter.offsetY = -0.35;
+    const seed = hashToUnit(light.id ?? `${light.x},${light.y}`);
+    const wobble = Math.sin((time || 0) * 5.2 + seed * 9.1) * 0.2 + Math.sin((time || 0) * 3.3 + seed * 13.7) * 0.15;
+    const flicker = 1 + wobble;
+    emitter.rate = 14 + flicker * 6;
+    emitter.size = 0.5 + flicker * 0.25;
+    emitter.life = 0.8 + flicker * 0.25;
+    emitter.spread = Math.PI / 16 + Math.abs(Math.sin((time || 0) * 2.1 + seed * 7.3)) * Math.PI / 48;
+    origins.push({ key, x: light.x, y: light.y });
+  }
+  for (const key of _lightEmitterKeys) {
+    if (!seen.has(key)) fx.removeEmitter(key);
+  }
+  _lightEmitterKeys.clear();
+  for (const key of seen) _lightEmitterKeys.add(key);
+  return origins;
+}
+
+function parseRgb(hex) {
+  if (typeof hex !== "string") return { r: 255, g: 180, b: 120 };
+  let h = hex.trim();
+  if (h.startsWith("#")) h = h.slice(1);
+  if (h.length === 3) {
+    return {
+      r: parseInt(h[0] + h[0], 16) || 255,
+      g: parseInt(h[1] + h[1], 16) || 180,
+      b: parseInt(h[2] + h[2], 16) || 120,
+    };
+  }
+  if (h.length === 6) {
+    return {
+      r: parseInt(h.slice(0, 2), 16) || 255,
+      g: parseInt(h.slice(2, 4), 16) || 180,
+      b: parseInt(h.slice(4, 6), 16) || 120,
+    };
+  }
+  return { r: 255, g: 180, b: 120 };
+}
+
+function hashToUnit(key) {
+  const s = String(key);
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
 }
 
 function hexToRgba(hex, alpha = 1) {
@@ -677,7 +787,7 @@ function frame(now) {
 
   stepSim(0);
 
-  if (PERF.particleCapacity > 0) fx.step(dtSec);
+  if (PERF.particleCapacity > 0) fx.step(dtSec, _particleOrigins);
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   worldEvents.updateBoltFx(dtSec);

@@ -12,13 +12,15 @@ import { BoundingCircle } from "../../rules/components/BoundingCircle.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { Anatomy } from "../../rules/components/Anatomy.js";
 import { DungeonGeometry } from "../../rules/components/DungeonGeometry.js";
+import { LightSource } from "../../rules/components/LightSource.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], radius:number, reach:number, stride:number, facing:{x:number,y:number} }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ seed:number, mbrVersion:number, moveVersion:number, occlVersion:number, mbr:any, primitives:any[], meta:any, options:any, hasData:boolean }} DungeonView */
 /** @typedef {{ id:number, pos:{x:number,y:number}, radius:number, reach:number, stride:number, facing:{x:number,y:number}, fov:{distance:number, angle:number} }} PlayerView */
-/** @typedef {{ turn:number, seed:number, player: PlayerView | null, entities: EntityView[], solids: SolidView[], emissives: any[], dungeon: DungeonView }} WorldView */
+/** @typedef {{ id:number, x:number, y:number, radius:number, intensity:number, color:string|null, flicker:number, style:string|null, emitter:string|null }} EmissiveView */
+/** @typedef {{ turn:number, seed:number, player: PlayerView | null, entities: EntityView[], solids: SolidView[], emissives: EmissiveView[], dungeon: DungeonView }} WorldView */
 
 /** @type {WorldView} */
 const _view = {
@@ -34,6 +36,8 @@ const _view = {
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
 const _solidRecs = new Map();    // id -> { id, x, y }
+/** @type {Map<number, EmissiveView>} */
+const _emissiveRecs = new Map();
 
 function cloneMeta(meta) {
   if (meta == null) return null;
@@ -104,6 +108,7 @@ export function buildWorldView(world) {
     /** @type {any} */ const circle = /** @type any */ (world.get(id, BoundingCircle));
     /** @type {any} */ const facing = /** @type any */ (world.get(id, Facing));
     /** @type {any} */ const anatomy = /** @type any */ (world.get(id, Anatomy));
+    /** @type {any} */ const light = /** @type any */ (world.get(id, LightSource));
 
     let kind = "default";
     if (terrain) {
@@ -198,6 +203,34 @@ export function buildWorldView(world) {
       if (!srec) { srec = { id, x: pos.x, y: pos.y }; _solidRecs.set(id, srec); }
       else { srec.x = pos.x; srec.y = pos.y; }
       _view.solids.push(srec);
+    }
+
+    if (light && light.radius > 0) {
+      let lrec = _emissiveRecs.get(id);
+      if (!lrec) {
+        lrec = {
+          id,
+          x: pos.x,
+          y: pos.y,
+          radius: Number(light.radius) || 0,
+          intensity: Number(light.intensity) || 0,
+          color: typeof light.color === "string" ? light.color : null,
+          flicker: Number(light.flicker) || 0,
+          style: typeof light.style === "string" ? light.style : null,
+          emitter: typeof light.emitter === "string" ? light.emitter : null,
+        };
+        _emissiveRecs.set(id, lrec);
+      } else {
+        lrec.x = pos.x;
+        lrec.y = pos.y;
+        lrec.radius = Number(light.radius) || 0;
+        lrec.intensity = Number(light.intensity) || 0;
+        lrec.color = typeof light.color === "string" ? light.color : null;
+        lrec.flicker = Number(light.flicker) || 0;
+        lrec.style = typeof light.style === "string" ? light.style : null;
+        lrec.emitter = typeof light.emitter === "string" ? light.emitter : null;
+      }
+      _view.emissives.push(lrec);
     }
   }
   return _view;
