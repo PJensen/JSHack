@@ -191,9 +191,10 @@ function render(worldView) {
   ctx.textBaseline = "middle";
 
   const dungeonState = ensureDungeonRenderState(worldView.dungeon);
+  const fovPolygon = samplePlayerFovPolygon(dungeonState.kernel, worldView.player, FOV_RAY_COUNT);
   if (dungeonState.primitives.length > 0) {
     drawDungeon(bctx, palette, glyphAtlas, dungeonState);
-    drawFovCone(bctx, dungeonState, worldView, palette);
+    drawFovCone(bctx, dungeonState, worldView, palette, fovPolygon);
   }
 
   drawBoundingCircles(bctx, worldView.entities, palette);
@@ -207,18 +208,32 @@ function render(worldView) {
   const vx1 = cam.x + viewHalfW + 1;
   const vy1 = cam.y + viewHalfH + 1;
 
+  const visibleActors = [];
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
-    if (!isTileKind(e.kind)) continue;
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-    const k = (typeof e.kind === "string") ? e.kind : "default";
-    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    if (isTileKind(e.kind)) {
+      const k = (typeof e.kind === "string") ? e.kind : "default";
+      drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    } else {
+      visibleActors.push(e);
+    }
   }
 
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
-    if (isTileKind(e.kind)) continue;
-    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
+  const lights = collectLightSources(worldView, { quality: PERF.quality });
+  const fovLight = fovPolygon ? { ...fovPolygon, color: palette.player?.glow || "#6cf" } : null;
+  renderEmissiveLights(
+    bctx,
+    dungeonState.kernel,
+    lights,
+    { x0: vx0, y0: vy0, x1: vx1, y1: vy1 },
+    _fxTime,
+    { quality: PERF.quality, fov: fovLight }
+  );
+  _particleOrigins = syncLightEmitters(lights, fx, _fxTime);
+
+  for (let i = 0; i < visibleActors.length; i++) {
+    const e = visibleActors[i];
     const k = (typeof e.kind === "string") ? e.kind : "default";
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
@@ -260,10 +275,6 @@ function render(worldView) {
       g.restore();
     }
   }
-
-  const lights = collectLightSources(worldView, { quality: PERF.quality });
-  renderEmissiveLights(bctx, dungeonState.kernel, lights, { x0: vx0, y0: vy0, x1: vx1, y1: vy1 }, _fxTime, { quality: PERF.quality });
-  _particleOrigins = syncLightEmitters(lights, fx, _fxTime);
 
   if (bctx) {
     worldEvents.drawBoltEffects(bctx);
@@ -606,34 +617,14 @@ function drawBoundingCircles(ctx, entities, palette) {
   ctx.restore();
 }
 
-function drawFovCone(ctx, state, worldView, palette) {
+function drawFovCone(ctx, state, worldView, palette, polygon) {
   const kernel = state?.kernel;
   const player = worldView?.player;
-  if (!kernel || !player) return;
+  const fov = polygon || samplePlayerFovPolygon(kernel, player, FOV_RAY_COUNT);
+  if (!fov) return;
 
-  const facing = player.facing || { x: 1, y: 0 };
-  const origin = player.pos || { x: 0, y: 0 };
-  const rawAngle = player.fov?.angle ?? (Math.PI * 0.75);
-  const angle = Math.max(0.1, Math.min(Math.PI * 2, rawAngle));
-  const desiredDist = player.fov?.distance ?? 12;
-  const distance = Math.min(FOV_MAX_DISTANCE, Math.max(FOV_MIN_DISTANCE, desiredDist));
-  const rayCount = FOV_RAY_COUNT;
-  const baseAngle = Math.atan2(facing.y, facing.x);
-  const halfAngle = angle * 0.5;
-
-  const points = [];
-  for (let i = 0; i <= rayCount; i++) {
-    const t = rayCount === 0 ? 0 : i / rayCount;
-    const ang = baseAngle - halfAngle + angle * t;
-    const dirx = Math.cos(ang);
-    const diry = Math.sin(ang);
-    const ray = kernel.raycastOccl(origin, { x: dirx, y: diry }, distance);
-    let travel = Math.min(distance, Number.isFinite(ray?.t) ? ray.t : distance);
-    if (ray?.hit) travel = Math.max(0, travel - 0.1);
-    points.push({ x: origin.x + dirx * travel, y: origin.y + diry * travel });
-  }
-
-  if (points.length < 2) return;
+  const { origin, points } = fov;
+  if (!origin || !points || points.length < 2) return;
   const glow = palette.player?.glow || "#6cf";
   const fillStyle = hexToRgba(glow, 0.2);
   const strokeStyle = hexToRgba(glow, 0.85);
@@ -652,6 +643,36 @@ function drawFovCone(ctx, state, worldView, palette) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
+
+function samplePlayerFovPolygon(kernel, player, rayCount = 0) {
+  if (!kernel || !player) return null;
+  const facing = player.facing || { x: 1, y: 0 };
+  const origin = player.pos || { x: 0, y: 0 };
+  const rawAngle = player.fov?.angle ?? (Math.PI * 0.75);
+  const angle = Math.max(0.1, Math.min(Math.PI * 2, rawAngle));
+  const desiredDist = player.fov?.distance ?? 12;
+  const distance = Math.min(FOV_MAX_DISTANCE, Math.max(FOV_MIN_DISTANCE, desiredDist));
+  const rays = Math.max(1, rayCount | 0);
+  const baseAngle = Math.atan2(facing.y, facing.x);
+  const halfAngle = angle * 0.5;
+
+  const points = [];
+  let maxDistance = 0;
+  for (let i = 0; i <= rays; i++) {
+    const t = rays === 0 ? 0 : i / rays;
+    const ang = baseAngle - halfAngle + angle * t;
+    const dirx = Math.cos(ang);
+    const diry = Math.sin(ang);
+    const ray = kernel.raycastOccl(origin, { x: dirx, y: diry }, distance);
+    let travel = Math.min(distance, Number.isFinite(ray?.t) ? ray.t : distance);
+    if (ray?.hit) travel = Math.max(0, travel - 0.1);
+    if (travel > maxDistance) maxDistance = travel;
+    points.push({ x: origin.x + dirx * travel, y: origin.y + diry * travel });
+  }
+
+  if (points.length < 2) return null;
+  return { origin, points, maxDistance: Math.max(maxDistance, distance * 0.85) };
 }
 
 function syncLightEmitters(lights, fx, time) {

@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
  * @param {DisplayLight[]} lights
  * @param {{ x0:number, y0:number, x1:number, y1:number }} bounds
  * @param {number} time
- * @param {{ quality?: string, ambientAlpha?: number }} opts
+ * @param {{ quality?: string, ambientAlpha?: number, fov?: { origin:{x:number,y:number}, points:Array<{x:number,y:number}>, maxDistance:number, color?:string } }} opts
  */
 export function renderEmissiveLights(ctx, kernel, lights, bounds, time = 0, opts = {}) {
   if (!ctx) return;
@@ -33,71 +33,97 @@ export function renderEmissiveLights(ctx, kernel, lights, bounds, time = 0, opts
   ctx.fillStyle = `rgba(0,0,0,${ambientAlpha})`;
   ctx.fillRect(rectX, rectY, rectW, rectH);
 
-  if (!Array.isArray(lights) || lights.length === 0) {
-    ctx.restore();
-    return;
-  }
-
   const computed = [];
-  for (let i = 0; i < lights.length; i++) {
-    const light = lights[i];
-    if (!(Number.isFinite(light.radius) && light.radius > 0)) continue;
-    const flick = applyFlicker(light, time);
-    const radius = Math.max(0.1, flick.radius);
-    const polygon = sampleLightPolygon(kernel, light.x, light.y, radius, sampleCount);
-    if (!polygon || polygon.points.length < 3) continue;
-    const color = parseColor(light.color);
-    computed.push({
-      light,
-      radius,
-      intensity: Math.max(0, flick.intensity),
-      color,
-      maxDistance: polygon.maxDistance,
-      points: polygon.points,
-    });
+  if (Array.isArray(lights)) {
+    for (let i = 0; i < lights.length; i++) {
+      const light = lights[i];
+      if (!(Number.isFinite(light.radius) && light.radius > 0)) continue;
+      const flick = applyFlicker(light, time);
+      const radius = Math.max(0.1, flick.radius);
+      const polygon = sampleLightPolygon(kernel, light.x, light.y, radius, sampleCount);
+      if (!polygon || polygon.points.length < 3) continue;
+      const color = parseColor(light.color);
+      computed.push({
+        light,
+        radius,
+        intensity: Math.max(0, flick.intensity),
+        color,
+        maxDistance: polygon.maxDistance,
+        points: polygon.points,
+      });
+    }
   }
 
-  if (computed.length === 0) {
-    ctx.restore();
-    return;
+  if (computed.length > 0) {
+    // First remove darkness under the light volumes for smooth falloff
+    for (let i = 0; i < computed.length; i++) {
+      const entry = computed[i];
+      const { light, radius, intensity, points } = entry;
+      const maxDist = Math.max(radius * 0.8, entry.maxDistance + 0.45);
+      ctx.save();
+      buildPath(ctx, points);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'destination-out';
+      const grad = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, maxDist);
+      const cutAlpha = Math.min(0.95, 0.55 + intensity * 0.35);
+      grad.addColorStop(0, `rgba(0,0,0,${cutAlpha})`);
+      grad.addColorStop(0.7, `rgba(0,0,0,${cutAlpha * 0.35})`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(light.x - maxDist, light.y - maxDist, maxDist * 2, maxDist * 2);
+      ctx.restore();
+    }
+
+    // Then add a tinted additive glow constrained to the polygon
+    for (let i = 0; i < computed.length; i++) {
+      const entry = computed[i];
+      const { light, radius, intensity, points, color } = entry;
+      const maxDist = Math.max(radius * 0.9, entry.maxDistance + 0.5);
+      ctx.save();
+      buildPath(ctx, points);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'lighter';
+      const grad = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, maxDist);
+      const a0 = Math.min(1, 0.85 * intensity);
+      const a1 = Math.min(1, 0.35 * intensity);
+      grad.addColorStop(0, rgba(color, a0));
+      grad.addColorStop(0.4, rgba(color, a1));
+      grad.addColorStop(1, rgba(color, 0));
+      ctx.fillStyle = grad;
+      ctx.fillRect(light.x - maxDist, light.y - maxDist, maxDist * 2, maxDist * 2);
+      ctx.restore();
+    }
   }
 
-  // First remove darkness under the light volumes for smooth falloff
-  for (let i = 0; i < computed.length; i++) {
-    const entry = computed[i];
-    const { light, radius, intensity, points } = entry;
-    const maxDist = Math.max(radius * 0.8, entry.maxDistance + 0.45);
+  const fov = opts.fov;
+  const fovPoints = Array.isArray(fov?.points) ? fov.points : null;
+  if (fov?.origin && fovPoints && fovPoints.length >= 2) {
+    const path = [fov.origin, ...fovPoints];
+    const maxDist = Math.max(0.25, Number(fov.maxDistance) || 0);
+    const color = parseColor(fov.color || '#6cf');
+
     ctx.save();
-    buildPath(ctx, points);
+    buildPath(ctx, path);
     ctx.clip();
     ctx.globalCompositeOperation = 'destination-out';
-    const grad = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, maxDist);
-    const cutAlpha = Math.min(0.95, 0.55 + intensity * 0.35);
-    grad.addColorStop(0, `rgba(0,0,0,${cutAlpha})`);
-    grad.addColorStop(0.7, `rgba(0,0,0,${cutAlpha * 0.35})`);
+    const grad = ctx.createRadialGradient(fov.origin.x, fov.origin.y, 0, fov.origin.x, fov.origin.y, maxDist);
+    grad.addColorStop(0, 'rgba(0,0,0,0.32)');
+    grad.addColorStop(0.45, 'rgba(0,0,0,0.22)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
-    ctx.fillRect(light.x - maxDist, light.y - maxDist, maxDist * 2, maxDist * 2);
+    ctx.fillRect(fov.origin.x - maxDist, fov.origin.y - maxDist, maxDist * 2, maxDist * 2);
     ctx.restore();
-  }
 
-  // Then add a tinted additive glow constrained to the polygon
-  for (let i = 0; i < computed.length; i++) {
-    const entry = computed[i];
-    const { light, radius, intensity, points, color } = entry;
-    const maxDist = Math.max(radius * 0.9, entry.maxDistance + 0.5);
     ctx.save();
-    buildPath(ctx, points);
+    buildPath(ctx, path);
     ctx.clip();
     ctx.globalCompositeOperation = 'lighter';
-    const grad = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, maxDist);
-    const a0 = Math.min(1, 0.85 * intensity);
-    const a1 = Math.min(1, 0.35 * intensity);
-    grad.addColorStop(0, rgba(color, a0));
-    grad.addColorStop(0.4, rgba(color, a1));
-    grad.addColorStop(1, rgba(color, 0));
-    ctx.fillStyle = grad;
-    ctx.fillRect(light.x - maxDist, light.y - maxDist, maxDist * 2, maxDist * 2);
+    const glow = ctx.createRadialGradient(fov.origin.x, fov.origin.y, 0, fov.origin.x, fov.origin.y, maxDist);
+    glow.addColorStop(0, rgba(color, 0.18));
+    glow.addColorStop(0.55, rgba(color, 0.08));
+    glow.addColorStop(1, rgba(color, 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(fov.origin.x - maxDist, fov.origin.y - maxDist, maxDist * 2, maxDist * 2);
     ctx.restore();
   }
 

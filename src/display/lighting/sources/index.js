@@ -11,22 +11,6 @@ export function collectLightSources(view, opts = {}) {
   const base = q === 'low' ? 5.5 : (q === 'high' ? 10.5 : 8.5);
   const radiusScale = q === 'low' ? 0.9 : (q === 'high' ? 1.1 : 1.0);
   const out = [];
-  if (view.player) {
-    const px = view.player.pos?.x ?? 0;
-    const py = view.player.pos?.y ?? 0;
-    const playerRadius = Math.max(base, (view.player.fov?.distance ?? base) * 0.6) * radiusScale;
-    out.push({
-      id: view.player.id ?? 'player',
-      x: px,
-      y: py,
-      radius: playerRadius,
-      intensity: 0.8,
-      color: '#9cdfff',
-      flicker: 0.05,
-      style: 'player',
-      emitter: null,
-    });
-  }
   // Derive small emissive lights from tags if present
   if (Array.isArray(view.entities)) {
     for (let i = 0; i < view.entities.length; i++) {
