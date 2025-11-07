@@ -15,6 +15,7 @@ import { getGeometryKernel } from "../environment/worldGeometry.js";
 
 const EPS = 1e-4;
 const SLIDE_EPS = 1e-3;
+const SLIDE_DOT_THRESHOLD = 0.35;
 
 /** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
@@ -77,7 +78,7 @@ export function movementSystem(world) {
             const nx = sweep.normal.x / nLen;
             const ny = sweep.normal.y / nLen;
             const dirDot = dirx * nx + diry * ny;
-            if (dirDot < -EPS) {
+            if (dirDot < SLIDE_DOT_THRESHOLD) {
               const tangx = dirx - dirDot * nx;
               const tangy = diry - dirDot * ny;
               const tangLen = Math.hypot(tangx, tangy);

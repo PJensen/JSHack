@@ -159,6 +159,31 @@ export function setupUIEventListeners(world, deps) {
     if (typeof spellId === "string" && spellId.length) setActiveSpell(spellId);
   });
 
+  const knowsLightning = () => learnedSpells().some((s) => s?.id === "lightning");
+
+  const onSpellGesture = (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = e?.detail?.id;
+    if (id !== "lightning") return;
+    if (!knowsLightning()) return;
+    setActiveSpell("lightning");
+    const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+    handler({ type: "rules.castActiveSpell", payload: { spellId: "lightning" } });
+    try {
+      window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
+        detail: {
+          id: "lightning",
+          mode: "cast",
+          quality: e?.detail?.quality ?? null,
+        }
+      }));
+    } catch {}
+  };
+
+  window.addEventListener("input:spellGesture", onSpellGesture);
+  inputDisposers.push(() => window.removeEventListener("input:spellGesture", onSpellGesture));
+
   addEventListener("ui:requestDrink", (ev) => {
     const itemId = ev?.detail?.itemId;
     if (!Number.isInteger(itemId)) return;

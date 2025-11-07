@@ -30,6 +30,17 @@ function createBoltFxManager(startShake, cam) {
         chainIndex: Number(chainIndex || 0)
       });
       lightPulses.push({ x: to.x, y: to.y, ttl: 0.12 });
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const dist = Math.hypot(dx, dy);
+      const steps = Math.min(9, Math.max(2, Math.round(dist * 1.8)));
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const px = from.x + dx * t;
+        const py = from.y + dy * t;
+        const ttl = 0.08 + (0.05 * (1 - Math.abs(0.5 - t) * 1.6));
+        lightPulses.push({ x: px, y: py, ttl });
+      }
       startShake(cam, 4, 0.18);
     }
   }
@@ -250,6 +261,13 @@ export function setupWorldEventHandlers(world, deps) {
     try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
     if (!getActiveSpellId()) {
       setActiveSpell(String(spellId));
+    }
+    if (String(spellId || "") === "lightning") {
+      try {
+        window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
+          detail: { id: "lightning", mode: "learn" }
+        }));
+      } catch {}
     }
   });
 
