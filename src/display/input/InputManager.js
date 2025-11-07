@@ -6,6 +6,10 @@ import { Actions, makeAction } from "./actions.js";
 import { screenToWorld } from "../camera/controller.js";
 import { recognizeLightningGesture } from "./gestureRecognizers.js";
 
+const GESTURE_HOLD_MS = 180;
+const GESTURE_DRAG_THRESHOLD = 26;
+const GESTURE_DRAG_THRESHOLD_SQ = GESTURE_DRAG_THRESHOLD * GESTURE_DRAG_THRESHOLD;
+
 export class InputManager {
   constructor(targetEl, options = {}) {
     this.target = targetEl || window;
@@ -14,11 +18,14 @@ export class InputManager {
     this._canvas = options.canvas || null;
     this._camera = options.camera || null;
     this._gesturePointerId = null;
+    this._gesturePointerType = "";
+    this._gestureCaptureEl = null;
     this._gesturePoints = [];
     this._gestureWorldPoints = [];
     this._gestureStartTime = 0;
-    this._gesturePointerType = "";
-    this._gestureCaptureEl = null;
+    this._gestureDownTime = 0;
+    this._gestureActive = false;
+    this._gestureHoldTimer = 0;
     this._getPointerOrigin = typeof options.getPointerOrigin === "function"
       ? options.getPointerOrigin
       : null;
@@ -189,6 +196,9 @@ export class InputManager {
     const pointer = this._computePointerPosition(e);
     if (!pointer) return;
     this._accumulateGesturePoint(pointer);
+    if (!this._gestureActive && this._shouldActivateGesture(pointer)) {
+      this._activateGesture();
+    }
   }
 
   _handlePointerUp(e) {
@@ -251,11 +261,15 @@ export class InputManager {
   _beginGesture(e, pointer) {
     if (this._gesturePointerId !== null) return;
     this._gesturePointerId = e.pointerId;
+    this._gesturePointerType = e.pointerType || "";
     this._gesturePoints = [];
     this._gestureWorldPoints = [];
-    this._gestureStartTime = performance?.now ? performance.now() : Date.now();
-    this._gesturePointerType = e.pointerType || "";
+    this._gestureActive = false;
+    const now = performance?.now ? performance.now() : Date.now();
+    this._gestureDownTime = now;
+    this._gestureStartTime = 0;
     this._accumulateGesturePoint(pointer, true);
+    this._scheduleGestureHold(e.pointerId);
     try {
       if (e.target && typeof e.target.setPointerCapture === "function") {
         e.target.setPointerCapture(e.pointerId);
@@ -289,21 +303,26 @@ export class InputManager {
       try { this._gestureCaptureEl.releasePointerCapture(this._gesturePointerId); } catch {}
     }
 
-    if (!cancelled && this._gesturePointerId !== null) {
+    this._clearGestureHold();
+
+    if (!cancelled && this._gesturePointerId !== null && this._gestureActive) {
       this._maybeEmitGesture();
     }
     this._gesturePointerId = null;
+    this._gesturePointerType = "";
+    this._gestureCaptureEl = null;
     this._gesturePoints = [];
     this._gestureWorldPoints = [];
     this._gestureStartTime = 0;
-    this._gesturePointerType = "";
-    this._gestureCaptureEl = null;
+    this._gestureDownTime = 0;
+    this._gestureActive = false;
   }
 
   _maybeEmitGesture() {
-    if (!this._gesturePoints || this._gesturePoints.length < 6) return;
+    if (!this._gestureActive || !this._gesturePoints || this._gesturePoints.length < 6) return;
     const now = performance?.now ? performance.now() : Date.now();
-    const duration = (now - this._gestureStartTime) / 1000;
+    const start = this._gestureStartTime || this._gestureDownTime || now;
+    const duration = (now - start) / 1000;
     if (!Number.isFinite(duration) || duration < 0.12) return;
 
     const result = recognizeLightningGesture(this._gesturePoints);
@@ -321,5 +340,42 @@ export class InputManager {
     try {
       window.dispatchEvent(new CustomEvent("input:spellGesture", { detail }));
     } catch {}
+  }
+
+  _scheduleGestureHold(pointerId) {
+    this._clearGestureHold();
+    const w = typeof window !== "undefined" ? window : null;
+    if (!w || typeof w.setTimeout !== "function") return;
+    this._gestureHoldTimer = w.setTimeout(() => {
+      this._gestureHoldTimer = 0;
+      if (this._gesturePointerId === pointerId && !this._gestureActive) {
+        this._activateGesture();
+      }
+    }, GESTURE_HOLD_MS);
+  }
+
+  _clearGestureHold() {
+    if (this._gestureHoldTimer) {
+      const w = typeof window !== "undefined" ? window : null;
+      if (w && typeof w.clearTimeout === "function") {
+        w.clearTimeout(this._gestureHoldTimer);
+      }
+      this._gestureHoldTimer = 0;
+    }
+  }
+
+  _shouldActivateGesture(pointer) {
+    if (this._gestureActive || !this._gesturePoints.length) return false;
+    const start = this._gesturePoints[0];
+    const dx = pointer.sx - start.x;
+    const dy = pointer.sy - start.y;
+    return (dx * dx + dy * dy) >= GESTURE_DRAG_THRESHOLD_SQ;
+  }
+
+  _activateGesture() {
+    if (this._gestureActive || this._gesturePointerId === null) return;
+    this._clearGestureHold();
+    this._gestureActive = true;
+    this._gestureStartTime = performance?.now ? performance.now() : Date.now();
   }
 }

@@ -101,29 +101,32 @@ export function renderEmissiveLights(ctx, kernel, lights, bounds, time = 0, opts
     const path = [fov.origin, ...fovPoints];
     const maxDist = Math.max(0.25, Number(fov.maxDistance) || 0);
     const color = parseColor(fov.color || '#6cf');
+    const extent = maxDist + 0.75;
 
     ctx.save();
     buildPath(ctx, path);
     ctx.clip();
     ctx.globalCompositeOperation = 'destination-out';
-    const grad = ctx.createRadialGradient(fov.origin.x, fov.origin.y, 0, fov.origin.x, fov.origin.y, maxDist);
-    grad.addColorStop(0, 'rgba(0,0,0,0.32)');
-    grad.addColorStop(0.45, 'rgba(0,0,0,0.22)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(fov.origin.x - maxDist, fov.origin.y - maxDist, maxDist * 2, maxDist * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(fov.origin.x - extent, fov.origin.y - extent, extent * 2, extent * 2);
     ctx.restore();
 
     ctx.save();
     buildPath(ctx, path);
     ctx.clip();
     ctx.globalCompositeOperation = 'lighter';
-    const glow = ctx.createRadialGradient(fov.origin.x, fov.origin.y, 0, fov.origin.x, fov.origin.y, maxDist);
-    glow.addColorStop(0, rgba(color, 0.18));
-    glow.addColorStop(0.55, rgba(color, 0.08));
-    glow.addColorStop(1, rgba(color, 0));
-    ctx.fillStyle = glow;
-    ctx.fillRect(fov.origin.x - maxDist, fov.origin.y - maxDist, maxDist * 2, maxDist * 2);
+    ctx.fillStyle = rgba(color, 0.12);
+    ctx.fillRect(fov.origin.x - extent, fov.origin.y - extent, extent * 2, extent * 2);
+    ctx.restore();
+
+    ctx.save();
+    buildPath(ctx, path);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = rgba(color, 0.18);
+    ctx.lineWidth = 0.18;
+    ctx.stroke();
     ctx.restore();
   }
 
