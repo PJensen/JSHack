@@ -4,6 +4,7 @@
 
 import { Actions, makeAction } from "./actions.js";
 import { screenToWorld } from "../camera/controller.js";
+import { recognizeLightningGesture } from "./gestureRecognizers.js";
 
 export class InputManager {
   constructor(targetEl, options = {}) {
@@ -12,12 +13,21 @@ export class InputManager {
     this.hotspots = new Map(); // id -> { element, action }
     this._canvas = options.canvas || null;
     this._camera = options.camera || null;
+    this._gesturePointerId = null;
+    this._gesturePoints = [];
+    this._gestureWorldPoints = [];
+    this._gestureStartTime = 0;
+    this._gesturePointerType = "";
+    this._gestureCaptureEl = null;
     this._getPointerOrigin = typeof options.getPointerOrigin === "function"
       ? options.getPointerOrigin
       : null;
 
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
+    this._onPointerMove = (e) => this._handlePointerMove(e);
+    this._onPointerUp = (e) => this._handlePointerUp(e);
+    this._onPointerCancel = (e) => this._handlePointerCancel(e);
 
     this._bind();
   }
@@ -56,12 +66,18 @@ export class InputManager {
     this.target.addEventListener("keydown", this._onKeyDown);
     const el = this._canvas || this.target;
     el.addEventListener("pointerdown", this._onPointerDown, { passive: false });
+    el.addEventListener("pointermove", this._onPointerMove, { passive: false });
+    el.addEventListener("pointerup", this._onPointerUp, { passive: false });
+    el.addEventListener("pointercancel", this._onPointerCancel, { passive: false });
   }
 
   _unbind() {
     this.target.removeEventListener("keydown", this._onKeyDown);
     const el = this._canvas || this.target;
     el.removeEventListener("pointerdown", this._onPointerDown);
+    el.removeEventListener("pointermove", this._onPointerMove);
+    el.removeEventListener("pointerup", this._onPointerUp);
+    el.removeEventListener("pointercancel", this._onPointerCancel);
   }
 
   _handleKeyDown(e) {
@@ -127,11 +143,72 @@ export class InputManager {
 
   _handlePointerDown(e) {
     e.preventDefault();
-    
-    // Get canvas dimensions
+
     const canvas = this._canvas;
     if (!canvas) return;
-    
+
+    const pointer = this._computePointerPosition(e);
+    if (!pointer) return;
+
+    this._beginGesture(e, pointer);
+
+    const origin = this._resolvePointerOrigin();
+
+    if (!origin) {
+      // Fallback: assume center of the canvas represents the actor.
+      const centerX = canvas.width * 0.5;
+      const centerY = canvas.height * 0.5;
+      const dx = (pointer.sx - centerX);
+      const dy = (pointer.sy - centerY);
+      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
+      this._emit(makeAction(Actions.Move, { dx, dy }));
+      return;
+    }
+
+    if (pointer.wx === null || pointer.wy === null) {
+      // Without camera conversion, fall back to canvas space relative vector.
+      const centerX = canvas.width * 0.5;
+      const centerY = canvas.height * 0.5;
+      const dx = (pointer.sx - centerX);
+      const dy = (pointer.sy - centerY);
+      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
+      this._emit(makeAction(Actions.Move, { dx, dy }));
+      return;
+    }
+
+    const dx = pointer.wx - origin.x;
+    const dy = pointer.wy - origin.y;
+    if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return;
+
+    this._emit(makeAction(Actions.Move, { dx, dy }));
+  }
+
+  _handlePointerMove(e) {
+    if (this._gesturePointerId === null || e.pointerId !== this._gesturePointerId) return;
+    if (!this._canvas) return;
+    const pointer = this._computePointerPosition(e);
+    if (!pointer) return;
+    this._accumulateGesturePoint(pointer);
+  }
+
+  _handlePointerUp(e) {
+    if (this._gesturePointerId === null || e.pointerId !== this._gesturePointerId) return;
+    if (!this._canvas) return;
+    const pointer = this._computePointerPosition(e);
+    if (pointer) {
+      this._accumulateGesturePoint(pointer);
+    }
+    this._finalizeGesture();
+  }
+
+  _handlePointerCancel(e) {
+    if (this._gesturePointerId === null || e.pointerId !== this._gesturePointerId) return;
+    this._finalizeGesture(true);
+  }
+
+  _computePointerPosition(e) {
+    const canvas = this._canvas;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width ? (canvas.width / rect.width) : 1;
     const scaleY = rect.height ? (canvas.height / rect.height) : 1;
@@ -140,52 +217,109 @@ export class InputManager {
 
     let wx = null;
     let wy = null;
-
     if (this._camera) {
-      const worldPos = screenToWorld(this._camera, sx, sy, canvas);
-      wx = worldPos[0];
-      wy = worldPos[1];
-    }
-
-    let origin = null;
-    if (this._getPointerOrigin) {
       try {
-        origin = this._getPointerOrigin() || null;
+        const worldPos = screenToWorld(this._camera, sx, sy, canvas);
+        if (Array.isArray(worldPos) && worldPos.length >= 2) {
+          wx = worldPos[0];
+          wy = worldPos[1];
+        }
       } catch {
-        origin = null;
+        wx = null;
+        wy = null;
       }
     }
 
-    if (!origin && this._camera) {
-      origin = { x: this._camera.x || 0, y: this._camera.y || 0 };
+    return { sx, sy, wx, wy };
+  }
+
+  _resolvePointerOrigin() {
+    if (this._getPointerOrigin) {
+      try {
+        const origin = this._getPointerOrigin();
+        if (origin && typeof origin.x === "number" && typeof origin.y === "number") {
+          return origin;
+        }
+      } catch {}
+    }
+    if (this._camera) {
+      return { x: this._camera.x || 0, y: this._camera.y || 0 };
+    }
+    return null;
+  }
+
+  _beginGesture(e, pointer) {
+    if (this._gesturePointerId !== null) return;
+    this._gesturePointerId = e.pointerId;
+    this._gesturePoints = [];
+    this._gestureWorldPoints = [];
+    this._gestureStartTime = performance?.now ? performance.now() : Date.now();
+    this._gesturePointerType = e.pointerType || "";
+    this._accumulateGesturePoint(pointer, true);
+    try {
+      if (e.target && typeof e.target.setPointerCapture === "function") {
+        e.target.setPointerCapture(e.pointerId);
+        this._gestureCaptureEl = e.target;
+      } else {
+        this._gestureCaptureEl = null;
+      }
+    } catch {
+      this._gestureCaptureEl = null;
+    }
+  }
+
+  _accumulateGesturePoint(pointer, force = false) {
+    if (!pointer) return;
+    const last = this._gesturePoints[this._gesturePoints.length - 1] || null;
+    if (!force && last) {
+      const dx = pointer.sx - last.x;
+      const dy = pointer.sy - last.y;
+      if (Math.hypot(dx, dy) < 4) {
+        return;
+      }
+    }
+    this._gesturePoints.push({ x: pointer.sx, y: pointer.sy });
+    if (pointer.wx !== null && pointer.wy !== null) {
+      this._gestureWorldPoints.push({ x: pointer.wx, y: pointer.wy });
+    }
+  }
+
+  _finalizeGesture(cancelled = false) {
+    if (this._gesturePointerId !== null && this._gestureCaptureEl && typeof this._gestureCaptureEl.releasePointerCapture === "function") {
+      try { this._gestureCaptureEl.releasePointerCapture(this._gesturePointerId); } catch {}
     }
 
-    if (!origin) {
-      // Fallback: assume center of the canvas represents the actor.
-      const centerX = canvas.width * 0.5;
-      const centerY = canvas.height * 0.5;
-      const dx = (sx - centerX);
-      const dy = (sy - centerY);
-      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
-      this._emit(makeAction(Actions.Move, { dx, dy }));
-      return;
+    if (!cancelled && this._gesturePointerId !== null) {
+      this._maybeEmitGesture();
     }
+    this._gesturePointerId = null;
+    this._gesturePoints = [];
+    this._gestureWorldPoints = [];
+    this._gestureStartTime = 0;
+    this._gesturePointerType = "";
+    this._gestureCaptureEl = null;
+  }
 
-    if (wx === null || wy === null) {
-      // Without camera conversion, fall back to canvas space relative vector.
-      const centerX = canvas.width * 0.5;
-      const centerY = canvas.height * 0.5;
-      const dx = (sx - centerX);
-      const dy = (sy - centerY);
-      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
-      this._emit(makeAction(Actions.Move, { dx, dy }));
-      return;
-    }
+  _maybeEmitGesture() {
+    if (!this._gesturePoints || this._gesturePoints.length < 6) return;
+    const now = performance?.now ? performance.now() : Date.now();
+    const duration = (now - this._gestureStartTime) / 1000;
+    if (!Number.isFinite(duration) || duration < 0.12) return;
 
-    const dx = wx - origin.x;
-    const dy = wy - origin.y;
-    if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return;
+    const result = recognizeLightningGesture(this._gesturePoints);
+    if (!result) return;
 
-    this._emit(makeAction(Actions.Move, { dx, dy }));
+    const detail = {
+      id: "lightning",
+      duration,
+      pointerType: this._gesturePointerType,
+      quality: result.quality,
+      bounds: result.bounds,
+      normalizedPath: result.normalizedPath,
+      worldPath: this._gestureWorldPoints.length ? this._gestureWorldPoints.slice() : null,
+    };
+    try {
+      window.dispatchEvent(new CustomEvent("input:spellGesture", { detail }));
+    } catch {}
   }
 }

@@ -8,9 +8,11 @@ export function initOverlays() {
   const pick = ensurePanel('pickup');
   const spells = ensurePanel('spells');
   const groundTip = ensureGroundTooltip(root);
+  const spellGestureHint = ensureSpellGestureHint(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
+  let spellGestureTimer = 0;
 
   window.addEventListener('ui:openInventory', () => {
     show(inv);
@@ -91,6 +93,32 @@ export function initOverlays() {
     renderMessageTicker(ticker, entries);
   });
 
+  window.addEventListener('ui:showSpellGestureHint', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = String(e?.detail?.id || '');
+    if (id !== 'lightning') return;
+    const mode = String(e?.detail?.mode || 'cast');
+    const quality = Number(e?.detail?.quality);
+    const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
+    const duration = mode === 'learn' ? 2600 : 1200;
+    spellGestureHint.glyph.textContent = 'Z';
+    spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+    spellGestureHint.glyph.style.opacity = mode === 'cast' ? '0.92' : '1';
+    spellGestureHint.wrap.style.display = 'flex';
+    spellGestureHint.wrap.style.animation = 'none';
+    spellGestureHint.wrap.style.transform = 'translate(-50%, -50%) scale(1)';
+    spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+    spellGestureHint.caption.textContent = mode === 'learn'
+      ? 'Draw a Z to unleash Lightning!'
+      : 'Lightning gesture ready!';
+    if (spellGestureTimer) window.clearTimeout(spellGestureTimer);
+    spellGestureTimer = window.setTimeout(() => {
+      spellGestureHint.wrap.style.display = 'none';
+      spellGestureTimer = 0;
+    }, duration);
+  });
+
   return { root, inv, log, ticker };
 }
 
@@ -125,6 +153,62 @@ function ensureGroundTooltip(root) {
   });
   root.appendChild(tip);
   return tip;
+}
+
+function ensureSpellGestureHint(root) {
+  const wrap = document.createElement('div');
+  Object.assign(wrap.style, {
+    position: 'fixed',
+    left: '50%',
+    top: '38%',
+    transform: 'translate(-50%, -50%)',
+    display: 'none',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+    gap: '12px',
+    zIndex: 920,
+  });
+
+  const glyph = document.createElement('div');
+  glyph.textContent = 'Z';
+  Object.assign(glyph.style, {
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    fontSize: 'min(160px, 28vw)',
+    color: '#d6f3ff',
+    letterSpacing: '-0.04em',
+    textShadow: buildLightningShadow(1),
+    transition: 'opacity 120ms ease-out',
+  });
+
+  const caption = document.createElement('div');
+  caption.textContent = 'Draw a Z to cast Lightning';
+  Object.assign(caption.style, {
+    fontFamily: 'monospace',
+    fontSize: 'min(24px, 5vw)',
+    color: '#d6f3ff',
+    textShadow: '0 0 6px rgba(80,160,255,0.55)',
+    background: 'rgba(8,12,18,0.55)',
+    padding: '6px 12px',
+    borderRadius: '999px',
+    border: '1px solid rgba(80,140,200,0.45)',
+  });
+
+  wrap.appendChild(glyph);
+  wrap.appendChild(caption);
+  root.appendChild(wrap);
+
+  return { wrap, glyph, caption };
+}
+
+function buildLightningShadow(intensity) {
+  const base = Math.max(0.2, Math.min(1, intensity));
+  const outer = (12 + base * 32).toFixed(1);
+  const inner = (6 + base * 18).toFixed(1);
+  const core = (3 + base * 10).toFixed(1);
+  return `0 0 ${outer}px rgba(120,200,255,0.55), 0 0 ${inner}px rgba(180,240,255,0.7), 0 0 ${core}px rgba(255,255,255,0.9)`;
 }
 
 /** @param {HTMLDivElement} tip @param {{mode?:'single'|'multi', item?:any, items?:any[], count?:number, pickupRange?:number}} detail */
