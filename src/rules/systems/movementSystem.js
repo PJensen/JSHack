@@ -68,7 +68,7 @@ export function movementSystem(world) {
       let hitGeometry = false;
 
       if (kernel) {
-        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius);
+        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius, { epsilon: 0.05 });
         dest = { ...sweep.point };
         hitGeometry = !!sweep.hit;
 
@@ -95,7 +95,7 @@ export function movementSystem(world) {
                   x: slideStart.x + tx * remainingDist,
                   y: slideStart.y + ty * remainingDist,
                 };
-                const slideSweep = kernel.sweepCapsule(slideStart, slideTarget, actorRadius);
+                const slideSweep = kernel.sweepCapsule(slideStart, slideTarget, actorRadius, { epsilon: 0.05 });
                 const candidate = { ...slideSweep.point };
                 const movedPrev = Math.hypot(dest.x - pos.x, dest.y - pos.y);
                 const movedCandidate = Math.hypot(candidate.x - pos.x, candidate.y - pos.y);

@@ -1,8 +1,8 @@
 // display/input/gestureRecognizers.js
 // Pure helper utilities for recognizing pointer gestures.
 
-const MIN_BOUNDS = 30;
-const MIN_TOTAL_LENGTH = 90;
+const MIN_BOUNDS = 22;
+const MIN_TOTAL_LENGTH = 10;
 const SEGMENT_FRACTIONS = [0.33, 0.66];
 
 /**
@@ -11,7 +11,9 @@ const SEGMENT_FRACTIONS = [0.33, 0.66];
  * @returns {{ quality:number, bounds:{minX:number,minY:number,width:number,height:number}, normalizedPath:{x:number,y:number}[] }|null}
  */
 export function recognizeLightningGesture(points) {
-  if (!Array.isArray(points) || points.length < 6) return null;
+  if (!Array.isArray(points) ) return null;
+
+  console.log(`Recognizing lightning gesture from ${points.length} points`);
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   let totalLength = 0;
@@ -48,9 +50,11 @@ export function recognizeLightningGesture(points) {
   const p3 = resampled[resampled.length - 1];
   if (!p0 || !p3) return null;
 
-  // Ensure gesture roughly travels left-to-right and top-to-bottom.
-  if (p0.x > 0.4 || p0.y > 0.45) return null;
-  if (p3.x < 0.6 || p3.y < 0.55) return null;
+  // Ensure gesture roughly travels left-to-right and top-to-bottom (more lenient).
+  if (p0.x > 0.65 || p0.y > 0.7) return null;
+  if (p3.x < 0.35 || p3.y < 0.3) return null;
+
+  console.log(`Resampled to ${resampled.length} points for analysis`);
 
   const p1 = samplePointAtFraction(resampled, cumulative, SEGMENT_FRACTIONS[0]);
   const p2 = samplePointAtFraction(resampled, cumulative, SEGMENT_FRACTIONS[1]);
@@ -62,21 +66,43 @@ export function recognizeLightningGesture(points) {
 
   if (!v1 || !v2 || !v3) return null;
 
-  // First and third segments: mostly horizontal, moving right.
-  if (v1.x <= 0.4) return null;
-  if (Math.abs(v1.y) > Math.max(0.35, Math.abs(v1.x) * 0.45)) return null;
-  if (v3.x <= 0.4) return null;
-  if (Math.abs(v3.y) > Math.max(0.35, Math.abs(v3.x) * 0.45)) return null;
+  console.log(`Segment vectors: v1=(${v1.x.toFixed(2)},${v1.y.toFixed(2)}) v2=(${v2.x.toFixed(2)},${v2.y.toFixed(2)}) v3=(${v3.x.toFixed(2)},${v3.y.toFixed(2)})`); 
 
-  // Middle segment: downward-left diagonal.
-  if (v2.x >= -0.1) return null;
-  if (v2.y <= 0.1) return null;
+  // First and third segments: mostly horizontal, moving right (lenient).
+  if (v1.x <= 0.2) return null;
+  if (Math.abs(v1.y) > Math.max(0.55, Math.abs(v1.x) * 0.9)) return null;
+  if (v3.x <= 0.2) return null;
+  if (Math.abs(v3.y) > Math.max(0.55, Math.abs(v3.x) * 0.9)) return null;
+
+  // Middle segment: downward-left diagonal (lenient).
+  if (v2.x >= -0.05) return null;
+  if (v2.y <= 0.0) return null;
   const diagRatio = Math.abs(v2.y / (v2.x || 1e-6));
-  if (diagRatio < 0.4 || diagRatio > 3.5) return null;
+  if (diagRatio < 0.3 || diagRatio > 6.0) return null;
 
-  // Turning direction should maintain the zig-zag (negative cross product for Z).
-  if (crossZ(v1, v2) >= -0.05) return null;
-  if (crossZ(v2, v3) >= -0.05) return null;
+  // Turning direction should maintain the zig-zag. Allow near-straight transitions.
+  // New rule: only reject when both turns have the SAME sign (no zig-zag),
+  // ignoring near-straight transitions and tiny wobble.
+  const cz12 = crossZ(v1, v2);
+  const cz23 = crossZ(v2, v3);
+  const d12 = dot(v1, v2);
+  const d23 = dot(v2, v3);
+  const EPS = 0.05;                // tiny wobble tolerance on cross product
+  const NEAR_STRAIGHT = 0.985;     // ~10° or less counted as straight
+  const strong12 = Math.abs(cz12) >= EPS;
+  const strong23 = Math.abs(cz23) >= EPS;
+  const near12 = d12 > NEAR_STRAIGHT;
+  const near23 = d23 > NEAR_STRAIGHT;
+  if (strong12 && strong23 && !near12 && !near23) {
+    const s12 = Math.sign(cz12);
+    const s23 = Math.sign(cz23);
+    if (s12 === s23) {
+      console.log('Turns do not zig-zag');
+      return null;
+    }
+  }
+
+  console.log('Directionality checks passed');
 
   // Ensure diagonal segment is substantial relative to total length.
   const segLens = [
@@ -84,11 +110,13 @@ export function recognizeLightningGesture(points) {
     distance(p1, p2),
     distance(p2, p3),
   ];
-  if (segLens[1] < 0.18) return null;
-  if (segLens[0] < 0.12 || segLens[2] < 0.12) return null;
+  if (segLens[1] < 0.12) return null;
+  if (segLens[0] < 0.08 || segLens[2] < 0.08) return null;
 
   const bounds = { minX, minY, width, height };
   const quality = scoreQuality(segLens, v1, v2, v3);
+
+  console.debug(`Lightning gesture recognized with quality=${quality.toFixed(3)}`);
 
   return {
     quality,
@@ -171,6 +199,10 @@ function crossZ(a, b) {
   return a.x * b.y - a.y * b.x;
 }
 
+function dot(a, b) {
+  return a.x * b.x + a.y * b.y;
+}
+
 function distance(a, b) {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
@@ -179,8 +211,8 @@ function scoreQuality(lengths, v1, v2, v3) {
   const idealDiag = 0.33;
   const diagScore = 1 - Math.abs(lengths[1] - idealDiag);
   const horizontalAlignment = 1 - (Math.abs(v1.y) + Math.abs(v3.y)) * 0.5;
-  const diagonalAlignment = 1 - Math.abs(Math.abs(v2.x) - Math.abs(v2.y));
-  const score = (diagScore * 0.4) + (horizontalAlignment * 0.3) + (diagonalAlignment * 0.3);
+  const diagonalAlignment = 1 - Math.min(1, Math.abs(Math.abs(v2.x) - Math.abs(v2.y)));
+  const score = (diagScore * 0.35) + (horizontalAlignment * 0.3) + (diagonalAlignment * 0.35);
   return Math.max(0, Math.min(1, score));
 }
 

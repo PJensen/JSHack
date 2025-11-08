@@ -16,6 +16,7 @@ export const Actions = Object.freeze({
   EquipItem: "rules.equipItem", // payload: { itemId:number }
 
   // Display-directed UI
+  TapWorld: "display.tapWorld", // payload: { x:number, y:number, sx?:number, sy?:number }
   OpenInventory: "display.openInventory", // payload: {}
   OpenMessageLog: "display.openMessageLog", // payload: {}
   Zoom: "display.zoom", // payload: { factor:number } (pinch scale delta)
@@ -36,6 +37,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.EquipItem]: Sinks.rules,
 
   // Display-directed UI actions
+  [Actions.TapWorld]: Sinks.display,
   [Actions.OpenInventory]: Sinks.display,
   [Actions.OpenMessageLog]: Sinks.display,
   [Actions.Zoom]: Sinks.display,

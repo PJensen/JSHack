@@ -11,9 +11,11 @@ import { useItemSystem } from "../../src/rules/systems/useItemSystem.js";
 import { projectileSystem } from "../../src/rules/systems/projectileSystem.js";
 import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
 import { effectSystem } from "../../src/rules/systems/effectSystem.js";
+import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
 import { equipmentSystem } from "../../src/rules/systems/equipmentSystem.js";
 import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
+import { rangedAttackSystem } from "../../src/rules/systems/rangedAttackSystem.js";
 import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
 import { movementSystem } from "../../src/rules/systems/movementSystem.js";
 import { combatSystem } from "../../src/rules/systems/combatSystem.js";
@@ -40,6 +42,7 @@ export function configureWorld(world) {
   registerSystem(projectileSystem, 'intents');
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
+  registerSystem(rangedAttackSystem, 'intents');
   registerSystem(movementSystem, 'intents');
   registerSystem(combatSystem, 'intents');
   // Run pickup after movement so stepping onto items can pick them up immediately
@@ -48,6 +51,7 @@ export function configureWorld(world) {
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
+  registerSystem(monsterSpawnerSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
 
@@ -98,9 +102,7 @@ export function configureWorld(world) {
 }
 
 function shouldProfileRules() {
-  const params = new URLSearchParams(window.location.search || '');
-  const v = (params.get('rulesProfile') || (typeof localStorage !== 'undefined' ? localStorage.getItem('jshack.rulesProfile') : '0') || '0');
-  return v === '1' || v === 'true' || v === 'on';
+  return false;
 }
 
 function getRulesProfilerState() {

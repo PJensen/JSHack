@@ -3,6 +3,7 @@ export const EQUIP_DEFS = {
   sword_plain:   { id:'sword_plain', name:'Short Sword', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{attack:2}, damageDice:'1d6' },
   dagger_quick:  { id:'dagger_quick', name:'Dagger', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{attack:1}, damageDice:'1d4' },
   axe_heavy:     { id:'axe_heavy', name:'Axe', kind:'equip', slot:'weapon', rarity:2, rarityName:'magic', bonuses:{attack:3}, damageDice:'1d8' },
+  bow_wood:      { id:'bow_wood', name:'Wooden Bow', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{attack:1}, damageDice:'1d6' },
   leather_armor: { id:'leather_armor', name:'Leather Armor', kind:'equip', slot:'armor', rarity:1, rarityName:'common', bonuses:{defense:1} },
   chain_armor:   { id:'chain_armor', name:'Chainmail', kind:'equip', slot:'armor', rarity:2, rarityName:'magic', bonuses:{defense:2} },
   ring_health:   { id:'ring_health', name:'Ring of Health', kind:'equip', slot:'ring', rarity:2, rarityName:'magic', bonuses:{maxHp:5} },
