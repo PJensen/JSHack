@@ -194,7 +194,7 @@ export class InputManager {
       const now = performance?.now ? performance.now() : Date.now();
       const start = this._gestureDownTime || now;
       const duration = (now - start) / 1000;
-      if (duration >= 0.12 && this._gesturePoints && this._gesturePoints.length >= 6) {
+      if (duration >= 0.08 && this._gesturePoints && this._gesturePoints.length >= 4) {
         // Try meteor (diagonal) first; then lightning "Z".
         let recognized = null;
         let recognizedId = null;

@@ -233,6 +233,15 @@ export function setupUIEventListeners(world, deps) {
   addEventListener("ui:castActiveSpell", () => {
     const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
     const id = ensureActiveSpell();
+    if (id === 'meteor') {
+      // Arm targeting flow for meteor when casting via button
+      setActiveSpell('meteor');
+      _meteorTargeting = { vx: 0, vy: -1 };
+      try {
+        window.dispatchEvent(new CustomEvent('ui:showSpellGestureHint', { detail: { id: 'meteor', mode: 'cast' } }));
+      } catch {}
+      return;
+    }
     handler({ type: "rules.castActiveSpell", payload: id ? { spellId: id } : {} });
   });
 

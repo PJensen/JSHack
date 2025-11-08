@@ -228,7 +228,8 @@ export function _testRecognizeLightningGesture(points) {
  * @returns {{ quality:number, bounds:{minX:number,minY:number,width:number,height:number}, normalizedPath:{x:number,y:number}[] }|null}
  */
 export function recognizeMeteorGesture(points) {
-  if (!Array.isArray(points) || points.length < 6) return null;
+  console.log('Recognizing meteor gesture');
+  if (!Array.isArray(points)) return null;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   let totalLength = 0;
   console.log(`Recognizing meteor gesture from ${points.length} points`);
