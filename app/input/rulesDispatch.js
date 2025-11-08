@@ -2,7 +2,7 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, Position, ItemInfo } from "../../src/rules/components/index.js";
+import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, Position, ItemInfo, FaceIntent } from "../../src/rules/components/index.js";
 import { UseIntent } from "../../src/rules/components/Intents/UseIntent.js";
 import { RangedAttackIntent } from "../../src/rules/components/Intents/RangedAttackIntent.js";
 import { itemsAt } from "../../src/rules/utils/queries.js";
@@ -42,6 +42,17 @@ export function makeRulesDispatcher(world, getActorId) {
         if (Number.isFinite(x) && Number.isFinite(y)) { intent.x = x; intent.y = y; }
         if (Number.isFinite(vx) && Number.isFinite(vy)) { intent.vx = vx; intent.vy = vy; }
         world?.add?.(actorId, CastSpellIntent, intent);
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.face": {
+        const { dx = null, dy = null, toX = null, toY = null } = action.payload || {};
+        const intent = {};
+        if (Number.isFinite(dx)) intent.dx = dx;
+        if (Number.isFinite(dy)) intent.dy = dy;
+        if (Number.isFinite(toX)) intent.toX = toX;
+        if (Number.isFinite(toY)) intent.toY = toY;
+        world?.add?.(actorId, FaceIntent, intent);
         world?.tick?.(1);
         break;
       }

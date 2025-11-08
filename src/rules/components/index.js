@@ -26,6 +26,7 @@ export { Status } from './Status.js';
 export { Vitality } from './Vitality.js';
 export { Settings } from './Settings.js';
 export { UseIntent } from './Intents/UseIntent.js';
+export { FaceIntent } from './Intents/FaceIntent.js';
 export { DungeonGeometry } from './DungeonGeometry.js';
 export { LightSource } from './LightSource.js';
 export { MonsterSpawner } from './MonsterSpawner.js';
