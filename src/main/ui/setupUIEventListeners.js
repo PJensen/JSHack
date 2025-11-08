@@ -40,6 +40,40 @@ export function setupUIEventListeners(world, deps) {
   // Simple spell targeting latch for Meteor
   let _meteorTargeting = null; // { vx, vy }
 
+  /**
+   * Maps an arbitrary direction vector to the nearest 8-direction grid step.
+   * @param {number} dx
+   * @param {number} dy
+   */
+  const resolveGridStep = (dx, dy) => {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return { dx: 0, dy: 0 };
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-5) return { dx: 0, dy: 0 };
+    const nx = dx / len;
+    const ny = dy / len;
+    const directions = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 },
+      { dx: 1, dy: 1 },
+      { dx: 1, dy: -1 },
+      { dx: -1, dy: 1 },
+      { dx: -1, dy: -1 },
+    ];
+    let best = directions[0];
+    let bestDot = -Infinity;
+    for (let i = 0; i < directions.length; i++) {
+      const dir = directions[i];
+      const dot = nx * dir.dx + ny * dir.dy;
+      if (dot > bestDot) {
+        bestDot = dot;
+        best = dir;
+      }
+    }
+    return best;
+  };
+
   const displayHandler = (action) => {
     switch (action.type) {
       case "display.tapWorld": {
@@ -115,8 +149,9 @@ export function setupUIEventListeners(world, deps) {
           // Default: move toward tap
           const dx = wx - pe.pos.x;
           const dy = wy - pe.pos.y;
+          const step = resolveGridStep(dx, dy);
           const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-          handler({ type: "rules.move", payload: { dx, dy } });
+          handler({ type: "rules.move", payload: { dx: step.dx, dy: step.dy } });
         }
         break;
       }
