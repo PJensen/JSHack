@@ -73,7 +73,7 @@ function placeSpellbook(world, room) {
   const { center } = room;
   const book = world.create();
   world.add(book, NamedIdentity, { name: "Spellbook of Lightning", identity: "book_lightning" });
-  world.add(book, Position, { x: center.x + 2, y: center.y + 1.5 });
+  world.add(book, Position, { x: center.x + 2, y: center.y + 1 });
   world.add(book, ItemInfo, {
     type: "learn",
     slot: "brain",
@@ -88,7 +88,7 @@ function placeSpellbook(world, room) {
   // New: Meteor spellbook
   const book2 = world.create();
   world.add(book2, NamedIdentity, { name: "Spellbook of Meteor", identity: "book_meteor" });
-  world.add(book2, Position, { x: center.x - 2, y: center.y + 1.5 });
+  world.add(book2, Position, { x: center.x - 2, y: center.y + 1 });
   world.add(book2, ItemInfo, {
     type: "learn",
     slot: "brain",
@@ -121,8 +121,8 @@ function placeBlastwaveScroll(world, room) {
 function placeTorch(world, room) {
   const { center, halfWidth, halfHeight } = room;
   const torch = world.create();
-  const offsetX = center.x + (halfWidth - 1.2);
-  const offsetY = center.y - (halfHeight - 1.2);
+  const offsetX = Math.round(center.x + halfWidth - 2);
+  const offsetY = Math.round(center.y - halfHeight + 2);
   world.add(torch, NamedIdentity, { name: "Wall Torch", identity: "torch" });
   world.add(torch, Position, { x: offsetX, y: offsetY });
   world.add(torch, LightSource, {
@@ -147,9 +147,9 @@ function setPlayerStats(world) {
 function dropPotions(world, room) {
   const { center } = room;
   const p1 = createFrom(world, HealthPotion, {});
-  world.add(p1, Position, { x: center.x + 2.5, y: center.y });
+  world.add(p1, Position, { x: center.x + 2, y: center.y });
   const p2 = createFrom(world, HealthPotion, {});
-  world.add(p2, Position, { x: center.x - 2.5, y: center.y });
+  world.add(p2, Position, { x: center.x - 2, y: center.y });
 }
 
 function dropGold(world, room) {
@@ -164,7 +164,7 @@ function dropGold(world, room) {
 function dropArrows(world, room) {
   const { center } = room;
   const arrows = createFrom(world, ArrowsStack, {});
-  world.add(arrows, Position, { x: center.x + 1.5, y: center.y - 1.5 });
+  world.add(arrows, Position, { x: center.x + 1, y: center.y - 1 });
 }
 
 function spawnMonsters(world, room) {
@@ -177,7 +177,7 @@ function spawnMonsters(world, room) {
     maxConcurrent: 3,
     cooldownTicks: 20,
     totalToSpawn: 15,
-    spawnRadius: 0.75,
+    spawnRadius: 0,
     spawnParams: { name: "Goblin", identity: "monster" }
   });
 }
@@ -185,12 +185,12 @@ function spawnMonsters(world, room) {
 function dropEquipment(world, room) {
   const { center, halfWidth, halfHeight } = room;
   const eqSword = buildEquipmentItem(world, "sword_plain", { affixes: ["fierce"] });
-  world.add(eqSword, Position, { x: center.x - (halfWidth - 2), y: center.y - (halfHeight - 2) });
+  world.add(eqSword, Position, { x: Math.round(center.x - (halfWidth - 2)), y: Math.round(center.y - (halfHeight - 2)) });
 
   const thornArmor = buildEquipmentItem(world, "chain_armor", { affixes: ["thorns1"] });
-  world.add(thornArmor, Position, { x: center.x + (halfWidth - 2), y: center.y + (halfHeight - 2) });
+  world.add(thornArmor, Position, { x: Math.round(center.x + (halfWidth - 2)), y: Math.round(center.y + (halfHeight - 2)) });
 
   // New: wooden bow to try ranged combat
   const woodBow = buildEquipmentItem(world, "bow_wood", {});
-  world.add(woodBow, Position, { x: center.x, y: center.y + (halfHeight - 2) });
+  world.add(woodBow, Position, { x: center.x, y: Math.round(center.y + (halfHeight - 2)) });
 }

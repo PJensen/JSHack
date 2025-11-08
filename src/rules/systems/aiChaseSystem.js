@@ -22,11 +22,21 @@ export function aiChaseSystem(world) {
     // If already has a MoveIntent (e.g., set externally), skip
     if (world.has(id, MoveIntent)) continue;
 
-    const vx = playerPos.x - pos.x;
-    const vy = playerPos.y - pos.y;
-    const mag = Math.hypot(vx, vy);
-    if (mag <= 1e-4) continue;
+    const dx = Math.round(playerPos.x) - Math.round(pos.x);
+    const dy = Math.round(playerPos.y) - Math.round(pos.y);
+    if (dx === 0 && dy === 0) continue;
 
-    try { world.add(id, MoveIntent, { dx: vx, dy: vy }); } catch {}
+    let stepX = 0;
+    let stepY = 0;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (absX > absY) stepX = Math.sign(dx);
+    else if (absY > absX) stepY = Math.sign(dy);
+    else if (absX > 0) stepX = Math.sign(dx);
+    else stepY = Math.sign(dy);
+
+    if (stepX === 0 && stepY === 0) continue;
+
+    try { world.add(id, MoveIntent, { dx: stepX, dy: stepY }); } catch {}
   }
 }

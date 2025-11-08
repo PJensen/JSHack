@@ -1,5 +1,5 @@
 // src/rules/systems/movementSystem.js
-// Consumes MoveIntent and applies analytic movement against the geometry kernel.
+// Consumes MoveIntent and applies grid-aligned movement against the tile map.
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
@@ -11,18 +11,26 @@ import { Vitality } from "../components/Vitality.js";
 import { BoundingCircle } from "../components/BoundingCircle.js";
 import { Facing } from "../components/Facing.js";
 import { Anatomy } from "../components/Anatomy.js";
-import { getGeometryKernel } from "../environment/worldGeometry.js";
+import { getTileMap, isTileWalkable, tileKey } from "../environment/tileMap.js";
 
-const EPS = 1e-4;
-const SLIDE_EPS = 1e-3;
-const SLIDE_DOT_THRESHOLD = 0.35;
+function chooseCardinalStep(dx, dy) {
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  if (absX === 0 && absY === 0) return { x: 0, y: 0 };
+  if (absX > absY) return { x: Math.sign(dx), y: 0 };
+  if (absY > absX) return { x: 0, y: Math.sign(dy) };
+  if (absX !== 0) return { x: Math.sign(dx), y: 0 };
+  return { x: 0, y: Math.sign(dy) };
+}
 
 /** @param {import('../../lib/ecs-js').World} world */
 export function movementSystem(world) {
-  const kernel = getGeometryKernel(world);
+  const tileMap = getTileMap(world);
 
-  /** @type {Map<number, {id:number,x:number,y:number,radius:number,solid:boolean,interactable:boolean,alive:boolean}>} */
+  /** @type {Map<number, {id:number,x:number,y:number,tileX:number,tileY:number,radius:number,solid:boolean,interactable:boolean,alive:boolean}>} */
   const colliderMap = new Map();
+  /** @type {Map<string, {id:number,x:number,y:number,tileX:number,tileY:number,radius:number,solid:boolean,interactable:boolean,alive:boolean}>} */
+  const tileOccupants = new Map();
 
   for (const [id, pos] of world.query(Position)) {
     if (!pos) continue;
@@ -31,15 +39,27 @@ export function movementSystem(world) {
     const alive = !!(vit && (vit.hp ?? 0) > 0);
     const solid = !!(collider?.solid) || alive;
     const radius = Math.max(0, world.get(id, BoundingCircle)?.radius ?? (solid ? 0.5 : 0));
-    colliderMap.set(id, {
+    const tileX = Math.round(pos.x);
+    const tileY = Math.round(pos.y);
+    const record = {
       id,
       x: pos.x,
       y: pos.y,
+      tileX,
+      tileY,
       radius,
       solid,
       interactable: world.has(id, Interactable),
       alive,
-    });
+    };
+    colliderMap.set(id, record);
+    if (solid) {
+      const key = tileKey(tileX, tileY);
+      const existing = tileOccupants.get(key);
+      if (!existing || (!existing.interactable && record.interactable)) {
+        tileOccupants.set(key, record);
+      }
+    }
   }
 
   for (const [actor, intent] of world.query(MoveIntent)) {
@@ -48,111 +68,84 @@ export function movementSystem(world) {
       if (!pos) { world.remove(actor, MoveIntent); continue; }
 
       const anatomy = world.get(actor, Anatomy);
-      const stride = Number.isFinite(intent.distance)
-        ? Math.max(0, intent.distance)
-        : Math.max(0, anatomy?.strideDistance ?? 1);
-      const actorRadius = Math.max(0, world.get(actor, BoundingCircle)?.radius ?? 0.5);
-
-      const dx = Number.isFinite(intent.dx) ? intent.dx : 0;
-      const dy = Number.isFinite(intent.dy) ? intent.dy : 0;
-      const mag = Math.hypot(dx, dy);
-      if (mag <= EPS || stride <= EPS) {
-        world.remove(actor, MoveIntent);
-        continue;
-      }
-      const dirx = dx / mag;
-      const diry = dy / mag;
-
-      const desired = { x: pos.x + dirx * stride, y: pos.y + diry * stride };
-      let dest = { ...desired };
-      let hitGeometry = false;
-
-      if (kernel) {
-        const sweep = kernel.sweepCapsule({ x: pos.x, y: pos.y }, desired, actorRadius, { epsilon: 0.05 });
-        dest = { ...sweep.point };
-        hitGeometry = !!sweep.hit;
-
-        if (sweep.hit && sweep.normal) {
-          const nLen = Math.hypot(sweep.normal.x, sweep.normal.y);
-          if (nLen > EPS) {
-            const nx = sweep.normal.x / nLen;
-            const ny = sweep.normal.y / nLen;
-            const dirDot = dirx * nx + diry * ny;
-            if (dirDot < SLIDE_DOT_THRESHOLD) {
-              const tangx = dirx - dirDot * nx;
-              const tangy = diry - dirDot * ny;
-              const tangLen = Math.hypot(tangx, tangy);
-              const remainingFrac = 1 - Math.max(0, Math.min(1, sweep.t ?? 1));
-              const remainingDist = stride * remainingFrac;
-              if (tangLen > EPS && remainingDist > EPS) {
-                const tx = tangx / tangLen;
-                const ty = tangy / tangLen;
-                const slideStart = {
-                  x: dest.x + nx * SLIDE_EPS,
-                  y: dest.y + ny * SLIDE_EPS,
-                };
-                const slideTarget = {
-                  x: slideStart.x + tx * remainingDist,
-                  y: slideStart.y + ty * remainingDist,
-                };
-                const slideSweep = kernel.sweepCapsule(slideStart, slideTarget, actorRadius, { epsilon: 0.05 });
-                const candidate = { ...slideSweep.point };
-                const movedPrev = Math.hypot(dest.x - pos.x, dest.y - pos.y);
-                const movedCandidate = Math.hypot(candidate.x - pos.x, candidate.y - pos.y);
-                if (movedCandidate > movedPrev + EPS) {
-                  dest = candidate;
-                  hitGeometry = hitGeometry || !!slideSweep.hit;
-                }
-              }
-            }
-          }
-        }
-      }
-
       const actorData = colliderMap.get(actor) || {
         id: actor,
         x: pos.x,
         y: pos.y,
-        radius: actorRadius,
+        tileX: Math.round(pos.x),
+        tileY: Math.round(pos.y),
+        radius: Math.max(0, world.get(actor, BoundingCircle)?.radius ?? 0.5),
         solid: true,
         interactable: world.has(actor, Interactable),
         alive: true,
       };
-      actorData.radius = actorRadius;
       actorData.x = pos.x;
       actorData.y = pos.y;
+      actorData.tileX = Math.round(pos.x);
+      actorData.tileY = Math.round(pos.y);
+      actorData.radius = Math.max(0, world.get(actor, BoundingCircle)?.radius ?? 0.5);
       actorData.solid = true;
       colliderMap.set(actor, actorData);
 
+      const rawDx = Number.isFinite(intent.dx) ? intent.dx : 0;
+      const rawDy = Number.isFinite(intent.dy) ? intent.dy : 0;
+      const step = chooseCardinalStep(rawDx, rawDy);
+      if (step.x === 0 && step.y === 0) { world.remove(actor, MoveIntent); continue; }
+
+      const requested = Number.isFinite(intent.distance) ? Math.max(1, Math.round(intent.distance)) : 1;
+      const stride = Math.max(1, Math.round(anatomy?.strideDistance ?? 1));
+      const stepsAllowed = Math.max(1, Math.min(requested, stride));
+
+      const originKey = actorData.solid ? tileKey(actorData.tileX, actorData.tileY) : null;
+      if (originKey) tileOccupants.delete(originKey);
+
+      let currentX = actorData.tileX;
+      let currentY = actorData.tileY;
+      let stepsTaken = 0;
       let blockedBy = null;
-      for (const other of colliderMap.values()) {
-        if (other.id === actor) continue;
-        if (!other.solid) continue;
-        const minDist = actorRadius + other.radius;
-        if (minDist <= 0) continue;
-        const dist = Math.hypot(dest.x - other.x, dest.y - other.y);
-        if (dist < minDist - EPS) {
-          blockedBy = other;
+
+      for (let i = 0; i < stepsAllowed; i++) {
+        const nextX = currentX + step.x;
+        const nextY = currentY + step.y;
+        const walkable = tileMap ? isTileWalkable(tileMap, nextX, nextY) : true;
+        const key = tileKey(nextX, nextY);
+        const occ = tileOccupants.get(key) || null;
+        if (!walkable) {
+          blockedBy = occ;
           break;
         }
+        if (occ && occ.id !== actor) {
+          blockedBy = occ;
+          break;
+        }
+        currentX = nextX;
+        currentY = nextY;
+        stepsTaken += 1;
       }
 
-      if (blockedBy) {
-        const fx = world.get(actor, Facing);
-        if (fx) {
-          world.set(actor, Facing, { x: dirx, y: diry });
-        } else {
-          try { world.add(actor, Facing, { x: dirx, y: diry }); } catch {}
+      if (stepsTaken <= 0) {
+        if (originKey && !tileOccupants.has(originKey) && actorData.solid) {
+          tileOccupants.set(originKey, actorData);
         }
 
-        if (blockedBy.interactable) {
-          try { world.add(actor, InteractIntent, { targetId: blockedBy.id }); } catch {}
-        } else if (blockedBy.alive) {
-          const reach = Math.max(0, anatomy?.reachDistance ?? 1);
-          const centerDist = Math.hypot(blockedBy.x - pos.x, blockedBy.y - pos.y);
-          const effectiveReach = reach + actorRadius + blockedBy.radius;
-          if (centerDist <= effectiveReach + 1e-3) {
-            try { world.add(actor, AttackIntent, { targetId: blockedBy.id }); } catch {}
+        const fx = world.get(actor, Facing);
+        if (fx) {
+          world.set(actor, Facing, { x: step.x, y: step.y });
+        } else {
+          try { world.add(actor, Facing, { x: step.x, y: step.y }); } catch {}
+        }
+
+        if (blockedBy) {
+          if (blockedBy.interactable) {
+            try { world.add(actor, InteractIntent, { targetId: blockedBy.id }); } catch {}
+          } else if (blockedBy.alive) {
+            const reach = Math.max(0, anatomy?.reachDistance ?? 1);
+            const targetData = colliderMap.get(blockedBy.id) || blockedBy;
+            const dist = Math.hypot((targetData?.x ?? currentX) - pos.x, (targetData?.y ?? currentY) - pos.y);
+            const effectiveReach = reach + actorData.radius + (targetData?.radius ?? 0);
+            if (dist <= effectiveReach + 1e-3) {
+              try { world.add(actor, AttackIntent, { targetId: blockedBy.id }); } catch {}
+            }
           }
         }
 
@@ -160,27 +153,24 @@ export function movementSystem(world) {
         continue;
       }
 
-      const delta = Math.hypot(dest.x - pos.x, dest.y - pos.y);
-      if (delta <= EPS) {
-        if (hitGeometry) {
-          const fx = world.get(actor, Facing);
-          if (fx) world.set(actor, Facing, { x: dirx, y: diry });
-        }
-        world.remove(actor, MoveIntent);
-        continue;
+      actorData.tileX = currentX;
+      actorData.tileY = currentY;
+      actorData.x = currentX;
+      actorData.y = currentY;
+      colliderMap.set(actor, actorData);
+
+      if (actorData.solid) {
+        tileOccupants.set(tileKey(currentX, currentY), actorData);
       }
 
-      world.set(actor, Position, { x: dest.x, y: dest.y });
-      world.emit?.("moved", { id: actor, from: { x: pos.x, y: pos.y }, to: { x: dest.x, y: dest.y } });
-      actorData.x = dest.x;
-      actorData.y = dest.y;
-      colliderMap.set(actor, actorData);
+      world.set(actor, Position, { x: currentX, y: currentY });
+      world.emit?.("moved", { id: actor, from: { x: pos.x, y: pos.y }, to: { x: currentX, y: currentY } });
 
       const fx = world.get(actor, Facing);
       if (fx) {
-        world.set(actor, Facing, { x: dirx, y: diry });
+        world.set(actor, Facing, { x: step.x, y: step.y });
       } else {
-        try { world.add(actor, Facing, { x: dirx, y: diry }); } catch {}
+        try { world.add(actor, Facing, { x: step.x, y: step.y }); } catch {}
       }
     } catch {}
     try { world.remove(actor, MoveIntent); } catch {}
