@@ -18,6 +18,14 @@ export const SPELL_DEFS = {
     minIntelligence: 8,
     script: 'lightning',
   },
+  meteor: {
+    id: 'meteor',
+    name: 'Meteor',
+    // Big punch; leave room for tuning
+    manaCost: 12,
+    minIntelligence: 0,
+    script: 'meteor',
+  },
 };
 
 /**

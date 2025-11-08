@@ -220,3 +220,61 @@ export function _testRecognizeLightningGesture(points) {
   return recognizeLightningGesture(points);
 }
 
+/**
+ * Recognize a diagonal slash (left- or right-leaning).
+ * Looser than lightning: prefers a mostly straight diagonal path.
+ * Returns same shape as lightning recognizer.
+ * @param {{x:number,y:number}[]} points
+ * @returns {{ quality:number, bounds:{minX:number,minY:number,width:number,height:number}, normalizedPath:{x:number,y:number}[] }|null}
+ */
+export function recognizeMeteorGesture(points) {
+  if (!Array.isArray(points) || points.length < 6) return null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let totalLength = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]; if (!p) continue;
+    const x = Number(p.x), y = Number(p.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (i > 0) { const q = points[i - 1]; totalLength += Math.hypot(x - q.x, y - q.y); }
+  }
+  const width = maxX - minX; const height = maxY - minY;
+  if (width < MIN_BOUNDS || height < MIN_BOUNDS) return null;
+  if (totalLength < MIN_TOTAL_LENGTH) return null;
+
+  const normalized = points.map((p) => ({
+    x: clamp01((p.x - minX) / (width || 1)),
+    y: clamp01((p.y - minY) / (height || 1)),
+  }));
+  const resampled = resamplePolyline(normalized, 32);
+  const p0 = resampled[0];
+  const pN = resampled[resampled.length - 1];
+  if (!p0 || !pN) return null;
+
+  const v = unitVector(p0, pN);
+  if (!v) return null;
+  // Require both components substantial (diagonal-ish)
+  if (Math.abs(v.x) < 0.45 || Math.abs(v.y) < 0.45) return null;
+  // Straightness: average perpendicular error to the segment
+  let err = 0;
+  const ax = p0.x, ay = p0.y, bx = pN.x, by = pN.y;
+  const dx = bx - ax, dy = by - ay; const segLen = Math.hypot(dx, dy) || 1;
+  for (let i = 1; i < resampled.length - 1; i++) {
+    const p = resampled[i];
+    // cross product magnitude over segment length ~ distance to line (normalized)
+    const dist = Math.abs((p.x - ax) * dy - (p.y - ay) * dx) / segLen;
+    err += dist;
+  }
+  err /= Math.max(1, resampled.length - 2);
+  if (err > 0.14) return null; // too wobbly
+
+  // Quality favors diagonal balance and low error
+  const diagBalance = 1 - Math.abs(Math.abs(v.x) - Math.abs(v.y));
+  const quality = Math.max(0, Math.min(1, (diagBalance * 0.6) + ((1 - Math.min(1, err / 0.3)) * 0.4)));
+  return {
+    quality,
+    bounds: { minX, minY, width, height },
+    normalizedPath: resampled,
+  };
+}

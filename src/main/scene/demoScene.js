@@ -82,6 +82,21 @@ function placeSpellbook(world, room) {
     rarity: 1,
     rarityName: "rare",
   });
+
+  // New: Meteor spellbook
+  const book2 = world.create();
+  world.add(book2, NamedIdentity, { name: "Spellbook of Meteor", identity: "book_meteor" });
+  world.add(book2, Position, { x: center.x - 2, y: center.y + 1.5 });
+  world.add(book2, ItemInfo, {
+    type: "learn",
+    slot: "brain",
+    description: "Teaches Meteor.",
+    weight: 1,
+    value: 0,
+    count: 1,
+    rarity: 1,
+    rarityName: "rare",
+  });
 }
 
 function placeTorch(world, room) {

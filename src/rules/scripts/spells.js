@@ -6,6 +6,8 @@ import { registerScript, runScript, ScriptVerb } from "../scripting.js";
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Vitality } from "../components/Vitality.js";
+import { Brain } from "../components/Brain.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 
 const LIGHTNING_KEY = "lightning";
 
@@ -77,6 +79,74 @@ registerScript(LIGHTNING_KEY, {
           try { world.emit && world.emit("died", { id: targetId, at: segTo }); } catch {}
         }
       }
+    }
+  },
+});
+
+// === Meteor spell ===
+const METEOR_KEY = "meteor";
+
+registerScript(METEOR_KEY, {
+  [ScriptVerb.SpellCast]: (world, ctx) => {
+    const actor = ctx?.actor | 0;
+    const spell = ctx?.spell;
+    const intent = ctx?.intent || {};
+    if (!(actor > 0) || !spell) return;
+
+    const apos = /** @type any */ (world.get(actor, Position));
+    if (!apos) return;
+
+    // Target coordinates required
+    const tx = Number(intent?.x ?? intent?.toX ?? null);
+    const ty = Number(intent?.y ?? intent?.toY ?? null);
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) return;
+
+    // Vector for visual approach (optional)
+    const vx = Number(intent?.vx ?? 0);
+    const vy = Number(intent?.vy ?? 0);
+
+    // Scale radius and base damage by intelligence
+    /** @type {{intelligence?:number}|null} */
+    const brain = /** @type any */ (world.get(actor, Brain));
+    const intel = Math.max(0, Number(brain?.intelligence || 0));
+    const radius = Math.max(1, Math.min(4, 1 + Math.floor(intel / 8))); // 1..4 tiles
+    const baseDmg = Math.max(4, Math.round(8 + intel * 0.5));
+
+    // Emit meteor visual with an approach vector
+    // Choose a decent "from" point based on dir, defaulting to top if missing.
+    let dirx = 0, diry = -1;
+    if (Number.isFinite(vx) && Number.isFinite(vy) && (Math.hypot(vx, vy) > 1e-3)) {
+      const len = Math.hypot(vx, vy) || 1;
+      dirx = vx / len; diry = vy / len;
+    }
+    const from = { x: tx - dirx * 8, y: ty - diry * 8 };
+    const to = { x: tx, y: ty };
+    try { world.emit && world.emit("spell:meteor", { actor, spellId: spell.id, from, to, radius }); } catch {}
+
+    // Deal AoE damage with mild radial falloff; apply burning DoT to survivors
+    const r2 = radius * radius;
+    for (const [id, p, vit] of world.query(Position, Vitality)) {
+      if (!p || !vit) continue;
+      const dist2 = (p.x - tx) * (p.x - tx) + (p.y - ty) * (p.y - ty);
+      if (dist2 > r2) continue;
+      // self-damage allowed
+      // Distance falloff: 100% at center -> 60% at edge
+      const d = Math.sqrt(dist2);
+      const falloff = 0.6 + 0.4 * Math.max(0, 1 - (d / Math.max(1e-3, radius)));
+      const dmg = Math.max(1, Math.round(baseDmg * falloff));
+      vit.hp = Math.max(0, (vit.hp | 0) - dmg);
+      try { world.emit && world.emit("damage", { id, amount: dmg, at: { x: p.x, y: p.y }, source: actor }); } catch {}
+      if ((vit.hp | 0) <= 0) {
+        try { world.emit && world.emit("died", { id, at: { x: p.x, y: p.y } }); } catch {}
+        continue;
+      }
+      // Apply burning DoT (2-4 turns, 1-2 potency scaled lightly by int)
+      const burnTurns = 2 + Math.min(2, Math.floor(intel / 12));
+      const burnPotency = 1 + (intel >= 16 ? 1 : 0);
+      const ae = /** @type any */ (world.get(id, ActiveEffects));
+      const eff = { key: 'burning', turnsLeft: burnTurns, potency: burnPotency, sourceId: actor };
+      if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
+      else try { world.add(id, ActiveEffects, { effects: [eff] }); } catch {}
     }
   },
 });

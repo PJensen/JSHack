@@ -83,12 +83,12 @@ export function useItemSystem(world) {
         continue;
       }
 
-      const intel = Number(brain.intelligence || 0);
-      if (spell.minIntelligence && intel < spell.minIntelligence) {
-        try { world.emit && world.emit('spell:learn-denied', { actor, reason: 'intelligence', need: spell.minIntelligence, have: intel, spellId: spell.id }); } catch {}
-        world.remove(actor, UseIntent);
-        continue;
-      }
+      // const intel = Number(brain.intelligence || 0);
+      // if (spell.minIntelligence && intel < spell.minIntelligence) {
+      //   try { world.emit && world.emit('spell:learn-denied', { actor, reason: 'intelligence', need: spell.minIntelligence, have: intel, spellId: spell.id }); } catch {}
+      //   world.remove(actor, UseIntent);
+      //   continue;
+      // }
 
       // learn
   if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];

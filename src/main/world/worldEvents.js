@@ -327,6 +327,26 @@ export function setupWorldEventHandlers(world, deps) {
     boltFx.addBolt({ from, to, chainIndex });
   });
 
+  // Meteor: a flaming projectile from sky to target, then an impact spark and shake
+  world.on("spell:meteor", ({ from, to }) => {
+    if (from && to) {
+      arrowFx.addArrow({ from, to, style: 'flame' });
+      // Schedule impact spark roughly when it hits
+      const dx = to.x - from.x; const dy = to.y - from.y;
+      const dist = Math.hypot(dx, dy) || 0;
+      const speed = 22; // match arrowFx
+      const duration = Math.max(0.08, Math.min(0.35, dist / speed));
+      try {
+        const w = typeof window !== 'undefined' ? window : null;
+        if (w && typeof w.setTimeout === 'function') {
+          w.setTimeout(() => {
+            arrowFx.addSpark(to.x, to.y, 'flame');
+          }, Math.round(duration * 1000));
+        }
+      } catch {}
+    }
+  });
+
   // Ranged shots: fast crossbow/arrow tracer (separate handler)
   world.on("ranged:shot", ({ from, to, style }) => {
     const s = style || 'flame';

@@ -37,8 +37,11 @@ export function makeRulesDispatcher(world, getActorId) {
         break;
       }
       case "rules.castActiveSpell": {
-        const { spellId = 0, targetId = actorId } = action.payload || {};
-        world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
+        const { spellId = 0, targetId = actorId, x = null, y = null, vx = null, vy = null } = action.payload || {};
+        const intent = { spellId, targetId };
+        if (Number.isFinite(x) && Number.isFinite(y)) { intent.x = x; intent.y = y; }
+        if (Number.isFinite(vx) && Number.isFinite(vy)) { intent.vx = vx; intent.vy = vy; }
+        world?.add?.(actorId, CastSpellIntent, intent);
         world?.tick?.(1);
         break;
       }

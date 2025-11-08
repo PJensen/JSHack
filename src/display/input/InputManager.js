@@ -4,7 +4,7 @@
 
 import { Actions, makeAction } from "./actions.js";
 import { screenToWorld } from "../camera/controller.js";
-import { recognizeLightningGesture } from "./gestureRecognizers.js";
+import { recognizeLightningGesture, recognizeMeteorGesture } from "./gestureRecognizers.js";
 
 const GESTURE_HOLD_MS = 180;
 const GESTURE_DRAG_THRESHOLD = 26;
@@ -195,15 +195,23 @@ export class InputManager {
       const start = this._gestureDownTime || now;
       const duration = (now - start) / 1000;
       if (duration >= 0.12 && this._gesturePoints && this._gesturePoints.length >= 6) {
-        const result = recognizeLightningGesture(this._gesturePoints);
-        if (result) {
+        // Try meteor (diagonal) first; then lightning "Z".
+        let recognized = null;
+        let recognizedId = null;
+        const mres = recognizeMeteorGesture(this._gesturePoints);
+        if (mres) { recognized = mres; recognizedId = 'meteor'; }
+        else {
+          const lres = recognizeLightningGesture(this._gesturePoints);
+          if (lres) { recognized = lres; recognizedId = 'lightning'; }
+        }
+        if (recognized && recognizedId) {
           const detail = {
-            id: "lightning",
+            id: recognizedId,
             duration,
             pointerType: this._gesturePointerType,
-            quality: result.quality,
-            bounds: result.bounds,
-            normalizedPath: result.normalizedPath,
+            quality: recognized.quality,
+            bounds: recognized.bounds,
+            normalizedPath: recognized.normalizedPath,
             worldPath: this._gestureWorldPoints.length ? this._gestureWorldPoints.slice() : null,
           };
           // Debug overlay notify
@@ -211,9 +219,9 @@ export class InputManager {
             const rect = this._lastRect || this._canvas?.getBoundingClientRect?.() || null;
             const sx = this._lastScaleX || 1;
             const sy = this._lastScaleY || 1;
-            const b = result.bounds;
+            const b = recognized.bounds;
             const screenBounds = rect ? { x: rect.left + b.minX / (sx || 1), y: rect.top + b.minY / (sy || 1), w: b.width / (sx || 1), h: b.height / (sy || 1) } : null;
-            window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: this._gestureClientPoints?.slice?.() || [], active: true, recognized: { id: 'lightning', quality: result.quality, bounds: screenBounds }, phase: 'recognized' } }));
+            window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: this._gestureClientPoints?.slice?.() || [], active: true, recognized: { id: recognizedId, quality: recognized.quality, bounds: screenBounds }, phase: 'recognized' } }));
           } catch {}
           try { window.dispatchEvent(new CustomEvent("input:spellGesture", { detail })); } catch {}
           this._finalizeGesture();

@@ -11,4 +11,6 @@ export const CastSpellIntent = defineComponent("CastSpellIntent", {
   targetId: 0,
   x: null,
   y: null,
+  vx: null,
+  vy: null,
 });

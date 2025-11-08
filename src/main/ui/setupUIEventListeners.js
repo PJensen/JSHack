@@ -37,6 +37,9 @@ export function setupUIEventListeners(world, deps) {
     () => (playerEntity(world)?.id || 0)
   );
 
+  // Simple spell targeting latch for Meteor
+  let _meteorTargeting = null; // { vx, vy }
+
   const displayHandler = (action) => {
     switch (action.type) {
       case "display.tapWorld": {
@@ -45,6 +48,13 @@ export function setupUIEventListeners(world, deps) {
         const pe = playerEntity(world);
         if (!pe) break;
         if (Number.isFinite(wx) && Number.isFinite(wy)) {
+          // If meteor targeting is armed, cast at tapped location
+          if (_meteorTargeting) {
+            const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+            handler({ type: "rules.castActiveSpell", payload: { spellId: "meteor", x: wx, y: wy, vx: _meteorTargeting.vx, vy: _meteorTargeting.vy } });
+            _meteorTargeting = null;
+            break;
+          }
           // Keep tap-to-move by default; only shoot if: tap hits monster AND player is ranged (bow equipped)
           let tappedMonster = null; let minCenter = Infinity;
           for (const [id, pos, ni, vit] of world.query(Position, NamedIdentity, Vitality)) {
@@ -255,25 +265,46 @@ export function setupUIEventListeners(world, deps) {
   });
 
   const knowsLightning = () => learnedSpells().some((s) => s?.id === "lightning");
+  const knowsMeteor = () => learnedSpells().some((s) => s?.id === "meteor");
 
   const onSpellGesture = (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const id = e?.detail?.id;
-    if (id !== "lightning") return;
-    if (!knowsLightning()) return;
-    setActiveSpell("lightning");
-    const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-    handler({ type: "rules.castActiveSpell", payload: { spellId: "lightning" } });
-    try {
-      window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
-        detail: {
-          id: "lightning",
-          mode: "cast",
-          quality: e?.detail?.quality ?? null,
-        }
-      }));
-    } catch {}
+    if (id === "lightning") {
+      if (!knowsLightning()) return;
+      setActiveSpell("lightning");
+      const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+      handler({ type: "rules.castActiveSpell", payload: { spellId: "lightning" } });
+      try {
+        window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
+          detail: { id: "lightning", mode: "cast", quality: e?.detail?.quality ?? null }
+        }));
+      } catch {}
+      return;
+    }
+
+    if (id === "meteor") {
+      if (!knowsMeteor()) return;
+      setActiveSpell("meteor");
+      // Arm targeting with direction vector approximated from worldPath (start->end)
+      const wpts = Array.isArray(e?.detail?.worldPath) ? e.detail.worldPath : null;
+      let vx = 0, vy = -1;
+      if (wpts && wpts.length >= 2) {
+        const a = wpts[0], b = wpts[wpts.length - 1];
+        const dx = b.x - a.x; const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        vx = dx / len; vy = dy / len;
+      }
+      _meteorTargeting = { vx, vy };
+      // Show a hint to tap target; reuse gesture hint UI if present
+      try {
+        window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
+          detail: { id: "meteor", mode: "learn", quality: e?.detail?.quality ?? null }
+        }));
+      } catch {}
+      return;
+    }
   };
 
   window.addEventListener("input:spellGesture", onSpellGesture);
