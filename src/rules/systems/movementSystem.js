@@ -13,14 +13,71 @@ import { Facing } from "../components/Facing.js";
 import { Anatomy } from "../components/Anatomy.js";
 import { getTileMap, isTileWalkable, tileKey } from "../environment/tileMap.js";
 
-function chooseCardinalStep(dx, dy) {
-  const absX = Math.abs(dx);
-  const absY = Math.abs(dy);
-  if (absX === 0 && absY === 0) return { x: 0, y: 0 };
-  if (absX > absY) return { x: Math.sign(dx), y: 0 };
-  if (absY > absX) return { x: 0, y: Math.sign(dy) };
-  if (absX !== 0) return { x: Math.sign(dx), y: 0 };
-  return { x: 0, y: Math.sign(dy) };
+function clampStepComponent(value) {
+  if (value > 0) return 1;
+  if (value < 0) return -1;
+  return 0;
+}
+
+function chooseGridStep(dx, dy) {
+  const vx = Number.isFinite(dx) ? dx : 0;
+  const vy = Number.isFinite(dy) ? dy : 0;
+  if (vx === 0 && vy === 0) return { x: 0, y: 0 };
+  const mag = Math.hypot(vx, vy);
+  if (mag <= 1e-6) {
+    return { x: clampStepComponent(vx), y: clampStepComponent(vy) };
+  }
+  let stepX = Math.round(vx / mag);
+  let stepY = Math.round(vy / mag);
+  if (stepX === 0 && vx !== 0) stepX = clampStepComponent(vx);
+  if (stepY === 0 && vy !== 0) stepY = clampStepComponent(vy);
+  return {
+    x: clampStepComponent(stepX),
+    y: clampStepComponent(stepY),
+  };
+}
+
+function canEnterTile(tileMap, tileOccupants, actorId, x, y) {
+  const walkable = tileMap ? isTileWalkable(tileMap, x, y) : true;
+  const occ = tileOccupants.get(tileKey(x, y)) || null;
+  if (!walkable) {
+    return { ok: false, blocker: occ };
+  }
+  if (occ && occ.id !== actorId) {
+    return { ok: false, blocker: occ };
+  }
+  return { ok: true, blocker: null };
+}
+
+function diagonalClear(tileMap, tileOccupants, actorId, fromX, fromY, stepX, stepY) {
+  if (!tileMap || stepX === 0 || stepY === 0) {
+    return { clear: true, blocker: null };
+  }
+  const horizX = fromX + stepX;
+  const horizY = fromY;
+  const vertX = fromX;
+  const vertY = fromY + stepY;
+
+  const horizWalkable = isTileWalkable(tileMap, horizX, horizY);
+  const vertWalkable = isTileWalkable(tileMap, vertX, vertY);
+
+  const horizOcc = tileOccupants.get(tileKey(horizX, horizY)) || null;
+  const vertOcc = tileOccupants.get(tileKey(vertX, vertY)) || null;
+
+  const horizBlocked = !horizWalkable || (horizOcc && horizOcc.id !== actorId);
+  const vertBlocked = !vertWalkable || (vertOcc && vertOcc.id !== actorId);
+
+  if (horizBlocked || vertBlocked) {
+    const blocker =
+      (horizBlocked && horizOcc && horizOcc.id !== actorId)
+        ? horizOcc
+        : (vertBlocked && vertOcc && vertOcc.id !== actorId)
+          ? vertOcc
+          : null;
+    return { clear: false, blocker };
+  }
+
+  return { clear: true, blocker: null };
 }
 
 /** @param {import('../../lib/ecs-js').World} world */
@@ -89,7 +146,7 @@ export function movementSystem(world) {
 
       const rawDx = Number.isFinite(intent.dx) ? intent.dx : 0;
       const rawDy = Number.isFinite(intent.dy) ? intent.dy : 0;
-      const step = chooseCardinalStep(rawDx, rawDy);
+      const step = chooseGridStep(rawDx, rawDy);
       if (step.x === 0 && step.y === 0) { world.remove(actor, MoveIntent); continue; }
 
       const requested = Number.isFinite(intent.distance) ? Math.max(1, Math.round(intent.distance)) : 1;
@@ -107,15 +164,18 @@ export function movementSystem(world) {
       for (let i = 0; i < stepsAllowed; i++) {
         const nextX = currentX + step.x;
         const nextY = currentY + step.y;
-        const walkable = tileMap ? isTileWalkable(tileMap, nextX, nextY) : true;
-        const key = tileKey(nextX, nextY);
-        const occ = tileOccupants.get(key) || null;
-        if (!walkable) {
-          blockedBy = occ;
-          break;
+
+        if (tileMap) {
+          const diagStatus = diagonalClear(tileMap, tileOccupants, actor, currentX, currentY, step.x, step.y);
+          if (!diagStatus.clear) {
+            blockedBy = diagStatus.blocker;
+            break;
+          }
         }
-        if (occ && occ.id !== actor) {
-          blockedBy = occ;
+
+        const { ok: canEnter, blocker } = canEnterTile(tileMap, tileOccupants, actor, nextX, nextY);
+        if (!canEnter) {
+          blockedBy = blocker;
           break;
         }
         currentX = nextX;
