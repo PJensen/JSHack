@@ -16,7 +16,8 @@ export const basePalette = {
   torch: { glyph: "t", fg: "#ffd8a8", glow: "#ffb347" },
 
   // Ammo
-  ammo_arrows: { glyph: "/", fg: "#e0e0e0", glow: "#f0f0f0" },
+  ammo_arrows: { glyph: "/", fg: "#8b5a2b", glow: "#b97a3a" },
+  ammo_arrows_flame: { glyph: "/", fg: "#ff9a3e", glow: "#ffb36b" },
 
   // Potions
   potion_health: { glyph: "!", fg: "#66ff99", glow: "#5cff9a" },

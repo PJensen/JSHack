@@ -44,10 +44,25 @@ export const ArrowsStack = defineArchetype(
     "ArrowsStack",
     [ItemInfo, {
         type: "ammo",
+        slot: "ammo",
         description: "A bundle of arrows.",
         weight: 0.2,
         value: 1, // per stack unit (approx)
         count: 10,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Arrows", identity: "ammo_arrows" })],
+);
+
+// Flaming arrows — ammo that applies burning and uses flame visuals
+export const FlamingArrowsStack = defineArchetype(
+    "FlamingArrowsStack",
+    [ItemInfo, {
+        type: "ammo",
+        slot: "ammo",
+        description: "A bundle of oil-soaked arrows that ignite on impact.",
+        weight: 0.25,
+        value: 2,
+        count: 10,
+    }],
+    [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Flaming Arrows", identity: "ammo_arrows_flame" })],
 );

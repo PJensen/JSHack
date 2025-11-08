@@ -25,7 +25,8 @@ export function equipItemSystem(world) {
     if (idx === -1) { world.remove(actor, EquipIntent); continue; }
 
     const info = world.get(itemId, ItemInfo);
-    if (!info || info.type !== 'equip') { world.remove(actor, EquipIntent); continue; }
+    // Allow equipping either traditional equipment (type 'equip') or ammo (type 'ammo')
+    if (!info || (info.type !== 'equip' && info.type !== 'ammo')) { world.remove(actor, EquipIntent); continue; }
 
     // Ensure Equipment component exists
     let eq = world.get(actor, Equipment);
@@ -69,6 +70,9 @@ export function equipItemSystem(world) {
     } else if (slot === 'shield') {
       if (Number.isInteger(eq.shield) && eq.shield > 0) pushToInventory(eq.shield);
       eq.shield = itemId; appliedSlot = 'shield';
+    } else if (slot === 'ammo') {
+      if (Number.isInteger(eq.ammo) && eq.ammo > 0) pushToInventory(eq.ammo);
+      eq.ammo = itemId; appliedSlot = 'ammo';
     } else {
       // Unknown or unsupported slot: put item back and ignore
       inv.items.push(itemId);
@@ -76,8 +80,8 @@ export function equipItemSystem(world) {
       continue;
     }
 
-    // Ensure count is 1 when equipped (no stacking on body)
-    if ((info.count | 0) > 1) {
+    // Ensure count is 1 when equipped (no stacking on body) except for ammo slot (stacks allowed)
+    if (appliedSlot !== 'ammo' && (info.count | 0) > 1) {
       world.mutate(itemId, ItemInfo, (r) => { r.count = 1; });
     }
 

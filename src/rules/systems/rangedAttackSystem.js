@@ -65,10 +65,15 @@ export function rangedAttackSystem(world) {
 
       const finalTo = clipShotToOcclusion(kernel, apos, desired, target);
 
-      // Consume an arrow when the shot is loosed.
+      // Consume an arrow (equipped ammo takes priority). Abort if none.
       const ammoTemplate = consumeArrow(world, actor);
+      if (!ammoTemplate) {
+        try { world.emit && world.emit('status', { id: actor, kind: 'noammo', text: 'OUT OF ARROWS' }); } catch {}
+        continue;
+      }
 
-      try { world.emit && world.emit('ranged:shot', { from: { x: apos.x, y: apos.y }, to: finalTo, style: 'flame' }); } catch {}
+      const vfxStyle = (ammoTemplate?.identity === 'ammo_arrows_flame') ? 'flame' : 'plain';
+      try { world.emit && world.emit('ranged:shot', { from: { x: apos.x, y: apos.y }, to: finalTo, style: vfxStyle }); } catch {}
 
       if (!target) continue;
 
@@ -103,10 +108,13 @@ export function rangedAttackSystem(world) {
       if ((vit.hp|0) <= 0) {
         try { world.emit && world.emit('died', { id: target.id, killer: actor }); } catch {}
       } else {
-        const ae = /** @type any */ (world.get(target.id, ActiveEffects));
-        const eff = { key: 'burning', turnsLeft: 2, potency: 1 };
-        if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
-        else { try { world.add(target.id, ActiveEffects, { effects: [eff] }); } catch {} }
+        // Apply burning only if flaming arrows were used
+        if (ammoTemplate?.identity === 'ammo_arrows_flame') {
+          const ae = /** @type any */ (world.get(target.id, ActiveEffects));
+          const eff = { key: 'burning', turnsLeft: 3, potency: 1 };
+          if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
+          else { try { world.add(target.id, ActiveEffects, { effects: [eff] }); } catch {} }
+        }
       }
 
       maybeReturnArrow(world, target.id, ammoTemplate, rng, true);
@@ -208,10 +216,39 @@ function applyFacing(world, actor, dx, dy) {
 
 function consumeArrow(world, actor) {
   const inv = world.get(actor, Inventory);
+  const eq = world.get(actor, Equipment);
+  // 1) Prefer equipped ammo slot
+  if (eq && Number.isInteger(eq.ammo) && eq.ammo > 0) {
+    const ammoId = eq.ammo;
+    const ident = world.get(ammoId, NamedIdentity);
+    const info = world.get(ammoId, ItemInfo);
+    if (ident && info && (info.count|0) > 0 && typeof ident.identity === 'string' && ident.identity.startsWith('ammo_arrows')) {
+      const template = { identity: ident.identity, name: ident.name || 'Arrows', info: { ...info, count: 1 } };
+      if ((info.count | 0) > 1) {
+        try { world.mutate(ammoId, ItemInfo, (rec) => { rec.count = Math.max(0, (rec.count || 1) - 1); }); } catch {}
+      } else {
+        // last arrow from the equipped stack — clear ammo slot, remove from inventory if present, and destroy entity
+        try { world.mutate(actor, Equipment, (r) => { if (r.ammo === ammoId) r.ammo = null; }); } catch {}
+        try { world.mutate(actor, Inventory, (rec) => { if (Array.isArray(rec.items)) rec.items = rec.items.filter((id) => id !== ammoId); }); } catch {}
+        try { world.destroy(ammoId); } catch {}
+      }
+      return template;
+    }
+  }
   if (!inv || !Array.isArray(inv.items)) return null;
-  for (const itemId of inv.items.slice()) {
+  // 2) Search inventory for any arrow stacks (prefer flaming first)
+  const items = inv.items.slice();
+  // Order: flaming first, then normal
+  const order = (id) => {
+    const i = world.get(id, NamedIdentity)?.identity;
+    if (i === 'ammo_arrows_flame') return 0;
+    if (i === 'ammo_arrows') return 1;
+    return 2;
+  };
+  items.sort((a, b) => order(a) - order(b));
+  for (const itemId of items) {
     const ident = world.get(itemId, NamedIdentity);
-    if (!ident || ident.identity !== 'ammo_arrows') continue;
+    if (!ident || (ident.identity !== 'ammo_arrows' && ident.identity !== 'ammo_arrows_flame')) continue;
     const info = world.get(itemId, ItemInfo);
     if (!info || (info.count|0) <= 0) continue;
     const template = {

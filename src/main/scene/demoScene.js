@@ -1,7 +1,7 @@
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { playerEntity } from "../../rules/utils/queries.js";
 import { createPlayer } from "../../rules/archetypes/Player.js";
-import { HealthPotion, GoldStack, ArrowsStack } from "../../rules/archetypes/Items.js";
+import { HealthPotion, GoldStack, ArrowsStack, FlamingArrowsStack } from "../../rules/archetypes/Items.js";
 import { Spawner } from "../../rules/archetypes/Spawner.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
@@ -165,6 +165,8 @@ function dropArrows(world, room) {
   const { center } = room;
   const arrows = createFrom(world, ArrowsStack, {});
   world.add(arrows, Position, { x: center.x + 1.5, y: center.y - 1.5 });
+  const farrows = createFrom(world, FlamingArrowsStack, {});
+  world.add(farrows, Position, { x: center.x - 1.5, y: center.y - 1.5 });
 }
 
 function spawnMonsters(world, room) {

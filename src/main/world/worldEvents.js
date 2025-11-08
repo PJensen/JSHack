@@ -295,12 +295,12 @@ function createArrowFxManager(startShake, cam) {
       const alpha = 1.0;
       // Trail (outer -> mid -> core)
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      const wOuter = a.style === 'meteor' ? 0.55 : 0.22;
-      const wMid = a.style === 'meteor' ? 0.32 : 0.12;
-      const wCore = a.style === 'meteor' ? 0.14 : 0.05;
+      const wOuter = a.style === 'meteor' ? 0.55 : (a.style === 'flame' ? 0.28 : 0.22);
+      const wMid = a.style === 'meteor' ? 0.32 : (a.style === 'flame' ? 0.16 : 0.12);
+      const wCore = a.style === 'meteor' ? 0.14 : (a.style === 'flame' ? 0.07 : 0.05);
       ctx.strokeStyle = outer; ctx.globalAlpha = 0.28 * alpha; ctx.lineWidth = wOuter; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.strokeStyle = mid;   ctx.globalAlpha = 0.50 * alpha; ctx.lineWidth = wMid;   ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.strokeStyle = core;  ctx.globalAlpha = 1.00 * alpha; ctx.lineWidth = wCore;  ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = mid;   ctx.globalAlpha = (a.style === 'flame' ? 0.60 : 0.50) * alpha; ctx.lineWidth = wMid;   ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = core;  ctx.globalAlpha = (a.style === 'flame' ? 1.00 : 1.00) * alpha; ctx.lineWidth = wCore;  ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
 
       // Head
       if (a.style === 'meteor') {
@@ -343,16 +343,18 @@ function createArrowFxManager(startShake, cam) {
       const s = sparks[i];
       const a = Math.max(0, Math.min(1, s.ttl / (s.max || 0.14)));
       const isMeteor = s.style === 'meteor';
-      const r = (isMeteor ? 0.55 : 0.25) + (isMeteor ? 0.45 : 0.25) * a;
+      const isFlame = s.style === 'flame';
+      const r = (isMeteor ? 0.55 : isFlame ? 0.32 : 0.25) + (isMeteor ? 0.45 : isFlame ? 0.30 : 0.25) * a;
       let outer = `rgba(255,170,80,${0.35 * a})`;
       let inner = `rgba(255,240,200,${0.85 * a})`;
       if (s.style === 'poison') { outer = `rgba(87,204,43,${0.35 * a})`; inner = `rgba(233,255,204,${0.85 * a})`; }
       if (s.style === 'magic') { outer = `rgba(126,92,255,${0.35 * a})`; inner = `rgba(233,225,255,${0.85 * a})`; }
       if (isMeteor) { outer = `rgba(255,140,60,${0.45 * a})`; inner = `rgba(255,240,200,${0.95 * a})`; }
+      if (isFlame) { outer = `rgba(255,160,60,${0.45 * a})`; inner = `rgba(255,230,170,${0.95 * a})`; }
       ctx.fillStyle = outer;
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = inner; ctx.lineWidth = isMeteor ? 0.12 : 0.06;
-      ctx.beginPath(); ctx.arc(s.x, s.y, r * (isMeteor ? 1.8 : 1.35), 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = inner; ctx.lineWidth = isMeteor ? 0.12 : (isFlame ? 0.08 : 0.06);
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * (isMeteor ? 1.8 : isFlame ? 1.5 : 1.35), 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }
@@ -368,8 +370,8 @@ function createArrowFxManager(startShake, cam) {
       if (a.style === 'poison') color = '#9cff66';
       if (a.style === 'magic') color = '#b69cff';
       const emitter = (a.style === 'flame') ? 'arrowFlame' : (a.style === 'meteor' ? 'meteorFlame' : null);
-      const radius = a.style === 'meteor' ? 2.5 + 1.2 * u : 1.4;
-      const intensity = a.style === 'meteor' ? 0.7 + 0.5 * u : 0.55;
+      const radius = a.style === 'meteor' ? 2.5 + 1.2 * u : (a.style === 'flame' ? 1.6 : 1.4);
+      const intensity = a.style === 'meteor' ? 0.7 + 0.5 * u : (a.style === 'flame' ? 0.65 : 0.55);
       arr.push({ id: `arrow:${i}`, x: hx, y: hy, radius, intensity, color, flicker: 0, style: a.style, emitter });
     }
     return arr;

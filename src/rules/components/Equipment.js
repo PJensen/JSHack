@@ -4,6 +4,7 @@ export const Equipment = defineComponent('Equipment', {
   weapon: null,
   armor: null,
   shield: null,
+  ammo: null,
   ring1: null,
   ring2: null,
   attackDerived: 0,
