@@ -7,6 +7,8 @@ import { Settings } from "../../rules/components/Settings.js";
 import { Anatomy } from "../../rules/components/Anatomy.js";
 import { BoundingCircle } from "../../rules/components/BoundingCircle.js";
 import { getSpell } from "../../rules/data/spells.js";
+import { DungeonGeometry } from "../../rules/components/DungeonGeometry.js";
+import { GeometryKernel } from "../../rules/environment/GeometryKernel.js";
 
 function bracketizeName(str) {
   const s = String(str ?? "");
@@ -145,9 +147,25 @@ function createBoltFxManager(startShake, cam, theme = 'bolt') {
 }
 
 // Expanding ring ripple FX (shockwave)
-function createRippleFxManager(startShake, cam) {
+function createRippleFxManager(startShake, cam, world) {
   /** @type {Array<{x:number,y:number, age:number, life:number, maxR:number, color:string}>} */
   const ripples = [];
+
+  // Lazy occlusion kernel from DungeonGeometry
+  let _kernel = null;
+  let _kernelVer = -1;
+  function ensureKernel() {
+    let geom = null;
+    for (const [, g] of world.query(DungeonGeometry)) { if (g) { geom = g; break; } }
+    if (!geom) { _kernel = null; _kernelVer = -1; return null; }
+    const v = Number(geom.occlVersion || 0);
+    if (!_kernel || v !== _kernelVer) {
+      _kernel = new GeometryKernel(geom.options || {});
+      _kernel.deserialize(geom);
+      _kernelVer = v;
+    }
+    return _kernel;
+  }
 
   function addRipple({ x, y, radius = 8, life = 0.6, color = '#ffa600' }) {
     ripples.push({ x, y, age: 0, life, maxR: radius, color });
@@ -167,27 +185,47 @@ function createRippleFxManager(startShake, cam) {
       const t = Math.max(0, Math.min(1, r.age / (r.life || 0.0001)));
       const rad = r.maxR * t;
       const alpha = (1 - t) * 0.7;
-      const steps = Math.max(24, Math.min(96, Math.round(rad * 16)));
+      const steps = Math.max(24, Math.min(96, Math.round(Math.max(8, rad * 16))));
+      const k = ensureKernel();
+
+      // Build occlusion-clipped poly points
+      const pts = new Array(steps + 1);
+      const clipped = new Array(steps + 1);
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        let rr = rad;
+        let isClip = false;
+        if (k && rad > 1e-3) {
+          const dx = Math.cos(a), dy = Math.sin(a);
+          const ray = k.raycastOccl({ x: r.x, y: r.y }, { x: dx, y: dy }, rad);
+          if (ray && ray.hit && typeof ray.t === 'number') {
+            rr = Math.max(0, Math.min(rad, ray.t));
+            isClip = rr < rad - 1e-3;
+          }
+        }
+        pts[i] = { x: r.x + Math.cos(a) * rr, y: r.y + Math.sin(a) * rr };
+        clipped[i] = isClip;
+      }
+
+      // Draw segments where consecutive points are not clipped
       ctx.globalAlpha = alpha * 0.55;
       ctx.strokeStyle = r.color;
       ctx.lineWidth = 0.04;
-      ctx.beginPath();
-      for (let i = 0; i <= steps; i++) {
-        const a = (i / steps) * Math.PI * 2;
-        const x = r.x + Math.cos(a) * rad;
-        const y = r.y + Math.sin(a) * rad;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      for (let i = 1; i <= steps; i++) {
+        if (clipped[i] || clipped[i - 1]) continue;
+        const p0 = pts[i - 1], p1 = pts[i];
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
       }
-      ctx.stroke();
       // subtle dots along ring
       const dots = Math.max(8, Math.min(48, Math.round(rad * 2)));
       ctx.globalAlpha = alpha * 0.35;
       ctx.fillStyle = r.color;
       for (let i = 0; i < dots; i++) {
-        const a = (i / dots) * Math.PI * 2;
-        const x = r.x + Math.cos(a) * rad;
-        const y = r.y + Math.sin(a) * rad;
-        ctx.beginPath(); ctx.arc(x, y, 0.05 + 0.03 * (1 - t), 0, Math.PI * 2); ctx.fill();
+        const si = Math.min(steps, Math.max(0, Math.round((i / dots) * steps)));
+        const p = pts[si];
+        const px = p?.x ?? r.x;
+        const py = p?.y ?? r.y;
+        ctx.beginPath(); ctx.arc(px, py, 0.05 + 0.03 * (1 - t), 0, Math.PI * 2); ctx.fill();
       }
     }
     ctx.restore();
@@ -350,7 +388,7 @@ export function setupWorldEventHandlers(world, deps) {
   const { getActiveSpellId, setActiveSpell } = activeSpells;
 
   const boltFx = createBoltFxManager(startShake, cam, 'bolt');
-  const rippleFx = createRippleFxManager(startShake, cam);
+  const rippleFx = createRippleFxManager(startShake, cam, world);
   const arrowFx = createArrowFxManager(startShake, cam);
   /** @type {string[]} */
   const messageLog = [];
@@ -470,12 +508,24 @@ export function setupWorldEventHandlers(world, deps) {
     log(`Not enough mana to cast [${String(spellId || "spell")}] (need ${need}, have ${have}).`);
   });
 
-  world.on("damage", ({ id, amount, source, critical, crit }) => {
+  world.on("damage", ({ id, amount, source, critical, crit, at }) => {
     const who = nameOfEntity(id);
     const atk = Number(source || 0) ? nameOfEntity(source) : null;
     const critTxt = (critical || crit) ? " (CRIT!)" : "";
     if (atk) log(`${atk} hits ${who} for ${amount}${critTxt}.`);
     else log(`${who} takes ${amount} damage${critTxt}.`);
+
+    // Float text for any damage source (spells, DoTs, etc.)
+    try {
+      const t = Number(id || 0) || 0;
+      const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : /** @type any */ (world.get(t, Position));
+      if (pos && Number.isFinite(amount)) {
+        const pe = playerEntity(world);
+        const isPlayer = !!pe && pe.id === t;
+        const col = isPlayer ? '#ff6060' : '#ffd966';
+        ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
+      }
+    } catch {}
   });
 
   world.on("healed", ({ id, amount }) => {

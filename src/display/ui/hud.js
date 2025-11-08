@@ -193,13 +193,14 @@ export function initHUD() {
   });
 
   // Right-aligned bar: Inventory appears left of Cast by append order
-  // Quick slot sits to the left of Inventory
+  // Quick-use stack now floats above this bar (right side)
   const quick = createQuickSlot();
-  bar.appendChild(quick.el);
   bar.appendChild(invBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   root.appendChild(bar);
+  // Mount quick stack to root so it sits above the bar
+  root.appendChild(quick.el);
   return { castBtn, invBtn, shootBtn };
 }
 
@@ -224,13 +225,20 @@ function ensureRoot() {
 function createQuickSlot() {
   const el = document.createElement('div');
   Object.assign(el.style, {
-    display: 'flex', alignItems: 'center', gap: '8px'
+    position: 'fixed',
+    right: '8px',
+    bottom: '56px', // hover just above the bottom action bar
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '8px',
+    pointerEvents: 'auto',
+    zIndex: 901,
   });
 
   /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number}>} */
   const stack = [];
-  /** @type {HTMLDivElement|null} */
-  let chip = null;
+  const MAX_VISIBLE = 4;
 
   function actionable(it) {
     const t = String(it.type||'');
@@ -239,18 +247,20 @@ function createQuickSlot() {
     return false;
   }
 
-  function renderTop() {
-    // Clean up existing
-    if (chip) { try { chip.remove(); } catch {}; chip = null; }
-    // Find first actionable entry from front
-    let top = null;
-    for (const it of stack) { if (actionable(it)) { top = it; break; } }
-    if (!top) return;
-    chip = renderQuickChip(top, {
-      onUse: () => dispatchAction(top),
-      onDismiss: () => dismissTop(top.id)
-    });
-    el.appendChild(chip);
+  function renderStack() {
+    // Rebuild the visible stack (top N actionable)
+    el.innerHTML = '';
+    let shown = 0;
+    for (const it of stack) {
+      if (!actionable(it)) continue;
+      const chip = renderQuickChip(it, {
+        onUse: () => dispatchAction(it),
+        onDismiss: () => dismissTop(it.id)
+      });
+      el.appendChild(chip);
+      shown++;
+      if (shown >= MAX_VISIBLE) break;
+    }
   }
 
   function dispatchAction(it) {
@@ -264,7 +274,7 @@ function createQuickSlot() {
   function dismissTop(id) {
     const idx = stack.findIndex((x) => x && x.id === id);
     if (idx >= 0) stack.splice(idx, 1);
-    renderTop();
+    renderStack();
   }
 
   // Events
@@ -277,7 +287,7 @@ function createQuickSlot() {
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
     stack.unshift({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1) });
-    renderTop();
+    renderStack();
   });
 
   window.addEventListener('ui:itemEquipped', (ev) => {
@@ -286,30 +296,18 @@ function createQuickSlot() {
     const id = Number(e?.detail?.itemId || 0);
     if (!id) return;
     const idx = stack.findIndex((x) => x && x.id === id);
-    if (idx >= 0) { stack.splice(idx, 1); renderTop(); }
+    if (idx >= 0) { stack.splice(idx, 1); renderStack(); }
   });
 
   window.addEventListener('ui:itemUsed', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const id = Number(e?.detail?.itemId || 0);
-    const removed = !!e?.detail?.removed;
-    const count = Number(e?.detail?.count || 0);
     if (!id) return;
-    const it = stack.find((x) => x && x.id === id) || null;
-    if (!it) return;
-    if (removed || count <= 0) {
-      // Pop this and show next
-      const idx = stack.findIndex((x) => x && x.id === id);
-      if (idx >= 0) stack.splice(idx, 1);
-      renderTop();
-    } else {
-      it.count = count;
-      // Update count in UI
-      if (chip) {
-        const cnt = chip.querySelector('[data-role="count"]');
-        if (cnt) cnt.textContent = `x${count}`;
-      }
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) {
+      stack.splice(idx, 1);
+      renderStack();
     }
   });
 

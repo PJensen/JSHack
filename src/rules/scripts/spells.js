@@ -212,48 +212,62 @@ registerScript(BLASTWAVE_KEY, {
       if (inLos) targets.push({ id, x: p.x, y: p.y });
     }
 
-    // Apply damage, knockback, and occasional stun
+    // Apply damage/knockback as the ring reaches each target (expand over life)
+    const LIFE_SEC = 0.7;
+    const schedule = (fn, ms) => {
+      try { const w = /** @type any */ (typeof window !== 'undefined' ? window : null); if (w && typeof w.setTimeout === 'function') { w.setTimeout(fn, ms); return; } } catch {}
+      // Fallback: run immediately if no timer available
+      try { fn(); } catch {}
+    };
+
     for (const t of targets) {
-      const vit = /** @type any */ (world.get(t.id, Vitality));
-      if (!vit) continue;
+      const dist = Math.max(0, Math.hypot(t.x - apos.x, t.y - apos.y));
+      const delay = Math.round((dist / Math.max(1e-6, MAX_R)) * LIFE_SEC * 1000);
+      schedule(() => {
+        const vit = /** @type any */ (world.get(t.id, Vitality));
+        if (!vit) return;
 
-      const before = vit.hp | 0;
-      vit.hp = Math.max(0, before - BASE_DMG);
-      try { world.emit && world.emit("damage", { id: t.id, amount: BASE_DMG, at: { x: t.x, y: t.y }, source: actor }); } catch {}
+        const curPos = /** @type any */ (world.get(t.id, Position));
+        const tx = Number.isFinite(curPos?.x) ? curPos.x : t.x;
+        const ty = Number.isFinite(curPos?.y) ? curPos.y : t.y;
 
-      // Knockback using geometry kernel sweep if available; otherwise naive set
-      try {
-        const kernel = getGeometryKernel?.(world) || null;
-        const p = /** @type any */ (world.get(t.id, Position));
-        if (p) {
-          const dirx = p.x - apos.x; const diry = p.y - apos.y;
-          const len = Math.hypot(dirx, diry) || 1;
-          const ux = dirx / len, uy = diry / len;
-          const desired = { x: p.x + ux * KNOCK_TILES, y: p.y + uy * KNOCK_TILES };
-          let dest = desired;
-          if (kernel && typeof kernel.sweepCapsule === 'function') {
-            const radius = Math.max(0, /** @type any */ (world.get(t.id, BoundingCircle))?.radius ?? 0.45);
-            const sweep = kernel.sweepCapsule({ x: p.x, y: p.y }, desired, radius, { epsilon: 0.05 });
-            dest = { ...sweep.point };
+        const before = vit.hp | 0;
+        vit.hp = Math.max(0, before - BASE_DMG);
+        try { world.emit && world.emit("damage", { id: t.id, amount: BASE_DMG, at: { x: tx, y: ty }, source: actor }); } catch {}
+
+        // Knockback using geometry kernel sweep if available; otherwise naive set
+        try {
+          const kernel = getGeometryKernel?.(world) || null;
+          if (curPos) {
+            const dirx = curPos.x - apos.x; const diry = curPos.y - apos.y;
+            const len = Math.hypot(dirx, diry) || 1;
+            const ux = dirx / len, uy = diry / len;
+            const desired = { x: curPos.x + ux * KNOCK_TILES, y: curPos.y + uy * KNOCK_TILES };
+            let dest = desired;
+            if (kernel && typeof kernel.sweepCapsule === 'function') {
+              const radius = Math.max(0, /** @type any */ (world.get(t.id, BoundingCircle))?.radius ?? 0.45);
+              const sweep = kernel.sweepCapsule({ x: curPos.x, y: curPos.y }, desired, radius, { epsilon: 0.05 });
+              dest = { ...sweep.point };
+            }
+            if (Number.isFinite(dest.x) && Number.isFinite(dest.y)) {
+              world.set(t.id, Position, { x: dest.x, y: dest.y });
+              try { world.emit && world.emit("moved", { id: t.id, from: { x: curPos.x, y: curPos.y }, to: { x: dest.x, y: dest.y } }); } catch {}
+            }
           }
-          if (Number.isFinite(dest.x) && Number.isFinite(dest.y)) {
-            world.set(t.id, Position, { x: dest.x, y: dest.y });
-            try { world.emit && world.emit("moved", { id: t.id, from: { x: p.x, y: p.y }, to: { x: dest.x, y: dest.y } }); } catch {}
-          }
-        }
-      } catch {}
+        } catch {}
 
-      // Chance to stun survivors
-      if ((vit.hp | 0) > 0) {
-        if (Math.random() < STUN_CHANCE) {
-          const ae = /** @type any */ (world.get(t.id, ActiveEffects));
-          const eff = { key: 'stunned', turnsLeft: STUN_TURNS, potency: 1, sourceId: actor };
-          if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
-          else try { world.add(t.id, ActiveEffects, { effects: [eff] }); } catch {}
+        // Chance to stun survivors
+        if ((vit.hp | 0) > 0) {
+          if (Math.random() < STUN_CHANCE) {
+            const ae = /** @type any */ (world.get(t.id, ActiveEffects));
+            const eff = { key: 'stunned', turnsLeft: STUN_TURNS, potency: 1, sourceId: actor };
+            if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
+            else try { world.add(t.id, ActiveEffects, { effects: [eff] }); } catch {}
+          }
+        } else {
+          try { world.emit && world.emit("died", { id: t.id, at: { x: tx, y: ty } }); } catch {}
         }
-      } else {
-        try { world.emit && world.emit("died", { id: t.id, at: { x: t.x, y: t.y } }); } catch {}
-      }
+      }, delay);
     }
   },
 });
