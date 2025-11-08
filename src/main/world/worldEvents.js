@@ -159,7 +159,7 @@ function createArrowFxManager(startShake, cam) {
     const speed = 22; // tiles per second
     const duration = Math.max(0.08, Math.min(0.35, dist / speed));
     arrows.push({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, t: 0, duration, style });
-    startShake(cam, 2, 0.08);
+    startShake(cam, style === 'meteor' ? 4 : 2, style === 'meteor' ? 0.12 : 0.08);
   }
 
   function addSpark(x, y, style = 'plain') {
@@ -193,7 +193,7 @@ function createArrowFxManager(startShake, cam) {
       const hx = a.from.x + dx * u;
       const hy = a.from.y + dy * u;
       const ang = Math.atan2(dy, dx);
-      const trailLen = Math.max(0.15, Math.min(0.5, (1 - u) * 0.75));
+      const trailLen = a.style === 'meteor' ? Math.max(0.25, Math.min(0.9, (1 - u) * 1.25)) : Math.max(0.15, Math.min(0.5, (1 - u) * 0.75));
       const tx = hx - Math.cos(ang) * trailLen;
       const ty = hy - Math.sin(ang) * trailLen;
 
@@ -201,41 +201,69 @@ function createArrowFxManager(startShake, cam) {
       let core = '#fff7cc', mid = '#ffc96b', outer = '#ff9a3e';
       if (a.style === 'poison') { core = '#e6ffcc'; mid = '#9cff66'; outer = '#57cc2b'; }
       if (a.style === 'magic') { core = '#e9e1ff'; mid = '#b69cff'; outer = '#7e5cff'; }
+      if (a.style === 'meteor') { core = '#fff3c0'; mid = '#ffba5c'; outer = '#ff7f2a'; }
 
       const alpha = 1.0;
       // Trail (outer -> mid -> core)
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      ctx.strokeStyle = outer; ctx.globalAlpha = 0.22 * alpha; ctx.lineWidth = 0.22; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.strokeStyle = mid;   ctx.globalAlpha = 0.45 * alpha; ctx.lineWidth = 0.12; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.strokeStyle = core;  ctx.globalAlpha = 1.00 * alpha; ctx.lineWidth = 0.05; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      const wOuter = a.style === 'meteor' ? 0.55 : 0.22;
+      const wMid = a.style === 'meteor' ? 0.32 : 0.12;
+      const wCore = a.style === 'meteor' ? 0.14 : 0.05;
+      ctx.strokeStyle = outer; ctx.globalAlpha = 0.28 * alpha; ctx.lineWidth = wOuter; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = mid;   ctx.globalAlpha = 0.50 * alpha; ctx.lineWidth = wMid;   ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = core;  ctx.globalAlpha = 1.00 * alpha; ctx.lineWidth = wCore;  ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
 
-      // Head: small wedge
-      ctx.save();
-      ctx.translate(hx, hy);
-      ctx.rotate(ang);
-      ctx.globalAlpha = 0.95 * alpha;
-      ctx.fillStyle = core;
-      ctx.beginPath();
-      ctx.moveTo(0.10, 0);
-      ctx.lineTo(-0.08, 0.05);
-      ctx.lineTo(-0.08, -0.05);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      // Head
+      if (a.style === 'meteor') {
+        const r = 0.32 + 0.36 * (0.5 + 0.5 * u); // bigger as it approaches
+        ctx.save();
+        ctx.globalAlpha = 1.0 * alpha;
+        ctx.fillStyle = core;
+        ctx.beginPath(); ctx.arc(hx, hy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.75 * alpha;
+        ctx.strokeStyle = mid; ctx.lineWidth = 0.10; ctx.beginPath(); ctx.arc(hx, hy, r * 1.25, 0, Math.PI * 2); ctx.stroke();
+        // Embers around the head
+        const embers = 6;
+        for (let k = 0; k < embers; k++) {
+          const ang0 = Math.random() * Math.PI * 2;
+          const rr = r + Math.random() * 0.35;
+          const ex = hx + Math.cos(ang0) * rr;
+          const ey = hy + Math.sin(ang0) * rr;
+          ctx.globalAlpha = 0.6 * alpha;
+          ctx.fillStyle = outer; ctx.beginPath(); ctx.arc(ex, ey, 0.06 + Math.random() * 0.08, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      } else {
+        // small wedge arrowhead
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.rotate(ang);
+        ctx.globalAlpha = 0.95 * alpha;
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.moveTo(0.10, 0);
+        ctx.lineTo(-0.08, 0.05);
+        ctx.lineTo(-0.08, -0.05);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
     }
     // Impact sparks
     for (let i = 0; i < sparks.length; i++) {
       const s = sparks[i];
       const a = Math.max(0, Math.min(1, s.ttl / (s.max || 0.14)));
-      const r = 0.25 + 0.25 * a;
+      const isMeteor = s.style === 'meteor';
+      const r = (isMeteor ? 0.55 : 0.25) + (isMeteor ? 0.45 : 0.25) * a;
       let outer = `rgba(255,170,80,${0.35 * a})`;
       let inner = `rgba(255,240,200,${0.85 * a})`;
       if (s.style === 'poison') { outer = `rgba(87,204,43,${0.35 * a})`; inner = `rgba(233,255,204,${0.85 * a})`; }
       if (s.style === 'magic') { outer = `rgba(126,92,255,${0.35 * a})`; inner = `rgba(233,225,255,${0.85 * a})`; }
+      if (isMeteor) { outer = `rgba(255,140,60,${0.45 * a})`; inner = `rgba(255,240,200,${0.95 * a})`; }
       ctx.fillStyle = outer;
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = inner; ctx.lineWidth = 0.06;
-      ctx.beginPath(); ctx.arc(s.x, s.y, r * 1.35, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = inner; ctx.lineWidth = isMeteor ? 0.12 : 0.06;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * (isMeteor ? 1.8 : 1.35), 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }
@@ -250,8 +278,10 @@ function createArrowFxManager(startShake, cam) {
       let color = '#ffb36b';
       if (a.style === 'poison') color = '#9cff66';
       if (a.style === 'magic') color = '#b69cff';
-      const emitter = (a.style === 'flame') ? 'arrowFlame' : null;
-      arr.push({ id: `arrow:${i}`, x: hx, y: hy, radius: 1.4, intensity: 0.55, color, flicker: 0, style: 'arrow', emitter });
+      const emitter = (a.style === 'flame') ? 'arrowFlame' : (a.style === 'meteor' ? 'meteorFlame' : null);
+      const radius = a.style === 'meteor' ? 2.5 + 1.2 * u : 1.4;
+      const intensity = a.style === 'meteor' ? 0.7 + 0.5 * u : 0.55;
+      arr.push({ id: `arrow:${i}`, x: hx, y: hy, radius, intensity, color, flicker: 0, style: a.style, emitter });
     }
     return arr;
   }
@@ -330,7 +360,7 @@ export function setupWorldEventHandlers(world, deps) {
   // Meteor: a flaming projectile from sky to target, then an impact spark and shake
   world.on("spell:meteor", ({ from, to }) => {
     if (from && to) {
-      arrowFx.addArrow({ from, to, style: 'flame' });
+      arrowFx.addArrow({ from, to, style: 'meteor' });
       // Schedule impact spark roughly when it hits
       const dx = to.x - from.x; const dy = to.y - from.y;
       const dist = Math.hypot(dx, dy) || 0;
@@ -340,7 +370,7 @@ export function setupWorldEventHandlers(world, deps) {
         const w = typeof window !== 'undefined' ? window : null;
         if (w && typeof w.setTimeout === 'function') {
           w.setTimeout(() => {
-            arrowFx.addSpark(to.x, to.y, 'flame');
+            arrowFx.addSpark(to.x, to.y, 'meteor');
           }, Math.round(duration * 1000));
         }
       } catch {}

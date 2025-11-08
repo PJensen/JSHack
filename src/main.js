@@ -765,6 +765,58 @@ function syncLightEmitters(lights, fx, time) {
       emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
       // For moving emitters, allow slight variability without heavy flicker
       origins.push({ key, x: light.x, y: light.y });
+    } else if (light?.emitter === "burning") {
+      // Subtle embers and heat shimmer for burning status
+      const key = `burning:${light.id ?? i}`;
+      seen.add(key);
+      const emitter = fx.ensureEmitter(key, {
+        continuous: true,
+        rate: 8,
+        spread: Math.PI / 10,
+        speed: 0.5,
+        speedJitter: 0.3,
+        life: 0.6,
+        lifeJitter: 0.3,
+        size: 0.14,
+        sizeEnd: 0.04,
+        angle: -Math.PI / 2,
+        ax: 0,
+        ay: -0.25,
+        color: light.color || "#ff7a2a",
+        alpha0: 0.55,
+        alpha1: 0.0,
+        offsetX: 0,
+        offsetY: -0.1,
+      });
+      const rgb = parseRgb(light.color || "#ff7a2a");
+      emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+      origins.push({ key, x: light.x, y: light.y });
+    } else if (light?.emitter === "meteorFlame") {
+      // Heavier fiery trail for meteor head
+      const key = `meteorFlame:${light.id ?? i}`;
+      seen.add(key);
+      const emitter = fx.ensureEmitter(key, {
+        continuous: true,
+        rate: 48,
+        spread: Math.PI / 10,
+        speed: 1.6,
+        speedJitter: 0.6,
+        life: 0.55,
+        lifeJitter: 0.35,
+        size: 0.55,
+        sizeEnd: 0.16,
+        angle: Math.PI,
+        ax: 0,
+        ay: -0.9,
+        color: light.color || "#ff9a3e",
+        alpha0: 0.95,
+        alpha1: 0.0,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      const rgb = parseRgb(light.color || "#ff9a3e");
+      emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+      origins.push({ key, x: light.x, y: light.y });
     }
   }
   for (const key of _lightEmitterKeys) {

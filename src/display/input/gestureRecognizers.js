@@ -231,6 +231,7 @@ export function recognizeMeteorGesture(points) {
   if (!Array.isArray(points) || points.length < 6) return null;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   let totalLength = 0;
+  console.log(`Recognizing meteor gesture from ${points.length} points`);
   for (let i = 0; i < points.length; i++) {
     const p = points[i]; if (!p) continue;
     const x = Number(p.x), y = Number(p.y);
@@ -240,22 +241,31 @@ export function recognizeMeteorGesture(points) {
     if (i > 0) { const q = points[i - 1]; totalLength += Math.hypot(x - q.x, y - q.y); }
   }
   const width = maxX - minX; const height = maxY - minY;
-  if (width < MIN_BOUNDS || height < MIN_BOUNDS) return null;
+  // Use a diagonal-based size test that's more forgiving for slashes
+  const localMin = Math.max(12, Math.floor(MIN_BOUNDS * 0.8));
+  const diag = Math.hypot(width, height);
+  if (diag < localMin) return null;
   if (totalLength < MIN_TOTAL_LENGTH) return null;
 
   const normalized = points.map((p) => ({
     x: clamp01((p.x - minX) / (width || 1)),
     y: clamp01((p.y - minY) / (height || 1)),
   }));
+
+  
+
   const resampled = resamplePolyline(normalized, 32);
+  if (!Array.isArray(resampled) || resampled.length < 2) return null;
   const p0 = resampled[0];
   const pN = resampled[resampled.length - 1];
   if (!p0 || !pN) return null;
-
   const v = unitVector(p0, pN);
   if (!v) return null;
   // Require both components substantial (diagonal-ish)
-  if (Math.abs(v.x) < 0.35 || Math.abs(v.y) < 0.35) return null;
+  if (Math.abs(v.x) < 0.35 || Math.abs(v.y) < 0.35) {
+    console.log(`Meteor gesture not diagonal enough: vx=${v.x.toFixed(3)} vy=${v.y.toFixed(3)}`);
+    return null;
+  }
   // Straightness: average perpendicular error to the segment
   let err = 0;
   const ax = p0.x, ay = p0.y, bx = pN.x, by = pN.y;
@@ -267,7 +277,10 @@ export function recognizeMeteorGesture(points) {
     err += dist;
   }
   err /= Math.max(1, resampled.length - 2);
-  if (err > 0.20) return null; // too wobbly
+  if (err > 0.20){
+    console.log(`Meteor gesture too wobbly: err=${err.toFixed(3)}`);
+     return null; // too wobbly
+  }
 
   // Quality favors diagonal balance and low error
   const diagBalance = 1 - Math.abs(Math.abs(v.x) - Math.abs(v.y));

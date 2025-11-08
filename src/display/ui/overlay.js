@@ -112,7 +112,8 @@ export function initOverlays() {
     const mode = String(e?.detail?.mode || 'cast');
     const quality = Number(e?.detail?.quality);
     const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
-    const duration = mode === 'learn' ? 2600 : 900;
+    let duration = mode === 'learn' ? 2600 : 900;
+    if (id === 'meteor' && mode === 'cast') duration = 1800;
     if (id === 'lightning') {
       spellGestureHint.glyph.textContent = 'Z';
       spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
@@ -125,10 +126,10 @@ export function initOverlays() {
       spellGestureHint.glyph.textContent = '/';
       spellGestureHint.glyph.style.textShadow = buildFlameShadow(clamped);
       spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,160,80,0.45))';
-      spellGestureHint.caption.textContent = mode === 'learn'
+      spellGestureHint.caption.textContent = (mode === 'learn')
         ? 'Draw a diagonal to call Meteor!'
-        : '';
-      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
+        : 'Tap a target';
+      spellGestureHint.caption.style.display = 'block';
     }
     spellGestureHint.glyph.style.opacity = mode === 'cast' ? '0.92' : '1';
     spellGestureHint.wrap.style.display = 'flex';

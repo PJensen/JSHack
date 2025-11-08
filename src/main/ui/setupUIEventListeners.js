@@ -300,7 +300,7 @@ export function setupUIEventListeners(world, deps) {
       // Show a hint to tap target; reuse gesture hint UI if present
       try {
         window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
-          detail: { id: "meteor", mode: "learn", quality: e?.detail?.quality ?? null }
+          detail: { id: "meteor", mode: "cast", quality: e?.detail?.quality ?? null }
         }));
       } catch {}
       return;

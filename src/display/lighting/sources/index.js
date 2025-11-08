@@ -21,12 +21,12 @@ export function collectLightSources(view, opts = {}) {
           id: `burn:${e.id ?? i}`,
           x: e.pos.x,
           y: e.pos.y,
-          radius: 3.2 * radiusScale,
-          intensity: 0.9,
-          color: '#ff9440',
-          flicker: 0.35,
+          radius: 1.2 * radiusScale,
+          intensity: 0.22,
+          color: '#ff7a2a',
+          flicker: 0.12,
           style: 'burning',
-          emitter: null,
+          emitter: 'burning',
         });
       }
       // Intentionally no emissive light for 'invulnerable' — visualized as a ring overlay.
