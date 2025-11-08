@@ -9,6 +9,7 @@ import { Position } from "../../rules/components/Position.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { Mana } from "../../rules/components/Mana.js";
+import { Brain } from "../../rules/components/Brain.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { buildEquipmentItem } from "../../rules/data/equipmentLoader.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
@@ -121,6 +122,8 @@ function setPlayerStats(world) {
   if (!pe) return;
   world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 1 });
   world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
+  // Ensure intelligence comfortably above any spell thresholds
+  try { world.mutate(pe.id, Brain, (r) => { r.intelligence = Math.max(16, Number(r.intelligence || 0)); }); } catch {}
 }
 
 function dropPotions(world, room) {

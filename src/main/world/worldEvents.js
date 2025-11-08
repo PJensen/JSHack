@@ -471,10 +471,11 @@ export function setupWorldEventHandlers(world, deps) {
     if (!getActiveSpellId()) {
       setActiveSpell(String(spellId));
     }
-    if (String(spellId || "") === "lightning") {
+    const sid = String(spellId || "");
+    if (sid === "lightning" || sid === "meteor") {
       try {
         window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
-          detail: { id: "lightning", mode: "learn" }
+          detail: { id: sid, mode: "learn" }
         }));
       } catch {}
     }

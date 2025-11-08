@@ -255,7 +255,7 @@ export function recognizeMeteorGesture(points) {
   const v = unitVector(p0, pN);
   if (!v) return null;
   // Require both components substantial (diagonal-ish)
-  if (Math.abs(v.x) < 0.45 || Math.abs(v.y) < 0.45) return null;
+  if (Math.abs(v.x) < 0.35 || Math.abs(v.y) < 0.35) return null;
   // Straightness: average perpendicular error to the segment
   let err = 0;
   const ax = p0.x, ay = p0.y, bx = pN.x, by = pN.y;
@@ -267,7 +267,7 @@ export function recognizeMeteorGesture(points) {
     err += dist;
   }
   err /= Math.max(1, resampled.length - 2);
-  if (err > 0.14) return null; // too wobbly
+  if (err > 0.20) return null; // too wobbly
 
   // Quality favors diagonal balance and low error
   const diagBalance = 1 - Math.abs(Math.abs(v.x) - Math.abs(v.y));

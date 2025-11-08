@@ -108,23 +108,32 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const id = String(e?.detail?.id || '');
-    if (id !== 'lightning') return;
+    if (id !== 'lightning' && id !== 'meteor') return;
     const mode = String(e?.detail?.mode || 'cast');
     const quality = Number(e?.detail?.quality);
     const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
     const duration = mode === 'learn' ? 2600 : 900;
-    spellGestureHint.glyph.textContent = 'Z';
-    spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+    if (id === 'lightning') {
+      spellGestureHint.glyph.textContent = 'Z';
+      spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+      spellGestureHint.caption.textContent = mode === 'learn'
+        ? 'Draw a Z to unleash Lightning!'
+        : '';
+      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
+    } else {
+      spellGestureHint.glyph.textContent = '/';
+      spellGestureHint.glyph.style.textShadow = buildFlameShadow(clamped);
+      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,160,80,0.45))';
+      spellGestureHint.caption.textContent = mode === 'learn'
+        ? 'Draw a diagonal to call Meteor!'
+        : '';
+      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
+    }
     spellGestureHint.glyph.style.opacity = mode === 'cast' ? '0.92' : '1';
     spellGestureHint.wrap.style.display = 'flex';
     spellGestureHint.wrap.style.animation = 'none';
     spellGestureHint.wrap.style.transform = 'translate(-50%, -50%) scale(1)';
-    spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
-    // Only announce on learn; keep caption hidden on cast.
-    spellGestureHint.caption.textContent = mode === 'learn'
-      ? 'Draw a Z to unleash Lightning!'
-      : '';
-    spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
     if (spellGestureTimer) window.clearTimeout(spellGestureTimer);
     spellGestureTimer = window.setTimeout(() => {
       spellGestureHint.wrap.style.display = 'none';
@@ -288,6 +297,14 @@ function buildLightningShadow(intensity) {
   const inner = (6 + base * 18).toFixed(1);
   const core = (3 + base * 10).toFixed(1);
   return `0 0 ${outer}px rgba(120,200,255,0.55), 0 0 ${inner}px rgba(180,240,255,0.7), 0 0 ${core}px rgba(255,255,255,0.9)`;
+}
+
+function buildFlameShadow(intensity) {
+  const base = Math.max(0.2, Math.min(1, intensity));
+  const outer = (12 + base * 32).toFixed(1);
+  const inner = (6 + base * 18).toFixed(1);
+  const core = (3 + base * 10).toFixed(1);
+  return `0 0 ${outer}px rgba(255,160,80,0.55), 0 0 ${inner}px rgba(255,200,120,0.7), 0 0 ${core}px rgba(255,255,200,0.9)`;
 }
 
 /** @param {HTMLDivElement} tip @param {{mode?:'single'|'multi', item?:any, items?:any[], count?:number, pickupRange?:number}} detail */
