@@ -50,10 +50,12 @@ export function setupUIEventListeners(world, deps) {
           for (const [id, pos, ni, vit] of world.query(Position, NamedIdentity, Vitality)) {
             if (!ni || ni.identity !== 'monster') continue;
             if (!vit || (vit.hp|0) <= 0) continue;
-            const r = Math.max(0, world.get(id, BoundingCircle)?.radius ?? 0.45);
+            const baseR = Math.max(0, world.get(id, BoundingCircle)?.radius ?? 0.45);
+            const pxMin = 18; // mobile-friendly minimum in screen pixels
+            const worldMin = tileSize && tileSize > 0 ? (pxMin / tileSize) : 0.0;
+            const hitR = Math.max(baseR * 0.9, worldMin);
             const centerDist = Math.hypot(pos.x - wx, pos.y - wy);
-            // Require a deliberate tap: inside circle and not just barely inside; prefer nearest center
-            if (centerDist <= r * 0.8 && centerDist < minCenter) { minCenter = centerDist; tappedMonster = id; }
+            if (centerDist <= hitR && centerDist < minCenter) { minCenter = centerDist; tappedMonster = id; }
           }
 
           // Check if player is ranged-only (bow equipped)

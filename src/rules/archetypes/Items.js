@@ -38,3 +38,16 @@ export const GoldStack = defineArchetype(
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Gold", identity: "gold" })],
 );
+
+// Stackable arrows (ammo) — planning for ranged ammo consumption
+export const ArrowsStack = defineArchetype(
+    "ArrowsStack",
+    [ItemInfo, {
+        type: "ammo",
+        description: "A bundle of arrows.",
+        weight: 0.2,
+        value: 1, // per stack unit (approx)
+        count: 10,
+    }],
+    [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Arrows", identity: "ammo_arrows" })],
+);

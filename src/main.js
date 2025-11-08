@@ -235,7 +235,7 @@ function render(worldView) {
     allLights,
     { x0: vx0, y0: vy0, x1: vx1, y1: vy1 },
     _fxTime,
-    { quality: PERF.quality, fov: fovLight }
+    { quality: PERF.quality, fov: fovLight, irregularity: 0.2, warmth: 0.35 }
   );
   _particleOrigins = syncLightEmitters(allLights, fx, _fxTime);
 
@@ -704,40 +704,68 @@ function syncLightEmitters(lights, fx, time) {
   const seen = new Set();
   for (let i = 0; i < lights.length; i++) {
     const light = lights[i];
-    if (light?.emitter !== "torch") continue;
-    const key = `torch:${light.id ?? i}`;
-    seen.add(key);
-    const emitter = fx.ensureEmitter(key, {
-      continuous: true,
-      rate: 16,
-      spread: Math.PI / 12,
-      speed: 0.65,
-      speedJitter: 0.45,
-      life: 0.9,
-      lifeJitter: 0.45,
-      size: 0.55,
-      sizeEnd: 0.18,
-      angle: -Math.PI / 2,
-      ax: 0,
-      ay: -0.6,
-      color: light.color || "#ffb347",
-      alpha0: 0.9,
-      alpha1: 0,
-      offsetX: 0,
-      offsetY: -0.2,
-    });
-    const rgb = parseRgb(light.color || "#ffb347");
-    emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
-    emitter.offsetX = 0;
-    emitter.offsetY = -0.35;
-    const seed = hashToUnit(light.id ?? `${light.x},${light.y}`);
-    const wobble = Math.sin((time || 0) * 5.2 + seed * 9.1) * 0.2 + Math.sin((time || 0) * 3.3 + seed * 13.7) * 0.15;
-    const flicker = 1 + wobble;
-    emitter.rate = 14 + flicker * 6;
-    emitter.size = 0.5 + flicker * 0.25;
-    emitter.life = 0.8 + flicker * 0.25;
-    emitter.spread = Math.PI / 16 + Math.abs(Math.sin((time || 0) * 2.1 + seed * 7.3)) * Math.PI / 48;
-    origins.push({ key, x: light.x, y: light.y });
+    if (light?.emitter === "torch") {
+      const key = `torch:${light.id ?? i}`;
+      seen.add(key);
+      const emitter = fx.ensureEmitter(key, {
+        continuous: true,
+        rate: 16,
+        spread: Math.PI / 12,
+        speed: 0.65,
+        speedJitter: 0.45,
+        life: 0.9,
+        lifeJitter: 0.45,
+        size: 0.55,
+        sizeEnd: 0.18,
+        angle: -Math.PI / 2,
+        ax: 0,
+        ay: -0.6,
+        color: light.color || "#ffb347",
+        alpha0: 0.9,
+        alpha1: 0,
+        offsetX: 0,
+        offsetY: -0.2,
+      });
+      const rgb = parseRgb(light.color || "#ffb347");
+      emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+      emitter.offsetX = 0;
+      emitter.offsetY = -0.35;
+      const seed = hashToUnit(light.id ?? `${light.x},${light.y}`);
+      const wobble = Math.sin((time || 0) * 5.2 + seed * 9.1) * 0.2 + Math.sin((time || 0) * 3.3 + seed * 13.7) * 0.15;
+      const flicker = 1 + wobble;
+      emitter.rate = 14 + flicker * 6;
+      emitter.size = 0.5 + flicker * 0.25;
+      emitter.life = 0.8 + flicker * 0.25;
+      emitter.spread = Math.PI / 16 + Math.abs(Math.sin((time || 0) * 2.1 + seed * 7.3)) * Math.PI / 48;
+      origins.push({ key, x: light.x, y: light.y });
+    } else if (light?.emitter === "arrowFlame") {
+      // Trailing particles for flaming arrow head (emitted at current head position)
+      const key = `arrowFlame:${light.id ?? i}`;
+      seen.add(key);
+      const emitter = fx.ensureEmitter(key, {
+        continuous: true,
+        rate: 22,
+        spread: Math.PI / 16,
+        speed: 1.4,
+        speedJitter: 0.35,
+        life: 0.35,
+        lifeJitter: 0.25,
+        size: 0.28,
+        sizeEnd: 0.08,
+        angle: Math.PI, // default back-facing; ovx/ovy will add arrow motion
+        ax: 0,
+        ay: -0.4,
+        color: light.color || "#ffb36b",
+        alpha0: 0.9,
+        alpha1: 0.0,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      const rgb = parseRgb(light.color || "#ffb36b");
+      emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+      // For moving emitters, allow slight variability without heavy flicker
+      origins.push({ key, x: light.x, y: light.y });
+    }
   }
   for (const key of _lightEmitterKeys) {
     if (!seen.has(key)) fx.removeEmitter(key);

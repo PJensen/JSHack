@@ -250,7 +250,8 @@ function createArrowFxManager(startShake, cam) {
       let color = '#ffb36b';
       if (a.style === 'poison') color = '#9cff66';
       if (a.style === 'magic') color = '#b69cff';
-      arr.push({ id: `arrow:${i}`, x: hx, y: hy, radius: 1.4, intensity: 0.55, color, flicker: 0, style: 'arrow', emitter: null });
+      const emitter = (a.style === 'flame') ? 'arrowFlame' : null;
+      arr.push({ id: `arrow:${i}`, x: hx, y: hy, radius: 1.4, intensity: 0.55, color, flicker: 0, style: 'arrow', emitter });
     }
     return arr;
   }
@@ -328,7 +329,22 @@ export function setupWorldEventHandlers(world, deps) {
 
   // Ranged shots: fast crossbow/arrow tracer (separate handler)
   world.on("ranged:shot", ({ from, to, style }) => {
-    arrowFx.addArrow({ from, to, style: style || 'flame' });
+    const s = style || 'flame';
+    arrowFx.addArrow({ from, to, style: s });
+    // Schedule impact spark to align with travel time
+    if (from && to) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const dist = Math.hypot(dx, dy) || 0;
+      const speed = 22; // tiles/sec (keep in sync with arrowFx)
+      const duration = Math.max(0.08, Math.min(0.35, dist / speed));
+      try {
+        const w = typeof window !== 'undefined' ? window : null;
+        if (w && typeof w.setTimeout === 'function') {
+          w.setTimeout(() => { arrowFx.addSpark(to.x, to.y, s); }, Math.round(duration * 1000));
+        }
+      } catch {}
+    }
   });
 
   world.on("ranged:impact", ({ at, style }) => {

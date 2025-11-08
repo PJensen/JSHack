@@ -86,7 +86,6 @@ export function rangedAttackSystem(world) {
     if (target) {
       // If occluded path shortened before target, do impact spark and finish (no damage)
       if ((Math.abs(finalTo.x - target.x) > 1e-3) || (Math.abs(finalTo.y - target.y) > 1e-3)) {
-        try { world.emit && world.emit('ranged:impact', { at: { x: finalTo.x, y: finalTo.y }, style: 'flame' }); } catch {}
         world.remove(actor, RangedAttackIntent);
         continue;
       }
@@ -103,7 +102,6 @@ export function rangedAttackSystem(world) {
       if (!isCrit && (isNat1 || totalToHit < armorClass)) {
         // Miss feedback (display logs/status)
         try { world.emit && world.emit('status', { id: target.id, kind: 'miss', text: 'MISS', source: actor }); } catch {}
-        try { world.emit && world.emit('ranged:impact', { at: { x: finalTo.x, y: finalTo.y }, style: 'flame' }); } catch {}
         world.remove(actor, RangedAttackIntent);
         continue;
       }
@@ -117,7 +115,6 @@ export function rangedAttackSystem(world) {
       if (tv) {
         tv.hp = Math.max(0, tv.hp - finalDmg);
         try { world.emit && world.emit('damaged', { target: target.id, amount: finalDmg, source: actor, critical: isCrit }); } catch {}
-        try { world.emit && world.emit('ranged:impact', { at: { x: finalTo.x, y: finalTo.y }, style: 'flame' }); } catch {}
         if ((tv.hp|0) <= 0) { try { world.emit && world.emit('died', { id: target.id, killer: actor }); } catch {} }
         else {
           // Add a small burning DoT for flaming arrow flavor
@@ -128,8 +125,7 @@ export function rangedAttackSystem(world) {
         }
       }
     } else {
-      // No target: if we clipped on geometry, add impact spark at final point
-      try { world.emit && world.emit('ranged:impact', { at: { x: finalTo.x, y: finalTo.y }, style: 'flame' }); } catch {}
+      // No target: impact spark now handled/scheduled by display via ranged:shot
     }
 
     world.remove(actor, RangedAttackIntent);
