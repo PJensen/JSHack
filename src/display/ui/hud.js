@@ -193,6 +193,9 @@ export function initHUD() {
   });
 
   // Right-aligned bar: Inventory appears left of Cast by append order
+  // Quick slot sits to the left of Inventory
+  const quick = createQuickSlot();
+  bar.appendChild(quick.el);
   bar.appendChild(invBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
@@ -215,4 +218,141 @@ function ensureRoot() {
     document.body.appendChild(root);
   }
   return root;
+}
+
+// --- Singular Quick Slot (most recent pickup) -----------------------------
+function createQuickSlot() {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    display: 'flex', alignItems: 'center', gap: '8px'
+  });
+
+  /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number}>} */
+  const stack = [];
+  /** @type {HTMLDivElement|null} */
+  let chip = null;
+
+  function actionable(it) {
+    const t = String(it.type||'');
+    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book') return (it.count||0) > 0;
+    if (t === 'equip') return true; // show until equipped
+    return false;
+  }
+
+  function renderTop() {
+    // Clean up existing
+    if (chip) { try { chip.remove(); } catch {}; chip = null; }
+    // Find first actionable entry from front
+    let top = null;
+    for (const it of stack) { if (actionable(it)) { top = it; break; } }
+    if (!top) return;
+    chip = renderQuickChip(top, {
+      onUse: () => dispatchAction(top),
+      onDismiss: () => dismissTop(top.id)
+    });
+    el.appendChild(chip);
+  }
+
+  function dispatchAction(it) {
+    const t = String(it.type||'');
+    if (t === 'potion') window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+    else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    else if (t === 'equip') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+    else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+  }
+
+  function dismissTop(id) {
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) stack.splice(idx, 1);
+    renderTop();
+  }
+
+  // Events
+  window.addEventListener('ui:recentPickup', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const item = e?.detail?.item;
+    if (!item) return;
+    // Insert at front, de-dup
+    const idx = stack.findIndex((x) => x && x.id === item.id);
+    if (idx >= 0) stack.splice(idx, 1);
+    stack.unshift({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1) });
+    renderTop();
+  });
+
+  window.addEventListener('ui:itemEquipped', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = Number(e?.detail?.itemId || 0);
+    if (!id) return;
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) { stack.splice(idx, 1); renderTop(); }
+  });
+
+  window.addEventListener('ui:itemUsed', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = Number(e?.detail?.itemId || 0);
+    const removed = !!e?.detail?.removed;
+    const count = Number(e?.detail?.count || 0);
+    if (!id) return;
+    const it = stack.find((x) => x && x.id === id) || null;
+    if (!it) return;
+    if (removed || count <= 0) {
+      // Pop this and show next
+      const idx = stack.findIndex((x) => x && x.id === id);
+      if (idx >= 0) stack.splice(idx, 1);
+      renderTop();
+    } else {
+      it.count = count;
+      // Update count in UI
+      if (chip) {
+        const cnt = chip.querySelector('[data-role="count"]');
+        if (cnt) cnt.textContent = `x${count}`;
+      }
+    }
+  });
+
+  return { el };
+}
+
+/** @param {{id:number,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function}} h */
+function renderQuickChip(it, h) {
+  const chip = document.createElement('div');
+  Object.assign(chip.style, {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    padding: '6px 8px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
+  });
+  const name = document.createElement('div');
+  name.textContent = `[${String(it.name||'item')}]`;
+  name.style.color = '#9cf';
+  const count = document.createElement('div');
+  count.dataset.role = 'count';
+  count.style.opacity = '0.8';
+  count.style.fontSize = '12px';
+  count.textContent = (it.type === 'potion' || it.type === 'scroll') ? `x${it.count||1}` : '';
+
+  const btn = document.createElement('button');
+  Object.assign(btn.style, {
+    padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+  });
+  btn.textContent = (it.type === 'equip') ? 'Equip' : (it.type === 'potion' ? 'Drink' : 'Read');
+  btn.addEventListener('click', () => h.onUse && h.onUse());
+
+  const x = document.createElement('button');
+  Object.assign(x.style, {
+    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer', minWidth: '28px'
+  });
+  x.textContent = '×';
+  x.title = 'Dismiss';
+  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+
+  chip.appendChild(name);
+  chip.appendChild(count);
+  chip.appendChild(btn);
+  chip.appendChild(x);
+  return chip;
 }

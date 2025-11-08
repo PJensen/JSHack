@@ -149,6 +149,8 @@ export function initOverlays() {
     }, duration);
   });
 
+  // Quick actions are now embedded in HUD (single slot)
+
   return { root, inv, log, ticker };
 }
 
@@ -349,6 +351,48 @@ function renderGroundTooltip(tip, detail) {
   // Bonus lines
   const bonuses = it.bonuses && typeof it.bonuses === 'object' ? it.bonuses : {};
   const bonusKeys = Object.keys(bonuses);
+  // Damage summary (if present)
+  const dmgWrap = document.createElement('div');
+  let hasDmg = false;
+  if (it.damageDice) {
+    const line = document.createElement('div');
+    line.textContent = `Damage: ${String(it.damageDice)}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (Number.isFinite(Number(bonuses.attack))) {
+    const v = Number(bonuses.attack);
+    const line = document.createElement('div');
+    const sign = v > 0 ? '+' : '';
+    line.textContent = `Attack: ${sign}${v}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (Number.isFinite(Number(bonuses.damage))) {
+    const v = Number(bonuses.damage);
+    const line = document.createElement('div');
+    const sign = v > 0 ? '+' : '';
+    line.textContent = `Damage Bonus: ${sign}${v}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (Number.isFinite(Number(bonuses.critChance)) || Number.isFinite(Number(bonuses.critMult))) {
+    const cc = Number(bonuses.critChance) || 0;
+    const cm = Number(bonuses.critMult) || 0;
+    const line = document.createElement('div');
+    line.textContent = `Crit: ${cc ? `${cc}%` : '—'}${cm ? ` x${cm.toFixed(2)}` : ''}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (hasDmg) {
+    const sep = document.createElement('div'); sep.textContent = '—'; sep.style.opacity = '0.4'; sep.style.margin = '6px 0 4px';
+    tip.appendChild(sep);
+    tip.appendChild(dmgWrap);
+  }
   if (bonusKeys.length) {
     for (const k of bonusKeys) {
       const v = Number(bonuses[k]);
@@ -655,6 +699,7 @@ function bracketize(s) {
   if (str.startsWith('[') && str.endsWith(']')) return str;
   return `[${str}]`;
 }
+
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
 function renderPickupChooser(panel, items) {

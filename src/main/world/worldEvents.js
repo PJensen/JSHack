@@ -531,12 +531,35 @@ export function setupWorldEventHandlers(world, deps) {
 
   world.on("item:pickup", ({ actor, itemId, count }) => {
     const info = world.get(itemId, ItemInfo);
-    if (!info || info.type !== "currency") return;
+    if (!info) return;
     const pos = world.get(actor, Position);
     if (!pos) return;
-    const n = Number.isFinite(count) ? Number(count) : Number(info.count || 1);
-    if (n > 0) {
-      ftext.addGold(pos.x, pos.y, n, { color: "#ffcd45" });
+
+    // Currency: float text feedback
+    if (info.type === "currency") {
+      const n = Number.isFinite(count) ? Number(count) : Number(info.count || 1);
+      if (n > 0) {
+        ftext.addGold(pos.x, pos.y, n, { color: "#ffcd45" });
+      }
+      return;
+    }
+
+    // Player pickups: notify quick action bar of the recent item
+    const pe = playerEntity(world);
+    if (pe && pe.id === actor) {
+      const name = world.get(itemId, NamedIdentity)?.name || info.description || info.type || "item";
+      const payload = {
+        id: itemId,
+        type: info.type,
+        slot: info.slot || "",
+        name,
+        count: info.count || 1,
+        rarityName: info.rarityName || "common",
+        bonuses: info.bonuses || {},
+        affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
+        damageDice: info.damageDice || null,
+      };
+      try { window.dispatchEvent(new CustomEvent("ui:recentPickup", { detail: { item: payload } })); } catch {}
     }
   });
 
@@ -546,8 +569,16 @@ export function setupWorldEventHandlers(world, deps) {
     try { window.dispatchEvent(new CustomEvent("ui:hideGroundItem")); } catch {}
   });
 
-  world.on("item:used", () => {
+  world.on("item:used", ({ actor, itemId }) => {
+    // Refresh inventory UI
     try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
+    // Notify quick-slot logic about the used item
+    try {
+      const info = world.get(itemId, ItemInfo);
+      const removed = !info;
+      const count = info?.count || 0;
+      window.dispatchEvent(new CustomEvent("ui:itemUsed", { detail: { itemId, removed, count } }));
+    } catch {}
   });
 
   world.on("spell:learned", ({ spellId }) => {
@@ -593,6 +624,7 @@ export function setupWorldEventHandlers(world, deps) {
     const label = name ? bracketizeName(name) : `item ${itemId}`;
     log(`You equip ${label}${slot ? " (" + slot + ")" : ""}.`);
     try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:itemEquipped", { detail: { itemId, slot } })); } catch {}
   });
 
   world.on("moved", ({ id, to }) => {
@@ -650,6 +682,7 @@ export function setupWorldEventHandlers(world, deps) {
         count: info?.count || 1,
         bonuses,
         affixes,
+        damageDice: info?.damageDice || null,
       },
       pickupRange: maxReach,
     };
