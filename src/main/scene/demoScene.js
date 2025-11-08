@@ -2,7 +2,7 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { playerEntity } from "../../rules/utils/queries.js";
 import { createPlayer } from "../../rules/archetypes/Player.js";
 import { HealthPotion, GoldStack } from "../../rules/archetypes/Items.js";
-import { Monster } from "../../rules/archetypes/Creatures.js";
+import { Spawner } from "../../rules/archetypes/Spawner.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
@@ -125,14 +125,18 @@ function dropGold(world, room) {
 }
 
 function spawnMonsters(world, room) {
-  const { center, halfWidth, halfHeight } = room;
-  const leftX = center.x - (halfWidth - 1.5);
-  const rightX = center.x + (halfWidth - 1.5);
-  const topY = center.y - (halfHeight - 1.5);
-  const bottomY = center.y + (halfHeight - 1.5);
-  createFrom(world, Monster, { x: leftX, y: topY, name: "Goblin", identity: "monster" });
-  createFrom(world, Monster, { x: rightX, y: topY, name: "Goblin", identity: "monster" });
-  createFrom(world, Monster, { x: center.x, y: bottomY, name: "Goblin", identity: "monster" });
+  const { center } = room;
+  // Place a single spawner instead of static monsters for testing
+  createFrom(world, Spawner, {
+    x: center.x + 2,
+    y: center.y,
+    name: "Monster Spawner",
+    maxConcurrent: 3,
+    cooldownTicks: 20,
+    totalToSpawn: 15,
+    spawnRadius: 0.75,
+    spawnParams: { name: "Goblin", identity: "monster" }
+  });
 }
 
 function dropEquipment(world, room) {
@@ -142,4 +146,8 @@ function dropEquipment(world, room) {
 
   const thornArmor = buildEquipmentItem(world, "chain_armor", { affixes: ["thorns1"] });
   world.add(thornArmor, Position, { x: center.x + (halfWidth - 2), y: center.y + (halfHeight - 2) });
+
+  // New: wooden bow to try ranged combat
+  const woodBow = buildEquipmentItem(world, "bow_wood", {});
+  world.add(woodBow, Position, { x: center.x, y: center.y + (halfHeight - 2) });
 }

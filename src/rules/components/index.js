@@ -28,3 +28,4 @@ export { Settings } from './Settings.js';
 export { UseIntent } from './Intents/UseIntent.js';
 export { DungeonGeometry } from './DungeonGeometry.js';
 export { LightSource } from './LightSource.js';
+export { MonsterSpawner } from './MonsterSpawner.js';

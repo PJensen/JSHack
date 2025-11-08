@@ -4,6 +4,7 @@
 
 import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, Position, ItemInfo } from "../../src/rules/components/index.js";
 import { UseIntent } from "../../src/rules/components/Intents/UseIntent.js";
+import { RangedAttackIntent } from "../../src/rules/components/Intents/RangedAttackIntent.js";
 import { itemsAt } from "../../src/rules/utils/queries.js";
 
 /**
@@ -38,6 +39,20 @@ export function makeRulesDispatcher(world, getActorId) {
       case "rules.castActiveSpell": {
         const { spellId = 0, targetId = actorId } = action.payload || {};
         world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.shootRanged": {
+        world?.add?.(actorId, RangedAttackIntent, {});
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.shootRangedAt": {
+        const { targetId = 0, x = null, y = null } = action.payload || {};
+        const intent = {};
+        if (Number.isInteger(targetId) && targetId > 0) intent.targetId = targetId;
+        if (Number.isFinite(x) && Number.isFinite(y)) { intent.toX = x; intent.toY = y; }
+        world?.add?.(actorId, RangedAttackIntent, intent);
         world?.tick?.(1);
         break;
       }

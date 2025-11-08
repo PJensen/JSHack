@@ -29,19 +29,7 @@ export function collectLightSources(view, opts = {}) {
           emitter: null,
         });
       }
-      if (e.tags.includes('invulnerable')) {
-        out.push({
-          id: `aegis:${e.id ?? i}`,
-          x: e.pos.x,
-          y: e.pos.y,
-          radius: 2.4 * radiusScale,
-          intensity: 0.7,
-          color: '#a0f5ff',
-          flicker: 0.1,
-          style: 'aegis',
-          emitter: null,
-        });
-      }
+      // Intentionally no emissive light for 'invulnerable' — visualized as a ring overlay.
     }
   }
   if (Array.isArray(view.emissives)) {

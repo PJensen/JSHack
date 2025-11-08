@@ -17,6 +17,8 @@ const DEFAULTS = {
   rayEpsStep: 0.5,
   maxSweepSteps: 96,
   sweepMinStep: 0.05,
+  // Separate epsilon for movement sweeps so narrow corridors remain navigable
+  sweepEpsHit: 0.05,
   gradientStep: 0.01,
 };
 
@@ -29,6 +31,7 @@ function withDefaults(opts = {}) {
     rayEpsStep: opts.rayEpsStep ?? DEFAULTS.rayEpsStep,
     maxSweepSteps: opts.maxSweepSteps ?? DEFAULTS.maxSweepSteps,
     sweepMinStep: opts.sweepMinStep ?? DEFAULTS.sweepMinStep,
+    sweepEpsHit: opts.sweepEpsHit ?? DEFAULTS.sweepEpsHit,
     gradientStep: opts.gradientStep ?? DEFAULTS.gradientStep,
   };
 }
@@ -313,7 +316,7 @@ export class GeometryKernel {
     }
     const maxSteps = Math.max(1, opts.maxSteps ?? this.options.maxSweepSteps);
     const minStep = Math.max(EPS, opts.minStep ?? this.options.sweepMinStep);
-    const epsHit = opts.epsilon ?? this.options.rayEpsHit;
+    const epsHit = opts.epsilon ?? this.options.sweepEpsHit ?? this.options.rayEpsHit;
 
     let traveled = 0;
     let steps = 0;

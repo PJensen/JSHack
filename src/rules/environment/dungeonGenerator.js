@@ -50,6 +50,15 @@ export function generateRectRoom(world, opts = {}) {
   const carveFlags = { affectsMove: true, affectsOccl: true };
   kernel.carveBox(roomMeta.center.x, roomMeta.center.y, roomMeta.halfWidth, roomMeta.halfHeight, 0, carveFlags);
 
+  // Carve a simple horizontal hallway from the room's right wall
+  const hallRadius = Math.max(0.75, Math.min(2, (opts.hallRadius ?? 1.5)));
+  const hallLen = Math.max(4, Math.floor(opts.hallLength ?? 10));
+  const hallStartX = roomMeta.center.x + roomMeta.halfWidth; // start at the right edge
+  const hallStartY = roomMeta.center.y;
+  const hallEndX = hallStartX + hallLen;
+  const hallEndY = hallStartY;
+  kernel.carveCapsule(hallStartX, hallStartY, hallEndX, hallEndY, hallRadius, carveFlags);
+
   const snapshot = kernel.snapshot();
   const entityId = ensureDungeonEntity(world, opts);
   const payload = {
@@ -59,7 +68,19 @@ export function generateRectRoom(world, opts = {}) {
     occlVersion: snapshot.occlVersion,
     mbr: snapshot.mbr,
     primitives: snapshot.primitives,
-    meta: { room: roomMeta },
+    meta: {
+      room: roomMeta,
+      hallway: {
+        shape: "capsule",
+        radius: hallRadius,
+        ax: hallStartX,
+        ay: hallStartY,
+        bx: hallEndX,
+        by: hallEndY,
+        length: hallLen,
+        side: "east",
+      },
+    },
     options: snapshot.options,
   };
 

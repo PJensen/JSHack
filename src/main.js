@@ -221,16 +221,23 @@ function render(worldView) {
   }
 
   const lights = collectLightSources(worldView, { quality: PERF.quality });
+  const boltLights = (typeof worldEvents.getBoltLightSources === 'function')
+    ? worldEvents.getBoltLightSources()
+    : [];
+  const arrowLights = (typeof worldEvents.getArrowLightSources === 'function')
+    ? worldEvents.getArrowLightSources()
+    : [];
+  const allLights = [...lights, ...boltLights, ...arrowLights];
   const fovLight = fovPolygon ? { ...fovPolygon, color: palette.player?.glow || "#6cf" } : null;
   renderEmissiveLights(
     bctx,
     dungeonState.kernel,
-    lights,
+    allLights,
     { x0: vx0, y0: vy0, x1: vx1, y1: vy1 },
     _fxTime,
     { quality: PERF.quality, fov: fovLight }
   );
-  _particleOrigins = syncLightEmitters(lights, fx, _fxTime);
+  _particleOrigins = syncLightEmitters(allLights, fx, _fxTime);
 
   for (let i = 0; i < visibleActors.length; i++) {
     const e = visibleActors[i];
@@ -238,13 +245,28 @@ function render(worldView) {
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
     if (PERF.quality !== "low" && Array.isArray(e.tags) && e.tags.includes("invulnerable")) {
+      const cx = e.pos.x, cy = e.pos.y;
+      const baseR = Math.max(0.2, Number(e.radius) || 0.45);
+      const wob = 0.06 * Math.sin(_fxTime * 5.5);
+      const r = baseR + wob;
       bctx.save();
       bctx.globalCompositeOperation = "lighter";
-      bctx.strokeStyle = "rgba(160,255,255,0.9)";
+      bctx.lineJoin = "round";
+      bctx.lineCap = "round";
       bctx.lineWidth = 0.08;
-      const r = 0.45 + 0.06 * Math.sin(_fxTime * 6.0);
+      bctx.strokeStyle = "rgba(255,255,255,0.5)";
+      // Soft blur halo
+      bctx.shadowBlur = 12;
+      bctx.shadowColor = "rgba(255,255,255,0.35)";
       bctx.beginPath();
-      bctx.arc(e.pos.x, e.pos.y, r, 0, Math.PI * 2);
+      bctx.arc(cx, cy, r, 0, Math.PI * 2);
+      bctx.stroke();
+      // Inner crisp core
+      bctx.shadowBlur = 0;
+      bctx.lineWidth = 0.05;
+      bctx.strokeStyle = "rgba(255,255,255,0.35)";
+      bctx.beginPath();
+      bctx.arc(cx, cy, r * 0.985, 0, Math.PI * 2);
       bctx.stroke();
       bctx.restore();
     }
@@ -278,6 +300,7 @@ function render(worldView) {
 
   if (bctx) {
     worldEvents.drawBoltEffects(bctx);
+    worldEvents.drawArrowEffects && worldEvents.drawArrowEffects(bctx);
   }
 
   fx.render({ mode: (PERF.quality === "low" ? "source-over" : "lighter"), alphaScale: 0.9, shape: (PERF.quality === "low" ? "rect" : "circle") });
@@ -791,6 +814,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   worldEvents.updateBoltFx(dtSec);
+  if (worldEvents.updateArrowFx) worldEvents.updateArrowFx(dtSec);
   ftext.step(dtSec);
 
   hudFeeds.updateVitalsHUD();

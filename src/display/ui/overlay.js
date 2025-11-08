@@ -9,6 +9,7 @@ export function initOverlays() {
   const spells = ensurePanel('spells');
   const groundTip = ensureGroundTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
+  const gestureDebug = ensureGestureDebugLayer(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
@@ -93,6 +94,16 @@ export function initOverlays() {
     renderMessageTicker(ticker, entries);
   });
 
+  // Gesture debug path overlay
+  window.addEventListener('ui:gestureProgress', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const pts = Array.isArray(e?.detail?.points) ? e.detail.points : [];
+    const active = !!e?.detail?.active;
+    const rec = e?.detail?.recognized || null;
+    drawGestureDebug(gestureDebug, pts, active, rec);
+  });
+
   window.addEventListener('ui:showSpellGestureHint', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -101,7 +112,7 @@ export function initOverlays() {
     const mode = String(e?.detail?.mode || 'cast');
     const quality = Number(e?.detail?.quality);
     const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
-    const duration = mode === 'learn' ? 2600 : 1200;
+    const duration = mode === 'learn' ? 2600 : 900;
     spellGestureHint.glyph.textContent = 'Z';
     spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
     spellGestureHint.glyph.style.opacity = mode === 'cast' ? '0.92' : '1';
@@ -109,9 +120,11 @@ export function initOverlays() {
     spellGestureHint.wrap.style.animation = 'none';
     spellGestureHint.wrap.style.transform = 'translate(-50%, -50%) scale(1)';
     spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+    // Only announce on learn; keep caption hidden on cast.
     spellGestureHint.caption.textContent = mode === 'learn'
       ? 'Draw a Z to unleash Lightning!'
-      : 'Lightning gesture ready!';
+      : '';
+    spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
     if (spellGestureTimer) window.clearTimeout(spellGestureTimer);
     spellGestureTimer = window.setTimeout(() => {
       spellGestureHint.wrap.style.display = 'none';
@@ -137,6 +150,72 @@ function ensureRoot() {
     document.body.appendChild(root);
   }
   return root;
+}
+
+// --- Gesture debug overlay -------------------------------------------------
+function ensureGestureDebugLayer(root) {
+  const canvas = document.createElement('canvas');
+  canvas.id = 'gesture-debug-layer';
+  Object.assign(canvas.style, {
+    position: 'fixed',
+    left: '0', top: '0', right: '0', bottom: '0',
+    width: '100vw', height: '100vh',
+    pointerEvents: 'none',
+    zIndex: 910,
+  });
+  root.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const resize = () => {
+    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    const w = Math.max(1, window.innerWidth | 0);
+    const h = Math.max(1, window.innerHeight | 0);
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  resize();
+  window.addEventListener('resize', resize);
+  return { canvas, ctx, resize };
+}
+
+function drawGestureDebug(layer, points, active, recognized) {
+  if (!layer || !layer.ctx) return;
+  const ctx = layer.ctx;
+  const canvas = layer.canvas;
+  // Clear
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!Array.isArray(points) || points.length === 0) return;
+
+  // Draw path
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = recognized ? '#5ff' : (active ? '#8cf' : '#bbb');
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+  // Endpoints
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first) { ctx.beginPath(); ctx.arc(first.x, first.y, 4, 0, Math.PI * 2); ctx.fill(); }
+  if (last) { ctx.beginPath(); ctx.arc(last.x, last.y, 4, 0, Math.PI * 2); ctx.fill(); }
+
+  // Recognition bounds
+  if (recognized && recognized.bounds) {
+    const b = recognized.bounds;
+    ctx.strokeStyle = 'rgba(120,200,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+  }
+  ctx.restore();
 }
 
 // --- Ground item tooltip (click to pick up) -------------------------------

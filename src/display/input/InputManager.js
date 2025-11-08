@@ -22,6 +22,7 @@ export class InputManager {
     this._gestureCaptureEl = null;
     this._gesturePoints = [];
     this._gestureWorldPoints = [];
+    this._gestureClientPoints = [];
     this._gestureStartTime = 0;
     this._gestureDownTime = 0;
     this._gestureActive = false;
@@ -158,36 +159,8 @@ export class InputManager {
     if (!pointer) return;
 
     this._beginGesture(e, pointer);
-
-    const origin = this._resolvePointerOrigin();
-
-    if (!origin) {
-      // Fallback: assume center of the canvas represents the actor.
-      const centerX = canvas.width * 0.5;
-      const centerY = canvas.height * 0.5;
-      const dx = (pointer.sx - centerX);
-      const dy = (pointer.sy - centerY);
-      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
-      this._emit(makeAction(Actions.Move, { dx, dy }));
-      return;
-    }
-
-    if (pointer.wx === null || pointer.wy === null) {
-      // Without camera conversion, fall back to canvas space relative vector.
-      const centerX = canvas.width * 0.5;
-      const centerY = canvas.height * 0.5;
-      const dx = (pointer.sx - centerX);
-      const dy = (pointer.sy - centerY);
-      if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) return;
-      this._emit(makeAction(Actions.Move, { dx, dy }));
-      return;
-    }
-
-    const dx = pointer.wx - origin.x;
-    const dy = pointer.wy - origin.y;
-    if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return;
-
-    this._emit(makeAction(Actions.Move, { dx, dy }));
+    // Do not emit Move on pointer down. We defer deciding between
+    // a movement tap vs. spell gesture until pointerup.
   }
 
   _handlePointerMove(e) {
@@ -208,7 +181,55 @@ export class InputManager {
     if (pointer) {
       this._accumulateGesturePoint(pointer);
     }
-    this._finalizeGesture();
+
+    // If a long-press/drag activated gesture mode, finalize to run recognizer.
+    if (this._gestureActive) {
+      this._finalizeGesture();
+      return;
+    }
+
+    // Fallback: if the stroke looks like a gesture even without explicit activation,
+    // try recognition before treating it as a tap move.
+    try {
+      const now = performance?.now ? performance.now() : Date.now();
+      const start = this._gestureDownTime || now;
+      const duration = (now - start) / 1000;
+      if (duration >= 0.12 && this._gesturePoints && this._gesturePoints.length >= 6) {
+        const result = recognizeLightningGesture(this._gesturePoints);
+        if (result) {
+          const detail = {
+            id: "lightning",
+            duration,
+            pointerType: this._gesturePointerType,
+            quality: result.quality,
+            bounds: result.bounds,
+            normalizedPath: result.normalizedPath,
+            worldPath: this._gestureWorldPoints.length ? this._gestureWorldPoints.slice() : null,
+          };
+          // Debug overlay notify
+          try {
+            const rect = this._lastRect || this._canvas?.getBoundingClientRect?.() || null;
+            const sx = this._lastScaleX || 1;
+            const sy = this._lastScaleY || 1;
+            const b = result.bounds;
+            const screenBounds = rect ? { x: rect.left + b.minX / (sx || 1), y: rect.top + b.minY / (sy || 1), w: b.width / (sx || 1), h: b.height / (sy || 1) } : null;
+            window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: this._gestureClientPoints?.slice?.() || [], active: true, recognized: { id: 'lightning', quality: result.quality, bounds: screenBounds }, phase: 'recognized' } }));
+          } catch {}
+          try { window.dispatchEvent(new CustomEvent("input:spellGesture", { detail })); } catch {}
+          this._finalizeGesture();
+          return;
+        }
+      }
+    } catch {}
+
+    // Otherwise treat as a short tap.
+    if (pointer) {
+      // Emit world-tap with world coords; display handler decides whether to shoot or move
+      const payload = { x: (pointer.wx ?? null), y: (pointer.wy ?? null), sx: pointer.sx, sy: pointer.sy };
+      this._emit(makeAction(Actions.TapWorld, payload));
+    }
+
+    this._finalizeGesture(true);
   }
 
   _handlePointerCancel(e) {
@@ -224,6 +245,10 @@ export class InputManager {
     const scaleY = rect.height ? (canvas.height / rect.height) : 1;
     const sx = (e.clientX - rect.left) * scaleX;
     const sy = (e.clientY - rect.top) * scaleY;
+    // Save for overlay mapping
+    this._lastRect = rect;
+    this._lastScaleX = scaleX;
+    this._lastScaleY = scaleY;
 
     let wx = null;
     let wy = null;
@@ -240,7 +265,7 @@ export class InputManager {
       }
     }
 
-    return { sx, sy, wx, wy };
+    return { sx, sy, wx, wy, cx: e.clientX, cy: e.clientY };
   }
 
   _resolvePointerOrigin() {
@@ -264,6 +289,7 @@ export class InputManager {
     this._gesturePointerType = e.pointerType || "";
     this._gesturePoints = [];
     this._gestureWorldPoints = [];
+    this._gestureClientPoints = [];
     this._gestureActive = false;
     const now = performance?.now ? performance.now() : Date.now();
     this._gestureDownTime = now;
@@ -293,9 +319,22 @@ export class InputManager {
       }
     }
     this._gesturePoints.push({ x: pointer.sx, y: pointer.sy });
+    if (Number.isFinite(pointer.cx) && Number.isFinite(pointer.cy)) {
+      this._gestureClientPoints.push({ x: pointer.cx, y: pointer.cy });
+    }
     if (pointer.wx !== null && pointer.wy !== null) {
       this._gestureWorldPoints.push({ x: pointer.wx, y: pointer.wy });
     }
+    // Debug overlay update
+    try {
+      window.dispatchEvent(new CustomEvent("ui:gestureProgress", {
+        detail: {
+          points: this._gestureClientPoints.slice(),
+          active: this._gestureActive === true,
+          phase: force ? 'start' : 'move',
+        }
+      }));
+    } catch {}
   }
 
   _finalizeGesture(cancelled = false) {
@@ -308,11 +347,14 @@ export class InputManager {
     if (!cancelled && this._gesturePointerId !== null && this._gestureActive) {
       this._maybeEmitGesture();
     }
+    // Clear overlay
+    try { window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: [], active: false, phase: 'end', cancelled: !!cancelled } })); } catch {}
     this._gesturePointerId = null;
     this._gesturePointerType = "";
     this._gestureCaptureEl = null;
     this._gesturePoints = [];
     this._gestureWorldPoints = [];
+    this._gestureClientPoints = [];
     this._gestureStartTime = 0;
     this._gestureDownTime = 0;
     this._gestureActive = false;
@@ -337,6 +379,15 @@ export class InputManager {
       normalizedPath: result.normalizedPath,
       worldPath: this._gestureWorldPoints.length ? this._gestureWorldPoints.slice() : null,
     };
+    // Debug recognition overlay hint
+    try {
+      const rect = this._lastRect || this._canvas?.getBoundingClientRect?.() || null;
+      const sx = this._lastScaleX || 1;
+      const sy = this._lastScaleY || 1;
+      const b = result.bounds;
+      const screenBounds = rect ? { x: rect.left + b.minX / (sx || 1), y: rect.top + b.minY / (sy || 1), w: b.width / (sx || 1), h: b.height / (sy || 1) } : null;
+      window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: this._gestureClientPoints.slice(), active: true, recognized: { id: 'lightning', quality: result.quality, bounds: screenBounds }, phase: 'recognized' } }));
+    } catch {}
     try {
       window.dispatchEvent(new CustomEvent("input:spellGesture", { detail }));
     } catch {}

@@ -14,10 +14,10 @@ function bracketizeName(str) {
   return `[${s}]`;
 }
 
-function createBoltFxManager(startShake, cam) {
+function createBoltFxManager(startShake, cam, theme = 'bolt') {
   /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, chainIndex:number}>} */
   const bolts = [];
-  /** @type {Array<{x:number,y:number, ttl:number}>} */
+  /** @type {Array<{x:number,y:number, ttl:number, max:number}>} */
   const lightPulses = [];
 
   function addBolt({ from, to, chainIndex = 0 }) {
@@ -25,23 +25,23 @@ function createBoltFxManager(startShake, cam) {
       bolts.push({
         from: { x: from.x, y: from.y },
         to: { x: to.x, y: to.y },
-        ttl: 0.14,
-        max: 0.14,
+        ttl: 0.20,
+        max: 0.20,
         chainIndex: Number(chainIndex || 0)
       });
-      lightPulses.push({ x: to.x, y: to.y, ttl: 0.12 });
+      lightPulses.push({ x: to.x, y: to.y, ttl: 0.18, max: 0.18 });
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const dist = Math.hypot(dx, dy);
-      const steps = Math.min(9, Math.max(2, Math.round(dist * 1.8)));
+      const steps = Math.min(12, Math.max(2, Math.round(dist * 2.2)));
       for (let i = 1; i < steps; i++) {
         const t = i / steps;
         const px = from.x + dx * t;
         const py = from.y + dy * t;
-        const ttl = 0.08 + (0.05 * (1 - Math.abs(0.5 - t) * 1.6));
-        lightPulses.push({ x: px, y: py, ttl });
+        const ttl = 0.10 + (0.06 * (1 - Math.abs(0.5 - t) * 1.6));
+        lightPulses.push({ x: px, y: py, ttl, max: ttl });
       }
-      startShake(cam, 4, 0.18);
+      startShake(cam, 5, 0.20);
     }
   }
 
@@ -66,33 +66,196 @@ function createBoltFxManager(startShake, cam) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const pulse of lightPulses) {
-      const a = Math.max(0, Math.min(1, pulse.ttl / 0.12));
-      ctx.fillStyle = `rgba(180,240,255,${0.18 * a})`;
-      ctx.beginPath(); ctx.arc(pulse.x, pulse.y, 0.6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = `rgba(255,255,220,${0.10 * a})`;
-      ctx.beginPath(); ctx.arc(pulse.x, pulse.y, 0.35, 0, Math.PI * 2); ctx.fill();
+      const a = Math.max(0, Math.min(1, pulse.ttl / (pulse.max || 0.18)));
+      const colOuter = (theme === 'flame') ? `rgba(255,170,80,${0.22 * a})` : `rgba(180,240,255,${0.22 * a})`;
+      const colInner = (theme === 'flame') ? `rgba(255,230,150,${0.12 * a})` : `rgba(255,255,220,${0.12 * a})`;
+      ctx.fillStyle = colOuter;
+      ctx.beginPath(); ctx.arc(pulse.x, pulse.y, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colInner;
+      ctx.beginPath(); ctx.arc(pulse.x, pulse.y, 0.4, 0, Math.PI * 2); ctx.fill();
     }
     for (const bolt of bolts) {
       const alpha = Math.max(0, Math.min(1, bolt.ttl / bolt.max));
-      const pts = jitterLine(bolt.from, bolt.to, 11, 0.10 * alpha);
+      const pts = jitterLine(bolt.from, bolt.to, 13, (theme === 'flame' ? 0.02 : 0.12) * alpha);
       ctx.lineJoin = "round"; ctx.lineCap = "round";
-      ctx.strokeStyle = `rgba(120,200,255,${0.18 * alpha})`;
-      ctx.lineWidth = 0.22;
+      // Outer glow
+      ctx.strokeStyle = (theme === 'flame') ? `rgba(255,160,60,${0.25 * alpha})` : `rgba(100,180,255,${0.20 * alpha})`;
+      ctx.lineWidth = 0.28;
       pathPolyline(ctx, pts); ctx.stroke();
 
-      ctx.strokeStyle = `rgba(160,220,255,${0.35 * alpha})`;
-      ctx.lineWidth = 0.10;
+      // Mid glow
+      ctx.strokeStyle = (theme === 'flame') ? `rgba(255,200,120,${0.50 * alpha})` : `rgba(160,220,255,${0.40 * alpha})`;
+      ctx.lineWidth = 0.12;
       pathPolyline(ctx, pts); ctx.stroke();
 
-      const core = jitterLine(bolt.from, bolt.to, 13, 0.05 * alpha);
-      ctx.strokeStyle = `rgba(230,255,255,${0.9 * alpha})`;
-      ctx.lineWidth = 0.045;
+      // Core
+      const core = jitterLine(bolt.from, bolt.to, 15, (theme === 'flame' ? 0.01 : 0.06) * alpha);
+      ctx.strokeStyle = (theme === 'flame') ? `rgba(255,240,200,${1.0 * alpha})` : `rgba(230,255,255,${1.0 * alpha})`;
+      ctx.lineWidth = 0.05;
       pathPolyline(ctx, core); ctx.stroke();
+
+      // Occasional branches
+      if (alpha > 0.2 && theme !== 'flame') {
+        const dx = bolt.to.x - bolt.from.x;
+        const dy = bolt.to.y - bolt.from.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const tx = dx / len, ty = dy / len;
+        const nx = -ty, ny = tx;
+        const branches = 1 + (Math.random() < 0.5 ? 1 : 0);
+        for (let j = 0; j < branches; j++) {
+          const t = 0.25 + Math.random() * 0.5;
+          const bx = bolt.from.x + dx * t;
+          const by = bolt.from.y + dy * t;
+          const out = (0.25 + Math.random() * 0.25) * len * alpha;
+          const side = Math.random() < 0.5 ? -1 : 1;
+          const ex = bx + tx * (out * 0.6) + nx * (out * 0.4 * side);
+          const ey = by + ty * (out * 0.6) + ny * (out * 0.4 * side);
+          const bpts = jitterLine({ x: bx, y: by }, { x: ex, y: ey }, 7, 0.10 * alpha);
+          ctx.strokeStyle = `rgba(170,230,255,${0.35 * alpha})`;
+          ctx.lineWidth = 0.08;
+          pathPolyline(ctx, bpts); ctx.stroke();
+        }
+      }
     }
     ctx.restore();
   }
 
-  return { addBolt, update, draw };
+  function getLightSources() {
+    const arr = [];
+    for (let i = 0; i < lightPulses.length; i++) {
+      const p = lightPulses[i];
+      const a = Math.max(0, Math.min(1, (p.ttl || 0) / (p.max || 0.18)));
+      if (a <= 0) continue;
+      arr.push({
+        id: `bolt:${i}`,
+        x: p.x,
+        y: p.y,
+        radius: 2.0 * a,
+        intensity: 0.65 * a,
+        color: (theme === 'flame' ? '#ffb36b' : '#aee9ff'),
+        flicker: 0.0,
+        style: (theme === 'flame' ? 'flame' : 'bolt'),
+        emitter: null,
+      });
+    }
+    return arr;
+  }
+
+  return { addBolt, update, draw, getLightSources };
+}
+
+// New: fast moving arrow/crossbow bolt VFX manager (separate from lightning)
+function createArrowFxManager(startShake, cam) {
+  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, style:string}>} */
+  const arrows = [];
+  /** @type {Array<{x:number,y:number, ttl:number, max:number, style:string}>} */
+  const sparks = [];
+
+  function addArrow({ from, to, style = 'plain' }) {
+    if (!from || !to) return;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const speed = 22; // tiles per second
+    const duration = Math.max(0.08, Math.min(0.35, dist / speed));
+    arrows.push({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, t: 0, duration, style });
+    startShake(cam, 2, 0.08);
+  }
+
+  function addSpark(x, y, style = 'plain') {
+    sparks.push({ x, y, ttl: 0.14, max: 0.14, style });
+  }
+
+  function update(dt) {
+    if (arrows.length) {
+      for (const a of arrows) a.t += dt;
+      for (let i = arrows.length - 1; i >= 0; i--) {
+        if (arrows[i].t >= arrows[i].duration + 0.02) arrows.splice(i, 1);
+      }
+    }
+    if (sparks.length) {
+      for (const s of sparks) s.ttl -= dt;
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        if (sparks[i].ttl <= 0) sparks.splice(i, 1);
+      }
+    }
+  }
+
+  /** @param {CanvasRenderingContext2D} ctx */
+  function draw(ctx) {
+    if (!arrows.length && !sparks.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const a of arrows) {
+      const u = Math.max(0, Math.min(1, a.t / Math.max(1e-6, a.duration)));
+      const dx = a.to.x - a.from.x;
+      const dy = a.to.y - a.from.y;
+      const hx = a.from.x + dx * u;
+      const hy = a.from.y + dy * u;
+      const ang = Math.atan2(dy, dx);
+      const trailLen = Math.max(0.15, Math.min(0.5, (1 - u) * 0.75));
+      const tx = hx - Math.cos(ang) * trailLen;
+      const ty = hy - Math.sin(ang) * trailLen;
+
+      // Colors per style
+      let core = '#fff7cc', mid = '#ffc96b', outer = '#ff9a3e';
+      if (a.style === 'poison') { core = '#e6ffcc'; mid = '#9cff66'; outer = '#57cc2b'; }
+      if (a.style === 'magic') { core = '#e9e1ff'; mid = '#b69cff'; outer = '#7e5cff'; }
+
+      const alpha = 1.0;
+      // Trail (outer -> mid -> core)
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = outer; ctx.globalAlpha = 0.22 * alpha; ctx.lineWidth = 0.22; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = mid;   ctx.globalAlpha = 0.45 * alpha; ctx.lineWidth = 0.12; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = core;  ctx.globalAlpha = 1.00 * alpha; ctx.lineWidth = 0.05; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+
+      // Head: small wedge
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(ang);
+      ctx.globalAlpha = 0.95 * alpha;
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.moveTo(0.10, 0);
+      ctx.lineTo(-0.08, 0.05);
+      ctx.lineTo(-0.08, -0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    // Impact sparks
+    for (let i = 0; i < sparks.length; i++) {
+      const s = sparks[i];
+      const a = Math.max(0, Math.min(1, s.ttl / (s.max || 0.14)));
+      const r = 0.25 + 0.25 * a;
+      let outer = `rgba(255,170,80,${0.35 * a})`;
+      let inner = `rgba(255,240,200,${0.85 * a})`;
+      if (s.style === 'poison') { outer = `rgba(87,204,43,${0.35 * a})`; inner = `rgba(233,255,204,${0.85 * a})`; }
+      if (s.style === 'magic') { outer = `rgba(126,92,255,${0.35 * a})`; inner = `rgba(233,225,255,${0.85 * a})`; }
+      ctx.fillStyle = outer;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = inner; ctx.lineWidth = 0.06;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * 1.35, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function getLightSources() {
+    const arr = [];
+    for (let i = 0; i < arrows.length; i++) {
+      const a = arrows[i];
+      const u = Math.max(0, Math.min(1, a.t / Math.max(1e-6, a.duration)));
+      const hx = a.from.x + (a.to.x - a.from.x) * u;
+      const hy = a.from.y + (a.to.y - a.from.y) * u;
+      let color = '#ffb36b';
+      if (a.style === 'poison') color = '#9cff66';
+      if (a.style === 'magic') color = '#b69cff';
+      arr.push({ id: `arrow:${i}`, x: hx, y: hy, radius: 1.4, intensity: 0.55, color, flicker: 0, style: 'arrow', emitter: null });
+    }
+    return arr;
+  }
+
+  return { addArrow, addSpark, update, draw, getLightSources };
 }
 
 /**
@@ -104,7 +267,8 @@ export function setupWorldEventHandlers(world, deps) {
   const { cam, ftext, startShake, activeSpells } = deps;
   const { getActiveSpellId, setActiveSpell } = activeSpells;
 
-  const boltFx = createBoltFxManager(startShake, cam);
+  const boltFx = createBoltFxManager(startShake, cam, 'bolt');
+  const arrowFx = createArrowFxManager(startShake, cam);
   /** @type {string[]} */
   const messageLog = [];
 
@@ -160,6 +324,15 @@ export function setupWorldEventHandlers(world, deps) {
 
   world.on("spell:bolt", ({ from, to, chainIndex = 0 }) => {
     boltFx.addBolt({ from, to, chainIndex });
+  });
+
+  // Ranged shots: fast crossbow/arrow tracer (separate handler)
+  world.on("ranged:shot", ({ from, to, style }) => {
+    arrowFx.addArrow({ from, to, style: style || 'flame' });
+  });
+
+  world.on("ranged:impact", ({ at, style }) => {
+    if (at && typeof at.x === 'number' && typeof at.y === 'number') arrowFx.addSpark(at.x, at.y, style || 'flame');
   });
 
   world.on("spell:not-known", ({ spellId }) => {
@@ -368,6 +541,10 @@ export function setupWorldEventHandlers(world, deps) {
     getMessageLogEntries,
     updateBoltFx: boltFx.update,
     drawBoltEffects: boltFx.draw,
+    getBoltLightSources: () => boltFx.getLightSources(),
+    updateArrowFx: arrowFx.update,
+    drawArrowEffects: arrowFx.draw,
+    getArrowLightSources: () => arrowFx.getLightSources(),
   };
 }
 

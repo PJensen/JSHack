@@ -99,6 +99,19 @@ export function initHUD() {
     }
   });
 
+  // Ranged attack button (to the right of Cast)
+  const shootBtn = document.createElement('button');
+  shootBtn.id = 'btn-shoot';
+  shootBtn.textContent = 'Shoot';
+  Object.assign(shootBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  shootBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
+  });
+
   // Update label when app sets active spell
   window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -182,8 +195,9 @@ export function initHUD() {
   // Right-aligned bar: Inventory appears left of Cast by append order
   bar.appendChild(invBtn);
   bar.appendChild(castBtn);
+  bar.appendChild(shootBtn);
   root.appendChild(bar);
-  return { castBtn, invBtn };
+  return { castBtn, invBtn, shootBtn };
 }
 
 function ensureRoot() {

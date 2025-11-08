@@ -4,11 +4,17 @@ import { makeRulesDispatcher } from "../../../app/input/rulesDispatch.js";
 import { initOverlays } from "../../display/ui/overlay.js";
 import { initHUD } from "../../display/ui/hud.js";
 import { Inventory } from "../../rules/components/Inventory.js";
+import { Position } from "../../rules/components/Position.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Settings } from "../../rules/components/Settings.js";
+import { Anatomy } from "../../rules/components/Anatomy.js";
+import { BoundingCircle } from "../../rules/components/BoundingCircle.js";
+import { Vitality } from "../../rules/components/Vitality.js";
 import { itemsAt, playerEntity } from "../../rules/utils/queries.js";
 import { zoomTo } from "../../display/camera/utils.js";
+import { Facing } from "../../rules/components/Facing.js";
 
 const resolveRulesDispatcher = (world, playerIdFn) => makeRulesDispatcher(world, playerIdFn);
 
@@ -33,6 +39,60 @@ export function setupUIEventListeners(world, deps) {
 
   const displayHandler = (action) => {
     switch (action.type) {
+      case "display.tapWorld": {
+        const wx = Number(action?.payload?.x);
+        const wy = Number(action?.payload?.y);
+        const pe = playerEntity(world);
+        if (!pe) break;
+        if (Number.isFinite(wx) && Number.isFinite(wy)) {
+          // Keep tap-to-move by default; only shoot if: tap hits monster AND player is ranged (bow equipped)
+          let tappedMonster = null; let minCenter = Infinity;
+          for (const [id, pos, ni, vit] of world.query(Position, NamedIdentity, Vitality)) {
+            if (!ni || ni.identity !== 'monster') continue;
+            if (!vit || (vit.hp|0) <= 0) continue;
+            const r = Math.max(0, world.get(id, BoundingCircle)?.radius ?? 0.45);
+            const centerDist = Math.hypot(pos.x - wx, pos.y - wy);
+            // Require a deliberate tap: inside circle and not just barely inside; prefer nearest center
+            if (centerDist <= r * 0.8 && centerDist < minCenter) { minCenter = centerDist; tappedMonster = id; }
+          }
+
+          // Check if player is ranged-only (bow equipped)
+          let isRanged = false;
+          const eq = world.get(pe.id, Equipment);
+          if (eq && Number.isInteger(eq.weapon) && eq.weapon > 0) {
+            const wName = world.get(eq.weapon, NamedIdentity);
+            if (wName && typeof wName.identity === 'string' && wName.identity.startsWith('bow_')) isRanged = true;
+          }
+
+          // Facing check: ensure monster is in front arc
+          let inFront = false;
+          if (tappedMonster) {
+            const fx = world.get(pe.id, Facing) || { x: 1, y: 0 };
+            const ppos = world.get(pe.id, Position);
+            const tpos = world.get(tappedMonster, Position);
+            if (ppos && tpos) {
+              const dx = tpos.x - ppos.x, dy = tpos.y - ppos.y;
+              const len = Math.hypot(dx, dy) || 1;
+              const dot = (dx/len) * (fx.x||1) + (dy/len) * (fx.y||0);
+              const CONE_DOT = Math.cos(Math.PI / 10); // ~18°
+              inFront = dot >= CONE_DOT;
+            }
+          }
+
+          if (tappedMonster && isRanged && inFront) {
+            const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+            handler({ type: "rules.shootRangedAt", payload: { targetId: tappedMonster } });
+            break;
+          }
+
+          // Default: move toward tap
+          const dx = wx - pe.pos.x;
+          const dy = wy - pe.pos.y;
+          const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+          handler({ type: "rules.move", payload: { dx, dy } });
+        }
+        break;
+      }
       case "display.openInventory":
         window.dispatchEvent(new CustomEvent("ui:openInventory"));
         break;
@@ -51,8 +111,35 @@ export function setupUIEventListeners(world, deps) {
       case "display.openPickupChooser": {
         const p = playerEntity(world);
         if (!p) break;
-        const ids = itemsAt(world, p.pos.x, p.pos.y);
+        // Prefer items on the current tile
+        let ids = itemsAt(world, p.pos.x, p.pos.y);
         if (ids.length === 0) {
+          // Fallback: pick nearest reachable item (keyboard-friendly)
+          const playerSettings = world.get(p.id, Settings);
+          const anatomy = world.get(p.id, Anatomy);
+          const reach = Math.max(0, anatomy?.reachDistance ?? 1);
+          const radius = Math.max(0, world.get(p.id, BoundingCircle)?.radius ?? 0.5);
+          const extraRange = Math.max(0, Number(playerSettings?.pickupRange ?? 0));
+          const maxReach = reach + radius + extraRange;
+          /** @type {Array<{ id:number, info:any, name:any, distance:number }>} */
+          const nearby = [];
+          for (const [eid, pos, info] of world.query(Position, ItemInfo)) {
+            if (!pos) continue;
+            if (!info || info.type === "currency") continue;
+            const itemRadius = Math.max(0, world.get(eid, BoundingCircle)?.radius ?? 0);
+            const dist = Math.max(0, Math.hypot(pos.x - p.pos.x, pos.y - p.pos.y) - itemRadius);
+            if (dist > maxReach) continue;
+            nearby.push({ id: eid, info, name: world.get(eid, NamedIdentity), distance: dist });
+          }
+          nearby.sort((a, b) => a.distance - b.distance);
+          if (nearby.length === 0) break;
+          if (nearby.length === 1) {
+            rulesHandler({ type: "rules.pickupItem", payload: { itemId: nearby[0].id } });
+            break;
+          }
+          // Multiple items nearby: open chooser with nearest-first ordering
+          const items = nearby.map(({ id: eid, info, name }) => ({ id: eid, type: info?.type || "item", name: name?.name || info?.type || "item", count: info?.count || 1 }));
+          window.dispatchEvent(new CustomEvent("ui:openPickupChooser", { detail: { items } }));
           break;
         }
         if (ids.length === 1) {
@@ -135,6 +222,12 @@ export function setupUIEventListeners(world, deps) {
     const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
     const id = ensureActiveSpell();
     handler({ type: "rules.castActiveSpell", payload: id ? { spellId: id } : {} });
+  });
+
+  // Ranged shooting (using equipped ranged weapon)
+  addEventListener("ui:shootRanged", () => {
+    const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+    handler({ type: "rules.shootRanged" });
   });
 
   addEventListener("ui:requestPickup", (e) => {
