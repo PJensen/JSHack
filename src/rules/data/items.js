@@ -8,6 +8,15 @@ export const ITEM_DEFS = {
         rarity: 1,
         rarityName: 'rare',
         description: 'Grants the ability to cast a lightning spell.',
+    },
+    scroll_blastwave: {
+        id: 'scroll_blastwave',
+        name: 'Scroll of Blast Wave',
+        type: 'scroll',
+        slot: 'bag',
+        rarity: 1,
+        rarityName: 'rare',
+        description: 'Casts Blast Wave without learning it.'
     }
 };
 

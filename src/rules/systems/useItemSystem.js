@@ -5,6 +5,7 @@ import { Consumable } from "../components/Consumable.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Brain } from "../components/Brain.js";
 import { getSpell } from "../data/spells.js";
+import { runSpellScript } from "../scripts/spells.js";
 /** @typedef {import('../../lib/ecs-js').World} World */
 
 /**
@@ -54,47 +55,47 @@ export function useItemSystem(world) {
       // By default, consumables are consumed on use
       consumed = true;
     } else if (info && (info.type === 'learn' || info.type === 'scroll' || info.type === 'book')) {
-      // Path 2: learning from a spellbook-like item
       const identity = (ni?.identity || '').toLowerCase();
-      // heuristic mapping: book_<spellId>
-      if (identity.startsWith('book_')) {
-        learnedSpellId = identity.substring('book_'.length);
+
+      // Path 2a: SCROLLS cast directly without knowledge/mana requirements
+      if (info.type === 'scroll' || identity.startsWith('scroll_')) {
+        const spellIdFromId = identity.startsWith('scroll_') ? identity.substring('scroll_'.length) : '';
+        const spell = getSpell(spellIdFromId);
+        if (!spell) { world.remove(actor, UseIntent); continue; }
+        // Directly execute spell script and emit semantic cast event; do NOT deduct mana or check knowledge.
+        try { runSpellScript(world, actor, spell, {}); } catch {}
+        try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: actor }); } catch {}
+        consumed = true; // scrolls are consumables
+      } else {
+        // Path 2b: learning from a spellbook-like item
+        // heuristic mapping: book_<spellId>
+        if (identity.startsWith('book_')) {
+          learnedSpellId = identity.substring('book_'.length);
+        }
+        if (!learnedSpellId) { world.remove(actor, UseIntent); continue; }
+
+        const spell = getSpell(learnedSpellId);
+        if (!spell) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'unknown-spell', spellId: learnedSpellId }); world.remove(actor, UseIntent); continue; }
+
+        /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
+        let brain = /** @type any */ (world.get(actor, Brain));
+        if (!brain) { try { world.add(actor, Brain, {}); brain = world.get(actor, Brain); } catch {} }
+        if (!brain) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'no-brain', spellId: spell.id }); world.remove(actor, UseIntent); continue; }
+
+        // already known
+        if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
+          try { world.emit && world.emit('spell:already-known', { actor, spellId: spell.id }); } catch {}
+          // don't consume on already known
+          world.remove(actor, UseIntent);
+          continue;
+        }
+
+        // learn
+        if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+        brain.learnedSpellIds.push(spell.id);
+        try { world.emit && world.emit('spell:learned', { actor, spellId: spell.id }); } catch {}
+        consumed = true;
       }
-      // fallback: if description mentions a known spell id
-      if (!learnedSpellId && info.description) {
-        const keys = Object.keys((awaitableNoop(), /** @type {any} */ ({}))); // placeholder to satisfy lints in strict mode
-        // no-op; we rely on the book_<id> convention
-      }
-      if (!learnedSpellId) { world.remove(actor, UseIntent); continue; }
-
-      const spell = getSpell(learnedSpellId);
-      if (!spell) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'unknown-spell', spellId: learnedSpellId }); world.remove(actor, UseIntent); continue; }
-
-  /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
-  let brain = /** @type any */ (world.get(actor, Brain));
-      if (!brain) { try { world.add(actor, Brain, {}); brain = world.get(actor, Brain); } catch {} }
-      if (!brain) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'no-brain', spellId: spell.id }); world.remove(actor, UseIntent); continue; }
-
-      // already known
-      if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
-        try { world.emit && world.emit('spell:already-known', { actor, spellId: spell.id }); } catch {}
-        // don't consume on already known
-        world.remove(actor, UseIntent);
-        continue;
-      }
-
-      // const intel = Number(brain.intelligence || 0);
-      // if (spell.minIntelligence && intel < spell.minIntelligence) {
-      //   try { world.emit && world.emit('spell:learn-denied', { actor, reason: 'intelligence', need: spell.minIntelligence, have: intel, spellId: spell.id }); } catch {}
-      //   world.remove(actor, UseIntent);
-      //   continue;
-      // }
-
-      // learn
-  if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-  brain.learnedSpellIds.push(spell.id);
-      try { world.emit && world.emit('spell:learned', { actor, spellId: spell.id }); } catch {}
-      consumed = true;
     }
 
     // If consumed, decrement stack or destroy and remove from inventory

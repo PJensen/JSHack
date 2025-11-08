@@ -34,6 +34,7 @@ export function populateDemoScene(world) {
   grantInitialShield(world);
   placeTorch(world, room);
   placeSpellbook(world, room);
+  placeBlastwaveScroll(world, room);
   setPlayerStats(world);
   dropPotions(world, room);
   dropGold(world, room);
@@ -93,6 +94,23 @@ function placeSpellbook(world, room) {
     slot: "brain",
     description: "Teaches Meteor.",
     weight: 1,
+    value: 0,
+    count: 1,
+    rarity: 1,
+    rarityName: "rare",
+  });
+}
+
+function placeBlastwaveScroll(world, room) {
+  const { center } = room;
+  const scroll = world.create();
+  world.add(scroll, NamedIdentity, { name: "Scroll of Blast Wave", identity: "scroll_blastwave" });
+  world.add(scroll, Position, { x: center.x, y: center.y - 2 });
+  world.add(scroll, ItemInfo, {
+    type: "scroll",
+    slot: "bag",
+    description: "Casts Blast Wave without learning it.",
+    weight: 0.1,
     value: 0,
     count: 1,
     rarity: 1,
