@@ -24,9 +24,10 @@ export function aiChaseSystem(world) {
 
     const vx = playerPos.x - pos.x;
     const vy = playerPos.y - pos.y;
-    const mag = Math.hypot(vx, vy);
-    if (mag <= 1e-4) continue;
+    const stepX = Math.abs(vx) > 1e-4 ? (vx > 0 ? 1 : -1) : 0;
+    const stepY = Math.abs(vy) > 1e-4 ? (vy > 0 ? 1 : -1) : 0;
+    if (stepX === 0 && stepY === 0) continue;
 
-    try { world.add(id, MoveIntent, { dx: vx, dy: vy }); } catch {}
+    try { world.add(id, MoveIntent, { dx: stepX, dy: stepY }); } catch {}
   }
 }

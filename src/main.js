@@ -77,6 +77,7 @@ const dungeonRenderState = {
   versionKey: null,
   primitives: [],
   dots: [],
+  wallTiles: [],
   kernel: null,
   mbr: null,
   options: null,
@@ -368,6 +369,7 @@ function ensureDungeonRenderState(dungeon) {
     dungeonRenderState.versionKey = null;
     dungeonRenderState.primitives.length = 0;
     dungeonRenderState.dots.length = 0;
+    dungeonRenderState.wallTiles.length = 0;
     dungeonRenderState.kernel = null;
     dungeonRenderState.mbr = null;
     dungeonRenderState.options = null;
@@ -401,6 +403,7 @@ function ensureDungeonRenderState(dungeon) {
 
 function computeDungeonDots(state) {
   state.dots = [];
+  state.wallTiles = [];
   const kernel = state.kernel;
   const mbr = state.mbr;
   if (!kernel || !mbr) return;
@@ -409,12 +412,44 @@ function computeDungeonDots(state) {
   const maxX = Math.ceil(mbr.maxX);
   const minY = Math.floor(mbr.minY);
   const maxY = Math.ceil(mbr.maxY);
+
+  const floorKeys = new Set();
+  /** @type {Array<{x:number,y:number}>} */
+  const floorTiles = [];
+
   for (let y = minY; y < maxY; y++) {
     for (let x = minX; x < maxX; x++) {
       const px = x + 0.5;
       const py = y + 0.5;
-      if (kernel.distanceMove(px, py) > 0.25) {
+      const dist = kernel.distanceMove(px, py);
+      if (dist > 0.25) {
         state.dots.push({ x: px, y: py });
+        const key = `${x},${y}`;
+        floorKeys.add(key);
+        floorTiles.push({ x, y });
+      }
+    }
+  }
+
+  const neighborOffsets = [
+    [1, 0], [-1, 0], [0, 1], [0, -1],
+    [1, 1], [1, -1], [-1, 1], [-1, -1],
+  ];
+  const wallKeys = new Set();
+
+  for (let i = 0; i < floorTiles.length; i++) {
+    const tile = floorTiles[i];
+    for (let j = 0; j < neighborOffsets.length; j++) {
+      const [dx, dy] = neighborOffsets[j];
+      const nx = tile.x + dx;
+      const ny = tile.y + dy;
+      const key = `${nx},${ny}`;
+      if (floorKeys.has(key) || wallKeys.has(key)) continue;
+      const px = nx + 0.5;
+      const py = ny + 0.5;
+      if (kernel.distanceMove(px, py) <= 0.25) {
+        state.wallTiles.push({ x: px, y: py });
+        wallKeys.add(key);
       }
     }
   }
@@ -490,6 +525,16 @@ function drawDungeon(ctx, palette, glyphAtlas, state) {
       default:
         break;
     }
+  }
+
+  if (glyphAtlas && Array.isArray(state.wallTiles) && state.wallTiles.length > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    for (let i = 0; i < state.wallTiles.length; i++) {
+      const tile = state.wallTiles[i];
+      drawKind(glyphAtlas, ctx, "wall", tile.x, tile.y);
+    }
+    ctx.restore();
   }
 
   if (glyphAtlas && state.dots.length > 0) {

@@ -90,6 +90,7 @@ export class InputManager {
 
   _handleKeyDown(e) {
     const { key, code } = e;
+    const keyLower = typeof key === "string" ? key.toLowerCase() : "";
     // If any UI panel is open, ignore movement/consumable bindings to let UI handle keys
     try {
       const openPanels = Array.from(document.querySelectorAll('.ui-panel')).filter(p => p && p.style.display === 'block');
@@ -100,41 +101,62 @@ export class InputManager {
     } catch {}
 
     // Open Inventory: 'i'
-    if (key?.toLowerCase() === 'i') {
+    if (keyLower === 'i') {
       e.preventDefault();
       this._emit(makeAction(Actions.OpenInventory));
       return;
     }
     // Wait intent: '.' (period)
-    if (key === ".") {
+    if (key === "." || code === "Numpad5") {
       e.preventDefault();
       this._emit(makeAction(Actions.Wait));
       return;
     }
+    // Diagonal movement (numpad-style)
+    if (code === "Home" || code === "Numpad7" || keyLower === "y") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Move, { dx: -1, dy: -1 }));
+      return;
+    }
+    if (code === "PageUp" || code === "Numpad9" || keyLower === "u") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Move, { dx: 1, dy: -1 }));
+      return;
+    }
+    if (code === "End" || code === "Numpad1" || keyLower === "b") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Move, { dx: -1, dy: 1 }));
+      return;
+    }
+    if (code === "PageDown" || code === "Numpad3" || keyLower === "n") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Move, { dx: 1, dy: 1 }));
+      return;
+    }
     // Move left / right
-    if (code === "ArrowLeft" || key === "a" || key === "h") {
+    if (code === "ArrowLeft" || code === "Numpad4" || keyLower === "a" || keyLower === "h") {
       e.preventDefault();
       this._emit(makeAction(Actions.Move, { dx: -1, dy: 0 }));
       return;
     }
-    if (code === "ArrowRight" || key === "d" || key === "l") {
+    if (code === "ArrowRight" || code === "Numpad6" || keyLower === "d" || keyLower === "l") {
       e.preventDefault();
       this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 }));
       return;
     }
     // Move up / down
-    if (code === "ArrowUp" || key === "w" || key === "k") {
+    if (code === "ArrowUp" || code === "Numpad8" || keyLower === "w" || keyLower === "k") {
       e.preventDefault();
       this._emit(makeAction(Actions.Move, { dx: 0, dy: -1 }));
       return;
     }
-    if (code === "ArrowDown" || key === "s" || key === "j") {
+    if (code === "ArrowDown" || code === "Numpad2" || keyLower === "s" || keyLower === "j") {
       e.preventDefault();
       this._emit(makeAction(Actions.Move, { dx: 0, dy: 1 }));
       return;
     }
     // Drink potion (common roguelike: 'q' for quaff)
-    if (key?.toLowerCase() === "q") {
+    if (keyLower === "q") {
       e.preventDefault();
       this._emit(makeAction(Actions.DrinkPotion));
       return;
