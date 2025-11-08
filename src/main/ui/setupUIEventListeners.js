@@ -43,8 +43,8 @@ export function setupUIEventListeners(world, deps) {
   const displayHandler = (action) => {
     switch (action.type) {
       case "display.tapWorld": {
-        const wx = Number(action?.payload?.x);
-        const wy = Number(action?.payload?.y);
+        const wx = (typeof action?.payload?.x === "number") ? action.payload.x : NaN;
+        const wy = (typeof action?.payload?.y === "number") ? action.payload.y : NaN;
         const pe = playerEntity(world);
         if (!pe) break;
         if (Number.isFinite(wx) && Number.isFinite(wy)) {
@@ -76,7 +76,10 @@ export function setupUIEventListeners(world, deps) {
             if (wName && typeof wName.identity === 'string' && wName.identity.startsWith('bow_')) isRanged = true;
           }
 
-          // Facing check: ensure monster is in front arc
+          // Facing + FOV cone check: ensure monster sits within the visible arc
+          const facingComp = world.get(pe.id, Facing) || { x: 1, y: 0 };
+          const baseAngle = Math.atan2(facingComp.y || 0, facingComp.x || 1);
+          const halfFov = Math.PI * 0.75 * 0.5; // match display FOV
           let inFront = false;
           if (tappedMonster) {
             const fx = world.get(pe.id, Facing) || { x: 1, y: 0 };
@@ -86,8 +89,11 @@ export function setupUIEventListeners(world, deps) {
               const dx = tpos.x - ppos.x, dy = tpos.y - ppos.y;
               const len = Math.hypot(dx, dy) || 1;
               const dot = (dx/len) * (fx.x||1) + (dy/len) * (fx.y||0);
-              const CONE_DOT = Math.cos(Math.PI / 10); // ~18°
-              inFront = dot >= CONE_DOT;
+              const CONE_DOT = Math.cos(halfFov);
+              const ang = Math.atan2(dy, dx);
+              let diff = ang - baseAngle;
+              diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+              inFront = dot >= CONE_DOT && Math.abs(diff) <= (halfFov + 1e-3);
             }
           }
 
@@ -95,6 +101,15 @@ export function setupUIEventListeners(world, deps) {
             const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
             handler({ type: "rules.shootRangedAt", payload: { targetId: tappedMonster } });
             break;
+          }
+
+          if (tappedMonster && isRanged) {
+            const tpos = world.get(tappedMonster, Position);
+            if (tpos) {
+              const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+              handler({ type: "rules.face", payload: { toX: tpos.x, toY: tpos.y } });
+              break;
+            }
           }
 
           // Default: move toward tap

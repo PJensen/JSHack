@@ -16,6 +16,7 @@ import { equipmentSystem } from "../../src/rules/systems/equipmentSystem.js";
 import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
 import { rangedAttackSystem } from "../../src/rules/systems/rangedAttackSystem.js";
+import { faceSystem } from "../../src/rules/systems/faceSystem.js";
 import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
 import { movementSystem } from "../../src/rules/systems/movementSystem.js";
 import { combatSystem } from "../../src/rules/systems/combatSystem.js";
@@ -42,6 +43,7 @@ export function configureWorld(world) {
   registerSystem(projectileSystem, 'intents');
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
+  registerSystem(faceSystem, 'intents');
   registerSystem(rangedAttackSystem, 'intents');
   registerSystem(movementSystem, 'intents');
   registerSystem(combatSystem, 'intents');
