@@ -375,16 +375,24 @@ export class InputManager {
     const duration = (now - start) / 1000;
     if (!Number.isFinite(duration) || duration < 0.12) return;
 
-    const result = recognizeLightningGesture(this._gesturePoints);
-    if (!result) return;
+    // Try meteor (diagonal) first; then lightning "Z".
+    let recognized = null;
+    let recognizedId = null;
+    const mres = recognizeMeteorGesture(this._gesturePoints);
+    if (mres) { recognized = mres; recognizedId = 'meteor'; }
+    else {
+      const lres = recognizeLightningGesture(this._gesturePoints);
+      if (lres) { recognized = lres; recognizedId = 'lightning'; }
+    }
+    if (!recognized) return;
 
     const detail = {
-      id: "lightning",
+      id: recognizedId,
       duration,
       pointerType: this._gesturePointerType,
-      quality: result.quality,
-      bounds: result.bounds,
-      normalizedPath: result.normalizedPath,
+      quality: recognized.quality,
+      bounds: recognized.bounds,
+      normalizedPath: recognized.normalizedPath,
       worldPath: this._gestureWorldPoints.length ? this._gestureWorldPoints.slice() : null,
     };
     // Debug recognition overlay hint
@@ -392,9 +400,9 @@ export class InputManager {
       const rect = this._lastRect || this._canvas?.getBoundingClientRect?.() || null;
       const sx = this._lastScaleX || 1;
       const sy = this._lastScaleY || 1;
-      const b = result.bounds;
+      const b = recognized.bounds;
       const screenBounds = rect ? { x: rect.left + b.minX / (sx || 1), y: rect.top + b.minY / (sy || 1), w: b.width / (sx || 1), h: b.height / (sy || 1) } : null;
-      window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: this._gestureClientPoints.slice(), active: true, recognized: { id: 'lightning', quality: result.quality, bounds: screenBounds }, phase: 'recognized' } }));
+      window.dispatchEvent(new CustomEvent("ui:gestureProgress", { detail: { points: this._gestureClientPoints.slice(), active: true, recognized: { id: recognizedId, quality: recognized.quality, bounds: screenBounds }, phase: 'recognized' } }));
     } catch {}
     try {
       window.dispatchEvent(new CustomEvent("input:spellGesture", { detail }));
