@@ -270,8 +270,27 @@ function render(worldView) {
       bctx.stroke();
       bctx.restore();
     }
+    if (PERF.quality !== "low" && Array.isArray(e.tags) && e.tags.includes("stunned")) {
+      const cx = e.pos.x, cy = e.pos.y;
+      const baseR = Math.max(0.22, Number(e.radius) || 0.42);
+      const wob = 0.05 * Math.sin(_fxTime * 6.0 + (e.id || 0));
+      const r = baseR + wob;
+      bctx.save();
+      bctx.globalCompositeOperation = "lighter";
+      bctx.lineJoin = "round"; bctx.lineCap = "round";
+      bctx.strokeStyle = "rgba(255,220,110,0.85)";
+      bctx.lineWidth = 0.07;
+      const segs = 10;
+      const gap = Math.PI * 2 / segs * 0.35;
+      for (let j = 0; j < segs; j++) {
+        const a0 = (j / segs) * Math.PI * 2 + wob * 0.8;
+        const a1 = a0 + (Math.PI * 2 / segs) - gap;
+        bctx.beginPath(); bctx.arc(cx, cy, r, a0, a1); bctx.stroke();
+      }
+      bctx.restore();
+    }
 
-    if (PERF.quality !== "low" && Array.isArray(e.tags) && e.tags.includes("thorns")) {
+      if (PERF.quality !== "low" && Array.isArray(e.tags) && e.tags.includes("thorns")) {
       const g = /** @type any */ (bctx);
       g.save();
       g.globalCompositeOperation = "lighter";
@@ -300,6 +319,7 @@ function render(worldView) {
 
   if (bctx) {
     worldEvents.drawBoltEffects(bctx);
+    worldEvents.drawRippleEffects && worldEvents.drawRippleEffects(bctx);
     worldEvents.drawArrowEffects && worldEvents.drawArrowEffects(bctx);
   }
 
@@ -894,6 +914,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   worldEvents.updateBoltFx(dtSec);
+  if (worldEvents.updateRippleFx) worldEvents.updateRippleFx(dtSec);
   if (worldEvents.updateArrowFx) worldEvents.updateArrowFx(dtSec);
   ftext.step(dtSec);
 

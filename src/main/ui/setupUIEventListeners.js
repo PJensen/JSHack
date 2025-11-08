@@ -275,19 +275,25 @@ export function setupUIEventListeners(world, deps) {
 
   const knowsLightning = () => learnedSpells().some((s) => s?.id === "lightning");
   const knowsMeteor = () => learnedSpells().some((s) => s?.id === "meteor");
+  const knowsBlastwave = () => learnedSpells().some((s) => s?.id === "blastwave");
 
   const onSpellGesture = (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const id = e?.detail?.id;
     if (id === "lightning") {
-      if (!knowsLightning()) return;
-      setActiveSpell("lightning");
+      // If player has Blast Wave and it is selected, cast that instead (same gesture)
+      const activeId = typeof activeSpells.getActiveSpellId === 'function' ? activeSpells.getActiveSpellId() : null;
+      const shouldBlast = (activeId === 'blastwave') && knowsBlastwave();
+      const spellId = shouldBlast ? 'blastwave' : 'lightning';
+      if (spellId === 'lightning' && !knowsLightning()) return;
+      if (spellId === 'blastwave' && !knowsBlastwave()) return;
+      setActiveSpell(spellId);
       const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-      handler({ type: "rules.castActiveSpell", payload: { spellId: "lightning" } });
+      handler({ type: "rules.castActiveSpell", payload: { spellId } });
       try {
         window.dispatchEvent(new CustomEvent("ui:showSpellGestureHint", {
-          detail: { id: "lightning", mode: "cast", quality: e?.detail?.quality ?? null }
+          detail: { id: spellId, mode: "cast", quality: e?.detail?.quality ?? null }
         }));
       } catch {}
       return;

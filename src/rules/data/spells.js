@@ -26,6 +26,14 @@ export const SPELL_DEFS = {
     minIntelligence: 0,
     script: 'meteor',
   },
+  blastwave: {
+    id: 'blastwave',
+    name: 'Blast Wave',
+    // Radial concussive pulse cast on self
+    manaCost: 7,
+    minIntelligence: 0,
+    script: 'blastwave',
+  },
 };
 
 /**

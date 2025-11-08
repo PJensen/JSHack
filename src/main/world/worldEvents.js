@@ -144,6 +144,57 @@ function createBoltFxManager(startShake, cam, theme = 'bolt') {
   return { addBolt, update, draw, getLightSources };
 }
 
+// Expanding ring ripple FX (shockwave)
+function createRippleFxManager(startShake, cam) {
+  /** @type {Array<{x:number,y:number, age:number, life:number, maxR:number, color:string}>} */
+  const ripples = [];
+
+  function addRipple({ x, y, radius = 8, life = 0.6, color = '#ffa600' }) {
+    ripples.push({ x, y, age: 0, life, maxR: radius, color });
+    startShake(cam, 3, Math.min(0.2, life));
+  }
+
+  function update(dt) {
+    for (const r of ripples) r.age += dt;
+    for (let i = ripples.length - 1; i >= 0; i--) if (ripples[i].age >= ripples[i].life) ripples.splice(i, 1);
+  }
+
+  /** @param {CanvasRenderingContext2D} ctx */
+  function draw(ctx) {
+    if (!ripples.length) return;
+    ctx.save();
+    for (const r of ripples) {
+      const t = Math.max(0, Math.min(1, r.age / (r.life || 0.0001)));
+      const rad = r.maxR * t;
+      const alpha = (1 - t) * 0.7;
+      const steps = Math.max(24, Math.min(96, Math.round(rad * 16)));
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 0.04;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const x = r.x + Math.cos(a) * rad;
+        const y = r.y + Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      // subtle dots along ring
+      const dots = Math.max(8, Math.min(48, Math.round(rad * 2)));
+      ctx.globalAlpha = alpha * 0.35;
+      ctx.fillStyle = r.color;
+      for (let i = 0; i < dots; i++) {
+        const a = (i / dots) * Math.PI * 2;
+        const x = r.x + Math.cos(a) * rad;
+        const y = r.y + Math.sin(a) * rad;
+        ctx.beginPath(); ctx.arc(x, y, 0.05 + 0.03 * (1 - t), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  return { addRipple, update, draw };
+}
 // New: fast moving arrow/crossbow bolt VFX manager (separate from lightning)
 function createArrowFxManager(startShake, cam) {
   /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, style:string}>} */
@@ -299,6 +350,7 @@ export function setupWorldEventHandlers(world, deps) {
   const { getActiveSpellId, setActiveSpell } = activeSpells;
 
   const boltFx = createBoltFxManager(startShake, cam, 'bolt');
+  const rippleFx = createRippleFxManager(startShake, cam);
   const arrowFx = createArrowFxManager(startShake, cam);
   /** @type {string[]} */
   const messageLog = [];
@@ -355,6 +407,11 @@ export function setupWorldEventHandlers(world, deps) {
 
   world.on("spell:bolt", ({ from, to, chainIndex = 0 }) => {
     boltFx.addBolt({ from, to, chainIndex });
+  });
+  world.on("spell:blastwave", ({ origin, radius = 8, life = 0.6, color = '#ff9d1e' }) => {
+    if (origin && typeof origin.x === 'number' && typeof origin.y === 'number') {
+      rippleFx.addRipple({ x: origin.x, y: origin.y, radius, life, color });
+    }
   });
 
   // Meteor: a flaming projectile from sky to target, then an impact spark and shake
@@ -609,6 +666,8 @@ export function setupWorldEventHandlers(world, deps) {
     updateBoltFx: boltFx.update,
     drawBoltEffects: boltFx.draw,
     getBoltLightSources: () => boltFx.getLightSources(),
+    updateRippleFx: rippleFx.update,
+    drawRippleEffects: rippleFx.draw,
     updateArrowFx: arrowFx.update,
     drawArrowEffects: arrowFx.draw,
     getArrowLightSources: () => arrowFx.getLightSources(),

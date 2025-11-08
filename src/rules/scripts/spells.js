@@ -8,6 +8,8 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { BoundingCircle } from "../components/BoundingCircle.js";
+import { getGeometryKernel } from "../environment/worldGeometry.js";
 
 const LIGHTNING_KEY = "lightning";
 
@@ -147,6 +149,111 @@ registerScript(METEOR_KEY, {
       const eff = { key: 'burning', turnsLeft: burnTurns, potency: burnPotency, sourceId: actor };
       if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
       else try { world.add(id, ActiveEffects, { effects: [eff] }); } catch {}
+    }
+  },
+});
+
+// === Blast Wave spell ===
+const BLASTWAVE_KEY = "blastwave";
+
+registerScript(BLASTWAVE_KEY, {
+  [ScriptVerb.SpellCast]: (world, ctx) => {
+    const actor = ctx?.actor | 0;
+    const spell = ctx?.spell;
+    if (!(actor > 0) || !spell) return;
+
+    /** @type {{x:number,y:number}|null} */
+    const apos = /** @type any */ (world.get(actor, Position));
+    if (!apos) return;
+
+    // Parameters
+    const MAX_R = 9;            // effect radius (tiles)
+    const BASE_DMG = 5;         // flat damage per target inside LOS
+    const KNOCK_TILES = 2.5;    // target knockback distance (tiles)
+    const STUN_CHANCE = 0.3;    // 30% chance
+    const STUN_TURNS = 1;       // 1 turn
+
+    // Visual: notify display layer to spawn a ripple ring
+    try {
+      world.emit && world.emit("spell:blastwave", {
+        actor,
+        spellId: spell.id,
+        origin: { x: apos.x, y: apos.y },
+        radius: MAX_R,
+        life: 0.7,
+        color: "#ff9d1e"
+      });
+    } catch {}
+
+    // Gather monster candidates within radius and line-of-sight if possible
+    const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+    const r2 = MAX_R * MAX_R;
+
+    /** @type {Array<{ id:number, x:number, y:number }>} */
+    const targets = [];
+    for (const [id, p, ni, vit] of world.query(Position, NamedIdentity, Vitality)) {
+      if (!p || !ni || !vit) continue;
+      if (id === actor) continue;
+      if (ni.identity !== "monster") continue;
+      if ((vit.hp | 0) <= 0) continue;
+      if (d2(apos.x, apos.y, p.x, p.y) > r2) continue;
+      // LOS check via geometry kernel occlusion raycast (best-effort)
+      let inLos = true;
+      try {
+        // Bridge emits dungeon geometry to display; rules may or may not have a kernel.
+        const kernel = getGeometryKernel?.(world) || null;
+        if (kernel && typeof kernel.raycastOccl === 'function') {
+          const dx = p.x - apos.x, dy = p.y - apos.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const hit = kernel.raycastOccl({ x: apos.x, y: apos.y }, { x: dx / len, y: dy / len }, len);
+          if (hit?.hit) inLos = false;
+        }
+      } catch {}
+      if (inLos) targets.push({ id, x: p.x, y: p.y });
+    }
+
+    // Apply damage, knockback, and occasional stun
+    for (const t of targets) {
+      const vit = /** @type any */ (world.get(t.id, Vitality));
+      if (!vit) continue;
+
+      const before = vit.hp | 0;
+      vit.hp = Math.max(0, before - BASE_DMG);
+      try { world.emit && world.emit("damage", { id: t.id, amount: BASE_DMG, at: { x: t.x, y: t.y }, source: actor }); } catch {}
+
+      // Knockback using geometry kernel sweep if available; otherwise naive set
+      try {
+        const kernel = getGeometryKernel?.(world) || null;
+        const p = /** @type any */ (world.get(t.id, Position));
+        if (p) {
+          const dirx = p.x - apos.x; const diry = p.y - apos.y;
+          const len = Math.hypot(dirx, diry) || 1;
+          const ux = dirx / len, uy = diry / len;
+          const desired = { x: p.x + ux * KNOCK_TILES, y: p.y + uy * KNOCK_TILES };
+          let dest = desired;
+          if (kernel && typeof kernel.sweepCapsule === 'function') {
+            const radius = Math.max(0, /** @type any */ (world.get(t.id, BoundingCircle))?.radius ?? 0.45);
+            const sweep = kernel.sweepCapsule({ x: p.x, y: p.y }, desired, radius, { epsilon: 0.05 });
+            dest = { ...sweep.point };
+          }
+          if (Number.isFinite(dest.x) && Number.isFinite(dest.y)) {
+            world.set(t.id, Position, { x: dest.x, y: dest.y });
+            try { world.emit && world.emit("moved", { id: t.id, from: { x: p.x, y: p.y }, to: { x: dest.x, y: dest.y } }); } catch {}
+          }
+        }
+      } catch {}
+
+      // Chance to stun survivors
+      if ((vit.hp | 0) > 0) {
+        if (Math.random() < STUN_CHANCE) {
+          const ae = /** @type any */ (world.get(t.id, ActiveEffects));
+          const eff = { key: 'stunned', turnsLeft: STUN_TURNS, potency: 1, sourceId: actor };
+          if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
+          else try { world.add(t.id, ActiveEffects, { effects: [eff] }); } catch {}
+        }
+      } else {
+        try { world.emit && world.emit("died", { id: t.id, at: { x: t.x, y: t.y } }); } catch {}
+      }
     }
   },
 });

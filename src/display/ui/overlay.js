@@ -108,19 +108,26 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const id = String(e?.detail?.id || '');
-    if (id !== 'lightning' && id !== 'meteor') return;
+    if (id !== 'lightning' && id !== 'meteor' && id !== 'blastwave') return;
     const mode = String(e?.detail?.mode || 'cast');
     const quality = Number(e?.detail?.quality);
     const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
     let duration = mode === 'learn' ? 2600 : 900;
     if (id === 'meteor' && mode === 'cast') duration = 1800;
-    if (id === 'lightning') {
+    if (id === 'lightning' || id === 'blastwave') {
       spellGestureHint.glyph.textContent = 'Z';
-      spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
-      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
-      spellGestureHint.caption.textContent = mode === 'learn'
-        ? 'Draw a Z to unleash Lightning!'
-        : '';
+      if (id === 'blastwave') {
+        // Warmer tint for blast wave
+        spellGestureHint.glyph.style.textShadow = '0 0 16px rgba(255,170,80,0.55), 0 0 30px rgba(255,140,50,0.35)';
+        spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,170,80,0.45))';
+        spellGestureHint.caption.textContent = mode === 'learn' ? 'Draw a Z to unleash Blast Wave!' : '';
+      } else {
+        spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+        spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+        spellGestureHint.caption.textContent = mode === 'learn'
+          ? 'Draw a Z to unleash Lightning!'
+          : '';
+      }
       spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
     } else {
       spellGestureHint.glyph.textContent = '/';
