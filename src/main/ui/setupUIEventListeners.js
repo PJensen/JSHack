@@ -40,6 +40,62 @@ export function setupUIEventListeners(world, deps) {
   // Simple spell targeting latch for Meteor
   let _meteorTargeting = null; // { vx, vy }
 
+  /**
+   * Maps an arbitrary direction vector to the nearest 8-direction grid step.
+   * @param {number} dx
+   * @param {number} dy
+   */
+  const resolveGridStep = (dx, dy) => {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return { dx: 0, dy: 0 };
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-5) return { dx: 0, dy: 0 };
+    const nx = dx / len;
+    const ny = dy / len;
+    const angle = Math.atan2(ny, nx);
+    const wrap = (r) => Math.atan2(Math.sin(r), Math.cos(r));
+
+    const CARDINAL_WIDTH = Math.PI / 4 * 1.4; // widen primary axes (~63deg)
+    const DIAGONAL_WIDTH = Math.PI / 4 * 0.75; // narrower (~34deg)
+
+    const cardinals = [
+      { dx: 1, dy: 0, angle: 0 },
+      { dx: -1, dy: 0, angle: Math.PI },
+      { dx: 0, dy: 1, angle: Math.PI / 2 },
+      { dx: 0, dy: -1, angle: -Math.PI / 2 },
+    ];
+    for (let i = 0; i < cardinals.length; i++) {
+      const target = cardinals[i];
+      const diff = Math.abs(wrap(angle - target.angle));
+      if (diff <= CARDINAL_WIDTH * 0.5) {
+        return target;
+      }
+    }
+
+    const diagonals = [
+      { dx: 1, dy: 1, angle: Math.PI / 4 },
+      { dx: 1, dy: -1, angle: -Math.PI / 4 },
+      { dx: -1, dy: 1, angle: (3 * Math.PI) / 4 },
+      { dx: -1, dy: -1, angle: (-3 * Math.PI) / 4 },
+    ];
+    let best = diagonals[0];
+    let bestScore = -Infinity;
+    for (let i = 0; i < diagonals.length; i++) {
+      const target = diagonals[i];
+      const diff = Math.abs(wrap(angle - target.angle));
+      const score = DIAGONAL_WIDTH * 0.5 - diff;
+      if (diff <= DIAGONAL_WIDTH * 0.5 && score > bestScore) {
+        bestScore = score;
+        best = target;
+      }
+    }
+    if (bestScore > -Infinity) {
+      return best;
+    }
+
+    // Fallback to raw component sign (should rarely occur)
+    return { dx: Math.sign(nx), dy: Math.sign(ny) };
+  };
+
   const displayHandler = (action) => {
     switch (action.type) {
       case "display.tapWorld": {
@@ -115,8 +171,9 @@ export function setupUIEventListeners(world, deps) {
           // Default: move toward tap
           const dx = wx - pe.pos.x;
           const dy = wy - pe.pos.y;
+          const step = resolveGridStep(dx, dy);
           const handler = resolveRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-          handler({ type: "rules.move", payload: { dx, dy } });
+          handler({ type: "rules.move", payload: { dx: step.dx, dy: step.dy } });
         }
         break;
       }

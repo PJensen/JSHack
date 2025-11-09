@@ -77,6 +77,7 @@ const dungeonRenderState = {
   versionKey: null,
   primitives: [],
   dots: [],
+  wallTiles: [],
   kernel: null,
   mbr: null,
   options: null,
@@ -368,6 +369,7 @@ function ensureDungeonRenderState(dungeon) {
     dungeonRenderState.versionKey = null;
     dungeonRenderState.primitives.length = 0;
     dungeonRenderState.dots.length = 0;
+    dungeonRenderState.wallTiles.length = 0;
     dungeonRenderState.kernel = null;
     dungeonRenderState.mbr = null;
     dungeonRenderState.options = null;
@@ -401,6 +403,7 @@ function ensureDungeonRenderState(dungeon) {
 
 function computeDungeonDots(state) {
   state.dots = [];
+  state.wallTiles = [];
   const kernel = state.kernel;
   const mbr = state.mbr;
   if (!kernel || !mbr) return;
@@ -409,12 +412,44 @@ function computeDungeonDots(state) {
   const maxX = Math.ceil(mbr.maxX);
   const minY = Math.floor(mbr.minY);
   const maxY = Math.ceil(mbr.maxY);
+
+  const floorKeys = new Set();
+  /** @type {Array<{x:number,y:number}>} */
+  const floorTiles = [];
+
   for (let y = minY; y < maxY; y++) {
     for (let x = minX; x < maxX; x++) {
       const px = x + 0.5;
       const py = y + 0.5;
-      if (kernel.distanceMove(px, py) > 0.25) {
+      const dist = kernel.distanceMove(px, py);
+      if (dist > 0.25) {
         state.dots.push({ x: px, y: py });
+        const key = `${x},${y}`;
+        floorKeys.add(key);
+        floorTiles.push({ x, y });
+      }
+    }
+  }
+
+  const neighborOffsets = [
+    [1, 0], [-1, 0], [0, 1], [0, -1],
+    [1, 1], [1, -1], [-1, 1], [-1, -1],
+  ];
+  const wallKeys = new Set();
+
+  for (let i = 0; i < floorTiles.length; i++) {
+    const tile = floorTiles[i];
+    for (let j = 0; j < neighborOffsets.length; j++) {
+      const [dx, dy] = neighborOffsets[j];
+      const nx = tile.x + dx;
+      const ny = tile.y + dy;
+      const key = `${nx},${ny}`;
+      if (floorKeys.has(key) || wallKeys.has(key)) continue;
+      const px = nx + 0.5;
+      const py = ny + 0.5;
+      if (kernel.distanceMove(px, py) <= 0.25) {
+        state.wallTiles.push({ x: px, y: py });
+        wallKeys.add(key);
       }
     }
   }
@@ -424,7 +459,7 @@ function drawDungeon(ctx, palette, glyphAtlas, state) {
   if (!state || state.primitives.length === 0) return;
   const wallFill = palette.wall?.glow || "#1f232c";
   const wallHighlight = palette.wall?.fg || "#8e96ab";
-  const floorFill = palette.floor?.glow || "#1c2029";
+  const floorFill = palette.floor?.glow || "#1f2129";
   const floorAccent = palette.floor?.fg || "#576072";
 
   ctx.save();
@@ -490,6 +525,16 @@ function drawDungeon(ctx, palette, glyphAtlas, state) {
       default:
         break;
     }
+  }
+
+  if (glyphAtlas && Array.isArray(state.wallTiles) && state.wallTiles.length > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    for (let i = 0; i < state.wallTiles.length; i++) {
+      const tile = state.wallTiles[i];
+      drawKind(glyphAtlas, ctx, "wall", tile.x, tile.y);
+    }
+    ctx.restore();
   }
 
   if (glyphAtlas && state.dots.length > 0) {
@@ -786,30 +831,35 @@ function syncLightEmitters(lights, fx, time) {
       // For moving emitters, allow slight variability without heavy flicker
       origins.push({ key, x: light.x, y: light.y });
     } else if (light?.emitter === "burning") {
-      // Subtle embers and heat shimmer for burning status
+      // Enhanced embers and heat shimmer for burning status
       const key = `burning:${light.id ?? i}`;
       seen.add(key);
       const emitter = fx.ensureEmitter(key, {
         continuous: true,
-        rate: 8,
-        spread: Math.PI / 10,
-        speed: 0.5,
-        speedJitter: 0.3,
-        life: 0.6,
-        lifeJitter: 0.3,
-        size: 0.14,
-        sizeEnd: 0.04,
+        rate: 14,
+        spread: Math.PI / 8,
+        speed: 0.65,
+        speedJitter: 0.35,
+        life: 0.85,
+        lifeJitter: 0.35,
+        size: 0.26,
+        sizeEnd: 0.08,
         angle: -Math.PI / 2,
         ax: 0,
-        ay: -0.25,
+        ay: -0.32,
         color: light.color || "#ff7a2a",
-        alpha0: 0.55,
+        alpha0: 0.75,
         alpha1: 0.0,
         offsetX: 0,
-        offsetY: -0.1,
+        offsetY: -0.14,
       });
       const rgb = parseRgb(light.color || "#ff7a2a");
       emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+      const seed = hashToUnit(light.id ?? `${light.x},${light.y}`);
+      const flicker = Math.sin((time || 0) * 4.4 + seed * 17.1) * 0.18 + Math.sin((time || 0) * 2.9 + seed * 9.7) * 0.12;
+      emitter.rate = 12 + flicker * 6;
+      emitter.size = 0.24 + flicker * 0.08;
+      emitter.life = 0.75 + Math.abs(flicker) * 0.2;
       origins.push({ key, x: light.x, y: light.y });
     } else if (light?.emitter === "meteorFlame") {
       // Heavier fiery trail for meteor head
