@@ -51,7 +51,7 @@ export function generateRectRoom(world, opts = {}) {
   kernel.carveBox(roomMeta.center.x, roomMeta.center.y, roomMeta.halfWidth, roomMeta.halfHeight, 0, carveFlags);
 
   // Carve a simple horizontal hallway from the room's right wall
-  const hallRadius = Math.max(0.75, Math.min(2, (opts.hallRadius ?? 1.5)));
+  const hallRadius = Math.max(0.75, Math.min(2, (opts.hallRadius ?? 1.0)));
   const hallLen = Math.max(4, Math.floor(opts.hallLength ?? 10));
   const hallStartX = roomMeta.center.x + roomMeta.halfWidth; // start at the right edge
   const hallStartY = roomMeta.center.y;
