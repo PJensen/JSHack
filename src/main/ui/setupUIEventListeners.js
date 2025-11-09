@@ -51,15 +51,28 @@ export function setupUIEventListeners(world, deps) {
     if (len <= 1e-5) return { dx: 0, dy: 0 };
     const nx = dx / len;
     const ny = dy / len;
+    const absX = Math.abs(nx);
+    const absY = Math.abs(ny);
+    const horizontalBias = absY > 1e-5 ? absX / absY : Infinity;
+    const verticalBias = absX > 1e-5 ? absY / absX : Infinity;
+    const ORTHO_BIAS = 1.2; // favor N/S/E/W when one axis dominates
+
+    if (horizontalBias >= ORTHO_BIAS) {
+      return { dx: Math.sign(nx), dy: 0 };
+    }
+    if (verticalBias >= ORTHO_BIAS) {
+      return { dx: 0, dy: Math.sign(ny) };
+    }
+
     const directions = [
-      { dx: 1, dy: 0 },
-      { dx: -1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: 0, dy: -1 },
       { dx: 1, dy: 1 },
       { dx: 1, dy: -1 },
       { dx: -1, dy: 1 },
       { dx: -1, dy: -1 },
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 },
     ];
     let best = directions[0];
     let bestDot = -Infinity;
