@@ -27,24 +27,30 @@ const ROOM_HEIGHT = 11;
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function populateDemoScene(world) {
-  const { room } = generateRectRoom(world, {
+  const { room, labeledRooms, doors } = generateRectRoom(world, {
     width: ROOM_WIDTH,
     height: ROOM_HEIGHT,
     name: "Demo Room",
   });
 
-  ensurePlayer(world, room.center);
-  placeEntryDoor(world, room);
+  const rooms = labeledRooms ?? { main: room };
+
+  ensurePlayer(world, rooms.main.center);
+  if (Array.isArray(doors) && doors.length) placeDoors(world, doors);
   grantInitialShield(world);
-  placeTorch(world, room);
-  placeSpellbook(world, room);
-  placeBlastwaveScroll(world, room);
+
+  // Lighting and flavor in main room
+  placeTorch(world, rooms.main);
+  placeSpellbook(world, rooms.main);
+
+  // Spread items around adjoining rooms
+  placeBlastwaveScroll(world, rooms.south ?? rooms.main);
   setPlayerStats(world);
-  dropPotions(world, room);
-  dropGold(world, room);
-  dropArrows(world, room);
-  spawnMonsters(world, room);
-  dropEquipment(world, room);
+  dropPotions(world, rooms.east ?? rooms.main);
+  dropGold(world, rooms.north ?? rooms.main);
+  dropArrows(world, rooms.south ?? rooms.main);
+  spawnMonsters(world, rooms.east ?? rooms.main);
+  dropEquipment(world, rooms.main, rooms);
 }
 
 function ensurePlayer(world, center) {
@@ -60,28 +66,30 @@ function ensurePlayer(world, center) {
   createPlayer(world, { x: center.x, y: center.y, name: "Hero" });
 }
 
-function placeEntryDoor(world, room) {
-  const doorX = room.center.x + room.halfWidth;
-  const doorY = room.center.y;
-  let existingDoorId = null;
-  for (const [id, pos] of world.query(Position, DoorState)) {
-    if (!pos) continue;
-    if (Math.abs(pos.x - doorX) < 0.25 && Math.abs(pos.y - doorY) < 0.25) {
-      existingDoorId = id;
-      break;
+function placeDoors(world, positions) {
+  const eps = 0.25;
+  for (const p of positions) {
+    const doorX = p.x;
+    const doorY = p.y;
+    let existingDoorId = null;
+    for (const [id, pos] of world.query(Position, DoorState)) {
+      if (!pos) continue;
+      if (Math.abs(pos.x - doorX) < eps && Math.abs(pos.y - doorY) < eps) {
+        existingDoorId = id;
+        break;
+      }
+    }
+    if (existingDoorId != null) {
+      world.set(existingDoorId, Position, { x: doorX, y: doorY });
+      world.set(existingDoorId, DoorState, { open: false, locked: false });
+      const collider = world.get(existingDoorId, Collider);
+      if (collider) {
+        world.set(existingDoorId, Collider, { ...collider, solid: true, blocksSight: true });
+      }
+    } else {
+      createFrom(world, Door, { x: doorX, y: doorY });
     }
   }
-
-  if (existingDoorId != null) {
-    world.set(existingDoorId, Position, { x: doorX, y: doorY });
-    world.set(existingDoorId, DoorState, { open: false, locked: false });
-    const collider = world.get(existingDoorId, Collider);
-    if (collider) {
-      world.set(existingDoorId, Collider, { ...collider, solid: true, blocksSight: true });
-    }
-    return;
-  }
-  createFrom(world, Door, { x: doorX, y: doorY });
 }
 
 function grantInitialShield(world) {
@@ -210,15 +218,22 @@ function spawnMonsters(world, room) {
   });
 }
 
-function dropEquipment(world, room) {
-  const { center, halfWidth, halfHeight } = room;
+function dropEquipment(world, mainRoom, rooms) {
+  const { center, halfWidth, halfHeight } = mainRoom;
   const eqSword = buildEquipmentItem(world, "sword_plain", { affixes: ["fierce"] });
   world.add(eqSword, Position, { x: center.x - (halfWidth - 2), y: center.y - (halfHeight - 2) });
 
+  // Put armor in the east room if present
+  const east = rooms?.east ?? mainRoom;
+  const armorPos = {
+    x: east.center.x + (east.halfWidth - 2),
+    y: east.center.y + (east.halfHeight - 2),
+  };
   const thornArmor = buildEquipmentItem(world, "chain_armor", { affixes: ["thorns1"] });
-  world.add(thornArmor, Position, { x: center.x + (halfWidth - 2), y: center.y + (halfHeight - 2) });
+  world.add(thornArmor, Position, armorPos);
 
-  // New: wooden bow to try ranged combat
+  // Wooden bow in the north room if present
+  const north = rooms?.north ?? mainRoom;
   const woodBow = buildEquipmentItem(world, "bow_wood", {});
-  world.add(woodBow, Position, { x: center.x, y: center.y + (halfHeight - 2) });
+  world.add(woodBow, Position, { x: north.center.x, y: north.center.y });
 }
