@@ -51,40 +51,49 @@ export function setupUIEventListeners(world, deps) {
     if (len <= 1e-5) return { dx: 0, dy: 0 };
     const nx = dx / len;
     const ny = dy / len;
-    const absX = Math.abs(nx);
-    const absY = Math.abs(ny);
-    const horizontalBias = absY > 1e-5 ? absX / absY : Infinity;
-    const verticalBias = absX > 1e-5 ? absY / absX : Infinity;
-    const ORTHO_BIAS = 1.2; // favor N/S/E/W when one axis dominates
+    const angle = Math.atan2(ny, nx);
+    const wrap = (r) => Math.atan2(Math.sin(r), Math.cos(r));
 
-    if (horizontalBias >= ORTHO_BIAS) {
-      return { dx: Math.sign(nx), dy: 0 };
-    }
-    if (verticalBias >= ORTHO_BIAS) {
-      return { dx: 0, dy: Math.sign(ny) };
-    }
+    const CARDINAL_WIDTH = Math.PI / 4 * 1.4; // widen primary axes (~63deg)
+    const DIAGONAL_WIDTH = Math.PI / 4 * 0.75; // narrower (~34deg)
 
-    const directions = [
-      { dx: 1, dy: 1 },
-      { dx: 1, dy: -1 },
-      { dx: -1, dy: 1 },
-      { dx: -1, dy: -1 },
-      { dx: 1, dy: 0 },
-      { dx: -1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: 0, dy: -1 },
+    const cardinals = [
+      { dx: 1, dy: 0, angle: 0 },
+      { dx: -1, dy: 0, angle: Math.PI },
+      { dx: 0, dy: 1, angle: Math.PI / 2 },
+      { dx: 0, dy: -1, angle: -Math.PI / 2 },
     ];
-    let best = directions[0];
-    let bestDot = -Infinity;
-    for (let i = 0; i < directions.length; i++) {
-      const dir = directions[i];
-      const dot = nx * dir.dx + ny * dir.dy;
-      if (dot > bestDot) {
-        bestDot = dot;
-        best = dir;
+    for (let i = 0; i < cardinals.length; i++) {
+      const target = cardinals[i];
+      const diff = Math.abs(wrap(angle - target.angle));
+      if (diff <= CARDINAL_WIDTH * 0.5) {
+        return target;
       }
     }
-    return best;
+
+    const diagonals = [
+      { dx: 1, dy: 1, angle: Math.PI / 4 },
+      { dx: 1, dy: -1, angle: -Math.PI / 4 },
+      { dx: -1, dy: 1, angle: (3 * Math.PI) / 4 },
+      { dx: -1, dy: -1, angle: (-3 * Math.PI) / 4 },
+    ];
+    let best = diagonals[0];
+    let bestScore = -Infinity;
+    for (let i = 0; i < diagonals.length; i++) {
+      const target = diagonals[i];
+      const diff = Math.abs(wrap(angle - target.angle));
+      const score = DIAGONAL_WIDTH * 0.5 - diff;
+      if (diff <= DIAGONAL_WIDTH * 0.5 && score > bestScore) {
+        bestScore = score;
+        best = target;
+      }
+    }
+    if (bestScore > -Infinity) {
+      return best;
+    }
+
+    // Fallback to raw component sign (should rarely occur)
+    return { dx: Math.sign(nx), dy: Math.sign(ny) };
   };
 
   const displayHandler = (action) => {

@@ -8,7 +8,7 @@ export const basePalette = {
 
   // Tiles
   // Colors tuned to match display defaults in drawDungeon
-  floor: { glyph: ".", fg: "#2e323c", glow: "#14171d" },
+  floor: { glyph: ".", fg: "#2e323c", glow: "#1f2129" },
   wall: { glyph: "#", fg: "#8e96ab", glow: "#1f232c" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },

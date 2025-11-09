@@ -459,7 +459,7 @@ function drawDungeon(ctx, palette, glyphAtlas, state) {
   if (!state || state.primitives.length === 0) return;
   const wallFill = palette.wall?.glow || "#1f232c";
   const wallHighlight = palette.wall?.fg || "#8e96ab";
-  const floorFill = palette.floor?.glow || "#1c2029";
+  const floorFill = palette.floor?.glow || "#1f2129";
   const floorAccent = palette.floor?.fg || "#576072";
 
   ctx.save();
@@ -831,30 +831,35 @@ function syncLightEmitters(lights, fx, time) {
       // For moving emitters, allow slight variability without heavy flicker
       origins.push({ key, x: light.x, y: light.y });
     } else if (light?.emitter === "burning") {
-      // Subtle embers and heat shimmer for burning status
+      // Enhanced embers and heat shimmer for burning status
       const key = `burning:${light.id ?? i}`;
       seen.add(key);
       const emitter = fx.ensureEmitter(key, {
         continuous: true,
-        rate: 8,
-        spread: Math.PI / 10,
-        speed: 0.5,
-        speedJitter: 0.3,
-        life: 0.6,
-        lifeJitter: 0.3,
-        size: 0.14,
-        sizeEnd: 0.04,
+        rate: 14,
+        spread: Math.PI / 8,
+        speed: 0.65,
+        speedJitter: 0.35,
+        life: 0.85,
+        lifeJitter: 0.35,
+        size: 0.26,
+        sizeEnd: 0.08,
         angle: -Math.PI / 2,
         ax: 0,
-        ay: -0.25,
+        ay: -0.32,
         color: light.color || "#ff7a2a",
-        alpha0: 0.55,
+        alpha0: 0.75,
         alpha1: 0.0,
         offsetX: 0,
-        offsetY: -0.1,
+        offsetY: -0.14,
       });
       const rgb = parseRgb(light.color || "#ff7a2a");
       emitter.r = rgb.r; emitter.g = rgb.g; emitter.b = rgb.b;
+      const seed = hashToUnit(light.id ?? `${light.x},${light.y}`);
+      const flicker = Math.sin((time || 0) * 4.4 + seed * 17.1) * 0.18 + Math.sin((time || 0) * 2.9 + seed * 9.7) * 0.12;
+      emitter.rate = 12 + flicker * 6;
+      emitter.size = 0.24 + flicker * 0.08;
+      emitter.life = 0.75 + Math.abs(flicker) * 0.2;
       origins.push({ key, x: light.x, y: light.y });
     } else if (light?.emitter === "meteorFlame") {
       // Heavier fiery trail for meteor head

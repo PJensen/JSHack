@@ -64,9 +64,10 @@ export function movementSystem(world) {
   for (const [id, pos] of world.query(Position)) {
     if (!pos) continue;
     const collider = world.get(id, Collider);
+    const hasExplicitCollider = !!(collider && typeof collider === "object" && ("solid" in collider || "blocksSight" in collider));
     const vit = world.get(id, Vitality);
     const alive = !!(vit && (vit.hp ?? 0) > 0);
-    const solid = !!(collider?.solid) || alive;
+    const solid = hasExplicitCollider ? !!(collider?.solid) : alive;
     const radius = Math.max(0, world.get(id, BoundingCircle)?.radius ?? (solid ? 0.5 : 0));
     const gridX = snapToGrid(pos.x);
     const gridY = snapToGrid(pos.y);
