@@ -13,6 +13,7 @@ import { Facing } from "../../rules/components/Facing.js";
 import { Anatomy } from "../../rules/components/Anatomy.js";
 import { DungeonGeometry } from "../../rules/components/DungeonGeometry.js";
 import { LightSource } from "../../rules/components/LightSource.js";
+import { Trap } from "../../rules/components/Trap.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], radius:number, reach:number, stride:number, facing:{x:number,y:number} }} EntityView */
@@ -163,7 +164,11 @@ export function buildWorldView(world) {
       }
     }
 
-    _view.entities.push(rec);
+    // Hide unrevealed traps from entity render list
+    const trap = /** @type any */ (world.get(id, Trap));
+    if (!(trap && trap.revealed === false)) {
+      _view.entities.push(rec);
+    }
     if (isPlayer) {
       const fovDistance = Math.max(8, Math.max(reach + radius, stride * 2, 4) * 2);
       const fovAngle = Math.PI * 0.75;

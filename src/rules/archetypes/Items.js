@@ -5,17 +5,17 @@ import { Potion } from "../components/Potion.js";
 
 // Simple Health Potion archetype using Potion component
 export const HealthPotion = defineArchetype(
-    "HealthPotion",
-    [Potion, {
-        name: "Health Potion",
-        route: "oral",
-        doses: 1,
-        channels: [],
-        effects: [
-            // A tiny regeneration-over-time example
-            { key: "regen", potency: 1, onset: 0, peak: 0, duration: 5, stack: "refresh" }
-        ],
-    }],
+  "HealthPotion",
+  [Potion, {
+      name: "Health Potion",
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+            // Regeneration-over-time; potency resolved as % of max HP at use time (see drinkSystem)
+            { key: "regen", potency: 0, onset: 0, peak: 0, duration: 8, stack: "refresh", meta: { percentOfMaxHp: 0.03 } }
+      ],
+  }],
     [ItemInfo, {
         type: "potion",
         description: "Restores health over a short duration.",

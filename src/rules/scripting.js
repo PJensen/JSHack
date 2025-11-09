@@ -15,6 +15,7 @@ export const ScriptVerb = Object.freeze({
   AffixPassive: "affix:passive",
   ItemOnEquip: "item:onEquip",
   ItemOnUnequip: "item:onUnequip",
+  TrapTrigger: "trap:trigger",
 });
 
 /**

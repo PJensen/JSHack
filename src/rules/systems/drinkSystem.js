@@ -4,6 +4,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { DrinkIntent } from "../components/Intents/DrinkIntent.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { DamageSpec } from "../components/DamageSpec.js";
+import { Vitality } from "../components/Vitality.js";
 // import { Physiology } from "../components/Physiology.js"; // optional for advanced toxicity scaling
 
 /**
@@ -69,23 +70,31 @@ export function drinkSystem(world) {
   let ae = world.get(target, ActiveEffects);
   if (!ae) { try { world.add(target, ActiveEffects, { effects: [] }); ae = world.get(target, ActiveEffects); } catch {} }
     for (const e of pot.effects) {
-      const existing = ae.effects.filter((x) => x.key === e.key);
-      if (e.stack === "refresh" && existing.length) {
+      // Resolve percent-of-max potency into absolute numbers at use time
+      let eff = { ...e };
+      if (eff?.meta && typeof eff.meta.percentOfMaxHp === 'number') {
+        const vit = world.get(target, Vitality);
+        const pct = Math.max(0, Math.min(1, Number(eff.meta.percentOfMaxHp || 0)));
+        const base = Math.max(1, Math.floor((vit?.maxHp || 0) * pct));
+        eff.potency = base;
+      }
+      const existing = ae.effects.filter((x) => x.key === eff.key);
+      if (eff.stack === "refresh" && existing.length) {
         for (const x of existing) {
-          x.potency = e.potency;
-          x.onsetLeft = e.onset;
-          x.peakLeft = e.peak;
-          x.turnsLeft = e.duration;
+          x.potency = eff.potency;
+          x.onsetLeft = eff.onset;
+          x.peakLeft = eff.peak;
+          x.turnsLeft = eff.duration;
         }
-      } else if (e.stack === "cap" && existing.length >= (e.maxStacks ?? 1)) {
-        strongest(existing).turnsLeft = e.duration;
+      } else if (eff.stack === "cap" && existing.length >= (eff.maxStacks ?? 1)) {
+        strongest(existing).turnsLeft = eff.duration;
       } else {
         ae.effects.push({
-          key: e.key,
-          potency: e.potency,
-          onsetLeft: e.onset,
-          peakLeft: e.peak,
-          turnsLeft: e.duration,
+          key: eff.key,
+          potency: eff.potency,
+          onsetLeft: eff.onset,
+          peakLeft: eff.peak,
+          turnsLeft: eff.duration,
           startedAtTurn: world.step,
           sourceId: item,
           meta: { route: pot.route, name: pot.name },

@@ -22,6 +22,9 @@ import { movementSystem } from "../../src/rules/systems/movementSystem.js";
 import { combatSystem } from "../../src/rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
+import { trapSystem } from "../../src/rules/systems/trapSystem.js";
+// Register trap scripts
+import "../../src/rules/scripts/traps.js";
 
 /**
  * @param {World} world
@@ -54,6 +57,8 @@ export function configureWorld(world) {
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
   registerSystem(monsterSpawnerSystem, 'effects');
+  // Trigger traps after movement and core effects
+  registerSystem(trapSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
 

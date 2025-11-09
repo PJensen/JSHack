@@ -18,6 +18,7 @@ import { buildEquipmentItem } from "../../rules/data/equipmentLoader.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { generateRectRoom } from "../../rules/environment/dungeonGenerator.js";
 import { LightSource } from "../../rules/components/LightSource.js";
+import { Trap } from "../../rules/components/Trap.js";
 
 const ROOM_WIDTH = 11;
 const ROOM_HEIGHT = 11;
@@ -51,6 +52,9 @@ export function populateDemoScene(world) {
   dropArrows(world, rooms.south ?? rooms.main);
   spawnMonsters(world, rooms.east ?? rooms.main);
   dropEquipment(world, rooms.main, rooms);
+  // Place spike trap and a helpful potion near the bow
+  placeSpikeTrap(world, rooms);
+  placeBowRoomPotion(world, rooms);
 }
 
 function ensurePlayer(world, center) {
@@ -90,6 +94,22 @@ function placeDoors(world, positions) {
       createFrom(world, Door, { x: doorX, y: doorY });
     }
   }
+}
+
+function placeSpikeTrap(world, rooms) {
+  const north = rooms?.north ?? rooms.main;
+  const at = { x: north.center.x, y: north.center.y + 3 };
+  const trap = world.create();
+  world.add(trap, Position, { x: at.x, y: at.y });
+  world.add(trap, Trap, { type: "spike", revealed: false, armed: true, script: 'trap_spike', params: { percent: 0.25 } });
+  // No NamedIdentity initially; added on trigger to reveal '^'
+}
+
+function placeBowRoomPotion(world, rooms) {
+  const north = rooms?.north ?? rooms.main;
+  const pos = { x: north.center.x + 1.5, y: north.center.y }; // a tile to the right of the bow
+  const p = createFrom(world, HealthPotion, {});
+  world.add(p, Position, pos);
 }
 
 function grantInitialShield(world) {

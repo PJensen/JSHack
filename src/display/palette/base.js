@@ -15,6 +15,9 @@ export const basePalette = {
   gold: { glyph: "$", fg: "#ffde5a", glow: "#ffcc66" },
   torch: { glyph: "t", fg: "#ffd8a8", glow: "#ffb347" },
 
+  // Traps
+  trap_spike: { glyph: "^", fg: "#cccccc", glow: "#888888" },
+
   // Ammo
   ammo_arrows: { glyph: "/", fg: "#e0e0e0", glow: "#f0f0f0" },
 
