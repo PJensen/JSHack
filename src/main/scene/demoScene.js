@@ -1,6 +1,9 @@
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { playerEntity } from "../../rules/utils/queries.js";
 import { createPlayer } from "../../rules/archetypes/Player.js";
+import { Door } from "../../rules/archetypes/Door.js";
+import { DoorState } from "../../rules/components/DoorState.js";
+import { Collider } from "../../rules/components/Collider.js";
 import { HealthPotion, GoldStack, ArrowsStack } from "../../rules/archetypes/Items.js";
 import { Spawner } from "../../rules/archetypes/Spawner.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
@@ -31,6 +34,7 @@ export function populateDemoScene(world) {
   });
 
   ensurePlayer(world, room.center);
+  placeEntryDoor(world, room);
   grantInitialShield(world);
   placeTorch(world, room);
   placeSpellbook(world, room);
@@ -54,6 +58,30 @@ function ensurePlayer(world, center) {
     return;
   }
   createPlayer(world, { x: center.x, y: center.y, name: "Hero" });
+}
+
+function placeEntryDoor(world, room) {
+  const doorX = room.center.x + room.halfWidth;
+  const doorY = room.center.y;
+  let existingDoorId = null;
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (!pos) continue;
+    if (Math.abs(pos.x - doorX) < 0.25 && Math.abs(pos.y - doorY) < 0.25) {
+      existingDoorId = id;
+      break;
+    }
+  }
+
+  if (existingDoorId != null) {
+    world.set(existingDoorId, Position, { x: doorX, y: doorY });
+    world.set(existingDoorId, DoorState, { open: false, locked: false });
+    const collider = world.get(existingDoorId, Collider);
+    if (collider) {
+      world.set(existingDoorId, Collider, { ...collider, solid: true, blocksSight: true });
+    }
+    return;
+  }
+  createFrom(world, Door, { x: doorX, y: doorY });
 }
 
 function grantInitialShield(world) {
