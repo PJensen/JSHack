@@ -176,13 +176,9 @@ function render(worldView) {
   const H = _cssH;
 
   bctx.save();
-  if (!_bgGrad || _bgGradH !== H) {
-    _bgGrad = bctx.createLinearGradient(0, 0, 0, H);
-    _bgGrad.addColorStop(0, "#0b0e16");
-    _bgGrad.addColorStop(1, "#0a0c14");
-    _bgGradH = H;
-  }
-  bctx.fillStyle = _bgGrad; bctx.fillRect(0, 0, W, H);
+  // Clear the frame without painting a background, so areas outside
+  // of carved dungeon tiles remain unpainted.
+  bctx.clearRect(0, 0, W, H);
   bctx.restore();
 
   bctx.save();
