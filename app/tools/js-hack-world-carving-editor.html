@@ -198,16 +198,21 @@
 
   // ===== Carving =====
   let isDragging=false,lastX=0,lastY=0; const undoStack=[];
+  let lastStrokeDir=null;
   function canvasToWorld(e){ const rect=canvas.getBoundingClientRect(); return [(e.clientX-rect.left)*dpr,(e.clientY-rect.top)*dpr]; }
-  canvas.addEventListener('pointerdown',e=>{ if(ui.mode.value==='moveTest') return; canvas.setPointerCapture(e.pointerId); const [x,y]=canvasToWorld(e); lastX=x; lastY=y; isDragging=true; addDotOrStart(x,y,e); });
+  canvas.addEventListener('pointerdown',e=>{ if(ui.mode.value==='moveTest') return; canvas.setPointerCapture(e.pointerId); const [x,y]=canvasToWorld(e); lastX=x; lastY=y; lastStrokeDir=null; isDragging=true; addDotOrStart(x,y,e); });
   canvas.addEventListener('pointermove',e=>{ if(ui.mode.value==='moveTest'||!isDragging) return; const [x,y]=canvasToWorld(e); const dx=x-lastX,dy=y-lastY; const dist=Math.hypot(dx,dy); const step=Math.max(1,+ui.radius.value/3); if(dist>=step){ addSegment(lastX,lastY,x,y,e); lastX=x; lastY=y; } });
   window.addEventListener('pointerup',e=>{ if(!isDragging) return; isDragging=false; if(canvas.releasePointerCapture){ try{ canvas.releasePointerCapture(e.pointerId);}catch(err){/* ignore */} }
-    if(ui.mode.value!=='carve') return; const [x,y]=canvasToWorld(e); const dx=x-lastX,dy=y-lastY; const dist=Math.hypot(dx,dy); if(dist>0.01){ addSegment(lastX,lastY,x,y,e); lastX=x; lastY=y; }
-    if(ui.brush.value==='circle'){ if(Kernel.consolidateCapsules()) undoStack.length=Kernel.carves.length; } else { undoStack.length=Kernel.carves.length; }
+    if(ui.mode.value!=='carve') return; const [x,y]=canvasToWorld(e); const dx=x-lastX,dy=y-lastY; const dist=Math.hypot(dx,dy); if(dist>0.01){ addSegment(lastX,lastY,x,y,e); lastX=x; lastY=y; } else { lastX=x; lastY=y; }
+    if(ui.brush.value==='circle'){ extendCapsuleTipToPointer(lastStrokeDir,x,y,+ui.radius.value); Kernel.consolidateCapsules(); }
+    undoStack.length=Kernel.carves.length;
+    lastStrokeDir=null;
   });
   function currentFlags(){ return {affectsMove:ui.affectsMove.checked,affectsOccl:ui.affectsOccl.checked}; }
   function addDotOrStart(x,y){ const r=+ui.radius.value, flags=currentFlags(), mode=ui.brush.value; if(mode==='circle'){ undoStack.push(Kernel.carveCircle(x,y,r,flags)); } else { undoStack.push(Kernel.carveCapsule(x,y,x+0.0001,y+0.0001,r,flags)); } }
-  function addSegment(ax,ay,bx,by){ const r=+ui.radius.value, flags=currentFlags(), mode=ui.brush.value; if(mode==='circle'){ undoStack.push(Kernel.carveCapsule(ax,ay,bx,by,r,flags)); } else if(mode==='rectslot'){ undoStack.push(Kernel.carveRectSlot(ax,ay,bx,by,r,flags)); } else if(mode==='square'){ const rot=(+ui.rotation.value)*Math.PI/180; undoStack.push(Kernel.carveSquare(ax,ay,bx,by,r,rot,flags)); } }
+  function addSegment(ax,ay,bx,by){ const r=+ui.radius.value, flags=currentFlags(), mode=ui.brush.value; if(mode==='circle'){ undoStack.push(Kernel.carveCapsule(ax,ay,bx,by,r,flags)); const dx=bx-ax,dy=by-ay; const segLen=Math.hypot(dx,dy); if(segLen>1e-3){ lastStrokeDir=[dx/segLen,dy/segLen]; } } else if(mode==='rectslot'){ undoStack.push(Kernel.carveRectSlot(ax,ay,bx,by,r,flags)); } else if(mode==='square'){ const rot=(+ui.rotation.value)*Math.PI/180; undoStack.push(Kernel.carveSquare(ax,ay,bx,by,r,rot,flags)); } }
+
+  function extendCapsuleTipToPointer(dir,x,y,r){ if(!dir) return false; const carves=Kernel.carves; const minGap=Math.max(0.5, r*0.25); for(let i=carves.length-1;i>=0;i--){ const prim=carves[i]; if(prim.type!=='capsule') continue; const gap=(x-prim.bx)*dir[0]+(y-prim.by)*dir[1]; if(gap>minGap){ prim.bx+=dir[0]*gap; prim.by+=dir[1]*gap; return true; } return false; } return false; }
 
   // Undo/Clear
   ui.undoBtn.addEventListener('click',()=>{ if(Kernel.carves.length>0){ Kernel.carves.pop(); undoStack.pop(); }});
