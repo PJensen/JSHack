@@ -22,7 +22,8 @@ export const PlayerArchetype = defineArchetype(
   [Inventory, (p) => ({ capacity: p.capacity ?? 20, weightLimit: p.weightLimit ?? null, items: [] })],
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
-  [BoundingCircle, (p) => ({ radius: p.radius ?? 0.55 })],
+  // Slightly slimmer default radius so the player can navigate 1-tile corridors.
+  [BoundingCircle, (p) => ({ radius: p.radius ?? 0.45 })],
   [Facing, (p) => {
     const fx = Number.isFinite(p.facing?.x) ? p.facing.x : 1;
     const fy = Number.isFinite(p.facing?.y) ? p.facing.y : 0;
@@ -52,7 +53,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Inventory, { capacity: params.capacity ?? 20, weightLimit: params.weightLimit ?? null, items: [] });
     world.add(id, NamedIdentity, { name: params.name ?? "Player", identity: params.identity ?? "player" });
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
-    world.add(id, BoundingCircle, { radius: params.radius ?? 0.55 });
+    world.add(id, BoundingCircle, { radius: params.radius ?? 0.45 });
     const fx = Number.isFinite(params.facing?.x) ? params.facing.x : 1;
     const fy = Number.isFinite(params.facing?.y) ? params.facing.y : 0;
     const mag = Math.hypot(fx, fy) || 1;
