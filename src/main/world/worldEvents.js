@@ -474,7 +474,7 @@ export function setupWorldEventHandlers(world, deps) {
 
   // Ranged shots: fast crossbow/arrow tracer (separate handler)
   world.on("ranged:shot", ({ from, to, style }) => {
-    const s = style || 'flame';
+    const s = style || 'plain';
     arrowFx.addArrow({ from, to, style: s });
     // Schedule impact spark to align with travel time
     if (from && to) {
@@ -493,7 +493,7 @@ export function setupWorldEventHandlers(world, deps) {
   });
 
   world.on("ranged:impact", ({ at, style }) => {
-    if (at && typeof at.x === 'number' && typeof at.y === 'number') arrowFx.addSpark(at.x, at.y, style || 'flame');
+    if (at && typeof at.x === 'number' && typeof at.y === 'number') arrowFx.addSpark(at.x, at.y, style || 'plain');
   });
 
   world.on("spell:not-known", ({ spellId }) => {

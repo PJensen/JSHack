@@ -65,10 +65,17 @@ export function rangedAttackSystem(world) {
 
       const finalTo = clipShotToOcclusion(kernel, apos, desired, target);
 
-      // Consume an arrow when the shot is loosed.
+      // Consume an arrow when the shot is loosed. If none, abort the attack.
       const ammoTemplate = consumeArrow(world, actor);
+      if (!ammoTemplate) {
+        try { world.emit && world.emit('status', { id: actor, kind: 'status', text: 'NO AMMO' }); } catch {}
+        continue;
+      }
 
-      try { world.emit && world.emit('ranged:shot', { from: { x: apos.x, y: apos.y }, to: finalTo, style: 'flame' }); } catch {}
+      // Visual style for the shot (plain by default for regular arrows)
+      const shotStyle = 'plain';
+
+      try { world.emit && world.emit('ranged:shot', { from: { x: apos.x, y: apos.y }, to: finalTo, style: shotStyle }); } catch {}
 
       if (!target) continue;
 
@@ -103,10 +110,13 @@ export function rangedAttackSystem(world) {
       if ((vit.hp|0) <= 0) {
         try { world.emit && world.emit('died', { id: target.id, killer: actor }); } catch {}
       } else {
-        const ae = /** @type any */ (world.get(target.id, ActiveEffects));
-        const eff = { key: 'burning', turnsLeft: 2, potency: 1 };
-        if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
-        else { try { world.add(target.id, ActiveEffects, { effects: [eff] }); } catch {} }
+        // Apply on-hit effects based on shot style (burn only for flaming shots)
+        if (shotStyle === 'flame') {
+          const ae = /** @type any */ (world.get(target.id, ActiveEffects));
+          const eff = { key: 'burning', turnsLeft: 2, potency: 1 };
+          if (ae && Array.isArray(ae.effects)) ae.effects.push(eff);
+          else { try { world.add(target.id, ActiveEffects, { effects: [eff] }); } catch {} }
+        }
       }
 
       maybeReturnArrow(world, target.id, ammoTemplate, rng, true);
