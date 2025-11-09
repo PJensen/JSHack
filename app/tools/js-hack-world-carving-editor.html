@@ -116,6 +116,55 @@
     const carveSquare=(ax,ay,bx,by,halfW,rot,flags)=>{carves.push({type:'square',ax,ay,bx,by,halfW,rot,...flags}); return carves.length-1};
     const clear=()=>{carves.length=0};
 
+    function consolidateCapsules(){
+      if(carves.length<2) return false;
+      const merged=[];
+      let changed=false;
+      const COS_EPS=Math.cos(5*Math.PI/180);
+      const POS_EPS_BASE=0.75;
+      for(let i=0;i<carves.length;i++){
+        const prim=carves[i];
+        if(prim.type==='capsule' && merged.length>0){
+          const prev=merged[merged.length-1];
+          if(prev.type==='capsule'){
+            const prevMove=prev.affectsMove!==false;
+            const primMove=prim.affectsMove!==false;
+            const prevOccl=prev.affectsOccl!==false;
+            const primOccl=prim.affectsOccl!==false;
+            const prevR=Number(prev.r)||0;
+            const primR=Number(prim.r)||0;
+            if(prevMove===primMove && prevOccl===primOccl && Math.abs(prevR-primR)<=1e-3){
+              const prevDx=prev.bx-prev.ax;
+              const prevDy=prev.by-prev.ay;
+              const primDx=prim.bx-prim.ax;
+              const primDy=prim.by-prim.ay;
+              const prevLen=Math.hypot(prevDx,prevDy);
+              const primLen=Math.hypot(primDx,primDy);
+              if(prevLen>1e-4 && primLen>1e-4){
+                const dot=(prevDx*primDx+prevDy*primDy)/(prevLen*primLen);
+                if(dot>=COS_EPS){
+                  const joinDist=Math.hypot(prev.bx-prim.ax,prev.by-prim.ay);
+                  const thresh=Math.max(POS_EPS_BASE,Math.min(prevLen,primLen)*0.1);
+                  if(joinDist<=thresh){
+                    prev.bx=prim.bx;
+                    prev.by=prim.by;
+                    changed=true;
+                    continue;
+                  }
+                }
+              }
+            }
+          }
+        }
+        merged.push(prim);
+      }
+      if(changed){
+        carves.length=0;
+        Array.prototype.push.apply(carves,merged);
+      }
+      return changed;
+    }
+
     function distanceMove(px,py){
       let best=-Infinity;
       for(const g of carves){ if(g.affectsMove===false) continue; switch(g.type){
@@ -133,8 +182,8 @@
       case 'square':{ const hx=0.5*Math.hypot(g.bx-g.ax,g.by-g.ay); const hy=g.halfW; const cx=(g.ax+g.bx)/2, cy=(g.ay+g.by)/2; best=Math.max(best,SDF.obox(px,py,cx,cy,hx,hy,g.rot)); } break; }} return best>0; }
 
     const serialize=()=>JSON.stringify(carves);
-    const deserialize=json=>{ try{ const arr=JSON.parse(json); carves.length=0; for(const g of arr) carves.push(g);}catch(e){console.error(e)} };
-    return {carves,carveCircle,carveCapsule,carveRectSlot,carveSquare,clear,distanceMove,insideFreeForOccl,serialize,deserialize};
+    const deserialize=json=>{ try{ const arr=JSON.parse(json); carves.length=0; for(const g of arr) carves.push(g); consolidateCapsules(); }catch(e){console.error(e)} };
+    return {carves,carveCircle,carveCapsule,carveRectSlot,carveSquare,clear,distanceMove,insideFreeForOccl,serialize,deserialize,consolidateCapsules};
   })();
 
   // ===== UI wiring =====
@@ -152,7 +201,10 @@
   function canvasToWorld(e){ const rect=canvas.getBoundingClientRect(); return [(e.clientX-rect.left)*dpr,(e.clientY-rect.top)*dpr]; }
   canvas.addEventListener('pointerdown',e=>{ if(ui.mode.value==='moveTest') return; canvas.setPointerCapture(e.pointerId); const [x,y]=canvasToWorld(e); lastX=x; lastY=y; isDragging=true; addDotOrStart(x,y,e); });
   canvas.addEventListener('pointermove',e=>{ if(ui.mode.value==='moveTest'||!isDragging) return; const [x,y]=canvasToWorld(e); const dx=x-lastX,dy=y-lastY; const dist=Math.hypot(dx,dy); const step=Math.max(1,+ui.radius.value/3); if(dist>=step){ addSegment(lastX,lastY,x,y,e); lastX=x; lastY=y; } });
-  window.addEventListener('pointerup',()=>{ isDragging=false; });
+  window.addEventListener('pointerup',e=>{ if(!isDragging) return; isDragging=false; if(canvas.releasePointerCapture){ try{ canvas.releasePointerCapture(e.pointerId);}catch(err){/* ignore */} }
+    if(ui.mode.value!=='carve') return; const [x,y]=canvasToWorld(e); const dx=x-lastX,dy=y-lastY; const dist=Math.hypot(dx,dy); if(dist>0.01){ addSegment(lastX,lastY,x,y,e); lastX=x; lastY=y; }
+    if(ui.brush.value==='circle'){ if(Kernel.consolidateCapsules()) undoStack.length=Kernel.carves.length; } else { undoStack.length=Kernel.carves.length; }
+  });
   function currentFlags(){ return {affectsMove:ui.affectsMove.checked,affectsOccl:ui.affectsOccl.checked}; }
   function addDotOrStart(x,y){ const r=+ui.radius.value, flags=currentFlags(), mode=ui.brush.value; if(mode==='circle'){ undoStack.push(Kernel.carveCircle(x,y,r,flags)); } else { undoStack.push(Kernel.carveCapsule(x,y,x+0.0001,y+0.0001,r,flags)); } }
   function addSegment(ax,ay,bx,by){ const r=+ui.radius.value, flags=currentFlags(), mode=ui.brush.value; if(mode==='circle'){ undoStack.push(Kernel.carveCapsule(ax,ay,bx,by,r,flags)); } else if(mode==='rectslot'){ undoStack.push(Kernel.carveRectSlot(ax,ay,bx,by,r,flags)); } else if(mode==='square'){ const rot=(+ui.rotation.value)*Math.PI/180; undoStack.push(Kernel.carveSquare(ax,ay,bx,by,r,rot,flags)); } }
