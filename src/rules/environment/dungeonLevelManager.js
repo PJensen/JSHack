@@ -88,6 +88,9 @@ function applyGeometrySnapshot(world, snapshot) {
   } else {
     world.add(entity, DungeonGeometry, snapshot);
   }
+  const kernel = ensureGeometryKernel(world, snapshot.options || {});
+  kernel.deserialize(snapshot);
+  setGeometryKernel(world, kernel);
 }
 
 function ensureDungeonEntity(world) {
