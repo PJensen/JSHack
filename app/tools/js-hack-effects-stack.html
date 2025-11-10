@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Status Effects — Flex Badges with Unicode Glyph + Pie Dial</title>
+<style>
+  :root{
+    --bg:#0b0f12; --panel:#111720; --ink:#e7eef7; --muted:#9fb0c1; --accent:#8fe;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,sans-serif}
+  .wrap{display:grid;grid-template-columns:360px 1fr;gap:12px;height:100%;}
+  .panel{background:var(--panel);padding:12px;overflow:auto;border-right:1px solid #15202b}
+  h1{font-size:16px;margin:0 0 8px}
+  .muted{color:var(--muted)}
+
+  /* Effects container */
+  .effects{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
+
+  /* Single effect square */
+  .effect{position:relative;width:58px;height:58px;border-radius:8px;display:grid;place-items:center;
+          box-shadow:0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);}
+  .effect .glyph{font-size:28px;line-height:1;filter:drop-shadow(0 1px 0 rgba(0,0,0,.6));}
+  .effect .ticks{position:absolute;right:4px;bottom:2px;font-size:12px;font-weight:700;color:#fff;
+                 text-shadow:0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)}
+  .effect .label{position:absolute;left:6px;bottom:2px;font-size:10px;color:rgba(255,255,255,.8)}
+
+  /* Pie overlay (remaining turns) */
+  .effect::after{content:"";position:absolute;inset:6px;border-radius:8px;pointer-events:none;
+                 background:conic-gradient(rgba(180,190,200,.2) var(--angle,0deg), transparent 0);
+                 mix-blend-mode:normal;}
+
+  /* Subtle outline to improve contrast on bright colors */
+  .effect::before{content:"";position:absolute;inset:0;border-radius:8px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+
+  /* Controls */
+  .row{display:flex;gap:8px;align-items:center;margin:8px 0}
+  .row label{min-width:120px;color:var(--muted)}
+  input[type="range"]{width:140px}
+  button{background:#1a2430;color:var(--ink);border:1px solid #263443;border-radius:8px;padding:8px 10px;cursor:pointer}
+  button:hover{background:#202e3d}
+  select, input[type="number"]{background:#0f141b;color:var(--ink);border:1px solid #213040;border-radius:8px;padding:6px}
+  code{background:#0f151d;border:1px solid #1e2a38;border-radius:6px;padding:2px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="panel">
+    <h1>Status Effects Demo</h1>
+    <p class="muted">Squares are HTML elements (no canvas). Background uses ~20% alpha. A central Unicode glyph marks the effect. Bottom‑right shows ticks remaining. The grey pie overlay (80% alpha) indicates the remaining ratio.</p>
+
+    <div class="row">
+      <label>Effect</label>
+      <select id="effectName"></select>
+    </div>
+    <div class="row">
+      <label>Total Ticks</label>
+      <input id="totalTicks" type="number" min="1" max="30" value="8"/>
+      <button id="addBtn">Add</button>
+    </div>
+    <div class="row">
+      <label>Global Tick (demo)</label>
+      <button id="tick1">−1 tick</button>
+      <button id="tickAll">Auto tick</button>
+      <span id="autoState" class="muted"></span>
+    </div>
+
+    <p class="muted">API: <code>addEffect(name,total)</code>, <code>tickOnce()</code>, <code>tickAll()</code></p>
+
+    <h3 style="margin:14px 0 6px">Glyph Set (36 made‑up effects)</h3>
+    <ul id="glyphList" class="muted" style="columns:2;margin:0;padding-left:16px"></ul>
+  </section>
+  <section style="padding:12px">
+    <div id="effects" class="effects" aria-label="Active effects"></div>
+  </section>
+</div>
+
+<script>
+// --- 36 made-up effects with Unicode glyphs and color hues ---
+const STATUS_SET = [
+  {name:'Stunned',         glyph:'✦', hue:  0},
+  {name:'Conflagrate',     glyph:'🔥', hue:  8},
+  {name:'Ward',            glyph:'⛨', hue:210},
+  {name:'Hex',             glyph:'☿', hue:280},
+  {name:'Frostbite',       glyph:'❄', hue:200},
+  {name:'Blighted',        glyph:'☣', hue: 70},
+  {name:'Wither',          glyph:'⚚', hue:285},
+  {name:'Berserk',         glyph:'⚔', hue:350},
+  {name:'Silenced',        glyph:'🔇', hue:220},
+  {name:'Rooted',          glyph:'⛓', hue:180},
+  {name:'Aegis',           glyph:'🛡', hue:190},
+  {name:'Haste',           glyph:'➤', hue:160},
+  {name:'Cripple',         glyph:'✖', hue:  0},
+  {name:'Regenerate',      glyph:'✚', hue:130},
+  {name:'True Sight',      glyph:'⌖', hue: 40},
+  {name:'Enkindle',        glyph:'☄', hue: 15},
+  {name:'Sanctify',        glyph:'✢', hue: 50},
+  {name:'Plague',          glyph:'☠', hue: 80},
+  {name:'Arcane Seal',     glyph:'⟐', hue:260},
+  {name:'Mire',            glyph:'◒', hue: 95},
+  {name:'Energized',       glyph:'⚡', hue: 55},
+  {name:'Stoneform',       glyph:'⬣', hue: 25},
+  {name:'Gale',            glyph:'〰', hue:190},
+  {name:'Shroud',          glyph:'◌', hue:220},
+  {name:'Bleeding',        glyph:'🩸', hue:350},
+  {name:'Focus',           glyph:'◎', hue: 35},
+  {name:'Banefire',        glyph:'✹', hue: 20},
+  {name:'Glacial',         glyph:'☾', hue:205},
+  {name:'Thorns',          glyph:'✿', hue:110},
+  {name:'Entropy',         glyph:'∞', hue:275},
+  {name:'Aether Vow',      glyph:'✪', hue:240},
+  {name:'Dreadmark',       glyph:'⛧', hue:300},
+  {name:'Vigor',           glyph:'⚕', hue:120},
+  {name:'Echo',            glyph:'◍', hue:210},
+  {name:'Daze',            glyph:'☆', hue: 10},
+  {name:'Omen',            glyph:'☉', hue: 45},
+  {name:'Null Field',      glyph:'⟁', hue:260},
+];
+
+// Populate selector and visible list
+const effectNameSel = document.getElementById('effectName');
+const glyphList = document.getElementById('glyphList');
+STATUS_SET.forEach(s => {
+  const opt = document.createElement('option');
+  opt.value = s.name; opt.textContent = `${s.name}  ${s.glyph}`; effectNameSel.appendChild(opt);
+  const li = document.createElement('li'); li.textContent = `${s.glyph}  ${s.name}`; glyphList.appendChild(li);
+});
+
+const effectsEl = document.getElementById('effects');
+const totalTicksInput = document.getElementById('totalTicks');
+
+function hsla(h, a=.2){ return `hsla(${h} 80% 50% / ${a})`; }
+function shadowColor(h){ return `hsl(${h} 55% 35%)`; }
+
+// Creates an effect element
+function createEffect({ name, glyph, hue }, total){
+  const el = document.createElement('div');
+  el.className = 'effect';
+  el.style.background = hsla(hue, 0.2); // ~20% alpha background fill
+  el.style.outline = `1px solid ${hsla(hue, 0.28)}`;
+  el.title = `${name} — ${glyph} — ${total} ticks`;
+
+  const g = document.createElement('div');
+  g.className = 'glyph';
+  g.textContent = glyph;
+  g.style.color = shadowColor(hue);
+
+  const t = document.createElement('div');
+  t.className = 'ticks';
+  t.textContent = total;
+
+  const lbl = document.createElement('div');
+  lbl.className = 'label';
+  lbl.textContent = name.split(' ')[0]; // short tag
+
+  el.append(g, lbl, t);
+  el.dataset.total = total;
+  el.dataset.remaining = total;
+  setAngle(el);
+  return el;
+}
+
+// Update the conic-gradient angle based on remaining/total
+function setAngle(el){
+  const rem = +el.dataset.remaining;
+  const tot = Math.max(1, +el.dataset.total);
+  const pct = Math.max(0, Math.min(1, rem / tot));
+  el.style.setProperty('--angle', (pct * 360) + 'deg');
+  el.querySelector('.ticks').textContent = rem;
+}
+
+// Public API
+window.addEffect = function(name, total){
+  const spec = STATUS_SET.find(s => s.name === name) || STATUS_SET[Math.floor(Math.random()*STATUS_SET.length)];
+  const el = createEffect(spec, total);
+  effectsEl.appendChild(el);
+  return el;
+}
+window.tickOnce = function(){
+  [...effectsEl.children].forEach(el => {
+    let r = Math.max(0, (+el.dataset.remaining||0) - 1);
+    el.dataset.remaining = r;
+    setAngle(el);
+    if(r <= 0){ el.style.opacity = .45; el.style.filter = 'grayscale(0.4)'; el.title = el.title.replace(/\d+ ticks?/, 'expired'); }
+  });
+}
+window.tickAll = function(){
+  // drop any that have hit 0
+  [...effectsEl.children].forEach(el => { if((+el.dataset.remaining||0) <= 0) el.remove(); });
+}
+
+// Demo wiring
+const addBtn = document.getElementById('addBtn');
+addBtn.addEventListener('click', () => {
+  const name = effectNameSel.value;
+  const total = Math.max(1, parseInt(totalTicksInput.value||'1',10));
+  addEffect(name, total);
+});
+
+// Seed a few effects
+['Stunned','Conflagrate','Ward','Hex','Frostbite','Aegis'].forEach((n,i)=>addEffect(n, 3+i));
+
+// Tick buttons
+const tick1 = document.getElementById('tick1');
+const tickAllBtn = document.getElementById('tickAll');
+const autoState = document.getElementById('autoState');
+let timer = null;
+
+tick1.onclick = () => tickOnce();
+
+tickAllBtn.onclick = () => {
+  if(timer){ clearInterval(timer); timer=null; autoState.textContent=''; return; }
+  timer = setInterval(()=>{
+    tickOnce();
+    // Periodically remove expired
+    [...effectsEl.children].some(el => (+el.dataset.remaining||0) <= 0) && tickAll();
+  }, 1000);
+  autoState.textContent = 'auto‑ticking…';
+};
+</script>
+</body>
+</html>

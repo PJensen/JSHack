@@ -56,7 +56,8 @@ export function initHUD() {
   const defenseLine = document.createElement('div');
   defenseLine.style.fontSize = '12px'; defenseLine.style.color = '#cfe8ff';
   const statusRow = document.createElement('div');
-  Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
+  // Effects stack container (replaces simple chips)
+  Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' });
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
   combatBox.appendChild(weaponLine); 
@@ -161,21 +162,8 @@ export function initHUD() {
     const defTxt = Number.isFinite(defense) && defense !== 0 ? (defense > 0 ? `+${defense}` : `${defense}`) : '0';
     defenseLine.textContent = `Defense: ${defTxt}`;
 
-    // Status chips
-    statusRow.innerHTML = '';
-    for (const s of statuses) {
-      const chip = document.createElement('div');
-      chip.textContent = `${String(s.key)}` + (Number.isFinite(s.turns) && s.turns > 0 ? ` (${s.turns})` : '');
-      Object.assign(chip.style, {
-        fontSize: '11px', padding: '2px 6px', borderRadius: '999px',
-        background: 'rgba(85,170,255,0.15)', color: '#cfe8ff', border: '1px solid #2d3b52'
-      });
-      if (String(s.key).toLowerCase() === 'invulnerable') {
-        chip.style.background = 'rgba(160,255,255,0.15)';
-        chip.style.color = '#e8ffff';
-      }
-      statusRow.appendChild(chip);
-    }
+    // Effects stack (badges + pie timers)
+    ensureEffectsStack(statusRow).update(statuses);
 
     // Affix chips (equipped gear effects)
     affixRow.innerHTML = '';
@@ -202,6 +190,118 @@ export function initHUD() {
   // Mount quick stack to root so it sits above the bar
   root.appendChild(quick.el);
   return { castBtn, invBtn, shootBtn };
+}
+
+// --- Effects Stack (status badges with pie timers) -------------------------
+/**
+ * Creates a lazy singleton manager bound to a container element.
+ * Renders square badges with a central glyph and a conic pie overlay
+ * showing remaining turns versus the known total since first seen.
+ */
+function ensureEffectsStack(container) {
+  // Memoize on the container node to avoid duplicates
+  if (container.__effectsStack) return container.__effectsStack;
+
+  /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement }>} */
+  const byKey = new Map();
+
+  // Visual dictionary mapping engine status keys -> presentation
+  const VIS = {
+    invulnerable: { name: 'Aegis', glyph: '🛡️', hue: 190 },
+    burning:      { name: 'Burning', glyph: '🔥', hue: 20 },
+    poisoned:     { name: 'Poison', glyph: '☣', hue: 90 },
+    regenerating: { name: 'Regen', glyph: '🌿', hue: 130 },
+    stunned:      { name: 'Stunned', glyph: '💫', hue: 0 },
+    thorns:       { name: 'Thorns', glyph: '🌵', hue: 110 },
+  };
+
+  const hsla = (h, a = 0.2) => `hsla(${h} 80% 50% / ${a})`;
+  const shadowColor = (h) => `hsl(${h} 55% 35%)`;
+
+  function createBadge(spec, total) {
+    const el = document.createElement('div');
+    // Shell
+    Object.assign(el.style, {
+      position: 'relative', width: '58px', height: '58px', borderRadius: '8px',
+      display: 'grid', placeItems: 'center',
+      boxShadow: '0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)',
+      outline: `1px solid ${hsla(spec.hue, 0.28)}`,
+      background: hsla(spec.hue, 0.2),
+    });
+    el.title = `${spec.name} • ${total} turns`;
+
+    // Glyph
+    const glyph = document.createElement('div');
+    glyph.textContent = spec.glyph;
+    Object.assign(glyph.style, { fontSize: '28px', lineHeight: '1', filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))', color: shadowColor(spec.hue) });
+
+    // Label (short tag)
+    const label = document.createElement('div');
+    Object.assign(label.style, { position: 'absolute', left: '6px', bottom: '2px', fontSize: '10px', color: 'rgba(255,255,255,.8)' });
+    label.textContent = String(spec.name).split(' ')[0];
+
+    // Ticks counter
+    const ticks = document.createElement('div');
+    Object.assign(ticks.style, { position: 'absolute', right: '4px', bottom: '2px', fontSize: '12px', fontWeight: '700', color: '#fff', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)' });
+    ticks.textContent = String(total);
+
+    // Pie overlay element (instead of ::after)
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'absolute', left: '6px', top: '6px', right: '6px', bottom: '6px', borderRadius: '8px', pointerEvents: 'none',
+      background: 'conic-gradient(rgba(180,190,200,.2) 0deg, transparent 0)'
+    });
+
+    el.appendChild(glyph);
+    el.appendChild(label);
+    el.appendChild(ticks);
+    el.appendChild(overlay);
+
+    return { el, overlay, ticksEl: ticks };
+  }
+
+  function setAngle(rec, remaining) {
+    const total = Math.max(1, rec.total | 0);
+    const pct = Math.max(0, Math.min(1, remaining / total));
+    const deg = (pct * 360).toFixed(2) + 'deg';
+    rec.overlay.style.background = `conic-gradient(rgba(180,190,200,.2) ${deg}, transparent 0)`;
+    rec.ticksEl.textContent = String(Math.max(0, remaining | 0));
+  }
+
+  function update(statuses) {
+    // Track which keys remain in this update
+    const seen = new Set();
+    for (const s of (Array.isArray(statuses) ? statuses : [])) {
+      const key = String(s.key || '').toLowerCase();
+      if (!key) continue;
+      const turns = Math.max(0, Number(s.turns || 0));
+      const spec = VIS[key] || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '✨', hue: 210 };
+      let rec = byKey.get(key);
+      if (!rec) {
+        const { el, overlay, ticksEl } = createBadge(spec, turns || 1);
+        rec = { el, overlay, ticksEl, total: Math.max(1, turns || 1) };
+        byKey.set(key, rec);
+        container.appendChild(el);
+      }
+      // Grow total if the duration extends (refresh behavior)
+      rec.total = Math.max(1, Math.max(rec.total || 1, turns || 1));
+      // Update visual angle + ticks
+      setAngle(rec, turns);
+      seen.add(key);
+    }
+    // Remove badges that no longer appear
+    for (const [key, rec] of byKey.entries()) {
+      if (!seen.has(key)) {
+        if (rec?.el?.parentNode === container) container.removeChild(rec.el);
+        byKey.delete(key);
+      }
+    }
+  }
+
+  const api = { update };
+  // @ts-ignore attach for memoization
+  container.__effectsStack = api;
+  return api;
 }
 
 function ensureRoot() {
