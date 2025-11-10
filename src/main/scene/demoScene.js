@@ -108,14 +108,21 @@ function buildSurfaceLevel(world) {
   const stairAlignment = computeStairAlignment(rooms);
   world[STAIR_ALIGN_KEY] = stairAlignment;
 
+  const mainLinks = [
+    { depth: MAIN_DEPTH, position: { ...stairAlignment.main } },
+    { depth: LOWER_DEPTH, position: { ...stairAlignment.main } },
+  ];
+  const eastLinks = [
+    { depth: MAIN_DEPTH, position: { ...stairAlignment.east } },
+    { depth: LOWER_DEPTH, position: { ...stairAlignment.east } },
+  ];
+
   created.push(createStairEntity(world, {
     name: "Main Stairwell",
     identity: "stairs_up",
     position: stairAlignment.main,
     depth: MAIN_DEPTH,
-    targetDepth: LOWER_DEPTH,
-    destination: stairAlignment.main,
-    direction: "down",
+    links: mainLinks,
   }));
 
   created.push(createStairEntity(world, {
@@ -123,9 +130,7 @@ function buildSurfaceLevel(world) {
     identity: "stairs_up",
     position: stairAlignment.east,
     depth: MAIN_DEPTH,
-    targetDepth: LOWER_DEPTH,
-    destination: stairAlignment.east,
-    direction: "down",
+    links: eastLinks,
   }));
 
   return { geometry, rooms, entities: flattenEntityIds(created), playerSpawn: rooms.main.center };
@@ -140,14 +145,21 @@ function buildLowerVaultLevel(world) {
 
   created.push(placeTorch(world, room));
 
+  const mainLinks = [
+    { depth: MAIN_DEPTH, position: { ...align.main } },
+    { depth: LOWER_DEPTH, position: { ...align.main } },
+  ];
+  const eastLinks = [
+    { depth: MAIN_DEPTH, position: { ...align.east } },
+    { depth: LOWER_DEPTH, position: { ...align.east } },
+  ];
+
   created.push(createStairEntity(world, {
     name: "Ascent Shaft",
     identity: "stairs_down",
     position: align.main,
     depth: LOWER_DEPTH,
-    targetDepth: MAIN_DEPTH,
-    destination: align.main,
-    direction: "up",
+    links: mainLinks,
   }));
 
   created.push(createStairEntity(world, {
@@ -155,9 +167,7 @@ function buildLowerVaultLevel(world) {
     identity: "stairs_down",
     position: align.east,
     depth: LOWER_DEPTH,
-    targetDepth: MAIN_DEPTH,
-    destination: align.east,
-    direction: "up",
+    links: eastLinks,
   }));
 
   return { geometry, rooms, entities: flattenEntityIds(created), playerSpawn: { ...align.main } };
@@ -378,7 +388,7 @@ function createPortal(world, { name, identity, position }) {
   return id;
 }
 
-function createStairEntity(world, { name, identity, position, depth, targetDepth, destination, direction }) {
+function createStairEntity(world, { name, identity, position, depth, links }) {
   const id = world.create();
   world.add(id, Position, { x: position.x, y: position.y });
   world.add(id, NamedIdentity, { name, identity });
@@ -386,12 +396,16 @@ function createStairEntity(world, { name, identity, position, depth, targetDepth
   if (Number.isFinite(depth)) {
     try { world.add(id, DungeonLevel, { depth }); } catch {}
   }
+  const linkData = Array.isArray(links) && links.length >= 2
+    ? links.map((node) => ({
+      depth: Number(node.depth),
+      position: { x: node.position?.x ?? position.x, y: node.position?.y ?? position.y }
+    }))
+    : null;
   world.add(id, Interactable, {
     action: "useStairs",
     params: {
-      targetDepth,
-      destinationPosition: destination ? { x: destination.x, y: destination.y } : null,
-      direction,
+      links: linkData,
       sourceDepth: depth,
       faceFrom: { x: position.x, y: position.y },
     }

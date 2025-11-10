@@ -6,6 +6,8 @@ import { Collider } from "../components/Collider.js";
 import { Position } from "../components/Position.js";
 import { Facing } from "../components/Facing.js";
 import { Dungeon } from "../components/Dungeon.js";
+import { Player } from "../components/Player.js";
+import { Brain } from "../components/Brain.js";
 import { activateDungeonLevel } from "../environment/dungeonLevelManager.js";
 
 const MIN_DUNGEON_DEPTH = 1;
@@ -45,18 +47,21 @@ export function InteractionSystem(world, actor, targetId) {
                 const params = inter.params || {};
                 const actorPos = world.get(actor, Position);
                 if (!actorPos) break;
-                const targetDepth = resolveTargetDepth(world, params);
+                const currentDepth = getCurrentDungeonDepth(world);
+                const linkedTarget = resolveLinkedStairTarget(params, currentDepth);
+                const targetDepth = linkedTarget?.depth ?? resolveTargetDepth(world, params);
                 if (!Number.isFinite(targetDepth)) {
-                    // Fallback to portal-style travel if no depth provided
                     handlePortalTravel(world, { actor, params, targetId, action: "useStairs" });
                     break;
                 }
-                const destination = resolveDestination(params, actorPos);
+                const destination = linkedTarget?.position || resolveDestination(params, world.get(targetId, Position) || actorPos) || { x: actorPos.x, y: actorPos.y };
                 const from = { x: actorPos.x, y: actorPos.y };
-                if (destination) {
-                    world.set(actor, Position, { x: destination.x, y: destination.y });
-                }
-                if (destination && params.faceAway !== false && params.faceFrom) {
+
+                try { activateDungeonLevel(world, targetDepth, { entryPoint: destination }); } catch {}
+                applyDungeonLevelChange(world, targetDepth);
+
+                world.set(actor, Position, { x: destination.x, y: destination.y });
+                if (params.faceAway !== false && params.faceFrom) {
                     const face = normalizeVec(destination.x - params.faceFrom.x, destination.y - params.faceFrom.y);
                     if (face) {
                         if (world.has(actor, Facing)) world.set(actor, Facing, face);
@@ -65,16 +70,17 @@ export function InteractionSystem(world, actor, targetId) {
                         }
                     }
                 }
-                try { activateDungeonLevel(world, targetDepth, { entryPoint: destination }); } catch {}
-                applyDungeonLevelChange(world, targetDepth);
-                world.emit?.("moved", { id: actor, from, to: destination || { ...from }, via: "stairs" });
+
+                const direction = linkedTarget ? (linkedTarget.depth > (currentDepth ?? 0) ? "down" : "up") : (targetDepth > (params.sourceDepth || 0) ? "down" : "up");
+
+                world.emit?.("moved", { id: actor, from, to: { x: destination.x, y: destination.y }, via: "stairs" });
                 world.emit?.("interaction", {
                     actor,
                     targetId,
                     action: "useStairs",
                     result: {
-                        direction: params.direction || (targetDepth > (params.sourceDepth || 0) ? "down" : "up"),
-                        to: destination || { ...from },
+                        direction,
+                        to: { x: destination.x, y: destination.y },
                         depth: targetDepth,
                     }
                 });
@@ -116,6 +122,7 @@ function applyDungeonLevelChange(world, nextDepth) {
     } catch {
         world.set(id, Dungeon, { level: next, id: rec?.id ?? null, name: rec?.name ?? "" });
     }
+    resetPlayerVisibility(world);
     world.emit?.("dungeon:levelChanged", { level: next, previous: current });
 }
 
@@ -137,6 +144,24 @@ function resolveTargetDepth(world, params) {
         }
     }
     return null;
+}
+
+function resolveLinkedStairTarget(params, currentDepth) {
+    if (!Number.isFinite(currentDepth)) return null;
+    const links = Array.isArray(params?.links) ? params.links : null;
+    if (!links || links.length < 2) return null;
+    const normalized = links.map((node) => ({
+        depth: Number(node.depth),
+        position: {
+            x: Number(node.position?.x),
+            y: Number(node.position?.y),
+        }
+    }));
+    const current = normalized.find((node) => node.depth === currentDepth);
+    if (!current) return null;
+    const target = normalized.find((node) => node.depth !== currentDepth && Number.isFinite(node.depth));
+    if (!target || !Number.isFinite(target.position.x) || !Number.isFinite(target.position.y)) return null;
+    return target;
 }
 
 function resolveDestination(params, fallback) {
@@ -183,4 +208,19 @@ function handlePortalTravel(world, { actor, params, targetId, action }) {
             linkId,
         }
     });
+}
+
+function getCurrentDungeonDepth(world) {
+    const info = getDungeonRecord(world);
+    return info?.rec ? Number(info.rec.level) : null;
+}
+
+function resetPlayerVisibility(world) {
+    for (const [id, , brain] of world.query(Player, Brain)) {
+        if (brain?.seenTiles instanceof Uint8Array) {
+            brain.seenTiles.fill(0);
+        } else if (brain) {
+            try { world.mutate(id, Brain, (rec) => { rec.seenTiles = new Uint8Array(rec.seenTiles?.length || 0); }); } catch {}
+        }
+    }
 }

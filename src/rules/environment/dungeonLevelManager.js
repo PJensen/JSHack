@@ -1,11 +1,13 @@
 import { DungeonGeometry } from "../components/DungeonGeometry.js";
 import { ensureGeometryKernel, setGeometryKernel } from "./worldGeometry.js";
+import { GeometryKernel } from "./GeometryKernel.js";
 import { serializeEntities, applySnapshot, makeRegistry } from "../../lib/ecs-js/serialization.js";
 
 const LEVEL_BUILDERS_KEY = Symbol.for("jshack.dungeon.levelBuilders");
 const LEVEL_ENTITIES_KEY = Symbol.for("jshack.dungeon.levelEntities");
 const ACTIVE_LEVEL_KEY = Symbol.for("jshack.dungeon.activeLevel");
 const LEVEL_STATE_KEY = Symbol.for("jshack.dungeon.levelState");
+const GEOM_SERIAL_KEY = Symbol.for("jshack.dungeon.geomSerial");
 
 function getLevelStateMap(world) {
   if (!world[LEVEL_STATE_KEY]) {
@@ -65,6 +67,8 @@ function captureActiveLevelState(world) {
   const snapshot = serializeEntities(world, ids);
   const state = ensureLevelState(world, active.depth);
   state.snapshot = snapshot;
+  const geom = getCurrentGeometryComponent(world);
+  if (geom) state.geometry = cloneGeometrySnapshot(geom);
 }
 
 function cleanupActiveLevel(world) {
@@ -81,16 +85,25 @@ function cleanupActiveLevel(world) {
 }
 
 function applyGeometrySnapshot(world, snapshot) {
-  if (!snapshot) return;
+  if (!snapshot) return null;
+  const payload = cloneGeometrySnapshot(snapshot);
+  const serial = nextGeometrySerial(world);
+  // Ensure a brand-new identity for render caches
+  payload.seed = ((payload.seed >>> 0) ^ (serial * 0x9e3779b9)) >>> 0;
+  payload.mbrVersion = serial;
+  payload.moveVersion = serial;
+  payload.occlVersion = serial;
   const entity = ensureDungeonEntity(world);
   if (world.has(entity, DungeonGeometry)) {
-    world.set(entity, DungeonGeometry, snapshot);
+    world.set(entity, DungeonGeometry, payload);
   } else {
-    world.add(entity, DungeonGeometry, snapshot);
+    world.add(entity, DungeonGeometry, payload);
   }
-  const kernel = ensureGeometryKernel(world, snapshot.options || {});
-  kernel.deserialize(snapshot);
-  setGeometryKernel(world, kernel);
+  // Install a fresh kernel instance to avoid cross-level mutation
+  const fresh = new GeometryKernel(payload.options || {});
+  fresh.deserialize(payload);
+  setGeometryKernel(world, fresh);
+  return payload;
 }
 
 function ensureDungeonEntity(world) {
@@ -129,45 +142,32 @@ export function activateDungeonLevel(world, depth, opts = {}) {
     return previous.info || {};
   }
 
-  if (previous) {
-    captureActiveLevelState(world);
-  }
+  // Tear down previous level's tracked entities only
   cleanupActiveLevel(world);
 
-  const stateMap = getLevelStateMap(world);
-  const state = stateMap.get(targetDepth);
-  let info = state?.info || null;
-  let trackedIds = [];
+  const builder = builders.get(targetDepth);
+  if (!builder) {
+    throw new Error(`activateDungeonLevel: no builder registered for depth ${targetDepth}`);
+  }
+  const ctx = { depth: targetDepth, previousDepth: previous ? previous.depth : null, entryPoint: opts.entryPoint };
+  const result = builder(world, ctx) || {};
 
-  if (state?.snapshot) {
-    trackedIds = Array.from(restoreSnapshot(world, state.snapshot));
-  } else {
-    const builder = builders.get(targetDepth);
-    if (!builder) {
-      throw new Error(`activateDungeonLevel: no builder registered for depth ${targetDepth}`);
-    }
-    const ctx = { depth: targetDepth, previousDepth: previous ? previous.depth : null, entryPoint: opts.entryPoint };
-    const result = builder(world, ctx) || {};
-    info = result;
-    const ids = collectEntityIds(result.entities);
-    trackedIds = ids;
-    const lvlState = ensureLevelState(world, targetDepth);
-    lvlState.info = result;
-    if (result.geometry) {
-      lvlState.geometry = cloneGeometrySnapshot(result.geometry);
-    }
+  // Apply fresh geometry every time to avoid stale state
+  if (result.geometry) {
+    applyGeometrySnapshot(world, result.geometry);
   }
 
-  setTrackedEntities(world, targetDepth, trackedIds);
+  const ids = collectEntityIds(result.entities);
+  setTrackedEntities(world, targetDepth, ids);
 
-  const futureState = ensureLevelState(world, targetDepth);
-  const geometry = futureState.geometry;
-  if (geometry) {
-    applyGeometrySnapshot(world, geometry);
-  }
+  // Cache last info per depth (without sharing geometry refs)
+  const lvlState = ensureLevelState(world, targetDepth);
+  lvlState.info = { ...result, geometry: result.geometry ? cloneGeometrySnapshot(result.geometry) : null };
+  lvlState.snapshot = null; // disable entity snapshotting for now
+  lvlState.geometry = result.geometry ? cloneGeometrySnapshot(result.geometry) : null;
 
-  setActiveLevelMeta(world, { depth: targetDepth, info: info || {} });
-  return info || {};
+  setActiveLevelMeta(world, { depth: targetDepth, info: lvlState.info });
+  return lvlState.info;
 }
 
 export function getActiveDungeonLevel(world) {
@@ -184,29 +184,11 @@ export function resetLevelGeometry(world) {
   const kernel = ensureGeometryKernel(world, { seed: world.seed >>> 0 });
   kernel.clear();
   setGeometryKernel(world, kernel);
-  applyGeometrySnapshot(world, {
-    seed: kernel.seed,
-    mbrVersion: kernel.mbrVersion,
-    moveVersion: kernel.moveVersion,
-    occlVersion: kernel.occlVersion,
-    mbr: kernel.mbr,
-    primitives: kernel.primitives,
-    meta: null,
-    options: kernel.options,
-  });
+  applyGeometrySnapshot(world, kernel.snapshot());
 }
 
-function restoreSnapshot(world, snapshot) {
-  if (!snapshot) return new Set();
-  const registry = buildComponentRegistry(world);
-  const before = new Set(world.alive);
-  applySnapshot(world, snapshot, registry, { mode: "append" });
-  const created = new Set();
-  for (const id of world.alive) {
-    if (!before.has(id)) created.add(id);
-  }
-  return created;
-}
+// Snapshot/restore temporarily disabled until geometry swap is stable
+function restoreSnapshot() { return new Set(); }
 
 function buildComponentRegistry(world) {
   const comps = [];
@@ -232,14 +214,31 @@ function collectEntityIds(list) {
 
 function cloneGeometrySnapshot(snapshot) {
   if (!snapshot) return null;
-  return {
-    seed: snapshot.seed,
-    mbrVersion: snapshot.mbrVersion,
-    moveVersion: snapshot.moveVersion,
-    occlVersion: snapshot.occlVersion,
-    mbr: snapshot.mbr ? { ...snapshot.mbr } : null,
-    primitives: Array.isArray(snapshot.primitives) ? snapshot.primitives.map((p) => ({ ...p })) : [],
-    meta: snapshot.meta ? JSON.parse(JSON.stringify(snapshot.meta)) : null,
-    options: snapshot.options ? { ...snapshot.options } : null,
-  };
+  try {
+    return JSON.parse(JSON.stringify(snapshot));
+  } catch {
+    return {
+      seed: snapshot.seed,
+      mbrVersion: snapshot.mbrVersion,
+      moveVersion: snapshot.moveVersion,
+      occlVersion: snapshot.occlVersion,
+      mbr: snapshot.mbr ? { ...snapshot.mbr } : null,
+      primitives: Array.isArray(snapshot.primitives) ? snapshot.primitives.map((p) => JSON.parse(JSON.stringify(p))) : [],
+      meta: snapshot.meta ? JSON.parse(JSON.stringify(snapshot.meta)) : null,
+      options: snapshot.options ? { ...snapshot.options } : null,
+    };
+  }
+}
+
+function nextGeometrySerial(world) {
+  const current = (world[GEOM_SERIAL_KEY] | 0) + 1;
+  world[GEOM_SERIAL_KEY] = current;
+  return current;
+}
+
+function getCurrentGeometryComponent(world) {
+  for (const [, geom] of world.query(DungeonGeometry)) {
+    if (geom) return geom;
+  }
+  return null;
 }
