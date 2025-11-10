@@ -3,7 +3,7 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Consumable } from "../components/Consumable.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Brain } from "../components/Brain.js";
+import { Brain, createSeenTilesBuffer } from "../components/Brain.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 /** @typedef {import('../../lib/ecs-js').World} World */
@@ -79,7 +79,9 @@ export function useItemSystem(world) {
 
         /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
         let brain = /** @type any */ (world.get(actor, Brain));
-        if (!brain) { try { world.add(actor, Brain, {}); brain = world.get(actor, Brain); } catch {} }
+        if (!brain) {
+          try { world.add(actor, Brain, { seenTiles: createSeenTilesBuffer() }); brain = world.get(actor, Brain); } catch {}
+        }
         if (!brain) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'no-brain', spellId: spell.id }); world.remove(actor, UseIntent); continue; }
 
         // already known

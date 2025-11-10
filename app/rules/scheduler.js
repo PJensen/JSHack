@@ -23,6 +23,7 @@ import { combatSystem } from "../../src/rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
 import { trapSystem } from "../../src/rules/systems/trapSystem.js";
+import { manaRegenerationSystem } from "../../src/rules/systems/manaRegenerationSystem.js";
 // Register trap scripts
 import "../../src/rules/scripts/traps.js";
 
@@ -56,6 +57,7 @@ export function configureWorld(world) {
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
+  registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(monsterSpawnerSystem, 'effects');
   // Trigger traps after movement and core effects
   registerSystem(trapSystem, 'effects');
