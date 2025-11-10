@@ -14,6 +14,8 @@ export const basePalette = {
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
   gold: { glyph: "$", fg: "#ffde5a", glow: "#ffcc66" },
   torch: { glyph: "t", fg: "#ffd8a8", glow: "#ffb347" },
+  stairs_down: { glyph: ">", fg: "#d7c27a", glow: "#ffe28a" },
+  stairs_up: { glyph: "<", fg: "#d7c27a", glow: "#ffe28a" },
 
   // Traps
   trap_spike: { glyph: "^", fg: "#cccccc", glow: "#888888" },
