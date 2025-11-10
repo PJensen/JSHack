@@ -10,8 +10,8 @@ export const basePalette = {
   // Colors tuned to match display defaults in drawDungeon
   floor: { glyph: ".", fg: "#9a9a9a", glow: "#666666" },
   wall: { glyph: "#", fg: "#8e96ab", glow: "#1f232c" },
-  door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
-  door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
+  door_closed: { glyph: "+", fg: "rgba(255, 255, 155, 1)", glow: "#aa7" },
+  door_open: { glyph: "/", fg: "rgba(255, 204, 132, 1)", glow: "#aa7" },
   gold: { glyph: "$", fg: "#ffde5a", glow: "#ffcc66" },
   torch: { glyph: "t", fg: "#ffd8a8", glow: "#ffb347" },
   stairs_down: { glyph: ">", fg: "#d7c27a", glow: "#ffe28a" },

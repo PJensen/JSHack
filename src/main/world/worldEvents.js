@@ -667,7 +667,20 @@ export function setupWorldEventHandlers(world, deps) {
   world.on("interaction", ({ action, result }) => {
     if (action === "toggleDoor") {
       log(`The door ${result === "opened" ? "opens" : (result === "closed" ? "closes" : "is locked")}.`);
+    } else if (action === "useStairs") {
+      const dir = result?.direction;
+      if (dir === "down") {
+        log("You descend the stairs...");
+      } else if (dir === "up") {
+        log("You climb the stairs.");
+      } else {
+        log("You move through the stairwell.");
+      }
     }
+  });
+
+  world.on("dungeon:levelChanged", ({ level }) => {
+    log(`You arrive on dungeon level ${level}.`);
   });
 
   world.on("item:equipped", ({ itemId, slot, name }) => {

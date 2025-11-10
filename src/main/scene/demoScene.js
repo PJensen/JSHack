@@ -19,22 +19,42 @@ import { createRng } from "../../lib/ecs-js/rng.js";
 import { generateRectRoom } from "../../rules/environment/dungeonGenerator.js";
 import { LightSource } from "../../rules/components/LightSource.js";
 import { Trap } from "../../rules/components/Trap.js";
+import { DungeonGeometry } from "../../rules/components/DungeonGeometry.js";
+import { Interactable } from "../../rules/components/Interactable.js";
+import { DungeonLevel } from "../../rules/components/Dungeon.js";
 
 const ROOM_WIDTH = 11;
 const ROOM_HEIGHT = 11;
+const LOWER_ROOM_WIDTH = 19;
+const LOWER_ROOM_HEIGHT = 13;
+const LOWER_ROOM_OFFSET_Y = 64;
+const MAIN_DEPTH = 1;
+const LOWER_DEPTH = 2;
 
 /**
  * Populate a small demo scene with a player, tiles, and items.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function populateDemoScene(world) {
-  const { room, labeledRooms, doors } = generateRectRoom(world, {
+  const { room, labeledRooms, doors, kernel, entityId } = generateRectRoom(world, {
     width: ROOM_WIDTH,
     height: ROOM_HEIGHT,
     name: "Demo Room",
   });
 
-  const rooms = labeledRooms ?? { main: room };
+  const rooms = { ...(labeledRooms || {}) };
+  if (!rooms.main) rooms.main = room;
+  rooms.main.depth = MAIN_DEPTH;
+  for (const info of Object.values(rooms)) {
+    if (info && !Number.isFinite(info.depth)) info.depth = MAIN_DEPTH;
+  }
+
+  const lowerRoom = ensureLowerLevelRoom(world, {
+    kernel,
+    dungeonEntityId: entityId,
+    anchor: rooms.main,
+  });
+  if (lowerRoom) rooms.lower = lowerRoom;
 
   ensurePlayer(world, rooms.main.center);
   if (Array.isArray(doors) && doors.length) placeDoors(world, doors);
@@ -55,6 +75,7 @@ export function populateDemoScene(world) {
   // Place spike trap and a helpful potion near the bow
   placeSpikeTrap(world, rooms);
   placeBowRoomPotion(world, rooms);
+  placeOmniDirectionalStairs(world, rooms);
 }
 
 function ensurePlayer(world, center) {
@@ -256,4 +277,161 @@ function dropEquipment(world, mainRoom, rooms) {
   const north = rooms?.north ?? mainRoom;
   const woodBow = buildEquipmentItem(world, "bow_wood", {});
   world.add(woodBow, Position, { x: north.center.x, y: north.center.y });
+}
+
+function ensureLowerLevelRoom(world, { kernel, dungeonEntityId, anchor }) {
+  if (!world || !kernel || !dungeonEntityId || !anchor) return null;
+  const carveFlags = { affectsMove: true, affectsOccl: true };
+  const halfWidth = LOWER_ROOM_WIDTH * 0.5;
+  const halfHeight = LOWER_ROOM_HEIGHT * 0.5;
+  const center = {
+    x: anchor.center.x,
+    y: anchor.center.y + LOWER_ROOM_OFFSET_Y,
+  };
+
+  kernel.carveBox(center.x, center.y, halfWidth, halfHeight, 0, carveFlags);
+
+  const lowerRoom = {
+    key: "lower",
+    shape: "rect-room",
+    width: LOWER_ROOM_WIDTH,
+    height: LOWER_ROOM_HEIGHT,
+    halfWidth,
+    halfHeight,
+    center: { ...center },
+    origin: { x: center.x - halfWidth, y: center.y - halfHeight },
+    depth: LOWER_DEPTH,
+  };
+
+  refreshDungeonGeometry(world, kernel, dungeonEntityId, lowerRoom);
+  return lowerRoom;
+}
+
+function refreshDungeonGeometry(world, kernel, dungeonEntityId, lowerRoom) {
+  if (!world || !kernel || !dungeonEntityId) return;
+  const snapshot = kernel.snapshot();
+  const current = world.get(dungeonEntityId, DungeonGeometry);
+  const meta = cloneDungeonMeta(current?.meta ?? {});
+  if (lowerRoom) {
+    if (!Array.isArray(meta.rooms)) meta.rooms = [];
+    meta.rooms = meta.rooms.map((r) => ({ ...r }));
+    meta.rooms.push({ key: lowerRoom.key, ...lowerRoom });
+    meta.layers = { ...(meta.layers || {}), lower: { ...lowerRoom } };
+  }
+
+  world.set(dungeonEntityId, DungeonGeometry, {
+    seed: snapshot.seed,
+    mbrVersion: snapshot.mbrVersion,
+    moveVersion: snapshot.moveVersion,
+    occlVersion: snapshot.occlVersion,
+    mbr: snapshot.mbr,
+    primitives: snapshot.primitives,
+    meta,
+    options: snapshot.options,
+  });
+}
+
+function cloneDungeonMeta(meta) {
+  try {
+    return JSON.parse(JSON.stringify(meta));
+  } catch {
+    return { ...meta };
+  }
+}
+
+function placeOmniDirectionalStairs(world, rooms) {
+  const lower = rooms?.lower;
+  const main = rooms?.main;
+  const east = rooms?.east ?? main;
+  if (!lower || !main || !east) return;
+
+  const mainTop = createStairsEntity(world, {
+    name: "Descending Stair",
+    identity: "stairs_up",
+    x: main.center.x - 1.5,
+    y: main.center.y + 1.5,
+    depth: MAIN_DEPTH,
+  });
+  const eastTop = createStairsEntity(world, {
+    name: "Eastern Stair",
+    identity: "stairs_up",
+    x: east.center.x - 1.5,
+    y: east.center.y - 1.5,
+    depth: MAIN_DEPTH,
+  });
+  const lowerWest = createStairsEntity(world, {
+    name: "Lower Stair",
+    identity: "stairs_down",
+    x: lower.center.x - 4,
+    y: lower.center.y,
+    depth: LOWER_DEPTH,
+  });
+  const lowerEast = createStairsEntity(world, {
+    name: "Hidden Stair",
+    identity: "stairs_down",
+    x: lower.center.x + 4,
+    y: lower.center.y,
+    depth: LOWER_DEPTH,
+  });
+
+  linkStairs(world, mainTop, lowerWest, {
+    offsetX: 0,
+    offsetY: 1.5,
+    direction: "down",
+    sourceDepth: MAIN_DEPTH,
+    targetDepth: LOWER_DEPTH,
+  });
+  linkStairs(world, lowerWest, mainTop, {
+    offsetX: 0,
+    offsetY: -1,
+    direction: "up",
+    sourceDepth: LOWER_DEPTH,
+    targetDepth: MAIN_DEPTH,
+  });
+  linkStairs(world, eastTop, lowerEast, {
+    offsetX: 0,
+    offsetY: 1.5,
+    direction: "down",
+    sourceDepth: MAIN_DEPTH,
+    targetDepth: LOWER_DEPTH,
+  });
+  linkStairs(world, lowerEast, eastTop, {
+    offsetX: 0,
+    offsetY: -1,
+    direction: "up",
+    sourceDepth: LOWER_DEPTH,
+    targetDepth: MAIN_DEPTH,
+  });
+}
+
+function createStairsEntity(world, { x, y, name, identity, depth }) {
+  const id = world.create();
+  world.add(id, Position, { x, y });
+  world.add(id, NamedIdentity, { name, identity });
+  world.add(id, Collider, { solid: true, blocksSight: false });
+  if (Number.isFinite(depth)) {
+    try { world.add(id, DungeonLevel, { depth }); } catch {}
+  }
+  return id;
+}
+
+function linkStairs(world, sourceId, targetId, { offsetX = 0, offsetY = 0, direction = "travel", sourceDepth = null, targetDepth = null, depthDelta = null }) {
+  let delta = Number.isFinite(depthDelta) ? depthDelta : null;
+  if (delta == null && Number.isFinite(sourceDepth) && Number.isFinite(targetDepth)) {
+    delta = targetDepth - sourceDepth;
+  }
+  const params = {
+    targetId,
+    arrivalOffset: { x: offsetX, y: offsetY },
+    direction,
+    faceAway: true,
+    sourceDepth: Number.isFinite(sourceDepth) ? sourceDepth : null,
+    targetDepth: Number.isFinite(targetDepth) ? targetDepth : null,
+    depthDelta: delta,
+  };
+  if (world.has(sourceId, Interactable)) {
+    world.set(sourceId, Interactable, { action: "useStairs", params });
+  } else {
+    world.add(sourceId, Interactable, { action: "useStairs", params });
+  }
 }
