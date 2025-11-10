@@ -24,6 +24,24 @@ const DEFAULTS = {
 
 const EPS = 1e-6;
 
+function extendSegmentByRadius(ax, ay, bx, by, radius) {
+  if (!(radius > 0)) {
+    return { ex: bx, ey: by };
+  }
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len <= EPS) {
+    return { ex: bx, ey: by };
+  }
+  const ux = dx / len;
+  const uy = dy / len;
+  return {
+    ex: bx + ux * radius,
+    ey: by + uy * radius,
+  };
+}
+
 function withDefaults(opts = {}) {
   return {
     maxRaySteps: opts.maxRaySteps ?? DEFAULTS.maxRaySteps,
@@ -118,13 +136,14 @@ export class GeometryKernel {
   }
 
   carveCapsule(ax, ay, bx, by, r, flags) {
+    const { ex, ey } = extendSegmentByRadius(ax, ay, bx, by, r);
     const prim = {
       id: this.nextId++,
       type: "capsule",
       ax,
       ay,
-      bx,
-      by,
+      bx: ex,
+      by: ey,
       r,
       ...primitiveFlags(flags),
     };
@@ -132,13 +151,14 @@ export class GeometryKernel {
   }
 
   carveRectSlot(ax, ay, bx, by, r, flags) {
+    const { ex, ey } = extendSegmentByRadius(ax, ay, bx, by, r);
     const prim = {
       id: this.nextId++,
       type: "rectslot",
       ax,
       ay,
-      bx,
-      by,
+      bx: ex,
+      by: ey,
       r,
       ...primitiveFlags(flags),
     };

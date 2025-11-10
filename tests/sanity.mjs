@@ -7,6 +7,7 @@ import { createPlayer } from '../src/rules/archetypes/Player.js';
 import { Anatomy } from '../src/rules/components/Anatomy.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { GeometryKernel } from '../src/rules/environment/GeometryKernel.js';
 
 function assert(c,m){ if(!c) throw new Error('Assertion failed: '+m); }
 
@@ -44,6 +45,14 @@ async function run(){
   // NamedIdentity sanity
   const ni = world.get(m, NamedIdentity);
   assert(ni && typeof ni.name === 'string' && ni.name.length>0, 'monster has a name');
+
+  const kernel = new GeometryKernel();
+  kernel.carveCapsule(0, 0, 5, 0, 2);
+  const capsule = kernel.primitives[kernel.primitives.length - 1];
+  assert(Math.abs(capsule.bx - 7) < 1e-6, 'capsule tool-path reaches full length');
+  kernel.carveRectSlot(0, 0, 0, 3, 1);
+  const rectslot = kernel.primitives[kernel.primitives.length - 1];
+  assert(Math.abs(rectslot.by - 4) < 1e-6, 'rectslot tool-path reaches full length');
 
   console.log('Sanity tests PASS');
 }
