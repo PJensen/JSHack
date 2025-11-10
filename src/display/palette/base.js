@@ -16,12 +16,15 @@ export const basePalette = {
   torch: { glyph: "t", fg: "#ffd8a8", glow: "#ffb347" },
   stairs_down: { glyph: ">", fg: "#d7c27a", glow: "#ffe28a" },
   stairs_up: { glyph: "<", fg: "#d7c27a", glow: "#ffe28a" },
+  portal_dark: { glyph: "🌑", fg: "#7f7bd6", glow: "#484192" },
+  portal_light: { glyph: "🌐", fg: "#7de8ff", glow: "#2d9dc0" },
 
   // Traps
   trap_spike: { glyph: "^", fg: "#cccccc", glow: "#888888" },
 
   // Ammo
-  ammo_arrows: { glyph: "/", fg: "#e0e0e0", glow: "#f0f0f0" },
+  ammo_arrows: { glyph: "/", fg: "#df6565ff", glow: "#f0f0f0" },
+  ammo_fire_arrows: { glyph: "/", fg: "#ff1d1dff", glow: "#f0f0f0" },
 
   // Potions
   potion_health: { glyph: "!", fg: "#66ff99", glow: "#5cff9a" },
@@ -31,7 +34,7 @@ export const basePalette = {
   spellbook_ice: { glyph: "b", fg: "#4da6ff", glow: "#4da6ff" },
   spellbook_lightning: { glyph: "b", fg: "#ffff66", glow: "#ffff66" },
   // Alias to match rules identity so it renders on the ground
-  book_lightning: { glyph: "b", fg: "#ffff66", glow: "#ffff66" },
+  book_lightning: { glyph: "📘", fg: "#ffff66", glow: "#ffff66" },
   spellbook_dark: { glyph: "b", fg: "#b366ff", glow: "#b366ff" },
   spellbook_healing: { glyph: "b", fg: "#66ff99", glow: "#66ff99" },
   spellbook_summoning: { glyph: "b", fg: "#ff66ff", glow: "#ff66ff" },

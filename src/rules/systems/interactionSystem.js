@@ -6,6 +6,7 @@ import { Collider } from "../components/Collider.js";
 import { Position } from "../components/Position.js";
 import { Facing } from "../components/Facing.js";
 import { Dungeon } from "../components/Dungeon.js";
+import { activateDungeonLevel } from "../environment/dungeonLevelManager.js";
 
 const MIN_DUNGEON_DEPTH = 1;
 const MAX_DUNGEON_DEPTH = 99;
@@ -42,20 +43,21 @@ export function InteractionSystem(world, actor, targetId) {
         case "useStairs":
             {
                 const params = inter.params || {};
-                const linkId = Number(params.targetId) || 0;
-                if (!linkId) break;
-                const destPos = world.get(linkId, Position);
                 const actorPos = world.get(actor, Position);
-                if (!destPos || !actorPos) break;
-                const arrival = params.arrivalOffset || {};
-                const offsetX = Number(arrival.x) || 0;
-                const offsetY = Number(arrival.y) || 0;
-                const targetX = destPos.x + offsetX;
-                const targetY = destPos.y + offsetY;
+                if (!actorPos) break;
+                const targetDepth = resolveTargetDepth(world, params);
+                if (!Number.isFinite(targetDepth)) {
+                    // Fallback to portal-style travel if no depth provided
+                    handlePortalTravel(world, { actor, params, targetId, action: "useStairs" });
+                    break;
+                }
+                const destination = resolveDestination(params, actorPos);
                 const from = { x: actorPos.x, y: actorPos.y };
-                world.set(actor, Position, { x: targetX, y: targetY });
-                if (params.faceAway !== false) {
-                    const face = normalizeVec(targetX - destPos.x, targetY - destPos.y);
+                if (destination) {
+                    world.set(actor, Position, { x: destination.x, y: destination.y });
+                }
+                if (destination && params.faceAway !== false && params.faceFrom) {
+                    const face = normalizeVec(destination.x - params.faceFrom.x, destination.y - params.faceFrom.y);
                     if (face) {
                         if (world.has(actor, Facing)) world.set(actor, Facing, face);
                         else {
@@ -63,19 +65,24 @@ export function InteractionSystem(world, actor, targetId) {
                         }
                     }
                 }
-                applyDungeonLevelChange(world, params);
-                world.emit?.("moved", { id: actor, from, to: { x: targetX, y: targetY }, via: "stairs" });
+                try { activateDungeonLevel(world, targetDepth, { entryPoint: destination }); } catch {}
+                applyDungeonLevelChange(world, targetDepth);
+                world.emit?.("moved", { id: actor, from, to: destination || { ...from }, via: "stairs" });
                 world.emit?.("interaction", {
                     actor,
                     targetId,
                     action: "useStairs",
                     result: {
-                        direction: params.direction || "travel",
-                        to: { x: targetX, y: targetY },
-                        linkId,
+                        direction: params.direction || (targetDepth > (params.sourceDepth || 0) ? "down" : "up"),
+                        to: destination || { ...from },
+                        depth: targetDepth,
                     }
                 });
             }
+            break;
+
+        case "usePortal":
+            handlePortalTravel(world, { actor, params: inter.params || {}, targetId, action: "usePortal" });
             break;
 
         case "openChest":
@@ -97,20 +104,12 @@ export function interactionSystem(world) {
     }
 }
 
-function applyDungeonLevelChange(world, params) {
+function applyDungeonLevelChange(world, nextDepth) {
     const dungeonInfo = getDungeonRecord(world);
     if (!dungeonInfo) return;
     const { id, rec } = dungeonInfo;
     const current = Number(rec.level) || MIN_DUNGEON_DEPTH;
-    const targetDepth = Number(params.targetDepth);
-    const delta = Number(params.depthDelta);
-    let next = current;
-    if (Number.isFinite(targetDepth) && targetDepth >= MIN_DUNGEON_DEPTH) {
-        next = targetDepth;
-    } else if (Number.isFinite(delta) && delta !== 0) {
-        next = current + delta;
-    }
-    next = Math.max(MIN_DUNGEON_DEPTH, Math.min(MAX_DUNGEON_DEPTH, next));
+    const next = Math.max(MIN_DUNGEON_DEPTH, Math.min(MAX_DUNGEON_DEPTH, Number(nextDepth) || current));
     if (next === current) return;
     try {
         world.mutate(id, Dungeon, (r) => { r.level = next; });
@@ -125,4 +124,63 @@ function getDungeonRecord(world) {
         if (rec) return { id, rec };
     }
     return null;
+}
+
+function resolveTargetDepth(world, params) {
+    if (!params) return null;
+    if (Number.isFinite(params.targetDepth)) return Number(params.targetDepth);
+    const delta = Number(params.depthDelta);
+    if (Number.isFinite(delta) && delta !== 0) {
+        const dungeonInfo = getDungeonRecord(world);
+        if (dungeonInfo?.rec && Number.isFinite(dungeonInfo.rec.level)) {
+            return dungeonInfo.rec.level + delta;
+        }
+    }
+    return null;
+}
+
+function resolveDestination(params, fallback) {
+    if (params?.destinationPosition && Number.isFinite(params.destinationPosition.x) && Number.isFinite(params.destinationPosition.y)) {
+        return { x: params.destinationPosition.x, y: params.destinationPosition.y };
+    }
+    if (params?.targetPosition && Number.isFinite(params.targetPosition.x) && Number.isFinite(params.targetPosition.y)) {
+        return { x: params.targetPosition.x, y: params.targetPosition.y };
+    }
+    if (fallback) return { x: fallback.x, y: fallback.y };
+    return null;
+}
+
+function handlePortalTravel(world, { actor, params, targetId, action }) {
+    const linkId = Number(params?.targetId || targetId) || 0;
+    if (!linkId) return;
+    const destPos = world.get(linkId, Position);
+    const actorPos = world.get(actor, Position);
+    if (!destPos || !actorPos) return;
+    const arrival = params?.arrivalOffset || {};
+    const offsetX = Number(arrival.x) || 0;
+    const offsetY = Number(arrival.y) || 0;
+    const targetX = destPos.x + offsetX;
+    const targetY = destPos.y + offsetY;
+    const from = { x: actorPos.x, y: actorPos.y };
+    world.set(actor, Position, { x: targetX, y: targetY });
+    if (params?.faceAway !== false) {
+        const face = normalizeVec(targetX - destPos.x, targetY - destPos.y);
+        if (face) {
+            if (world.has(actor, Facing)) world.set(actor, Facing, face);
+            else {
+                try { world.add(actor, Facing, face); } catch { }
+            }
+        }
+    }
+    world.emit?.("moved", { id: actor, from, to: { x: targetX, y: targetY }, via: action });
+    world.emit?.("interaction", {
+        actor,
+        targetId: linkId,
+        action,
+        result: {
+            mode: "portal",
+            to: { x: targetX, y: targetY },
+            linkId,
+        }
+    });
 }

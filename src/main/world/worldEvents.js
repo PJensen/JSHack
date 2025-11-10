@@ -676,6 +676,8 @@ export function setupWorldEventHandlers(world, deps) {
       } else {
         log("You move through the stairwell.");
       }
+    } else if (action === "usePortal") {
+      log("You step through the portal.");
     }
   });
 

@@ -22,60 +22,34 @@ import { Trap } from "../../rules/components/Trap.js";
 import { DungeonGeometry } from "../../rules/components/DungeonGeometry.js";
 import { Interactable } from "../../rules/components/Interactable.js";
 import { DungeonLevel } from "../../rules/components/Dungeon.js";
+import { registerDungeonLevel, activateDungeonLevel } from "../../rules/environment/dungeonLevelManager.js";
+import { ensureGeometryKernel } from "../../rules/environment/worldGeometry.js";
 
 const ROOM_WIDTH = 11;
 const ROOM_HEIGHT = 11;
 const LOWER_ROOM_WIDTH = 19;
 const LOWER_ROOM_HEIGHT = 13;
-const LOWER_ROOM_OFFSET_Y = 64;
 const MAIN_DEPTH = 1;
 const LOWER_DEPTH = 2;
+const STAIR_ALIGN_KEY = Symbol.for("jshack.dungeon.stairAlign");
 
 /**
- * Populate a small demo scene with a player, tiles, and items.
+ * Populate a multi-level dungeon with portals on the surface and real stairs between depths.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function populateDemoScene(world) {
-  const { room, labeledRooms, doors, kernel, entityId } = generateRectRoom(world, {
-    width: ROOM_WIDTH,
-    height: ROOM_HEIGHT,
-    name: "Demo Room",
-  });
+  const playerId = ensurePlayer(world, { x: 0, y: 0 });
 
-  const rooms = { ...(labeledRooms || {}) };
-  if (!rooms.main) rooms.main = room;
-  rooms.main.depth = MAIN_DEPTH;
-  for (const info of Object.values(rooms)) {
-    if (info && !Number.isFinite(info.depth)) info.depth = MAIN_DEPTH;
+  registerDungeonLevel(world, MAIN_DEPTH, buildSurfaceLevel);
+  registerDungeonLevel(world, LOWER_DEPTH, buildLowerVaultLevel);
+
+  const levelInfo = activateDungeonLevel(world, MAIN_DEPTH, { initial: true });
+  if (levelInfo?.playerSpawn) {
+    setPlayerPosition(world, playerId, levelInfo.playerSpawn);
   }
 
-  const lowerRoom = ensureLowerLevelRoom(world, {
-    kernel,
-    dungeonEntityId: entityId,
-    anchor: rooms.main,
-  });
-  if (lowerRoom) rooms.lower = lowerRoom;
-
-  ensurePlayer(world, rooms.main.center);
-  if (Array.isArray(doors) && doors.length) placeDoors(world, doors);
-  grantInitialShield(world);
-
-  // Lighting and flavor in main room
-  placeTorch(world, rooms.main);
-  placeSpellbook(world, rooms.main);
-
-  // Spread items around adjoining rooms
-  placeBlastwaveScroll(world, rooms.south ?? rooms.main);
   setPlayerStats(world);
-  dropPotions(world, rooms.east ?? rooms.main);
-  dropGold(world, rooms.north ?? rooms.main);
-  dropArrows(world, rooms.south ?? rooms.main);
-  spawnMonsters(world, rooms.east ?? rooms.main);
-  dropEquipment(world, rooms.main, rooms);
-  // Place spike trap and a helpful potion near the bow
-  placeSpikeTrap(world, rooms);
-  placeBowRoomPotion(world, rooms);
-  placeOmniDirectionalStairs(world, rooms);
+  grantInitialShield(world);
 }
 
 function ensurePlayer(world, center) {
@@ -86,51 +60,107 @@ function ensurePlayer(world, center) {
     if (facing) {
       world.set(existing.id, Facing, { x: 1, y: 0 });
     }
-    return;
+    return existing.id;
   }
-  createPlayer(world, { x: center.x, y: center.y, name: "Hero" });
+  const id = createPlayer(world, { x: center.x, y: center.y, name: "Hero" });
+  return id;
 }
 
-function placeDoors(world, positions) {
-  const eps = 0.25;
-  for (const p of positions) {
-    const doorX = p.x;
-    const doorY = p.y;
-    let existingDoorId = null;
-    for (const [id, pos] of world.query(Position, DoorState)) {
-      if (!pos) continue;
-      if (Math.abs(pos.x - doorX) < eps && Math.abs(pos.y - doorY) < eps) {
-        existingDoorId = id;
-        break;
-      }
-    }
-    if (existingDoorId != null) {
-      world.set(existingDoorId, Position, { x: doorX, y: doorY });
-      world.set(existingDoorId, DoorState, { open: false, locked: false });
-      const collider = world.get(existingDoorId, Collider);
-      if (collider) {
-        world.set(existingDoorId, Collider, { ...collider, solid: true, blocksSight: true });
-      }
-    } else {
-      createFrom(world, Door, { x: doorX, y: doorY });
-    }
+function setPlayerPosition(world, playerId, pos) {
+  if (!pos || !playerId) return;
+  world.set(playerId, Position, { x: pos.x, y: pos.y });
+  const facing = world.get(playerId, Facing);
+  if (facing) {
+    world.set(playerId, Facing, { x: 1, y: 0 });
   }
 }
 
-function placeSpikeTrap(world, rooms) {
-  const north = rooms?.north ?? rooms.main;
-  const at = { x: north.center.x, y: north.center.y + 3 };
-  const trap = world.create();
-  world.add(trap, Position, { x: at.x, y: at.y });
-  world.add(trap, Trap, { type: "spike", revealed: false, armed: true, script: 'trap_spike', params: { percent: 0.25 } });
-  // No NamedIdentity initially; added on trigger to reveal '^'
+function buildSurfaceLevel(world) {
+  const layout = generateRectRoom(world, {
+    width: ROOM_WIDTH,
+    height: ROOM_HEIGHT,
+    name: "Demo Room",
+  });
+
+  const rooms = normalizeRooms(layout, MAIN_DEPTH);
+  const created = [];
+
+  created.push(...placeDoors(world, layout.doors));
+  created.push(placeTorch(world, rooms.main));
+  created.push(...placeSpellbooks(world, rooms.main));
+  created.push(placeBlastwaveScroll(world, rooms.south ?? rooms.main));
+  created.push(...dropPotions(world, rooms.east ?? rooms.main));
+  created.push(dropGold(world, rooms.north ?? rooms.main));
+  created.push(dropArrows(world, rooms.south ?? rooms.main));
+  created.push(spawnMonsters(world, rooms.east ?? rooms.main));
+  created.push(...dropEquipment(world, rooms.main, rooms));
+  created.push(placeSpikeTrap(world, rooms));
+  created.push(placeBowRoomPotion(world, rooms));
+
+  const portalRoom = carvePortalVault(world, layout.kernel, layout.entityId, rooms.main);
+  if (portalRoom) {
+    rooms.portal = portalRoom;
+    created.push(...placePortalNetwork(world, rooms.main, portalRoom));
+  }
+
+  const geometry = cloneGeometry(world, layout.entityId);
+
+  const stairAlignment = computeStairAlignment(rooms);
+  world[STAIR_ALIGN_KEY] = stairAlignment;
+
+  created.push(createStairEntity(world, {
+    name: "Main Stairwell",
+    identity: "stairs_up",
+    position: stairAlignment.main,
+    depth: MAIN_DEPTH,
+    targetDepth: LOWER_DEPTH,
+    destination: stairAlignment.main,
+    direction: "down",
+  }));
+
+  created.push(createStairEntity(world, {
+    name: "East Stairwell",
+    identity: "stairs_up",
+    position: stairAlignment.east,
+    depth: MAIN_DEPTH,
+    targetDepth: LOWER_DEPTH,
+    destination: stairAlignment.east,
+    direction: "down",
+  }));
+
+  return { geometry, rooms, entities: flattenEntityIds(created), playerSpawn: rooms.main.center };
 }
 
-function placeBowRoomPotion(world, rooms) {
-  const north = rooms?.north ?? rooms.main;
-  const pos = { x: north.center.x + 1.5, y: north.center.y }; // a tile to the right of the bow
-  const p = createFrom(world, HealthPotion, {});
-  world.add(p, Position, pos);
+function buildLowerVaultLevel(world) {
+  const align = world[STAIR_ALIGN_KEY] || defaultStairAlignment();
+  const { geometry, room } = generateLowerVault(world);
+  const rooms = { main: room };
+  rooms.main.depth = LOWER_DEPTH;
+  const created = [];
+
+  created.push(placeTorch(world, room));
+
+  created.push(createStairEntity(world, {
+    name: "Ascent Shaft",
+    identity: "stairs_down",
+    position: align.main,
+    depth: LOWER_DEPTH,
+    targetDepth: MAIN_DEPTH,
+    destination: align.main,
+    direction: "up",
+  }));
+
+  created.push(createStairEntity(world, {
+    name: "Hidden Shaft",
+    identity: "stairs_down",
+    position: align.east,
+    depth: LOWER_DEPTH,
+    targetDepth: MAIN_DEPTH,
+    destination: align.east,
+    direction: "up",
+  }));
+
+  return { geometry, rooms, entities: flattenEntityIds(created), playerSpawn: { ...align.main } };
 }
 
 function grantInitialShield(world) {
@@ -146,7 +176,8 @@ function grantInitialShield(world) {
   }
 }
 
-function placeSpellbook(world, room) {
+function placeSpellbooks(world, room) {
+  const ids = [];
   const { center } = room;
   const book = world.create();
   world.add(book, NamedIdentity, { name: "Spellbook of Lightning", identity: "book_lightning" });
@@ -161,8 +192,8 @@ function placeSpellbook(world, room) {
     rarity: 1,
     rarityName: "rare",
   });
+  ids.push(book);
 
-  // New: Meteor spellbook
   const book2 = world.create();
   world.add(book2, NamedIdentity, { name: "Spellbook of Meteor", identity: "book_meteor" });
   world.add(book2, Position, { x: center.x - 2, y: center.y + 1.5 });
@@ -176,6 +207,8 @@ function placeSpellbook(world, room) {
     rarity: 1,
     rarityName: "rare",
   });
+  ids.push(book2);
+  return ids;
 }
 
 function placeBlastwaveScroll(world, room) {
@@ -193,6 +226,7 @@ function placeBlastwaveScroll(world, room) {
     rarity: 1,
     rarityName: "rare",
   });
+  return scroll;
 }
 
 function placeTorch(world, room) {
@@ -210,6 +244,7 @@ function placeTorch(world, room) {
     style: "torch",
     emitter: "torch",
   });
+  return torch;
 }
 
 function setPlayerStats(world) {
@@ -217,16 +252,19 @@ function setPlayerStats(world) {
   if (!pe) return;
   world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 1 });
   world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
-  // Ensure intelligence comfortably above any spell thresholds
   try { world.mutate(pe.id, Brain, (r) => { r.intelligence = Math.max(16, Number(r.intelligence || 0)); }); } catch {}
 }
 
 function dropPotions(world, room) {
+  const ids = [];
   const { center } = room;
   const p1 = createFrom(world, HealthPotion, {});
   world.add(p1, Position, { x: center.x + 2.5, y: center.y });
+  ids.push(p1);
   const p2 = createFrom(world, HealthPotion, {});
   world.add(p2, Position, { x: center.x - 2.5, y: center.y });
+  ids.push(p2);
+  return ids;
 }
 
 function dropGold(world, room) {
@@ -236,18 +274,19 @@ function dropGold(world, room) {
   const gold = createFrom(world, GoldStack, {});
   world.add(gold, Position, { x: center.x - 1, y: center.y - 1 });
   world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
+  return gold;
 }
 
 function dropArrows(world, room) {
   const { center } = room;
   const arrows = createFrom(world, ArrowsStack, {});
   world.add(arrows, Position, { x: center.x + 1.5, y: center.y - 1.5 });
+  return arrows;
 }
 
 function spawnMonsters(world, room) {
   const { center } = room;
-  // Place a single spawner instead of static monsters for testing
-  createFrom(world, Spawner, {
+  return createFrom(world, Spawner, {
     x: center.x + 2,
     y: center.y,
     name: "Monster Spawner",
@@ -260,11 +299,12 @@ function spawnMonsters(world, room) {
 }
 
 function dropEquipment(world, mainRoom, rooms) {
+  const ids = [];
   const { center, halfWidth, halfHeight } = mainRoom;
   const eqSword = buildEquipmentItem(world, "sword_plain", { affixes: ["fierce"] });
   world.add(eqSword, Position, { x: center.x - (halfWidth - 2), y: center.y - (halfHeight - 2) });
+  ids.push(eqSword);
 
-  // Put armor in the east room if present
   const east = rooms?.east ?? mainRoom;
   const armorPos = {
     x: east.center.x + (east.halfWidth - 2),
@@ -272,66 +312,148 @@ function dropEquipment(world, mainRoom, rooms) {
   };
   const thornArmor = buildEquipmentItem(world, "chain_armor", { affixes: ["thorns1"] });
   world.add(thornArmor, Position, armorPos);
+  ids.push(thornArmor);
 
-  // Wooden bow in the north room if present
   const north = rooms?.north ?? mainRoom;
   const woodBow = buildEquipmentItem(world, "bow_wood", {});
   world.add(woodBow, Position, { x: north.center.x, y: north.center.y });
+  ids.push(woodBow);
+  return ids;
 }
 
-function ensureLowerLevelRoom(world, { kernel, dungeonEntityId, anchor }) {
-  if (!world || !kernel || !dungeonEntityId || !anchor) return null;
-  const carveFlags = { affectsMove: true, affectsOccl: true };
-  const halfWidth = LOWER_ROOM_WIDTH * 0.5;
-  const halfHeight = LOWER_ROOM_HEIGHT * 0.5;
-  const center = {
-    x: anchor.center.x,
-    y: anchor.center.y + LOWER_ROOM_OFFSET_Y,
-  };
-
-  kernel.carveBox(center.x, center.y, halfWidth, halfHeight, 0, carveFlags);
-
-  const lowerRoom = {
-    key: "lower",
-    shape: "rect-room",
-    width: LOWER_ROOM_WIDTH,
-    height: LOWER_ROOM_HEIGHT,
-    halfWidth,
-    halfHeight,
-    center: { ...center },
-    origin: { x: center.x - halfWidth, y: center.y - halfHeight },
-    depth: LOWER_DEPTH,
-  };
-
-  refreshDungeonGeometry(world, kernel, dungeonEntityId, lowerRoom);
-  return lowerRoom;
+function placeSpikeTrap(world, rooms) {
+  const north = rooms?.north ?? rooms.main;
+  const at = { x: north.center.x, y: north.center.y + 3 };
+  const trap = world.create();
+  world.add(trap, Position, { x: at.x, y: at.y });
+  world.add(trap, Trap, { type: "spike", revealed: false, armed: true, script: 'trap_spike', params: { percent: 0.25 } });
+  return trap;
 }
 
-function refreshDungeonGeometry(world, kernel, dungeonEntityId, lowerRoom) {
-  if (!world || !kernel || !dungeonEntityId) return;
-  const snapshot = kernel.snapshot();
-  const current = world.get(dungeonEntityId, DungeonGeometry);
-  const meta = cloneDungeonMeta(current?.meta ?? {});
-  if (lowerRoom) {
-    if (!Array.isArray(meta.rooms)) meta.rooms = [];
-    meta.rooms = meta.rooms.map((r) => ({ ...r }));
-    meta.rooms.push({ key: lowerRoom.key, ...lowerRoom });
-    meta.layers = { ...(meta.layers || {}), lower: { ...lowerRoom } };
+function placeBowRoomPotion(world, rooms) {
+  const north = rooms?.north ?? rooms.main;
+  const pos = { x: north.center.x + 1.5, y: north.center.y };
+  const p = createFrom(world, HealthPotion, {});
+  world.add(p, Position, pos);
+  return p;
+}
+
+function placeDoors(world, positions) {
+  if (!Array.isArray(positions)) return [];
+  const ids = [];
+  for (const p of positions) {
+    const door = createFrom(world, Door, { x: p.x, y: p.y });
+    ids.push(door);
+    world.set(door, DoorState, { open: false, locked: false });
+    const collider = world.get(door, Collider);
+    if (collider) {
+      world.set(door, Collider, { ...collider, solid: true, blocksSight: true });
+    }
   }
-
-  world.set(dungeonEntityId, DungeonGeometry, {
-    seed: snapshot.seed,
-    mbrVersion: snapshot.mbrVersion,
-    moveVersion: snapshot.moveVersion,
-    occlVersion: snapshot.occlVersion,
-    mbr: snapshot.mbr,
-    primitives: snapshot.primitives,
-    meta,
-    options: snapshot.options,
-  });
+  return ids;
 }
 
-function cloneDungeonMeta(meta) {
+function placePortalNetwork(world, mainRoom, portalRoom) {
+  const ids = [];
+  const entry = { x: mainRoom.center.x + mainRoom.halfWidth - 1, y: mainRoom.center.y };
+  const exit = { x: portalRoom.center.x, y: portalRoom.center.y };
+  const [a, b] = createPortalPair(world, entry, exit);
+  ids.push(a, b);
+  return ids;
+}
+
+function createPortalPair(world, fromPos, toPos) {
+  const a = createPortal(world, { name: "Portal", identity: "portal_dark", position: fromPos });
+  const b = createPortal(world, { name: "Portal", identity: "portal_light", position: toPos });
+  world.add(a, Interactable, { action: "usePortal", params: { targetId: b, arrivalOffset: { x: 0, y: 0 } } });
+  world.add(b, Interactable, { action: "usePortal", params: { targetId: a, arrivalOffset: { x: 0, y: 0 } } });
+  return [a, b];
+}
+
+function createPortal(world, { name, identity, position }) {
+  const id = world.create();
+  world.add(id, NamedIdentity, { name, identity });
+  world.add(id, Position, { x: position.x, y: position.y });
+  world.add(id, Collider, { solid: true, blocksSight: false });
+  return id;
+}
+
+function createStairEntity(world, { name, identity, position, depth, targetDepth, destination, direction }) {
+  const id = world.create();
+  world.add(id, Position, { x: position.x, y: position.y });
+  world.add(id, NamedIdentity, { name, identity });
+  world.add(id, Collider, { solid: true, blocksSight: false });
+  if (Number.isFinite(depth)) {
+    try { world.add(id, DungeonLevel, { depth }); } catch {}
+  }
+  world.add(id, Interactable, {
+    action: "useStairs",
+    params: {
+      targetDepth,
+      destinationPosition: destination ? { x: destination.x, y: destination.y } : null,
+      direction,
+      sourceDepth: depth,
+      faceFrom: { x: position.x, y: position.y },
+    }
+  });
+  return id;
+}
+
+function flattenEntityIds(values) {
+  const out = [];
+  const visit = (val) => {
+    if (Array.isArray(val)) {
+      for (const inner of val) visit(inner);
+      return;
+    }
+    if (Number.isInteger(val)) out.push(val);
+  };
+  values.forEach(visit);
+  return out;
+}
+
+function normalizeRooms(layout, depth) {
+  const rooms = { ...(layout.labeledRooms || {}) };
+  if (!rooms.main) rooms.main = layout.room;
+  for (const info of Object.values(rooms)) {
+    if (info && !Number.isFinite(info.depth)) info.depth = depth;
+  }
+  return rooms;
+}
+
+function computeStairAlignment(rooms) {
+  const main = rooms.main;
+  const east = rooms.east ?? rooms.main;
+  return {
+    main: { x: main.center.x + 1, y: main.center.y + 2 },
+    east: { x: east.center.x - 1, y: east.center.y - 2 },
+  };
+}
+
+function defaultStairAlignment() {
+  return {
+    main: { x: 0, y: 2 },
+    east: { x: 6, y: 0 },
+  };
+}
+
+function cloneGeometry(world, entityId) {
+  const geom = world.get(entityId, DungeonGeometry);
+  if (!geom) return null;
+  return {
+    seed: geom.seed,
+    mbrVersion: geom.mbrVersion,
+    moveVersion: geom.moveVersion,
+    occlVersion: geom.occlVersion,
+    mbr: geom.mbr ? { ...geom.mbr } : null,
+    primitives: Array.isArray(geom.primitives) ? geom.primitives.map((p) => ({ ...p })) : [],
+    meta: cloneMeta(geom.meta),
+    options: geom.options ? { ...geom.options } : null,
+  };
+}
+
+function cloneMeta(meta) {
+  if (!meta) return null;
   try {
     return JSON.parse(JSON.stringify(meta));
   } catch {
@@ -339,99 +461,73 @@ function cloneDungeonMeta(meta) {
   }
 }
 
-function placeOmniDirectionalStairs(world, rooms) {
-  const lower = rooms?.lower;
-  const main = rooms?.main;
-  const east = rooms?.east ?? main;
-  if (!lower || !main || !east) return;
-
-  const mainTop = createStairsEntity(world, {
-    name: "Descending Stair",
-    identity: "stairs_up",
-    x: main.center.x - 1.5,
-    y: main.center.y + 1.5,
-    depth: MAIN_DEPTH,
-  });
-  const eastTop = createStairsEntity(world, {
-    name: "Eastern Stair",
-    identity: "stairs_up",
-    x: east.center.x - 1.5,
-    y: east.center.y - 1.5,
-    depth: MAIN_DEPTH,
-  });
-  const lowerWest = createStairsEntity(world, {
-    name: "Lower Stair",
-    identity: "stairs_down",
-    x: lower.center.x - 4,
-    y: lower.center.y,
-    depth: LOWER_DEPTH,
-  });
-  const lowerEast = createStairsEntity(world, {
-    name: "Hidden Stair",
-    identity: "stairs_down",
-    x: lower.center.x + 4,
-    y: lower.center.y,
-    depth: LOWER_DEPTH,
-  });
-
-  linkStairs(world, mainTop, lowerWest, {
-    offsetX: 0,
-    offsetY: 1.5,
-    direction: "down",
-    sourceDepth: MAIN_DEPTH,
-    targetDepth: LOWER_DEPTH,
-  });
-  linkStairs(world, lowerWest, mainTop, {
-    offsetX: 0,
-    offsetY: -1,
-    direction: "up",
-    sourceDepth: LOWER_DEPTH,
-    targetDepth: MAIN_DEPTH,
-  });
-  linkStairs(world, eastTop, lowerEast, {
-    offsetX: 0,
-    offsetY: 1.5,
-    direction: "down",
-    sourceDepth: MAIN_DEPTH,
-    targetDepth: LOWER_DEPTH,
-  });
-  linkStairs(world, lowerEast, eastTop, {
-    offsetX: 0,
-    offsetY: -1,
-    direction: "up",
-    sourceDepth: LOWER_DEPTH,
-    targetDepth: MAIN_DEPTH,
-  });
-}
-
-function createStairsEntity(world, { x, y, name, identity, depth }) {
-  const id = world.create();
-  world.add(id, Position, { x, y });
-  world.add(id, NamedIdentity, { name, identity });
-  world.add(id, Collider, { solid: true, blocksSight: false });
-  if (Number.isFinite(depth)) {
-    try { world.add(id, DungeonLevel, { depth }); } catch {}
-  }
-  return id;
-}
-
-function linkStairs(world, sourceId, targetId, { offsetX = 0, offsetY = 0, direction = "travel", sourceDepth = null, targetDepth = null, depthDelta = null }) {
-  let delta = Number.isFinite(depthDelta) ? depthDelta : null;
-  if (delta == null && Number.isFinite(sourceDepth) && Number.isFinite(targetDepth)) {
-    delta = targetDepth - sourceDepth;
-  }
-  const params = {
-    targetId,
-    arrivalOffset: { x: offsetX, y: offsetY },
-    direction,
-    faceAway: true,
-    sourceDepth: Number.isFinite(sourceDepth) ? sourceDepth : null,
-    targetDepth: Number.isFinite(targetDepth) ? targetDepth : null,
-    depthDelta: delta,
+function carvePortalVault(world, kernel, entityId, anchor) {
+  if (!kernel || !anchor) return null;
+  const carveFlags = { affectsMove: true, affectsOccl: true };
+  const halfWidth = LOWER_ROOM_WIDTH * 0.5;
+  const halfHeight = LOWER_ROOM_HEIGHT * 0.5;
+  const center = {
+    x: anchor.center.x,
+    y: anchor.center.y + 32,
   };
-  if (world.has(sourceId, Interactable)) {
-    world.set(sourceId, Interactable, { action: "useStairs", params });
+  kernel.carveBox(center.x, center.y, halfWidth, halfHeight, 0, carveFlags);
+  const snapshot = kernel.snapshot();
+  const geometry = {
+    seed: snapshot.seed,
+    mbrVersion: snapshot.mbrVersion,
+    moveVersion: snapshot.moveVersion,
+    occlVersion: snapshot.occlVersion,
+    mbr: snapshot.mbr,
+    primitives: snapshot.primitives,
+    meta: null,
+    options: snapshot.options,
+  };
+  if (world.has(entityId, DungeonGeometry)) {
+    world.set(entityId, DungeonGeometry, geometry);
   } else {
-    world.add(sourceId, Interactable, { action: "useStairs", params });
+    world.add(entityId, DungeonGeometry, geometry);
   }
+  return {
+    key: "portal",
+    shape: "rect-room",
+    width: LOWER_ROOM_WIDTH,
+    height: LOWER_ROOM_HEIGHT,
+    halfWidth,
+    halfHeight,
+    center,
+    depth: MAIN_DEPTH,
+  };
+}
+
+function generateLowerVault(world) {
+  const kernel = ensureGeometryKernel(world, { seed: world.seed ^ 0x5d3 });
+  kernel.clear();
+  const carveFlags = { affectsMove: true, affectsOccl: true };
+  const halfWidth = LOWER_ROOM_WIDTH * 0.5;
+  const halfHeight = LOWER_ROOM_HEIGHT * 0.5;
+  kernel.carveBox(0, 0, halfWidth, halfHeight, 0, carveFlags);
+  const snapshot = kernel.snapshot();
+  const geometry = {
+    seed: snapshot.seed,
+    mbrVersion: snapshot.mbrVersion,
+    moveVersion: snapshot.moveVersion,
+    occlVersion: snapshot.occlVersion,
+    mbr: snapshot.mbr,
+    primitives: snapshot.primitives,
+    meta: null,
+    options: snapshot.options,
+  };
+  return {
+    geometry,
+    room: {
+      key: "lower",
+      shape: "rect-room",
+      width: LOWER_ROOM_WIDTH,
+      height: LOWER_ROOM_HEIGHT,
+      halfWidth,
+      halfHeight,
+      center: { x: 0, y: 0 },
+      depth: LOWER_DEPTH,
+    },
+  };
 }
