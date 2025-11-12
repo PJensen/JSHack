@@ -25,6 +25,23 @@ import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
 import { trapSystem } from "../../src/rules/systems/trapSystem.js";
 // Register trap scripts
 import "../../src/rules/scripts/traps.js";
+import {
+  FloorRef,
+  Position,
+  Facing,
+  GeomHandle,
+  FloorState,
+  LightingAccelHandle,
+  DungeonLevel,
+  PortalTrace,
+  LightSource
+} from "../../src/rules/components/index.js";
+import { KernelCache, getPortalsV } from "../../src/rules/analytic/index.js";
+import { createGeomKernelSystem } from "../../src/rules/systems/geomKernelSystem.js";
+import { createKernelPrewarmSystem } from "../../src/rules/systems/kernelPrewarmSystem.js";
+import { createPortalUseSystem } from "../../src/rules/systems/portalUseSystem.js";
+import { createLightingBakeSystem } from "../../src/rules/systems/lightingBakeSystem.js";
+import { createFloorActivationSystem } from "../../src/rules/systems/floorActivationSystem.js";
 
 /**
  * @param {World} world
@@ -34,6 +51,26 @@ export function configureWorld(world) {
 
   // Install affix event listeners once per world
   installAffixTriggers(world);
+
+  const kernelCache = new KernelCache(4);
+
+  registerSystem(
+    createGeomKernelSystem({
+      geomHandleComponent: GeomHandle,
+      floorStateComponent: FloorState
+    }),
+    "intents"
+  );
+
+  registerSystem(
+    createKernelPrewarmSystem({
+      floorRefComponent: FloorRef,
+      positionComponent: Position,
+      cache: kernelCache,
+      portalsAccessor: getPortalsV
+    }),
+    "intents"
+  );
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -61,6 +98,44 @@ export function configureWorld(world) {
   registerSystem(trapSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
+
+  registerSystem(
+    createPortalUseSystem({
+      floorRefComponent: FloorRef,
+      positionComponent: Position,
+      facingComponent: Facing,
+      portalTraceComponent: PortalTrace,
+      portalsAccessor: getPortalsV
+    }),
+    'effects'
+  );
+
+  registerSystem(
+    createLightingBakeSystem({
+      lightingAccelComponent: LightingAccelHandle,
+      geomHandleComponent: GeomHandle,
+      lightProvider: (floorId) => {
+        const lights = [];
+        for (const [id, light, pos, ref] of world.query(LightSource, Position, FloorRef)) {
+          if (!ref || ref.floorId !== floorId) continue;
+          lights.push({
+            id,
+            position: { x: pos.x, y: pos.y },
+            intensity: light.intensity ?? 1,
+            radius: light.radius ?? 0,
+            color: light.color ?? '#ffffff'
+          });
+        }
+        return lights;
+      }
+    }),
+    'effects'
+  );
+
+  registerSystem(
+    createFloorActivationSystem({ dungeonLevelComponent: DungeonLevel }),
+    'effects'
+  );
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');
