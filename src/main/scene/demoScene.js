@@ -1,259 +1,368 @@
-import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { playerEntity } from "../../rules/utils/queries.js";
 import { createPlayer } from "../../rules/archetypes/Player.js";
-import { Door } from "../../rules/archetypes/Door.js";
-import { DoorState } from "../../rules/components/DoorState.js";
-import { Collider } from "../../rules/components/Collider.js";
-import { HealthPotion, GoldStack, ArrowsStack } from "../../rules/archetypes/Items.js";
-import { Spawner } from "../../rules/archetypes/Spawner.js";
-import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
-import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { Position } from "../../rules/components/Position.js";
-import { Facing } from "../../rules/components/Facing.js";
-import { ItemInfo } from "../../rules/components/ItemInfo.js";
-import { Mana } from "../../rules/components/Mana.js";
-import { Brain } from "../../rules/components/Brain.js";
-import { Vitality } from "../../rules/components/Vitality.js";
-import { buildEquipmentItem } from "../../rules/data/equipmentLoader.js";
-import { createRng } from "../../lib/ecs-js/rng.js";
-import { generateRectRoom } from "../../rules/environment/dungeonGenerator.js";
-import { LightSource } from "../../rules/components/LightSource.js";
-import { Trap } from "../../rules/components/Trap.js";
+import { GeometryKernel } from "../../rules/environment/GeometryKernel.js";
+import { setGeometryKernel } from "../../rules/environment/worldGeometry.js";
+import {
+  FloorRef,
+  GeomHandle,
+  FloorState,
+  LightingAccelHandle,
+  DungeonLevel,
+  DungeonGeometry,
+  Position,
+  NamedIdentity,
+  LightSource,
+} from "../../rules/components/index.js";
+import {
+  registerFloorDefinition,
+  registerPortalV,
+  resetRegistries,
+} from "../../rules/analytic/index.js";
 
-const ROOM_WIDTH = 11;
-const ROOM_HEIGHT = 11;
+const LEVEL_ID = "demo-analytic";
+
+const FLOOR_BLUEPRINTS = [
+  {
+    id: 1,
+    label: "Sunken Atrium",
+    spawn: { x: -2, y: 0 },
+    layout: [
+      { type: "box", cx: 0, cy: 0, hx: 6, hy: 5 },
+      { type: "capsule", ax: -6, ay: 0, bx: 6, by: 0, r: 1.4 },
+      { type: "capsule", ax: 0, ay: -5, bx: 0, by: 7, r: 1.3 },
+    ],
+    analytic: [
+      { type: "solid-box", min: { x: -8.5, y: -8.5 }, max: { x: -7.5, y: 8.5 }, tag: "wall" },
+      { type: "solid-box", min: { x: 7.5, y: -8.5 }, max: { x: 8.5, y: 8.5 }, tag: "wall" },
+      { type: "solid-box", min: { x: -8.5, y: 7.5 }, max: { x: 8.5, y: 8.5 }, tag: "wall" },
+      { type: "solid-circle", center: { x: -3, y: 0 }, radius: 1.1, tag: "column" },
+      { type: "solid-circle", center: { x: 3, y: 0 }, radius: 1.1, tag: "column" },
+    ],
+    rooms: [
+      { key: "atrium", width: 12, height: 10, center: { x: 0, y: 0 } },
+    ],
+    lights: [
+      { position: { x: -4.5, y: -3.5 }, radius: 6, intensity: 1.15, color: "#ffcc88" },
+      { position: { x: 4.25, y: 3.5 }, radius: 6, intensity: 0.95, color: "#88d0ff" },
+    ],
+  },
+  {
+    id: 2,
+    label: "Forge Gallery",
+    spawn: { x: 0, y: 0 },
+    layout: [
+      { type: "box", cx: 0, cy: 0, hx: 7, hy: 4 },
+      { type: "box", cx: -6, cy: 0, hx: 2.5, hy: 3 },
+      { type: "capsule", ax: 0, ay: -4, bx: 0, by: 7, r: 1.2 },
+    ],
+    analytic: [
+      { type: "solid-box", min: { x: -9, y: -5 }, max: { x: -8, y: 5 }, tag: "wall" },
+      { type: "solid-box", min: { x: 8, y: -5 }, max: { x: 9, y: 5 }, tag: "wall" },
+      { type: "solid-box", min: { x: -2, y: 3.5 }, max: { x: 2, y: 4.5 }, tag: "beam" },
+      { type: "solid-circle", center: { x: 3, y: -2 }, radius: 1.2, tag: "forge" },
+    ],
+    rooms: [
+      { key: "gallery", width: 12, height: 8, center: { x: 0, y: 0 } },
+      { key: "workshop", width: 6, height: 6, center: { x: -6, y: 0 } },
+    ],
+    lights: [
+      { position: { x: -6, y: 0 }, radius: 5, intensity: 1.2, color: "#ff8844" },
+      { position: { x: 2.5, y: -2 }, radius: 4.5, intensity: 1.0, color: "#ffa244" },
+    ],
+  },
+  {
+    id: 3,
+    label: "Crystal Grotto",
+    spawn: { x: -2, y: 1 },
+    layout: [
+      { type: "circle", cx: -6, cy: 0, r: 3.5 },
+      { type: "capsule", ax: -6, ay: 0, bx: 2, by: 4, r: 1.1 },
+      { type: "box", cx: 4, cy: 4, hx: 3, hy: 3 },
+    ],
+    analytic: [
+      { type: "solid-circle", center: { x: -6, y: 0 }, radius: 1.2, tag: "pillar" },
+      { type: "solid-box", min: { x: 2, y: 3 }, max: { x: 6, y: 7 }, tag: "crystal" },
+    ],
+    rooms: [
+      { key: "grotto", width: 8, height: 8, center: { x: -6, y: 0 } },
+    ],
+    lights: [
+      { position: { x: -6, y: 0 }, radius: 6, intensity: 0.9, color: "#7fb7ff" },
+      { position: { x: 4, y: 4 }, radius: 5, intensity: 1.3, color: "#b38fff" },
+    ],
+  },
+];
+
+const PORTALS = [
+  {
+    id: "atrium-stairs",
+    fromFloor: 1,
+    toFloor: 2,
+    center: { x: 0, y: 6 },
+    radius: 0.9,
+    rotation: Math.PI / 2,
+    arrivalFacing: Math.PI / 2,
+    visAttn: 0.85,
+  },
+  {
+    id: "forge-lift",
+    fromFloor: 2,
+    toFloor: 3,
+    center: { x: -6, y: 0 },
+    radius: 0.85,
+    rotation: -Math.PI / 2,
+    arrivalFacing: 0,
+    visAttn: 0.75,
+  },
+];
 
 /**
- * Populate a small demo scene with a player, tiles, and items.
- * @param {import('../../lib/ecs-js/index.js').World} world
+ * Populate the analytic dungeon demo scene with multi-floor data and portal traversal hooks.
+ * @param {import("../../lib/ecs-js/index.js").World} world
  */
 export function populateDemoScene(world) {
-  const { room, labeledRooms, doors } = generateRectRoom(world, {
-    width: ROOM_WIDTH,
-    height: ROOM_HEIGHT,
-    name: "Demo Room",
+  resetRegistries();
+
+  const blueprintMap = new Map(FLOOR_BLUEPRINTS.map((bp) => [bp.id, bp]));
+  const floorKernels = new Map();
+  const geometrySnapshots = new Map();
+
+  for (const blueprint of FLOOR_BLUEPRINTS) {
+    const kernel = new GeometryKernel({ seed: (world.seed ?? 0) ^ (blueprint.id * 131) });
+    applyLayout(kernel, blueprint.layout);
+    floorKernels.set(blueprint.id, kernel);
+    geometrySnapshots.set(blueprint.id, createDungeonSnapshot(blueprint, kernel));
+
+    registerFloorDefinition(blueprint.id, {
+      primitives: blueprint.analytic,
+      version: blueprint.version ?? 1,
+      levelArgs: { id: LEVEL_ID },
+      floorArgs: { id: blueprint.id, label: blueprint.label },
+    });
+  }
+
+  for (const portal of PORTALS) {
+    if (!blueprintMap.has(portal.fromFloor) || !blueprintMap.has(portal.toFloor)) {
+      continue;
+    }
+    const { forward, inverse } = makePortalTransforms(portal);
+    registerPortalV({
+      id: portal.id,
+      fromFloor: portal.fromFloor,
+      toFloor: portal.toFloor,
+      shape2D: {
+        type: "circle",
+        center: { x: portal.center.x, y: portal.center.y },
+        radius: portal.radius ?? 0.75,
+      },
+      transformAB: forward,
+      transformBA: inverse,
+      arrivalFacing: portal.arrivalFacing ?? 0,
+      visAttn: portal.visAttn ?? 1,
+      reentrySnapEpsilon: portal.snap ?? 0.05,
+    });
+  }
+
+  const levelEntity = world.create();
+  world.add(levelEntity, DungeonLevel, {
+    levelId: LEVEL_ID,
+    floors: FLOOR_BLUEPRINTS.map((bp) => bp.id),
+    activeFloorId: FLOOR_BLUEPRINTS[0].id,
   });
 
-  const rooms = labeledRooms ?? { main: room };
+  for (const blueprint of FLOOR_BLUEPRINTS) {
+    const resource = world.create();
+    world.add(resource, GeomHandle, { floorId: blueprint.id, kernelKey: "", snapshotPtr: null, version: 0 });
+    world.add(resource, FloorState, { floorId: blueprint.id, doorStatesHash: "", dynamicEditsHash: "" });
+    world.add(resource, LightingAccelHandle, { floorId: blueprint.id, accelPtr: null, version: 0, ttlTicks: 0 });
+  }
 
-  ensurePlayer(world, rooms.main.center);
-  if (Array.isArray(doors) && doors.length) placeDoors(world, doors);
-  grantInitialShield(world);
+  const geometryEntity = world.create();
 
-  // Lighting and flavor in main room
-  placeTorch(world, rooms.main);
-  placeSpellbook(world, rooms.main);
+  const updateActiveFloor = (floorId) => {
+    const snapshot = geometrySnapshots.get(floorId);
+    if (snapshot) {
+      const payload = cloneSnapshot(snapshot);
+      if (world.has(geometryEntity, DungeonGeometry)) {
+        world.set(geometryEntity, DungeonGeometry, payload);
+      } else {
+        world.add(geometryEntity, DungeonGeometry, payload);
+      }
+    }
+    const kernel = floorKernels.get(floorId);
+    if (kernel) {
+      setGeometryKernel(world, kernel);
+    }
+    const level = world.get(levelEntity, DungeonLevel);
+    if (level) {
+      level.activeFloorId = floorId;
+    }
+  };
 
-  // Spread items around adjoining rooms
-  placeBlastwaveScroll(world, rooms.south ?? rooms.main);
-  setPlayerStats(world);
-  dropPotions(world, rooms.east ?? rooms.main);
-  dropGold(world, rooms.north ?? rooms.main);
-  dropArrows(world, rooms.south ?? rooms.main);
-  spawnMonsters(world, rooms.east ?? rooms.main);
-  dropEquipment(world, rooms.main, rooms);
-  // Place spike trap and a helpful potion near the bow
-  placeSpikeTrap(world, rooms);
-  placeBowRoomPotion(world, rooms);
+  updateActiveFloor(FLOOR_BLUEPRINTS[0].id);
+
+  world.on("FloorChanged", ({ toFloor }) => {
+    if (Number.isFinite(toFloor)) {
+      updateActiveFloor(toFloor);
+    }
+  });
+
+  const startFloor = FLOOR_BLUEPRINTS[0];
+  const playerId = ensurePlayer(world, startFloor.spawn, startFloor.id);
+
+  for (const blueprint of FLOOR_BLUEPRINTS) {
+    placeFloorMarker(world, blueprint);
+    placeFloorLights(world, blueprint);
+  }
+
+  return playerId;
 }
 
-function ensurePlayer(world, center) {
+function applyLayout(kernel, layout = []) {
+  if (!Array.isArray(layout)) return;
+  const flags = { affectsMove: true, affectsOccl: true };
+  for (const shape of layout) {
+    if (!shape) continue;
+    switch (shape.type) {
+      case "box":
+        kernel.carveBox(shape.cx ?? 0, shape.cy ?? 0, shape.hx ?? 1, shape.hy ?? 1, shape.rot ?? 0, flags);
+        break;
+      case "capsule":
+        kernel.carveCapsule(shape.ax ?? 0, shape.ay ?? 0, shape.bx ?? 0, shape.by ?? 0, shape.r ?? 1, flags);
+        break;
+      case "rectslot":
+        kernel.carveRectSlot(shape.ax ?? 0, shape.ay ?? 0, shape.bx ?? 0, shape.by ?? 0, shape.r ?? 1, flags);
+        break;
+      case "square":
+        kernel.carveSquare(shape.ax ?? 0, shape.ay ?? 0, shape.bx ?? 0, shape.by ?? 0, shape.halfW ?? shape.halfWidth ?? 1, shape.rot ?? 0, flags);
+        break;
+      case "circle":
+        kernel.carveCircle(shape.cx ?? 0, shape.cy ?? 0, shape.r ?? 1, flags);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+function createDungeonSnapshot(blueprint, kernel) {
+  const snap = kernel.snapshot();
+  const rooms = Array.isArray(blueprint.rooms)
+    ? blueprint.rooms.map((room, idx) => ({
+        key: room.key ?? `room-${idx}`,
+        width: room.width ?? 0,
+        height: room.height ?? 0,
+        center: room.center ? { x: room.center.x ?? 0, y: room.center.y ?? 0 } : { x: 0, y: 0 },
+      }))
+    : [];
+  return {
+    seed: snap.seed,
+    mbrVersion: snap.mbrVersion,
+    moveVersion: snap.moveVersion,
+    occlVersion: snap.occlVersion,
+    mbr: snap.mbr
+      ? { minX: snap.mbr.minX, minY: snap.mbr.minY, maxX: snap.mbr.maxX, maxY: snap.mbr.maxY }
+      : null,
+    primitives: snap.primitives.map((p) => ({ ...p })),
+    meta: {
+      levelId: LEVEL_ID,
+      floorId: blueprint.id,
+      label: blueprint.label,
+      room: rooms[0] ? { ...rooms[0] } : null,
+      rooms,
+    },
+    options: snap.options ? { ...snap.options } : null,
+  };
+}
+
+function cloneSnapshot(snapshot) {
+  return {
+    seed: snapshot.seed,
+    mbrVersion: snapshot.mbrVersion,
+    moveVersion: snapshot.moveVersion,
+    occlVersion: snapshot.occlVersion,
+    mbr: snapshot.mbr
+      ? { minX: snapshot.mbr.minX, minY: snapshot.mbr.minY, maxX: snapshot.mbr.maxX, maxY: snapshot.mbr.maxY }
+      : null,
+    primitives: Array.isArray(snapshot.primitives)
+      ? snapshot.primitives.map((prim) => ({ ...prim }))
+      : [],
+    meta: snapshot.meta ? JSON.parse(JSON.stringify(snapshot.meta)) : null,
+    options: snapshot.options ? { ...snapshot.options } : null,
+  };
+}
+
+function makePortalTransforms(portal) {
+  const center = portal.center ?? { x: 0, y: 0 };
+  const rotation = Number.isFinite(portal.rotation) ? portal.rotation : 0;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  return {
+    forward: {
+      apply(point) {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        const rx = cos * dx - sin * dy;
+        const ry = sin * dx + cos * dy;
+        return { x: center.x + rx, y: center.y + ry };
+      },
+    },
+    inverse: {
+      apply(point) {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        const rx = cos * dx + sin * dy;
+        const ry = -sin * dx + cos * dy;
+        return { x: center.x + rx, y: center.y + ry };
+      },
+    },
+  };
+}
+
+function ensurePlayer(world, spawn, floorId) {
   const existing = playerEntity(world);
   if (existing) {
-    world.set(existing.id, Position, { x: center.x, y: center.y });
-    const facing = world.get(existing.id, Facing);
-    if (facing) {
-      world.set(existing.id, Facing, { x: 1, y: 0 });
-    }
-    return;
-  }
-  createPlayer(world, { x: center.x, y: center.y, name: "Hero" });
-}
-
-function placeDoors(world, positions) {
-  const eps = 0.25;
-  for (const p of positions) {
-    const doorX = p.x;
-    const doorY = p.y;
-    let existingDoorId = null;
-    for (const [id, pos] of world.query(Position, DoorState)) {
-      if (!pos) continue;
-      if (Math.abs(pos.x - doorX) < eps && Math.abs(pos.y - doorY) < eps) {
-        existingDoorId = id;
-        break;
-      }
-    }
-    if (existingDoorId != null) {
-      world.set(existingDoorId, Position, { x: doorX, y: doorY });
-      world.set(existingDoorId, DoorState, { open: false, locked: false });
-      const collider = world.get(existingDoorId, Collider);
-      if (collider) {
-        world.set(existingDoorId, Collider, { ...collider, solid: true, blocksSight: true });
-      }
+    world.set(existing.id, Position, { x: spawn.x, y: spawn.y });
+    const floorRef = world.get(existing.id, FloorRef);
+    if (floorRef) {
+      floorRef.floorId = floorId;
+      floorRef.altitude = 0;
     } else {
-      createFrom(world, Door, { x: doorX, y: doorY });
+      world.add(existing.id, FloorRef, { floorId, altitude: 0 });
     }
+    return existing.id;
   }
+  const id = createPlayer(world, { x: spawn.x, y: spawn.y, name: "Delver" });
+  world.add(id, FloorRef, { floorId, altitude: 0 });
+  return id;
 }
 
-function placeSpikeTrap(world, rooms) {
-  const north = rooms?.north ?? rooms.main;
-  const at = { x: north.center.x, y: north.center.y + 3 };
-  const trap = world.create();
-  world.add(trap, Position, { x: at.x, y: at.y });
-  world.add(trap, Trap, { type: "spike", revealed: false, armed: true, script: 'trap_spike', params: { percent: 0.25 } });
-  // No NamedIdentity initially; added on trigger to reveal '^'
-}
-
-function placeBowRoomPotion(world, rooms) {
-  const north = rooms?.north ?? rooms.main;
-  const pos = { x: north.center.x + 1.5, y: north.center.y }; // a tile to the right of the bow
-  const p = createFrom(world, HealthPotion, {});
-  world.add(p, Position, pos);
-}
-
-function grantInitialShield(world) {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const ae = world.get(pe.id, ActiveEffects);
-  if (ae && Array.isArray(ae.effects)) {
-    ae.effects.push({ key: "invulnerable", turnsLeft: 10, potency: 1 });
-  } else {
-    world.add(pe.id, ActiveEffects, {
-      effects: [{ key: "invulnerable", turnsLeft: 10, potency: 1 }]
+function placeFloorLights(world, blueprint) {
+  if (!Array.isArray(blueprint.lights)) return;
+  for (const light of blueprint.lights) {
+    const entity = world.create();
+    world.add(entity, Position, {
+      x: light.position?.x ?? 0,
+      y: light.position?.y ?? 0,
+    });
+    world.add(entity, FloorRef, { floorId: blueprint.id, altitude: 0 });
+    world.add(entity, LightSource, {
+      radius: light.radius ?? 5,
+      intensity: light.intensity ?? 1,
+      color: light.color ?? "#ffffff",
+      flicker: light.flicker ?? 0.1,
+      style: light.style ?? "omni",
+      emitter: light.emitter ?? null,
     });
   }
 }
 
-function placeSpellbook(world, room) {
-  const { center } = room;
-  const book = world.create();
-  world.add(book, NamedIdentity, { name: "Spellbook of Lightning", identity: "book_lightning" });
-  world.add(book, Position, { x: center.x + 2, y: center.y + 1.5 });
-  world.add(book, ItemInfo, {
-    type: "learn",
-    slot: "brain",
-    description: "Teaches Lightning.",
-    weight: 1,
-    value: 0,
-    count: 1,
-    rarity: 1,
-    rarityName: "rare",
+function placeFloorMarker(world, blueprint) {
+  const marker = world.create();
+  world.add(marker, Position, { x: blueprint.spawn.x, y: blueprint.spawn.y - 1.5 });
+  world.add(marker, FloorRef, { floorId: blueprint.id, altitude: 0 });
+  world.add(marker, NamedIdentity, {
+    name: blueprint.label,
+    identity: `marker_floor_${blueprint.id}`,
   });
-
-  // New: Meteor spellbook
-  const book2 = world.create();
-  world.add(book2, NamedIdentity, { name: "Spellbook of Meteor", identity: "book_meteor" });
-  world.add(book2, Position, { x: center.x - 2, y: center.y + 1.5 });
-  world.add(book2, ItemInfo, {
-    type: "learn",
-    slot: "brain",
-    description: "Teaches Meteor.",
-    weight: 1,
-    value: 0,
-    count: 1,
-    rarity: 1,
-    rarityName: "rare",
-  });
-}
-
-function placeBlastwaveScroll(world, room) {
-  const { center } = room;
-  const scroll = world.create();
-  world.add(scroll, NamedIdentity, { name: "Scroll of Blast Wave", identity: "scroll_blastwave" });
-  world.add(scroll, Position, { x: center.x, y: center.y - 2 });
-  world.add(scroll, ItemInfo, {
-    type: "scroll",
-    slot: "bag",
-    description: "Casts Blast Wave without learning it.",
-    weight: 0.1,
-    value: 0,
-    count: 1,
-    rarity: 1,
-    rarityName: "rare",
-  });
-}
-
-function placeTorch(world, room) {
-  const { center, halfWidth, halfHeight } = room;
-  const torch = world.create();
-  const offsetX = center.x + (halfWidth - 1.2);
-  const offsetY = center.y - (halfHeight - 1.2);
-  world.add(torch, NamedIdentity, { name: "Wall Torch", identity: "torch" });
-  world.add(torch, Position, { x: offsetX, y: offsetY });
-  world.add(torch, LightSource, {
-    radius: 7.5,
-    intensity: 1.0,
-    color: "#ffb36b",
-    flicker: 0.45,
-    style: "torch",
-    emitter: "torch",
-  });
-}
-
-function setPlayerStats(world) {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 1 });
-  world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
-  // Ensure intelligence comfortably above any spell thresholds
-  try { world.mutate(pe.id, Brain, (r) => { r.intelligence = Math.max(16, Number(r.intelligence || 0)); }); } catch {}
-}
-
-function dropPotions(world, room) {
-  const { center } = room;
-  const p1 = createFrom(world, HealthPotion, {});
-  world.add(p1, Position, { x: center.x + 2.5, y: center.y });
-  const p2 = createFrom(world, HealthPotion, {});
-  world.add(p2, Position, { x: center.x - 2.5, y: center.y });
-}
-
-function dropGold(world, room) {
-  const { center } = room;
-  const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
-  const coins = rng.int(12, 47);
-  const gold = createFrom(world, GoldStack, {});
-  world.add(gold, Position, { x: center.x - 1, y: center.y - 1 });
-  world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
-}
-
-function dropArrows(world, room) {
-  const { center } = room;
-  const arrows = createFrom(world, ArrowsStack, {});
-  world.add(arrows, Position, { x: center.x + 1.5, y: center.y - 1.5 });
-}
-
-function spawnMonsters(world, room) {
-  const { center } = room;
-  // Place a single spawner instead of static monsters for testing
-  createFrom(world, Spawner, {
-    x: center.x + 2,
-    y: center.y,
-    name: "Monster Spawner",
-    maxConcurrent: 3,
-    cooldownTicks: 20,
-    totalToSpawn: 15,
-    spawnRadius: 0.75,
-    spawnParams: { name: "Goblin", identity: "monster" }
-  });
-}
-
-function dropEquipment(world, mainRoom, rooms) {
-  const { center, halfWidth, halfHeight } = mainRoom;
-  const eqSword = buildEquipmentItem(world, "sword_plain", { affixes: ["fierce"] });
-  world.add(eqSword, Position, { x: center.x - (halfWidth - 2), y: center.y - (halfHeight - 2) });
-
-  // Put armor in the east room if present
-  const east = rooms?.east ?? mainRoom;
-  const armorPos = {
-    x: east.center.x + (east.halfWidth - 2),
-    y: east.center.y + (east.halfHeight - 2),
-  };
-  const thornArmor = buildEquipmentItem(world, "chain_armor", { affixes: ["thorns1"] });
-  world.add(thornArmor, Position, armorPos);
-
-  // Wooden bow in the north room if present
-  const north = rooms?.north ?? mainRoom;
-  const woodBow = buildEquipmentItem(world, "bow_wood", {});
-  world.add(woodBow, Position, { x: north.center.x, y: north.center.y });
 }
