@@ -1,3 +1,5 @@
+NEWS: hopefully a release tomorrow.
+
 # JS-Hack
 
 A hackable, zero-dependency, browser-based like engine built with pure JavaScript and a Entity-Component-System (ECS) architecture. Designed for experimentation and exploration.
