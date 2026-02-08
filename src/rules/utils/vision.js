@@ -5,6 +5,7 @@ import { Position } from '../components/Position.js';
 import { Collider } from '../components/Collider.js';
 import { isOpaque } from '../environment/dungeon/tileMap.js';
 import { CHUNK_SIZE } from '../environment/dungeon/constants.js';
+import { forEachInRect } from './spatialIndex.js';
 
 /**
  * Build a chunked mask of tiles that block vision (doors, etc.).
@@ -13,8 +14,16 @@ import { CHUNK_SIZE } from '../environment/dungeon/constants.js';
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @returns {Map<string, Uint8Array>}
  */
-export function buildBlocksVisionMap(world) {
+export function buildBlocksVisionMap(world, bounds = null) {
   const blocked = new Map();
+  if (bounds && typeof bounds === 'object') {
+    const { x0, y0, x1, y1 } = bounds;
+    forEachInRect(world, x0, y0, x1, y1, (id, pos) => {
+      const col = world.get(id, Collider);
+      if (col && col.blocksSight) _set(blocked, pos.x, pos.y);
+    });
+    return blocked;
+  }
   for (const [id, pos, col] of world.query(Position, Collider)) {
     if (col && col.blocksSight) _set(blocked, pos.x, pos.y);
   }
