@@ -10,6 +10,8 @@ export const basePalette = {
   wall: { glyph: "#", fg: "#99a", glow: "#667" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
+  stair_down: { glyph: ">", fg: "#ccc", glow: "#888" },
+  stair_up:   { glyph: "<", fg: "#ccc", glow: "#888" },
   gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
   // Potions
   potion_health: { glyph: "🧪", fg: "#66ff99", glow: "#5cff9a" },

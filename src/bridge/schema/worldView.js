@@ -55,6 +55,9 @@ export function buildWorldView(world) {
 		} else if (!terrain && !door) {
 			// fall back to identity for creatures/items
 			kind = ident?.identity || ident?.name || "default";
+		} else if (terrain && ident && ident.identity && ident.identity !== "default") {
+			// Terrain entities with explicit identity (stairs, special tiles)
+			kind = ident.identity;
 		}
 
 		/** @type {EntityView|null} */

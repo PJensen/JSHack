@@ -33,6 +33,14 @@ export function InteractionSystem(world, actor, targetId) {
         case "readText":
             world.emit("interaction", { actor, targetId, action: "readText", textId: inter.params?.textId });
             break;
+
+        case "descendStair":
+        case "ascendStair":
+            world.emit?.("stair:traverse", {
+                actor, targetId,
+                direction: inter.action === "descendStair" ? "down" : "up",
+            });
+            break;
     }
     return true;
 }
