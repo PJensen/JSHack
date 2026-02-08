@@ -2,7 +2,7 @@
 // Register rules systems into phases and set the world scheduler.
 
 import { composeScheduler, registerSystem, clearSystems, getOrderedSystems } from "../../src/lib/ecs-js/index.js";
-/** @typedef {import('../../src/lib/ecs-js').World} World */
+/** @typedef {import('../../src/lib/ecs-js/index.js').World} World */
 import { drinkSystem } from "../../src/rules/systems/drinkSystem.js";
 import { itemPickupSystem, autoPickupPostMoveSystem } from "../../src/rules/systems/itemPickupSystem.js";
 import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";

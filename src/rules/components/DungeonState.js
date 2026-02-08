@@ -10,4 +10,5 @@ export const DungeonState = defineComponent('DungeonState', {
   playerChunkX: 0,
   playerChunkY: 0,
   chunkLoadRadius: 2,
+  chunkLoadBudget: 2, // max chunks to generate per tick
 });

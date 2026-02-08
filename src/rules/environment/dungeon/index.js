@@ -22,7 +22,7 @@ import { CHUNK_SIZE } from './constants.js';
  * inside the first room of the origin chunk.
  * The chunkManagementSystem will load/materialize chunks on the next tick.
  *
- * @param {import('../../../lib/ecs-js').World} world
+ * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {Object} [opts]
  * @param {number} [opts.startDepth=1]
  * @returns {{ x: number, y: number }} spawn position for the player
@@ -49,6 +49,7 @@ export function initDungeon(world, opts = {}) {
     playerChunkX: Math.floor(spawnX / CHUNK_SIZE),
     playerChunkY: Math.floor(spawnY / CHUNK_SIZE),
     chunkLoadRadius: 2,
+    chunkLoadBudget: 2,
   });
 
   return { x: spawnX, y: spawnY };

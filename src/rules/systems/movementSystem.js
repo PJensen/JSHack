@@ -17,7 +17,7 @@ import { Vitality } from "../components/Vitality.js";
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function movementSystem(world) {
   // Build occupancy and terrain maps for quick blocking checks
   const blocking = new Map(); // key(x,y) -> true if non-walkable terrain, solid collider, or living occupant present

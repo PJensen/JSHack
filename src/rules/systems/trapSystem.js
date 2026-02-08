@@ -4,7 +4,7 @@ import { Trap } from "../components/Trap.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function trapSystem(world) {
   // Find the player
   let playerId = 0;

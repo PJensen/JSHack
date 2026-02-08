@@ -55,12 +55,14 @@ export function clearAll() {
  * @returns {number} tile type constant (TILE_VOID if unloaded)
  */
 export function getTile(x, y) {
-  const cx = Math.floor(x / CHUNK_SIZE);
-  const cy = Math.floor(y / CHUNK_SIZE);
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const cx = Math.floor(xi / CHUNK_SIZE);
+  const cy = Math.floor(yi / CHUNK_SIZE);
   const tiles = _chunks.get(_key(cx, cy));
   if (!tiles) return TILE_VOID;
-  const lx = x - cx * CHUNK_SIZE;
-  const ly = y - cy * CHUNK_SIZE;
+  const lx = xi - cx * CHUNK_SIZE;
+  const ly = yi - cy * CHUNK_SIZE;
   return tiles[ly * CHUNK_SIZE + lx];
 }
 
@@ -91,11 +93,39 @@ export function isOpaque(x, y) {
  * @param {(x: number, y: number, tile: number) => void} callback
  */
 export function forEachTileInRect(x0, y0, x1, y1, callback) {
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const tile = getTile(x, y);
-      if (tile !== TILE_VOID) {
-        callback(x, y, tile);
+  if (x1 < x0) { const t = x0; x0 = x1; x1 = t; }
+  if (y1 < y0) { const t = y0; y0 = y1; y1 = t; }
+
+  const ix0 = Math.floor(x0);
+  const iy0 = Math.floor(y0);
+  const ix1 = Math.floor(x1);
+  const iy1 = Math.floor(y1);
+
+  const cx0 = Math.floor(ix0 / CHUNK_SIZE);
+  const cy0 = Math.floor(iy0 / CHUNK_SIZE);
+  const cx1 = Math.floor(ix1 / CHUNK_SIZE);
+  const cy1 = Math.floor(iy1 / CHUNK_SIZE);
+
+  for (let cy = cy0; cy <= cy1; cy++) {
+    const wy0 = cy * CHUNK_SIZE;
+    const ly0 = (cy === cy0) ? (iy0 - cy * CHUNK_SIZE) : 0;
+    const ly1 = (cy === cy1) ? (iy1 - cy * CHUNK_SIZE) : (CHUNK_SIZE - 1);
+
+    for (let cx = cx0; cx <= cx1; cx++) {
+      const tiles = _chunks.get(_key(cx, cy));
+      if (!tiles) continue;
+
+      const wx0 = cx * CHUNK_SIZE;
+      const lx0 = (cx === cx0) ? (ix0 - cx * CHUNK_SIZE) : 0;
+      const lx1 = (cx === cx1) ? (ix1 - cx * CHUNK_SIZE) : (CHUNK_SIZE - 1);
+
+      for (let ly = ly0; ly <= ly1; ly++) {
+        const row = ly * CHUNK_SIZE;
+        const wy = wy0 + ly;
+        for (let lx = lx0; lx <= lx1; lx++) {
+          const tile = tiles[row + lx];
+          if (tile !== TILE_VOID) callback(wx0 + lx, wy, tile);
+        }
       }
     }
   }
