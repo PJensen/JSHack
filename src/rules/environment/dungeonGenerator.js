@@ -117,18 +117,22 @@ export function generateDungeon(world, opts = {}) {
       // Horizontal: room to the east or west
       adjCx = dir.dx * (halfW + corridorLen + adjHalfW + 1);
       adjCy = rngRange(-2, 2);
-      corrFromX = dir.dx * (halfW + 1);
+      // Main room wall facing corridor (east wall = rw - halfW, west wall = -(halfW+1))
+      corrFromX = dir.dx > 0 ? (rw - halfW) : -(halfW + 1);
       corrFromY = 0;
-      corrToX = adjCx - dir.dx * (adjHalfW + 1);
+      // Adjacent room wall facing main (west wall = cx-halfW-1, east wall = cx+adjW-halfW)
+      corrToX = dir.dx > 0 ? (adjCx - adjHalfW - 1) : (adjCx + adjW - adjHalfW);
       corrToY = adjCy;
     } else {
       // Vertical: room to the north or south
       adjCx = rngRange(-2, 2);
       adjCy = dir.dy * (halfH + corridorLen + adjHalfH + 1);
       corrFromX = 0;
-      corrFromY = dir.dy * (halfH + 1);
+      // Main room wall facing corridor (south wall = rh - halfH, north wall = -(halfH+1))
+      corrFromY = dir.dy > 0 ? (rh - halfH) : -(halfH + 1);
       corrToX = adjCx;
-      corrToY = adjCy - dir.dy * (adjHalfH + 1);
+      // Adjacent room wall facing main (north wall = cy-halfH-1, south wall = cy+adjH-halfH)
+      corrToY = dir.dy > 0 ? (adjCy - adjHalfH - 1) : (adjCy + adjH - adjHalfH);
     }
 
     carveRoom(adjCx, adjCy, adjW, adjH);
