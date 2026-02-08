@@ -779,13 +779,24 @@ function render(worldView) {
   const vx1 = cam.x + viewHalfW + 1;
   const vy1 = cam.y + viewHalfH + 1;
 
-  // Pass 1: tiles from TileMap grid (direct viewport loop — no entity iteration)
+  // Pass 1: tiles from TileMap grid (3-state fog-of-war)
   if (worldView.tileGrid) {
+    const vis = worldView.visible;
+    const exp = worldView.explored;
     worldView.tileGrid.forEachTileInRect(
       Math.floor(vx0), Math.floor(vy0), Math.ceil(vx1), Math.ceil(vy1),
       (x, y, tile) => {
-        const kind = _tileKindMap[tile];
-        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+        const key = `${x},${y}`;
+        if (vis && vis.has(key)) {
+          const kind = _tileKindMap[tile];
+          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+        } else if (exp && exp.has(key)) {
+          bctx.globalAlpha = 0.35;
+          const kind = _tileKindMap[tile];
+          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+          bctx.globalAlpha = 1.0;
+        }
+        // unexplored: skip — background gradient is already black
       }
     );
   }
