@@ -4,19 +4,20 @@
 import { Position } from '../components/Position.js';
 import { Collider } from '../components/Collider.js';
 import { isOpaque } from '../environment/dungeon/tileMap.js';
+import { CHUNK_SIZE } from '../environment/dungeon/constants.js';
 
 /**
- * Build a Set of "x,y" keys for entities that block vision (doors, etc.).
+ * Build a chunked mask of tiles that block vision (doors, etc.).
  * Walls are handled by TileMap.isOpaque() — this only covers Collider.blocksSight.
  *
  * @param {import('../../lib/ecs-js/index.js').World} world
- * @returns {Set<string>}
+ * @returns {Map<string, Uint8Array>}
  */
 export function buildBlocksVisionMap(world) {
-  const blocked = new Set();
+  const blocked = new Map();
   for (const [id, pos] of world.query(Position)) {
     const col = world.get(id, Collider);
-    if (col && col.blocksSight) blocked.add(`${pos.x},${pos.y}`);
+    if (col && col.blocksSight) _set(blocked, pos.x, pos.y);
   }
   return blocked;
 }
@@ -24,9 +25,41 @@ export function buildBlocksVisionMap(world) {
 /**
  * Returns an isBlocked callback suitable for hasLOS / computeFOV.
  * Composes TileMap opacity (walls) with entity-based blocksSight (closed doors).
- * @param {Set<string>} blockedSet
+ * @param {Map<string, Uint8Array>} blockedMap
  * @returns {(x:number, y:number) => boolean}
  */
-export function blockedCallback(blockedSet) {
-  return (x, y) => isOpaque(x, y) || blockedSet.has(`${x},${y}`);
+export function blockedCallback(blockedMap) {
+  return (x, y) => isOpaque(x, y) || _has(blockedMap, x, y);
+}
+
+function _key(cx, cy) { return `${cx},${cy}`; }
+
+function _getChunk(map, cx, cy, create) {
+  const key = _key(cx, cy);
+  let chunk = map.get(key);
+  if (!chunk && create) {
+    chunk = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+    map.set(key, chunk);
+  }
+  return chunk;
+}
+
+function _set(map, x, y) {
+  const cx = Math.floor(x / CHUNK_SIZE);
+  const cy = Math.floor(y / CHUNK_SIZE);
+  const lx = x - cx * CHUNK_SIZE;
+  const ly = y - cy * CHUNK_SIZE;
+  if (lx < 0 || ly < 0 || lx >= CHUNK_SIZE || ly >= CHUNK_SIZE) return;
+  const chunk = _getChunk(map, cx, cy, true);
+  chunk[ly * CHUNK_SIZE + lx] = 1;
+}
+
+function _has(map, x, y) {
+  const cx = Math.floor(x / CHUNK_SIZE);
+  const cy = Math.floor(y / CHUNK_SIZE);
+  const lx = x - cx * CHUNK_SIZE;
+  const ly = y - cy * CHUNK_SIZE;
+  if (lx < 0 || ly < 0 || lx >= CHUNK_SIZE || ly >= CHUNK_SIZE) return false;
+  const chunk = _getChunk(map, cx, cy, false);
+  return !!(chunk && chunk[ly * CHUNK_SIZE + lx]);
 }

@@ -781,16 +781,15 @@ function render(worldView) {
 
   // Pass 1: tiles from TileMap grid (3-state fog-of-war)
   if (worldView.tileGrid) {
-    const vis = worldView.visible;
-    const exp = worldView.explored;
+    const isVisible = worldView.isVisible;
+    const isExplored = worldView.isExplored;
     worldView.tileGrid.forEachTileInRect(
       Math.floor(vx0), Math.floor(vy0), Math.ceil(vx1), Math.ceil(vy1),
       (x, y, tile) => {
-        const key = `${x},${y}`;
-        if (vis && vis.has(key)) {
+        if (isVisible && isVisible(x, y)) {
           const kind = _tileKindMap[tile];
           if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
-        } else if (exp && exp.has(key)) {
+        } else if (isExplored && isExplored(x, y)) {
           bctx.globalAlpha = 0.35;
           const kind = _tileKindMap[tile];
           if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
