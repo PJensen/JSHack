@@ -26,6 +26,12 @@
     "test:projectile": "deno run --allow-read tests/projectile.mjs",
     "test:interaction": "deno run --allow-read tests/interaction.mjs",
     "test:trap": "deno run --allow-read tests/trap.mjs",
-    "test:drink": "deno run --allow-read tests/drink.mjs"
+    "test:drink": "deno run --allow-read tests/drink.mjs",
+    "test:wait": "deno run --allow-read tests/wait.mjs",
+    "test:aiChase": "deno run --allow-read tests/aiChase.mjs",
+    "test:spawner": "deno run --allow-read tests/spawner.mjs",
+    "test:equipItem": "deno run --allow-read tests/equipItem.mjs",
+    "test:affixTrigger": "deno run --allow-read tests/affixTrigger.mjs",
+    "test:dataIntegrity": "deno run --allow-read tests/dataIntegrity.mjs"
   }
 }
