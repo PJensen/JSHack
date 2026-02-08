@@ -14,11 +14,14 @@ import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
-  // Build blocking map once per tick
+  const intents = world.query(RangedAttackIntent);
+  if (intents.count({ cheap: true }) === 0) return;
+
+  // Build blocking map once per tick when needed
   const blocked = buildBlocksVisionMap(world);
   const isBlocked = blockedCallback(blocked);
 
-  for (const [attacker, intent] of world.query(RangedAttackIntent)) {
+  for (const [attacker, intent] of intents) {
     const defender = intent.targetId | 0;
     if (!world.isAlive(defender)) { world.remove(attacker, RangedAttackIntent); continue; }
 

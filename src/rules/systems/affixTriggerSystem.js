@@ -7,6 +7,8 @@ import { AFFIX_DEFS } from '../data/affixes.js';
 import { Vitality } from '../components/Vitality.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 
+const AFFIX_TRIGGERS_KEY = Symbol.for('jshack.affixTriggers');
+
 function eachAffix(world, entityId, cb) {
   const eq = world.get(entityId, Equipment);
   if (!eq) return;
@@ -43,8 +45,9 @@ function makeCtx(world, base) {
 }
 
 export function installAffixTriggers(world) {
+  if (!world || world[AFFIX_TRIGGERS_KEY]) return;
   // Handle defender-side reactions on damage. Attacker-side hooks are applied by combatSystem for determinism.
-  world.on('damaged', ({ target, amount, source }) => {
+  const off = world.on('damaged', ({ target, amount, source }) => {
     const base = { attacker: source, defender: target, weaponId: 0, damage: amount, world };
     const ctxT = makeCtx(world, base);
     // defender affixes with onDamaged
@@ -54,4 +57,5 @@ export function installAffixTriggers(world) {
       }
     });
   });
+  world[AFFIX_TRIGGERS_KEY] = off;
 }
