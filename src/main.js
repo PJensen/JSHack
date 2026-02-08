@@ -490,6 +490,114 @@ world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex=0 }) =>
     startShake(cam, 4, 0.18);
   }
 });
+// Meteor impact VFX (world-space; display-only state)
+/** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
+const _meteorFx = [];
+world.on('spell:meteor', ({ actor, origin, radius }) => {
+  if (origin && Number.isFinite(origin.x)) {
+    _meteorFx.push({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.45, max: 0.45 });
+    startShake(cam, 7, 0.30);
+    // Fire particle burst
+    const N = 30;
+    for (let i = 0; i < N; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 1.0 + Math.random() * 2.5;
+      const life = 0.3 + Math.random() * 0.4;
+      fx.pool.spawn({
+        x: origin.x + (Math.random() - 0.5) * 0.4,
+        y: origin.y + (Math.random() - 0.5) * 0.4,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        ax: 0, ay: 0.8,
+        life,
+        size0: 0.25 + Math.random() * 0.15,
+        size1: 0.04,
+        r: 255, g: 140 + Math.random() * 80 | 0, b: 30,
+        a0: 0.95, a1: 0.0,
+        rot: 0, rotVel: 0
+      });
+    }
+  }
+});
+// Blastwave ring VFX (world-space; display-only state)
+/** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
+const _blastwaveFx = [];
+world.on('spell:blastwave', ({ actor, origin, knockbacks, radius }) => {
+  if (origin && Number.isFinite(origin.x)) {
+    _blastwaveFx.push({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.35, max: 0.35 });
+    startShake(cam, 5, 0.22);
+    // Radial particle burst
+    const N = 24;
+    for (let i = 0; i < N; i++) {
+      const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const spd = 2.0 + Math.random() * 1.5;
+      fx.pool.spawn({
+        x: origin.x, y: origin.y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        ax: 0, ay: 0,
+        life: 0.25 + Math.random() * 0.15,
+        size0: 0.18, size1: 0.03,
+        r: 200, g: 220, b: 255,
+        a0: 0.8, a1: 0.0,
+        rot: 0, rotVel: 0
+      });
+    }
+  }
+});
+// Proc VFX: vampiric life-steal
+world.on('proc:vampiric', ({ actor, target, amount }) => {
+  const apos = world.get(Number(actor || 0), Position);
+  const tpos = world.get(Number(target || 0), Position);
+  if (!apos) return;
+  ftext.addStatus(apos.x, apos.y - 0.3, 'LIFESTEAL', { color: '#ff4040', life: 0.6 });
+  if (tpos) {
+    const dx = apos.x - tpos.x, dy = apos.y - tpos.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    for (let i = 0; i < 6; i++) {
+      const spd = 1.5 + Math.random() * 1.0;
+      fx.pool.spawn({
+        x: tpos.x + (Math.random() - 0.5) * 0.3,
+        y: tpos.y + (Math.random() - 0.5) * 0.3,
+        vx: (dx / dist) * spd + (Math.random() - 0.5) * 0.5,
+        vy: (dy / dist) * spd + (Math.random() - 0.5) * 0.5,
+        ax: 0, ay: 0,
+        life: 0.35 + Math.random() * 0.15,
+        size0: 0.15, size1: 0.04,
+        r: 200, g: 50, b: 50,
+        a0: 0.85, a1: 0.0,
+        rot: 0, rotVel: 0
+      });
+    }
+  }
+});
+// Proc VFX: thorns retaliation
+world.on('proc:thorns', ({ actor, target }) => {
+  const tpos = world.get(Number(target || 0), Position);
+  if (!tpos) return;
+  ftext.addStatus(tpos.x, tpos.y - 0.3, 'THORNS', { color: '#78ff78', life: 0.6 });
+  for (let i = 0; i < 5; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 0.8 + Math.random() * 0.6;
+    fx.pool.spawn({
+      x: tpos.x, y: tpos.y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      ax: 0, ay: 0,
+      life: 0.2 + Math.random() * 0.15,
+      size0: 0.12, size1: 0.03,
+      r: 120, g: 255, b: 120,
+      a0: 0.9, a1: 0.0,
+      rot: 0, rotVel: 0
+    });
+  }
+});
+// Proc VFX: fierce bonus damage
+world.on('proc:fierce', ({ actor, target }) => {
+  const tpos = world.get(Number(target || 0), Position);
+  if (!tpos) return;
+  ftext.addStatus(tpos.x, tpos.y + 0.3, '+1', { color: '#ffa040', life: 0.4 });
+});
 world.on('spell:not-known', ({ actor, spellId }) => {
   log(`You don't know that spell${spellId?` [${spellId}]`:''}.`);
 });
@@ -856,7 +964,8 @@ function render(worldView) {
 
   // Spell bolt VFX (world-space additive glow)
   if (bctx) drawBoltEffects(bctx);
-
+  if (bctx) drawMeteorEffects(bctx);
+  if (bctx) drawBlastwaveEffects(bctx);
 
   // Particles (already in world space)
   fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
@@ -932,6 +1041,8 @@ function frame(now) {
   updateShake(cam, dtSec);
   // Display-only VFX lifetimes
   updateBoltFx(dtSec);
+  updateMeteorFx(dtSec);
+  updateBlastwaveFx(dtSec);
   ftext.step(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
