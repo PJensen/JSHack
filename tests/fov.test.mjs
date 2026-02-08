@@ -1,5 +1,5 @@
 import { assert } from "jsr:@std/assert";
-import { computeFOV, computeFOVKeys, packKey16 } from '../src/shared/math/fov.js';
+import { computeFOV, computeFOVKeys, computeFOVKeys32, packKey16, packKey32 } from '../src/shared/math/fov.js';
 
 Deno.test("origin tile is always visible", () => {
   const vis = computeFOV(5, 5, 10, () => false);
@@ -45,4 +45,11 @@ Deno.test("computeFOVKeys uses packed integer keys", () => {
   assert(vis.has(packKey16(0, 0)), 'origin packed key visible');
   assert(vis.has(packKey16(2, 0)), 'edge packed key visible');
   assert(!vis.has(packKey16(3, 0)), 'beyond radius not visible');
+});
+
+Deno.test("computeFOVKeys32 uses packed BigInt keys", () => {
+  const vis = computeFOVKeys32(0, 0, 2, () => false);
+  assert(vis.has(packKey32(0, 0)), 'origin packed key visible');
+  assert(vis.has(packKey32(2, 0)), 'edge packed key visible');
+  assert(!vis.has(packKey32(3, 0)), 'beyond radius not visible');
 });

@@ -107,6 +107,30 @@ export function unpackKey16(key) {
 }
 
 /**
+ * Pack two 32-bit signed coords into a 64-bit BigInt key.
+ * Note: valid range per axis is [-2147483648..2147483647].
+ * @param {number} x
+ * @param {number} y
+ * @returns {bigint}
+ */
+export function packKey32(x, y) {
+  const bx = BigInt.asIntN(32, BigInt(x));
+  const by = BigInt.asIntN(32, BigInt(y));
+  return (bx << 32n) | (by & 0xffffffffn);
+}
+
+/**
+ * Unpack a 64-bit BigInt key into [x,y].
+ * @param {bigint} key
+ * @returns {[number, number]}
+ */
+export function unpackKey32(key) {
+  const x = Number(BigInt.asIntN(32, key >> 32n));
+  const y = Number(BigInt.asIntN(32, key));
+  return [x, y];
+}
+
+/**
  * Compute FOV using packed integer keys in the output Set.
  * @param {number} ox
  * @param {number} oy
@@ -120,6 +144,27 @@ export function computeFOVKeys(ox, oy, radius, isBlocked, out) {
   visible.clear();
   computeFOV(ox, oy, radius, isBlocked, (x, y) => {
     visible.add(packKey16(x, y));
+  });
+  return visible;
+}
+
+/**
+ * Compute FOV using packed BigInt keys in the output Set.
+ * Example:
+ *   const visible = computeFOVKeys32(px, py, 8, isBlocked);
+ *   if (visible.has(packKey32(px + 1, py))) { /* tile is visible */ }
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} radius
+ * @param {(x:number, y:number)=>boolean} isBlocked
+ * @param {Set<bigint>=} out
+ * @returns {Set<bigint>}
+ */
+export function computeFOVKeys32(ox, oy, radius, isBlocked, out) {
+  const visible = out || new Set();
+  visible.clear();
+  computeFOV(ox, oy, radius, isBlocked, (x, y) => {
+    visible.add(packKey32(x, y));
   });
   return visible;
 }
