@@ -19,6 +19,10 @@ import { movementSystem } from "../../src/rules/systems/movementSystem.js";
 import { combatSystem } from "../../src/rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
+import { trapSystem } from "../../src/rules/systems/trapSystem.js";
+import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
+// Side-effect: registers trap script handlers at import time
+import "../../src/rules/scripts/traps.js";
 
 /**
  * @param {World} world
@@ -44,12 +48,16 @@ export function configureWorld(world) {
   registerSystem(combatSystem, 'intents');
   // Run pickup after movement so stepping onto items can pick them up immediately
   registerSystem(itemPickupSystem, 'intents');
+  // Traps trigger after movement (player steps onto trap tile)
+  registerSystem(trapSystem, 'intents');
 
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
+  // Spawners tick in the effects phase
+  registerSystem(monsterSpawnerSystem, 'effects');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');

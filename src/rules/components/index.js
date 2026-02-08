@@ -25,3 +25,5 @@ export { Vitality } from './Vitality.js';
 export { Settings } from './Settings.js';
 export { ScriptRef } from './ScriptRef.js';
 export { UseIntent } from './Intents/UseIntent.js';
+export { RangedAttackIntent } from './Intents/RangedAttackIntent.js';
+export { MonsterSpawner } from './MonsterSpawner.js';
