@@ -1121,6 +1121,81 @@ function drawBoltEffects(ctx) {
   ctx.restore();
 }
 
+// Update meteor/blastwave VFX lifetimes
+/** @param {number} dt */
+function updateMeteorFx(dt) {
+  for (let i = _meteorFx.length - 1; i >= 0; i--) {
+    _meteorFx[i].ttl -= dt;
+    if (_meteorFx[i].ttl <= 0) _meteorFx.splice(i, 1);
+  }
+}
+/** @param {number} dt */
+function updateBlastwaveFx(dt) {
+  for (let i = _blastwaveFx.length - 1; i >= 0; i--) {
+    _blastwaveFx[i].ttl -= dt;
+    if (_blastwaveFx[i].ttl <= 0) _blastwaveFx.splice(i, 1);
+  }
+}
+
+// Draw meteor impact effects under camera transform
+/** @param {CanvasRenderingContext2D} ctx */
+function drawMeteorEffects(ctx) {
+  if (!_meteorFx.length) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const m of _meteorFx) {
+    const t = 1 - m.ttl / m.max; // 0→1 over lifetime
+    // Phase 1: bright white impact flash
+    if (t < 0.15) {
+      const flashT = t / 0.15;
+      const flashR = 0.3 + flashT * (m.radius + 0.5);
+      const flashA = 0.7 * (1 - flashT);
+      ctx.fillStyle = `rgba(255,255,220,${flashA})`;
+      ctx.beginPath(); ctx.arc(m.x, m.y, flashR, 0, Math.PI * 2); ctx.fill();
+    }
+    // Phase 2: orange-red glow fading out
+    const glowA = 0.35 * (1 - t);
+    const glowR = m.radius * 0.8 + t * 0.5;
+    ctx.fillStyle = `rgba(255,120,40,${glowA})`;
+    ctx.beginPath(); ctx.arc(m.x, m.y, glowR, 0, Math.PI * 2); ctx.fill();
+    // Inner hot core
+    const coreA = 0.25 * (1 - t * t);
+    ctx.fillStyle = `rgba(255,200,100,${coreA})`;
+    ctx.beginPath(); ctx.arc(m.x, m.y, glowR * 0.4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Draw blastwave shockwave ring under camera transform
+/** @param {CanvasRenderingContext2D} ctx */
+function drawBlastwaveEffects(ctx) {
+  if (!_blastwaveFx.length) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const bw of _blastwaveFx) {
+    const t = 1 - bw.ttl / bw.max; // 0→1
+    // Expanding ring
+    const ringR = t * (bw.radius + 0.5);
+    const ringA = 0.6 * (1 - t);
+    ctx.strokeStyle = `rgba(180,210,255,${ringA})`;
+    ctx.lineWidth = 0.12 * (1 - t * 0.7);
+    ctx.beginPath(); ctx.arc(bw.x, bw.y, ringR, 0, Math.PI * 2); ctx.stroke();
+    // Inner filled disc (fades fast)
+    if (t < 0.4) {
+      const discA = 0.2 * (1 - t / 0.4);
+      ctx.fillStyle = `rgba(220,240,255,${discA})`;
+      ctx.beginPath(); ctx.arc(bw.x, bw.y, ringR * 0.6, 0, Math.PI * 2); ctx.fill();
+    }
+    // Bright center flash
+    if (t < 0.1) {
+      const cFlashA = 0.5 * (1 - t / 0.1);
+      ctx.fillStyle = `rgba(255,255,255,${cFlashA})`;
+      ctx.beginPath(); ctx.arc(bw.x, bw.y, 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 // --- Vitals HUD feed (HP/Mana) --------------------------------------------
 let _lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1 };
 function updateVitalsHUD() {
