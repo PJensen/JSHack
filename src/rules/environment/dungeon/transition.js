@@ -6,6 +6,7 @@ import { DungeonState } from '../../components/DungeonState.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { clearAll as clearTileMap } from './tileMap.js';
+import { clearExplored } from './exploredMap.js';
 
 /**
  * Transition the dungeon to a new depth.
@@ -21,8 +22,9 @@ import { clearAll as clearTileMap } from './tileMap.js';
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
  */
 export function transitionToDepth(world, newDepth, destinationPos) {
-  // Clear all tile data from TileMap
+  // Clear all tile data from TileMap and fog-of-war state
   clearTileMap();
+  clearExplored();
 
   // Unload all chunks
   const chunksToDestroy = [];
