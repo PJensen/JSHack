@@ -21,7 +21,6 @@ import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem
 import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
 import { trapSystem } from "../../src/rules/systems/trapSystem.js";
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
-import { chunkManagementSystem } from "../../src/rules/systems/chunkManagementSystem.js";
 // Side-effect: registers trap script handlers at import time
 import "../../src/rules/scripts/traps.js";
 
@@ -33,9 +32,6 @@ export function configureWorld(world) {
 
   // Install affix event listeners once per world
   installAffixTriggers(world);
-
-  // Phase: dungeon (chunk loading before anything else)
-  registerSystem(chunkManagementSystem, 'dungeon');
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -67,7 +63,7 @@ export function configureWorld(world) {
   registerSystem(cleanupSystem, 'cleanup');
 
   // Compose scheduler: order of phases matters
-  const baseScheduler = composeScheduler('dungeon', 'intents', 'effects', 'cleanup');
+  const baseScheduler = composeScheduler('intents', 'effects', 'cleanup');
   const profEnabled = shouldProfileRules();
   if (!profEnabled) {
     world.setScheduler(baseScheduler);
@@ -75,8 +71,8 @@ export function configureWorld(world) {
   }
 
   // Build profiled scheduler: measure per system and per phase using high-res timer
-  /** @type {Array<'dungeon'|'intents'|'effects'>} */
-  const phases = ['dungeon', 'intents', 'effects'];
+  /** @type {Array<'intents'|'effects'>} */
+  const phases = ['intents', 'effects'];
   /** @type {Record<string, Function[]>} */
   const phaseSystems = Object.create(null);
   for (const ph of phases) phaseSystems[ph] = getOrderedSystems(ph);

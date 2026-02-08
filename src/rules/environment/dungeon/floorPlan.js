@@ -57,11 +57,21 @@ export function generateFloorPlan(worldSeed, depth) {
     });
   }
 
+  // Derive chunk extent from stair positions + 1 chunk padding
+  const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
+  const extent = {
+    minCX: Math.min(...allChunkPositions.map(s => s.chunkX)) - 1,
+    maxCX: Math.max(...allChunkPositions.map(s => s.chunkX)) + 1,
+    minCY: Math.min(...allChunkPositions.map(s => s.chunkY)) - 1,
+    maxCY: Math.max(...allChunkPositions.map(s => s.chunkY)) + 1,
+  };
+
   return {
     depth,
     seed,
     downStairs,
     upStairs,
+    extent,
     difficultyMult: 1.0 + (depth - 1) * 0.15,
     theme: _pickTheme(rng, depth),
   };

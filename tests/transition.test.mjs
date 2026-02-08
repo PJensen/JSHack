@@ -2,10 +2,9 @@ import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';
-import { ChunkMeta } from '../src/rules/components/ChunkMeta.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
-import { chunkManagementSystem } from '../src/rules/systems/chunkManagementSystem.js';
 import { transitionToDepth } from '../src/rules/environment/dungeon/transition.js';
+import { initDungeon } from '../src/rules/environment/dungeon/index.js';
 import { loadedChunkCount, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 
 function makePlayerAt(world, x, y) {
@@ -15,45 +14,26 @@ function makePlayerAt(world, x, y) {
   return id;
 }
 
-function makeDungeonState(world, seed = 42, depth = 1) {
-  const id = world.create();
-  world.add(id, DungeonState, {
-    worldSeed: seed,
-    currentDepth: depth,
-    playerChunkX: 0,
-    playerChunkY: 0,
-    chunkLoadRadius: 1, // smaller radius for faster tests
-  });
-  return id;
-}
-
-function countChunks(world) {
-  let n = 0;
-  for (const [_id] of world.query(ChunkMeta)) n++;
-  return n;
-}
-
-Deno.test("transitionToDepth unloads all chunks", () => {
+Deno.test("transitionToDepth clears and regenerates floor", () => {
   clearAll();
   const world = new World({ seed: 42 });
-  makePlayerAt(world, 0, 0);
-  makeDungeonState(world, 42, 1);
+  const spawn = initDungeon(world);
+  makePlayerAt(world, spawn.x, spawn.y);
 
-  chunkManagementSystem(world);
-  assert(countChunks(world) > 0, 'chunks loaded before transition');
-  assert(loadedChunkCount() > 0, 'tileMap has data before transition');
+  const chunksFloor1 = loadedChunkCount();
+  assert(chunksFloor1 > 0, 'floor 1 has tile data');
 
   transitionToDepth(world, 2, { x: 10, y: 10 });
 
-  assert(countChunks(world) === 0, 'all chunks unloaded after transition');
-  assert(loadedChunkCount() === 0, 'tileMap cleared after transition');
+  const chunksFloor2 = loadedChunkCount();
+  assert(chunksFloor2 > 0, 'floor 2 has tile data after transition');
 });
 
 Deno.test("transitionToDepth updates DungeonState.currentDepth", () => {
   clearAll();
   const world = new World({ seed: 42 });
+  initDungeon(world);
   makePlayerAt(world, 0, 0);
-  makeDungeonState(world, 42, 1);
 
   transitionToDepth(world, 5, { x: 0, y: 0 });
 
@@ -65,8 +45,8 @@ Deno.test("transitionToDepth updates DungeonState.currentDepth", () => {
 Deno.test("transitionToDepth moves player to destination", () => {
   clearAll();
   const world = new World({ seed: 42 });
+  initDungeon(world);
   makePlayerAt(world, 0, 0);
-  makeDungeonState(world, 42, 1);
 
   transitionToDepth(world, 2, { x: 100, y: -50 });
 
@@ -79,8 +59,8 @@ Deno.test("transitionToDepth moves player to destination", () => {
 Deno.test("transitionToDepth emits dungeon:transitioned event", () => {
   clearAll();
   const world = new World({ seed: 42 });
+  initDungeon(world);
   makePlayerAt(world, 0, 0);
-  makeDungeonState(world, 42, 1);
 
   const events = [];
   world.on('dungeon:transitioned', e => events.push(e));
@@ -92,23 +72,16 @@ Deno.test("transitionToDepth emits dungeon:transitioned event", () => {
   assert(events[0].pos.x === 5 && events[0].pos.y === 5, 'correct pos');
 });
 
-Deno.test("chunks regenerate correctly on new floor after transition", () => {
+Deno.test("transitionToDepth updates floorEntityIds", () => {
   clearAll();
   const world = new World({ seed: 42 });
+  initDungeon(world);
   makePlayerAt(world, 0, 0);
-  makeDungeonState(world, 42, 1);
 
-  // Load floor 1
-  chunkManagementSystem(world);
-  const tileChunksFloor1 = loadedChunkCount();
-
-  // Transition to floor 2
   transitionToDepth(world, 2, { x: 0, y: 0 });
-  chunkManagementSystem(world);
-  const tileChunksFloor2 = loadedChunkCount();
 
-  // Both floors should have tile data
-  assert(tileChunksFloor1 > 0, 'floor 1 has tile data');
-  assert(tileChunksFloor2 > 0, 'floor 2 has tile data');
-  assert(countChunks(world) > 0, 'chunks loaded on floor 2');
+  for (const [_id, ds] of world.query(DungeonState)) {
+    assert(Array.isArray(ds.floorEntityIds), 'floorEntityIds is array');
+    assert(ds.floorEntityIds.length > 0, 'new floor has entities');
+  }
 });

@@ -1,53 +1,57 @@
 // rules/environment/dungeon/transition.js
 // Handles level transitions (ascending/descending stairs).
 
-import { ChunkMeta } from '../../components/ChunkMeta.js';
 import { DungeonState } from '../../components/DungeonState.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
+import { generateFloor } from './index.js';
 
 /**
  * Transition the dungeon to a new depth.
  *
  * Steps:
- * 1. Unload ALL loaded chunks (destroy tile/feature entities)
- * 2. Update DungeonState.currentDepth
- * 3. Move player to destination position
- * 4. chunkManagementSystem will load new chunks on next tick
+ * 1. Destroy all floor entities
+ * 2. Clear tile data and fog-of-war
+ * 3. Generate new floor
+ * 4. Move player to destination position
  *
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
  */
 export function transitionToDepth(world, newDepth, destinationPos) {
-  // Clear all tile data from TileMap and fog-of-war state
+  // Find dungeon state
+  let dungeonId = null;
+  let ds = null;
+  for (const [id, state] of world.query(DungeonState)) {
+    dungeonId = id;
+    ds = state;
+    break;
+  }
+
+  // Destroy all entities from the current floor
+  if (ds && Array.isArray(ds.floorEntityIds)) {
+    for (const eid of ds.floorEntityIds) {
+      try { world.destroy(eid); } catch (_) { /* already gone */ }
+    }
+  }
+
+  // Clear tile data and fog-of-war
   clearTileMap();
   clearExplored();
 
-  // Unload all chunks
-  const chunksToDestroy = [];
-  for (const [metaId, meta] of world.query(ChunkMeta)) {
-    chunksToDestroy.push({ metaId, entityIds: meta.entityIds });
-  }
-  for (const { metaId, entityIds } of chunksToDestroy) {
-    if (Array.isArray(entityIds)) {
-      for (const eid of entityIds) {
-        try { world.destroy(eid); } catch (_) { /* already gone */ }
-      }
-    }
-    try { world.destroy(metaId); } catch (_) { /* already gone */ }
-  }
+  // Generate the new floor
+  const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
+  const { entityIds } = generateFloor(world, worldSeed, newDepth);
 
   // Update dungeon state
-  for (const [dungeonId, _ds] of world.query(DungeonState)) {
+  if (dungeonId != null) {
     world.mutate(dungeonId, DungeonState, r => {
       r.currentDepth = newDepth;
-      r.playerChunkX = 0;
-      r.playerChunkY = 0;
+      r.floorEntityIds = entityIds;
     });
-    break;
   }
 
   // Move player to destination
