@@ -64,7 +64,7 @@ export function populateChunk(chunk, floorPlan, rng) {
 
 /**
  * Materialize a spawn point into an ECS entity.
- * @param {import('../../../lib/ecs-js').World} world
+ * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {SpawnPoint} spawn
  * @returns {number|null} entity ID
  */

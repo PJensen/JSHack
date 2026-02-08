@@ -1,6 +1,6 @@
 // rules/scripts/spells.js
 // Minimal spell script registry and runner (pure rules; deterministic).
-/** @typedef {import('../../lib/ecs-js').World} World */
+/** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
  * Register built-in spell scripts here. Handlers may mutate the world,

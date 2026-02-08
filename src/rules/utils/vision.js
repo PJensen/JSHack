@@ -9,7 +9,7 @@ import { isOpaque } from '../environment/dungeon/tileMap.js';
  * Build a Set of "x,y" keys for entities that block vision (doors, etc.).
  * Walls are handled by TileMap.isOpaque() — this only covers Collider.blocksSight.
  *
- * @param {import('../../lib/ecs-js').World} world
+ * @param {import('../../lib/ecs-js/index.js').World} world
  * @returns {Set<string>}
  */
 export function buildBlocksVisionMap(world) {

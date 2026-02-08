@@ -14,7 +14,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 /**
  * Collect all entities with Vitality and remove those whose hp <= 0.
  * Keep this system small and deterministic; drops/epitaphs/etc. can be layered later.
- * @param {import('../../lib/ecs-js').World} world
+ * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function cleanupSystem(world) {
   for (const [id, vit] of world.query(Vitality)) {

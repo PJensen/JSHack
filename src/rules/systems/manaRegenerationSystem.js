@@ -3,7 +3,7 @@ import { Mana } from '../components/Mana.js';
 
 /**
  * Increment mana up to maxMana using the component's manaRegen rate.
- * @param {import('../../lib/ecs-js').World} world
+ * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function manaRegenerationSystem(world) {
     for (const [entity, manaComp] of world.query(Mana)) {

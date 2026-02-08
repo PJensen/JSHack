@@ -13,7 +13,7 @@ import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 
-/** @param {import('../../lib/ecs-js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
+/** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
     const eq = world.get(entityId, Equipment);
     if (!eq) return;
@@ -28,7 +28,7 @@ function forEachAffix(world, entityId, fn) {
     }
 }
 
-/** @param {import('../../lib/ecs-js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
+/** @param {import('../../lib/ecs-js/index.js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
 function attachHelpers(world, base) {
     /** @param {string} k @param {number} v */
     base.addBonus = (k, v) => { if (k === 'damage') base.damage += v; };
@@ -53,7 +53,7 @@ function attachHelpers(world, base) {
     return base;
 }
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
         const defender = intent.targetId | 0;
