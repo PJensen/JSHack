@@ -27,21 +27,14 @@ import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
 import { Position } from "./rules/components/Position.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
-import { createFrom } from "./lib/ecs-js/archetype.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
-import { HealthPotion, GoldStack, ArrowsStack } from "./rules/archetypes/Items.js";
-import { FloorTile, WallTile } from "./rules/archetypes/Tiles.js";
-import { Door } from "./rules/archetypes/Door.js";
-import { Monster } from "./rules/archetypes/Creatures.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
-import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { getSpell } from "./rules/data/spells.js";
 import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
-import { createRng } from "./lib/ecs-js/rng.js";
 import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 import { FloatText } from "./display/passes/vfx/text/floatText.js";
@@ -159,36 +152,25 @@ function updateActiveSpellLabel() {
   try { window.dispatchEvent(new CustomEvent('ui:updateActiveSpellLabel', { detail: { id: _activeSpellId, name, cost, canCast } })); } catch {}
 }
 
-// ---- Demo scene: ensure a player exists and a couple items around ----------
-// Build a small dungeon room (10x10) centered at (0,0)
-const W = 10, H = 10;
-const ox = -((W - 1) >> 1), oy = -((H - 1) >> 1);
-// Door at the bottom wall center (compute before tile loop to skip placing a wall there)
-const doorPos = { x: 0, y: oy + (H - 1) };
+// ---- Dungeon initialization -------------------------------------------------
+import { initDungeon } from "./rules/environment/dungeon/index.js";
 
-for (let y = 0; y < H; y++) {
-  for (let x = 0; x < W; x++) {
-    const gx = ox + x, gy = oy + y;
-    const isBorder = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
-    if (isBorder) {
-      if (gx === doorPos.x && gy === doorPos.y) continue;
-      createFrom(world, WallTile, { x: gx, y: gy });
-    } else {
-      createFrom(world, FloorTile, { x: gx, y: gy });
-    }
-  }
-}
-// Add a single door at the bottom wall center
-createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
+// Initialize the procedural dungeon (chunks loaded by chunkManagementSystem each tick)
+const spawnPos = initDungeon(world);
 
-// Ensure a player exists at room center
+// Create player at the spawn position (center of first room in origin chunk)
 if (!playerEntity(world)) {
-  createPlayer(world, { x: 0, y: 0, name: "Hero" });
+  createPlayer(world, { x: spawnPos.x, y: spawnPos.y, name: "Hero" });
 }
-// Apply 10-turn invulnerability to the player at start
+
+// Set player stats
 {
   const pe = playerEntity(world);
   if (pe) {
+    // Mana and vitality
+    world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 1 });
+    world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
+    // 10-turn invulnerability at start
     const ae = world.get(pe.id, ActiveEffects);
     if (ae && Array.isArray(ae.effects)) {
       ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
@@ -197,101 +179,6 @@ if (!playerEntity(world)) {
     }
   }
 }
-
-// Give the player a starting Spellbook of Lightning
-// {
-//   const pe = playerEntity(world);
-//   if (pe) {
-
-//     // const inv = world.get(pe.id, Inventory);
-//     // if (inv && Array.isArray(inv.items)) inv.items.push(book);
-//   }
-// }
-
-
-// add a spellbook of lightning to the world
-const pe = playerEntity(world);
-const book = world.create();
-world.add(book, NamedIdentity, { name: 'Spellbook of Lightning', identity: 'book_lightning' });
-world.add(book, Position, { x: 4, y: 4 });
-world.add(book, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Lightning.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
-
-// set players basic mana/vitality stats
-if (pe) {
-  world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 1 });
-  // Vitality uses hp/maxHp fields
-  world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
-}
-
-// Drop a couple of health potions on the floor
-const p1 = createFrom(world, HealthPotion, {});
-world.add(p1, Position, { x: 4, y: 0 });
-const p2 = createFrom(world, HealthPotion, {});
-world.add(p2, Position, { x: -3, y: 0 });
-
-// Spawn a stack of gold (currency) using deterministic RNG
-{
-  const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
-  const coins = rng.int(12, 47);
-  const gold = createFrom(world, GoldStack, {});
-  world.add(gold, Position, { x: -1, y: -1 });
-  world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
-}
-
-// Spawn a few monsters that will chase the player
-createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
-createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
-createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
-
-// Drop a sample equipment stack (sword + armor) to validate picker & palette wiring
-// Start with a slightly nastier sword: add a damage-boosting affix
-const eqSword = buildEquipmentItem(world, 'sword_plain', { affixes: ['fierce'] });
-world.add(eqSword, Position, { x: -3, y: -3 });
-
-// Place a chestpiece with Thorns affix in the bottom-left corner of the room (inside the walls)
-// Use the room bounds (ox, oy, W, H) defined above: bottom-left interior tile is (ox+1, oy+H-2)
-const thornArmor = buildEquipmentItem(world, 'chain_armor', { affixes: ['thorns1'] });
-world.add(thornArmor, Position, { x: ox + 1, y: oy + H - 2 });
-
-// // Add an Iron Pickaxe in the demo room
-// const eqPickaxe = buildEquipmentItem(world, 'iron_pickaxe', {});
-// world.add(eqPickaxe, Position, { x: 1, y: -1 });
-
-// ---- Playtest items: ranged, spells, equipment variety ----
-// Bow + arrows (top-right area)
-const eqBow = buildEquipmentItem(world, 'bow_short', {});
-world.add(eqBow, Position, { x: 3, y: -3 });
-const arrows = createFrom(world, ArrowsStack, {});
-world.add(arrows, Position, { x: 3, y: -2 });
-
-// Extra weapons (top-left area)
-const eqDagger = buildEquipmentItem(world, 'dagger_quick', {});
-world.add(eqDagger, Position, { x: -2, y: -3 });
-const eqAxe = buildEquipmentItem(world, 'axe_heavy', {});
-world.add(eqAxe, Position, { x: -1, y: -3 });
-
-// Shield + ring (right side)
-const eqShield = buildEquipmentItem(world, 'shield_wood', {});
-world.add(eqShield, Position, { x: 4, y: -2 });
-const eqRing = buildEquipmentItem(world, 'ring_health', {});
-world.add(eqRing, Position, { x: 0, y: -3 });
-
-// Spellbooks (bottom row, near lightning book at 4,4)
-const bookMeteor = world.create();
-world.add(bookMeteor, NamedIdentity, { name: 'Spellbook of Meteor', identity: 'book_meteor' });
-world.add(bookMeteor, Position, { x: 2, y: 4 });
-world.add(bookMeteor, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Meteor.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
-
-const bookBlast = world.create();
-world.add(bookBlast, NamedIdentity, { name: 'Spellbook of Blast Wave', identity: 'book_blastwave' });
-world.add(bookBlast, Position, { x: 3, y: 4 });
-world.add(bookBlast, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Blast Wave.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
-
-// Scroll of Blast Wave (single-use)
-const scrollBlast = world.create();
-world.add(scrollBlast, NamedIdentity, { name: 'Scroll of Blast Wave', identity: 'scroll_blastwave' });
-world.add(scrollBlast, Position, { x: 1, y: 4 });
-world.add(scrollBlast, ItemInfo, { type: 'scroll', slot: 'bag', description: 'Casts Blast Wave without learning it.', weight: 0.5, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -887,7 +774,7 @@ function render(worldView) {
   ctx.textBaseline = "middle";
 
   // Draw tiles first, then actors/items for layering without per-frame array allocs
-  const isTileKind = (k) => k === 'floor' || k === 'wall' || (typeof k === 'string' && k.startsWith('door_'));
+  const isTileKind = (k) => k === 'floor' || k === 'wall' || (typeof k === 'string' && (k.startsWith('door_') || k.startsWith('stair_')));
 
   // Set glyph height in world units once per frame (pre-transform px). With camera.scale=TILE_PX,
   // 1px here becomes TILE_PX on screen, matching tile size.
