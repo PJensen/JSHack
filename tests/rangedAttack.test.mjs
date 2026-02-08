@@ -7,8 +7,9 @@ import { Inventory } from '../src/rules/components/Inventory.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { RangedAttackIntent } from '../src/rules/components/Intents/RangedAttackIntent.js';
-import { Terrain } from '../src/rules/components/Terrain.js';
 import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
+import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 
 function makeBow(world) {
   const id = world.create();
@@ -39,14 +40,16 @@ function makeSword(world) {
   return id;
 }
 
-function makeWall(world, x, y) {
-  const id = world.create();
-  world.add(id, Position, { x, y });
-  world.add(id, Terrain, { walkable: false, opaque: true });
-  return id;
+/** Place a wall tile in the tileMap at (x,y) within a floor-filled chunk. */
+function placeWallInTileMap(x, y) {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[y * CHUNK_SIZE + x] = TILE_WALL;
+  loadChunk(0, 0, tiles);
 }
 
 function setup(opts = {}) {
+  clearAll(); // Reset tileMap between tests
   const world = new World({ seed: opts.seed || 99 });
   world.step = opts.step || 1;
 
@@ -119,7 +122,7 @@ Deno.test("ranged: no ammo → ranged:no-ammo emitted", () => {
 Deno.test("ranged: LOS blocked by wall → ranged:blocked emitted", () => {
   const events = [];
   const { world, archer, target } = setup();
-  makeWall(world, 3, 0);
+  placeWallInTileMap(3, 0); // Place wall after setup() since setup calls clearAll()
   trackEvents(world, events);
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);

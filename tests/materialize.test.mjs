@@ -4,58 +4,56 @@ import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { materializeChunk } from '../src/rules/environment/dungeon/materialize.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_VOID } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
-import { Terrain } from '../src/rules/components/Terrain.js';
 import { DoorState } from '../src/rules/components/DoorState.js';
 import { Collider } from '../src/rules/components/Collider.js';
 import { Interactable } from '../src/rules/components/Interactable.js';
+import { loadChunk, clearAll, isWalkable, isOpaque } from '../src/rules/environment/dungeon/tileMap.js';
 
-Deno.test("materializeChunk creates correct entity count", () => {
+Deno.test("materializeChunk creates correct entity count (doors + spawns only)", () => {
   const world = new World({ seed: 42 });
   const chunk = generateChunk(42, 1, 0, 0);
 
-  // Count non-void tiles (doors count as 2 entities: floor + door)
-  let expectedMin = 0;
+  // Only doors create entities (no stair opts passed, spawns empty from generateChunk)
+  let expectedDoors = 0;
   for (let i = 0; i < chunk.tiles.length; i++) {
-    const t = chunk.tiles[i];
-    if (t === TILE_FLOOR) expectedMin++;
-    else if (t === TILE_WALL) expectedMin++;
-    else if (t === TILE_DOOR) expectedMin += 2; // floor + door
+    if (chunk.tiles[i] === TILE_DOOR) expectedDoors++;
   }
 
   const ids = materializeChunk(world, chunk);
-  assert(ids.length === expectedMin, `entity count matches: expected ${expectedMin}, got ${ids.length}`);
+  assert(ids.length === expectedDoors, `entity count matches doors: expected ${expectedDoors}, got ${ids.length}`);
 });
 
-Deno.test("materialized floor tiles have correct Position and Terrain", () => {
-  const world = new World({ seed: 42 });
+Deno.test("tileMap reports floor tiles as walkable and non-opaque", () => {
+  clearAll();
   const chunk = generateChunk(42, 1, 0, 0);
-  const ids = materializeChunk(world, chunk);
+  loadChunk(0, 0, chunk.tiles);
 
   let floorCount = 0;
-  for (const id of ids) {
-    const pos = world.get(id, Position);
-    const ter = world.get(id, Terrain);
-    if (!ter) continue;
-    if (ter.walkable && !world.has(id, DoorState)) {
-      floorCount++;
-      assert(Number.isInteger(pos.x) && Number.isInteger(pos.y), 'floor has integer pos');
-      assert(ter.opaque === false, 'floor is not opaque');
+  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      if (chunk.tiles[ly * CHUNK_SIZE + lx] === TILE_FLOOR) {
+        floorCount++;
+        assert(isWalkable(lx, ly), `floor at (${lx},${ly}) is walkable`);
+        assert(!isOpaque(lx, ly), `floor at (${lx},${ly}) is not opaque`);
+      }
     }
   }
   assert(floorCount > 0, 'has floor tiles');
 });
 
-Deno.test("materialized wall tiles are not walkable and are opaque", () => {
-  const world = new World({ seed: 42 });
+Deno.test("tileMap reports wall tiles as not walkable and opaque", () => {
+  clearAll();
   const chunk = generateChunk(42, 1, 0, 0);
-  materializeChunk(world, chunk);
+  loadChunk(0, 0, chunk.tiles);
 
   let wallCount = 0;
-  for (const [id, pos] of world.query(Position)) {
-    const ter = world.get(id, Terrain);
-    if (ter && !ter.walkable && !world.has(id, DoorState)) {
-      wallCount++;
-      assert(ter.opaque === true, `wall at (${pos.x},${pos.y}) is opaque`);
+  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      if (chunk.tiles[ly * CHUNK_SIZE + lx] === TILE_WALL) {
+        wallCount++;
+        assert(!isWalkable(lx, ly), `wall at (${lx},${ly}) is not walkable`);
+        assert(isOpaque(lx, ly), `wall at (${lx},${ly}) is opaque`);
+      }
     }
   }
   assert(wallCount > 0, 'has wall tiles');
@@ -77,7 +75,6 @@ Deno.test("materialized doors have DoorState, Collider, and Interactable", () =>
     assert(ds.open === false, 'door starts closed');
   }
 
-  // Should match chunk.doors count
   assert(doorCount === chunk.doors.length, `door count matches: ${doorCount} vs ${chunk.doors.length}`);
 });
 

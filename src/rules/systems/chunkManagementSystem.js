@@ -11,6 +11,7 @@ import { populateChunk } from '../environment/dungeon/populate.js';
 import { generateFloorPlan } from '../environment/dungeon/floorPlan.js';
 import { chunkSeed } from '../environment/dungeon/seed.js';
 import { CHUNK_SIZE, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../environment/dungeon/constants.js';
+import { loadChunk as tileMapLoad, unloadChunk as tileMapUnload } from '../environment/dungeon/tileMap.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { StairDown, StairUp } from '../archetypes/Stairs.js';
 import { playerEntity } from '../utils/queries.js';
@@ -115,7 +116,10 @@ function _loadChunk(world, worldSeed, depth, cx, cy) {
   const popRng = createRng(popSeed >>> 0);
   chunkData.spawns = populateChunk(chunkData, floorPlan, popRng);
 
-  // Materialize tiles and spawns
+  // Register tile data in the analytic TileMap (O(1) lookups for systems)
+  tileMapLoad(cx, cy, chunkData.tiles);
+
+  // Materialize interactive entities only (doors, stairs, spawns)
   const stairOpts = {
     createStairDown: (w, x, y) => createFrom(w, StairDown, { x, y }),
     createStairUp: (w, x, y) => createFrom(w, StairUp, { x, y }),
@@ -134,6 +138,9 @@ function _loadChunk(world, worldSeed, depth, cx, cy) {
 }
 
 function _unloadChunk(world, metaId, meta) {
+  // Remove tile data from TileMap
+  tileMapUnload(meta.chunkX, meta.chunkY);
+
   // Destroy all entities belonging to this chunk
   if (Array.isArray(meta.entityIds)) {
     for (const eid of meta.entityIds) {

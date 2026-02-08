@@ -3,8 +3,8 @@
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { Terrain } from "../components/Terrain.js";
 import { Collider } from "../components/Collider.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { Interactable } from "../components/Interactable.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
@@ -25,10 +25,6 @@ export function movementSystem(world) {
   const occupants = new Map(); // key(x,y) -> entity id (first seen) for quick bump-checks
 
   for (const [id, pos] of world.query(Position)) {
-    const ter = world.get(id, Terrain);
-    if (ter && !ter.walkable) {
-      blocking.set(key(pos.x, pos.y), true);
-    }
     const col = world.get(id, Collider);
     if (col && col.solid) {
       blocking.set(key(pos.x, pos.y), true);
@@ -55,7 +51,7 @@ export function movementSystem(world) {
       const ny = pos.y + (intent.dy | 0);
       const k = key(nx, ny);
 
-      if (blocking.get(k)) {
+      if (!isWalkable(nx, ny) || blocking.get(k)) {
         // If there's an interactable (e.g., door), try to interact on bump instead of moving.
         const targetId = interactables.get(k);
         if (targetId) {
@@ -65,8 +61,6 @@ export function movementSystem(world) {
           let target = 0;
           for (const [eid, p] of world.query(Position)) {
             if (p.x !== nx || p.y !== ny) continue;
-            // Avoid terrain tiles
-            if (world.get(eid, Terrain)) continue;
             // Prefer living targets
             if (world.get(eid, Vitality)) { target = eid; break; }
             // Fallback to any non-terrain occupant if no living found yet
