@@ -1,5 +1,5 @@
 import { assert } from "jsr:@std/assert";
-import { computeFOV } from '../src/shared/math/fov.js';
+import { computeFOV, computeFOVKeys, packKey16 } from '../src/shared/math/fov.js';
 
 Deno.test("origin tile is always visible", () => {
   const vis = computeFOV(5, 5, 10, () => false);
@@ -38,4 +38,11 @@ Deno.test("reuse output set", () => {
   computeFOV(0, 0, 1, () => false, out);
   assert(out.has('0,0'), 'reused set has origin');
   assert(out.size > 0, 'reused set populated');
+});
+
+Deno.test("computeFOVKeys uses packed integer keys", () => {
+  const vis = computeFOVKeys(0, 0, 2, () => false);
+  assert(vis.has(packKey16(0, 0)), 'origin packed key visible');
+  assert(vis.has(packKey16(2, 0)), 'edge packed key visible');
+  assert(!vis.has(packKey16(3, 0)), 'beyond radius not visible');
 });
