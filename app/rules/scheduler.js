@@ -21,6 +21,7 @@ import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem
 import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
 import { trapSystem } from "../../src/rules/systems/trapSystem.js";
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
+import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
 // Side-effect: registers trap script handlers at import time
 import "../../src/rules/scripts/traps.js";
 
@@ -61,6 +62,8 @@ export function configureWorld(world) {
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');
+  // Keep spatial index in sync after structural changes
+  registerSystem(spatialIndexSystem, 'cleanup');
 
   // Compose scheduler: order of phases matters
   const baseScheduler = composeScheduler('intents', 'effects', 'cleanup');

@@ -25,6 +25,7 @@ import { StairDown, StairUp } from '../../archetypes/Stairs.js';
 import { CHUNK_SIZE, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
+import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 
 /**
  * Generate all chunks for a floor and materialize everything at once.
@@ -103,6 +104,7 @@ export function initDungeon(world, opts = {}) {
 
   clearTileMap();
   clearExplored();
+  clearSpatialIndex(world);
 
   const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, depth);
 

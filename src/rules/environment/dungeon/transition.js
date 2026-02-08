@@ -7,6 +7,7 @@ import { Player } from '../../components/Player.js';
 import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
 import { generateFloor } from './index.js';
+import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 
 /**
  * Transition the dungeon to a new depth.
@@ -41,6 +42,7 @@ export function transitionToDepth(world, newDepth, destinationPos) {
   // Clear tile data and fog-of-war
   clearTileMap();
   clearExplored();
+  clearSpatialIndex(world);
 
   // Generate the new floor
   const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
