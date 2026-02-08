@@ -12,15 +12,15 @@ import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getTile, forEachTileInRect } from '../../rules/environment/dungeon/tileMap.js';
 import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
-import { updateFOV, visible, explored } from '../../rules/environment/dungeon/exploredMap.js';
+import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[] }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, visible: Set<string>|null, explored: Set<string>|null }} WorldView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], tileGrid: null, visible: null, explored: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], tileGrid: null, isVisible: null, isExplored: null };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
@@ -28,6 +28,7 @@ const _solidRecs = new Map();    // id -> { id, x, y }
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
+let _lastFovStep = -1;
 
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -101,16 +102,18 @@ export function buildWorldView(world) {
 
 	// Compute FOV (once per turn, idempotent via step check in updateFOV)
 	if (_view.player) {
-		const brain = world.get(_view.player.id, Brain);
-		const radius = brain?.visionRange ?? 10;
-		const blockedSet = buildBlocksVisionMap(world);
-		const isBlocked = blockedCallback(blockedSet);
-		updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked);
+		if (_view.turn !== _lastFovStep) {
+			_lastFovStep = _view.turn;
+			const brain = world.get(_view.player.id, Brain);
+			const radius = brain?.visionRange ?? 10;
+			const blockedMap = buildBlocksVisionMap(world);
+			const isBlocked = blockedCallback(blockedMap);
+			updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked);
+		}
 	}
 
-	const vis = visible();
-	_view.visible = vis;
-	_view.explored = explored();
+	_view.isVisible = isVisible;
+	_view.isExplored = isExplored;
 
 	// Filter entities by FOV: only include visible entities + always include player
 	for (let i = 0; i < _allEntities.length; i++) {
@@ -119,8 +122,7 @@ export function buildWorldView(world) {
 			_view.entities.push(rec);
 			continue;
 		}
-		const key = `${rec.pos.x},${rec.pos.y}`;
-		if (vis.has(key)) {
+		if (isVisible(rec.pos.x, rec.pos.y)) {
 			_view.entities.push(rec);
 		}
 	}
