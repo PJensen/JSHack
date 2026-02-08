@@ -1,0 +1,26 @@
+{
+  "tasks": {
+    "test": "deno run --allow-read tests/blockMonsters.mjs && deno run --allow-read tests/invuln.mjs && deno run --allow-read tests/monsterPickupDrop.mjs && deno run --allow-read tests/inventory.mjs && deno run --allow-read tests/effects.mjs && deno run --allow-read tests/equipment.mjs && deno run --allow-read tests/equipIntent.mjs && deno run --allow-read tests/equipmentSystem.mjs && deno run --allow-read tests/combat.mjs && deno run --allow-read tests/validate.mjs && deno run --allow-read tests/learnSpell.mjs && deno run --allow-read tests/castSpell.mjs && deno run --allow-read tests/sanity.mjs && deno run --allow-read tests/autopickup.mjs && deno run --allow-read tests/fov.mjs && deno run --allow-read tests/gridLOS.mjs && deno run --allow-read tests/dungeon.mjs && deno run --allow-read tests/rangedAttack.mjs && deno run --allow-read tests/blastwave.mjs && deno run --allow-read tests/meteor.mjs && deno run --allow-read tests/deathCleanup.mjs",
+    "test:blockMonsters": "deno run --allow-read tests/blockMonsters.mjs",
+    "test:invuln": "deno run --allow-read tests/invuln.mjs",
+    "test:monsterPickupDrop": "deno run --allow-read tests/monsterPickupDrop.mjs",
+    "test:inventory": "deno run --allow-read tests/inventory.mjs",
+    "test:effects": "deno run --allow-read tests/effects.mjs",
+    "test:equipment": "deno run --allow-read tests/equipment.mjs",
+    "test:equipIntent": "deno run --allow-read tests/equipIntent.mjs",
+    "test:equipmentSystem": "deno run --allow-read tests/equipmentSystem.mjs",
+    "test:combat": "deno run --allow-read tests/combat.mjs",
+    "test:validate": "deno run --allow-read tests/validate.mjs",
+    "test:learnSpell": "deno run --allow-read tests/learnSpell.mjs",
+    "test:castSpell": "deno run --allow-read tests/castSpell.mjs",
+    "test:sanity": "deno run --allow-read tests/sanity.mjs",
+    "test:autopickup": "deno run --allow-read tests/autopickup.mjs",
+    "test:fov": "deno run --allow-read tests/fov.mjs",
+    "test:gridLOS": "deno run --allow-read tests/gridLOS.mjs",
+    "test:dungeon": "deno run --allow-read tests/dungeon.mjs",
+    "test:rangedAttack": "deno run --allow-read tests/rangedAttack.mjs",
+    "test:blastwave": "deno run --allow-read tests/blastwave.mjs",
+    "test:meteor": "deno run --allow-read tests/meteor.mjs",
+    "test:deathCleanup": "deno run --allow-read tests/deathCleanup.mjs"
+  }
+}
