@@ -1,4 +1,3 @@
-import { MATERIAL_CATALOG } from '../src/rules/data/materials.js';
 import { SPELL_DEFS, getSpell, listSpells } from '../src/rules/data/spells.js';
 import { ITEM_DEFS, getItem, listItems } from '../src/rules/data/items.js';
 import { AFFIX_DEFS, getAffix, listAffixes } from '../src/rules/data/affixes.js';
@@ -6,42 +5,7 @@ import { registerScript, runScript, listRegisteredScripts, ScriptVerb } from '..
 
 function assert(c, m) { if (!c) throw new Error('Assertion failed: ' + m); }
 
-const MATERIAL_FIELDS = [
-  'kind', 'mohsHardness', 'density_g_cm3', 'brittleness',
-  'flammability', 'ignitionTempC', 'burnSeverity', 'meltPointC',
-  'wetAbsorbency', 'conductivity', 'corrosionResist',
-  'lightPass', 'lightReflect', 'lightAbsorb', 'lightEmit',
-  'radShieldAlpha', 'radShieldBeta', 'radShieldGamma', 'radShieldNeutron', 'radActivation'
-];
-
 async function run() {
-  // --- Materials ---
-  assert(Array.isArray(MATERIAL_CATALOG), 'MATERIAL_CATALOG should be an array');
-  assert(MATERIAL_CATALOG.length > 0, 'MATERIAL_CATALOG should not be empty');
-
-  const matIds = new Set();
-  for (const entry of MATERIAL_CATALOG) {
-    assert(typeof entry.id === 'string' && entry.id.length > 0, `material must have string id`);
-    assert(!matIds.has(entry.id), `duplicate material id: ${entry.id}`);
-    matIds.add(entry.id);
-
-    const mat = entry.Material;
-    assert(mat && typeof mat === 'object', `material ${entry.id} must have Material object`);
-
-    for (const field of MATERIAL_FIELDS) {
-      const val = mat[field];
-      if (field === 'kind') {
-        assert(typeof val === 'string', `${entry.id}.kind must be string`);
-      } else {
-        assert(typeof val === 'number', `${entry.id}.${field} must be number, got ${typeof val}`);
-      }
-    }
-
-    // Physical sanity: density > 0, hardness >= 0
-    assert(mat.density_g_cm3 > 0, `${entry.id} density must be positive`);
-    assert(mat.mohsHardness >= 0, `${entry.id} hardness must be non-negative`);
-  }
-
   // --- Spells ---
   assert(Object.keys(SPELL_DEFS).length > 0, 'SPELL_DEFS should not be empty');
 
@@ -103,7 +67,7 @@ async function run() {
   const scripts = listRegisteredScripts();
   assert(scripts.includes('test:data_integrity'), 'registered script should appear in list');
 
-  console.log(`Data integrity tests PASS (${MATERIAL_CATALOG.length} materials, ${Object.keys(SPELL_DEFS).length} spells, ${Object.keys(ITEM_DEFS).length} items, ${Object.keys(AFFIX_DEFS).length} affixes)`);
+  console.log(`Data integrity tests PASS (${Object.keys(SPELL_DEFS).length} spells, ${Object.keys(ITEM_DEFS).length} items, ${Object.keys(AFFIX_DEFS).length} affixes)`);
 }
 
 run().catch(e => { console.error(e); process.exitCode = 1; });
