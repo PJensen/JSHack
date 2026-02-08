@@ -10,6 +10,7 @@ export const EQUIP_DEFS = {
   shield_wood:   { id:'shield_wood', name:'Wooden Shield', kind:'equip', slot:'shield', rarity:1, rarityName:'common', bonuses:{defense:1} },
   shield_iron:   { id:'shield_iron', name:'Iron Shield', kind:'equip', slot:'shield', rarity:2, rarityName:'magic', bonuses:{defense:2} },
   iron_pickaxe:  { id:'iron_pickaxe', name:'Iron Pickaxe', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{dig:1}, damageDice:'1d4' },
+  bow_short:     { id:'bow_short', name:'Short Bow', kind:'equip', slot:'weapon', subtype:'bow', rarity:1, rarityName:'common', bonuses:{attack:1}, damageDice:'1d6', range:8 },
 };
 
 // Helpers (rules-side, data only)
