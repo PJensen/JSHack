@@ -106,6 +106,7 @@ export function configureWorld(world) {
 }
 
 function shouldProfileRules() {
+  if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search || '');
   const v = (params.get('rulesProfile') || (typeof localStorage !== 'undefined' ? localStorage.getItem('jshack.rulesProfile') : '0') || '0');
   return v === '1' || v === 'true' || v === 'on';
