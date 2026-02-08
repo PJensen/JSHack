@@ -52,24 +52,22 @@ export function movementSystem(world) {
       const k = key(nx, ny);
 
       if (!isWalkable(nx, ny) || blocking.get(k)) {
-        // If there's an interactable (e.g., door), try to interact on bump instead of moving.
-        const targetId = interactables.get(k);
-        if (targetId) {
-          world.add(actor, InteractIntent, { targetId });
+        // Cheap bump-attack: prefer a living target with Vitality in the destination cell.
+        let target = 0;
+        for (const [eid, p] of world.query(Position)) {
+          if (p.x !== nx || p.y !== ny) continue;
+          // Prefer living targets
+          if (world.get(eid, Vitality)) { target = eid; break; }
+        }
+        const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
+        if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
+          // Living entity on tile: attack it (even if there's also a door/interactable)
+          try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
         } else {
-          // Cheap bump-attack: prefer a target with Vitality in the destination cell.
-          let target = 0;
-          for (const [eid, p] of world.query(Position)) {
-            if (p.x !== nx || p.y !== ny) continue;
-            // Prefer living targets
-            if (world.get(eid, Vitality)) { target = eid; break; }
-            // Fallback to any non-terrain occupant if no living found yet
-            if (!target) target = eid;
-          }
-          // Only allow bump-attacks from orthogonal adjacency (no diagonals)
-          const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
-          if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
-            try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+          // No living target — try interactable (e.g., closed door)
+          const targetId = interactables.get(k);
+          if (targetId) {
+            world.add(actor, InteractIntent, { targetId });
           }
         }
         // blocked: movement is consumed
