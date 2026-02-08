@@ -7,6 +7,7 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { installAffixTriggers } from '../src/rules/systems/affixTriggerSystem.js';
+import { Position } from '../src/rules/components/Position.js';
 
 function assert(c,m){ if(!c) throw new Error('Assertion failed: '+m); }
 
@@ -39,6 +40,10 @@ async function run() {
   const hero = makeActor(world, 'Hero', { weapon: sword }, 9);
   const foe  = makeActor(world, 'Goblin', { armor: thorns });
 
+  // Place actors adjacent so the melee range gate passes
+  world.add(hero, Position, { x: 1, y: 1 });
+  world.add(foe, Position, { x: 1, y: 2 });
+
   // derive
   equipmentSystem(world);
   // debug derived
@@ -55,14 +60,15 @@ async function run() {
   const fVit = world.get(foe, Vitality);
   console.log('DBG hp', { hero: hVit.hp, foe: fVit.hp });
 
-  // Expectations:
-  // base damage = 1 + attackDerived(2) = 3
-  // fierce (onBeforeHit) +1 -> 4
-  // defense 1 -> 3 dealt
-  // vamp1 heals attacker by floor(damage/3) => +1
-  // Thorns now has 20% proc chance on hit; hero HP can be 10 (no proc) or 8 (proc for 2)
-  assert(fVit.hp === 7, 'foe took 3 damage');
-  assert(hVit.hp === 10 || hVit.hp === 8, `hero HP after vamp + possible thorns should be 10 or 8, got ${hVit.hp}`);
+  // d20-based combat (seed=123):
+  // d20 + attackBonus(3) vs AC 11 → hit
+  // damage = 1d8 roll + flatBonus(floor(2/2)=1) = base
+  // fierce (onBeforeHit) +1
+  // vamp1 heals attacker floor(finalDmg/3)
+  // thorns1 20% proc → retaliate 2 to attacker
+  // With this seed: foe takes 5, hero 9 + 1(vamp) - 2(thorns) = 8
+  assert(fVit.hp === 5, `foe should be at 5 hp, got ${fVit.hp}`);
+  assert(hVit.hp === 8, `hero HP after vamp + thorns should be 8, got ${hVit.hp}`);
 
   console.log('Combat tests PASS');
 }
