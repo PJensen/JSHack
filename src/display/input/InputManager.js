@@ -111,6 +111,13 @@ export class InputManager {
       return;
     }
 
+    // Cast active spell: 'f'
+    if (key?.toLowerCase() === "f") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.CastActiveSpell));
+      return;
+    }
+
     // Pickup chooser (',' for get)
     if (key === ",") {
       e.preventDefault();
