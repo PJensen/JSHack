@@ -21,6 +21,7 @@ registerScript(AFFIX_THORNS, {
       const roll = rngInt(r, 1, 100);
       if (roll <= 20) {
         ctx.retaliate(2);
+        try { world.emit && world.emit('proc:thorns', { actor: ctx.defender, target: ctx.attacker }); } catch {}
         try {
           const ae = world.get(defender, ActiveEffects);
           if (ae && Array.isArray(ae.effects)) {
@@ -37,14 +38,17 @@ registerScript(AFFIX_THORNS, {
 });
 
 registerScript(AFFIX_VAMP, {
-  [ScriptVerb.AffixOnHit]: (_world, ctx) => {
-    ctx.healAttacker(Math.max(1, Math.floor(ctx.damage / 3)));
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    const amt = Math.max(1, Math.floor(ctx.damage / 3));
+    ctx.healAttacker(amt);
+    try { world.emit && world.emit('proc:vampiric', { actor: ctx.attacker, target: ctx.defender, amount: amt }); } catch {}
   },
 });
 
 registerScript(AFFIX_FIERCE, {
-  [ScriptVerb.AffixOnBeforeHit]: (_world, ctx) => {
+  [ScriptVerb.AffixOnBeforeHit]: (world, ctx) => {
     ctx.damage += 1;
+    try { world.emit && world.emit('proc:fierce', { actor: ctx.attacker, target: ctx.defender }); } catch {}
   },
 });
 
