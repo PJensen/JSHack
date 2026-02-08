@@ -8,8 +8,14 @@ import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { Inventory, ItemInfo, NamedIdentity } from '../src/rules/components/index.js';
 import { GoldStack } from '../src/rules/archetypes/Items.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
+import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 
 Deno.test("monster picks up gold and drops it on death", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+
   const world = new World({ seed: 999 });
   configureWorld(world);
 

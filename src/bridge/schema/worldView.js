@@ -4,20 +4,20 @@
 import { Position } from "../../rules/components/Position.js";
 import { Player } from "../../rules/components/Player.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { Terrain } from "../../rules/components/Terrain.js";
 import { DoorState } from "../../rules/components/DoorState.js";
 import { Collider } from "../../rules/components/Collider.js";
 import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
+import { getTile, forEachTileInRect } from '../../rules/environment/dungeon/tileMap.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[] }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[] }} WorldView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any }} WorldView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [] };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], tileGrid: null };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
@@ -36,28 +36,22 @@ export function buildWorldView(world) {
 	// emissives left as future use; keep empty
 	_view.emissives.length = 0;
 
+	// Expose tile grid functions for direct grid-based rendering
+	_view.tileGrid = { getTile, forEachTileInRect };
+
 	for (const [id, pos] of world.query(Position)) {
 		const isPlayer = world.has(id, Player);
 		/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
-		/** @type {any} */ const terrain = /** @type any */ (world.get(id, Terrain));
 		/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
 		/** @type {any} */ const col = /** @type any */ (world.get(id, Collider));
 
 		let kind = "default";
-		if (terrain) {
-			kind = terrain.walkable ? "floor" : "wall";
-		}
 		if (door) {
 			kind = door.open ? "door_open" : "door_closed";
-		}
-		if (isPlayer) {
+		} else if (isPlayer) {
 			kind = "player";
-		} else if (!terrain && !door) {
-			// fall back to identity for creatures/items
+		} else {
 			kind = ident?.identity || ident?.name || "default";
-		} else if (terrain && ident && ident.identity && ident.identity !== "default") {
-			// Terrain entities with explicit identity (stairs, special tiles)
-			kind = ident.identity;
 		}
 
 		/** @type {EntityView|null} */
@@ -94,8 +88,8 @@ export function buildWorldView(world) {
 			else { _view.player.id = id; _view.player.pos.x = pos.x; _view.player.pos.y = pos.y; }
 		}
 
-		// solids list for display/collision readers
-		if ((terrain && !terrain.walkable) || (col && col.solid)) {
+		// solids list for display/collision readers (entity-based only: doors)
+		if (col && col.solid) {
 			let srec = _solidRecs.get(id);
 			if (!srec) { srec = { id, x: pos.x, y: pos.y }; _solidRecs.set(id, srec); }
 			else { srec.x = pos.x; srec.y = pos.y; }
@@ -104,4 +98,3 @@ export function buildWorldView(world) {
 	}
 	return _view;
 }
-

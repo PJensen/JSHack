@@ -154,6 +154,8 @@ function updateActiveSpellLabel() {
 
 // ---- Dungeon initialization -------------------------------------------------
 import { initDungeon } from "./rules/environment/dungeon/index.js";
+import { TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from "./rules/environment/dungeon/constants.js";
+const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 'floor', [TILE_STAIR_DOWN]: 'stair_down', [TILE_STAIR_UP]: 'stair_up' };
 
 // Initialize the procedural dungeon (chunks loaded by chunkManagementSystem each tick)
 const spawnPos = initDungeon(world);
@@ -769,17 +771,7 @@ function render(worldView) {
   bctx.save();
   applyCamera(bctx, cam, back);
 
-  // Draw entities (glyph-based, mapped from kind/tags)
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Draw tiles first, then actors/items for layering without per-frame array allocs
-  const isTileKind = (k) => k === 'floor' || k === 'wall' || (typeof k === 'string' && (k.startsWith('door_') || k.startsWith('stair_')));
-
-  // Set glyph height in world units once per frame (pre-transform px). With camera.scale=TILE_PX,
-  // 1px here becomes TILE_PX on screen, matching tile size.
-  // We now use pre-rendered glyph bitmaps; font is not used for entities.
-  // Compute simple view bounds in world units for culling
+  // Compute view bounds in world units for culling
   const viewHalfW = W * 0.5 / (cam.scale || 1);
   const viewHalfH = H * 0.5 / (cam.scale || 1);
   const vx0 = cam.x - viewHalfW - 1; // add small margin
@@ -787,22 +779,23 @@ function render(worldView) {
   const vx1 = cam.x + viewHalfW + 1;
   const vy1 = cam.y + viewHalfH + 1;
 
-  // Pass 1: tiles
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
-    if (!isTileKind(e.kind)) continue;
-    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-  const k = (typeof e.kind === 'string') ? e.kind : 'default';
-  drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+  // Pass 1: tiles from TileMap grid (direct viewport loop — no entity iteration)
+  if (worldView.tileGrid) {
+    worldView.tileGrid.forEachTileInRect(
+      Math.floor(vx0), Math.floor(vy0), Math.ceil(vx1), Math.ceil(vy1),
+      (x, y, tile) => {
+        const kind = _tileKindMap[tile];
+        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+      }
+    );
   }
 
-  // Pass 2: non-tiles
+  // Pass 2: entities (doors, stairs, monsters, items, player)
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
-    if (isTileKind(e.kind)) continue;
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-  const k = (typeof e.kind === 'string') ? e.kind : 'default';
-  drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    const k = (typeof e.kind === 'string') ? e.kind : 'default';
+    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
     // Glyph-FX: show an invulnerability shimmer ring when tagged
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {

@@ -2,17 +2,17 @@ import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
-import { Terrain } from '../src/rules/components/Terrain.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { runSpellScript } from '../src/rules/scripts/spells.js';
+import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 
 const SPELL = { id: 'blastwave', name: 'Blast Wave', manaCost: 7, script: 'blastwave' };
 
-function makeWall(world, x, y) {
-  const id = world.create();
-  world.add(id, Position, { x, y });
-  world.add(id, Terrain, { walkable: false, opaque: true });
-  return id;
+/** Load a floor-filled chunk so isWalkable returns true for all positions in it. */
+function loadFloorChunk(cx = 0, cy = 0) {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  return { tiles, cx, cy };
 }
 
 function makeEntity(world, x, y, hp, faction) {
@@ -24,6 +24,10 @@ function makeEntity(world, x, y, hp, faction) {
 }
 
 Deno.test("blastwave: dist-1 pushed 2 tiles, dist-2 pushed 1 tile", () => {
+  clearAll();
+  const { tiles, cx, cy } = loadFloorChunk();
+  loadChunk(cx, cy, tiles);
+
   const world = new World({ seed: 1 });
   const caster = makeEntity(world, 5, 5, 20, 'player');
   const a = makeEntity(world, 6, 5, 20, 'enemy');
@@ -38,6 +42,10 @@ Deno.test("blastwave: dist-1 pushed 2 tiles, dist-2 pushed 1 tile", () => {
 });
 
 Deno.test("blastwave: push direction = sign away from caster", () => {
+  clearAll();
+  const { tiles, cx, cy } = loadFloorChunk();
+  loadChunk(cx, cy, tiles);
+
   const world = new World({ seed: 1 });
   const caster = makeEntity(world, 5, 5, 20, 'player');
   const left = makeEntity(world, 4, 5, 20, 'enemy');
@@ -52,6 +60,10 @@ Deno.test("blastwave: push direction = sign away from caster", () => {
 });
 
 Deno.test("blastwave: closer = pushed farther", () => {
+  clearAll();
+  const { tiles, cx, cy } = loadFloorChunk();
+  loadChunk(cx, cy, tiles);
+
   const world = new World({ seed: 1 });
   const caster = makeEntity(world, 5, 5, 20, 'player');
   const near = makeEntity(world, 5, 4, 20, 'enemy');
@@ -66,10 +78,15 @@ Deno.test("blastwave: closer = pushed farther", () => {
 });
 
 Deno.test("blastwave: cannot push through walls", () => {
+  clearAll();
+  // Load chunk with a wall at (7,5), floors everywhere else
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 7] = TILE_WALL; // (7,5) is wall
+  loadChunk(0, 0, tiles);
+
   const world = new World({ seed: 1 });
   const caster = makeEntity(world, 5, 5, 20, 'player');
   const target = makeEntity(world, 6, 5, 20, 'enemy');
-  makeWall(world, 7, 5);
 
   runSpellScript(world, caster, SPELL, {});
 
@@ -78,6 +95,7 @@ Deno.test("blastwave: cannot push through walls", () => {
 });
 
 Deno.test("blastwave: damage applied, attenuated by distance", () => {
+  clearAll();
   const world = new World({ seed: 1 });
   const caster = makeEntity(world, 5, 5, 20, 'player');
   const near = makeEntity(world, 6, 5, 20, 'enemy');
@@ -93,6 +111,7 @@ Deno.test("blastwave: damage applied, attenuated by distance", () => {
 });
 
 Deno.test("blastwave: caster not affected", () => {
+  clearAll();
   const world = new World({ seed: 1 });
   const caster = makeEntity(world, 5, 5, 20, 'player');
   makeEntity(world, 6, 5, 20, 'enemy');
@@ -106,6 +125,7 @@ Deno.test("blastwave: caster not affected", () => {
 });
 
 Deno.test("blastwave: spell:blastwave event emitted", () => {
+  clearAll();
   const world = new World({ seed: 1 });
   const events = [];
   world.on('spell:blastwave', (d) => events.push(d));
@@ -118,6 +138,7 @@ Deno.test("blastwave: spell:blastwave event emitted", () => {
 });
 
 Deno.test("blastwave: kill → died emitted", () => {
+  clearAll();
   const world = new World({ seed: 1 });
   const events = [];
   world.on('died', (d) => events.push(d));
