@@ -12,8 +12,8 @@ export const HealthPotion = defineArchetype(
         doses: 1,
         channels: [],
         effects: [
-            // A tiny regeneration-over-time example
-            { key: "regen", potency: 1, onset: 0, peak: 0, duration: 5, stack: "refresh" }
+            // Regeneration-over-time; potency resolved as % of max HP at use time (see drinkSystem)
+            { key: "regen", potency: 0, onset: 0, peak: 0, duration: 8, stack: "refresh", meta: { percentOfMaxHp: 0.03 } }
         ],
     }],
     [ItemInfo, {
@@ -37,4 +37,17 @@ export const GoldStack = defineArchetype(
         count: 1,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Gold", identity: "gold" })],
+);
+
+// Stackable arrows (ammo) — planning for ranged ammo consumption
+export const ArrowsStack = defineArchetype(
+    "ArrowsStack",
+    [ItemInfo, {
+        type: "ammo",
+        description: "A bundle of arrows.",
+        weight: 0.2,
+        value: 1,
+        count: 10,
+    }],
+    [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Arrows", identity: "ammo_arrows" })],
 );

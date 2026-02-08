@@ -18,6 +18,20 @@ export const SPELL_DEFS = {
     minIntelligence: 8,
     script: 'lightning',
   },
+  meteor: {
+    id: 'meteor',
+    name: 'Meteor',
+    manaCost: 12,
+    minIntelligence: 0,
+    script: 'meteor',
+  },
+  blastwave: {
+    id: 'blastwave',
+    name: 'Blast Wave',
+    manaCost: 7,
+    minIntelligence: 0,
+    script: 'blastwave',
+  },
 };
 
 /**
