@@ -1,18 +1,17 @@
 // rules/environment/dungeon/materialize.js
-// Converts a ChunkData tile map into ECS entities.
+// Creates ECS entities for interactive features (doors, stairs, spawns).
+// Floor and wall tiles are NOT entities — they live in the TileMap grid.
 
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
-import { FloorTile, WallTile } from '../../archetypes/Tiles.js';
 import { Door } from '../../archetypes/Door.js';
-import { Position } from '../../components/Position.js';
 import { materializeSpawn } from './populate.js';
 import {
-  CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR,
-  TILE_STAIR_DOWN, TILE_STAIR_UP,
+  CHUNK_SIZE, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from './constants.js';
 
 /**
- * Convert a ChunkData tile map into ECS entities.
+ * Create ECS entities for interactive tiles and spawn features.
+ * Floor/wall tiles are handled by the TileMap — no entities created for them.
  * @param {import('../../../lib/ecs-js').World} world
  * @param {import('./chunk.js').ChunkData} chunk
  * @param {Object} [opts]
@@ -33,38 +32,24 @@ export function materializeChunk(world, chunk, opts = {}) {
       const wy = oy + ly;
 
       switch (tile) {
-        case TILE_FLOOR:
-          ids.push(createFrom(world, FloorTile, { x: wx, y: wy }));
-          break;
-        case TILE_WALL:
-          ids.push(createFrom(world, WallTile, { x: wx, y: wy }));
-          break;
-        case TILE_DOOR: {
-          // Floor underneath + door on top
-          ids.push(createFrom(world, FloorTile, { x: wx, y: wy }));
+        case TILE_DOOR:
           ids.push(createFrom(world, Door, { x: wx, y: wy }));
           break;
-        }
-        case TILE_STAIR_DOWN: {
-          ids.push(createFrom(world, FloorTile, { x: wx, y: wy }));
+        case TILE_STAIR_DOWN:
           if (opts.createStairDown) {
             ids.push(opts.createStairDown(world, wx, wy));
           }
           break;
-        }
-        case TILE_STAIR_UP: {
-          ids.push(createFrom(world, FloorTile, { x: wx, y: wy }));
+        case TILE_STAIR_UP:
           if (opts.createStairUp) {
             ids.push(opts.createStairUp(world, wx, wy));
           }
           break;
-        }
-        // TILE_VOID: nothing
       }
     }
   }
 
-  // Materialize spawn points
+  // Materialize spawn points (monsters, items)
   for (const sp of chunk.spawns) {
     const eid = spawnFeature(world, sp);
     if (eid != null) ids.push(eid);

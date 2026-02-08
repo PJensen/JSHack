@@ -2,11 +2,11 @@ import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';
-import { Terrain } from '../src/rules/components/Terrain.js';
 import { ChunkMeta } from '../src/rules/components/ChunkMeta.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { chunkManagementSystem } from '../src/rules/systems/chunkManagementSystem.js';
 import { CHUNK_SIZE } from '../src/rules/environment/dungeon/constants.js';
+import { loadedChunkCount, clearAll, getTile, isWalkable } from '../src/rules/environment/dungeon/tileMap.js';
 
 function makePlayerAt(world, x, y) {
   const id = world.create();
@@ -33,15 +33,8 @@ function countChunks(world) {
   return count;
 }
 
-function countTerrain(world) {
-  let count = 0;
-  for (const [id] of world.query(Position)) {
-    if (world.has(id, Terrain)) count++;
-  }
-  return count;
-}
-
 Deno.test("chunkManagementSystem loads chunks around player", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
@@ -52,29 +45,30 @@ Deno.test("chunkManagementSystem loads chunks around player", () => {
   const chunks = countChunks(world);
   assert(chunks === 25, `expected 25 chunks, got ${chunks}`);
 
-  // Should have terrain entities
-  const terrain = countTerrain(world);
-  assert(terrain > 0, `expected terrain entities, got ${terrain}`);
+  // TileMap should have tile data loaded
+  assert(loadedChunkCount() > 0, `expected loaded tileMap chunks, got ${loadedChunkCount()}`);
 });
 
 Deno.test("chunkManagementSystem is idempotent (no duplicates on re-run)", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
 
   chunkManagementSystem(world);
   const chunks1 = countChunks(world);
-  const terrain1 = countTerrain(world);
+  const tileChunks1 = loadedChunkCount();
 
   chunkManagementSystem(world);
   const chunks2 = countChunks(world);
-  const terrain2 = countTerrain(world);
+  const tileChunks2 = loadedChunkCount();
 
   assert(chunks1 === chunks2, `chunk count stable: ${chunks1} vs ${chunks2}`);
-  assert(terrain1 === terrain2, `terrain count stable: ${terrain1} vs ${terrain2}`);
+  assert(tileChunks1 === tileChunks2, `tileMap chunk count stable: ${tileChunks1} vs ${tileChunks2}`);
 });
 
 Deno.test("moving player loads new chunks", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   const pid = makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
@@ -93,6 +87,7 @@ Deno.test("moving player loads new chunks", () => {
 });
 
 Deno.test("distant chunks are unloaded", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   const pid = makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
@@ -112,37 +107,42 @@ Deno.test("distant chunks are unloaded", () => {
 });
 
 Deno.test("regenerated chunk produces identical layout", () => {
+  clearAll();
   const world1 = new World({ seed: 42 });
   makePlayerAt(world1, 0, 0);
   makeDungeonState(world1, 42, 1);
   chunkManagementSystem(world1);
 
-  // Collect floor positions from chunk (0,0)
-  const floors1 = new Set();
-  for (const [id, pos] of world1.query(Position)) {
-    const ter = world1.get(id, Terrain);
-    if (ter && ter.walkable) floors1.add(`${pos.x},${pos.y}`);
+  // Collect walkable positions from chunk (0,0) via tileMap
+  const walkable1 = new Set();
+  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      if (isWalkable(lx, ly)) walkable1.add(`${lx},${ly}`);
+    }
   }
 
   // Create a fresh world and generate the same dungeon
+  clearAll();
   const world2 = new World({ seed: 42 });
   makePlayerAt(world2, 0, 0);
   makeDungeonState(world2, 42, 1);
   chunkManagementSystem(world2);
 
-  const floors2 = new Set();
-  for (const [id, pos] of world2.query(Position)) {
-    const ter = world2.get(id, Terrain);
-    if (ter && ter.walkable) floors2.add(`${pos.x},${pos.y}`);
+  const walkable2 = new Set();
+  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      if (isWalkable(lx, ly)) walkable2.add(`${lx},${ly}`);
+    }
   }
 
-  assert(floors1.size === floors2.size, `same floor count: ${floors1.size} vs ${floors2.size}`);
-  for (const k of floors1) {
-    assert(floors2.has(k), `floor at ${k} exists in both`);
+  assert(walkable1.size === walkable2.size, `same walkable count: ${walkable1.size} vs ${walkable2.size}`);
+  for (const k of walkable1) {
+    assert(walkable2.has(k), `walkable at ${k} exists in both`);
   }
 });
 
 Deno.test("no action when no DungeonState exists", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   // No DungeonState — system should do nothing
@@ -151,6 +151,7 @@ Deno.test("no action when no DungeonState exists", () => {
 });
 
 Deno.test("no action when no player exists", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makeDungeonState(world, 42, 1);
   // No player — system should do nothing

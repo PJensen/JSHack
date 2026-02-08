@@ -10,6 +10,7 @@ export { transitionToDepth } from './transition.js';
 export { populateChunk, materializeSpawn } from './populate.js';
 export { pickMonster, pickItem } from './tables.js';
 export { buildBSP, placeRooms, carveRooms, connectRooms, collectLeafRooms } from './bsp.js';
+export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isOpaque, forEachTileInRect, loadedChunkCount } from './tileMap.js';
 
 import { DungeonState } from '../../components/DungeonState.js';
 import { generateChunk } from './chunk.js';

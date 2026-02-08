@@ -2,11 +2,11 @@ import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';
-import { Terrain } from '../src/rules/components/Terrain.js';
 import { ChunkMeta } from '../src/rules/components/ChunkMeta.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { chunkManagementSystem } from '../src/rules/systems/chunkManagementSystem.js';
 import { transitionToDepth } from '../src/rules/environment/dungeon/transition.js';
+import { loadedChunkCount, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 
 function makePlayerAt(world, x, y) {
   const id = world.create();
@@ -33,30 +33,24 @@ function countChunks(world) {
   return n;
 }
 
-function countTerrain(world) {
-  let n = 0;
-  for (const [id] of world.query(Position)) {
-    if (world.has(id, Terrain)) n++;
-  }
-  return n;
-}
-
 Deno.test("transitionToDepth unloads all chunks", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
 
   chunkManagementSystem(world);
   assert(countChunks(world) > 0, 'chunks loaded before transition');
-  assert(countTerrain(world) > 0, 'terrain exists before transition');
+  assert(loadedChunkCount() > 0, 'tileMap has data before transition');
 
   transitionToDepth(world, 2, { x: 10, y: 10 });
 
   assert(countChunks(world) === 0, 'all chunks unloaded after transition');
-  assert(countTerrain(world) === 0, 'all terrain destroyed after transition');
+  assert(loadedChunkCount() === 0, 'tileMap cleared after transition');
 });
 
 Deno.test("transitionToDepth updates DungeonState.currentDepth", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
@@ -69,6 +63,7 @@ Deno.test("transitionToDepth updates DungeonState.currentDepth", () => {
 });
 
 Deno.test("transitionToDepth moves player to destination", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
@@ -82,6 +77,7 @@ Deno.test("transitionToDepth moves player to destination", () => {
 });
 
 Deno.test("transitionToDepth emits dungeon:transitioned event", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
@@ -97,21 +93,22 @@ Deno.test("transitionToDepth emits dungeon:transitioned event", () => {
 });
 
 Deno.test("chunks regenerate correctly on new floor after transition", () => {
+  clearAll();
   const world = new World({ seed: 42 });
   makePlayerAt(world, 0, 0);
   makeDungeonState(world, 42, 1);
 
   // Load floor 1
   chunkManagementSystem(world);
-  const terrainFloor1 = countTerrain(world);
+  const tileChunksFloor1 = loadedChunkCount();
 
   // Transition to floor 2
   transitionToDepth(world, 2, { x: 0, y: 0 });
   chunkManagementSystem(world);
-  const terrainFloor2 = countTerrain(world);
+  const tileChunksFloor2 = loadedChunkCount();
 
-  // Both floors should have terrain, but different layouts
-  assert(terrainFloor1 > 0, 'floor 1 has terrain');
-  assert(terrainFloor2 > 0, 'floor 2 has terrain');
+  // Both floors should have tile data
+  assert(tileChunksFloor1 > 0, 'floor 1 has tile data');
+  assert(tileChunksFloor2 > 0, 'floor 2 has tile data');
   assert(countChunks(world) > 0, 'chunks loaded on floor 2');
 });

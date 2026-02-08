@@ -2,12 +2,12 @@
 // ECS-aware vision query helpers.
 
 import { Position } from '../components/Position.js';
-import { Terrain } from '../components/Terrain.js';
 import { Collider } from '../components/Collider.js';
+import { isOpaque } from '../environment/dungeon/tileMap.js';
 
 /**
- * Build a Set of "x,y" keys for tiles that block vision.
- * Checks Terrain.opaque and Collider.blocksSight.
+ * Build a Set of "x,y" keys for entities that block vision (doors, etc.).
+ * Walls are handled by TileMap.isOpaque() — this only covers Collider.blocksSight.
  *
  * @param {import('../../lib/ecs-js').World} world
  * @returns {Set<string>}
@@ -15,21 +15,18 @@ import { Collider } from '../components/Collider.js';
 export function buildBlocksVisionMap(world) {
   const blocked = new Set();
   for (const [id, pos] of world.query(Position)) {
-    let blocks = false;
-    const ter = world.get(id, Terrain);
-    if (ter && ter.opaque) blocks = true;
     const col = world.get(id, Collider);
-    if (col && col.blocksSight) blocks = true;
-    if (blocks) blocked.add(`${pos.x},${pos.y}`);
+    if (col && col.blocksSight) blocked.add(`${pos.x},${pos.y}`);
   }
   return blocked;
 }
 
 /**
  * Returns an isBlocked callback suitable for hasLOS / computeFOV.
+ * Composes TileMap opacity (walls) with entity-based blocksSight (closed doors).
  * @param {Set<string>} blockedSet
  * @returns {(x:number, y:number) => boolean}
  */
 export function blockedCallback(blockedSet) {
-  return (x, y) => blockedSet.has(`${x},${y}`);
+  return (x, y) => isOpaque(x, y) || blockedSet.has(`${x},${y}`);
 }

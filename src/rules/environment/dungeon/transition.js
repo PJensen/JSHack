@@ -5,6 +5,7 @@ import { ChunkMeta } from '../../components/ChunkMeta.js';
 import { DungeonState } from '../../components/DungeonState.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
+import { clearAll as clearTileMap } from './tileMap.js';
 
 /**
  * Transition the dungeon to a new depth.
@@ -20,6 +21,9 @@ import { Player } from '../../components/Player.js';
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
  */
 export function transitionToDepth(world, newDepth, destinationPos) {
+  // Clear all tile data from TileMap
+  clearTileMap();
+
   // Unload all chunks
   const chunksToDestroy = [];
   for (const [metaId, meta] of world.query(ChunkMeta)) {

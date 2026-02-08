@@ -12,8 +12,8 @@ const REGISTRY = Object.create(null);
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Vitality } from "../components/Vitality.js";
-import { Terrain } from "../components/Terrain.js";
 import { Collider } from "../components/Collider.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
 
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
 /** @param {World} world @param {number} actor @param {{id:string,name:string,manaCost:number,[k:string]:any}} spell @param {{[k:string]:any}} intent */
@@ -101,11 +101,10 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
   const RADIUS = 2;
   const BASE_DMG = 6;
 
-  // Build walkability blocking set (non-walkable terrain + solid colliders)
+  // Build entity-based blocking set (solid colliders like doors)
+  // Terrain walls are handled by tileMap.isWalkable()
   const blocking = new Set();
   for (const [id, pos] of world.query(Position)) {
-    const ter = /** @type any */ (world.get(id, Terrain));
-    if (ter && !ter.walkable) { blocking.add(`${pos.x},${pos.y}`); continue; }
     const col = /** @type any */ (world.get(id, Collider));
     if (col && col.solid) blocking.add(`${pos.x},${pos.y}`);
   }
@@ -135,7 +134,7 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
     for (let step = 0; step < pushDist; step++) {
       const nx = cx + t.dx;
       const ny = cy + t.dy;
-      if (blocking.has(`${nx},${ny}`)) break;
+      if (!isWalkable(nx, ny) || blocking.has(`${nx},${ny}`)) break;
       cx = nx;
       cy = ny;
     }
