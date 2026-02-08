@@ -83,3 +83,43 @@ export function computeFOV(ox, oy, radius, isBlocked, out) {
   castVisibility(setVisible, ox, oy, 1, 1.0, 0.0, radius,  0, -1, -1,  0, isBlocked);
   return visible;
 }
+
+/**
+ * Pack two 16-bit signed coords into a 32-bit integer key.
+ * Note: valid range per axis is [-32768..32767].
+ * @param {number} x
+ * @param {number} y
+ * @returns {number}
+ */
+export function packKey16(x, y) {
+  return ((x & 0xffff) << 16) | (y & 0xffff);
+}
+
+/**
+ * Unpack a 32-bit integer key into [x,y].
+ * @param {number} key
+ * @returns {[number, number]}
+ */
+export function unpackKey16(key) {
+  const x = (key >> 16);
+  const y = (key << 16) >> 16; // sign-extend lower 16
+  return [x, y];
+}
+
+/**
+ * Compute FOV using packed integer keys in the output Set.
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} radius
+ * @param {(x:number, y:number)=>boolean} isBlocked
+ * @param {Set<number>=} out
+ * @returns {Set<number>}
+ */
+export function computeFOVKeys(ox, oy, radius, isBlocked, out) {
+  const visible = out || new Set();
+  visible.clear();
+  computeFOV(ox, oy, radius, isBlocked, (x, y) => {
+    visible.add(packKey16(x, y));
+  });
+  return visible;
+}
