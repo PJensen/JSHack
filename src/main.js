@@ -29,7 +29,7 @@ import { Position } from "./rules/components/Position.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
-import { HealthPotion, GoldStack } from "./rules/archetypes/Items.js";
+import { HealthPotion, GoldStack, ArrowsStack } from "./rules/archetypes/Items.js";
 import { FloorTile, WallTile } from "./rules/archetypes/Tiles.js";
 import { Door } from "./rules/archetypes/Door.js";
 import { Monster } from "./rules/archetypes/Creatures.js";
@@ -256,6 +256,42 @@ world.add(thornArmor, Position, { x: ox + 1, y: oy + H - 2 });
 // // Add an Iron Pickaxe in the demo room
 // const eqPickaxe = buildEquipmentItem(world, 'iron_pickaxe', {});
 // world.add(eqPickaxe, Position, { x: 1, y: -1 });
+
+// ---- Playtest items: ranged, spells, equipment variety ----
+// Bow + arrows (top-right area)
+const eqBow = buildEquipmentItem(world, 'bow_short', {});
+world.add(eqBow, Position, { x: 3, y: -3 });
+const arrows = createFrom(world, ArrowsStack, {});
+world.add(arrows, Position, { x: 3, y: -2 });
+
+// Extra weapons (top-left area)
+const eqDagger = buildEquipmentItem(world, 'dagger_quick', {});
+world.add(eqDagger, Position, { x: -2, y: -3 });
+const eqAxe = buildEquipmentItem(world, 'axe_heavy', {});
+world.add(eqAxe, Position, { x: -1, y: -3 });
+
+// Shield + ring (right side)
+const eqShield = buildEquipmentItem(world, 'shield_wood', {});
+world.add(eqShield, Position, { x: 4, y: -2 });
+const eqRing = buildEquipmentItem(world, 'ring_health', {});
+world.add(eqRing, Position, { x: 0, y: -3 });
+
+// Spellbooks (bottom row, near lightning book at 4,4)
+const bookMeteor = world.create();
+world.add(bookMeteor, NamedIdentity, { name: 'Spellbook of Meteor', identity: 'book_meteor' });
+world.add(bookMeteor, Position, { x: 2, y: 4 });
+world.add(bookMeteor, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Meteor.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
+
+const bookBlast = world.create();
+world.add(bookBlast, NamedIdentity, { name: 'Spellbook of Blast Wave', identity: 'book_blastwave' });
+world.add(bookBlast, Position, { x: 3, y: 4 });
+world.add(bookBlast, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Blast Wave.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
+
+// Scroll of Blast Wave (single-use)
+const scrollBlast = world.create();
+world.add(scrollBlast, NamedIdentity, { name: 'Scroll of Blast Wave', identity: 'scroll_blastwave' });
+world.add(scrollBlast, Position, { x: 1, y: 4 });
+world.add(scrollBlast, ItemInfo, { type: 'scroll', slot: 'bag', description: 'Casts Blast Wave without learning it.', weight: 0.5, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
