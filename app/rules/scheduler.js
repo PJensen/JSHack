@@ -8,7 +8,7 @@ import { itemPickupSystem, autoPickupPostMoveSystem } from "../../src/rules/syst
 import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";
 import { equipItemSystem } from "../../src/rules/systems/equipItemSystem.js";
 import { useItemSystem } from "../../src/rules/systems/useItemSystem.js";
-import { projectileSystem } from "../../src/rules/systems/projectileSystem.js";
+import { rangedAttackSystem } from "../../src/rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
 import { effectSystem } from "../../src/rules/systems/effectSystem.js";
 import { equipmentSystem } from "../../src/rules/systems/equipmentSystem.js";
@@ -41,7 +41,7 @@ export function configureWorld(world) {
   registerSystem(useItemSystem, 'intents');
   registerSystem(equipItemSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
-  registerSystem(projectileSystem, 'intents');
+  registerSystem(rangedAttackSystem, 'intents');
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
   registerSystem(movementSystem, 'intents');
