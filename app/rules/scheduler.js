@@ -71,8 +71,8 @@ export function configureWorld(world) {
   }
 
   // Build profiled scheduler: measure per system and per phase using high-res timer
-  /** @type {Array<'intents'|'effects'>} */
-  const phases = ['intents', 'effects'];
+  /** @type {Array<'intents'|'effects'|'cleanup'>} */
+  const phases = ['intents', 'effects', 'cleanup'];
   /** @type {Record<string, Function[]>} */
   const phaseSystems = Object.create(null);
   for (const ph of phases) phaseSystems[ph] = getOrderedSystems(ph);
@@ -89,8 +89,8 @@ export function configureWorld(world) {
       let phStart = performance.now();
       const sysTimes = [];
       for (let i = 0; i < list.length; i++) {
-  /** @type {Function} */
-  const fn = /** @type any */ (list[i] || (()=>{}));
+        /** @type {Function} */
+        const fn = /** @type any */ (list[i] || (()=>{}));
         const s0 = performance.now();
         fn(w, dt);
         const s1 = performance.now();

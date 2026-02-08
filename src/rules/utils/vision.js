@@ -15,8 +15,7 @@ import { CHUNK_SIZE } from '../environment/dungeon/constants.js';
  */
 export function buildBlocksVisionMap(world) {
   const blocked = new Map();
-  for (const [id, pos] of world.query(Position)) {
-    const col = world.get(id, Collider);
+  for (const [id, pos, col] of world.query(Position, Collider)) {
     if (col && col.blocksSight) _set(blocked, pos.x, pos.y);
   }
   return blocked;
