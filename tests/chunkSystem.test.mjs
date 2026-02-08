@@ -23,6 +23,7 @@ function makeDungeonState(world, seed = 42, depth = 1) {
     playerChunkX: 0,
     playerChunkY: 0,
     chunkLoadRadius: 2,
+    chunkLoadBudget: 100, // high budget so all chunks load in one tick for tests
   });
   return id;
 }

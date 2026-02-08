@@ -10,18 +10,24 @@ import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getTile, forEachTileInRect } from '../../rules/environment/dungeon/tileMap.js';
+import { Brain } from '../../rules/components/Brain.js';
+import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
+import { updateFOV, visible, explored } from '../../rules/environment/dungeon/exploredMap.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[] }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any }} WorldView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, visible: Set<string>|null, explored: Set<string>|null }} WorldView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], tileGrid: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], tileGrid: null, visible: null, explored: null };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
 const _solidRecs = new Map();    // id -> { id, x, y }
+
+/** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
+const _allEntities = [];
 
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -33,8 +39,8 @@ export function buildWorldView(world) {
 	_view.player = null;
 	_view.entities.length = 0;
 	_view.solids.length = 0;
-	// emissives left as future use; keep empty
 	_view.emissives.length = 0;
+	_allEntities.length = 0;
 
 	// Expose tile grid functions for direct grid-based rendering
 	_view.tileGrid = { getTile, forEachTileInRect };
@@ -72,17 +78,13 @@ export function buildWorldView(world) {
 				const s = stat.statuses[i];
 				const t = String(s.type || '').toLowerCase();
 				if (!t) continue;
-				// Whitelist: only expose a small set as tags to keep display contract tidy
 				if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns') {
 					rec.tags.push(t);
 				}
 			}
 		}
 
-		// Project simple equipment-derived tags (display-only), e.g., 'thorns' when wearing thorned armor
-		// No gear-based tag injection; thorns will appear via Status when it procs
-
-		_view.entities.push(rec);
+		_allEntities.push(rec);
 		if (isPlayer) {
 			if (!_view.player) _view.player = { id, pos: { x: pos.x, y: pos.y } };
 			else { _view.player.id = id; _view.player.pos.x = pos.x; _view.player.pos.y = pos.y; }
@@ -96,5 +98,32 @@ export function buildWorldView(world) {
 			_view.solids.push(srec);
 		}
 	}
+
+	// Compute FOV (once per turn, idempotent via step check in updateFOV)
+	if (_view.player) {
+		const brain = world.get(_view.player.id, Brain);
+		const radius = brain?.visionRange ?? 10;
+		const blockedSet = buildBlocksVisionMap(world);
+		const isBlocked = blockedCallback(blockedSet);
+		updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked);
+	}
+
+	const vis = visible();
+	_view.visible = vis;
+	_view.explored = explored();
+
+	// Filter entities by FOV: only include visible entities + always include player
+	for (let i = 0; i < _allEntities.length; i++) {
+		const rec = _allEntities[i];
+		if (_view.player && rec.id === _view.player.id) {
+			_view.entities.push(rec);
+			continue;
+		}
+		const key = `${rec.pos.x},${rec.pos.y}`;
+		if (vis.has(key)) {
+			_view.entities.push(rec);
+		}
+	}
+
 	return _view;
 }
