@@ -449,6 +449,13 @@ function ensurePanel(kind) {
     fontFamily: 'monospace',
   });
 
+  // Tapping/clicking outside the inner content should close the overlay.
+  panel.addEventListener('pointerdown', (ev) => {
+    if (ev.target === panel) {
+      hide(panel);
+    }
+  });
+
   const inner = document.createElement('div');
   Object.assign(inner.style, {
     position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
@@ -761,7 +768,7 @@ function renderPickupChooser(panel, items) {
   btnPickAll.textContent = 'Pick All';
   decorateButton(btnPickAll);
   btnPickAll.addEventListener('click', () => {
-  const ids = items.map((i) => i.id);
+    const ids = items.map((i) => i.id);
     if (!ids.length) return;
     window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
     hide(panel);
@@ -772,10 +779,14 @@ function renderPickupChooser(panel, items) {
   decorateButton(btnCancel);
   btnCancel.addEventListener('click', () => hide(panel));
 
-  actions.appendChild(btnPickSel);
   actions.appendChild(btnPickAll);
+  actions.appendChild(btnPickSel);
   actions.appendChild(btnCancel);
   el.appendChild(actions);
+
+  queueMicrotask(() => {
+    try { btnPickAll.focus(); } catch {}
+  });
 }
 
 /** @param {HTMLButtonElement} btn */
