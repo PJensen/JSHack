@@ -20,6 +20,3 @@ export const SPLIT_RATIO_MIN = 0.35;
 export const SPLIT_RATIO_MAX = 0.65;
 export const BSP_MAX_DEPTH   = 5;
 
-// Chunk management
-export const CHUNK_LOAD_RADIUS   = 2;  // Manhattan distance in chunks
-export const CHUNK_UNLOAD_RADIUS = 3;  // unload beyond this
