@@ -24,9 +24,9 @@ export function initHUD() {
     const row = document.createElement('div');
     row.style.display = 'flex'; row.style.flexDirection = 'column'; row.style.gap = '2px';
     const cap = document.createElement('div');
-    cap.textContent = label; 
-    cap.style.fontSize = '12px'; 
-    cap.style.opacity = '0.9'; 
+    cap.textContent = label;
+    cap.style.fontSize = '12px';
+    cap.style.opacity = '0.9';
     cap.style.textAlign = 'left';
     const box = document.createElement('div');
     Object.assign(box.style, { position: 'relative', height: '12px', borderRadius: '6px', background: bg, border: '1px solid #2d3b52' });
@@ -56,11 +56,11 @@ export function initHUD() {
   const defenseLine = document.createElement('div');
   defenseLine.style.fontSize = '12px'; defenseLine.style.color = '#cfe8ff';
   const statusRow = document.createElement('div');
-  Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
+  Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' });
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
-  combatBox.appendChild(weaponLine); 
-  combatBox.appendChild(defenseLine); 
+  combatBox.appendChild(weaponLine);
+  combatBox.appendChild(defenseLine);
   combatBox.appendChild(statusRow);
   combatBox.appendChild(affixRow);
   vitals.appendChild(combatBox);
@@ -99,6 +99,19 @@ export function initHUD() {
     }
   });
 
+  // Ranged attack button (to the right of Cast)
+  const shootBtn = document.createElement('button');
+  shootBtn.id = 'btn-shoot';
+  shootBtn.textContent = 'Shoot';
+  Object.assign(shootBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  shootBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
+  });
+
   // Update label when app sets active spell
   window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -132,8 +145,8 @@ export function initHUD() {
     const e = ev;
     const weapon = e?.detail?.weapon || null;
     const defense = Number(e?.detail?.defense ?? 0);
-  const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
-  const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
+    const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
+    const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
 
     // Weapon line
     if (weapon && weapon.name) {
@@ -148,21 +161,8 @@ export function initHUD() {
     const defTxt = Number.isFinite(defense) && defense !== 0 ? (defense > 0 ? `+${defense}` : `${defense}`) : '0';
     defenseLine.textContent = `Defense: ${defTxt}`;
 
-    // Status chips
-    statusRow.innerHTML = '';
-    for (const s of statuses) {
-      const chip = document.createElement('div');
-      chip.textContent = `${String(s.key)}` + (Number.isFinite(s.turns) && s.turns > 0 ? ` (${s.turns})` : '');
-      Object.assign(chip.style, {
-        fontSize: '11px', padding: '2px 6px', borderRadius: '999px',
-        background: 'rgba(85,170,255,0.15)', color: '#cfe8ff', border: '1px solid #2d3b52'
-      });
-      if (String(s.key).toLowerCase() === 'invulnerable') {
-        chip.style.background = 'rgba(160,255,255,0.15)';
-        chip.style.color = '#e8ffff';
-      }
-      statusRow.appendChild(chip);
-    }
+    // Effects stack (badges + pie timers)
+    ensureEffectsStack(statusRow).update(statuses);
 
     // Affix chips (equipped gear effects)
     affixRow.innerHTML = '';
@@ -180,10 +180,108 @@ export function initHUD() {
   });
 
   // Right-aligned bar: Inventory appears left of Cast by append order
+  const quick = createQuickSlot();
   bar.appendChild(invBtn);
   bar.appendChild(castBtn);
+  bar.appendChild(shootBtn);
   root.appendChild(bar);
-  return { castBtn, invBtn };
+  root.appendChild(quick.el);
+  return { castBtn, invBtn, shootBtn };
+}
+
+// --- Effects Stack (status badges with pie timers) -------------------------
+function ensureEffectsStack(container) {
+  if (container.__effectsStack) return container.__effectsStack;
+
+  /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement }>} */
+  const byKey = new Map();
+
+  const VIS = {
+    invulnerable: { name: 'Aegis', glyph: '\u{1F6E1}\uFE0F', hue: 190 },
+    burning:      { name: 'Burning', glyph: '\u{1F525}', hue: 20 },
+    poisoned:     { name: 'Poison', glyph: '\u2623', hue: 90 },
+    regenerating: { name: 'Regen', glyph: '\u{1F33F}', hue: 130 },
+    stunned:      { name: 'Stunned', glyph: '\u{1F4AB}', hue: 0 },
+    thorns:       { name: 'Thorns', glyph: '\u{1F335}', hue: 110 },
+  };
+
+  const hsla = (h, a = 0.2) => `hsla(${h} 80% 50% / ${a})`;
+  const shadowColor = (h) => `hsl(${h} 55% 35%)`;
+
+  function createBadge(spec, total) {
+    const el = document.createElement('div');
+    Object.assign(el.style, {
+      position: 'relative', width: '58px', height: '58px', borderRadius: '8px',
+      display: 'grid', placeItems: 'center',
+      boxShadow: '0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)',
+      outline: `1px solid ${hsla(spec.hue, 0.28)}`,
+      background: hsla(spec.hue, 0.2),
+    });
+    el.title = `${spec.name} \u2022 ${total} turns`;
+
+    const glyph = document.createElement('div');
+    glyph.textContent = spec.glyph;
+    Object.assign(glyph.style, { fontSize: '28px', lineHeight: '1', filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))', color: shadowColor(spec.hue) });
+
+    const label = document.createElement('div');
+    Object.assign(label.style, { position: 'absolute', left: '6px', bottom: '2px', fontSize: '10px', color: 'rgba(255,255,255,.8)' });
+    label.textContent = String(spec.name).split(' ')[0];
+
+    const ticks = document.createElement('div');
+    Object.assign(ticks.style, { position: 'absolute', right: '4px', bottom: '2px', fontSize: '12px', fontWeight: '700', color: '#fff', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)' });
+    ticks.textContent = String(total);
+
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'absolute', left: '6px', top: '6px', right: '6px', bottom: '6px', borderRadius: '8px', pointerEvents: 'none',
+      background: 'conic-gradient(rgba(180,190,200,.2) 0deg, transparent 0)'
+    });
+
+    el.appendChild(glyph);
+    el.appendChild(label);
+    el.appendChild(ticks);
+    el.appendChild(overlay);
+
+    return { el, overlay, ticksEl: ticks };
+  }
+
+  function setAngle(rec, remaining) {
+    const total = Math.max(1, rec.total | 0);
+    const pct = Math.max(0, Math.min(1, remaining / total));
+    const deg = (pct * 360).toFixed(2) + 'deg';
+    rec.overlay.style.background = `conic-gradient(rgba(180,190,200,.2) ${deg}, transparent 0)`;
+    rec.ticksEl.textContent = String(Math.max(0, remaining | 0));
+  }
+
+  function update(statuses) {
+    const seen = new Set();
+    for (const s of (Array.isArray(statuses) ? statuses : [])) {
+      const key = String(s.key || '').toLowerCase();
+      if (!key) continue;
+      const turns = Math.max(0, Number(s.turns || 0));
+      const spec = VIS[key] || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 };
+      let rec = byKey.get(key);
+      if (!rec) {
+        const { el, overlay, ticksEl } = createBadge(spec, turns || 1);
+        rec = { el, overlay, ticksEl, total: Math.max(1, turns || 1) };
+        byKey.set(key, rec);
+        container.appendChild(el);
+      }
+      rec.total = Math.max(1, Math.max(rec.total || 1, turns || 1));
+      setAngle(rec, turns);
+      seen.add(key);
+    }
+    for (const [key, rec] of byKey.entries()) {
+      if (!seen.has(key)) {
+        if (rec?.el?.parentNode === container) container.removeChild(rec.el);
+        byKey.delete(key);
+      }
+    }
+  }
+
+  const api = { update };
+  container.__effectsStack = api;
+  return api;
 }
 
 function ensureRoot() {
@@ -201,4 +299,135 @@ function ensureRoot() {
     document.body.appendChild(root);
   }
   return root;
+}
+
+// --- Singular Quick Slot (most recent pickup) -----------------------------
+function createQuickSlot() {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    position: 'fixed',
+    right: '8px',
+    bottom: '56px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '8px',
+    pointerEvents: 'auto',
+    zIndex: 901,
+  });
+
+  /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number}>} */
+  const stack = [];
+  const MAX_VISIBLE = 4;
+
+  function actionable(it) {
+    const t = String(it.type||'');
+    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book') return (it.count||0) > 0;
+    if (t === 'equip') return true;
+    return false;
+  }
+
+  function renderStack() {
+    el.innerHTML = '';
+    let shown = 0;
+    for (const it of stack) {
+      if (!actionable(it)) continue;
+      const chip = renderQuickChip(it, {
+        onUse: () => dispatchAction(it),
+        onDismiss: () => dismissTop(it.id)
+      });
+      el.appendChild(chip);
+      shown++;
+      if (shown >= MAX_VISIBLE) break;
+    }
+  }
+
+  function dispatchAction(it) {
+    const t = String(it.type||'');
+    if (t === 'potion') window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+    else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    else if (t === 'equip') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+    else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+  }
+
+  function dismissTop(id) {
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) stack.splice(idx, 1);
+    renderStack();
+  }
+
+  window.addEventListener('ui:recentPickup', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const item = e?.detail?.item;
+    if (!item) return;
+    const idx = stack.findIndex((x) => x && x.id === item.id);
+    if (idx >= 0) stack.splice(idx, 1);
+    stack.unshift({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1) });
+    renderStack();
+  });
+
+  window.addEventListener('ui:itemEquipped', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = Number(e?.detail?.itemId || 0);
+    if (!id) return;
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) { stack.splice(idx, 1); renderStack(); }
+  });
+
+  window.addEventListener('ui:itemUsed', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = Number(e?.detail?.itemId || 0);
+    if (!id) return;
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) {
+      stack.splice(idx, 1);
+      renderStack();
+    }
+  });
+
+  return { el };
+}
+
+/** @param {{id:number,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function}} h */
+function renderQuickChip(it, h) {
+  const chip = document.createElement('div');
+  Object.assign(chip.style, {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    padding: '6px 8px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
+  });
+  const name = document.createElement('div');
+  name.textContent = `[${String(it.name||'item')}]`;
+  name.style.color = '#9cf';
+  const count = document.createElement('div');
+  count.dataset.role = 'count';
+  count.style.opacity = '0.8';
+  count.style.fontSize = '12px';
+  count.textContent = (it.type === 'potion' || it.type === 'scroll') ? `x${it.count||1}` : '';
+
+  const btn = document.createElement('button');
+  Object.assign(btn.style, {
+    padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+  });
+  btn.textContent = (it.type === 'equip') ? 'Equip' : (it.type === 'potion' ? 'Drink' : 'Read');
+  btn.addEventListener('click', () => h.onUse && h.onUse());
+
+  const x = document.createElement('button');
+  Object.assign(x.style, {
+    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer', minWidth: '28px'
+  });
+  x.textContent = '\u00D7';
+  x.title = 'Dismiss';
+  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+
+  chip.appendChild(name);
+  chip.appendChild(count);
+  chip.appendChild(btn);
+  chip.appendChild(x);
+  return chip;
 }

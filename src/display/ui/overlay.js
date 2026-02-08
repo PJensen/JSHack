@@ -8,9 +8,12 @@ export function initOverlays() {
   const pick = ensurePanel('pickup');
   const spells = ensurePanel('spells');
   const groundTip = ensureGroundTooltip(root);
+  const spellGestureHint = ensureSpellGestureHint(root);
+  const gestureDebug = ensureGestureDebugLayer(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
+  let spellGestureTimer = 0;
 
   window.addEventListener('ui:openInventory', () => {
     show(inv);
@@ -91,6 +94,61 @@ export function initOverlays() {
     renderMessageTicker(ticker, entries);
   });
 
+  // Gesture debug path overlay
+  window.addEventListener('ui:gestureProgress', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const pts = Array.isArray(e?.detail?.points) ? e.detail.points : [];
+    const active = !!e?.detail?.active;
+    const rec = e?.detail?.recognized || null;
+    drawGestureDebug(gestureDebug, pts, active, rec);
+  });
+
+  window.addEventListener('ui:showSpellGestureHint', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const id = String(e?.detail?.id || '');
+    if (id !== 'lightning' && id !== 'meteor' && id !== 'blastwave') return;
+    const mode = String(e?.detail?.mode || 'cast');
+    const quality = Number(e?.detail?.quality);
+    const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
+    let duration = mode === 'learn' ? 2600 : 900;
+    if (id === 'meteor' && mode === 'cast') duration = 1800;
+    if (id === 'lightning' || id === 'blastwave') {
+      spellGestureHint.glyph.textContent = 'Z';
+      if (id === 'blastwave') {
+        // Warmer tint for blast wave
+        spellGestureHint.glyph.style.textShadow = '0 0 16px rgba(255,170,80,0.55), 0 0 30px rgba(255,140,50,0.35)';
+        spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,170,80,0.45))';
+        spellGestureHint.caption.textContent = mode === 'learn' ? 'Draw a Z to unleash Blast Wave!' : '';
+      } else {
+        spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+        spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+        spellGestureHint.caption.textContent = mode === 'learn'
+          ? 'Draw a Z to unleash Lightning!'
+          : '';
+      }
+      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
+    } else {
+      spellGestureHint.glyph.textContent = '/';
+      spellGestureHint.glyph.style.textShadow = buildFlameShadow(clamped);
+      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,160,80,0.45))';
+      spellGestureHint.caption.textContent = (mode === 'learn')
+        ? 'Draw a diagonal to call Meteor!'
+        : 'Tap a target';
+      spellGestureHint.caption.style.display = 'block';
+    }
+    spellGestureHint.glyph.style.opacity = mode === 'cast' ? '0.92' : '1';
+    spellGestureHint.wrap.style.display = 'flex';
+    spellGestureHint.wrap.style.animation = 'none';
+    spellGestureHint.wrap.style.transform = 'translate(-50%, -50%) scale(1)';
+    if (spellGestureTimer) window.clearTimeout(spellGestureTimer);
+    spellGestureTimer = window.setTimeout(() => {
+      spellGestureHint.wrap.style.display = 'none';
+      spellGestureTimer = 0;
+    }, duration);
+  });
+
   return { root, inv, log, ticker };
 }
 
@@ -111,6 +169,72 @@ function ensureRoot() {
   return root;
 }
 
+// --- Gesture debug overlay -------------------------------------------------
+function ensureGestureDebugLayer(root) {
+  const canvas = document.createElement('canvas');
+  canvas.id = 'gesture-debug-layer';
+  Object.assign(canvas.style, {
+    position: 'fixed',
+    left: '0', top: '0', right: '0', bottom: '0',
+    width: '100vw', height: '100vh',
+    pointerEvents: 'none',
+    zIndex: 910,
+  });
+  root.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const resize = () => {
+    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    const w = Math.max(1, window.innerWidth | 0);
+    const h = Math.max(1, window.innerHeight | 0);
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  resize();
+  window.addEventListener('resize', resize);
+  return { canvas, ctx, resize };
+}
+
+function drawGestureDebug(layer, points, active, recognized) {
+  if (!layer || !layer.ctx) return;
+  const ctx = layer.ctx;
+  const canvas = layer.canvas;
+  // Clear
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!Array.isArray(points) || points.length === 0) return;
+
+  // Draw path
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = recognized ? '#5ff' : (active ? '#8cf' : '#bbb');
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+  // Endpoints
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first) { ctx.beginPath(); ctx.arc(first.x, first.y, 4, 0, Math.PI * 2); ctx.fill(); }
+  if (last) { ctx.beginPath(); ctx.arc(last.x, last.y, 4, 0, Math.PI * 2); ctx.fill(); }
+
+  // Recognition bounds
+  if (recognized && recognized.bounds) {
+    const b = recognized.bounds;
+    ctx.strokeStyle = 'rgba(120,200,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+  }
+  ctx.restore();
+}
+
 // --- Ground item tooltip (click to pick up) -------------------------------
 /** @param {HTMLElement} root */
 function ensureGroundTooltip(root) {
@@ -127,6 +251,70 @@ function ensureGroundTooltip(root) {
   return tip;
 }
 
+function ensureSpellGestureHint(root) {
+  const wrap = document.createElement('div');
+  Object.assign(wrap.style, {
+    position: 'fixed',
+    left: '50%',
+    top: '38%',
+    transform: 'translate(-50%, -50%)',
+    display: 'none',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+    gap: '12px',
+    zIndex: 920,
+  });
+
+  const glyph = document.createElement('div');
+  glyph.textContent = 'Z';
+  Object.assign(glyph.style, {
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    fontSize: 'min(160px, 28vw)',
+    color: '#d6f3ff',
+    letterSpacing: '-0.04em',
+    textShadow: buildLightningShadow(1),
+    transition: 'opacity 120ms ease-out',
+  });
+
+  const caption = document.createElement('div');
+  caption.textContent = 'Draw a Z to cast Lightning';
+  Object.assign(caption.style, {
+    fontFamily: 'monospace',
+    fontSize: 'min(24px, 5vw)',
+    color: '#d6f3ff',
+    textShadow: '0 0 6px rgba(80,160,255,0.55)',
+    background: 'rgba(8,12,18,0.55)',
+    padding: '6px 12px',
+    borderRadius: '999px',
+    border: '1px solid rgba(80,140,200,0.45)',
+  });
+
+  wrap.appendChild(glyph);
+  wrap.appendChild(caption);
+  root.appendChild(wrap);
+
+  return { wrap, glyph, caption };
+}
+
+function buildLightningShadow(intensity) {
+  const base = Math.max(0.2, Math.min(1, intensity));
+  const outer = (12 + base * 32).toFixed(1);
+  const inner = (6 + base * 18).toFixed(1);
+  const core = (3 + base * 10).toFixed(1);
+  return `0 0 ${outer}px rgba(120,200,255,0.55), 0 0 ${inner}px rgba(180,240,255,0.7), 0 0 ${core}px rgba(255,255,255,0.9)`;
+}
+
+function buildFlameShadow(intensity) {
+  const base = Math.max(0.2, Math.min(1, intensity));
+  const outer = (12 + base * 32).toFixed(1);
+  const inner = (6 + base * 18).toFixed(1);
+  const core = (3 + base * 10).toFixed(1);
+  return `0 0 ${outer}px rgba(255,160,80,0.55), 0 0 ${inner}px rgba(255,200,120,0.7), 0 0 ${core}px rgba(255,255,200,0.9)`;
+}
+
 /** @param {HTMLDivElement} tip @param {{mode?:'single'|'multi', item?:any, items?:any[], count?:number, pickupRange?:number}} detail */
 function renderGroundTooltip(tip, detail) {
   tip.innerHTML = '';
@@ -135,7 +323,7 @@ function renderGroundTooltip(tip, detail) {
     const row = document.createElement('div');
     row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
     const lbl = document.createElement('div');
-    lbl.textContent = `${detail?.count || (detail?.items?.length || 0)} items here`;
+    lbl.textContent = `${detail?.count || (detail?.items?.length || 0)} items nearby`;
     lbl.style.fontWeight = 'bold';
     const hint = document.createElement('div');
     hint.textContent = 'Tap to choose'; hint.style.marginLeft = 'auto'; hint.style.opacity = '0.8';
@@ -161,6 +349,48 @@ function renderGroundTooltip(tip, detail) {
   // Bonus lines
   const bonuses = it.bonuses && typeof it.bonuses === 'object' ? it.bonuses : {};
   const bonusKeys = Object.keys(bonuses);
+  // Damage summary (if present)
+  const dmgWrap = document.createElement('div');
+  let hasDmg = false;
+  if (it.damageDice) {
+    const line = document.createElement('div');
+    line.textContent = `Damage: ${String(it.damageDice)}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (Number.isFinite(Number(bonuses.attack))) {
+    const v = Number(bonuses.attack);
+    const line = document.createElement('div');
+    const sign = v > 0 ? '+' : '';
+    line.textContent = `Attack: ${sign}${v}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (Number.isFinite(Number(bonuses.damage))) {
+    const v = Number(bonuses.damage);
+    const line = document.createElement('div');
+    const sign = v > 0 ? '+' : '';
+    line.textContent = `Damage Bonus: ${sign}${v}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (Number.isFinite(Number(bonuses.critChance)) || Number.isFinite(Number(bonuses.critMult))) {
+    const cc = Number(bonuses.critChance) || 0;
+    const cm = Number(bonuses.critMult) || 0;
+    const line = document.createElement('div');
+    line.textContent = `Crit: ${cc ? `${cc}%` : '—'}${cm ? ` x${cm.toFixed(2)}` : ''}`;
+    line.style.color = '#ffd7a0';
+    dmgWrap.appendChild(line);
+    hasDmg = true;
+  }
+  if (hasDmg) {
+    const sep = document.createElement('div'); sep.textContent = '—'; sep.style.opacity = '0.4'; sep.style.margin = '6px 0 4px';
+    tip.appendChild(sep);
+    tip.appendChild(dmgWrap);
+  }
   if (bonusKeys.length) {
     for (const k of bonusKeys) {
       const v = Number(bonuses[k]);
