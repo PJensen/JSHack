@@ -12,7 +12,7 @@ import {
 /**
  * Create ECS entities for interactive tiles and spawn features.
  * Floor/wall tiles are handled by the TileMap — no entities created for them.
- * @param {import('../../../lib/ecs-js').World} world
+ * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {import('./chunk.js').ChunkData} chunk
  * @param {Object} [opts]
  * @param {Function} [opts.createStairDown] - archetype creator for down stairs
@@ -60,7 +60,7 @@ export function materializeChunk(world, chunk, opts = {}) {
 
 /**
  * Create an entity from a spawn point descriptor.
- * @param {import('../../../lib/ecs-js').World} world
+ * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {{x:number, y:number, kind:string, params:Object}} spawn
  * @returns {number|null} entity ID or null
  */

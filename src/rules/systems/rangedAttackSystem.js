@@ -12,7 +12,7 @@ import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
   // Build blocking map once per tick
   const blocked = buildBlocksVisionMap(world);

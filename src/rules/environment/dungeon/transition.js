@@ -16,7 +16,7 @@ import { clearAll as clearTileMap } from './tileMap.js';
  * 3. Move player to destination position
  * 4. chunkManagementSystem will load new chunks on next tick
  *
- * @param {import('../../../lib/ecs-js').World} world
+ * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
  */

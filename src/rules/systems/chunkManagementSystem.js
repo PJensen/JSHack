@@ -20,7 +20,7 @@ import { playerEntity } from '../utils/queries.js';
 const _floorPlans = new Map(); // `${worldSeed}:${depth}` -> FloorPlan
 
 /**
- * @param {import('../../lib/ecs-js').World} world
+ * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function chunkManagementSystem(world) {
   // Find the dungeon state singleton
@@ -52,13 +52,18 @@ export function chunkManagementSystem(world) {
   const depth = ds.currentDepth;
   const worldSeed = ds.worldSeed;
 
-  // Build set of chunks that should be loaded
-  const shouldBeLoaded = new Set();
+  // Build list of chunks that should be loaded (nearest-first)
+  /** @type {Array<{cx:number, cy:number, dist:number, key:string}>} */
+  const shouldBeLoaded = [];
   for (let dy = -radius; dy <= radius; dy++) {
     for (let dx = -radius; dx <= radius; dx++) {
-      shouldBeLoaded.add(`${pcx + dx},${pcy + dy}`);
+      const cx = pcx + dx;
+      const cy = pcy + dy;
+      const dist = Math.max(Math.abs(dx), Math.abs(dy)); // Chebyshev distance
+      shouldBeLoaded.push({ cx, cy, dist, key: `${cx},${cy}` });
     }
   }
+  shouldBeLoaded.sort((a, b) => a.dist - b.dist);
 
   // Build map of currently loaded chunks
   const loaded = new Map(); // key -> { metaId, meta }
@@ -67,10 +72,12 @@ export function chunkManagementSystem(world) {
   }
 
   // Load missing chunks
-  for (const key of shouldBeLoaded) {
-    if (loaded.has(key)) continue;
-    const [cx, cy] = key.split(',').map(Number);
-    _loadChunk(world, worldSeed, depth, cx, cy);
+  let budget = Number.isFinite(ds.chunkLoadBudget) ? Math.max(0, ds.chunkLoadBudget | 0) : 0;
+  if (budget <= 0) budget = 1;
+  for (const rec of shouldBeLoaded) {
+    if (loaded.has(rec.key)) continue;
+    if (budget-- <= 0) break;
+    _loadChunk(world, worldSeed, depth, rec.cx, rec.cy);
   }
 
   // Unload distant chunks (Chebyshev distance to match square load grid)

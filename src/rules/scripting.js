@@ -75,7 +75,7 @@ function mergeParams(target, params) {
  * Run a script by key or ScriptRef.
  * @param {string | object} ref
  * @param {string} verb
- * @param {import('../lib/ecs-js').World} world
+ * @param {import('../lib/ecs-js/index.js').World} world
  * @param {any} context
  */
 export function runScript(ref, verb, world, context = {}) {
@@ -96,7 +96,7 @@ export function runScript(ref, verb, world, context = {}) {
 
 /**
  * Look up ScriptRef on an entity and execute the handler for the given verb.
- * @param {import('../lib/ecs-js').World} world
+ * @param {import('../lib/ecs-js/index.js').World} world
  * @param {number} entityId
  * @param {string} verb
  * @param {any} context
