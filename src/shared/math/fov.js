@@ -152,7 +152,9 @@ export function computeFOVKeys(ox, oy, radius, isBlocked, out) {
  * Compute FOV using packed BigInt keys in the output Set.
  * Example:
  *   const visible = computeFOVKeys32(px, py, 8, isBlocked);
- *   if (visible.has(packKey32(px + 1, py))) { /* tile is visible */ }
+ *   if (visible.has(packKey32(px + 1, py))) { // tile is visible
+ *     // ...
+ *   }
  * @param {number} ox
  * @param {number} oy
  * @param {number} radius
