@@ -7,6 +7,7 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { cleanupSystem } from '../src/rules/systems/cleanupSystem.js';
+import { Position } from '../src/rules/components/Position.js';
 
 /** @param {any} c @param {string} m */
 function assert(c,m){ if(!c) throw new Error('Assertion failed: '+m); }
@@ -45,6 +46,10 @@ async function run() {
   const bigSword = makeWeapon(world, { id:'test_big_sword', name:'Test Sword', attack: 99 });
   const hero = makeActor(world, 'Hero', { weapon: bigSword }, 10);
   const foe = makeActor(world, 'Dummy', {}, 3);
+
+  // Place actors adjacent so the melee range gate passes
+  world.add(hero, Position, { x: 0, y: 0 });
+  world.add(foe, Position, { x: 1, y: 0 });
 
   equipmentSystem(world);
 
