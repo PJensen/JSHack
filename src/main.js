@@ -157,7 +157,7 @@ import { initDungeon } from "./rules/environment/dungeon/index.js";
 import { TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from "./rules/environment/dungeon/constants.js";
 const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 'floor', [TILE_STAIR_DOWN]: 'stair_down', [TILE_STAIR_UP]: 'stair_up' };
 
-// Initialize the procedural dungeon (chunks loaded by chunkManagementSystem each tick)
+// Initialize the procedural dungeon (entire floor generated up front)
 const spawnPos = initDungeon(world);
 
 // Create player at the spawn position (center of first room in origin chunk)
