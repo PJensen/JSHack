@@ -628,7 +628,7 @@ function renderInventory(panel, items) {
     const it = items[sel]; if (!it) return;
     if (it.type === 'potion') {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
-    } else if (it.type === 'equip') {
+    } else if (it.type === 'equip' || it.type === 'ammo') {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
     } else if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll') {
       window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
@@ -647,7 +647,7 @@ function renderInventory(panel, items) {
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
     else if (k === 'Enter') { defaultAction(); e.preventDefault(); }
-    else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip' || it?.type === 'ammo') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
