@@ -22,8 +22,9 @@ import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
 import { trapSystem } from "../../src/rules/systems/trapSystem.js";
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
-// Side-effect: registers trap script handlers at import time
+// Side-effect: registers script handlers at import time
 import "../../src/rules/scripts/traps.js";
+import "../../src/rules/scripts/monsters.js";
 
 /**
  * @param {World} world

@@ -19,6 +19,8 @@ export const MONSTERS = [
     sizeClass: 'S',
     massKg: 2,
     resistances: { kinetic: { DR: 0 } },
+    speed: 1,
+    script: 'monster:ratBite',
     description: 'A mangy rodent with beady eyes.',
   },
   {
@@ -36,6 +38,8 @@ export const MONSTERS = [
     sizeClass: 'S',
     massKg: 30,
     resistances: { kinetic: { DR: 2 } },
+    speed: 2,
+    script: null,
     description: 'A sneering green-skinned runt armed with a rusty shiv.',
   },
   {
@@ -53,6 +57,8 @@ export const MONSTERS = [
     sizeClass: 'XS',
     massKg: 1,
     resistances: { kinetic: { DR: 0 } },
+    speed: 1,
+    script: null,
     description: 'A leathery-winged vermin that darts erratically.',
   },
 
@@ -72,6 +78,8 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 95,
     resistances: { kinetic: { DR: 6 } },
+    speed: 2,
+    script: null,
     description: 'A thick-skulled brute with a chipped cleaver.',
   },
   {
@@ -92,6 +100,8 @@ export const MONSTERS = [
       kinetic: { DR: 4, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
+    speed: 2,
+    script: null,
     description: 'Bones held together by spite. Resistant to piercing.',
   },
   {
@@ -109,6 +119,8 @@ export const MONSTERS = [
     sizeClass: 'S',
     massKg: 15,
     resistances: { kinetic: { DR: 2 }, chemical: { toxMult: 0 } },
+    speed: 1,
+    script: 'monster:spiderBite',
     description: 'A dog-sized arachnid with venomous fangs.',
   },
 
@@ -128,6 +140,8 @@ export const MONSTERS = [
     sizeClass: 'L',
     massKg: 200,
     resistances: { kinetic: { DR: 10 }, thermal: { burnMult: 1.5 } },
+    speed: 3,
+    script: null,
     description: 'A hulking regenerator. Weak to fire.',
   },
   {
@@ -148,6 +162,8 @@ export const MONSTERS = [
       kinetic: { DR: 2, bluntMult: 0.3, slashMult: 0.3, pierceMult: 0.3 },
       electric: { ohms: 50 },
     },
+    speed: 1,
+    script: 'monster:wraithTouch',
     description: 'A spectral horror. Physical attacks pass through it.',
   },
   {
@@ -165,6 +181,8 @@ export const MONSTERS = [
     sizeClass: 'L',
     massKg: 250,
     resistances: { kinetic: { DR: 12 } },
+    speed: 3,
+    script: null,
     description: 'A lumbering slab of muscle and bad intentions.',
   },
 
@@ -187,6 +205,8 @@ export const MONSTERS = [
       kinetic: { DR: 14 },
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
+    speed: 2,
+    script: null,
     description: 'Sulphur and malice given form. Immune to fire.',
   },
   {
@@ -207,6 +227,8 @@ export const MONSTERS = [
       kinetic: { DR: 18, pierceMult: 0.7 },
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
+    speed: 2,
+    script: 'monster:dragonClaw',
     description: 'Scales like hammered bronze. The apex predator of the deep.',
   },
   {
@@ -228,6 +250,8 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
       electric: { ohms: 200 },
     },
+    speed: 3,
+    script: null,
     description: 'An undead sorcerer sustained by a hidden phylactery.',
   },
 ];
@@ -249,4 +273,4 @@ export function getMonster(id) {
   return _byId.get(id) || null;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, description:string }} MonsterDef */
+/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, script:string|null, description:string }} MonsterDef */
