@@ -144,6 +144,10 @@ export function combatSystem(world) {
         });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+        // Innate monster on-hit script (e.g., rat bite → disease)
+        if (atkEq?.naturalScript) {
+            runScript(atkEq.naturalScript, ScriptVerb.AffixOnHit, world, hitCtx);
+        }
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {

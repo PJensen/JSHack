@@ -3,6 +3,7 @@
 
 import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
+import { Speed } from "../components/Speed.js";
 import { Player } from "../components/Player.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
@@ -22,6 +23,11 @@ export function aiChaseSystem(world) {
   forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
     const fac = world.get(id, Faction);
     if (!fac || fac.key !== 'enemy') return;
+
+    // Speed gate: only act on ticks that match this entity's cadence
+    const spd = world.get(id, Speed);
+    const actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
+    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
 
     // If already has a MoveIntent (e.g., set externally), skip
     if (world.has(id, MoveIntent)) return;

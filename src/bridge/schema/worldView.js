@@ -117,7 +117,7 @@ export function buildWorldView(world) {
 					const s = stat.statuses[i];
 					const t = String(s.type || '').toLowerCase();
 					if (!t) continue;
-					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns') {
+					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns' || t === 'diseased') {
 						rec.tags.push(t);
 					}
 				}
@@ -167,7 +167,7 @@ export function buildWorldView(world) {
 					const s = stat.statuses[i];
 					const t = String(s.type || '').toLowerCase();
 					if (!t) continue;
-					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns') {
+					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns' || t === 'diseased') {
 						rec.tags.push(t);
 					}
 				}

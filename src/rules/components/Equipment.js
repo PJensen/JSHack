@@ -11,5 +11,6 @@ export const Equipment = defineComponent('Equipment', {
   maxHpDerived: 0,
   critChanceDerived: 0,
   critMultDerived: 0,
-  naturalDamageDice: null
+  naturalDamageDice: null,
+  naturalScript: null
 });

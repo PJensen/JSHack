@@ -100,6 +100,17 @@ export function effectSystem(world) {
                     upsertStatus(nextStatuses, { type: 'stunned', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
+                case 'disease':
+                case 'diseased': {
+                    const dmg = Math.max(0, potency * stacks);
+                    if (vit) {
+                        vit.hp = Math.max(0, vit.hp - dmg);
+                        try { world.emit && world.emit('damage', { id, amount: dmg }); } catch {}
+                        if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
+                    }
+                    upsertStatus(nextStatuses, { type: 'diseased', duration: e.turnsLeft, potency, stacks });
+                    break;
+                }
                 case 'thorns': {
                     // Purely visual status to indicate a thorns proc this turn
                     upsertStatus(nextStatuses, { type: 'thorns', duration: e.turnsLeft, potency, stacks });
