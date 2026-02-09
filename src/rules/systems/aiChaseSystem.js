@@ -2,7 +2,7 @@
 // Very simple AI: monsters attempt to step toward the player each tick.
 
 import { Position } from "../components/Position.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
@@ -18,10 +18,10 @@ export function aiChaseSystem(world) {
   }
   if (!playerPos) return;
 
-  // For each monster (identity === 'monster'), add a MoveIntent toward player if none queued
+  // For each enemy-faction entity, add a MoveIntent toward player if none queued
   forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
-    const ident = world.get(id, NamedIdentity);
-    if (!ident || ident.identity !== 'monster') return;
+    const fac = world.get(id, Faction);
+    if (!fac || fac.key !== 'enemy') return;
 
     // If already has a MoveIntent (e.g., set externally), skip
     if (world.has(id, MoveIntent)) return;
