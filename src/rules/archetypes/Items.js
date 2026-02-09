@@ -47,6 +47,7 @@ export const ArrowsStack = defineArchetype(
     "ArrowsStack",
     [ItemInfo, {
         type: "ammo",
+        slot: "ammo",
         description: "A bundle of arrows.",
         weight: 0.2,
         value: 1,
@@ -60,6 +61,7 @@ export const FireArrowsStack = defineArchetype(
     "FireArrowsStack",
     [ItemInfo, {
         type: "ammo",
+        slot: "ammo",
         subtype: "fire",
         description: "Arrows tipped with alchemical fire.",
         weight: 0.3,

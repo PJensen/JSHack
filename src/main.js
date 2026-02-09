@@ -299,7 +299,8 @@ addEventListener('ui:requestInventoryData', () => {
             (eq.armor === id && 'armor') ||
             (eq.shield === id && 'shield') ||
             (eq.ring1 === id && 'ring1') ||
-            (eq.ring2 === id && 'ring2')
+            (eq.ring2 === id && 'ring2') ||
+            (eq.ammo === id && 'ammo')
           )) || null;
           items.push({
             id,
