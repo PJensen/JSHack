@@ -354,7 +354,7 @@ function createQuickSlot() {
   function actionable(it) {
     const t = String(it.type||'');
     if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book') return (it.count||0) > 0;
-    if (t === 'equip') return true;
+    if (t === 'equip' || t === 'ammo') return true;
     return false;
   }
 
@@ -377,7 +377,7 @@ function createQuickSlot() {
     const t = String(it.type||'');
     if (t === 'potion') window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
-    else if (t === 'equip') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+    else if (t === 'equip' || t === 'ammo') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
     else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
   }
 
@@ -444,7 +444,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'learn' ? 'Learn' : 'Read'));
+  btn.textContent = (it.type === 'equip' || it.type === 'ammo') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'learn' ? 'Learn' : 'Read'));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');
