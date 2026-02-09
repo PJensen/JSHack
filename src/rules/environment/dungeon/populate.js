@@ -81,9 +81,11 @@ export function materializeSpawn(world, spawn) {
         attackDerived: p.attackDerived,
         defenseDerived: p.defenseDerived,
         naturalDamageDice: p.naturalDamageDice,
+        naturalScript: p.naturalScript,
         sizeClass: p.sizeClass,
         massKg: p.massKg,
         resistances: p.resistances,
+        speed: p.speed,
       });
     }
     case 'gold': {
