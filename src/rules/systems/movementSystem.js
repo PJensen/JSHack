@@ -3,8 +3,8 @@
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { Terrain } from "../components/Terrain.js";
 import { Collider } from "../components/Collider.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { Interactable } from "../components/Interactable.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
@@ -17,7 +17,7 @@ import { Vitality } from "../components/Vitality.js";
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function movementSystem(world) {
   // Build occupancy and terrain maps for quick blocking checks
   const blocking = new Map(); // key(x,y) -> true if non-walkable terrain, solid collider, or living occupant present
@@ -25,10 +25,6 @@ export function movementSystem(world) {
   const occupants = new Map(); // key(x,y) -> entity id (first seen) for quick bump-checks
 
   for (const [id, pos] of world.query(Position)) {
-    const ter = world.get(id, Terrain);
-    if (ter && !ter.walkable) {
-      blocking.set(key(pos.x, pos.y), true);
-    }
     const col = world.get(id, Collider);
     if (col && col.solid) {
       blocking.set(key(pos.x, pos.y), true);
@@ -55,27 +51,23 @@ export function movementSystem(world) {
       const ny = pos.y + (intent.dy | 0);
       const k = key(nx, ny);
 
-      if (blocking.get(k)) {
-        // If there's an interactable (e.g., door), try to interact on bump instead of moving.
-        const targetId = interactables.get(k);
-        if (targetId) {
-          world.add(actor, InteractIntent, { targetId });
+      if (!isWalkable(nx, ny) || blocking.get(k)) {
+        // Cheap bump-attack: prefer a living target with Vitality in the destination cell.
+        let target = 0;
+        for (const [eid, p] of world.query(Position)) {
+          if (p.x !== nx || p.y !== ny) continue;
+          // Prefer living targets
+          if (world.get(eid, Vitality)) { target = eid; break; }
+        }
+        const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
+        if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
+          // Living entity on tile: attack it (even if there's also a door/interactable)
+          try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
         } else {
-          // Cheap bump-attack: prefer a target with Vitality in the destination cell.
-          let target = 0;
-          for (const [eid, p] of world.query(Position)) {
-            if (p.x !== nx || p.y !== ny) continue;
-            // Avoid terrain tiles
-            if (world.get(eid, Terrain)) continue;
-            // Prefer living targets
-            if (world.get(eid, Vitality)) { target = eid; break; }
-            // Fallback to any non-terrain occupant if no living found yet
-            if (!target) target = eid;
-          }
-          // Only allow bump-attacks from orthogonal adjacency (no diagonals)
-          const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
-          if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
-            try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+          // No living target — try interactable (e.g., closed door)
+          const targetId = interactables.get(k);
+          if (targetId) {
+            world.add(actor, InteractIntent, { targetId });
           }
         }
         // blocked: movement is consumed

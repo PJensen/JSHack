@@ -13,6 +13,7 @@ import { Equipment } from "../components/Equipment.js";
 import { Wounds } from "../components/Wounds.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
+import { Speed } from "../components/Speed.js";
 
 /**
  * Consolidated creature archetypes
@@ -74,11 +75,15 @@ export const Creature = defineArchetype(
     armor: p.armor ?? null,
     ring1: p.ring1 ?? null,
     ring2: p.ring2 ?? null,
-    attackDerived: 0, defenseDerived: 0, maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,
+    attackDerived: p.attackDerived ?? 0, defenseDerived: p.defenseDerived ?? 0,
+    naturalDamageDice: p.naturalDamageDice ?? null,
+    naturalScript: p.naturalScript ?? null,
+    maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,
   })],
   [Wounds, { list: [] }],
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
+  [Speed, (p) => ({ actEvery: p.speed ?? 1 })],
 );
 
 // Human (humanoid defaults, neutral faction)

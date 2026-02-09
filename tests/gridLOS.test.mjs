@@ -1,9 +1,9 @@
 import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
-import { createFrom } from '../src/lib/ecs-js/archetype.js';
-import { FloorTile, WallTile } from '../src/rules/archetypes/Tiles.js';
 import { hasLOS } from '../src/shared/math/gridLOS.js';
-import { buildBlocksVisionMap } from '../src/rules/utils/vision.js';
+import { buildBlocksVisionMap, blockedCallback } from '../src/rules/utils/vision.js';
+import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 
 Deno.test("clear LOS on empty grid", () => {
   const neverBlocked = () => false;
@@ -36,25 +36,29 @@ Deno.test("target tile itself does not block LOS", () => {
   assert(hasLOS(0, 0, 5, 0, wallAtTarget), 'can see wall tile itself');
 });
 
-Deno.test("buildBlocksVisionMap with ECS world", () => {
+Deno.test("buildBlocksVisionMap with ECS world + TileMap", () => {
+  clearAll();
+  // Set up tileMap: floors at y=0,1 and walls at y=2
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  for (let x = 0; x <= 2; x++) {
+    tiles[2 * CHUNK_SIZE + x] = TILE_WALL; // wall at y=2
+  }
+  loadChunk(0, 0, tiles);
+
   const world = new World({ seed: 42 });
 
-  for (let x = 0; x <= 2; x++) {
-    createFrom(world, FloorTile, { x, y: 0 });
-    createFrom(world, FloorTile, { x, y: 1 });
-    createFrom(world, WallTile, { x, y: 2 });
-  }
-
+  // buildBlocksVisionMap only returns entity-based blocks (Collider.blocksSight)
+  // Walls are handled by tileMap.isOpaque() via blockedCallback
   const blocked = buildBlocksVisionMap(world);
+  const isBlocked = blockedCallback(blocked);
 
-  assert(!blocked.has('0,0'), 'floor 0,0 not blocked');
-  assert(!blocked.has('1,1'), 'floor 1,1 not blocked');
+  assert(!isBlocked(0, 0), 'floor 0,0 not blocked');
+  assert(!isBlocked(1, 1), 'floor 1,1 not blocked');
 
-  assert(blocked.has('0,2'), 'wall 0,2 blocked');
-  assert(blocked.has('1,2'), 'wall 1,2 blocked');
-  assert(blocked.has('2,2'), 'wall 2,2 blocked');
+  assert(isBlocked(0, 2), 'wall 0,2 blocked');
+  assert(isBlocked(1, 2), 'wall 1,2 blocked');
+  assert(isBlocked(2, 2), 'wall 2,2 blocked');
 
-  const isBlocked = (x, y) => blocked.has(`${x},${y}`);
   assert(hasLOS(0, 0, 2, 1, isBlocked), 'LOS within room');
   assert(!hasLOS(0, 0, 1, 4, isBlocked), 'LOS blocked by wall row');
 });

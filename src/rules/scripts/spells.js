@@ -1,6 +1,6 @@
 // rules/scripts/spells.js
 // Minimal spell script registry and runner (pure rules; deterministic).
-/** @typedef {import('../../lib/ecs-js').World} World */
+/** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
  * Register built-in spell scripts here. Handlers may mutate the world,
@@ -10,10 +10,11 @@
 const REGISTRY = Object.create(null);
 
 import { Position } from "../components/Position.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
-import { Terrain } from "../components/Terrain.js";
 import { Collider } from "../components/Collider.js";
+import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
+import { hasLOS } from "../../shared/math/gridLOS.js";
 
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
 /** @param {World} world @param {number} actor @param {{id:string,name:string,manaCost:number,[k:string]:any}} spell @param {{[k:string]:any}} intent */
@@ -35,28 +36,32 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   const candidates = [];
   for (const [id, p] of world.query(Position)) {
     if (id === actor) continue;
-    const ni = /** @type any */ (world.get(id, NamedIdentity));
-    if (!ni || ni.identity !== 'monster') continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || fac.key !== 'enemy') continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp|0) <= 0) continue;
-    // within max radius
+    // within max radius (LOS is checked per-hop, not globally)
     if (d2(apos.x, apos.y, p.x, p.y) <= MAX_R*MAX_R) {
       candidates.push({ id, x: p.x, y: p.y });
     }
   }
-  if (!candidates.length) {
-    // Nothing to hit; emit a short self-burst semantic
+
+  // First target must be in LOS from the caster
+  candidates.sort((a,b)=> d2(apos.x,apos.y,a.x,a.y) - d2(apos.x,apos.y,b.x,b.y));
+  let first = null;
+  for (const c of candidates) {
+    if (hasLOS(apos.x|0, apos.y|0, c.x|0, c.y|0, isOpaque)) { first = c; break; }
+  }
+  if (!first) {
+    // Nothing visible to hit; emit a short self-burst semantic
     try { world.emit && world.emit('spell:bolt', { actor, targetId: actor, spellId: spell.id, from: {x: apos.x, y: apos.y}, to: {x: apos.x, y: apos.y}, chainIndex: 0 }); } catch {}
     return;
   }
 
-  // Choose nearest from actor
-  candidates.sort((a,b)=> d2(apos.x,apos.y,a.x,a.y) - d2(apos.x,apos.y,b.x,b.y));
   const used = new Set();
   const chain = [];
-  let cur = candidates[0];
-  used.add(cur.id);
-  chain.push(cur);
+  used.add(first.id);
+  chain.push(first);
 
   // Chain to up to CHAIN_MAX-1 additional targets, nearest to current within CHAIN_RADIUS
   while (chain.length < CHAIN_MAX) {
@@ -65,7 +70,8 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     for (const c of candidates) {
       if (used.has(c.id)) continue;
       const dist2 = d2(last.x, last.y, c.x, c.y);
-      if (dist2 <= CHAIN_RADIUS*CHAIN_RADIUS && dist2 < bestD2) { best = c; bestD2 = dist2; }
+      if (dist2 <= CHAIN_RADIUS*CHAIN_RADIUS && dist2 < bestD2
+          && hasLOS(last.x|0, last.y|0, c.x|0, c.y|0, isOpaque)) { best = c; bestD2 = dist2; }
     }
     if (!best) break;
     used.add(best.id);
@@ -101,11 +107,10 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
   const RADIUS = 2;
   const BASE_DMG = 6;
 
-  // Build walkability blocking set (non-walkable terrain + solid colliders)
+  // Build entity-based blocking set (solid colliders like doors)
+  // Terrain walls are handled by tileMap.isWalkable()
   const blocking = new Set();
   for (const [id, pos] of world.query(Position)) {
-    const ter = /** @type any */ (world.get(id, Terrain));
-    if (ter && !ter.walkable) { blocking.add(`${pos.x},${pos.y}`); continue; }
     const col = /** @type any */ (world.get(id, Collider));
     if (col && col.solid) blocking.add(`${pos.x},${pos.y}`);
   }
@@ -135,7 +140,7 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
     for (let step = 0; step < pushDist; step++) {
       const nx = cx + t.dx;
       const ny = cy + t.dy;
-      if (blocking.has(`${nx},${ny}`)) break;
+      if (!isWalkable(nx, ny) || blocking.has(`${nx},${ny}`)) break;
       cx = nx;
       cy = ny;
     }
@@ -174,16 +179,18 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     ox = intent.x | 0;
     oy = intent.y | 0;
   } else {
-    // Auto-target nearest enemy with hp > 0
+    // Auto-target nearest visible enemy with hp > 0
     let bestId = 0, bestD2 = Infinity;
     for (const [id, pos] of world.query(Position)) {
       if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || fac.key !== 'enemy') continue;
       const vit = /** @type any */ (world.get(id, Vitality));
       if (!vit || (vit.hp | 0) <= 0) continue;
       const dx = (pos.x | 0) - (apos.x | 0);
       const dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestId = id; bestD2 = d2; }
+      if (d2 < bestD2 && hasLOS(apos.x | 0, apos.y | 0, pos.x | 0, pos.y | 0, isOpaque)) { bestId = id; bestD2 = d2; }
     }
     if (!bestId) return;
     const tp = /** @type any */ (world.get(bestId, Position));

@@ -13,7 +13,7 @@ import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 
-/** @param {import('../../lib/ecs-js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
+/** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
     const eq = world.get(entityId, Equipment);
     if (!eq) return;
@@ -28,7 +28,7 @@ function forEachAffix(world, entityId, fn) {
     }
 }
 
-/** @param {import('../../lib/ecs-js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
+/** @param {import('../../lib/ecs-js/index.js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
 function attachHelpers(world, base) {
     /** @param {string} k @param {number} v */
     base.addBonus = (k, v) => { if (k === 'damage') base.damage += v; };
@@ -53,7 +53,7 @@ function attachHelpers(world, base) {
     return base;
 }
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
         const defender = intent.targetId | 0;
@@ -85,8 +85,17 @@ export function combatSystem(world) {
 
         const atkEq = world.get(attacker, Equipment);
         const defEq = world.get(defender, Equipment);
-        const attackBonus = 1 + (atkEq?.attackDerived || 0);
-        const armorClass = 10 + (defEq?.defenseDerived || 0);
+        // Disease penalty: each stack of 'diseased' reduces attack/defense by potency
+        const atkStatus = world.get(attacker, Status);
+        const atkDisease = atkStatus?.statuses?.find(s => s.type === 'diseased');
+        const atkDiseasePenalty = atkDisease ? Math.max(0, (atkDisease.potency || 1) * (atkDisease.stacks || 1)) : 0;
+
+        const defStatus = world.get(defender, Status);
+        const defDisease = defStatus?.statuses?.find(s => s.type === 'diseased');
+        const defDiseasePenalty = defDisease ? Math.max(0, (defDisease.potency || 1) * (defDisease.stacks || 1)) : 0;
+
+        const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty);
+        const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty);
 
         // Deterministic d20 roll seeded by world + participants + step
         const seed = (world.seed >>> 0) ^ ((world.step | 0) * 0x9e3779b9 >>> 0) ^ (attacker >>> 0) ^ ((defender << 16) >>> 0);
@@ -111,9 +120,9 @@ export function combatSystem(world) {
             baseDice = (info && info.damageDice) ? String(info.damageDice) : null;
         }
         if (!baseDice) {
-            // Fallbacks: monsters hit harder than barehanded players
+            // Fallbacks: use natural damage dice (claws/bite) if defined, else defaults
             const isPlayer = world.has(attacker, Player);
-            baseDice = isPlayer ? '1d2' : '1d8';
+            baseDice = isPlayer ? '1d2' : (atkEq?.naturalDamageDice || '1d8');
         }
         const damageRoll = rollDice(baseDice, r);
         // Add a small portion of attack bonus as flat damage (DnD-ish flavor)
@@ -129,6 +138,10 @@ export function combatSystem(world) {
                 runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
             }
         });
+        // Innate monster pre-hit script (e.g., orc rage bonus damage)
+        if (atkEq?.naturalScript) {
+            runScript(atkEq.naturalScript, ScriptVerb.AffixOnBeforeHit, world, ctx);
+        }
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -144,6 +157,10 @@ export function combatSystem(world) {
         });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+        // Innate monster on-hit script (e.g., rat bite → disease)
+        if (atkEq?.naturalScript) {
+            runScript(atkEq.naturalScript, ScriptVerb.AffixOnHit, world, hitCtx);
+        }
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {
