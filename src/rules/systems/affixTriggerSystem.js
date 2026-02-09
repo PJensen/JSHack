@@ -56,6 +56,11 @@ export function installAffixTriggers(world) {
         runScript(a.script, ScriptVerb.AffixOnDamaged, world, ctxT);
       }
     });
+    // Innate monster on-damaged script (e.g., skeleton reassemble, lich phylactery)
+    const defEq = world.get(target, Equipment);
+    if (defEq?.naturalScript) {
+      runScript(defEq.naturalScript, ScriptVerb.AffixOnDamaged, world, ctxT);
+    }
   });
   world[AFFIX_TRIGGERS_KEY] = off;
 }

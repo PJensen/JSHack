@@ -28,8 +28,10 @@ export function trapSystem(world) {
     // Reveal and name before triggering so logs show source
     const ident = world.get(tid, NamedIdentity);
     if (!ident) {
-      const name = t.type === 'spike' ? 'Spike Trap' : 'Trap';
-      try { world.add(tid, NamedIdentity, { name, identity: 'trap_spike' }); } catch {}
+      const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap' };
+      const name = trapNames[t.type] || 'Trap';
+      const identity = 'trap_' + (t.type || 'spike');
+      try { world.add(tid, NamedIdentity, { name, identity }); } catch {}
     }
 
     // Run scripted behavior

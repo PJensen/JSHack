@@ -4,6 +4,7 @@
 import { createRng } from '../../../lib/ecs-js/rng.js';
 import { floorSeed } from './seed.js';
 import { CHUNK_SIZE } from './constants.js';
+import { dungeonConfig } from './dungeonConfig.js';
 
 /**
  * @typedef {Object} StairPlacement
@@ -34,17 +35,13 @@ export function generateFloorPlan(worldSeed, depth) {
   const seed = floorSeed(worldSeed, depth);
   const rng = createRng(seed);
 
-  // Down stairs: always at least 1, deeper floors occasionally get 2
-  const downStairCount = 1 + (depth >= 5 && rng.next() < 0.3 ? 1 : 0);
-  const downStairs = [];
-  for (let i = 0; i < downStairCount; i++) {
-    downStairs.push({
-      chunkX: rng.int(1, 3) * (i % 2 === 0 ? 1 : -1),
-      chunkY: rng.int(1, 3) * (i < 2 ? 1 : -1),
-      localX: rng.int(4, CHUNK_SIZE - 5),
-      localY: rng.int(4, CHUNK_SIZE - 5),
-    });
-  }
+  // Down stairs: placed in the starting chunk (0,0)
+  const downStairs = [{
+    chunkX: 0,
+    chunkY: 0,
+    localX: 0,
+    localY: 0,
+  }];
 
   // Up stairs: 1 near origin, except on floor 1
   const upStairs = [];

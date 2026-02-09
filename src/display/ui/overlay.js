@@ -8,6 +8,7 @@ export function initOverlays() {
   const pick = ensurePanel('pickup');
   const spells = ensurePanel('spells');
   const groundTip = ensureGroundTooltip(root);
+  const stairTip = ensureStairTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
 
@@ -84,6 +85,18 @@ export function initOverlays() {
   });
   window.addEventListener('ui:hideGroundItem', () => {
     groundTip.style.display = 'none';
+  });
+
+  // Stair tooltip lifecycle
+  window.addEventListener('ui:showStairTooltip', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderStairTooltip(stairTip, d);
+    stairTip.style.display = 'block';
+  });
+  window.addEventListener('ui:hideStairTooltip', () => {
+    stairTip.style.display = 'none';
   });
 
   // Passive updates to the always-on ticker
@@ -249,6 +262,48 @@ function ensureGroundTooltip(root) {
   });
   root.appendChild(tip);
   return tip;
+}
+
+// --- Stair tooltip (tap to descend/ascend) ---------------------------------
+/** @param {HTMLElement} root */
+function ensureStairTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'stair-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed', left: '50%', bottom: '120px', transform: 'translateX(-50%)',
+    minWidth: '180px', pointerEvents: 'auto', display: 'none',
+    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
+    border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    fontFamily: 'monospace', padding: '10px 16px', zIndex: 850,
+    textAlign: 'center', cursor: 'pointer'
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+/** @param {HTMLDivElement} tip @param {{stairId?:number, direction?:string}} detail */
+function renderStairTooltip(tip, detail) {
+  tip.innerHTML = '';
+  const dir = detail?.direction || 'down';
+  const label = dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs';
+
+  const title = document.createElement('div');
+  title.textContent = label;
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' });
+  tip.appendChild(title);
+
+  const hint = document.createElement('div');
+  hint.style.opacity = '0.8';
+  hint.style.fontSize = '12px';
+  hint.textContent = `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
+  tip.appendChild(hint);
+
+  tip.onclick = () => {
+    window.dispatchEvent(new CustomEvent('ui:requestStairTraverse', {
+      detail: { stairId: detail?.stairId, direction: dir }
+    }));
+    tip.style.display = 'none';
+  };
 }
 
 function ensureSpellGestureHint(root) {
@@ -557,7 +612,7 @@ function renderInventory(panel, items) {
 
   const hint = document.createElement('div');
   hint.style.marginTop = '8px'; hint.style.opacity = '0.85';
-  hint.textContent = '↑/↓ to select · Enter to Use (Drink/Equip/Learn) · E=Equip · D=Drink · U=Use · Esc=Close';
+  hint.textContent = '↑/↓ to select · Enter to Use · E=Equip · D=Drink · U=Use · S=Set Spell · Esc=Close';
   el.appendChild(hint);
 
   /** @param {number} i */
@@ -577,6 +632,9 @@ function renderInventory(panel, items) {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
     } else if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll') {
       window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    } else if (it.type === 'spell') {
+      const spellId = String(it.id || '').replace(/^spell:/, '');
+      if (spellId) window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } }));
     }
   }
 
@@ -592,6 +650,7 @@ function renderInventory(panel, items) {
     else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
   }
 
   // Activate keyboard navigation while panel is open

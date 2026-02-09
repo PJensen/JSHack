@@ -6,11 +6,13 @@ export const Equipment = defineComponent('Equipment', {
   shield: null,
   ring1: null,
   ring2: null,
+  ammo: null,
   attackDerived: 0,
   defenseDerived: 0,
   maxHpDerived: 0,
   critChanceDerived: 0,
   critMultDerived: 0,
+  manaRegenDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });

@@ -85,8 +85,17 @@ export function combatSystem(world) {
 
         const atkEq = world.get(attacker, Equipment);
         const defEq = world.get(defender, Equipment);
-        const attackBonus = 1 + (atkEq?.attackDerived || 0);
-        const armorClass = 10 + (defEq?.defenseDerived || 0);
+        // Disease penalty: each stack of 'diseased' reduces attack/defense by potency
+        const atkStatus = world.get(attacker, Status);
+        const atkDisease = atkStatus?.statuses?.find(s => s.type === 'diseased');
+        const atkDiseasePenalty = atkDisease ? Math.max(0, (atkDisease.potency || 1) * (atkDisease.stacks || 1)) : 0;
+
+        const defStatus = world.get(defender, Status);
+        const defDisease = defStatus?.statuses?.find(s => s.type === 'diseased');
+        const defDiseasePenalty = defDisease ? Math.max(0, (defDisease.potency || 1) * (defDisease.stacks || 1)) : 0;
+
+        const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty);
+        const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty);
 
         // Deterministic d20 roll seeded by world + participants + step
         const seed = (world.seed >>> 0) ^ ((world.step | 0) * 0x9e3779b9 >>> 0) ^ (attacker >>> 0) ^ ((defender << 16) >>> 0);
@@ -129,6 +138,10 @@ export function combatSystem(world) {
                 runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
             }
         });
+        // Innate monster pre-hit script (e.g., orc rage bonus damage)
+        if (atkEq?.naturalScript) {
+            runScript(atkEq.naturalScript, ScriptVerb.AffixOnBeforeHit, world, ctx);
+        }
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 

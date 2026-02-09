@@ -1,6 +1,9 @@
 import { registerScript, ScriptVerb } from "../scripting.js";
 import { Vitality } from "../components/Vitality.js";
 import { Position } from "../components/Position.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { Monster } from "../archetypes/Creatures.js";
+import { getMonster } from "../data/monsters.js";
 
 // Spike trap: deals percentage of max HP as damage.
 // Params: { percent?: number } // 0..1
@@ -17,6 +20,42 @@ registerScript('trap_spike', {
     try { world.emit && world.emit('damaged', { target, amount, source: Number(ctx?.trapId || 0) || 0, at: pos ? { x: pos.x, y: pos.y } : undefined }); } catch {}
     if (vit.hp <= 0) {
       try { world.emit && world.emit('died', { id: target, killer: Number(ctx?.trapId || 0) || 0 }); } catch {}
+    }
+  }
+});
+
+// Snake trap: spawns a cluster of snakes around the trigger point.
+// Params: { count?: number } — number of snakes (default 3)
+registerScript('trap_snake', {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) || 0;
+    const trapPos = world.get(trapId, Position);
+    if (!trapPos) return;
+
+    const snakeDef = getMonster('snake');
+    if (!snakeDef) return;
+
+    const count = Number(ctx?.params?.count ?? 3);
+    // Offsets for adjacent tiles (cardinal + diagonal)
+    const offsets = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+    for (let i = 0; i < count && i < offsets.length; i++) {
+      const [dx, dy] = offsets[i];
+      createFrom(world, Monster, {
+        x: trapPos.x + dx,
+        y: trapPos.y + dy,
+        name: snakeDef.name,
+        identity: snakeDef.id,
+        maxHp: snakeDef.baseHp,
+        faction: 'enemy',
+        attackDerived: snakeDef.attack,
+        defenseDerived: snakeDef.defense,
+        naturalDamageDice: snakeDef.damageDice,
+        naturalScript: snakeDef.script,
+        sizeClass: snakeDef.sizeClass,
+        massKg: snakeDef.massKg,
+        resistances: snakeDef.resistances,
+        speed: snakeDef.speed,
+      });
     }
   }
 });

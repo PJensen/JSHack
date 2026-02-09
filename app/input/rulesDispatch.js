@@ -36,7 +36,13 @@ export function makeRulesDispatcher(world, getActorId) {
         break;
       }
       case "rules.castActiveSpell": {
-        const { spellId = 0, targetId = actorId } = action.payload || {};
+        const { spellId, targetId = actorId } = action.payload || {};
+        if (!spellId) {
+          // No spell specified (keyboard shortcut); delegate to app-side
+          // active spell resolution via the same path as the Cast button.
+          try { window.dispatchEvent(new CustomEvent('ui:castActiveSpell')); } catch {}
+          break;
+        }
         world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
         world?.tick?.(1);
         break;
@@ -53,6 +59,11 @@ export function makeRulesDispatcher(world, getActorId) {
         if (!Number.isInteger(itemId) || itemId <= 0) break;
         world?.add?.(actorId, UseIntent, { itemId, targetId });
         world?.tick?.(1);
+        break;
+      }
+      case "rules.shootRanged": {
+        // No explicit target; delegate to app-side auto-targeting
+        try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
         break;
       }
       case "rules.rangedAttack": {
