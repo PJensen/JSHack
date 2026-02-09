@@ -71,12 +71,19 @@ export function populateChunk(chunk, floorPlan, rng) {
 export function materializeSpawn(world, spawn) {
   switch (spawn.kind) {
     case 'monster': {
+      const p = spawn.params;
       return createFrom(world, Monster, {
         x: spawn.x, y: spawn.y,
-        name: spawn.params.name,
-        identity: spawn.params.identity,
-        maxHp: spawn.params.maxHp,
-        faction: spawn.params.faction,
+        name: p.name,
+        identity: p.identity,
+        maxHp: p.maxHp,
+        faction: p.faction,
+        attackDerived: p.attackDerived,
+        defenseDerived: p.defenseDerived,
+        naturalDamageDice: p.naturalDamageDice,
+        sizeClass: p.sizeClass,
+        massKg: p.massKg,
+        resistances: p.resistances,
       });
     }
     case 'gold': {

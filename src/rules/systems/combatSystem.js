@@ -111,9 +111,9 @@ export function combatSystem(world) {
             baseDice = (info && info.damageDice) ? String(info.damageDice) : null;
         }
         if (!baseDice) {
-            // Fallbacks: monsters hit harder than barehanded players
+            // Fallbacks: use natural damage dice (claws/bite) if defined, else defaults
             const isPlayer = world.has(attacker, Player);
-            baseDice = isPlayer ? '1d2' : '1d8';
+            baseDice = isPlayer ? '1d2' : (atkEq?.naturalDamageDice || '1d8');
         }
         const damageRoll = rollDice(baseDice, r);
         // Add a small portion of attack bonus as flat damage (DnD-ish flavor)
