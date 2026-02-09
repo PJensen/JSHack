@@ -10,6 +10,10 @@ import { Inventory } from "../components/Inventory.js";
 import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { DungeonState } from "../components/DungeonState.js";
+import { createRng } from "../../lib/ecs-js/rng.js";
+import { getMonster, getMonsterLootTable } from "../data/monsters.js";
+import { dropLoot } from "../data/lootResolver.js";
 
 /**
  * Collect all entities with Vitality and remove those whose hp <= 0.
@@ -38,6 +42,21 @@ export function cleanupSystem(world) {
         // Clear inventory to reflect that items are no longer held
         inv.items.length = 0;
       }
+      // Generate loot from monster's loot table
+      const ident = world.get(id, NamedIdentity);
+      if (ident && pos) {
+        const monsterDef = getMonster(ident.identity);
+        if (monsterDef) {
+          const tableId = getMonsterLootTable(monsterDef);
+          const step = world.step | 0;
+          const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ ((id * 0x517cc1b7) >>> 0)) >>> 0;
+          const rng = createRng(lootSeed);
+          let depth = 1;
+          for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
+          dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
+        }
+      }
+
       world.destroy(id);
     }
   }

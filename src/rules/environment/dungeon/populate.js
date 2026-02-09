@@ -6,10 +6,16 @@ import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Position } from '../../components/Position.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
 import { Monster } from '../../archetypes/Creatures.js';
-import { HealthPotion, GoldStack } from '../../archetypes/Items.js';
+import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
-import { pickMonster, pickItem } from './tables.js';
+import { pickMonster, pickItem, pickTrap } from './tables.js';
 import { CHUNK_SIZE } from './constants.js';
+import { getMonster } from '../../data/monsters.js';    // DEBUG
+import { getItem } from '../../data/items.js';           // DEBUG
+import { NamedIdentity } from '../../components/NamedIdentity.js';
+import { Chest } from '../../archetypes/Door.js';
+import { Interactable } from '../../components/Interactable.js';
+import { Trap } from '../../components/Trap.js';
 
 /**
  * @typedef {Object} SpawnPoint
@@ -29,6 +35,33 @@ import { CHUNK_SIZE } from './constants.js';
 export function populateChunk(chunk, floorPlan, rng) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
+
+  // ── DEBUG: force spellbooks into first room ────────────────
+  if (chunk.rooms.length > 0) {
+    const r0 = chunk.rooms[0];
+    const cx = r0.x + Math.floor(r0.w / 2);
+    const cy = r0.y + Math.floor(r0.h / 2);
+    for (const [i, bookId] of ['book_lightning', 'book_meteor', 'book_blastwave'].entries()) {
+      spawns.push({ x: cx - 1 + i, y: cy + 1, kind: 'book', params: { bookId } });
+    }
+    // DEBUG: force a bow and arrows into first room
+    spawns.push({ x: cx - 1, y: cy + 2, kind: 'equipment', params: { equipId: 'bow_short', affixes: [] } });
+    spawns.push({ x: cx, y: cy + 2, kind: 'arrows', params: {} });
+    spawns.push({ x: cx + 1, y: cy + 2, kind: 'fire_arrows', params: {} });
+    // DEBUG: force a grid bug near center of first room
+    const gb = getMonster('grid_bug');
+    if (gb) {
+      spawns.push({ x: cx + 2, y: cy, kind: 'monster', params: {
+        name: gb.name, identity: gb.id,
+        maxHp: Math.floor(gb.baseHp + floorPlan.depth * gb.hpPerLevel),
+        faction: 'enemy', attackDerived: gb.attack, defenseDerived: gb.defense,
+        naturalDamageDice: gb.damageDice, naturalScript: gb.script,
+        sizeClass: gb.sizeClass, massKg: gb.massKg,
+        resistances: gb.resistances, speed: gb.speed,
+      }});
+    }
+  }
+  // ── END DEBUG ───────────────────────────────────────────────
 
   for (const room of chunk.rooms) {
     const area = room.w * room.h;
@@ -56,6 +89,24 @@ export function populateChunk(chunk, floorPlan, rng) {
         kind: item.kind,
         params: item,
       });
+    }
+
+    // Trap density: ~1 per 50-80 floor tiles
+    const trapBudget = Math.max(0, Math.floor(area / rng.int(50, 80)));
+    for (let i = 0; i < trapBudget; i++) {
+      const tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      const ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      const trap = pickTrap(rng, floorPlan.depth);
+      spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
+    }
+
+    // Chest: ~30% chance per room
+    if (rng.next() < 0.30) {
+      const chx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      const chy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      const d = floorPlan.depth;
+      const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
+      spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId } });
     }
   }
 
@@ -100,7 +151,56 @@ export function materializeSpawn(world, spawn) {
       return id;
     }
     case 'equipment': {
-      const id = buildEquipmentItem(world, spawn.params.equipId);
+      const id = buildEquipmentItem(world, spawn.params.equipId, {
+        affixes: spawn.params.affixes || [],
+      });
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'arrows': {
+      const id = createFrom(world, ArrowsStack, {});
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'fire_arrows': {
+      const id = createFrom(world, FireArrowsStack, {});
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'scroll': {
+      const id = createFrom(world, ScrollOfMapping, {});
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'chest': {
+      const id = createFrom(world, Chest, { x: spawn.x, y: spawn.y });
+      const inter = world.get(id, Interactable);
+      if (inter) inter.params = { lootTable: spawn.params.lootTable };
+      return id;
+    }
+    case 'trap': {
+      const p = spawn.params;
+      const id = world.create();
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      world.add(id, Trap, {
+        type: p.type,
+        script: p.script,
+        params: p.params || {},
+        revealed: false,
+        armed: true,
+      });
+      // No NamedIdentity — trap is invisible until triggered
+      return id;
+    }
+    case 'book': {
+      const def = getItem(spawn.params.bookId);
+      if (!def) return null;
+      const id = world.create();
+      world.add(id, NamedIdentity, { name: def.name, identity: def.id });
+      world.add(id, ItemInfo, {
+        type: def.type, slot: def.slot, weight: 1, value: 0,
+        description: def.description, count: 1,
+      });
       world.add(id, Position, { x: spawn.x, y: spawn.y });
       return id;
     }

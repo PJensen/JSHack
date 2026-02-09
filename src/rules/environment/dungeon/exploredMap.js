@@ -89,9 +89,52 @@ export function isVisible(x, y) { return _has(_visible, x, y); }
 /** @returns {(x:number, y:number) => boolean} */
 export function isExplored(x, y) { return _has(_explored, x, y); }
 
+/** Mark a single tile as explored (for map-reveal effects). */
+export function markExplored(x, y) { _set(_explored, x, y); }
+
 /** Clear all explored/visible data (call on depth transition). */
 export function clearExplored() {
   _explored.clear();
   _clearVisible();
   _lastStep = -1;
+}
+
+/**
+ * Randomly zero out a fraction of explored tiles on the current floor.
+ * Each explored byte has `fraction` probability of being forgotten.
+ * @param {number} fraction - probability [0,1] of forgetting each tile
+ * @param {() => number} rngFn - returns float in [0,1)
+ */
+export function degradeExplored(fraction, rngFn) {
+  for (const chunk of _explored.values()) {
+    for (let i = 0; i < chunk.length; i++) {
+      if (chunk[i] && rngFn() < fraction) {
+        chunk[i] = 0;
+      }
+    }
+  }
+}
+
+/**
+ * Snapshot the current explored chunks so they can be restored later.
+ * @returns {Map<string, Uint8Array>} deep copy of explored state
+ */
+export function saveExplored() {
+  const snap = new Map();
+  for (const [key, chunk] of _explored) {
+    snap.set(key, new Uint8Array(chunk));
+  }
+  return snap;
+}
+
+/**
+ * Restore a previously saved explored snapshot.
+ * Merges into (currently empty) explored map.
+ * @param {Map<string, Uint8Array>} snap
+ */
+export function restoreExplored(snap) {
+  if (!snap) return;
+  for (const [key, chunk] of snap) {
+    _explored.set(key, new Uint8Array(chunk));
+  }
 }

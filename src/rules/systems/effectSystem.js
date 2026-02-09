@@ -100,20 +100,32 @@ export function effectSystem(world) {
                     upsertStatus(nextStatuses, { type: 'stunned', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
-                case 'disease':
-                case 'diseased': {
+                case 'bleed':
+                case 'bleeding': {
                     const dmg = Math.max(0, potency * stacks);
                     if (vit) {
                         vit.hp = Math.max(0, vit.hp - dmg);
                         try { world.emit && world.emit('damage', { id, amount: dmg }); } catch {}
                         if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
                     }
+                    upsertStatus(nextStatuses, { type: 'bleeding', duration: e.turnsLeft, potency, stacks });
+                    break;
+                }
+                case 'disease':
+                case 'diseased': {
+                    // Disease weakens rather than dealing damage.
+                    // Penalty is applied at combat time by combatSystem reading the 'diseased' status.
                     upsertStatus(nextStatuses, { type: 'diseased', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
                 case 'thorns': {
                     // Purely visual status to indicate a thorns proc this turn
                     upsertStatus(nextStatuses, { type: 'thorns', duration: e.turnsLeft, potency, stacks });
+                    break;
+                }
+                case 'mindwipe':
+                case 'mindwiped': {
+                    upsertStatus(nextStatuses, { type: 'mindwiped', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
                 default: {

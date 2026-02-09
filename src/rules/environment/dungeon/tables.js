@@ -2,6 +2,7 @@
 // Loot tables and monster pools for depth-scaled entity placement.
 
 import { getMonstersByTier } from '../../data/monsters.js';
+import { resolveLootTable } from '../../data/lootResolver.js';
 
 /**
  * Pick monster parameters based on depth.
@@ -28,31 +29,50 @@ export function pickMonster(rng, depth) {
   };
 }
 
-/** Equipment IDs by rarity tier. */
-const EQUIP_COMMON = [
-  'sword_plain', 'dagger_quick', 'leather_armor', 'shield_wood',
-];
-const EQUIP_MAGIC = [
-  'axe_heavy', 'chain_armor', 'ring_health', 'ring_precision', 'shield_iron',
-];
-
 /**
- * Pick an item spawn descriptor.
+ * Pick an item spawn descriptor via the loot table system.
+ * Returns a materializeSpawn-compatible descriptor: {kind, count?, equipId?}
  * @param {Object} rng
  * @param {number} depth
  * @returns {{kind:string, count?:number, equipId?:string}}
  */
 export function pickItem(rng, depth) {
-  const roll = rng.next();
-  if (roll < 0.40) {
-    return { kind: 'gold', count: rng.int(5 + depth * 2, 15 + depth * 5) };
+  const tableId = depth >= 8 ? 'floor:magic' : 'floor:common';
+  const drops = resolveLootTable(tableId, rng, depth);
+  if (drops.length === 0) return { kind: 'potion' };
+
+  // Convert first resolved drop to the spawn descriptor format
+  const drop = drops[0];
+  switch (drop.kind) {
+    case 'gold':
+      return { kind: 'gold', count: drop.params.count };
+    case 'equip':
+      return { kind: 'equipment', equipId: drop.params.equipId, affixes: drop.params.affixes };
+    case 'archetype':
+      if (drop.params.archetype === 'HealthPotion') return { kind: 'potion' };
+      if (drop.params.archetype === 'ArrowsStack') return { kind: 'arrows' };
+      if (drop.params.archetype === 'ScrollOfMapping') return { kind: 'scroll' };
+      return { kind: 'potion' };
+    case 'item':
+      return { kind: 'book', bookId: drop.params.itemId };
+    default:
+      return { kind: 'potion' };
   }
-  if (roll < 0.70) {
-    return { kind: 'potion' };
+}
+
+/**
+ * Pick a trap descriptor based on depth.
+ * @param {Object} rng
+ * @param {number} depth
+ * @returns {{type:string, script:string, params:Object}}
+ */
+export function pickTrap(rng, depth) {
+  // Snake traps appear from depth 3+, increasing in likelihood
+  if (depth >= 3 && rng.next() < Math.min(0.4, 0.1 + depth * 0.03)) {
+    const count = Math.min(5, 2 + Math.floor(depth / 5));
+    return { type: 'snake', script: 'trap_snake', params: { count } };
   }
-  if (roll < 0.90) {
-    const pool = depth >= 5 ? EQUIP_MAGIC : EQUIP_COMMON;
-    return { kind: 'equipment', equipId: rng.choice(pool) };
-  }
-  return { kind: 'potion' }; // scrolls not yet implemented, fallback to potion
+  // Spike damage: 15% at shallow depths, up to 35% deep
+  const percent = Math.min(0.35, 0.15 + depth * 0.02);
+  return { type: 'spike', script: 'trap_spike', params: { percent } };
 }

@@ -131,6 +131,24 @@ export function forEachTileInRect(x0, y0, x1, y1, callback) {
   }
 }
 
+/**
+ * Iterate every non-void tile across all loaded chunks.
+ * @param {(x: number, y: number, tile: number) => void} callback
+ */
+export function forEachLoadedTile(callback) {
+  for (const [key, tiles] of _chunks) {
+    const [cxStr, cyStr] = key.split(',');
+    const ox = (+cxStr) * CHUNK_SIZE;
+    const oy = (+cyStr) * CHUNK_SIZE;
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      const row = ly * CHUNK_SIZE;
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        if (tiles[row + lx] !== TILE_VOID) callback(ox + lx, oy + ly, tiles[row + lx]);
+      }
+    }
+  }
+}
+
 /** @returns {number} number of loaded chunks */
 export function loadedChunkCount() {
   return _chunks.size;
