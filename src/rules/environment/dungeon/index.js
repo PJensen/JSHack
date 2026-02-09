@@ -11,7 +11,8 @@ export { transitionToDepth } from './transition.js';
 export { populateChunk, materializeSpawn } from './populate.js';
 export { pickMonster, pickItem } from './tables.js';
 export { buildBSP, placeRooms, carveRooms, connectRooms, collectLeafRooms } from './bsp.js';
-export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isOpaque, forEachTileInRect, loadedChunkCount } from './tileMap.js';
+export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isOpaque, forEachTileInRect, forEachLoadedTile, loadedChunkCount } from './tileMap.js';
+export { markExplored } from './exploredMap.js';
 
 import { DungeonState } from '../../components/DungeonState.js';
 import { generateChunk } from './chunk.js';
@@ -53,15 +54,21 @@ export function generateFloor(world, worldSeed, depth) {
     for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
       const chunkData = generateChunk(worldSeed, depth, cx, cy);
 
-      // Place stairs if the floor plan has any in this chunk
+      // Place stairs inside actual rooms (not at random positions that may be void)
       for (const stair of floorPlan.downStairs) {
-        if (stair.chunkX === cx && stair.chunkY === cy) {
-          chunkData.tiles[stair.localY * CHUNK_SIZE + stair.localX] = TILE_STAIR_DOWN;
+        if (stair.chunkX === cx && stair.chunkY === cy && chunkData.rooms.length > 0) {
+          const room = chunkData.rooms[chunkData.rooms.length - 1];
+          const lx = (room.x - cx * CHUNK_SIZE) + Math.floor(room.w / 2);
+          const ly = (room.y - cy * CHUNK_SIZE) + Math.floor(room.h / 2);
+          chunkData.tiles[ly * CHUNK_SIZE + lx] = TILE_STAIR_DOWN;
         }
       }
       for (const stair of floorPlan.upStairs) {
-        if (stair.chunkX === cx && stair.chunkY === cy) {
-          chunkData.tiles[stair.localY * CHUNK_SIZE + stair.localX] = TILE_STAIR_UP;
+        if (stair.chunkX === cx && stair.chunkY === cy && chunkData.rooms.length > 0) {
+          const room = chunkData.rooms[0];
+          const lx = (room.x - cx * CHUNK_SIZE) + Math.floor(room.w / 2);
+          const ly = (room.y - cy * CHUNK_SIZE) + Math.floor(room.h / 2);
+          chunkData.tiles[ly * CHUNK_SIZE + lx] = TILE_STAIR_UP;
         }
       }
 

@@ -55,12 +55,15 @@ export function initHUD() {
   weaponLine.style.fontSize = '12px'; weaponLine.style.color = '#cfe8ff';
   const defenseLine = document.createElement('div');
   defenseLine.style.fontSize = '12px'; defenseLine.style.color = '#cfe8ff';
+  const ammoLine = document.createElement('div');
+  ammoLine.style.fontSize = '12px'; ammoLine.style.color = '#cfe8ff'; ammoLine.style.display = 'none';
   const statusRow = document.createElement('div');
   Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' });
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
   combatBox.appendChild(weaponLine);
   combatBox.appendChild(defenseLine);
+  combatBox.appendChild(ammoLine);
   combatBox.appendChild(statusRow);
   combatBox.appendChild(affixRow);
   vitals.appendChild(combatBox);
@@ -161,6 +164,15 @@ export function initHUD() {
     const defTxt = Number.isFinite(defense) && defense !== 0 ? (defense > 0 ? `+${defense}` : `${defense}`) : '0';
     defenseLine.textContent = `Defense: ${defTxt}`;
 
+    // Ammo line (only visible when carrying arrows)
+    const ammoCount = Number(e?.detail?.ammo ?? 0);
+    if (ammoCount > 0) {
+      ammoLine.textContent = `Ammo: ${ammoCount}`;
+      ammoLine.style.display = '';
+    } else {
+      ammoLine.style.display = 'none';
+    }
+
     // Effects stack (badges + pie timers)
     ensureEffectsStack(statusRow).update(statuses);
 
@@ -193,17 +205,29 @@ export function initHUD() {
 function ensureEffectsStack(container) {
   if (container.__effectsStack) return container.__effectsStack;
 
-  /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement }>} */
+  /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement, stacksEl: HTMLDivElement }>} */
   const byKey = new Map();
 
-  const VIS = {
+  const _VIS = {
     invulnerable: { name: 'Aegis', glyph: '\u{1F6E1}\uFE0F', hue: 190 },
     burning:      { name: 'Burning', glyph: '\u{1F525}', hue: 20 },
-    poisoned:     { name: 'Poison', glyph: '\u2623', hue: 90 },
-    regenerating: { name: 'Regen', glyph: '\u{1F33F}', hue: 130 },
-    stunned:      { name: 'Stunned', glyph: '\u{1F4AB}', hue: 0 },
-    thorns:       { name: 'Thorns', glyph: '\u{1F335}', hue: 110 },
+    poisoned:     { name: 'Poison', glyph: '\u2620\uFE0F', hue: 120 },
+    regenerating: { name: 'Regen', glyph: '\u{1F49A}', hue: 140 },
+    stunned:      { name: 'Stunned', glyph: '\u{1F4AB}', hue: 45 },
+    thorns:       { name: 'Thorns', glyph: '\u{1F339}', hue: 110 },
+    diseased:     { name: 'Disease', glyph: '\u{1F9A0}', hue: 55 },
+    bleeding:     { name: 'Bleed', glyph: '\u{1FA78}', hue: 350 },
   };
+  // Aliases: raw ActiveEffects keys → same VIS entry
+  _VIS.invuln = _VIS.invulnerable;
+  _VIS.burn   = _VIS.burning;
+  _VIS.poison = _VIS.poisoned;
+  _VIS.regen  = _VIS.regenerating;
+  _VIS.regeneration = _VIS.regenerating;
+  _VIS.stun   = _VIS.stunned;
+  _VIS.disease = _VIS.diseased;
+  _VIS.bleed  = _VIS.bleeding;
+  const VIS = _VIS;
 
   const hsla = (h, a = 0.2) => `hsla(${h} 80% 50% / ${a})`;
   const shadowColor = (h) => `hsl(${h} 55% 35%)`;
@@ -237,12 +261,17 @@ function ensureEffectsStack(container) {
       background: 'conic-gradient(rgba(180,190,200,.2) 0deg, transparent 0)'
     });
 
+    const stacksEl = document.createElement('div');
+    Object.assign(stacksEl.style, { position: 'absolute', right: '4px', top: '2px', fontSize: '11px', fontWeight: '700', color: '#ffcc44', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)', zIndex: '2' });
+    stacksEl.textContent = 'x1';
+
     el.appendChild(glyph);
     el.appendChild(label);
     el.appendChild(ticks);
     el.appendChild(overlay);
+    el.appendChild(stacksEl);
 
-    return { el, overlay, ticksEl: ticks };
+    return { el, overlay, ticksEl: ticks, stacksEl };
   }
 
   function setAngle(rec, remaining) {
@@ -259,16 +288,18 @@ function ensureEffectsStack(container) {
       const key = String(s.key || '').toLowerCase();
       if (!key) continue;
       const turns = Math.max(0, Number(s.turns || 0));
+      const stacks = Math.max(1, Number(s.stacks || 1));
       const spec = VIS[key] || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 };
       let rec = byKey.get(key);
       if (!rec) {
-        const { el, overlay, ticksEl } = createBadge(spec, turns || 1);
-        rec = { el, overlay, ticksEl, total: Math.max(1, turns || 1) };
+        const { el, overlay, ticksEl, stacksEl } = createBadge(spec, turns || 1);
+        rec = { el, overlay, ticksEl, stacksEl, total: Math.max(1, turns || 1) };
         byKey.set(key, rec);
         container.appendChild(el);
       }
       rec.total = Math.max(1, Math.max(rec.total || 1, turns || 1));
       setAngle(rec, turns);
+      rec.stacksEl.textContent = `x${stacks}`;
       seen.add(key);
     }
     for (const [key, rec] of byKey.entries()) {
@@ -413,7 +444,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip') ? 'Equip' : (it.type === 'potion' ? 'Drink' : 'Read');
+  btn.textContent = (it.type === 'equip') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'learn' ? 'Learn' : 'Read'));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');

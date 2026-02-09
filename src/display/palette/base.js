@@ -9,6 +9,7 @@ export const basePalette = {
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" },
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
   bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" },
+  grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
   // Tier 1
   orc:      { glyph: "o", fg: "#cc6644", glow: "#993320" },
   skeleton: { glyph: "s", fg: "#ddd8c8", glow: "#aaa590" },
@@ -35,12 +36,23 @@ export const basePalette = {
   spellbook_fire: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
   spellbook_ice: { glyph: "📘", fg: "#4da6ff", glow: "#4da6ff" },
   spellbook_lightning: { glyph: "📓", fg: "#ffff66", glow: "#ffff66" },
-  // Alias to match rules identity so it renders on the ground
+  // Aliases to match rules identity so they render on the ground
   book_lightning: { glyph: "📓", fg: "#ffff66", glow: "#ffff66" },
+  book_meteor: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
+  book_blastwave: { glyph: "📙", fg: "#ffa333", glow: "#ffa333" },
   spellbook_dark: { glyph: "📙", fg: "#b366ff", glow: "#b366ff" },
   spellbook_healing: { glyph: "📒", fg: "#66ff99", glow: "#66ff99" },
   spellbook_summoning: { glyph: "📓", fg: "#ff66ff", glow: "#ff66ff" },
   spellbook_earth: { glyph: "📔", fg: "#cc9966", glow: "#cc9966" },
+
+  // Ammo
+  ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },
+
+  // Traps (revealed after triggering)
+  trap_spike: { glyph: "^", fg: "#a84000", glow: "#d65d1f" },
+  trap_snake: { glyph: "^", fg: "#55aa44", glow: "#338822" },
+  // Tier 0 (snake — spawned by snake traps)
+  snake:    { glyph: "S", fg: "#55aa44", glow: "#338822" },
 
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }

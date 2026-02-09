@@ -20,6 +20,7 @@ import { combatSystem } from "../../src/rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
 import { trapSystem } from "../../src/rules/systems/trapSystem.js";
+import { manaRegenerationSystem } from "../../src/rules/systems/manaRegenerationSystem.js";
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
 // Side-effect: registers script handlers at import time
@@ -56,6 +57,7 @@ export function configureWorld(world) {
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
+  registerSystem(manaRegenerationSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase

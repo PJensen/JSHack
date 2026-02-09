@@ -39,8 +39,9 @@ export const MONSTERS = [
     massKg: 30,
     resistances: { kinetic: { DR: 2 } },
     speed: 2,
-    script: null,
+    script: 'monster:goblinShiv',
     description: 'A sneering green-skinned runt armed with a rusty shiv.',
+    lootTable: 'drop:goblin',
   },
   {
     id: 'bat',
@@ -58,8 +59,48 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    script: null,
+    script: 'monster:batScreech',
     description: 'A leathery-winged vermin that darts erratically.',
+  },
+
+  {
+    id: 'grid_bug',
+    name: 'Grid Bug',
+    tier: 0,
+    glyph: 'x',
+    fg: '#bb66ff',
+    glow: '#44ccff',
+    baseHp: 3,
+    hpPerLevel: 0.5,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d2',
+    sizeClass: 'XS',
+    massKg: 1,
+    resistances: { kinetic: { DR: 0 }, electric: { ohms: Infinity } },
+    speed: 1,
+    script: 'monster:gridBugZap',
+    description: 'A tiny crackling insect that moves only along the grid axes.',
+  },
+
+  {
+    id: 'snake',
+    name: 'Snake',
+    tier: 0,
+    glyph: 'S',
+    fg: '#55aa44',
+    glow: '#338822',
+    baseHp: 4,
+    hpPerLevel: 0.8,
+    attack: 1,
+    defense: 0,
+    damageDice: '1d3',
+    sizeClass: 'XS',
+    massKg: 3,
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
+    speed: 1,
+    script: 'monster:snakeBite',
+    description: 'A hissing serpent with venomous fangs.',
   },
 
   // ── Tier 1 (floors 6-10) ───────────────────────────────────────────
@@ -79,7 +120,7 @@ export const MONSTERS = [
     massKg: 95,
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
-    script: null,
+    script: 'monster:orcRage',
     description: 'A thick-skulled brute with a chipped cleaver.',
   },
   {
@@ -101,7 +142,7 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
     },
     speed: 2,
-    script: null,
+    script: 'monster:skeletonReassemble',
     description: 'Bones held together by spite. Resistant to piercing.',
   },
   {
@@ -141,7 +182,7 @@ export const MONSTERS = [
     massKg: 200,
     resistances: { kinetic: { DR: 10 }, thermal: { burnMult: 1.5 } },
     speed: 3,
-    script: null,
+    script: 'monster:trollSmash',
     description: 'A hulking regenerator. Weak to fire.',
   },
   {
@@ -182,8 +223,32 @@ export const MONSTERS = [
     massKg: 250,
     resistances: { kinetic: { DR: 12 } },
     speed: 3,
-    script: null,
+    script: 'monster:ogreCrush',
     description: 'A lumbering slab of muscle and bad intentions.',
+  },
+
+  {
+    id: 'floating_eye',
+    name: 'Floating Eye',
+    tier: 2,
+    glyph: 'o',
+    fg: '#dd55ff',
+    glow: '#9922cc',
+    baseHp: 38,
+    hpPerLevel: 3.5,
+    attack: 5,
+    defense: 5,
+    damageDice: '2d6',
+    sizeClass: 'M',
+    massKg: 75,
+    resistances: {
+      kinetic: { DR: 6, bluntMult: 0.7, slashMult: 0.7, pierceMult: 0.7 },
+      chemical: { toxMult: 0 },
+      electric: { ohms: 100 },
+    },
+    speed: 2,
+    script: 'monster:mindflayerBlast',
+    description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
   },
 
   // ── Tier 3 (floors 16+) ────────────────────────────────────────────
@@ -206,7 +271,7 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    script: null,
+    script: 'monster:demonHellfire',
     description: 'Sulphur and malice given form. Immune to fire.',
   },
   {
@@ -230,6 +295,7 @@ export const MONSTERS = [
     speed: 2,
     script: 'monster:dragonClaw',
     description: 'Scales like hammered bronze. The apex predator of the deep.',
+    lootTable: 'drop:dragon',
   },
   {
     id: 'lich',
@@ -251,8 +317,9 @@ export const MONSTERS = [
       electric: { ohms: 200 },
     },
     speed: 3,
-    script: null,
+    script: 'monster:lichDrain',
     description: 'An undead sorcerer sustained by a hidden phylactery.',
+    lootTable: 'drop:lich',
   },
 ];
 
@@ -273,4 +340,9 @@ export function getMonster(id) {
   return _byId.get(id) || null;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, script:string|null, description:string }} MonsterDef */
+/** @param {MonsterDef} def @returns {string} loot table ID */
+export function getMonsterLootTable(def) {
+  return def.lootTable || `drop:tier${def.tier}`;
+}
+
+/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, script:string|null, description:string, lootTable?:string }} MonsterDef */

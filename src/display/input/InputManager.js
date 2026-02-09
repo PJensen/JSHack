@@ -118,6 +118,13 @@ export class InputManager {
       return;
     }
 
+    // Ranged attack: 'r'
+    if (key?.toLowerCase() === "r") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.ShootRanged));
+      return;
+    }
+
     // Pickup chooser (',' for get)
     if (key === ",") {
       e.preventDefault();
