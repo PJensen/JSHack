@@ -7,8 +7,14 @@ import { Position } from '../src/rules/components/Position.js';
 import { Inventory, ItemInfo } from '../src/rules/components/index.js';
 import { GoldStack } from '../src/rules/archetypes/Items.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
+import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 
 Deno.test("player auto-picks up gold when moving onto its tile", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+
   const world = new World({ seed: 1234 });
   configureWorld(world);
 

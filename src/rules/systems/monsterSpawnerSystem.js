@@ -5,7 +5,7 @@ import { Owner } from "../components/Owner.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
   for (const [id, sp] of world.query(MonsterSpawner)) {
     try {

@@ -6,7 +6,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Brain } from "../components/Brain.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
-/** @typedef {import('../../lib/ecs-js').World} World */
+/** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
  * useItemSystem — resolves UseIntent for generic item use.

@@ -7,6 +7,7 @@ export const EQUIP_DEFS = {
   chain_armor:   { id:'chain_armor', name:'Chainmail', kind:'equip', slot:'armor', rarity:2, rarityName:'magic', bonuses:{defense:2} },
   ring_health:   { id:'ring_health', name:'Ring of Health', kind:'equip', slot:'ring', rarity:2, rarityName:'magic', bonuses:{maxHp:5} },
   ring_precision:{ id:'ring_precision', name:'Ring of Precision', kind:'equip', slot:'ring', rarity:2, rarityName:'magic', bonuses:{critChance:0.08} },
+  ring_arcana:   { id:'ring_arcana', name:'Ring of Arcana', kind:'equip', slot:'ring', rarity:3, rarityName:'rare', bonuses:{manaRegen:0.5} },
   shield_wood:   { id:'shield_wood', name:'Wooden Shield', kind:'equip', slot:'shield', rarity:1, rarityName:'common', bonuses:{defense:1} },
   shield_iron:   { id:'shield_iron', name:'Iron Shield', kind:'equip', slot:'shield', rarity:2, rarityName:'magic', bonuses:{defense:2} },
   iron_pickaxe:  { id:'iron_pickaxe', name:'Iron Pickaxe', kind:'equip', slot:'weapon', rarity:1, rarityName:'common', bonuses:{dig:1}, damageDice:'1d4' },

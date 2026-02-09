@@ -10,15 +10,19 @@ import { Faction } from '../components/Faction.js';
 import { Position } from '../components/Position.js';
 import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
+import { ActiveEffects } from '../components/ActiveEffects.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 
-/** @param {import('../../lib/ecs-js').World} world */
+/** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
-  // Build blocking map once per tick
+  const intents = world.query(RangedAttackIntent);
+  if (intents.count({ cheap: true }) === 0) return;
+
+  // Build blocking map once per tick when needed
   const blocked = buildBlocksVisionMap(world);
   const isBlocked = blockedCallback(blocked);
 
-  for (const [attacker, intent] of world.query(RangedAttackIntent)) {
+  for (const [attacker, intent] of intents) {
     const defender = intent.targetId | 0;
     if (!world.isAlive(defender)) { world.remove(attacker, RangedAttackIntent); continue; }
 
@@ -39,11 +43,16 @@ export function rangedAttackSystem(world) {
       continue;
     }
 
-    // Find ammo in inventory
+    // Find ammo: prefer equipped ammo slot, fall back to first ammo in inventory
     const inv = world.get(attacker, Inventory);
     let ammoId = 0;
     let ammoInfo = null;
-    if (inv && Array.isArray(inv.items)) {
+    const equippedAmmo = eq?.ammo || 0;
+    if (equippedAmmo && world.isAlive(equippedAmmo)) {
+      const info = world.get(equippedAmmo, ItemInfo);
+      if (info && info.type === 'ammo') { ammoId = equippedAmmo; ammoInfo = info; }
+    }
+    if (!ammoId && inv && Array.isArray(inv.items)) {
       for (const itemId of inv.items) {
         const info = world.get(itemId, ItemInfo);
         if (info && info.type === 'ammo') { ammoId = itemId; ammoInfo = info; break; }
@@ -94,11 +103,14 @@ export function rangedAttackSystem(world) {
     const isCrit = d20 === 20;
     const isNat1 = d20 === 1;
 
+    // Ammo style (for VFX and bonus effects)
+    const ammoStyle = ammoInfo.subtype || 'plain';
+
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
       world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
       // Consume ammo even on miss
       consumeAmmo(world, attacker, ammoId, ammoInfo);
-      world.emit?.('ranged:shot', { attacker, target: defender, hit: false });
+      world.emit?.('ranged:shot', { attacker, target: defender, hit: false, style: ammoStyle });
       world.remove(attacker, RangedAttackIntent);
       continue;
     }
@@ -108,6 +120,10 @@ export function rangedAttackSystem(world) {
     const damageRoll = rollDice(baseDice, r);
     const flatBonus = Math.max(0, Math.floor((eq?.attackDerived || 0) / 2));
     let dmg = Math.max(1, damageRoll + flatBonus);
+
+    // Ammo bonus damage (fire arrows: +1d4)
+    if (ammoStyle === 'fire') dmg += rollDice('1d4', r);
+
     if (isCrit) dmg = Math.max(1, dmg * 2);
 
     // Apply damage
@@ -115,10 +131,28 @@ export function rangedAttackSystem(world) {
     world.emit?.('damaged', { target: defender, amount: dmg, source: attacker, critical: isCrit });
     if (defVit.hp <= 0) world.emit?.('died', { id: defender, killer: attacker });
 
+    // Fire arrows apply burning (3 turns, 2 dmg/turn)
+    if (ammoStyle === 'fire' && defVit.hp > 0) {
+      const ae = world.get(defender, ActiveEffects);
+      const effect = { key: 'burn', turnsLeft: 3, potency: 2, stacks: 1 };
+      if (ae && Array.isArray(ae.effects)) {
+        const existing = ae.effects.find(e => e.key === 'burn');
+        if (existing) {
+          existing.stacks = (existing.stacks || 1) + 1;
+          existing.turnsLeft = Math.max(existing.turnsLeft, 3);
+        } else {
+          ae.effects.push(effect);
+        }
+      } else {
+        try { world.add(defender, ActiveEffects, { effects: [effect] }); } catch {}
+      }
+      world.emit?.('proc:burning', { actor: attacker, target: defender });
+    }
+
     // Consume ammo
     consumeAmmo(world, attacker, ammoId, ammoInfo);
 
-    world.emit?.('ranged:shot', { attacker, target: defender, hit: true, damage: dmg });
+    world.emit?.('ranged:shot', { attacker, target: defender, hit: true, damage: dmg, style: ammoStyle });
     world.remove(attacker, RangedAttackIntent);
   }
 }
@@ -128,12 +162,14 @@ function consumeAmmo(world, owner, ammoId, ammoInfo) {
   if (ammoInfo.count > 1) {
     ammoInfo.count -= 1;
   } else {
-    // Last arrow: remove from inventory, destroy entity
+    // Last arrow: remove from inventory, clear equip slot, destroy entity
     const inv = world.get(owner, Inventory);
     if (inv && Array.isArray(inv.items)) {
       const idx = inv.items.indexOf(ammoId);
       if (idx !== -1) inv.items.splice(idx, 1);
     }
+    const eq = world.get(owner, Equipment);
+    if (eq && eq.ammo === ammoId) eq.ammo = null;
     world.destroy(ammoId);
   }
 }

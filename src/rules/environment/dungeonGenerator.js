@@ -9,7 +9,7 @@ import { bresenhamLine } from '../../shared/math/bresenham.js';
 /**
  * Generate a multi-room dungeon using integer tile entities.
  *
- * @param {import('../../lib/ecs-js').World} world
+ * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {{ width?:number, height?:number, corridorLen?:number, seed?:number }} [opts]
  * @returns {{ rooms: Array<{key:string, cx:number, cy:number, w:number, h:number}>,
  *             corridors: Array<{from:{x:number,y:number}, to:{x:number,y:number}}>,
