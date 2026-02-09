@@ -10,7 +10,7 @@ import { playerEntity } from "./rules/utils/queries.js";
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera } from "./display/camera/controller.js";
 import { updateShake, startShake } from "./display/camera/shake.js";
-import { zoomTo, jumpTo } from "./display/camera/utils.js";
+import { zoomTo, jumpTo, easeTo } from "./display/camera/utils.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
 import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
@@ -21,32 +21,32 @@ import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
+import { initStatusLine } from "./display/ui/statusLine.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
 import { Position } from "./rules/components/Position.js";
+import { Player } from "./rules/components/Player.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
-import { createFrom } from "./lib/ecs-js/archetype.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
-import { HealthPotion, GoldStack, ArrowsStack } from "./rules/archetypes/Items.js";
-import { FloorTile, WallTile } from "./rules/archetypes/Tiles.js";
-import { Door } from "./rules/archetypes/Door.js";
-import { Monster } from "./rules/archetypes/Creatures.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
-import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { getSpell } from "./rules/data/spells.js";
 import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
-import { createRng } from "./lib/ecs-js/rng.js";
 import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 import { FloatText } from "./display/passes/vfx/text/floatText.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
+import { DungeonState } from "./rules/components/DungeonState.js";
+import { Faction } from "./rules/components/Faction.js";
+import { forEachInRadius } from "./rules/utils/spatialIndex.js";
+import { hasLOS } from "./shared/math/gridLOS.js";
+import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -159,36 +159,47 @@ function updateActiveSpellLabel() {
   try { window.dispatchEvent(new CustomEvent('ui:updateActiveSpellLabel', { detail: { id: _activeSpellId, name, cost, canCast } })); } catch {}
 }
 
-// ---- Demo scene: ensure a player exists and a couple items around ----------
-// Build a small dungeon room (10x10) centered at (0,0)
-const W = 10, H = 10;
-const ox = -((W - 1) >> 1), oy = -((H - 1) >> 1);
-// Door at the bottom wall center (compute before tile loop to skip placing a wall there)
-const doorPos = { x: 0, y: oy + (H - 1) };
+// ---- Dungeon initialization -------------------------------------------------
+import { initDungeon } from "./rules/environment/dungeon/index.js";
+import { transitionToDepth } from "./rules/environment/dungeon/transition.js";
+import { TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from "./rules/environment/dungeon/constants.js";
+import { dungeonConfig } from "./rules/environment/dungeon/dungeonConfig.js";
+const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 'floor', [TILE_STAIR_DOWN]: 'stair_down', [TILE_STAIR_UP]: 'stair_up' };
 
-for (let y = 0; y < H; y++) {
-  for (let x = 0; x < W; x++) {
-    const gx = ox + x, gy = oy + y;
-    const isBorder = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
-    if (isBorder) {
-      if (gx === doorPos.x && gy === doorPos.y) continue;
-      createFrom(world, WallTile, { x: gx, y: gy });
-    } else {
-      createFrom(world, FloorTile, { x: gx, y: gy });
+// Allow URL override: ?dungeonScale=0.3 for compact debugging floors
+{
+  const ds = parseFloat(new URLSearchParams(window.location.search).get('dungeonScale'));
+  if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
+}
+
+// Initialize the procedural dungeon (entire floor generated up front)
+const spawnPos = initDungeon(world);
+
+// Diagnostic: log all stair entities so we can confirm they exist
+{
+  let stairCount = 0;
+  for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity === 'stair_down' || ni.identity === 'stair_up') {
+      console.log(`[DUNGEON] ${ni.identity} entity #${id} at (${pos.x}, ${pos.y})`);
+      stairCount++;
     }
   }
+  if (stairCount === 0) console.warn('[DUNGEON] WARNING: No stair entities were created!');
 }
-// Add a single door at the bottom wall center
-createFrom(world, Door, { x: doorPos.x, y: doorPos.y });
 
-// Ensure a player exists at room center
+// Create player at the spawn position (center of first room in origin chunk)
 if (!playerEntity(world)) {
-  createPlayer(world, { x: 0, y: 0, name: "Hero" });
+  createPlayer(world, { x: spawnPos.x, y: spawnPos.y, name: "Hero" });
 }
-// Apply 10-turn invulnerability to the player at start
+
+// Set player stats
 {
   const pe = playerEntity(world);
   if (pe) {
+    // Mana and vitality
+    world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 0.1 });
+    world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
+    // 10-turn invulnerability at start
     const ae = world.get(pe.id, ActiveEffects);
     if (ae && Array.isArray(ae.effects)) {
       ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
@@ -198,100 +209,19 @@ if (!playerEntity(world)) {
   }
 }
 
-// Give the player a starting Spellbook of Lightning
-// {
-//   const pe = playerEntity(world);
-//   if (pe) {
-
-//     // const inv = world.get(pe.id, Inventory);
-//     // if (inv && Array.isArray(inv.items)) inv.items.push(book);
-//   }
-// }
-
-
-// add a spellbook of lightning to the world
-const pe = playerEntity(world);
-const book = world.create();
-world.add(book, NamedIdentity, { name: 'Spellbook of Lightning', identity: 'book_lightning' });
-world.add(book, Position, { x: 4, y: 4 });
-world.add(book, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Lightning.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
-
-// set players basic mana/vitality stats
-if (pe) {
-  world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 1 });
-  // Vitality uses hp/maxHp fields
-  world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
-}
-
-// Drop a couple of health potions on the floor
-const p1 = createFrom(world, HealthPotion, {});
-world.add(p1, Position, { x: 4, y: 0 });
-const p2 = createFrom(world, HealthPotion, {});
-world.add(p2, Position, { x: -3, y: 0 });
-
-// Spawn a stack of gold (currency) using deterministic RNG
+// Give player a Scroll of Mapping (reveals full dungeon — debug aid)
+import { ScrollOfMapping } from "./rules/archetypes/Items.js";
+import { createFrom } from "./lib/ecs-js/archetype.js";
 {
-  const rng = createRng(world.seed >>> 0 ^ 0x9e3779b9);
-  const coins = rng.int(12, 47);
-  const gold = createFrom(world, GoldStack, {});
-  world.add(gold, Position, { x: -1, y: -1 });
-  world.mutate(gold, ItemInfo, (r) => { r.count = coins; });
+  const pe = playerEntity(world);
+  if (pe) {
+    const inv = world.get(pe.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      const scrollId = createFrom(world, ScrollOfMapping, {});
+      inv.items.push(scrollId);
+    }
+  }
 }
-
-// Spawn a few monsters that will chase the player
-createFrom(world, Monster, { x: ox + 2, y: oy + 2, name: "Goblin", identity: "monster" });
-createFrom(world, Monster, { x: ox + W - 3, y: oy + 2, name: "Goblin", identity: "monster" });
-createFrom(world, Monster, { x: ox + 2, y: oy + H - 3, name: "Goblin", identity: "monster" });
-
-// Drop a sample equipment stack (sword + armor) to validate picker & palette wiring
-// Start with a slightly nastier sword: add a damage-boosting affix
-const eqSword = buildEquipmentItem(world, 'sword_plain', { affixes: ['fierce'] });
-world.add(eqSword, Position, { x: -3, y: -3 });
-
-// Place a chestpiece with Thorns affix in the bottom-left corner of the room (inside the walls)
-// Use the room bounds (ox, oy, W, H) defined above: bottom-left interior tile is (ox+1, oy+H-2)
-const thornArmor = buildEquipmentItem(world, 'chain_armor', { affixes: ['thorns1'] });
-world.add(thornArmor, Position, { x: ox + 1, y: oy + H - 2 });
-
-// // Add an Iron Pickaxe in the demo room
-// const eqPickaxe = buildEquipmentItem(world, 'iron_pickaxe', {});
-// world.add(eqPickaxe, Position, { x: 1, y: -1 });
-
-// ---- Playtest items: ranged, spells, equipment variety ----
-// Bow + arrows (top-right area)
-const eqBow = buildEquipmentItem(world, 'bow_short', {});
-world.add(eqBow, Position, { x: 3, y: -3 });
-const arrows = createFrom(world, ArrowsStack, {});
-world.add(arrows, Position, { x: 3, y: -2 });
-
-// Extra weapons (top-left area)
-const eqDagger = buildEquipmentItem(world, 'dagger_quick', {});
-world.add(eqDagger, Position, { x: -2, y: -3 });
-const eqAxe = buildEquipmentItem(world, 'axe_heavy', {});
-world.add(eqAxe, Position, { x: -1, y: -3 });
-
-// Shield + ring (right side)
-const eqShield = buildEquipmentItem(world, 'shield_wood', {});
-world.add(eqShield, Position, { x: 4, y: -2 });
-const eqRing = buildEquipmentItem(world, 'ring_health', {});
-world.add(eqRing, Position, { x: 0, y: -3 });
-
-// Spellbooks (bottom row, near lightning book at 4,4)
-const bookMeteor = world.create();
-world.add(bookMeteor, NamedIdentity, { name: 'Spellbook of Meteor', identity: 'book_meteor' });
-world.add(bookMeteor, Position, { x: 2, y: 4 });
-world.add(bookMeteor, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Meteor.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
-
-const bookBlast = world.create();
-world.add(bookBlast, NamedIdentity, { name: 'Spellbook of Blast Wave', identity: 'book_blastwave' });
-world.add(bookBlast, Position, { x: 3, y: 4 });
-world.add(bookBlast, ItemInfo, { type: 'learn', slot: 'brain', description: 'Teaches Blast Wave.', weight: 1, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
-
-// Scroll of Blast Wave (single-use)
-const scrollBlast = world.create();
-world.add(scrollBlast, NamedIdentity, { name: 'Scroll of Blast Wave', identity: 'scroll_blastwave' });
-world.add(scrollBlast, Position, { x: 1, y: 4 });
-world.add(scrollBlast, ItemInfo, { type: 'scroll', slot: 'bag', description: 'Casts Blast Wave without learning it.', weight: 0.5, value: 0, count: 1, rarity: 1, rarityName: 'rare' });
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -350,6 +280,7 @@ const inputDisposers = [];
 // ---- Display UI overlays + data feeds -------------------------------------
 initOverlays();
 initHUD();
+initStatusLine();
 
 // Provide inventory data to overlay when requested
 addEventListener('ui:requestInventoryData', () => {
@@ -368,7 +299,8 @@ addEventListener('ui:requestInventoryData', () => {
             (eq.armor === id && 'armor') ||
             (eq.shield === id && 'shield') ||
             (eq.ring1 === id && 'ring1') ||
-            (eq.ring2 === id && 'ring2')
+            (eq.ring2 === id && 'ring2') ||
+            (eq.ammo === id && 'ammo')
           )) || null;
           items.push({
             id,
@@ -386,6 +318,26 @@ addEventListener('ui:requestInventoryData', () => {
         }
       }
     }
+    // Append learned spells as virtual brain-slot items
+    const brain = world.get(p.id, Brain);
+    const spellIds = Array.isArray(brain?.learnedSpellIds) ? brain.learnedSpellIds : [];
+    for (const sid of spellIds) {
+      const s = getSpell(sid);
+      if (!s) continue;
+      items.push({
+        id: `spell:${sid}`,
+        type: 'spell',
+        description: `Mana ${s.manaCost}`,
+        count: 1,
+        slot: 'brain',
+        name: s.name,
+        rarityName: 'rare',
+        bonuses: {},
+        affixes: [],
+        equipped: _activeSpellId === sid,
+        equippedSlot: _activeSpellId === sid ? 'brain' : null,
+      });
+    }
   }
   window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items } }));
 });
@@ -396,11 +348,15 @@ addEventListener('ui:requestMessageLogData', () => {
   window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
 });
 
-// Active spell button click → cast
+// Active spell button click → cast (or open spell picker if none active)
 addEventListener('ui:castActiveSpell', () => {
-  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   const id = ensureActiveSpell();
-  rulesHandler({ type: 'rules.castActiveSpell', payload: id ? { spellId: id } : {} });
+  if (!id) {
+    try { window.dispatchEvent(new CustomEvent('ui:openSpellPicker')); } catch {}
+    return;
+  }
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: id } });
 });
 
 // When user selects items from the pickup chooser overlay
@@ -415,6 +371,43 @@ addEventListener('ui:requestPickup', (e) => {
   }
 });
 
+// Ranged shoot button / 'r' key → auto-target nearest visible enemy and fire
+addEventListener('ui:shootRanged', () => {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const eq = /** @type any */ (world.get(pe.id, Equipment));
+  const weaponId = Number(eq?.weapon || 0);
+  const weaponInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
+  if (!weaponInfo || weaponInfo.subtype !== 'bow') {
+    log('You need a bow to shoot.');
+    return;
+  }
+  const maxRange = weaponInfo.range || 8;
+  const px = pe.pos.x | 0, py = pe.pos.y | 0;
+  const blocked = buildBlocksVisionMap(world);
+  const isBlocked = blockedCallback(blocked);
+
+  let bestId = 0, bestDist = Infinity;
+  forEachInRadius(world, px, py, maxRange, (id, pos) => {
+    if (id === pe.id) return;
+    const fac = world.get(id, Faction);
+    if (!fac || fac.key !== 'enemy') return;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) return;
+    const tx = pos.x | 0, ty = pos.y | 0;
+    if (!hasLOS(px, py, tx, ty, isBlocked)) return;
+    const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+    if (dist < bestDist) { bestDist = dist; bestId = id; }
+  });
+
+  if (!bestId) {
+    log('No target in range.');
+    return;
+  }
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.rangedAttack', payload: { targetId: bestId } });
+});
+
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
   const spells = learnedSpells();
@@ -425,7 +418,11 @@ addEventListener('ui:selectActiveSpell', (ev) => {
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const spellId = e?.detail?.spellId;
-  if (typeof spellId === 'string' && spellId.length) setActiveSpell(spellId);
+  if (typeof spellId === 'string' && spellId.length) {
+    setActiveSpell(spellId);
+    // Refresh inventory so the brain-slot active marker updates
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  }
 });
 
 // Basic app-side message log collector (bridge-free for now)
@@ -545,6 +542,40 @@ world.on('spell:blastwave', ({ actor, origin, knockbacks, radius }) => {
     }
   }
 });
+// Arrow tracer VFX (world-space; display-only state)
+/** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, dx:number, dy:number, len:number, style:string}>} */
+const _arrowFx = [];
+/** @type {Array<{x:number, y:number, ttl:number, style:string}>} */
+const _arrowSparks = [];
+world.on('ranged:shot', ({ attacker, target, hit, style }) => {
+  const apos = world.get(Number(attacker||0), Position);
+  const dpos = world.get(Number(target||0), Position);
+  if (!apos || !dpos) return;
+  const dx = dpos.x - apos.x, dy = dpos.y - apos.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const speed = 18; // tiles per second
+  const duration = Math.max(0.06, Math.min(0.4, len / speed));
+  const s = String(style || 'plain');
+  _arrowFx.push({
+    from: { x: apos.x, y: apos.y }, to: { x: dpos.x, y: dpos.y },
+    t: 0, duration, dx: dx / len, dy: dy / len, len, style: s
+  });
+  startShake(cam, s === 'fire' ? 3 : 2, s === 'fire' ? 0.10 : 0.08);
+  // Fire arrow: spawn trailing embers
+  if (s === 'fire' && fx?.pool) {
+    for (let i = 0; i < 4; i++) {
+      fx.pool.spawn({
+        x: apos.x + dx / len * 0.5, y: apos.y + dy / len * 0.5,
+        vx: (dx / len) * 3 + (Math.random() - 0.5) * 1.5,
+        vy: (dy / len) * 3 + (Math.random() - 0.5) * 1.5,
+        ax: 0, ay: 0.4, life: 0.25 + Math.random() * 0.15,
+        size0: 0.12 + Math.random() * 0.08, size1: 0.02,
+        r: 255, g: 160 + Math.random() * 60 | 0, b: 30,
+        a0: 0.9, a1: 0, rot: 0, rotVel: 0
+      });
+    }
+  }
+});
 // Proc VFX: vampiric life-steal
 world.on('proc:vampiric', ({ actor, target, amount }) => {
   const apos = world.get(Number(actor || 0), Position);
@@ -587,6 +618,28 @@ world.on('proc:thorns', ({ actor, target }) => {
       life: 0.2 + Math.random() * 0.15,
       size0: 0.12, size1: 0.03,
       r: 120, g: 255, b: 120,
+      a0: 0.9, a1: 0.0,
+      rot: 0, rotVel: 0
+    });
+  }
+});
+// Proc VFX: burning applied (one-shot ignite burst)
+world.on('proc:burning', ({ actor, target }) => {
+  const tpos = world.get(Number(target || 0), Position);
+  if (!tpos) return;
+  ftext.addStatus(tpos.x, tpos.y - 0.3, 'BURNING', { color: '#ff6600', life: 0.6 });
+  for (let i = 0; i < 8; i++) {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.6;
+    const spd = 0.6 + Math.random() * 0.8;
+    fx.pool.spawn({
+      x: tpos.x + (Math.random() - 0.5) * 0.2,
+      y: tpos.y + (Math.random() - 0.5) * 0.2,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      ax: 0, ay: -0.4,
+      life: 0.3 + Math.random() * 0.2,
+      size0: 0.18, size1: 0.04,
+      r: 255, g: 140 + (Math.random() * 60) | 0, b: 20,
       a0: 0.9, a1: 0.0,
       rot: 0, rotVel: 0
     });
@@ -651,6 +704,8 @@ world.on('damaged', ({ target, amount, critical, crit, source }) => {
     if (wid) {
       const wname = /** @type any */ (world.get(wid, NamedIdentity))?.name;
       if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
+    } else if (world.has(Number(source||0), Player)) {
+      weaponLabel = ' with bare fists';
     }
   }
   log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`);
@@ -677,6 +732,22 @@ world.on('status', ({ id, kind, at, text, source }) => {
   if (style === 'miss' && src) log(`${src} misses ${tgt}.`);
   if (style === 'immune' && src) log(`${src} can't hurt ${tgt}.`);
 });
+// Ranged combat feedback
+world.on('ranged:no-ammo', ({ attacker }) => {
+  const who = nameOfEntity(attacker);
+  log(who === 'You' ? 'You have no arrows.' : `${who} is out of ammo.`);
+  const pos = world.get(Number(attacker||0), Position);
+  if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch {}
+});
+world.on('ranged:blocked', ({ attacker, target }) => {
+  const who = nameOfEntity(attacker);
+  log(who === 'You' ? 'Your shot is blocked.' : `${who}'s shot is blocked.`);
+});
+world.on('ranged:out-of-range', ({ attacker, target }) => {
+  const who = nameOfEntity(attacker);
+  const tgt = nameOfEntity(target);
+  log(who === 'You' ? `${tgt} is out of range.` : `${who}'s target is out of range.`);
+});
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type !== 'currency') return;
@@ -687,6 +758,27 @@ world.on('item:pickup', ({ actor, itemId, count }) => {
     ftext.addGold(pos.x, pos.y, n, { color: '#ffcd45' });
   }
 });
+// Dispatch quick-slot notification for non-currency pickups
+world.on('item:pickup', ({ actor, itemId }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== actor) return;
+  const info = world.get(itemId, ItemInfo);
+  if (!info || info.type === 'currency') return;
+  const name = world.get(itemId, NamedIdentity);
+  try {
+    window.dispatchEvent(new CustomEvent('ui:recentPickup', {
+      detail: {
+        item: {
+          id: Number(itemId),
+          type: info.type || 'item',
+          slot: info.slot || '',
+          name: name?.name || info.description || info.type || 'item',
+          count: info.count || 1
+        }
+      }
+    }));
+  } catch {}
+});
 // Refresh inventory UI when any item is used (consumed/learned/etc.)
 world.on('item:used', ({ actor, itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
@@ -695,10 +787,14 @@ world.on('item:used', ({ actor, itemId }) => {
 world.on('spell:learned', ({ actor, spellId }) => {
   const s = getSpell(String(spellId||''));
   const label = s?.name ? `[${s.name}]` : `[${String(spellId||'spell')}]`;
-  log(`You learn ${label}.`);
+  // set active spell if none selected, and tell the user
+  if (!_activeSpellId) {
+    setActiveSpell(String(spellId));
+    log(`You learn ${label}. It is now your active spell.`);
+  } else {
+    log(`You learn ${label}.`);
+  }
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
-  // set active spell if none selected
-  if (!_activeSpellId) { setActiveSpell(String(spellId)); }
 });
 world.on('spell:already-known', ({ actor, spellId }) => {
   const s = getSpell(String(spellId||''));
@@ -717,6 +813,44 @@ world.on('interaction', ({ action, result }) => {
   if (action === 'toggleDoor') {
     log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`);
   }
+});
+
+// Stair traversal: handle level transitions
+world.on('stair:traverse', ({ actor, targetId, direction }) => {
+  let currentDepth = 1;
+  for (const [, state] of world.query(DungeonState)) {
+    currentDepth = state.currentDepth;
+    break;
+  }
+
+  const newDepth = direction === 'down' ? currentDepth + 1 : currentDepth - 1;
+  if (newDepth < 1) {
+    log('You cannot ascend any further.');
+    return;
+  }
+
+  log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`);
+  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction });
+
+  // Invalidate cached world view
+  _cachedView = null;
+  _cachedStep = -1;
+});
+
+// UI stair tooltip tap → trigger stair traverse
+addEventListener('ui:requestStairTraverse', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const stairId = e?.detail?.stairId;
+  const direction = e?.detail?.direction || 'down';
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  world.emit?.('stair:traverse', {
+    actor: pe.id,
+    targetId: stairId,
+    direction
+  });
 });
 // Update inventory and log when an item is equipped
 world.on('item:equipped', ({ actor, itemId, slot, name }) => {
@@ -774,6 +908,35 @@ world.on('moved', ({ id, to }) => {
     pickupRange
   };
   try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: payload })); } catch {}
+});
+
+// When player moves, show stair tooltip if near stairs
+world.on('moved', ({ id, to }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== id) return;
+
+  // Find stairs within Chebyshev distance 1
+  let nearestStair = null;
+  let nearestDist = Infinity;
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up') continue;
+    const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
+    if (dist <= 1 && dist < nearestDist) {
+      nearestDist = dist;
+      nearestStair = { id: eid, identity: ni.identity };
+    }
+  }
+
+  if (nearestStair) {
+    const direction = nearestStair.identity === 'stair_down' ? 'down' : 'up';
+    try {
+      window.dispatchEvent(new CustomEvent('ui:showStairTooltip', {
+        detail: { stairId: nearestStair.id, direction }
+      }));
+    } catch {}
+  } else {
+    try { window.dispatchEvent(new CustomEvent('ui:hideStairTooltip')); } catch {}
+  }
 });
 
 // Hide ground tooltip after pickups to avoid stale UI
@@ -840,8 +1003,8 @@ fx.ctx = bctx;
 // Avoid expensive per-particle transforms: draw in world units under camera transform
 fx.worldToScreen = (p) => ({ x: p.x, y: p.y, size: p.size });
 
-// Optionally attach an emitter to a stable key (e.g., player id) later
-// fx.ensureEmitter(playerId, preset);
+// Burning fire emitter tracking (display-only reconciliation)
+const _burningEmitters = new Set();
 
 // Floating combat text (display-only, world-space)
 const ftext = new FloatText();
@@ -882,17 +1045,7 @@ function render(worldView) {
   bctx.save();
   applyCamera(bctx, cam, back);
 
-  // Draw entities (glyph-based, mapped from kind/tags)
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Draw tiles first, then actors/items for layering without per-frame array allocs
-  const isTileKind = (k) => k === 'floor' || k === 'wall' || (typeof k === 'string' && k.startsWith('door_'));
-
-  // Set glyph height in world units once per frame (pre-transform px). With camera.scale=TILE_PX,
-  // 1px here becomes TILE_PX on screen, matching tile size.
-  // We now use pre-rendered glyph bitmaps; font is not used for entities.
-  // Compute simple view bounds in world units for culling
+  // Compute view bounds in world units for culling
   const viewHalfW = W * 0.5 / (cam.scale || 1);
   const viewHalfH = H * 0.5 / (cam.scale || 1);
   const vx0 = cam.x - viewHalfW - 1; // add small margin
@@ -900,22 +1053,55 @@ function render(worldView) {
   const vx1 = cam.x + viewHalfW + 1;
   const vy1 = cam.y + viewHalfH + 1;
 
-  // Pass 1: tiles
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
-    if (!isTileKind(e.kind)) continue;
-    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-  const k = (typeof e.kind === 'string') ? e.kind : 'default';
-  drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+  // Pass 1: tiles from TileMap grid (3-state fog-of-war)
+  if (worldView.tileGrid) {
+    const isVisible = worldView.isVisible;
+    const isExplored = worldView.isExplored;
+    worldView.tileGrid.forEachTileInRect(
+      Math.floor(vx0), Math.floor(vy0), Math.ceil(vx1), Math.ceil(vy1),
+      (x, y, tile) => {
+        if (isVisible && isVisible(x, y)) {
+          const kind = _tileKindMap[tile];
+          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+        } else if (isExplored && isExplored(x, y)) {
+          bctx.globalAlpha = 0.35;
+          const kind = _tileKindMap[tile];
+          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+          bctx.globalAlpha = 1.0;
+        }
+        // unexplored: skip — background gradient is already black
+      }
+    );
   }
 
-  // Pass 2: non-tiles
+  // Pass 2: entities (doors, stairs, monsters, items, player)
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
-    if (isTileKind(e.kind)) continue;
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-  const k = (typeof e.kind === 'string') ? e.kind : 'default';
-  drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    const k = (typeof e.kind === 'string') ? e.kind : 'default';
+    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+
+    // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
+    if (PERF.quality !== 'low' && k === 'grid_bug') {
+      const t = _fxTime * 3.0;               // 3 Hz cycle
+      const pct = (Math.sin(t) + 1) * 0.5;   // 0 → 1 → 0
+      const r = Math.round(187 + (68  - 187) * pct);
+      const g = Math.round(102 + (204 - 102) * pct);
+      const b = Math.round(255 + (255 - 255) * pct);
+      bctx.save();
+      bctx.globalCompositeOperation = 'lighter';
+      bctx.fillStyle = `rgba(${r},${g},${b},0.25)`;
+      bctx.beginPath();
+      bctx.arc(e.pos.x, e.pos.y, 0.35, 0, Math.PI * 2);
+      bctx.fill();
+      bctx.strokeStyle = `rgba(${r},${g},${b},0.7)`;
+      bctx.lineWidth = 0.06;
+      const rad = 0.42 + 0.04 * Math.sin(t * 1.7);
+      bctx.beginPath();
+      bctx.arc(e.pos.x, e.pos.y, rad, 0, Math.PI * 2);
+      bctx.stroke();
+      bctx.restore();
+    }
 
     // Glyph-FX: show an invulnerability shimmer ring when tagged
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
@@ -960,12 +1146,51 @@ function render(worldView) {
       g.beginPath(); g.arc(cx, cy, out + 0.02, 0, Math.PI * 2); g.stroke();
       g.restore();
     }
+
+    // Glyph-FX: flickering fire aura (unused — burning uses particles only)
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('_fire_aura')) {
+      /** @type {CanvasRenderingContext2D} */
+      const g = /** @type any */ (bctx);
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      const cx = e.pos.x, cy = e.pos.y;
+
+      // Inner warm glow (pulsing)
+      const pulse = 0.08 + 0.04 * Math.sin(_fxTime * 8.0);
+      g.fillStyle = `rgba(255,120,20,${(0.12 + pulse).toFixed(2)})`;
+      g.beginPath(); g.arc(cx, cy, 0.38, 0, Math.PI * 2); g.fill();
+
+      // Flickering flame tongues (6 short strokes radiating outward)
+      const nf = 6;
+      const fBase = 0.28;
+      g.lineWidth = 0.07;
+      for (let j = 0; j < nf; j++) {
+        const a = (j / nf) * Math.PI * 2 + _fxTime * 1.5;
+        const flicker = 0.04 * Math.sin(_fxTime * 12.0 + j * 2.1);
+        const tip = 0.42 + flicker;
+        const x0 = cx + Math.cos(a) * fBase;
+        const y0 = cy + Math.sin(a) * fBase;
+        const x1 = cx + Math.cos(a) * tip;
+        const y1 = cy + Math.sin(a) * tip;
+        g.strokeStyle = (j % 2 === 0) ? 'rgba(255,160,40,0.85)' : 'rgba(255,80,20,0.75)';
+        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      }
+
+      // Outer heat ring (subtle, wobbly)
+      g.strokeStyle = 'rgba(255,100,30,0.30)';
+      g.lineWidth = 0.04;
+      const rOuter = 0.46 + 0.03 * Math.sin(_fxTime * 6.0);
+      g.beginPath(); g.arc(cx, cy, rOuter, 0, Math.PI * 2); g.stroke();
+
+      g.restore();
+    }
   }
 
   // Spell bolt VFX (world-space additive glow)
   if (bctx) drawBoltEffects(bctx);
   if (bctx) drawMeteorEffects(bctx);
   if (bctx) drawBlastwaveEffects(bctx);
+  if (bctx) drawArrowEffects(bctx);
 
   // Particles (already in world space)
   fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
@@ -990,9 +1215,9 @@ function render(worldView) {
     ctx.textAlign = "left"; 
     ctx.textBaseline = "top";
     const s = fx.stats();
-    // ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8);
+    ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8); // DEBUG
     const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
-    // ctx.fillText(`fx fps: ${fpsInt}`, 8, 24);
+    ctx.fillText(`fx fps: ${fpsInt}`, 8, 24); // DEBUG
 
     // Optional rules profiler overlay (top 3 systems by last tick duration)
     const prof = /** @type any */ (window).__JSHACK_RULES_PROF;
@@ -1035,27 +1260,70 @@ function frame(now) {
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
 
-  // Advance display-only systems
-  if (PERF.particleCapacity > 0) fx.step(dtSec);
+  // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   // Display-only VFX lifetimes
   updateBoltFx(dtSec);
   updateMeteorFx(dtSec);
   updateBlastwaveFx(dtSec);
+  updateArrowFx(dtSec);
   ftext.step(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
   updateVitalsHUD();
   updateCombatHUD();
+  updateDepthHUD();
 
   // Render
   const view = getCachedView();
-  // keep camera centered on player if present
-  if (view.player) {
+  // keep camera centered on player if present (unless debug-detached)
+  if (view.player && !cam._detached) {
     // Directly set follow target at player world coords
     followEntity(cam, view.player.pos, dtSec, 6.0);
   }
+
+  // Burning particle emitter reconciliation + advance particles
+  if (PERF.particleCapacity > 0) {
+    const _emitterOrigins = [];
+    const nowBurning = new Set();
+    for (let i = 0; i < view.entities.length; i++) {
+      const e = view.entities[i];
+      if (Array.isArray(e.tags) && e.tags.includes('burning')) {
+        nowBurning.add(e.id);
+        if (!_burningEmitters.has(e.id)) {
+          fx.ensureEmitter(`burn:${e.id}`, {
+            continuous: true,
+            rate: 18,
+            angle: -Math.PI / 2,
+            spread: Math.PI / 5,
+            speed: 0.8,
+            speedJitter: 0.4,
+            ax: 0, ay: -0.5,
+            life: 0.7,
+            lifeJitter: 0.3,
+            size: 0.28,
+            sizeEnd: 0.06,
+            color: '#ff8c00',
+            alpha0: 0.9,
+            alpha1: 0.0,
+            offsetX: 0,
+            offsetY: -0.15,
+          });
+          _burningEmitters.add(e.id);
+        }
+        _emitterOrigins.push({ key: `burn:${e.id}`, x: e.pos.x, y: e.pos.y });
+      }
+    }
+    for (const id of _burningEmitters) {
+      if (!nowBurning.has(id)) {
+        fx.removeEmitter(`burn:${id}`);
+        _burningEmitters.delete(id);
+      }
+    }
+    fx.step(dtSec, _emitterOrigins);
+  }
+
   render(view);
 
   requestAnimationFrame(frame);
@@ -1196,6 +1464,107 @@ function drawBlastwaveEffects(ctx) {
   ctx.restore();
 }
 
+// --- Arrow tracer update & draw --------------------------------------------
+/** @param {number} dt */
+function updateArrowFx(dt) {
+  for (let i = _arrowFx.length - 1; i >= 0; i--) {
+    const a = _arrowFx[i];
+    a.t += dt;
+    if (a.t >= a.duration) {
+      // Arrow arrived — spawn impact spark
+      _arrowSparks.push({ x: a.to.x, y: a.to.y, ttl: 0.18, style: a.style || 'plain' });
+      _arrowFx.splice(i, 1);
+    }
+  }
+  for (let i = _arrowSparks.length - 1; i >= 0; i--) {
+    _arrowSparks[i].ttl -= dt;
+    if (_arrowSparks[i].ttl <= 0) _arrowSparks.splice(i, 1);
+  }
+}
+/** @param {CanvasRenderingContext2D} ctx */
+function drawArrowEffects(ctx) {
+  if (!_arrowFx.length && !_arrowSparks.length) return;
+  ctx.save();
+
+  // Draw flying arrows
+  for (const a of _arrowFx) {
+    const progress = Math.min(1, a.t / a.duration);
+    const isFire = a.style === 'fire';
+    // Current head position (lerp from→to)
+    const hx = a.from.x + (a.to.x - a.from.x) * progress;
+    const hy = a.from.y + (a.to.y - a.from.y) * progress;
+    // Tail trails behind the head
+    const tailLen = Math.min(isFire ? 0.8 : 0.6, a.len * progress);
+    const tx = hx - a.dx * tailLen;
+    const ty = hy - a.dy * tailLen;
+
+    if (isFire) {
+      // Fire arrow: outer glow
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,100,20,0.25)';
+      ctx.lineWidth = 0.18;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.restore();
+      // Fire arrow: bright orange shaft
+      ctx.strokeStyle = 'rgba(255,160,40,0.95)';
+      ctx.lineWidth = 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      // Fire arrowhead (hot white-yellow tip)
+      ctx.fillStyle = 'rgba(255,240,180,1.0)';
+      ctx.beginPath(); ctx.arc(hx, hy, 0.09, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Normal arrow: warm wood shaft
+      ctx.strokeStyle = 'rgba(210,180,110,0.9)';
+      ctx.lineWidth = 0.06;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      // Arrowhead (bright tip)
+      ctx.fillStyle = 'rgba(240,230,200,0.95)';
+      ctx.beginPath(); ctx.arc(hx, hy, 0.07, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Impact sparks
+  for (const s of _arrowSparks) {
+    const alpha = Math.max(0, s.ttl / 0.18);
+    const isFire = s.style === 'fire';
+    if (isFire) {
+      // Fire impact: orange-red burst
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,120,30,${0.5 * alpha})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 0.3 * alpha, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,200,80,${0.4 * alpha})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 0.15 * alpha, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else {
+      // Normal impact: small warm flash
+      ctx.fillStyle = `rgba(255,220,140,${0.5 * alpha})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 0.2 * alpha, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,250,230,${0.3 * alpha})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 0.1 * alpha, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+// --- Depth HUD feed (dungeon level) ----------------------------------------
+let _lastDepth = -1;
+function updateDepthHUD() {
+  for (const [, state] of world.query(DungeonState)) {
+    const d = state.currentDepth;
+    if (d !== _lastDepth) {
+      _lastDepth = d;
+      try { window.dispatchEvent(new CustomEvent('ui:updateDepth', { detail: { depth: d } })); } catch {}
+    }
+    break;
+  }
+}
+
 // --- Vitals HUD feed (HP/Mana) --------------------------------------------
 let _lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1 };
 function updateVitalsHUD() {
@@ -1224,8 +1593,8 @@ function updateCombatHUD() {
   const wInfo = wid ? world.get(wid, ItemInfo) : null;
   const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : '';
   const dmgDice = wInfo?.damageDice || '';
-  const statuses = Array.isArray(st?.effects) ? st.effects.map((e) => ({ key: String(e.key||e.type||'').toLowerCase(), turns: Number(e.turnsLeft||e.duration||0) })) : [];
-  const statusSig = statuses.map(s=>`${s.key}:${s.turns}`).join('|');
+  const statuses = Array.isArray(st?.effects) ? st.effects.map((e) => ({ key: String(e.key||e.type||'').toLowerCase(), turns: Number(e.turnsLeft||e.duration||0), stacks: Number(e.stacks||1) })) : [];
+  const statusSig = statuses.map(s=>`${s.key}:${s.turns}:${s.stacks}`).join('|');
 
   // Collect equipped affix names for HUD display
   const affixIds = [];
@@ -1300,6 +1669,32 @@ addEventListener("keydown", (e) => {
   if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
   if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }
   if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, TILE_PX); e.preventDefault(); return; }
+  if (key === "9") {
+    // Debug: toggle camera between nearest down-stair and player
+    if (cam._detached) {
+      cam._detached = false;
+      console.log('[DEBUG] Camera re-attached to player');
+    } else {
+      let best = null, bestDist = Infinity;
+      const pp = playerEntity(world);
+      const px = pp ? world.get(pp.id, Position)?.x ?? 0 : 0;
+      const py = pp ? world.get(pp.id, Position)?.y ?? 0 : 0;
+      for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
+        if (ni.identity === 'stair_down') {
+          const d = Math.abs(pos.x - px) + Math.abs(pos.y - py);
+          if (d < bestDist) { bestDist = d; best = pos; }
+        }
+      }
+      if (best) {
+        cam._detached = true;
+        console.log(`[DEBUG] Easing to stair_down at (${best.x}, ${best.y})`);
+        easeTo(cam, { x: best.x, y: best.y, dur: 0.8 });
+      } else {
+        console.warn('[DEBUG] No stair_down entity found on this floor!');
+      }
+    }
+    e.preventDefault(); return;
+  }
   if ((key || "").toLowerCase() === "x") { startShake(cam, 6, 0.35); e.preventDefault(); return; }
 });
 

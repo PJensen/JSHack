@@ -9,6 +9,7 @@ const AFFIX_VAMP = "affix:vamp1";
 const AFFIX_FIERCE = "affix:fierce";
 const AFFIX_GUARD = "affix:guard1";
 const AFFIX_LIFE = "affix:life1";
+const AFFIX_ATTUNED = "affix:attuned1";
 
 registerScript(AFFIX_THORNS, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
@@ -64,12 +65,19 @@ registerScript(AFFIX_LIFE, {
   },
 });
 
+registerScript(AFFIX_ATTUNED, {
+  [ScriptVerb.AffixPassive]: (_world, ctx) => {
+    ctx.addBonus("manaRegen", 0.25);
+  },
+});
+
 export const AFFIX_DEFS = {
   thorns1: { name: "Thorns I", slots: ["armor"], triggers: ["onHit"], script: AFFIX_THORNS, weight: 30 },
   vamp1: { name: "Vampiric I", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_VAMP, weight: 20 },
   fierce: { name: "Fierce", slots: ["weapon"], triggers: ["onBeforeHit"], script: AFFIX_FIERCE, weight: 25 },
   guard1: { name: "Guarded", slots: ["armor"], passive: AFFIX_GUARD, triggers: [], weight: 25 },
   life1: { name: "Healthy", slots: ["armor", "ring"], passive: AFFIX_LIFE, triggers: [], weight: 22 },
+  attuned1: { name: "Attuned", slots: ["ring"], passive: AFFIX_ATTUNED, triggers: [], weight: 20 },
 };
 
 export function listAffixes() { return Object.entries(AFFIX_DEFS).map(([id, rec]) => ({ id, ...rec })); }

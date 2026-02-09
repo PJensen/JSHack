@@ -13,7 +13,8 @@ function emptyDerived() {
     defenseDerived: 0,
     maxHpDerived: 0,
     critChanceDerived: 0,
-    critMultDerived: 0
+    critMultDerived: 0,
+    manaRegenDerived: 0
   };
 }
 
@@ -24,6 +25,7 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.maxHp)) acc.maxHpDerived += bonuses.maxHp;
   if (Number.isFinite(bonuses.critChance)) acc.critChanceDerived += bonuses.critChance;
   if (Number.isFinite(bonuses.critMult)) acc.critMultDerived += bonuses.critMult;
+  if (Number.isFinite(bonuses.manaRegen)) acc.manaRegenDerived += bonuses.manaRegen;
 }
 
 function runAffixPassives(world, ctx, affixIds) {
@@ -48,7 +50,7 @@ export function equipmentSystem(world) {
       applyBonuses(d, info.bonuses);
       // passive affixes
       const ctx = {
-        addBonus: (k, v) => { if (k in d) d[k] += v; else if (k === 'attack') d.attackDerived += v; else if (k === 'defense') d.defenseDerived += v; else if (k === 'maxHp') d.maxHpDerived += v; else if (k === 'critChance') d.critChanceDerived += v; else if (k === 'critMult') d.critMultDerived += v; },
+        addBonus: (k, v) => { if (k in d) d[k] += v; else if (k === 'attack') d.attackDerived += v; else if (k === 'defense') d.defenseDerived += v; else if (k === 'maxHp') d.maxHpDerived += v; else if (k === 'critChance') d.critChanceDerived += v; else if (k === 'critMult') d.critMultDerived += v; else if (k === 'manaRegen') d.manaRegenDerived += v; },
         entityId: id,
         itemId,
         world
@@ -62,5 +64,6 @@ export function equipmentSystem(world) {
     eq.maxHpDerived = d.maxHpDerived;
     eq.critChanceDerived = d.critChanceDerived;
     eq.critMultDerived = d.critMultDerived;
+    eq.manaRegenDerived = d.manaRegenDerived;
   }
 }

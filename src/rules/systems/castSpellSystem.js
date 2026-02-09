@@ -3,7 +3,7 @@ import { Brain } from "../components/Brain.js";
 import { Mana } from "../components/Mana.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
-/** @typedef {import('../../lib/ecs-js').World} World */
+/** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 // castSpellSystem — placeholder implementation that consumes CastSpellIntent
 // and emits a semantic event. Extend with actual spell resolution later.

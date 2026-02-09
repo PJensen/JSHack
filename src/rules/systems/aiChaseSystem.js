@@ -2,38 +2,50 @@
 // Very simple AI: monsters attempt to step toward the player each tick.
 
 import { Position } from "../components/Position.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Faction } from "../components/Faction.js";
+import { Speed } from "../components/Speed.js";
 import { Player } from "../components/Player.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { forEachInRadius } from "../utils/spatialIndex.js";
+
+const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
 export function aiChaseSystem(world) {
   // Identify the player position (first found)
   let playerPos = null;
-  for (const [id, pos] of world.query(Position)) {
-    if (world.has(id, Player)) { playerPos = { x: pos.x, y: pos.y }; break; }
+  for (const [id, _p, pos] of world.query(Player, Position)) {
+    playerPos = { x: pos.x, y: pos.y };
+    break;
   }
   if (!playerPos) return;
 
-  // For each monster (identity === 'monster'), add a MoveIntent toward player if none queued
-  for (const [id, pos] of world.query(Position)) {
-    const ident = world.get(id, NamedIdentity);
-    if (!ident || ident.identity !== 'monster') continue;
+  // For each enemy-faction entity, add a MoveIntent toward player if none queued
+  forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
+    const fac = world.get(id, Faction);
+    if (!fac || fac.key !== 'enemy') return;
+
+    // Speed gate: only act on ticks that match this entity's cadence
+    const spd = world.get(id, Speed);
+    const actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
+    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
 
     // If already has a MoveIntent (e.g., set externally), skip
-    if (world.has(id, MoveIntent)) continue;
+    if (world.has(id, MoveIntent)) return;
 
-    const dx0 = Math.sign(playerPos.x - pos.x) | 0;
-    const dy0 = Math.sign(playerPos.y - pos.y) | 0;
+    const dxp = playerPos.x - pos.x;
+    const dyp = playerPos.y - pos.y;
+    const dx0 = Math.sign(dxp) | 0;
+    const dy0 = Math.sign(dyp) | 0;
 
     // Prefer axis with bigger distance; fallback to the other axis
-    const ax = Math.abs(playerPos.x - pos.x);
-    const ay = Math.abs(playerPos.y - pos.y);
+    const ax = Math.abs(dxp);
+    const ay = Math.abs(dyp);
     let dx = 0, dy = 0;
     if (ax >= ay) { dx = dx0; dy = 0; } else { dy = dy0; dx = 0; }
 
     // If both zero (same tile), do nothing
-    if ((dx | dy) === 0) continue;
+    if ((dx | dy) === 0) return;
 
     try { world.add(id, MoveIntent, { dx, dy }); } catch {}
-  }
+  });
 }
