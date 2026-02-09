@@ -3,6 +3,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { Faction } from '../src/rules/components/Faction.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { aiChaseSystem } from '../src/rules/systems/aiChaseSystem.js';
 
@@ -16,7 +17,8 @@ Deno.test("monster east of player chases west", () => {
 
   const m1 = world.create();
   world.add(m1, Position, { x: 8, y: 5 });
-  world.add(m1, NamedIdentity, { name: 'Goblin', identity: 'monster' });
+  world.add(m1, NamedIdentity, { name: 'Goblin', identity: 'goblin' });
+  world.add(m1, Faction, { key: 'enemy' });
 
   aiChaseSystem(world);
 
@@ -35,7 +37,8 @@ Deno.test("monster north of player chases south", () => {
 
   const m2 = world.create();
   world.add(m2, Position, { x: 5, y: 2 });
-  world.add(m2, NamedIdentity, { name: 'Orc', identity: 'monster' });
+  world.add(m2, NamedIdentity, { name: 'Orc', identity: 'orc' });
+  world.add(m2, Faction, { key: 'enemy' });
 
   aiChaseSystem(world);
 
@@ -54,7 +57,8 @@ Deno.test("diagonal chase: equal distance prefers x-axis", () => {
 
   const m3 = world.create();
   world.add(m3, Position, { x: 8, y: 2 });
-  world.add(m3, NamedIdentity, { name: 'Troll', identity: 'monster' });
+  world.add(m3, NamedIdentity, { name: 'Troll', identity: 'troll' });
+  world.add(m3, Faction, { key: 'enemy' });
 
   aiChaseSystem(world);
 
@@ -73,7 +77,8 @@ Deno.test("pre-existing MoveIntent is not overwritten", () => {
 
   const m4 = world.create();
   world.add(m4, Position, { x: 3, y: 5 });
-  world.add(m4, NamedIdentity, { name: 'Imp', identity: 'monster' });
+  world.add(m4, NamedIdentity, { name: 'Imp', identity: 'imp' });
+  world.add(m4, Faction, { key: 'enemy' });
   world.add(m4, MoveIntent, { dx: 0, dy: -1 });
 
   aiChaseSystem(world);
@@ -92,7 +97,8 @@ Deno.test("monster on same tile as player does not move", () => {
 
   const m5 = world.create();
   world.add(m5, Position, { x: 5, y: 5 });
-  world.add(m5, NamedIdentity, { name: 'Shade', identity: 'monster' });
+  world.add(m5, NamedIdentity, { name: 'Shade', identity: 'shade' });
+  world.add(m5, Faction, { key: 'enemy' });
 
   aiChaseSystem(world);
 
@@ -110,6 +116,7 @@ Deno.test("non-monster entity is ignored by AI chase", () => {
   const npc = world.create();
   world.add(npc, Position, { x: 0, y: 0 });
   world.add(npc, NamedIdentity, { name: 'Villager', identity: 'npc' });
+  world.add(npc, Faction, { key: 'neutral' });
 
   aiChaseSystem(world);
 
@@ -120,7 +127,8 @@ Deno.test("no player → AI chase is a no-op", () => {
   const world = new World({ seed: 2 });
   const lonely = world.create();
   world.add(lonely, Position, { x: 0, y: 0 });
-  world.add(lonely, NamedIdentity, { name: 'Bat', identity: 'monster' });
+  world.add(lonely, NamedIdentity, { name: 'Bat', identity: 'bat' });
+  world.add(lonely, Faction, { key: 'enemy' });
   aiChaseSystem(world);
   assert(!world.has(lonely, MoveIntent), 'no player means no chase');
 });
