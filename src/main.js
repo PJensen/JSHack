@@ -221,7 +221,13 @@ if (!playerEntity(world)) {
     world.add(pe.id, Devotion, { deityId: 'molkhar' });
     const deity = initDeity('molkhar');
     if (deity) {
-      deity.on('wrath', ({ intensity }) => {
+      // Cooldown tracker: deity events only fire messages every N ticks
+      const _deityCooldowns = { wrath: 0, demand: 0, utterance: 0 };
+      const DEITY_COOLDOWN = 30; // minimum ticks between repeated messages
+
+      deity.on('wrath', ({ intensity, tick }) => {
+        if (tick - _deityCooldowns.wrath < DEITY_COOLDOWN) return;
+        _deityCooldowns.wrath = tick;
         const dmg = Math.round(5 + intensity * 10);
         log(`Mol'Khar's wrath strikes you! (${dmg} damage)`);
         const vit = /** @type any */ (world.get(pe.id, Vitality));
@@ -233,6 +239,7 @@ if (!playerEntity(world)) {
         }
       });
       deity.on('miracle', ({ serenity }) => {
+        // Miracles are rare enough — no cooldown needed
         const heal = Math.round(10 + serenity * 10);
         log(`Mol'Khar grants you a miracle! (+${heal} HP)`);
         const vit = /** @type any */ (world.get(pe.id, Vitality));
@@ -242,9 +249,12 @@ if (!playerEntity(world)) {
           try { world.emit?.('healed', { id: pe.id, amount: heal }); } catch {}
         }
       });
-      deity.on('demand', () => {
+      deity.on('demand', ({ tick }) => {
+        if (tick - _deityCooldowns.demand < DEITY_COOLDOWN) return;
+        _deityCooldowns.demand = tick;
         log("Mol'Khar hungers for blood!");
       });
+      // moodShift is already self-limiting (only fires on actual transitions)
       deity.on('moodShift', ({ to }) => {
         const labels = {
           wrath: 'wrathful', serenity: 'serene', hunger: 'hungry',
@@ -252,7 +262,9 @@ if (!playerEntity(world)) {
         };
         log(`Mol'Khar grows ${labels[to] || to}.`);
       });
-      deity.on('utterance', ({ dominant }) => {
+      deity.on('utterance', ({ dominant, tick }) => {
+        if (tick - _deityCooldowns.utterance < DEITY_COOLDOWN) return;
+        _deityCooldowns.utterance = tick;
         const lines = {
           wrath: '"More blood!" bellows Mol\'Khar.',
           serenity: '"You serve well," whispers Mol\'Khar.',
