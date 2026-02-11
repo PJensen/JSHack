@@ -10,8 +10,7 @@ import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping 
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
 import { pickMonster, pickItem, pickTrap } from './tables.js';
 import { CHUNK_SIZE } from './constants.js';
-import { getMonster } from '../../data/monsters.js';    // DEBUG
-import { getItem } from '../../data/items.js';           // DEBUG
+import { getItem } from '../../data/items.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Chest } from '../../archetypes/Door.js';
 import { Interactable } from '../../components/Interactable.js';
@@ -35,33 +34,6 @@ import { Trap } from '../../components/Trap.js';
 export function populateChunk(chunk, floorPlan, rng) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
-
-  // ── DEBUG: force spellbooks into first room ────────────────
-  if (chunk.rooms.length > 0) {
-    const r0 = chunk.rooms[0];
-    const cx = r0.x + Math.floor(r0.w / 2);
-    const cy = r0.y + Math.floor(r0.h / 2);
-    for (const [i, bookId] of ['book_lightning', 'book_meteor', 'book_blastwave'].entries()) {
-      spawns.push({ x: cx - 1 + i, y: cy + 1, kind: 'book', params: { bookId } });
-    }
-    // DEBUG: force a bow and arrows into first room
-    spawns.push({ x: cx - 1, y: cy + 2, kind: 'equipment', params: { equipId: 'bow_short', affixes: [] } });
-    spawns.push({ x: cx, y: cy + 2, kind: 'arrows', params: {} });
-    spawns.push({ x: cx + 1, y: cy + 2, kind: 'fire_arrows', params: {} });
-    // DEBUG: force a grid bug near center of first room
-    const gb = getMonster('grid_bug');
-    if (gb) {
-      spawns.push({ x: cx + 2, y: cy, kind: 'monster', params: {
-        name: gb.name, identity: gb.id,
-        maxHp: Math.floor(gb.baseHp + floorPlan.depth * gb.hpPerLevel),
-        faction: 'enemy', attackDerived: gb.attack, defenseDerived: gb.defense,
-        naturalDamageDice: gb.damageDice, naturalScript: gb.script,
-        sizeClass: gb.sizeClass, massKg: gb.massKg,
-        resistances: gb.resistances, speed: gb.speed,
-      }});
-    }
-  }
-  // ── END DEBUG ───────────────────────────────────────────────
 
   for (const room of chunk.rooms) {
     const area = room.w * room.h;

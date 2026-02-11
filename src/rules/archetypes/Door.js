@@ -4,6 +4,7 @@ import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 
 export const Door = defineArchetype("Door",
   [Position, (p) => ({ x: p.x, y: p.y })],
@@ -17,6 +18,7 @@ export const Door = defineArchetype("Door",
 export const Chest = defineArchetype(
   "Chest",
   [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Chest", identity: "chest" }],
   [Interactable, { action: "openChest", params: { lootTable: "basic" } }],
   [Material, { kind: "iron" }]
 );

@@ -49,6 +49,9 @@ export const basePalette = {
   ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },
   ammo_fire_arrows: { glyph: "/", fg: "#ff6a33", glow: "#ff4400" },
 
+  // Containers
+  chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
+
   // Traps (revealed after triggering)
   trap_spike: { glyph: "^", fg: "#a84000", glow: "#d65d1f" },
   trap_snake: { glyph: "^", fg: "#55aa44", glow: "#338822" },
