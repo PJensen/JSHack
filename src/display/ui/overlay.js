@@ -211,6 +211,7 @@ function ensureGestureDebugLayer(root) {
     width: '100vw', height: '100vh',
     pointerEvents: 'none',
     zIndex: 910,
+    display: 'none',
   });
   root.appendChild(canvas);
 
