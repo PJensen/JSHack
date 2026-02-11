@@ -19,6 +19,7 @@ export const Chest = defineArchetype(
   "Chest",
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Chest", identity: "chest" }],
+  [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "openChest", params: { lootTable: "basic" } }],
   [Material, { kind: "iron" }]
 );
