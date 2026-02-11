@@ -15,10 +15,11 @@ export const LOOT_TABLES = {
   "sub:equip_common": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "equip", weight: 25, pool: ["sword_plain"], affixChance: 0 },
-      { type: "equip", weight: 25, pool: ["dagger_quick"], affixChance: 0 },
-      { type: "equip", weight: 25, pool: ["leather_armor"], affixChance: 0 },
-      { type: "equip", weight: 25, pool: ["shield_wood"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["sword_plain"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["dagger_quick"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["leather_armor"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["shield_wood"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["bow_short"], affixChance: 0 },
     ],
   },
 
@@ -146,11 +147,13 @@ export const LOOT_TABLES = {
   "chest:basic": {
     rolls: { min: 1, max: 3 },
     entries: [
-      { type: "gold",      weight: 30, count: { base: 8, perDepth: 3 } },
-      { type: "archetype", weight: 25, archetype: "HealthPotion" },
-      { type: "table",     weight: 20, tableId: "sub:equip_common" },
-      { type: "archetype", weight: 15, archetype: "ArrowsStack" },
+      { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
+      { type: "archetype", weight: 20, archetype: "HealthPotion" },
+      { type: "table",     weight: 15, tableId: "sub:equip_common" },
+      { type: "archetype", weight: 10, archetype: "ArrowsStack" },
+      { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
+      { type: "table",     weight: 15, tableId: "sub:spellbooks" },
     ],
   },
 
@@ -196,10 +199,13 @@ export const LOOT_TABLES = {
   "floor:common": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "gold",      weight: 40, count: { base: 5, perDepth: 2 } },
-      { type: "archetype", weight: 30, archetype: "HealthPotion" },
-      { type: "table",     weight: 20, tableId: "sub:equip_common" },
+      { type: "gold",      weight: 30, count: { base: 5, perDepth: 2 } },
+      { type: "archetype", weight: 22, archetype: "HealthPotion" },
+      { type: "table",     weight: 18, tableId: "sub:equip_common" },
       { type: "archetype", weight: 10, archetype: "ArrowsStack" },
+      { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
+      { type: "table",     weight: 10, tableId: "sub:spellbooks" },
+      { type: "table",     weight: 5,  tableId: "sub:scrolls" },
     ],
   },
 
