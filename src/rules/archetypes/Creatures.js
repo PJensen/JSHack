@@ -14,6 +14,8 @@ import { Wounds } from "../components/Wounds.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
 import { Speed } from "../components/Speed.js";
+import { Interactable } from "../components/Interactable.js";
+import { ShopInventory } from "../components/ShopInventory.js";
 
 /**
  * Consolidated creature archetypes
@@ -125,6 +127,23 @@ export const Other = withOverrides(Creature, {
   Anatomy: (p) => ({ parts: resolveAnatomyParts({ ...p, anatomyKind: p.anatomyKind ?? null }) }),
   NamedIdentity: (p) => ({ name: p.name ?? "Creature", identity: p.identity ?? (p.kind ?? "creature") }),
 });
+
+// Shopkeeper (powerful neutral NPC with a shop; extends Human + adds Interactable & ShopInventory)
+export const Shopkeeper = defineArchetype("Shopkeeper",
+  { use: Human, with: new Map([
+    ["Faction", () => ({ key: "shopkeeper" })],
+    ["NamedIdentity", (p) => ({ name: p.name ?? "Shopkeeper", identity: "shopkeeper" })],
+    ["Vitality", (p) => ({ maxHp: p.maxHp ?? 200, hp: p.hp ?? (p.maxHp ?? 200) })],
+    ["Equipment", (p) => ({
+      weapon: null, armor: null, ring1: null, ring2: null,
+      attackDerived: p.attackDerived ?? 15, defenseDerived: p.defenseDerived ?? 15,
+      naturalDamageDice: p.naturalDamageDice ?? "2d10", naturalScript: null,
+      maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,
+    })],
+  ]) },
+  [Interactable, { action: "openShop" }],
+  [ShopInventory, { items: [], buyMarkup: 1.0, sellDiscount: 0.5 }],
+);
 
 // Back-compat shims (optional): export a HumanoidBase if callers expect it
 export const HumanoidBase = Human;

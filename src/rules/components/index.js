@@ -27,3 +27,4 @@ export { ScriptRef } from './ScriptRef.js';
 export { UseIntent } from './Intents/UseIntent.js';
 export { RangedAttackIntent } from './Intents/RangedAttackIntent.js';
 export { MonsterSpawner } from './MonsterSpawner.js';
+export { Devotion } from './Devotion.js';

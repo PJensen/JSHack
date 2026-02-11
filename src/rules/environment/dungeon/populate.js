@@ -5,7 +5,9 @@ import { createRng } from '../../../lib/ecs-js/rng.js';
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Position } from '../../components/Position.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
-import { Monster } from '../../archetypes/Creatures.js';
+import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
+import { ShopInventory } from '../../components/ShopInventory.js';
+import { generateShopStock } from '../../data/shopStock.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
 import { pickMonster, pickItem, pickTrap } from './tables.js';
@@ -80,6 +82,14 @@ export function populateChunk(chunk, floorPlan, rng) {
       const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
       spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId } });
     }
+  }
+
+  // Shopkeeper: one per chunk, first eligible room, ~30% chance
+  if (chunk.rooms.length > 0 && rng.next() < 0.30) {
+    const room = chunk.rooms[0];
+    const sx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+    const sy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+    spawns.push({ x: sx, y: sy, kind: 'shopkeeper', params: { depth: floorPlan.depth } });
   }
 
   return spawns;
@@ -162,6 +172,15 @@ export function materializeSpawn(world, spawn) {
         armed: true,
       });
       // No NamedIdentity — trap is invisible until triggered
+      return id;
+    }
+    case 'shopkeeper': {
+      const id = createFrom(world, Shopkeeper, { x: spawn.x, y: spawn.y });
+      const depth = spawn.params.depth || 1;
+      const shopRng = createRng(((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0x5470) >>> 0);
+      const stock = generateShopStock(world, depth, shopRng);
+      const shop = world.get(id, ShopInventory);
+      if (shop) shop.items = stock;
       return id;
     }
     case 'book': {

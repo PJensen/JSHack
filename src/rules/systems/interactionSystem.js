@@ -7,6 +7,7 @@ import { Position } from "../components/Position.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { dropLoot } from "../data/lootResolver.js";
+import { ShopInventory } from "../components/ShopInventory.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -47,6 +48,20 @@ export function InteractionSystem(world, actor, targetId) {
 
         case "readText":
             world.emit("interaction", { actor, targetId, action: "readText", textId: inter.params?.textId });
+            break;
+
+        case "openShop":
+            {
+                const shop = world.get(targetId, ShopInventory);
+                if (shop) {
+                    world.emit?.("shop:open", {
+                        actor, targetId,
+                        shopItems: [...(shop.items || [])],
+                        buyMarkup: shop.buyMarkup ?? 1.0,
+                        sellDiscount: shop.sellDiscount ?? 0.5,
+                    });
+                }
+            }
             break;
 
         case "descendStair":
