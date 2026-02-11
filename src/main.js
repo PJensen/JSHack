@@ -882,9 +882,54 @@ world.on('spell:learn-denied', ({ actor, reason, need, have, spellId }) => {
   if (reason === 'unknown-spell') msg = `This tome is inscrutable.`;
   log(msg);
 });
-world.on('interaction', ({ action, result }) => {
+world.on('interaction', ({ action, result, items: droppedIds, targetId }) => {
   if (action === 'toggleDoor') {
     log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`);
+  }
+  if (action === 'openChest') {
+    log('You open the chest!');
+    // Auto-pickup currency drops silently
+    const nonCurrency = [];
+    if (Array.isArray(droppedIds)) {
+      for (const eid of droppedIds) {
+        const info = world.get(eid, ItemInfo);
+        if (!info) continue;
+        if (info.type === 'currency') {
+          // Auto-pickup gold immediately
+          const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+          rulesHandler({ type: 'rules.pickupItem', payload: { itemId: eid } });
+        } else {
+          const name = world.get(eid, NamedIdentity);
+          nonCurrency.push({
+            id: eid,
+            type: info.type || 'item',
+            name: name?.name || info.type || 'item',
+            count: info.count || 1,
+            rarityName: info.rarityName || 'common',
+            bonuses: info.bonuses || {},
+            affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
+          });
+        }
+      }
+    }
+    if (nonCurrency.length === 1) {
+      // Single item — show ground tooltip for quick pickup
+      const it = nonCurrency[0];
+      try {
+        window.dispatchEvent(new CustomEvent('ui:showGroundItem', {
+          detail: {
+            mode: 'single',
+            item: it,
+            pickupRange: 2,
+          }
+        }));
+      } catch {}
+    } else if (nonCurrency.length > 1) {
+      // Multiple items — open the pickup chooser directly
+      try {
+        window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items: nonCurrency } }));
+      } catch {}
+    }
   }
 });
 
