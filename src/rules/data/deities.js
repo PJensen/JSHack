@@ -1,7 +1,7 @@
 // rules/data/deities.js
 // Deity definitions. Pure data — no behavior, no display.
 
-/** @type {Record<string, import('../deity/Deity.js').DeityOpts>} */
+/** @type {Record<string, import('../../lib/deity-js/deity.js').DeityOpts>} */
 export const DEITY_DEFS = {
   molkhar: {
     name: "Mol'Khar",
@@ -26,6 +26,7 @@ export const DEITY_DEFS = {
     moodOpts: { hysteresis: 0.25, attractorStrength: 0.04 },
     ledgerOpts: { decayHalfLife: 80 },
     thresholds: { wrath: 0.38, miracle: 0.55, demand: 0.32, omen: 0.28 },
+    neglectThreshold: 50,
   },
 };
 
