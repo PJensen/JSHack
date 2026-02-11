@@ -814,7 +814,9 @@ function renderPickupChooser(panel, items) {
       if (cb.checked) selections.add(it.id); else selections.delete(it.id);
     });
   const name = document.createElement('span');
-    name.style.color = '#9cf';
+    const rn = String(it.rarityName || 'common').toLowerCase();
+    name.style.color = (rn === 'rare' || rn === 'magic') ? '#55aaff' : rn === 'epic' ? '#c47bff' : rn === 'legendary' ? '#ff9f3b' : '#ffffff';
+    name.style.fontWeight = 'bold';
   name.textContent = bracketize(sanitize(it.name || it.type || 'item'));
     const desc = document.createElement('span');
     desc.style.opacity = '0.85';
@@ -834,7 +836,7 @@ function renderPickupChooser(panel, items) {
   actions.style.marginTop = '10px';
 
   const btnPickSel = document.createElement('button');
-  btnPickSel.textContent = 'Pick Selected';
+  btnPickSel.textContent = 'Take Selected';
   decorateButton(btnPickSel);
   btnPickSel.addEventListener('click', () => {
     const ids = Array.from(selections);
@@ -844,7 +846,7 @@ function renderPickupChooser(panel, items) {
   });
 
   const btnPickAll = document.createElement('button');
-  btnPickAll.textContent = 'Pick All';
+  btnPickAll.textContent = 'Take All';
   decorateButton(btnPickAll);
   btnPickAll.addEventListener('click', () => {
     const ids = items.map((i) => i.id);
