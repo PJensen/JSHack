@@ -7,6 +7,7 @@ export function initOverlays() {
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const spells = ensurePanel('spells');
+  const shop = ensurePanel('shop');
   const groundTip = ensureGroundTooltip(root);
   const stairTip = ensureStairTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
@@ -36,7 +37,7 @@ export function initOverlays() {
     window.dispatchEvent(new CustomEvent('ui:requestMessageLogData'));
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(spells); }
+    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(spells); hide(shop); }
   });
 
   // Data feeds
@@ -73,6 +74,24 @@ export function initOverlays() {
     const items = (e?.detail?.items) || [];
     renderPickupChooser(pick, items);
     show(pick);
+  });
+
+  // Shop overlay
+  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5 };
+  window.addEventListener('ui:openShop', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _shopState.shopkeeperId = d.shopkeeperId || 0;
+    _shopState.buyMarkup = d.buyMarkup ?? 1.0;
+    _shopState.sellDiscount = d.sellDiscount ?? 0.5;
+    show(shop);
+  });
+  window.addEventListener('ui:shopData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderShop(shop, d, _shopState);
   });
 
   // Ground item tooltip lifecycle
@@ -846,6 +865,168 @@ function renderPickupChooser(panel, items) {
   queueMicrotask(() => {
     try { btnPickAll.focus(); } catch {}
   });
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number}} state */
+function renderShop(panel, data, state) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+
+  const shopItems = data?.shopItems || [];
+  const playerItems = data?.playerItems || [];
+  const gold = data?.gold || 0;
+
+  // Header
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' });
+  const title = document.createElement('div');
+  title.textContent = 'Shopkeeper';
+  title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
+  const goldLabel = document.createElement('div');
+  goldLabel.textContent = `Gold: ${gold}`;
+  goldLabel.style.marginLeft = 'auto'; goldLabel.style.color = '#ffde5a'; goldLabel.style.fontWeight = 'bold';
+  header.appendChild(title); header.appendChild(goldLabel);
+  el.appendChild(header);
+
+  // Tabs
+  let activeTab = 'buy';
+  const tabBar = document.createElement('div');
+  Object.assign(tabBar.style, { display: 'flex', gap: '4px', marginBottom: '10px' });
+
+  const buyTab = document.createElement('button');
+  buyTab.textContent = 'Buy';
+  decorateButton(buyTab);
+
+  const sellTab = document.createElement('button');
+  sellTab.textContent = 'Sell';
+  decorateButton(sellTab);
+
+  tabBar.appendChild(buyTab); tabBar.appendChild(sellTab);
+  el.appendChild(tabBar);
+
+  const listContainer = document.createElement('div');
+  listContainer.style.maxHeight = '50vh'; listContainer.style.overflow = 'auto';
+  el.appendChild(listContainer);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  el.appendChild(hint);
+
+  let sel = 0;
+  let currentItems = [];
+
+  function updateTabStyle() {
+    buyTab.style.background = activeTab === 'buy' ? '#1a2640' : '#101626';
+    buyTab.style.borderColor = activeTab === 'buy' ? '#55aaff' : '#2d3b52';
+    sellTab.style.background = activeTab === 'sell' ? '#1a2640' : '#101626';
+    sellTab.style.borderColor = activeTab === 'sell' ? '#55aaff' : '#2d3b52';
+  }
+
+  function renderList() {
+    listContainer.innerHTML = '';
+    sel = 0;
+    currentItems = activeTab === 'buy' ? shopItems : playerItems;
+
+    if (!currentItems.length) {
+      const empty = document.createElement('div');
+      empty.textContent = activeTab === 'buy' ? '(nothing for sale)' : '(nothing to sell)';
+      listContainer.appendChild(empty);
+      hint.textContent = 'Tab=Switch · Esc=Close';
+      return;
+    }
+
+    const rows = currentItems.map((it, idx) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'flex', alignItems: 'center', gap: '8px',
+        width: '100%', padding: '6px 8px',
+        background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+        cursor: 'pointer', marginBottom: '4px',
+      });
+
+      const name = document.createElement('span');
+      const rn = String(it.rarityName || 'common').toLowerCase();
+      const rs = rarityStyle(rn);
+      name.textContent = bracketize(sanitize(it.name || 'item'));
+      Object.assign(name.style, rs);
+
+      const price = document.createElement('span');
+      price.style.marginLeft = 'auto';
+      price.style.color = '#ffde5a';
+      price.style.fontWeight = 'bold';
+      const cost = activeTab === 'buy' ? (it.buyPrice || 0) : (it.sellPrice || 0);
+      price.textContent = `${cost}g`;
+
+      row.appendChild(name);
+      if (it.count > 1) {
+        const qty = document.createElement('span');
+        qty.style.opacity = '0.7'; qty.textContent = `x${it.count}`;
+        row.appendChild(qty);
+      }
+      row.appendChild(price);
+
+      row.addEventListener('mouseenter', () => setSel(idx));
+      row.addEventListener('click', () => doTransaction());
+      listContainer.appendChild(row);
+      return row;
+    });
+
+    function setSel(i) {
+      sel = Math.max(0, Math.min(currentItems.length - 1, i | 0));
+      rows.forEach((r, j) => {
+        r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+        r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+      });
+    }
+
+    setSel(0);
+    hint.textContent = activeTab === 'buy'
+      ? '↑/↓ select · Enter=Buy · Tab=Sell tab · Esc=Close'
+      : '↑/↓ select · Enter=Sell · Tab=Buy tab · Esc=Close';
+
+    function doTransaction() {
+      const it = currentItems[sel]; if (!it) return;
+      if (activeTab === 'buy') {
+        window.dispatchEvent(new CustomEvent('ui:requestBuy', {
+          detail: { shopkeeperId: state.shopkeeperId, itemId: it.id }
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('ui:requestSell', {
+          detail: { shopkeeperId: state.shopkeeperId, itemId: it.id }
+        }));
+      }
+    }
+
+    /** @param {KeyboardEvent} e */
+    function onKey(e) {
+      if (panel.style.display !== 'block') return;
+      const k = e.key;
+      if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
+      else if (k === 'Tab') {
+        e.preventDefault();
+        activeTab = activeTab === 'buy' ? 'sell' : 'buy';
+        updateTabStyle();
+        renderList();
+      }
+    }
+
+    window.addEventListener('keydown', onKey);
+    const obs = new MutationObserver(() => {
+      if (panel.style.display === 'none') {
+        window.removeEventListener('keydown', onKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  buyTab.addEventListener('click', () => { activeTab = 'buy'; updateTabStyle(); renderList(); });
+  sellTab.addEventListener('click', () => { activeTab = 'sell'; updateTabStyle(); renderList(); });
+
+  updateTabStyle();
+  renderList();
 }
 
 /** @param {HTMLButtonElement} btn */

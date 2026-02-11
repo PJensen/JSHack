@@ -23,6 +23,7 @@ import { trapSystem } from "../../src/rules/systems/trapSystem.js";
 import { manaRegenerationSystem } from "../../src/rules/systems/manaRegenerationSystem.js";
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
+import { deitySystem } from "../../src/rules/systems/deitySystem.js";
 // Side-effect: registers script handlers at import time
 import "../../src/rules/scripts/traps.js";
 import "../../src/rules/scripts/monsters.js";
@@ -62,6 +63,8 @@ export function configureWorld(world) {
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase
   registerSystem(monsterSpawnerSystem, 'effects');
+  // Deity mood ticks in the effects phase (after combat results are emitted)
+  registerSystem(deitySystem, 'effects');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');

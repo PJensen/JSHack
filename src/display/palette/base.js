@@ -49,6 +49,9 @@ export const basePalette = {
   ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },
   ammo_fire_arrows: { glyph: "/", fg: "#ff6a33", glow: "#ff4400" },
 
+  // NPCs
+  shopkeeper: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
+
   // Containers
   chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
 

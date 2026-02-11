@@ -42,8 +42,13 @@ import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 import { FloatText } from "./display/passes/vfx/text/floatText.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
+import { Devotion } from "./rules/components/Devotion.js";
+import { initDeity } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { Faction } from "./rules/components/Faction.js";
+import { ShopInventory } from "./rules/components/ShopInventory.js";
+import { createFrom } from "./lib/ecs-js/archetype.js";
+import { GoldStack } from "./rules/archetypes/Items.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
@@ -205,6 +210,59 @@ if (!playerEntity(world)) {
       ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
     } else {
       world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
+    }
+  }
+}
+
+// Deity: bind player to Mol'Khar and wire deity events to message log
+{
+  const pe = playerEntity(world);
+  if (pe) {
+    world.add(pe.id, Devotion, { deityId: 'molkhar' });
+    const deity = initDeity('molkhar');
+    if (deity) {
+      deity.on('wrath', ({ intensity }) => {
+        const dmg = Math.round(5 + intensity * 10);
+        log(`Mol'Khar's wrath strikes you! (${dmg} damage)`);
+        const vit = /** @type any */ (world.get(pe.id, Vitality));
+        if (vit) {
+          const newHp = Math.max(0, vit.hp - dmg);
+          world.set(pe.id, Vitality, { ...vit, hp: newHp });
+          try { world.emit?.('damage', { id: pe.id, amount: dmg, source: 0 }); } catch {}
+          if (newHp <= 0) try { world.emit?.('died', { id: pe.id }); } catch {}
+        }
+      });
+      deity.on('miracle', ({ serenity }) => {
+        const heal = Math.round(10 + serenity * 10);
+        log(`Mol'Khar grants you a miracle! (+${heal} HP)`);
+        const vit = /** @type any */ (world.get(pe.id, Vitality));
+        if (vit) {
+          const newHp = Math.min(vit.maxHp, vit.hp + heal);
+          world.set(pe.id, Vitality, { ...vit, hp: newHp });
+          try { world.emit?.('healed', { id: pe.id, amount: heal }); } catch {}
+        }
+      });
+      deity.on('demand', () => {
+        log("Mol'Khar hungers for blood!");
+      });
+      deity.on('moodShift', ({ to }) => {
+        const labels = {
+          wrath: 'wrathful', serenity: 'serene', hunger: 'hungry',
+          amusement: 'amused', sorrow: 'sorrowful', chaos: 'chaotic',
+        };
+        log(`Mol'Khar grows ${labels[to] || to}.`);
+      });
+      deity.on('utterance', ({ dominant }) => {
+        const lines = {
+          wrath: '"More blood!" bellows Mol\'Khar.',
+          serenity: '"You serve well," whispers Mol\'Khar.',
+          hunger: '"Feed me, mortal," growls Mol\'Khar.',
+          amusement: 'Mol\'Khar laughs at your antics.',
+          sorrow: 'Mol\'Khar weeps silently.',
+          chaos: 'The air crackles with divine unease.',
+        };
+        log(lines[dominant?.dimension] || 'Mol\'Khar stirs.');
+      });
     }
   }
 }
@@ -856,6 +914,202 @@ addEventListener('ui:requestStairTraverse', (ev) => {
     direction
   });
 });
+
+// ---- Shop event wiring -------------------------------------------------------
+
+/** Count the player's gold from inventory */
+function playerGoldCount() {
+  const pe = playerEntity(world);
+  if (!pe) return 0;
+  const inv = world.get(pe.id, Inventory);
+  if (!inv) return 0;
+  for (const id of inv.items) {
+    const info = world.get(id, ItemInfo);
+    if (info && info.type === 'currency') return info.count || 0;
+  }
+  return 0;
+}
+
+/** Build item detail for the shop UI from an entity ID */
+function buildShopItemDetail(id, markup) {
+  const info = world.get(id, ItemInfo);
+  const name = world.get(id, NamedIdentity);
+  if (!info) return null;
+  return {
+    id,
+    name: name?.name || info.description || info.type || 'item',
+    type: info.type,
+    slot: info.slot,
+    count: info.count || 1,
+    value: info.value || 0,
+    buyPrice: Math.ceil((info.value || 0) * markup),
+    rarityName: info.rarityName || 'common',
+    description: info.description || '',
+    bonuses: info.bonuses || {},
+    affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
+  };
+}
+
+/** Dispatch current shop state to the UI */
+function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount) {
+  const shop = world.get(shopkeeperId, ShopInventory);
+  if (!shop) return;
+  const shopItems = [];
+  for (const id of (shop.items || [])) {
+    const detail = buildShopItemDetail(id, buyMarkup);
+    if (detail) shopItems.push(detail);
+  }
+  const pe = playerEntity(world);
+  const playerItems = [];
+  if (pe) {
+    const inv = world.get(pe.id, Inventory);
+    if (inv) {
+      for (const id of inv.items) {
+        const info = world.get(id, ItemInfo);
+        if (!info || info.type === 'currency') continue;
+        const name = world.get(id, NamedIdentity);
+        playerItems.push({
+          id,
+          name: name?.name || info.description || info.type || 'item',
+          type: info.type,
+          slot: info.slot,
+          count: info.count || 1,
+          value: info.value || 0,
+          sellPrice: Math.floor((info.value || 0) * sellDiscount),
+          rarityName: info.rarityName || 'common',
+          description: info.description || '',
+        });
+      }
+    }
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('ui:shopData', { detail: {
+      shopkeeperId, shopItems, playerItems,
+      gold: playerGoldCount(),
+      buyMarkup, sellDiscount,
+    }}));
+  } catch {}
+}
+
+// When shop:open fires from interaction system → open shop UI
+world.on('shop:open', ({ actor, targetId, shopItems, buyMarkup, sellDiscount }) => {
+  log('You approach the shopkeeper.');
+  dispatchShopData(targetId, buyMarkup, sellDiscount);
+  try { window.dispatchEvent(new CustomEvent('ui:openShop', { detail: { shopkeeperId: targetId, buyMarkup, sellDiscount } })); } catch {}
+});
+
+// Buy request from shop UI
+addEventListener('ui:requestBuy', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const { shopkeeperId, itemId } = e?.detail || {};
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const shop = world.get(shopkeeperId, ShopInventory);
+  if (!shop) return;
+  const info = world.get(itemId, ItemInfo);
+  if (!info) return;
+
+  const buyMarkup = shop.buyMarkup ?? 1.0;
+  const price = Math.ceil((info.value || 0) * buyMarkup);
+  const gold = playerGoldCount();
+
+  if (gold < price) {
+    log('You cannot afford that.');
+    return;
+  }
+
+  // Deduct gold
+  const inv = world.get(pe.id, Inventory);
+  if (inv) {
+    for (const gid of inv.items) {
+      const gi = world.get(gid, ItemInfo);
+      if (gi && gi.type === 'currency') {
+        world.mutate(gid, ItemInfo, r => { r.count = (r.count || 0) - price; });
+        break;
+      }
+    }
+  }
+
+  // Transfer item from shop to player inventory
+  const idx = shop.items.indexOf(itemId);
+  if (idx !== -1) shop.items.splice(idx, 1);
+  if (inv) {
+    try { world.remove(itemId, Position); } catch {}
+    inv.items.push(itemId);
+  }
+
+  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+  log(`You buy ${bracketizeName(itemName)} for ${price} gold.`);
+
+  // Refresh shop UI
+  dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
+});
+
+// Sell request from shop UI
+addEventListener('ui:requestSell', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const { shopkeeperId, itemId } = e?.detail || {};
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const shop = world.get(shopkeeperId, ShopInventory);
+  if (!shop) return;
+  const info = world.get(itemId, ItemInfo);
+  if (!info) return;
+
+  const sellDiscount = shop.sellDiscount ?? 0.5;
+  const price = Math.floor((info.value || 0) * sellDiscount);
+
+  // Remove from player inventory
+  const inv = world.get(pe.id, Inventory);
+  if (inv) {
+    const idx = inv.items.indexOf(itemId);
+    if (idx !== -1) inv.items.splice(idx, 1);
+  }
+
+  // Unequip if equipped
+  const eq = world.get(pe.id, Equipment);
+  if (eq) {
+    for (const slot of ['weapon', 'armor', 'shield', 'ring1', 'ring2', 'ammo']) {
+      if (eq[slot] === itemId) { eq[slot] = null; break; }
+    }
+  }
+
+  // Add item to shop stock
+  shop.items.push(itemId);
+
+  // Add gold to player
+  if (inv) {
+    let found = false;
+    for (const gid of inv.items) {
+      const gi = world.get(gid, ItemInfo);
+      if (gi && gi.type === 'currency') {
+        world.mutate(gid, ItemInfo, r => { r.count = (r.count || 0) + price; });
+        found = true;
+        break;
+      }
+    }
+    if (!found && price > 0) {
+      // Player has no gold stack yet — create one
+      const gid = createFrom(world, GoldStack, {});
+      try { world.remove(gid, Position); } catch {}
+      world.mutate(gid, ItemInfo, r => { r.count = price; });
+      inv.items.push(gid);
+    }
+  }
+
+  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+  log(`You sell ${bracketizeName(itemName)} for ${price} gold.`);
+
+  // Refresh shop UI
+  dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
+});
+
+// ---- End shop event wiring ---------------------------------------------------
+
 // Update inventory and log when an item is equipped
 world.on('item:equipped', ({ actor, itemId, slot, name }) => {
   const label = name ? bracketizeName(name) : `item ${itemId}`;
@@ -942,6 +1196,16 @@ world.on('moved', ({ id, to }) => {
     } catch {}
   } else {
     try { window.dispatchEvent(new CustomEvent('ui:hideStairTooltip')); } catch {}
+  }
+
+  // Check for adjacent shopkeeper
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'shopkeeper') continue;
+    const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
+    if (dist === 1) {
+      log('A shopkeeper is nearby. Bump to trade.');
+      break;
+    }
   }
 });
 
