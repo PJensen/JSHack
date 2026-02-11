@@ -464,6 +464,8 @@ world.on('drank', ({ actor, itemId, target }) => {
   } else {
     log(`${who} uses ${it} on ${tgt}.`);
   }
+  // Dismiss the quick-slot chip for this item
+  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
 });
 world.on('castSpell', ({ actor, spellId, targetId }) => {
   const who = nameOfEntity(actor);
@@ -781,6 +783,8 @@ world.on('item:pickup', ({ actor, itemId }) => {
 });
 // Refresh inventory UI when any item is used (consumed/learned/etc.)
 world.on('item:used', ({ actor, itemId }) => {
+  // Dismiss the quick-slot chip for this item
+  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
 // Log spell learning events
@@ -856,6 +860,8 @@ addEventListener('ui:requestStairTraverse', (ev) => {
 world.on('item:equipped', ({ actor, itemId, slot, name }) => {
   const label = name ? bracketizeName(name) : `item ${itemId}`;
   log(`You equip ${label}${slot ? ' ('+slot+')' : ''}.`);
+  // Dismiss the quick-slot chip for this item
+  try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail: { itemId } })); } catch {}
   // Refresh the open inventory panel (if open)
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
