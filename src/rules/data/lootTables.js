@@ -56,64 +56,64 @@ export const LOOT_TABLES = {
   // ── Monster tier defaults ─────────────────────────────────────────
 
   "drop:tier0": {
-    rolls: { min: 1, max: 1 },
+    rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing", weight: 60 },
-      { type: "gold",      weight: 25, count: { base: 2, perDepth: 1 } },
-      { type: "archetype", weight: 10, archetype: "HealthPotion" },
-      { type: "table",     weight: 5,  tableId: "sub:equip_common" },
+      { type: "nothing",   weight: 15 },
+      { type: "gold",      weight: 30, count: { base: 5, perDepth: 2 } },
+      { type: "archetype", weight: 25, archetype: "HealthPotion" },
+      { type: "table",     weight: 20, tableId: "sub:equip_common" },
+      { type: "table",     weight: 10, tableId: "sub:scrolls" },
     ],
   },
 
   "drop:tier1": {
-    rolls: { min: 1, max: 2 },
+    rolls: { min: 1, max: 3 },
     entries: [
-      { type: "nothing",   weight: 40 },
-      { type: "gold",      weight: 25, count: { base: 5, perDepth: 2 } },
-      { type: "archetype", weight: 12, archetype: "HealthPotion" },
-      { type: "table",     weight: 10, tableId: "sub:equip_common" },
-      { type: "equip",     weight: 5,  pool: ["axe_heavy", "chain_armor", "ring_health"], affixChance: 0.10, affixCountMax: 1 },
-      { type: "table",     weight: 8,  tableId: "sub:scrolls" },
+      { type: "nothing",   weight: 10 },
+      { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
+      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 15, tableId: "sub:equip_common" },
+      { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "ring_health"], affixChance: 0.20, affixCountMax: 1 },
+      { type: "table",     weight: 15, tableId: "sub:scrolls" },
+      { type: "table",     weight: 10, tableId: "sub:spellbooks" },
     ],
   },
 
   "drop:tier2": {
-    rolls: { min: 1, max: 2 },
+    rolls: { min: 2, max: 3 },
     entries: [
-      { type: "nothing",   weight: 25 },
-      { type: "gold",      weight: 20, count: { base: 12, perDepth: 4 } },
-      { type: "archetype", weight: 10, archetype: "HealthPotion" },
-      { type: "table",     weight: 15, tableId: "sub:equip_magic" },
-      { type: "table",     weight: 10, tableId: "sub:scrolls" },
-      { type: "table",     weight: 10, tableId: "sub:spellbooks" },
-      { type: "equip",     weight: 10, pool: ["ring_health", "ring_precision", "ring_arcana"], affixChance: 0.25, affixCountMax: 1 },
+      { type: "gold",      weight: 20, count: { base: 15, perDepth: 5 } },
+      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 20, tableId: "sub:equip_magic" },
+      { type: "table",     weight: 15, tableId: "sub:scrolls" },
+      { type: "table",     weight: 15, tableId: "sub:spellbooks" },
+      { type: "equip",     weight: 15, pool: ["ring_health", "ring_precision", "ring_arcana"], affixChance: 0.40, affixCountMax: 1 },
     ],
   },
 
   "drop:tier3": {
-    rolls: { min: 2, max: 3 },
+    rolls: { min: 3, max: 5 },
     entries: [
-      { type: "nothing",   weight: 10 },
-      { type: "gold",      weight: 15, count: { base: 25, perDepth: 6 } },
-      { type: "archetype", weight: 8,  archetype: "HealthPotion" },
-      { type: "table",     weight: 20, tableId: "sub:equip_magic" },
-      { type: "table",     weight: 15, tableId: "sub:spellbooks" },
-      { type: "table",     weight: 12, tableId: "sub:scrolls" },
-      { type: "equip",     weight: 20, pool: ["axe_heavy", "chain_armor", "shield_iron", "ring_health", "ring_precision", "ring_arcana"],
-        affixChance: 0.60, affixCountMax: 2 },
+      { type: "gold",      weight: 15, count: { base: 30, perDepth: 8 } },
+      { type: "archetype", weight: 10, archetype: "HealthPotion" },
+      { type: "table",     weight: 25, tableId: "sub:equip_magic" },
+      { type: "table",     weight: 20, tableId: "sub:spellbooks" },
+      { type: "table",     weight: 15, tableId: "sub:scrolls" },
+      { type: "equip",     weight: 15, pool: ["axe_heavy", "chain_armor", "shield_iron", "ring_health", "ring_precision", "ring_arcana"],
+        affixChance: 0.80, affixCountMax: 2 },
     ],
   },
 
   // ── Monster-specific overrides ────────────────────────────────────
 
   "drop:goblin": {
-    rolls: { min: 1, max: 2 },
+    rolls: { min: 1, max: 3 },
     entries: [
-      { type: "nothing",   weight: 35 },
-      { type: "gold",      weight: 30, count: { base: 3, perDepth: 2 } },
-      { type: "equip",     weight: 20, pool: ["dagger_quick"], affixChance: 0.05, affixCountMax: 1 },
-      { type: "archetype", weight: 10, archetype: "ArrowsStack" },
-      { type: "archetype", weight: 5,  archetype: "HealthPotion" },
+      { type: "gold",      weight: 30, count: { base: 5, perDepth: 3 } },
+      { type: "equip",     weight: 25, pool: ["dagger_quick"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "archetype", weight: 20, archetype: "ArrowsStack" },
+      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 10, tableId: "sub:scrolls" },
     ],
   },
 
@@ -137,15 +137,14 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "equip",     weight: 15, pool: ["ring_health", "ring_precision", "ring_arcana"],
         affixChance: 0.50, affixCountMax: 2 },
-      { type: "archetype", weight: 10, archetype: "HealthPotion" },
-      { type: "nothing",   weight: 10 },
+      { type: "archetype", weight: 15, archetype: "HealthPotion" },
     ],
   },
 
   // ── Chest tables ──────────────────────────────────────────────────
 
   "chest:basic": {
-    rolls: { min: 1, max: 3 },
+    rolls: { min: 2, max: 4 },
     entries: [
       { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
       { type: "archetype", weight: 20, archetype: "HealthPotion" },
@@ -158,7 +157,7 @@ export const LOOT_TABLES = {
   },
 
   "chest:magic": {
-    rolls: { min: 2, max: 4 },
+    rolls: { min: 3, max: 5 },
     entries: [
       { type: "gold",      weight: 20, count: { base: 15, perDepth: 5 } },
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
@@ -171,7 +170,7 @@ export const LOOT_TABLES = {
   },
 
   "chest:legendary": {
-    rolls: { min: 3, max: 5 },
+    rolls: { min: 4, max: 6 },
     entries: [
       { type: "equip",     weight: 30, pool: ["axe_heavy", "chain_armor", "shield_iron", "ring_health", "ring_precision", "ring_arcana"],
         affixChance: 0.90, affixCountMax: 3 },
