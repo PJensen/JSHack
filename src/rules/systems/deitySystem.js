@@ -38,17 +38,20 @@ function wireWorldEvents(world) {
   if (_wired.has(world)) return;
   _wired.add(world);
 
-  // Kill events → deity.action('kill')
+  // Kill events → deity.action('kill') + optional offering
   world.on('died', ({ id, killer }) => {
     if (!killer) return;
-    // Only feed player kills to the deity
     if (!world.has(killer, Player)) return;
     const dev = world.get(killer, Devotion);
     if (!dev?.deityId) return;
     const deity = _deities.get(dev.deityId);
     if (!deity) return;
-    // Magnitude: base 0.3, bigger monsters could be higher in the future
+    const def = getDeity(dev.deityId);
     deity.action('kill', { magnitude: 0.5, target: String(id) });
+    // War gods treat kills as implicit blood offerings (resets neglect clock)
+    if (def?.killsAreOfferings) {
+      deity.offer('blood', { value: 0.3, alignment: def.alignment ?? 'neutral' });
+    }
   });
 
   // Heal events → deity.action('heal')
