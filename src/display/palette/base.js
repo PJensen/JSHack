@@ -18,6 +18,7 @@ export const basePalette = {
   troll:    { glyph: "T", fg: "#66aa66", glow: "#448844" },
   wraith:   { glyph: "W", fg: "#aabbff", glow: "#7799dd" },
   ogre:     { glyph: "O", fg: "#cc9966", glow: "#996633" },
+  floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
   // Tier 3
   demon:    { glyph: "&", fg: "#ff4444", glow: "#cc0000" },
   dragon:   { glyph: "D", fg: "#ffcc33", glow: "#dd9900" },
@@ -36,6 +37,9 @@ export const basePalette = {
   spellbook_fire: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
   spellbook_ice: { glyph: "📘", fg: "#4da6ff", glow: "#4da6ff" },
   spellbook_lightning: { glyph: "📓", fg: "#ffff66", glow: "#ffff66" },
+  // Scrolls
+  scroll_mapping: { glyph: "?", fg: "#eeddaa", glow: "#ccbb88" },
+  scroll_blastwave: { glyph: "?", fg: "#ffa333", glow: "#dd8811" },
   // Aliases to match rules identity so they render on the ground
   book_lightning: { glyph: "📓", fg: "#ffff66", glow: "#ffff66" },
   book_meteor: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
