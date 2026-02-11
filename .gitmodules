@@ -2,3 +2,6 @@
 	path = src/lib/ecs-js
 	url = https://github.com/PJensen/ecs-js.git
 	branch = main
+[submodule "src/lib/deity-js"]
+	path = src/lib/deity-js
+	url = https://github.com/PJensen/Deity-js.git
