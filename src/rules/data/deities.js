@@ -27,6 +27,7 @@ export const DEITY_DEFS = {
     ledgerOpts: { decayHalfLife: 80 },
     thresholds: { wrath: 0.38, miracle: 0.55, demand: 0.32, omen: 0.28 },
     neglectThreshold: 50,
+    killsAreOfferings: true, // blood of enemies feeds the war god
   },
 };
 
