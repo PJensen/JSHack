@@ -269,7 +269,6 @@ if (!playerEntity(world)) {
 
 // Give player a Scroll of Mapping (reveals full dungeon — debug aid)
 import { ScrollOfMapping } from "./rules/archetypes/Items.js";
-import { createFrom } from "./lib/ecs-js/archetype.js";
 {
   const pe = playerEntity(world);
   if (pe) {
