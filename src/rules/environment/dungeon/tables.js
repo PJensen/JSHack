@@ -51,6 +51,7 @@ export function pickItem(rng, depth) {
     case 'archetype':
       if (drop.params.archetype === 'HealthPotion') return { kind: 'potion' };
       if (drop.params.archetype === 'ArrowsStack') return { kind: 'arrows' };
+      if (drop.params.archetype === 'FireArrowsStack') return { kind: 'fire_arrows' };
       if (drop.params.archetype === 'ScrollOfMapping') return { kind: 'scroll' };
       return { kind: 'potion' };
     case 'item':
