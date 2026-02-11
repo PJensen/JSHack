@@ -179,6 +179,18 @@ export const LOOT_TABLES = {
     ],
   },
 
+  // ── Shop stock tables ────────────────────────────────────────────
+
+  "shop:equipment": {
+    rolls: { min: 2, max: 4 },
+    entries: [
+      { type: "table",  weight: 40, tableId: "sub:equip_common" },
+      { type: "table",  weight: 30, tableId: "sub:equip_magic" },
+      { type: "table",  weight: 15, tableId: "sub:scrolls" },
+      { type: "table",  weight: 15, tableId: "sub:spellbooks" },
+    ],
+  },
+
   // ── Floor loot (replaces pickItem) ────────────────────────────────
 
   "floor:common": {

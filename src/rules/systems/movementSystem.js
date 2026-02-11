@@ -13,6 +13,7 @@ import { Settings } from "../components/Settings.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Vitality } from "../components/Vitality.js";
+import { Faction } from "../components/Faction.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -61,8 +62,13 @@ export function movementSystem(world) {
         }
         const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
         if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
-          // Living entity on tile: attack it (even if there's also a door/interactable)
-          try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+          // Check faction: neutral/shopkeeper NPCs with Interactable trigger interaction, not attack
+          const fac = world.get(target, Faction);
+          if (fac && (fac.key === 'shopkeeper' || fac.key === 'neutral') && world.has(target, Interactable)) {
+            try { world.add(actor, InteractIntent, { targetId: target }); } catch {}
+          } else {
+            try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+          }
         } else {
           // No living target — try interactable (e.g., closed door)
           const targetId = interactables.get(k);
