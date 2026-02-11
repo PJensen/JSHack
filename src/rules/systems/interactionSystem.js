@@ -42,6 +42,9 @@ export function InteractionSystem(world, actor, targetId) {
                 const droppedIds = chestPos
                     ? dropLoot(world, lootTableId, rng, depth, { x: chestPos.x, y: chestPos.y })
                     : [];
+                // Disable chest so it can't be opened again
+                try { world.remove(targetId, Interactable); } catch {}
+                try { world.set(targetId, Collider, { solid: false, blocksSight: false }); } catch {}
                 world.emit("interaction", { actor, targetId, action: "openChest", loot: lootTableId, items: droppedIds });
             }
             break;
