@@ -115,6 +115,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
   });
 
+  // Engrave button (to the right of Shoot)
+  const engraveBtn = document.createElement('button');
+  engraveBtn.id = 'btn-engrave';
+  engraveBtn.textContent = 'Engrave';
+  Object.assign(engraveBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  engraveBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
+  });
+
   // Update label when app sets active spell
   window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -196,9 +209,10 @@ export function initHUD() {
   bar.appendChild(invBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
+  bar.appendChild(engraveBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
-  return { castBtn, invBtn, shootBtn };
+  return { castBtn, invBtn, shootBtn, engraveBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
