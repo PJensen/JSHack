@@ -879,6 +879,23 @@ world.on('item:pickup', ({ actor, itemId }) => {
     }));
   } catch {}
 });
+// Pet pickup: log when the pet picks up an item
+world.on('item:pickup', ({ actor, itemId, count }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id === actor) return; // skip player pickups (handled elsewhere)
+  const petName = nameOfEntity(actor);
+  const it = nameOfItem(itemId);
+  log(`${petName} picks up ${it}.`);
+});
+// Pet deliver: log when the pet drops an item at the player's feet
+world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
+  const petName = nameOfEntity(petId);
+  // Use pre-resolved itemName since the item entity may be destroyed after stacking
+  const label = itemName ? bracketizeName(itemName) : nameOfItem(itemId);
+  log(`${petName} drops ${label} at your feet.`);
+  // Trigger inventory UI refresh
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+});
 // Engrave event → combat log + float text
 world.on('engrave', ({ actor, text, x, y }) => {
   const who = nameOfEntity(actor);

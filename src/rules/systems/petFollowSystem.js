@@ -43,6 +43,10 @@ export function petFollowSystem(world) {
           if (!info) continue;
           const count = info.count || 1;
           const ident = world.get(itemId, NamedIdentity)?.identity;
+          const itemName = world.get(itemId, NamedIdentity)?.name || info.description || info.type || 'item';
+
+          // Emit before stacking (which may destroy the item entity)
+          try { world.emit?.('pet:deliver', { petId: id, actor: playerId, itemId, itemName, count }); } catch {}
 
           // Try to stack into existing player item
           let stacked = false;
@@ -65,7 +69,6 @@ export function petFollowSystem(world) {
               try { world.add(itemId, Position, { x: playerPos.x, y: playerPos.y }); } catch {}
             }
           }
-          try { world.emit?.('item:pickup', { actor: playerId, itemId, count }); } catch {}
         }
         petInv.items.length = 0;
       }
