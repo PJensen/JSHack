@@ -53,6 +53,9 @@ export const basePalette = {
   ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },
   ammo_fire_arrows: { glyph: "/", fg: "#ff6a33", glow: "#ff4400" },
 
+  // Pets
+  kitty: { glyph: "f", fg: "#ffcc88", glow: "#cc9955" },
+
   // NPCs
   shopkeeper: { glyph: "@", fg: "#c47bff", glow: "#9955cc" },
 
@@ -64,6 +67,9 @@ export const basePalette = {
   trap_snake: { glyph: "^", fg: "#55aa44", glow: "#338822" },
   // Tier 0 (snake — spawned by snake traps)
   snake:    { glyph: "S", fg: "#55aa44", glow: "#338822" },
+
+  // Engravings
+  engraving: { glyph: "~", fg: "#8899aa", glow: "#556677" },
 
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }

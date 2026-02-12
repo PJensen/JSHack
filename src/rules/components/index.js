@@ -28,3 +28,5 @@ export { UseIntent } from './Intents/UseIntent.js';
 export { RangedAttackIntent } from './Intents/RangedAttackIntent.js';
 export { MonsterSpawner } from './MonsterSpawner.js';
 export { Devotion } from './Devotion.js';
+export { Engraving } from './Engraving.js';
+export { EngraveIntent } from './Intents/EngraveIntent.js';

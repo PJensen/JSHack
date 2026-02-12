@@ -52,6 +52,9 @@ import { GoldStack } from "./rules/archetypes/Items.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
+import { Engraving } from "./rules/components/Engraving.js";
+import { Pet } from "./rules/components/Pet.js";
+import { Owner } from "./rules/components/Owner.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -211,6 +214,20 @@ if (!playerEntity(world)) {
     } else {
       world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
     }
+  }
+}
+
+// Spawn pet (kitty) next to the player
+{
+  const pe = playerEntity(world);
+  if (pe) {
+    const ppos = world.get(pe.id, Position);
+    const petId = world.create();
+    world.add(petId, Pet);
+    world.add(petId, Position, { x: ppos.x + 1, y: ppos.y });
+    world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+    world.add(petId, Faction, { key: "pet" });
+    world.add(petId, Owner, { ownerId: pe.id });
   }
 }
 
@@ -475,6 +492,16 @@ addEventListener('ui:shootRanged', () => {
   }
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({ type: 'rules.rangedAttack', payload: { targetId: bestId } });
+});
+
+// Engrave button → prompt for text, then dispatch engrave action
+addEventListener('ui:engrave', () => {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const text = prompt('Engrave what on the ground?');
+  if (!text || !text.trim()) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.engrave', payload: { text: text.trim() } });
 });
 
 // Spell picker data feed and selection
@@ -850,6 +877,13 @@ world.on('item:pickup', ({ actor, itemId }) => {
     }));
   } catch {}
 });
+// Engrave event → combat log + float text
+world.on('engrave', ({ actor, text, x, y }) => {
+  const who = nameOfEntity(actor);
+  log(`${who} engrave${who === 'You' ? '' : 's'} "${text}" on the ground.`);
+  try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch {}
+});
+
 // Refresh inventory UI when any item is used (consumed/learned/etc.)
 world.on('item:used', ({ actor, itemId }) => {
   // Dismiss the quick-slot chip for this item
@@ -1265,6 +1299,18 @@ world.on('moved', ({ id, to }) => {
   }
 });
 
+// When player moves onto a tile with an engraving, show it in the log
+world.on('moved', ({ id, to }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== id) return;
+  for (const [eid, eng, pos] of world.query(Engraving, Position)) {
+    if (pos.x === to.x && pos.y === to.y) {
+      log(`You see "${eng.text}" engraved on the ground here.`);
+      break;
+    }
+  }
+});
+
 // Hide ground tooltip after pickups to avoid stale UI
 world.on('item:pickup', ({ actor, itemId }) => {
   const pe = playerEntity(world);
@@ -1398,6 +1444,25 @@ function render(worldView) {
         // unexplored: skip — background gradient is already black
       }
     );
+  }
+
+  // Pass 1.5: engravings on the ground (between tiles and entities)
+  if (worldView.engravings && worldView.engravings.length) {
+    const isVis = worldView.isVisible;
+    bctx.save();
+    bctx.textAlign = 'center';
+    bctx.textBaseline = 'middle';
+    bctx.font = '0.32px monospace';
+    for (let i = 0; i < worldView.engravings.length; i++) {
+      const eng = worldView.engravings[i];
+      if (eng.pos.x < vx0 || eng.pos.x > vx1 || eng.pos.y < vy0 || eng.pos.y > vy1) continue;
+      bctx.globalAlpha = (isVis && isVis(eng.pos.x, eng.pos.y)) ? 0.6 : 0.2;
+      bctx.fillStyle = '#8899aa';
+      const label = eng.text.length > 8 ? eng.text.slice(0, 7) + '\u2026' : eng.text;
+      bctx.fillText(label, eng.pos.x, eng.pos.y + 0.28);
+    }
+    bctx.globalAlpha = 1.0;
+    bctx.restore();
   }
 
   // Pass 2: entities (doors, stairs, monsters, items, player)

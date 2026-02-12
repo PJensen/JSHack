@@ -14,14 +14,17 @@ import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
 import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
 import { forEachInRect, ensureSpatialIndex } from '../../rules/utils/spatialIndex.js';
+import { Engraving } from '../../rules/components/Engraving.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[] }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
+/** @typedef {{ id:number, text:string, pos:{x:number,y:number} }} EngravingView */
+
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], tileGrid: null, isVisible: null, isExplored: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
@@ -42,6 +45,7 @@ export function buildWorldView(world) {
 	_view.entities.length = 0;
 	_view.solids.length = 0;
 	_view.emissives.length = 0;
+	_view.engravings.length = 0;
 	_allEntities.length = 0;
 
 	// Expose tile grid functions for direct grid-based rendering
@@ -198,6 +202,13 @@ export function buildWorldView(world) {
 		}
 		if (isVisible(rec.pos.x, rec.pos.y)) {
 			_view.entities.push(rec);
+		}
+	}
+
+	// Collect engravings (visible or explored tiles)
+	for (const [id, eng, pos] of world.query(Engraving, Position)) {
+		if (isVisible(pos.x, pos.y) || isExplored(pos.x, pos.y)) {
+			_view.engravings.push({ id, text: eng.text, pos: { x: pos.x, y: pos.y } });
 		}
 	}
 
