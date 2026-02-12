@@ -228,6 +228,8 @@ if (!playerEntity(world)) {
     world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
     world.add(petId, Faction, { key: "pet" });
     world.add(petId, Owner, { ownerId: pe.id });
+    world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
+    world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
   }
 }
 
@@ -882,6 +884,17 @@ world.on('engrave', ({ actor, text, x, y }) => {
   const who = nameOfEntity(actor);
   log(`${who} engrave${who === 'You' ? '' : 's'} "${text}" on the ground.`);
   try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch {}
+});
+// Engraving scrambled by foot traffic
+world.on('engrave:scrambled', ({ actor, text, x, y }) => {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const ppos = world.get(pe.id, Position);
+  // Only log if the player can see the tile
+  if (ppos && Math.max(Math.abs(ppos.x - x), Math.abs(ppos.y - y)) <= 10) {
+    const who = nameOfEntity(actor);
+    log(`${who} scuff${who === 'You' ? '' : 's'} the engraving underfoot.`);
+  }
 });
 
 // Refresh inventory UI when any item is used (consumed/learned/etc.)
