@@ -15,6 +15,7 @@ import { equipmentSystem } from "../../src/rules/systems/equipmentSystem.js";
 import { waitSystem } from "../../src/rules/systems/waitSystem.js";
 import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
+import { petFollowSystem } from "../../src/rules/systems/petFollowSystem.js";
 import { movementSystem } from "../../src/rules/systems/movementSystem.js";
 import { combatSystem } from "../../src/rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
@@ -24,6 +25,7 @@ import { manaRegenerationSystem } from "../../src/rules/systems/manaRegeneration
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../../src/rules/systems/deitySystem.js";
+import { engraveSystem } from "../../src/rules/systems/engraveSystem.js";
 // Side-effect: registers script handlers at import time
 import "../../src/rules/scripts/traps.js";
 import "../../src/rules/scripts/monsters.js";
@@ -40,6 +42,7 @@ export function configureWorld(world) {
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
   registerSystem(aiChaseSystem, 'intents');
+  registerSystem(petFollowSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
@@ -48,6 +51,7 @@ export function configureWorld(world) {
   registerSystem(rangedAttackSystem, 'intents');
   registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
+  registerSystem(engraveSystem, 'intents');
   registerSystem(movementSystem, 'intents');
   registerSystem(combatSystem, 'intents');
   // Run pickup after movement so stepping onto items can pick them up immediately
