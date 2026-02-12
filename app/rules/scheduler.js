@@ -25,7 +25,7 @@ import { manaRegenerationSystem } from "../../src/rules/systems/manaRegeneration
 import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../../src/rules/systems/deitySystem.js";
-import { engraveSystem } from "../../src/rules/systems/engraveSystem.js";
+import { engraveSystem, installEngraveListeners } from "../../src/rules/systems/engraveSystem.js";
 // Side-effect: registers script handlers at import time
 import "../../src/rules/scripts/traps.js";
 import "../../src/rules/scripts/monsters.js";
@@ -38,6 +38,8 @@ export function configureWorld(world) {
 
   // Install affix event listeners once per world
   installAffixTriggers(world);
+  // Install engraving scramble-on-step listener once per world
+  installEngraveListeners(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -49,10 +51,13 @@ export function configureWorld(world) {
   registerSystem(equipItemSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
   registerSystem(rangedAttackSystem, 'intents');
-  registerSystem(interactionSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
   registerSystem(engraveSystem, 'intents');
   registerSystem(movementSystem, 'intents');
+  // interactionSystem must run AFTER movementSystem: bump-to-interact adds
+  // InteractIntent during movement; processing it in the same tick prevents
+  // the shop overlay from re-firing on every subsequent action.
+  registerSystem(interactionSystem, 'intents');
   registerSystem(combatSystem, 'intents');
   // Run pickup after movement so stepping onto items can pick them up immediately
   registerSystem(itemPickupSystem, 'intents');
