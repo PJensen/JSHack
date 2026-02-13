@@ -17,6 +17,8 @@ import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Trap } from '../../components/Trap.js';
+import { Inventory } from '../../components/Inventory.js';
+import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 
 /**
  * @typedef {Object} SpawnPoint
@@ -80,7 +82,7 @@ export function populateChunk(chunk, floorPlan, rng) {
       const chy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
       const d = floorPlan.depth;
       const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
-      spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId } });
+      spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
     }
   }
 
@@ -156,8 +158,23 @@ export function materializeSpawn(world, spawn) {
     }
     case 'chest': {
       const id = createFrom(world, Chest, { x: spawn.x, y: spawn.y });
-      const inter = world.get(id, Interactable);
-      if (inter) inter.params = { lootTable: spawn.params.lootTable };
+      // Pre-populate chest inventory from loot table
+      const lootTable = spawn.params.lootTable || 'chest:basic';
+      const chestSeed = ((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0xCE57) >>> 0;
+      const chestRng = createRng(chestSeed);
+      const depth = spawn.params.depth || 1;
+      const drops = resolveLootTable(lootTable, chestRng, depth);
+      const inv = world.get(id, Inventory);
+      if (inv) {
+        const dummyPos = { x: spawn.x, y: spawn.y };
+        for (const drop of drops) {
+          const eid = materializeDrop(world, drop, dummyPos);
+          if (eid != null) {
+            try { world.remove(eid, Position); } catch {}
+            inv.items.push(eid);
+          }
+        }
+      }
       return id;
     }
     case 'trap': {

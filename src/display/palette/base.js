@@ -68,6 +68,27 @@ export const basePalette = {
   // Tier 0 (snake — spawned by snake traps)
   snake:    { glyph: "S", fg: "#55aa44", glow: "#338822" },
 
+  // Food & Rations
+  food_ration:      { glyph: "%", fg: "#c4a46c", glow: "#a08050" },
+  food_iron_ration: { glyph: "%", fg: "#d4b87c", glow: "#b09860" },
+
+  // Corpses (inherit monster color, traditional '%' glyph)
+  corpse_rat:          { glyph: "%", fg: "#b89070", glow: "#a06030" },
+  corpse_goblin:       { glyph: "%", fg: "#7ecc5a", glow: "#4a9030" },
+  corpse_bat:          { glyph: "%", fg: "#9080b0", glow: "#605080" },
+  corpse_grid_bug:     { glyph: "%", fg: "#bb66ff", glow: "#44ccff" },
+  corpse_snake:        { glyph: "%", fg: "#55aa44", glow: "#338822" },
+  corpse_orc:          { glyph: "%", fg: "#cc6644", glow: "#993320" },
+  corpse_skeleton:     { glyph: "%", fg: "#ddd8c8", glow: "#aaa590" },
+  corpse_spider:       { glyph: "%", fg: "#55bb55", glow: "#338833" },
+  corpse_troll:        { glyph: "%", fg: "#66aa66", glow: "#448844" },
+  corpse_wraith:       { glyph: "%", fg: "#aabbff", glow: "#7799dd" },
+  corpse_ogre:         { glyph: "%", fg: "#cc9966", glow: "#996633" },
+  corpse_floating_eye: { glyph: "%", fg: "#dd55ff", glow: "#9922cc" },
+  corpse_demon:        { glyph: "%", fg: "#ff4444", glow: "#cc0000" },
+  corpse_dragon:       { glyph: "%", fg: "#ffcc33", glow: "#dd9900" },
+  corpse_lich:         { glyph: "%", fg: "#cc88ff", glow: "#9955cc" },
+
   // Engravings
   engraving: { glyph: "~", fg: "#8899aa", glow: "#556677" },
 

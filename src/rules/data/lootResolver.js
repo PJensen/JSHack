@@ -9,6 +9,7 @@ import { getItem } from './items.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildEquipmentItem } from './equipmentLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping } from '../archetypes/Items.js';
+import { Ration, IronRation } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
@@ -21,6 +22,8 @@ const ARCHETYPE_MAP = {
   GoldStack,
   ArrowsStack,
   ScrollOfMapping,
+  Ration,
+  IronRation,
 };
 
 // ── Resolution ──────────────────────────────────────────────────────

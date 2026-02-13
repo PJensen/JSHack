@@ -4,6 +4,7 @@ import { Interactable } from '../src/rules/components/Interactable.js';
 import { InteractIntent } from '../src/rules/components/Intents/InteractIntent.js';
 import { DoorState } from '../src/rules/components/DoorState.js';
 import { Collider } from '../src/rules/components/Collider.js';
+import { Inventory } from '../src/rules/components/Inventory.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
 
 Deno.test("toggle door: closed → open → closed", () => {
@@ -57,20 +58,62 @@ Deno.test("locked door stays closed and emits locked event", () => {
   assert(events.some(e => e.result === 'locked'), 'should emit locked interaction event');
 });
 
-Deno.test("open chest emits event with loot", () => {
+Deno.test("open chest emits chest:open event", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
   const chest = world.create();
-  world.add(chest, Interactable, { action: 'openChest', params: { lootTable: 'gold' } });
+  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Inventory, { items: [100, 101], capacity: 20, weightLimit: null });
 
   world.add(actor, InteractIntent, { targetId: chest });
   const chestEvents = [];
-  world.on('interaction', e => { if (e.action === 'openChest') chestEvents.push(e); });
+  world.on('chest:open', e => chestEvents.push(e));
   interactionSystem(world);
 
-  assert(chestEvents.length === 1, 'should emit openChest event');
-  assert(chestEvents[0].loot === 'gold', `loot should be 'gold', got ${chestEvents[0].loot}`);
+  assert(chestEvents.length === 1, 'should emit chest:open event');
+  assert(chestEvents[0].targetId === chest, 'event should reference the chest');
+  assert(chestEvents[0].chestItems.length === 2, 'should include chest items');
+});
+
+Deno.test("chest remains interactable after opening", () => {
+  const world = new World({ seed: 1 });
+
+  const actor = world.create();
+  const chest = world.create();
+  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  // Open chest twice
+  world.add(actor, InteractIntent, { targetId: chest });
+  interactionSystem(world);
+  world.add(actor, InteractIntent, { targetId: chest });
+  interactionSystem(world);
+
+  assert(world.has(chest, Interactable), 'chest should still be interactable after multiple opens');
+});
+
+Deno.test("chest:open event includes copy of items", () => {
+  const world = new World({ seed: 1 });
+
+  const actor = world.create();
+  const chest = world.create();
+  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Inventory, { items: [42, 43, 44], capacity: 20, weightLimit: null });
+
+  const events = [];
+  world.on('chest:open', e => events.push(e));
+
+  world.add(actor, InteractIntent, { targetId: chest });
+  interactionSystem(world);
+
+  assert(events.length === 1);
+  assert(Array.isArray(events[0].chestItems));
+  assert(events[0].chestItems.length === 3);
+  // Ensure it's a copy, not a reference
+  events[0].chestItems.push(999);
+  const inv = world.get(chest, Inventory);
+  assert(inv.items.length === 3, 'original inventory should be unchanged');
 });
 
 Deno.test("read text emits event with textId", () => {
