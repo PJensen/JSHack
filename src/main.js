@@ -294,7 +294,7 @@ if (!playerEntity(world)) {
     const chosenDeityId = urlParams.get('deity') || 'molkhar';
 
     world.add(pe.id, Devotion, { deityId: chosenDeityId });
-    const deity = initDeity(chosenDeityId);
+    const deity = initDeity(chosenDeityId, world);
     if (deity) {
       // Cooldown tracker: deity events only fire messages every N ticks
       const _deityCooldowns = { wrath: 0, demand: 0, utterance: 0 };
@@ -313,16 +313,10 @@ if (!playerEntity(world)) {
           if (newHp <= 0) try { world.emit?.('died', { id: pe.id }); } catch {}
         }
       });
-      deity.on('miracle', ({ serenity }) => {
-        // Miracles are rare enough — no cooldown needed
-        const heal = Math.round(10 + serenity * 10);
-        log(`${deity.name} grants you a miracle! (+${heal} HP)`);
-        const vit = /** @type any */ (world.get(pe.id, Vitality));
-        if (vit) {
-          const newHp = Math.min(vit.maxHp, vit.hp + heal);
-          world.set(pe.id, Vitality, { ...vit, hp: newHp });
-          try { world.emit?.('healed', { id: pe.id, amount: heal }); } catch {}
-        }
+      // Miracle handling moved to deitySystem.js for richer need-based effects
+      // Listen for the resulting deity:miracle events to log messages
+      world.on('deity:miracle', ({ message }) => {
+        if (message) log(message);
       });
       deity.on('demand', ({ tick }) => {
         if (tick - _deityCooldowns.demand < DEITY_COOLDOWN) return;
@@ -975,9 +969,15 @@ world.on('healed', ({ id, amount }) => {
     try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch {}
   }
 });
-world.on('prayer', ({ actor }) => {
+world.on('prayer', ({ actor, distress }) => {
   const who = nameOfEntity(actor);
-  log(`${who} prays to the heavens...`);
+  if (distress?.desperate) {
+    log(`${who} desperately prays for divine intervention!`);
+  } else if (distress?.troubled) {
+    log(`${who} prays for aid...`);
+  } else {
+    log(`${who} prays to the heavens...`);
+  }
 });
 world.on('died', ({ id }) => {
   const who = nameOfEntity(id);
