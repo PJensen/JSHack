@@ -1,14 +1,15 @@
 import { defineArchetype } from "../../lib/ecs-js/archetype.js";
 import { Position } from "../components/Position.js";
-import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 
-export const Door = defineArchetype("Door",
+export const Chest = defineArchetype(
+  "Chest",
   [Position, (p) => ({ x: p.x, y: p.y })],
-  [Material, { kind: "wood" }],
-  [DoorState, { open: false, locked: false }],
-  [Collider, { solid: true, blocksSight: true }],
-  [Interactable, { action: "toggleDoor" }],
+  [NamedIdentity, { name: "Chest", identity: "chest" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "openChest", params: { lootTable: "basic" } }],
+  [Material, { kind: "iron" }]
 );
