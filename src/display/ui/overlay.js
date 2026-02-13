@@ -101,6 +101,10 @@ export function initOverlays() {
     _shopState.sellDiscount = d.sellDiscount ?? 0.5;
     show(shop);
   });
+  window.addEventListener('ui:closeShop', () => {
+    _shopState.shopkeeperId = 0;
+    hide(shop);
+  });
   window.addEventListener('ui:shopData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;

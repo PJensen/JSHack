@@ -1219,9 +1219,34 @@ function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount) {
   } catch {}
 }
 
+function isPlayerAdjacentToEntity(entityId) {
+  const pe = playerEntity(world);
+  if (!pe || pe.id <= 0 || !Number.isInteger(entityId) || entityId <= 0) return false;
+  const pPos = world.get(pe.id, Position);
+  const tPos = world.get(entityId, Position);
+  if (!pPos || !tPos) return false;
+  const dist = Math.max(Math.abs(pPos.x - tPos.x), Math.abs(pPos.y - tPos.y));
+  return dist <= 1;
+}
+
+let activeShopSession = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5 };
+
+function closeShopUI() {
+  activeShopSession.shopkeeperId = 0;
+  try { window.dispatchEvent(new CustomEvent('ui:closeShop')); } catch {}
+}
+
 // When shop:open fires from interaction system → open shop UI
 world.on('shop:open', ({ actor, targetId, shopItems, buyMarkup, sellDiscount }) => {
+  const pe = playerEntity(world);
+  if (!pe || actor !== pe.id) return;
+  if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
   log('You approach the shopkeeper.');
+  activeShopSession = {
+    shopkeeperId: Number(targetId) || 0,
+    buyMarkup: buyMarkup ?? 1.0,
+    sellDiscount: sellDiscount ?? 0.5,
+  };
   dispatchShopData(targetId, buyMarkup, sellDiscount);
   try { window.dispatchEvent(new CustomEvent('ui:openShop', { detail: { shopkeeperId: targetId, buyMarkup, sellDiscount } })); } catch {}
 });
@@ -1233,6 +1258,11 @@ addEventListener('ui:requestBuy', (ev) => {
   const { shopkeeperId, itemId } = e?.detail || {};
   const pe = playerEntity(world);
   if (!pe) return;
+  if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+    log('The shopkeeper is too far away.');
+    closeShopUI();
+    return;
+  }
 
   const shop = world.get(shopkeeperId, ShopInventory);
   if (!shop) return;
@@ -1282,6 +1312,11 @@ addEventListener('ui:requestSell', (ev) => {
   const { shopkeeperId, itemId } = e?.detail || {};
   const pe = playerEntity(world);
   if (!pe) return;
+  if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+    log('The shopkeeper is too far away.');
+    closeShopUI();
+    return;
+  }
 
   const shop = world.get(shopkeeperId, ShopInventory);
   if (!shop) return;
@@ -1546,6 +1581,9 @@ world.on('moved', ({ id, to }) => {
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== id) return;
+  if (activeShopSession.shopkeeperId > 0 && !isPlayerAdjacentToEntity(activeShopSession.shopkeeperId)) {
+    closeShopUI();
+  }
 
   // Find stairs within Chebyshev distance 1
   let nearestStair = null;
