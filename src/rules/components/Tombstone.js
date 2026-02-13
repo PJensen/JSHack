@@ -3,10 +3,12 @@
 import { defineComponent } from "../../lib/ecs-js/core.js";
 
 const Tombstone = defineComponent({
-  name: '',        // Name of the deceased entity
-  cause: '',       // Cause of death (optional)
+  playerName: '',  // Name of the deceased entity
+  depth: 0,        // Floor depth where death occurred
+  cause: '',       // Cause of death ('combat', 'starvation', 'trap', etc.)
+  killerName: null, // Name of killer entity (null for environmental deaths)
   turn: 0,         // Game turn when death occurred
-  epitaph: '',     // Optional epitaph or message
+  epitaph: '',     // Formatted epitaph message for display
 });
 
 export default Tombstone;

@@ -5,6 +5,7 @@ import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { Inventory } from "../components/Inventory.js";
+import TombstoneComponent from "../components/Tombstone.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -65,6 +66,26 @@ export function InteractionSystem(world, actor, targetId) {
                 actor, targetId,
                 direction: inter.action === "descendStair" ? "down" : "up",
             });
+            break;
+
+        case "readTombstone":
+            {
+                const tombstone = world.get(targetId, TombstoneComponent);
+                if (tombstone) {
+                    world.emit?.("interaction", {
+                        actor,
+                        targetId,
+                        action: "readTombstone",
+                        epitaph: tombstone.epitaph,
+                        tombstoneData: {
+                            playerName: tombstone.playerName,
+                            depth: tombstone.depth,
+                            cause: tombstone.cause,
+                            killerName: tombstone.killerName,
+                        }
+                    });
+                }
+            }
             break;
     }
     return true;

@@ -27,7 +27,7 @@ const _exploredCache = new Map();
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
- * @param {{direction?: 'up'|'down'}} [opts]
+ * @param {{direction?: 'up'|'down', tombstoneRepo?: Object}} [opts]
  */
 export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
@@ -59,7 +59,8 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   // Generate the new floor
   const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
-  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, newDepth);
+  const tombstoneRepo = opts.tombstoneRepo || null;
+  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, newDepth, tombstoneRepo);
 
   // Restore explored state if this floor was previously visited
   const savedExplored = _exploredCache.get(newDepth);

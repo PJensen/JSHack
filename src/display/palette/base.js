@@ -62,6 +62,9 @@ export const basePalette = {
   // Containers
   chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
 
+  // Tombstones (player death markers)
+  tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },
+
   // Traps (revealed after triggering)
   trap_spike: { glyph: "^", fg: "#a84000", glow: "#d65d1f" },
   trap_snake: { glyph: "^", fg: "#55aa44", glow: "#338822" },

@@ -48,6 +48,8 @@ import { DungeonState } from "./rules/components/DungeonState.js";
 import { Faction } from "./rules/components/Faction.js";
 import { ShopInventory } from "./rules/components/ShopInventory.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
+import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
+import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import { GoldStack } from "./rules/archetypes/Items.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
@@ -127,7 +129,12 @@ resize();
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });
 configureWorld(world);
-// Only app/scenes step the sim (deterministic). We’ll keep it paused here.
+
+// Initialize tombstone system
+const tombstoneRepo = new TombstoneRepository();
+installTombstoneDeathListener(world, tombstoneRepo);
+
+// Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 
 // --- Active spell selection (app-side state) ---------------------------------
@@ -185,7 +192,7 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
 const _startDepth = parseInt(new URLSearchParams(window.location.search).get('floor'), 10) || 1;
 
 // Initialize the procedural dungeon (entire floor generated up front)
-const spawnPos = initDungeon(world, { startDepth: _startDepth });
+const spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
 
 // Diagnostic: log all stair entities so we can confirm they exist
 {
@@ -1084,6 +1091,16 @@ world.on('interaction', ({ action, result, items: droppedIds, targetId }) => {
       } catch {}
     }
   }
+  if (action === 'readTombstone') {
+    const { epitaph } = arguments[0];
+    if (epitaph) {
+      log('--- TOMBSTONE ---');
+      log(epitaph);
+      log('----------------');
+    } else {
+      log('The tombstone inscription has faded...');
+    }
+  }
 });
 
 // Stair traversal: handle level transitions
@@ -1101,7 +1118,7 @@ world.on('stair:traverse', ({ actor, targetId, direction }) => {
   }
 
   log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`);
-  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction });
+  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
 
   // Invalidate cached world view
   _cachedView = null;
