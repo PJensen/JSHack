@@ -10,7 +10,6 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Settings } from "../components/Settings.js";
-import { InteractIntent } from "../components/Intents/InteractIntent.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
@@ -74,25 +73,18 @@ export function movementSystem(world) {
           // Check faction: neutral/shopkeeper NPCs with Interactable trigger interaction, not attack
           const fac = world.get(target, Faction);
           if (fac && (fac.key === 'shopkeeper' || fac.key === 'neutral') && world.has(target, Interactable)) {
-            try { world.add(actor, InteractIntent, { targetId: target }); } catch {}
+            // Emit bump-interact event for cross-system communication without direct coupling
+            try { world.emit?.("bump:interact", { actor, target }); } catch {}
           } else {
             try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
           }
         } else if (world.has(actor, Player)) {
           // No living target — try interactable (e.g., closed door, chest)
           // Only the player can bump-interact with objects; monsters just bounce off.
-          // Facing guard: only trigger if the interactable is in the direction
-          // the player is currently facing (prevents accidental triggers on
-          // adjacent interactables when the move direction doesn't match).
+          // Emit bump-interact event for cross-system communication without direct coupling
           const targetId = interactables.get(k);
           if (targetId) {
-            const facing = world.get(actor, Facing);
-            const tpos = world.get(targetId, Position);
-            const facingMatches = !facing || !tpos
-              || ((Math.sign(tpos.x - pos.x) === facing.dx) && (Math.sign(tpos.y - pos.y) === facing.dy));
-            if (facingMatches) {
-              world.add(actor, InteractIntent, { targetId });
-            }
+            try { world.emit?.("bump:interact", { actor, target: targetId }); } catch {}
           }
         }
         // blocked: movement is consumed
