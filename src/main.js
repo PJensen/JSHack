@@ -891,12 +891,16 @@ world.on('item:pickup', ({ actor, itemId, count }) => {
   const it = nameOfItem(itemId);
   log(`${petName} picks up ${it}.`);
 });
-// Pet deliver: log when the pet drops an item at the player's feet
-world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
+// Pet deliver: log when the pet drops an item beside the player.
+world.on('pet:deliver', ({ petId, actor, itemId, itemName, count, mode }) => {
   const petName = nameOfEntity(petId);
   // Use pre-resolved itemName since the item entity may be destroyed after stacking
   const label = itemName ? bracketizeName(itemName) : nameOfItem(itemId);
-  log(`${petName} drops ${label} at your feet.`);
+  if (mode === 'inventory') {
+    log(`${petName} gives you ${label}.`);
+  } else {
+    log(`${petName} drops ${label} next to you.`);
+  }
   // Trigger inventory UI refresh
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });

@@ -1,7 +1,7 @@
 // src/rules/systems/petFollowSystem.js
 // Pets follow the player each tick, staying within 2 tiles.
 // If the pet is very far away (e.g. floor transition), it teleports nearby.
-// When adjacent to the player and carrying items, drops them at the player.
+// When adjacent to the player and carrying items, drops them beside the player.
 
 import { Position } from "../components/Position.js";
 import { Pet } from "../components/Pet.js";
@@ -32,14 +32,34 @@ export function petFollowSystem(world) {
     const dy = playerPos.y - pos.y;
     const dist = Math.abs(dx) + Math.abs(dy); // Manhattan distance
 
-    // When adjacent (or same tile), drop carried items at player's feet
+    // When adjacent (or same tile), drop carried items beside the player.
     if (dist <= 1) {
       const petInv = world.get(id, Inventory);
       if (petInv && petInv.items.length > 0) {
+        const dropTile = findNearestValidTileAround(world, playerPos, {
+          maxDistance: 1,
+          exclude: [{ x: playerPos.x, y: playerPos.y }],
+        });
+        if (!dropTile) continue;
+
         for (const itemId of petInv.items) {
           const itemName = world.get(itemId, NamedIdentity)?.name || world.get(itemId, ItemInfo)?.description || 'item';
-          try { world.add(itemId, Position, { x: playerPos.x, y: playerPos.y }); } catch {}
-          try { world.emit?.('pet:deliver', { petId: id, actor: playerId, itemId, itemName }); } catch {}
+          if (world.has(itemId, Position)) {
+            world.set(itemId, Position, { x: dropTile.x, y: dropTile.y });
+          } else {
+            world.add(itemId, Position, { x: dropTile.x, y: dropTile.y });
+          }
+          try {
+            world.emit?.('pet:deliver', {
+              petId: id,
+              actor: playerId,
+              itemId,
+              itemName,
+              destination: { x: dropTile.x, y: dropTile.y },
+              mode: 'drop',
+              autoTransferred: false,
+            });
+          } catch {}
         }
         petInv.items.length = 0;
       }
