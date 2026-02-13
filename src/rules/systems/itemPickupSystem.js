@@ -5,6 +5,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Settings } from "../components/Settings.js";
 import { Player } from "../components/Player.js";
+import { Unpaid } from "../components/Unpaid.js";
 import { forEachItemAt } from "../utils/tileQueryCache.js";
 
 // Helper: sum inventory weight
@@ -21,6 +22,11 @@ function inventoryWeight(world, inv) {
 function findStackTarget(world, inv, itemId) {
     const ident = world.get(itemId, NamedIdentity)?.identity;
     if (!ident) return 0;
+
+    // Unpaid items should not stack to preserve their Unpaid component
+    const isUnpaid = world.has(itemId, Unpaid);
+    if (isUnpaid) return 0;
+
     for (const id of inv.items) {
         if (id === itemId) continue;
         const n = world.get(id, NamedIdentity);
@@ -29,8 +35,12 @@ function findStackTarget(world, inv, itemId) {
     return 0;
 }
     
-function findStackTargetByIdentity(world, inv, identity) {
+function findStackTargetByIdentity(world, inv, identity, itemId = 0) {
     if (!identity) return 0;
+
+    // Unpaid items should not stack
+    if (itemId > 0 && world.has(itemId, Unpaid)) return 0;
+
     for (const id of inv.items) {
         const n = world.get(id, NamedIdentity);
         if (n && n.identity === identity) return id;
@@ -131,7 +141,7 @@ export function autoPickupPostMoveSystem(world) {
             if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
             const name = world.get(itemId, NamedIdentity);
-            const stackTarget = findStackTargetByIdentity(world, inv, name?.identity);
+            const stackTarget = findStackTargetByIdentity(world, inv, name?.identity, itemId);
             if (stackTarget) {
                 world.mutate(stackTarget, ItemInfo, (r) => { r.count = (r.count || 1) + takeCount; });
                 world.destroy(itemId);

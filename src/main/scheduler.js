@@ -18,6 +18,7 @@ import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
+import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
 import { movementSystem } from "../rules/systems/movementSystem.js";
 import { combatSystem } from "../rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
@@ -63,6 +64,8 @@ export function configureWorld(world) {
   registerSystem(rangedAttackSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
   registerSystem(engraveSystem, 'intents');
+  // Shopkeeper system must run BEFORE movementSystem to block exits
+  registerSystem(shopkeeperSystem, 'intents');
   registerSystem(movementSystem, 'intents');
   // interactionSystem must run AFTER movementSystem: bump-to-interact adds
   // InteractIntent during movement; processing it in the same tick prevents
