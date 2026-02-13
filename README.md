@@ -513,7 +513,8 @@ Key rules:
 - **[AGENTS.md](AGENTS.md)** — Guide for AI agents and autonomous operators
 - **[TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md)** — Project philosophy and constraints
 - **[SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md)** — Layer boundaries and import rules
-- **[ecs-js README](src/lib/ecs-js/README.md)** — ECS core API
+- **[ecs-js](http://github.com/pjensen/ecs-js)** — Canonical ECS library (external dependency)
+- **[ecs-js README](src/lib/ecs-js/README.md)** — Vendored ECS core API docs
 - **[ecs-js AGENTS.md](src/lib/ecs-js/AGENTS.md)** — ECS-specific guidance
 
 ### Inspiration
@@ -526,9 +527,9 @@ Key rules:
 
 ## License
 
-MIT License. Do whatever you want with it. Build something cool. Share it. Hack it. Break it. Learn from it.
+Human-Scale Source License (HSSL) v1.2
 
-See [LICENSE](LICENSE) for the legal stuff.
+See [LICENSE](LICENSE) for terms.
 
 ---
 
