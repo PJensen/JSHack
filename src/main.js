@@ -22,6 +22,7 @@ import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
+import { createHudFeeds } from "./main/ui/hudFeeds.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -157,6 +158,10 @@ function getPlayerMana() {
   const m = /** @type any */ (world.get(pe.id, Mana));
   return { mana: Number(m?.mana || 0), maxMana: Number(m?.maxMana || 0) };
 }
+
+// Initialize HUD feed updaters with stamina support
+const hudFeeds = createHudFeeds(world, { getPlayerMana });
+
 function ensureActiveSpell() {
   if (_activeSpellId) return _activeSpellId;
   const list = learnedSpells();
@@ -857,6 +862,13 @@ world.on('spell:unknown', ({ actor, spellId }) => {
 });
 world.on('spell:oom', ({ actor, spellId, need, have }) => {
   log(`Not enough mana to cast [${String(spellId||'spell')}] (need ${need}, have ${have}).`);
+});
+world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
+  const weaponInfo = world.get(weaponId, ItemInfo);
+  const weaponName = weaponInfo ?
+    (world.get(weaponId, NamedIdentity)?.name || weaponInfo.description || weaponInfo.type)
+    : 'fists';
+  log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`);
 });
 // Legacy generic damage hook (spells and DoTs may emit this)
 world.on('damage', ({ id, amount, source, critical, crit }) => {
@@ -1984,9 +1996,9 @@ function frame(now) {
   ftext.step(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
-  updateVitalsHUD();
-  updateCombatHUD();
-  updateDepthHUD();
+  hudFeeds.updateVitalsHUD();
+  hudFeeds.updateCombatHUD();
+  hudFeeds.updateDepthHUD();
 
   // Render
   const view = getCachedView();
@@ -2352,118 +2364,6 @@ function drawArrowEffects(ctx) {
   }
 
   ctx.restore();
-}
-
-// --- Depth HUD feed (dungeon level) ----------------------------------------
-let _lastDepth = -1;
-function updateDepthHUD() {
-  for (const [, state] of world.query(DungeonState)) {
-    const d = state.currentDepth;
-    if (d !== _lastDepth) {
-      _lastDepth = d;
-      try { window.dispatchEvent(new CustomEvent('ui:updateDepth', { detail: { depth: d } })); } catch {}
-    }
-    break;
-  }
-}
-
-// --- Vitals HUD feed (HP/Mana) --------------------------------------------
-let _lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1 };
-function updateVitalsHUD() {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  /** @type {{ hp?:number, maxHp?:number }|null} */
-  const vit = /** @type any */ (world.get(pe.id, Vitality));
-  const m = getPlayerMana();
-  const hp = Number(vit?.hp ?? 0), maxHp = Number(vit?.maxHp ?? 0);
-  if (hp !== _lastVitals.hp || maxHp !== _lastVitals.maxHp || m.mana !== _lastVitals.mana || m.maxMana !== _lastVitals.maxMana) {
-    _lastVitals = { hp, maxHp, mana: m.mana, maxMana: m.maxMana };
-    try { window.dispatchEvent(new CustomEvent('ui:updateVitals', { detail: _lastVitals })); } catch {}
-  }
-}
-
-// --- Combat HUD feed (weapon, defense, statuses) -------------------------
-let _lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: '', affixSig: '' };
-function updateCombatHUD() {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const eq = /** @type any */ (world.get(pe.id, Equipment));
-  const st = /** @type any */ (world.get(pe.id, ActiveEffects));
-  const semanticStatus = /** @type any */ (world.get(pe.id, Status));
-  const wid = Number(eq?.weapon || 0);
-  const atk = Number(eq?.attackDerived || 0);
-  const def = Number(eq?.defenseDerived || 0);
-  const wInfo = wid ? world.get(wid, ItemInfo) : null;
-  const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : '';
-  const dmgDice = wInfo?.damageDice || '';
-  /** @type {Map<string, { key: string, turns: number, stacks: number }>} */
-  const statusMap = new Map();
-  if (Array.isArray(st?.effects)) {
-    for (const e of st.effects) {
-      const key = String(e?.key || e?.type || '').toLowerCase();
-      if (!key) continue;
-      const turns = Math.max(0, Number(e?.turnsLeft || e?.duration || 0));
-      const stacks = Math.max(1, Number(e?.stacks || 1));
-      const prev = statusMap.get(key);
-      if (!prev) statusMap.set(key, { key, turns, stacks });
-      else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
-    }
-  }
-  if (Array.isArray(semanticStatus?.statuses)) {
-    for (const s of semanticStatus.statuses) {
-      const key = String(s?.type || s?.key || '').toLowerCase();
-      if (!key) continue;
-      const turns = Math.max(0, Number(s?.duration || s?.turns || 0));
-      const stacks = Math.max(1, Number(s?.stacks || 1));
-      const prev = statusMap.get(key);
-      if (!prev) statusMap.set(key, { key, turns, stacks });
-      else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
-    }
-  }
-  const hc = /** @type any */ (world.get(pe.id, Hunger));
-  if (hc) {
-    const level = hc.satiation > 0 ? 'satiated' : getHungerLevel(Number(hc.hunger || 0));
-    if (level !== 'normal') {
-      const key = String(level).toLowerCase();
-      const turns = hc.satiation > 0 ? Math.max(0, Number(hc.satiation || 0)) : 9999;
-      const stacks = 1;
-      const prev = statusMap.get(key);
-      if (!prev) statusMap.set(key, { key, turns, stacks });
-      else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
-    }
-  }
-  const statuses = Array.from(statusMap.values());
-  const statusSig = statuses.map(s=>`${s.key}:${s.turns}:${s.stacks}`).join('|');
-
-  // Collect equipped affix names for HUD display
-  const affixIds = [];
-  const pushAffixes = (id) => {
-    const info = id ? world.get(id, ItemInfo) : null;
-    const arr = info && Array.isArray(info.affixes) ? info.affixes : [];
-    for (const a of arr) affixIds.push(String(a));
-  };
-  if (eq) {
-    pushAffixes(Number(eq.weapon||0));
-    pushAffixes(Number(eq.armor||0));
-    pushAffixes(Number(eq.ring1||0));
-    pushAffixes(Number(eq.ring2||0));
-  }
-  // Do not show Thorns as a persistent affix chip; it should only appear in Status when it procs
-  const affixNames = affixIds
-    .filter((id) => !/^thorns/i.test(String(id)))
-    .map((id) => (AFFIX_DEFS?.[id]?.name) || id);
-  const affixSig = affixNames.join('|');
-  if (_lastCombatHud.weaponId !== wid || _lastCombatHud.atk !== atk || _lastCombatHud.def !== def || _lastCombatHud.statusSig !== statusSig || _lastCombatHud.affixSig !== affixSig) {
-    _lastCombatHud = { weaponId: wid, atk, def, statusSig, affixSig };
-    try {
-      window.dispatchEvent(new CustomEvent('ui:updateCombatHUD', { detail: {
-        weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk } : null,
-        defense: def,
-        statuses,
-        affixes: affixNames
-      }}));
-    } catch {}
-  }
 }
 
 /** @param {CanvasRenderingContext2D} ctx 

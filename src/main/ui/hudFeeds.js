@@ -1,5 +1,6 @@
 import { playerEntity } from "../../rules/utils/queries.js";
 import { Vitality } from "../../rules/components/Vitality.js";
+import { Stamina } from "../../rules/components/Stamina.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
@@ -19,7 +20,7 @@ import { getHungerLevel } from "../../rules/data/food.js";
 export function createHudFeeds(world, deps) {
   const { getPlayerMana } = deps;
 
-  let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1 };
+  let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
   let lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
   let lastDepth = -1;
 
@@ -29,10 +30,18 @@ export function createHudFeeds(world, deps) {
     /** @type {{ hp?:number, maxHp?:number }|null} */
     const vit = /** @type any */ (world.get(pe.id, Vitality));
     const mana = getPlayerMana();
+    const stam = /** @type any */ (world.get(pe.id, Stamina));
+    const eq = /** @type any */ (world.get(pe.id, Equipment));
+
     const hp = Number(vit?.hp ?? 0);
     const maxHp = Number(vit?.maxHp ?? 0);
-    if (hp !== lastVitals.hp || maxHp !== lastVitals.maxHp || mana.mana !== lastVitals.mana || mana.maxMana !== lastVitals.maxMana) {
-      lastVitals = { hp, maxHp, mana: mana.mana, maxMana: mana.maxMana };
+    const stamina = Number(stam?.stamina ?? 0);
+    const maxStaminaBonus = Number(eq?.maxStaminaDerived ?? 0);
+    const maxStamina = Number(stam?.maxStamina ?? 100) + maxStaminaBonus;
+    if (hp !== lastVitals.hp || maxHp !== lastVitals.maxHp ||
+        mana.mana !== lastVitals.mana || mana.maxMana !== lastVitals.maxMana ||
+        stamina !== lastVitals.stamina || maxStamina !== lastVitals.maxStamina) {
+      lastVitals = { hp, maxHp, mana: mana.mana, maxMana: mana.maxMana, stamina, maxStamina };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateVitals", { detail: lastVitals }));
       } catch {}

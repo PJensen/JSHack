@@ -22,6 +22,7 @@ import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
+import { staminaRegenerationSystem } from "../rules/systems/staminaRegenerationSystem.js";
 import { monsterSpawnerSystem } from "../rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../rules/systems/deitySystem.js";
@@ -74,6 +75,7 @@ export function configureWorld(world) {
   registerSystem(effectSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
+  registerSystem(staminaRegenerationSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase

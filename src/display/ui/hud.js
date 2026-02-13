@@ -41,7 +41,8 @@ export function initHUD() {
 
   const hp = makeBar('HP', 'linear-gradient(90deg,#7bff7b,#3ad13a)', '#0f1421');
   const mp = makeBar('Mana', 'linear-gradient(90deg,#55aaff,#2d7dd2)', '#0f1421');
-  vitals.appendChild(hp.row); vitals.appendChild(mp.row);
+  const st = makeBar('Stamina', 'linear-gradient(90deg,#ffc530,#ff8c00)', '#0f1421');
+  vitals.appendChild(hp.row); vitals.appendChild(mp.row); vitals.appendChild(st.row);
 
   // Combat HUD: weapon/context and effects chips
   const combatBox = document.createElement('div');
@@ -157,12 +158,16 @@ export function initHUD() {
     const e = ev;
     const hpVal = Number(e?.detail?.hp ?? 0), hpMax = Math.max(1, Number(e?.detail?.maxHp ?? 1));
     const mpVal = Number(e?.detail?.mana ?? 0), mpMax = Math.max(1, Number(e?.detail?.maxMana ?? 1));
+    const stVal = Number(e?.detail?.stamina ?? 0), stMax = Math.max(1, Number(e?.detail?.maxStamina ?? 1));
     const hpf = Math.max(0, Math.min(1, hpVal / hpMax));
     const mpf = Math.max(0, Math.min(1, mpVal / mpMax));
+    const stf = Math.max(0, Math.min(1, stVal / stMax));
     hp.fill.style.width = `${(hpf * 100).toFixed(1)}%`;
     mp.fill.style.width = `${(mpf * 100).toFixed(1)}%`;
+    st.fill.style.width = `${(stf * 100).toFixed(1)}%`;
     hp.text.textContent = `${hpVal}/${hpMax}`;
     mp.text.textContent = `${mpVal}/${mpMax}`;
+    st.text.textContent = `${stVal}/${stMax}`;
   });
 
   // Update combat HUD details

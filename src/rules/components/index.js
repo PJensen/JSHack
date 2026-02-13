@@ -20,6 +20,7 @@ export { WaitIntent } from './Intents/WaitIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';
 export { AttackIntent } from './Intents/AttackIntent.js';
 export { EquipIntent } from './Intents/EquipIntent.js';
+export { Stamina } from './Stamina.js';
 export { Status } from './Status.js';
 export { Vitality } from './Vitality.js';
 export { Settings } from './Settings.js';

@@ -9,6 +9,7 @@ import { Faction } from '../components/Faction.js';
 import { Player } from '../components/Player.js';
 import { Status } from '../components/Status.js';
 import { Position } from '../components/Position.js';
+import { Stamina } from '../components/Stamina.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
@@ -86,6 +87,31 @@ export function combatSystem(world) {
 
         const atkEq = world.get(attacker, Equipment);
         const defEq = world.get(defender, Equipment);
+
+        // Stamina gate: check if attacker has enough stamina for weapon
+        const atkStam = world.get(attacker, Stamina);
+        let weaponId = atkEq?.weapon || 0;
+        let staminaCost = 3; // default unarmed cost
+
+        if (weaponId) {
+            const weaponInfo = world.get(weaponId, ItemInfo);
+            staminaCost = Number(weaponInfo?.staminaCost ?? 8);
+        }
+
+        if (atkStam) {
+            const have = Number(atkStam.stamina ?? 0);
+            if (have < staminaCost) {
+                // Insufficient stamina - block attack, message, consume turn
+                world.emit?.('attack:insufficient-stamina', {
+                    attacker, defender, weaponId, need: staminaCost, have
+                });
+                world.remove(attacker, AttackIntent);
+                continue;
+            }
+            // Deduct stamina
+            world.set(attacker, Stamina, { ...atkStam, stamina: have - staminaCost });
+        }
+
         // Disease penalty: each stack of 'diseased' reduces attack/defense by potency
         const atkStatus = world.get(attacker, Status);
         const atkDisease = atkStatus?.statuses?.find(s => s.type === 'diseased');
@@ -120,7 +146,7 @@ export function combatSystem(world) {
         }
 
         // Base damage from weapon dice (or fallback)
-        let weaponId = atkEq?.weapon || 0;
+        weaponId = atkEq?.weapon || 0;
         let baseDice = null;
         if (weaponId) {
             const info = world.get(weaponId, ItemInfo);
