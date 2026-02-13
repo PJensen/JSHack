@@ -7,34 +7,7 @@
 import { Hunger } from '../components/Hunger.js';
 import { Vitality } from '../components/Vitality.js';
 import { Status } from '../components/Status.js';
-
-// Severity thresholds
-const HUNGER_LEVELS = [
-  { name: 'normal',   min: 0,    max: 199  },
-  { name: 'peckish',  min: 200,  max: 399  },
-  { name: 'hungry',   min: 400,  max: 599  },
-  { name: 'famished', min: 600,  max: 799  },
-  { name: 'starving', min: 800,  max: 999  },
-  { name: 'wasting',  min: 1000, max: Infinity },
-];
-
-const HUNGER_STATUS_TYPES = new Set([
-  'satiated', 'peckish', 'hungry', 'famished', 'starving', 'wasting',
-]);
-
-// Potency encodes the attack/defense penalty for combatSystem to read
-const POTENCY_MAP = { peckish: 0, hungry: 1, famished: 2, starving: 3, wasting: 4 };
-
-/**
- * @param {number} hunger
- * @returns {string}
- */
-export function getHungerLevel(hunger) {
-  for (const level of HUNGER_LEVELS) {
-    if (hunger >= level.min && hunger <= level.max) return level.name;
-  }
-  return 'wasting';
-}
+import { HUNGER_STATUS_TYPES, HUNGER_POTENCY, getHungerLevel } from '../data/food.js';
 
 /**
  * hungerSystem — processes hunger escalation each tick.
@@ -98,7 +71,7 @@ export function hungerSystem(world) {
         stat.statuses.push({
           type: level,
           duration: 9999,
-          potency: POTENCY_MAP[level] || 0,
+          potency: HUNGER_POTENCY[level] || 0,
           stacks: 1,
         });
       }
