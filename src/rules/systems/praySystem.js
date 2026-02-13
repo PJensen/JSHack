@@ -9,6 +9,7 @@ import { getDeityInstance } from "./deitySystem.js";
 /**
  * praySystem — processes PrayIntent by calling deity.pray()
  * Detects player distress and boosts prayer effectiveness when in need.
+ * (Spam is handled by deity's Supplicant system — predictability angers gods)
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function praySystem(world) {

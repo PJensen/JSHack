@@ -303,14 +303,38 @@ if (!playerEntity(world)) {
       deity.on('wrath', ({ intensity, tick }) => {
         if (tick - _deityCooldowns.wrath < DEITY_COOLDOWN) return;
         _deityCooldowns.wrath = tick;
-        const dmg = Math.round(5 + intensity * 10);
-        log(`${deity.name}'s wrath strikes you! (${dmg} damage)`);
+
         const vit = /** @type any */ (world.get(pe.id, Vitality));
-        if (vit) {
-          const newHp = Math.max(0, vit.hp - dmg);
-          world.set(pe.id, Vitality, { ...vit, hp: newHp });
-          try { world.emit?.('damage', { id: pe.id, amount: dmg, source: 0 }); } catch {}
-          if (newHp <= 0) try { world.emit?.('died', { id: pe.id }); } catch {}
+        if (!vit) return;
+
+        // Wrath damage is % of CURRENT HP — leaves you hanging by a thread
+        // Low intensity: 50-65% of current HP
+        // High intensity: 70-85% of current HP
+        const damagePercent = 0.5 + (intensity * 0.35); // 0.5 to 0.85
+        const damage = Math.max(1, Math.floor(vit.hp * damagePercent));
+
+        // Minimum HP after wrath: 5% of max, or 1 (never instant death from wrath alone)
+        const minHp = Math.max(1, Math.floor(vit.maxHp * 0.05));
+        const newHp = Math.max(minHp, vit.hp - damage);
+
+        log(`${deity.name}'s WRATH strikes you down! (-${damage} HP, barely alive!)`);
+        world.set(pe.id, Vitality, { ...vit, hp: newHp });
+        try { world.emit?.('damage', { id: pe.id, amount: damage, source: 0 }); } catch {}
+
+        // High intensity wrath also curses you
+        if (intensity > 0.6) {
+          const status = world.get(pe.id, Status);
+          if (status) {
+            const curses = status.statuses || [];
+            // Add weakened curse (reduces damage/stats)
+            curses.push({ type: 'weakened', duration: Math.round(20 + intensity * 30), potency: intensity });
+            // At very high wrath, add cursed status
+            if (intensity > 0.8) {
+              curses.push({ type: 'cursed', duration: Math.round(30 + intensity * 40), potency: 1.0 });
+              log(`You feel ${deity.name}'s curse upon you!`);
+            }
+            world.set(pe.id, Status, { statuses: curses });
+          }
         }
       });
       // Miracle handling moved to deitySystem.js for richer need-based effects
