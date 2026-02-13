@@ -17,7 +17,7 @@ import { forEachInRect, ensureSpatialIndex } from '../../rules/utils/spatialInde
 import { Engraving } from '../../rules/components/Engraving.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[] }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
@@ -93,6 +93,7 @@ export function buildWorldView(world) {
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
 			/** @type {any} */ const col = /** @type any */ (world.get(id, Collider));
+			/** @type {any} */ const itemInfo = /** @type any */ (world.get(id, ItemInfo));
 
 			let kind = "default";
 			if (door) {
@@ -103,13 +104,19 @@ export function buildWorldView(world) {
 				kind = ident?.identity || ident?.name || "default";
 			}
 
+			let layer = 300; // actors
+			if (itemInfo) layer = 100; // items/ground
+			else if (door) layer = 200; // doors/walls-like entities
+			else if (isPlayer) layer = 400; // player on top
+
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [] };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
+				rec.layer = layer;
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 			}
@@ -121,7 +128,7 @@ export function buildWorldView(world) {
 					const s = stat.statuses[i];
 					const t = String(s.type || '').toLowerCase();
 					if (!t) continue;
-					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns' || t === 'diseased' || t === 'bleeding' || t === 'satiated' || t === 'peckish' || t === 'hungry' || t === 'famished' || t === 'starving' || t === 'wasting') {
+					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regen' || t === 'thorns' || t === 'disease' || t === 'bleeding' || t === 'satiated' || t === 'peckish' || t === 'hungry' || t === 'famished' || t === 'starving' || t === 'wasting') {
 						rec.tags.push(t);
 					}
 				}
@@ -143,6 +150,7 @@ export function buildWorldView(world) {
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
 			/** @type {any} */ const col = /** @type any */ (world.get(id, Collider));
+			/** @type {any} */ const itemInfo = /** @type any */ (world.get(id, ItemInfo));
 
 			let kind = "default";
 			if (door) {
@@ -153,13 +161,19 @@ export function buildWorldView(world) {
 				kind = ident?.identity || ident?.name || "default";
 			}
 
+			let layer = 300; // actors
+			if (itemInfo) layer = 100; // items/ground
+			else if (door) layer = 200; // doors/walls-like entities
+			else if (isPlayer) layer = 400; // player on top
+
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [] };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
+				rec.layer = layer;
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 			}
@@ -171,7 +185,7 @@ export function buildWorldView(world) {
 					const s = stat.statuses[i];
 					const t = String(s.type || '').toLowerCase();
 					if (!t) continue;
-					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regenerating' || t === 'thorns' || t === 'diseased' || t === 'bleeding' || t === 'satiated' || t === 'peckish' || t === 'hungry' || t === 'famished' || t === 'starving' || t === 'wasting') {
+					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regen' || t === 'thorns' || t === 'disease' || t === 'bleeding' || t === 'satiated' || t === 'peckish' || t === 'hungry' || t === 'famished' || t === 'starving' || t === 'wasting') {
 						rec.tags.push(t);
 					}
 				}
@@ -204,6 +218,12 @@ export function buildWorldView(world) {
 			_view.entities.push(rec);
 		}
 	}
+	_view.entities.sort((a, b) => (
+		(a.layer - b.layer) ||
+		(a.pos.y - b.pos.y) ||
+		(a.pos.x - b.pos.x) ||
+		(a.id - b.id)
+	));
 
 	// Collect engravings (visible or explored tiles)
 	for (const [id, eng, pos] of world.query(Engraving, Position)) {

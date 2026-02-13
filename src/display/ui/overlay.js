@@ -1,6 +1,8 @@
 // display/ui/overlay.js
 // Minimal UI overlays for inventory and message log; display-only.
 
+import { ensureMemoryGraph } from './memoryGraph.js';
+
 export function initOverlays() {
   const root = ensureRoot();
   const inv = ensurePanel('inventory');
@@ -14,6 +16,7 @@ export function initOverlays() {
   const stairTip = ensureStairTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
+  const memoryGraph = ensureMemoryGraph(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
@@ -33,13 +36,36 @@ export function initOverlays() {
       window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
     }
   });
+  // Toggle memory graph
+  window.addEventListener('ui:toggleMemoryGraph', () => {
+    if (memoryGraph.canvas.style.display === 'block') {
+      memoryGraph.hide();
+      memoryGraph.stopSampling();
+    } else {
+      memoryGraph.show();
+      memoryGraph.startSampling();
+    }
+  });
   window.addEventListener('ui:openMessageLog', () => {
     show(log);
     // Request messages; app may respond with ui:messageLogData
     window.dispatchEvent(new CustomEvent('ui:requestMessageLogData'));
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(usePanel); hide(spells); hide(shop); hide(chest); }
+    if (e.key === 'Escape') {
+      hide(inv);
+      hide(log);
+      hide(pick);
+      hide(usePanel);
+      hide(spells);
+      hide(shop);
+      hide(chest);
+      // Close memory graph
+      if (memoryGraph.canvas.style.display === 'block') {
+        memoryGraph.hide();
+        memoryGraph.stopSampling();
+      }
+    }
   });
 
   // Data feeds
@@ -100,6 +126,10 @@ export function initOverlays() {
     _shopState.buyMarkup = d.buyMarkup ?? 1.0;
     _shopState.sellDiscount = d.sellDiscount ?? 0.5;
     show(shop);
+  });
+  window.addEventListener('ui:closeShop', () => {
+    _shopState.shopkeeperId = 0;
+    hide(shop);
   });
   window.addEventListener('ui:shopData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -1343,11 +1373,10 @@ function ensureMessageTicker(root) {
 /** @param {HTMLElement} container @param {Array<any>} entries */
 function renderMessageTicker(container, entries) {
   if (!container) return;
-  // Show last ~8 messages newest at bottom
+  // Show last ~8 messages with oldest at top, newest at bottom
   const recent = entries.slice(-8);
   container.innerHTML = '';
-  // With top-right layout, show newest at the top
-  for (let i = recent.length - 1; i >= 0; i--) {
+  for (let i = 0; i < recent.length; i++) {
     const row = document.createElement('div');
     row.textContent = String(recent[i] ?? '');
     row.style.textShadow = '0 1px 0 rgba(0,0,0,0.4)';

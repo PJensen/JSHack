@@ -5,6 +5,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Settings } from "../components/Settings.js";
 import { Player } from "../components/Player.js";
+import { forEachItemAt } from "../utils/tileQueryCache.js";
 
 // Helper: sum inventory weight
 function inventoryWeight(world, inv) {
@@ -117,25 +118,17 @@ export function itemPickupSystem(world) {
 
 // Post-move auto-pickup pass (registered in 'effects' phase)
 export function autoPickupPostMoveSystem(world) {
-    for (const [id, _pos, inv] of world.query(Position, Inventory)) {
-        if (!world.has(id, Player)) continue;
+    for (const [id, pos, inv] of world.query(Player, Position, Inventory)) {
         const set = world.get(id, Settings);
         const enable = (set?.autoPickup !== false);
         if (!enable) continue;
         const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
-        const pos = world.get(id, Position);
-        if (!pos) continue;
-        const candidates = [];
-        for (const [itemId] of world.query(Position)) {
+        forEachItemAt(world, pos.x, pos.y, (itemId) => {
+            if (!world.isAlive(itemId)) return;
             const ipos = world.get(itemId, Position);
-            if (!ipos || ipos.x !== pos.x || ipos.y !== pos.y) continue;
+            if (!ipos || ipos.x !== pos.x || ipos.y !== pos.y) return;
             const info = world.get(itemId, ItemInfo);
-            if (!info || !info.type || !kinds.includes(info.type)) continue;
-            candidates.push(itemId);
-        }
-        for (const itemId of candidates) {
-            const info = world.get(itemId, ItemInfo);
-            if (!info) continue;
+            if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
             const name = world.get(itemId, NamedIdentity);
             const stackTarget = findStackTargetByIdentity(world, inv, name?.identity);
@@ -147,6 +140,6 @@ export function autoPickupPostMoveSystem(world) {
                 inv.items.push(itemId);
             }
             try { world.emit && world.emit('item:pickup', { actor: id, itemId, count: takeCount }); } catch {}
-        }
+        });
     }
 }

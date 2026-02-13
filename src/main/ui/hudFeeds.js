@@ -1,12 +1,18 @@
 import { playerEntity } from "../../rules/utils/queries.js";
 import { Vitality } from "../../rules/components/Vitality.js";
+import { Stamina } from "../../rules/components/Stamina.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
+import { Status } from "../../rules/components/Status.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { AFFIX_DEFS } from "../../rules/data/affixes.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { Hunger } from "../../rules/components/Hunger.js";
+import { getHungerLevel } from "../../rules/data/food.js";
+import { Pet } from "../../rules/components/Pet.js";
+import { PetState } from "../../rules/components/PetState.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -16,9 +22,11 @@ import { DungeonState } from "../../rules/components/DungeonState.js";
 export function createHudFeeds(world, deps) {
   const { getPlayerMana } = deps;
 
-  let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1 };
+  let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
   let lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
   let lastDepth = -1;
+  let lastPetExists = false;
+  let lastPetState = "";
 
   function updateVitalsHUD() {
     const pe = playerEntity(world);
@@ -26,10 +34,18 @@ export function createHudFeeds(world, deps) {
     /** @type {{ hp?:number, maxHp?:number }|null} */
     const vit = /** @type any */ (world.get(pe.id, Vitality));
     const mana = getPlayerMana();
+    const stam = /** @type any */ (world.get(pe.id, Stamina));
+    const eq = /** @type any */ (world.get(pe.id, Equipment));
+
     const hp = Number(vit?.hp ?? 0);
     const maxHp = Number(vit?.maxHp ?? 0);
-    if (hp !== lastVitals.hp || maxHp !== lastVitals.maxHp || mana.mana !== lastVitals.mana || mana.maxMana !== lastVitals.maxMana) {
-      lastVitals = { hp, maxHp, mana: mana.mana, maxMana: mana.maxMana };
+    const stamina = Number(stam?.stamina ?? 0);
+    const maxStaminaBonus = Number(eq?.maxStaminaDerived ?? 0);
+    const maxStamina = Number(stam?.maxStamina ?? 100) + maxStaminaBonus;
+    if (hp !== lastVitals.hp || maxHp !== lastVitals.maxHp ||
+        mana.mana !== lastVitals.mana || mana.maxMana !== lastVitals.maxMana ||
+        stamina !== lastVitals.stamina || maxStamina !== lastVitals.maxStamina) {
+      lastVitals = { hp, maxHp, mana: mana.mana, maxMana: mana.maxMana, stamina, maxStamina };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateVitals", { detail: lastVitals }));
       } catch {}
@@ -41,15 +57,50 @@ export function createHudFeeds(world, deps) {
     if (!pe) return;
     const eq = /** @type any */ (world.get(pe.id, Equipment));
     const st = /** @type any */ (world.get(pe.id, ActiveEffects));
+    const semanticStatus = /** @type any */ (world.get(pe.id, Status));
     const wid = Number(eq?.weapon || 0);
     const atk = Number(eq?.attackDerived || 0);
     const def = Number(eq?.defenseDerived || 0);
     const wInfo = wid ? world.get(wid, ItemInfo) : null;
     const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : "";
     const dmgDice = wInfo?.damageDice || "";
-    const statuses = Array.isArray(st?.effects)
-      ? st.effects.map((e) => ({ key: String(e.key || e.type || "").toLowerCase(), turns: Number(e.turnsLeft || e.duration || 0), stacks: Number(e.stacks || 1) }))
-      : [];
+    /** @type {Map<string, { key: string, turns: number, stacks: number }>} */
+    const statusMap = new Map();
+    if (Array.isArray(st?.effects)) {
+      for (const e of st.effects) {
+        const key = String(e?.key || e?.type || "").toLowerCase();
+        if (!key) continue;
+        const turns = Math.max(0, Number(e?.turnsLeft || e?.duration || 0));
+        const stacks = Math.max(1, Number(e?.stacks || 1));
+        const prev = statusMap.get(key);
+        if (!prev) statusMap.set(key, { key, turns, stacks });
+        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+      }
+    }
+    if (Array.isArray(semanticStatus?.statuses)) {
+      for (const s of semanticStatus.statuses) {
+        const key = String(s?.type || s?.key || "").toLowerCase();
+        if (!key) continue;
+        const turns = Math.max(0, Number(s?.duration || s?.turns || 0));
+        const stacks = Math.max(1, Number(s?.stacks || 1));
+        const prev = statusMap.get(key);
+        if (!prev) statusMap.set(key, { key, turns, stacks });
+        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+      }
+    }
+    const hc = /** @type any */ (world.get(pe.id, Hunger));
+    if (hc) {
+      const level = hc.satiation > 0 ? "satiated" : getHungerLevel(Number(hc.hunger || 0));
+      if (level !== "normal") {
+        const key = String(level).toLowerCase();
+        const turns = hc.satiation > 0 ? Math.max(0, Number(hc.satiation || 0)) : 9999;
+        const stacks = 1;
+        const prev = statusMap.get(key);
+        if (!prev) statusMap.set(key, { key, turns, stacks });
+        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+      }
+    }
+    const statuses = Array.from(statusMap.values());
     const statusSig = statuses.map((s) => `${s.key}:${s.turns}:${s.stacks}`).join("|");
 
     const affixIds = [];
@@ -107,9 +158,43 @@ export function createHudFeeds(world, deps) {
     }
   }
 
+  function updatePetHUD() {
+    // Check if pet exists
+    let petExists = false;
+    let petState = "";
+    for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
+      if (!vit || vit.hp <= 0) continue;
+      petExists = true;
+      const state = world.get(petId, PetState);
+      petState = state?.state || "following";
+      break; // Only one pet for now
+    }
+
+    // Update visibility if changed
+    if (petExists !== lastPetExists) {
+      lastPetExists = petExists;
+      try {
+        window.dispatchEvent(new CustomEvent("ui:petExists", {
+          detail: { exists: petExists }
+        }));
+      } catch {}
+    }
+
+    // Update state if changed
+    if (petExists && petState !== lastPetState) {
+      lastPetState = petState;
+      try {
+        window.dispatchEvent(new CustomEvent("ui:updatePetButton", {
+          detail: { state: petState }
+        }));
+      } catch {}
+    }
+  }
+
   return {
     updateVitalsHUD,
     updateCombatHUD,
     updateDepthHUD,
+    updatePetHUD,
   };
 }

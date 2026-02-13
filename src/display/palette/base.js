@@ -94,6 +94,8 @@ export const basePalette = {
   corpse_demon:        { glyph: "%", fg: "#ff4444", glow: "#cc0000" },
   corpse_dragon:       { glyph: "%", fg: "#ffcc33", glow: "#dd9900" },
   corpse_lich:         { glyph: "%", fg: "#cc88ff", glow: "#9955cc" },
+  corpse_kitty:        { glyph: "%", fg: "#ffcc88", glow: "#cc9955" },
+  corpse_pet:          { glyph: "%", fg: "#ffcc88", glow: "#cc9955" },
 
   // Engravings
   engraving: { glyph: "~", fg: "#8899aa", glow: "#556677" },

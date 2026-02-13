@@ -41,9 +41,10 @@ export function initHUD() {
 
   const hp = makeBar('HP', 'linear-gradient(90deg,#7bff7b,#3ad13a)', '#0f1421');
   const mp = makeBar('Mana', 'linear-gradient(90deg,#55aaff,#2d7dd2)', '#0f1421');
-  vitals.appendChild(hp.row); vitals.appendChild(mp.row);
+  const st = makeBar('Stamina', 'linear-gradient(90deg,#ffc530,#ff8c00)', '#0f1421');
+  vitals.appendChild(hp.row); vitals.appendChild(mp.row); vitals.appendChild(st.row);
 
-  // Combat HUD: weapon, defense, status chips
+  // Combat HUD: weapon/context and effects chips
   const combatBox = document.createElement('div');
   Object.assign(combatBox.style, {
     display: 'flex', flexDirection: 'column', gap: '4px',
@@ -53,8 +54,6 @@ export function initHUD() {
   });
   const weaponLine = document.createElement('div');
   weaponLine.style.fontSize = '12px'; weaponLine.style.color = '#cfe8ff';
-  const defenseLine = document.createElement('div');
-  defenseLine.style.fontSize = '12px'; defenseLine.style.color = '#cfe8ff';
   const ammoLine = document.createElement('div');
   ammoLine.style.fontSize = '12px'; ammoLine.style.color = '#cfe8ff'; ammoLine.style.display = 'none';
   const statusRow = document.createElement('div');
@@ -62,7 +61,6 @@ export function initHUD() {
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
   combatBox.appendChild(weaponLine);
-  combatBox.appendChild(defenseLine);
   combatBox.appendChild(ammoLine);
   combatBox.appendChild(statusRow);
   combatBox.appendChild(affixRow);
@@ -141,6 +139,150 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
   });
 
+  // Pray button (to the right of Engrave)
+  const prayBtn = document.createElement('button');
+  prayBtn.id = 'btn-pray';
+  prayBtn.textContent = 'Pray';
+  Object.assign(prayBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  prayBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch {}
+  });
+
+  // Pet control button (touch/press interface)
+  const petBtn = document.createElement('button');
+  petBtn.id = 'btn-pet';
+  petBtn.textContent = 'Pet: Following';
+  Object.assign(petBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer',
+    display: 'none' // Hidden by default, shown when pet exists
+  });
+
+  // Long-press detection for state rotation vs menu (touch and mouse interface)
+  let pressTimer = null;
+  let isLongPress = false;
+  const LONG_PRESS_DURATION = 500; // ms
+
+  function resetBackground() {
+    const currentState = petBtn.dataset.state || 'following';
+    if (currentState === 'fleeing') {
+      petBtn.style.background = '#3d1616';
+    } else if (currentState === 'guarding') {
+      petBtn.style.background = '#16263d';
+    } else {
+      petBtn.style.background = '#101626';
+    }
+  }
+
+  function startPress() {
+    isLongPress = false;
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+      window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
+      // Visual feedback for long press
+      petBtn.style.background = '#1a2636';
+    }, LONG_PRESS_DURATION);
+  }
+
+  function endPress() {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    resetBackground();
+    // If not a long press, rotate state
+    if (!isLongPress) {
+      try { window.dispatchEvent(new CustomEvent('ui:rotatePetState')); } catch {}
+    }
+    isLongPress = false;
+  }
+
+  function cancelPress() {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    isLongPress = false;
+    resetBackground();
+  }
+
+  // Touch event handlers
+  petBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent mouse event emulation
+    startPress();
+  });
+
+  petBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    endPress();
+  });
+
+  petBtn.addEventListener('touchcancel', () => {
+    cancelPress();
+  });
+
+  // Mouse event handlers
+  petBtn.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // Left click only
+      startPress();
+    }
+  });
+
+  petBtn.addEventListener('mouseup', (e) => {
+    if (e.button === 0) {
+      endPress();
+    }
+  });
+
+  petBtn.addEventListener('mouseleave', () => {
+    cancelPress();
+  });
+
+  // Right-click or context menu: Open full menu immediately
+  petBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    cancelPress(); // Cancel any ongoing long-press
+    window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
+  });
+
+  // Show/hide pet button based on pet existence
+  window.addEventListener('ui:petExists', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const exists = Boolean(e?.detail?.exists);
+    petBtn.style.display = exists ? '' : 'none';
+  });
+  // Update button based on pet state
+  window.addEventListener('ui:updatePetButton', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const state = String(e?.detail?.state || 'following');
+    const stateLabels = {
+      following: 'Following',
+      staying: 'Staying',
+      fetching: 'Fetching',
+      returning: 'Returning',
+      guarding: 'Guarding',
+      fleeing: 'Fleeing!',
+      idle: 'Idle'
+    };
+    petBtn.textContent = `Pet: ${stateLabels[state] || state}`;
+    petBtn.dataset.state = state; // Store for background reset
+    // Color code by state
+    if (state === 'fleeing') {
+      petBtn.style.background = '#3d1616'; // Red tint for danger
+    } else if (state === 'guarding') {
+      petBtn.style.background = '#16263d'; // Blue tint for combat
+    } else {
+      petBtn.style.background = '#101626'; // Default
+    }
+  });
+
   // Update label when app sets active spell
   window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -160,12 +302,16 @@ export function initHUD() {
     const e = ev;
     const hpVal = Number(e?.detail?.hp ?? 0), hpMax = Math.max(1, Number(e?.detail?.maxHp ?? 1));
     const mpVal = Number(e?.detail?.mana ?? 0), mpMax = Math.max(1, Number(e?.detail?.maxMana ?? 1));
+    const stVal = Number(e?.detail?.stamina ?? 0), stMax = Math.max(1, Number(e?.detail?.maxStamina ?? 1));
     const hpf = Math.max(0, Math.min(1, hpVal / hpMax));
     const mpf = Math.max(0, Math.min(1, mpVal / mpMax));
+    const stf = Math.max(0, Math.min(1, stVal / stMax));
     hp.fill.style.width = `${(hpf * 100).toFixed(1)}%`;
     mp.fill.style.width = `${(mpf * 100).toFixed(1)}%`;
+    st.fill.style.width = `${(stf * 100).toFixed(1)}%`;
     hp.text.textContent = `${hpVal}/${hpMax}`;
     mp.text.textContent = `${mpVal}/${mpMax}`;
+    st.text.textContent = `${stVal}/${stMax}`;
   });
 
   // Update combat HUD details
@@ -173,22 +319,16 @@ export function initHUD() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const weapon = e?.detail?.weapon || null;
-    const defense = Number(e?.detail?.defense ?? 0);
     const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
     const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
 
     // Weapon line
     if (weapon && weapon.name) {
       const dd = weapon.damageDice ? `, ${weapon.damageDice}` : '';
-      const atk = Number(weapon.attack||0);
-      const atkTxt = Number.isFinite(atk) && atk !== 0 ? (atk > 0 ? `+${atk}` : `${atk}`) : '0';
-      weaponLine.textContent = `Weapon: [${String(weapon.name)}] (Atk ${atkTxt}${dd ? `, ${dd}` : ''})`;
+      weaponLine.textContent = `Weapon: [${String(weapon.name)}]${dd ? ` (${dd})` : ''}`;
     } else {
       weaponLine.textContent = `Weapon: (none)`;
     }
-    // Defense line
-    const defTxt = Number.isFinite(defense) && defense !== 0 ? (defense > 0 ? `+${defense}` : `${defense}`) : '0';
-    defenseLine.textContent = `Defense: ${defTxt}`;
 
     // Ammo line (only visible when carrying arrows)
     const ammoCount = Number(e?.detail?.ammo ?? 0);
@@ -221,12 +361,14 @@ export function initHUD() {
   const quick = createQuickSlot();
   bar.appendChild(invBtn);
   bar.appendChild(useBtn);
+  bar.appendChild(petBtn); // Pet button after Use
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(engraveBtn);
+  bar.appendChild(prayBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
-  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn };
+  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn, petBtn, prayBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
@@ -314,7 +456,8 @@ function ensureEffectsStack(container) {
     const pct = Math.max(0, Math.min(1, remaining / total));
     const deg = (pct * 360).toFixed(2) + 'deg';
     rec.overlay.style.background = `conic-gradient(rgba(180,190,200,.2) ${deg}, transparent 0)`;
-    rec.ticksEl.textContent = String(Math.max(0, remaining | 0));
+    const r = Math.max(0, remaining | 0);
+    rec.ticksEl.textContent = r >= 9999 ? '\u221E' : String(r);
   }
 
   function update(statuses) {
@@ -334,7 +477,7 @@ function ensureEffectsStack(container) {
       }
       rec.total = Math.max(1, Math.max(rec.total || 1, turns || 1));
       setAngle(rec, turns);
-      rec.stacksEl.textContent = `x${stacks}`;
+      rec.stacksEl.textContent = stacks >= 9999 ? '\u221E' : `x${stacks}`;
       seen.add(key);
     }
     for (const [key, rec] of byKey.entries()) {
