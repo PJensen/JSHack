@@ -32,6 +32,7 @@ import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
+import { Status } from "./rules/components/Status.js";
 import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
 import { getSpell } from "./rules/data/spells.js";
@@ -58,6 +59,7 @@ import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
+import { getHungerLevel } from "./rules/data/food.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -2349,13 +2351,50 @@ function updateCombatHUD() {
   if (!pe) return;
   const eq = /** @type any */ (world.get(pe.id, Equipment));
   const st = /** @type any */ (world.get(pe.id, ActiveEffects));
+  const semanticStatus = /** @type any */ (world.get(pe.id, Status));
   const wid = Number(eq?.weapon || 0);
   const atk = Number(eq?.attackDerived || 0);
   const def = Number(eq?.defenseDerived || 0);
   const wInfo = wid ? world.get(wid, ItemInfo) : null;
   const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : '';
   const dmgDice = wInfo?.damageDice || '';
-  const statuses = Array.isArray(st?.effects) ? st.effects.map((e) => ({ key: String(e.key||e.type||'').toLowerCase(), turns: Number(e.turnsLeft||e.duration||0), stacks: Number(e.stacks||1) })) : [];
+  /** @type {Map<string, { key: string, turns: number, stacks: number }>} */
+  const statusMap = new Map();
+  if (Array.isArray(st?.effects)) {
+    for (const e of st.effects) {
+      const key = String(e?.key || e?.type || '').toLowerCase();
+      if (!key) continue;
+      const turns = Math.max(0, Number(e?.turnsLeft || e?.duration || 0));
+      const stacks = Math.max(1, Number(e?.stacks || 1));
+      const prev = statusMap.get(key);
+      if (!prev) statusMap.set(key, { key, turns, stacks });
+      else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+    }
+  }
+  if (Array.isArray(semanticStatus?.statuses)) {
+    for (const s of semanticStatus.statuses) {
+      const key = String(s?.type || s?.key || '').toLowerCase();
+      if (!key) continue;
+      const turns = Math.max(0, Number(s?.duration || s?.turns || 0));
+      const stacks = Math.max(1, Number(s?.stacks || 1));
+      const prev = statusMap.get(key);
+      if (!prev) statusMap.set(key, { key, turns, stacks });
+      else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+    }
+  }
+  const hc = /** @type any */ (world.get(pe.id, Hunger));
+  if (hc) {
+    const level = hc.satiation > 0 ? 'satiated' : getHungerLevel(Number(hc.hunger || 0));
+    if (level !== 'normal') {
+      const key = String(level).toLowerCase();
+      const turns = hc.satiation > 0 ? Math.max(0, Number(hc.satiation || 0)) : 9999;
+      const stacks = 1;
+      const prev = statusMap.get(key);
+      if (!prev) statusMap.set(key, { key, turns, stacks });
+      else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+    }
+  }
+  const statuses = Array.from(statusMap.values());
   const statusSig = statuses.map(s=>`${s.key}:${s.turns}:${s.stacks}`).join('|');
 
   // Collect equipped affix names for HUD display

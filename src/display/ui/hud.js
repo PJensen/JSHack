@@ -314,7 +314,8 @@ function ensureEffectsStack(container) {
     const pct = Math.max(0, Math.min(1, remaining / total));
     const deg = (pct * 360).toFixed(2) + 'deg';
     rec.overlay.style.background = `conic-gradient(rgba(180,190,200,.2) ${deg}, transparent 0)`;
-    rec.ticksEl.textContent = String(Math.max(0, remaining | 0));
+    const r = Math.max(0, remaining | 0);
+    rec.ticksEl.textContent = r >= 9999 ? '\u221E' : String(r);
   }
 
   function update(statuses) {
@@ -334,7 +335,7 @@ function ensureEffectsStack(container) {
       }
       rec.total = Math.max(1, Math.max(rec.total || 1, turns || 1));
       setAngle(rec, turns);
-      rec.stacksEl.textContent = `x${stacks}`;
+      rec.stacksEl.textContent = stacks >= 9999 ? '\u221E' : `x${stacks}`;
       seen.add(key);
     }
     for (const [key, rec] of byKey.entries()) {
