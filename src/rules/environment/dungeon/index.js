@@ -35,9 +35,10 @@ import { clearSpatialIndex } from '../../utils/spatialIndex.js';
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} worldSeed
  * @param {number} depth
+ * @param {Object} [tombstoneRepo] - Tombstone repository for placing tombstones
  * @returns {{ spawnX: number, spawnY: number, entityIds: number[] }}
  */
-export function generateFloor(world, worldSeed, depth) {
+export function generateFloor(world, worldSeed, depth, tombstoneRepo = null) {
   const floorPlan = generateFloorPlan(worldSeed, depth);
   const { extent } = floorPlan;
   const allEntityIds = [];
@@ -75,7 +76,7 @@ export function generateFloor(world, worldSeed, depth) {
       // Populate chunk with monsters and items
       const popSeed = chunkSeed(worldSeed, depth, cx, cy) ^ 0xDEAD;
       const popRng = createRng(popSeed >>> 0);
-      chunkData.spawns = populateChunk(chunkData, floorPlan, popRng);
+      chunkData.spawns = populateChunk(chunkData, floorPlan, popRng, tombstoneRepo);
 
       // Register tile data
       tileMapLoad(cx, cy, chunkData.tiles);
@@ -103,17 +104,19 @@ export function generateFloor(world, worldSeed, depth) {
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {Object} [opts]
  * @param {number} [opts.startDepth=1]
+ * @param {Object} [opts.tombstoneRepo] - Tombstone repository for placing tombstones
  * @returns {{ x: number, y: number }} spawn position for the player
  */
 export function initDungeon(world, opts = {}) {
   const depth = opts.startDepth || 1;
   const worldSeed = world.seed >>> 0;
+  const tombstoneRepo = opts.tombstoneRepo || null;
 
   clearTileMap();
   clearExplored();
   clearSpatialIndex(world);
 
-  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, depth);
+  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, depth, tombstoneRepo);
 
   // Create dungeon state singleton
   const dsId = world.create();
