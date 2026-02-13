@@ -39,8 +39,8 @@ export function generateFloorPlan(worldSeed, depth) {
   const downStairs = [{
     chunkX: 0,
     chunkY: 0,
-    localX: 0,
-    localY: 0,
+    localX: rng.int(4, CHUNK_SIZE - 5),
+    localY: rng.int(4, CHUNK_SIZE - 5),
   }];
 
   // Up stairs: 1 near origin, except on floor 1
