@@ -4,7 +4,7 @@
 // ---- Imports ---------------------------------------------------------------
 // rules/ (app owns lifecycle only; no display code here)
 import { World } from "./lib/ecs-js/index.js";            // ECS World
-import { configureWorld } from "../app/rules/scheduler.js";
+import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 
 // display/ camera + director utilities (pure display resources)
@@ -17,7 +17,7 @@ import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
 import { enableInputLockdown } from "./display/input/lockdown.js";
-import { makeRulesDispatcher } from "../app/input/rulesDispatch.js";
+import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";

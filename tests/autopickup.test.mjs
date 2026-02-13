@@ -1,6 +1,6 @@
 import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
-import { configureWorld } from '../app/rules/scheduler.js';
+import { configureWorld } from '../src/main/scheduler.js';
 import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { createPlayer } from '../src/rules/archetypes/Player.js';
 import { Position } from '../src/rules/components/Position.js';
