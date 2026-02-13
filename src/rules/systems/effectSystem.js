@@ -123,6 +123,12 @@ export function effectSystem(world) {
                     upsertStatus(nextStatuses, { type: 'thorns', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
+                case 'frost':
+                case 'frozen': {
+                    // Frost slows movement; no per-tick damage. Movement gating handled by movementSystem.
+                    upsertStatus(nextStatuses, { type: 'frozen', duration: e.turnsLeft, potency, stacks });
+                    break;
+                }
                 case 'mindwipe':
                 case 'mindwiped': {
                     upsertStatus(nextStatuses, { type: 'mindwiped', duration: e.turnsLeft, potency, stacks });

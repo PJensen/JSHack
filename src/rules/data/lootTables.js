@@ -56,8 +56,9 @@ export const LOOT_TABLES = {
   "sub:wands": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "item", weight: 50, itemId: "wand_lightning" },
-      { type: "item", weight: 50, itemId: "wand_meteor" },
+      { type: "item", weight: 40, itemId: "wand_lightning" },
+      { type: "item", weight: 35, itemId: "wand_meteor" },
+      { type: "item", weight: 25, itemId: "wand_frost" },
     ],
   },
 
