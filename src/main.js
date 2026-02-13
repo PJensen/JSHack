@@ -5,7 +5,7 @@
 // rules/ (app owns lifecycle only; no display code here)
 import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "../app/rules/scheduler.js";
-import { playerEntity } from "./rules/utils/queries.js";
+import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera } from "./display/camera/controller.js";
@@ -222,9 +222,13 @@ if (!playerEntity(world)) {
   const pe = playerEntity(world);
   if (pe) {
     const ppos = world.get(pe.id, Position);
+    const spawnTile = findNearestValidTileAround(world, ppos, {
+      maxDistance: 1,
+      exclude: [{ x: ppos.x, y: ppos.y }],
+    });
     const petId = world.create();
     world.add(petId, Pet);
-    world.add(petId, Position, { x: ppos.x + 1, y: ppos.y });
+    world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
     world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
     world.add(petId, Faction, { key: "pet" });
     world.add(petId, Owner, { ownerId: pe.id });
