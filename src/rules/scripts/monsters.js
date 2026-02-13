@@ -75,6 +75,17 @@ registerScript('monster:dragonClaw', {
   },
 });
 
+// Snake bite: 25% chance → poison (5 turns, potency 1, stacks)
+registerScript('monster:snakeBite', {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000f);
+    if (rngInt(r, 1, 100) <= 25) {
+      pushEffect(world, ctx.defender, { key: 'poison', turnsLeft: 5, potency: 1, stacks: 1 });
+      try { world.emit('proc:poisoned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
+    }
+  },
+});
+
 // Goblin shiv: 20% chance → bleed (3 turns, potency 1, stacks)
 registerScript('monster:goblinShiv', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
