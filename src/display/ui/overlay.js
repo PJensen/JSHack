@@ -6,6 +6,7 @@ export function initOverlays() {
   const inv = ensurePanel('inventory');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
+  const usePanel = ensurePanel('use');
   const spells = ensurePanel('spells');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
@@ -38,7 +39,7 @@ export function initOverlays() {
     window.dispatchEvent(new CustomEvent('ui:requestMessageLogData'));
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(spells); hide(shop); hide(chest); }
+    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(usePanel); hide(spells); hide(shop); hide(chest); }
   });
 
   // Data feeds
@@ -75,6 +76,18 @@ export function initOverlays() {
     const items = (e?.detail?.items) || [];
     renderPickupChooser(pick, items);
     show(pick);
+  });
+
+  // Use-item chooser (filtered inventory for usable items)
+  window.addEventListener('ui:openUseChooser', () => {
+    show(usePanel);
+    window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData'));
+  });
+  window.addEventListener('ui:usableItemsData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const items = (e?.detail?.items) || [];
+    renderUseChooser(usePanel, items);
   });
 
   // Shop overlay
@@ -667,7 +680,7 @@ function renderInventory(panel, items) {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     } else if (it.type === 'equip' || it.type === 'ammo') {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-    } else if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll') {
+    } else if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food') {
       window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     } else if (it.type === 'spell') {
       const spellId = String(it.id || '').replace(/^spell:/, '');
@@ -686,7 +699,7 @@ function renderInventory(panel, items) {
     else if (k === 'Enter') { defaultAction(); e.preventDefault(); }
     else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip' || it?.type === 'ammo') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
-    else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
   }
 
@@ -885,6 +898,109 @@ function renderPickupChooser(panel, items) {
   queueMicrotask(() => {
     try { btnPickAll.focus(); } catch {}
   });
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
+function renderUseChooser(panel, items) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+  const title = document.createElement('div');
+  title.textContent = 'Use which item?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(no usable items)';
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  let sel = 0;
+
+  const rows = items.map((it, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      width: '100%', padding: '6px 8px',
+      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer'
+    });
+
+    const name = document.createElement('span');
+    const rn = String(it.rarityName || 'common').toLowerCase();
+    const rs = rarityStyle(rn);
+    name.textContent = bracketize(sanitize(it.name || it.description || it.type));
+    Object.assign(name.style, rs);
+
+    const typeLabel = document.createElement('span');
+    typeLabel.style.opacity = '0.6';
+    typeLabel.style.fontSize = '12px';
+    typeLabel.textContent = it.type || '';
+
+    const qty = document.createElement('span');
+    qty.style.marginLeft = 'auto'; qty.style.opacity = '0.8';
+    qty.textContent = it.count > 1 ? `x${it.count}` : '';
+
+    row.appendChild(name);
+    row.appendChild(typeLabel);
+    row.appendChild(qty);
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => useSelected());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Use \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(items.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+
+  function useSelected() {
+    const it = items[sel]; if (!it) return;
+    if (it.type === 'potion') {
+      window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    }
+    hide(panel);
+  }
+
+  setSel(0);
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Enter') { useSelected(); e.preventDefault(); }
+  }
+
+  window.addEventListener('keydown', onKey);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', onKey);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number}} state */

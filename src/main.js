@@ -440,6 +440,32 @@ addEventListener('ui:requestInventoryData', () => {
   window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items } }));
 });
 
+// Provide usable items to the use-chooser overlay when requested
+const USABLE_TYPES = new Set(['wand', 'scroll', 'book', 'learn', 'food', 'potion']);
+addEventListener('ui:requestUsableItemsData', () => {
+  const p = playerEntity(world);
+  const items = [];
+  if (p) {
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        const info = world.get(id, ItemInfo);
+        if (!info || !USABLE_TYPES.has(info.type)) continue;
+        const name = world.get(id, NamedIdentity);
+        items.push({
+          id,
+          type: info.type,
+          description: info.description,
+          count: info.count,
+          name: name?.name,
+          rarityName: info.rarityName,
+        });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
+});
+
 // Provide message log entries (placeholder until rules log is wired)
 addEventListener('ui:requestMessageLogData', () => {
   const entries = messageLog.slice();
