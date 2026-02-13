@@ -9,6 +9,7 @@ import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
 import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
+import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
@@ -56,6 +57,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   clearTileMap();
   clearExplored();
   clearSpatialIndex(world);
+  invalidateTileQueryCache(world);
 
   // Generate the new floor
   const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
@@ -100,6 +102,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   }
 
   world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });
+  invalidateTileQueryCache(world);
 }
 
 /**

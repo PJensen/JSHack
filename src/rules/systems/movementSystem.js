@@ -15,6 +15,7 @@ import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
 import { Facing } from "../components/Facing.js";
+import { getLivingEntityAt, getItemsAt } from "../utils/tileQueryCache.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -24,8 +25,6 @@ export function movementSystem(world) {
   // Build occupancy and terrain maps for quick blocking checks
   const blocking = new Map(); // key(x,y) -> true if non-walkable terrain, solid collider, or living occupant present
   const interactables = new Map(); // key(x,y) -> entity id with Interactable
-  const livingOccupants = new Map(); // key(x,y) -> living entity id for bump-attack checks
-  const pickupItems = new Map(); // key(x,y) -> item ids at that tile for immediate auto-pickup
 
   for (const [id, pos] of world.query(Position)) {
     const kk = key(pos.x, pos.y);
@@ -37,19 +36,9 @@ export function movementSystem(world) {
     const vit = world.get(id, Vitality);
     if (vit && (vit.hp ?? 0) > 0) {
       blocking.set(kk, true);
-      if (!livingOccupants.has(kk)) livingOccupants.set(kk, id);
     }
     if (world.has(id, Interactable)) {
       interactables.set(kk, id);
-    }
-    const info = world.get(id, ItemInfo);
-    if (info && info.type) {
-      let ids = pickupItems.get(kk);
-      if (!ids) {
-        ids = [];
-        pickupItems.set(kk, ids);
-      }
-      ids.push(id);
     }
   }
 
@@ -71,7 +60,7 @@ export function movementSystem(world) {
 
       if (!isWalkable(nx, ny) || blocking.get(k)) {
         // Cheap bump-attack: prefer a living target with Vitality in the destination cell.
-        const target = livingOccupants.get(k) || 0;
+        const target = getLivingEntityAt(world, nx, ny);
         const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
         if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
           // Check faction: neutral/shopkeeper NPCs with Interactable trigger interaction, not attack
@@ -106,7 +95,7 @@ export function movementSystem(world) {
         const enable = (set?.autoPickup !== false);
         if (inv && enable) {
           const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
-          const idsAtTile = pickupItems.get(k) || [];
+          const idsAtTile = getItemsAt(world, nx, ny);
           const toTake = [];
           for (let i = 0; i < idsAtTile.length; i++) {
             const itemId = idsAtTile[i];
@@ -143,14 +132,6 @@ export function movementSystem(world) {
               }
             }
             try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch {}
-
-            // Keep local tile cache in sync to avoid re-processing in this tick.
-            const tileItems = pickupItems.get(k);
-            if (tileItems) {
-              const idx = tileItems.indexOf(itemId);
-              if (idx >= 0) tileItems.splice(idx, 1);
-              if (tileItems.length === 0) pickupItems.delete(k);
-            }
           }
         }
       }

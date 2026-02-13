@@ -5,6 +5,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Settings } from "../components/Settings.js";
 import { Player } from "../components/Player.js";
+import { getItemsAt } from "../utils/tileQueryCache.js";
 
 // Helper: sum inventory weight
 function inventoryWeight(world, inv) {
@@ -117,28 +118,13 @@ export function itemPickupSystem(world) {
 
 // Post-move auto-pickup pass (registered in 'effects' phase)
 export function autoPickupPostMoveSystem(world) {
-    const pickupItems = new Map(); // "x,y" -> item ids currently on that tile
-    const key = (x, y) => `${x},${y}`;
-
-    for (const [itemId, pos] of world.query(Position)) {
-        const info = world.get(itemId, ItemInfo);
-        if (!info || !info.type) continue;
-        const k = key(pos.x, pos.y);
-        let ids = pickupItems.get(k);
-        if (!ids) {
-            ids = [];
-            pickupItems.set(k, ids);
-        }
-        ids.push(itemId);
-    }
-
     for (const [id, pos, inv] of world.query(Player, Position, Inventory)) {
         const set = world.get(id, Settings);
         const enable = (set?.autoPickup !== false);
         if (!enable) continue;
         const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
         const candidates = [];
-        const tileItems = pickupItems.get(key(pos.x, pos.y)) || [];
+        const tileItems = getItemsAt(world, pos.x, pos.y);
         for (let i = 0; i < tileItems.length; i++) {
             const itemId = tileItems[i];
             if (!world.isAlive(itemId)) continue;
@@ -162,14 +148,6 @@ export function autoPickupPostMoveSystem(world) {
                 inv.items.push(itemId);
             }
             try { world.emit && world.emit('item:pickup', { actor: id, itemId, count: takeCount }); } catch {}
-
-            // Keep local tile cache in sync to avoid reprocessing within this tick.
-            const ids = pickupItems.get(key(pos.x, pos.y));
-            if (ids) {
-                const idx = ids.indexOf(itemId);
-                if (idx >= 0) ids.splice(idx, 1);
-                if (ids.length === 0) pickupItems.delete(key(pos.x, pos.y));
-            }
         }
     }
 }
