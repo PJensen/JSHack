@@ -43,7 +43,7 @@ export function initHUD() {
   const mp = makeBar('Mana', 'linear-gradient(90deg,#55aaff,#2d7dd2)', '#0f1421');
   vitals.appendChild(hp.row); vitals.appendChild(mp.row);
 
-  // Combat HUD: weapon, defense, status chips
+  // Combat HUD: weapon/context and effects chips
   const combatBox = document.createElement('div');
   Object.assign(combatBox.style, {
     display: 'flex', flexDirection: 'column', gap: '4px',
@@ -53,8 +53,6 @@ export function initHUD() {
   });
   const weaponLine = document.createElement('div');
   weaponLine.style.fontSize = '12px'; weaponLine.style.color = '#cfe8ff';
-  const defenseLine = document.createElement('div');
-  defenseLine.style.fontSize = '12px'; defenseLine.style.color = '#cfe8ff';
   const ammoLine = document.createElement('div');
   ammoLine.style.fontSize = '12px'; ammoLine.style.color = '#cfe8ff'; ammoLine.style.display = 'none';
   const statusRow = document.createElement('div');
@@ -62,7 +60,6 @@ export function initHUD() {
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
   combatBox.appendChild(weaponLine);
-  combatBox.appendChild(defenseLine);
   combatBox.appendChild(ammoLine);
   combatBox.appendChild(statusRow);
   combatBox.appendChild(affixRow);
@@ -173,22 +170,16 @@ export function initHUD() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const weapon = e?.detail?.weapon || null;
-    const defense = Number(e?.detail?.defense ?? 0);
     const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
     const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
 
     // Weapon line
     if (weapon && weapon.name) {
       const dd = weapon.damageDice ? `, ${weapon.damageDice}` : '';
-      const atk = Number(weapon.attack||0);
-      const atkTxt = Number.isFinite(atk) && atk !== 0 ? (atk > 0 ? `+${atk}` : `${atk}`) : '0';
-      weaponLine.textContent = `Weapon: [${String(weapon.name)}] (Atk ${atkTxt}${dd ? `, ${dd}` : ''})`;
+      weaponLine.textContent = `Weapon: [${String(weapon.name)}]${dd ? ` (${dd})` : ''}`;
     } else {
       weaponLine.textContent = `Weapon: (none)`;
     }
-    // Defense line
-    const defTxt = Number.isFinite(defense) && defense !== 0 ? (defense > 0 ? `+${defense}` : `${defense}`) : '0';
-    defenseLine.textContent = `Defense: ${defTxt}`;
 
     // Ammo line (only visible when carrying arrows)
     const ammoCount = Number(e?.detail?.ammo ?? 0);
