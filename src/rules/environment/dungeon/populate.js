@@ -10,10 +10,11 @@ import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopStock } from '../../data/shopStock.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem } from '../../archetypes/Items.js';
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
-import { pickMonster, pickItem, pickTrap } from './tables.js';
+import { pickMonster, pickItem, pickTrap, pickSpawner } from './tables.js';
 import { getItem } from '../../data/items.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
+import { Spawner } from '../../archetypes/Spawner.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 
@@ -35,12 +36,28 @@ import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 export function populateChunk(chunk, floorPlan, rng) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
+  const SPAWNER_FRACTION = 0.03; // 3% of monster budget becomes spawners (~1 every 3-5 rooms)
 
   for (const room of chunk.rooms) {
     const area = room.w * room.h;
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
-    const monsterBudget = Math.max(0, Math.floor(area / rng.int(20, 30) * diff));
+    const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(20, 30) * diff));
+    const spawnerBudget = Math.floor(totalMonsterBudget * SPAWNER_FRACTION);
+    const monsterBudget = totalMonsterBudget - spawnerBudget;
+
+    // Place spawners (create monster packs)
+    for (let i = 0; i < spawnerBudget; i++) {
+      const mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      spawns.push({
+        x: mx, y: my,
+        kind: 'spawner',
+        params: pickSpawner(rng, floorPlan.depth),
+      });
+    }
+
+    // Place individual monsters
     for (let i = 0; i < monsterBudget; i++) {
       const mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
@@ -180,6 +197,23 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, arch, {
         x: spawn.x, y: spawn.y,
         trapParams: p.params || {},
+      });
+    }
+    case 'spawner': {
+      const p = spawn.params;
+      const monsterParams = p.monsterType;
+      // Create spawner with specific identity for display palette lookup
+      return createFrom(world, Spawner, {
+        x: spawn.x,
+        y: spawn.y,
+        name: `${monsterParams.name} Nest`,
+        identity: 'spawner',  // Used by display layer to lookup glyph/color
+        spawnParams: monsterParams,
+        totalToSpawn: p.packSize,
+        cooldownTicks: 15,
+        maxConcurrent: 3,
+        spawnRadius: 2,
+        maxHp: 50,  // Make spawners destructible but not too fragile
       });
     }
     case 'shopkeeper': {

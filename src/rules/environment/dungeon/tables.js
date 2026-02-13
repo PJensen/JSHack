@@ -77,3 +77,34 @@ export function pickTrap(rng, depth) {
   const percent = Math.min(0.35, 0.15 + depth * 0.02);
   return { type: 'spike', script: 'trap_spike', params: { percent } };
 }
+
+// Pack size by monster size class - how many monsters to spawn per pack
+const PACK_SIZE_BY_CLASS = {
+  'XS': { min: 3, max: 6 },   // tiny creatures - swarms
+  'S':  { min: 2, max: 5 },   // small creatures - groups
+  'M':  { min: 1, max: 3 },   // medium creatures - pairs/trios
+  'L':  { min: 1, max: 2 },   // large creatures - rare pairs
+  'XL': { min: 1, max: 1 },   // gigantic creatures - never pack
+};
+
+/**
+ * Pick spawner parameters based on depth.
+ * Returns spawner config with monster type and pack size.
+ * @param {Object} rng - createRng() instance
+ * @param {number} depth
+ * @returns {{monsterType:Object, packSize:number, depth:number}}
+ */
+export function pickSpawner(rng, depth) {
+  // Get base monster using existing pickMonster logic
+  const monsterParams = pickMonster(rng, depth);
+
+  // Look up pack size based on monster's size class
+  const packRange = PACK_SIZE_BY_CLASS[monsterParams.sizeClass] || PACK_SIZE_BY_CLASS['M'];
+  const packSize = rng.int(packRange.min, packRange.max);
+
+  return {
+    monsterType: monsterParams,
+    packSize: packSize,
+    depth: depth,
+  };
+}
