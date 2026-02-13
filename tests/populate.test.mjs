@@ -116,3 +116,36 @@ Deno.test("materializeSpawn creates equipment entity", () => {
   const info = world.get(id, ItemInfo);
   assert(info.type === 'equip', 'is equipment');
 });
+
+function countRoomDoors(room, doors) {
+  let count = 0;
+  for (const d of doors) {
+    const onVerticalWall =
+      (d.x === room.x - 1 || d.x === room.x + room.w) &&
+      d.y >= room.y &&
+      d.y < room.y + room.h;
+    const onHorizontalWall =
+      (d.y === room.y - 1 || d.y === room.y + room.h) &&
+      d.x >= room.x &&
+      d.x < room.x + room.w;
+    if (onVerticalWall || onHorizontalWall) count++;
+  }
+  return count;
+}
+
+Deno.test("shopkeeper spawns only in leaf rooms with exactly one door", () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const chunk = generateChunk(seed, 1, 0, 0);
+    const rng = createRng(seed * 1337);
+    const floorPlan = { depth: 1, difficultyMult: 1.0 };
+    const spawns = populateChunk(chunk, floorPlan, rng);
+
+    const shopkeepers = spawns.filter(s => s.kind === 'shopkeeper');
+    for (const sk of shopkeepers) {
+      const room = sk.params?.room;
+      assert(room, "shopkeeper spawn should include room metadata");
+      const doors = countRoomDoors(room, chunk.doors || []);
+      assert(doors === 1, `shop room must have exactly one door, got ${doors}`);
+    }
+  }
+});
