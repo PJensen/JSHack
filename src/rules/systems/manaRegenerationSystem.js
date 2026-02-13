@@ -1,6 +1,7 @@
 import { Mana } from '../components/Mana.js';
 import { Equipment } from '../components/Equipment.js';
 import { Status } from '../components/Status.js';
+import { HUNGER_MANA_MULT } from '../data/food.js';
 
 
 /**
@@ -19,8 +20,8 @@ export function manaRegenerationSystem(world) {
             const _stat = world.get(entity, Status);
             let _hungerMult = 1.0;
             if (_stat && Array.isArray(_stat.statuses)) {
-                const _hs = _stat.statuses.find(s => s.type === 'famished' || s.type === 'starving' || s.type === 'wasting');
-                if (_hs) _hungerMult = _hs.type === 'famished' ? 0.5 : 0.0;
+                const _hs = _stat.statuses.find(s => s.type in HUNGER_MANA_MULT);
+                if (_hs) _hungerMult = HUNGER_MANA_MULT[_hs.type];
             }
             const rate = (baseRate + bonus) * _hungerMult;
             const newMana = Math.min(manaComp.maxMana, manaComp.mana + rate);
