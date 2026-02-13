@@ -103,8 +103,20 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
-  // Shopkeeper: one per chunk, only in rooms with exactly one door, ~30% chance.
-  const eligibleShopRooms = chunk.rooms.filter((room) => countRoomDoors(room, chunk.doors || []) === 1);
+  // Shopkeeper: one per chunk, only in dead-end rooms (exactly one entrance), ~30% chance.
+  // Extra rule: never use the origin chunk's spawn room (rooms[0] in chunk 0,0).
+  const spawnRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
+    ? chunk.rooms[0]
+    : null;
+  const eligibleShopRooms = chunk.rooms.filter((room) => {
+    const isDeadEnd = countRoomDoors(room, chunk.doors || []) === 1;
+    const isSpawnRoom = !!spawnRoom &&
+      room.x === spawnRoom.x &&
+      room.y === spawnRoom.y &&
+      room.w === spawnRoom.w &&
+      room.h === spawnRoom.h;
+    return isDeadEnd && !isSpawnRoom;
+  });
   if (eligibleShopRooms.length > 0 && rng.next() < 0.30) {
     const room = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
 
