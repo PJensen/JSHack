@@ -12,6 +12,7 @@ import { Position } from '../components/Position.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
+import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
@@ -95,10 +96,9 @@ export function combatSystem(world) {
         const defDiseasePenalty = defDisease ? Math.max(0, (defDisease.potency || 1) * (defDisease.stacks || 1)) : 0;
 
         // Hunger penalty: hungry/famished/starving/wasting reduce attack and defense
-        const _hungerTypes = ['hungry', 'famished', 'starving', 'wasting'];
-        const atkHunger = atkStatus?.statuses?.find(s => _hungerTypes.includes(s.type));
+        const atkHunger = atkStatus?.statuses?.find(s => HUNGER_COMBAT_LEVELS.includes(s.type));
         const atkHungerPenalty = atkHunger ? Math.max(0, atkHunger.potency || 0) : 0;
-        const defHunger = defStatus?.statuses?.find(s => _hungerTypes.includes(s.type));
+        const defHunger = defStatus?.statuses?.find(s => HUNGER_COMBAT_LEVELS.includes(s.type));
         const defHungerPenalty = defHunger ? Math.max(0, defHunger.potency || 0) : 0;
 
         const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty - atkHungerPenalty);

@@ -51,3 +51,47 @@ export const CORPSE_WEIGHT = {
   L:  8,
   XL: 15,
 };
+
+// ── Hunger severity constants ─────────────────────────────────────
+// Single source of truth for level names, thresholds, and penalties.
+// Consumed by hungerSystem, combatSystem, manaRegenerationSystem, and display.
+
+/** Severity thresholds (frozen). */
+export const HUNGER_LEVELS = Object.freeze([
+  Object.freeze({ name: 'normal',   min: 0,    max: 199  }),
+  Object.freeze({ name: 'peckish',  min: 200,  max: 399  }),
+  Object.freeze({ name: 'hungry',   min: 400,  max: 599  }),
+  Object.freeze({ name: 'famished', min: 600,  max: 799  }),
+  Object.freeze({ name: 'starving', min: 800,  max: 999  }),
+  Object.freeze({ name: 'wasting',  min: 1000, max: Infinity }),
+]);
+
+/** All status types that the hunger system projects (for filtering). */
+export const HUNGER_STATUS_TYPES = Object.freeze(new Set([
+  'satiated', 'peckish', 'hungry', 'famished', 'starving', 'wasting',
+]));
+
+/** Attack/defense penalty per hunger level (read by combatSystem). */
+export const HUNGER_POTENCY = Object.freeze({
+  peckish: 0, hungry: 1, famished: 2, starving: 3, wasting: 4,
+});
+
+/** Levels that apply a combat penalty (frozen array for status lookups). */
+export const HUNGER_COMBAT_LEVELS = Object.freeze(['hungry', 'famished', 'starving', 'wasting']);
+
+/** Levels that throttle mana regen, mapped to multiplier. */
+export const HUNGER_MANA_MULT = Object.freeze({
+  famished: 0.5, starving: 0.0, wasting: 0.0,
+});
+
+/**
+ * Resolve a hunger counter value to its severity level name.
+ * @param {number} hunger
+ * @returns {string}
+ */
+export function getHungerLevel(hunger) {
+  for (const level of HUNGER_LEVELS) {
+    if (hunger >= level.min && hunger <= level.max) return level.name;
+  }
+  return 'wasting';
+}
