@@ -35,7 +35,37 @@ export const ITEM_DEFS = {
         rarity: 1,
         rarityName: 'rare',
         description: 'Casts Blast Wave without learning it.'
-    }
+    },
+    wand_lightning: {
+        id: 'wand_lightning',
+        name: 'Wand of Lightning',
+        type: 'wand',
+        slot: 'bag',
+        charges: 3,
+        rarity: 1,
+        rarityName: 'rare',
+        description: 'Zaps a bolt of chain lightning. 3 charges.',
+    },
+    wand_blastwave: {
+        id: 'wand_blastwave',
+        name: 'Wand of Blast Wave',
+        type: 'wand',
+        slot: 'bag',
+        charges: 4,
+        rarity: 1,
+        rarityName: 'rare',
+        description: 'Unleashes a concussive blast wave. 4 charges.',
+    },
+    wand_meteor: {
+        id: 'wand_meteor',
+        name: 'Wand of Meteor',
+        type: 'wand',
+        slot: 'bag',
+        charges: 2,
+        rarity: 1,
+        rarityName: 'rare',
+        description: 'Calls down a meteor. 2 charges.',
+    },
 };
 
 export function listItems() { return Object.values(ITEM_DEFS); }
