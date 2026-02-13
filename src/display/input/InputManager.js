@@ -125,6 +125,13 @@ export class InputManager {
       return;
     }
 
+    // Memory graph toggle: '8'
+    if (key === '8') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
+      return;
+    }
+
     // Pickup chooser (',' for get)
     if (key === ",") {
       e.preventDefault();
