@@ -117,7 +117,7 @@ export function initOverlays() {
   });
 
   // Shop overlay
-  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5 };
+  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse' };
   window.addEventListener('ui:openShop', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -125,10 +125,12 @@ export function initOverlays() {
     _shopState.shopkeeperId = d.shopkeeperId || 0;
     _shopState.buyMarkup = d.buyMarkup ?? 1.0;
     _shopState.sellDiscount = d.sellDiscount ?? 0.5;
+    _shopState.mode = d.mode || 'browse';
     show(shop);
   });
   window.addEventListener('ui:closeShop', () => {
     _shopState.shopkeeperId = 0;
+    _shopState.mode = 'browse';
     hide(shop);
   });
   window.addEventListener('ui:shopData', (ev) => {
@@ -660,6 +662,10 @@ function renderInventory(panel, items) {
       width: '100%', padding: '6px 8px',
       background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px'
     });
+    if (it.unpaid) {
+      row.style.borderColor = '#d9963b';
+      row.style.background = 'rgba(65, 35, 10, 0.75)';
+    }
     row.dataset.itemId = String(it.id);
     row.tabIndex = 0;
 
@@ -679,9 +685,20 @@ function renderInventory(panel, items) {
     const qty = document.createElement('span');
     qty.style.marginLeft = 'auto'; qty.style.opacity = '0.8'; qty.textContent = `x${it.count ?? 1}`;
 
+    const unpaidTag = document.createElement('span');
+    if (it.unpaid) {
+      const bill = Number(it.unpaidPrice || 0);
+      unpaidTag.textContent = bill > 0 ? `UNPAID ${bill}g` : 'UNPAID';
+      unpaidTag.style.color = '#ffbf5a';
+      unpaidTag.style.fontWeight = 'bold';
+      unpaidTag.style.fontSize = '11px';
+      unpaidTag.style.marginLeft = '6px';
+    }
+
     row.appendChild(star);
     row.appendChild(name);
     row.appendChild(slot);
+    if (it.unpaid) row.appendChild(unpaidTag);
     row.appendChild(qty);
 
     row.addEventListener('mouseenter', () => { setSel(idx); });
@@ -692,15 +709,17 @@ function renderInventory(panel, items) {
 
   const hint = document.createElement('div');
   hint.style.marginTop = '8px'; hint.style.opacity = '0.85';
-  hint.textContent = '↑/↓ to select · Enter to Use · E=Equip · D=Drink · U=Use · S=Set Spell · Esc=Close';
+  hint.textContent = '↑/↓ to select · Enter to Use · E=Equip · D=Drink · U=Use · S=Set Spell · Esc=Close · UNPAID items are stolen';
   el.appendChild(hint);
 
   /** @param {number} i */
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i|0));
-  rows.forEach((r, j) => {
+    rows.forEach((r, j) => {
+      const baseBg = items[j]?.unpaid ? 'rgba(65, 35, 10, 0.75)' : '#0f1421';
+      const activeBg = items[j]?.unpaid ? 'rgba(85, 45, 14, 0.9)' : '#0b1323';
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+      r.style.background = (j === sel) ? activeBg : baseBg;
     });
   }
 
@@ -1041,26 +1060,153 @@ function renderUseChooser(panel, items) {
   obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number}} state */
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number, mode:string}} state */
 function renderShop(panel, data, state) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
+  const mode = data?.mode || state?.mode || 'browse';
   const shopItems = data?.shopItems || [];
   const playerItems = data?.playerItems || [];
+  const unpaidItems = data?.unpaidItems || [];
+  const totalBill = data?.totalBill || 0;
   const gold = data?.gold || 0;
 
   // Header
   const header = document.createElement('div');
   Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' });
   const title = document.createElement('div');
-  title.textContent = 'Shopkeeper';
+  title.textContent = mode === 'checkout' ? 'Shopkeeper Invoice' : 'Shopkeeper';
   title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
   const goldLabel = document.createElement('div');
   goldLabel.textContent = `Gold: ${gold}`;
   goldLabel.style.marginLeft = 'auto'; goldLabel.style.color = '#ffde5a'; goldLabel.style.fontWeight = 'bold';
   header.appendChild(title); header.appendChild(goldLabel);
   el.appendChild(header);
+
+  if (mode === 'checkout') {
+    const billLine = document.createElement('div');
+    billLine.textContent = `Amount Due: ${totalBill}g`;
+    billLine.style.marginBottom = '10px';
+    billLine.style.color = '#ffde5a';
+    billLine.style.fontWeight = 'bold';
+    el.appendChild(billLine);
+
+    const listContainer = document.createElement('div');
+    listContainer.style.maxHeight = '45vh';
+    listContainer.style.overflow = 'auto';
+    el.appendChild(listContainer);
+
+    const actions = document.createElement('div');
+    Object.assign(actions.style, { display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' });
+    const payBtn = document.createElement('button');
+    payBtn.textContent = 'Pay Bill';
+    decorateButton(payBtn);
+    payBtn.style.fontWeight = 'bold';
+    const returnBtn = document.createElement('button');
+    returnBtn.textContent = 'Return Item';
+    decorateButton(returnBtn);
+    actions.appendChild(payBtn);
+    actions.appendChild(returnBtn);
+    el.appendChild(actions);
+
+    const hint = document.createElement('div');
+    hint.style.marginTop = '8px';
+    hint.style.opacity = '0.85';
+    hint.style.fontSize = '12px';
+    el.appendChild(hint);
+
+    let sel = 0;
+    const rows = [];
+    if (!unpaidItems.length) {
+      const empty = document.createElement('div');
+      empty.textContent = '(invoice is empty)';
+      listContainer.appendChild(empty);
+      returnBtn.disabled = true;
+      hint.textContent = 'P=Pay bill · Esc=Close';
+    } else {
+      unpaidItems.forEach((it, idx) => {
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+          display: 'flex', alignItems: 'center', gap: '8px',
+          width: '100%', padding: '6px 8px',
+          background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+          cursor: 'pointer', marginBottom: '4px',
+        });
+
+        const name = document.createElement('span');
+        name.textContent = bracketize(sanitize(it.name || 'item'));
+        const rn = String(it.rarityName || 'common').toLowerCase();
+        Object.assign(name.style, rarityStyle(rn));
+
+        const price = document.createElement('span');
+        price.style.marginLeft = 'auto';
+        price.style.color = '#ffde5a';
+        price.style.fontWeight = 'bold';
+        price.textContent = `${it.price || 0}g`;
+
+        row.appendChild(name);
+        if (it.count > 1) {
+          const qty = document.createElement('span');
+          qty.style.opacity = '0.7';
+          qty.textContent = `x${it.count}`;
+          row.appendChild(qty);
+        }
+        row.appendChild(price);
+        row.addEventListener('mouseenter', () => setSel(idx));
+        row.addEventListener('click', () => returnSelected());
+        listContainer.appendChild(row);
+        rows.push(row);
+      });
+      hint.textContent = '↑/↓ select · Enter=Return item · P=Pay bill · Esc=Close';
+      setSel(0);
+    }
+
+    function setSel(i) {
+      sel = Math.max(0, Math.min(unpaidItems.length - 1, i | 0));
+      rows.forEach((r, j) => {
+        r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+        r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+      });
+    }
+
+    function payBill() {
+      window.dispatchEvent(new CustomEvent('ui:payBill', {
+        detail: { shopkeeperId: state.shopkeeperId }
+      }));
+    }
+
+    function returnSelected() {
+      const it = unpaidItems[sel];
+      if (!it) return;
+      window.dispatchEvent(new CustomEvent('ui:removeFromInvoice', {
+        detail: { shopkeeperId: state.shopkeeperId, itemId: it.id }
+      }));
+    }
+
+    payBtn.addEventListener('click', payBill);
+    returnBtn.addEventListener('click', returnSelected);
+
+    /** @param {KeyboardEvent} e */
+    function onKey(e) {
+      if (panel.style.display !== 'block') return;
+      const k = e.key;
+      if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      else if (k === 'Enter') { returnSelected(); e.preventDefault(); }
+      else if (k === 'p' || k === 'P') { payBill(); e.preventDefault(); }
+    }
+
+    window.addEventListener('keydown', onKey);
+    const obs = new MutationObserver(() => {
+      if (panel.style.display === 'none') {
+        window.removeEventListener('keydown', onKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+    return;
+  }
 
   // Tabs
   let activeTab = 'buy';

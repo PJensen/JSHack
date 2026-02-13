@@ -7,7 +7,7 @@ import { Position } from '../../components/Position.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
 import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
-import { generateShopStock } from '../../data/shopStock.js';
+import { generateShopItem } from '../../data/shopStock.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem } from '../../archetypes/Items.js';
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
 import { pickMonster, pickItem, pickTrap, pickSpawner } from './tables.js';
@@ -296,12 +296,9 @@ export function materializeSpawn(world, spawn) {
       const depth = spawn.params.depth || 1;
       const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0x5470) >>> 0);
 
-      // Generate a single random shop item
-      const stock = generateShopStock(world, depth, shopRng);
-      if (stock.length === 0) return null;
-
-      // Pick a random item from the generated stock
-      const itemId = stock[shopRng.int(0, stock.length - 1)];
+      // Generate exactly one item for this floor spawn (no orphan stock entities).
+      const itemId = generateShopItem(world, depth, shopRng);
+      if (itemId == null) return null;
 
       // Place it on the floor
       world.add(itemId, Position, { x: spawn.x, y: spawn.y });
