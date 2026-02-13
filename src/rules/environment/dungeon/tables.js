@@ -68,8 +68,8 @@ export function pickItem(rng, depth) {
  * @returns {{type:string, script:string, params:Object}}
  */
 export function pickTrap(rng, depth) {
-  // Snake traps appear from depth 3+, increasing in likelihood
-  if (depth >= 3 && rng.next() < Math.min(0.4, 0.1 + depth * 0.03)) {
+  // Snake traps appear from depth 6+ (tier 1), increasing in likelihood
+  if (depth >= 6 && rng.next() < Math.min(0.4, 0.1 + depth * 0.03)) {
     const count = Math.min(5, 2 + Math.floor(depth / 5));
     return { type: 'snake', script: 'trap_snake', params: { count } };
   }
