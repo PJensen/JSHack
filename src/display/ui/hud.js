@@ -139,6 +139,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
   });
 
+  // Pray button (to the right of Engrave)
+  const prayBtn = document.createElement('button');
+  prayBtn.id = 'btn-pray';
+  prayBtn.textContent = 'Pray';
+  Object.assign(prayBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  prayBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch {}
+  });
+
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
@@ -352,9 +365,10 @@ export function initHUD() {
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(engraveBtn);
+  bar.appendChild(prayBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
-  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn, petBtn };
+  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn, petBtn, prayBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------

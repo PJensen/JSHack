@@ -1373,11 +1373,10 @@ function ensureMessageTicker(root) {
 /** @param {HTMLElement} container @param {Array<any>} entries */
 function renderMessageTicker(container, entries) {
   if (!container) return;
-  // Show last ~8 messages newest at bottom
+  // Show last ~8 messages with oldest at top, newest at bottom
   const recent = entries.slice(-8);
   container.innerHTML = '';
-  // With top-right layout, show newest at the top
-  for (let i = recent.length - 1; i >= 0; i--) {
+  for (let i = 0; i < recent.length; i++) {
     const row = document.createElement('div');
     row.textContent = String(recent[i] ?? '');
     row.style.textShadow = '0 1px 0 rgba(0,0,0,0.4)';

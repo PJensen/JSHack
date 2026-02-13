@@ -13,6 +13,7 @@ import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
 import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
+import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
@@ -54,6 +55,7 @@ export function configureWorld(world) {
   registerSystem(petCommandSystem, 'intents'); // Process pet commands first
   registerSystem(petBehaviorSystem, 'intents'); // Then execute pet behaviors
   registerSystem(waitSystem, 'intents');
+  registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
   registerSystem(equipItemSystem, 'intents');

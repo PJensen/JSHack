@@ -17,6 +17,7 @@ export { PickupIntent } from './Intents/PickupIntent.js';
 export { DropIntent } from './Intents/DropIntent.js';
 export { MoveIntent } from './Intents/MoveIntent.js';
 export { WaitIntent } from './Intents/WaitIntent.js';
+export { PrayIntent } from './Intents/PrayIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';
 export { AttackIntent } from './Intents/AttackIntent.js';
 export { EquipIntent } from './Intents/EquipIntent.js';

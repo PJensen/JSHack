@@ -82,6 +82,12 @@ export class InputManager {
       this._emit(makeAction(Actions.Wait));
       return;
     }
+    // Pray to deity: 'P' (Shift+P)
+    if (key === "P") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Pray));
+      return;
+    }
     // Move left / right
     if (code === "ArrowLeft" || key === "a" || key === "h") {
       e.preventDefault();

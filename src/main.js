@@ -967,6 +967,10 @@ world.on('healed', ({ id, amount }) => {
     try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch {}
   }
 });
+world.on('prayer', ({ actor }) => {
+  const who = nameOfEntity(actor);
+  log(`${who} prays to the heavens...`);
+});
 world.on('died', ({ id }) => {
   const who = nameOfEntity(id);
   log(`${who} dies.`);
@@ -2097,6 +2101,7 @@ function render(worldView) {
     const e = worldView.entities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
+    if (k.includes('corpse')) console.log('[RENDER] Corpse:', k, 'has atlas entry:', glyphAtlas.has(k));
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -2231,12 +2236,12 @@ function render(worldView) {
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "#9cf";
     ctx.font = "12px monospace";
-    ctx.textAlign = "left"; 
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    const s = fx.stats();
-    ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8); // DEBUG
-    const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
-    ctx.fillText(`fx fps: ${fpsInt}`, 8, 24); // DEBUG
+    // const s = fx.stats();
+    // ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8); // DEBUG
+    // const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
+    // ctx.fillText(`fx fps: ${fpsInt}`, 8, 24); // DEBUG
 
     // Optional rules profiler overlay (top 3 systems by last tick duration)
     const prof = /** @type any */ (window).__JSHACK_RULES_PROF;
