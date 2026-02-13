@@ -125,6 +125,13 @@ export class InputManager {
       return;
     }
 
+    // Pet state rotation: 'p'
+    if (key?.toLowerCase() === "p") {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:rotatePetState'));
+      return;
+    }
+
     // Memory graph toggle: '8'
     if (key === '8') {
       e.preventDefault();

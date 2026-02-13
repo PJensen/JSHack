@@ -139,30 +139,110 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
   });
 
-  // Pet control button (follows spell-button pattern)
+  // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
   petBtn.textContent = 'Pet: Following';
   Object.assign(petBtn.style, {
     padding: '8px 12px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    display: 'none' // Hidden by default, shown when pet exists
   });
-  // Left-click: Quick recall to following
-  petBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:recallPet')); } catch {}
+
+  // Long-press detection for state rotation vs menu (touch and mouse interface)
+  let pressTimer = null;
+  let isLongPress = false;
+  const LONG_PRESS_DURATION = 500; // ms
+
+  function resetBackground() {
+    const currentState = petBtn.dataset.state || 'following';
+    if (currentState === 'fleeing') {
+      petBtn.style.background = '#3d1616';
+    } else if (currentState === 'guarding') {
+      petBtn.style.background = '#16263d';
+    } else {
+      petBtn.style.background = '#101626';
+    }
+  }
+
+  function startPress() {
+    isLongPress = false;
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+      window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
+      // Visual feedback for long press
+      petBtn.style.background = '#1a2636';
+    }, LONG_PRESS_DURATION);
+  }
+
+  function endPress() {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    resetBackground();
+    // If not a long press, rotate state
+    if (!isLongPress) {
+      try { window.dispatchEvent(new CustomEvent('ui:rotatePetState')); } catch {}
+    }
+    isLongPress = false;
+  }
+
+  function cancelPress() {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    isLongPress = false;
+    resetBackground();
+  }
+
+  // Touch event handlers
+  petBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent mouse event emulation
+    startPress();
   });
-  // Right-click: Open command menu
+
+  petBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    endPress();
+  });
+
+  petBtn.addEventListener('touchcancel', () => {
+    cancelPress();
+  });
+
+  // Mouse event handlers
+  petBtn.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // Left click only
+      startPress();
+    }
+  });
+
+  petBtn.addEventListener('mouseup', (e) => {
+    if (e.button === 0) {
+      endPress();
+    }
+  });
+
+  petBtn.addEventListener('mouseleave', () => {
+    cancelPress();
+  });
+
+  // Right-click or context menu: Open full menu immediately
   petBtn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    cancelPress(); // Cancel any ongoing long-press
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
-  // Shift+Left or Middle-click: Also open menu
-  petBtn.addEventListener('mousedown', (e) => {
-    if (e.button === 1 || (e.shiftKey && e.button === 0)) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
-    }
+
+  // Show/hide pet button based on pet existence
+  window.addEventListener('ui:petExists', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const exists = Boolean(e?.detail?.exists);
+    petBtn.style.display = exists ? '' : 'none';
   });
   // Update button based on pet state
   window.addEventListener('ui:updatePetButton', (ev) => {
@@ -179,6 +259,7 @@ export function initHUD() {
       idle: 'Idle'
     };
     petBtn.textContent = `Pet: ${stateLabels[state] || state}`;
+    petBtn.dataset.state = state; // Store for background reset
     // Color code by state
     if (state === 'fleeing') {
       petBtn.style.background = '#3d1616'; // Red tint for danger

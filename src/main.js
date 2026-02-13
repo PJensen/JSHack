@@ -53,7 +53,9 @@ import { ShopInventory } from "./rules/components/ShopInventory.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
-import { GoldStack } from "./rules/archetypes/Items.js";
+import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack } from "./rules/archetypes/Items.js";
+import { Ration, IronRation } from "./rules/archetypes/Food.js";
+import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
@@ -274,6 +276,13 @@ if (!playerEntity(world)) {
       lastPlayerY: ppos.y,
       commandCooldown: 0,
     });
+
+    // Notify UI that pet exists
+    try {
+      window.dispatchEvent(new CustomEvent('ui:petExists', {
+        detail: { exists: true }
+      }));
+    } catch {}
   }
 }
 
@@ -351,6 +360,98 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
     if (inv && Array.isArray(inv.items)) {
       const scrollId = createFrom(world, ScrollOfMapping, {});
       inv.items.push(scrollId);
+    }
+  }
+}
+
+// Process ?give query string parameter to spawn items in player inventory
+// Format: ?give=item_id*count,item_id*count
+// Example: ?give=gold*1000,potion_health*5,sword_plain*1
+{
+  const giveParam = new URLSearchParams(window.location.search).get('give');
+  if (giveParam) {
+    const pe = playerEntity(world);
+    if (pe) {
+      const inv = world.get(pe.id, Inventory);
+      if (inv && Array.isArray(inv.items)) {
+        // Map of item identities to their archetype constructors
+        const ITEM_ARCHETYPES = {
+          'gold': GoldStack,
+          'potion_health': HealthPotion,
+          'ammo_arrows': ArrowsStack,
+          'ammo_fire_arrows': FireArrowsStack,
+          'food_ration': Ration,
+          'food_iron_ration': IronRation,
+          'scroll_mapping': ScrollOfMapping,
+        };
+
+        // Equipment IDs (handled differently via buildEquipmentItem)
+        const EQUIPMENT_IDS = new Set([
+          'sword_plain', 'dagger_quick', 'axe_heavy',
+          'leather_armor', 'chain_armor',
+          'ring_health', 'ring_precision', 'ring_arcana',
+          'shield_wood', 'shield_iron', 'iron_pickaxe', 'bow_short'
+        ]);
+
+        // Parse comma-separated item specs
+        const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
+
+        for (const spec of specs) {
+          // Parse "item_id*count" format
+          const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
+          if (!match) {
+            console.warn(`[?give] Invalid format: "${spec}" (expected: item_id*count)`);
+            continue;
+          }
+
+          const itemId = match[1];
+          const count = parseInt(match[2] || '1', 10);
+
+          if (!Number.isFinite(count) || count < 1) {
+            console.warn(`[?give] Invalid count for "${itemId}": ${match[2]}`);
+            continue;
+          }
+
+          try {
+            let createdItemId = null;
+
+            // Check if it's an archetype-based item
+            if (ITEM_ARCHETYPES[itemId]) {
+              createdItemId = createFrom(world, ITEM_ARCHETYPES[itemId], {});
+              // Set count for stackable items
+              if (count > 1) {
+                world.mutate(createdItemId, ItemInfo, r => { r.count = count; });
+              }
+            }
+            // Check if it's an equipment item
+            else if (EQUIPMENT_IDS.has(itemId)) {
+              createdItemId = buildEquipmentItem(world, itemId, {});
+              // Equipment typically isn't stackable, create multiple if count > 1
+              if (count > 1) {
+                inv.items.push(createdItemId);
+                for (let i = 1; i < count; i++) {
+                  const extraId = buildEquipmentItem(world, itemId, {});
+                  inv.items.push(extraId);
+                }
+                console.log(`[?give] Created ${count}x ${itemId}`);
+                continue; // Skip the single push below
+              }
+            }
+            else {
+              console.warn(`[?give] Unknown item: "${itemId}"`);
+              continue;
+            }
+
+            // Add the created item to inventory
+            if (createdItemId !== null) {
+              inv.items.push(createdItemId);
+              console.log(`[?give] Created ${count}x ${itemId}`);
+            }
+          } catch (err) {
+            console.error(`[?give] Error creating item "${itemId}":`, err);
+          }
+        }
+      }
     }
   }
 }
@@ -910,6 +1011,16 @@ world.on('healed', ({ id, amount }) => {
 world.on('died', ({ id }) => {
   const who = nameOfEntity(id);
   log(`${who} dies.`);
+
+  // Check if the dead entity is a pet
+  if (world.has(id, Pet)) {
+    // Notify UI that pet no longer exists
+    try {
+      window.dispatchEvent(new CustomEvent('ui:petExists', {
+        detail: { exists: false }
+      }));
+    } catch {}
+  }
 });
 // Floating text hooks: damage and gold pickups
 // Deterministic combat damage (from combatSystem)
@@ -1071,38 +1182,163 @@ world.on('pet:teleported', ({ petId, from, to }) => {
   log(`${petName} teleports to your side.`);
 });
 
-// Handle UI pet commands
-window.addEventListener('ui:recallPet', () => {
-  // Find pet and command it to follow
-  for (const [id, _pet] of world.query(Pet)) {
-    const intentId = world.create();
-    world.add(intentId, PetCommandIntent, {
-      petId: id,
-      command: 'follow',
-      targetX: null,
-      targetY: null,
-      targetItemId: 0
-    });
-    break; // Only one pet for now
-  }
-});
-
+// Handle UI pet commands (instant, no tick consumed)
 window.addEventListener('ui:petCommand', (ev) => {
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const command = e?.detail?.command;
   if (!command) return;
-  // Find pet
-  for (const [id, _pet] of world.query(Pet)) {
-    const intentId = world.create();
-    world.add(intentId, PetCommandIntent, {
-      petId: id,
-      command,
-      targetX: null,  // TODO: Get from click for guard
-      targetY: null,
-      targetItemId: 0  // TODO: Get from selection for fetch
-    });
-    break;
+
+  // Find pet and directly update state (instant, no tick needed)
+  for (const [petId, _pet] of world.query(Pet)) {
+    const petPos = world.get(petId, Position);
+    if (!petPos) break;
+
+    // Get or create PetState
+    let petState = world.get(petId, PetState);
+    if (!petState) {
+      const pe = playerEntity(world);
+      const playerPos = pe ? world.get(pe.id, Position) : null;
+      world.add(petId, PetState, {
+        state: 'following',
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: world.step,
+        lastPlayerX: playerPos?.x ?? null,
+        lastPlayerY: playerPos?.y ?? null,
+        commandCooldown: 0,
+      });
+      petState = world.get(petId, PetState);
+    }
+
+    const prevState = petState.state;
+
+    // Update state directly based on command
+    switch (command) {
+      case 'follow':
+        petState.state = 'following';
+        petState.targetX = null;
+        petState.targetY = null;
+        petState.targetItemId = 0;
+        break;
+
+      case 'stay':
+        petState.state = 'staying';
+        petState.targetX = petPos.x;
+        petState.targetY = petPos.y;
+        petState.targetItemId = 0;
+        break;
+
+      case 'guard':
+        petState.state = 'guarding';
+        petState.targetX = petPos.x;
+        petState.targetY = petPos.y;
+        petState.targetItemId = 0;
+        break;
+
+      case 'idle':
+        petState.state = 'idle';
+        petState.targetX = null;
+        petState.targetY = null;
+        petState.targetItemId = 0;
+        break;
+
+      case 'fetch':
+        // TODO: Need item selection for fetch
+        break;
+    }
+
+    // Update state metadata and emit event
+    if (prevState !== petState.state) {
+      petState.stateEnteredTurn = world.step;
+      petState.commandCooldown = 0;
+      try {
+        world.emit?.('pet:state:changed', {
+          petId,
+          prevState,
+          newState: petState.state,
+          command
+        });
+      } catch {}
+    }
+
+    break; // Only one pet for now
+  }
+});
+
+// Rotate pet state through common commands (instant, no tick)
+window.addEventListener('ui:rotatePetState', () => {
+  // State rotation cycle: following → staying → guarding → idle → following
+  const stateOrder = ['following', 'staying', 'guarding', 'idle'];
+
+  for (const [petId, _pet] of world.query(Pet)) {
+    const petPos = world.get(petId, Position);
+    if (!petPos) break;
+
+    // Get or create PetState
+    let petState = world.get(petId, PetState);
+    if (!petState) {
+      const pe = playerEntity(world);
+      const playerPos = pe ? world.get(pe.id, Position) : null;
+      world.add(petId, PetState, {
+        state: 'following',
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: world.step,
+        lastPlayerX: playerPos?.x ?? null,
+        lastPlayerY: playerPos?.y ?? null,
+        commandCooldown: 0,
+      });
+      petState = world.get(petId, PetState);
+    }
+
+    const currentState = petState.state;
+
+    // Find next state in rotation (skip automatic states like fetching, returning, fleeing)
+    let nextState = 'following';
+    const currentIndex = stateOrder.indexOf(currentState);
+    if (currentIndex >= 0) {
+      nextState = stateOrder[(currentIndex + 1) % stateOrder.length];
+    } else {
+      // If in an automatic state, go to following
+      nextState = 'following';
+    }
+
+    const prevState = petState.state;
+
+    // Directly update state based on next state
+    petState.state = nextState;
+
+    if (nextState === 'staying' || nextState === 'guarding') {
+      petState.targetX = petPos.x;
+      petState.targetY = petPos.y;
+      petState.targetItemId = 0;
+    } else {
+      petState.targetX = null;
+      petState.targetY = null;
+      petState.targetItemId = 0;
+    }
+
+    // Update state metadata and emit event
+    if (prevState !== petState.state) {
+      petState.stateEnteredTurn = world.step;
+      petState.commandCooldown = 0;
+      const command = nextState === 'staying' ? 'stay' :
+                     nextState === 'guarding' ? 'guard' :
+                     nextState === 'idle' ? 'idle' : 'follow';
+      try {
+        world.emit?.('pet:state:changed', {
+          petId,
+          prevState,
+          newState: petState.state,
+          command
+        });
+      } catch {}
+    }
+
+    break; // Only one pet for now
   }
 });
 
@@ -2099,6 +2335,7 @@ function frame(now) {
   hudFeeds.updateVitalsHUD();
   hudFeeds.updateCombatHUD();
   hudFeeds.updateDepthHUD();
+  hudFeeds.updatePetHUD();
 
   // Render
   const view = getCachedView();

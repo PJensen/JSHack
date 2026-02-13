@@ -11,6 +11,8 @@ import { AFFIX_DEFS } from "../../rules/data/affixes.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { Hunger } from "../../rules/components/Hunger.js";
 import { getHungerLevel } from "../../rules/data/food.js";
+import { Pet } from "../../rules/components/Pet.js";
+import { PetState } from "../../rules/components/PetState.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -23,6 +25,8 @@ export function createHudFeeds(world, deps) {
   let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
   let lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
   let lastDepth = -1;
+  let lastPetExists = false;
+  let lastPetState = "";
 
   function updateVitalsHUD() {
     const pe = playerEntity(world);
@@ -154,9 +158,42 @@ export function createHudFeeds(world, deps) {
     }
   }
 
+  function updatePetHUD() {
+    // Check if pet exists
+    let petExists = false;
+    let petState = "";
+    for (const [petId, _pet] of world.query(Pet)) {
+      petExists = true;
+      const state = world.get(petId, PetState);
+      petState = state?.state || "following";
+      break; // Only one pet for now
+    }
+
+    // Update visibility if changed
+    if (petExists !== lastPetExists) {
+      lastPetExists = petExists;
+      try {
+        window.dispatchEvent(new CustomEvent("ui:petExists", {
+          detail: { exists: petExists }
+        }));
+      } catch {}
+    }
+
+    // Update state if changed
+    if (petExists && petState !== lastPetState) {
+      lastPetState = petState;
+      try {
+        window.dispatchEvent(new CustomEvent("ui:updatePetButton", {
+          detail: { state: petState }
+        }));
+      } catch {}
+    }
+  }
+
   return {
     updateVitalsHUD,
     updateCombatHUD,
     updateDepthHUD,
+    updatePetHUD,
   };
 }
