@@ -8,15 +8,12 @@ import { ItemInfo } from '../../components/ItemInfo.js';
 import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopStock } from '../../data/shopStock.js';
-import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
+import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem } from '../../archetypes/Items.js';
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
 import { pickMonster, pickItem, pickTrap } from './tables.js';
-import { CHUNK_SIZE } from './constants.js';
 import { getItem } from '../../data/items.js';
-import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Chest } from '../../archetypes/Chest.js';
-import { Interactable } from '../../components/Interactable.js';
-import { Trap } from '../../components/Trap.js';
+import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 
@@ -179,17 +176,11 @@ export function materializeSpawn(world, spawn) {
     }
     case 'trap': {
       const p = spawn.params;
-      const id = world.create();
-      world.add(id, Position, { x: spawn.x, y: spawn.y });
-      world.add(id, Trap, {
-        type: p.type,
-        script: p.script,
-        params: p.params || {},
-        revealed: false,
-        armed: true,
+      const arch = p.type === 'snake' ? SnakeTrap : SpikeTrap;
+      return createFrom(world, arch, {
+        x: spawn.x, y: spawn.y,
+        trapParams: p.params || {},
       });
-      // No NamedIdentity — trap is invisible until triggered
-      return id;
     }
     case 'shopkeeper': {
       const id = createFrom(world, Shopkeeper, { x: spawn.x, y: spawn.y });
@@ -203,9 +194,8 @@ export function materializeSpawn(world, spawn) {
     case 'book': {
       const def = getItem(spawn.params.bookId);
       if (!def) return null;
-      const id = world.create();
-      world.add(id, NamedIdentity, { name: def.name, identity: def.id });
-      world.add(id, ItemInfo, {
+      const id = createFrom(world, MagicItem, {
+        name: def.name, identity: def.id,
         type: def.type, slot: def.slot, weight: 1, value: 0,
         description: def.description, count: 1,
       });

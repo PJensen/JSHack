@@ -10,6 +10,7 @@ export const ScriptVerb = Object.freeze({
   AffixPassive: "affix:passive",
   ItemOnEquip: "item:onEquip",
   ItemOnUnequip: "item:onUnequip",
+  ItemUse: "item:use",
   TrapTrigger: "trap:trigger",
 });
 
@@ -39,17 +40,15 @@ export function getScriptHandlers(key) {
 }
 
 function normalizeRef(ref) {
-  if (!ref) return { key: "", params: null, inline: null };
-  if (typeof ref === "string") return { key: ref, params: null, inline: null };
-  if (typeof ref === "function") return { key: "", params: null, inline: ref };
+  if (!ref) return { key: "", params: null };
+  if (typeof ref === "string") return { key: ref, params: null };
   if (typeof ref === "object") {
     // Support both local ScriptRef { ref, params } and ecs-js ScriptRef { id, args }
     const key = ref.key ?? ref.id ?? ref.ref ?? ref.script ?? "";
     const params = ref.params ?? ref.args ?? null;
-    const inline = typeof ref.fn === "function" ? ref.fn : (typeof ref.handler === "function" ? ref.handler : null);
-    return { key, params, inline };
+    return { key, params };
   }
-  return { key: "", params: null, inline: null };
+  return { key: "", params: null };
 }
 
 function resolveHandler(handlers, verb) {
@@ -79,9 +78,9 @@ function mergeParams(target, params) {
  * @param {any} context
  */
 export function runScript(ref, verb, world, context = {}) {
-  const { key, params, inline } = normalizeRef(ref);
+  const { key, params } = normalizeRef(ref);
   const handlerSource = key ? REGISTRY.get(String(key)) : null;
-  const handler = inline || resolveHandler(handlerSource, verb);
+  const handler = resolveHandler(handlerSource, verb);
   if (typeof handler !== "function") return;
   const ctx = context && typeof context === "object" ? context : {};
   if (!ctx.world) ctx.world = world;

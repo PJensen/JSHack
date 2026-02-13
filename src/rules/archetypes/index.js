@@ -7,3 +7,5 @@ export { FloorTile, WallTile } from './Tiles.js';
 export { PlayerArchetype, createPlayer } from './Player.js';
 export { Spawner } from './Spawner.js';
 export { Ration, IronRation, createCorpse } from './Food.js';
+export { SpikeTrap, SnakeTrap } from './Traps.js';
+export { MagicItem } from './Items.js';
