@@ -27,6 +27,7 @@ import { createHudFeeds } from "./main/ui/hudFeeds.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
+import { installMessageWiring } from "./main/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { Inventory } from "./rules/components/Inventory.js";
@@ -593,53 +594,20 @@ const messageLog = createMessageLog({
     try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries } })); } catch {}
   },
 });
-/** @param {string} msg */
-function log(msg) {
-  messageLog.log(msg);
-}
-/** Format helpers for message log */
-function nameOfEntity(id) {
-  const pe = playerEntity(world);
-  const playerId = pe?.id || 0;
-  const n = Number(id || 0);
-  if (playerId && n === playerId) return 'You';
-  const ni = world.get(n, NamedIdentity);
-  const label = ni?.name;
-  return label ? bracketizeName(label) : `Entity ${n}`;
-}
-function nameOfItem(id) {
-  const n = Number(id || 0);
-  const ni = world.get(n, NamedIdentity);
-  const info = world.get(n, ItemInfo);
-  const label = ni?.name || info?.description || info?.type;
-  return label ? bracketizeName(label) : `item ${n}`;
-}
+// Message formatting and logging now handled in messageWiring module
 
-installDeityUiWiring(world, { log });
-
-world.on('drank', ({ actor, itemId, target }) => {
-  const who = nameOfEntity(actor);
-  const it = nameOfItem(itemId);
-  const tgt = nameOfEntity(target || actor);
-  if (tgt === 'You' && who === 'You') {
-    log(`You drink ${it}.`);
-  } else if (who === tgt) {
-    log(`${who} drinks ${it}.`);
-  } else {
-    log(`${who} uses ${it} on ${tgt}.`);
-  }
-  // Dismiss the quick-slot chip for this item
-  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
+installDeityUiWiring(world, { log: messageLog.log.bind(messageLog) });
+installMessageWiring({
+  world,
+  messageLog,
+  playerEntity,
+  bracketizeName,
+  getSpell
 });
-world.on('castSpell', ({ actor, spellId, targetId }) => {
-  const who = nameOfEntity(actor);
-  const tgt = nameOfEntity(targetId || actor);
-  const s = getSpell(String(spellId || _activeSpellId || ''));
-  const label = s?.name ? bracketizeName(s.name) : '[Spell]';
-  if (who === 'You' && tgt === 'You') log(`You cast ${label}.`);
-  else if (who === 'You') log(`You cast ${label} on ${tgt}.`);
-  else if (tgt === 'You') log(`${who} casts ${label} on you.`);
-  else log(`${who} casts ${label} on ${tgt}.`);
+
+// Dismiss the quick-slot chip when item is used
+world.on('drank', ({ itemId }) => {
+  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
 });
 // Bolt segments for display VFX (world-space; display-only state)
 /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, chainIndex:number}>} */
@@ -870,55 +838,17 @@ world.on('proc:fierce', ({ actor, target }) => {
   if (!tpos) return;
   ftext.addStatus(tpos.x, tpos.y + 0.3, '+1', { color: '#ffa040', life: 0.4 });
 });
-world.on('spell:not-known', ({ actor, spellId }) => {
-  log(`You don't know that spell${spellId?` [${spellId}]`:''}.`);
-});
-world.on('spell:unknown', ({ actor, spellId }) => {
-  log(`Unknown spell${spellId?` [${spellId}]`:''}.`);
-});
-world.on('spell:oom', ({ actor, spellId, need, have }) => {
-  log(`Not enough mana to cast [${String(spellId||'spell')}] (need ${need}, have ${have}).`);
-});
-world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
-  const weaponInfo = world.get(weaponId, ItemInfo);
-  const weaponName = weaponInfo ?
-    (world.get(weaponId, NamedIdentity)?.name || weaponInfo.description || weaponInfo.type)
-    : 'fists';
-  log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`);
-});
-// Legacy generic damage hook (spells and DoTs may emit this)
-world.on('damage', ({ id, amount, source, critical, crit }) => {
-  const who = nameOfEntity(id);
-  const atk = Number(source||0) ? nameOfEntity(source) : null;
-  const critTxt = (critical || crit) ? ' (CRIT!)' : '';
-  if (atk) log(`${atk} hits ${who} for ${amount}${critTxt}.`);
-  else log(`${who} takes ${amount} damage${critTxt}.`);
-});
+// Spell and attack error messages now handled in messageWiring
+// Heal floating text (message handled in messageWiring)
 world.on('healed', ({ id, amount }) => {
-  const who = nameOfEntity(id);
-  log(`${who} heals ${amount}.`);
   const pos = world.get(Number(id||0), Position);
   if (pos && Number.isFinite(amount)) {
     try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch {}
   }
 });
-world.on('prayer', ({ actor, distress }) => {
-  const who = nameOfEntity(actor);
-  if (distress?.desperate) {
-    log(`${who} desperately prays for divine intervention!`);
-  } else if (distress?.troubled) {
-    log(`${who} prays for aid...`);
-  } else {
-    log(`${who} prays to the heavens...`);
-  }
-});
+// Pet death UI notification (message handled in messageWiring)
 world.on('died', ({ id }) => {
-  const who = nameOfEntity(id);
-  log(`${who} dies.`);
-
-  // Check if the dead entity is a pet
   if (world.has(id, Pet)) {
-    // Notify UI that pet no longer exists
     try {
       window.dispatchEvent(new CustomEvent('ui:petExists', {
         detail: { exists: false }
@@ -926,35 +856,16 @@ world.on('died', ({ id }) => {
     } catch {}
   }
 });
-// Floating text hooks: damage and gold pickups
-// Deterministic combat damage (from combatSystem)
-world.on('damaged', ({ target, amount, critical, crit, source }) => {
+// Floating text hooks: damage (messages handled in messageWiring)
+world.on('damaged', ({ target, amount, critical, crit }) => {
   const t = Number(target||0) || 0;
   const pos = /** @type any */ (world.get(t, Position));
   const pe = playerEntity(world);
   const isPlayer = !!pe && pe.id === t;
   if (pos && Number.isFinite(amount)) {
-    // Player damage is RED, others remain yellow-ish
     const col = isPlayer ? '#ff6060' : '#ffd966';
     ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
   }
-  // Message log: "A hits B for N (CRIT!)"
-  const defName = nameOfEntity(target);
-  const atkName = nameOfEntity(source);
-  const critTxt = (critical || crit) ? ' (CRIT!)' : '';
-  // Try to include weapon label if attacker has one
-  let weaponLabel = '';
-  if (Number(source||0)) {
-    const eq = /** @type any */ (world.get(Number(source||0), Equipment));
-    const wid = Number(eq?.weapon || 0);
-    if (wid) {
-      const wname = /** @type any */ (world.get(wid, NamedIdentity))?.name;
-      if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
-    } else if (world.has(Number(source||0), Player)) {
-      weaponLabel = ' with bare fists';
-    }
-  }
-  log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`);
 });
 world.on('damage', ({ id, amount, at, critical, crit }) => {
   const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : world.get(Number(id||0), Position);
@@ -965,34 +876,18 @@ world.on('damage', ({ id, amount, at, critical, crit }) => {
     ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
   }
 });
-// Generic status text UX hook (optional): kind='miss'|'immune'|...
-world.on('status', ({ id, kind, at, text, source }) => {
+// Status floating text (messages handled in messageWiring)
+world.on('status', ({ id, kind, at, text }) => {
   const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : world.get(Number(id||0), Position);
   if (!pos) return;
   const style = (String(kind||'')).toLowerCase() === 'miss' ? 'miss' : ((String(kind||'')).toLowerCase() === 'immune' ? 'immune' : 'status');
   const label = String(text || kind || '').toUpperCase() || (style === 'miss' ? 'MISS' : (style === 'immune' ? 'IMMUNE' : 'STATUS'));
   try { ftext.addStatus(pos.x, pos.y, label, { style }); } catch {}
-  // Verbose log for combat statuses when we have participants
-  const tgt = nameOfEntity(id);
-  const src = Number(source||0) ? nameOfEntity(source) : null;
-  if (style === 'miss' && src) log(`${src} misses ${tgt}.`);
-  if (style === 'immune' && src) log(`${src} can't hurt ${tgt}.`);
 });
-// Ranged combat feedback
+// Ranged combat floating text (messages handled in messageWiring)
 world.on('ranged:no-ammo', ({ attacker }) => {
-  const who = nameOfEntity(attacker);
-  log(who === 'You' ? 'You have no arrows.' : `${who} is out of ammo.`);
   const pos = world.get(Number(attacker||0), Position);
   if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch {}
-});
-world.on('ranged:blocked', ({ attacker, target }) => {
-  const who = nameOfEntity(attacker);
-  log(who === 'You' ? 'Your shot is blocked.' : `${who}'s shot is blocked.`);
-});
-world.on('ranged:out-of-range', ({ attacker, target }) => {
-  const who = nameOfEntity(attacker);
-  const tgt = nameOfEntity(target);
-  log(who === 'You' ? `${tgt} is out of range.` : `${who}'s target is out of range.`);
 });
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
@@ -1025,38 +920,13 @@ world.on('item:pickup', ({ actor, itemId }) => {
     }));
   } catch {}
 });
-// Pet pickup: log when the pet picks up an item
-world.on('item:pickup', ({ actor, itemId, count }) => {
-  const pe = playerEntity(world);
-  if (!pe || pe.id === actor) return; // skip player pickups (handled elsewhere)
-  const petName = nameOfEntity(actor);
-  const it = nameOfItem(itemId);
-  log(`${petName} picks up ${it}.`);
-});
-// Pet deliver: log when the pet drops an item at the player's feet
+// Pet deliver UI refresh (message handled in messageWiring)
 world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
-  const petName = nameOfEntity(petId);
-  // Use pre-resolved itemName since the item entity may be destroyed after stacking
-  const label = itemName ? bracketizeName(itemName) : nameOfItem(itemId);
-  log(`${petName} drops ${label} at your feet.`);
-  // Trigger inventory UI refresh
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
 
-// Pet state changes
-world.on('pet:state:changed', ({ petId, prevState, newState, command }) => {
-  const petName = nameOfEntity(petId);
-  const stateNames = {
-    following: 'following you',
-    staying: 'staying put',
-    guarding: 'guarding',
-    fetching: 'fetching an item',
-    returning: 'returning',
-    fleeing: 'fleeing',
-    idle: 'idle'
-  };
-  log(`${petName} is now ${stateNames[newState] || newState}.`);
-  // Update HUD button
+// Pet state UI updates (messages handled in messageWiring)
+world.on('pet:state:changed', ({ newState }) => {
   try {
     window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
       detail: { state: newState }
@@ -1064,26 +934,12 @@ world.on('pet:state:changed', ({ petId, prevState, newState, command }) => {
   } catch {}
 });
 
-world.on('pet:state:auto', ({ petId, newState, reason }) => {
-  const petName = nameOfEntity(petId);
-  if (reason === 'low_health') {
-    log(`${petName} flees to safety!`);
-  } else if (reason === 'health_restored') {
-    log(`${petName} returns to your side.`);
-  } else if (reason === 'item_picked_up') {
-    log(`${petName} has the item!`);
-  }
-  // Update HUD button
+world.on('pet:state:auto', ({ newState }) => {
   try {
     window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
       detail: { state: newState }
     }));
   } catch {}
-});
-
-world.on('pet:teleported', ({ petId, from, to }) => {
-  const petName = nameOfEntity(petId);
-  log(`${petName} teleports to your side.`);
 });
 
 // Handle UI pet commands (instant, no tick consumed)
@@ -1248,22 +1104,9 @@ window.addEventListener('ui:rotatePetState', () => {
   }
 });
 
-// Engrave event → combat log + float text
-world.on('engrave', ({ actor, text, x, y }) => {
-  const who = nameOfEntity(actor);
-  log(`${who} engrave${who === 'You' ? '' : 's'} "${text}" on the ground.`);
+// Engrave floating text (messages handled in messageWiring)
+world.on('engrave', ({ text, x, y }) => {
   try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch {}
-});
-// Engraving scrambled by foot traffic
-world.on('engrave:scrambled', ({ actor, text, x, y }) => {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const ppos = world.get(pe.id, Position);
-  // Only log if the player can see the tile
-  if (ppos && Math.max(Math.abs(ppos.x - x), Math.abs(ppos.y - y)) <= 10) {
-    const who = nameOfEntity(actor);
-    log(`${who} scuff${who === 'You' ? '' : 's'} the engraving underfoot.`);
-  }
 });
 
 // Refresh inventory UI when any item is used (consumed/learned/etc.)
@@ -1272,38 +1115,17 @@ world.on('item:used', ({ actor, itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
-// Log spell learning events
-world.on('spell:learned', ({ actor, spellId }) => {
-  const s = getSpell(String(spellId||''));
-  const label = s?.name ? `[${s.name}]` : `[${String(spellId||'spell')}]`;
-  // set active spell if none selected, and tell the user
+// Spell learning logic (messages handled in messageWiring)
+world.on('spell:learned', ({ spellId }) => {
+  // Set active spell if none selected
   if (!_activeSpellId) {
     setActiveSpell(String(spellId));
-    log(`You learn ${label}. It is now your active spell.`);
-  } else {
-    log(`You learn ${label}.`);
   }
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
-world.on('spell:already-known', ({ actor, spellId }) => {
-  const s = getSpell(String(spellId||''));
-  const label = s?.name ? `[${s.name}]` : `[${String(spellId||'spell')}]`;
-  log(`You already know ${label}.`);
-});
-world.on('spell:learn-denied', ({ actor, reason, need, have, spellId }) => {
-  const s = getSpell(String(spellId||''));
-  const label = s?.name ? `[${s.name}]` : (spellId ? `[${String(spellId)}]` : 'that spell');
-  let msg = `You can't learn ${label}.`;
-  if (reason === 'intelligence') msg = `You need more intelligence to learn ${label} (need ${need}, have ${have}).`;
-  if (reason === 'unknown-spell') msg = `This tome is inscrutable.`;
-  log(msg);
-});
-world.on('interaction', ({ action, result, items: droppedIds, targetId }) => {
-  if (action === 'toggleDoor') {
-    log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`);
-  }
+// Interaction UI logic (messages handled in messageWiring)
+world.on('interaction', ({ action, items: droppedIds }) => {
   if (action === 'openChest') {
-    log('You open the chest!');
     // Auto-pickup currency drops silently
     const nonCurrency = [];
     if (Array.isArray(droppedIds)) {
@@ -1311,7 +1133,6 @@ world.on('interaction', ({ action, result, items: droppedIds, targetId }) => {
         const info = world.get(eid, ItemInfo);
         if (!info) continue;
         if (info.type === 'currency') {
-          // Auto-pickup gold immediately
           const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
           rulesHandler({ type: 'rules.pickupItem', payload: { itemId: eid } });
         } else {
@@ -1329,38 +1150,22 @@ world.on('interaction', ({ action, result, items: droppedIds, targetId }) => {
       }
     }
     if (nonCurrency.length === 1) {
-      // Single item — show ground tooltip for quick pickup
       const it = nonCurrency[0];
       try {
         window.dispatchEvent(new CustomEvent('ui:showGroundItem', {
-          detail: {
-            mode: 'single',
-            item: it,
-            pickupRange: 2,
-          }
+          detail: { mode: 'single', item: it, pickupRange: 2 }
         }));
       } catch {}
     } else if (nonCurrency.length > 1) {
-      // Multiple items — open the pickup chooser directly
       try {
         window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items: nonCurrency } }));
       } catch {}
     }
   }
-  if (action === 'readTombstone') {
-    const { epitaph } = arguments[0];
-    if (epitaph) {
-      log('--- TOMBSTONE ---');
-      log(epitaph);
-      log('----------------');
-    } else {
-      log('The tombstone inscription has faded...');
-    }
-  }
 });
 
-// Stair traversal: handle level transitions
-world.on('stair:traverse', ({ actor, targetId, direction }) => {
+// Stair traversal logic (messages handled in messageWiring)
+world.on('stair:traverse', ({ direction }) => {
   let currentDepth = 1;
   for (const [, state] of world.query(DungeonState)) {
     currentDepth = state.currentDepth;
@@ -1368,12 +1173,8 @@ world.on('stair:traverse', ({ actor, targetId, direction }) => {
   }
 
   const newDepth = direction === 'down' ? currentDepth + 1 : currentDepth - 1;
-  if (newDepth < 1) {
-    log('You cannot ascend any further.');
-    return;
-  }
+  if (newDepth < 1) return;
 
-  log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`);
   transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
 
   // Invalidate cached world view
@@ -1397,16 +1198,12 @@ addEventListener('ui:requestStairTraverse', (ev) => {
   });
 });
 
-const shopWiring = installShopWiring({ world, playerEntity, log, bracketizeName });
-installChestWiring({ world, playerEntity, log, bracketizeName });
+const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
+installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 
-// Update inventory and log when an item is equipped
-world.on('item:equipped', ({ actor, itemId, slot, name }) => {
-  const label = name ? bracketizeName(name) : `item ${itemId}`;
-  log(`You equip ${label}${slot ? ' ('+slot+')' : ''}.`);
-  // Dismiss the quick-slot chip for this item
+// Item equipped UI updates (message handled in messageWiring)
+world.on('item:equipped', ({ itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail: { itemId } })); } catch {}
-  // Refresh the open inventory panel (if open)
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
 
