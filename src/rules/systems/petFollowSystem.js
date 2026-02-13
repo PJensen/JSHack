@@ -10,6 +10,7 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { findNearestValidTileAround } from "../utils/queries.js";
 
 const FOLLOW_DISTANCE = 2;  // start following when farther than this
 const TELEPORT_DISTANCE = 10; // teleport if farther than this
@@ -46,7 +47,11 @@ export function petFollowSystem(world) {
 
     // Teleport if too far (floor transition, etc.)
     if (dist > TELEPORT_DISTANCE) {
-      world.set(id, Position, { x: playerPos.x + 1, y: playerPos.y });
+      const teleportTile = findNearestValidTileAround(world, playerPos, {
+        maxDistance: 1,
+        exclude: [{ x: playerPos.x, y: playerPos.y }],
+      });
+      if (teleportTile) world.set(id, Position, teleportTile);
       continue;
     }
 
