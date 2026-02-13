@@ -39,7 +39,7 @@ function normalizeVolumes(parts) {
  * Weighted hit resolver (deterministic if you pass a deterministic RNG).
  * rng(): returns [0,1).
  */
-export function pickHitPart(anatomy, rng = Math.random) {
+export function pickHitPart(anatomy, rng) {
   const r = rng();
   let acc = 0;
   for (const p of anatomy.parts) {
