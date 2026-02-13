@@ -26,7 +26,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   if (world[INSTALLED] && world[API_KEY]) return world[API_KEY];
   world[INSTALLED] = true;
 
-  let activeShopSession = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5 };
+  let activeShopSession = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: "browse" };
 
   function playerGoldCount() {
     const pe = playerEntity(world);
@@ -150,8 +150,20 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     return dist <= 1;
   }
 
+  function placeItemOnShopFloor(itemId, shopkeeperId) {
+    const shopPos = world.get(shopkeeperId, Position);
+    if (!shopPos) return false;
+    if (world.has(itemId, Position)) {
+      world.set(itemId, Position, { x: shopPos.x, y: shopPos.y });
+    } else {
+      world.add(itemId, Position, { x: shopPos.x, y: shopPos.y });
+    }
+    return true;
+  }
+
   function closeShopUI() {
     activeShopSession.shopkeeperId = 0;
+    activeShopSession.mode = "browse";
     try { window.dispatchEvent(new CustomEvent("ui:closeShop")); } catch {}
   }
 
@@ -160,13 +172,17 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!pe || actor !== pe.id) return;
     if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
     log("You approach the shopkeeper.");
+    const shop = world.get(targetId, ShopInventory);
+    const markup = buyMarkup ?? shop?.buyMarkup ?? 1.0;
+    const discount = sellDiscount ?? shop?.sellDiscount ?? 0.5;
     activeShopSession = {
       shopkeeperId: Number(targetId) || 0,
-      buyMarkup: buyMarkup ?? 1.0,
-      sellDiscount: sellDiscount ?? 0.5,
+      buyMarkup: markup,
+      sellDiscount: discount,
+      mode: "browse",
     };
-    dispatchShopData(targetId, buyMarkup, sellDiscount);
-    try { window.dispatchEvent(new CustomEvent("ui:openShop", { detail: { shopkeeperId: targetId, buyMarkup, sellDiscount } })); } catch {}
+    dispatchShopData(targetId, markup, discount, "browse");
+    try { window.dispatchEvent(new CustomEvent("ui:openShop", { detail: { shopkeeperId: targetId, buyMarkup: markup, sellDiscount: discount, mode: "browse" } })); } catch {}
   });
 
   addEventListener("ui:requestBuy", (ev) => {
@@ -186,9 +202,13 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const info = world.get(itemId, ItemInfo);
     if (!info) return;
 
-    // Check if item is an unpaid floor item or in old-style shop inventory
+    // Floor shop model: only unpaid floor items from this shopkeeper are purchasable.
     const unpaid = world.get(itemId, Unpaid);
-    const price = unpaid ? unpaid.price : Math.ceil((info.value || 0) * (shop.buyMarkup ?? 1.0));
+    if (!unpaid || unpaid.shopkeeperId !== shopkeeperId || !world.has(itemId, Position)) {
+      log("That item is not on this shop floor.");
+      return;
+    }
+    const price = unpaid.price;
     const gold = playerGoldCount();
 
     if (gold < price) {
@@ -215,10 +235,6 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       }
     }
 
-    // Remove from shop inventory (old style) or floor (new style)
-    const idx = shop.items.indexOf(itemId);
-    if (idx !== -1) shop.items.splice(idx, 1);
-
     // Remove from floor and add to inventory
     try { world.remove(itemId, Position); } catch {}
     // Remove unpaid status (item is now paid for)
@@ -228,7 +244,8 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
     log(`You buy ${bracketizeName(itemName)} for ${price} gold.`);
 
-    dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
+    const mode = activeShopSession.mode === "checkout" ? "checkout" : "browse";
+    dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5, mode);
   });
 
   addEventListener("ui:requestSell", (ev) => {
@@ -252,10 +269,10 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const price = Math.floor((info.value || 0) * sellDiscount);
 
     const inv = world.get(pe.id, Inventory);
-    if (inv) {
-      const idx = inv.items.indexOf(itemId);
-      if (idx !== -1) inv.items.splice(idx, 1);
-    }
+    if (!inv) return;
+    if (!inv.items.includes(itemId)) return;
+    const idx = inv.items.indexOf(itemId);
+    if (idx !== -1) inv.items.splice(idx, 1);
 
     const eq = world.get(pe.id, Equipment);
     if (eq) {
@@ -264,30 +281,38 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       }
     }
 
-    shop.items.push(itemId);
+    const resalePrice = Math.ceil((info.value || 0) * (shop.buyMarkup ?? 1.0));
+    if (!placeItemOnShopFloor(itemId, shopkeeperId)) {
+      log("The shop floor is inaccessible.");
+      return;
+    }
+    if (world.has(itemId, Unpaid)) {
+      world.set(itemId, Unpaid, { shopkeeperId, price: resalePrice });
+    } else {
+      world.add(itemId, Unpaid, { shopkeeperId, price: resalePrice });
+    }
 
-    if (inv) {
-      let found = false;
-      for (const gid of inv.items) {
-        const gi = world.get(gid, ItemInfo);
-        if (gi && gi.type === "currency") {
-          world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) + price; });
-          found = true;
-          break;
-        }
+    let found = false;
+    for (const gid of inv.items) {
+      const gi = world.get(gid, ItemInfo);
+      if (gi && gi.type === "currency") {
+        world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) + price; });
+        found = true;
+        break;
       }
-      if (!found && price > 0) {
-        const gid = createFrom(world, GoldStack, {});
-        try { world.remove(gid, Position); } catch {}
-        world.mutate(gid, ItemInfo, (r) => { r.count = price; });
-        inv.items.push(gid);
-      }
+    }
+    if (!found && price > 0) {
+      const gid = createFrom(world, GoldStack, {});
+      try { world.remove(gid, Position); } catch {}
+      world.mutate(gid, ItemInfo, (r) => { r.count = price; });
+      inv.items.push(gid);
     }
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
     log(`You sell ${bracketizeName(itemName)} for ${price} gold.`);
 
-    dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
+    const mode = activeShopSession.mode === "checkout" ? "checkout" : "browse";
+    dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5, mode);
   });
 
   // Handle shop exit blocking (triggered when player tries to leave with unpaid items)
@@ -302,6 +327,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       shopkeeperId: Number(shopkeeperId) || 0,
       buyMarkup: 1.3,
       sellDiscount: 0.5,
+      mode: "checkout",
     };
 
     const shop = world.get(shopkeeperId, ShopInventory);
@@ -328,6 +354,43 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
   });
 
+  addEventListener("ui:removeFromInvoice", (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const { shopkeeperId, itemId } = e?.detail || {};
+    const pe = playerEntity(world);
+    if (!pe) return;
+    if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+      log("The shopkeeper is too far away.");
+      closeShopUI();
+      return;
+    }
+
+    const inv = world.get(pe.id, Inventory);
+    if (!inv) return;
+    if (!inv.items.includes(itemId)) return;
+
+    const unpaid = world.get(itemId, Unpaid);
+    if (!unpaid || unpaid.shopkeeperId !== shopkeeperId) return;
+
+    const idx = inv.items.indexOf(itemId);
+    if (idx !== -1) inv.items.splice(idx, 1);
+
+    const eq = world.get(pe.id, Equipment);
+    if (eq) {
+      for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo"]) {
+        if (eq[slot] === itemId) { eq[slot] = null; break; }
+      }
+    }
+
+    placeItemOnShopFloor(itemId, shopkeeperId);
+    const itemName = world.get(itemId, NamedIdentity)?.name || "item";
+    log(`You return ${bracketizeName(itemName)} to the shop floor.`);
+
+    const shop = world.get(shopkeeperId, ShopInventory);
+    dispatchShopData(shopkeeperId, shop?.buyMarkup ?? 1.0, shop?.sellDiscount ?? 0.5, "checkout");
+  });
+
   // Handle payment of bill
   addEventListener("ui:payBill", (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -335,6 +398,11 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const { shopkeeperId } = e?.detail || {};
     const pe = playerEntity(world);
     if (!pe) return;
+    if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+      log("The shopkeeper is too far away.");
+      closeShopUI();
+      return;
+    }
 
     const shop = world.get(shopkeeperId, ShopInventory);
     if (!shop) return;
@@ -383,6 +451,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
 
     log(`You pay ${totalBill} gold for your purchases. "Thank you, come again!"`);
+    activeShopSession.mode = "browse";
     closeShopUI();
   });
 
