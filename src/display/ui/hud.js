@@ -82,6 +82,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:toggleInventory')); } catch {}
   });
 
+  // Use item button (opens filtered usable-item picker)
+  const useBtn = document.createElement('button');
+  useBtn.id = 'btn-use';
+  useBtn.textContent = 'Use';
+  Object.assign(useBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  useBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:openUseChooser')); } catch {}
+  });
+
   const castBtn = document.createElement('button');
   castBtn.id = 'active-spell';
   castBtn.textContent = 'Cast';
@@ -207,12 +220,13 @@ export function initHUD() {
   // Right-aligned bar: Inventory appears left of Cast by append order
   const quick = createQuickSlot();
   bar.appendChild(invBtn);
+  bar.appendChild(useBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(engraveBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
-  return { castBtn, invBtn, shootBtn, engraveBtn };
+  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
@@ -374,7 +388,7 @@ function createQuickSlot() {
 
   function actionable(it) {
     const t = String(it.type||'');
-    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
+    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food' || t === 'wand') return (it.count||0) > 0;
     if (t === 'equip' || t === 'ammo') return true;
     return false;
   }
@@ -466,7 +480,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip' || it.type === 'ammo') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : 'Read')));
+  btn.textContent = (it.type === 'equip' || it.type === 'ammo') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'wand' ? 'Zap' : (it.type === 'learn' ? 'Learn' : 'Read'))));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');
