@@ -11,6 +11,9 @@ import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { DungeonState } from "../components/DungeonState.js";
+import { Pet } from "../components/Pet.js";
+import { Owner } from "../components/Owner.js";
+import { Player } from "../components/Player.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { getMonster, getMonsterLootTable } from "../data/monsters.js";
 import { dropLoot } from "../data/lootResolver.js";
@@ -43,6 +46,17 @@ export function cleanupSystem(world) {
         // Clear inventory to reflect that items are no longer held
         inv.items.length = 0;
       }
+      // Check if this was a pet before cleanup
+      const wasPet = world.has(id, Pet);
+      let petOwnerId = 0;
+      if (wasPet) {
+        // Find the owner (player who had this pet)
+        for (const [playerId] of world.query(Player)) {
+          petOwnerId = playerId;
+          break;
+        }
+      }
+
       // Generate loot from monster's loot table
       const ident = world.get(id, NamedIdentity);
       if (ident && pos) {
@@ -57,14 +71,36 @@ export function cleanupSystem(world) {
           dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
 
           // Drop a corpse for the killed monster
-          // Base 75% chance, +8% per tier (higher tier = more guaranteed)
-          const corpseChance = Math.min(1.0, 0.75 + (monsterDef.tier || 0) * 0.08);
+          // Pets ALWAYS drop corpses (100% chance)
+          // Other monsters: Base 75% chance, +8% per tier (higher tier = more guaranteed)
+          const corpseChance = wasPet ? 1.0 : Math.min(1.0, 0.75 + (monsterDef.tier || 0) * 0.08);
           const corpseRoll = rng.next();
           if (corpseRoll < corpseChance) {
             const corpseId = createCorpse(world, monsterDef, { x: pos.x, y: pos.y });
+
+            // If this was a pet, mark the corpse with Pet tag and Owner
+            if (wasPet && petOwnerId) {
+              try {
+                world.add(corpseId, Pet);
+                world.add(corpseId, Owner, { ownerId: petOwnerId });
+              } catch { /* */ }
+            }
+
             try { world.emit && world.emit('item:dropped', { itemId: corpseId, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }
           }
         }
+      }
+
+      // Emit betrayal event if a pet died
+      if (wasPet && petOwnerId) {
+        try {
+          world.emit && world.emit('pet:died', {
+            petId: id,
+            ownerId: petOwnerId,
+            name: ident?.name || 'pet',
+            at: pos
+          });
+        } catch { /* */ }
       }
 
       world.destroy(id);

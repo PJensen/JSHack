@@ -63,6 +63,28 @@ function wireWorldEvents(world) {
     if (!deity) return;
     deity.action('heal', { magnitude: 0.3, target: 'self' });
   });
+
+  // Pet death → deity.action('betray') — killing your own companion
+  world.on('pet:died', ({ ownerId, name }) => {
+    if (!world.has(ownerId, Player)) return;
+    const dev = world.get(ownerId, Devotion);
+    if (!dev?.deityId) return;
+    const deity = _deities.get(dev.deityId);
+    if (!deity) return;
+    // Betrayal is a serious offense — magnitude reflects the bond broken
+    deity.action('betray', { magnitude: 0.8, target: name || 'companion' });
+  });
+
+  // Eating pet corpse → deity.desecrate() — ultimate disrespect
+  world.on('corpse:desecrated', ({ actor, corpseName }) => {
+    if (!world.has(actor, Player)) return;
+    const dev = world.get(actor, Devotion);
+    if (!dev?.deityId) return;
+    const deity = _deities.get(dev.deityId);
+    if (!deity) return;
+    // Direct desecration — eating your companion's remains
+    deity.desecrate(corpseName || 'pet_corpse');
+  });
 }
 
 /**
