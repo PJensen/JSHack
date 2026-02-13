@@ -6,6 +6,7 @@ import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { ShopInventory } from "../../rules/components/ShopInventory.js";
+import { Unpaid } from "../../rules/components/Unpaid.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
 const API_KEY = Symbol.for("jshack:main:shopWiring:api");
@@ -58,14 +59,26 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     };
   }
 
-  function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount) {
+  function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount, mode = 'browse') {
     const shop = world.get(shopkeeperId, ShopInventory);
     if (!shop) return;
+
     const shopItems = [];
-    for (const id of (shop.items || [])) {
-      const detail = buildShopItemDetail(id, buyMarkup);
-      if (detail) shopItems.push(detail);
+    const unpaidItems = [];
+    let totalBill = 0;
+
+    // Collect floor items with Unpaid component belonging to this shopkeeper
+    for (const [itemId, unpaid, pos] of world.query(Unpaid, Position)) {
+      if (unpaid.shopkeeperId === shopkeeperId) {
+        const detail = buildShopItemDetail(itemId, 1.0); // Price already in Unpaid
+        if (detail) {
+          detail.buyPrice = unpaid.price; // Use the pre-calculated price
+          shopItems.push(detail);
+        }
+      }
     }
+
+    // Collect unpaid items in player inventory (for bill/checkout)
     const pe = playerEntity(world);
     const playerItems = [];
     if (pe) {
@@ -73,27 +86,56 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       if (inv) {
         for (const id of inv.items) {
           const info = world.get(id, ItemInfo);
-          if (!info || info.type === "currency") continue;
-          const name = world.get(id, NamedIdentity);
-          playerItems.push({
-            id,
-            name: name?.name || info.description || info.type || "item",
-            type: info.type,
-            slot: info.slot,
-            count: info.count || 1,
-            value: info.value || 0,
-            sellPrice: Math.floor((info.value || 0) * sellDiscount),
-            rarityName: info.rarityName || "common",
-            description: info.description || "",
-          });
+          if (!info) continue;
+
+          const unpaid = world.get(id, Unpaid);
+          if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
+            // This is an unpaid item from this shop
+            const name = world.get(id, NamedIdentity);
+            const detail = {
+              id,
+              name: name?.name || info.description || info.type || "item",
+              type: info.type,
+              slot: info.slot,
+              count: info.count || 1,
+              value: info.value || 0,
+              price: unpaid.price,
+              unpaid: true,
+              rarityName: info.rarityName || "common",
+              description: info.description || "",
+            };
+            unpaidItems.push(detail);
+            totalBill += unpaid.price;
+          } else if (info.type !== "currency") {
+            // Regular item for selling
+            const name = world.get(id, NamedIdentity);
+            playerItems.push({
+              id,
+              name: name?.name || info.description || info.type || "item",
+              type: info.type,
+              slot: info.slot,
+              count: info.count || 1,
+              value: info.value || 0,
+              sellPrice: Math.floor((info.value || 0) * sellDiscount),
+              rarityName: info.rarityName || "common",
+              description: info.description || "",
+            });
+          }
         }
       }
     }
+
     try {
       window.dispatchEvent(new CustomEvent("ui:shopData", { detail: {
-        shopkeeperId, shopItems, playerItems,
+        shopkeeperId,
+        shopItems,
+        playerItems,
+        unpaidItems,
+        totalBill,
         gold: playerGoldCount(),
-        buyMarkup, sellDiscount,
+        buyMarkup,
+        sellDiscount,
+        mode,
       } }));
     } catch {}
   }
@@ -144,8 +186,9 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const info = world.get(itemId, ItemInfo);
     if (!info) return;
 
-    const buyMarkup = shop.buyMarkup ?? 1.0;
-    const price = Math.ceil((info.value || 0) * buyMarkup);
+    // Check if item is an unpaid floor item or in old-style shop inventory
+    const unpaid = world.get(itemId, Unpaid);
+    const price = unpaid ? unpaid.price : Math.ceil((info.value || 0) * (shop.buyMarkup ?? 1.0));
     const gold = playerGoldCount();
 
     if (gold < price) {
@@ -154,22 +197,33 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
 
     const inv = world.get(pe.id, Inventory);
-    if (inv) {
-      for (const gid of inv.items) {
-        const gi = world.get(gid, ItemInfo);
-        if (gi && gi.type === "currency") {
-          world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) - price; });
-          break;
-        }
+    if (!inv) return;
+
+    // Check inventory capacity
+    const hasCapacity = inv.capacity == null || inv.items.length < inv.capacity;
+    if (!hasCapacity) {
+      log("Your pack is full.");
+      return;
+    }
+
+    // Deduct gold
+    for (const gid of inv.items) {
+      const gi = world.get(gid, ItemInfo);
+      if (gi && gi.type === "currency") {
+        world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) - price; });
+        break;
       }
     }
 
+    // Remove from shop inventory (old style) or floor (new style)
     const idx = shop.items.indexOf(itemId);
     if (idx !== -1) shop.items.splice(idx, 1);
-    if (inv) {
-      try { world.remove(itemId, Position); } catch {}
-      inv.items.push(itemId);
-    }
+
+    // Remove from floor and add to inventory
+    try { world.remove(itemId, Position); } catch {}
+    // Remove unpaid status (item is now paid for)
+    try { world.remove(itemId, Unpaid); } catch {}
+    inv.items.push(itemId);
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
     log(`You buy ${bracketizeName(itemName)} for ${price} gold.`);
@@ -234,6 +288,102 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     log(`You sell ${bracketizeName(itemName)} for ${price} gold.`);
 
     dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
+  });
+
+  // Handle shop exit blocking (triggered when player tries to leave with unpaid items)
+  world.on("shop:exit-blocked", ({ actor, shopkeeperId, bill }) => {
+    const pe = playerEntity(world);
+    if (!pe || actor !== pe.id) return;
+
+    log(`The shopkeeper blocks your way! "You owe me ${bill} gold!"`);
+
+    // Open shop UI in checkout mode
+    activeShopSession = {
+      shopkeeperId: Number(shopkeeperId) || 0,
+      buyMarkup: 1.3,
+      sellDiscount: 0.5,
+    };
+
+    const shop = world.get(shopkeeperId, ShopInventory);
+    const markup = shop?.buyMarkup ?? 1.3;
+    const discount = shop?.sellDiscount ?? 0.5;
+
+    dispatchShopData(shopkeeperId, markup, discount, 'checkout');
+    try {
+      window.dispatchEvent(new CustomEvent("ui:openShop", {
+        detail: { shopkeeperId, buyMarkup: markup, sellDiscount: discount, mode: 'checkout' }
+      }));
+    } catch {}
+  });
+
+  // Handle item pickup - notify when picking up unpaid items
+  world.on("item:pickup", ({ actor, itemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || actor !== pe.id) return;
+
+    const unpaid = world.get(itemId, Unpaid);
+    if (unpaid && unpaid.price > 0) {
+      const itemName = world.get(itemId, NamedIdentity)?.name || "item";
+      log(`You pick up ${bracketizeName(itemName)} (unpaid, ${unpaid.price} gold).`);
+    }
+  });
+
+  // Handle payment of bill
+  addEventListener("ui:payBill", (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const { shopkeeperId } = e?.detail || {};
+    const pe = playerEntity(world);
+    if (!pe) return;
+
+    const shop = world.get(shopkeeperId, ShopInventory);
+    if (!shop) return;
+
+    // Calculate total bill
+    const inv = world.get(pe.id, Inventory);
+    if (!inv) return;
+
+    let totalBill = 0;
+    const unpaidItemIds = [];
+
+    for (const itemId of inv.items) {
+      const unpaid = world.get(itemId, Unpaid);
+      if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
+        totalBill += unpaid.price;
+        unpaidItemIds.push(itemId);
+      }
+    }
+
+    if (totalBill === 0) {
+      log("You have no unpaid items.");
+      closeShopUI();
+      return;
+    }
+
+    const gold = playerGoldCount();
+    if (gold < totalBill) {
+      log(`You cannot afford that. You need ${totalBill} gold but only have ${gold}.`);
+      return;
+    }
+
+    // Deduct gold
+    for (const gid of inv.items) {
+      const gi = world.get(gid, ItemInfo);
+      if (gi && gi.type === "currency") {
+        world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) - totalBill; });
+        break;
+      }
+    }
+
+    // Remove Unpaid component from all items
+    for (const itemId of unpaidItemIds) {
+      try {
+        world.remove(itemId, Unpaid);
+      } catch {}
+    }
+
+    log(`You pay ${totalBill} gold for your purchases. "Thank you, come again!"`);
+    closeShopUI();
   });
 
   const api = Object.freeze({

@@ -36,3 +36,5 @@ export { Hunger } from './Hunger.js';
 export { Facing } from './Facing.js';
 export { PetState } from './PetState.js';
 export { PetCommandIntent } from './Intents/PetCommandIntent.js';
+export { Unpaid } from './Unpaid.js';
+export { RoomMetadata } from './RoomMetadata.js';

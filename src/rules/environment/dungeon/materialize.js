@@ -5,6 +5,9 @@
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Door } from '../../archetypes/Door.js';
 import { materializeSpawn } from './populate.js';
+import { RoomMetadata } from '../../components/RoomMetadata.js';
+import { Unpaid } from '../../components/Unpaid.js';
+import { Position } from '../../components/Position.js';
 import {
   CHUNK_SIZE, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from './constants.js';
@@ -53,6 +56,30 @@ export function materializeChunk(world, chunk, opts = {}) {
   for (const sp of chunk.spawns) {
     const eid = spawnFeature(world, sp);
     if (eid != null) ids.push(eid);
+  }
+
+  // Post-process: Add Unpaid components to shop items with correct shopkeeperId
+  for (const [roomId, room] of world.query(RoomMetadata)) {
+    if (room.roomType === 'shop' && room.shopkeeperId > 0) {
+      // Find all shop_item spawns in this room and add Unpaid components
+      for (const sp of chunk.spawns) {
+        if (sp.kind === 'shop_item' && sp._itemId && sp._calculatedPrice) {
+          const itemId = sp._itemId;
+          const pos = world.get(itemId, Position);
+          if (pos &&
+              pos.x >= room.x && pos.x < room.x + room.w &&
+              pos.y >= room.y && pos.y < room.y + room.h) {
+            // Add Unpaid component now that we know the shopkeeperId
+            try {
+              world.add(itemId, Unpaid, {
+                shopkeeperId: room.shopkeeperId,
+                price: sp._calculatedPrice
+              });
+            } catch {}
+          }
+        }
+      }
+    }
   }
 
   return ids;
