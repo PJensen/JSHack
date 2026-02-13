@@ -31,7 +31,7 @@ Deno.test("pickMonster scales HP with depth", () => {
 
 Deno.test("pickItem returns valid kinds", () => {
   const rng = createRng(42);
-  const validKinds = new Set(['gold', 'potion', 'equipment']);
+  const validKinds = new Set(['gold', 'potion', 'equipment', 'arrows', 'fire_arrows', 'scroll', 'book']);
   for (let i = 0; i < 20; i++) {
     const item = pickItem(rng, 5);
     assert(validKinds.has(item.kind), `valid kind: ${item.kind}`);
