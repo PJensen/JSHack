@@ -46,16 +46,6 @@ export const ITEM_DEFS = {
         rarityName: 'rare',
         description: 'Zaps a bolt of chain lightning. 3 charges.',
     },
-    wand_blastwave: {
-        id: 'wand_blastwave',
-        name: 'Wand of Blast Wave',
-        type: 'wand',
-        slot: 'bag',
-        charges: 4,
-        rarity: 1,
-        rarityName: 'rare',
-        description: 'Unleashes a concussive blast wave. 4 charges.',
-    },
     wand_meteor: {
         id: 'wand_meteor',
         name: 'Wand of Meteor',
