@@ -1,4 +1,4 @@
-import { defineComponent } from "../../lib/ecs-js/index.js";
+import { defineComponent } from "../../../lib/ecs-js/index.js";
 
 /**
  * MeleeAttackIntent — queued by input/AI when attacker wants to strike target.

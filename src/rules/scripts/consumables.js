@@ -5,6 +5,9 @@ import { registerScript, ScriptVerb } from "../scripting.js";
 import { Hunger } from "../components/Hunger.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
+import { Pet } from "../components/Pet.js";
+import { Owner } from "../components/Owner.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
 
@@ -14,11 +17,26 @@ import { markExplored } from "../environment/dungeon/exploredMap.js";
 registerScript('consumable:eat', {
   [ScriptVerb.ItemUse]: (world, ctx) => {
     const actor = Number(ctx?.actor || 0) || 0;
+    const itemId = Number(ctx?.itemId || 0) || 0;
     const nutrition = Number(ctx?.params?.nutrition || 0);
     const special = ctx?.params?.special || null;
 
     const hc = world.get(actor, Hunger);
     if (!hc) return;
+
+    // Check if this is a pet corpse being eaten (desecration!)
+    if (itemId > 0 && world.has(itemId, Pet)) {
+      const owner = world.get(itemId, Owner);
+      const corpseIdent = world.get(itemId, NamedIdentity);
+      try {
+        world.emit && world.emit('corpse:desecrated', {
+          actor,
+          itemId,
+          ownerId: owner?.ownerId || 0,
+          corpseName: corpseIdent?.name || 'pet corpse',
+        });
+      } catch { /* */ }
+    }
 
     const newHunger = hc.hunger - nutrition;
     if (newHunger < 0) {

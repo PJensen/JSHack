@@ -92,7 +92,7 @@ export function effectSystem(world) {
                         const delta = vit.hp - before;
                         if (delta > 0) { try { world.emit && world.emit('healed', { id, amount: delta }); } catch {} }
                     }
-                    upsertStatus(nextStatuses, { type: 'regenerating', duration: e.turnsLeft, potency, stacks });
+                    upsertStatus(nextStatuses, { type: 'regen', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
                 case 'stun':
@@ -114,8 +114,8 @@ export function effectSystem(world) {
                 case 'disease':
                 case 'diseased': {
                     // Disease weakens rather than dealing damage.
-                    // Penalty is applied at combat time by combatSystem reading the 'diseased' status.
-                    upsertStatus(nextStatuses, { type: 'diseased', duration: e.turnsLeft, potency, stacks });
+                    // Penalty is applied at combat time by combatSystem reading the 'disease' status.
+                    upsertStatus(nextStatuses, { type: 'disease', duration: e.turnsLeft, potency, stacks });
                     break;
                 }
                 case 'thorns': {

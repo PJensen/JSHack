@@ -21,7 +21,14 @@ import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
+import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
+import { createHudFeeds } from "./main/ui/hudFeeds.js";
+import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
+import { createMessageLog } from "./main/ui/messageLog.js";
+import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
+import { installShopWiring } from "./main/wiring/shopWiring.js";
+import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -46,18 +53,20 @@ import { Devotion } from "./rules/components/Devotion.js";
 import { initDeity } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { Faction } from "./rules/components/Faction.js";
-import { ShopInventory } from "./rules/components/ShopInventory.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
-import { GoldStack } from "./rules/archetypes/Items.js";
+import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
+import { PetState } from "./rules/components/PetState.js";
+import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js";
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
+import { getHungerLevel } from "./rules/data/food.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -71,27 +80,9 @@ bctx.imageSmoothingEnabled = false;
 // Lock down browser-driven inputs/scroll/zoom so the app fully controls them
 enableInputLockdown({ canvas });
 
-// Quality/perf controls
-const PERF = (() => {
-  const params = new URLSearchParams(window.location.search || '');
-  // Mobile-first defaults: fast without any URL args
-  const q = (params.get('quality') || (typeof localStorage !== 'undefined' ? 
-    localStorage.getItem('jshack.quality') : 'high') || 'high').toLowerCase();
-  // Cap DPR on mobile/high-DPR screens to avoid excessive fill-rate costs
-  const defaultCap = 1.5; // mobile-first
-  const dprCapArg = Number(params.get('dprCap')) || Number((typeof localStorage !== 'undefined' && localStorage.getItem('jshack.dprCap')) || 0);
-  const dprCap = Number.isFinite(dprCapArg) && dprCapArg > 0 ? dprCapArg : defaultCap;
-  const isLow = q === 'low';
-  const isHigh = q === 'high';
-  return {
-    quality: q,
-    dprCap: isHigh ? 3 : (isLow ? 1 : dprCap),
-    glowLayers: isLow ? 0 : 2,
-    particleCapacity: isLow ? 512 : 4096,
-    // Default to snap camera (no perceived lag); can override via ?cameraLerp=number
-    cameraLerp: (params.get('cameraLerp') !== null ? Number(params.get('cameraLerp')) : 0)
-  };
-})();
+const runtimeConfig = readRuntimeConfig();
+const PERF = runtimeConfig.perf;
+const chosenDeityId = runtimeConfig.chosenDeityId;
 
 // Use tile-sized world units: 1 world unit == 1 tile on screen
 const TILE_PX = 28;
@@ -155,6 +146,10 @@ function getPlayerMana() {
   const m = /** @type any */ (world.get(pe.id, Mana));
   return { mana: Number(m?.mana || 0), maxMana: Number(m?.maxMana || 0) };
 }
+
+// Initialize HUD feed updaters with stamina support
+const hudFeeds = createHudFeeds(world, { getPlayerMana });
+
 function ensureActiveSpell() {
   if (_activeSpellId) return _activeSpellId;
   const list = learnedSpells();
@@ -184,12 +179,12 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
 
 // Allow URL override: ?dungeonScale=0.3 for compact debugging floors
 {
-  const ds = parseFloat(new URLSearchParams(window.location.search).get('dungeonScale'));
+  const ds = runtimeConfig.dungeonScale;
   if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
 }
 
 // Allow URL override: ?floor=6 to skip straight to a specific depth
-const _startDepth = parseInt(new URLSearchParams(window.location.search).get('floor'), 10) || 1;
+const _startDepth = runtimeConfig.startDepth;
 
 // Initialize the procedural dungeon (entire floor generated up front)
 const spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
@@ -247,71 +242,39 @@ if (!playerEntity(world)) {
     world.add(petId, Owner, { ownerId: pe.id });
     world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
     world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
+    // Pet combat components
+    world.add(petId, Vitality, { maxHp: 30, hp: 30 });
+    world.add(petId, Equipment, {
+      attackDerived: 2,   // Base attack bonus
+      defenseDerived: 2   // Base defense (armorClass = 10 + defense = 12)
+    });
+    // Pet state machine
+    world.add(petId, PetState, {
+      state: 'following',
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: world.step,
+      lastPlayerX: ppos.x,
+      lastPlayerY: ppos.y,
+      commandCooldown: 0,
+    });
+
+    // Notify UI that pet exists
+    try {
+      window.dispatchEvent(new CustomEvent('ui:petExists', {
+        detail: { exists: true }
+      }));
+    } catch {}
   }
 }
 
-// Deity: bind player to Mol'Khar and wire deity events to message log
+// Deity: bind player to chosen deity (via ?deity=id querystring) and wire deity events to message log
 {
   const pe = playerEntity(world);
   if (pe) {
-    world.add(pe.id, Devotion, { deityId: 'molkhar' });
-    const deity = initDeity('molkhar');
-    if (deity) {
-      // Cooldown tracker: deity events only fire messages every N ticks
-      const _deityCooldowns = { wrath: 0, demand: 0, utterance: 0 };
-      const DEITY_COOLDOWN = 30; // minimum ticks between repeated messages
-
-      deity.on('wrath', ({ intensity, tick }) => {
-        if (tick - _deityCooldowns.wrath < DEITY_COOLDOWN) return;
-        _deityCooldowns.wrath = tick;
-        const dmg = Math.round(5 + intensity * 10);
-        log(`Mol'Khar's wrath strikes you! (${dmg} damage)`);
-        const vit = /** @type any */ (world.get(pe.id, Vitality));
-        if (vit) {
-          const newHp = Math.max(0, vit.hp - dmg);
-          world.set(pe.id, Vitality, { ...vit, hp: newHp });
-          try { world.emit?.('damage', { id: pe.id, amount: dmg, source: 0 }); } catch {}
-          if (newHp <= 0) try { world.emit?.('died', { id: pe.id }); } catch {}
-        }
-      });
-      deity.on('miracle', ({ serenity }) => {
-        // Miracles are rare enough — no cooldown needed
-        const heal = Math.round(10 + serenity * 10);
-        log(`Mol'Khar grants you a miracle! (+${heal} HP)`);
-        const vit = /** @type any */ (world.get(pe.id, Vitality));
-        if (vit) {
-          const newHp = Math.min(vit.maxHp, vit.hp + heal);
-          world.set(pe.id, Vitality, { ...vit, hp: newHp });
-          try { world.emit?.('healed', { id: pe.id, amount: heal }); } catch {}
-        }
-      });
-      deity.on('demand', ({ tick }) => {
-        if (tick - _deityCooldowns.demand < DEITY_COOLDOWN) return;
-        _deityCooldowns.demand = tick;
-        log("Mol'Khar hungers for blood!");
-      });
-      // moodShift is already self-limiting (only fires on actual transitions)
-      deity.on('moodShift', ({ to }) => {
-        const labels = {
-          wrath: 'wrathful', serenity: 'serene', hunger: 'hungry',
-          amusement: 'amused', sorrow: 'sorrowful', chaos: 'chaotic',
-        };
-        log(`Mol'Khar grows ${labels[to] || to}.`);
-      });
-      deity.on('utterance', ({ dominant, tick }) => {
-        if (tick - _deityCooldowns.utterance < DEITY_COOLDOWN) return;
-        _deityCooldowns.utterance = tick;
-        const lines = {
-          wrath: '"More blood!" bellows Mol\'Khar.',
-          serenity: '"You serve well," whispers Mol\'Khar.',
-          hunger: '"Feed me, mortal," growls Mol\'Khar.',
-          amusement: 'Mol\'Khar laughs at your antics.',
-          sorrow: 'Mol\'Khar weeps silently.',
-          chaos: 'The air crackles with divine unease.',
-        };
-        log(lines[dominant?.dimension] || 'Mol\'Khar stirs.');
-      });
-    }
+    world.add(pe.id, Devotion, { deityId: chosenDeityId });
+    initDeity(chosenDeityId, world);
   }
 }
 
@@ -324,6 +287,54 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
     if (inv && Array.isArray(inv.items)) {
       const scrollId = createFrom(world, ScrollOfMapping, {});
       inv.items.push(scrollId);
+    }
+  }
+}
+
+// Process ?give query string parameter to spawn items in player inventory
+// Format: ?give=item_id*count,item_id*count
+// Example: ?give=gold*1000,potion_health*5,sword_plain*1
+{
+  const giveParam = runtimeConfig.giveParam;
+  if (giveParam) {
+    const pe = playerEntity(world);
+    if (pe) {
+      const inv = world.get(pe.id, Inventory);
+      if (inv && Array.isArray(inv.items)) {
+        // Parse comma-separated item specs
+        const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
+
+        for (const spec of specs) {
+          // Parse "item_id*count" format
+          const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
+          if (!match) {
+            console.warn(`[?give] Invalid format: "${spec}" (expected: item_id*count)`);
+            continue;
+          }
+
+          const itemId = match[1];
+          const count = parseInt(match[2] || '1', 10);
+
+          if (!Number.isFinite(count) || count < 1) {
+            console.warn(`[?give] Invalid count for "${itemId}": ${match[2]}`);
+            continue;
+          }
+
+          try {
+            // Use centralized item factory
+            const createdItemId = createItemById(world, itemId, { count });
+
+            if (createdItemId !== null) {
+              inv.items.push(createdItemId);
+              console.log(`[?give] Created ${count}x ${itemId}`);
+            } else {
+              console.warn(`[?give] Unknown item: "${itemId}"`);
+            }
+          } catch (err) {
+            console.error(`[?give] Error creating item "${itemId}":`, err);
+          }
+        }
+      }
     }
   }
 }
@@ -385,6 +396,7 @@ const inputDisposers = [];
 // ---- Display UI overlays + data feeds -------------------------------------
 initOverlays();
 initHUD();
+initPetMenu();
 initStatusLine();
 
 // Provide inventory data to overlay when requested
@@ -475,7 +487,7 @@ addEventListener('ui:requestUsableItemsData', () => {
 
 // Provide message log entries (placeholder until rules log is wired)
 addEventListener('ui:requestMessageLogData', () => {
-  const entries = messageLog.slice();
+  const entries = messageLog.getEntries();
   window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
 });
 
@@ -549,6 +561,14 @@ addEventListener('ui:engrave', () => {
   rulesHandler({ type: 'rules.engrave', payload: { text: text.trim() } });
 });
 
+// Pray button → dispatch pray action
+addEventListener('ui:pray', () => {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.pray', payload: {} });
+});
+
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
   const spells = learnedSpells();
@@ -567,14 +587,15 @@ addEventListener('ui:selectActiveSpell', (ev) => {
 });
 
 // Basic app-side message log collector (bridge-free for now)
-/** @type {string[]} */
-const messageLog = [];
+const messageLog = createMessageLog({
+  maxEntries: 50,
+  onUpdate: (entries) => {
+    try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries } })); } catch {}
+  },
+});
 /** @param {string} msg */
 function log(msg) {
-  messageLog.push(msg);
-  if (messageLog.length > 50) messageLog.shift();
-  // Update always-on ticker
-  try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries: messageLog } })); } catch {}
+  messageLog.log(msg);
 }
 /** Format helpers for message log */
 function nameOfEntity(id) {
@@ -593,6 +614,8 @@ function nameOfItem(id) {
   const label = ni?.name || info?.description || info?.type;
   return label ? bracketizeName(label) : `item ${n}`;
 }
+
+installDeityUiWiring(world, { log });
 
 world.on('drank', ({ actor, itemId, target }) => {
   const who = nameOfEntity(actor);
@@ -856,6 +879,13 @@ world.on('spell:unknown', ({ actor, spellId }) => {
 world.on('spell:oom', ({ actor, spellId, need, have }) => {
   log(`Not enough mana to cast [${String(spellId||'spell')}] (need ${need}, have ${have}).`);
 });
+world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
+  const weaponInfo = world.get(weaponId, ItemInfo);
+  const weaponName = weaponInfo ?
+    (world.get(weaponId, NamedIdentity)?.name || weaponInfo.description || weaponInfo.type)
+    : 'fists';
+  log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`);
+});
 // Legacy generic damage hook (spells and DoTs may emit this)
 world.on('damage', ({ id, amount, source, critical, crit }) => {
   const who = nameOfEntity(id);
@@ -872,9 +902,29 @@ world.on('healed', ({ id, amount }) => {
     try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch {}
   }
 });
+world.on('prayer', ({ actor, distress }) => {
+  const who = nameOfEntity(actor);
+  if (distress?.desperate) {
+    log(`${who} desperately prays for divine intervention!`);
+  } else if (distress?.troubled) {
+    log(`${who} prays for aid...`);
+  } else {
+    log(`${who} prays to the heavens...`);
+  }
+});
 world.on('died', ({ id }) => {
   const who = nameOfEntity(id);
   log(`${who} dies.`);
+
+  // Check if the dead entity is a pet
+  if (world.has(id, Pet)) {
+    // Notify UI that pet no longer exists
+    try {
+      window.dispatchEvent(new CustomEvent('ui:petExists', {
+        detail: { exists: false }
+      }));
+    } catch {}
+  }
 });
 // Floating text hooks: damage and gold pickups
 // Deterministic combat damage (from combatSystem)
@@ -992,6 +1042,212 @@ world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
   // Trigger inventory UI refresh
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
+
+// Pet state changes
+world.on('pet:state:changed', ({ petId, prevState, newState, command }) => {
+  const petName = nameOfEntity(petId);
+  const stateNames = {
+    following: 'following you',
+    staying: 'staying put',
+    guarding: 'guarding',
+    fetching: 'fetching an item',
+    returning: 'returning',
+    fleeing: 'fleeing',
+    idle: 'idle'
+  };
+  log(`${petName} is now ${stateNames[newState] || newState}.`);
+  // Update HUD button
+  try {
+    window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
+      detail: { state: newState }
+    }));
+  } catch {}
+});
+
+world.on('pet:state:auto', ({ petId, newState, reason }) => {
+  const petName = nameOfEntity(petId);
+  if (reason === 'low_health') {
+    log(`${petName} flees to safety!`);
+  } else if (reason === 'health_restored') {
+    log(`${petName} returns to your side.`);
+  } else if (reason === 'item_picked_up') {
+    log(`${petName} has the item!`);
+  }
+  // Update HUD button
+  try {
+    window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
+      detail: { state: newState }
+    }));
+  } catch {}
+});
+
+world.on('pet:teleported', ({ petId, from, to }) => {
+  const petName = nameOfEntity(petId);
+  log(`${petName} teleports to your side.`);
+});
+
+// Handle UI pet commands (instant, no tick consumed)
+window.addEventListener('ui:petCommand', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const command = e?.detail?.command;
+  if (!command) return;
+
+  // Find pet and directly update state (instant, no tick needed)
+  for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
+    if (!vit || vit.hp <= 0) continue;
+    const petPos = world.get(petId, Position);
+    if (!petPos) break;
+
+    // Get or create PetState
+    let petState = world.get(petId, PetState);
+    if (!petState) {
+      const pe = playerEntity(world);
+      const playerPos = pe ? world.get(pe.id, Position) : null;
+      world.add(petId, PetState, {
+        state: 'following',
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: world.step,
+        lastPlayerX: playerPos?.x ?? null,
+        lastPlayerY: playerPos?.y ?? null,
+        commandCooldown: 0,
+      });
+      petState = world.get(petId, PetState);
+    }
+
+    const prevState = petState.state;
+
+    // Update state directly based on command
+    switch (command) {
+      case 'follow':
+        petState.state = 'following';
+        petState.targetX = null;
+        petState.targetY = null;
+        petState.targetItemId = 0;
+        break;
+
+      case 'stay':
+        petState.state = 'staying';
+        petState.targetX = petPos.x;
+        petState.targetY = petPos.y;
+        petState.targetItemId = 0;
+        break;
+
+      case 'guard':
+        petState.state = 'guarding';
+        petState.targetX = petPos.x;
+        petState.targetY = petPos.y;
+        petState.targetItemId = 0;
+        break;
+
+      case 'idle':
+        petState.state = 'idle';
+        petState.targetX = null;
+        petState.targetY = null;
+        petState.targetItemId = 0;
+        break;
+
+      case 'fetch':
+        // TODO: Need item selection for fetch
+        break;
+    }
+
+    // Update state metadata and emit event
+    if (prevState !== petState.state) {
+      petState.stateEnteredTurn = world.step;
+      petState.commandCooldown = 0;
+      try {
+        world.emit?.('pet:state:changed', {
+          petId,
+          prevState,
+          newState: petState.state,
+          command
+        });
+      } catch {}
+    }
+
+    break; // Only one pet for now
+  }
+});
+
+// Rotate pet state through common commands (instant, no tick)
+window.addEventListener('ui:rotatePetState', () => {
+  // State rotation cycle: following → staying → guarding → idle → following
+  const stateOrder = ['following', 'staying', 'guarding', 'idle'];
+
+  for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
+    if (!vit || vit.hp <= 0) continue;
+    const petPos = world.get(petId, Position);
+    if (!petPos) break;
+
+    // Get or create PetState
+    let petState = world.get(petId, PetState);
+    if (!petState) {
+      const pe = playerEntity(world);
+      const playerPos = pe ? world.get(pe.id, Position) : null;
+      world.add(petId, PetState, {
+        state: 'following',
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: world.step,
+        lastPlayerX: playerPos?.x ?? null,
+        lastPlayerY: playerPos?.y ?? null,
+        commandCooldown: 0,
+      });
+      petState = world.get(petId, PetState);
+    }
+
+    const currentState = petState.state;
+
+    // Find next state in rotation (skip automatic states like fetching, returning, fleeing)
+    let nextState = 'following';
+    const currentIndex = stateOrder.indexOf(currentState);
+    if (currentIndex >= 0) {
+      nextState = stateOrder[(currentIndex + 1) % stateOrder.length];
+    } else {
+      // If in an automatic state, go to following
+      nextState = 'following';
+    }
+
+    const prevState = petState.state;
+
+    // Directly update state based on next state
+    petState.state = nextState;
+
+    if (nextState === 'staying' || nextState === 'guarding') {
+      petState.targetX = petPos.x;
+      petState.targetY = petPos.y;
+      petState.targetItemId = 0;
+    } else {
+      petState.targetX = null;
+      petState.targetY = null;
+      petState.targetItemId = 0;
+    }
+
+    // Update state metadata and emit event
+    if (prevState !== petState.state) {
+      petState.stateEnteredTurn = world.step;
+      petState.commandCooldown = 0;
+      const command = nextState === 'staying' ? 'stay' :
+                     nextState === 'guarding' ? 'guard' :
+                     nextState === 'idle' ? 'idle' : 'follow';
+      try {
+        world.emit?.('pet:state:changed', {
+          petId,
+          prevState,
+          newState: petState.state,
+          command
+        });
+      } catch {}
+    }
+
+    break; // Only one pet for now
+  }
+});
+
 // Engrave event → combat log + float text
 world.on('engrave', ({ actor, text, x, y }) => {
   const who = nameOfEntity(actor);
@@ -1141,344 +1397,8 @@ addEventListener('ui:requestStairTraverse', (ev) => {
   });
 });
 
-// ---- Shop event wiring -------------------------------------------------------
-
-/** Count the player's gold from inventory */
-function playerGoldCount() {
-  const pe = playerEntity(world);
-  if (!pe) return 0;
-  const inv = world.get(pe.id, Inventory);
-  if (!inv) return 0;
-  for (const id of inv.items) {
-    const info = world.get(id, ItemInfo);
-    if (info && info.type === 'currency') return info.count || 0;
-  }
-  return 0;
-}
-
-/** Build item detail for the shop UI from an entity ID */
-function buildShopItemDetail(id, markup) {
-  const info = world.get(id, ItemInfo);
-  const name = world.get(id, NamedIdentity);
-  if (!info) return null;
-  return {
-    id,
-    name: name?.name || info.description || info.type || 'item',
-    type: info.type,
-    slot: info.slot,
-    count: info.count || 1,
-    value: info.value || 0,
-    buyPrice: Math.ceil((info.value || 0) * markup),
-    rarityName: info.rarityName || 'common',
-    description: info.description || '',
-    bonuses: info.bonuses || {},
-    affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
-  };
-}
-
-/** Dispatch current shop state to the UI */
-function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount) {
-  const shop = world.get(shopkeeperId, ShopInventory);
-  if (!shop) return;
-  const shopItems = [];
-  for (const id of (shop.items || [])) {
-    const detail = buildShopItemDetail(id, buyMarkup);
-    if (detail) shopItems.push(detail);
-  }
-  const pe = playerEntity(world);
-  const playerItems = [];
-  if (pe) {
-    const inv = world.get(pe.id, Inventory);
-    if (inv) {
-      for (const id of inv.items) {
-        const info = world.get(id, ItemInfo);
-        if (!info || info.type === 'currency') continue;
-        const name = world.get(id, NamedIdentity);
-        playerItems.push({
-          id,
-          name: name?.name || info.description || info.type || 'item',
-          type: info.type,
-          slot: info.slot,
-          count: info.count || 1,
-          value: info.value || 0,
-          sellPrice: Math.floor((info.value || 0) * sellDiscount),
-          rarityName: info.rarityName || 'common',
-          description: info.description || '',
-        });
-      }
-    }
-  }
-  try {
-    window.dispatchEvent(new CustomEvent('ui:shopData', { detail: {
-      shopkeeperId, shopItems, playerItems,
-      gold: playerGoldCount(),
-      buyMarkup, sellDiscount,
-    }}));
-  } catch {}
-}
-
-// When shop:open fires from interaction system → open shop UI
-world.on('shop:open', ({ actor, targetId, shopItems, buyMarkup, sellDiscount }) => {
-  log('You approach the shopkeeper.');
-  dispatchShopData(targetId, buyMarkup, sellDiscount);
-  try { window.dispatchEvent(new CustomEvent('ui:openShop', { detail: { shopkeeperId: targetId, buyMarkup, sellDiscount } })); } catch {}
-});
-
-// Buy request from shop UI
-addEventListener('ui:requestBuy', (ev) => {
-  /** @type {CustomEvent} */ // @ts-ignore
-  const e = ev;
-  const { shopkeeperId, itemId } = e?.detail || {};
-  const pe = playerEntity(world);
-  if (!pe) return;
-
-  const shop = world.get(shopkeeperId, ShopInventory);
-  if (!shop) return;
-  const info = world.get(itemId, ItemInfo);
-  if (!info) return;
-
-  const buyMarkup = shop.buyMarkup ?? 1.0;
-  const price = Math.ceil((info.value || 0) * buyMarkup);
-  const gold = playerGoldCount();
-
-  if (gold < price) {
-    log('You cannot afford that.');
-    return;
-  }
-
-  // Deduct gold
-  const inv = world.get(pe.id, Inventory);
-  if (inv) {
-    for (const gid of inv.items) {
-      const gi = world.get(gid, ItemInfo);
-      if (gi && gi.type === 'currency') {
-        world.mutate(gid, ItemInfo, r => { r.count = (r.count || 0) - price; });
-        break;
-      }
-    }
-  }
-
-  // Transfer item from shop to player inventory
-  const idx = shop.items.indexOf(itemId);
-  if (idx !== -1) shop.items.splice(idx, 1);
-  if (inv) {
-    try { world.remove(itemId, Position); } catch {}
-    inv.items.push(itemId);
-  }
-
-  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
-  log(`You buy ${bracketizeName(itemName)} for ${price} gold.`);
-
-  // Refresh shop UI
-  dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
-});
-
-// Sell request from shop UI
-addEventListener('ui:requestSell', (ev) => {
-  /** @type {CustomEvent} */ // @ts-ignore
-  const e = ev;
-  const { shopkeeperId, itemId } = e?.detail || {};
-  const pe = playerEntity(world);
-  if (!pe) return;
-
-  const shop = world.get(shopkeeperId, ShopInventory);
-  if (!shop) return;
-  const info = world.get(itemId, ItemInfo);
-  if (!info) return;
-
-  const sellDiscount = shop.sellDiscount ?? 0.5;
-  const price = Math.floor((info.value || 0) * sellDiscount);
-
-  // Remove from player inventory
-  const inv = world.get(pe.id, Inventory);
-  if (inv) {
-    const idx = inv.items.indexOf(itemId);
-    if (idx !== -1) inv.items.splice(idx, 1);
-  }
-
-  // Unequip if equipped
-  const eq = world.get(pe.id, Equipment);
-  if (eq) {
-    for (const slot of ['weapon', 'armor', 'shield', 'ring1', 'ring2', 'ammo']) {
-      if (eq[slot] === itemId) { eq[slot] = null; break; }
-    }
-  }
-
-  // Add item to shop stock
-  shop.items.push(itemId);
-
-  // Add gold to player
-  if (inv) {
-    let found = false;
-    for (const gid of inv.items) {
-      const gi = world.get(gid, ItemInfo);
-      if (gi && gi.type === 'currency') {
-        world.mutate(gid, ItemInfo, r => { r.count = (r.count || 0) + price; });
-        found = true;
-        break;
-      }
-    }
-    if (!found && price > 0) {
-      // Player has no gold stack yet — create one
-      const gid = createFrom(world, GoldStack, {});
-      try { world.remove(gid, Position); } catch {}
-      world.mutate(gid, ItemInfo, r => { r.count = price; });
-      inv.items.push(gid);
-    }
-  }
-
-  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
-  log(`You sell ${bracketizeName(itemName)} for ${price} gold.`);
-
-  // Refresh shop UI
-  dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5);
-});
-
-// ---- End shop event wiring ---------------------------------------------------
-
-// ---- Chest event wiring -------------------------------------------------------
-
-/** Build item detail for the chest UI from an entity ID */
-function buildChestItemDetail(id) {
-  const info = world.get(id, ItemInfo);
-  const name = world.get(id, NamedIdentity);
-  if (!info) return null;
-  return {
-    id,
-    name: name?.name || info.description || info.type || 'item',
-    type: info.type,
-    slot: info.slot,
-    count: info.count || 1,
-    rarityName: info.rarityName || 'common',
-    description: info.description || '',
-    bonuses: info.bonuses || {},
-    affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
-  };
-}
-
-/** Dispatch current chest state to the UI */
-function dispatchChestData(chestId) {
-  const inv = world.get(chestId, Inventory);
-  if (!inv) return;
-  const chestItems = [];
-  for (const id of (inv.items || [])) {
-    const detail = buildChestItemDetail(id);
-    if (detail) chestItems.push(detail);
-  }
-  const pe = playerEntity(world);
-  const playerItems = [];
-  if (pe) {
-    const playerInv = world.get(pe.id, Inventory);
-    if (playerInv) {
-      for (const id of playerInv.items) {
-        const info = world.get(id, ItemInfo);
-        if (!info || info.type === 'currency') continue;
-        const name = world.get(id, NamedIdentity);
-        playerItems.push({
-          id,
-          name: name?.name || info.description || info.type || 'item',
-          type: info.type,
-          slot: info.slot,
-          count: info.count || 1,
-          rarityName: info.rarityName || 'common',
-          description: info.description || '',
-        });
-      }
-    }
-  }
-  try {
-    window.dispatchEvent(new CustomEvent('ui:chestData', { detail: {
-      chestId, chestItems, playerItems,
-    }}));
-  } catch {}
-}
-
-// When chest:open fires from interaction system → open chest UI
-world.on('chest:open', ({ actor, targetId }) => {
-  log('You open the chest.');
-  dispatchChestData(targetId);
-  try { window.dispatchEvent(new CustomEvent('ui:openChest', { detail: { chestId: targetId } })); } catch {}
-});
-
-// Take request from chest UI
-addEventListener('ui:requestChestTake', (ev) => {
-  /** @type {CustomEvent} */ // @ts-ignore
-  const e = ev;
-  const { chestId, itemId } = e?.detail || {};
-  const pe = playerEntity(world);
-  if (!pe) return;
-
-  const chestInv = world.get(chestId, Inventory);
-  if (!chestInv) return;
-
-  // Verify item is in chest
-  const idx = chestInv.items.indexOf(itemId);
-  if (idx === -1) return;
-
-  // Check player inventory capacity
-  const playerInv = world.get(pe.id, Inventory);
-  if (playerInv && playerInv.items.length >= playerInv.capacity) {
-    log('Your inventory is full.');
-    return;
-  }
-
-  // Transfer item from chest to player
-  chestInv.items.splice(idx, 1);
-  if (playerInv) {
-    try { world.remove(itemId, Position); } catch {}
-    playerInv.items.push(itemId);
-  }
-
-  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
-  log(`You take ${bracketizeName(itemName)} from the chest.`);
-
-  dispatchChestData(chestId);
-});
-
-// Put request from chest UI
-addEventListener('ui:requestChestPut', (ev) => {
-  /** @type {CustomEvent} */ // @ts-ignore
-  const e = ev;
-  const { chestId, itemId } = e?.detail || {};
-  const pe = playerEntity(world);
-  if (!pe) return;
-
-  const chestInv = world.get(chestId, Inventory);
-  if (!chestInv) return;
-  const info = world.get(itemId, ItemInfo);
-  if (!info) return;
-
-  // Check chest capacity
-  if (chestInv.items.length >= chestInv.capacity) {
-    log('The chest is full.');
-    return;
-  }
-
-  // Remove from player inventory
-  const playerInv = world.get(pe.id, Inventory);
-  if (playerInv) {
-    const idx = playerInv.items.indexOf(itemId);
-    if (idx !== -1) playerInv.items.splice(idx, 1);
-  }
-
-  // Unequip if equipped
-  const eq = world.get(pe.id, Equipment);
-  if (eq) {
-    for (const slot of ['weapon', 'armor', 'shield', 'ring1', 'ring2', 'ammo']) {
-      if (eq[slot] === itemId) { eq[slot] = null; break; }
-    }
-  }
-
-  // Add to chest inventory
-  chestInv.items.push(itemId);
-
-  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
-  log(`You put ${bracketizeName(itemName)} in the chest.`);
-
-  dispatchChestData(chestId);
-});
-
-// ---- End chest event wiring ---------------------------------------------------
+const shopWiring = installShopWiring({ world, playerEntity, log, bracketizeName });
+installChestWiring({ world, playerEntity, log, bracketizeName });
 
 // Update inventory and log when an item is equipped
 world.on('item:equipped', ({ actor, itemId, slot, name }) => {
@@ -1544,6 +1464,7 @@ world.on('moved', ({ id, to }) => {
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== id) return;
+  shopWiring.handlePlayerMoved();
 
   // Find stairs within Chebyshev distance 1
   let nearestStair = null;
@@ -1746,11 +1667,47 @@ function render(worldView) {
   }
 
   // Pass 2: entities (doors, stairs, monsters, items, player)
+  // When a tile contains both items and actors, slightly offset item glyphs
+  // so ground items (like corpses) remain visible under occupants.
+  const stackMeta = new Map(); // "x,y" -> { maxLayer:number, itemSeen:number }
+  for (let i = 0; i < worldView.entities.length; i++) {
+    const e = worldView.entities[i];
+    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
+    const key = `${e.pos.x},${e.pos.y}`;
+    const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
+    const meta = stackMeta.get(key);
+    if (!meta) stackMeta.set(key, { maxLayer: layer, itemSeen: 0 });
+    else if (layer > meta.maxLayer) meta.maxLayer = layer;
+  }
+
+  const ITEM_STACK_OFFSETS = [
+    [-0.18, 0.20],
+    [0.00, 0.20],
+    [0.18, 0.20],
+    [-0.10, 0.30],
+    [0.10, 0.30],
+  ];
+
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
+
+    let drawX = e.pos.x;
+    let drawY = e.pos.y;
+    if (layer === 100) {
+      const meta = stackMeta.get(`${e.pos.x},${e.pos.y}`);
+      if (meta && meta.maxLayer > layer) {
+        const idx = Math.min(meta.itemSeen, ITEM_STACK_OFFSETS.length - 1);
+        const [ox, oy] = ITEM_STACK_OFFSETS[idx];
+        meta.itemSeen += 1;
+        drawX += ox;
+        drawY += oy;
+      }
+    }
+
+    drawKind(glyphAtlas, bctx, k, drawX, drawY);
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
     if (PERF.quality !== 'low' && k === 'grid_bug') {
@@ -1884,12 +1841,12 @@ function render(worldView) {
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "#9cf";
     ctx.font = "12px monospace";
-    ctx.textAlign = "left"; 
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    const s = fx.stats();
-    ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8); // DEBUG
-    const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
-    ctx.fillText(`fx fps: ${fpsInt}`, 8, 24); // DEBUG
+    // const s = fx.stats();
+    // ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8); // DEBUG
+    // const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
+    // ctx.fillText(`fx fps: ${fpsInt}`, 8, 24); // DEBUG
 
     // Optional rules profiler overlay (top 3 systems by last tick duration)
     const prof = /** @type any */ (window).__JSHACK_RULES_PROF;
@@ -1944,9 +1901,10 @@ function frame(now) {
   ftext.step(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
-  updateVitalsHUD();
-  updateCombatHUD();
-  updateDepthHUD();
+  hudFeeds.updateVitalsHUD();
+  hudFeeds.updateCombatHUD();
+  hudFeeds.updateDepthHUD();
+  hudFeeds.updatePetHUD();
 
   // Render
   const view = getCachedView();
@@ -2312,81 +2270,6 @@ function drawArrowEffects(ctx) {
   }
 
   ctx.restore();
-}
-
-// --- Depth HUD feed (dungeon level) ----------------------------------------
-let _lastDepth = -1;
-function updateDepthHUD() {
-  for (const [, state] of world.query(DungeonState)) {
-    const d = state.currentDepth;
-    if (d !== _lastDepth) {
-      _lastDepth = d;
-      try { window.dispatchEvent(new CustomEvent('ui:updateDepth', { detail: { depth: d } })); } catch {}
-    }
-    break;
-  }
-}
-
-// --- Vitals HUD feed (HP/Mana) --------------------------------------------
-let _lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1 };
-function updateVitalsHUD() {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  /** @type {{ hp?:number, maxHp?:number }|null} */
-  const vit = /** @type any */ (world.get(pe.id, Vitality));
-  const m = getPlayerMana();
-  const hp = Number(vit?.hp ?? 0), maxHp = Number(vit?.maxHp ?? 0);
-  if (hp !== _lastVitals.hp || maxHp !== _lastVitals.maxHp || m.mana !== _lastVitals.mana || m.maxMana !== _lastVitals.maxMana) {
-    _lastVitals = { hp, maxHp, mana: m.mana, maxMana: m.maxMana };
-    try { window.dispatchEvent(new CustomEvent('ui:updateVitals', { detail: _lastVitals })); } catch {}
-  }
-}
-
-// --- Combat HUD feed (weapon, defense, statuses) -------------------------
-let _lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: '', affixSig: '' };
-function updateCombatHUD() {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const eq = /** @type any */ (world.get(pe.id, Equipment));
-  const st = /** @type any */ (world.get(pe.id, ActiveEffects));
-  const wid = Number(eq?.weapon || 0);
-  const atk = Number(eq?.attackDerived || 0);
-  const def = Number(eq?.defenseDerived || 0);
-  const wInfo = wid ? world.get(wid, ItemInfo) : null;
-  const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : '';
-  const dmgDice = wInfo?.damageDice || '';
-  const statuses = Array.isArray(st?.effects) ? st.effects.map((e) => ({ key: String(e.key||e.type||'').toLowerCase(), turns: Number(e.turnsLeft||e.duration||0), stacks: Number(e.stacks||1) })) : [];
-  const statusSig = statuses.map(s=>`${s.key}:${s.turns}:${s.stacks}`).join('|');
-
-  // Collect equipped affix names for HUD display
-  const affixIds = [];
-  const pushAffixes = (id) => {
-    const info = id ? world.get(id, ItemInfo) : null;
-    const arr = info && Array.isArray(info.affixes) ? info.affixes : [];
-    for (const a of arr) affixIds.push(String(a));
-  };
-  if (eq) {
-    pushAffixes(Number(eq.weapon||0));
-    pushAffixes(Number(eq.armor||0));
-    pushAffixes(Number(eq.ring1||0));
-    pushAffixes(Number(eq.ring2||0));
-  }
-  // Do not show Thorns as a persistent affix chip; it should only appear in Status when it procs
-  const affixNames = affixIds
-    .filter((id) => !/^thorns/i.test(String(id)))
-    .map((id) => (AFFIX_DEFS?.[id]?.name) || id);
-  const affixSig = affixNames.join('|');
-  if (_lastCombatHud.weaponId !== wid || _lastCombatHud.atk !== atk || _lastCombatHud.def !== def || _lastCombatHud.statusSig !== statusSig || _lastCombatHud.affixSig !== affixSig) {
-    _lastCombatHud = { weaponId: wid, atk, def, statusSig, affixSig };
-    try {
-      window.dispatchEvent(new CustomEvent('ui:updateCombatHUD', { detail: {
-        weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk } : null,
-        defense: def,
-        statuses,
-        affixes: affixNames
-      }}));
-    } catch {}
-  }
 }
 
 /** @param {CanvasRenderingContext2D} ctx 

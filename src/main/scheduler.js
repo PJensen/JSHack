@@ -13,15 +13,18 @@ import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
 import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
+import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
-import { petFollowSystem } from "../rules/systems/petFollowSystem.js";
+import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
+import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { movementSystem } from "../rules/systems/movementSystem.js";
 import { combatSystem } from "../rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
+import { staminaRegenerationSystem } from "../rules/systems/staminaRegenerationSystem.js";
 import { monsterSpawnerSystem } from "../rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../rules/systems/deitySystem.js";
@@ -49,8 +52,10 @@ export function configureWorld(world) {
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
   registerSystem(aiChaseSystem, 'intents');
-  registerSystem(petFollowSystem, 'intents');
+  registerSystem(petCommandSystem, 'intents'); // Process pet commands first
+  registerSystem(petBehaviorSystem, 'intents'); // Then execute pet behaviors
   registerSystem(waitSystem, 'intents');
+  registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
   registerSystem(equipItemSystem, 'intents');
@@ -74,6 +79,7 @@ export function configureWorld(world) {
   registerSystem(effectSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
+  registerSystem(staminaRegenerationSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase
