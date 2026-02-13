@@ -26,6 +26,7 @@ import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSyst
 import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../../src/rules/systems/deitySystem.js";
 import { engraveSystem, installEngraveListeners } from "../../src/rules/systems/engraveSystem.js";
+import { hungerSystem } from "../../src/rules/systems/hungerSystem.js";
 // Side-effect: registers script handlers at import time
 import "../../src/rules/scripts/traps.js";
 import "../../src/rules/scripts/monsters.js";
@@ -67,6 +68,7 @@ export function configureWorld(world) {
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
+  registerSystem(hungerSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');

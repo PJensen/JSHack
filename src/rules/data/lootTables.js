@@ -53,6 +53,14 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "sub:food": {
+    rolls: { min: 1, max: 2 },
+    entries: [
+      { type: "archetype", weight: 60, archetype: "Ration" },
+      { type: "archetype", weight: 40, archetype: "IronRation" },
+    ],
+  },
+
   // ── Monster tier defaults ─────────────────────────────────────────
 
   "drop:tier0": {
@@ -63,6 +71,7 @@ export const LOOT_TABLES = {
       { type: "archetype", weight: 25, archetype: "HealthPotion" },
       { type: "table",     weight: 20, tableId: "sub:equip_common" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
+      { type: "archetype", weight: 10, archetype: "Ration" },
     ],
   },
 
@@ -76,6 +85,7 @@ export const LOOT_TABLES = {
       { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "ring_health"], affixChance: 0.20, affixCountMax: 1 },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
+      { type: "archetype", weight: 8,  archetype: "Ration" },
     ],
   },
 
@@ -88,6 +98,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
       { type: "equip",     weight: 15, pool: ["ring_health", "ring_precision", "ring_arcana"], affixChance: 0.40, affixCountMax: 1 },
+      { type: "archetype", weight: 5,  archetype: "IronRation" },
     ],
   },
 
@@ -153,6 +164,7 @@ export const LOOT_TABLES = {
       { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
+      { type: "archetype", weight: 10, archetype: "Ration" },
     ],
   },
 
@@ -166,6 +178,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "shield_iron"],
         affixChance: 0.50, affixCountMax: 2 },
+      { type: "archetype", weight: 8,  archetype: "IronRation" },
     ],
   },
 
@@ -190,6 +203,7 @@ export const LOOT_TABLES = {
       { type: "table",  weight: 30, tableId: "sub:equip_magic" },
       { type: "table",  weight: 15, tableId: "sub:scrolls" },
       { type: "table",  weight: 15, tableId: "sub:spellbooks" },
+      { type: "table",  weight: 15, tableId: "sub:food" },
     ],
   },
 
@@ -205,6 +219,7 @@ export const LOOT_TABLES = {
       { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:scrolls" },
+      { type: "archetype", weight: 8,  archetype: "Ration" },
     ],
   },
 

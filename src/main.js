@@ -55,6 +55,7 @@ import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
 import { Owner } from "./rules/components/Owner.js";
+import { Hunger } from "./rules/components/Hunger.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -217,6 +218,8 @@ if (!playerEntity(world)) {
     } else {
       world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
     }
+    // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
+    world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
   }
 }
 
@@ -1236,6 +1239,150 @@ addEventListener('ui:requestSell', (ev) => {
 });
 
 // ---- End shop event wiring ---------------------------------------------------
+
+// ---- Chest event wiring -------------------------------------------------------
+
+/** Build item detail for the chest UI from an entity ID */
+function buildChestItemDetail(id) {
+  const info = world.get(id, ItemInfo);
+  const name = world.get(id, NamedIdentity);
+  if (!info) return null;
+  return {
+    id,
+    name: name?.name || info.description || info.type || 'item',
+    type: info.type,
+    slot: info.slot,
+    count: info.count || 1,
+    rarityName: info.rarityName || 'common',
+    description: info.description || '',
+    bonuses: info.bonuses || {},
+    affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
+  };
+}
+
+/** Dispatch current chest state to the UI */
+function dispatchChestData(chestId) {
+  const inv = world.get(chestId, Inventory);
+  if (!inv) return;
+  const chestItems = [];
+  for (const id of (inv.items || [])) {
+    const detail = buildChestItemDetail(id);
+    if (detail) chestItems.push(detail);
+  }
+  const pe = playerEntity(world);
+  const playerItems = [];
+  if (pe) {
+    const playerInv = world.get(pe.id, Inventory);
+    if (playerInv) {
+      for (const id of playerInv.items) {
+        const info = world.get(id, ItemInfo);
+        if (!info || info.type === 'currency') continue;
+        const name = world.get(id, NamedIdentity);
+        playerItems.push({
+          id,
+          name: name?.name || info.description || info.type || 'item',
+          type: info.type,
+          slot: info.slot,
+          count: info.count || 1,
+          rarityName: info.rarityName || 'common',
+          description: info.description || '',
+        });
+      }
+    }
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('ui:chestData', { detail: {
+      chestId, chestItems, playerItems,
+    }}));
+  } catch {}
+}
+
+// When chest:open fires from interaction system → open chest UI
+world.on('chest:open', ({ actor, targetId }) => {
+  log('You open the chest.');
+  dispatchChestData(targetId);
+  try { window.dispatchEvent(new CustomEvent('ui:openChest', { detail: { chestId: targetId } })); } catch {}
+});
+
+// Take request from chest UI
+addEventListener('ui:requestChestTake', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const { chestId, itemId } = e?.detail || {};
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const chestInv = world.get(chestId, Inventory);
+  if (!chestInv) return;
+
+  // Verify item is in chest
+  const idx = chestInv.items.indexOf(itemId);
+  if (idx === -1) return;
+
+  // Check player inventory capacity
+  const playerInv = world.get(pe.id, Inventory);
+  if (playerInv && playerInv.items.length >= playerInv.capacity) {
+    log('Your inventory is full.');
+    return;
+  }
+
+  // Transfer item from chest to player
+  chestInv.items.splice(idx, 1);
+  if (playerInv) {
+    try { world.remove(itemId, Position); } catch {}
+    playerInv.items.push(itemId);
+  }
+
+  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+  log(`You take ${bracketizeName(itemName)} from the chest.`);
+
+  dispatchChestData(chestId);
+});
+
+// Put request from chest UI
+addEventListener('ui:requestChestPut', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const { chestId, itemId } = e?.detail || {};
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const chestInv = world.get(chestId, Inventory);
+  if (!chestInv) return;
+  const info = world.get(itemId, ItemInfo);
+  if (!info) return;
+
+  // Check chest capacity
+  if (chestInv.items.length >= chestInv.capacity) {
+    log('The chest is full.');
+    return;
+  }
+
+  // Remove from player inventory
+  const playerInv = world.get(pe.id, Inventory);
+  if (playerInv) {
+    const idx = playerInv.items.indexOf(itemId);
+    if (idx !== -1) playerInv.items.splice(idx, 1);
+  }
+
+  // Unequip if equipped
+  const eq = world.get(pe.id, Equipment);
+  if (eq) {
+    for (const slot of ['weapon', 'armor', 'shield', 'ring1', 'ring2', 'ammo']) {
+      if (eq[slot] === itemId) { eq[slot] = null; break; }
+    }
+  }
+
+  // Add to chest inventory
+  chestInv.items.push(itemId);
+
+  const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+  log(`You put ${bracketizeName(itemName)} in the chest.`);
+
+  dispatchChestData(chestId);
+});
+
+// ---- End chest event wiring ---------------------------------------------------
 
 // Update inventory and log when an item is equipped
 world.on('item:equipped', ({ actor, itemId, slot, name }) => {

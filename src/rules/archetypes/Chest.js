@@ -4,6 +4,7 @@ import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Inventory } from "../components/Inventory.js";
 
 export const Chest = defineArchetype(
   "Chest",
@@ -11,5 +12,6 @@ export const Chest = defineArchetype(
   [NamedIdentity, { name: "Chest", identity: "chest" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "openChest", params: { lootTable: "basic" } }],
-  [Material, { kind: "iron" }]
+  [Material, { kind: "iron" }],
+  [Inventory, { items: [], capacity: 20, weightLimit: null }]
 );

@@ -3,11 +3,8 @@ import { Interactable } from "../components/Interactable.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
 import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
-import { Position } from "../components/Position.js";
-import { DungeonState } from "../components/DungeonState.js";
-import { createRng } from "../../lib/ecs-js/rng.js";
-import { dropLoot } from "../data/lootResolver.js";
 import { ShopInventory } from "../components/ShopInventory.js";
+import { Inventory } from "../components/Inventory.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -33,19 +30,14 @@ export function InteractionSystem(world, actor, targetId) {
 
         case "openChest":
             {
-                const lootTableId = inter.params?.lootTable || "chest:basic";
-                const chestSeed = ((world.seed >>> 0) ^ ((targetId * 0x9e3779b9) >>> 0) ^ 0xCE57) >>> 0;
-                const rng = createRng(chestSeed);
-                let depth = 1;
-                for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
-                const chestPos = world.get(targetId, Position);
-                const droppedIds = chestPos
-                    ? dropLoot(world, lootTableId, rng, depth, { x: chestPos.x, y: chestPos.y })
-                    : [];
-                // Disable chest so it can't be opened again
-                try { world.remove(targetId, Interactable); } catch {}
-                try { world.set(targetId, Collider, { solid: false, blocksSight: false }); } catch {}
-                world.emit("interaction", { actor, targetId, action: "openChest", loot: lootTableId, items: droppedIds });
+                const inv = world.get(targetId, Inventory);
+                if (inv) {
+                    world.emit?.("chest:open", {
+                        actor,
+                        targetId,
+                        chestItems: [...(inv.items || [])],
+                    });
+                }
             }
             break;
 

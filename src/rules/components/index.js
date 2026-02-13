@@ -30,3 +30,4 @@ export { MonsterSpawner } from './MonsterSpawner.js';
 export { Devotion } from './Devotion.js';
 export { Engraving } from './Engraving.js';
 export { EngraveIntent } from './Intents/EngraveIntent.js';
+export { Hunger } from './Hunger.js';

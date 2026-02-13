@@ -6,4 +6,4 @@ export { Sign } from './Sign.js';
 export { FloorTile, WallTile } from './Tiles.js';
 export { PlayerArchetype, createPlayer } from './Player.js';
 export { Spawner } from './Spawner.js';
-
+export { Ration, IronRation, createCorpse } from './Food.js';
