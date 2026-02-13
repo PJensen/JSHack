@@ -59,7 +59,7 @@ export function cleanupSystem(world) {
           // Drop a corpse for the killed monster
           // Base 75% chance, +8% per tier (higher tier = more guaranteed)
           const corpseChance = Math.min(1.0, 0.75 + (monsterDef.tier || 0) * 0.08);
-          const corpseRoll = rng.next ? rng.next() : Math.random();
+          const corpseRoll = rng.next();
           if (corpseRoll < corpseChance) {
             const corpseId = createCorpse(world, monsterDef, { x: pos.x, y: pos.y });
             try { world.emit && world.emit('item:dropped', { itemId: corpseId, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }

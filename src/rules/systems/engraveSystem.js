@@ -3,6 +3,7 @@ import { Engraving } from "../components/Engraving.js";
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Physiology } from "../components/Physiology.js";
+import { mulberry32, combatSeed } from "../utils/rng.js";
 
 /**
  * engraveSystem — consumes EngraveIntent, creates an Engraving entity
@@ -101,9 +102,6 @@ export function installEngraveListeners(world) {
   if (!world || world[INSTALLED]) return;
   world[INSTALLED] = true;
 
-  // Simple seeded-ish RNG derived from world step so it's deterministic
-  const rng = () => Math.random();
-
   world.on("moved", ({ id, to }) => {
     if (!to) return;
     const tx = to.x | 0, ty = to.y | 0;
@@ -114,6 +112,9 @@ export function installEngraveListeners(world) {
       // Don't scramble if the text is already fully degraded
       const clean = eng.text.split("").filter((c) => !SCUFF.includes(c));
       if (!clean.length) continue;
+
+      // Deterministic per (step, walker, engraving)
+      const rng = mulberry32(combatSeed(world.seed, world.step, id, eid, 0xE69A0000));
 
       // Determine mass of the walker
       const phys = world.get(id, Physiology);
