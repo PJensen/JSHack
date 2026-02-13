@@ -14,7 +14,9 @@ function emptyDerived() {
     maxHpDerived: 0,
     critChanceDerived: 0,
     critMultDerived: 0,
-    manaRegenDerived: 0
+    manaRegenDerived: 0,
+    staminaRegenDerived: 0,
+    maxStaminaDerived: 0
   };
 }
 
@@ -26,6 +28,8 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.critChance)) acc.critChanceDerived += bonuses.critChance;
   if (Number.isFinite(bonuses.critMult)) acc.critMultDerived += bonuses.critMult;
   if (Number.isFinite(bonuses.manaRegen)) acc.manaRegenDerived += bonuses.manaRegen;
+  if (Number.isFinite(bonuses.staminaRegen)) acc.staminaRegenDerived += bonuses.staminaRegen;
+  if (Number.isFinite(bonuses.maxStamina)) acc.maxStaminaDerived += bonuses.maxStamina;
 }
 
 function runAffixPassives(world, ctx, affixIds) {
@@ -50,7 +54,7 @@ export function equipmentSystem(world) {
       applyBonuses(d, info.bonuses);
       // passive affixes
       const ctx = {
-        addBonus: (k, v) => { if (k in d) d[k] += v; else if (k === 'attack') d.attackDerived += v; else if (k === 'defense') d.defenseDerived += v; else if (k === 'maxHp') d.maxHpDerived += v; else if (k === 'critChance') d.critChanceDerived += v; else if (k === 'critMult') d.critMultDerived += v; else if (k === 'manaRegen') d.manaRegenDerived += v; },
+        addBonus: (k, v) => { if (k in d) d[k] += v; else if (k === 'attack') d.attackDerived += v; else if (k === 'defense') d.defenseDerived += v; else if (k === 'maxHp') d.maxHpDerived += v; else if (k === 'critChance') d.critChanceDerived += v; else if (k === 'critMult') d.critMultDerived += v; else if (k === 'manaRegen') d.manaRegenDerived += v; else if (k === 'staminaRegen') d.staminaRegenDerived += v; else if (k === 'maxStamina') d.maxStaminaDerived += v; },
         entityId: id,
         itemId,
         world
@@ -65,5 +69,7 @@ export function equipmentSystem(world) {
     eq.critChanceDerived = d.critChanceDerived;
     eq.critMultDerived = d.critMultDerived;
     eq.manaRegenDerived = d.manaRegenDerived;
+    eq.staminaRegenDerived = d.staminaRegenDerived;
+    eq.maxStaminaDerived = d.maxStaminaDerived;
   }
 }

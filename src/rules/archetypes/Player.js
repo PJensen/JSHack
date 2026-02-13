@@ -9,6 +9,7 @@ import { Vitality } from "../components/Vitality.js";
 import { Settings } from "../components/Settings.js";
 import { Equipment } from "../components/Equipment.js";
 import { Mana } from "../components/Mana.js";
+import { Stamina } from "../components/Stamina.js";
 import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
 import { Facing } from "../components/Facing.js";
@@ -27,6 +28,7 @@ export const PlayerArchetype = defineArchetype(
   [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })],
   [Equipment, {}],
   [Mana, {}],
+  [Stamina, (p) => ({ maxStamina: p.maxStamina ?? 100, stamina: p.stamina ?? 100, staminaRegen: p.staminaRegen ?? 5.0 })],
   [Brain, {}],
   [Facing, { dx: 0, dy: 0 }]
 );
@@ -44,6 +46,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Vitality, { maxHp: params.maxHp ?? 10, hp: params.hp ?? (params.maxHp ?? 10) });
     world.add(id, Settings, { autoPickup: params.autoPickup ?? true, autoPickupKinds: params.autoPickupKinds ?? ['currency'] });
     world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
+    world.add(id, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 5.0 });
     return id;
   })();
 }

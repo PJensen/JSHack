@@ -11,6 +11,7 @@ export const Actions = Object.freeze({
   // Rules-directed intents
   Move: "rules.move", // payload: { dx:number, dy:number }
   Wait: "rules.wait", // payload: {}
+  Pray: "rules.pray", // payload: {}
   DrinkPotion: "rules.drinkPotion", // payload: { itemId?:number, targetId?:number }
   CastActiveSpell: "rules.castActiveSpell", // payload: { spellId?:number, targetId?:number }
   EquipItem: "rules.equipItem", // payload: { itemId:number }
@@ -32,6 +33,7 @@ export const defaultActionSinks = Object.freeze({
   // Rules-directed intents
   [Actions.Move]: Sinks.rules,
   [Actions.Wait]: Sinks.rules,
+  [Actions.Pray]: Sinks.rules,
   [Actions.DrinkPotion]: Sinks.rules,
   [Actions.PickupItem]: Sinks.rules,
   [Actions.CastActiveSpell]: Sinks.rules,

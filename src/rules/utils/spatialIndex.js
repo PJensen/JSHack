@@ -5,7 +5,7 @@ import { Position } from '../components/Position.js';
 import { Changed } from '../../lib/ecs-js/index.js';
 import { CHUNK_SIZE } from '../environment/dungeon/constants.js';
 
-/** @typedef {{ byCell: Map<string, Set<number>>, entityCell: Map<number, string>, lastStep: number, seeded: boolean }} SpatialState */
+/** @typedef {{ byCell: Map<string, Set<number>>, entityCell: Map<number, string>, lastStep: number, seeded: boolean, lastBackfillStep: number }} SpatialState */
 
 /** @type {WeakMap<object, SpatialState>} */
 const _states = new WeakMap();
@@ -23,7 +23,7 @@ function _cell(x, y) {
 function _state(world) {
   let st = _states.get(world);
   if (!st) {
-    st = { byCell: new Map(), entityCell: new Map(), lastStep: -1, seeded: false };
+    st = { byCell: new Map(), entityCell: new Map(), lastStep: -1, seeded: false, lastBackfillStep: -1 };
     _states.set(world, st);
   }
   return st;
@@ -63,6 +63,7 @@ export function rebuildSpatialIndex(world) {
   }
   st.lastStep = world.step | 0;
   st.seeded = true;
+  st.lastBackfillStep = world.step | 0;
 }
 
 /** Update index from Changed(Position). Should run once per tick (after movement). */
@@ -78,7 +79,22 @@ export function updateSpatialIndex(world) {
 /** Ensure index exists for current world state (safe to call from render). */
 export function ensureSpatialIndex(world) {
   const st = _state(world);
-  if (!st.seeded) rebuildSpatialIndex(world);
+  if (!st.seeded) {
+    rebuildSpatialIndex(world);
+    return;
+  }
+  const step = world.step | 0;
+  if (st.lastBackfillStep === step) return;
+
+  // Render-side safety net: deferred structural changes may miss same-tick
+  // cleanup sync; backfill any Position entities absent from the index.
+  for (const [id, pos] of world.query(Position)) {
+    if (st.entityCell.has(id)) continue;
+    const { key } = _cell(pos.x, pos.y);
+    _addToCell(st, key, id);
+    st.entityCell.set(id, key);
+  }
+  st.lastBackfillStep = step;
 }
 
 /** Clear index for a world (e.g., on floor transition). */
@@ -87,6 +103,7 @@ export function clearSpatialIndex(world) {
   st.byCell.clear();
   st.entityCell.clear();
   st.lastStep = -1;
+  st.lastBackfillStep = -1;
   st.seeded = false;
 }
 

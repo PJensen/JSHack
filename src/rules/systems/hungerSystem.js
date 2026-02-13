@@ -60,22 +60,26 @@ export function hungerSystem(world) {
 
     // 3) Project hunger status into Status component for HUD display
     const stat = world.get(id, Status);
-    if (stat && Array.isArray(stat.statuses)) {
-      // Remove any previous hunger-related statuses
-      stat.statuses = stat.statuses.filter(s => !HUNGER_STATUS_TYPES.has(s.type));
+    const nextStatuses = Array.isArray(stat?.statuses)
+      ? stat.statuses.filter(s => !HUNGER_STATUS_TYPES.has(s.type))
+      : [];
 
-      // Add current hunger status (skip 'normal' as it's invisible)
-      if (hc.satiation > 0) {
-        stat.statuses.push({ type: 'satiated', duration: hc.satiation, potency: 1, stacks: 1 });
-      } else if (level !== 'normal') {
-        stat.statuses.push({
-          type: level,
-          duration: 9999,
-          potency: HUNGER_POTENCY[level] || 0,
-          stacks: 1,
-        });
-      }
+    // Add current hunger status (skip 'normal' as it's invisible)
+    if (hc.satiation > 0) {
+      nextStatuses.push({ type: 'satiated', duration: hc.satiation, potency: 1, stacks: 1 });
+    } else if (level !== 'normal') {
+      nextStatuses.push({
+        type: level,
+        duration: 9999,
+        potency: HUNGER_POTENCY[level] || 0,
+        stacks: 1,
+      });
     }
+
+    try {
+      if (stat) world.set(id, Status, { statuses: nextStatuses });
+      else if (nextStatuses.length > 0) world.add(id, Status, { statuses: nextStatuses });
+    } catch { /* deferred during tick; will flush post-tick */ }
 
     // 4) Emit event for UI/bridge
     try {
