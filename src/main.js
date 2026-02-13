@@ -53,9 +53,8 @@ import { ShopInventory } from "./rules/components/ShopInventory.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
-import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack } from "./rules/archetypes/Items.js";
-import { Ration, IronRation } from "./rules/archetypes/Food.js";
-import { buildEquipmentItem } from "./rules/data/equipmentLoader.js";
+import { GoldStack } from "./rules/archetypes/Items.js";
+import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
@@ -374,25 +373,6 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
     if (pe) {
       const inv = world.get(pe.id, Inventory);
       if (inv && Array.isArray(inv.items)) {
-        // Map of item identities to their archetype constructors
-        const ITEM_ARCHETYPES = {
-          'gold': GoldStack,
-          'potion_health': HealthPotion,
-          'ammo_arrows': ArrowsStack,
-          'ammo_fire_arrows': FireArrowsStack,
-          'food_ration': Ration,
-          'food_iron_ration': IronRation,
-          'scroll_mapping': ScrollOfMapping,
-        };
-
-        // Equipment IDs (handled differently via buildEquipmentItem)
-        const EQUIPMENT_IDS = new Set([
-          'sword_plain', 'dagger_quick', 'axe_heavy',
-          'leather_armor', 'chain_armor',
-          'ring_health', 'ring_precision', 'ring_arcana',
-          'shield_wood', 'shield_iron', 'iron_pickaxe', 'bow_short'
-        ]);
-
         // Parse comma-separated item specs
         const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
 
@@ -413,39 +393,14 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
           }
 
           try {
-            let createdItemId = null;
+            // Use centralized item factory
+            const createdItemId = createItemById(world, itemId, { count });
 
-            // Check if it's an archetype-based item
-            if (ITEM_ARCHETYPES[itemId]) {
-              createdItemId = createFrom(world, ITEM_ARCHETYPES[itemId], {});
-              // Set count for stackable items
-              if (count > 1) {
-                world.mutate(createdItemId, ItemInfo, r => { r.count = count; });
-              }
-            }
-            // Check if it's an equipment item
-            else if (EQUIPMENT_IDS.has(itemId)) {
-              createdItemId = buildEquipmentItem(world, itemId, {});
-              // Equipment typically isn't stackable, create multiple if count > 1
-              if (count > 1) {
-                inv.items.push(createdItemId);
-                for (let i = 1; i < count; i++) {
-                  const extraId = buildEquipmentItem(world, itemId, {});
-                  inv.items.push(extraId);
-                }
-                console.log(`[?give] Created ${count}x ${itemId}`);
-                continue; // Skip the single push below
-              }
-            }
-            else {
-              console.warn(`[?give] Unknown item: "${itemId}"`);
-              continue;
-            }
-
-            // Add the created item to inventory
             if (createdItemId !== null) {
               inv.items.push(createdItemId);
               console.log(`[?give] Created ${count}x ${itemId}`);
+            } else {
+              console.warn(`[?give] Unknown item: "${itemId}"`);
             }
           } catch (err) {
             console.error(`[?give] Error creating item "${itemId}":`, err);
