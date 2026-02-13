@@ -3,7 +3,6 @@
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { Collider } from "../components/Collider.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { Interactable } from "../components/Interactable.js";
 import { Inventory } from "../components/Inventory.js";
@@ -11,36 +10,21 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Settings } from "../components/Settings.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
-import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
 import { Facing } from "../components/Facing.js";
-import { getLivingEntityAt, getItemsAt } from "../utils/tileQueryCache.js";
+import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function movementSystem(world) {
-  // Build occupancy and terrain maps for quick blocking checks
-  const blocking = new Map(); // key(x,y) -> true if non-walkable terrain, solid collider, or living occupant present
-  const interactables = new Map(); // key(x,y) -> entity id with Interactable
-
-  for (const [id, pos] of world.query(Position)) {
-    const kk = key(pos.x, pos.y);
-    const col = world.get(id, Collider);
-    if (col && col.solid) {
-      blocking.set(kk, true);
-    }
-    // Treat any living entity as blocking by default (prevents walking through monsters)
-    const vit = world.get(id, Vitality);
-    if (vit && (vit.hp ?? 0) > 0) {
-      blocking.set(kk, true);
-    }
-    if (world.has(id, Interactable)) {
-      interactables.set(kk, id);
-    }
-  }
+  const tiles = getTileQuerySnapshot(world);
+  // Start from snapshot and reserve destinations as actors move this tick.
+  const blocking = new Set(tiles.blockedByCell);
+  const interactables = tiles.interactableByCell;
+  const living = tiles.livingByCell;
 
   for (const [actor, intent] of world.query(MoveIntent)) {
     try {
@@ -58,9 +42,9 @@ export function movementSystem(world) {
         world.set(actor, Facing, { dx: mdx, dy: mdy });
       }
 
-      if (!isWalkable(nx, ny) || blocking.get(k)) {
+      if (!isWalkable(nx, ny) || blocking.has(k)) {
         // Cheap bump-attack: prefer a living target with Vitality in the destination cell.
-        const target = getLivingEntityAt(world, nx, ny);
+        const target = living.get(k) || 0;
         const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
         if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
           // Check faction: neutral/shopkeeper NPCs with Interactable trigger interaction, not attack
@@ -86,7 +70,7 @@ export function movementSystem(world) {
         world.set(actor, Position, { x: nx, y: ny });
         world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
         // Reserve the destination so subsequent movers in this tick can't step into the same tile
-        blocking.set(k, true);
+        blocking.add(k);
 
         // Immediate auto-pickup for actors with Settings.autoPickup (defaults true)
         // Focused on currency to avoid unexpected heavy pickups.
@@ -95,43 +79,39 @@ export function movementSystem(world) {
         const enable = (set?.autoPickup !== false);
         if (inv && enable) {
           const kinds = Array.isArray(set?.autoPickupKinds) && set.autoPickupKinds.length ? set.autoPickupKinds : ["currency"];
-          const idsAtTile = getItemsAt(world, nx, ny);
-          const toTake = [];
-          for (let i = 0; i < idsAtTile.length; i++) {
-            const itemId = idsAtTile[i];
-            if (!world.isAlive(itemId)) continue;
-            const ipos = world.get(itemId, Position);
-            if (!ipos || ipos.x !== nx || ipos.y !== ny) continue;
-            const info = world.get(itemId, ItemInfo);
-            if (!info || !info.type || !kinds.includes(info.type)) continue;
-            toTake.push(itemId);
-          }
-          for (const itemId of toTake) {
-            const info = world.get(itemId, ItemInfo);
-            if (!info) continue;
-            const count = info.count || 1;
-            const ident = world.get(itemId, NamedIdentity)?.identity;
-            // find existing stack by identity
-            let stackTarget = 0;
-            for (const id of inv.items) {
-              const n = world.get(id, NamedIdentity);
-              if (n && n.identity === ident) { stackTarget = id; break; }
-            }
-            if (stackTarget) {
-              world.mutate(stackTarget, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count || 1) + count; });
-              world.destroy(itemId);
-            } else {
-              // capacity gate: allow if capacity not set or there's room
-              // Special case: currency ignores capacity so monsters can hoard gold even with capacity 0
-              const ignoreCapacity = info.type === 'currency';
-              if (ignoreCapacity || inv.capacity == null || inv.items.length < inv.capacity) {
-                try { world.remove(itemId, Position); } catch {}
-                inv.items.push(itemId);
-              } else {
-                // no capacity — skip silently for now
+          const idsAtTile = tiles.itemsByCell.get(k);
+          if (idsAtTile && idsAtTile.length > 0) {
+            for (let i = 0; i < idsAtTile.length; i++) {
+              const itemId = idsAtTile[i];
+              if (!world.isAlive(itemId)) continue;
+              const ipos = world.get(itemId, Position);
+              if (!ipos || ipos.x !== nx || ipos.y !== ny) continue;
+              const info = world.get(itemId, ItemInfo);
+              if (!info || !info.type || !kinds.includes(info.type)) continue;
+              const count = info.count || 1;
+              const ident = world.get(itemId, NamedIdentity)?.identity;
+              // find existing stack by identity
+              let stackTarget = 0;
+              for (const id of inv.items) {
+                const n = world.get(id, NamedIdentity);
+                if (n && n.identity === ident) { stackTarget = id; break; }
               }
+              if (stackTarget) {
+                world.mutate(stackTarget, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count || 1) + count; });
+                world.destroy(itemId);
+              } else {
+                // capacity gate: allow if capacity not set or there's room
+                // Special case: currency ignores capacity so monsters can hoard gold even with capacity 0
+                const ignoreCapacity = info.type === 'currency';
+                if (ignoreCapacity || inv.capacity == null || inv.items.length < inv.capacity) {
+                  try { world.remove(itemId, Position); } catch {}
+                  inv.items.push(itemId);
+                } else {
+                  // no capacity — skip silently for now
+                }
+              }
+              try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch {}
             }
-            try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch {}
           }
         }
       }
