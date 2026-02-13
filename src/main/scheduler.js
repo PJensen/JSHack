@@ -26,6 +26,7 @@ import { monsterSpawnerSystem } from "../rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../rules/systems/deitySystem.js";
 import { engraveSystem, installEngraveListeners } from "../rules/systems/engraveSystem.js";
+import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
@@ -42,6 +43,8 @@ export function configureWorld(world) {
   installAffixTriggers(world);
   // Install engraving scramble-on-step listener once per world
   installEngraveListeners(world);
+  // Install bump-interact listener for immediate interactions (doors, chests, NPCs)
+  installBumpInteractListener(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
