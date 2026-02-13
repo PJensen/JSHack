@@ -6,12 +6,13 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Brain } from "../components/Brain.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
+import { runScript, ScriptVerb } from "../scripting.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
  * useItemSystem — resolves UseIntent for generic item use.
  * Supports:
- * - Consumable items with a useEffect(world, actor, item) function
+ * - Consumable items with an effectKey dispatched via the scripting registry
  * - Learning spells from items of kind "learn" (e.g., spellbooks)
  *
  * Semantics:
@@ -43,15 +44,15 @@ export function useItemSystem(world) {
   const info = /** @type any */ (world.get(itemId, ItemInfo));
   /** @type {{identity?:string}|null} */
   const ni = /** @type any */ (world.get(itemId, NamedIdentity));
-  /** @type {{useEffect?:(w:any,a:number,i:number)=>void, remainingUses?:number}|null} */
+  /** @type {{effectKey?:string, effectParams?:object, remainingUses?:number}|null} */
   const cons = /** @type any */ (world.get(itemId, Consumable));
 
     let consumed = false;
     let learnedSpellId = null;
 
-    // Path 1: explicit consumable with useEffect
-    if (cons && typeof cons.useEffect === 'function') {
-      try { cons.useEffect(world, actor, itemId); } catch {}
+    // Path 1: consumable with a scripting-registry effectKey
+    if (cons && cons.effectKey) {
+      try { runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }); } catch {}
       // By default, consumables are consumed on use
       consumed = true;
     } else if (info && (info.type === 'learn' || info.type === 'scroll' || info.type === 'wand' || info.type === 'book')) {

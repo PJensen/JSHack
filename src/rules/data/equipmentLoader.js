@@ -19,7 +19,7 @@ export function listEquipment() { return Object.values(EQUIP_DEFS); }
  * buildEquipmentItem(world, equipId, opts?)
  * Creates an item entity in the world from a base equipment definition.
  * - Adds NamedIdentity (identity = equipId) and ItemInfo with type 'equip' and slot info
- * - Optionally attaches ScriptRef if base definition contains a script function
+ * - Optionally attaches ScriptRef if base definition contains a script key
  * - Does not set Position; caller should place it
  */
 export function buildEquipmentItem(world, equipId, opts = {}) {
@@ -45,7 +45,7 @@ export function buildEquipmentItem(world, equipId, opts = {}) {
   };
   world.add(id, ItemInfo, info);
   // Attach script reference when supplied (for onEquip/onHit, etc.)
-  if (typeof base.script === 'function') {
+  if (base.script && typeof base.script === 'string') {
     world.add(id, ScriptRef, { ref: base.script, params: { from: base.id } });
   }
   return id;

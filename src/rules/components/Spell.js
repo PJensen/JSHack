@@ -6,5 +6,4 @@ export const Spell = defineComponent('Spell', {
   id: null,
   name: '',
   cost: 0,
-  cast: null // function or reference
 });

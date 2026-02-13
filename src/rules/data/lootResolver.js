@@ -8,11 +8,10 @@ import { getEquipmentDef } from './equipment.js';
 import { getItem } from './items.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildEquipmentItem } from './equipmentLoader.js';
-import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, MagicItem } from '../archetypes/Items.js';
 import { Ration, IronRation } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
-import { NamedIdentity } from '../components/NamedIdentity.js';
 
 const MAX_NESTING = 5;
 
@@ -185,13 +184,11 @@ export function materializeDrop(world, drop, pos) {
     case "item": {
       const def = getItem(drop.params.itemId);
       if (!def) return null;
-      const id = world.create();
-      world.add(id, NamedIdentity, { name: def.name, identity: def.id });
-      world.add(id, ItemInfo, {
+      const id = createFrom(world, MagicItem, {
+        name: def.name, identity: def.id,
         type: def.type, slot: def.slot, weight: 1, value: 0,
         description: def.description, count: def.charges || 1,
         rarity: def.rarity || 1, rarityName: def.rarityName || 'common',
-        affixes: [],
       });
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;

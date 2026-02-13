@@ -3,8 +3,6 @@ import { NamedIdentity }          from "../components/NamedIdentity.js";
 import { ItemInfo }          from "../components/ItemInfo.js";
 import { Potion } from "../components/Potion.js";
 import { Consumable } from "../components/Consumable.js";
-import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
-import { markExplored } from "../environment/dungeon/exploredMap.js";
 
 // Simple Health Potion archetype using Potion component
 export const HealthPotion = defineArchetype(
@@ -71,13 +69,29 @@ export const FireArrowsStack = defineArchetype(
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Fire Arrows", identity: "ammo_fire_arrows" })],
 );
 
+// Generic magic item (spellbooks, wands, scrolls) — resolves from item def params
+export const MagicItem = defineArchetype(
+    "MagicItem",
+    [NamedIdentity, (p) => ({ name: p.name ?? "Item", identity: p.identity ?? "item" })],
+    [ItemInfo, (p) => ({
+        type: p.type ?? "learn",
+        slot: p.slot ?? "bag",
+        weight: p.weight ?? 1,
+        value: p.value ?? 0,
+        description: p.description ?? "",
+        count: p.count ?? 1,
+        rarity: p.rarity ?? 1,
+        rarityName: p.rarityName ?? "common",
+        affixes: [],
+    })],
+);
+
 // Debug/utility: reveals entire dungeon map when used
 export const ScrollOfMapping = defineArchetype(
     "ScrollOfMapping",
     [Consumable, {
-        useEffect: (_world, _actor, _itemId) => {
-            forEachLoadedTile((x, y) => markExplored(x, y));
-        },
+        effectKey: 'consumable:mapping',
+        effectParams: {},
         remainingUses: 1,
         potency: 0,
     }],

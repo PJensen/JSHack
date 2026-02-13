@@ -30,6 +30,7 @@ import { hungerSystem } from "../../src/rules/systems/hungerSystem.js";
 // Side-effect: registers script handlers at import time
 import "../../src/rules/scripts/traps.js";
 import "../../src/rules/scripts/monsters.js";
+import "../../src/rules/scripts/consumables.js";
 
 /**
  * @param {World} world
