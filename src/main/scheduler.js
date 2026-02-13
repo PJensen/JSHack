@@ -32,6 +32,7 @@ import { deitySystem } from "../rules/systems/deitySystem.js";
 import { engraveSystem, installEngraveListeners } from "../rules/systems/engraveSystem.js";
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
+import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -89,6 +90,8 @@ export function configureWorld(world) {
   registerSystem(monsterSpawnerSystem, 'effects');
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
+  // Ambient sounds check proximity in the effects phase
+  registerSystem(ambientSoundSystem, 'effects');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');

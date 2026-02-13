@@ -4,17 +4,29 @@ export function installDeityUiWiring(world, { log }) {
   if (!world || typeof log !== "function" || world[DEITY_UI_WIRING_INSTALLED]) return;
   world[DEITY_UI_WIRING_INSTALLED] = true;
 
+  /** Helper to log deity messages with type */
+  const logDeity = (text) => {
+    if (typeof log === 'function') {
+      // Support both old log(string) and new log({text, type}) signatures
+      if (typeof text === 'string') {
+        log({ text, type: 'deity' });
+      } else {
+        log(text);
+      }
+    }
+  };
+
   world.on("deity:miracle", ({ message }) => {
-    if (message) log(message);
+    if (message) logDeity(message);
   });
 
   world.on("deity:wrath", ({ deityName, damage, cursed }) => {
-    log(`${deityName}'s WRATH strikes you down! (-${damage} HP, barely alive!)`);
-    if (cursed) log(`You feel ${deityName}'s curse upon you!`);
+    logDeity(`${deityName}'s WRATH strikes you down! (-${damage} HP, barely alive!)`);
+    if (cursed) logDeity(`You feel ${deityName}'s curse upon you!`);
   });
 
   world.on("deity:demand", ({ deityName }) => {
-    log(`${deityName} hungers for an offering!`);
+    logDeity(`${deityName} hungers for an offering!`);
   });
 
   world.on("deity:moodShift", ({ deityName, to }) => {
@@ -26,7 +38,7 @@ export function installDeityUiWiring(world, { log }) {
       sorrow: "sorrowful",
       chaos: "chaotic",
     };
-    log(`${deityName} grows ${labels[to] || to}.`);
+    logDeity(`${deityName} grows ${labels[to] || to}.`);
   });
 
   world.on("deity:utterance", ({ deityName, dominant }) => {
@@ -38,6 +50,6 @@ export function installDeityUiWiring(world, { log }) {
       sorrow: `${deityName} weeps silently.`,
       chaos: "The air crackles with divine unease.",
     };
-    log(lines[dominant?.dimension] || `${deityName} stirs.`);
+    logDeity(lines[dominant?.dimension] || `${deityName} stirs.`);
   });
 }
