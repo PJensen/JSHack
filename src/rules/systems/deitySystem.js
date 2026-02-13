@@ -24,28 +24,28 @@ const _deities = new Map();
 /** @type {WeakSet<import('../../lib/ecs-js/index.js').World>} */
 const _wired = new WeakSet();
 
-/** @type {WeakMap<import('../../lib/deity-js/deity.js').Deity, Set<string>>} */
+/** @type {WeakMap<import('../../lib/deity-js/deity.js').Deity, WeakSet<import('../../lib/ecs-js/index.js').World>>} */
 const _miraclesWired = new WeakMap();
 
 /** Get (or lazily create) a Deity instance for a given deityId. */
 function ensureDeity(deityId, world = null) {
-  if (_deities.has(deityId)) return _deities.get(deityId);
-  const def = getDeity(deityId);
-  if (!def) return null;
-  const deity = new Deity(def);
-  _deities.set(deityId, deity);
+  let deity = _deities.get(deityId) || null;
+  if (!deity) {
+    const def = getDeity(deityId);
+    if (!def) return null;
+    deity = new Deity(def);
+    _deities.set(deityId, deity);
+  }
 
   // Wire miracles if we have a world reference
   if (world) {
     if (!_miraclesWired.has(deity)) {
-      _miraclesWired.set(deity, new Set());
+      _miraclesWired.set(deity, new WeakSet());
     }
     const wiredWorlds = _miraclesWired.get(deity);
-    // Use a unique ID for the world to avoid double-wiring
-    const worldId = String(world.id || 'default');
-    if (!wiredWorlds.has(worldId)) {
+    if (!wiredWorlds.has(world)) {
       wireDeityMiracles(deity, deityId, world);
-      wiredWorlds.add(worldId);
+      wiredWorlds.add(world);
     }
   }
 
@@ -138,6 +138,81 @@ function wireWorldEvents(world) {
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 function wireDeityMiracles(deity, deityId, world) {
+  const cooldowns = { wrath: 0, demand: 0, utterance: 0 };
+  const DEITY_COOLDOWN = 30;
+
+  // Wrath inflicts damage and optional curses on the worshipper.
+  deity.on('wrath', ({ intensity = 0, tick = 0 }) => {
+    if ((tick - cooldowns.wrath) < DEITY_COOLDOWN) return;
+    cooldowns.wrath = tick;
+
+    for (const [playerId] of world.query(Player, Devotion)) {
+      const dev = world.get(playerId, Devotion);
+      if (dev?.deityId !== deityId) continue;
+
+      const vit = world.get(playerId, Vitality);
+      if (!vit) continue;
+
+      const beforeHp = Math.max(0, Number(vit.hp || 0));
+      const damagePercent = 0.5 + (Number(intensity || 0) * 0.35);
+      const plannedDamage = Math.max(1, Math.floor(beforeHp * damagePercent));
+      const minHp = Math.max(1, Math.floor(Number(vit.maxHp || 1) * 0.05));
+      const newHp = Math.max(minHp, beforeHp - plannedDamage);
+      const actualDamage = Math.max(0, beforeHp - newHp);
+
+      vit.hp = newHp;
+
+      let cursed = false;
+      if (Number(intensity || 0) > 0.6) {
+        const status = world.get(playerId, Status);
+        if (status) {
+          const statuses = Array.isArray(status.statuses) ? status.statuses : [];
+          statuses.push({
+            type: 'weakened',
+            duration: Math.round(20 + Number(intensity || 0) * 30),
+            potency: Number(intensity || 0),
+          });
+          if (Number(intensity || 0) > 0.8) {
+            statuses.push({
+              type: 'cursed',
+              duration: Math.round(30 + Number(intensity || 0) * 40),
+              potency: 1.0,
+            });
+            cursed = true;
+          }
+          status.statuses = statuses;
+        }
+      }
+
+      world.emit('damage', { id: playerId, amount: actualDamage, source: 0 });
+      world.emit('deity:wrath', {
+        playerId,
+        deityId,
+        deityName: deity.name,
+        intensity: Number(intensity || 0),
+        damage: actualDamage,
+        cursed,
+        tick,
+      });
+    }
+  });
+
+  deity.on('demand', ({ tick = 0 }) => {
+    if ((tick - cooldowns.demand) < DEITY_COOLDOWN) return;
+    cooldowns.demand = tick;
+    world.emit('deity:demand', { deityId, deityName: deity.name, tick });
+  });
+
+  deity.on('moodShift', ({ to }) => {
+    world.emit('deity:moodShift', { deityId, deityName: deity.name, to });
+  });
+
+  deity.on('utterance', ({ dominant, tick = 0 }) => {
+    if ((tick - cooldowns.utterance) < DEITY_COOLDOWN) return;
+    cooldowns.utterance = tick;
+    world.emit('deity:utterance', { deityId, deityName: deity.name, dominant, tick });
+  });
+
   // When deity grants a miracle, help the player based on their needs
   deity.on('miracle', ({ serenity, tick }) => {
     // Find the player who worships this deity

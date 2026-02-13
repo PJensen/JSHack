@@ -24,6 +24,9 @@ import { initHUD } from "./display/ui/hud.js";
 import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
 import { createHudFeeds } from "./main/ui/hudFeeds.js";
+import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
+import { createMessageLog } from "./main/ui/messageLog.js";
+import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -34,7 +37,6 @@ import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
-import { Status } from "./rules/components/Status.js";
 import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
 import { getSpell } from "./rules/data/spells.js";
@@ -78,27 +80,9 @@ bctx.imageSmoothingEnabled = false;
 // Lock down browser-driven inputs/scroll/zoom so the app fully controls them
 enableInputLockdown({ canvas });
 
-// Quality/perf controls
-const PERF = (() => {
-  const params = new URLSearchParams(window.location.search || '');
-  // Mobile-first defaults: fast without any URL args
-  const q = (params.get('quality') || (typeof localStorage !== 'undefined' ? 
-    localStorage.getItem('jshack.quality') : 'high') || 'high').toLowerCase();
-  // Cap DPR on mobile/high-DPR screens to avoid excessive fill-rate costs
-  const defaultCap = 1.5; // mobile-first
-  const dprCapArg = Number(params.get('dprCap')) || Number((typeof localStorage !== 'undefined' && localStorage.getItem('jshack.dprCap')) || 0);
-  const dprCap = Number.isFinite(dprCapArg) && dprCapArg > 0 ? dprCapArg : defaultCap;
-  const isLow = q === 'low';
-  const isHigh = q === 'high';
-  return {
-    quality: q,
-    dprCap: isHigh ? 3 : (isLow ? 1 : dprCap),
-    glowLayers: isLow ? 0 : 2,
-    particleCapacity: isLow ? 512 : 4096,
-    // Default to snap camera (no perceived lag); can override via ?cameraLerp=number
-    cameraLerp: (params.get('cameraLerp') !== null ? Number(params.get('cameraLerp')) : 0)
-  };
-})();
+const runtimeConfig = readRuntimeConfig();
+const PERF = runtimeConfig.perf;
+const chosenDeityId = runtimeConfig.chosenDeityId;
 
 // Use tile-sized world units: 1 world unit == 1 tile on screen
 const TILE_PX = 28;
@@ -195,12 +179,12 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
 
 // Allow URL override: ?dungeonScale=0.3 for compact debugging floors
 {
-  const ds = parseFloat(new URLSearchParams(window.location.search).get('dungeonScale'));
+  const ds = runtimeConfig.dungeonScale;
   if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
 }
 
 // Allow URL override: ?floor=6 to skip straight to a specific depth
-const _startDepth = parseInt(new URLSearchParams(window.location.search).get('floor'), 10) || 1;
+const _startDepth = runtimeConfig.startDepth;
 
 // Initialize the procedural dungeon (entire floor generated up front)
 const spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
@@ -289,86 +273,8 @@ if (!playerEntity(world)) {
 {
   const pe = playerEntity(world);
   if (pe) {
-    // Read deity from query string, default to molkhar
-    const urlParams = new URLSearchParams(window.location.search);
-    const chosenDeityId = urlParams.get('deity') || 'molkhar';
-
     world.add(pe.id, Devotion, { deityId: chosenDeityId });
-    const deity = initDeity(chosenDeityId, world);
-    if (deity) {
-      // Cooldown tracker: deity events only fire messages every N ticks
-      const _deityCooldowns = { wrath: 0, demand: 0, utterance: 0 };
-      const DEITY_COOLDOWN = 30; // minimum ticks between repeated messages
-
-      deity.on('wrath', ({ intensity, tick }) => {
-        if (tick - _deityCooldowns.wrath < DEITY_COOLDOWN) return;
-        _deityCooldowns.wrath = tick;
-
-        const vit = /** @type any */ (world.get(pe.id, Vitality));
-        if (!vit) return;
-
-        // Wrath damage is % of CURRENT HP — leaves you hanging by a thread
-        // Low intensity: 50-65% of current HP
-        // High intensity: 70-85% of current HP
-        const damagePercent = 0.5 + (intensity * 0.35); // 0.5 to 0.85
-        const damage = Math.max(1, Math.floor(vit.hp * damagePercent));
-
-        // Minimum HP after wrath: 5% of max, or 1 (never instant death from wrath alone)
-        const minHp = Math.max(1, Math.floor(vit.maxHp * 0.05));
-        const newHp = Math.max(minHp, vit.hp - damage);
-
-        log(`${deity.name}'s WRATH strikes you down! (-${damage} HP, barely alive!)`);
-        world.set(pe.id, Vitality, { ...vit, hp: newHp });
-        try { world.emit?.('damage', { id: pe.id, amount: damage, source: 0 }); } catch {}
-
-        // High intensity wrath also curses you
-        if (intensity > 0.6) {
-          const status = world.get(pe.id, Status);
-          if (status) {
-            const curses = status.statuses || [];
-            // Add weakened curse (reduces damage/stats)
-            curses.push({ type: 'weakened', duration: Math.round(20 + intensity * 30), potency: intensity });
-            // At very high wrath, add cursed status
-            if (intensity > 0.8) {
-              curses.push({ type: 'cursed', duration: Math.round(30 + intensity * 40), potency: 1.0 });
-              log(`You feel ${deity.name}'s curse upon you!`);
-            }
-            world.set(pe.id, Status, { statuses: curses });
-          }
-        }
-      });
-      // Miracle handling moved to deitySystem.js for richer need-based effects
-      // Listen for the resulting deity:miracle events to log messages
-      world.on('deity:miracle', ({ message }) => {
-        if (message) log(message);
-      });
-      deity.on('demand', ({ tick }) => {
-        if (tick - _deityCooldowns.demand < DEITY_COOLDOWN) return;
-        _deityCooldowns.demand = tick;
-        log(`${deity.name} hungers for an offering!`);
-      });
-      // moodShift is already self-limiting (only fires on actual transitions)
-      deity.on('moodShift', ({ to }) => {
-        const labels = {
-          wrath: 'wrathful', serenity: 'serene', hunger: 'hungry',
-          amusement: 'amused', sorrow: 'sorrowful', chaos: 'chaotic',
-        };
-        log(`${deity.name} grows ${labels[to] || to}.`);
-      });
-      deity.on('utterance', ({ dominant, tick }) => {
-        if (tick - _deityCooldowns.utterance < DEITY_COOLDOWN) return;
-        _deityCooldowns.utterance = tick;
-        const lines = {
-          wrath: `"More blood!" bellows ${deity.name}.`,
-          serenity: `"You serve well," whispers ${deity.name}.`,
-          hunger: `"Feed me, mortal," growls ${deity.name}.`,
-          amusement: `${deity.name} laughs at your antics.`,
-          sorrow: `${deity.name} weeps silently.`,
-          chaos: 'The air crackles with divine unease.',
-        };
-        log(lines[dominant?.dimension] || `${deity.name} stirs.`);
-      });
-    }
+    initDeity(chosenDeityId, world);
   }
 }
 
@@ -389,7 +295,7 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
 // Format: ?give=item_id*count,item_id*count
 // Example: ?give=gold*1000,potion_health*5,sword_plain*1
 {
-  const giveParam = new URLSearchParams(window.location.search).get('give');
+  const giveParam = runtimeConfig.giveParam;
   if (giveParam) {
     const pe = playerEntity(world);
     if (pe) {
@@ -581,7 +487,7 @@ addEventListener('ui:requestUsableItemsData', () => {
 
 // Provide message log entries (placeholder until rules log is wired)
 addEventListener('ui:requestMessageLogData', () => {
-  const entries = messageLog.slice();
+  const entries = messageLog.getEntries();
   window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
 });
 
@@ -681,14 +587,15 @@ addEventListener('ui:selectActiveSpell', (ev) => {
 });
 
 // Basic app-side message log collector (bridge-free for now)
-/** @type {string[]} */
-const messageLog = [];
+const messageLog = createMessageLog({
+  maxEntries: 50,
+  onUpdate: (entries) => {
+    try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries } })); } catch {}
+  },
+});
 /** @param {string} msg */
 function log(msg) {
-  messageLog.push(msg);
-  if (messageLog.length > 50) messageLog.shift();
-  // Update always-on ticker
-  try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries: messageLog } })); } catch {}
+  messageLog.log(msg);
 }
 /** Format helpers for message log */
 function nameOfEntity(id) {
@@ -707,6 +614,8 @@ function nameOfItem(id) {
   const label = ni?.name || info?.description || info?.type;
   return label ? bracketizeName(label) : `item ${n}`;
 }
+
+installDeityUiWiring(world, { log });
 
 world.on('drank', ({ actor, itemId, target }) => {
   const who = nameOfEntity(actor);
