@@ -180,8 +180,11 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
   if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
 }
 
+// Allow URL override: ?floor=6 to skip straight to a specific depth
+const _startDepth = parseInt(new URLSearchParams(window.location.search).get('floor'), 10) || 1;
+
 // Initialize the procedural dungeon (entire floor generated up front)
-const spawnPos = initDungeon(world);
+const spawnPos = initDungeon(world, { startDepth: _startDepth });
 
 // Diagnostic: log all stair entities so we can confirm they exist
 {
