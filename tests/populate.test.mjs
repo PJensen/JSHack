@@ -149,3 +149,36 @@ Deno.test("shopkeeper spawns only in leaf rooms with exactly one door", () => {
     }
   }
 });
+
+Deno.test("origin chunk spawn room is never selected as a shop room", () => {
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    rooms: [
+      // This mirrors the starting room convention (rooms[0] in origin chunk)
+      { x: 0, y: 0, w: 6, h: 6 },
+      { x: 20, y: 20, w: 6, h: 6 },
+    ],
+    doors: [
+      { x: -1, y: 2 },  // one entrance for room 0
+      { x: 19, y: 22 }, // one entrance for room 1
+    ],
+  };
+  const floorPlan = { depth: 1, difficultyMult: 1.0 };
+  const rng = {
+    next: () => 0, // always pass chance gates
+    int: (min) => min, // deterministic pick first eligible
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const shopkeeper = spawns.find((s) => s.kind === 'shopkeeper');
+  assert(shopkeeper, 'expected a shopkeeper to spawn for this deterministic setup');
+  const room = shopkeeper.params?.room;
+  assert(room, 'shopkeeper must include room metadata');
+  assert(
+    !(room.x === chunk.rooms[0].x && room.y === chunk.rooms[0].y && room.w === chunk.rooms[0].w && room.h === chunk.rooms[0].h),
+    'shopkeeper must not be placed in origin chunk spawn room',
+  );
+});
