@@ -36,6 +36,7 @@ import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
 import { Position } from "./rules/components/Position.js";
 import { Player } from "./rules/components/Player.js";
+import { Unpaid } from "./rules/components/Unpaid.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
 import { followEntity } from "./display/camera/follow.js";
@@ -432,6 +433,9 @@ addEventListener('ui:requestInventoryData', () => {
             affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
             equipped: Boolean(equippedSlot),
             equippedSlot,
+            unpaid: world.has(id, Unpaid),
+            unpaidPrice: world.get(id, Unpaid)?.price || 0,
+            unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
           });
         }
       }
