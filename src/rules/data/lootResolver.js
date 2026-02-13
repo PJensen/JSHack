@@ -189,7 +189,7 @@ export function materializeDrop(world, drop, pos) {
       world.add(id, NamedIdentity, { name: def.name, identity: def.id });
       world.add(id, ItemInfo, {
         type: def.type, slot: def.slot, weight: 1, value: 0,
-        description: def.description, count: 1,
+        description: def.description, count: def.charges || 1,
         rarity: def.rarity || 1, rarityName: def.rarityName || 'common',
         affixes: [],
       });
