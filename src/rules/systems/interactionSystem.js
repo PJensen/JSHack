@@ -77,3 +77,23 @@ export function interactionSystem(world) {
         try { world.remove(actor, InteractIntent); } catch {}
     }
 }
+
+// --- Bump-interact event listener ----------------------------------------
+
+const BUMP_INTERACT_INSTALLED = Symbol.for("jshack.bumpInteract");
+
+/**
+ * Install a world.on('bump:interact') listener for immediate interactions
+ * triggered by movement (e.g., bumping doors/chests/NPCs).
+ * This avoids the deferred-add problem where InteractIntent wouldn't be
+ * visible until next tick.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ */
+export function installBumpInteractListener(world) {
+  if (!world || world[BUMP_INTERACT_INSTALLED]) return;
+  world[BUMP_INTERACT_INSTALLED] = true;
+
+  world.on("bump:interact", ({ actor, target }) => {
+    try { InteractionSystem(world, actor, target); } catch {}
+  });
+}
