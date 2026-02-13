@@ -285,12 +285,16 @@ if (!playerEntity(world)) {
   }
 }
 
-// Deity: bind player to Mol'Khar and wire deity events to message log
+// Deity: bind player to chosen deity (via ?deity=id querystring) and wire deity events to message log
 {
   const pe = playerEntity(world);
   if (pe) {
-    world.add(pe.id, Devotion, { deityId: 'molkhar' });
-    const deity = initDeity('molkhar');
+    // Read deity from query string, default to molkhar
+    const urlParams = new URLSearchParams(window.location.search);
+    const chosenDeityId = urlParams.get('deity') || 'molkhar';
+
+    world.add(pe.id, Devotion, { deityId: chosenDeityId });
+    const deity = initDeity(chosenDeityId);
     if (deity) {
       // Cooldown tracker: deity events only fire messages every N ticks
       const _deityCooldowns = { wrath: 0, demand: 0, utterance: 0 };
@@ -300,7 +304,7 @@ if (!playerEntity(world)) {
         if (tick - _deityCooldowns.wrath < DEITY_COOLDOWN) return;
         _deityCooldowns.wrath = tick;
         const dmg = Math.round(5 + intensity * 10);
-        log(`Mol'Khar's wrath strikes you! (${dmg} damage)`);
+        log(`${deity.name}'s wrath strikes you! (${dmg} damage)`);
         const vit = /** @type any */ (world.get(pe.id, Vitality));
         if (vit) {
           const newHp = Math.max(0, vit.hp - dmg);
@@ -312,7 +316,7 @@ if (!playerEntity(world)) {
       deity.on('miracle', ({ serenity }) => {
         // Miracles are rare enough — no cooldown needed
         const heal = Math.round(10 + serenity * 10);
-        log(`Mol'Khar grants you a miracle! (+${heal} HP)`);
+        log(`${deity.name} grants you a miracle! (+${heal} HP)`);
         const vit = /** @type any */ (world.get(pe.id, Vitality));
         if (vit) {
           const newHp = Math.min(vit.maxHp, vit.hp + heal);
@@ -323,7 +327,7 @@ if (!playerEntity(world)) {
       deity.on('demand', ({ tick }) => {
         if (tick - _deityCooldowns.demand < DEITY_COOLDOWN) return;
         _deityCooldowns.demand = tick;
-        log("Mol'Khar hungers for blood!");
+        log(`${deity.name} hungers for an offering!`);
       });
       // moodShift is already self-limiting (only fires on actual transitions)
       deity.on('moodShift', ({ to }) => {
@@ -331,20 +335,20 @@ if (!playerEntity(world)) {
           wrath: 'wrathful', serenity: 'serene', hunger: 'hungry',
           amusement: 'amused', sorrow: 'sorrowful', chaos: 'chaotic',
         };
-        log(`Mol'Khar grows ${labels[to] || to}.`);
+        log(`${deity.name} grows ${labels[to] || to}.`);
       });
       deity.on('utterance', ({ dominant, tick }) => {
         if (tick - _deityCooldowns.utterance < DEITY_COOLDOWN) return;
         _deityCooldowns.utterance = tick;
         const lines = {
-          wrath: '"More blood!" bellows Mol\'Khar.',
-          serenity: '"You serve well," whispers Mol\'Khar.',
-          hunger: '"Feed me, mortal," growls Mol\'Khar.',
-          amusement: 'Mol\'Khar laughs at your antics.',
-          sorrow: 'Mol\'Khar weeps silently.',
+          wrath: `"More blood!" bellows ${deity.name}.`,
+          serenity: `"You serve well," whispers ${deity.name}.`,
+          hunger: `"Feed me, mortal," growls ${deity.name}.`,
+          amusement: `${deity.name} laughs at your antics.`,
+          sorrow: `${deity.name} weeps silently.`,
           chaos: 'The air crackles with divine unease.',
         };
-        log(lines[dominant?.dimension] || 'Mol\'Khar stirs.');
+        log(lines[dominant?.dimension] || `${deity.name} stirs.`);
       });
     }
   }

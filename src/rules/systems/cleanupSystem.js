@@ -61,22 +61,47 @@ export function cleanupSystem(world) {
       const ident = world.get(id, NamedIdentity);
       if (ident && pos) {
         const monsterDef = getMonster(ident.identity);
-        if (monsterDef) {
-          const tableId = getMonsterLootTable(monsterDef);
-          const step = world.step | 0;
-          const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ ((id * 0x517cc1b7) >>> 0)) >>> 0;
-          const rng = createRng(lootSeed);
-          let depth = 1;
-          for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
-          dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
 
-          // Drop a corpse for the killed monster
+        // For pets without monster definitions, create a fallback definition
+        const effectiveMonsterDef = monsterDef || (wasPet ? {
+          id: ident.identity || 'pet',
+          name: ident.name || 'Pet',
+          sizeClass: 'S',
+          massKg: 10,
+          tier: 0
+        } : null);
+
+        if (effectiveMonsterDef) {
+          // Drop loot only if there's a real monster definition with a loot table
+          if (monsterDef) {
+            const tableId = getMonsterLootTable(monsterDef);
+            const step = world.step | 0;
+            const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ ((id * 0x517cc1b7) >>> 0)) >>> 0;
+            const rng = createRng(lootSeed);
+            let depth = 1;
+            for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
+            dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
+          }
+
+          // Drop a corpse for the killed monster or pet
           // Pets ALWAYS drop corpses (100% chance)
           // Other monsters: Base 75% chance, +8% per tier (higher tier = more guaranteed)
-          const corpseChance = wasPet ? 1.0 : Math.min(1.0, 0.75 + (monsterDef.tier || 0) * 0.08);
-          const corpseRoll = rng.next();
-          if (corpseRoll < corpseChance) {
-            const corpseId = createCorpse(world, monsterDef, { x: pos.x, y: pos.y });
+          const corpseChance = wasPet ? 1.0 : Math.min(1.0, 0.75 + (effectiveMonsterDef.tier || 0) * 0.08);
+          // Use the RNG if available, otherwise just check corpseChance directly
+          let shouldCreateCorpse = false;
+          if (monsterDef) {
+            const step = world.step | 0;
+            const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ ((id * 0x517cc1b7) >>> 0)) >>> 0;
+            const rng = createRng(lootSeed);
+            const corpseRoll = rng.next();
+            shouldCreateCorpse = corpseRoll < corpseChance;
+          } else {
+            // For pets without monster defs, always create corpse
+            shouldCreateCorpse = wasPet;
+          }
+
+          if (shouldCreateCorpse) {
+            const corpseId = createCorpse(world, effectiveMonsterDef, { x: pos.x, y: pos.y });
 
             // If this was a pet, mark the corpse with Pet tag and Owner
             if (wasPet && petOwnerId) {
