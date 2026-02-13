@@ -15,6 +15,7 @@ import { getItem } from '../../data/items.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
+import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 
@@ -31,9 +32,10 @@ import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
  * @param {import('./chunk.js').ChunkData} chunk
  * @param {{difficultyMult:number, depth:number}} floorPlan
  * @param {Object} rng - createRng() instance
+ * @param {Object} [tombstoneRepo] - Tombstone repository for placing tombstones
  * @returns {SpawnPoint[]}
  */
-export function populateChunk(chunk, floorPlan, rng) {
+export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
   const SPAWNER_FRACTION = 0.03; // 3% of monster budget becomes spawners (~1 every 3-5 rooms)
@@ -106,6 +108,32 @@ export function populateChunk(chunk, floorPlan, rng) {
     const sx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
     const sy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
     spawns.push({ x: sx, y: sy, kind: 'shopkeeper', params: { depth: floorPlan.depth } });
+  }
+
+  // Tombstone spawning: retrieve tombstones for this depth
+  if (tombstoneRepo && chunk.rooms.length > 0) {
+    // Get random tombstones for this depth (1-3 per chunk, based on availability)
+    const tombstoneCount = Math.min(3, chunk.rooms.length);
+    const tombstones = tombstoneRepo.getRandomForDepth(
+      floorPlan.depth,
+      tombstoneCount,
+      rng
+    );
+
+    // Place tombstones in random rooms
+    for (const tombstoneData of tombstones) {
+      const roomIdx = Math.floor(rng.next() * chunk.rooms.length);
+      const room = chunk.rooms[roomIdx];
+      const tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      const ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+
+      spawns.push({
+        x: tx,
+        y: ty,
+        kind: 'tombstone',
+        params: tombstoneData
+      });
+    }
   }
 
   return spawns;
@@ -235,6 +263,21 @@ export function materializeSpawn(world, spawn) {
       });
       world.add(id, Position, { x: spawn.x, y: spawn.y });
       return id;
+    }
+    case 'tombstone': {
+      const data = spawn.params;
+      const epitaph = generateEpitaph(data);
+
+      return createFrom(world, Tombstone, {
+        x: spawn.x,
+        y: spawn.y,
+        playerName: data.playerName,
+        depth: data.depth,
+        cause: data.cause,
+        killerName: data.killerName,
+        turn: data.turn,
+        epitaph: epitaph,
+      });
     }
     default:
       return null;
