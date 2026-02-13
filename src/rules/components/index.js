@@ -31,3 +31,4 @@ export { Devotion } from './Devotion.js';
 export { Engraving } from './Engraving.js';
 export { EngraveIntent } from './Intents/EngraveIntent.js';
 export { Hunger } from './Hunger.js';
+export { Facing } from './Facing.js';
