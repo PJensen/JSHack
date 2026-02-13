@@ -637,6 +637,14 @@ addEventListener('ui:engrave', () => {
   rulesHandler({ type: 'rules.engrave', payload: { text: text.trim() } });
 });
 
+// Pray button → dispatch pray action
+addEventListener('ui:pray', () => {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.pray', payload: {} });
+});
+
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
   const spells = learnedSpells();
