@@ -139,6 +139,56 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
   });
 
+  // Pet control button (follows spell-button pattern)
+  const petBtn = document.createElement('button');
+  petBtn.id = 'btn-pet';
+  petBtn.textContent = 'Pet: Following';
+  Object.assign(petBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  // Left-click: Quick recall to following
+  petBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:recallPet')); } catch {}
+  });
+  // Right-click: Open command menu
+  petBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
+  });
+  // Shift+Left or Middle-click: Also open menu
+  petBtn.addEventListener('mousedown', (e) => {
+    if (e.button === 1 || (e.shiftKey && e.button === 0)) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
+    }
+  });
+  // Update button based on pet state
+  window.addEventListener('ui:updatePetButton', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const state = String(e?.detail?.state || 'following');
+    const stateLabels = {
+      following: 'Following',
+      staying: 'Staying',
+      fetching: 'Fetching',
+      returning: 'Returning',
+      guarding: 'Guarding',
+      fleeing: 'Fleeing!',
+      idle: 'Idle'
+    };
+    petBtn.textContent = `Pet: ${stateLabels[state] || state}`;
+    // Color code by state
+    if (state === 'fleeing') {
+      petBtn.style.background = '#3d1616'; // Red tint for danger
+    } else if (state === 'guarding') {
+      petBtn.style.background = '#16263d'; // Blue tint for combat
+    } else {
+      petBtn.style.background = '#101626'; // Default
+    }
+  });
+
   // Update label when app sets active spell
   window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -217,12 +267,13 @@ export function initHUD() {
   const quick = createQuickSlot();
   bar.appendChild(invBtn);
   bar.appendChild(useBtn);
+  bar.appendChild(petBtn); // Pet button after Use
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(engraveBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
-  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn };
+  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------

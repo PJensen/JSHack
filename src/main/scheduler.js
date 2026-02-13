@@ -15,7 +15,8 @@ import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
-import { petFollowSystem } from "../rules/systems/petFollowSystem.js";
+import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
+import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { movementSystem } from "../rules/systems/movementSystem.js";
 import { combatSystem } from "../rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
@@ -50,7 +51,8 @@ export function configureWorld(world) {
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
   registerSystem(aiChaseSystem, 'intents');
-  registerSystem(petFollowSystem, 'intents');
+  registerSystem(petCommandSystem, 'intents'); // Process pet commands first
+  registerSystem(petBehaviorSystem, 'intents'); // Then execute pet behaviors
   registerSystem(waitSystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');

@@ -33,3 +33,5 @@ export { Engraving } from './Engraving.js';
 export { EngraveIntent } from './Intents/EngraveIntent.js';
 export { Hunger } from './Hunger.js';
 export { Facing } from './Facing.js';
+export { PetState } from './PetState.js';
+export { PetCommandIntent } from './Intents/PetCommandIntent.js';

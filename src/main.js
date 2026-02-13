@@ -21,6 +21,7 @@ import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
+import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
 import { createHudFeeds } from "./main/ui/hudFeeds.js";
 import { Inventory } from "./rules/components/Inventory.js";
@@ -58,6 +59,8 @@ import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
+import { PetState } from "./rules/components/PetState.js";
+import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js";
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
@@ -254,6 +257,23 @@ if (!playerEntity(world)) {
     world.add(petId, Owner, { ownerId: pe.id });
     world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
     world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
+    // Pet combat components
+    world.add(petId, Vitality, { maxHp: 30, hp: 30 });
+    world.add(petId, Equipment, {
+      attackDerived: 2,   // Base attack bonus
+      defenseDerived: 2   // Base defense (armorClass = 10 + defense = 12)
+    });
+    // Pet state machine
+    world.add(petId, PetState, {
+      state: 'following',
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: world.step,
+      lastPlayerX: ppos.x,
+      lastPlayerY: ppos.y,
+      commandCooldown: 0,
+    });
   }
 }
 
@@ -392,6 +412,7 @@ const inputDisposers = [];
 // ---- Display UI overlays + data feeds -------------------------------------
 initOverlays();
 initHUD();
+initPetMenu();
 initStatusLine();
 
 // Provide inventory data to overlay when requested
@@ -1006,6 +1027,85 @@ world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
   // Trigger inventory UI refresh
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
+
+// Pet state changes
+world.on('pet:state:changed', ({ petId, prevState, newState, command }) => {
+  const petName = nameOfEntity(petId);
+  const stateNames = {
+    following: 'following you',
+    staying: 'staying put',
+    guarding: 'guarding',
+    fetching: 'fetching an item',
+    returning: 'returning',
+    fleeing: 'fleeing',
+    idle: 'idle'
+  };
+  log(`${petName} is now ${stateNames[newState] || newState}.`);
+  // Update HUD button
+  try {
+    window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
+      detail: { state: newState }
+    }));
+  } catch {}
+});
+
+world.on('pet:state:auto', ({ petId, newState, reason }) => {
+  const petName = nameOfEntity(petId);
+  if (reason === 'low_health') {
+    log(`${petName} flees to safety!`);
+  } else if (reason === 'health_restored') {
+    log(`${petName} returns to your side.`);
+  } else if (reason === 'item_picked_up') {
+    log(`${petName} has the item!`);
+  }
+  // Update HUD button
+  try {
+    window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
+      detail: { state: newState }
+    }));
+  } catch {}
+});
+
+world.on('pet:teleported', ({ petId, from, to }) => {
+  const petName = nameOfEntity(petId);
+  log(`${petName} teleports to your side.`);
+});
+
+// Handle UI pet commands
+window.addEventListener('ui:recallPet', () => {
+  // Find pet and command it to follow
+  for (const [id, _pet] of world.query(Pet)) {
+    const intentId = world.create();
+    world.add(intentId, PetCommandIntent, {
+      petId: id,
+      command: 'follow',
+      targetX: null,
+      targetY: null,
+      targetItemId: 0
+    });
+    break; // Only one pet for now
+  }
+});
+
+window.addEventListener('ui:petCommand', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const command = e?.detail?.command;
+  if (!command) return;
+  // Find pet
+  for (const [id, _pet] of world.query(Pet)) {
+    const intentId = world.create();
+    world.add(intentId, PetCommandIntent, {
+      petId: id,
+      command,
+      targetX: null,  // TODO: Get from click for guard
+      targetY: null,
+      targetItemId: 0  // TODO: Get from selection for fetch
+    });
+    break;
+  }
+});
+
 // Engrave event → combat log + float text
 world.on('engrave', ({ actor, text, x, y }) => {
   const who = nameOfEntity(actor);
