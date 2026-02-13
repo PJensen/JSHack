@@ -14,7 +14,7 @@ import { pickMonster, pickItem, pickTrap } from './tables.js';
 import { CHUNK_SIZE } from './constants.js';
 import { getItem } from '../../data/items.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
-import { Chest } from '../../archetypes/Door.js';
+import { Chest } from '../../archetypes/Chest.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Trap } from '../../components/Trap.js';
 
