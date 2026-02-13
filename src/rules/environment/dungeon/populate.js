@@ -103,9 +103,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
-  // Shopkeeper: one per chunk, first eligible room, ~30% chance
-  if (chunk.rooms.length > 0 && rng.next() < 0.30) {
-    const room = chunk.rooms[0];
+  // Shopkeeper: one per chunk, only in rooms with exactly one door, ~30% chance.
+  const eligibleShopRooms = chunk.rooms.filter((room) => countRoomDoors(room, chunk.doors || []) === 1);
+  if (eligibleShopRooms.length > 0 && rng.next() < 0.30) {
+    const room = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
 
     // Place shopkeeper near the room entrance (prefer near doors)
     const sx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
@@ -162,6 +163,28 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   }
 
   return spawns;
+}
+
+/**
+ * Count doors that sit on a room's perimeter wall.
+ * @param {{x:number,y:number,w:number,h:number}} room
+ * @param {Array<{x:number,y:number}>} doors
+ * @returns {number}
+ */
+function countRoomDoors(room, doors) {
+  let count = 0;
+  for (const d of doors) {
+    const onVerticalWall =
+      (d.x === room.x - 1 || d.x === room.x + room.w) &&
+      d.y >= room.y &&
+      d.y < room.y + room.h;
+    const onHorizontalWall =
+      (d.y === room.y - 1 || d.y === room.y + room.h) &&
+      d.x >= room.x &&
+      d.x < room.x + room.w;
+    if (onVerticalWall || onHorizontalWall) count++;
+  }
+  return count;
 }
 
 /**
