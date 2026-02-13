@@ -15,6 +15,7 @@ import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
+import { Facing } from "../components/Facing.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -49,9 +50,16 @@ export function movementSystem(world) {
       const pos = world.get(actor, Position);
       if (!pos) { world.remove(actor, MoveIntent); continue; }
 
-      const nx = pos.x + (intent.dx | 0);
-      const ny = pos.y + (intent.dy | 0);
+      const mdx = intent.dx | 0;
+      const mdy = intent.dy | 0;
+      const nx = pos.x + mdx;
+      const ny = pos.y + mdy;
       const k = key(nx, ny);
+
+      // Record facing direction on every move attempt (successful or not)
+      if (world.has(actor, Facing)) {
+        world.set(actor, Facing, { dx: mdx, dy: mdy });
+      }
 
       if (!isWalkable(nx, ny) || blocking.get(k)) {
         // Cheap bump-attack: prefer a living target with Vitality in the destination cell.
@@ -73,9 +81,18 @@ export function movementSystem(world) {
         } else if (world.has(actor, Player)) {
           // No living target — try interactable (e.g., closed door, chest)
           // Only the player can bump-interact with objects; monsters just bounce off.
+          // Facing guard: only trigger if the interactable is in the direction
+          // the player is currently facing (prevents accidental triggers on
+          // adjacent interactables when the move direction doesn't match).
           const targetId = interactables.get(k);
           if (targetId) {
-            world.add(actor, InteractIntent, { targetId });
+            const facing = world.get(actor, Facing);
+            const tpos = world.get(targetId, Position);
+            const facingMatches = !facing || !tpos
+              || ((Math.sign(tpos.x - pos.x) === facing.dx) && (Math.sign(tpos.y - pos.y) === facing.dy));
+            if (facingMatches) {
+              world.add(actor, InteractIntent, { targetId });
+            }
           }
         }
         // blocked: movement is consumed

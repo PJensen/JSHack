@@ -11,6 +11,7 @@ import { Equipment } from "../components/Equipment.js";
 import { Mana } from "../components/Mana.js";
 import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
+import { Facing } from "../components/Facing.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -26,7 +27,8 @@ export const PlayerArchetype = defineArchetype(
   [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })],
   [Equipment, {}],
   [Mana, {}],
-  [Brain, {}]
+  [Brain, {}],
+  [Facing, { dx: 0, dy: 0 }]
 );
 
 export function createPlayer(world, params = {}) {
