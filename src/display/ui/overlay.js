@@ -812,7 +812,15 @@ function renderMessageLog(panel, entries) {
   });
   for (const m of entries) {
     const row = document.createElement('div');
-    row.textContent = String(m);
+    // Handle both plain strings (legacy) and message objects with types
+    if (typeof m === 'string') {
+      row.textContent = m;
+    } else if (m && typeof m === 'object') {
+      row.textContent = m.text || String(m);
+      row.style.color = getMessageColor(m.type);
+    } else {
+      row.textContent = String(m);
+    }
     box.appendChild(row);
   }
   if (!entries.length) {
@@ -1377,10 +1385,35 @@ function renderMessageTicker(container, entries) {
   const recent = entries.slice(-8);
   container.innerHTML = '';
   for (let i = 0; i < recent.length; i++) {
+    const m = recent[i];
     const row = document.createElement('div');
-    row.textContent = String(recent[i] ?? '');
+    // Handle both plain strings (legacy) and message objects with types
+    if (typeof m === 'string') {
+      row.textContent = m;
+    } else if (m && typeof m === 'object') {
+      row.textContent = m.text || String(m);
+      row.style.color = getMessageColor(m.type);
+    } else {
+      row.textContent = String(m ?? '');
+    }
     row.style.textShadow = '0 1px 0 rgba(0,0,0,0.4)';
     container.appendChild(row);
+  }
+}
+
+/**
+ * Get color for message type
+ * @param {string} type - Message type
+ * @returns {string} Hex color code
+ */
+function getMessageColor(type) {
+  switch (type) {
+    case 'combat': return '#ff6b6b';    // Red - attacks, damage, death
+    case 'deity': return '#c47bff';     // Purple - deity events, prayers, miracles
+    case 'ambient': return '#77dd77';   // Soft green - environmental sounds, atmosphere
+    case 'system': return '#ffd966';    // Yellow - items, doors, level ups
+    case 'default':
+    default: return '#cfe8ff';          // Default blue-white
   }
 }
 
