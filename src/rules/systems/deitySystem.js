@@ -12,6 +12,8 @@ import { Devotion } from '../components/Devotion.js';
 import { Deity } from '../../lib/deity-js/deity.js';
 import { getDeity } from '../data/deities.js';
 import { Player } from '../components/Player.js';
+import { Pet } from '../components/Pet.js';
+import { Owner } from '../components/Owner.js';
 
 /** @type {Map<string, import('../deity/Deity.js').Deity>} */
 const _deities = new Map();
@@ -84,6 +86,26 @@ function wireWorldEvents(world) {
     if (!deity) return;
     // Direct desecration — eating your companion's remains
     deity.desecrate(corpseName || 'pet_corpse');
+  });
+
+  // Hitting your own pet → deity.action('betray') with lower magnitude
+  world.on('damaged', ({ target, source, amount }) => {
+    if (!source || !target) return;
+    if (!world.has(source, Player)) return;
+    if (!world.has(target, Pet)) return;
+
+    // Check if the player owns this pet
+    const owner = world.get(target, Owner);
+    if (!owner || owner.ownerId !== source) return;
+
+    const dev = world.get(source, Devotion);
+    if (!dev?.deityId) return;
+    const deity = _deities.get(dev.deityId);
+    if (!deity) return;
+
+    // Lesser betrayal than killing — scale by damage dealt
+    const magnitude = Math.min(0.3, (amount || 1) * 0.05);
+    deity.action('betray', { magnitude, target: 'companion' });
   });
 }
 
