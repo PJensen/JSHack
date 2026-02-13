@@ -98,7 +98,7 @@ function assessDistress(world, playerId) {
   if (world.has(playerId, Status)) {
     const status = world.get(playerId, Status);
     for (const s of status.statuses || []) {
-      if (s.type === 'diseased' || s.type === 'poisoned') {
+      if (s.type === 'disease' || s.type === 'poisoned') {
         needs.push('cure');
         severity += 0.6;
       } else if (s.type === 'cursed') {

@@ -1185,7 +1185,8 @@ window.addEventListener('ui:petCommand', (ev) => {
   if (!command) return;
 
   // Find pet and directly update state (instant, no tick needed)
-  for (const [petId, _pet] of world.query(Pet)) {
+  for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
+    if (!vit || vit.hp <= 0) continue;
     const petPos = world.get(petId, Position);
     if (!petPos) break;
 
@@ -1267,7 +1268,8 @@ window.addEventListener('ui:rotatePetState', () => {
   // State rotation cycle: following → staying → guarding → idle → following
   const stateOrder = ['following', 'staying', 'guarding', 'idle'];
 
-  for (const [petId, _pet] of world.query(Pet)) {
+  for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
+    if (!vit || vit.hp <= 0) continue;
     const petPos = world.get(petId, Position);
     if (!petPos) break;
 
@@ -2129,12 +2131,47 @@ function render(worldView) {
   }
 
   // Pass 2: entities (doors, stairs, monsters, items, player)
+  // When a tile contains both items and actors, slightly offset item glyphs
+  // so ground items (like corpses) remain visible under occupants.
+  const stackMeta = new Map(); // "x,y" -> { maxLayer:number, itemSeen:number }
+  for (let i = 0; i < worldView.entities.length; i++) {
+    const e = worldView.entities[i];
+    if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
+    const key = `${e.pos.x},${e.pos.y}`;
+    const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
+    const meta = stackMeta.get(key);
+    if (!meta) stackMeta.set(key, { maxLayer: layer, itemSeen: 0 });
+    else if (layer > meta.maxLayer) meta.maxLayer = layer;
+  }
+
+  const ITEM_STACK_OFFSETS = [
+    [-0.18, 0.20],
+    [0.00, 0.20],
+    [0.18, 0.20],
+    [-0.10, 0.30],
+    [0.10, 0.30],
+  ];
+
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    if (k.includes('corpse')) console.log('[RENDER] Corpse:', k, 'has atlas entry:', glyphAtlas.has(k));
-    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
+
+    let drawX = e.pos.x;
+    let drawY = e.pos.y;
+    if (layer === 100) {
+      const meta = stackMeta.get(`${e.pos.x},${e.pos.y}`);
+      if (meta && meta.maxLayer > layer) {
+        const idx = Math.min(meta.itemSeen, ITEM_STACK_OFFSETS.length - 1);
+        const [ox, oy] = ITEM_STACK_OFFSETS[idx];
+        meta.itemSeen += 1;
+        drawX += ox;
+        drawY += oy;
+      }
+    }
+
+    drawKind(glyphAtlas, bctx, k, drawX, drawY);
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
     if (PERF.quality !== 'low' && k === 'grid_bug') {

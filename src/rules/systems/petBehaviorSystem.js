@@ -35,7 +35,8 @@ export function petBehaviorSystem(world) {
   }
   if (!playerPos) return;
 
-  for (const [id, _pet, pos] of world.query(Pet, Position)) {
+  for (const [id, _pet, pos, vit] of world.query(Pet, Position, Vitality)) {
+    if (!vit || vit.hp <= 0) continue;
     // Get or create PetState
     let petState = world.get(id, PetState);
     if (!petState) {

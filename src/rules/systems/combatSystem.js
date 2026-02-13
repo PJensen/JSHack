@@ -112,13 +112,13 @@ export function combatSystem(world) {
             world.set(attacker, Stamina, { ...atkStam, stamina: have - staminaCost });
         }
 
-        // Disease penalty: each stack of 'diseased' reduces attack/defense by potency
+        // Disease penalty: each stack of 'disease' reduces attack/defense by potency
         const atkStatus = world.get(attacker, Status);
-        const atkDisease = atkStatus?.statuses?.find(s => s.type === 'diseased');
+        const atkDisease = atkStatus?.statuses?.find(s => s.type === 'disease');
         const atkDiseasePenalty = atkDisease ? Math.max(0, (atkDisease.potency || 1) * (atkDisease.stacks || 1)) : 0;
 
         const defStatus = world.get(defender, Status);
-        const defDisease = defStatus?.statuses?.find(s => s.type === 'diseased');
+        const defDisease = defStatus?.statuses?.find(s => s.type === 'disease');
         const defDiseasePenalty = defDisease ? Math.max(0, (defDisease.potency || 1) * (defDisease.stacks || 1)) : 0;
 
         // Hunger penalty: hungry/famished/starving/wasting reduce attack and defense

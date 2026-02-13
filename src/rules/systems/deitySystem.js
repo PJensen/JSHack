@@ -191,7 +191,7 @@ function wireDeityMiracles(deity, deityId, world) {
       } else if ((primaryNeed === 'cure' || primaryNeed === 'blessing') && world.has(playerId, Status)) {
         // Cure harmful status effects
         const status = world.get(playerId, Status);
-        const harmful = ['diseased', 'poisoned', 'cursed', 'bleeding', 'weakened'];
+        const harmful = ['disease', 'poisoned', 'cursed', 'bleeding', 'weakened'];
         const before = status.statuses.length;
         status.statuses = status.statuses.filter(s => !harmful.includes(s.type));
         const cured = before - status.statuses.length;
@@ -244,7 +244,7 @@ function assessPlayerNeeds(world, playerId) {
       if (s.type === 'cursed') {
         needsBlessing = true;
         maxUrgency = Math.max(maxUrgency, 0.8);
-      } else if (s.type === 'diseased' || s.type === 'poisoned') {
+      } else if (s.type === 'disease' || s.type === 'poisoned') {
         maxUrgency = Math.max(maxUrgency, 0.7);
       } else if (s.type === 'bleeding') {
         maxUrgency = Math.max(maxUrgency, 0.6);

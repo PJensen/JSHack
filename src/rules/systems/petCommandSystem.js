@@ -7,6 +7,7 @@ import { PetState } from '../components/PetState.js';
 import { Position } from '../components/Position.js';
 import { Player } from '../components/Player.js';
 import { ItemInfo } from '../components/ItemInfo.js';
+import { Vitality } from '../components/Vitality.js';
 
 const COMMAND_COOLDOWN = 0; // turns between commands (0 = instant)
 
@@ -26,8 +27,13 @@ export function petCommandSystem(world) {
   for (const [intentId, intent] of world.query(PetCommandIntent)) {
     const petId = intent.petId;
 
-    // Validate pet exists and has required components
+    // Validate pet exists, is on-map, and is alive
     if (!world.has(petId, Pet) || !world.has(petId, Position)) {
+      world.remove(intentId, PetCommandIntent);
+      continue;
+    }
+    const vit = world.get(petId, Vitality);
+    if (!vit || vit.hp <= 0) {
       world.remove(intentId, PetCommandIntent);
       continue;
     }

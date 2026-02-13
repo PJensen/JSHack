@@ -162,7 +162,8 @@ export function createHudFeeds(world, deps) {
     // Check if pet exists
     let petExists = false;
     let petState = "";
-    for (const [petId, _pet] of world.query(Pet)) {
+    for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
+      if (!vit || vit.hp <= 0) continue;
       petExists = true;
       const state = world.get(petId, PetState);
       petState = state?.state || "following";
