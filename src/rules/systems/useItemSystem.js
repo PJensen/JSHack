@@ -54,11 +54,20 @@ export function useItemSystem(world) {
       try { cons.useEffect(world, actor, itemId); } catch {}
       // By default, consumables are consumed on use
       consumed = true;
-    } else if (info && (info.type === 'learn' || info.type === 'scroll' || info.type === 'book')) {
+    } else if (info && (info.type === 'learn' || info.type === 'scroll' || info.type === 'wand' || info.type === 'book')) {
       const identity = (ni?.identity || '').toLowerCase();
 
-      // Path 2a: SCROLLS cast directly without knowledge/mana requirements
-      if (info.type === 'scroll' || identity.startsWith('scroll_')) {
+      // Path 2a: WANDS fire spell from charges, no mana cost, auto-targets like bow
+      if (info.type === 'wand') {
+        const spellIdFromId = identity.startsWith('wand_') ? identity.substring('wand_'.length) : '';
+        const spell = getSpell(spellIdFromId);
+        if (!spell) { world.remove(actor, UseIntent); continue; }
+        try { runSpellScript(world, actor, spell, { targetId: intent.targetId }); } catch {}
+        try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: intent.targetId || actor, source: 'wand' }); } catch {}
+        consumed = true;
+
+      // Path 2b: SCROLLS cast directly without knowledge/mana requirements
+      } else if (info.type === 'scroll' || identity.startsWith('scroll_')) {
         const spellIdFromId = identity.startsWith('scroll_') ? identity.substring('scroll_'.length) : '';
         const spell = getSpell(spellIdFromId);
         if (!spell) { world.remove(actor, UseIntent); continue; }
@@ -66,7 +75,7 @@ export function useItemSystem(world) {
         try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: actor }); } catch {}
         consumed = true;
       } else {
-        // Path 2b: learning from a spellbook-like item
+        // Path 2c: learning from a spellbook-like item
         if (identity.startsWith('book_')) {
           learnedSpellId = identity.substring('book_'.length);
         }
