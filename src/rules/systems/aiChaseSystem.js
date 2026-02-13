@@ -4,6 +4,7 @@
 import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { Speed } from "../components/Speed.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Player } from "../components/Player.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
@@ -26,7 +27,19 @@ export function aiChaseSystem(world) {
 
     // Speed gate: only act on ticks that match this entity's cadence
     const spd = world.get(id, Speed);
-    const actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
+    let actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
+
+    // Frost slow: layer on top of base Speed — each stack doubles the cadence
+    // 1 stack → act half as often, 2 → third, 3 → quarter
+    const ae = world.get(id, ActiveEffects);
+    if (ae && Array.isArray(ae.effects)) {
+      const frost = ae.effects.find(/** @param {any} e */ (e) => e.key === 'frost');
+      if (frost) {
+        const stacks = Math.min(frost.stacks || 1, 3);
+        actEvery = actEvery * (1 + stacks);
+      }
+    }
+
     if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
 
     // If already has a MoveIntent (e.g., set externally), skip
