@@ -1,6 +1,6 @@
 // Affix definitions: triggers can be onBeforeHit, onHit, onDamaged, onKill, onEquip, onUnequip
 // Scripts are registered via the central scripting router.
-import { mulberry32, rngInt } from "../../lib/ecs-js/rng.js";
+import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { registerScript, ScriptVerb } from "../scripting.js";
 
@@ -17,7 +17,7 @@ registerScript(AFFIX_THORNS, {
       const attacker = (ctx && ctx.attacker) | 0;
       const defender = (ctx && ctx.defender) | 0;
       const step = (world && world.step) | 0;
-      const seed = ((world?.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ (attacker >>> 0) ^ ((defender << 16) >>> 0) ^ 0xc0ffee01) >>> 0;
+      const seed = combatSeed(world?.seed ?? 0, step, attacker, defender, 0xc0ffee01);
       const r = mulberry32(seed);
       const roll = rngInt(r, 1, 100);
       if (roll <= 20) {

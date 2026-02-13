@@ -3,14 +3,10 @@
 
 import { registerScript, ScriptVerb } from "../scripting.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
-import { mulberry32, rngInt } from "../../lib/ecs-js/rng.js";
+import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { Brain } from '../components/Brain.js';
 
-function combatSeed(world, ctx) {
-  return ((world.seed >>> 0) ^ ((world.step * 0x9e3779b9) >>> 0)
-    ^ (ctx.attacker >>> 0) ^ ((ctx.defender << 16) >>> 0)) >>> 0;
-}
 
 function pushEffect(world, entityId, effect) {
   const ae = world.get(entityId, ActiveEffects);
@@ -33,7 +29,7 @@ function pushEffect(world, entityId, effect) {
 // Each subsequent bite has a chance to add another stack and refresh duration.
 registerScript('monster:ratBite', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0001);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0001));
     if (rngInt(r, 1, 100) <= 25) {
       pushEffect(world, ctx.defender, { key: 'disease', turnsLeft: 20, potency: 1, stacks: 1 });
       try { world.emit('proc:diseased', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -44,7 +40,7 @@ registerScript('monster:ratBite', {
 // Spider bite: 30% chance → poison (5 turns, potency 2, stacks)
 registerScript('monster:spiderBite', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0002);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0002));
     if (rngInt(r, 1, 100) <= 30) {
       pushEffect(world, ctx.defender, { key: 'poison', turnsLeft: 5, potency: 2, stacks: 1 });
       try { world.emit('proc:poisoned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -55,7 +51,7 @@ registerScript('monster:spiderBite', {
 // Wraith touch: 20% chance → drain life (heal self for 1/3 of damage dealt)
 registerScript('monster:wraithTouch', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0003);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0003));
     if (rngInt(r, 1, 100) <= 20) {
       const amt = Math.max(1, Math.floor(ctx.damage / 3));
       ctx.healAttacker(amt);
@@ -67,7 +63,7 @@ registerScript('monster:wraithTouch', {
 // Dragon claw: 20% chance → burn (5 turns, potency 4)
 registerScript('monster:dragonClaw', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0004);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0004));
     if (rngInt(r, 1, 100) <= 20) {
       pushEffect(world, ctx.defender, { key: 'burn', turnsLeft: 5, potency: 4, stacks: 1 });
       try { world.emit('proc:burning', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -78,7 +74,7 @@ registerScript('monster:dragonClaw', {
 // Snake bite: 25% chance → poison (5 turns, potency 1, stacks)
 registerScript('monster:snakeBite', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000f);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000f));
     if (rngInt(r, 1, 100) <= 25) {
       pushEffect(world, ctx.defender, { key: 'poison', turnsLeft: 5, potency: 1, stacks: 1 });
       try { world.emit('proc:poisoned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -89,7 +85,7 @@ registerScript('monster:snakeBite', {
 // Goblin shiv: 20% chance → bleed (3 turns, potency 1, stacks)
 registerScript('monster:goblinShiv', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0005);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0005));
     if (rngInt(r, 1, 100) <= 20) {
       pushEffect(world, ctx.defender, { key: 'bleed', turnsLeft: 3, potency: 1, stacks: 1 });
       try { world.emit('proc:bleeding', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -100,7 +96,7 @@ registerScript('monster:goblinShiv', {
 // Bat screech: 15% chance → stun (1 turn)
 registerScript('monster:batScreech', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0006);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0006));
     if (rngInt(r, 1, 100) <= 15) {
       pushEffect(world, ctx.defender, { key: 'stun', turnsLeft: 1, potency: 1, stacks: 1 });
       try { world.emit('proc:stunned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -111,7 +107,7 @@ registerScript('monster:batScreech', {
 // Orc rage: 25% chance → +2 bonus damage (onBeforeHit)
 registerScript('monster:orcRage', {
   [ScriptVerb.AffixOnBeforeHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0007);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0007));
     if (rngInt(r, 1, 100) <= 25) {
       ctx.damage += 2;
       try { world.emit('proc:rage', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -122,7 +118,7 @@ registerScript('monster:orcRage', {
 // Skeleton reassemble: 20% chance → self-heal 2 HP when damaged
 registerScript('monster:skeletonReassemble', {
   [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0008);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0008));
     if (rngInt(r, 1, 100) <= 20) {
       ctx.heal(ctx.defender, 2);
       try { world.emit('proc:reassemble', { actor: ctx.defender }); } catch {}
@@ -136,7 +132,7 @@ registerScript('monster:trollSmash', {
     pushEffect(world, ctx.attacker, { key: 'regen', turnsLeft: 3, potency: 2, stacks: 1 });
   },
   [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0009);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0009));
     if (rngInt(r, 1, 100) <= 30) {
       ctx.heal(ctx.defender, 1);
       try { world.emit('proc:regenerate', { actor: ctx.defender }); } catch {}
@@ -147,7 +143,7 @@ registerScript('monster:trollSmash', {
 // Ogre crush: 25% chance → stun (2 turns)
 registerScript('monster:ogreCrush', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000a);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000a));
     if (rngInt(r, 1, 100) <= 25) {
       pushEffect(world, ctx.defender, { key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
       try { world.emit('proc:stunned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -158,7 +154,7 @@ registerScript('monster:ogreCrush', {
 // Demon hellfire: onHit 30% burn + onDamaged fire retaliation
 registerScript('monster:demonHellfire', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000b);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000b));
     if (rngInt(r, 1, 100) <= 30) {
       pushEffect(world, ctx.defender, { key: 'burn', turnsLeft: 4, potency: 3, stacks: 1 });
       try { world.emit('proc:burning', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -173,7 +169,7 @@ registerScript('monster:demonHellfire', {
 // Lich drain: onHit 25% life drain + onDamaged 20% phylactery regen
 registerScript('monster:lichDrain', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000c);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000c));
     if (rngInt(r, 1, 100) <= 25) {
       const amt = Math.max(1, Math.floor(ctx.damage / 2));
       ctx.healAttacker(amt);
@@ -181,7 +177,7 @@ registerScript('monster:lichDrain', {
     }
   },
   [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000d);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000d));
     if (rngInt(r, 1, 100) <= 20) {
       pushEffect(world, ctx.defender, { key: 'regen', turnsLeft: 3, potency: 2, stacks: 1 });
       try { world.emit('proc:phylactery', { actor: ctx.defender }); } catch {}
@@ -192,7 +188,7 @@ registerScript('monster:lichDrain', {
 // Grid bug zap: 30% chance → shock (2 turns, potency 1)
 registerScript('monster:gridBugZap', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead0010);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0010));
     if (rngInt(r, 1, 100) <= 30) {
       pushEffect(world, ctx.defender, { key: 'shock', turnsLeft: 2, potency: 1, stacks: 1 });
       try { world.emit('proc:shocked', { actor: ctx.attacker, target: ctx.defender }); } catch {}
@@ -203,7 +199,7 @@ registerScript('monster:gridBugZap', {
 // Mind flayer blast: 20% chance → fragmentary map memory loss on a random floor
 registerScript('monster:mindflayerBlast', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world, ctx) ^ 0xdead000e);
+    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000e));
     if (rngInt(r, 1, 100) <= 20) {
       const { depth } = degradeFloorMemory(r, { fraction: 0.3 });
       const brain = world.get(ctx.defender, Brain);

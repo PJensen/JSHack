@@ -10,7 +10,7 @@ import { Player } from '../components/Player.js';
 import { Status } from '../components/Status.js';
 import { Position } from '../components/Position.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
-import { mulberry32, rngInt } from '../../lib/ecs-js/rng.js';
+import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
 
@@ -105,8 +105,8 @@ export function combatSystem(world) {
         const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty - defHungerPenalty);
 
         // Deterministic d20 roll seeded by world + participants + step
-        const seed = (world.seed >>> 0) ^ ((world.step | 0) * 0x9e3779b9 >>> 0) ^ (attacker >>> 0) ^ ((defender << 16) >>> 0);
-        const r = mulberry32(seed >>> 0);
+        const seed = combatSeed(world.seed, world.step, attacker, defender);
+        const r = mulberry32(seed);
         const d20 = rngInt(r, 1, 20);
         const totalToHit = d20 + attackBonus;
         const isCrit = d20 === 20;
@@ -197,17 +197,3 @@ export function combatSystem(world) {
     }
 }
 
-// Dice helpers
-/** @param {string} spec @param {() => number} rng */
-function rollDice(spec, rng) {
-    // spec like '2d6' or '1d8'
-    const m = /^\s*(\d+)d(\d+)\s*$/i.exec(String(spec||''));
-    if (!m) return 1;
-    const cStr = m[1] || '1';
-    const sStr = m[2] || '2';
-    const count = Math.max(1, (parseInt(cStr,10)|0));
-    const sides = Math.max(2, (parseInt(sStr,10)|0));
-    let sum = 0;
-    for (let i=0;i<count;i++) sum += rngInt(rng, 1, sides);
-    return sum;
-}
