@@ -231,6 +231,13 @@ function ensureEffectsStack(container) {
     thorns:       { name: 'Thorns', glyph: '\u{1F339}', hue: 110 },
     diseased:     { name: 'Disease', glyph: '\u{1F9A0}', hue: 55 },
     bleeding:     { name: 'Bleed', glyph: '\u{1FA78}', hue: 350 },
+    // Hunger levels
+    satiated:     { name: 'Satiated', glyph: '\u{1F60B}', hue: 130 },
+    peckish:      { name: 'Peckish', glyph: '\u{1F37D}\uFE0F', hue: 55 },
+    hungry:       { name: 'Hungry', glyph: '\u{1F356}', hue: 35 },
+    famished:     { name: 'Famished', glyph: '\u{1F9B4}', hue: 20 },
+    starving:     { name: 'Starving', glyph: '\u{1F480}', hue: 5 },
+    wasting:      { name: 'Wasting', glyph: '\u2620\uFE0F', hue: 350 },
   };
   // Aliases: raw ActiveEffects keys → same VIS entry
   _VIS.invuln = _VIS.invulnerable;
@@ -367,7 +374,7 @@ function createQuickSlot() {
 
   function actionable(it) {
     const t = String(it.type||'');
-    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book') return (it.count||0) > 0;
+    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
     if (t === 'equip' || t === 'ammo') return true;
     return false;
   }
@@ -390,6 +397,7 @@ function createQuickSlot() {
   function dispatchAction(it) {
     const t = String(it.type||'');
     if (t === 'potion') window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+    else if (t === 'food') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     else if (t === 'equip' || t === 'ammo') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
     else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
@@ -451,14 +459,14 @@ function renderQuickChip(it, h) {
   count.dataset.role = 'count';
   count.style.opacity = '0.8';
   count.style.fontSize = '12px';
-  count.textContent = (it.type === 'potion' || it.type === 'scroll') ? `x${it.count||1}` : '';
+  count.textContent = (it.type === 'potion' || it.type === 'scroll' || it.type === 'food') ? `x${it.count||1}` : '';
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip' || it.type === 'ammo') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'learn' ? 'Learn' : 'Read'));
+  btn.textContent = (it.type === 'equip' || it.type === 'ammo') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : 'Read')));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');

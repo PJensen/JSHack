@@ -8,6 +8,7 @@ export function initOverlays() {
   const pick = ensurePanel('pickup');
   const spells = ensurePanel('spells');
   const shop = ensurePanel('shop');
+  const chest = ensurePanel('chest');
   const groundTip = ensureGroundTooltip(root);
   const stairTip = ensureStairTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
@@ -37,7 +38,7 @@ export function initOverlays() {
     window.dispatchEvent(new CustomEvent('ui:requestMessageLogData'));
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(spells); hide(shop); }
+    if (e.key === 'Escape') { hide(inv); hide(log); hide(pick); hide(spells); hide(shop); hide(chest); }
   });
 
   // Data feeds
@@ -92,6 +93,22 @@ export function initOverlays() {
     const e = ev;
     const d = e?.detail || {};
     renderShop(shop, d, _shopState);
+  });
+
+  // Chest overlay
+  let _chestState = { chestId: 0 };
+  window.addEventListener('ui:openChest', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _chestState.chestId = d.chestId || 0;
+    show(chest);
+  });
+  window.addEventListener('ui:chestData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderChest(chest, d, _chestState);
   });
 
   // Ground item tooltip lifecycle
@@ -1027,6 +1044,156 @@ function renderShop(panel, data, state) {
 
   buyTab.addEventListener('click', () => { activeTab = 'buy'; updateTabStyle(); renderList(); });
   sellTab.addEventListener('click', () => { activeTab = 'sell'; updateTabStyle(); renderList(); });
+
+  updateTabStyle();
+  renderList();
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{chestId:number}} state */
+function renderChest(panel, data, state) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+
+  const chestItems = data?.chestItems || [];
+  const playerItems = data?.playerItems || [];
+
+  // Header
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' });
+  const title = document.createElement('div');
+  title.textContent = 'Chest';
+  title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
+  header.appendChild(title);
+  el.appendChild(header);
+
+  // Tabs
+  let activeTab = 'take';
+  const tabBar = document.createElement('div');
+  Object.assign(tabBar.style, { display: 'flex', gap: '4px', marginBottom: '10px' });
+
+  const takeTab = document.createElement('button');
+  takeTab.textContent = 'Take';
+  decorateButton(takeTab);
+
+  const putTab = document.createElement('button');
+  putTab.textContent = 'Put';
+  decorateButton(putTab);
+
+  tabBar.appendChild(takeTab); tabBar.appendChild(putTab);
+  el.appendChild(tabBar);
+
+  const listContainer = document.createElement('div');
+  listContainer.style.maxHeight = '50vh'; listContainer.style.overflow = 'auto';
+  el.appendChild(listContainer);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  el.appendChild(hint);
+
+  let sel = 0;
+  let currentItems = [];
+
+  function updateTabStyle() {
+    takeTab.style.background = activeTab === 'take' ? '#1a2640' : '#101626';
+    takeTab.style.borderColor = activeTab === 'take' ? '#55aaff' : '#2d3b52';
+    putTab.style.background = activeTab === 'put' ? '#1a2640' : '#101626';
+    putTab.style.borderColor = activeTab === 'put' ? '#55aaff' : '#2d3b52';
+  }
+
+  function renderList() {
+    listContainer.innerHTML = '';
+    sel = 0;
+    currentItems = activeTab === 'take' ? chestItems : playerItems;
+
+    if (!currentItems.length) {
+      const empty = document.createElement('div');
+      empty.textContent = activeTab === 'take' ? '(chest is empty)' : '(nothing to store)';
+      listContainer.appendChild(empty);
+      hint.textContent = 'Tab=Switch \u00b7 Esc=Close';
+      return;
+    }
+
+    const rows = currentItems.map((it, idx) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'flex', alignItems: 'center', gap: '8px',
+        width: '100%', padding: '6px 8px',
+        background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+        cursor: 'pointer', marginBottom: '4px',
+      });
+
+      const name = document.createElement('span');
+      const rn = String(it.rarityName || 'common').toLowerCase();
+      const rs = rarityStyle(rn);
+      name.textContent = bracketize(sanitize(it.name || 'item'));
+      Object.assign(name.style, rs);
+
+      row.appendChild(name);
+      if (it.count > 1) {
+        const qty = document.createElement('span');
+        qty.style.opacity = '0.7'; qty.textContent = `x${it.count}`;
+        row.appendChild(qty);
+      }
+
+      row.addEventListener('mouseenter', () => setSel(idx));
+      row.addEventListener('click', () => doTransaction());
+      listContainer.appendChild(row);
+      return row;
+    });
+
+    function setSel(i) {
+      sel = Math.max(0, Math.min(currentItems.length - 1, i | 0));
+      rows.forEach((r, j) => {
+        r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+        r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+      });
+    }
+
+    setSel(0);
+    hint.textContent = activeTab === 'take'
+      ? '\u2191/\u2193 select \u00b7 Enter=Take \u00b7 Tab=Put tab \u00b7 Esc=Close'
+      : '\u2191/\u2193 select \u00b7 Enter=Put \u00b7 Tab=Take tab \u00b7 Esc=Close';
+
+    function doTransaction() {
+      const it = currentItems[sel]; if (!it) return;
+      if (activeTab === 'take') {
+        window.dispatchEvent(new CustomEvent('ui:requestChestTake', {
+          detail: { chestId: state.chestId, itemId: it.id }
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('ui:requestChestPut', {
+          detail: { chestId: state.chestId, itemId: it.id }
+        }));
+      }
+    }
+
+    /** @param {KeyboardEvent} e */
+    function onKey(e) {
+      if (panel.style.display !== 'block') return;
+      const k = e.key;
+      if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
+      else if (k === 'Tab') {
+        e.preventDefault();
+        activeTab = activeTab === 'take' ? 'put' : 'take';
+        updateTabStyle();
+        renderList();
+      }
+    }
+
+    window.addEventListener('keydown', onKey);
+    const obs = new MutationObserver(() => {
+      if (panel.style.display === 'none') {
+        window.removeEventListener('keydown', onKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  takeTab.addEventListener('click', () => { activeTab = 'take'; updateTabStyle(); renderList(); });
+  putTab.addEventListener('click', () => { activeTab = 'put'; updateTabStyle(); renderList(); });
 
   updateTabStyle();
   renderList();

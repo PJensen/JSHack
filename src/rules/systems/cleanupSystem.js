@@ -14,6 +14,7 @@ import { DungeonState } from "../components/DungeonState.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { getMonster, getMonsterLootTable } from "../data/monsters.js";
 import { dropLoot } from "../data/lootResolver.js";
+import { createCorpse } from "../archetypes/Food.js";
 
 /**
  * Collect all entities with Vitality and remove those whose hp <= 0.
@@ -54,6 +55,15 @@ export function cleanupSystem(world) {
           let depth = 1;
           for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
           dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
+
+          // Drop a corpse for the killed monster
+          // Base 75% chance, +8% per tier (higher tier = more guaranteed)
+          const corpseChance = Math.min(1.0, 0.75 + (monsterDef.tier || 0) * 0.08);
+          const corpseRoll = rng.next ? rng.next() : Math.random();
+          if (corpseRoll < corpseChance) {
+            const corpseId = createCorpse(world, monsterDef, { x: pos.x, y: pos.y });
+            try { world.emit && world.emit('item:dropped', { itemId: corpseId, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }
+          }
         }
       }
 

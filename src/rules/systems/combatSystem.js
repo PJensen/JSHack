@@ -94,8 +94,15 @@ export function combatSystem(world) {
         const defDisease = defStatus?.statuses?.find(s => s.type === 'diseased');
         const defDiseasePenalty = defDisease ? Math.max(0, (defDisease.potency || 1) * (defDisease.stacks || 1)) : 0;
 
-        const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty);
-        const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty);
+        // Hunger penalty: hungry/famished/starving/wasting reduce attack and defense
+        const _hungerTypes = ['hungry', 'famished', 'starving', 'wasting'];
+        const atkHunger = atkStatus?.statuses?.find(s => _hungerTypes.includes(s.type));
+        const atkHungerPenalty = atkHunger ? Math.max(0, atkHunger.potency || 0) : 0;
+        const defHunger = defStatus?.statuses?.find(s => _hungerTypes.includes(s.type));
+        const defHungerPenalty = defHunger ? Math.max(0, defHunger.potency || 0) : 0;
+
+        const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty - atkHungerPenalty);
+        const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty - defHungerPenalty);
 
         // Deterministic d20 roll seeded by world + participants + step
         const seed = (world.seed >>> 0) ^ ((world.step | 0) * 0x9e3779b9 >>> 0) ^ (attacker >>> 0) ^ ((defender << 16) >>> 0);
