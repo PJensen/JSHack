@@ -13,6 +13,8 @@ import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
 import { Collider } from "../components/Collider.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Physiology } from "../components/Physiology.js";
 import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 
@@ -214,6 +216,82 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
   }
 
   try { world.emit && world.emit('spell:meteor', { actor, origin: { x: ox, y: oy }, radius: RADIUS }); } catch {}
+};
+
+// Frost — auto-target nearest enemy in LOS; apply cold damage + slow effect scaled by mass.
+// Heavier creatures shrug off frost faster; lighter ones freeze longer.
+REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const MAX_R = 10;
+  const BASE_DMG = 4;
+
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Collect living enemy candidates in range
+  /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+  const candidates = [];
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || fac.key !== 'enemy') continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist2 = d2(apos.x, apos.y, p.x, p.y);
+    if (dist2 <= MAX_R * MAX_R) {
+      candidates.push({ id, x: p.x, y: p.y, dist2 });
+    }
+  }
+
+  // Pick nearest with LOS
+  candidates.sort((a, b) => a.dist2 - b.dist2);
+  let target = null;
+  for (const c of candidates) {
+    if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isOpaque)) { target = c; break; }
+  }
+  if (!target) {
+    // No valid target; emit a fizzle pulse at caster
+    try { world.emit && world.emit('spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, fizzle: true }); } catch {}
+    return;
+  }
+
+  // Apply cold damage
+  const vit = /** @type any */ (world.get(target.id, Vitality));
+  if (vit) {
+    vit.hp = Math.max(0, (vit.hp | 0) - BASE_DMG);
+    try { world.emit && world.emit('damage', { id: target.id, amount: BASE_DMG, at: { x: target.x, y: target.y } }); } catch {}
+    if ((vit.hp | 0) <= 0) {
+      try { world.emit && world.emit('died', { id: target.id, at: { x: target.x, y: target.y } }); } catch {}
+    }
+  }
+
+  // Compute frost duration from target mass: lighter = longer slow
+  // Base 5 turns, -1 per 30kg above 40kg, min 2 turns
+  const phys = /** @type any */ (world.get(target.id, Physiology));
+  const massKg = (phys && typeof phys.massKg === 'number') ? phys.massKg : 80;
+  const baseDuration = 5;
+  const massPenalty = Math.floor(Math.max(0, massKg - 40) / 30);
+  const duration = Math.max(2, baseDuration - massPenalty);
+
+  // Apply frost effect via ActiveEffects (ECS-compliant: read-then-mutate)
+  let ae = /** @type any */ (world.get(target.id, ActiveEffects));
+  if (!ae) {
+    try { world.add(target.id, ActiveEffects, { effects: [] }); } catch {}
+    ae = /** @type any */ (world.get(target.id, ActiveEffects));
+  }
+  if (ae && Array.isArray(ae.effects)) {
+    const existing = ae.effects.find(/** @param {any} e */ (e) => e.key === 'frost');
+    if (existing) {
+      existing.turnsLeft = Math.max(existing.turnsLeft, duration);
+      existing.stacks = Math.min((existing.stacks || 1) + 1, 3);
+    } else {
+      ae.effects.push({ key: 'frost', turnsLeft: duration, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
+    }
+  }
+
+  // Emit semantic event for display VFX
+  try { world.emit && world.emit('spell:frost', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y }, duration, mass: massKg }); } catch {}
 };
 
 /**

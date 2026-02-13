@@ -32,6 +32,13 @@ export const SPELL_DEFS = {
     minIntelligence: 0,
     script: 'blastwave',
   },
+  frost: {
+    id: 'frost',
+    name: 'Frost',
+    manaCost: 5,
+    minIntelligence: 0,
+    script: 'frost',
+  },
 };
 
 /**

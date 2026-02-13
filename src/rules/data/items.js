@@ -56,6 +56,16 @@ export const ITEM_DEFS = {
         rarityName: 'rare',
         description: 'Calls down a meteor. 2 charges.',
     },
+    wand_frost: {
+        id: 'wand_frost',
+        name: 'Wand of Frost',
+        type: 'wand',
+        slot: 'bag',
+        charges: 3,
+        rarity: 1,
+        rarityName: 'rare',
+        description: 'Encases an enemy in frost, slowing them. Lighter foes freeze longer. 3 charges.',
+    },
 };
 
 export function listItems() { return Object.values(ITEM_DEFS); }
