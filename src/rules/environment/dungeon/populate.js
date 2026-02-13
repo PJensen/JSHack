@@ -18,6 +18,7 @@ import { Spawner } from '../../archetypes/Spawner.js';
 import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
+import { RoomMetadata } from '../../components/RoomMetadata.js';
 
 /**
  * @typedef {Object} SpawnPoint
@@ -105,9 +106,33 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   // Shopkeeper: one per chunk, first eligible room, ~30% chance
   if (chunk.rooms.length > 0 && rng.next() < 0.30) {
     const room = chunk.rooms[0];
+
+    // Place shopkeeper near the room entrance (prefer near doors)
     const sx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
     const sy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-    spawns.push({ x: sx, y: sy, kind: 'shopkeeper', params: { depth: floorPlan.depth } });
+
+    spawns.push({
+      x: sx,
+      y: sy,
+      kind: 'shopkeeper',
+      params: {
+        depth: floorPlan.depth,
+        room: { x: room.x, y: room.y, w: room.w, h: room.h }
+      }
+    });
+
+    // Scatter shop items on the floor throughout the room (5-12 items)
+    const itemCount = rng.int(5, 12);
+    for (let i = 0; i < itemCount; i++) {
+      const ix = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      const iy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      spawns.push({
+        x: ix,
+        y: iy,
+        kind: 'shop_item',
+        params: { depth: floorPlan.depth }
+      });
+    }
   }
 
   // Tombstone spawning: retrieve tombstones for this depth
@@ -247,11 +272,50 @@ export function materializeSpawn(world, spawn) {
     case 'shopkeeper': {
       const id = createFrom(world, Shopkeeper, { x: spawn.x, y: spawn.y });
       const depth = spawn.params.depth || 1;
-      const shopRng = createRng(((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0x5470) >>> 0);
-      const stock = generateShopStock(world, depth, shopRng);
+
+      // Create a room metadata entity to mark this as a shop
+      if (spawn.params.room) {
+        const roomEntity = world.create();
+        world.add(roomEntity, RoomMetadata, {
+          roomType: 'shop',
+          x: spawn.params.room.x,
+          y: spawn.params.room.y,
+          w: spawn.params.room.w,
+          h: spawn.params.room.h,
+          shopkeeperId: id,
+        });
+      }
+
+      // Keep ShopInventory component for pricing info, but start with empty items
       const shop = world.get(id, ShopInventory);
-      if (shop) shop.items = stock;
+      if (shop) shop.items = [];
+
       return id;
+    }
+    case 'shop_item': {
+      const depth = spawn.params.depth || 1;
+      const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0x5470) >>> 0);
+
+      // Generate a single random shop item
+      const stock = generateShopStock(world, depth, shopRng);
+      if (stock.length === 0) return null;
+
+      // Pick a random item from the generated stock
+      const itemId = stock[shopRng.int(0, stock.length - 1)];
+
+      // Place it on the floor
+      world.add(itemId, Position, { x: spawn.x, y: spawn.y });
+
+      // Calculate price (will be added as Unpaid in post-processing)
+      const info = world.get(itemId, ItemInfo);
+      if (info) {
+        const price = Math.ceil((info.value || 0) * 1.3); // 30% markup
+        // Store price temporarily in spawn params for post-processing
+        spawn._calculatedPrice = price;
+        spawn._itemId = itemId;
+      }
+
+      return itemId;
     }
     case 'book': {
       const def = getItem(spawn.params.bookId);
