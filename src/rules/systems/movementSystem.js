@@ -14,6 +14,7 @@ import { InteractIntent } from "../components/Intents/InteractIntent.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
+import { Player } from "../components/Player.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -69,8 +70,9 @@ export function movementSystem(world) {
           } else {
             try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
           }
-        } else {
-          // No living target — try interactable (e.g., closed door)
+        } else if (world.has(actor, Player)) {
+          // No living target — try interactable (e.g., closed door, chest)
+          // Only the player can bump-interact with objects; monsters just bounce off.
           const targetId = interactables.get(k);
           if (targetId) {
             world.add(actor, InteractIntent, { targetId });
