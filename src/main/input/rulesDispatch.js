@@ -1,10 +1,10 @@
-// app/input/rulesDispatch.js
+// src/main/input/rulesDispatch.js
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../src/rules/components/index.js";
-import { UseIntent } from "../../src/rules/components/Intents/UseIntent.js";
-import { itemsAt } from "../../src/rules/utils/queries.js";
+import { MoveIntent, WaitIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../rules/components/index.js";
+import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
+import { itemsAt } from "../../rules/utils/queries.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.

@@ -1,36 +1,36 @@
-// app/rules/scheduler.js
+// src/main/scheduler.js
 // Register rules systems into phases and set the world scheduler.
 
-import { composeScheduler, registerSystem, clearSystems, getOrderedSystems } from "../../src/lib/ecs-js/index.js";
-/** @typedef {import('../../src/lib/ecs-js/index.js').World} World */
-import { drinkSystem } from "../../src/rules/systems/drinkSystem.js";
-import { itemPickupSystem, autoPickupPostMoveSystem } from "../../src/rules/systems/itemPickupSystem.js";
-import { itemDropSystem } from "../../src/rules/systems/itemDropSystem.js";
-import { equipItemSystem } from "../../src/rules/systems/equipItemSystem.js";
-import { useItemSystem } from "../../src/rules/systems/useItemSystem.js";
-import { rangedAttackSystem } from "../../src/rules/systems/rangedAttackSystem.js";
-import { interactionSystem } from "../../src/rules/systems/interactionSystem.js";
-import { effectSystem } from "../../src/rules/systems/effectSystem.js";
-import { equipmentSystem } from "../../src/rules/systems/equipmentSystem.js";
-import { waitSystem } from "../../src/rules/systems/waitSystem.js";
-import { castSpellSystem } from "../../src/rules/systems/castSpellSystem.js";
-import { aiChaseSystem } from "../../src/rules/systems/aiChaseSystem.js";
-import { petFollowSystem } from "../../src/rules/systems/petFollowSystem.js";
-import { movementSystem } from "../../src/rules/systems/movementSystem.js";
-import { combatSystem } from "../../src/rules/systems/combatSystem.js";
-import { installAffixTriggers } from "../../src/rules/systems/affixTriggerSystem.js";
-import { cleanupSystem } from "../../src/rules/systems/cleanupSystem.js";
-import { trapSystem } from "../../src/rules/systems/trapSystem.js";
-import { manaRegenerationSystem } from "../../src/rules/systems/manaRegenerationSystem.js";
-import { monsterSpawnerSystem } from "../../src/rules/systems/monsterSpawnerSystem.js";
-import { spatialIndexSystem } from "../../src/rules/systems/spatialIndexSystem.js";
-import { deitySystem } from "../../src/rules/systems/deitySystem.js";
-import { engraveSystem, installEngraveListeners } from "../../src/rules/systems/engraveSystem.js";
-import { hungerSystem } from "../../src/rules/systems/hungerSystem.js";
+import { composeScheduler, registerSystem, clearSystems, getOrderedSystems } from "../lib/ecs-js/index.js";
+/** @typedef {import('../lib/ecs-js/index.js').World} World */
+import { drinkSystem } from "../rules/systems/drinkSystem.js";
+import { itemPickupSystem, autoPickupPostMoveSystem } from "../rules/systems/itemPickupSystem.js";
+import { itemDropSystem } from "../rules/systems/itemDropSystem.js";
+import { equipItemSystem } from "../rules/systems/equipItemSystem.js";
+import { useItemSystem } from "../rules/systems/useItemSystem.js";
+import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
+import { interactionSystem } from "../rules/systems/interactionSystem.js";
+import { effectSystem } from "../rules/systems/effectSystem.js";
+import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
+import { waitSystem } from "../rules/systems/waitSystem.js";
+import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
+import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
+import { petFollowSystem } from "../rules/systems/petFollowSystem.js";
+import { movementSystem } from "../rules/systems/movementSystem.js";
+import { combatSystem } from "../rules/systems/combatSystem.js";
+import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
+import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
+import { trapSystem } from "../rules/systems/trapSystem.js";
+import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
+import { monsterSpawnerSystem } from "../rules/systems/monsterSpawnerSystem.js";
+import { spatialIndexSystem } from "../rules/systems/spatialIndexSystem.js";
+import { deitySystem } from "../rules/systems/deitySystem.js";
+import { engraveSystem, installEngraveListeners } from "../rules/systems/engraveSystem.js";
+import { hungerSystem } from "../rules/systems/hungerSystem.js";
 // Side-effect: registers script handlers at import time
-import "../../src/rules/scripts/traps.js";
-import "../../src/rules/scripts/monsters.js";
-import "../../src/rules/scripts/consumables.js";
+import "../rules/scripts/traps.js";
+import "../rules/scripts/monsters.js";
+import "../rules/scripts/consumables.js";
 
 /**
  * @param {World} world
