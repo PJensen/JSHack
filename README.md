@@ -1,126 +1,547 @@
-# JS-Hack
+# JSHack 🎮⚡
 
-A hackable, zero-dependency, browser-based like engine built with pure JavaScript and a Entity-Component-System (ECS) architecture. Designed for experimentation and exploration.
+**A mobile-first roguelike built to be hacked.**
 
-## Building
+Pure JavaScript. Zero dependencies. No build step. Just open `index.html` and start playing. Edit a file, hit refresh, see your changes instantly. This is JavaScript the way it was meant to be: hackable, transparent, and fun.
 
-Execute `./build.ps1` to check for errors
+---
 
-## Prime Directives
+## What makes this different?
 
-- **Pure ES Modules**: No build step, no bundler. Works by opening `index.html` directly or serving via a static server.
-- **ECS Architecture**: Composable ECS core with archetypes, systems, and components.
-- **Deterministic**: Seeded RNG for reproducible runs and debugging. 0xC0FFEE
-- **Hackable**: Modular codebase, easy to inspect and extend. One file = one idea.
-- **Mobile-Friendly**: Responsive UX skeleton for desktop and mobile.
-- **Shims, Adapters and Compatibility:** Never try to make something backwards compatible. Just re-work it.
-- - **Logging:** Never spam log messages. 
+### 🚀 Zero build step, zero dependencies
 
-## Quick Start
+No npm. No webpack. No babel. No TypeScript. Just **pure ES modules** that run directly in your browser. Open `index.html` — it just works. Edit `src/rules/systems/movementSystem.js`, refresh, and your changes are live. No waiting, no compilation, no mysterious build errors.
 
-### Performance/Quality controls
+```bash
+# That's it. Seriously.
+open index.html
+```
 
-Mobile GPUs have limited fill-rate. The renderer now exposes a few conservative switches that keep visuals consistent while reducing per-frame work:
+### 📱 Mobile-first, touch-first
 
-- URL params (or matching localStorage keys) — set once and reload:
-	- `?quality=low|auto|high` — presets for glow layers and particle capacity
-	- `?dprCap=<number>` — caps devicePixelRatio used for the canvas (default auto: 1.5–2 on high-DPR devices)
+This isn't "mobile-friendly" — it's **mobile-native**. Touch controls are primary. Designed for phones. Keyboard works great too, but we built this for your thumb on a subway, not a mouse at a desk.
 
-Examples:
+- Tap sides to move (cardinal directions)
+- Double-tap to pick up items
+- Pinch to zoom
+- Swipe right for inventory, down for messages
 
-- `index.html?quality=low` — disables glyph glow, halves particle pool, caps DPR to 1
-- `index.html?dprCap=2` — keeps crispness but avoids 3×/4× DPR overload on phones
+All UI elements are finger-sized. No hover states. No tiny tap targets. Just intuitive touch controls that work.
 
-These controls operate entirely in display/ and do not affect deterministic rules/.
-1. **Clone or Download** this repository.
-2. **Open `index.html`** in your browser _or_ serve the folder with a static server:
+### 🎲 Deterministic and replayable
 
-	```sh
-	# Python 3.x
-	python -m http.server 8000
-	# or use any static server
-	```
-3. Play in your browser! No build or install required.
+Every run is seeded (default: `0xC0FFEE` ☕). Same seed + same inputs = same outcome, every time. Debug by replaying. Share interesting seeds. Build regression tests that actually work.
 
-## Controls
+```js
+const world = new World({ seed: 0xDEADBEEF });
+world.tick(1); // Perfectly reproducible
+```
 
-- Keyboard
-	- Arrow keys / WASD / HJKL: Move
-	- . (period): Wait a turn
-	- , (comma): Open pickup chooser for items underfoot
-	- Q: Drink a potion (from inventory UI)
-	- +/- or Numpad +/-: Zoom in/out; 0: Reset camera
-	- X: Quick camera shake (demo)
+### 🏗️ ECS architecture you can actually see
 
-- Touch / Pointer
-	- Single tap: Move toward the tapped screen side (cardinal)
-	- Double tap (quick): Pick up items underfoot (opens chooser if multiple)
-	- Pinch: Zoom in/out
-	- Swipe right: Open inventory
-	- Swipe down: Open message log
+Built on a clean **Entity-Component-System** architecture. Not hidden behind abstractions — you can see exactly how entities, components, and systems work. Want to understand ECS? Read the source. It's just JavaScript.
 
-## Mobile-friendly item pickups
+- **Entities** are IDs
+- **Components** are plain objects
+- **Systems** are functions that query and modify components
 
-When you walk over a non-currency item, a WoW-style tooltip appears near the bottom. Tap it to pick up the item. If multiple items are on the tile, tapping opens a simple chooser.
+No magic. No framework ceremony. Just composable logic.
 
-Manual pickups respect a per-actor `Settings.pickupRange` (in tiles; default 1). This allows adjacent pickups on touch devices without precise stepping.
+### 🧩 One file = one idea
 
-## Project Structure
+Every file has a single, clear purpose. Want to change how movement works? Open [movementSystem.js](src/rules/systems/movementSystem.js). Want to add a new monster? Create an archetype in [Creatures.js](src/rules/archetypes/Creatures.js). The codebase is organized for humans, not bundlers.
 
-- `index.html` — Main entry point for the game.
-- `src/` — Source code (ECS core, systems, components, utilities).
-- `reference/` — Demos and implementation references.
-- `world/` — Game-specific archetypes, components, data, and systems.
+### 🎨 Church and State separation
+
+Deterministic simulation (`rules/`) is completely separate from rendering (`display/`). The rules layer has **zero DOM, zero rendering, zero async code**. It's pure, testable logic. The display layer consumes a stable snapshot and renders however it wants. You can swap renderers, run headless tests, or replay demos without touching game logic.
+
+See [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) for the philosophy.
+
+### 🔧 Built to be hacked
+
+We're not "shipping a product" — we're **exploiting JavaScript for fun**. Clever tricks encouraged. Weird experiments welcome. Open your console, poke around, break things, fix them. This is a playground.
+
+Every decision prioritizes hackability:
+- No transpilation (edit and refresh)
+- No bundling (import real files)
+- No frameworks (see the actual code)
+- No abstractions (everything is transparent)
+
+If you can `console.log` it, you can understand it.
+
+---
+
+## Getting Started
+
+### Play it in 30 seconds
+
+```bash
+git clone https://github.com/your-username/JSHack.git
+cd JSHack
+open index.html
+```
+
+Or serve it with any static server:
+
+```bash
+python -m http.server 8000
+# Then open http://localhost:8000
+```
+
+**That's it.** No `npm install`. No `npm run build`. Just open and play.
+
+### Controls
+
+**Touch / Mobile (primary):**
+- **Tap screen sides**: Move in that direction
+- **Double-tap**: Pick up items at your feet
+- **Pinch**: Zoom in/out
+- **Swipe right**: Open inventory
+- **Swipe down**: Open message log
+
+**Keyboard (also works):**
+- **Arrow keys / WASD / HJKL**: Move (pick your poison)
+- **. (period)**: Wait a turn
+- **, (comma)**: Pick up items
+- **Q**: Drink a potion
+- **+/- (or numpad)**: Zoom in/out
+- **0**: Reset zoom
+- **X**: Camera shake demo (because why not)
+
+### Performance tuning
+
+On older phones or just want better framerates? Add URL params:
+
+```
+index.html?quality=low    # Fast mode: no glow, fewer particles
+index.html?quality=high   # Full eye candy
+index.html?dprCap=1       # Force 1x pixel density (speed boost)
+```
+
+These only affect visuals — the deterministic simulation stays identical.
+
+---
 
 ## How It Works
 
-- The game boots from `src/main.js`, which sets up the canvas and ECS world.
-- All logic is organized into ES modules. Systems iterate over entities with matching components.
-- Archetypes provide prefab-like entity creation.
-- No frameworks, no transpilers, no dependencies.
+### The 30-second architecture tour
 
-## Turn and Combat Rules
+```
+src/
+  rules/     — Pure deterministic simulation (the roguelike logic)
+  bridge/    — Stable contract between rules and display
+  display/   — Rendering, particles, camera, input handling
+  main/      — Wires everything together
+```
 
-- Strict turns: player acts, then all monsters act, then back to player; one action per entity per round.
-- Player input is only accepted on the player's turn; monster AI only runs on the monsters' turn.
-- Actions that consume a turn include: moving one tile, opening a door, or initiating a melee attack.
-- Melee attacks use DnD-like resolution:
-	- Roll d20 + attackBonus vs target's armorClass; natural 1 always misses, natural 20 always crits.
-	- On hit, roll damage from atkMin..atkMax; crits multiply damage by critMult.
-	- Optional flat mitigation from defense is applied after damage.
-	- Defaults come from `CombatStats` and can be modified by equipment.
+**Rules** never import **Display**. **Display** never imports **Rules**. They talk through a clean **Bridge** contract. This keeps the simulation pure and deterministic while letting the visuals do whatever they want.
 
-## Development
+### Turn-based simulation
 
-- Edit or add modules in `src/` or `world/` to extend the game.
-- Use the reference demos in `reference/` for learning or testing ECS features.
-- All code is MIT licensed and intended for learning, hacking, and rapid prototyping.
+Strict turn order: player acts → all monsters act → effects trigger → cleanup runs → back to player. One action per entity per turn. No realtime chaos.
 
-## Effects & Status (rules/)
+Actions that consume a turn:
+- Moving one tile
+- Attacking something
+- Using an item
+- Waiting (yes, waiting is an action)
 
-- Active effects are stored in `ActiveEffects.effects` on an entity as records like `{ key, turnsLeft, potency?, stacks?, onsetLeft? }`.
-- The `effectSystem` runs each tick and applies gameplay results:
-	- `poison` and `burn` deal damage over time to `Vitality.hp`.
-	- `regeneration` heals each tick up to `Vitality.maxHp`.
-	- `stun` sets a status flag (no movement/AI gating yet).
-- Current statuses are mirrored into `Status.statuses` each tick (e.g., `poisoned`, `burning`). When an entity has no effects, statuses clear automatically.
+### Combat rules (D&D-style)
 
-Example: Apply poison to the player for 3 turns at 2 damage per tick by pushing `{ key:'poison', turnsLeft:3, potency:2 }` into the player's `ActiveEffects.effects`. On each world tick, hp will drop by 2 until the effect expires, and the `poisoned` status will appear during the duration.
+```
+Attacker rolls: d20 + attackBonus
+Target has: armorClass
 
-## End-of-turn cleanup
+Hit if roll ≥ AC
+Natural 1: always miss
+Natural 20: always crit (damage × critMult)
 
-- A dedicated `cleanup` phase runs at the end of each world tick. It currently removes any entity with `Vitality.hp <= 0` to prevent "dead men walking" in subsequent turns. Systems can react to deaths (events, affixes, VFX, logging) earlier in the tick; removal is deferred until this phase to keep ordering deterministic.
+Damage: roll(minDamage, maxDamage) - defense
+```
+
+Equipment modifies your stats. Affixes add special effects. Crits feel good.
+
+### Systems run in phases
+
+Systems are organized into three phases:
+
+1. **intents**: AI, player input, movement, combat, interactions
+2. **effects**: Status effects, equipment bonuses, hunger, mana regen, spawners
+3. **cleanup**: Remove dead entities, update spatial index
+
+See [scheduler.js](src/main/scheduler.js) for the full registration order. Add your own systems by registering them to a phase. Systems never call other systems — they emit events instead.
+
+### Components are just frozen objects
+
+```js
+export const Position = Object.freeze({
+  x: 0,
+  y: 0,
+});
+
+export const Vitality = Object.freeze({
+  hp: 10,
+  maxHp: 10,
+});
+```
+
+That's it. No classes. No inheritance. Just plain data.
+
+### Archetypes spawn entities
+
+```js
+import { Goblin } from './rules/archetypes/Creatures.js';
+import { createFrom } from './lib/ecs-js/archetype.js';
+
+const goblinId = createFrom(world, Goblin, { x: 10, y: 10 });
+```
+
+Archetypes are templates. Spawn as many as you want. Modify their components. They're just entities.
+
+---
+
+## Hacking on JSHack
+
+### Make a new monster in 2 minutes
+
+1. Open [src/rules/archetypes/Creatures.js](src/rules/archetypes/Creatures.js)
+2. Copy an existing monster definition
+3. Change the stats (hp, damage, XP, name)
+4. Refresh your browser
+5. Your monster spawns
+
+No compilation. No bundling. Just edit and play.
+
+### Add a new system
+
+1. Create `src/rules/systems/mySystem.js`:
+   ```js
+   export function mySystem(world, dt) {
+     for (const [id, pos, thing] of world.query(Position, Thing)) {
+       // Your logic here
+     }
+   }
+   ```
+
+2. Register it in [src/main/scheduler.js](src/main/scheduler.js):
+   ```js
+   import { mySystem } from '../rules/systems/mySystem.js';
+   registerSystem(mySystem, 'intents'); // or 'effects' or 'cleanup'
+   ```
+
+3. Refresh browser
+
+4. Your system runs every tick
+
+### Debug with determinism
+
+```js
+// In your browser console
+const world = new World({ seed: 0xC0FFEE });
+// ...set up your scenario...
+world.tick(1); // Run one turn
+world.tick(1); // Run another
+
+// Same seed, same setup → same results, always
+```
+
+Replay bugs. Share seeds. Build regression tests. Determinism is your superpower.
+
+### Emit events, not calls
+
+Systems communicate via events, never direct calls:
+
+```js
+// ✅ GOOD: Emit an event
+world.emit('combat:hit', { attackerId, targetId, damage });
+
+// ❌ BAD: Call another system
+combatSystem(world, dt); // Never do this!
+```
+
+Events keep the scheduler in control and execution order predictable.
+
+---
+
+## What's Inside?
+
+### 🎮 Core Features
+
+- **Turn-based roguelike gameplay** — classic dungeon crawling
+- **Monster AI** — chase the player, respect obstacles
+- **Item system** — potions, scrolls, weapons, armor, wands
+- **Magic system** — fireball, lightning bolt, heal, and more
+- **Equipment** — weapons, armor, with affix modifiers
+- **Status effects** — poison, burn, regen, stun
+- **Hunger system** — eat food or suffer penalties
+- **Deity favor** — worship gods, gain boons or invoke wrath
+- **Pet companions** — they follow and fight for you
+- **Traps** — pressure plates, arrow traps, spike pits
+- **Shops** — buy and sell items
+- **Dungeon generation** — procedural levels with rooms and corridors
+- **FOV & exploration** — shadowcasting visibility, fog of war
+
+### 🔧 Developer Tools
+
+- **Deterministic replay** — seeded RNG for perfect reproducibility
+- **Rules profiler** — per-system timing (`?rulesProfile=1`)
+- **Event system** — inter-system communication without coupling
+- **Spatial indexing** — fast radius queries for AI and effects
+- **Script system** — attach behavior to entities without hardcoding
+- **Hot reload** — edit JS, refresh browser, see changes instantly
+
+### 📚 Content
+
+- **26 systems** — movement, combat, AI, items, effects, spawning, cleanup
+- **30+ components** — Position, Vitality, Inventory, Brain, Equipment, etc.
+- **12 archetype files** — Player, Creatures, Items, Tiles, Doors, Stairs, Traps, etc.
+- **Spell library** — offensive, defensive, utility spells
+- **Monster roster** — kobolds, goblins, orcs, trolls, and more
+- **Item database** — consumables, equipment, treasures
+- **Deity pantheon** — multiple gods with unique mechanics
+
+All data-driven. All modifiable. All in plain JavaScript files.
+
+---
+
+## Project Structure
+
+```
+JSHack/
+├── index.html              # Entry point (just open it!)
+├── src/
+│   ├── rules/              # Pure deterministic simulation
+│   │   ├── systems/        # 26 game logic systems
+│   │   ├── components/     # 30+ data containers
+│   │   ├── archetypes/     # Entity templates
+│   │   ├── scripts/        # Behavior hooks (spells, items, traps)
+│   │   ├── data/           # Spells, monsters, items, loot tables
+│   │   └── environment/    # Dungeon generation, FOV, tiles
+│   ├── bridge/             # Rules ↔ Display contract
+│   │   └── schema/         # WorldView, MapView DTOs
+│   ├── display/            # Rendering & presentation
+│   │   ├── passes/         # Render pipeline (glyphs, VFX, particles)
+│   │   ├── camera/         # Camera controller, follow, shake, zoom
+│   │   ├── input/          # Touch & keyboard input routing
+│   │   ├── ui/             # HUD, inventory, messages, overlays
+│   │   └── palette/        # Visual mappings (glyphs, colors)
+│   ├── main/               # Application wiring
+│   │   ├── scheduler.js    # System registration & phases
+│   │   └── input/          # Input → Intent conversion
+│   ├── shared/             # Pure utilities (math, grid algorithms)
+│   └── lib/                # Vendored libraries (ecs-js, deity-js)
+├── tests/                  # Test suite (Deno)
+├── reference/              # Demos and examples
+└── AGENTS.md               # Guide for AI/autonomous agents
+```
+
+**Design principle**: Import boundaries enforce separation. Rules can't import Display. Display can't import Rules. Bridge is the contract. See [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) for details.
+
+---
+
+## Philosophy
+
+### We believe in:
+
+- **Zero build steps** — pure ES modules, instant feedback
+- **Determinism** — seeded RNG, reproducible runs, testable logic
+- **Transparency** — no frameworks, no magic, just readable code
+- **Hackability** — one file = one idea, easy to modify
+- **Mobile-first** — touch is primary, phones are the platform
+- **Fun** — we're hacking and exploring JavaScript, not shipping enterprise software
+
+### We avoid:
+
+- ❌ Build tools (webpack, babel, rollup)
+- ❌ Frameworks (React, Vue, Angular)
+- ❌ Dependencies (zero npm packages)
+- ❌ TypeScript (just JavaScript)
+- ❌ Node (we use Deno for tests)
+- ❌ Backwards compatibility hacks (just rework it)
+
+**If you can't `console.log` it and understand it immediately, we're doing it wrong.**
+
+---
+
+## Advanced Topics
+
+### Status Effects
+
+Apply effects to entities:
+
+```js
+const effects = world.get(entityId, ActiveEffects) || { effects: [] };
+effects.effects.push({
+  key: 'poison',      // Effect type
+  turnsLeft: 5,       // Duration
+  potency: 2,         // Damage per turn
+});
+world.set(entityId, ActiveEffects, effects);
+```
+
+Effects tick automatically. Poison deals damage. Regen heals. Stun... stuns. Current statuses are mirrored to the `Status` component each tick for easy querying.
+
+### Scripting System
+
+Attach behavior to entities without hardcoding systems:
+
+```js
+// In src/rules/scripts/myScript.js
+import { registerScript, ScriptVerb } from '../scripting.js';
+
+registerScript('lightning_wand', {
+  [ScriptVerb.ItemUse]: (world, ctx) => {
+    const { userId, targetX, targetY } = ctx;
+    // Zap logic here
+    world.emit('damage', { id: targetId, amount: 10 });
+  }
+});
+
+// Attach to entity
+world.set(wandId, ScriptRef, { ref: 'lightning_wand' });
+```
+
+Scripts respond to verbs: `spell:cast`, `item:use`, `trap:trigger`, `affix:onHit`, etc.
+
+### Event System
+
+Systems communicate via events to avoid coupling:
+
+```js
+// System A emits
+world.emit('combat:hit', { attackerId, targetId, damage });
+
+// System B listens (installed once at startup)
+const INSTALLED = Symbol.for('jshack:combatLogger:installed');
+if (!world[INSTALLED]) {
+  world[INSTALLED] = true;
+  world.on('combat:hit', ({ attackerId, targetId, damage }) => {
+    console.log(`Entity ${attackerId} hit ${targetId} for ${damage} damage`);
+  });
+}
+```
+
+Events flow through the world. Systems stay decoupled. Order is predictable.
+
+### Spatial Queries
+
+Fast radius queries for AI, explosions, AOE:
+
+```js
+import { forEachInRadius } from './rules/utils/spatialIndex.js';
+
+forEachInRadius(world, x, y, radius, (entityId) => {
+  // Apply damage, effects, etc.
+});
+```
+
+Maintained automatically by `spatialIndexSystem` in the cleanup phase.
+
+---
+
+## Testing
+
+We use **Deno** (not Node) for testing:
+
+```bash
+deno test --allow-read tests/
+deno run tests/movementSystem.test.js
+```
+
+Tests are simple:
+
+```js
+import { World } from '../src/lib/ecs-js/index.js';
+import { movementSystem } from '../src/rules/systems/movementSystem.js';
+
+const world = new World({ seed: 42 });
+// ...setup...
+movementSystem(world, 1);
+// ...assert...
+```
+
+Deterministic seeds mean tests are reproducible. No flaky tests. No "works on my machine."
+
+---
 
 ## Contributing
 
-Contributions, bug reports, and suggestions are welcome! Please open an issue or submit a pull request.
+We're hacking for fun, but contributions are welcome!
+
+1. **Fork it**
+2. **Hack on it** (edit files, refresh browser)
+3. **Test it** (Deno tests, play the game)
+4. **Open a PR** with a clear description
+
+**Good PRs:**
+- ✅ Add a new monster or item
+- ✅ Fix a bug with a test
+- ✅ Add a new system with tests
+- ✅ Improve mobile touch controls
+- ✅ Enhance dungeon generation
+
+**Bad PRs:**
+- ❌ Add npm, webpack, babel, or any build step
+- ❌ Add TypeScript
+- ❌ Add a framework
+- ❌ Break determinism
+- ❌ Mix rules and display layers
+
+Read [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md) and [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) before contributing. This project has burned twice by violating its constraints. Let's not make it three times.
+
+---
+
+## For AI Agents & Copilots
+
+If you're an autonomous agent or LLM-based copilot reading this:
+
+👉 **Read [AGENTS.md](AGENTS.md) first.** It has everything you need to work with this codebase effectively.
+
+Key rules:
+- ECS-js is external; only fix genuine bugs
+- No system-to-system calls; use events with Symbol tracking
+- Mobile-first always (touch is primary)
+- Church (display) and State (rules) are separated
+- Deno, not Node
+
+---
+
+## Resources
+
+### Documentation
+
+- **[AGENTS.md](AGENTS.md)** — Guide for AI agents and autonomous operators
+- **[TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md)** — Project philosophy and constraints
+- **[SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md)** — Layer boundaries and import rules
+- **[ecs-js README](src/lib/ecs-js/README.md)** — ECS core API
+- **[ecs-js AGENTS.md](src/lib/ecs-js/AGENTS.md)** — ECS-specific guidance
+
+### Inspiration
+
+- [Roguelike Development Guide](http://www.roguebasin.com/)
+- [ECS Architecture](https://en.wikipedia.org/wiki/Entity_component_system)
+- Classic roguelikes: NetHack, DCSS, Brogue
+
+---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. Do whatever you want with it. Build something cool. Share it. Hack it. Break it. Learn from it.
 
-## Banned Words, Concepts and Tools
+See [LICENSE](LICENSE) for the legal stuff.
 
-- "game", "sprite", "assets", "toy"
-- "node", "typescript", ".t.ds"
 ---
+
+## Why JSHack?
+
+Because JavaScript doesn't need frameworks and build tools to be powerful. Because mobile deserves great roguelikes. Because deterministic simulations are beautiful. Because one file should equal one idea. Because hacking should be fun.
+
+**Open `index.html`. Edit a file. Refresh. Hack.**
+
+That's it. That's the whole pitch.
+
+Now go build something weird. ⚡
+
+---
+
+*Built with ☕ (0xC0FFEE) and pure JavaScript.*
