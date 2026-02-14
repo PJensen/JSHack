@@ -100,6 +100,48 @@ export const basePalette = {
   // Engravings
   engraving: { glyph: "~", fg: "#8899aa", glow: "#556677" },
 
+  // ── Gems (gemstones) ────────────────────────────────────────────
+  gem_dilithium:   { glyph: "*", fg: "#ffffff", glow: "#ccccff" },
+  gem_diamond:     { glyph: "*", fg: "#ffffff", glow: "#eeeeff" },
+  gem_ruby:        { glyph: "*", fg: "#ff3333", glow: "#cc1111" },
+  gem_jacinth:     { glyph: "*", fg: "#ff8833", glow: "#dd6611" },
+  gem_sapphire:    { glyph: "*", fg: "#3366ff", glow: "#2244cc" },
+  gem_black_opal:  { glyph: "*", fg: "#333344", glow: "#5555aa" },
+  gem_emerald:     { glyph: "*", fg: "#33dd33", glow: "#22aa22" },
+  gem_turquoise:   { glyph: "*", fg: "#44ccaa", glow: "#339988" },
+  gem_citrine:     { glyph: "*", fg: "#ffee44", glow: "#ddcc22" },
+  gem_aquamarine:  { glyph: "*", fg: "#44ddff", glow: "#22bbdd" },
+  gem_amber:       { glyph: "*", fg: "#cc8833", glow: "#aa6622" },
+  gem_topaz:       { glyph: "*", fg: "#cc9933", glow: "#aa7722" },
+  gem_jet:         { glyph: "*", fg: "#222233", glow: "#444466" },
+  gem_opal:        { glyph: "*", fg: "#eeddff", glow: "#ccbbdd" },
+  gem_chrysoberyl: { glyph: "*", fg: "#dddd44", glow: "#bbbb22" },
+  gem_garnet:      { glyph: "*", fg: "#cc3344", glow: "#aa2233" },
+  gem_amethyst:    { glyph: "*", fg: "#aa44ff", glow: "#8822dd" },
+  gem_jasper:      { glyph: "*", fg: "#cc4433", glow: "#aa3322" },
+  gem_fluorite:    { glyph: "*", fg: "#88ff88", glow: "#66dd66" },
+  gem_jade:        { glyph: "*", fg: "#55bb55", glow: "#449944" },
+  gem_obsidian:    { glyph: "*", fg: "#222222", glow: "#555577" },
+  gem_agate:       { glyph: "*", fg: "#ee8844", glow: "#cc6633" },
+
+  // ── Worthless glass ─────────────────────────────────────────────
+  glass_white:     { glyph: "*", fg: "#dddddd", glow: "#aaaaaa" },
+  glass_blue:      { glyph: "*", fg: "#3366dd", glow: "#2244aa" },
+  glass_red:       { glyph: "*", fg: "#dd3333", glow: "#aa1111" },
+  glass_brown:     { glyph: "*", fg: "#aa7733", glow: "#885522" },
+  glass_orange:    { glyph: "*", fg: "#dd7733", glow: "#bb5522" },
+  glass_yellow:    { glyph: "*", fg: "#dddd33", glow: "#bbbb22" },
+  glass_black:     { glyph: "*", fg: "#333333", glow: "#555555" },
+  glass_green:     { glyph: "*", fg: "#33bb33", glow: "#229922" },
+  glass_violet:    { glyph: "*", fg: "#9933dd", glow: "#7722bb" },
+
+  // ── Gray stones & rocks ─────────────────────────────────────────
+  stone_luckstone:  { glyph: "`", fg: "#999999", glow: "#777777" },
+  stone_loadstone:  { glyph: "`", fg: "#888888", glow: "#666666" },
+  stone_touchstone: { glyph: "`", fg: "#aaaaaa", glow: "#888888" },
+  stone_flint:      { glyph: "`", fg: "#777777", glow: "#555555" },
+  stone_rock:       { glyph: "`", fg: "#666666", glow: "#444444" },
+
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
 };
