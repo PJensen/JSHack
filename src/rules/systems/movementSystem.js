@@ -16,6 +16,7 @@ import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
 import { Facing } from "../components/Facing.js";
+import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 
 /** @param {number} x @param {number} y */
@@ -75,7 +76,7 @@ export function movementSystem(world) {
                 const stam = world.get(actor, Stamina);
                 const cost = Number(wInfo.staminaCost ?? 5);
                 if (stam && (Number(stam.stamina ?? 0) >= cost)) {
-                  world.set(actor, Stamina, { ...stam, stamina: stam.stamina - cost });
+                  world.set(actor, Stamina, { ...stam, stamina: stam.stamina - cost, regenCooldown: STAMINA_REGEN_COOLDOWN });
                   setTile(nx, ny, TILE_FLOOR);
                   // Backfill: turn any void neighbors into walls so we never expose void
                   for (const [dx, dy] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]) {

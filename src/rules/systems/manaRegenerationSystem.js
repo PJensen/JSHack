@@ -12,6 +12,14 @@ import { HUNGER_MANA_MULT } from '../data/food.js';
 export function manaRegenerationSystem(world) {
     for (const [entity, manaComp] of world.query(Mana)) {
         if (!manaComp) continue;
+
+        // Cooldown: skip regen on turns where mana was spent
+        const cd = Number(manaComp.regenCooldown ?? 0);
+        if (cd > 0) {
+            manaComp.regenCooldown = cd - 1;
+            continue;
+        }
+
         if (manaComp.mana < manaComp.maxMana) {
             const baseRate = Number(manaComp.manaRegen ?? 0);
             const eq = world.get(entity, Equipment);
@@ -24,8 +32,7 @@ export function manaRegenerationSystem(world) {
                 if (_hs) _hungerMult = HUNGER_MANA_MULT[_hs.type];
             }
             const rate = (baseRate + bonus) * _hungerMult;
-            const newMana = Math.min(manaComp.maxMana, manaComp.mana + rate);
-            world.set(entity, Mana, { ...manaComp, mana: newMana });
+            manaComp.mana = Math.min(manaComp.maxMana, manaComp.mana + rate);
         }
     }
 }

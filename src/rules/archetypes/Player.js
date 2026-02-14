@@ -29,7 +29,7 @@ export const PlayerArchetype = defineArchetype(
   [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })],
   [Equipment, {}],
   [Mana, {}],
-  [Stamina, (p) => ({ maxStamina: p.maxStamina ?? 100, stamina: p.stamina ?? 100, staminaRegen: p.staminaRegen ?? 5.0 })],
+  [Stamina, (p) => ({ maxStamina: p.maxStamina ?? 100, stamina: p.stamina ?? 100, staminaRegen: p.staminaRegen ?? 2.0 })],
   [Brain, {}],
   [Facing, { dx: 0, dy: 0 }],
   [Score, {}]
@@ -48,7 +48,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Vitality, { maxHp: params.maxHp ?? 20, hp: params.hp ?? (params.maxHp ?? 20) });
     world.add(id, Settings, { autoPickup: params.autoPickup ?? true, autoPickupKinds: params.autoPickupKinds ?? ['currency'] });
     world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
-    world.add(id, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 5.0 });
+    world.add(id, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 2.0 });
     world.add(id, Score, {});
     return id;
   })();
