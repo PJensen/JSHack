@@ -14,9 +14,9 @@ export const MONSTER_COMBAT_PROC_ACTION_IDS = Object.freeze([
   "retaliate_flat",
 ]);
 
-export const MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS = Object.freeze([
-  "actor_target",
-  "actor_only",
+export const MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS = Object.freeze([
+  "attacker_defender",
+  "defender_only",
 ]);
 
 /**
@@ -34,8 +34,8 @@ export const MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS = Object.freeze([
  *     minAmount?: number,
  *   },
  *   emitEvent?: string,
- *   emitPayload?: "actor_target"|"actor_only",
- *   emitAmount?: boolean,
+ *   eventSchema?: "attacker_defender"|"defender_only",
+ *   includeAmount?: boolean,
  * }} MonsterCombatProcDef
  */
 
@@ -49,8 +49,8 @@ export const MONSTER_COMBAT_PROC_DEFS = [
     seedSalt: 0xdead0003,
     action: { kind: "heal_attacker_fraction_damage", numerator: 1, denominator: 3, minAmount: 1 },
     emitEvent: "proc:drain",
-    emitPayload: "actor_target",
-    emitAmount: true,
+    eventSchema: "attacker_defender",
+    includeAmount: true,
   },
   {
     id: "orc_rage_bonus_damage",
@@ -60,7 +60,7 @@ export const MONSTER_COMBAT_PROC_DEFS = [
     seedSalt: 0xdead0007,
     action: { kind: "add_damage_flat", amount: 2 },
     emitEvent: "proc:rage",
-    emitPayload: "actor_target",
+    eventSchema: "attacker_defender",
   },
   {
     id: "skeleton_reassemble_heal",
@@ -70,7 +70,7 @@ export const MONSTER_COMBAT_PROC_DEFS = [
     seedSalt: 0xdead0008,
     action: { kind: "heal_defender_flat", amount: 2 },
     emitEvent: "proc:reassemble",
-    emitPayload: "actor_only",
+    eventSchema: "defender_only",
   },
   {
     id: "troll_regenerate_on_damaged",
@@ -80,7 +80,7 @@ export const MONSTER_COMBAT_PROC_DEFS = [
     seedSalt: 0xdead0009,
     action: { kind: "heal_defender_flat", amount: 1 },
     emitEvent: "proc:regenerate",
-    emitPayload: "actor_only",
+    eventSchema: "defender_only",
   },
   {
     id: "demon_hellfire_retaliate",
@@ -90,7 +90,7 @@ export const MONSTER_COMBAT_PROC_DEFS = [
     seedSalt: 0xdead00bf,
     action: { kind: "retaliate_flat", amount: 2 },
     emitEvent: "proc:hellfire",
-    emitPayload: "actor_only",
+    eventSchema: "defender_only",
   },
   {
     id: "lich_drain",
@@ -100,8 +100,7 @@ export const MONSTER_COMBAT_PROC_DEFS = [
     seedSalt: 0xdead000c,
     action: { kind: "heal_attacker_fraction_damage", numerator: 1, denominator: 2, minAmount: 1 },
     emitEvent: "proc:drain",
-    emitPayload: "actor_target",
-    emitAmount: true,
+    eventSchema: "attacker_defender",
+    includeAmount: true,
   },
 ];
-

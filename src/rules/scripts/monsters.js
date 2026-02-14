@@ -96,16 +96,16 @@ function executeCombatProcAction(action, ctx) {
  */
 function emitCombatProc(world, ctx, def, amount) {
   if (!def.emitEvent) return;
-  const payloadMode = String(def.emitPayload || 'actor_target');
+  const payloadMode = String(def.eventSchema || 'attacker_defender');
   const payload = {};
 
-  if (payloadMode === 'actor_only') {
+  if (payloadMode === 'defender_only') {
     payload.actor = ctx.defender;
   } else {
     payload.actor = ctx.attacker;
     payload.target = ctx.defender;
   }
-  if (def.emitAmount) payload.amount = amount;
+  if (def.includeAmount) payload.amount = amount;
 
   try { world.emit(def.emitEvent, payload); } catch {}
 }
