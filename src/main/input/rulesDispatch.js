@@ -4,6 +4,7 @@
 
 import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../rules/components/index.js";
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
+import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 
 /**
@@ -82,6 +83,14 @@ export function makeRulesDispatcher(world, getActorId) {
         const { text = "" } = action.payload || {};
         if (!text) break;
         world?.add?.(actorId, EngraveIntent, { text });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.applyItem": {
+        const { itemId = 0, targetItemId = 0 } = action.payload || {};
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+        if (!Number.isInteger(targetItemId) || targetItemId <= 0) break;
+        world?.add?.(actorId, ApplyIntent, { itemId, targetItemId });
         world?.tick?.(1);
         break;
       }
