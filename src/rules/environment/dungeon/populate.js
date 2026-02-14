@@ -20,6 +20,9 @@ import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
+import { NamedIdentity } from '../../components/NamedIdentity.js';
+import { isIdentified } from '../../data/identification.js';
+import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
 
 /**
  * @typedef {Object} SpawnPoint
@@ -386,7 +389,16 @@ export function materializeSpawn(world, spawn) {
       // Calculate price (will be added as Unpaid in post-processing)
       const info = world.get(itemId, ItemInfo);
       if (info) {
-        const price = Math.ceil((info.value || 0) * 1.3); // 30% markup
+        // Unidentified gems use appearance-based pricing
+        let baseValue = info.value || 0;
+        if (info.type === 'gem') {
+          const ni = world.get(itemId, NamedIdentity);
+          const identity = ni?.identity || '';
+          if (!identity || !isIdentified(identity)) {
+            baseValue = getUnidentifiedGemValue(info.description) || baseValue;
+          }
+        }
+        const price = Math.ceil(baseValue * 1.3); // 30% markup
         // Store price temporarily in spawn params for post-processing
         spawn._calculatedPrice = price;
         spawn._itemId = itemId;
