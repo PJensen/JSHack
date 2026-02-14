@@ -72,6 +72,10 @@ import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { APPLY_DEFS, getApplyDef } from "./rules/data/applyDefs.js";
+import { resolveItemDisplayName } from "./main/wiring/itemName.js";
+import { resetIdentification } from "./rules/data/identification.js";
+import { initGemPricing, resetGemPricing } from "./rules/data/gemPricing.js";
+import { createRng } from "./lib/ecs-js/rng.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -125,6 +129,10 @@ resize();
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });
 configureWorld(world);
+
+// Initialize identification & gem pricing for this game run
+resetIdentification();
+initGemPricing(createRng(world.seed ^ 0x6E45));
 
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
@@ -240,6 +248,11 @@ if (!playerEntity(world)) {
     const pickaxeId = createItemById(world, 'iron_pickaxe');
     if (inv && pickaxeId != null) {
       inv.items.push(pickaxeId);
+    }
+    // Starting touchstone: for testing gems
+    const touchstoneId = createItemById(world, 'stone_touchstone');
+    if (inv && touchstoneId != null) {
+      inv.items.push(touchstoneId);
     }
   }
 }
@@ -397,8 +410,7 @@ const inputDisposers = [];
         } else {
           const items = ids.map((id) => {
             const info = world.get(id, ItemInfo);
-            const name = world.get(id, NamedIdentity);
-            return { id, type: info?.type || 'item', name: name?.name || info?.type || 'item', count: info?.count || 1 };
+            return { id, type: info?.type || 'item', name: resolveItemDisplayName(world, id), count: info?.count || 1 };
           });
           window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
         }
@@ -431,7 +443,6 @@ addEventListener('ui:requestInventoryData', () => {
     if (inv && Array.isArray(inv.items)) {
       for (const id of inv.items) {
         const info = world.get(id, ItemInfo);
-        const name = world.get(id, NamedIdentity);
         if (info) {
           const equippedSlot = (eq && (
             (eq.weapon === id && 'weapon') ||
@@ -447,7 +458,7 @@ addEventListener('ui:requestInventoryData', () => {
             description: info.description,
             count: info.count,
             slot: info.slot,
-            name: name?.name,
+            name: resolveItemDisplayName(world, id),
             rarityName: info.rarityName,
             bonuses: info.bonuses || {},
             affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
@@ -495,13 +506,12 @@ addEventListener('ui:requestUsableItemsData', () => {
       for (const id of inv.items) {
         const info = world.get(id, ItemInfo);
         if (!info || !USABLE_TYPES.has(info.type)) continue;
-        const name = world.get(id, NamedIdentity);
         items.push({
           id,
           type: info.type,
           description: info.description,
           count: info.count,
-          name: name?.name,
+          name: resolveItemDisplayName(world, id),
           rarityName: info.rarityName,
         });
       }
@@ -521,7 +531,7 @@ addEventListener('ui:requestApplyToolsData', () => {
         const ni = world.get(id, NamedIdentity);
         const identity = ni?.identity || '';
         if (!APPLY_DEFS[identity]) continue;
-        items.push({ id, name: ni?.name || identity });
+        items.push({ id, name: resolveItemDisplayName(world, id) });
       }
     }
   }
@@ -543,8 +553,7 @@ addEventListener('ui:requestApplyTargetsData', (ev) => {
         if (id === toolId) continue; // don't apply tool to itself
         const info = world.get(id, ItemInfo);
         if (filterType && info?.type !== filterType) continue;
-        const ni = world.get(id, NamedIdentity);
-        items.push({ id, name: ni?.name || info?.type || 'item', description: info?.description || '' });
+        items.push({ id, name: resolveItemDisplayName(world, id), description: info?.description || '' });
       }
     }
   }
@@ -999,7 +1008,6 @@ world.on('item:pickup', ({ actor, itemId }) => {
   if (!pe || pe.id !== actor) return;
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
-  const name = world.get(itemId, NamedIdentity);
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
@@ -1007,7 +1015,7 @@ world.on('item:pickup', ({ actor, itemId }) => {
           id: Number(itemId),
           type: info.type || 'item',
           slot: info.slot || '',
-          name: name?.name || info.description || info.type || 'item',
+          name: resolveItemDisplayName(world, itemId),
           count: info.count || 1
         }
       }
@@ -1230,11 +1238,10 @@ world.on('interaction', ({ action, items: droppedIds }) => {
           const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
           rulesHandler({ type: 'rules.pickupItem', payload: { itemId: eid } });
         } else {
-          const name = world.get(eid, NamedIdentity);
           nonCurrency.push({
             id: eid,
             type: info.type || 'item',
-            name: name?.name || info.type || 'item',
+            name: resolveItemDisplayName(world, eid),
             count: info.count || 1,
             rarityName: info.rarityName || 'common',
             bonuses: info.bonuses || {},
@@ -1328,8 +1335,7 @@ world.on('moved', ({ id, to }) => {
   if (hasChest || nonCurrency.length > 1) {
     const items = nonCurrency.map((eid) => {
       const info = world.get(eid, ItemInfo);
-      const name = world.get(eid, NamedIdentity);
-      return { id: eid, type: info?.type || 'item', name: name?.name || info?.type || 'item', count: info?.count || 1 };
+      return { id: eid, type: info?.type || 'item', name: resolveItemDisplayName(world, eid), count: info?.count || 1 };
     });
     try {
       window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: { mode: 'multi', count: items.length, items, fromChest: hasChest } }));
@@ -1339,7 +1345,6 @@ world.on('moved', ({ id, to }) => {
   // Single item: build tooltip content
   const itemId = nonCurrency[0];
   const info = world.get(itemId, ItemInfo);
-  const name = world.get(itemId, NamedIdentity);
   const set = world.get(pe.id, Settings);
   const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
   const affixes = Array.isArray(info?.affixes) ? info.affixes.slice() : [];
@@ -1348,7 +1353,7 @@ world.on('moved', ({ id, to }) => {
     mode: 'single',
     item: {
       id: itemId,
-      name: name?.name || info?.description || info?.type || 'item',
+      name: resolveItemDisplayName(world, itemId),
       rarityName: info?.rarityName || 'common',
       description: info?.description || '',
       count: info?.count || 1,
