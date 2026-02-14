@@ -73,7 +73,7 @@ import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { APPLY_DEFS, getApplyDef } from "./rules/data/applyDefs.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
-import { resetIdentification } from "./rules/data/identification.js";
+import { resetIdentification, identify } from "./rules/data/identification.js";
 import { initGemPricing, resetGemPricing } from "./rules/data/gemPricing.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 
@@ -132,6 +132,7 @@ configureWorld(world);
 
 // Initialize identification & gem pricing for this game run
 resetIdentification();
+identify('stone_touchstone');
 initGemPricing(createRng(world.seed ^ 0x6E45));
 
 // Initialize tombstone system
