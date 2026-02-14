@@ -59,6 +59,7 @@ import { Faction } from "./rules/components/Faction.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
+import { installDeathShareListener } from "./rules/systems/shareDeathSystem.js";
 import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
@@ -127,6 +128,7 @@ configureWorld(world);
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
 installTombstoneDeathListener(world, tombstoneRepo);
+installDeathShareListener(world);
 
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }

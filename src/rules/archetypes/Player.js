@@ -13,6 +13,7 @@ import { Stamina } from "../components/Stamina.js";
 import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
 import { Facing } from "../components/Facing.js";
+import { Score } from "../components/Score.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -30,7 +31,8 @@ export const PlayerArchetype = defineArchetype(
   [Mana, {}],
   [Stamina, (p) => ({ maxStamina: p.maxStamina ?? 100, stamina: p.stamina ?? 100, staminaRegen: p.staminaRegen ?? 5.0 })],
   [Brain, {}],
-  [Facing, { dx: 0, dy: 0 }]
+  [Facing, { dx: 0, dy: 0 }],
+  [Score, {}]
 );
 
 export function createPlayer(world, params = {}) {
@@ -47,6 +49,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Settings, { autoPickup: params.autoPickup ?? true, autoPickupKinds: params.autoPickupKinds ?? ['currency'] });
     world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
     world.add(id, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 5.0 });
+    world.add(id, Score, {});
     return id;
   })();
 }
