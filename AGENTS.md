@@ -89,6 +89,19 @@ Direct system calls break the ECS scheduler's control flow and make execution or
 3. Emit events
 4. Listen to events
 
+### Composability over one-off wiring
+
+When adding emergent gameplay interactions (materials, status interactions, item reactions, etc.):
+
+- Prefer one composable system with a small reaction table over many micro-systems.
+- Key reactions off semantic state (`Status`, `ActiveEffects`, tags, data), not off a single spell/script ID.
+- Add new reactions as data entries in the table; avoid hardcoding source-specific branches.
+- Define trigger conditions as data (e.g., `sourceStatuses`) instead of hardcoded `if` helpers per status.
+- For item reactions, handle both containment scopes explicitly: items on the ground and items in inventories/equipment.
+- Do not keep legacy/back-compat shims in rules code unless explicitly requested for migration.
+
+This keeps mechanics scalable as content grows (many statuses, many materials) without exploding system count.
+
 ### Event-based communication pattern
 
 ```js
