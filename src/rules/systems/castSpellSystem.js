@@ -3,6 +3,7 @@ import { Brain } from "../components/Brain.js";
 import { Mana } from "../components/Mana.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
+import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 // castSpellSystem — placeholder implementation that consumes CastSpellIntent
@@ -53,8 +54,11 @@ export function castSpellSystem(world) {
       continue;
     }
 
-    // Deduct mana
-    if (mana) mana.mana = have - cost;
+    // Deduct mana and suppress regen this turn
+    if (mana) {
+      mana.mana = have - cost;
+      mana.regenCooldown = MANA_REGEN_COOLDOWN;
+    }
 
     // Run scripted behavior (pure rules)
     try { runSpellScript(world, actor, spell, intent); } catch {}

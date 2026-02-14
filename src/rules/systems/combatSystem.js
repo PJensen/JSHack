@@ -8,6 +8,7 @@ import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
 import { Player } from '../components/Player.js';
 import { Status } from '../components/Status.js';
+import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { Position } from '../components/Position.js';
 import { Stamina } from '../components/Stamina.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
@@ -108,8 +109,8 @@ export function combatSystem(world) {
                 world.remove(attacker, AttackIntent);
                 continue;
             }
-            // Deduct stamina
-            world.set(attacker, Stamina, { ...atkStam, stamina: have - staminaCost });
+            // Deduct stamina and suppress regen this turn
+            world.set(attacker, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
         }
 
         // Disease penalty: each stack of 'disease' reduces attack/defense by potency
