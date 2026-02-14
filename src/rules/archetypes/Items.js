@@ -86,6 +86,23 @@ export const MagicItem = defineArchetype(
     })],
 );
 
+// Gem / stone — parameterized from GEM_DEFS at creation time
+export const GemItem = defineArchetype(
+    "GemItem",
+    [NamedIdentity, (p) => ({ name: p.name ?? "gem", identity: p.identity ?? "gem" })],
+    [ItemInfo, (p) => ({
+        type: "gem",
+        slot: "bag",
+        weight: p.weight ?? 1,
+        value: p.value ?? 0,
+        description: p.description ?? "",
+        count: 1,
+        rarity: 1,
+        rarityName: "common",
+        affixes: [],
+    })],
+);
+
 // Debug/utility: reveals entire dungeon map when used
 export const ScrollOfMapping = defineArchetype(
     "ScrollOfMapping",
