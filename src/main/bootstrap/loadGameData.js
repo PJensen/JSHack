@@ -3,9 +3,8 @@
 
 import { MONSTERS } from "../../rules/data/monsters.js";
 import { SPELL_DEFS } from "../../rules/data/spells.js";
-import { ITEM_DEFS } from "../../rules/data/items.js";
+import { ITEM_CATALOG } from "../../rules/data/itemCatalog.js";
 import { AFFIX_DEFS } from "../../rules/data/affixes.js";
-import { EQUIP_DEFS } from "../../rules/data/equipment.js";
 import { LOOT_TABLES } from "../../rules/data/lootTables.js";
 import { DEITY_DEFS } from "../../rules/data/deities.js";
 import { GEM_DEFS } from "../../rules/data/gems.js";
@@ -36,9 +35,8 @@ export function getGameDataLoadPlan() {
   const datasets = [
     { id: "monsters", label: "Loading monster defs", total: MONSTERS.length },
     { id: "spells", label: "Loading spell defs", total: Object.keys(SPELL_DEFS).length },
-    { id: "items", label: "Loading item defs", total: Object.keys(ITEM_DEFS).length },
+    { id: "items", label: "Loading item catalog", total: Object.keys(ITEM_CATALOG).length },
     { id: "affixes", label: "Loading affix defs", total: Object.keys(AFFIX_DEFS).length },
-    { id: "equipment", label: "Loading equipment defs", total: Object.keys(EQUIP_DEFS).length },
     { id: "loot", label: "Loading loot tables", total: Object.keys(LOOT_TABLES).length },
     { id: "deities", label: "Loading deity defs", total: Object.keys(DEITY_DEFS).length },
     { id: "gems", label: "Loading gem defs", total: Object.keys(GEM_DEFS).length },
@@ -104,10 +102,10 @@ export function loadGameData(opts = {}) {
     }
 
     if (ds.id === "items") {
-      const keys = Object.keys(ITEM_DEFS);
+      const keys = Object.keys(ITEM_CATALOG);
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
-        void ITEM_DEFS[key];
+        void ITEM_CATALOG[key];
         completed++;
         emit(ds, i + 1);
       }
@@ -119,17 +117,6 @@ export function loadGameData(opts = {}) {
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         void AFFIX_DEFS[key];
-        completed++;
-        emit(ds, i + 1);
-      }
-      continue;
-    }
-
-    if (ds.id === "equipment") {
-      const keys = Object.keys(EQUIP_DEFS);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        void EQUIP_DEFS[key];
         completed++;
         emit(ds, i + 1);
       }
@@ -202,7 +189,7 @@ export function loadGameData(opts = {}) {
     }
 
     if (ds.id === "validate") {
-      validateAll({ EQUIP_DEFS, AFFIX_DEFS });
+      validateAll({ ITEM_CATALOG, AFFIX_DEFS });
       completed++;
       emit(ds, 1);
     }

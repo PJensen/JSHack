@@ -6,7 +6,7 @@ import { Inventory } from '../src/rules/components/Inventory.js';
 import { EquipIntent } from '../src/rules/components/Intents/EquipIntent.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { equipItemSystem } from '../src/rules/systems/equipItemSystem.js';
-import { buildEquipmentItem } from '../src/rules/data/equipmentLoader.js';
+import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 
 Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
@@ -18,8 +18,8 @@ Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
   /** @type {any} */
   const eq = world.get(player, Equipment);
 
-  const sword = buildEquipmentItem(world, 'sword_plain', {});
-  const armor = buildEquipmentItem(world, 'leather_armor', {});
+  const sword = buildCatalogItem(world, 'sword_plain', {});
+  const armor = buildCatalogItem(world, 'leather_armor', {});
 
   inv.items.push(sword);
   inv.items.push(armor);

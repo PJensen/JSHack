@@ -1,0 +1,53 @@
+import { getCatalogItem } from "./itemCatalog.js";
+import { ItemInfo } from "../components/ItemInfo.js";
+import { Material } from "../components/Material.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import { ScriptRef } from "../components/ScriptRef.js";
+
+/**
+ * Build an item entity from the unified item catalog.
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {string} itemId
+ * @param {{ affixes?: string[], count?: number }} [opts]
+ */
+export function buildCatalogItem(world, itemId, opts = {}) {
+  const def = getCatalogItem(itemId);
+  if (!def) throw new Error(`Unknown item id: ${itemId}`);
+
+  const isEquip = String(def.catalogKind || "") === "equipment";
+  const explicitCount = Number(opts.count || 0) | 0;
+  const count = explicitCount > 0
+    ? explicitCount
+    : (isEquip ? 1 : Math.max(1, Number(def.charges || 1) | 0));
+
+  const id = world.create();
+  world.add(id, NamedIdentity, { name: def.name, identity: def.id });
+
+  const info = {
+    type: def.type || (isEquip ? "equip" : "item"),
+    slot: def.slot || "",
+    weight: Number(def.weight || 1),
+    value: Number(def.value || 0),
+    description: def.description || def.desc || def.name || "",
+    count,
+    bonuses: def.bonuses || {},
+    rarity: def.rarity || 1,
+    rarityName: def.rarityName || "common",
+    affixes: Array.isArray(opts.affixes) ? opts.affixes.slice() : [],
+    damageDice: def.damageDice || null,
+    staminaCost: def.staminaCost ?? null,
+    subtype: def.subtype || null,
+    range: def.range || null,
+  };
+  world.add(id, ItemInfo, info);
+
+  if (typeof def.material === "string" && def.material) {
+    world.add(id, Material, { kind: def.material });
+  }
+  if (typeof def.script === "string" && def.script) {
+    world.add(id, ScriptRef, { ref: def.script, params: { from: def.id } });
+  }
+
+  return id;
+}
+
