@@ -4,6 +4,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { populateChunk, materializeSpawn } from '../src/rules/environment/dungeon/populate.js';
 import { pickMonster, pickItem } from '../src/rules/environment/dungeon/tables.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
@@ -117,23 +118,48 @@ Deno.test("materializeSpawn creates equipment entity", () => {
   assert(info.type === 'equip', 'is equipment');
 });
 
-function countRoomDoors(room, doors) {
-  let count = 0;
-  for (const d of doors) {
-    const onVerticalWall =
-      (d.x === room.x - 1 || d.x === room.x + room.w) &&
-      d.y >= room.y &&
-      d.y < room.y + room.h;
-    const onHorizontalWall =
-      (d.y === room.y - 1 || d.y === room.y + room.h) &&
-      d.x >= room.x &&
-      d.x < room.x + room.w;
-    if (onVerticalWall || onHorizontalWall) count++;
+function countRoomEntrances(room, chunk) {
+  const rx = room.x - chunk.chunkX * CHUNK_SIZE;
+  const ry = room.y - chunk.chunkY * CHUNK_SIZE;
+  const rw = room.w;
+  const rh = room.h;
+  const tiles = chunk.tiles;
+  function getTile(x, y) {
+    if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
+    return tiles[y * CHUNK_SIZE + x];
   }
-  return count;
+  function isPassable(tile) {
+    return tile === TILE_FLOOR || tile === TILE_DOOR || tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP;
+  }
+  let entrances = 0;
+  let prev = false;
+  for (let y = ry; y < ry + rh; y++) {
+    const open = isPassable(getTile(rx - 1, y));
+    if (open && !prev) entrances++;
+    prev = open;
+  }
+  prev = false;
+  for (let y = ry; y < ry + rh; y++) {
+    const open = isPassable(getTile(rx + rw, y));
+    if (open && !prev) entrances++;
+    prev = open;
+  }
+  prev = false;
+  for (let x = rx; x < rx + rw; x++) {
+    const open = isPassable(getTile(x, ry - 1));
+    if (open && !prev) entrances++;
+    prev = open;
+  }
+  prev = false;
+  for (let x = rx; x < rx + rw; x++) {
+    const open = isPassable(getTile(x, ry + rh));
+    if (open && !prev) entrances++;
+    prev = open;
+  }
+  return entrances;
 }
 
-Deno.test("shopkeeper spawns only in leaf rooms with exactly one door", () => {
+Deno.test("shopkeeper spawns only in dead-end rooms with one perimeter entrance", () => {
   for (let seed = 1; seed <= 30; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
     const rng = createRng(seed * 1337);
@@ -144,25 +170,33 @@ Deno.test("shopkeeper spawns only in leaf rooms with exactly one door", () => {
     for (const sk of shopkeepers) {
       const room = sk.params?.room;
       assert(room, "shopkeeper spawn should include room metadata");
-      const doors = countRoomDoors(room, chunk.doors || []);
-      assert(doors === 1, `shop room must have exactly one door, got ${doors}`);
+      const entrances = countRoomEntrances(room, chunk);
+      assert(entrances === 1, `shop room must have exactly one perimeter entrance, got ${entrances}`);
     }
   }
 });
 
 Deno.test("origin chunk spawn room is never selected as a shop room", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  // Room 0 (spawn room)
+  for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  // Room 1 (eligible shop room)
+  for (let y = 20; y < 26; y++) for (let x = 20; x < 26; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  // Exactly one entrance for each room
+  tiles[2 * CHUNK_SIZE + 6] = TILE_FLOOR;   // east opening from room 0
+  tiles[22 * CHUNK_SIZE + 19] = TILE_FLOOR; // west opening for room 1
+
   const chunk = {
     chunkX: 0,
     chunkY: 0,
+    tiles,
     rooms: [
       // This mirrors the starting room convention (rooms[0] in origin chunk)
       { x: 0, y: 0, w: 6, h: 6 },
       { x: 20, y: 20, w: 6, h: 6 },
     ],
-    doors: [
-      { x: -1, y: 2 },  // one entrance for room 0
-      { x: 19, y: 22 }, // one entrance for room 1
-    ],
+    doors: [],
   };
   const floorPlan = { depth: 1, difficultyMult: 1.0 };
   const rng = {
