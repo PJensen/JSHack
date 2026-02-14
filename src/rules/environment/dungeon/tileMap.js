@@ -67,6 +67,38 @@ export function getTile(x, y) {
 }
 
 /**
+ * Set the tile type at world coordinates (runtime mutation).
+ * @param {number} x
+ * @param {number} y
+ * @param {number} tileType - TILE_* constant
+ * @returns {boolean} true if the tile was set successfully
+ */
+export function setTile(x, y, tileType) {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const cx = Math.floor(xi / CHUNK_SIZE);
+  const cy = Math.floor(yi / CHUNK_SIZE);
+  const tiles = _chunks.get(_key(cx, cy));
+  if (!tiles) return false;
+  const lx = xi - cx * CHUNK_SIZE;
+  const ly = yi - cy * CHUNK_SIZE;
+  tiles[ly * CHUNK_SIZE + lx] = tileType;
+  return true;
+}
+
+/**
+ * Check whether the chunk containing (x, y) is loaded.
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function isLoaded(x, y) {
+  const cx = Math.floor(Math.floor(x) / CHUNK_SIZE);
+  const cy = Math.floor(Math.floor(y) / CHUNK_SIZE);
+  return _chunks.has(_key(cx, cy));
+}
+
+/**
  * @param {number} x
  * @param {number} y
  * @returns {boolean}

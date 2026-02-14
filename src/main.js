@@ -232,6 +232,11 @@ if (!playerEntity(world)) {
       inv.items.push(daggerId);
       eq.weapon = daggerId;
     }
+    // Starting pickaxe: for digging through walls
+    const pickaxeId = createItemById(world, 'iron_pickaxe');
+    if (inv && pickaxeId != null) {
+      inv.items.push(pickaxeId);
+    }
   }
 }
 

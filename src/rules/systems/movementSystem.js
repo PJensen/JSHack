@@ -3,7 +3,10 @@
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { isWalkable } from "../environment/dungeon/tileMap.js";
+import { isWalkable, getTile, setTile, isLoaded } from "../environment/dungeon/tileMap.js";
+import { TILE_VOID, TILE_WALL, TILE_FLOOR } from "../environment/dungeon/constants.js";
+import { Equipment } from "../components/Equipment.js";
+import { Stamina } from "../components/Stamina.js";
 import { Interactable } from "../components/Interactable.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
@@ -62,6 +65,30 @@ export function movementSystem(world) {
           const targetId = interactables.get(k);
           if (targetId) {
             try { world.emit?.("bump:interact", { actor, target: targetId }); } catch {}
+          } else if (getTile(nx, ny) === TILE_WALL) {
+            // Dig: if the player has a pickaxe equipped (weapon with dig bonus), mine the wall.
+            const eq = world.get(actor, Equipment);
+            const weaponId = eq?.weapon || 0;
+            if (weaponId) {
+              const wInfo = world.get(weaponId, ItemInfo);
+              if (wInfo?.bonuses?.dig) {
+                const stam = world.get(actor, Stamina);
+                const cost = Number(wInfo.staminaCost ?? 5);
+                if (stam && (Number(stam.stamina ?? 0) >= cost)) {
+                  world.set(actor, Stamina, { ...stam, stamina: stam.stamina - cost });
+                  setTile(nx, ny, TILE_FLOOR);
+                  // Backfill: turn any void neighbors into walls so we never expose void
+                  for (const [dx, dy] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]) {
+                    if (isLoaded(nx+dx, ny+dy) && getTile(nx+dx, ny+dy) === TILE_VOID) {
+                      setTile(nx+dx, ny+dy, TILE_WALL);
+                    }
+                  }
+                  try { world.emit?.("tile:dug", { actor, x: nx, y: ny }); } catch {}
+                } else {
+                  try { world.emit?.("attack:insufficient-stamina", { attacker: actor, need: cost, have: Number(stam?.stamina ?? 0) }); } catch {}
+                }
+              }
+            }
           }
         }
         // blocked: movement is consumed
