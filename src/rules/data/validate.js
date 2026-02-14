@@ -265,6 +265,87 @@ export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {
   return true;
 }
 
+export function validateMonsterCombatProcDefs(MONSTER_COMBAT_PROC_DEFS, opts = {}) {
+  if (!Array.isArray(MONSTER_COMBAT_PROC_DEFS)) throw new Error('MONSTER_COMBAT_PROC_DEFS must be an array');
+  const triggerIds = new Set(Array.isArray(opts.triggerIds) ? opts.triggerIds : []);
+  const actionIds = new Set(Array.isArray(opts.actionIds) ? opts.actionIds : []);
+  const emitPayloadIds = new Set(Array.isArray(opts.emitPayloadIds) ? opts.emitPayloadIds : []);
+  const defIds = new Set();
+  const scriptTriggerPairs = new Set();
+
+  for (let i = 0; i < MONSTER_COMBAT_PROC_DEFS.length; i++) {
+    const def = MONSTER_COMBAT_PROC_DEFS[i];
+    const id = String(def?.id || '');
+    if (!id) throw new Error(`monster combat proc def[${i}]: id required`);
+    if (defIds.has(id)) throw new Error(`monster combat proc def ${id}: duplicate id`);
+    defIds.add(id);
+
+    const script = String(def?.script || '');
+    if (!script) throw new Error(`monster combat proc def ${id}: script required`);
+
+    const trigger = String(def?.trigger || '');
+    if (!trigger) throw new Error(`monster combat proc def ${id}: trigger required`);
+    if (triggerIds.size > 0 && !triggerIds.has(trigger)) {
+      throw new Error(`monster combat proc def ${id}: unknown trigger ${trigger}`);
+    }
+
+    const pair = `${script}::${trigger}`;
+    if (scriptTriggerPairs.has(pair)) {
+      throw new Error(`monster combat proc def ${id}: duplicate script+trigger pair ${pair}`);
+    }
+    scriptTriggerPairs.add(pair);
+
+    const chancePct = Number(def?.chancePct);
+    if (!Number.isInteger(chancePct) || chancePct < 1 || chancePct > 100) {
+      throw new Error(`monster combat proc def ${id}: chancePct must be an integer from 1 to 100`);
+    }
+
+    if (!Number.isInteger(def?.seedSalt)) {
+      throw new Error(`monster combat proc def ${id}: seedSalt must be an integer`);
+    }
+
+    const action = def?.action;
+    if (!action || typeof action !== 'object') throw new Error(`monster combat proc def ${id}: action object required`);
+    const kind = String(action.kind || '');
+    if (!kind) throw new Error(`monster combat proc def ${id}: action.kind required`);
+    if (actionIds.size > 0 && !actionIds.has(kind)) {
+      throw new Error(`monster combat proc def ${id}: unknown action kind ${kind}`);
+    }
+
+    if (kind === 'add_damage_flat' || kind === 'heal_defender_flat' || kind === 'retaliate_flat') {
+      if (!Number.isFinite(action.amount)) {
+        throw new Error(`monster combat proc def ${id}: action.amount required for ${kind}`);
+      }
+    }
+    if (kind === 'heal_attacker_fraction_damage') {
+      if (!Number.isInteger(action.numerator) || action.numerator < 1) {
+        throw new Error(`monster combat proc def ${id}: action.numerator must be integer >= 1`);
+      }
+      if (!Number.isInteger(action.denominator) || action.denominator < 1) {
+        throw new Error(`monster combat proc def ${id}: action.denominator must be integer >= 1`);
+      }
+      if (action.minAmount != null && (!Number.isFinite(action.minAmount) || action.minAmount < 0)) {
+        throw new Error(`monster combat proc def ${id}: action.minAmount must be >= 0 when provided`);
+      }
+    }
+
+    if (def.emitEvent != null && (typeof def.emitEvent !== 'string' || !def.emitEvent.trim())) {
+      throw new Error(`monster combat proc def ${id}: emitEvent must be non-empty string when provided`);
+    }
+    if (def.emitPayload != null) {
+      const emitPayload = String(def.emitPayload || '');
+      if (!emitPayloadIds.has(emitPayload)) {
+        throw new Error(`monster combat proc def ${id}: unknown emitPayload ${emitPayload}`);
+      }
+    }
+    if (def.emitAmount != null && typeof def.emitAmount !== 'boolean') {
+      throw new Error(`monster combat proc def ${id}: emitAmount must be boolean when provided`);
+    }
+  }
+
+  return true;
+}
+
 export function validateAll({
   ITEM_CATALOG,
   AFFIX_DEFS,
@@ -276,6 +357,10 @@ export function validateAll({
   EFFECT_OPERATION_IDS,
   MONSTER_STATUS_PROC_DEFS,
   MONSTER_PROC_TRIGGER_IDS,
+  MONSTER_COMBAT_PROC_DEFS,
+  MONSTER_COMBAT_PROC_TRIGGER_IDS,
+  MONSTER_COMBAT_PROC_ACTION_IDS,
+  MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
@@ -290,5 +375,15 @@ export function validateAll({
       : true)
     && (MONSTER_STATUS_PROC_DEFS
       ? validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, { triggerIds: MONSTER_PROC_TRIGGER_IDS })
+      : true)
+    && (MONSTER_COMBAT_PROC_DEFS
+      ? validateMonsterCombatProcDefs(
+        MONSTER_COMBAT_PROC_DEFS,
+        {
+          triggerIds: MONSTER_COMBAT_PROC_TRIGGER_IDS,
+          actionIds: MONSTER_COMBAT_PROC_ACTION_IDS,
+          emitPayloadIds: MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS,
+        },
+      )
       : true);
 }
