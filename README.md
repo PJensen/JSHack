@@ -466,28 +466,7 @@ Deterministic seeds mean tests are reproducible. No flaky tests. No "works on my
 
 ## Contributing
 
-We're hacking for fun, but contributions are welcome!
-
-1. **Fork it**
-2. **Hack on it** (edit files, refresh browser)
-3. **Test it** (Deno tests, play the game)
-4. **Open a PR** with a clear description
-
-**Good PRs:**
-- ✅ Add a new monster or item
-- ✅ Fix a bug with a test
-- ✅ Add a new system with tests
-- ✅ Improve mobile touch controls
-- ✅ Enhance dungeon generation
-
-**Bad PRs:**
-- ❌ Add npm, webpack, babel, or any build step
-- ❌ Add TypeScript
-- ❌ Add a framework
-- ❌ Break determinism
-- ❌ Mix rules and display layers
-
-Read [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md) and [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) before contributing. This project has burned twice by violating its constraints. Let's not make it three times.
+Contributions that align with the project's vision are welcome. Read **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, guidelines, and expectations. The short version: keep it simple, test your changes, don't break the constraints in [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md).
 
 ---
 
