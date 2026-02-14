@@ -4,6 +4,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Consumable } from "../components/Consumable.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Brain } from "../components/Brain.js";
+import { ITEM_USE_DEFS } from "../data/itemUseDefs.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { runScript, ScriptVerb } from "../scripting.js";
@@ -13,7 +14,7 @@ import { runScript, ScriptVerb } from "../scripting.js";
  * useItemSystem — resolves UseIntent for generic item use.
  * Supports:
  * - Consumable items with an effectKey dispatched via the scripting registry
- * - Learning spells from items of kind "learn" (e.g., spellbooks)
+ * - Data-driven behaviors from itemUseDefs (wands, scrolls, spellbooks)
  *
  * Semantics:
  * - The item must be present in the actor's Inventory
@@ -24,6 +25,118 @@ import { runScript, ScriptVerb } from "../scripting.js";
  *   - 'spell:learn-denied' { actor, reason, spellId? }
  *   - 'spell:already-known' { actor, spellId }
  */
+
+/**
+ * @param {{type?:string}|null} info
+ * @param {string} identity
+ * @param {{itemTypes?:string[], identityPrefix?:string}} match
+ */
+function matchesUseDef(info, identity, match) {
+  if (!match || typeof match !== "object") return false;
+  const type = String(info?.type || "").toLowerCase();
+  const normalizedIdentity = String(identity || "").toLowerCase();
+
+  const itemTypes = Array.isArray(match.itemTypes)
+    ? match.itemTypes.map((v) => String(v || "").toLowerCase()).filter(Boolean)
+    : [];
+  const identityPrefix = String(match.identityPrefix || "").toLowerCase();
+
+  if (itemTypes.length > 0 && !itemTypes.includes(type)) return false;
+  if (identityPrefix && !normalizedIdentity.startsWith(identityPrefix)) return false;
+
+  return itemTypes.length > 0 || !!identityPrefix;
+}
+
+/**
+ * @param {{type?:string}|null} info
+ * @param {string} identity
+ */
+function findUseDef(info, identity) {
+  for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
+    const def = ITEM_USE_DEFS[i];
+    if (matchesUseDef(info, identity, def.match)) return def;
+  }
+  return null;
+}
+
+/**
+ * @param {string} identity
+ * @param {string} prefix
+ */
+function spellIdFromIdentity(identity, prefix) {
+  const normalizedIdentity = String(identity || "").toLowerCase();
+  const normalizedPrefix = String(prefix || "").toLowerCase();
+  if (!normalizedPrefix || !normalizedIdentity.startsWith(normalizedPrefix)) return "";
+  return normalizedIdentity.substring(normalizedPrefix.length);
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @returns {{learnedSpellIds?:string[], intelligence?:number}|null}
+ */
+function ensureBrain(world, actor) {
+  /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
+  let brain = /** @type any */ (world.get(actor, Brain));
+  if (!brain) {
+    try { world.add(actor, Brain, {}); } catch {}
+    brain = /** @type any */ (world.get(actor, Brain));
+  }
+  return brain;
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {{targetId?:number}} intent
+ * @param {string} identity
+ * @param {{ kind?:string, identityPrefix?:string, targetMode?:string, castEventSource?:string, consumeOnSuccess?:boolean }} action
+ */
+function executeUseAction(world, actor, intent, identity, action) {
+  const consumeOnSuccess = action.consumeOnSuccess !== false;
+  const spellId = spellIdFromIdentity(identity, String(action.identityPrefix || ""));
+  if (!spellId) return false;
+  const spell = getSpell(spellId);
+  if (!spell) {
+    if (action.kind === "learn_spell_from_identity") {
+      try { world.emit && world.emit("spell:learn-denied", { actor, reason: "unknown-spell", spellId }); } catch {}
+    }
+    return false;
+  }
+
+  if (action.kind === "cast_spell_from_identity") {
+    const targetMode = String(action.targetMode || "self");
+    const runIntent = targetMode === "intentTarget" ? { targetId: intent?.targetId } : {};
+    try { runSpellScript(world, actor, spell, runIntent); } catch {}
+    const castEvent = {
+      actor,
+      spellId: spell.id,
+      targetId: targetMode === "intentTarget" ? (intent?.targetId || actor) : actor,
+    };
+    if (action.castEventSource) castEvent.source = action.castEventSource;
+    try { world.emit && world.emit("castSpell", castEvent); } catch {}
+    return consumeOnSuccess;
+  }
+
+  if (action.kind === "learn_spell_from_identity") {
+    const brain = ensureBrain(world, actor);
+    if (!brain) {
+      try { world.emit && world.emit("spell:learn-denied", { actor, reason: "no-brain", spellId: spell.id }); } catch {}
+      return false;
+    }
+    if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
+      try { world.emit && world.emit("spell:already-known", { actor, spellId: spell.id }); } catch {}
+      return false;
+    }
+    if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+    brain.learnedSpellIds.push(spell.id);
+    try { world.emit && world.emit("spell:learned", { actor, spellId: spell.id }); } catch {}
+    return consumeOnSuccess;
+  }
+
+  return false;
+}
+
 /**
  * @param {World} world
  */
@@ -32,89 +145,43 @@ export function useItemSystem(world) {
     const itemId = intent.itemId | 0;
     if (!(itemId > 0)) { world.remove(actor, UseIntent); continue; }
 
-  /** @type {{items:number[]}|null} */
-  const inv = /** @type any */ (world.get(actor, Inventory));
+    /** @type {{items:number[]}|null} */
+    const inv = /** @type any */ (world.get(actor, Inventory));
     if (!inv || !Array.isArray(inv.items)) { world.remove(actor, UseIntent); continue; }
 
     // ensure item is in inventory
     const idx = inv.items.indexOf(itemId);
     if (idx === -1) { world.remove(actor, UseIntent); continue; }
 
-  /** @type {{type?:string, description?:string, count?:number}|null} */
-  const info = /** @type any */ (world.get(itemId, ItemInfo));
-  /** @type {{identity?:string}|null} */
-  const ni = /** @type any */ (world.get(itemId, NamedIdentity));
-  /** @type {{effectKey?:string, effectParams?:object, remainingUses?:number}|null} */
-  const cons = /** @type any */ (world.get(itemId, Consumable));
+    /** @type {{type?:string, description?:string, count?:number}|null} */
+    const info = /** @type any */ (world.get(itemId, ItemInfo));
+    /** @type {{identity?:string}|null} */
+    const ni = /** @type any */ (world.get(itemId, NamedIdentity));
+    /** @type {{effectKey?:string, effectParams?:object, remainingUses?:number}|null} */
+    const cons = /** @type any */ (world.get(itemId, Consumable));
+    const identity = String(ni?.identity || "").toLowerCase();
 
     let consumed = false;
-    let learnedSpellId = null;
 
     // Path 1: consumable with a scripting-registry effectKey
     if (cons && cons.effectKey) {
       try { runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }); } catch {}
-      // By default, consumables are consumed on use
       consumed = true;
-    } else if (info && (info.type === 'learn' || info.type === 'scroll' || info.type === 'wand' || info.type === 'book')) {
-      const identity = (ni?.identity || '').toLowerCase();
-
-      // Path 2a: WANDS fire spell from charges, no mana cost, auto-targets like bow
-      if (info.type === 'wand') {
-        const spellIdFromId = identity.startsWith('wand_') ? identity.substring('wand_'.length) : '';
-        const spell = getSpell(spellIdFromId);
-        if (!spell) { world.remove(actor, UseIntent); continue; }
-        try { runSpellScript(world, actor, spell, { targetId: intent.targetId }); } catch {}
-        try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: intent.targetId || actor, source: 'wand' }); } catch {}
-        consumed = true;
-
-      // Path 2b: SCROLLS cast directly without knowledge/mana requirements
-      } else if (info.type === 'scroll' || identity.startsWith('scroll_')) {
-        const spellIdFromId = identity.startsWith('scroll_') ? identity.substring('scroll_'.length) : '';
-        const spell = getSpell(spellIdFromId);
-        if (!spell) { world.remove(actor, UseIntent); continue; }
-        try { runSpellScript(world, actor, spell, {}); } catch {}
-        try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: actor }); } catch {}
-        consumed = true;
-      } else {
-        // Path 2c: learning from a spellbook-like item
-        if (identity.startsWith('book_')) {
-          learnedSpellId = identity.substring('book_'.length);
-        }
-        if (!learnedSpellId) { world.remove(actor, UseIntent); continue; }
-
-        const spell = getSpell(learnedSpellId);
-        if (!spell) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'unknown-spell', spellId: learnedSpellId }); world.remove(actor, UseIntent); continue; }
-
-        /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
-        let brain = /** @type any */ (world.get(actor, Brain));
-        if (!brain) { try { world.add(actor, Brain, {}); brain = world.get(actor, Brain); } catch {} }
-        if (!brain) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'no-brain', spellId: spell.id }); world.remove(actor, UseIntent); continue; }
-
-        // already known
-        if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
-          try { world.emit && world.emit('spell:already-known', { actor, spellId: spell.id }); } catch {}
-          world.remove(actor, UseIntent);
-          continue;
-        }
-
-        // learn
-        if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-        brain.learnedSpellIds.push(spell.id);
-        try { world.emit && world.emit('spell:learned', { actor, spellId: spell.id }); } catch {}
-        consumed = true;
-      }
+    } else if (info) {
+      const def = findUseDef(info, identity);
+      if (def) consumed = executeUseAction(world, actor, intent, identity, def.action || {});
     }
 
     // If consumed, decrement stack or destroy and remove from inventory
     if (consumed) {
-  if (info && Number.isFinite(info?.count) && (info?.count ?? 0) > 1) {
+      if (info && Number.isFinite(info?.count) && (info?.count ?? 0) > 1) {
         world.mutate(itemId, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count | 0) - 1; });
       } else {
         // remove from inventory list first to avoid dangling id
         if (idx >= 0) inv.items.splice(idx, 1);
         try { world.destroy(itemId); } catch {}
       }
-      try { world.emit && world.emit('item:used', { actor, itemId }); } catch {}
+      try { world.emit && world.emit("item:used", { actor, itemId }); } catch {}
     }
 
     // clear intent

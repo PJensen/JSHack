@@ -9,6 +9,7 @@ import { LOOT_TABLES } from "../../rules/data/lootTables.js";
 import { DEITY_DEFS } from "../../rules/data/deities.js";
 import { GEM_DEFS } from "../../rules/data/gems.js";
 import { APPLY_DEFS } from "../../rules/data/applyDefs.js";
+import { ITEM_USE_ACTION_IDS, ITEM_USE_DEFS } from "../../rules/data/itemUseDefs.js";
 import { MATERIAL_REACTION_OUTCOME_IDS, MATERIAL_REACTION_RULES } from "../../rules/data/materialReactions.js";
 import { NUTRITION_BY_SIZE, CORPSE_EFFECTS } from "../../rules/data/food.js";
 import { validateAll } from "../../rules/data/validate.js";
@@ -47,6 +48,7 @@ export function getGameDataLoadPlan() {
       total: Object.keys(NUTRITION_BY_SIZE).length + Object.keys(CORPSE_EFFECTS).length,
     },
     { id: "apply", label: "Loading apply defs", total: Object.keys(APPLY_DEFS).length },
+    { id: "itemUse", label: "Loading item use defs", total: ITEM_USE_DEFS.length },
     { id: "materialReactions", label: "Loading material reactions", total: MATERIAL_REACTION_RULES.length },
     { id: "validate", label: "Validating data", total: 1 },
   ];
@@ -190,6 +192,15 @@ export function loadGameData(opts = {}) {
       continue;
     }
 
+    if (ds.id === "itemUse") {
+      for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
+        void ITEM_USE_DEFS[i];
+        completed++;
+        emit(ds, i + 1);
+      }
+      continue;
+    }
+
     if (ds.id === "materialReactions") {
       for (let i = 0; i < MATERIAL_REACTION_RULES.length; i++) {
         void MATERIAL_REACTION_RULES[i];
@@ -205,6 +216,8 @@ export function loadGameData(opts = {}) {
         AFFIX_DEFS,
         MATERIAL_REACTION_RULES,
         MATERIAL_REACTION_OUTCOME_IDS,
+        ITEM_USE_DEFS,
+        ITEM_USE_ACTION_IDS,
       });
       completed++;
       emit(ds, 1);
