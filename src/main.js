@@ -223,6 +223,15 @@ if (!playerEntity(world)) {
     }
     // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
     world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
+
+    // Starting weapon: a simple dagger, equipped
+    const inv = world.get(pe.id, Inventory);
+    const eq = world.get(pe.id, Equipment);
+    const daggerId = createItemById(world, 'dagger_quick');
+    if (inv && eq && daggerId != null) {
+      inv.items.push(daggerId);
+      eq.weapon = daggerId;
+    }
   }
 }
 
