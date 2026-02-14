@@ -1,8 +1,8 @@
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
-import { Status } from "../components/Status.js";
 import { Vitality } from "../components/Vitality.js";
+import { isEntityInvulnerable } from "../utils/effectGuards.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -11,14 +11,6 @@ const DEFAULT_DAMAGE = 2;
 function clampInt(value, fallback, min = 0) {
   const n = Number.isFinite(value) ? (value | 0) : fallback;
   return Math.max(min, n | 0);
-}
-
-function isInvulnerable(stat) {
-  return !!(stat
-    && Array.isArray(stat.statuses)
-    && stat.statuses.some((s) => (
-      String(s?.type || "").toLowerCase() === "invulnerable" && ((Number(s?.duration || 0) | 0) > 0)
-    )));
 }
 
 /**
@@ -80,7 +72,7 @@ export function plasmaCloudSystem(world) {
         const dy = Math.abs((tpos.y | 0) - (pos.y | 0));
         if (Math.max(dx, dy) > radius) continue;
 
-        if (isInvulnerable(world.get(id, Status))) {
+        if (isEntityInvulnerable(world, id)) {
           try { world.emit?.("status", { id, kind: "immune", source: cloudId, text: "plasma" }); } catch { /* */ }
           continue;
         }

@@ -15,6 +15,7 @@ import { AFFIX_DEFS } from '../data/affixes.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
+import { isEntityInvulnerable } from '../utils/effectGuards.js';
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
@@ -204,8 +205,7 @@ export function combatSystem(world) {
         });
 
         // Invulnerability gate: if defender has 'invulnerable' status active, nullify damage
-        const stat = world.get(defender, Status);
-        const isInvuln = !!(stat && Array.isArray(stat.statuses) && stat.statuses.some(s => String(s.type).toLowerCase() === 'invulnerable' && (s.duration|0) > 0));
+        const isInvuln = isEntityInvulnerable(world, defender);
         if (isInvuln) {
             finalDmg = 0;
             world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
@@ -223,4 +223,3 @@ export function combatSystem(world) {
         world.remove(attacker, AttackIntent);
     }
 }
-
