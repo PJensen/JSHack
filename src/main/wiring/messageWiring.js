@@ -283,6 +283,12 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`, 'system');
   });
 
+  // === Dig events ===
+  world.on('tile:dug', ({ actor, x, y }) => {
+    const who = nameOfEntity(actor);
+    log(`${who} dig${who === 'You' ? '' : 's'} through the wall.`, 'system');
+  });
+
   // === Equipment events ===
   world.on('item:equipped', ({ actor, itemId, slot, name }) => {
     const label = name ? bracketizeName(name) : `item ${itemId}`;
