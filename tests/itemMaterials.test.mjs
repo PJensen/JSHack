@@ -42,3 +42,21 @@ Deno.test("createItemById routes magic items through materialized loader", () =>
   assert(mat && mat.kind === "paper", "spellbook should carry paper material");
 });
 
+Deno.test("simple archetype items carry baseline materials", () => {
+  const world = new World({ seed: 14 });
+
+  const cases = [
+    ["gold", "gold"],
+    ["potion_health", "glass"],
+    ["ammo_arrows", "wood"],
+    ["scroll_mapping", "paper"],
+  ];
+
+  for (let i = 0; i < cases.length; i++) {
+    const [itemId, expectedMaterial] = cases[i];
+    const id = createItemById(world, itemId);
+    assert(id != null, `expected item for ${itemId}`);
+    const mat = world.get(id, Material);
+    assert(mat && mat.kind === expectedMaterial, `${itemId} should use ${expectedMaterial}`);
+  }
+});

@@ -36,6 +36,7 @@ import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
 import { plasmaCloudSystem } from "../rules/systems/plasmaCloudSystem.js";
 import { installGridBugDeathClouds } from "../rules/systems/gridBugDeathCloudSystem.js";
+import { materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -88,6 +89,7 @@ export function configureWorld(world) {
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
+  registerSystem(materialReactionSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
   registerSystem(plasmaCloudSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');

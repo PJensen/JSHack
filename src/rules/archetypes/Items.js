@@ -3,6 +3,7 @@ import { NamedIdentity }          from "../components/NamedIdentity.js";
 import { ItemInfo }          from "../components/ItemInfo.js";
 import { Potion } from "../components/Potion.js";
 import { Consumable } from "../components/Consumable.js";
+import { Material } from "../components/Material.js";
 
 // Simple Health Potion archetype using Potion component
 export const HealthPotion = defineArchetype(
@@ -25,6 +26,7 @@ export const HealthPotion = defineArchetype(
         count: 1,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Health Potion", identity: 'potion_health' })],
+    [Material, { kind: "glass" }],
 );
 
 // Currency stack (Gold) — zero weight, stackable via ItemInfo.count
@@ -38,6 +40,7 @@ export const GoldStack = defineArchetype(
         count: 1,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Gold", identity: "gold" })],
+    [Material, { kind: "gold" }],
 );
 
 // Stackable arrows (ammo) — planning for ranged ammo consumption
@@ -52,6 +55,7 @@ export const ArrowsStack = defineArchetype(
         count: 10,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Arrows", identity: "ammo_arrows" })],
+    [Material, { kind: "wood" }],
 );
 
 // Fire arrows — bonus 1d4 fire damage on hit
@@ -67,6 +71,7 @@ export const FireArrowsStack = defineArchetype(
         count: 5,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Fire Arrows", identity: "ammo_fire_arrows" })],
+    [Material, { kind: "wood" }],
 );
 
 // Generic magic item (spellbooks, wands, scrolls) — resolves from item def params
@@ -120,4 +125,5 @@ export const ScrollOfMapping = defineArchetype(
         count: 1,
     }],
     [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Scroll of Mapping", identity: "scroll_mapping" })],
+    [Material, { kind: "paper" }],
 );
