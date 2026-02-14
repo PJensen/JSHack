@@ -8,10 +8,10 @@ import { ItemInfo } from '../../components/ItemInfo.js';
 import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopItem } from '../../data/shopStock.js';
-import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem } from '../../archetypes/Items.js';
+import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildEquipmentItem } from '../../data/equipmentLoader.js';
+import { buildMagicItem } from '../../data/itemLoader.js';
 import { pickMonster, pickItem, pickTrap, pickSpawner } from './tables.js';
-import { getItem } from '../../data/items.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
@@ -407,13 +407,13 @@ export function materializeSpawn(world, spawn) {
       return itemId;
     }
     case 'book': {
-      const def = getItem(spawn.params.bookId);
-      if (!def) return null;
-      const id = createFrom(world, MagicItem, {
-        name: def.name, identity: def.id,
-        type: def.type, slot: def.slot, weight: 1, value: 0,
-        description: def.description, count: 1,
-      });
+      let id = null;
+      try {
+        id = buildMagicItem(world, spawn.params.bookId, { count: 1 });
+      } catch {
+        return null;
+      }
+      if (!(id > 0)) return null;
       world.add(id, Position, { x: spawn.x, y: spawn.y });
       return id;
     }
