@@ -36,12 +36,22 @@ import { clearSpatialIndex } from '../../utils/spatialIndex.js';
  * @param {number} worldSeed
  * @param {number} depth
  * @param {Object} [tombstoneRepo] - Tombstone repository for placing tombstones
+ * @param {(progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void} [onProgress]
  * @returns {{ spawnX: number, spawnY: number, entityIds: number[] }}
  */
-export function generateFloor(world, worldSeed, depth, tombstoneRepo = null) {
+export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null) {
   const floorPlan = generateFloorPlan(worldSeed, depth);
   const { extent } = floorPlan;
   const allEntityIds = [];
+  const totalChunks = Math.max(
+    0,
+    (extent.maxCX - extent.minCX + 1) * (extent.maxCY - extent.minCY + 1),
+  );
+  let processedChunks = 0;
+
+  if (typeof onProgress === 'function') {
+    onProgress({ phase: 'chunks', depth, processed: 0, total: totalChunks });
+  }
 
   const stairOpts = {
     createStairDown: (w, x, y) => createFrom(w, StairDown, { x, y }),
@@ -91,6 +101,18 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null) {
         spawnX = room.x + Math.floor(room.w / 2);
         spawnY = room.y + Math.floor(room.h / 2);
       }
+
+      processedChunks++;
+      if (typeof onProgress === 'function') {
+        onProgress({
+          phase: 'chunks',
+          depth,
+          processed: processedChunks,
+          total: totalChunks,
+          cx,
+          cy,
+        });
+      }
     }
   }
 
@@ -105,18 +127,20 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null) {
  * @param {Object} [opts]
  * @param {number} [opts.startDepth=1]
  * @param {Object} [opts.tombstoneRepo] - Tombstone repository for placing tombstones
+ * @param {(progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void} [opts.onProgress]
  * @returns {{ x: number, y: number }} spawn position for the player
  */
 export function initDungeon(world, opts = {}) {
   const depth = opts.startDepth || 1;
   const worldSeed = world.seed >>> 0;
   const tombstoneRepo = opts.tombstoneRepo || null;
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
 
   clearTileMap();
   clearExplored();
   clearSpatialIndex(world);
 
-  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, depth, tombstoneRepo);
+  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress);
 
   // Create dungeon state singleton
   const dsId = world.create();
