@@ -8,6 +8,7 @@ import { itemPickupSystem, autoPickupPostMoveSystem } from "../rules/systems/ite
 import { itemDropSystem } from "../rules/systems/itemDropSystem.js";
 import { equipItemSystem } from "../rules/systems/equipItemSystem.js";
 import { useItemSystem } from "../rules/systems/useItemSystem.js";
+import { applySystem } from "../rules/systems/applySystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
@@ -37,6 +38,7 @@ import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
 import "../rules/scripts/consumables.js";
+import "../rules/scripts/apply.js";
 
 /**
  * @param {World} world
@@ -60,6 +62,7 @@ export function configureWorld(world) {
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
+  registerSystem(applySystem, 'intents');
   registerSystem(equipItemSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
   registerSystem(rangedAttackSystem, 'intents');

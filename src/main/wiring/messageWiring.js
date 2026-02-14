@@ -4,6 +4,7 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { Player } from "../../rules/components/Player.js";
 import { Position } from "../../rules/components/Position.js";
+import { resolveItemDisplayName } from "./itemName.js";
 
 const INSTALLED = Symbol.for("jshack:main:messageWiring:installed");
 
@@ -44,9 +45,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   function nameOfItem(id) {
     const n = Number(id || 0);
-    const ni = world.get(n, NamedIdentity);
-    const info = world.get(n, ItemInfo);
-    const label = ni?.name || info?.description || info?.type;
+    const label = resolveItemDisplayName(world, n);
     return label ? bracketizeName(label) : `item ${n}`;
   }
 
@@ -287,6 +286,29 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   world.on('tile:dug', ({ actor, x, y }) => {
     const who = nameOfEntity(actor);
     log(`${who} dig${who === 'You' ? '' : 's'} through the wall.`, 'system');
+  });
+
+  // === Apply events ===
+  world.on('item:applied', ({ targetId, result }) => {
+    if (!result) return;
+    if (result.type === 'touchstone') {
+      const targetName = nameOfItem(targetId) || result.appearance || 'gem';
+      if (result.hardness === 'hard') {
+        log(`You rub ${targetName} on the touchstone... it makes a hard white streak!`, 'system');
+      } else {
+        log(`You rub ${targetName} on the touchstone... it leaves a dull scratch.`, 'system');
+      }
+    } else if (result.type === 'nothing') {
+      log(`Nothing happens.`, 'system');
+    }
+  });
+
+  // === Identification events ===
+  world.on('item:identified', ({ identity, name, appearance, category }) => {
+    const displayName = bracketizeName(name);
+    log(`You identify the ${appearance}: it's ${displayName}!`, 'system');
+    // Trigger inventory refresh so names update immediately
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
   });
 
   // === Equipment events ===

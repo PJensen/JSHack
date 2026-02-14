@@ -93,6 +93,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:openUseChooser')); } catch {}
   });
 
+  // Apply tool button (opens apply-tool picker for touchstone, etc.)
+  const applyBtn = document.createElement('button');
+  applyBtn.id = 'btn-apply';
+  applyBtn.textContent = 'Apply';
+  Object.assign(applyBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  applyBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:openApplyChooser')); } catch {}
+  });
+
   const castBtn = document.createElement('button');
   castBtn.id = 'active-spell';
   castBtn.textContent = 'Cast';
@@ -361,7 +374,8 @@ export function initHUD() {
   const quick = createQuickSlot();
   bar.appendChild(invBtn);
   bar.appendChild(useBtn);
-  bar.appendChild(petBtn); // Pet button after Use
+  bar.appendChild(applyBtn);
+  bar.appendChild(petBtn); // Pet button after Apply
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(engraveBtn);

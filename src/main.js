@@ -71,6 +71,11 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
+import { APPLY_DEFS, getApplyDef } from "./rules/data/applyDefs.js";
+import { resolveItemDisplayName } from "./main/wiring/itemName.js";
+import { resetIdentification, identify } from "./rules/data/identification.js";
+import { initGemPricing, resetGemPricing } from "./rules/data/gemPricing.js";
+import { createRng } from "./lib/ecs-js/rng.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -124,6 +129,11 @@ resize();
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });
 configureWorld(world);
+
+// Initialize identification & gem pricing for this game run
+resetIdentification();
+identify('stone_touchstone');
+initGemPricing(createRng(world.seed ^ 0x6E45));
 
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
@@ -239,6 +249,11 @@ if (!playerEntity(world)) {
     const pickaxeId = createItemById(world, 'iron_pickaxe');
     if (inv && pickaxeId != null) {
       inv.items.push(pickaxeId);
+    }
+    // Starting touchstone: for testing gems
+    const touchstoneId = createItemById(world, 'stone_touchstone');
+    if (inv && touchstoneId != null) {
+      inv.items.push(touchstoneId);
     }
   }
 }
@@ -396,13 +411,15 @@ const inputDisposers = [];
         } else {
           const items = ids.map((id) => {
             const info = world.get(id, ItemInfo);
-            const name = world.get(id, NamedIdentity);
-            return { id, type: info?.type || 'item', name: name?.name || info?.type || 'item', count: info?.count || 1 };
+            return { id, type: info?.type || 'item', name: resolveItemDisplayName(world, id), count: info?.count || 1 };
           });
           window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
         }
         break;
       }
+      case "display.openApplyChooser":
+        window.dispatchEvent(new CustomEvent("ui:openApplyChooser"));
+        break;
       default:
         break;
     }
@@ -427,7 +444,6 @@ addEventListener('ui:requestInventoryData', () => {
     if (inv && Array.isArray(inv.items)) {
       for (const id of inv.items) {
         const info = world.get(id, ItemInfo);
-        const name = world.get(id, NamedIdentity);
         if (info) {
           const equippedSlot = (eq && (
             (eq.weapon === id && 'weapon') ||
@@ -443,7 +459,7 @@ addEventListener('ui:requestInventoryData', () => {
             description: info.description,
             count: info.count,
             slot: info.slot,
-            name: name?.name,
+            name: resolveItemDisplayName(world, id),
             rarityName: info.rarityName,
             bonuses: info.bonuses || {},
             affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
@@ -491,19 +507,67 @@ addEventListener('ui:requestUsableItemsData', () => {
       for (const id of inv.items) {
         const info = world.get(id, ItemInfo);
         if (!info || !USABLE_TYPES.has(info.type)) continue;
-        const name = world.get(id, NamedIdentity);
         items.push({
           id,
           type: info.type,
           description: info.description,
           count: info.count,
-          name: name?.name,
+          name: resolveItemDisplayName(world, id),
           rarityName: info.rarityName,
         });
       }
     }
   }
   window.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
+});
+
+// Provide applicable tools to the apply-tool chooser
+addEventListener('ui:requestApplyToolsData', () => {
+  const p = playerEntity(world);
+  const items = [];
+  if (p) {
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        const ni = world.get(id, NamedIdentity);
+        const identity = ni?.identity || '';
+        if (!APPLY_DEFS[identity]) continue;
+        items.push({ id, name: resolveItemDisplayName(world, id) });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:applyToolsData', { detail: { items } }));
+});
+
+// Provide filtered targets for an apply tool
+addEventListener('ui:requestApplyTargetsData', (ev) => {
+  const toolId = ev?.detail?.toolId || 0;
+  const p = playerEntity(world);
+  const items = [];
+  if (p && toolId) {
+    const toolNi = world.get(toolId, NamedIdentity);
+    const def = getApplyDef(toolNi?.identity || '');
+    const filterType = def?.targetFilter || '';
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        if (id === toolId) continue; // don't apply tool to itself
+        const info = world.get(id, ItemInfo);
+        if (filterType && info?.type !== filterType) continue;
+        items.push({ id, name: resolveItemDisplayName(world, id), description: info?.description || '' });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:applyTargetsData', { detail: { items } }));
+});
+
+// When user confirms an apply action from the UI
+addEventListener('ui:requestApply', (ev) => {
+  const toolId = ev?.detail?.toolId || 0;
+  const targetItemId = ev?.detail?.targetItemId || 0;
+  if (!toolId || !targetItemId) return;
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler({ type: 'rules.applyItem', payload: { itemId: toolId, targetItemId } });
 });
 
 // Provide message log entries (placeholder until rules log is wired)
@@ -929,6 +993,24 @@ world.on('ranged:no-ammo', ({ attacker }) => {
   const pos = world.get(Number(attacker||0), Position);
   if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch {}
 });
+// Insufficient stamina floating flavor text (message handled in messageWiring)
+const _staminaLines = [
+  'Too exhausted!',
+  'Your arms feel heavy...',
+  'You can barely lift your weapon!',
+  'You gasp for breath...',
+  'Your muscles refuse!',
+  'Not enough strength...',
+  'You stagger with fatigue!',
+  'Your body protests!',
+];
+world.on('attack:insufficient-stamina', ({ attacker }) => {
+  const pos = world.get(Number(attacker || 0), Position);
+  if (pos) {
+    const line = _staminaLines[Math.floor(Math.random() * _staminaLines.length)];
+    try { ftext.addStatus(pos.x, pos.y - 0.3, line, { color: '#ff8c00', life: 1.0 }); } catch {}
+  }
+});
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type !== 'currency') return;
@@ -945,7 +1027,6 @@ world.on('item:pickup', ({ actor, itemId }) => {
   if (!pe || pe.id !== actor) return;
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
-  const name = world.get(itemId, NamedIdentity);
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
@@ -953,7 +1034,7 @@ world.on('item:pickup', ({ actor, itemId }) => {
           id: Number(itemId),
           type: info.type || 'item',
           slot: info.slot || '',
-          name: name?.name || info.description || info.type || 'item',
+          name: resolveItemDisplayName(world, itemId),
           count: info.count || 1
         }
       }
@@ -1176,11 +1257,10 @@ world.on('interaction', ({ action, items: droppedIds }) => {
           const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
           rulesHandler({ type: 'rules.pickupItem', payload: { itemId: eid } });
         } else {
-          const name = world.get(eid, NamedIdentity);
           nonCurrency.push({
             id: eid,
             type: info.type || 'item',
-            name: name?.name || info.type || 'item',
+            name: resolveItemDisplayName(world, eid),
             count: info.count || 1,
             rarityName: info.rarityName || 'common',
             bonuses: info.bonuses || {},
@@ -1274,8 +1354,7 @@ world.on('moved', ({ id, to }) => {
   if (hasChest || nonCurrency.length > 1) {
     const items = nonCurrency.map((eid) => {
       const info = world.get(eid, ItemInfo);
-      const name = world.get(eid, NamedIdentity);
-      return { id: eid, type: info?.type || 'item', name: name?.name || info?.type || 'item', count: info?.count || 1 };
+      return { id: eid, type: info?.type || 'item', name: resolveItemDisplayName(world, eid), count: info?.count || 1 };
     });
     try {
       window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: { mode: 'multi', count: items.length, items, fromChest: hasChest } }));
@@ -1285,7 +1364,6 @@ world.on('moved', ({ id, to }) => {
   // Single item: build tooltip content
   const itemId = nonCurrency[0];
   const info = world.get(itemId, ItemInfo);
-  const name = world.get(itemId, NamedIdentity);
   const set = world.get(pe.id, Settings);
   const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
   const affixes = Array.isArray(info?.affixes) ? info.affixes.slice() : [];
@@ -1294,7 +1372,7 @@ world.on('moved', ({ id, to }) => {
     mode: 'single',
     item: {
       id: itemId,
-      name: name?.name || info?.description || info?.type || 'item',
+      name: resolveItemDisplayName(world, itemId),
       rarityName: info?.rarityName || 'common',
       description: info?.description || '',
       count: info?.count || 1,

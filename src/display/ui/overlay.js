@@ -61,6 +61,7 @@ export function initOverlays() {
       hide(spells);
       hide(shop);
       hide(chest);
+      hide(applyPanel);
       // Close memory graph
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
@@ -115,6 +116,34 @@ export function initOverlays() {
     const e = ev;
     const items = (e?.detail?.items) || [];
     renderUseChooser(usePanel, items);
+  });
+
+  // Apply-tool chooser (two-step: pick tool, then pick target)
+  const applyPanel = ensurePanel('apply');
+  let _applyToolId = 0;
+  window.addEventListener('ui:openApplyChooser', () => {
+    _applyToolId = 0;
+    show(applyPanel);
+    window.dispatchEvent(new CustomEvent('ui:requestApplyToolsData'));
+  });
+  window.addEventListener('ui:applyToolsData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const tools = (e?.detail?.items) || [];
+    renderApplyToolChooser(applyPanel, tools, (toolId) => {
+      _applyToolId = toolId;
+      window.dispatchEvent(new CustomEvent('ui:requestApplyTargetsData', { detail: { toolId } }));
+    });
+  });
+  window.addEventListener('ui:applyTargetsData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const targets = (e?.detail?.items) || [];
+    const toolId = _applyToolId;
+    renderApplyTargetChooser(applyPanel, targets, toolId, (targetItemId) => {
+      window.dispatchEvent(new CustomEvent('ui:requestApply', { detail: { toolId, targetItemId } }));
+      hide(applyPanel);
+    });
   });
 
   // Shop overlay
@@ -1103,6 +1132,167 @@ function renderUseChooser(panel, items) {
     else if (k === 'Enter') { useSelected(); e.preventDefault(); }
   }
 
+  window.addEventListener('keydown', onKey);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', onKey);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} tools @param {(toolId:number)=>void} onSelect */
+function renderApplyToolChooser(panel, tools, onSelect) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+  const title = document.createElement('div');
+  title.textContent = 'Apply which tool?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!tools.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(no applicable tools)';
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  let sel = 0;
+  const rows = tools.map((it, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      width: '100%', padding: '6px 8px',
+      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer'
+    });
+    const name = document.createElement('span');
+    name.textContent = bracketize(sanitize(it.name || 'tool'));
+    row.appendChild(name);
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => pickTool());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Apply \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(tools.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+  function pickTool() {
+    const it = tools[sel]; if (!it) return;
+    onSelect(it.id);
+  }
+  setSel(0);
+
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Enter') { pickTool(); e.preventDefault(); }
+  }
+  window.addEventListener('keydown', onKey);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', onKey);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} targets @param {number} toolId @param {(targetId:number)=>void} onSelect */
+function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+  const title = document.createElement('div');
+  title.textContent = 'Apply to which item?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!targets.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(no valid targets)';
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  let sel = 0;
+  const rows = targets.map((it, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      width: '100%', padding: '6px 8px',
+      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer'
+    });
+    const name = document.createElement('span');
+    name.textContent = bracketize(sanitize(it.name || 'item'));
+    row.appendChild(name);
+
+    if (it.description) {
+      const desc = document.createElement('span');
+      desc.style.opacity = '0.6';
+      desc.style.fontSize = '12px';
+      desc.textContent = it.description;
+      row.appendChild(desc);
+    }
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => pickTarget());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Apply \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(targets.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+  function pickTarget() {
+    const it = targets[sel]; if (!it) return;
+    onSelect(it.id);
+  }
+  setSel(0);
+
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Enter') { pickTarget(); e.preventDefault(); }
+  }
   window.addEventListener('keydown', onKey);
   const obs = new MutationObserver(() => {
     if (panel.style.display === 'none') {
