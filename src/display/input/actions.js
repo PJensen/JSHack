@@ -26,6 +26,8 @@ export const Actions = Object.freeze({
   OpenPickupChooser: "display.openPickupChooser", // payload: {}
   // Direct rules pickup (used by chooser submission)
   PickupItem: "rules.pickupItem", // payload: { itemId?:number, count?:number }
+  // Apply a tool to a target inventory item
+  OpenApplyChooser: "display.openApplyChooser", // payload: {}
 });
 
 // Default routing from action → sink
@@ -46,6 +48,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.OpenMessageLog]: Sinks.display,
   [Actions.Zoom]: Sinks.display,
   [Actions.OpenPickupChooser]: Sinks.display,
+  [Actions.OpenApplyChooser]: Sinks.display,
 });
 
 // Utility to build an action object

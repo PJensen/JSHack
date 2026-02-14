@@ -289,6 +289,21 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`${who} dig${who === 'You' ? '' : 's'} through the wall.`, 'system');
   });
 
+  // === Apply events ===
+  world.on('item:applied', ({ targetId, result }) => {
+    if (!result) return;
+    if (result.type === 'touchstone') {
+      const targetName = nameOfItem(targetId) || result.appearance || 'gem';
+      if (result.hardness === 'hard') {
+        log(`You rub ${targetName} on the touchstone... it makes a hard white streak!`, 'system');
+      } else {
+        log(`You rub ${targetName} on the touchstone... it leaves a dull scratch.`, 'system');
+      }
+    } else if (result.type === 'nothing') {
+      log(`Nothing happens.`, 'system');
+    }
+  });
+
   // === Equipment events ===
   world.on('item:equipped', ({ actor, itemId, slot, name }) => {
     const label = name ? bracketizeName(name) : `item ${itemId}`;
