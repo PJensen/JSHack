@@ -22,7 +22,7 @@ export const PlayerArchetype = defineArchetype(
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [ActiveEffects, { effects: [] }],
-  [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
+  [Vitality, (p) => ({ maxHp: p.maxHp ?? 20, hp: p.hp ?? (p.maxHp ?? 20) })],
   // Make player a solid collider so others cannot move through and vice versa
   [Collider, (p) => ({ solid: p.solid ?? true, blocksSight: p.blocksSight ?? false })],
   [Settings, (p) => ({ autoPickup: p.autoPickup ?? true, autoPickupKinds: p.autoPickupKinds ?? ['currency'] })],
@@ -43,7 +43,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
     world.add(id, Equipment, {});
     world.add(id, ActiveEffects, { effects: [] });
-    world.add(id, Vitality, { maxHp: params.maxHp ?? 10, hp: params.hp ?? (params.maxHp ?? 10) });
+    world.add(id, Vitality, { maxHp: params.maxHp ?? 20, hp: params.hp ?? (params.maxHp ?? 20) });
     world.add(id, Settings, { autoPickup: params.autoPickup ?? true, autoPickupKinds: params.autoPickupKinds ?? ['currency'] });
     world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
     world.add(id, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 5.0 });
