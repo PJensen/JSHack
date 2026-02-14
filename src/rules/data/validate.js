@@ -37,6 +37,94 @@ export function validateAffixes(AFFIX_DEFS) {
   return true;
 }
 
-export function validateAll({ ITEM_CATALOG, AFFIX_DEFS }) {
-  return validateItemCatalog(ITEM_CATALOG) && validateAffixes(AFFIX_DEFS);
+export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}) {
+  if (!Array.isArray(MATERIAL_REACTION_RULES)) throw new Error('MATERIAL_REACTION_RULES must be an array');
+  const outcomeIds = new Set(Array.isArray(opts.outcomeIds) ? opts.outcomeIds : []);
+  const ruleIds = new Set();
+
+  for (let i = 0; i < MATERIAL_REACTION_RULES.length; i++) {
+    const rule = MATERIAL_REACTION_RULES[i];
+    const id = String(rule?.id || '');
+    if (!id) throw new Error(`material reaction rule[${i}]: id required`);
+    if (ruleIds.has(id)) throw new Error(`material reaction rule ${id}: duplicate id`);
+    ruleIds.add(id);
+
+    if (!Array.isArray(rule.sourceStatuses) || rule.sourceStatuses.length === 0) {
+      throw new Error(`material reaction rule ${id}: sourceStatuses required`);
+    }
+    for (const status of rule.sourceStatuses) {
+      if (typeof status !== 'string' || !status.trim()) {
+        throw new Error(`material reaction rule ${id}: sourceStatuses must contain non-empty strings`);
+      }
+    }
+
+    if (!Array.isArray(rule.itemScopes) || rule.itemScopes.length === 0) {
+      throw new Error(`material reaction rule ${id}: itemScopes required`);
+    }
+    for (const scope of rule.itemScopes) {
+      if (scope !== 'ground' && scope !== 'inventory') {
+        throw new Error(`material reaction rule ${id}: itemScopes must be 'ground' or 'inventory'`);
+      }
+    }
+
+    if (typeof rule.eventKind !== 'string' || !rule.eventKind.trim()) {
+      throw new Error(`material reaction rule ${id}: eventKind required`);
+    }
+
+    if (!Array.isArray(rule.reactions) || rule.reactions.length === 0) {
+      throw new Error(`material reaction rule ${id}: reactions required`);
+    }
+
+    const reactionIds = new Set();
+    for (let r = 0; r < rule.reactions.length; r++) {
+      const reaction = rule.reactions[r];
+      const reactionId = String(reaction?.id || '');
+      if (!reactionId) throw new Error(`material reaction rule ${id}: reaction[${r}] id required`);
+      if (reactionIds.has(reactionId)) throw new Error(`material reaction rule ${id}: duplicate reaction id ${reactionId}`);
+      reactionIds.add(reactionId);
+
+      const match = reaction?.match;
+      if (!match || typeof match !== 'object') {
+        throw new Error(`material reaction rule ${id}.${reactionId}: match object required`);
+      }
+
+      const itemTypes = Array.isArray(match.itemTypes) ? match.itemTypes : [];
+      const materials = Array.isArray(match.materials) ? match.materials : [];
+      const identities = Array.isArray(match.identities) ? match.identities : [];
+
+      if (itemTypes.length + materials.length + identities.length === 0) {
+        throw new Error(`material reaction rule ${id}.${reactionId}: match must include at least one clause`);
+      }
+
+      for (const arr of [itemTypes, materials, identities]) {
+        for (const val of arr) {
+          if (typeof val !== 'string' || !val.trim()) {
+            throw new Error(`material reaction rule ${id}.${reactionId}: match values must be non-empty strings`);
+          }
+        }
+      }
+
+      if (typeof reaction.outcome !== 'string' || !reaction.outcome.trim()) {
+        throw new Error(`material reaction rule ${id}.${reactionId}: outcome required`);
+      }
+      if (outcomeIds.size > 0 && !outcomeIds.has(reaction.outcome)) {
+        throw new Error(`material reaction rule ${id}.${reactionId}: unknown outcome ${reaction.outcome}`);
+      }
+    }
+  }
+
+  return true;
+}
+
+export function validateAll({
+  ITEM_CATALOG,
+  AFFIX_DEFS,
+  MATERIAL_REACTION_RULES,
+  MATERIAL_REACTION_OUTCOME_IDS,
+}) {
+  return validateItemCatalog(ITEM_CATALOG)
+    && validateAffixes(AFFIX_DEFS)
+    && (MATERIAL_REACTION_RULES
+      ? validateMaterialReactionRules(MATERIAL_REACTION_RULES, { outcomeIds: MATERIAL_REACTION_OUTCOME_IDS })
+      : true);
 }
