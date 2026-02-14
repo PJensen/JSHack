@@ -31,6 +31,7 @@ import { installMessageWiring } from "./main/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
+import { loadGameData } from "./main/bootstrap/loadGameData.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -177,6 +178,26 @@ installTombstoneDeathListener(world, tombstoneRepo);
 installDeathShareListener(world);
 bootAdvance("Installed run listeners");
 
+// Warm data registries with per-dataset progress callbacks.
+let _bootDataUnits = 0;
+const _bootDataBase = _bootDoneUnits;
+loadGameData({
+  onProgress: (progress) => {
+    if (!progress || progress.phase !== 'data') return;
+    const total = Math.max(1, Number(progress.overallTotal) || 1);
+    if (_bootDataUnits === 0) {
+      _bootDataUnits = total;
+      _bootTotalUnits += _bootDataUnits;
+    }
+    const completed = Math.max(0, Math.min(_bootDataUnits, Number(progress.completed) || 0));
+    const dsProcessed = Math.max(0, Number(progress.processed) || 0);
+    const dsTotal = Math.max(1, Number(progress.total) || 1);
+    updateBootProgress(`${progress.label} ${dsProcessed}/${dsTotal}`, _bootDataBase + completed);
+  },
+});
+_bootDoneUnits = _bootDataBase + _bootDataUnits;
+updateBootProgress("Game data loaded", _bootDoneUnits);
+
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 
@@ -244,7 +265,8 @@ const _bootChunkTotal = Math.max(
   (_bootFloorPlan.extent.maxCX - _bootFloorPlan.extent.minCX + 1)
   * (_bootFloorPlan.extent.maxCY - _bootFloorPlan.extent.minCY + 1),
 );
-_bootTotalUnits += _bootChunkTotal;
+let _bootChunkUnits = _bootChunkTotal;
+_bootTotalUnits += _bootChunkUnits;
 const _bootDungeonBase = _bootDoneUnits;
 updateBootProgress(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
 
@@ -256,13 +278,15 @@ const spawnPos = initDungeon(world, {
     if (!progress || progress.phase !== 'chunks') return;
     const total = Math.max(1, Number(progress.total) || _bootChunkTotal);
     const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
-    const floorTotal = BOOT_STATIC_UNITS + total;
-    if (_bootTotalUnits !== floorTotal) _bootTotalUnits = floorTotal;
+    if (total !== _bootChunkUnits) {
+      _bootTotalUnits += (total - _bootChunkUnits);
+      _bootChunkUnits = total;
+    }
     updateBootProgress(`Generating dungeon ${processed}/${total} chunks`, _bootDungeonBase + processed);
   },
 });
-_bootDoneUnits = _bootDungeonBase + _bootChunkTotal;
-updateBootProgress(`Dungeon ready (${_bootChunkTotal} chunks)`, _bootDoneUnits);
+_bootDoneUnits = _bootDungeonBase + _bootChunkUnits;
+updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
 
 // Diagnostic: log all stair entities so we can confirm they exist
 {

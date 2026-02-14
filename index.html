@@ -176,6 +176,9 @@
 			let bootDone = 0;
 			let bootTotal = 1;
 			let bootHidden = false;
+			let bootDoneRequested = false;
+			let bootQueueRunning = false;
+			const bootQueue = [];
 
 			function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 			function renderBoot() {
@@ -184,22 +187,53 @@
 				bootFraction.textContent = `${Math.round(pct * 100)}% (${Math.max(0, Math.floor(bootDone))}/${Math.max(1, Math.floor(bootTotal))})`;
 			}
 
-			window.__JSHACK_BOOT_PROGRESS = (progress = {}) => {
+			function applyBootProgress(progress = {}) {
 				const nextDone = Number(progress.done);
 				const nextTotal = Number(progress.total);
 				if (Number.isFinite(nextDone)) bootDone = Math.max(0, nextDone);
 				if (Number.isFinite(nextTotal)) bootTotal = Math.max(1, nextTotal);
 				if (typeof progress.label === 'string' && progress.label.length) bootLabel.textContent = progress.label;
 				renderBoot();
-			};
+			}
 
-			window.__JSHACK_BOOT_DONE = () => {
+			function bootStepDelayMs() {
+				const rnd = 1 + Math.floor(Math.random() * 10); // 50..100
+				return 1 + rnd; // 100..150
+			}
+
+			function flushBootQueue() {
+				if (bootQueueRunning) return;
+				bootQueueRunning = true;
+				const run = () => {
+					const next = bootQueue.shift();
+					if (!next) {
+						bootQueueRunning = false;
+						if (bootDoneRequested) hideBootLoader();
+						return;
+					}
+					applyBootProgress(next);
+					setTimeout(run, bootStepDelayMs());
+				};
+				run();
+			}
+
+			function hideBootLoader() {
 				if (bootHidden) return;
 				bootHidden = true;
 				bootDone = bootTotal;
 				renderBoot();
 				bootLoader.setAttribute('data-hidden', '1');
 				setTimeout(() => bootLoader.remove(), 240);
+			}
+
+			window.__JSHACK_BOOT_PROGRESS = (progress = {}) => {
+				bootQueue.push(progress);
+				flushBootQueue();
+			};
+
+			window.__JSHACK_BOOT_DONE = () => {
+				bootDoneRequested = true;
+				if (!bootQueueRunning && bootQueue.length === 0) hideBootLoader();
 			};
 
 			renderBoot();
