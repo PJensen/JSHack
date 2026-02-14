@@ -118,7 +118,6 @@ export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}
 
 export function validateItemUseDefs(ITEM_USE_DEFS, opts = {}) {
   if (!Array.isArray(ITEM_USE_DEFS)) throw new Error('ITEM_USE_DEFS must be an array');
-  const actionIds = new Set(Array.isArray(opts.actionIds) ? opts.actionIds : []);
   const defIds = new Set();
 
   for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
@@ -143,19 +142,7 @@ export function validateItemUseDefs(ITEM_USE_DEFS, opts = {}) {
       throw new Error(`item use def ${id}: identityPrefix must be non-empty string`);
     }
 
-    const action = def?.action;
-    if (!action || typeof action !== 'object') throw new Error(`item use def ${id}: action object required`);
-    const kind = String(action.kind || '');
-    if (!kind) throw new Error(`item use def ${id}: action.kind required`);
-    if (actionIds.size > 0 && !actionIds.has(kind)) throw new Error(`item use def ${id}: unknown action kind ${kind}`);
-
-    const actionPrefix = String(action.identityPrefix || '');
-    if (!actionPrefix) throw new Error(`item use def ${id}: action.identityPrefix required`);
-
-    const targetMode = String(action.targetMode || '');
-    if (targetMode && targetMode !== 'intentTarget' && targetMode !== 'self' && targetMode !== 'none') {
-      throw new Error(`item use def ${id}: invalid targetMode ${targetMode}`);
-    }
+    if (typeof def?.action !== 'function') throw new Error(`item use def ${id}: action function required`);
   }
 
   return true;
@@ -206,6 +193,8 @@ export function validateEffectDefs(EFFECT_DEFS, opts = {}) {
 export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {}) {
   if (!Array.isArray(MONSTER_STATUS_PROC_DEFS)) throw new Error('MONSTER_STATUS_PROC_DEFS must be an array');
   const triggerIds = new Set(Array.isArray(opts.triggerIds) ? opts.triggerIds : []);
+  const targetIds = new Set(Array.isArray(opts.targetIds) ? opts.targetIds : []);
+  const eventSchemaIds = new Set(Array.isArray(opts.eventSchemaIds) ? opts.eventSchemaIds : []);
   const defIds = new Set();
   const scriptTriggerPairs = new Set();
 
@@ -240,106 +229,49 @@ export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {
       throw new Error(`monster status proc def ${id}: seedSalt must be an integer`);
     }
 
+    const hasApply = typeof def?.apply === 'function';
     const effect = def?.effect;
-    if (!effect || typeof effect !== 'object') {
-      throw new Error(`monster status proc def ${id}: effect object required`);
+
+    if (!hasApply && (!effect || typeof effect !== 'object')) {
+      throw new Error(`monster status proc def ${id}: effect object required when apply is not provided`);
     }
-    if (typeof effect.key !== 'string' || !effect.key.trim()) {
-      throw new Error(`monster status proc def ${id}: effect.key required`);
+    if (effect != null) {
+      if (typeof effect !== 'object') {
+        throw new Error(`monster status proc def ${id}: effect must be an object when provided`);
+      }
+      if (typeof effect.key !== 'string' || !effect.key.trim()) {
+        throw new Error(`monster status proc def ${id}: effect.key required`);
+      }
+      if (!Number.isInteger(effect.turnsLeft) || effect.turnsLeft < 0) {
+        throw new Error(`monster status proc def ${id}: effect.turnsLeft must be integer >= 0`);
+      }
+      if (typeof effect.potency !== 'number') {
+        throw new Error(`monster status proc def ${id}: effect.potency must be numeric`);
+      }
+      if (effect.stacks != null && (!Number.isInteger(effect.stacks) || effect.stacks < 1)) {
+        throw new Error(`monster status proc def ${id}: effect.stacks must be integer >= 1`);
+      }
     }
-    if (!Number.isInteger(effect.turnsLeft) || effect.turnsLeft < 0) {
-      throw new Error(`monster status proc def ${id}: effect.turnsLeft must be integer >= 0`);
+
+    if (def.target != null) {
+      const target = String(def.target || '');
+      if (targetIds.size > 0 && !targetIds.has(target)) {
+        throw new Error(`monster status proc def ${id}: unknown target ${target}`);
+      }
     }
-    if (typeof effect.potency !== 'number') {
-      throw new Error(`monster status proc def ${id}: effect.potency must be numeric`);
-    }
-    if (effect.stacks != null && (!Number.isInteger(effect.stacks) || effect.stacks < 1)) {
-      throw new Error(`monster status proc def ${id}: effect.stacks must be integer >= 1`);
+
+    if (def.apply != null && typeof def.apply !== 'function') {
+      throw new Error(`monster status proc def ${id}: apply must be function when provided`);
     }
 
     if (def.emitEvent != null && (typeof def.emitEvent !== 'string' || !def.emitEvent.trim())) {
       throw new Error(`monster status proc def ${id}: emitEvent must be non-empty string when provided`);
     }
-  }
-
-  return true;
-}
-
-export function validateMonsterCombatProcDefs(MONSTER_COMBAT_PROC_DEFS, opts = {}) {
-  if (!Array.isArray(MONSTER_COMBAT_PROC_DEFS)) throw new Error('MONSTER_COMBAT_PROC_DEFS must be an array');
-  const triggerIds = new Set(Array.isArray(opts.triggerIds) ? opts.triggerIds : []);
-  const actionIds = new Set(Array.isArray(opts.actionIds) ? opts.actionIds : []);
-  const eventSchemaIds = new Set(Array.isArray(opts.eventSchemaIds) ? opts.eventSchemaIds : []);
-  const defIds = new Set();
-  const scriptTriggerPairs = new Set();
-
-  for (let i = 0; i < MONSTER_COMBAT_PROC_DEFS.length; i++) {
-    const def = MONSTER_COMBAT_PROC_DEFS[i];
-    const id = String(def?.id || '');
-    if (!id) throw new Error(`monster combat proc def[${i}]: id required`);
-    if (defIds.has(id)) throw new Error(`monster combat proc def ${id}: duplicate id`);
-    defIds.add(id);
-
-    const script = String(def?.script || '');
-    if (!script) throw new Error(`monster combat proc def ${id}: script required`);
-
-    const trigger = String(def?.trigger || '');
-    if (!trigger) throw new Error(`monster combat proc def ${id}: trigger required`);
-    if (triggerIds.size > 0 && !triggerIds.has(trigger)) {
-      throw new Error(`monster combat proc def ${id}: unknown trigger ${trigger}`);
-    }
-
-    const pair = `${script}::${trigger}`;
-    if (scriptTriggerPairs.has(pair)) {
-      throw new Error(`monster combat proc def ${id}: duplicate script+trigger pair ${pair}`);
-    }
-    scriptTriggerPairs.add(pair);
-
-    const chancePct = Number(def?.chancePct);
-    if (!Number.isInteger(chancePct) || chancePct < 1 || chancePct > 100) {
-      throw new Error(`monster combat proc def ${id}: chancePct must be an integer from 1 to 100`);
-    }
-
-    if (!Number.isInteger(def?.seedSalt)) {
-      throw new Error(`monster combat proc def ${id}: seedSalt must be an integer`);
-    }
-
-    const action = def?.action;
-    if (!action || typeof action !== 'object') throw new Error(`monster combat proc def ${id}: action object required`);
-    const kind = String(action.kind || '');
-    if (!kind) throw new Error(`monster combat proc def ${id}: action.kind required`);
-    if (actionIds.size > 0 && !actionIds.has(kind)) {
-      throw new Error(`monster combat proc def ${id}: unknown action kind ${kind}`);
-    }
-
-    if (kind === 'add_damage_flat' || kind === 'heal_defender_flat' || kind === 'retaliate_flat') {
-      if (!Number.isFinite(action.amount)) {
-        throw new Error(`monster combat proc def ${id}: action.amount required for ${kind}`);
-      }
-    }
-    if (kind === 'heal_attacker_fraction_damage') {
-      if (!Number.isInteger(action.numerator) || action.numerator < 1) {
-        throw new Error(`monster combat proc def ${id}: action.numerator must be integer >= 1`);
-      }
-      if (!Number.isInteger(action.denominator) || action.denominator < 1) {
-        throw new Error(`monster combat proc def ${id}: action.denominator must be integer >= 1`);
-      }
-      if (action.minAmount != null && (!Number.isFinite(action.minAmount) || action.minAmount < 0)) {
-        throw new Error(`monster combat proc def ${id}: action.minAmount must be >= 0 when provided`);
-      }
-    }
-
-    if (def.emitEvent != null && (typeof def.emitEvent !== 'string' || !def.emitEvent.trim())) {
-      throw new Error(`monster combat proc def ${id}: emitEvent must be non-empty string when provided`);
-    }
     if (def.eventSchema != null) {
       const eventSchema = String(def.eventSchema || '');
-      if (!eventSchemaIds.has(eventSchema)) {
-        throw new Error(`monster combat proc def ${id}: unknown eventSchema ${eventSchema}`);
+      if (eventSchemaIds.size > 0 && !eventSchemaIds.has(eventSchema)) {
+        throw new Error(`monster status proc def ${id}: unknown eventSchema ${eventSchema}`);
       }
-    }
-    if (def.includeAmount != null && typeof def.includeAmount !== 'boolean') {
-      throw new Error(`monster combat proc def ${id}: includeAmount must be boolean when provided`);
     }
   }
 
@@ -352,15 +284,12 @@ export function validateAll({
   MATERIAL_REACTION_RULES,
   MATERIAL_REACTION_OUTCOME_IDS,
   ITEM_USE_DEFS,
-  ITEM_USE_ACTION_IDS,
   EFFECT_DEFS,
   EFFECT_OPERATION_IDS,
   MONSTER_STATUS_PROC_DEFS,
   MONSTER_PROC_TRIGGER_IDS,
-  MONSTER_COMBAT_PROC_DEFS,
-  MONSTER_COMBAT_PROC_TRIGGER_IDS,
-  MONSTER_COMBAT_PROC_ACTION_IDS,
-  MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS,
+  MONSTER_PROC_TARGET_IDS,
+  MONSTER_PROC_EVENT_SCHEMA_IDS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
@@ -368,21 +297,18 @@ export function validateAll({
       ? validateMaterialReactionRules(MATERIAL_REACTION_RULES, { outcomeIds: MATERIAL_REACTION_OUTCOME_IDS })
       : true)
     && (ITEM_USE_DEFS
-      ? validateItemUseDefs(ITEM_USE_DEFS, { actionIds: ITEM_USE_ACTION_IDS })
+      ? validateItemUseDefs(ITEM_USE_DEFS)
       : true)
     && (EFFECT_DEFS
       ? validateEffectDefs(EFFECT_DEFS, { operationIds: EFFECT_OPERATION_IDS })
       : true)
     && (MONSTER_STATUS_PROC_DEFS
-      ? validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, { triggerIds: MONSTER_PROC_TRIGGER_IDS })
-      : true)
-    && (MONSTER_COMBAT_PROC_DEFS
-      ? validateMonsterCombatProcDefs(
-        MONSTER_COMBAT_PROC_DEFS,
+      ? validateMonsterStatusProcDefs(
+        MONSTER_STATUS_PROC_DEFS,
         {
-          triggerIds: MONSTER_COMBAT_PROC_TRIGGER_IDS,
-          actionIds: MONSTER_COMBAT_PROC_ACTION_IDS,
-          eventSchemaIds: MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS,
+          triggerIds: MONSTER_PROC_TRIGGER_IDS,
+          targetIds: MONSTER_PROC_TARGET_IDS,
+          eventSchemaIds: MONSTER_PROC_EVENT_SCHEMA_IDS,
         },
       )
       : true);

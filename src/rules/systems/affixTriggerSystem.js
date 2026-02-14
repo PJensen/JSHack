@@ -4,6 +4,8 @@
 import { Equipment } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
+import { getMonster } from '../data/monsters.js';
+import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Vitality } from '../components/Vitality.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 
@@ -44,6 +46,22 @@ function makeCtx(world, base) {
   return base;
 }
 
+/**
+ * @param {any} world
+ * @param {number} entityId
+ * @param {any} ctx
+ */
+function runMonsterOnDamaged(world, entityId, ctx) {
+  const ni = world.get(entityId, NamedIdentity);
+  const def = ni ? getMonster(ni.identity) : null;
+  const hook = def?.hooks?.onDamaged;
+  if (typeof hook === 'function') {
+    try { hook({ world, ctx }); } catch {}
+    return true;
+  }
+  return false;
+}
+
 export function installAffixTriggers(world) {
   if (!world || world[AFFIX_TRIGGERS_KEY]) return;
   // Handle defender-side reactions on damage. Attacker-side hooks are applied by combatSystem for determinism.
@@ -56,11 +74,8 @@ export function installAffixTriggers(world) {
         runScript(a.script, ScriptVerb.AffixOnDamaged, world, ctxT);
       }
     });
-    // Innate monster on-damaged script (e.g., skeleton reassemble, lich phylactery)
-    const defEq = world.get(target, Equipment);
-    if (defEq?.naturalScript) {
-      runScript(defEq.naturalScript, ScriptVerb.AffixOnDamaged, world, ctxT);
-    }
+    // Innate monster on-damaged behavior from monster definition hooks
+    runMonsterOnDamaged(world, target, ctxT);
   });
   world[AFFIX_TRIGGERS_KEY] = off;
 }
