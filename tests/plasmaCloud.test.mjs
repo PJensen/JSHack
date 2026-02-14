@@ -3,6 +3,7 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { PlasmaCloud } from "../src/rules/components/PlasmaCloud.js";
 import { Position } from "../src/rules/components/Position.js";
+import { Resistances } from "../src/rules/components/Resistences.js";
 import { Status } from "../src/rules/components/Status.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { installGridBugDeathClouds } from "../src/rules/systems/gridBugDeathCloudSystem.js";
@@ -72,6 +73,28 @@ Deno.test("plasma cloud respects invulnerable status", () => {
 
   assertEquals(world.get(target, Vitality).hp, 10);
   assert(immuneEvents.some((e) => e.id === target && String(e.kind) === "immune"), "immune status event expected");
+});
+
+Deno.test("plasma cloud uses electric resistances", () => {
+  const world = new World({ seed: 777 });
+  const statuses = [];
+  world.on("status", (data) => statuses.push(data));
+
+  const vulnerable = makeActor(world, 0, 0, 12, "Vulnerable");
+  const resistant = makeActor(world, 1, 0, 12, "Resistant");
+  const immune = makeActor(world, -1, 0, 12, "Immune");
+
+  world.add(vulnerable, Resistances, { electric: { ohms: 500, fibrillationA: 0.03 } });
+  world.add(resistant, Resistances, { electric: { ohms: 2000, fibrillationA: 0.03 } });
+  world.add(immune, Resistances, { electric: { ohms: Infinity, fibrillationA: 0.03 } });
+
+  spawnPlasmaCloud(world, { x: 0, y: 0, turnsLeft: 1, radius: 1, damage: 2 });
+  plasmaCloudSystem(world);
+
+  assertEquals(world.get(vulnerable, Vitality).hp, 8); // 2 * (1000/500) = 4
+  assertEquals(world.get(resistant, Vitality).hp, 11); // 2 * (1000/2000) = 1
+  assertEquals(world.get(immune, Vitality).hp, 12); // Infinity ohms -> no damage
+  assert(statuses.some((s) => s.id === immune && String(s.kind) === "immune"), "immune status expected for grounded target");
 });
 
 Deno.test("grid bug death installs once and spawns one cloud per bug per step", () => {
