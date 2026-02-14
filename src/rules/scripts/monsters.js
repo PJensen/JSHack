@@ -6,6 +6,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { Brain } from '../components/Brain.js';
+import { MONSTER_COMBAT_PROC_DEFS } from "../data/monsterCombatProcs.js";
 import { MONSTER_STATUS_PROC_DEFS } from "../data/monsterStatusProcs.js";
 
 
@@ -49,52 +50,89 @@ for (let i = 0; i < MONSTER_STATUS_PROC_DEFS.length; i++) {
   });
 }
 
-// Wraith touch: 20% chance → drain life (heal self for 1/3 of damage dealt)
-registerScript('monster:wraithTouch', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0003));
-    if (rngInt(r, 1, 100) <= 20) {
-      const amt = Math.max(1, Math.floor(ctx.damage / 3));
-      ctx.healAttacker(amt);
-      try { world.emit('proc:drain', { actor: ctx.attacker, target: ctx.defender, amount: amt }); } catch {}
-    }
-  },
-});
+/**
+ * @param {any} action
+ * @param {any} ctx
+ */
+function executeCombatProcAction(action, ctx) {
+  const kind = String(action?.kind || '');
+  if (!kind) return { ok: false, amount: 0 };
 
+  if (kind === 'add_damage_flat') {
+    const amount = Number(action.amount || 0) | 0;
+    ctx.damage += amount;
+    return { ok: true, amount };
+  }
 
-// Orc rage: 25% chance → +2 bonus damage (onBeforeHit)
-registerScript('monster:orcRage', {
-  [ScriptVerb.AffixOnBeforeHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0007));
-    if (rngInt(r, 1, 100) <= 25) {
-      ctx.damage += 2;
-      try { world.emit('proc:rage', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
+  if (kind === 'heal_attacker_fraction_damage') {
+    const numerator = Math.max(1, Number(action.numerator || 1) | 0);
+    const denominator = Math.max(1, Number(action.denominator || 1) | 0);
+    const minAmount = Math.max(0, Number(action.minAmount || 0) | 0);
+    const amount = Math.max(minAmount, Math.floor((Number(ctx.damage || 0) * numerator) / denominator));
+    if (typeof ctx.healAttacker === 'function') ctx.healAttacker(amount);
+    return { ok: true, amount };
+  }
 
-// Skeleton reassemble: 20% chance → self-heal 2 HP when damaged
-registerScript('monster:skeletonReassemble', {
-  [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0008));
-    if (rngInt(r, 1, 100) <= 20) {
-      ctx.heal(ctx.defender, 2);
-      try { world.emit('proc:reassemble', { actor: ctx.defender }); } catch {}
-    }
-  },
-});
+  if (kind === 'heal_defender_flat') {
+    const amount = Math.max(0, Number(action.amount || 0) | 0);
+    if (typeof ctx.heal === 'function') ctx.heal(ctx.defender, amount);
+    return { ok: true, amount };
+  }
+
+  if (kind === 'retaliate_flat') {
+    const amount = Math.max(0, Number(action.amount || 0) | 0);
+    if (typeof ctx.retaliate === 'function') ctx.retaliate(amount);
+    return { ok: true, amount };
+  }
+
+  return { ok: false, amount: 0 };
+}
+
+/**
+ * @param {any} world
+ * @param {any} ctx
+ * @param {any} def
+ * @param {number} amount
+ */
+function emitCombatProc(world, ctx, def, amount) {
+  if (!def.emitEvent) return;
+  const payloadMode = String(def.emitPayload || 'actor_target');
+  const payload = {};
+
+  if (payloadMode === 'actor_only') {
+    payload.actor = ctx.defender;
+  } else {
+    payload.actor = ctx.attacker;
+    payload.target = ctx.defender;
+  }
+  if (def.emitAmount) payload.amount = amount;
+
+  try { world.emit(def.emitEvent, payload); } catch {}
+}
+
+for (let i = 0; i < MONSTER_COMBAT_PROC_DEFS.length; i++) {
+  const def = MONSTER_COMBAT_PROC_DEFS[i];
+  const verb = TRIGGER_TO_VERB[def.trigger];
+  if (!verb || !def.script) continue;
+
+  registerScript(def.script, {
+    [verb]: (world, ctx) => {
+      const chance = Number(def.chancePct || 0) | 0;
+      if (chance < 100) {
+        const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, def.seedSalt));
+        if (rngInt(r, 1, 100) > chance) return;
+      }
+      const result = executeCombatProcAction(def.action, ctx);
+      if (!result.ok) return;
+      emitCombatProc(world, ctx, def, result.amount);
+    },
+  });
+}
 
 // Troll smash: onHit self-apply regen + onDamaged 30% instant self-heal
 registerScript('monster:trollSmash', {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     pushEffect(world, ctx.attacker, { key: 'regen', turnsLeft: 3, potency: 2, stacks: 1 });
-  },
-  [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0009));
-    if (rngInt(r, 1, 100) <= 30) {
-      ctx.heal(ctx.defender, 1);
-      try { world.emit('proc:regenerate', { actor: ctx.defender }); } catch {}
-    }
   },
 });
 
@@ -108,22 +146,10 @@ registerScript('monster:demonHellfire', {
       try { world.emit('proc:burning', { actor: ctx.attacker, target: ctx.defender }); } catch {}
     }
   },
-  [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
-    ctx.retaliate(2);
-    try { world.emit('proc:hellfire', { actor: ctx.defender }); } catch {}
-  },
 });
 
 // Lich drain: onHit 25% life drain + onDamaged 20% phylactery regen
 registerScript('monster:lichDrain', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000c));
-    if (rngInt(r, 1, 100) <= 25) {
-      const amt = Math.max(1, Math.floor(ctx.damage / 2));
-      ctx.healAttacker(amt);
-      try { world.emit('proc:drain', { actor: ctx.attacker, target: ctx.defender, amount: amt }); } catch {}
-    }
-  },
   [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
     const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000d));
     if (rngInt(r, 1, 100) <= 20) {
