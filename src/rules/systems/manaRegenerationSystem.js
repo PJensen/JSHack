@@ -32,8 +32,7 @@ export function manaRegenerationSystem(world) {
                 if (_hs) _hungerMult = HUNGER_MANA_MULT[_hs.type];
             }
             const rate = (baseRate + bonus) * _hungerMult;
-            const newMana = Math.min(manaComp.maxMana, manaComp.mana + rate);
-            world.set(entity, Mana, { ...manaComp, mana: newMana });
+            manaComp.mana = Math.min(manaComp.maxMana, manaComp.mana + rate);
         }
     }
 }

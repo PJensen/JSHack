@@ -12,10 +12,12 @@ export function staminaRegenerationSystem(world) {
   for (const [entity, staminaComp] of world.query(Stamina)) {
     if (!staminaComp) continue;
 
-    // Cooldown: skip regen on turns where stamina was spent
+    // Cooldown: skip regen on turns where stamina was spent.
+    // Direct mutation — world.set() defers during ticks and would
+    // spread stale values, clobbering combat/dig deductions.
     const cd = Number(staminaComp.regenCooldown ?? 0);
     if (cd > 0) {
-      world.set(entity, Stamina, { ...staminaComp, regenCooldown: cd - 1 });
+      staminaComp.regenCooldown = cd - 1;
       continue;
     }
 
@@ -29,7 +31,6 @@ export function staminaRegenerationSystem(world) {
     const regenBonus = Number(eq?.staminaRegenDerived ?? 0);
     const rate = baseRate + regenBonus;
 
-    const newStamina = Math.min(effectiveMaxStamina, staminaComp.stamina + rate);
-    world.set(entity, Stamina, { ...staminaComp, stamina: newStamina });
+    staminaComp.stamina = Math.min(effectiveMaxStamina, staminaComp.stamina + rate);
   }
 }
