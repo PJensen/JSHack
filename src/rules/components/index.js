@@ -32,6 +32,7 @@ export { RangedAttackIntent } from './Intents/RangedAttackIntent.js';
 export { MonsterSpawner } from './MonsterSpawner.js';
 export { Devotion } from './Devotion.js';
 export { Engraving } from './Engraving.js';
+export { PlasmaCloud } from './PlasmaCloud.js';
 export { EngraveIntent } from './Intents/EngraveIntent.js';
 export { Hunger } from './Hunger.js';
 export { Facing } from './Facing.js';

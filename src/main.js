@@ -925,6 +925,117 @@ world.on('spell:frost', ({ actor, targetId, from, at, duration, mass, fizzle }) 
 const _arrowFx = [];
 /** @type {Array<{x:number, y:number, ttl:number, style:string}>} */
 const _arrowSparks = [];
+/** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number }>} */
+const _plasmaCloudFx = new Map();
+
+function spawnPlasmaCloudSparks(x, y, count = 8) {
+  if (!fx?.pool) return;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.4 + Math.random() * 1.2;
+    fx.pool.spawn({
+      x: x + (Math.random() - 0.5) * 0.35,
+      y: y + (Math.random() - 0.5) * 0.35,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      ax: 0,
+      ay: 0,
+      life: 0.22 + Math.random() * 0.18,
+      size0: 0.09 + Math.random() * 0.06,
+      size1: 0.02,
+      r: 170 + ((Math.random() * 60) | 0),
+      g: 235 + ((Math.random() * 20) | 0),
+      b: 255,
+      a0: 0.9,
+      a1: 0.0,
+      rot: 0,
+      rotVel: 0,
+    });
+  }
+}
+
+world.on('plasmaCloud:spawned', ({ cloudId, at, radius, turnsLeft }) => {
+  if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+  const id = Number(cloudId || 0) | 0;
+  if (!(id > 0)) return;
+  const r = Math.max(0, Number(radius || 1) | 0);
+  const ttl = Math.max(1, Number(turnsLeft || 1) | 0);
+  _plasmaCloudFx.set(id, {
+    x: at.x,
+    y: at.y,
+    radius: r,
+    turnsLeft: ttl,
+    maxTurns: ttl,
+    flash: 0.24,
+    phase: Math.random() * Math.PI * 2,
+    fading: false,
+    fadeLeft: 0,
+    fadeMax: 0,
+  });
+  // Fill every dangerous tile with initial spark activity.
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+      spawnPlasmaCloudSparks(at.x + dx, at.y + dy, 2);
+    }
+  }
+  startShake(cam, 2, 0.10);
+});
+
+world.on('plasmaCloud:pulse', ({ cloudId, at, radius, turnsLeft, affectedIds }) => {
+  const id = Number(cloudId || 0) | 0;
+  if (!(id > 0)) return;
+  const r = Math.max(0, Number(radius || 1) | 0);
+  const ttl = Math.max(0, Number(turnsLeft || 0) | 0);
+  const prev = _plasmaCloudFx.get(id);
+  const next = {
+    x: (at && Number.isFinite(at.x)) ? at.x : (prev?.x ?? 0),
+    y: (at && Number.isFinite(at.y)) ? at.y : (prev?.y ?? 0),
+    radius: r,
+    turnsLeft: ttl,
+    maxTurns: Math.max(prev?.maxTurns ?? 0, ttl),
+    flash: 0.26,
+    phase: prev?.phase ?? (Math.random() * Math.PI * 2),
+    fading: false,
+    fadeLeft: 0,
+    fadeMax: 0,
+  };
+  _plasmaCloudFx.set(id, next);
+
+  if (Array.isArray(affectedIds)) {
+    for (let i = 0; i < affectedIds.length; i++) {
+      const tpos = world.get(Number(affectedIds[i] || 0), Position);
+      if (!tpos) continue;
+      spawnPlasmaCloudSparks(tpos.x, tpos.y, 5);
+    }
+  } else {
+    // Fallback: keep it visually loud even if the payload omits affected ids.
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+        if (Math.random() < 0.35) spawnPlasmaCloudSparks(next.x + dx, next.y + dy, 2);
+      }
+    }
+  }
+  startShake(cam, 2, 0.08);
+});
+
+world.on('plasmaCloud:expired', ({ cloudId, at, radius }) => {
+  const id = Number(cloudId || 0) | 0;
+  if (!(id > 0)) return;
+  const cloud = _plasmaCloudFx.get(id);
+  if (!cloud) return;
+  if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) {
+    cloud.x = at.x;
+    cloud.y = at.y;
+  }
+  if (Number.isFinite(radius)) cloud.radius = Math.max(0, Number(radius) | 0);
+  cloud.fading = true;
+  cloud.fadeMax = 0.45;
+  cloud.fadeLeft = cloud.fadeMax;
+  cloud.flash = Math.max(cloud.flash, 0.16);
+});
+
 world.on('ranged:shot', ({ attacker, target, hit, style }) => {
   const apos = world.get(Number(attacker||0), Position);
   const dpos = world.get(Number(target||0), Position);
@@ -1833,6 +1944,7 @@ function render(worldView) {
   if (bctx) drawBlastwaveEffects(bctx);
   if (bctx) drawFrostEffects(bctx);
   if (bctx) drawArrowEffects(bctx);
+  if (bctx) drawPlasmaCloudEffects(bctx);
 
   // Particles (already in world space)
   fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
@@ -1911,6 +2023,7 @@ function frame(now) {
   updateBlastwaveFx(dtSec);
   updateFrostFx(dtSec);
   updateArrowFx(dtSec);
+  updatePlasmaCloudFx(dtSec);
   ftext.step(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
@@ -2280,6 +2393,122 @@ function drawArrowEffects(ctx) {
       ctx.fillStyle = `rgba(255,250,230,${0.3 * alpha})`;
       ctx.beginPath(); ctx.arc(s.x, s.y, 0.1 * alpha, 0, Math.PI * 2); ctx.fill();
     }
+  }
+
+  ctx.restore();
+}
+
+/** @param {number} dt */
+function updatePlasmaCloudFx(dt) {
+  for (const [cloudId, cloud] of _plasmaCloudFx) {
+    cloud.flash = Math.max(0, cloud.flash - dt);
+    if (cloud.fading) {
+      cloud.fadeLeft = Math.max(0, cloud.fadeLeft - dt);
+      if (cloud.fadeLeft <= 0) {
+        _plasmaCloudFx.delete(cloudId);
+      }
+      continue;
+    }
+    // Safety net: if entity is gone but we missed expired event, start a soft fade.
+    if (!world.isAlive(cloudId)) {
+      cloud.fading = true;
+      cloud.fadeMax = 0.35;
+      cloud.fadeLeft = Math.max(cloud.fadeLeft, cloud.fadeMax);
+      cloud.flash = Math.max(cloud.flash, 0.12);
+    }
+  }
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function drawPlasmaCloudEffects(ctx) {
+  if (!_plasmaCloudFx.size) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const TAU = Math.PI * 2;
+
+  for (const cloud of _plasmaCloudFx.values()) {
+    const cx = cloud.x;
+    const cy = cloud.y;
+    const r = Math.max(0, cloud.radius | 0);
+    const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
+    const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+    const fadeFactor = cloud.fading
+      ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+      : 1;
+    const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
+    const alphaScale = lifeFactor * fadeFactor;
+
+    // Mark every hazardous tile with overlapping circular plasma pools (no grid boxes).
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (dist > r) continue;
+
+        const tx = cx + dx;
+        const ty = cy + dy;
+        const ring = 1 - (dist / (r + 1));
+        const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * alphaScale;
+
+        ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 0.62 + 0.04 * pulse, 0, TAU);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(180,250,255,${(alpha * 0.45).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 0.34 + 0.03 * pulse, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    // Wobbling closed quadratic-Bezier contour around the hazardous footprint.
+    const points = [];
+    const pointCount = Math.max(12, 14 + r * 8);
+    const baseR = r + 0.92;
+    const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
+    const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
+    for (let i = 0; i < pointCount; i++) {
+      const t = i / pointCount;
+      const a = t * TAU;
+      const wobble =
+        0.14 * Math.sin(_fxTime * 3.9 + a * 3.0 + cloud.phase) +
+        0.09 * Math.sin(_fxTime * 5.3 + a * 5.0 - cloud.phase * 0.6);
+      const rrX = baseR + wobble + 0.06 * pulse;
+      const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
+      points.push({
+        x: cx + driftX + Math.cos(a) * rrX,
+        y: cy + driftY + Math.sin(a) * rrY,
+      });
+    }
+    if (points.length >= 3) {
+      const p0 = points[0];
+      const p1 = points[1];
+      const firstMid = { x: (p0.x + p1.x) * 0.5, y: (p0.y + p1.y) * 0.5 };
+      ctx.beginPath();
+      ctx.moveTo(firstMid.x, firstMid.y);
+      for (let i = 1; i <= points.length; i++) {
+        const p = points[i % points.length];
+        const n = points[(i + 1) % points.length];
+        const mid = { x: (p.x + n.x) * 0.5, y: (p.y + n.y) * 0.5 };
+        ctx.quadraticCurveTo(p.x, p.y, mid.x, mid.y);
+      }
+      ctx.closePath();
+
+      const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * alphaScale;
+      ctx.fillStyle = `rgba(95,230,255,${blobA.toFixed(3)})`;
+      ctx.fill();
+
+      const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * alphaScale;
+      ctx.strokeStyle = `rgba(190,250,255,${edgeA.toFixed(3)})`;
+      ctx.lineWidth = 0.08;
+      ctx.stroke();
+    }
+
+    // Core energetic haze.
+    ctx.fillStyle = `rgba(210,255,255,${((0.12 + pulse * 0.10 + flashBoost * 0.18) * alphaScale).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, TAU);
+    ctx.fill();
   }
 
   ctx.restore();
