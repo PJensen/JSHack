@@ -925,7 +925,7 @@ world.on('spell:frost', ({ actor, targetId, from, at, duration, mass, fizzle }) 
 const _arrowFx = [];
 /** @type {Array<{x:number, y:number, ttl:number, style:string}>} */
 const _arrowSparks = [];
-/** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number }>} */
+/** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number }>} */
 const _plasmaCloudFx = new Map();
 
 function spawnPlasmaCloudSparks(x, y, count = 8) {
@@ -968,6 +968,9 @@ world.on('plasmaCloud:spawned', ({ cloudId, at, radius, turnsLeft }) => {
     maxTurns: ttl,
     flash: 0.24,
     phase: Math.random() * Math.PI * 2,
+    fading: false,
+    fadeLeft: 0,
+    fadeMax: 0,
   });
   // Fill every dangerous tile with initial spark activity.
   for (let dy = -r; dy <= r; dy++) {
@@ -993,6 +996,9 @@ world.on('plasmaCloud:pulse', ({ cloudId, at, radius, turnsLeft, affectedIds }) 
     maxTurns: Math.max(prev?.maxTurns ?? 0, ttl),
     flash: 0.26,
     phase: prev?.phase ?? (Math.random() * Math.PI * 2),
+    fading: false,
+    fadeLeft: 0,
+    fadeMax: 0,
   };
   _plasmaCloudFx.set(id, next);
 
@@ -1014,10 +1020,20 @@ world.on('plasmaCloud:pulse', ({ cloudId, at, radius, turnsLeft, affectedIds }) 
   startShake(cam, 2, 0.08);
 });
 
-world.on('plasmaCloud:expired', ({ cloudId }) => {
+world.on('plasmaCloud:expired', ({ cloudId, at, radius }) => {
   const id = Number(cloudId || 0) | 0;
   if (!(id > 0)) return;
-  _plasmaCloudFx.delete(id);
+  const cloud = _plasmaCloudFx.get(id);
+  if (!cloud) return;
+  if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) {
+    cloud.x = at.x;
+    cloud.y = at.y;
+  }
+  if (Number.isFinite(radius)) cloud.radius = Math.max(0, Number(radius) | 0);
+  cloud.fading = true;
+  cloud.fadeMax = 0.45;
+  cloud.fadeLeft = cloud.fadeMax;
+  cloud.flash = Math.max(cloud.flash, 0.16);
 });
 
 world.on('ranged:shot', ({ attacker, target, hit, style }) => {
@@ -2386,8 +2402,20 @@ function drawArrowEffects(ctx) {
 function updatePlasmaCloudFx(dt) {
   for (const [cloudId, cloud] of _plasmaCloudFx) {
     cloud.flash = Math.max(0, cloud.flash - dt);
-    // Safety net: if a cloud entity is gone unexpectedly, fade then remove.
-    if (!world.isAlive(cloudId) && cloud.flash <= 0) _plasmaCloudFx.delete(cloudId);
+    if (cloud.fading) {
+      cloud.fadeLeft = Math.max(0, cloud.fadeLeft - dt);
+      if (cloud.fadeLeft <= 0) {
+        _plasmaCloudFx.delete(cloudId);
+      }
+      continue;
+    }
+    // Safety net: if entity is gone but we missed expired event, start a soft fade.
+    if (!world.isAlive(cloudId)) {
+      cloud.fading = true;
+      cloud.fadeMax = 0.35;
+      cloud.fadeLeft = Math.max(cloud.fadeLeft, cloud.fadeMax);
+      cloud.flash = Math.max(cloud.flash, 0.12);
+    }
   }
 }
 
@@ -2404,7 +2432,11 @@ function drawPlasmaCloudEffects(ctx) {
     const r = Math.max(0, cloud.radius | 0);
     const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
     const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+    const fadeFactor = cloud.fading
+      ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+      : 1;
     const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
+    const alphaScale = lifeFactor * fadeFactor;
 
     // Mark every hazardous tile with overlapping circular plasma pools (no grid boxes).
     for (let dy = -r; dy <= r; dy++) {
@@ -2415,7 +2447,7 @@ function drawPlasmaCloudEffects(ctx) {
         const tx = cx + dx;
         const ty = cy + dy;
         const ring = 1 - (dist / (r + 1));
-        const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * lifeFactor;
+        const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * alphaScale;
 
         ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
         ctx.beginPath();
@@ -2462,18 +2494,18 @@ function drawPlasmaCloudEffects(ctx) {
       }
       ctx.closePath();
 
-      const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * lifeFactor;
+      const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * alphaScale;
       ctx.fillStyle = `rgba(95,230,255,${blobA.toFixed(3)})`;
       ctx.fill();
 
-      const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * lifeFactor;
+      const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * alphaScale;
       ctx.strokeStyle = `rgba(190,250,255,${edgeA.toFixed(3)})`;
       ctx.lineWidth = 0.08;
       ctx.stroke();
     }
 
     // Core energetic haze.
-    ctx.fillStyle = `rgba(210,255,255,${(0.12 + pulse * 0.10 + flashBoost * 0.18).toFixed(3)})`;
+    ctx.fillStyle = `rgba(210,255,255,${((0.12 + pulse * 0.10 + flashBoost * 0.18) * alphaScale).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, TAU);
     ctx.fill();
