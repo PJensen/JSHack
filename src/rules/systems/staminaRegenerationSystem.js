@@ -12,6 +12,13 @@ export function staminaRegenerationSystem(world) {
   for (const [entity, staminaComp] of world.query(Stamina)) {
     if (!staminaComp) continue;
 
+    // Cooldown: skip regen on turns where stamina was spent
+    const cd = Number(staminaComp.regenCooldown ?? 0);
+    if (cd > 0) {
+      world.set(entity, Stamina, { ...staminaComp, regenCooldown: cd - 1 });
+      continue;
+    }
+
     const eq = world.get(entity, Equipment);
     const maxStaminaBonus = Number(eq?.maxStaminaDerived ?? 0);
     const effectiveMaxStamina = staminaComp.maxStamina + maxStaminaBonus;
