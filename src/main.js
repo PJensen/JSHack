@@ -92,6 +92,39 @@ enableInputLockdown({ canvas });
 const runtimeConfig = readRuntimeConfig();
 const PERF = runtimeConfig.perf;
 const chosenDeityId = runtimeConfig.chosenDeityId;
+const BOOT_STATIC_UNITS = 9;
+let _bootDoneUnits = 0;
+let _bootTotalUnits = BOOT_STATIC_UNITS;
+
+/**
+ * @param {string} label
+ * @param {number} [done]
+ */
+function updateBootProgress(label, done = _bootDoneUnits) {
+  try {
+    const fn = /** @type {any} */ (window).__JSHACK_BOOT_PROGRESS;
+    if (typeof fn === 'function') {
+      fn({
+        label,
+        done: Math.max(0, done),
+        total: Math.max(1, _bootTotalUnits),
+      });
+    }
+  } catch {}
+}
+
+/** @param {string} label */
+function bootAdvance(label) {
+  _bootDoneUnits += 1;
+  updateBootProgress(label);
+}
+
+function finishBoot() {
+  try {
+    const fn = /** @type {any} */ (window).__JSHACK_BOOT_DONE;
+    if (typeof fn === 'function') fn();
+  } catch {}
+}
 
 // Use tile-sized world units: 1 world unit == 1 tile on screen
 const TILE_PX = 28;
@@ -125,20 +158,24 @@ function resize() {
 }
 addEventListener("resize", resize);
 resize();
+updateBootProgress("Booting engine...");
 
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });
 configureWorld(world);
+bootAdvance("Configured ECS systems");
 
 // Initialize identification & gem pricing for this game run
 resetIdentification();
 identify('stone_touchstone');
 initGemPricing(createRng(world.seed ^ 0x6E45));
+bootAdvance("Prepared run-specific item state");
 
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
 installTombstoneDeathListener(world, tombstoneRepo);
 installDeathShareListener(world);
+bootAdvance("Installed run listeners");
 
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
@@ -186,7 +223,7 @@ function updateActiveSpellLabel() {
 }
 
 // ---- Dungeon initialization -------------------------------------------------
-import { initDungeon } from "./rules/environment/dungeon/index.js";
+import { initDungeon, generateFloorPlan } from "./rules/environment/dungeon/index.js";
 import { transitionToDepth } from "./rules/environment/dungeon/transition.js";
 import { TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from "./rules/environment/dungeon/constants.js";
 import { dungeonConfig } from "./rules/environment/dungeon/dungeonConfig.js";
@@ -200,9 +237,32 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
 
 // Allow URL override: ?floor=6 to skip straight to a specific depth
 const _startDepth = runtimeConfig.startDepth;
+const _initialDepth = (Number.isFinite(_startDepth) && _startDepth > 0) ? _startDepth : 1;
+const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth);
+const _bootChunkTotal = Math.max(
+  1,
+  (_bootFloorPlan.extent.maxCX - _bootFloorPlan.extent.minCX + 1)
+  * (_bootFloorPlan.extent.maxCY - _bootFloorPlan.extent.minCY + 1),
+);
+_bootTotalUnits += _bootChunkTotal;
+const _bootDungeonBase = _bootDoneUnits;
+updateBootProgress(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
 
 // Initialize the procedural dungeon (entire floor generated up front)
-const spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
+const spawnPos = initDungeon(world, {
+  startDepth: _startDepth,
+  tombstoneRepo,
+  onProgress: (progress) => {
+    if (!progress || progress.phase !== 'chunks') return;
+    const total = Math.max(1, Number(progress.total) || _bootChunkTotal);
+    const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
+    const floorTotal = BOOT_STATIC_UNITS + total;
+    if (_bootTotalUnits !== floorTotal) _bootTotalUnits = floorTotal;
+    updateBootProgress(`Generating dungeon ${processed}/${total} chunks`, _bootDungeonBase + processed);
+  },
+});
+_bootDoneUnits = _bootDungeonBase + _bootChunkTotal;
+updateBootProgress(`Dungeon ready (${_bootChunkTotal} chunks)`, _bootDoneUnits);
 
 // Diagnostic: log all stair entities so we can confirm they exist
 {
@@ -371,6 +431,7 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
     }
   }
 }
+bootAdvance("Spawned player state");
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -427,12 +488,14 @@ const inputDisposers = [];
 
   setupInput({ canvas, rulesHandler, displayHandler, onDispose: inputDisposers, touchFeedback: true });
 }
+bootAdvance("Bound input handlers");
 
 // ---- Display UI overlays + data feeds -------------------------------------
 initOverlays();
 initHUD();
 initPetMenu();
 initStatusLine();
+bootAdvance("Initialized HUD and overlays");
 
 // Provide inventory data to overlay when requested
 addEventListener('ui:requestInventoryData', () => {
@@ -1321,6 +1384,7 @@ addEventListener('ui:requestStairTraverse', (ev) => {
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installDigWiring({ world });
+bootAdvance("Installed world/UI wiring");
 
 // Item equipped UI updates (message handled in messageWiring)
 world.on('item:equipped', ({ itemId }) => {
@@ -1519,6 +1583,7 @@ try {
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
 const glyphAtlas = createGlyphAtlas(palette, { glowLayers: PERF.glowLayers, sizePx: (PERF.quality==='low'?32:64), fontPx: (PERF.quality==='low'?28:56) });
+bootAdvance("Prepared render resources");
 
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
@@ -2227,7 +2292,11 @@ function jitterLine(a, b, segments = 9, amp = 0.08) {
   }
   return out;
 }
-requestAnimationFrame(frame);
+bootAdvance("Starting render loop");
+requestAnimationFrame((now) => {
+  frame(now);
+  finishBoot();
+});
 
 // ---- Minimal demo “scene” controls (display-only) --------------------------
 addEventListener("keydown", (e) => {

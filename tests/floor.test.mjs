@@ -77,3 +77,42 @@ Deno.test("floor generates multiple chunks within extent", () => {
   // we should have significantly more than 1 chunk loaded
   assert(loadedChunkCount() > 1, `expected multiple chunks, got ${loadedChunkCount()}`);
 });
+
+Deno.test("generateFloor emits monotonic chunk progress callbacks", () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  const calls = [];
+
+  generateFloor(world, 42, 1, null, (progress) => {
+    if (progress?.phase === 'chunks') calls.push(progress);
+  });
+
+  assert(calls.length > 1, 'expected chunk progress callbacks');
+  const total = Number(calls[0]?.total || 0);
+  assert(total > 0, 'expected chunk total > 0');
+  assert(Number(calls[0]?.processed ?? -1) === 0, 'first callback starts at processed=0');
+  assert(calls.length === total + 1, `expected ${total + 1} callbacks, got ${calls.length}`);
+
+  for (let i = 0; i < calls.length; i++) {
+    const c = calls[i];
+    assert(c.total === total, `callback ${i} total mismatch`);
+    assert(c.processed === i, `callback ${i} expected processed=${i}, got ${c.processed}`);
+  }
+});
+
+Deno.test("initDungeon forwards chunk progress callback", () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  const calls = [];
+
+  initDungeon(world, {
+    onProgress: (progress) => {
+      if (progress?.phase === 'chunks') calls.push(progress);
+    },
+  });
+
+  assert(calls.length > 1, 'expected forwarded chunk progress callbacks');
+  assert(Number(calls[0]?.processed ?? -1) === 0, 'first callback starts at processed=0');
+  const last = calls[calls.length - 1];
+  assert(last.processed === last.total, 'last callback reaches total');
+});
