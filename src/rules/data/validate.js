@@ -116,15 +116,65 @@ export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}
   return true;
 }
 
+export function validateItemUseDefs(ITEM_USE_DEFS, opts = {}) {
+  if (!Array.isArray(ITEM_USE_DEFS)) throw new Error('ITEM_USE_DEFS must be an array');
+  const actionIds = new Set(Array.isArray(opts.actionIds) ? opts.actionIds : []);
+  const defIds = new Set();
+
+  for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
+    const def = ITEM_USE_DEFS[i];
+    const id = String(def?.id || '');
+    if (!id) throw new Error(`item use def[${i}]: id required`);
+    if (defIds.has(id)) throw new Error(`item use def ${id}: duplicate id`);
+    defIds.add(id);
+
+    const match = def?.match;
+    if (!match || typeof match !== 'object') throw new Error(`item use def ${id}: match object required`);
+
+    const itemTypes = Array.isArray(match.itemTypes) ? match.itemTypes : [];
+    const identityPrefix = String(match.identityPrefix || '');
+    if (itemTypes.length === 0 && !identityPrefix) {
+      throw new Error(`item use def ${id}: match requires itemTypes or identityPrefix`);
+    }
+    for (const type of itemTypes) {
+      if (typeof type !== 'string' || !type.trim()) throw new Error(`item use def ${id}: itemTypes must be non-empty strings`);
+    }
+    if (identityPrefix && (typeof identityPrefix !== 'string' || !identityPrefix.trim())) {
+      throw new Error(`item use def ${id}: identityPrefix must be non-empty string`);
+    }
+
+    const action = def?.action;
+    if (!action || typeof action !== 'object') throw new Error(`item use def ${id}: action object required`);
+    const kind = String(action.kind || '');
+    if (!kind) throw new Error(`item use def ${id}: action.kind required`);
+    if (actionIds.size > 0 && !actionIds.has(kind)) throw new Error(`item use def ${id}: unknown action kind ${kind}`);
+
+    const actionPrefix = String(action.identityPrefix || '');
+    if (!actionPrefix) throw new Error(`item use def ${id}: action.identityPrefix required`);
+
+    const targetMode = String(action.targetMode || '');
+    if (targetMode && targetMode !== 'intentTarget' && targetMode !== 'self' && targetMode !== 'none') {
+      throw new Error(`item use def ${id}: invalid targetMode ${targetMode}`);
+    }
+  }
+
+  return true;
+}
+
 export function validateAll({
   ITEM_CATALOG,
   AFFIX_DEFS,
   MATERIAL_REACTION_RULES,
   MATERIAL_REACTION_OUTCOME_IDS,
+  ITEM_USE_DEFS,
+  ITEM_USE_ACTION_IDS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
     && (MATERIAL_REACTION_RULES
       ? validateMaterialReactionRules(MATERIAL_REACTION_RULES, { outcomeIds: MATERIAL_REACTION_OUTCOME_IDS })
+      : true)
+    && (ITEM_USE_DEFS
+      ? validateItemUseDefs(ITEM_USE_DEFS, { actionIds: ITEM_USE_ACTION_IDS })
       : true);
 }
