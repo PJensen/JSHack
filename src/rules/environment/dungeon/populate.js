@@ -19,6 +19,7 @@ import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 
 /**
  * @typedef {Object} SpawnPoint
@@ -103,13 +104,13 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
-  // Shopkeeper: one per chunk, only in dead-end rooms (exactly one entrance), ~30% chance.
+  // Shopkeeper: one per chunk, only in dead-end rooms (exactly one perimeter entrance), ~30% chance.
   // Extra rule: never use the origin chunk's spawn room (rooms[0] in chunk 0,0).
   const spawnRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
     ? chunk.rooms[0]
     : null;
   const eligibleShopRooms = chunk.rooms.filter((room) => {
-    const isDeadEnd = countRoomDoors(room, chunk.doors || []) === 1;
+    const isDeadEnd = countRoomEntrances(room, chunk) === 1;
     const isSpawnRoom = !!spawnRoom &&
       room.x === spawnRoom.x &&
       room.y === spawnRoom.y &&
@@ -178,25 +179,69 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
 }
 
 /**
- * Count doors that sit on a room's perimeter wall.
+ * Count contiguous perimeter openings from a room into passable non-room space.
+ * This models "entrances" (dead-end detection), not literal door tiles.
  * @param {{x:number,y:number,w:number,h:number}} room
- * @param {Array<{x:number,y:number}>} doors
+ * @param {{chunkX:number,chunkY:number,tiles:Uint8Array}} chunk
  * @returns {number}
  */
-function countRoomDoors(room, doors) {
-  let count = 0;
-  for (const d of doors) {
-    const onVerticalWall =
-      (d.x === room.x - 1 || d.x === room.x + room.w) &&
-      d.y >= room.y &&
-      d.y < room.y + room.h;
-    const onHorizontalWall =
-      (d.y === room.y - 1 || d.y === room.y + room.h) &&
-      d.x >= room.x &&
-      d.x < room.x + room.w;
-    if (onVerticalWall || onHorizontalWall) count++;
+function countRoomEntrances(room, chunk) {
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  const rw = room.w;
+  const rh = room.h;
+  const tiles = chunk.tiles;
+
+  function getTile(x, y) {
+    if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
+    return tiles[y * CHUNK_SIZE + x];
   }
-  return count;
+
+  function isPassable(tile) {
+    return tile === TILE_FLOOR || tile === TILE_DOOR || tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP;
+  }
+
+  let entrances = 0;
+
+  // West openings: outside cells at (rx-1, ry..ry+rh-1)
+  {
+    let prevOpen = false;
+    for (let y = ry; y < ry + rh; y++) {
+      const open = isPassable(getTile(rx - 1, y));
+      if (open && !prevOpen) entrances++;
+      prevOpen = open;
+    }
+  }
+  // East openings: outside cells at (rx+rw, ry..ry+rh-1)
+  {
+    let prevOpen = false;
+    for (let y = ry; y < ry + rh; y++) {
+      const open = isPassable(getTile(rx + rw, y));
+      if (open && !prevOpen) entrances++;
+      prevOpen = open;
+    }
+  }
+  // North openings: outside cells at (rx..rx+rw-1, ry-1)
+  {
+    let prevOpen = false;
+    for (let x = rx; x < rx + rw; x++) {
+      const open = isPassable(getTile(x, ry - 1));
+      if (open && !prevOpen) entrances++;
+      prevOpen = open;
+    }
+  }
+  // South openings: outside cells at (rx..rx+rw-1, ry+rh)
+  {
+    let prevOpen = false;
+    for (let x = rx; x < rx + rw; x++) {
+      const open = isPassable(getTile(x, ry + rh));
+      if (open && !prevOpen) entrances++;
+      prevOpen = open;
+    }
+  }
+  return entrances;
 }
 
 /**
