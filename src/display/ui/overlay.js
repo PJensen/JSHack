@@ -887,19 +887,23 @@ function renderPickupChooser(panel, items) {
   list.style.gap = '6px';
 
   const selections = new Set();
+  let sel = 0;
 
-  for (const it of items) {
+  const checkboxes = [];
+  const rows = items.map((it, idx) => {
     const row = document.createElement('label');
     Object.assign(row.style, {
       display: 'flex', alignItems: 'center', gap: '8px',
       padding: '6px 8px', border: '1px solid #2d3b52', borderRadius: '6px',
       background: '#0f1421'
     });
+    row.tabIndex = 0;
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.addEventListener('change', () => {
       if (cb.checked) selections.add(it.id); else selections.delete(it.id);
     });
+    checkboxes.push(cb);
   const name = document.createElement('span');
     const rn = String(it.rarityName || 'common').toLowerCase();
     name.style.color = (rn === 'rare' || rn === 'magic') ? '#55aaff' : rn === 'epic' ? '#c47bff' : rn === 'legendary' ? '#ff9f3b' : '#ffffff';
@@ -912,35 +916,46 @@ function renderPickupChooser(panel, items) {
     row.appendChild(cb);
     row.appendChild(name);
     row.appendChild(desc);
+    row.addEventListener('mouseenter', () => { setSel(idx); });
     list.appendChild(row);
-  }
+    return row;
+  });
 
   el.appendChild(list);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85';
+  hint.textContent = '↑/↓ select · Space=Toggle · Enter=Take All · Esc=Close';
+  el.appendChild(hint);
 
   const actions = document.createElement('div');
   actions.style.display = 'flex';
   actions.style.gap = '8px';
   actions.style.marginTop = '10px';
 
-  const btnPickSel = document.createElement('button');
-  btnPickSel.textContent = 'Take Selected';
-  decorateButton(btnPickSel);
-  btnPickSel.addEventListener('click', () => {
+  function takeSelected() {
     const ids = Array.from(selections);
     if (!ids.length) return;
     window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
     hide(panel);
-  });
+  }
 
-  const btnPickAll = document.createElement('button');
-  btnPickAll.textContent = 'Take All';
-  decorateButton(btnPickAll);
-  btnPickAll.addEventListener('click', () => {
+  function takeAll() {
     const ids = items.map((i) => i.id);
     if (!ids.length) return;
     window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
     hide(panel);
-  });
+  }
+
+  const btnPickSel = document.createElement('button');
+  btnPickSel.textContent = 'Take Selected';
+  decorateButton(btnPickSel);
+  btnPickSel.addEventListener('click', takeSelected);
+
+  const btnPickAll = document.createElement('button');
+  btnPickAll.textContent = 'Take All';
+  decorateButton(btnPickAll);
+  btnPickAll.addEventListener('click', takeAll);
 
   const btnCancel = document.createElement('button');
   btnCancel.textContent = 'Cancel';
@@ -952,9 +967,37 @@ function renderPickupChooser(panel, items) {
   actions.appendChild(btnCancel);
   el.appendChild(actions);
 
-  queueMicrotask(() => {
-    try { btnPickAll.focus(); } catch {}
+  /** @param {number} i */
+  function setSel(i) {
+    sel = Math.max(0, Math.min(items.length - 1, i|0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(0); e.preventDefault(); }
+    else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
+    else if (k === ' ') { checkboxes[sel].checked = !checkboxes[sel].checked; checkboxes[sel].dispatchEvent(new Event('change')); e.preventDefault(); }
+    else if (k === 'Enter') { selections.size ? takeSelected() : takeAll(); e.preventDefault(); }
+  }
+
+  setSel(0);
+  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+  window.addEventListener('keydown', keyHandler);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', keyHandler);
+      obs.disconnect();
+    }
   });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */

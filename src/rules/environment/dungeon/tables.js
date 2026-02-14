@@ -73,8 +73,8 @@ export function pickTrap(rng, depth) {
     const count = Math.min(5, 2 + Math.floor(depth / 5));
     return { type: 'snake', script: 'trap_snake', params: { count } };
   }
-  // Spike damage: 15% at shallow depths, up to 35% deep
-  const percent = Math.min(0.35, 0.15 + depth * 0.02);
+  // Spike damage: 35% of max HP at all depths
+  const percent = 0.35;
   return { type: 'spike', script: 'trap_spike', params: { percent } };
 }
 
