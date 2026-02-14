@@ -6,9 +6,10 @@ import { LOOT_TABLES } from './lootTables.js';
 import { AFFIX_DEFS } from './affixes.js';
 import { getEquipmentDef } from './equipment.js';
 import { getItem } from './items.js';
+import { getGem, pickGem } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildEquipmentItem } from './equipmentLoader.js';
-import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, MagicItem } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, MagicItem, GemItem } from '../archetypes/Items.js';
 import { Ration, IronRation } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
@@ -73,6 +74,12 @@ export function resolveLootTable(tableId, rng, depth, nest = 0) {
       case "item":
         results.push({ kind: "item", params: { itemId: entry.itemId } });
         break;
+
+      case "gem": {
+        const gem = entry.gemId ? getGem(entry.gemId) : pickGem(rng, entry.materials ? { materials: entry.materials } : {});
+        if (gem) results.push({ kind: "gem", params: { gemId: gem.id } });
+        break;
+      }
 
       case "table": {
         const nested = resolveLootTable(entry.tableId, rng, depth, nest + 1);
@@ -176,6 +183,18 @@ export function materializeDrop(world, drop, pos) {
     case "equip": {
       const id = buildEquipmentItem(world, drop.params.equipId, {
         affixes: drop.params.affixes || [],
+      });
+      world.add(id, Position, { x: pos.x, y: pos.y });
+      return id;
+    }
+
+    case "gem": {
+      const gem = getGem(drop.params.gemId);
+      if (!gem) return null;
+      const id = createFrom(world, GemItem, {
+        name: gem.name, identity: gem.id,
+        weight: gem.weight, value: gem.value,
+        description: gem.appearance,
       });
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;

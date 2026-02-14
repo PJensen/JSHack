@@ -6,6 +6,7 @@
 //   "archetype" - named archetype (HealthPotion, ArrowsStack, ScrollOfMapping)
 //   "equip"     - equipment from pool[] with optional affix rolling
 //   "item"      - from ITEM_DEFS (spellbooks, scrolls)
+//   "gem"       - random gem via pickGem(); optional gemId for specific, materials[] to filter
 //   "table"     - nested table reference (composable)
 
 export const LOOT_TABLES = {
@@ -180,6 +181,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:wands" },
       { type: "archetype", weight: 10, archetype: "Ration" },
+      { type: "gem",       weight: 4,  materials: ["gemstone", "glass"] },
     ],
   },
 
@@ -195,6 +197,7 @@ export const LOOT_TABLES = {
         affixChance: 0.50, affixCountMax: 2 },
       { type: "table",     weight: 10, tableId: "sub:wands" },
       { type: "archetype", weight: 8,  archetype: "IronRation" },
+      { type: "gem",       weight: 6,  materials: ["gemstone", "glass"] },
     ],
   },
 
@@ -208,6 +211,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "archetype", weight: 15, archetype: "HealthPotion" },
       { type: "table",     weight: 12, tableId: "sub:wands" },
+      { type: "gem",       weight: 8,  materials: ["gemstone"] },
     ],
   },
 
@@ -238,6 +242,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:scrolls" },
       { type: "archetype", weight: 8,  archetype: "Ration" },
+      { type: "gem",       weight: 3,  materials: ["gemstone", "glass"] },
     ],
   },
 
@@ -249,6 +254,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
+      { type: "gem",       weight: 5,  materials: ["gemstone", "glass"] },
     ],
   },
 };

@@ -30,6 +30,7 @@ import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
 import { installMessageWiring } from "./main/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
+import { installDigWiring } from "./main/wiring/digWiring.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -1237,6 +1238,7 @@ addEventListener('ui:requestStairTraverse', (ev) => {
 
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
+installDigWiring({ world });
 
 // Item equipped UI updates (message handled in messageWiring)
 world.on('item:equipped', ({ itemId }) => {

@@ -5,10 +5,11 @@ import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildEquipmentItem } from '../data/equipmentLoader.js';
 import { getEquipmentDef } from '../data/equipment.js';
 import { getItem } from '../data/items.js';
+import { getGem } from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
-import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem, GemItem } from '../archetypes/Items.js';
 import { Ration, IronRation } from '../archetypes/Food.js';
 
 /**
@@ -56,7 +57,20 @@ export function createItemById(world, itemId, opts = {}) {
     return buildEquipmentItem(world, itemId, { affixes });
   }
 
-  // 3. Check magic items (wands, scrolls, spellbooks) from ITEM_DEFS
+  // 3. Check gem definitions
+  const gemDef = getGem(itemId);
+  if (gemDef) {
+    const id = createFrom(world, GemItem, {
+      name: gemDef.name,
+      identity: gemDef.id,
+      weight: gemDef.weight,
+      value: gemDef.value,
+      description: gemDef.appearance,
+    });
+    return id;
+  }
+
+  // 4. Check magic items (wands, scrolls, spellbooks) from ITEM_DEFS
   const itemDef = getItem(itemId);
   if (itemDef) {
     const id = createFrom(world, MagicItem, {
@@ -87,6 +101,7 @@ export function isValidItemId(itemId) {
   return !!(
     SIMPLE_ITEM_ARCHETYPES[itemId] ||
     getEquipmentDef(itemId) ||
+    getGem(itemId) ||
     getItem(itemId)
   );
 }
