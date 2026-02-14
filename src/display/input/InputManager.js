@@ -145,6 +145,13 @@ export class InputManager {
       return;
     }
 
+    // Apply tool: 'A' (Shift+A)
+    if (key === "A") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.OpenApplyChooser));
+      return;
+    }
+
     // Pickup chooser (',' for get)
     if (key === ",") {
       e.preventDefault();

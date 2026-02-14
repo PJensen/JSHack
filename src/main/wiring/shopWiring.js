@@ -7,6 +7,9 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { ShopInventory } from "../../rules/components/ShopInventory.js";
 import { Unpaid } from "../../rules/components/Unpaid.js";
+import { resolveItemDisplayName } from "./itemName.js";
+import { isIdentified } from "../../rules/data/identification.js";
+import { getUnidentifiedGemValue } from "../../rules/data/gemPricing.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
 const API_KEY = Symbol.for("jshack:main:shopWiring:api");
@@ -40,13 +43,26 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     return 0;
   }
 
+  /** Resolve sell value: unidentified gems use appearance-based pricing. */
+  function resolveItemSellValue(id) {
+    const info = world.get(id, ItemInfo);
+    if (!info) return 0;
+    if (info.type === 'gem') {
+      const ni = world.get(id, NamedIdentity);
+      const identity = ni?.identity || '';
+      if (!identity || !isIdentified(identity)) {
+        return getUnidentifiedGemValue(info.description) || info.value || 0;
+      }
+    }
+    return info.value || 0;
+  }
+
   function buildShopItemDetail(id, markup) {
     const info = world.get(id, ItemInfo);
-    const name = world.get(id, NamedIdentity);
     if (!info) return null;
     return {
       id,
-      name: name?.name || info.description || info.type || "item",
+      name: resolveItemDisplayName(world, id),
       type: info.type,
       slot: info.slot,
       count: info.count || 1,
@@ -91,10 +107,9 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
           const unpaid = world.get(id, Unpaid);
           if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
             // This is an unpaid item from this shop
-            const name = world.get(id, NamedIdentity);
             const detail = {
               id,
-              name: name?.name || info.description || info.type || "item",
+              name: resolveItemDisplayName(world, id),
               type: info.type,
               slot: info.slot,
               count: info.count || 1,
@@ -108,15 +123,15 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
             totalBill += unpaid.price;
           } else if (info.type !== "currency") {
             // Regular item for selling
-            const name = world.get(id, NamedIdentity);
+            const sellValue = resolveItemSellValue(id);
             playerItems.push({
               id,
-              name: name?.name || info.description || info.type || "item",
+              name: resolveItemDisplayName(world, id),
               type: info.type,
               slot: info.slot,
               count: info.count || 1,
-              value: info.value || 0,
-              sellPrice: Math.floor((info.value || 0) * sellDiscount),
+              value: sellValue,
+              sellPrice: Math.floor(sellValue * sellDiscount),
               rarityName: info.rarityName || "common",
               description: info.description || "",
             });
@@ -241,8 +256,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     try { world.remove(itemId, Unpaid); } catch {}
     inv.items.push(itemId);
 
-    const itemName = world.get(itemId, NamedIdentity)?.name || "item";
-    log(`You buy ${bracketizeName(itemName)} for ${price} gold.`);
+    log(`You buy ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
 
     const mode = activeShopSession.mode === "checkout" ? "checkout" : "browse";
     dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5, mode);
@@ -266,7 +280,8 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!info) return;
 
     const sellDiscount = shop.sellDiscount ?? 0.5;
-    const price = Math.floor((info.value || 0) * sellDiscount);
+    const sellValue = resolveItemSellValue(itemId);
+    const price = Math.floor(sellValue * sellDiscount);
 
     const inv = world.get(pe.id, Inventory);
     if (!inv) return;
@@ -308,8 +323,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       inv.items.push(gid);
     }
 
-    const itemName = world.get(itemId, NamedIdentity)?.name || "item";
-    log(`You sell ${bracketizeName(itemName)} for ${price} gold.`);
+    log(`You sell ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
 
     const mode = activeShopSession.mode === "checkout" ? "checkout" : "browse";
     dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5, mode);
@@ -349,8 +363,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
 
     const unpaid = world.get(itemId, Unpaid);
     if (unpaid && unpaid.price > 0) {
-      const itemName = world.get(itemId, NamedIdentity)?.name || "item";
-      log(`You pick up ${bracketizeName(itemName)} (unpaid, ${unpaid.price} gold).`);
+      log(`You pick up ${bracketizeName(resolveItemDisplayName(world, itemId))} (unpaid, ${unpaid.price} gold).`);
     }
   });
 
@@ -384,8 +397,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
 
     placeItemOnShopFloor(itemId, shopkeeperId);
-    const itemName = world.get(itemId, NamedIdentity)?.name || "item";
-    log(`You return ${bracketizeName(itemName)} to the shop floor.`);
+    log(`You return ${bracketizeName(resolveItemDisplayName(world, itemId))} to the shop floor.`);
 
     const shop = world.get(shopkeeperId, ShopInventory);
     dispatchShopData(shopkeeperId, shop?.buyMarkup ?? 1.0, shop?.sellDiscount ?? 0.5, "checkout");
