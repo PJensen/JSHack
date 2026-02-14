@@ -15,6 +15,7 @@ import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.
 import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
 import { forEachInRect, ensureSpatialIndex } from '../../rules/utils/spatialIndex.js';
 import { Engraving } from '../../rules/components/Engraving.js';
+import { PlasmaCloud } from "../../rules/components/PlasmaCloud.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number }} EntityView */
@@ -89,6 +90,7 @@ export function buildWorldView(world) {
 		const x1 = _view.player.pos.x + viewR;
 		const y1 = _view.player.pos.y + viewR;
 		forEachInRect(world, x0, y0, x1, y1, (id, pos) => {
+			if (world.has(id, PlasmaCloud)) return;
 			const isPlayer = _view.player && id === _view.player.id;
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
@@ -146,6 +148,7 @@ export function buildWorldView(world) {
 		});
 	} else {
 		for (const [id, pos] of world.query(Position)) {
+			if (world.has(id, PlasmaCloud)) continue;
 			const isPlayer = world.has(id, Player);
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
