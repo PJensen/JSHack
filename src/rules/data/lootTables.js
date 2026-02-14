@@ -5,7 +5,7 @@
 //   "gold"      - gold stack, count scales with depth: base + depth * perDepth
 //   "archetype" - named archetype (HealthPotion, ArrowsStack, ScrollOfMapping)
 //   "equip"     - equipment from pool[] with optional affix rolling
-//   "item"      - from ITEM_DEFS (spellbooks, scrolls)
+//   "item"      - from ITEM_CATALOG magic entries (spellbooks, scrolls, wands)
 //   "gem"       - random gem via pickGem(); optional gemId for specific, materials[] to filter
 //   "table"     - nested table reference (composable)
 

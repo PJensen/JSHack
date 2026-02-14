@@ -3,13 +3,13 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Material } from "../src/rules/components/Material.js";
-import { buildMagicItem } from "../src/rules/data/itemLoader.js";
+import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { materializeDrop } from "../src/rules/data/lootResolver.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 
-Deno.test("buildMagicItem applies material and charges from item defs", () => {
+Deno.test("buildCatalogItem applies material and charges from item defs", () => {
   const world = new World({ seed: 11 });
-  const wandId = buildMagicItem(world, "wand_lightning");
+  const wandId = buildCatalogItem(world, "wand_lightning");
 
   const mat = world.get(wandId, Material);
   const info = world.get(wandId, ItemInfo);

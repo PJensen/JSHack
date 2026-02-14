@@ -9,8 +9,7 @@ import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopItem } from '../../data/shopStock.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
-import { buildEquipmentItem } from '../../data/equipmentLoader.js';
-import { buildMagicItem } from '../../data/itemLoader.js';
+import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
 import { pickMonster, pickItem, pickTrap, pickSpawner } from './tables.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
@@ -285,7 +284,7 @@ export function materializeSpawn(world, spawn) {
       return id;
     }
     case 'equipment': {
-      const id = buildEquipmentItem(world, spawn.params.equipId, {
+      const id = buildCatalogItem(world, spawn.params.equipId, {
         affixes: spawn.params.affixes || [],
       });
       world.add(id, Position, { x: spawn.x, y: spawn.y });
@@ -409,7 +408,7 @@ export function materializeSpawn(world, spawn) {
     case 'book': {
       let id = null;
       try {
-        id = buildMagicItem(world, spawn.params.bookId, { count: 1 });
+        id = buildCatalogItem(world, spawn.params.bookId, { count: 1 });
       } catch {
         return null;
       }

@@ -2,10 +2,8 @@
 // Centralized item creation by ID. Single source of truth for spawning items.
 
 import { createFrom } from '../../lib/ecs-js/archetype.js';
-import { buildEquipmentItem } from '../data/equipmentLoader.js';
-import { EQUIP_DEFS, getEquipmentDef } from '../data/equipment.js';
-import { buildMagicItem } from '../data/itemLoader.js';
-import { getItem, ITEM_DEFS } from '../data/items.js';
+import { buildCatalogItem } from '../data/itemCatalogLoader.js';
+import { ITEM_CATALOG, getCatalogItem, isCatalogEquipment, isCatalogMagic } from '../data/itemCatalog.js';
 import { getGem } from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
@@ -52,10 +50,10 @@ export function createItemById(world, itemId, opts = {}) {
     return id;
   }
 
-  // 2. Check equipment definitions
-  const equipDef = getEquipmentDef(itemId);
-  if (equipDef) {
-    return buildEquipmentItem(world, itemId, { affixes });
+  // 2. Check unified catalog definitions
+  const catalogDef = getCatalogItem(itemId);
+  if (catalogDef && isCatalogEquipment(catalogDef)) {
+    return buildCatalogItem(world, itemId, { affixes, count });
   }
 
   // 3. Check gem definitions
@@ -71,8 +69,8 @@ export function createItemById(world, itemId, opts = {}) {
     return id;
   }
 
-  // 4. Check magic items (wands, scrolls, spellbooks) from ITEM_DEFS
-  if (getItem(itemId)) return buildMagicItem(world, itemId);
+  // 4. Check magic items (wands, scrolls, spellbooks) from unified catalog
+  if (catalogDef && isCatalogMagic(catalogDef)) return buildCatalogItem(world, itemId, { count });
 
   // Unknown item
   return null;
@@ -86,9 +84,8 @@ export function createItemById(world, itemId, opts = {}) {
 export function isValidItemId(itemId) {
   return !!(
     SIMPLE_ITEM_ARCHETYPES[itemId] ||
-    getEquipmentDef(itemId) ||
-    getGem(itemId) ||
-    getItem(itemId)
+    getCatalogItem(itemId) ||
+    getGem(itemId)
   );
 }
 
@@ -98,7 +95,6 @@ export function isValidItemId(itemId) {
  */
 export function listAllItemIds() {
   const simpleIds = Object.keys(SIMPLE_ITEM_ARCHETYPES);
-  const equipIds = Object.keys(EQUIP_DEFS || {});
-  const magicIds = Object.keys(ITEM_DEFS || {});
-  return [...simpleIds, ...equipIds, ...magicIds];
+  const catalogIds = Object.keys(ITEM_CATALOG || {});
+  return [...simpleIds, ...catalogIds];
 }

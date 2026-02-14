@@ -1,6 +1,6 @@
 import { assert } from "jsr:@std/assert";
 import { SPELL_DEFS, getSpell, listSpells } from '../src/rules/data/spells.js';
-import { ITEM_DEFS, getItem, listItems } from '../src/rules/data/items.js';
+import { ITEM_CATALOG, getCatalogItem, listCatalogItems } from '../src/rules/data/itemCatalog.js';
 import { AFFIX_DEFS, getAffix, listAffixes } from '../src/rules/data/affixes.js';
 import { registerScript, runScript, listRegisteredScripts, ScriptVerb } from '../src/rules/scripting.js';
 
@@ -18,19 +18,20 @@ Deno.test("spell definitions are valid", () => {
   assert(listSpells().length === Object.keys(SPELL_DEFS).length, 'listSpells length should match');
 });
 
-Deno.test("item definitions are valid", () => {
-  assert(Object.keys(ITEM_DEFS).length > 0, 'ITEM_DEFS should not be empty');
+Deno.test("item catalog definitions are valid", () => {
+  assert(Object.keys(ITEM_CATALOG).length > 0, 'ITEM_CATALOG should not be empty');
 
-  for (const [id, item] of Object.entries(ITEM_DEFS)) {
+  for (const [id, item] of Object.entries(ITEM_CATALOG)) {
     assert(item.id === id, `item key ${id} should match item.id`);
     assert(typeof item.name === 'string' && item.name.length > 0, `item ${id} must have name`);
     assert(typeof item.type === 'string', `item ${id} must have type`);
+    assert(typeof item.catalogKind === 'string' && item.catalogKind.length > 0, `item ${id} must have catalogKind`);
     assert(typeof item.material === 'string' && item.material.length > 0, `item ${id} must have material`);
   }
 
-  assert(getItem('book_lightning') !== null, 'getItem should find book_lightning');
-  assert(getItem('nonexistent') === null, 'getItem should return null for missing');
-  assert(listItems().length === Object.keys(ITEM_DEFS).length, 'listItems length should match');
+  assert(getCatalogItem('book_lightning') !== null, 'getCatalogItem should find book_lightning');
+  assert(getCatalogItem('nonexistent') === null, 'getCatalogItem should return null for missing');
+  assert(listCatalogItems().length === Object.keys(ITEM_CATALOG).length, 'listCatalogItems length should match');
 });
 
 Deno.test("affix definitions are valid", () => {

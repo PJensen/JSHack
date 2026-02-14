@@ -4,11 +4,10 @@
 
 import { LOOT_TABLES } from './lootTables.js';
 import { AFFIX_DEFS } from './affixes.js';
-import { getEquipmentDef } from './equipment.js';
+import { getCatalogItem, isCatalogEquipment } from './itemCatalog.js';
 import { getGem, pickGem } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
-import { buildEquipmentItem } from './equipmentLoader.js';
-import { buildMagicItem } from './itemLoader.js';
+import { buildCatalogItem } from './itemCatalogLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
 import { Ration, IronRation } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
@@ -123,8 +122,8 @@ function weightedPick(entries, rng) {
 function rollAffixes(rng, equipId, affixChance, maxCount) {
   if (rng.next() >= affixChance) return [];
 
-  const def = getEquipmentDef(equipId);
-  if (!def) return [];
+  const def = getCatalogItem(equipId);
+  if (!def || !isCatalogEquipment(def)) return [];
 
   // Map equipment slot to affix slot: shield -> armor for affix purposes
   const slot = def.slot === 'shield' ? 'armor' : def.slot;
@@ -181,7 +180,7 @@ export function materializeDrop(world, drop, pos) {
     }
 
     case "equip": {
-      const id = buildEquipmentItem(world, drop.params.equipId, {
+      const id = buildCatalogItem(world, drop.params.equipId, {
         affixes: drop.params.affixes || [],
       });
       world.add(id, Position, { x: pos.x, y: pos.y });
@@ -202,7 +201,7 @@ export function materializeDrop(world, drop, pos) {
 
     case "item": {
       let id = null;
-      try { id = buildMagicItem(world, drop.params.itemId); } catch { return null; }
+      try { id = buildCatalogItem(world, drop.params.itemId); } catch { return null; }
       if (!(id > 0)) return null;
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;
