@@ -993,6 +993,24 @@ world.on('ranged:no-ammo', ({ attacker }) => {
   const pos = world.get(Number(attacker||0), Position);
   if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch {}
 });
+// Insufficient stamina floating flavor text (message handled in messageWiring)
+const _staminaLines = [
+  'Too exhausted!',
+  'Your arms feel heavy...',
+  'You can barely lift your weapon!',
+  'You gasp for breath...',
+  'Your muscles refuse!',
+  'Not enough strength...',
+  'You stagger with fatigue!',
+  'Your body protests!',
+];
+world.on('attack:insufficient-stamina', ({ attacker }) => {
+  const pos = world.get(Number(attacker || 0), Position);
+  if (pos) {
+    const line = _staminaLines[Math.floor(Math.random() * _staminaLines.length)];
+    try { ftext.addStatus(pos.x, pos.y - 0.3, line, { color: '#ff8c00', life: 1.0 }); } catch {}
+  }
+});
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type !== 'currency') return;
