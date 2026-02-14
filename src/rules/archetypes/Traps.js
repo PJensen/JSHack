@@ -9,7 +9,7 @@ export const SpikeTrap = defineArchetype(
     [Trap, (p) => ({
         type: 'spike',
         script: 'trap_spike',
-        params: p.trapParams ?? { percent: 0.15 },
+        params: p.trapParams ?? { percent: 0.35 },
         revealed: false,
         armed: true,
     })],

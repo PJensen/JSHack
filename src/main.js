@@ -212,9 +212,8 @@ if (!playerEntity(world)) {
 {
   const pe = playerEntity(world);
   if (pe) {
-    // Mana and vitality
+    // Mana
     world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 0.1 });
-    world.add(pe.id, Vitality, { hp: 100, maxHp: 100 });
     // 10-turn invulnerability at start
     const ae = world.get(pe.id, ActiveEffects);
     if (ae && Array.isArray(ae.effects)) {
