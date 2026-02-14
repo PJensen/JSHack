@@ -161,6 +161,48 @@ export function validateItemUseDefs(ITEM_USE_DEFS, opts = {}) {
   return true;
 }
 
+export function validateEffectDefs(EFFECT_DEFS, opts = {}) {
+  if (!Array.isArray(EFFECT_DEFS)) throw new Error('EFFECT_DEFS must be an array');
+  const operationIds = new Set(Array.isArray(opts.operationIds) ? opts.operationIds : []);
+  const defIds = new Set();
+  const seenKeys = new Set();
+
+  for (let i = 0; i < EFFECT_DEFS.length; i++) {
+    const def = EFFECT_DEFS[i];
+    const id = String(def?.id || '');
+    if (!id) throw new Error(`effect def[${i}]: id required`);
+    if (defIds.has(id)) throw new Error(`effect def ${id}: duplicate id`);
+    defIds.add(id);
+
+    if (!Array.isArray(def.keys) || def.keys.length === 0) {
+      throw new Error(`effect def ${id}: keys required`);
+    }
+    for (const key of def.keys) {
+      if (typeof key !== 'string' || !key.trim()) {
+        throw new Error(`effect def ${id}: keys must be non-empty strings`);
+      }
+      const normalized = key.trim().toLowerCase();
+      if (seenKeys.has(normalized)) throw new Error(`effect def ${id}: duplicate key ${normalized}`);
+      seenKeys.add(normalized);
+    }
+
+    const operation = String(def.operation || '');
+    if (!operation) throw new Error(`effect def ${id}: operation required`);
+    if (operationIds.size > 0 && !operationIds.has(operation)) {
+      throw new Error(`effect def ${id}: unknown operation ${operation}`);
+    }
+
+    if (!Array.isArray(def.statuses)) throw new Error(`effect def ${id}: statuses must be an array`);
+    for (const status of def.statuses) {
+      if (typeof status !== 'string' || !status.trim()) {
+        throw new Error(`effect def ${id}: statuses must contain non-empty strings`);
+      }
+    }
+  }
+
+  return true;
+}
+
 export function validateAll({
   ITEM_CATALOG,
   AFFIX_DEFS,
@@ -168,6 +210,8 @@ export function validateAll({
   MATERIAL_REACTION_OUTCOME_IDS,
   ITEM_USE_DEFS,
   ITEM_USE_ACTION_IDS,
+  EFFECT_DEFS,
+  EFFECT_OPERATION_IDS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
@@ -176,5 +220,8 @@ export function validateAll({
       : true)
     && (ITEM_USE_DEFS
       ? validateItemUseDefs(ITEM_USE_DEFS, { actionIds: ITEM_USE_ACTION_IDS })
+      : true)
+    && (EFFECT_DEFS
+      ? validateEffectDefs(EFFECT_DEFS, { operationIds: EFFECT_OPERATION_IDS })
       : true);
 }
