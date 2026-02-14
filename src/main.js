@@ -2396,6 +2396,7 @@ function drawPlasmaCloudEffects(ctx) {
   if (!_plasmaCloudFx.size) return;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
+  const TAU = Math.PI * 2;
 
   for (const cloud of _plasmaCloudFx.values()) {
     const cx = cloud.x;
@@ -2405,7 +2406,7 @@ function drawPlasmaCloudEffects(ctx) {
     const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
     const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
 
-    // Fill each hazardous tile directly so players can read danger bounds immediately.
+    // Mark every hazardous tile with overlapping circular plasma pools (no grid boxes).
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
@@ -2414,28 +2415,67 @@ function drawPlasmaCloudEffects(ctx) {
         const tx = cx + dx;
         const ty = cy + dy;
         const ring = 1 - (dist / (r + 1));
-        const alpha = (0.08 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * lifeFactor;
+        const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * lifeFactor;
 
         ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
-        ctx.fillRect(tx - 0.5, ty - 0.5, 1, 1);
+        ctx.beginPath();
+        ctx.arc(tx, ty, 0.62 + 0.04 * pulse, 0, TAU);
+        ctx.fill();
 
-        const edgeA = (0.12 + pulse * 0.06 + flashBoost * 0.10) * lifeFactor;
-        ctx.strokeStyle = `rgba(175,250,255,${edgeA.toFixed(3)})`;
-        ctx.lineWidth = 0.03;
-        ctx.strokeRect(tx - 0.5, ty - 0.5, 1, 1);
+        ctx.fillStyle = `rgba(180,250,255,${(alpha * 0.45).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 0.34 + 0.03 * pulse, 0, TAU);
+        ctx.fill();
       }
     }
 
-    // Outer danger boundary for quick readability.
-    const boundaryA = (0.24 + pulse * 0.08 + flashBoost * 0.14) * lifeFactor;
-    ctx.strokeStyle = `rgba(130,235,255,${boundaryA.toFixed(3)})`;
-    ctx.lineWidth = 0.07;
-    ctx.strokeRect(cx - r - 0.5, cy - r - 0.5, r * 2 + 1, r * 2 + 1);
+    // Wobbling closed quadratic-Bezier contour around the hazardous footprint.
+    const points = [];
+    const pointCount = Math.max(12, 14 + r * 8);
+    const baseR = r + 0.92;
+    const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
+    const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
+    for (let i = 0; i < pointCount; i++) {
+      const t = i / pointCount;
+      const a = t * TAU;
+      const wobble =
+        0.14 * Math.sin(_fxTime * 3.9 + a * 3.0 + cloud.phase) +
+        0.09 * Math.sin(_fxTime * 5.3 + a * 5.0 - cloud.phase * 0.6);
+      const rrX = baseR + wobble + 0.06 * pulse;
+      const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
+      points.push({
+        x: cx + driftX + Math.cos(a) * rrX,
+        y: cy + driftY + Math.sin(a) * rrY,
+      });
+    }
+    if (points.length >= 3) {
+      const p0 = points[0];
+      const p1 = points[1];
+      const firstMid = { x: (p0.x + p1.x) * 0.5, y: (p0.y + p1.y) * 0.5 };
+      ctx.beginPath();
+      ctx.moveTo(firstMid.x, firstMid.y);
+      for (let i = 1; i <= points.length; i++) {
+        const p = points[i % points.length];
+        const n = points[(i + 1) % points.length];
+        const mid = { x: (p.x + n.x) * 0.5, y: (p.y + n.y) * 0.5 };
+        ctx.quadraticCurveTo(p.x, p.y, mid.x, mid.y);
+      }
+      ctx.closePath();
+
+      const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * lifeFactor;
+      ctx.fillStyle = `rgba(95,230,255,${blobA.toFixed(3)})`;
+      ctx.fill();
+
+      const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * lifeFactor;
+      ctx.strokeStyle = `rgba(190,250,255,${edgeA.toFixed(3)})`;
+      ctx.lineWidth = 0.08;
+      ctx.stroke();
+    }
 
     // Core energetic haze.
     ctx.fillStyle = `rgba(210,255,255,${(0.12 + pulse * 0.10 + flashBoost * 0.18).toFixed(3)})`;
     ctx.beginPath();
-    ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, TAU);
     ctx.fill();
   }
 
