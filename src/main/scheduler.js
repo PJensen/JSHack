@@ -34,6 +34,8 @@ import { engraveSystem, installEngraveListeners } from "../rules/systems/engrave
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
+import { plasmaCloudSystem } from "../rules/systems/plasmaCloudSystem.js";
+import { installGridBugDeathClouds } from "../rules/systems/gridBugDeathCloudSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -52,6 +54,8 @@ export function configureWorld(world) {
   installEngraveListeners(world);
   // Install bump-interact listener for immediate interactions (doors, chests, NPCs)
   installBumpInteractListener(world);
+  // Install grid bug death-to-plasma-cloud trigger once per world
+  installGridBugDeathClouds(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -85,6 +89,7 @@ export function configureWorld(world) {
   registerSystem(equipmentSystem, 'effects');
   registerSystem(effectSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
+  registerSystem(plasmaCloudSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick

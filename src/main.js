@@ -925,6 +925,101 @@ world.on('spell:frost', ({ actor, targetId, from, at, duration, mass, fizzle }) 
 const _arrowFx = [];
 /** @type {Array<{x:number, y:number, ttl:number, style:string}>} */
 const _arrowSparks = [];
+/** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number }>} */
+const _plasmaCloudFx = new Map();
+
+function spawnPlasmaCloudSparks(x, y, count = 8) {
+  if (!fx?.pool) return;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.4 + Math.random() * 1.2;
+    fx.pool.spawn({
+      x: x + (Math.random() - 0.5) * 0.35,
+      y: y + (Math.random() - 0.5) * 0.35,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      ax: 0,
+      ay: 0,
+      life: 0.22 + Math.random() * 0.18,
+      size0: 0.09 + Math.random() * 0.06,
+      size1: 0.02,
+      r: 170 + ((Math.random() * 60) | 0),
+      g: 235 + ((Math.random() * 20) | 0),
+      b: 255,
+      a0: 0.9,
+      a1: 0.0,
+      rot: 0,
+      rotVel: 0,
+    });
+  }
+}
+
+world.on('plasmaCloud:spawned', ({ cloudId, at, radius, turnsLeft }) => {
+  if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+  const id = Number(cloudId || 0) | 0;
+  if (!(id > 0)) return;
+  const r = Math.max(0, Number(radius || 1) | 0);
+  const ttl = Math.max(1, Number(turnsLeft || 1) | 0);
+  _plasmaCloudFx.set(id, {
+    x: at.x,
+    y: at.y,
+    radius: r,
+    turnsLeft: ttl,
+    maxTurns: ttl,
+    flash: 0.24,
+    phase: Math.random() * Math.PI * 2,
+  });
+  // Fill every dangerous tile with initial spark activity.
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+      spawnPlasmaCloudSparks(at.x + dx, at.y + dy, 2);
+    }
+  }
+  startShake(cam, 2, 0.10);
+});
+
+world.on('plasmaCloud:pulse', ({ cloudId, at, radius, turnsLeft, affectedIds }) => {
+  const id = Number(cloudId || 0) | 0;
+  if (!(id > 0)) return;
+  const r = Math.max(0, Number(radius || 1) | 0);
+  const ttl = Math.max(0, Number(turnsLeft || 0) | 0);
+  const prev = _plasmaCloudFx.get(id);
+  const next = {
+    x: (at && Number.isFinite(at.x)) ? at.x : (prev?.x ?? 0),
+    y: (at && Number.isFinite(at.y)) ? at.y : (prev?.y ?? 0),
+    radius: r,
+    turnsLeft: ttl,
+    maxTurns: Math.max(prev?.maxTurns ?? 0, ttl),
+    flash: 0.26,
+    phase: prev?.phase ?? (Math.random() * Math.PI * 2),
+  };
+  _plasmaCloudFx.set(id, next);
+
+  if (Array.isArray(affectedIds)) {
+    for (let i = 0; i < affectedIds.length; i++) {
+      const tpos = world.get(Number(affectedIds[i] || 0), Position);
+      if (!tpos) continue;
+      spawnPlasmaCloudSparks(tpos.x, tpos.y, 5);
+    }
+  } else {
+    // Fallback: keep it visually loud even if the payload omits affected ids.
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+        if (Math.random() < 0.35) spawnPlasmaCloudSparks(next.x + dx, next.y + dy, 2);
+      }
+    }
+  }
+  startShake(cam, 2, 0.08);
+});
+
+world.on('plasmaCloud:expired', ({ cloudId }) => {
+  const id = Number(cloudId || 0) | 0;
+  if (!(id > 0)) return;
+  _plasmaCloudFx.delete(id);
+});
+
 world.on('ranged:shot', ({ attacker, target, hit, style }) => {
   const apos = world.get(Number(attacker||0), Position);
   const dpos = world.get(Number(target||0), Position);
@@ -1833,6 +1928,7 @@ function render(worldView) {
   if (bctx) drawBlastwaveEffects(bctx);
   if (bctx) drawFrostEffects(bctx);
   if (bctx) drawArrowEffects(bctx);
+  if (bctx) drawPlasmaCloudEffects(bctx);
 
   // Particles (already in world space)
   fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
@@ -1911,6 +2007,7 @@ function frame(now) {
   updateBlastwaveFx(dtSec);
   updateFrostFx(dtSec);
   updateArrowFx(dtSec);
+  updatePlasmaCloudFx(dtSec);
   ftext.step(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
@@ -2280,6 +2377,66 @@ function drawArrowEffects(ctx) {
       ctx.fillStyle = `rgba(255,250,230,${0.3 * alpha})`;
       ctx.beginPath(); ctx.arc(s.x, s.y, 0.1 * alpha, 0, Math.PI * 2); ctx.fill();
     }
+  }
+
+  ctx.restore();
+}
+
+/** @param {number} dt */
+function updatePlasmaCloudFx(dt) {
+  for (const [cloudId, cloud] of _plasmaCloudFx) {
+    cloud.flash = Math.max(0, cloud.flash - dt);
+    // Safety net: if a cloud entity is gone unexpectedly, fade then remove.
+    if (!world.isAlive(cloudId) && cloud.flash <= 0) _plasmaCloudFx.delete(cloudId);
+  }
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function drawPlasmaCloudEffects(ctx) {
+  if (!_plasmaCloudFx.size) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (const cloud of _plasmaCloudFx.values()) {
+    const cx = cloud.x;
+    const cy = cloud.y;
+    const r = Math.max(0, cloud.radius | 0);
+    const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
+    const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+    const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
+
+    // Fill each hazardous tile directly so players can read danger bounds immediately.
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (dist > r) continue;
+
+        const tx = cx + dx;
+        const ty = cy + dy;
+        const ring = 1 - (dist / (r + 1));
+        const alpha = (0.08 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * lifeFactor;
+
+        ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
+        ctx.fillRect(tx - 0.5, ty - 0.5, 1, 1);
+
+        const edgeA = (0.12 + pulse * 0.06 + flashBoost * 0.10) * lifeFactor;
+        ctx.strokeStyle = `rgba(175,250,255,${edgeA.toFixed(3)})`;
+        ctx.lineWidth = 0.03;
+        ctx.strokeRect(tx - 0.5, ty - 0.5, 1, 1);
+      }
+    }
+
+    // Outer danger boundary for quick readability.
+    const boundaryA = (0.24 + pulse * 0.08 + flashBoost * 0.14) * lifeFactor;
+    ctx.strokeStyle = `rgba(130,235,255,${boundaryA.toFixed(3)})`;
+    ctx.lineWidth = 0.07;
+    ctx.strokeRect(cx - r - 0.5, cy - r - 0.5, r * 2 + 1, r * 2 + 1);
+
+    // Core energetic haze.
+    ctx.fillStyle = `rgba(210,255,255,${(0.12 + pulse * 0.10 + flashBoost * 0.18).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
