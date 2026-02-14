@@ -96,8 +96,8 @@ Deno.test("disease stacking: pushEffect increments stacks and refreshes duration
 
   // Verify disease is active with stacks=1 and duration has ticked down
   let st = world.get(player, Status);
-  let diseased = st.statuses.find(s => s.type === 'diseased');
-  assert(diseased, 'diseased status present after first application');
+  let diseased = st.statuses.find(s => s.type === 'disease');
+  assert(diseased, 'disease status present after first application');
   assertEquals(diseased.stacks, 1, 'stacks should be 1 after first application');
   assert(diseased.duration < 20, 'duration should have ticked down');
 
@@ -111,8 +111,8 @@ Deno.test("disease stacking: pushEffect increments stacks and refreshes duration
   world.tick(1);
 
   st = world.get(player, Status);
-  diseased = st.statuses.find(s => s.type === 'diseased');
-  assert(diseased, 'diseased status present after second application');
+  diseased = st.statuses.find(s => s.type === 'disease');
+  assert(diseased, 'disease status present after second application');
   assertEquals(diseased.stacks, 2, 'stacks should be 2 after second application');
 
   // Third stack
@@ -123,7 +123,7 @@ Deno.test("disease stacking: pushEffect increments stacks and refreshes duration
   world.tick(1);
 
   st = world.get(player, Status);
-  diseased = st.statuses.find(s => s.type === 'diseased');
+  diseased = st.statuses.find(s => s.type === 'disease');
   assertEquals(diseased.stacks, 3, 'stacks should be 3 after third application');
 
   // Verify disease doesn't deal damage (hp unchanged)

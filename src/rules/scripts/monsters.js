@@ -6,6 +6,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { Brain } from '../components/Brain.js';
+import { MONSTER_STATUS_PROC_DEFS } from "../data/monsterStatusProcs.js";
 
 
 function pushEffect(world, entityId, effect) {
@@ -24,29 +25,29 @@ function pushEffect(world, entityId, effect) {
   }
 }
 
-// Rat bite: 25% chance → disease (20 turns, potency 1, stacks)
-// Disease doesn't deal damage — it weakens the victim (-1 attack, -1 defense per stack).
-// Each subsequent bite has a chance to add another stack and refresh duration.
-registerScript('monster:ratBite', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0001));
-    if (rngInt(r, 1, 100) <= 25) {
-      pushEffect(world, ctx.defender, { key: 'disease', turnsLeft: 20, potency: 1, stacks: 1 });
-      try { world.emit('proc:diseased', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
+const TRIGGER_TO_VERB = Object.freeze({
+  onHit: ScriptVerb.AffixOnHit,
+  onBeforeHit: ScriptVerb.AffixOnBeforeHit,
+  onDamaged: ScriptVerb.AffixOnDamaged,
 });
 
-// Spider bite: 30% chance → poison (5 turns, potency 2, stacks)
-registerScript('monster:spiderBite', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0002));
-    if (rngInt(r, 1, 100) <= 30) {
-      pushEffect(world, ctx.defender, { key: 'poison', turnsLeft: 5, potency: 2, stacks: 1 });
-      try { world.emit('proc:poisoned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
+for (let i = 0; i < MONSTER_STATUS_PROC_DEFS.length; i++) {
+  const def = MONSTER_STATUS_PROC_DEFS[i];
+  const verb = TRIGGER_TO_VERB[def.trigger];
+  if (!verb || !def.script) continue;
+
+  registerScript(def.script, {
+    [verb]: (world, ctx) => {
+      const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, def.seedSalt));
+      if (rngInt(r, 1, 100) <= def.chancePct) {
+        pushEffect(world, ctx.defender, { ...def.effect });
+        if (def.emitEvent) {
+          try { world.emit(def.emitEvent, { actor: ctx.attacker, target: ctx.defender }); } catch {}
+        }
+      }
+    },
+  });
+}
 
 // Wraith touch: 20% chance → drain life (heal self for 1/3 of damage dealt)
 registerScript('monster:wraithTouch', {
@@ -60,49 +61,6 @@ registerScript('monster:wraithTouch', {
   },
 });
 
-// Dragon claw: 20% chance → burn (5 turns, potency 4)
-registerScript('monster:dragonClaw', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0004));
-    if (rngInt(r, 1, 100) <= 20) {
-      pushEffect(world, ctx.defender, { key: 'burn', turnsLeft: 5, potency: 4, stacks: 1 });
-      try { world.emit('proc:burning', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
-
-// Snake bite: 25% chance → poison (5 turns, potency 1, stacks)
-registerScript('monster:snakeBite', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000f));
-    if (rngInt(r, 1, 100) <= 25) {
-      pushEffect(world, ctx.defender, { key: 'poison', turnsLeft: 5, potency: 1, stacks: 1 });
-      try { world.emit('proc:poisoned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
-
-// Goblin shiv: 20% chance → bleed (3 turns, potency 1, stacks)
-registerScript('monster:goblinShiv', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0005));
-    if (rngInt(r, 1, 100) <= 20) {
-      pushEffect(world, ctx.defender, { key: 'bleed', turnsLeft: 3, potency: 1, stacks: 1 });
-      try { world.emit('proc:bleeding', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
-
-// Bat screech: 15% chance → stun (1 turn)
-registerScript('monster:batScreech', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0006));
-    if (rngInt(r, 1, 100) <= 15) {
-      pushEffect(world, ctx.defender, { key: 'stun', turnsLeft: 1, potency: 1, stacks: 1 });
-      try { world.emit('proc:stunned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
 
 // Orc rage: 25% chance → +2 bonus damage (onBeforeHit)
 registerScript('monster:orcRage', {
@@ -140,16 +98,6 @@ registerScript('monster:trollSmash', {
   },
 });
 
-// Ogre crush: 25% chance → stun (2 turns)
-registerScript('monster:ogreCrush', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000a));
-    if (rngInt(r, 1, 100) <= 25) {
-      pushEffect(world, ctx.defender, { key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
-      try { world.emit('proc:stunned', { actor: ctx.attacker, target: ctx.defender }); } catch {}
-    }
-  },
-});
 
 // Demon hellfire: onHit 30% burn + onDamaged fire retaliation
 registerScript('monster:demonHellfire', {
@@ -181,17 +129,6 @@ registerScript('monster:lichDrain', {
     if (rngInt(r, 1, 100) <= 20) {
       pushEffect(world, ctx.defender, { key: 'regen', turnsLeft: 3, potency: 2, stacks: 1 });
       try { world.emit('proc:phylactery', { actor: ctx.defender }); } catch {}
-    }
-  },
-});
-
-// Grid bug zap: 30% chance → shock (2 turns, potency 1)
-registerScript('monster:gridBugZap', {
-  [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead0010));
-    if (rngInt(r, 1, 100) <= 30) {
-      pushEffect(world, ctx.defender, { key: 'shock', turnsLeft: 2, potency: 1, stacks: 1 });
-      try { world.emit('proc:shocked', { actor: ctx.attacker, target: ctx.defender }); } catch {}
     }
   },
 });

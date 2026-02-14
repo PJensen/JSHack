@@ -203,6 +203,68 @@ export function validateEffectDefs(EFFECT_DEFS, opts = {}) {
   return true;
 }
 
+export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {}) {
+  if (!Array.isArray(MONSTER_STATUS_PROC_DEFS)) throw new Error('MONSTER_STATUS_PROC_DEFS must be an array');
+  const triggerIds = new Set(Array.isArray(opts.triggerIds) ? opts.triggerIds : []);
+  const defIds = new Set();
+  const scriptTriggerPairs = new Set();
+
+  for (let i = 0; i < MONSTER_STATUS_PROC_DEFS.length; i++) {
+    const def = MONSTER_STATUS_PROC_DEFS[i];
+    const id = String(def?.id || '');
+    if (!id) throw new Error(`monster status proc def[${i}]: id required`);
+    if (defIds.has(id)) throw new Error(`monster status proc def ${id}: duplicate id`);
+    defIds.add(id);
+
+    const script = String(def?.script || '');
+    if (!script) throw new Error(`monster status proc def ${id}: script required`);
+
+    const trigger = String(def?.trigger || '');
+    if (!trigger) throw new Error(`monster status proc def ${id}: trigger required`);
+    if (triggerIds.size > 0 && !triggerIds.has(trigger)) {
+      throw new Error(`monster status proc def ${id}: unknown trigger ${trigger}`);
+    }
+
+    const pair = `${script}::${trigger}`;
+    if (scriptTriggerPairs.has(pair)) {
+      throw new Error(`monster status proc def ${id}: duplicate script+trigger pair ${pair}`);
+    }
+    scriptTriggerPairs.add(pair);
+
+    const chancePct = Number(def?.chancePct);
+    if (!Number.isInteger(chancePct) || chancePct < 1 || chancePct > 100) {
+      throw new Error(`monster status proc def ${id}: chancePct must be an integer from 1 to 100`);
+    }
+
+    if (!Number.isInteger(def?.seedSalt)) {
+      throw new Error(`monster status proc def ${id}: seedSalt must be an integer`);
+    }
+
+    const effect = def?.effect;
+    if (!effect || typeof effect !== 'object') {
+      throw new Error(`monster status proc def ${id}: effect object required`);
+    }
+    if (typeof effect.key !== 'string' || !effect.key.trim()) {
+      throw new Error(`monster status proc def ${id}: effect.key required`);
+    }
+    if (!Number.isInteger(effect.turnsLeft) || effect.turnsLeft < 0) {
+      throw new Error(`monster status proc def ${id}: effect.turnsLeft must be integer >= 0`);
+    }
+    if (typeof effect.potency !== 'number') {
+      throw new Error(`monster status proc def ${id}: effect.potency must be numeric`);
+    }
+    if (effect.stacks != null && (!Number.isInteger(effect.stacks) || effect.stacks < 1)) {
+      throw new Error(`monster status proc def ${id}: effect.stacks must be integer >= 1`);
+    }
+
+    if (def.emitEvent != null && (typeof def.emitEvent !== 'string' || !def.emitEvent.trim())) {
+      throw new Error(`monster status proc def ${id}: emitEvent must be non-empty string when provided`);
+    }
+  }
+
+  return true;
+}
+
 export function validateAll({
   ITEM_CATALOG,
   AFFIX_DEFS,
@@ -212,6 +274,8 @@ export function validateAll({
   ITEM_USE_ACTION_IDS,
   EFFECT_DEFS,
   EFFECT_OPERATION_IDS,
+  MONSTER_STATUS_PROC_DEFS,
+  MONSTER_PROC_TRIGGER_IDS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
@@ -223,5 +287,8 @@ export function validateAll({
       : true)
     && (EFFECT_DEFS
       ? validateEffectDefs(EFFECT_DEFS, { operationIds: EFFECT_OPERATION_IDS })
+      : true)
+    && (MONSTER_STATUS_PROC_DEFS
+      ? validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, { triggerIds: MONSTER_PROC_TRIGGER_IDS })
       : true);
 }
