@@ -3,6 +3,8 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { PlasmaCloud } from "../src/rules/components/PlasmaCloud.js";
 import { Position } from "../src/rules/components/Position.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { Material } from "../src/rules/components/Material.js";
 import { Resistances } from "../src/rules/components/Resistences.js";
 import { Status } from "../src/rules/components/Status.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
@@ -95,6 +97,36 @@ Deno.test("plasma cloud uses electric resistances", () => {
   assertEquals(world.get(resistant, Vitality).hp, 11); // 2 * (1000/2000) = 1
   assertEquals(world.get(immune, Vitality).hp, 12); // Infinity ohms -> no damage
   assert(statuses.some((s) => s.id === immune && String(s.kind) === "immune"), "immune status expected for grounded target");
+});
+
+Deno.test("plasma cloud conductivity changes damage from worn material", () => {
+  const world = new World({ seed: 778 });
+
+  const metalWearer = makeActor(world, 0, 0, 20, "Metal");
+  const woodWearer = makeActor(world, 1, 0, 20, "Wood");
+  const noGear = makeActor(world, -1, 0, 20, "None");
+
+  world.add(metalWearer, Resistances, { electric: { ohms: 1000, fibrillationA: 0.03 } });
+  world.add(woodWearer, Resistances, { electric: { ohms: 1000, fibrillationA: 0.03 } });
+  world.add(noGear, Resistances, { electric: { ohms: 1000, fibrillationA: 0.03 } });
+
+  const ironArmor = world.create();
+  world.add(ironArmor, Material, { kind: "iron" });
+  const woodArmor = world.create();
+  world.add(woodArmor, Material, { kind: "wood" });
+
+  world.add(metalWearer, Equipment, { armor: ironArmor });
+  world.add(woodWearer, Equipment, { armor: woodArmor });
+
+  spawnPlasmaCloud(world, { x: 0, y: 0, turnsLeft: 1, radius: 1, damage: 2 });
+  plasmaCloudSystem(world);
+
+  const metalHp = world.get(metalWearer, Vitality).hp;
+  const woodHp = world.get(woodWearer, Vitality).hp;
+  const noGearHp = world.get(noGear, Vitality).hp;
+
+  assert(metalHp < noGearHp, `metal should amplify electric coupling (metalHp=${metalHp}, noGearHp=${noGearHp})`);
+  assert(woodHp > noGearHp, `wood should damp electric coupling (woodHp=${woodHp}, noGearHp=${noGearHp})`);
 });
 
 Deno.test("grid bug death installs once and spawns one cloud per bug per step", () => {

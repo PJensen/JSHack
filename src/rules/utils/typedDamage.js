@@ -1,8 +1,16 @@
 import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
 import { isEntityInvulnerable } from "./effectGuards.js";
+import { Equipment } from "../components/Equipment.js";
+import { Material } from "../components/Material.js";
+import { MATERIAL_CATALOG } from "../data/materials.js";
 
 const BASE_ELECTRIC_OHMS = 1000;
+const BASE_BODY_CONDUCTIVITY = 0.2;
+
+const MATERIAL_CONDUCTIVITY = new Map(
+  MATERIAL_CATALOG.map((row) => [String(row?.id || ""), Number(row?.Material?.conductivity ?? BASE_BODY_CONDUCTIVITY)]),
+);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -21,6 +29,50 @@ function electricMultiplier(resist) {
 }
 
 /**
+ * Material conductivity coupling from equipped gear.
+ * Conductive worn materials amplify electric transfer; insulators reduce it.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} targetId
+ */
+function equippedConductivityMultiplier(world, targetId) {
+  const eq = world.get(targetId, Equipment);
+  if (!eq) return 1;
+
+  /** @type {Array<[string, number]>} */
+  const slotWeights = [
+    ["armor", 0.55],
+    ["shield", 0.25],
+    ["weapon", 0.20],
+    ["ring1", 0.08],
+    ["ring2", 0.08],
+    ["ammo", 0.04],
+  ];
+
+  let weighted = 0;
+  let totalWeight = 0;
+  for (let i = 0; i < slotWeights.length; i++) {
+    const [slot, weight] = slotWeights[i];
+    const itemId = Number(eq[slot] || 0) | 0;
+    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
+
+    const mat = world.get(itemId, Material);
+    const kind = String(mat?.kind || "");
+    if (!kind) continue;
+    const conductivity = MATERIAL_CONDUCTIVITY.has(kind)
+      ? Number(MATERIAL_CONDUCTIVITY.get(kind))
+      : BASE_BODY_CONDUCTIVITY;
+    if (!Number.isFinite(conductivity)) continue;
+    weighted += conductivity * weight;
+    totalWeight += weight;
+  }
+
+  if (totalWeight <= 0) return 1;
+  const avgConductivity = weighted / totalWeight;
+  // 0.2 (flesh-like) -> neutral 1.0
+  return clamp(1 + (avgConductivity - BASE_BODY_CONDUCTIVITY) * 1.8, 0.65, 2.0);
+}
+
+/**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {number} targetId
  * @param {{ amount:number, type?:string }} spec
@@ -32,8 +84,10 @@ export function resolveTypedDamage(world, targetId, spec) {
   const type = String(spec?.type || "generic").toLowerCase();
   if (type === "electric" || type === "plasma") {
     const resist = world.get(targetId, Resistances);
-    const mult = electricMultiplier(resist);
-    return Math.max(0, Math.floor(amount * mult));
+    const resistMult = electricMultiplier(resist);
+    if (resistMult <= 0) return 0;
+    const gearMult = equippedConductivityMultiplier(world, targetId);
+    return Math.max(0, Math.floor(amount * resistMult * gearMult));
   }
   return amount;
 }

@@ -8,6 +8,7 @@ import { AFFIX_DEFS } from './affixes.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { ScriptRef } from '../components/ScriptRef.js';
+import { Material } from '../components/Material.js';
 
 /**
  * listEquipment()
@@ -45,6 +46,9 @@ export function buildEquipmentItem(world, equipId, opts = {}) {
     range: base.range || null,
   };
   world.add(id, ItemInfo, info);
+  if (base.material && typeof base.material === 'string') {
+    world.add(id, Material, { kind: base.material });
+  }
   // Attach script reference when supplied (for onEquip/onHit, etc.)
   if (base.script && typeof base.script === 'string') {
     world.add(id, ScriptRef, { ref: base.script, params: { from: base.id } });
