@@ -17,6 +17,7 @@ export function initOverlays() {
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
   const memoryGraph = ensureMemoryGraph(root);
+  const deathScreen = ensureDeathScreen(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
@@ -241,6 +242,15 @@ export function initOverlays() {
       spellGestureHint.wrap.style.display = 'none';
       spellGestureTimer = 0;
     }, duration);
+  });
+
+  // Death screen with social share
+  window.addEventListener('ui:playerDied', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderDeathScreen(deathScreen, d);
+    deathScreen.style.display = 'block';
   });
 
   return { root, inv, log, ticker };
@@ -1614,4 +1624,131 @@ function rarityStyle(rarityName) {
   if (rn === 'epic') return { color: '#c47bff', fontWeight: 'bold' };
   if (rn === 'legendary') return { color: '#ff9f3b', fontWeight: 'bold' };
   return { color: '#ffffff', fontWeight: 'bold' };
+}
+
+// --- Death screen with social share ----------------------------------------
+/** @param {HTMLElement} root */
+function ensureDeathScreen(root) {
+  const panel = document.createElement('div');
+  panel.id = 'death-screen';
+  Object.assign(panel.style, {
+    position: 'fixed', left: '0', top: '0', right: '0', bottom: '0',
+    display: 'none', pointerEvents: 'auto',
+    background: 'rgba(0,0,0,0.88)',
+    fontFamily: 'monospace', zIndex: 1100,
+  });
+  root.appendChild(panel);
+  return panel;
+}
+
+/** @param {HTMLDivElement} panel @param {{depth?:number, score?:number, seed?:number, killerName?:string|null, cause?:string, shareUrl?:string}} detail */
+function renderDeathScreen(panel, detail) {
+  panel.innerHTML = '';
+
+  const box = document.createElement('div');
+  Object.assign(box.style, {
+    position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+    width: 'min(420px, 88vw)', textAlign: 'center',
+    background: '#0b0e16', border: '1px solid #3a1c1c', borderRadius: '10px',
+    padding: '28px 24px', boxShadow: '0 0 60px rgba(180,40,40,0.35)',
+    color: '#cfe8ff',
+  });
+
+  // Skull
+  const skull = document.createElement('div');
+  skull.textContent = '\u2620\uFE0F';
+  skull.style.fontSize = '64px';
+  skull.style.marginBottom = '8px';
+  box.appendChild(skull);
+
+  // Title
+  const title = document.createElement('div');
+  title.textContent = 'You Have Perished';
+  Object.assign(title.style, {
+    fontSize: '22px', fontWeight: 'bold', color: '#ff6b6b',
+    textShadow: '0 0 12px rgba(255,60,60,0.4)', marginBottom: '16px',
+  });
+  box.appendChild(title);
+
+  // Stats
+  const depth = detail?.depth ?? 1;
+  const score = detail?.score ?? 0;
+  const seed = detail?.seed ?? 0;
+  const seedHex = seed ? '0x' + seed.toString(16).toUpperCase() : '???';
+  const killerName = detail?.killerName;
+  const cause = detail?.cause;
+
+  const stats = document.createElement('div');
+  Object.assign(stats.style, { marginBottom: '18px', lineHeight: '1.8', fontSize: '14px' });
+
+  if (killerName) {
+    const line = document.createElement('div');
+    line.textContent = `Slain by ${killerName}`;
+    line.style.color = '#ff9999';
+    stats.appendChild(line);
+  } else if (cause && cause !== 'unknown') {
+    const line = document.createElement('div');
+    line.textContent = `Cause: ${cause}`;
+    line.style.color = '#ff9999';
+    stats.appendChild(line);
+  }
+
+  const depthLine = document.createElement('div');
+  depthLine.textContent = `Depth reached: ${depth}`;
+  stats.appendChild(depthLine);
+
+  const scoreLine = document.createElement('div');
+  scoreLine.textContent = `Score: ${score}`;
+  stats.appendChild(scoreLine);
+
+  const seedLine = document.createElement('div');
+  seedLine.textContent = `Seed: ${seedHex}`;
+  seedLine.style.opacity = '0.7';
+  stats.appendChild(seedLine);
+
+  box.appendChild(stats);
+
+  // Share button
+  if (detail?.shareUrl) {
+    const shareBtn = document.createElement('a');
+    shareBtn.href = detail.shareUrl;
+    shareBtn.target = '_blank';
+    shareBtn.rel = 'noopener';
+    shareBtn.textContent = 'Share on X';
+    Object.assign(shareBtn.style, {
+      display: 'inline-block', padding: '10px 22px',
+      background: '#1a1a2e', color: '#cfe8ff', fontFamily: 'monospace',
+      border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer', textDecoration: 'none', fontSize: '14px',
+      marginBottom: '12px',
+      transition: 'background 120ms',
+    });
+    shareBtn.addEventListener('mouseenter', () => { shareBtn.style.background = '#242448'; });
+    shareBtn.addEventListener('mouseleave', () => { shareBtn.style.background = '#1a1a2e'; });
+    box.appendChild(shareBtn);
+    box.appendChild(document.createElement('br'));
+  }
+
+  // Dismiss hint
+  const hint = document.createElement('div');
+  hint.textContent = 'Press any key to continue';
+  Object.assign(hint.style, { opacity: '0.5', fontSize: '12px', marginTop: '10px' });
+  box.appendChild(hint);
+
+  panel.appendChild(box);
+
+  // Dismiss on key or tap (after a short delay to avoid accidental dismiss)
+  const dismiss = () => {
+    panel.style.display = 'none';
+    window.removeEventListener('keydown', onKey);
+    panel.removeEventListener('pointerdown', onTap);
+  };
+  const onKey = () => dismiss();
+  const onTap = (/** @type {PointerEvent} */ ev) => {
+    if (ev.target === panel) dismiss();
+  };
+  setTimeout(() => {
+    window.addEventListener('keydown', onKey, { once: true });
+    panel.addEventListener('pointerdown', onTap);
+  }, 600);
 }
