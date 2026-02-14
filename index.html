@@ -107,6 +107,21 @@
 				color: #d6ecff;
 			}
 
+			#boot-brand {
+				margin: 2px 0 8px;
+				font-size: 20px;
+				letter-spacing: 0.08em;
+				text-align: center;
+				color: #8bd4ff;
+				text-shadow: 0 0 8px rgba(139, 212, 255, 0.55);
+				animation: bootBrandPulse 1.2s ease-in-out infinite;
+			}
+
+			#boot-brand .at {
+				color: #cffff4;
+				text-shadow: 0 0 10px rgba(170, 255, 220, 0.65);
+			}
+
 			#boot-label {
 				letter-spacing: 0.03em;
 				opacity: 0.95;
@@ -133,6 +148,11 @@
 				font-size: 11px;
 				opacity: 0.9;
 			}
+
+			@keyframes bootBrandPulse {
+				0%, 100% { opacity: 0.7; transform: translateY(0); }
+				50% { opacity: 1; transform: translateY(-1px); }
+			}
 		</style>
 	</head>
 
@@ -141,7 +161,8 @@
 		<div class="hint">JS-Hack</div>
 		<div id="boot-loader">
 			<div id="boot-card">
-				<div id="boot-label">Booting...</div>
+					<div id="boot-brand"><span class="at">@</span></div>
+					<div id="boot-label">Loading...</div>
 				<div id="boot-track"><div id="boot-fill"></div></div>
 				<div id="boot-fraction">0%</div>
 			</div>

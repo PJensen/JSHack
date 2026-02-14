@@ -158,7 +158,7 @@ function resize() {
 }
 addEventListener("resize", resize);
 resize();
-updateBootProgress("Booting engine...");
+updateBootProgress("Loading...");
 
 // ---- App wires rules/ (no display logic here) ------------------------------
 const world = new World({ seed: 0xa77a77 });
