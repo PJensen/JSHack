@@ -2,7 +2,7 @@
 
 **A mobile-first roguelike built to be hacked.**
 
-Pure JavaScript. Zero dependencies. No build step. Just open `index.html` and start playing. Edit a file, hit refresh, see your changes instantly. This is JavaScript the way it was meant to be: hackable, transparent, and fun.
+Pure JavaScript. Zero dependencies. No build step. Serve the folder, open the page, and start playing. Edit a file, hit refresh, see your changes instantly. This is JavaScript the way it was meant to be: hackable, transparent, and fun.
 
 ---
 
@@ -10,11 +10,12 @@ Pure JavaScript. Zero dependencies. No build step. Just open `index.html` and st
 
 ### 🚀 Zero build step, zero dependencies
 
-No npm. No webpack. No babel. No TypeScript. Just **pure ES modules** that run directly in your browser. Open `index.html` — it just works. Edit `src/rules/systems/movementSystem.js`, refresh, and your changes are live. No waiting, no compilation, no mysterious build errors.
+No npm. No webpack. No babel. No TypeScript. Just **pure ES modules** that run directly in your browser. Serve the project folder, open the page, and you're playing. Edit `src/rules/systems/movementSystem.js`, refresh, and your changes are live. No waiting, no compilation, no mysterious build errors.
 
 ```bash
-# That's it. Seriously.
-open index.html
+# Any static HTTP server works. ES modules require it.
+python3 -m http.server 8000
+# Then open http://localhost:8000
 ```
 
 ### 📱 Mobile-first, touch-first
@@ -76,19 +77,13 @@ If you can `console.log` it, you can understand it.
 ### Play it in 30 seconds
 
 ```bash
-git clone https://github.com/your-username/JSHack.git
+git clone https://github.com/PJensen/JSHack.git
 cd JSHack
-open index.html
+python3 -m http.server 8000
+# Open http://localhost:8000
 ```
 
-Or serve it with any static server:
-
-```bash
-python -m http.server 8000
-# Then open http://localhost:8000
-```
-
-**That's it.** No `npm install`. No `npm run build`. Just open and play.
+Any static HTTP server works — ES modules need to be served over HTTP, not opened as `file://` URLs. No `npm install`. No `npm run build`. Just serve and play.
 
 ### Controls
 
@@ -210,7 +205,7 @@ Archetypes are templates. Spawn as many as you want. Modify their components. Th
 4. Refresh your browser
 5. Your monster spawns
 
-No compilation. No bundling. Just edit and play.
+No compilation. No bundling. Just edit and refresh.
 
 ### Add a new system
 
@@ -308,7 +303,7 @@ All data-driven. All modifiable. All in plain JavaScript files.
 
 ```
 JSHack/
-├── index.html              # Entry point (just open it!)
+├── index.html              # Entry point (serve over HTTP)
 ├── src/
 │   ├── rules/              # Pure deterministic simulation
 │   │   ├── systems/        # 26 game logic systems
@@ -516,7 +511,7 @@ See [LICENSE](LICENSE) for terms.
 
 Because JavaScript doesn't need frameworks and build tools to be powerful. Because mobile deserves great roguelikes. Because deterministic simulations are beautiful. Because one file should equal one idea. Because hacking should be fun.
 
-**Open `index.html`. Edit a file. Refresh. Hack.**
+**Serve the folder. Edit a file. Refresh. Hack.**
 
 That's it. That's the whole pitch.
 
