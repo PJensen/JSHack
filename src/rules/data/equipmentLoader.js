@@ -40,6 +40,7 @@ export function buildEquipmentItem(world, equipId, opts = {}) {
     rarityName: base.rarityName || 'common',
     affixes: Array.isArray(opts.affixes) ? opts.affixes.slice() : [],
     damageDice: base.damageDice || null,
+    staminaCost: base.staminaCost ?? null,
     subtype: base.subtype || null,
     range: base.range || null,
   };
