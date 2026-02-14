@@ -511,9 +511,29 @@ addEventListener('ui:castActiveSpell', () => {
 addEventListener('ui:requestPickup', (e) => {
   const arr = e.detail?.itemIds;
   if (!Array.isArray(arr) || !arr.length) return;
-  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   for (const id of arr) {
-    if (Number.isInteger(id) && id > 0) {
+    if (!Number.isInteger(id) || id <= 0) continue;
+    // Check if the item is inside a chest inventory (no Position)
+    if (!world.get(id, Position)) {
+      const playerInv = world.get(pe.id, Inventory);
+      if (!playerInv || (playerInv.capacity != null && playerInv.items.length >= playerInv.capacity)) continue;
+      // Find and remove from the chest that holds it
+      for (const [cid, , ni] of world.query(Position, NamedIdentity)) {
+        if (ni.identity !== 'chest') continue;
+        const cInv = world.get(cid, Inventory);
+        if (!cInv) continue;
+        const idx = cInv.items.indexOf(id);
+        if (idx === -1) continue;
+        cInv.items.splice(idx, 1);
+        playerInv.items.push(id);
+        const count = world.get(id, ItemInfo)?.count || 1;
+        try { world.emit?.('item:pickup', { actor: pe.id, itemId: id, count }); } catch {}
+        break;
+      }
+    } else {
       rulesHandler({ type: 'rules.pickupItem', payload: { itemId: id } });
     }
   }
@@ -1216,6 +1236,14 @@ world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== id) return;
   const ids = itemsAt(world, to.x, to.y);
+  // Also include items from chests at this tile
+  let hasChest = false;
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'chest' || pos.x !== to.x || pos.y !== to.y) continue;
+    hasChest = true;
+    const inv = world.get(eid, Inventory);
+    if (inv) for (const itemId of inv.items) ids.push(itemId);
+  }
   // Filter out currency; we want deliberate pickup for non-gold
   const nonCurrency = ids.filter((eid) => {
     const info = world.get(eid, ItemInfo);
@@ -1225,15 +1253,15 @@ world.on('moved', ({ id, to }) => {
     try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch {}
     return;
   }
-  // If multiple items, prompt chooser on click; otherwise show direct-pick tooltip
-  if (nonCurrency.length > 1) {
+  // Chest items always use the chooser with "Open Chest" label
+  if (hasChest || nonCurrency.length > 1) {
     const items = nonCurrency.map((eid) => {
       const info = world.get(eid, ItemInfo);
       const name = world.get(eid, NamedIdentity);
       return { id: eid, type: info?.type || 'item', name: name?.name || info?.type || 'item', count: info?.count || 1 };
     });
     try {
-      window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: { mode: 'multi', count: items.length, items } }));
+      window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: { mode: 'multi', count: items.length, items, fromChest: hasChest } }));
     } catch {}
     return;
   }

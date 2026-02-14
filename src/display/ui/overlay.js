@@ -460,7 +460,7 @@ function renderGroundTooltip(tip, detail) {
     const row = document.createElement('div');
     row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
     const lbl = document.createElement('div');
-    lbl.textContent = `${detail?.count || (detail?.items?.length || 0)} items nearby`;
+    lbl.textContent = detail?.fromChest ? 'Open Chest' : `${detail?.count || (detail?.items?.length || 0)} items nearby`;
     lbl.style.fontWeight = 'bold';
     const hint = document.createElement('div');
     hint.textContent = 'Tap to choose'; hint.style.marginLeft = 'auto'; hint.style.opacity = '0.8';
