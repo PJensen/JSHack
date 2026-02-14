@@ -88,52 +88,85 @@ function ensureBrain(world, actor) {
 /**
  * @param {World} world
  * @param {number} actor
- * @param {{targetId?:number}} intent
+ * @param {{targetId?:number}|null} intent
  * @param {string} identity
- * @param {{ kind?:string, identityPrefix?:string, targetMode?:string, castEventSource?:string, consumeOnSuccess?:boolean }} action
  */
-function executeUseAction(world, actor, intent, identity, action) {
-  const consumeOnSuccess = action.consumeOnSuccess !== false;
-  const spellId = spellIdFromIdentity(identity, String(action.identityPrefix || ""));
-  if (!spellId) return false;
-  const spell = getSpell(spellId);
-  if (!spell) {
-    if (action.kind === "learn_spell_from_identity") {
-      try { world.emit && world.emit("spell:learn-denied", { actor, reason: "unknown-spell", spellId }); } catch {}
-    }
-    return false;
-  }
+function createUseActionHelpers(world, actor, intent, identity) {
+  return {
+    /**
+     * @param {{ identityPrefix:string, targetMode?:"intentTarget"|"self"|"none", castEventSource?:string, consumeOnSuccess?:boolean }} action
+     */
+    castSpellFromIdentity(action) {
+      const consumeOnSuccess = action.consumeOnSuccess !== false;
+      const spellId = spellIdFromIdentity(identity, String(action.identityPrefix || ""));
+      if (!spellId) return false;
+      const spell = getSpell(spellId);
+      if (!spell) return false;
 
-  if (action.kind === "cast_spell_from_identity") {
-    const targetMode = String(action.targetMode || "self");
-    const runIntent = targetMode === "intentTarget" ? { targetId: intent?.targetId } : {};
-    try { runSpellScript(world, actor, spell, runIntent); } catch {}
-    const castEvent = {
-      actor,
-      spellId: spell.id,
-      targetId: targetMode === "intentTarget" ? (intent?.targetId || actor) : actor,
-    };
-    if (action.castEventSource) castEvent.source = action.castEventSource;
-    try { world.emit && world.emit("castSpell", castEvent); } catch {}
-    return consumeOnSuccess;
-  }
+      const targetMode = String(action.targetMode || "self");
+      const runIntent = targetMode === "intentTarget" ? { targetId: intent?.targetId } : {};
+      try { runSpellScript(world, actor, spell, runIntent); } catch {}
 
-  if (action.kind === "learn_spell_from_identity") {
-    const brain = ensureBrain(world, actor);
-    if (!brain) {
-      try { world.emit && world.emit("spell:learn-denied", { actor, reason: "no-brain", spellId: spell.id }); } catch {}
-      return false;
-    }
-    if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
-      try { world.emit && world.emit("spell:already-known", { actor, spellId: spell.id }); } catch {}
-      return false;
-    }
-    if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-    brain.learnedSpellIds.push(spell.id);
-    try { world.emit && world.emit("spell:learned", { actor, spellId: spell.id }); } catch {}
-    return consumeOnSuccess;
-  }
+      const castEvent = {
+        actor,
+        spellId: spell.id,
+        targetId: targetMode === "intentTarget" ? (intent?.targetId || actor) : actor,
+      };
+      if (action.castEventSource) castEvent.source = action.castEventSource;
+      try { world.emit && world.emit("castSpell", castEvent); } catch {}
+      return consumeOnSuccess;
+    },
 
+    /**
+     * @param {{ identityPrefix:string, consumeOnSuccess?:boolean }} action
+     */
+    learnSpellFromIdentity(action) {
+      const consumeOnSuccess = action.consumeOnSuccess !== false;
+      const spellId = spellIdFromIdentity(identity, String(action.identityPrefix || ""));
+      if (!spellId) return false;
+      const spell = getSpell(spellId);
+      if (!spell) {
+        try { world.emit && world.emit("spell:learn-denied", { actor, reason: "unknown-spell", spellId }); } catch {}
+        return false;
+      }
+
+      const brain = ensureBrain(world, actor);
+      if (!brain) {
+        try { world.emit && world.emit("spell:learn-denied", { actor, reason: "no-brain", spellId: spell.id }); } catch {}
+        return false;
+      }
+      if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
+        try { world.emit && world.emit("spell:already-known", { actor, spellId: spell.id }); } catch {}
+        return false;
+      }
+
+      if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+      brain.learnedSpellIds.push(spell.id);
+      try { world.emit && world.emit("spell:learned", { actor, spellId: spell.id }); } catch {}
+      return consumeOnSuccess;
+    },
+
+    /**
+     * @param {string} eventName
+     * @param {Record<string, any>} payload
+     */
+    emit(eventName, payload) {
+      try { world.emit && world.emit(eventName, payload); } catch {}
+    },
+  };
+}
+
+/**
+ * @param {(context:any) => boolean} action
+ * @param {any} context
+ */
+function executeUseAction(action, context) {
+  if (typeof action !== "function") return false;
+  try {
+    const out = action(context);
+    if (typeof out === "boolean") return out;
+    if (out && typeof out === "object" && typeof out.consumed === "boolean") return out.consumed;
+  } catch {}
   return false;
 }
 
@@ -169,7 +202,18 @@ export function useItemSystem(world) {
       consumed = true;
     } else if (info) {
       const def = findUseDef(info, identity);
-      if (def) consumed = executeUseAction(world, actor, intent, identity, def.action || {});
+      if (def) {
+        const helpers = createUseActionHelpers(world, actor, intent, identity);
+        consumed = executeUseAction(def.action, {
+          world,
+          actor,
+          itemId,
+          intent,
+          info,
+          identity,
+          helpers,
+        });
+      }
     }
 
     // If consumed, decrement stack or destroy and remove from inventory

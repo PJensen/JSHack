@@ -1,6 +1,36 @@
 // rules/data/monsters.js
 // Central monster definitions. Each entry feeds into pickMonster() for spawning,
 // the Monster archetype for ECS creation, and the display palette for rendering.
+import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Brain } from "../components/Brain.js";
+import { degradeFloorMemory } from "../environment/dungeon/transition.js";
+import { combatSeed, mulberry32, rngInt } from "../utils/rng.js";
+import { MONSTER_SCRIPT_IDS } from "./monsterScriptIds.js";
+
+function pushEffect(world, entityId, effect) {
+  const ae = world.get(entityId, ActiveEffects);
+  if (ae && Array.isArray(ae.effects)) {
+    const existing = ae.effects.find((e) => e.key === effect.key);
+    if (existing) {
+      existing.stacks = (existing.stacks || 1) + 1;
+      existing.turnsLeft = Math.max(existing.turnsLeft, effect.turnsLeft);
+      return;
+    }
+    ae.effects.push(effect);
+    return;
+  }
+  try { world.add(entityId, ActiveEffects, { effects: [effect] }); } catch {}
+}
+
+function rollChance(world, ctx, chancePct, seedSalt) {
+  if (chancePct >= 100) return true;
+  const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, seedSalt));
+  return rngInt(r, 1, 100) <= chancePct;
+}
+
+function emit(world, eventName, payload) {
+  try { world.emit(eventName, payload); } catch {}
+}
 
 export const MONSTERS = [
   // ── Tier 0 (floors 1-5) ────────────────────────────────────────────
@@ -20,7 +50,14 @@ export const MONSTERS = [
     massKg: 2,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    script: 'monster:ratBite',
+    script: MONSTER_SCRIPT_IDS.RAT_BITE,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 25, 0xdead0001)) return;
+        pushEffect(world, ctx.defender, { key: "disease", turnsLeft: 20, potency: 1, stacks: 1 });
+        emit(world, "proc:diseased", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A mangy rodent with beady eyes.',
   },
   {
@@ -39,7 +76,14 @@ export const MONSTERS = [
     massKg: 30,
     resistances: { kinetic: { DR: 2 } },
     speed: 2,
-    script: 'monster:goblinShiv',
+    script: MONSTER_SCRIPT_IDS.GOBLIN_SHIV,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 20, 0xdead0005)) return;
+        pushEffect(world, ctx.defender, { key: "bleed", turnsLeft: 3, potency: 1, stacks: 1 });
+        emit(world, "proc:bleeding", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A sneering green-skinned runt armed with a rusty shiv.',
     lootTable: 'drop:goblin',
   },
@@ -59,7 +103,14 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    script: 'monster:batScreech',
+    script: MONSTER_SCRIPT_IDS.BAT_SCREECH,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 15, 0xdead0006)) return;
+        pushEffect(world, ctx.defender, { key: "stun", turnsLeft: 1, potency: 1, stacks: 1 });
+        emit(world, "proc:stunned", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A leathery-winged vermin that darts erratically.',
   },
 
@@ -79,7 +130,14 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 }, electric: { ohms: Infinity } },
     speed: 1,
-    script: 'monster:gridBugZap',
+    script: MONSTER_SCRIPT_IDS.GRID_BUG_ZAP,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 30, 0xdead0010)) return;
+        pushEffect(world, ctx.defender, { key: "shock", turnsLeft: 2, potency: 1, stacks: 1 });
+        emit(world, "proc:shocked", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A tiny crackling insect that moves only along the grid axes.',
   },
 
@@ -99,7 +157,14 @@ export const MONSTERS = [
     massKg: 3,
     resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
     speed: 1,
-    script: 'monster:snakeBite',
+    script: MONSTER_SCRIPT_IDS.SNAKE_BITE,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 25, 0xdead000f)) return;
+        pushEffect(world, ctx.defender, { key: "poison", turnsLeft: 5, potency: 1, stacks: 1 });
+        emit(world, "proc:poisoned", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A hissing serpent with venomous fangs.',
   },
 
@@ -120,7 +185,14 @@ export const MONSTERS = [
     massKg: 95,
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
-    script: 'monster:orcRage',
+    script: MONSTER_SCRIPT_IDS.ORC_RAGE,
+    hooks: {
+      onBeforeHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 25, 0xdead0007)) return;
+        ctx.damage += 2;
+        emit(world, "proc:rage", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A thick-skulled brute with a chipped cleaver.',
   },
   {
@@ -142,7 +214,14 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
     },
     speed: 2,
-    script: 'monster:skeletonReassemble',
+    script: MONSTER_SCRIPT_IDS.SKELETON_REASSEMBLE,
+    hooks: {
+      onDamaged: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 20, 0xdead0008)) return;
+        if (typeof ctx.heal === "function") ctx.heal(ctx.defender, 2);
+        emit(world, "proc:reassemble", { actor: ctx.defender });
+      },
+    },
     description: 'Bones held together by spite. Resistant to piercing.',
   },
   {
@@ -161,7 +240,14 @@ export const MONSTERS = [
     massKg: 15,
     resistances: { kinetic: { DR: 2 }, chemical: { toxMult: 0 } },
     speed: 1,
-    script: 'monster:spiderBite',
+    script: MONSTER_SCRIPT_IDS.SPIDER_BITE,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 30, 0xdead0002)) return;
+        pushEffect(world, ctx.defender, { key: "poison", turnsLeft: 5, potency: 2, stacks: 1 });
+        emit(world, "proc:poisoned", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A dog-sized arachnid with venomous fangs.',
   },
 
@@ -182,7 +268,17 @@ export const MONSTERS = [
     massKg: 200,
     resistances: { kinetic: { DR: 10 }, thermal: { burnMult: 1.5 } },
     speed: 3,
-    script: 'monster:trollSmash',
+    script: MONSTER_SCRIPT_IDS.TROLL_SMASH,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        pushEffect(world, ctx.attacker, { key: "regen", turnsLeft: 3, potency: 2, stacks: 1 });
+      },
+      onDamaged: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 30, 0xdead0009)) return;
+        if (typeof ctx.heal === "function") ctx.heal(ctx.defender, 1);
+        emit(world, "proc:regenerate", { actor: ctx.defender });
+      },
+    },
     description: 'A hulking regenerator. Weak to fire.',
   },
   {
@@ -204,7 +300,15 @@ export const MONSTERS = [
       electric: { ohms: 50 },
     },
     speed: 1,
-    script: 'monster:wraithTouch',
+    script: MONSTER_SCRIPT_IDS.WRAITH_TOUCH,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 20, 0xdead0003)) return;
+        const amount = Math.max(1, Math.floor((Number(ctx.damage || 0) * 1) / 3));
+        if (typeof ctx.healAttacker === "function") ctx.healAttacker(amount);
+        emit(world, "proc:drain", { actor: ctx.attacker, target: ctx.defender, amount });
+      },
+    },
     description: 'A spectral horror. Physical attacks pass through it.',
   },
   {
@@ -223,7 +327,14 @@ export const MONSTERS = [
     massKg: 250,
     resistances: { kinetic: { DR: 12 } },
     speed: 3,
-    script: 'monster:ogreCrush',
+    script: MONSTER_SCRIPT_IDS.OGRE_CRUSH,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 25, 0xdead000a)) return;
+        pushEffect(world, ctx.defender, { key: "stun", turnsLeft: 2, potency: 1, stacks: 1 });
+        emit(world, "proc:stunned", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'A lumbering slab of muscle and bad intentions.',
   },
 
@@ -247,7 +358,18 @@ export const MONSTERS = [
       electric: { ohms: 100 },
     },
     speed: 2,
-    script: 'monster:mindflayerBlast',
+    script: MONSTER_SCRIPT_IDS.MINDFLAYER_BLAST,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000e));
+        if (rngInt(r, 1, 100) > 20) return;
+        const { depth } = degradeFloorMemory(r, { fraction: 0.3 });
+        const brain = world.get(ctx.defender, Brain);
+        if (brain) brain.learnedSpellIds = [];
+        pushEffect(world, ctx.defender, { key: "mindwipe", turnsLeft: 2, potency: 1, stacks: 1 });
+        emit(world, "proc:mindwipe", { actor: ctx.attacker, target: ctx.defender, affectedDepth: depth });
+      },
+    },
     description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
   },
 
@@ -271,7 +393,18 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    script: 'monster:demonHellfire',
+    script: MONSTER_SCRIPT_IDS.DEMON_HELLFIRE,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 30, 0xdead000b)) return;
+        pushEffect(world, ctx.defender, { key: "burn", turnsLeft: 4, potency: 3, stacks: 1 });
+        emit(world, "proc:burning", { actor: ctx.attacker, target: ctx.defender });
+      },
+      onDamaged: ({ world, ctx }) => {
+        if (typeof ctx.retaliate === "function") ctx.retaliate(2);
+        emit(world, "proc:hellfire", { actor: ctx.defender });
+      },
+    },
     description: 'Sulphur and malice given form. Immune to fire.',
   },
   {
@@ -293,7 +426,14 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    script: 'monster:dragonClaw',
+    script: MONSTER_SCRIPT_IDS.DRAGON_CLAW,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 20, 0xdead0004)) return;
+        pushEffect(world, ctx.defender, { key: "burn", turnsLeft: 5, potency: 4, stacks: 1 });
+        emit(world, "proc:burning", { actor: ctx.attacker, target: ctx.defender });
+      },
+    },
     description: 'Scales like hammered bronze. The apex predator of the deep.',
     lootTable: 'drop:dragon',
   },
@@ -317,7 +457,20 @@ export const MONSTERS = [
       electric: { ohms: 200 },
     },
     speed: 3,
-    script: 'monster:lichDrain',
+    script: MONSTER_SCRIPT_IDS.LICH_DRAIN,
+    hooks: {
+      onHit: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 25, 0xdead000c)) return;
+        const amount = Math.max(1, Math.floor((Number(ctx.damage || 0) * 1) / 2));
+        if (typeof ctx.healAttacker === "function") ctx.healAttacker(amount);
+        emit(world, "proc:drain", { actor: ctx.attacker, target: ctx.defender, amount });
+      },
+      onDamaged: ({ world, ctx }) => {
+        if (!rollChance(world, ctx, 20, 0xdead000d)) return;
+        pushEffect(world, ctx.defender, { key: "regen", turnsLeft: 3, potency: 2, stacks: 1 });
+        emit(world, "proc:phylactery", { actor: ctx.defender });
+      },
+    },
     description: 'An undead sorcerer sustained by a hidden phylactery.',
     lootTable: 'drop:lich',
   },
@@ -345,4 +498,4 @@ export function getMonsterLootTable(def) {
   return def.lootTable || `drop:tier${def.tier}`;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, script:string|null, description:string, lootTable?:string }} MonsterDef */
+/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, script:string|null, hooks?:Record<string, Function>|null, description:string, lootTable?:string }} MonsterDef */

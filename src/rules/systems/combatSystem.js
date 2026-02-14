@@ -11,7 +11,9 @@ import { Status } from '../components/Status.js';
 import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { Position } from '../components/Position.js';
 import { Stamina } from '../components/Stamina.js';
+import { NamedIdentity } from '../components/NamedIdentity.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
+import { getMonster } from '../data/monsters.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
@@ -55,6 +57,23 @@ function attachHelpers(world, base) {
         vit.hp = Math.min(vit.maxHp, vit.hp + Math.max(0, amount | 0));
     };
     return base;
+}
+
+/**
+ * @param {any} world
+ * @param {number} entityId
+ * @param {'onBeforeHit'|'onHit'} hookName
+ * @param {any} ctx
+ */
+function runMonsterHook(world, entityId, hookName, ctx) {
+    const ni = world.get(entityId, NamedIdentity);
+    const def = ni ? getMonster(ni.identity) : null;
+    const hook = def?.hooks?.[hookName];
+    if (typeof hook === 'function') {
+        try { hook({ world, ctx }); } catch {}
+        return true;
+    }
+    return false;
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
@@ -173,10 +192,8 @@ export function combatSystem(world) {
                 runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
             }
         });
-        // Innate monster pre-hit script (e.g., orc rage bonus damage)
-        if (atkEq?.naturalScript) {
-            runScript(atkEq.naturalScript, ScriptVerb.AffixOnBeforeHit, world, ctx);
-        }
+        // Innate monster pre-hit behavior from monster definition hooks
+        runMonsterHook(world, attacker, 'onBeforeHit', ctx);
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -192,10 +209,8 @@ export function combatSystem(world) {
         });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
-        // Innate monster on-hit script (e.g., rat bite → disease)
-        if (atkEq?.naturalScript) {
-            runScript(atkEq.naturalScript, ScriptVerb.AffixOnHit, world, hitCtx);
-        }
+        // Innate monster on-hit behavior from monster definition hooks
+        runMonsterHook(world, attacker, 'onHit', hitCtx);
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {
