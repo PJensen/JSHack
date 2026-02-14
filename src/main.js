@@ -71,6 +71,7 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
+import { APPLY_DEFS, getApplyDef } from "./rules/data/applyDefs.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
 const canvas = document.getElementById("stage");
@@ -403,6 +404,9 @@ const inputDisposers = [];
         }
         break;
       }
+      case "display.openApplyChooser":
+        window.dispatchEvent(new CustomEvent("ui:openApplyChooser"));
+        break;
       default:
         break;
     }
@@ -504,6 +508,56 @@ addEventListener('ui:requestUsableItemsData', () => {
     }
   }
   window.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
+});
+
+// Provide applicable tools to the apply-tool chooser
+addEventListener('ui:requestApplyToolsData', () => {
+  const p = playerEntity(world);
+  const items = [];
+  if (p) {
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        const ni = world.get(id, NamedIdentity);
+        const identity = ni?.identity || '';
+        if (!APPLY_DEFS[identity]) continue;
+        items.push({ id, name: ni?.name || identity });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:applyToolsData', { detail: { items } }));
+});
+
+// Provide filtered targets for an apply tool
+addEventListener('ui:requestApplyTargetsData', (ev) => {
+  const toolId = ev?.detail?.toolId || 0;
+  const p = playerEntity(world);
+  const items = [];
+  if (p && toolId) {
+    const toolNi = world.get(toolId, NamedIdentity);
+    const def = getApplyDef(toolNi?.identity || '');
+    const filterType = def?.targetFilter || '';
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        if (id === toolId) continue; // don't apply tool to itself
+        const info = world.get(id, ItemInfo);
+        if (filterType && info?.type !== filterType) continue;
+        const ni = world.get(id, NamedIdentity);
+        items.push({ id, name: ni?.name || info?.type || 'item', description: info?.description || '' });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:applyTargetsData', { detail: { items } }));
+});
+
+// When user confirms an apply action from the UI
+addEventListener('ui:requestApply', (ev) => {
+  const toolId = ev?.detail?.toolId || 0;
+  const targetItemId = ev?.detail?.targetItemId || 0;
+  if (!toolId || !targetItemId) return;
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler({ type: 'rules.applyItem', payload: { itemId: toolId, targetItemId } });
 });
 
 // Provide message log entries (placeholder until rules log is wired)

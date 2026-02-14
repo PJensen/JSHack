@@ -12,6 +12,7 @@ export const ScriptVerb = Object.freeze({
   ItemOnUnequip: "item:onUnequip",
   ItemUse: "item:use",
   TrapTrigger: "trap:trigger",
+  ItemApply: "item:apply",
 });
 
 /**
