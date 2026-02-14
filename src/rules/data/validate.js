@@ -269,7 +269,7 @@ export function validateMonsterCombatProcDefs(MONSTER_COMBAT_PROC_DEFS, opts = {
   if (!Array.isArray(MONSTER_COMBAT_PROC_DEFS)) throw new Error('MONSTER_COMBAT_PROC_DEFS must be an array');
   const triggerIds = new Set(Array.isArray(opts.triggerIds) ? opts.triggerIds : []);
   const actionIds = new Set(Array.isArray(opts.actionIds) ? opts.actionIds : []);
-  const emitPayloadIds = new Set(Array.isArray(opts.emitPayloadIds) ? opts.emitPayloadIds : []);
+  const eventSchemaIds = new Set(Array.isArray(opts.eventSchemaIds) ? opts.eventSchemaIds : []);
   const defIds = new Set();
   const scriptTriggerPairs = new Set();
 
@@ -332,14 +332,14 @@ export function validateMonsterCombatProcDefs(MONSTER_COMBAT_PROC_DEFS, opts = {
     if (def.emitEvent != null && (typeof def.emitEvent !== 'string' || !def.emitEvent.trim())) {
       throw new Error(`monster combat proc def ${id}: emitEvent must be non-empty string when provided`);
     }
-    if (def.emitPayload != null) {
-      const emitPayload = String(def.emitPayload || '');
-      if (!emitPayloadIds.has(emitPayload)) {
-        throw new Error(`monster combat proc def ${id}: unknown emitPayload ${emitPayload}`);
+    if (def.eventSchema != null) {
+      const eventSchema = String(def.eventSchema || '');
+      if (!eventSchemaIds.has(eventSchema)) {
+        throw new Error(`monster combat proc def ${id}: unknown eventSchema ${eventSchema}`);
       }
     }
-    if (def.emitAmount != null && typeof def.emitAmount !== 'boolean') {
-      throw new Error(`monster combat proc def ${id}: emitAmount must be boolean when provided`);
+    if (def.includeAmount != null && typeof def.includeAmount !== 'boolean') {
+      throw new Error(`monster combat proc def ${id}: includeAmount must be boolean when provided`);
     }
   }
 
@@ -360,7 +360,7 @@ export function validateAll({
   MONSTER_COMBAT_PROC_DEFS,
   MONSTER_COMBAT_PROC_TRIGGER_IDS,
   MONSTER_COMBAT_PROC_ACTION_IDS,
-  MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS,
+  MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
@@ -382,7 +382,7 @@ export function validateAll({
         {
           triggerIds: MONSTER_COMBAT_PROC_TRIGGER_IDS,
           actionIds: MONSTER_COMBAT_PROC_ACTION_IDS,
-          emitPayloadIds: MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS,
+          eventSchemaIds: MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS,
         },
       )
       : true);

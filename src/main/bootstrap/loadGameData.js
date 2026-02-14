@@ -14,7 +14,7 @@ import { ITEM_USE_ACTION_IDS, ITEM_USE_DEFS } from "../../rules/data/itemUseDefs
 import {
   MONSTER_COMBAT_PROC_ACTION_IDS,
   MONSTER_COMBAT_PROC_DEFS,
-  MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS,
+  MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS,
   MONSTER_COMBAT_PROC_TRIGGER_IDS,
 } from "../../rules/data/monsterCombatProcs.js";
 import { MONSTER_PROC_TRIGGER_IDS, MONSTER_STATUS_PROC_DEFS } from "../../rules/data/monsterStatusProcs.js";
@@ -263,7 +263,7 @@ export function loadGameData(opts = {}) {
         MONSTER_COMBAT_PROC_DEFS,
         MONSTER_COMBAT_PROC_TRIGGER_IDS,
         MONSTER_COMBAT_PROC_ACTION_IDS,
-        MONSTER_COMBAT_PROC_EMIT_PAYLOAD_IDS,
+        MONSTER_COMBAT_PROC_EVENT_SCHEMA_IDS,
       });
       completed++;
       emit(ds, 1);
