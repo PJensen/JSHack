@@ -20,6 +20,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 20, pool: ["leather_armor"], affixChance: 0 },
       { type: "equip", weight: 20, pool: ["shield_wood"], affixChance: 0 },
       { type: "equip", weight: 20, pool: ["bow_short"], affixChance: 0 },
+      { type: "equip", weight: 10, pool: ["iron_pickaxe"], affixChance: 0 },
     ],
   },
 
