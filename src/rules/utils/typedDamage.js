@@ -4,9 +4,16 @@ import { isEntityInvulnerable } from "./effectGuards.js";
 import { Equipment } from "../components/Equipment.js";
 import { Material } from "../components/Material.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
+import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
 
-const BASE_ELECTRIC_OHMS = 1000;
-const BASE_BODY_CONDUCTIVITY = 0.2;
+const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
+const BASE_BODY_CONDUCTIVITY = Number(ELECTRIC_DAMAGE_TUNING.baseBodyConductivity);
+const RESIST_MULTIPLIER_MIN = Number(ELECTRIC_DAMAGE_TUNING.resistMultiplierMin);
+const RESIST_MULTIPLIER_MAX = Number(ELECTRIC_DAMAGE_TUNING.resistMultiplierMax);
+const CONDUCTIVITY_SCALE = Number(ELECTRIC_DAMAGE_TUNING.conductivityScale);
+const CONDUCTIVITY_MULTIPLIER_MIN = Number(ELECTRIC_DAMAGE_TUNING.conductivityMultiplierMin);
+const CONDUCTIVITY_MULTIPLIER_MAX = Number(ELECTRIC_DAMAGE_TUNING.conductivityMultiplierMax);
+const SLOT_WEIGHT_TABLE = Object.entries(ELECTRIC_DAMAGE_TUNING.slotWeights || {});
 
 const MATERIAL_CONDUCTIVITY = new Map(
   MATERIAL_CATALOG.map((row) => [String(row?.id || ""), Number(row?.Material?.conductivity ?? BASE_BODY_CONDUCTIVITY)]),
@@ -24,8 +31,8 @@ function electricMultiplier(resist) {
   const ohms = Number(resist?.electric?.ohms);
   if (ohms === Infinity) return 0;
   if (!Number.isFinite(ohms)) return 1;
-  if (ohms <= 0) return 2.5;
-  return clamp(BASE_ELECTRIC_OHMS / ohms, 0.1, 2.5);
+  if (ohms <= 0) return RESIST_MULTIPLIER_MAX;
+  return clamp(BASE_ELECTRIC_OHMS / ohms, RESIST_MULTIPLIER_MIN, RESIST_MULTIPLIER_MAX);
 }
 
 /**
@@ -38,20 +45,12 @@ function equippedConductivityMultiplier(world, targetId) {
   const eq = world.get(targetId, Equipment);
   if (!eq) return 1;
 
-  /** @type {Array<[string, number]>} */
-  const slotWeights = [
-    ["armor", 0.55],
-    ["shield", 0.25],
-    ["weapon", 0.20],
-    ["ring1", 0.08],
-    ["ring2", 0.08],
-    ["ammo", 0.04],
-  ];
-
   let weighted = 0;
   let totalWeight = 0;
-  for (let i = 0; i < slotWeights.length; i++) {
-    const [slot, weight] = slotWeights[i];
+  for (let i = 0; i < SLOT_WEIGHT_TABLE.length; i++) {
+    const [slot, rawWeight] = SLOT_WEIGHT_TABLE[i];
+    const weight = Number(rawWeight);
+    if (!(weight > 0)) continue;
     const itemId = Number(eq[slot] || 0) | 0;
     if (!(itemId > 0) || !world.isAlive(itemId)) continue;
 
@@ -68,8 +67,12 @@ function equippedConductivityMultiplier(world, targetId) {
 
   if (totalWeight <= 0) return 1;
   const avgConductivity = weighted / totalWeight;
-  // 0.2 (flesh-like) -> neutral 1.0
-  return clamp(1 + (avgConductivity - BASE_BODY_CONDUCTIVITY) * 1.8, 0.65, 2.0);
+  // Base body conductivity -> neutral 1.0 multiplier.
+  return clamp(
+    1 + (avgConductivity - BASE_BODY_CONDUCTIVITY) * CONDUCTIVITY_SCALE,
+    CONDUCTIVITY_MULTIPLIER_MIN,
+    CONDUCTIVITY_MULTIPLIER_MAX,
+  );
 }
 
 /**

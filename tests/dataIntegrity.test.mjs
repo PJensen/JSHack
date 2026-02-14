@@ -25,6 +25,7 @@ Deno.test("item definitions are valid", () => {
     assert(item.id === id, `item key ${id} should match item.id`);
     assert(typeof item.name === 'string' && item.name.length > 0, `item ${id} must have name`);
     assert(typeof item.type === 'string', `item ${id} must have type`);
+    assert(typeof item.material === 'string' && item.material.length > 0, `item ${id} must have material`);
   }
 
   assert(getItem('book_lightning') !== null, 'getItem should find book_lightning');

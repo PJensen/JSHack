@@ -3,13 +3,14 @@
 
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildEquipmentItem } from '../data/equipmentLoader.js';
-import { getEquipmentDef } from '../data/equipment.js';
-import { getItem } from '../data/items.js';
+import { EQUIP_DEFS, getEquipmentDef } from '../data/equipment.js';
+import { buildMagicItem } from '../data/itemLoader.js';
+import { getItem, ITEM_DEFS } from '../data/items.js';
 import { getGem } from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
-import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, MagicItem, GemItem } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
 import { Ration, IronRation } from '../archetypes/Food.js';
 
 /**
@@ -71,22 +72,7 @@ export function createItemById(world, itemId, opts = {}) {
   }
 
   // 4. Check magic items (wands, scrolls, spellbooks) from ITEM_DEFS
-  const itemDef = getItem(itemId);
-  if (itemDef) {
-    const id = createFrom(world, MagicItem, {
-      name: itemDef.name,
-      identity: itemDef.id,
-      type: itemDef.type,
-      slot: itemDef.slot,
-      weight: 1,
-      value: 0,
-      description: itemDef.description,
-      count: itemDef.charges || 1,
-      rarity: itemDef.rarity || 1,
-      rarityName: itemDef.rarityName || 'common',
-    });
-    return id;
-  }
+  if (getItem(itemId)) return buildMagicItem(world, itemId);
 
   // Unknown item
   return null;
@@ -112,7 +98,7 @@ export function isValidItemId(itemId) {
  */
 export function listAllItemIds() {
   const simpleIds = Object.keys(SIMPLE_ITEM_ARCHETYPES);
-  const equipIds = Object.keys(getEquipmentDef.EQUIP_DEFS || {});
-  const magicIds = Object.keys(getItem.ITEM_DEFS || {});
+  const equipIds = Object.keys(EQUIP_DEFS || {});
+  const magicIds = Object.keys(ITEM_DEFS || {});
   return [...simpleIds, ...equipIds, ...magicIds];
 }
