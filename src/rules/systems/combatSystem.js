@@ -11,7 +11,12 @@ import { Status } from '../components/Status.js';
 import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { Position } from '../components/Position.js';
 import { Stamina } from '../components/Stamina.js';
+import { NamedIdentity } from '../components/NamedIdentity.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
+import { getMonster } from '../data/monsters.js';
+import { CombatCallbackContext } from '../data/callbacks/combat.js';
+import { runCallbackList } from '../interaction/dispatch.js';
+import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
@@ -57,6 +62,40 @@ function attachHelpers(world, base) {
     return base;
 }
 
+/**
+ * @param {any} status
+ * @param {string} type
+ * @returns {number}
+ */
+function statusStrength(status, type) {
+    if (!status || !Array.isArray(status.statuses)) return 0;
+    let total = 0;
+    for (const s of status.statuses) {
+        if (!s || s.type !== type) continue;
+        if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
+        const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
+        const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
+        total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
+    }
+    return total;
+}
+
+/**
+ * Run monster definition hooks for a given trigger via runCallbackList.
+ * @param {any} world
+ * @param {number} entityId - the monster entity whose hooks to run
+ * @param {'onBeforeHit'|'onHit'|'onDamaged'} hookName
+ * @param {any} frame - combat frame (with heal/healAttacker/retaliate attached)
+ */
+function runMonsterHooks(world, entityId, hookName, frame) {
+    const ni = world.get(entityId, NamedIdentity);
+    const def = ni ? getMonster(ni.identity) : null;
+    const hooks = def?.hooks?.[hookName];
+    if (!Array.isArray(hooks) || hooks.length === 0) return;
+    const ctx = new CombatCallbackContext(world, frame, { degradeFloorMemory });
+    runCallbackList(hooks, ctx);
+}
+
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
@@ -81,8 +120,6 @@ export function combatSystem(world) {
         const af = world.get(attacker, Faction)?.key || '';
         const df = world.get(defender, Faction)?.key || '';
         if (af && df && af === df) {
-            // treat as immune (same faction)
-            // world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
             world.remove(attacker, AttackIntent);
             continue;
         }
@@ -129,8 +166,33 @@ export function combatSystem(world) {
         const defHunger = defStatus?.statuses?.find(s => HUNGER_COMBAT_LEVELS.includes(s.type));
         const defHungerPenalty = defHunger ? Math.max(0, defHunger.potency || 0) : 0;
 
-        const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty - atkHungerPenalty);
-        const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty - defHungerPenalty);
+        // Status pass modifiers: weakened/cursed are penalties, blessed is a bonus.
+        const atkWeakenPenalty = statusStrength(atkStatus, 'weakened');
+        const defWeakenPenalty = statusStrength(defStatus, 'weakened');
+        const atkCursedPenalty = statusStrength(atkStatus, 'cursed');
+        const defCursedPenalty = statusStrength(defStatus, 'cursed');
+        const atkBlessedBonus = statusStrength(atkStatus, 'blessed');
+        const defBlessedBonus = statusStrength(defStatus, 'blessed');
+
+        const attackBonus = Math.max(
+            0,
+            1
+            + (atkEq?.attackDerived || 0)
+            - atkDiseasePenalty
+            - atkHungerPenalty
+            - atkWeakenPenalty
+            - atkCursedPenalty
+            + atkBlessedBonus
+        );
+        const armorClass = 10 + Math.max(
+            0,
+            (defEq?.defenseDerived || 0)
+            - defDiseasePenalty
+            - defHungerPenalty
+            - defWeakenPenalty
+            - defCursedPenalty
+            + defBlessedBonus
+        );
 
         // Deterministic d20 roll seeded by world + participants + step
         const seed = combatSeed(world.seed, world.step, attacker, defender);
@@ -173,10 +235,8 @@ export function combatSystem(world) {
                 runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
             }
         });
-        // Innate monster pre-hit script (e.g., orc rage bonus damage)
-        if (atkEq?.naturalScript) {
-            runScript(atkEq.naturalScript, ScriptVerb.AffixOnBeforeHit, world, ctx);
-        }
+        // Innate monster pre-hit behavior from monster definition hooks
+        runMonsterHooks(world, attacker, 'onBeforeHit', ctx);
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -192,10 +252,8 @@ export function combatSystem(world) {
         });
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
-        // Innate monster on-hit script (e.g., rat bite → disease)
-        if (atkEq?.naturalScript) {
-            runScript(atkEq.naturalScript, ScriptVerb.AffixOnHit, world, hitCtx);
-        }
+        // Innate monster on-hit behavior from monster definition hooks
+        runMonsterHooks(world, attacker, 'onHit', hitCtx);
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {
@@ -215,6 +273,10 @@ export function combatSystem(world) {
             defVit.hp = Math.max(0, defVit.hp - finalDmg);
             world.emit('damaged', { target: defender, amount: finalDmg, source: attacker, critical: isCrit });
             if (defVit.hp <= 0) world.emit('died', { id: defender, killer: attacker });
+
+            // Defender on-damaged hooks (e.g., skeleton reassemble, troll regen, demon retaliate)
+            const damagedCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
+            runMonsterHooks(world, defender, 'onDamaged', damagedCtx);
         } else {
             // Zero damage after modifiers → treat as miss/blocked; include attacker for logs
             world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });

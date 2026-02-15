@@ -3,6 +3,57 @@
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
+import { EFFECT_DEFS } from '../data/effectDefs.js';
+
+/** @type {Record<string, { operation:string, statuses:string[] }>} */
+const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
+
+/**
+ * @param {Array<{keys?:string[], operation?:string, statuses?:string[]}>} defs
+ */
+function buildEffectIndex(defs) {
+    const map = Object.create(null);
+    for (let i = 0; i < defs.length; i++) {
+        const def = defs[i];
+        const keys = Array.isArray(def?.keys) ? def.keys : [];
+        for (let k = 0; k < keys.length; k++) {
+            const key = String(keys[k] || '').toLowerCase();
+            if (!key || map[key]) continue;
+            map[key] = {
+                operation: String(def?.operation || 'none'),
+                statuses: Array.isArray(def?.statuses) ? def.statuses : [],
+            };
+        }
+    }
+    return map;
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {{hp:number,maxHp:number}|null} vit
+ * @param {"none"|"damage"|"heal"|string} operation
+ * @param {number} potency
+ * @param {number} stacks
+ */
+function applyEffectOperation(world, id, vit, operation, potency, stacks) {
+    if (!vit) return;
+    const amount = Math.max(0, potency * stacks);
+
+    if (operation === 'damage') {
+        vit.hp = Math.max(0, vit.hp - amount);
+        try { world.emit && world.emit('damage', { id, amount }); } catch {}
+        if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
+        return;
+    }
+
+    if (operation === 'heal') {
+        const before = vit.hp;
+        vit.hp = Math.min(vit.maxHp, vit.hp + amount);
+        const delta = vit.hp - before;
+        if (delta > 0) { try { world.emit && world.emit('healed', { id, amount: delta }); } catch {} }
+    }
+}
 
 /**
  * effectSystem — per-tick effect resolver.
@@ -12,15 +63,15 @@ import { Vitality } from '../components/Vitality.js';
  * - Expires effects when their turnsLeft reach 0
  */
 export function effectSystem(world) {
-        for (const [id, ae] of world.query(ActiveEffects)) {
-            if (!ae || !Array.isArray(ae.effects)) continue;
-            if (ae.effects.length === 0) {
-                // If no active effects, clear Status if present
-                if (world.has(id, Status)) {
-                    try { world.set(id, Status, { statuses: [] }); } catch {}
-                }
-                continue;
+    for (const [id, ae] of world.query(ActiveEffects)) {
+        if (!ae || !Array.isArray(ae.effects)) continue;
+        if (ae.effects.length === 0) {
+            // If no active effects, clear Status if present
+            if (world.has(id, Status)) {
+                try { world.set(id, Status, { statuses: [] }); } catch {}
             }
+            continue;
+        }
 
         // Ensure targets have Vitality/Status if needed
         let vit = world.get(id, Vitality);
@@ -41,7 +92,6 @@ export function effectSystem(world) {
             // Onset delay handling (optional field)
             if (Number.isInteger(e.onsetLeft) && e.onsetLeft > 0) {
                 e.onsetLeft -= 1;
-                // Not yet active; still reflect a latent status if desired (skip for now)
                 continue;
             }
 
@@ -49,99 +99,27 @@ export function effectSystem(world) {
             e.turnsLeft = Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0;
             const stacks = (e.stacks && e.stacks > 0) ? e.stacks : 1;
             const potency = (typeof e.potency === 'number') ? e.potency : 1;
-            const key = (e.key || '').toLowerCase();
+            const key = String(e.key || '').toLowerCase();
+            const def = EFFECTS_BY_KEY[key];
 
-            // Apply effect
-            switch (key) {
-                case 'invuln':
-                case 'invulnerable': {
-                    // No direct HP change; reflect status for bridge/display and for other systems to check if needed
-                    upsertStatus(nextStatuses, { type: 'invulnerable', duration: e.turnsLeft, potency, stacks });
-                    break;
+            if (def) {
+                applyEffectOperation(world, id, vit, def.operation, potency, stacks);
+                for (let i = 0; i < def.statuses.length; i++) {
+                    const statusType = String(def.statuses[i] || '');
+                    if (!statusType) continue;
+                    upsertStatus(nextStatuses, {
+                        type: statusType,
+                        duration: e.turnsLeft,
+                        potency,
+                        stacks,
+                    });
                 }
-                case 'poison':
-                case 'poisoned': {
-                    const dmg = Math.max(0, potency * stacks);
-                    if (vit) {
-                        vit.hp = Math.max(0, vit.hp - dmg);
-                        // Emit semantic damage event for bridge/display
-                        try { world.emit && world.emit('damage', { id, amount: dmg }); } catch {}
-                        if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
-                    }
-                    // Reflect status
-                    upsertStatus(nextStatuses, { type: 'poisoned', duration: e.turnsLeft, potency, stacks });
-                    break;
+            } else {
+                // Fallback: optional callback dispatch by name (future-friendly)
+                if (e.cbKey && typeof effectCallbacks[e.cbKey] === 'function') {
+                    try { effectCallbacks[e.cbKey]({ world, id, e, vit, statusMap: nextStatuses }); } catch {}
                 }
-                case 'burn':
-                case 'burning': {
-                    const dmg = Math.max(0, potency * stacks);
-                    if (vit) {
-                        vit.hp = Math.max(0, vit.hp - dmg);
-                        try { world.emit && world.emit('damage', { id, amount: dmg }); } catch {}
-                        if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
-                    }
-                    upsertStatus(nextStatuses, { type: 'burning', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'regen':
-                case 'regeneration': {
-                    const heal = Math.max(0, potency * stacks);
-                    if (vit) {
-                        const before = vit.hp;
-                        vit.hp = Math.min(vit.maxHp, vit.hp + heal);
-                        const delta = vit.hp - before;
-                        if (delta > 0) { try { world.emit && world.emit('healed', { id, amount: delta }); } catch {} }
-                    }
-                    upsertStatus(nextStatuses, { type: 'regen', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'stun':
-                case 'stunned': {
-                    upsertStatus(nextStatuses, { type: 'stunned', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'bleed':
-                case 'bleeding': {
-                    const dmg = Math.max(0, potency * stacks);
-                    if (vit) {
-                        vit.hp = Math.max(0, vit.hp - dmg);
-                        try { world.emit && world.emit('damage', { id, amount: dmg }); } catch {}
-                        if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
-                    }
-                    upsertStatus(nextStatuses, { type: 'bleeding', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'disease':
-                case 'diseased': {
-                    // Disease weakens rather than dealing damage.
-                    // Penalty is applied at combat time by combatSystem reading the 'disease' status.
-                    upsertStatus(nextStatuses, { type: 'disease', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'thorns': {
-                    // Purely visual status to indicate a thorns proc this turn
-                    upsertStatus(nextStatuses, { type: 'thorns', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'frost':
-                case 'frozen': {
-                    // Frost slows movement; no per-tick damage. Movement gating handled by movementSystem.
-                    upsertStatus(nextStatuses, { type: 'frozen', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                case 'mindwipe':
-                case 'mindwiped': {
-                    upsertStatus(nextStatuses, { type: 'mindwiped', duration: e.turnsLeft, potency, stacks });
-                    break;
-                }
-                default: {
-                    // Fallback: optional callback dispatch by name (future-friendly)
-                    if (e.cbKey && typeof effectCallbacks[e.cbKey] === 'function') {
-                        try { effectCallbacks[e.cbKey]({ world, id, e, vit, statusMap: nextStatuses }); } catch {}
-                    }
-                    // Unknown types still tick down but do nothing by default
-                    break;
-                }
+                // Unknown types still tick down but do nothing by default
             }
 
             // Age the effect at the end of its tick
@@ -149,16 +127,24 @@ export function effectSystem(world) {
         }
 
         // Cull expired effects
-        ae.effects = ae.effects.filter(e => (e && Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0) > 0 || (Number.isInteger(e.onsetLeft) && e.onsetLeft > 0));
+        ae.effects = ae.effects.filter((e) => (
+            (e && Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0) > 0
+            || (Number.isInteger(e.onsetLeft) && e.onsetLeft > 0)
+        ));
 
         // Sync Status with active effects snapshot
-            const statuses = Array.from(nextStatuses.values())
-                .map(s => ({ type: s.type, duration: Math.max(0, ~~s.duration), potency: s.potency, stacks: s.stacks }))
-                .filter(s => s.duration > 0);
-            try {
-                if (hadStatus || world.has(id, Status)) world.set(id, Status, { statuses });
-                else world.add(id, Status, { statuses });
-            } catch { /* deferred during tick; will flush post-tick */ }
+        const statuses = Array.from(nextStatuses.values())
+            .map((s) => ({
+                type: s.type,
+                duration: Math.max(0, ~~s.duration),
+                potency: s.potency,
+                stacks: s.stacks,
+            }))
+            .filter((s) => s.duration > 0);
+        try {
+            if (hadStatus || world.has(id, Status)) world.set(id, Status, { statuses });
+            else world.add(id, Status, { statuses });
+        } catch { /* deferred during tick; will flush post-tick */ }
     }
 }
 

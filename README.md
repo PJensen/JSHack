@@ -166,6 +166,14 @@ Systems are organized into three phases:
 
 See [scheduler.js](src/main/scheduler.js) for the full registration order. Add your own systems by registering them to a phase. Systems never call other systems — they emit events instead.
 
+### Action transactions vs intents
+
+JSHack also has a rules-layer action transaction utility (`src/rules/interaction/mutations.js`) used by action contexts (item use/apply/eat) for commit-or-cancel behavior.
+
+- Use **intents + phases** for system ordering and turn flow.
+- Use **action transactions** only for local all-or-nothing mutation batches inside a single action resolver.
+- Do not treat action transactions as a second scheduler or engine queue. ECS-js remains the only engine-level deferred command system.
+
 ### Components are just frozen objects
 
 ```js

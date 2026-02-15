@@ -25,7 +25,6 @@ export function pickMonster(rng, depth) {
     massKg: t.massKg,
     resistances: t.resistances,
     speed: t.speed,
-    naturalScript: t.script,
   };
 }
 

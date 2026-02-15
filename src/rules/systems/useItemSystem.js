@@ -3,27 +3,46 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Consumable } from "../components/Consumable.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Brain } from "../components/Brain.js";
-import { getSpell } from "../data/spells.js";
-import { runSpellScript } from "../scripts/spells.js";
+import { findItemUseDef } from "../data/itemUseDefs.js";
 import { runScript, ScriptVerb } from "../scripting.js";
+import { ItemUseActionContext } from "../utils/actionContexts.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
  * useItemSystem — resolves UseIntent for generic item use.
- * Supports:
- * - Consumable items with an effectKey dispatched via the scripting registry
- * - Learning spells from items of kind "learn" (e.g., spellbooks)
  *
- * Semantics:
- * - The item must be present in the actor's Inventory
- * - When consumed, reduce stack count (ItemInfo.count) or destroy if single
- * - Emits events:
- *   - 'item:used' { actor, itemId }
- *   - 'spell:learned' { actor, spellId }
- *   - 'spell:learn-denied' { actor, reason, spellId? }
- *   - 'spell:already-known' { actor, spellId }
+ * Cancellation: if a def callback calls ctx.cancel(), the item is NOT consumed
+ * and all queued effects are discarded.
  */
+
+function executeUseAction(action, context) {
+  if (typeof action !== "function") return false;
+  try {
+    const out = action(context);
+    if (typeof out === "boolean") return out;
+    if (out && typeof out === "object" && typeof out.consumed === "boolean") return out.consumed;
+  } catch {}
+  return false;
+}
+
+/**
+ * Normalize script return values to a consistent shape.
+ * @param {any} result
+ */
+function normalizeScriptUseResult(result) {
+  if (typeof result === "boolean") return { consumed: result, cancelled: false };
+  if (result && typeof result === "object") {
+    return {
+      consumed: typeof result.consumed === "boolean" ? result.consumed : true,
+      cancelled: result.cancelled === true,
+      code: result.code,
+      message: result.message,
+      consumesTurn: result.consumesTurn,
+    };
+  }
+  return { consumed: true, cancelled: false };
+}
+
 /**
  * @param {World} world
  */
@@ -32,89 +51,85 @@ export function useItemSystem(world) {
     const itemId = intent.itemId | 0;
     if (!(itemId > 0)) { world.remove(actor, UseIntent); continue; }
 
-  /** @type {{items:number[]}|null} */
-  const inv = /** @type any */ (world.get(actor, Inventory));
+    /** @type {{items:number[]}|null} */
+    const inv = /** @type any */ (world.get(actor, Inventory));
     if (!inv || !Array.isArray(inv.items)) { world.remove(actor, UseIntent); continue; }
 
     // ensure item is in inventory
     const idx = inv.items.indexOf(itemId);
     if (idx === -1) { world.remove(actor, UseIntent); continue; }
 
-  /** @type {{type?:string, description?:string, count?:number}|null} */
-  const info = /** @type any */ (world.get(itemId, ItemInfo));
-  /** @type {{identity?:string}|null} */
-  const ni = /** @type any */ (world.get(itemId, NamedIdentity));
-  /** @type {{effectKey?:string, effectParams?:object, remainingUses?:number}|null} */
-  const cons = /** @type any */ (world.get(itemId, Consumable));
+    /** @type {{type?:string, description?:string, count?:number}|null} */
+    const info = /** @type any */ (world.get(itemId, ItemInfo));
+    /** @type {{identity?:string}|null} */
+    const ni = /** @type any */ (world.get(itemId, NamedIdentity));
+    /** @type {{effectKey?:string, effectParams?:object, remainingUses?:number}|null} */
+    const cons = /** @type any */ (world.get(itemId, Consumable));
+    const identity = String(ni?.identity || "").toLowerCase();
 
     let consumed = false;
-    let learnedSpellId = null;
 
     // Path 1: consumable with a scripting-registry effectKey
     if (cons && cons.effectKey) {
-      try { runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }); } catch {}
-      // By default, consumables are consumed on use
-      consumed = true;
-    } else if (info && (info.type === 'learn' || info.type === 'scroll' || info.type === 'wand' || info.type === 'book')) {
-      const identity = (ni?.identity || '').toLowerCase();
+      const result = normalizeScriptUseResult(
+        runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }),
+      );
+      if (result.cancelled) {
+        try {
+          world.emit?.("item:use-cancelled", {
+            actor,
+            itemId,
+            code: result.code,
+            message: result.message,
+            consumesTurn: result.consumesTurn,
+          });
+        } catch {}
+        world.remove(actor, UseIntent);
+        continue;
+      }
+      consumed = result.consumed;
+    } else if (info) {
+      const context = new ItemUseActionContext({
+        world,
+        actor,
+        itemId,
+        intent,
+        info,
+        identity,
+      });
+      const def = findItemUseDef(context);
+      if (def) {
+        const run = typeof def.run === "function" ? def.run : def.action;
+        consumed = executeUseAction(run, context);
 
-      // Path 2a: WANDS fire spell from charges, no mana cost, auto-targets like bow
-      if (info.type === 'wand') {
-        const spellIdFromId = identity.startsWith('wand_') ? identity.substring('wand_'.length) : '';
-        const spell = getSpell(spellIdFromId);
-        if (!spell) { world.remove(actor, UseIntent); continue; }
-        try { runSpellScript(world, actor, spell, { targetId: intent.targetId }); } catch {}
-        try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: intent.targetId || actor, source: 'wand' }); } catch {}
-        consumed = true;
-
-      // Path 2b: SCROLLS cast directly without knowledge/mana requirements
-      } else if (info.type === 'scroll' || identity.startsWith('scroll_')) {
-        const spellIdFromId = identity.startsWith('scroll_') ? identity.substring('scroll_'.length) : '';
-        const spell = getSpell(spellIdFromId);
-        if (!spell) { world.remove(actor, UseIntent); continue; }
-        try { runSpellScript(world, actor, spell, {}); } catch {}
-        try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: actor }); } catch {}
-        consumed = true;
-      } else {
-        // Path 2c: learning from a spellbook-like item
-        if (identity.startsWith('book_')) {
-          learnedSpellId = identity.substring('book_'.length);
-        }
-        if (!learnedSpellId) { world.remove(actor, UseIntent); continue; }
-
-        const spell = getSpell(learnedSpellId);
-        if (!spell) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'unknown-spell', spellId: learnedSpellId }); world.remove(actor, UseIntent); continue; }
-
-        /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
-        let brain = /** @type any */ (world.get(actor, Brain));
-        if (!brain) { try { world.add(actor, Brain, {}); brain = world.get(actor, Brain); } catch {} }
-        if (!brain) { world.emit && world.emit('spell:learn-denied', { actor, reason: 'no-brain', spellId: spell.id }); world.remove(actor, UseIntent); continue; }
-
-        // already known
-        if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
-          try { world.emit && world.emit('spell:already-known', { actor, spellId: spell.id }); } catch {}
+        // Cancellation: discard queued effects, emit cancel event, skip consumption
+        if (context.cancelled) {
+          context.discard();
+          const reason = context.cancelReason;
+          try {
+            world.emit?.("item:use-cancelled", {
+              actor, itemId, code: reason?.code, message: reason?.message, consumesTurn: reason?.consumesTurn,
+            });
+          } catch {}
           world.remove(actor, UseIntent);
           continue;
         }
 
-        // learn
-        if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-        brain.learnedSpellIds.push(spell.id);
-        try { world.emit && world.emit('spell:learned', { actor, spellId: spell.id }); } catch {}
-        consumed = true;
+        // Commit queued mutations (damage, heal, effects)
+        context.commit();
       }
     }
 
     // If consumed, decrement stack or destroy and remove from inventory
     if (consumed) {
-  if (info && Number.isFinite(info?.count) && (info?.count ?? 0) > 1) {
+      if (info && Number.isFinite(info?.count) && (info?.count ?? 0) > 1) {
         world.mutate(itemId, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count | 0) - 1; });
       } else {
         // remove from inventory list first to avoid dangling id
         if (idx >= 0) inv.items.splice(idx, 1);
         try { world.destroy(itemId); } catch {}
       }
-      try { world.emit && world.emit('item:used', { actor, itemId }); } catch {}
+      try { world.emit && world.emit("item:used", { actor, itemId }); } catch {}
     }
 
     // clear intent
