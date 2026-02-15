@@ -63,7 +63,7 @@ export const APPLY_DEFS = [
     canUseTool: (ctx) => ctx.getToolIdentity() === APPLY_TOOL_IDENTITY.TOUCHSTONE,
     canTarget: isGemTarget,
     run: (ctx) => {
-      const actor = ctx.actor;
+      const actor = ctx.actorId;
       const toolId = ctx.toolId;
       const targetId = ctx.targetId;
       const identity = ctx.getTargetIdentity();
@@ -115,7 +115,7 @@ export const APPLY_DEFS = [
       };
       const consumedTool = ctx.consumeTool();
       ctx.emit("item:applied", {
-        actor: ctx.actor,
+        actor: ctx.actorId,
         toolId: ctx.toolId,
         targetId: ctx.targetId,
         result: {

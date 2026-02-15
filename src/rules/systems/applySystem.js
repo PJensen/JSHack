@@ -6,7 +6,9 @@ import { ItemApplyActionContext } from "../utils/actionContexts.js";
 
 /**
  * applySystem — resolves ApplyIntent for applying a tool item to a target item.
- * Looks up the tool's identity and dispatches via the scripting registry.
+ *
+ * Cancellation: if def.run() calls ctx.cancel(), all queued mutations are
+ * discarded and an 'item:apply-cancelled' event is emitted.
  * @param {World} world
  */
 export function applySystem(world) {
@@ -29,6 +31,20 @@ export function applySystem(world) {
     if (def && typeof def.run === "function") {
       const ctx = new ItemApplyActionContext({ world, actor, toolId, targetId });
       try { def.run(ctx); } catch {}
+
+      if (ctx.cancelled) {
+        ctx.discard();
+        const reason = ctx.cancelReason;
+        try {
+          world.emit?.("item:apply-cancelled", {
+            actor, toolId, targetId, code: reason?.code, message: reason?.message,
+          });
+        } catch {}
+        world.remove(actor, ApplyIntent);
+        continue;
+      }
+
+      ctx.commit();
     }
 
     world.remove(actor, ApplyIntent);

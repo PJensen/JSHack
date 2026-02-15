@@ -10,18 +10,9 @@ import { ItemUseActionContext } from "../utils/actionContexts.js";
 
 /**
  * useItemSystem — resolves UseIntent for generic item use.
- * Supports:
- * - Consumable items with an effectKey dispatched via the scripting registry
- * - Data-driven behaviors from itemUseDefs (wands, scrolls, spellbooks)
  *
- * Semantics:
- * - The item must be present in the actor's Inventory
- * - When consumed, reduce stack count (ItemInfo.count) or destroy if single
- * - Emits events:
- *   - 'item:used' { actor, itemId }
- *   - 'spell:learned' { actor, spellId }
- *   - 'spell:learn-denied' { actor, reason, spellId? }
- *   - 'spell:already-known' { actor, spellId }
+ * Cancellation: if a def callback calls ctx.cancel(), the item is NOT consumed
+ * and all queued effects are discarded.
  */
 
 function executeUseAction(action, context) {
@@ -77,6 +68,22 @@ export function useItemSystem(world) {
       if (def) {
         const run = typeof def.run === "function" ? def.run : def.action;
         consumed = executeUseAction(run, context);
+
+        // Cancellation: discard queued effects, emit cancel event, skip consumption
+        if (context.cancelled) {
+          context.discard();
+          const reason = context.cancelReason;
+          try {
+            world.emit?.("item:use-cancelled", {
+              actor, itemId, code: reason?.code, message: reason?.message,
+            });
+          } catch {}
+          world.remove(actor, UseIntent);
+          continue;
+        }
+
+        // Commit queued mutations (damage, heal, effects)
+        context.commit();
       }
     }
 

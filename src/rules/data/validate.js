@@ -303,6 +303,40 @@ export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {
   return true;
 }
 
+const VALID_HOOK_KEYS = new Set([
+  'onHit', 'onBeforeHit', 'onDamaged', 'eat',
+]);
+
+export function validateHookCallbacks(defs, opts = {}) {
+  if (!Array.isArray(defs)) throw new Error('defs must be an array');
+  const allowedKeys = opts.allowedKeys instanceof Set ? opts.allowedKeys : VALID_HOOK_KEYS;
+
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i];
+    const id = String(def?.id || `[${i}]`);
+    const hooks = def?.hooks;
+    if (hooks == null) continue;
+    if (typeof hooks !== 'object' || Array.isArray(hooks)) {
+      throw new Error(`${id}: hooks must be a plain object`);
+    }
+    for (const key of Object.keys(hooks)) {
+      if (allowedKeys.size > 0 && !allowedKeys.has(key)) {
+        throw new Error(`${id}: unknown hook key '${key}'`);
+      }
+      const arr = hooks[key];
+      if (!Array.isArray(arr)) {
+        throw new Error(`${id}: hooks.${key} must be an array`);
+      }
+      for (let j = 0; j < arr.length; j++) {
+        if (typeof arr[j] !== 'function') {
+          throw new Error(`${id}: hooks.${key}[${j}] must be a function`);
+        }
+      }
+    }
+  }
+  return true;
+}
+
 export function validateAll({
   ITEM_CATALOG,
   AFFIX_DEFS,
@@ -316,6 +350,7 @@ export function validateAll({
   MONSTER_PROC_TRIGGER_IDS,
   MONSTER_PROC_TARGET_IDS,
   MONSTER_PROC_EVENT_SCHEMA_IDS,
+  MONSTERS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
     && validateAffixes(AFFIX_DEFS)
@@ -340,5 +375,8 @@ export function validateAll({
           eventSchemaIds: MONSTER_PROC_EVENT_SCHEMA_IDS,
         },
       )
+      : true)
+    && (MONSTERS
+      ? validateHookCallbacks(MONSTERS)
       : true);
 }

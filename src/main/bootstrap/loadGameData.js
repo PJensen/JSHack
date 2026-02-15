@@ -249,6 +249,7 @@ export function loadGameData(opts = {}) {
         MONSTER_PROC_TRIGGER_IDS,
         MONSTER_PROC_TARGET_IDS,
         MONSTER_PROC_EVENT_SCHEMA_IDS,
+        MONSTERS,
       });
       completed++;
       emit(ds, 1);

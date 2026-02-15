@@ -3,50 +3,17 @@
 
 import { registerScript, ScriptVerb } from "../scripting.js";
 import { Hunger } from "../components/Hunger.js";
-import { ActiveEffects } from "../components/ActiveEffects.js";
-import { Vitality } from "../components/Vitality.js";
 import { Pet } from "../components/Pet.js";
 import { Owner } from "../components/Owner.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
-import { runCorpseUseProc } from "../data/food.js";
-
-/**
- * @param {any} world
- * @param {number} actor
- * @param {number} itemId
- */
-function createCorpseUseContext(world, actor, itemId) {
-  return {
-    world,
-    actor,
-    itemId,
-    emit(eventName, payload) {
-      try { world.emit && world.emit(eventName, payload); } catch { /* */ }
-    },
-    pushEffect(effect) {
-      let ae = world.get(actor, ActiveEffects);
-      if (!ae) {
-        try { world.add(actor, ActiveEffects, { effects: [] }); ae = world.get(actor, ActiveEffects); } catch { /* */ }
-      }
-      if (!ae || !Array.isArray(ae.effects)) return;
-      ae.effects.push(effect);
-    },
-    damage(amount, source = "corpse") {
-      const vit = world.get(actor, Vitality);
-      if (!vit) return 0;
-      const dmg = Math.max(0, amount | 0);
-      if (dmg <= 0) return 0;
-      vit.hp = Math.max(0, (vit.hp | 0) - dmg);
-      try { world.emit && world.emit("damage", { id: actor, amount: dmg, source }); } catch { /* */ }
-      return dmg;
-    },
-  };
-}
+import { getMonster } from "../data/monsters.js";
+import { EatCallbackContext, CORPSE_EAT_HOOKS } from "../data/callbacks/eat.js";
+import { runCallbackList } from "../interaction/dispatch.js";
 
 // Eat food: reduce hunger by nutrition, convert surplus to satiation,
-// and run per-corpse callback effects.
+// and run per-corpse callback effects from monster definition hooks.
 // Params: { nutrition: number, corpseType?: string }
 registerScript('consumable:eat', {
   [ScriptVerb.ItemUse]: (world, ctx) => {
@@ -87,9 +54,16 @@ registerScript('consumable:eat', {
       } catch { /* */ }
     }
 
+    // Resolve corpse type and run eat hooks from monster definition
     const corpseType = corpseTypeParam || String((world.get(itemId, NamedIdentity)?.identity || "").replace(/^corpse_/, ""));
     if (!corpseType) return;
-    runCorpseUseProc(corpseType, createCorpseUseContext(world, actor, itemId));
+
+    const monsterDef = getMonster(corpseType);
+    const hooks = monsterDef?.hooks?.eat || CORPSE_EAT_HOOKS[corpseType];
+    if (hooks) {
+      const eatCtx = new EatCallbackContext(world, actor, itemId);
+      runCallbackList(hooks, eatCtx);
+    }
   },
 });
 

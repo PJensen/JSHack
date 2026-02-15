@@ -14,13 +14,13 @@ Deno.test("monster status proc defs declare callable behavior or data effect", (
   }
 });
 
-Deno.test("monster status proc defs are projected into runtime monster combat proc defs", () => {
+Deno.test("every monster with proc defs has corresponding hooks on its monster definition", () => {
   const runtimeIds = new Set(MONSTER_COMBAT_PROC_DEFS.map((def) => String(def.id || "")));
 
   for (let i = 0; i < MONSTER_STATUS_PROC_DEFS.length; i++) {
     const def = MONSTER_STATUS_PROC_DEFS[i];
     assert(runtimeIds.has(def.id), `expected runtime proc defs to include ${def.id}`);
-    const hook = getMonster(def.monsterId)?.hooks?.[def.trigger];
-    assert(typeof hook === "function", `expected hook ${def.monsterId}.${def.trigger} to exist`);
+    const hookList = getMonster(def.monsterId)?.hooks?.[def.trigger];
+    assert(Array.isArray(hookList) && hookList.length > 0, `expected hook array ${def.monsterId}.${def.trigger} to exist and be non-empty`);
   }
 });
