@@ -3,19 +3,19 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { getMonster } from "../src/rules/data/monsters.js";
+import { CombatCallbackContext } from "../src/rules/data/callbacks/combat.js";
+import { runCallbackList } from "../src/rules/interaction/dispatch.js";
 
 Deno.test("troll smash on-hit applies regen to attacker", () => {
   const world = new World({ seed: 123 });
   const attacker = world.create();
   const defender = world.create();
-  const hook = getMonster("troll")?.hooks?.onHit;
-  assert(typeof hook === "function", "troll onHit hook should exist");
 
-  hook({ world, ctx: {
-    attacker,
-    defender,
-    damage: 5,
-  }});
+  const hooks = getMonster("troll")?.hooks?.onHit;
+  assert(Array.isArray(hooks) && hooks.length > 0, "troll onHit hooks should exist");
+
+  const ctx = new CombatCallbackContext(world, { attacker, defender, damage: 5 });
+  runCallbackList(hooks, ctx);
 
   const ae = world.get(attacker, ActiveEffects);
   assert(ae && Array.isArray(ae.effects), "attacker should gain active effects");
@@ -23,8 +23,9 @@ Deno.test("troll smash on-hit applies regen to attacker", () => {
 });
 
 Deno.test("lich drain on-damaged can emit phylactery event with defender actor", () => {
-  const hook = getMonster("lich")?.hooks?.onDamaged;
-  assert(typeof hook === "function", "lich onDamaged hook should exist");
+  const hooks = getMonster("lich")?.hooks?.onDamaged;
+  assert(Array.isArray(hooks) && hooks.length > 0, "lich onDamaged hooks should exist");
+
   let found = false;
   for (let seed = 0; seed < 2048; seed++) {
     const world = new World({ seed });
@@ -34,11 +35,8 @@ Deno.test("lich drain on-damaged can emit phylactery event with defender actor",
 
     world.on("proc:phylactery", (evt) => { payload = evt; });
 
-    hook({ world, ctx: {
-      attacker,
-      defender,
-      damage: 4,
-    }});
+    const ctx = new CombatCallbackContext(world, { attacker, defender, damage: 4 });
+    runCallbackList(hooks, ctx);
 
     const ae = world.get(defender, ActiveEffects);
     if (ae && Array.isArray(ae.effects) && ae.effects.some((e) => e.key === "regen")) {
@@ -52,8 +50,9 @@ Deno.test("lich drain on-damaged can emit phylactery event with defender actor",
 });
 
 Deno.test("mind flayer on-hit callback can wipe spells and apply mindwipe", () => {
-  const hook = getMonster("floating_eye")?.hooks?.onHit;
-  assert(typeof hook === "function", "floating eye onHit hook should exist");
+  const hooks = getMonster("floating_eye")?.hooks?.onHit;
+  assert(Array.isArray(hooks) && hooks.length > 0, "floating eye onHit hooks should exist");
+
   let found = false;
   for (let seed = 0; seed < 4096; seed++) {
     const world = new World({ seed });
@@ -64,11 +63,8 @@ Deno.test("mind flayer on-hit callback can wipe spells and apply mindwipe", () =
 
     world.on("proc:mindwipe", (evt) => { payload = evt; });
 
-    hook({ world, ctx: {
-      attacker,
-      defender,
-      damage: 7,
-    }});
+    const ctx = new CombatCallbackContext(world, { attacker, defender, damage: 7 });
+    runCallbackList(hooks, ctx);
 
     const ae = world.get(defender, ActiveEffects);
     if (ae && Array.isArray(ae.effects) && ae.effects.some((e) => e.key === "mindwipe")) {
