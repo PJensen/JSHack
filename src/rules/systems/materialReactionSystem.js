@@ -63,6 +63,52 @@ function transmuteToAsh(world, id, info, mat) {
 }
 
 /**
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} itemId
+ * @param {any} info
+ * @param {any} mat
+ */
+function snapshotItemState(world, itemId, info, mat) {
+  const ni = world.get(itemId, NamedIdentity);
+  const fallbackName = info?.description || info?.type || `item ${itemId}`;
+  return {
+    name: String(ni?.name || fallbackName),
+    identity: String(ni?.identity || ""),
+    type: String(info?.type || ""),
+    material: String(mat?.kind || ""),
+  };
+}
+
+/**
+ * @param {{
+ *   itemId: number,
+ *   ownerId: number | null,
+ *   scope: "inventory" | "ground",
+ *   sourceId: number,
+ *   sourcePos: {x:number,y:number},
+ *   rule: { id: string, eventKind: string },
+ *   reaction: { id: string, result?: string },
+ *   from: { name: string, identity: string, type: string, material: string },
+ *   to: { name: string, identity: string, type: string, material: string },
+ * }} spec
+ */
+function createItemTransformedEvent(spec) {
+  return Object.freeze({
+    itemId: Number(spec.itemId || 0) | 0,
+    ownerId: Number.isInteger(spec.ownerId) && spec.ownerId > 0 ? (spec.ownerId | 0) : null,
+    scope: spec.scope === "inventory" ? "inventory" : "ground",
+    source: Number(spec.sourceId || 0) | 0,
+    cause: String(spec.rule?.eventKind || "unknown"),
+    rule: String(spec.rule?.id || ""),
+    reaction: String(spec.reaction?.id || ""),
+    at: { x: spec.sourcePos.x | 0, y: spec.sourcePos.y | 0 },
+    from: spec.from,
+    to: spec.to,
+    result: String(spec.reaction?.result || "changed"),
+  });
+}
+
+/**
  * @param {any} info
  * @param {any} mat
  * @param {string} identity
@@ -116,8 +162,10 @@ function applyReactionOutcome(world, itemId, info, mat, outcome) {
  * @param {{x:number,y:number}} sourcePos
  * @param {Set<string|number>} seen
  * @param {any} rule
+ * @param {"inventory"|"ground"} scope
+ * @param {number|null} ownerId
  */
-function reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule) {
+function reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule, scope, ownerId) {
   if (!(itemId > 0) || !world.isAlive(itemId)) return false;
   const seenKey = `${rule.id}:${itemId}`;
   if (seen.has(seenKey)) return false;
@@ -127,19 +175,23 @@ function reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule) {
   for (let i = 0; i < rule.reactions.length; i++) {
     const reaction = rule.reactions[i];
     if (!matchesReaction(info, mat, identity, reaction.match)) continue;
+    const from = snapshotItemState(world, itemId, info, mat);
     if (!applyReactionOutcome(world, itemId, info, mat, reaction.outcome)) continue;
+    const to = snapshotItemState(world, itemId, info, mat);
 
     seen.add(seenKey);
     try {
-      world.emit?.("item:burned", {
+      world.emit?.("item:transformed", createItemTransformedEvent({
         itemId,
-        source: sourceId,
-        kind: rule.eventKind,
-        rule: rule.id,
-        reaction: reaction.id,
-        at: { x: sourcePos.x | 0, y: sourcePos.y | 0 },
-        result: String(reaction.result || "changed"),
-      });
+        ownerId,
+        scope,
+        sourceId,
+        sourcePos,
+        rule,
+        reaction,
+        from,
+        to,
+      }));
     } catch { /* */ }
     return true;
   }
@@ -172,7 +224,7 @@ export function materialReactionSystem(world) {
           // Floor items on the same tile as the source.
           for (const [itemId, itemPos, info, mat] of world.query(Position, ItemInfo, Material)) {
             if (itemPos.x !== sourcePos.x || itemPos.y !== sourcePos.y) continue;
-            reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule);
+            reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule, "ground", null);
           }
           continue;
         }
@@ -187,7 +239,7 @@ export function materialReactionSystem(world) {
             const info = world.get(itemId, ItemInfo);
             const mat = world.get(itemId, Material);
             if (!info || !mat) continue;
-            reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule);
+            reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule, "inventory", sourceId);
           }
         }
       }
