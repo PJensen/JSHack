@@ -4,6 +4,7 @@ import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { createCorpse } from "../src/rules/archetypes/Food.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
+import { Consumable } from "../src/rules/components/Consumable.js";
 import { Resistances } from "../src/rules/components/Resistences.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
@@ -22,6 +23,8 @@ Deno.test("eating eel corpse grants electric resistance", () => {
     massKg: 6,
     tier: 1,
   }, { x: 0, y: 0 });
+  const eelConsumable = world.get(eelCorpse, Consumable);
+  assertEquals(eelConsumable?.effectParams?.corpseIdentity, "corpse_eel", "corpse identity should follow corpse_<monsterId> convention");
   inv.items.push(eelCorpse);
 
   const beforeOhms = Number(world.get(player, Resistances)?.electric?.ohms || 0);
@@ -56,4 +59,3 @@ Deno.test("eating bat corpse can apply disease effect", () => {
   assert(ae && Array.isArray(ae.effects), "player should gain active effects");
   assert(ae.effects.some((e) => e.key === "disease"), "bat corpse should apply disease");
 });
-

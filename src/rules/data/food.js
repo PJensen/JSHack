@@ -1,6 +1,12 @@
 // rules/data/food.js
 // Nutrition data for food items and corpse nutrition calculations.
-// Corpse eat behavior now lives on monster defs (hooks.eat) via callbacks/eat.js.
+// Corpse eat behavior lives on corpse item data keyed by corpse identity.
+
+import {
+  corpseStatusEffect,
+  corpseDamage,
+  grantElectricResist,
+} from "./callbacks/eat.js";
 
 /**
  * Base nutrition by monster sizeClass.
@@ -25,31 +31,70 @@ export function computeCorpseNutrition(monsterDef) {
   return base + massBonus;
 }
 
-export const CORPSE_PROC_ID = Object.freeze({
-  DISEASE: "corpse:disease",
-  POISON: "corpse:poison",
-  SHOCK: "corpse:shock",
-  MINDWIPE: "corpse:mindwipe",
-  HALLUCINATION: "corpse:hallucination",
-  ELECTRIC_RESIST: "corpse:electric_resist",
+const EMPTY_HOOKS = Object.freeze([]);
+
+/**
+ * Corpse item definitions keyed by corpse identity.
+ * The identity convention is `corpse_${monsterId}`.
+ */
+export const CORPSE_DEFS = Object.freeze({
+  corpse_rat: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1)]),
+  }),
+  corpse_bat: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1)]),
+  }),
+  corpse_grid_bug: Object.freeze({
+    onEat: Object.freeze([corpseDamage(3)]),
+  }),
+  corpse_snake: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("poison", 8, 2)]),
+  }),
+  corpse_spider: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("poison", 8, 2)]),
+  }),
+  corpse_wraith: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("mindwipe", 15, 1)]),
+  }),
+  corpse_floating_eye: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("mindwipe", 30, 2, "hallucination")]),
+  }),
+  corpse_lich: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("mindwipe", 15, 1)]),
+  }),
+  corpse_eel: Object.freeze({
+    onEat: Object.freeze([grantElectricResist]),
+  }),
 });
 
 /**
- * Declarative corpse proc map.
- * Monster id -> proc id.
- * null/undefined = no special effect.
+ * @param {string} key
+ * @returns {string}
  */
-export const CORPSE_EFFECTS = Object.freeze({
-  rat: CORPSE_PROC_ID.DISEASE,
-  bat: CORPSE_PROC_ID.DISEASE,
-  snake: CORPSE_PROC_ID.POISON,
-  spider: CORPSE_PROC_ID.POISON,
-  grid_bug: CORPSE_PROC_ID.SHOCK,
-  wraith: CORPSE_PROC_ID.MINDWIPE,
-  floating_eye: CORPSE_PROC_ID.HALLUCINATION,
-  lich: CORPSE_PROC_ID.MINDWIPE,
-  eel: CORPSE_PROC_ID.ELECTRIC_RESIST,
-});
+function normalizeCorpseIdentity(key) {
+  const normalized = String(key || "").toLowerCase().trim();
+  if (!normalized) return "";
+  if (normalized.startsWith("corpse_")) return normalized;
+  return `corpse_${normalized}`;
+}
+
+/**
+ * @param {string} key corpse identity or monster id
+ * @returns {{ onEat?: Function[] }|null}
+ */
+export function getCorpseDef(key) {
+  const identity = normalizeCorpseIdentity(key);
+  return identity ? (CORPSE_DEFS[identity] || null) : null;
+}
+
+/**
+ * @param {string} key corpse identity or monster id
+ * @returns {Function[]}
+ */
+export function getCorpseEatHooks(key) {
+  const hooks = getCorpseDef(key)?.onEat;
+  return Array.isArray(hooks) ? hooks : EMPTY_HOOKS;
+}
 
 /** Standard ration nutrition values. */
 export const RATION_NUTRITION = 400;

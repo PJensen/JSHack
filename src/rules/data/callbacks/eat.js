@@ -118,11 +118,3 @@ export function grantElectricResist(ctx) {
   if (!Number.isFinite(resist.electric.fibrillationA)) resist.electric.fibrillationA = 0.03;
   ctx.emit("hunger:resistance-gained", { actor: ctx.actor, type: "electric", ohms: nextOhms });
 }
-
-/**
- * Fallback eat hooks for corpse types that aren't in the monster table.
- * Looked up by corpseType string when getMonster() returns null.
- */
-export const CORPSE_EAT_HOOKS = Object.freeze({
-  eel: [grantElectricResist],
-});
