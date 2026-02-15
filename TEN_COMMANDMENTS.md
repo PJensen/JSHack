@@ -63,10 +63,34 @@ Sub-tile collision resolution, capsule sweep tests, continuous-space pathfinding
 the player sees a grid. Solve grid problems. The elegance of the solution is
 irrelevant if it solves a problem that doesn't exist in the game the player plays.
 
-## X. Thou shalt remember: you did this twice.
+## X. Thou shalt drive systems with data, not code.
+
+Monster behaviors, item effects, material reactions, status procs — these belong
+in declarative definition files under `src/rules/data/`, not in `if/else` chains
+inside systems. Systems read data and execute it; they do not *know* what "poison"
+does. When adding a new effect or behavior, the first file you touch should be a
+data definition, and it should have a schema validated at boot. If you're adding a
+case to a switch statement, you're hard-coding.
+
+## XI. Thou shalt remember: you did this twice.
 
 Oct 23, 2025: 564 lines of lighting infrastructure in one evening. Deleted
 12,924 lines six days later. Nov 6, 2025: 921-line GeometryKernel reintroduced
 two days after the clean rebuild. Same mistake. Same rabbit hole. Different hat.
 
 If you are excited about the math, **that is the warning sign.**
+
+## XII. Thou shalt not build a second scheduler.
+
+ECS-js already owns deferred structural mutation (`world.command`) and tick order.
+Do not recreate that engine layer inside `src/rules/`.
+
+If you need turn flow or cross-system ordering:
+- use intent components
+- use scheduler phases
+- use events
+
+If you need all-or-nothing resolution for one action (e.g., cancel item use):
+- use action-local transaction helpers only
+- keep them local to action contexts
+- never let them become a global queue

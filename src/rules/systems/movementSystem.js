@@ -16,11 +16,37 @@ import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
 import { Facing } from "../components/Facing.js";
+import { Status } from "../components/Status.js";
 import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
+import { combatSeed, mulberry32 } from "../utils/rng.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
+
+const MISSTEP_DIRS = Object.freeze([
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0],            [1, 0],
+  [-1, 1],  [0, 1],   [1, 1],
+]);
+
+/**
+ * @param {any} status
+ * @param {string} type
+ * @returns {number}
+ */
+function statusStrength(status, type) {
+  if (!status || !Array.isArray(status.statuses)) return 0;
+  let total = 0;
+  for (const s of status.statuses) {
+    if (!s || s.type !== type) continue;
+    if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
+    const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
+    const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
+    total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
+  }
+  return total;
+}
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function movementSystem(world) {
@@ -35,8 +61,30 @@ export function movementSystem(world) {
       const pos = world.get(actor, Position);
       if (!pos) { world.remove(actor, MoveIntent); continue; }
 
-      const mdx = intent.dx | 0;
-      const mdy = intent.dy | 0;
+      const intendedDx = intent.dx | 0;
+      const intendedDy = intent.dy | 0;
+      let mdx = intendedDx;
+      let mdy = intendedDy;
+
+      // Confusion: movement inputs become a deterministic random misstep.
+      const confusePower = statusStrength(world.get(actor, Status), "confused");
+      if (confusePower > 0 && (intendedDx !== 0 || intendedDy !== 0)) {
+        const options = MISSTEP_DIRS.filter(([dx, dy]) => !(dx === intendedDx && dy === intendedDy));
+        if (options.length > 0) {
+          const posSalt = (((pos.x | 0) & 0xffff) << 16) ^ ((pos.y | 0) & 0xffff);
+          const r = mulberry32(combatSeed(world.seed, world.step, actor, posSalt, 0xC0F00D11));
+          const idx = (r() * options.length) | 0;
+          [mdx, mdy] = options[idx];
+          try {
+            world.emit?.("status:confused-misstep", {
+              actor,
+              from: { dx: intendedDx, dy: intendedDy },
+              to: { dx: mdx, dy: mdy },
+            });
+          } catch {}
+        }
+      }
+
       const nx = pos.x + mdx;
       const ny = pos.y + mdy;
       const k = key(nx, ny);
@@ -49,7 +97,7 @@ export function movementSystem(world) {
       if (!isWalkable(nx, ny) || blocking.has(k)) {
         // Cheap bump-attack: prefer a living target with Vitality in the destination cell.
         const target = living.get(k) || 0;
-        const manhattan = Math.abs(intent.dx | 0) + Math.abs(intent.dy | 0);
+        const manhattan = Math.abs(mdx) + Math.abs(mdy);
         if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
           // Check faction: neutral/shopkeeper NPCs with Interactable trigger interaction, not attack
           const fac = world.get(target, Faction);

@@ -75,6 +75,18 @@ JSHack has burned twice (Oct 23 and Nov 6, 2025) by violating these constraints.
 
 **Default assumption**: The problem is in JSHack code, not ECS-js. Only touch ECS-js when you're certain it's an architecture bug.
 
+### Action transaction boundary (do not build a second ECS)
+
+JSHack has a rules-layer action-local transaction utility in `src/rules/interaction/mutations.js`.
+It exists only to support all-or-nothing resolution inside one action callback chain (cancel vs commit).
+
+Rules:
+- It is **not** a scheduler.
+- It is **not** a replacement for ECS-js `world.command(...)`.
+- It must **not** become a cross-system queue.
+- In rules code, only `src/rules/utils/actionContexts.js` may import it directly.
+- If you need multi-system ordering, use intent components + scheduler phases (`intents`, `effects`, `cleanup`), not transaction ops.
+
 ---
 
 ## System communication: Events, not calls

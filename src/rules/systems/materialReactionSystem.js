@@ -4,26 +4,9 @@ import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { Status } from "../components/Status.js";
+import { MATERIAL_REACTION_RULES } from "../data/materialReactions.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
-
-/**
- * @typedef {{
- *   id: string,
- *   when: (info:any, mat:any) => boolean,
- *   apply: (world:any, id:number, info:any, mat:any) => void,
- * }} MaterialReaction
- */
-
-/**
- * @typedef {{
- *   id: string,
- *   sourceStatuses: string[],
- *   itemScopes: Array<"ground"|"inventory">,
- *   eventKind: string,
- *   reactions: MaterialReaction[],
- * }} MaterialReactionRule
- */
 
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
@@ -79,25 +62,50 @@ function transmuteToAsh(world, id, info, mat) {
   else world.add(id, Material, { kind: "sand" });
 }
 
-/** @type {MaterialReaction[]} */
-const ITEM_REACTIONS = [
-  {
-    id: "paper_scroll_to_ash",
-    when: (info, mat) => String(info?.type || "") === "scroll" && String(mat?.kind || "") === "paper",
-    apply: transmuteToAsh,
-  },
-];
+/**
+ * @param {any} info
+ * @param {any} mat
+ * @param {string} identity
+ * @param {{ itemTypes?: string[], materials?: string[], identities?: string[] }} match
+ */
+function matchesReaction(info, mat, identity, match) {
+  if (!match || typeof match !== "object") return false;
 
-/** @type {MaterialReactionRule[]} */
-const MATERIAL_REACTION_RULES = [
-  {
-    id: "burning_items_combust",
-    sourceStatuses: ["burning", "burn"],
-    itemScopes: ["ground", "inventory"],
-    eventKind: "burning",
-    reactions: ITEM_REACTIONS,
-  },
-];
+  const type = String(info?.type || "").toLowerCase();
+  const kind = String(mat?.kind || "").toLowerCase();
+  const normalizedIdentity = String(identity || "").toLowerCase();
+
+  const itemTypes = Array.isArray(match.itemTypes)
+    ? match.itemTypes.map((v) => String(v || "").toLowerCase()).filter(Boolean)
+    : [];
+  const materials = Array.isArray(match.materials)
+    ? match.materials.map((v) => String(v || "").toLowerCase()).filter(Boolean)
+    : [];
+  const identities = Array.isArray(match.identities)
+    ? match.identities.map((v) => String(v || "").toLowerCase()).filter(Boolean)
+    : [];
+
+  if (itemTypes.length > 0 && !itemTypes.includes(type)) return false;
+  if (materials.length > 0 && !materials.includes(kind)) return false;
+  if (identities.length > 0 && !identities.includes(normalizedIdentity)) return false;
+
+  return itemTypes.length > 0 || materials.length > 0 || identities.length > 0;
+}
+
+/**
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} itemId
+ * @param {any} info
+ * @param {any} mat
+ * @param {string} outcome
+ */
+function applyReactionOutcome(world, itemId, info, mat, outcome) {
+  if (outcome === "transmute_to_ash") {
+    transmuteToAsh(world, itemId, info, mat);
+    return true;
+  }
+  return false;
+}
 
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
@@ -107,18 +115,20 @@ const MATERIAL_REACTION_RULES = [
  * @param {number} sourceId
  * @param {{x:number,y:number}} sourcePos
  * @param {Set<string|number>} seen
- * @param {MaterialReactionRule} rule
+ * @param {any} rule
  */
 function reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule) {
   if (!(itemId > 0) || !world.isAlive(itemId)) return false;
   const seenKey = `${rule.id}:${itemId}`;
   if (seen.has(seenKey)) return false;
+  const ni = world.get(itemId, NamedIdentity);
+  const identity = String(ni?.identity || "");
 
   for (let i = 0; i < rule.reactions.length; i++) {
     const reaction = rule.reactions[i];
-    if (!reaction.when(info, mat)) continue;
+    if (!matchesReaction(info, mat, identity, reaction.match)) continue;
+    if (!applyReactionOutcome(world, itemId, info, mat, reaction.outcome)) continue;
 
-    reaction.apply(world, itemId, info, mat);
     seen.add(seenKey);
     try {
       world.emit?.("item:burned", {
@@ -128,7 +138,7 @@ function reactItem(world, itemId, info, mat, sourceId, sourcePos, seen, rule) {
         rule: rule.id,
         reaction: reaction.id,
         at: { x: sourcePos.x | 0, y: sourcePos.y | 0 },
-        result: "ash",
+        result: String(reaction.result || "changed"),
       });
     } catch { /* */ }
     return true;

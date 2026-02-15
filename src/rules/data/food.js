@@ -1,5 +1,13 @@
 // rules/data/food.js
 // Nutrition data for food items and corpse nutrition calculations.
+// Corpse eat behavior lives on corpse item data keyed by corpse identity.
+
+import {
+  cancelEat,
+  corpseStatusEffect,
+  corpseDamage,
+  grantElectricResist,
+} from "./callbacks/eat.js";
 
 /**
  * Base nutrition by monster sizeClass.
@@ -24,20 +32,73 @@ export function computeCorpseNutrition(monsterDef) {
   return base + massBonus;
 }
 
+const EMPTY_HOOKS = Object.freeze([]);
+
 /**
- * Some corpses are poisonous or have special effects when consumed.
- * Maps monster id -> special effect key.
- * null/undefined = safe to eat.
+ * Corpse item definitions keyed by corpse identity.
+ * The identity convention is `corpse_${monsterId}`.
  */
-export const CORPSE_EFFECTS = {
-  rat:          'disease',        // mangy rodent, risk of disease
-  snake:        'poison',         // venomous snake
-  spider:       'poison',         // venomous spider
-  grid_bug:     'shock',          // electric jolt (minor damage)
-  wraith:       'mindwipe',       // spectral meal, disorienting
-  floating_eye: 'hallucination',  // psychedelic meat
-  lich:         'mindwipe',       // eldritch remains
-};
+export const CORPSE_DEFS = Object.freeze({
+  corpse_rat: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1)]),
+  }),
+  corpse_bat: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1)]),
+  }),
+  corpse_grid_bug: Object.freeze({
+    onEat: Object.freeze([corpseDamage(3)]),
+  }),
+  corpse_snake: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("poison", 8, 2)]),
+  }),
+  corpse_spider: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("poison", 8, 2)]),
+  }),
+  corpse_wraith: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("mindwipe", 15, 1)]),
+  }),
+  corpse_floating_eye: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("mindwipe", 30, 2, "hallucination")]),
+  }),
+  corpse_lich: Object.freeze({
+    onEat: Object.freeze([corpseStatusEffect("mindwipe", 15, 1)]),
+  }),
+  corpse_eel: Object.freeze({
+    onEat: Object.freeze([grantElectricResist]),
+  }),
+  corpse_test_cancel: Object.freeze({
+    onEat: Object.freeze([cancelEat("FAIL", "You cannot stomach that.", true)]),
+  }),
+});
+
+/**
+ * @param {string} key
+ * @returns {string}
+ */
+function normalizeCorpseIdentity(key) {
+  const normalized = String(key || "").toLowerCase().trim();
+  if (!normalized) return "";
+  if (normalized.startsWith("corpse_")) return normalized;
+  return `corpse_${normalized}`;
+}
+
+/**
+ * @param {string} key corpse identity or monster id
+ * @returns {{ onEat?: Function[] }|null}
+ */
+export function getCorpseDef(key) {
+  const identity = normalizeCorpseIdentity(key);
+  return identity ? (CORPSE_DEFS[identity] || null) : null;
+}
+
+/**
+ * @param {string} key corpse identity or monster id
+ * @returns {Function[]}
+ */
+export function getCorpseEatHooks(key) {
+  const hooks = getCorpseDef(key)?.onEat;
+  return Array.isArray(hooks) ? hooks : EMPTY_HOOKS;
+}
 
 /** Standard ration nutrition values. */
 export const RATION_NUTRITION = 400;

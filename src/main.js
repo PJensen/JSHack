@@ -72,7 +72,7 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
-import { APPLY_DEFS, getApplyDef } from "./rules/data/applyDefs.js";
+import { canUseApplyTool, listApplyTargetsForTool } from "./rules/data/applyDefs.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { resetIdentification, identify } from "./rules/data/identification.js";
 import { initGemPricing, resetGemPricing } from "./rules/data/gemPricing.js";
@@ -616,9 +616,7 @@ addEventListener('ui:requestApplyToolsData', () => {
     const inv = world.get(p.id, Inventory);
     if (inv && Array.isArray(inv.items)) {
       for (const id of inv.items) {
-        const ni = world.get(id, NamedIdentity);
-        const identity = ni?.identity || '';
-        if (!APPLY_DEFS[identity]) continue;
+        if (!canUseApplyTool(world, p.id, id)) continue;
         items.push({ id, name: resolveItemDisplayName(world, id) });
       }
     }
@@ -632,17 +630,11 @@ addEventListener('ui:requestApplyTargetsData', (ev) => {
   const p = playerEntity(world);
   const items = [];
   if (p && toolId) {
-    const toolNi = world.get(toolId, NamedIdentity);
-    const def = getApplyDef(toolNi?.identity || '');
-    const filterType = def?.targetFilter || '';
-    const inv = world.get(p.id, Inventory);
-    if (inv && Array.isArray(inv.items)) {
-      for (const id of inv.items) {
-        if (id === toolId) continue; // don't apply tool to itself
-        const info = world.get(id, ItemInfo);
-        if (filterType && info?.type !== filterType) continue;
-        items.push({ id, name: resolveItemDisplayName(world, id), description: info?.description || '' });
-      }
+    const targetIds = listApplyTargetsForTool(world, p.id, toolId);
+    for (let i = 0; i < targetIds.length; i++) {
+      const id = targetIds[i];
+      const info = world.get(id, ItemInfo);
+      items.push({ id, name: resolveItemDisplayName(world, id), description: info?.description || '' });
     }
   }
   window.dispatchEvent(new CustomEvent('ui:applyTargetsData', { detail: { items } }));

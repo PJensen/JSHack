@@ -1,12 +1,14 @@
 import { ApplyIntent } from "../components/Intents/ApplyIntent.js";
 import { Inventory } from "../components/Inventory.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
-import { runScript, ScriptVerb } from "../scripting.js";
+import { findApplyDef } from "../data/applyDefs.js";
+import { ItemApplyActionContext } from "../utils/actionContexts.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
  * applySystem — resolves ApplyIntent for applying a tool item to a target item.
- * Looks up the tool's identity and dispatches via the scripting registry.
+ *
+ * Cancellation: if def.run() calls ctx.cancel(), all queued mutations are
+ * discarded and an 'item:apply-cancelled' event is emitted.
  * @param {World} world
  */
 export function applySystem(world) {
@@ -25,13 +27,29 @@ export function applySystem(world) {
       continue;
     }
 
-    const ni = /** @type any */ (world.get(toolId, NamedIdentity));
-    const identity = ni?.identity || '';
+    const def = findApplyDef(world, actor, toolId, targetId);
+    if (def && typeof def.run === "function") {
+      const ctx = new ItemApplyActionContext({ world, actor, toolId, targetId });
+      try { def.run(ctx); } catch {}
 
-    if (identity) {
-      try {
-        runScript(identity, ScriptVerb.ItemApply, world, { actor, toolId, targetId });
-      } catch {}
+      if (ctx.cancelled) {
+        ctx.discard();
+        const reason = ctx.cancelReason;
+        try {
+          world.emit?.("item:apply-cancelled", {
+            actor,
+            toolId,
+            targetId,
+            code: reason?.code,
+            message: reason?.message,
+            consumesTurn: reason?.consumesTurn,
+          });
+        } catch {}
+        world.remove(actor, ApplyIntent);
+        continue;
+      }
+
+      ctx.commit();
     }
 
     world.remove(actor, ApplyIntent);

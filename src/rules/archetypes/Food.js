@@ -6,9 +6,9 @@ import { Position } from "../components/Position.js";
 import {
   RATION_NUTRITION,
   IRON_RATION_NUTRITION,
-  CORPSE_EFFECTS,
   CORPSE_WEIGHT,
   computeCorpseNutrition,
+  getCorpseEatHooks,
 } from "../data/food.js";
 
 // Standard Ration archetype
@@ -60,14 +60,16 @@ export const IronRation = defineArchetype(
  */
 export function createCorpse(world, monsterDef, pos) {
   const nutrition = computeCorpseNutrition(monsterDef);
-  const special = CORPSE_EFFECTS[monsterDef.id] || null;
+  const corpseIdentity = `corpse_${String(monsterDef.id || "").toLowerCase()}`;
+  const onEat = getCorpseEatHooks(corpseIdentity);
+  const hasSpecialProc = onEat.length > 0;
   const weight = CORPSE_WEIGHT[monsterDef.sizeClass] || 3;
 
   const id = world.create();
 
   world.add(id, Consumable, {
     effectKey: 'consumable:eat',
-    effectParams: { nutrition, special },
+    effectParams: { nutrition, corpseIdentity },
     remainingUses: 1,
     potency: 0,
   });
@@ -76,13 +78,13 @@ export function createCorpse(world, monsterDef, pos) {
     type: "food",
     weight,
     value: Math.max(1, Math.floor(nutrition / 20)),
-    description: `The remains of a ${monsterDef.name}. ${special ? 'Looks questionable.' : 'Looks edible.'}`,
+    description: `The remains of a ${monsterDef.name}. ${hasSpecialProc ? 'Looks questionable.' : 'Looks edible.'}`,
     count: 1,
   });
 
   world.add(id, NamedIdentity, {
     name: `${monsterDef.name} Corpse`,
-    identity: `corpse_${monsterDef.id}`,
+    identity: corpseIdentity,
   });
 
   world.add(id, Position, { x: pos.x, y: pos.y });
