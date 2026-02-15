@@ -2,43 +2,41 @@
 // Eat callback context and shared factory functions for corpse eating hooks.
 // Callbacks are plain (ctx) => void functions invoked via runCallbackList.
 
-import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { RuleActionContext } from "../../utils/actionContexts.js";
 import { Resistances } from "../../components/Resistences.js";
-import { Vitality } from "../../components/Vitality.js";
 
 // ── EatCallbackContext ─────────────────────────────────────────────
 
 /**
  * Context passed to corpse eat hook callbacks.
- * Provides pushEffect(), damage(), emit() targeting the eating actor.
+ * Mutations are queued and only applied on commit().
  */
-export class EatCallbackContext {
+export class EatCallbackContext extends RuleActionContext {
   /**
    * @param {any} world
    * @param {number} actor - the entity eating the corpse
    * @param {number} itemId - the corpse entity being eaten
    */
   constructor(world, actor, itemId) {
-    this.world = world;
+    super(world);
     this.actor = actor;
     this.itemId = itemId;
-    this._cancelled = false;
-    this._cancelReason = null;
+    this._postCommitEvents = [];
   }
 
-  get cancelled() { return this._cancelled; }
-  get cancelReason() { return this._cancelReason; }
-
-  cancel(reason) {
-    this._cancelled = true;
-    this._cancelReason = typeof reason === "string"
-      ? { code: reason, message: reason }
-      : reason || { code: "CANCELLED", message: "Cancelled" };
+  /**
+   * Queue nutrition application (hunger/satiation update).
+   * @param {number} nutrition
+   */
+  applyNutrition(nutrition) {
+    const amount = Number(nutrition || 0);
+    if (!Number.isFinite(amount) || amount === 0) return false;
+    return this.queueMutation({ type: "nutrition", entityId: this.actor, nutrition: amount });
   }
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    try { this.world.emit && this.world.emit(eventName, payload); } catch {}
+    this._postCommitEvents.push({ eventName, payload });
   }
 
   /**
@@ -46,12 +44,7 @@ export class EatCallbackContext {
    * @param {{ key:string, turnsLeft:number, potency:number, stacks?:number, sourceId?:number }} effect
    */
   pushEffect(effect) {
-    let ae = this.world.get(this.actor, ActiveEffects);
-    if (!ae) {
-      try { this.world.add(this.actor, ActiveEffects, { effects: [] }); ae = this.world.get(this.actor, ActiveEffects); } catch {}
-    }
-    if (!ae || !Array.isArray(ae.effects)) return;
-    ae.effects.push(effect);
+    return super.pushEffect(this.actor, effect);
   }
 
   /**
@@ -61,13 +54,40 @@ export class EatCallbackContext {
    * @returns {number} damage dealt
    */
   damage(amount, source = "corpse") {
-    const vit = this.world.get(this.actor, Vitality);
-    if (!vit) return 0;
-    const dmg = Math.max(0, amount | 0);
-    if (dmg <= 0) return 0;
-    vit.hp = Math.max(0, (vit.hp | 0) - dmg);
-    try { this.world.emit && this.world.emit("damage", { id: this.actor, amount: dmg, source }); } catch {}
-    return dmg;
+    return super.damage(this.actor, amount, source);
+  }
+
+  /**
+   * Queue electric resistance grant on the eating actor.
+   * @param {number} [minOhms]
+   * @param {number} [fibrillationA]
+   */
+  grantElectricResistance(minOhms = 2400, fibrillationA = 0.03) {
+    return this.queueMutation({
+      type: "grantElectricResistance",
+      entityId: this.actor,
+      minOhms,
+      fibrillationA,
+    });
+  }
+
+  commit() {
+    const applied = super.commit();
+    if (this.cancelled) {
+      this._postCommitEvents.length = 0;
+      return applied;
+    }
+    for (let i = 0; i < this._postCommitEvents.length; i++) {
+      const entry = this._postCommitEvents[i];
+      try { this.world.emit && this.world.emit(entry.eventName, entry.payload); } catch {}
+    }
+    this._postCommitEvents.length = 0;
+    return applied;
+  }
+
+  discard() {
+    this._postCommitEvents.length = 0;
+    return super.discard();
   }
 }
 
@@ -103,18 +123,20 @@ export function corpseDamage(amount) {
  * Used by eel corpse.
  */
 export function grantElectricResist(ctx) {
-  let resist = ctx.world.get(ctx.actor, Resistances);
-  if (!resist) {
-    try { ctx.world.add(ctx.actor, Resistances, {}); } catch {}
-    resist = ctx.world.get(ctx.actor, Resistances);
-  }
-  if (!resist) return;
-  const current = Number(resist?.electric?.ohms);
-  const nextOhms = Number.isFinite(current)
-    ? Math.max(current, 2400)
-    : 2400;
-  if (!resist.electric || typeof resist.electric !== "object") resist.electric = {};
-  resist.electric.ohms = nextOhms;
-  if (!Number.isFinite(resist.electric.fibrillationA)) resist.electric.fibrillationA = 0.03;
+  const current = Number(ctx.world.get(ctx.actor, Resistances)?.electric?.ohms);
+  const nextOhms = Number.isFinite(current) ? Math.max(current, 2400) : 2400;
+  ctx.grantElectricResistance(2400, 0.03);
   ctx.emit("hunger:resistance-gained", { actor: ctx.actor, type: "electric", ohms: nextOhms });
+}
+
+/**
+ * Cancel the eat action with a structured reason.
+ * Useful for hard-gated corpse interactions.
+ */
+export function cancelEat(code, message, consumesTurn = true) {
+  const reasonCode = String(code || "FAIL");
+  const reasonMessage = String(message || "You cannot do that.");
+  return (ctx) => {
+    ctx.cancel({ code: reasonCode, message: reasonMessage, consumesTurn });
+  };
 }

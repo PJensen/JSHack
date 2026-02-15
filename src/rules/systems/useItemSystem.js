@@ -26,6 +26,24 @@ function executeUseAction(action, context) {
 }
 
 /**
+ * Normalize script return values to a consistent shape.
+ * @param {any} result
+ */
+function normalizeScriptUseResult(result) {
+  if (typeof result === "boolean") return { consumed: result, cancelled: false };
+  if (result && typeof result === "object") {
+    return {
+      consumed: typeof result.consumed === "boolean" ? result.consumed : true,
+      cancelled: result.cancelled === true,
+      code: result.code,
+      message: result.message,
+      consumesTurn: result.consumesTurn,
+    };
+  }
+  return { consumed: true, cancelled: false };
+}
+
+/**
  * @param {World} world
  */
 export function useItemSystem(world) {
@@ -53,8 +71,23 @@ export function useItemSystem(world) {
 
     // Path 1: consumable with a scripting-registry effectKey
     if (cons && cons.effectKey) {
-      try { runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }); } catch {}
-      consumed = true;
+      const result = normalizeScriptUseResult(
+        runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }),
+      );
+      if (result.cancelled) {
+        try {
+          world.emit?.("item:use-cancelled", {
+            actor,
+            itemId,
+            code: result.code,
+            message: result.message,
+            consumesTurn: result.consumesTurn,
+          });
+        } catch {}
+        world.remove(actor, UseIntent);
+        continue;
+      }
+      consumed = result.consumed;
     } else if (info) {
       const context = new ItemUseActionContext({
         world,
@@ -75,7 +108,7 @@ export function useItemSystem(world) {
           const reason = context.cancelReason;
           try {
             world.emit?.("item:use-cancelled", {
-              actor, itemId, code: reason?.code, message: reason?.message,
+              actor, itemId, code: reason?.code, message: reason?.message, consumesTurn: reason?.consumesTurn,
             });
           } catch {}
           world.remove(actor, UseIntent);

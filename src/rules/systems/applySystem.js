@@ -37,7 +37,12 @@ export function applySystem(world) {
         const reason = ctx.cancelReason;
         try {
           world.emit?.("item:apply-cancelled", {
-            actor, toolId, targetId, code: reason?.code, message: reason?.message,
+            actor,
+            toolId,
+            targetId,
+            code: reason?.code,
+            message: reason?.message,
+            consumesTurn: reason?.consumesTurn,
           });
         } catch {}
         world.remove(actor, ApplyIntent);

@@ -79,3 +79,18 @@ Oct 23, 2025: 564 lines of lighting infrastructure in one evening. Deleted
 two days after the clean rebuild. Same mistake. Same rabbit hole. Different hat.
 
 If you are excited about the math, **that is the warning sign.**
+
+## XII. Thou shalt not build a second scheduler.
+
+ECS-js already owns deferred structural mutation (`world.command`) and tick order.
+Do not recreate that engine layer inside `src/rules/`.
+
+If you need turn flow or cross-system ordering:
+- use intent components
+- use scheduler phases
+- use events
+
+If you need all-or-nothing resolution for one action (e.g., cancel item use):
+- use action-local transaction helpers only
+- keep them local to action contexts
+- never let them become a global queue

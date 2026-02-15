@@ -21,8 +21,29 @@ registerScript('consumable:eat', {
     const itemId = Number(ctx?.itemId || 0) || 0;
     const nutrition = Number(ctx?.params?.nutrition || 0);
     const corpseIdentityParam = String(ctx?.params?.corpseIdentity || "").toLowerCase();
+    const eatCtx = new EatCallbackContext(world, actor, itemId);
+    eatCtx.applyNutrition(nutrition);
 
-    const hc = world.get(actor, Hunger);
+    // Resolve corpse identity and run per-corpse item hooks.
+    const corpseIdentity = corpseIdentityParam || String(world.get(itemId, NamedIdentity)?.identity || "").toLowerCase();
+    const hooks = getCorpseEatHooks(corpseIdentity);
+    if (Array.isArray(hooks) && hooks.length > 0) {
+      runCallbackList(hooks, eatCtx);
+    }
+
+    if (eatCtx.cancelled) {
+      const reason = eatCtx.cancelReason || { code: "CANCELLED", message: "Cancelled" };
+      eatCtx.discard();
+      return {
+        consumed: false,
+        cancelled: true,
+        code: reason.code,
+        message: reason.message,
+        consumesTurn: reason.consumesTurn,
+      };
+    }
+
+    eatCtx.commit();
 
     // Check if this is a pet corpse being eaten (desecration!)
     if (itemId > 0 && world.has(itemId, Pet)) {
@@ -38,15 +59,8 @@ registerScript('consumable:eat', {
       } catch { /* */ }
     }
 
-    if (hc) {
-      const newHunger = hc.hunger - nutrition;
-      if (newHunger < 0) {
-        hc.satiation = Math.min(hc.satiation + Math.abs(newHunger), 200);
-        hc.hunger = 0;
-      } else {
-        hc.hunger = newHunger;
-      }
-
+    const hc = world.get(actor, Hunger);
+    if (hc && Number.isFinite(nutrition) && nutrition !== 0) {
       try {
         world.emit && world.emit('hunger:ate', {
           actor, nutrition, newHunger: hc.hunger, satiation: hc.satiation,
@@ -54,13 +68,7 @@ registerScript('consumable:eat', {
       } catch { /* */ }
     }
 
-    // Resolve corpse identity and run per-corpse item hooks.
-    const corpseIdentity = corpseIdentityParam || String(world.get(itemId, NamedIdentity)?.identity || "").toLowerCase();
-    const hooks = getCorpseEatHooks(corpseIdentity);
-    if (Array.isArray(hooks) && hooks.length > 0) {
-      const eatCtx = new EatCallbackContext(world, actor, itemId);
-      runCallbackList(hooks, eatCtx);
-    }
+    return { consumed: true };
   },
 });
 
