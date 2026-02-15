@@ -5,15 +5,10 @@ import { EFFECT_DEFS, EFFECT_OPERATION_IDS } from '../src/rules/data/effectDefs.
 import { APPLY_DEFS } from '../src/rules/data/applyDefs.js';
 import { ITEM_USE_DEFS } from '../src/rules/data/itemUseDefs.js';
 import { MATERIAL_REACTION_OUTCOME_IDS, MATERIAL_REACTION_RULES } from '../src/rules/data/materialReactions.js';
-import {
-  MONSTER_PROC_EVENT_SCHEMA_IDS,
-  MONSTER_PROC_TARGET_IDS,
-  MONSTER_PROC_TRIGGER_IDS,
-  MONSTER_STATUS_PROC_DEFS,
-} from '../src/rules/data/monsterStatusProcs.js';
+import { MONSTERS } from "../src/rules/data/monsters.js";
 import { validateAll } from '../src/rules/data/validate.js';
 
-Deno.test("data validation passes for item catalog, affixes, effects, item-use, monster procs, and material reactions", () => {
+Deno.test("data validation passes for item catalog, affixes, effects, item-use, monster hooks, and material reactions", () => {
   const ok = validateAll({
     ITEM_CATALOG,
     AFFIX_DEFS,
@@ -21,10 +16,7 @@ Deno.test("data validation passes for item catalog, affixes, effects, item-use, 
     EFFECT_DEFS,
     EFFECT_OPERATION_IDS,
     ITEM_USE_DEFS,
-    MONSTER_STATUS_PROC_DEFS,
-    MONSTER_PROC_TRIGGER_IDS,
-    MONSTER_PROC_TARGET_IDS,
-    MONSTER_PROC_EVENT_SCHEMA_IDS,
+    MONSTERS,
     MATERIAL_REACTION_RULES,
     MATERIAL_REACTION_OUTCOME_IDS,
   });
