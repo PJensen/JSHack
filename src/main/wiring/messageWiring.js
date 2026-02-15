@@ -272,7 +272,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     }
   });
 
-  world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph }) => {
+  world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph, title, text }) => {
     if (action === 'toggleDoor') {
       log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`, 'system');
     }
@@ -286,6 +286,15 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
         log('----------------', 'system');
       } else {
         log('The tombstone inscription has faded...', 'system');
+      }
+    }
+    if (action === 'readBook') {
+      if (text) {
+        log(`--- ${title || 'Book'} ---`, 'system');
+        log(text, 'system');
+        log('----------------', 'system');
+      } else {
+        log('The pages have crumbled to dust...', 'system');
       }
     }
   });
@@ -326,6 +335,16 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`You identify the ${appearance}: it's ${displayName}!`, 'system');
     // Trigger inventory refresh so names update immediately
     try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  });
+
+  // === Food decay events ===
+  world.on('food:decayed', ({ ownerId, itemId, stage, itemName }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== ownerId) return;
+    const label = bracketizeName(itemName);
+    if (stage === 'off')    log(`Your ${label} smells off.`, 'system');
+    if (stage === 'rancid') log(`Your ${label} reeks!`, 'system');
+    if (stage === 'putrid') log(`Your ${label} is putrid!`, 'system');
   });
 
   // === Equipment events ===

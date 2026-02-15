@@ -3,9 +3,12 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Consumable } from "../components/Consumable.js";
 import { Position } from "../components/Position.js";
+import { FoodDecay } from "../components/FoodDecay.js";
 import {
   RATION_NUTRITION,
   IRON_RATION_NUTRITION,
+  SHELF_LIFE_RATION,
+  SHELF_LIFE_CORPSE,
   CORPSE_WEIGHT,
   computeCorpseNutrition,
   getCorpseEatHooks,
@@ -28,6 +31,7 @@ export const Ration = defineArchetype(
     count: 1,
   }],
   [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Ration", identity: "food_ration" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: SHELF_LIFE_RATION }],
 );
 
 // Iron Ration — premium, found in chests or shops
@@ -88,6 +92,7 @@ export function createCorpse(world, monsterDef, pos) {
   });
 
   world.add(id, Position, { x: pos.x, y: pos.y });
+  world.add(id, FoodDecay, { turnsHeld: 0, shelfLife: SHELF_LIFE_CORPSE });
 
   return id;
 }

@@ -5,7 +5,9 @@
 
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { FoodDecay } from "../../rules/components/FoodDecay.js";
 import { isIdentified } from "../../rules/data/identification.js";
+import { getDecayStage } from "../../rules/data/food.js";
 
 /**
  * Resolve the display name for an item entity.
@@ -30,5 +32,17 @@ export function resolveItemDisplayName(world, entityId) {
   }
 
   // Non-gem items: true name → description → type fallback
-  return ni?.name || info?.description || info?.type || 'item';
+  let name = ni?.name || info?.description || info?.type || 'item';
+
+  // Prepend decay stage for food that has gone off
+  const decay = world.get(entityId, FoodDecay);
+  if (decay) {
+    const { stage } = getDecayStage(decay.turnsHeld, decay.shelfLife);
+    if (stage !== 'fresh') {
+      const prefix = stage.charAt(0).toUpperCase() + stage.slice(1);
+      name = `${prefix} ${name}`;
+    }
+  }
+
+  return name;
 }
