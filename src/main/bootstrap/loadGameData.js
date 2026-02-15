@@ -11,12 +11,6 @@ import { GEM_DEFS } from "../../rules/data/gems.js";
 import { APPLY_DEFS } from "../../rules/data/applyDefs.js";
 import { EFFECT_DEFS, EFFECT_OPERATION_IDS } from "../../rules/data/effectDefs.js";
 import { ITEM_USE_DEFS } from "../../rules/data/itemUseDefs.js";
-import {
-  MONSTER_PROC_EVENT_SCHEMA_IDS,
-  MONSTER_PROC_TARGET_IDS,
-  MONSTER_PROC_TRIGGER_IDS,
-  MONSTER_STATUS_PROC_DEFS,
-} from "../../rules/data/monsterStatusProcs.js";
 import { MATERIAL_REACTION_OUTCOME_IDS, MATERIAL_REACTION_RULES } from "../../rules/data/materialReactions.js";
 import { NUTRITION_BY_SIZE, CORPSE_DEFS } from "../../rules/data/food.js";
 import { validateAll } from "../../rules/data/validate.js";
@@ -57,7 +51,6 @@ export function getGameDataLoadPlan() {
     { id: "apply", label: "Loading apply defs", total: APPLY_DEFS.length },
     { id: "effects", label: "Loading effect defs", total: EFFECT_DEFS.length },
     { id: "itemUse", label: "Loading item use defs", total: ITEM_USE_DEFS.length },
-    { id: "monsterProcs", label: "Loading monster proc defs", total: MONSTER_STATUS_PROC_DEFS.length },
     { id: "materialReactions", label: "Loading material reactions", total: MATERIAL_REACTION_RULES.length },
     { id: "validate", label: "Validating data", total: 1 },
   ];
@@ -217,15 +210,6 @@ export function loadGameData(opts = {}) {
       continue;
     }
 
-    if (ds.id === "monsterProcs") {
-      for (let i = 0; i < MONSTER_STATUS_PROC_DEFS.length; i++) {
-        void MONSTER_STATUS_PROC_DEFS[i];
-        completed++;
-        emit(ds, i + 1);
-      }
-      continue;
-    }
-
     if (ds.id === "materialReactions") {
       for (let i = 0; i < MATERIAL_REACTION_RULES.length; i++) {
         void MATERIAL_REACTION_RULES[i];
@@ -245,10 +229,6 @@ export function loadGameData(opts = {}) {
         ITEM_USE_DEFS,
         EFFECT_DEFS,
         EFFECT_OPERATION_IDS,
-        MONSTER_STATUS_PROC_DEFS,
-        MONSTER_PROC_TRIGGER_IDS,
-        MONSTER_PROC_TARGET_IDS,
-        MONSTER_PROC_EVENT_SCHEMA_IDS,
         MONSTERS,
       });
       completed++;
