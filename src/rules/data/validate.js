@@ -227,6 +227,9 @@ export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {
     if (defIds.has(id)) throw new Error(`monster status proc def ${id}: duplicate id`);
     defIds.add(id);
 
+    const monsterId = String(def?.monsterId || '');
+    if (!monsterId) throw new Error(`monster status proc def ${id}: monsterId required`);
+
     const script = String(def?.script || '');
     if (!script) throw new Error(`monster status proc def ${id}: script required`);
 

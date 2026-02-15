@@ -1,7 +1,7 @@
 // rules/data/monsterStatusProcs.js
 // Data-driven monster proc scripts that apply status effects.
 import { Brain } from "../components/Brain.js";
-import { degradeFloorMemory } from "../environment/dungeon/transition.js";
+import { degradeExplored } from "../environment/dungeon/exploredMap.js";
 import { MONSTER_SCRIPT_IDS } from "./monsterScriptIds.js";
 
 export const MONSTER_PROC_TRIGGER = Object.freeze({
@@ -28,13 +28,20 @@ export const MONSTER_PROC_EVENT_SCHEMA_IDS = Object.freeze(Object.values(MONSTER
 
 /**
  * Mind flayer blast: clear known spells, apply mindwipe, and degrade map memory.
- * @param {{ world:any, ctx:any, rng?:() => number, pushEffect:(entityId:number, effect:any) => void, emit:(event:string, payload:any) => void }} context
+ * @param {{ world:any, ctx:any, rng?:() => number, degradeFloorMemory?:(rng:() => number, opts?:any) => { depth:number }, pushEffect:(entityId:number, effect:any) => void, emit:(event:string, payload:any) => void }} context
  */
 function applyMindflayerBlast(context) {
   const world = context.world;
   const ctx = context.ctx;
   const rng = typeof context?.rng === "function" ? context.rng : (() => 0);
-  const { depth } = degradeFloorMemory(rng, { fraction: 0.3 });
+  const degradeMemory = typeof context?.degradeFloorMemory === "function"
+    ? context.degradeFloorMemory
+    : (rngFn, opts = {}) => {
+      const fraction = Math.max(0, Math.min(1, opts?.fraction ?? 0.3));
+      degradeExplored(fraction, rngFn);
+      return { depth: 0 };
+    };
+  const { depth } = degradeMemory(rng, { fraction: 0.3 });
   const brain = world.get(ctx.defender, Brain);
   if (brain) brain.learnedSpellIds = [];
 
@@ -49,6 +56,7 @@ function applyMindflayerBlast(context) {
 /**
  * @typedef {{
  *   id: string,
+ *   monsterId: string,
  *   script: string,
  *   trigger: "onHit"|"onBeforeHit"|"onDamaged",
  *   chancePct: number,
@@ -65,6 +73,7 @@ function applyMindflayerBlast(context) {
 export const MONSTER_STATUS_PROC_DEFS = [
   {
     id: "rat_bite_disease",
+    monsterId: "rat",
     script: MONSTER_SCRIPT_IDS.RAT_BITE,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 25,
@@ -74,6 +83,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "spider_bite_poison",
+    monsterId: "spider",
     script: MONSTER_SCRIPT_IDS.SPIDER_BITE,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 30,
@@ -83,6 +93,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "dragon_claw_burn",
+    monsterId: "dragon",
     script: MONSTER_SCRIPT_IDS.DRAGON_CLAW,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 20,
@@ -92,6 +103,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "snake_bite_poison",
+    monsterId: "snake",
     script: MONSTER_SCRIPT_IDS.SNAKE_BITE,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 25,
@@ -101,6 +113,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "goblin_shiv_bleed",
+    monsterId: "goblin",
     script: MONSTER_SCRIPT_IDS.GOBLIN_SHIV,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 20,
@@ -110,6 +123,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "bat_screech_stun",
+    monsterId: "bat",
     script: MONSTER_SCRIPT_IDS.BAT_SCREECH,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 15,
@@ -119,6 +133,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "ogre_crush_stun",
+    monsterId: "ogre",
     script: MONSTER_SCRIPT_IDS.OGRE_CRUSH,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 25,
@@ -128,6 +143,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "grid_bug_zap_shock",
+    monsterId: "grid_bug",
     script: MONSTER_SCRIPT_IDS.GRID_BUG_ZAP,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 30,
@@ -137,6 +153,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "troll_smash_regen_on_hit",
+    monsterId: "troll",
     script: MONSTER_SCRIPT_IDS.TROLL_SMASH,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 100,
@@ -146,6 +163,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "demon_hellfire_burn_on_hit",
+    monsterId: "demon",
     script: MONSTER_SCRIPT_IDS.DEMON_HELLFIRE,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 30,
@@ -155,6 +173,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "lich_phylactery_regen_on_damaged",
+    monsterId: "lich",
     script: MONSTER_SCRIPT_IDS.LICH_DRAIN,
     trigger: MONSTER_PROC_TRIGGER.ON_DAMAGED,
     chancePct: 20,
@@ -165,6 +184,7 @@ export const MONSTER_STATUS_PROC_DEFS = [
   },
   {
     id: "mindflayer_mindwipe_on_hit",
+    monsterId: "floating_eye",
     script: MONSTER_SCRIPT_IDS.MINDFLAYER_BLAST,
     trigger: MONSTER_PROC_TRIGGER.ON_HIT,
     chancePct: 20,

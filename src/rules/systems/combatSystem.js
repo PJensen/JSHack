@@ -15,6 +15,7 @@ import { NamedIdentity } from '../components/NamedIdentity.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { getMonster } from '../data/monsters.js';
 import { MONSTER_COMBAT_TRIGGER } from '../data/monsterCombatProcs.js';
+import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
@@ -65,13 +66,14 @@ function attachHelpers(world, base) {
  * @param {number} entityId
  * @param {'onBeforeHit'|'onHit'|'onDamaged'} hookName
  * @param {any} ctx
+ * @param {{ degradeFloorMemory?:(rng:() => number, opts?:any) => { depth:number } } | null} deps
  */
-function runMonsterHook(world, entityId, hookName, ctx) {
+function runMonsterHook(world, entityId, hookName, ctx, deps = null) {
     const ni = world.get(entityId, NamedIdentity);
     const def = ni ? getMonster(ni.identity) : null;
     const hook = def?.hooks?.[hookName];
     if (typeof hook === 'function') {
-        try { hook({ world, ctx }); } catch {}
+        try { hook({ world, ctx, deps }); } catch {}
         return true;
     }
     return false;
@@ -194,7 +196,7 @@ export function combatSystem(world) {
             }
         });
         // Innate monster pre-hit behavior from monster definition hooks
-        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.BEFORE_HIT, ctx);
+        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.BEFORE_HIT, ctx, { degradeFloorMemory });
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -211,7 +213,7 @@ export function combatSystem(world) {
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
         // Innate monster on-hit behavior from monster definition hooks
-        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.HIT, hitCtx);
+        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.HIT, hitCtx, { degradeFloorMemory });
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {

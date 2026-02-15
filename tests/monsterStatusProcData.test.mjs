@@ -34,3 +34,19 @@ Deno.test("monster status proc data rejects unknown trigger", () => {
   }
   assert(threw, "validator should reject unknown monster proc triggers");
 });
+
+Deno.test("monster status proc data rejects missing monsterId", () => {
+  const defs = MONSTER_STATUS_PROC_DEFS.map((def, i) => (i === 0 ? { ...def, monsterId: "" } : { ...def }));
+
+  let threw = false;
+  try {
+    validateMonsterStatusProcDefs(defs, {
+      triggerIds: MONSTER_PROC_TRIGGER_IDS,
+      targetIds: MONSTER_PROC_TARGET_IDS,
+      eventSchemaIds: MONSTER_PROC_EVENT_SCHEMA_IDS,
+    });
+  } catch {
+    threw = true;
+  }
+  assert(threw, "validator should reject missing monsterId");
+});

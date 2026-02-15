@@ -7,6 +7,7 @@ import { AFFIX_DEFS } from '../data/affixes.js';
 import { getMonster } from '../data/monsters.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Vitality } from '../components/Vitality.js';
+import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 
 const AFFIX_TRIGGERS_KEY = Symbol.for('jshack.affixTriggers');
@@ -50,13 +51,14 @@ function makeCtx(world, base) {
  * @param {any} world
  * @param {number} entityId
  * @param {any} ctx
+ * @param {{ degradeFloorMemory?:(rng:() => number, opts?:any) => { depth:number } } | null} deps
  */
-function runMonsterOnDamaged(world, entityId, ctx) {
+function runMonsterOnDamaged(world, entityId, ctx, deps = null) {
   const ni = world.get(entityId, NamedIdentity);
   const def = ni ? getMonster(ni.identity) : null;
   const hook = def?.hooks?.onDamaged;
   if (typeof hook === 'function') {
-    try { hook({ world, ctx }); } catch {}
+    try { hook({ world, ctx, deps }); } catch {}
     return true;
   }
   return false;
@@ -75,7 +77,7 @@ export function installAffixTriggers(world) {
       }
     });
     // Innate monster on-damaged behavior from monster definition hooks
-    runMonsterOnDamaged(world, target, ctxT);
+    runMonsterOnDamaged(world, target, ctxT, { degradeFloorMemory });
   });
   world[AFFIX_TRIGGERS_KEY] = off;
 }
