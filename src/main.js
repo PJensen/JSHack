@@ -339,6 +339,11 @@ if (!playerEntity(world)) {
     if (inv && touchstoneId != null) {
       inv.items.push(touchstoneId);
     }
+    // Book of the Dead: view past deaths
+    const bookDeadId = createItemById(world, 'book_dead');
+    if (inv && bookDeadId != null) {
+      inv.items.push(bookDeadId);
+    }
   }
 }
 

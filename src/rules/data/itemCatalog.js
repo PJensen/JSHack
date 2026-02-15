@@ -181,6 +181,17 @@ export const ITEM_CATALOG = {
     rarityName: "rare",
     description: "Grants the ability to cast a blast wave spell.",
   },
+  book_dead: {
+    id: "book_dead",
+    catalogKind: "magic",
+    name: "Book of the Dead",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "legendary",
+    description: "An ancient tome bound in pale leather. It records the fate of every hero who came before.",
+  },
   scroll_blastwave: {
     id: "scroll_blastwave",
     catalogKind: "magic",
