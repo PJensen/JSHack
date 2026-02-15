@@ -304,7 +304,7 @@ export function validateMonsterStatusProcDefs(MONSTER_STATUS_PROC_DEFS, opts = {
 }
 
 const VALID_HOOK_KEYS = new Set([
-  'onHit', 'onBeforeHit', 'onDamaged', 'eat',
+  'onHit', 'onBeforeHit', 'onDamaged',
 ]);
 
 export function validateHookCallbacks(defs, opts = {}) {

@@ -14,10 +14,6 @@ import {
   statusEffectOnDamaged,
   mindflayerBlastOnHit,
 } from "./callbacks/combat.js";
-import {
-  corpseStatusEffect,
-  corpseDamage,
-} from "./callbacks/eat.js";
 
 export const MONSTERS = [
   // ── Tier 0 (floors 1-5) ────────────────────────────────────────────
@@ -39,7 +35,6 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead0001, { key: "disease", turnsLeft: 20, potency: 1 }, "proc:diseased")],
-      eat: [corpseStatusEffect("disease", 20, 1)],
     },
     description: 'A mangy rodent with beady eyes.',
   },
@@ -83,7 +78,6 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(15, 0xdead0006, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
-      eat: [corpseStatusEffect("disease", 20, 1)],
     },
     description: 'A leathery-winged vermin that darts erratically.',
   },
@@ -106,7 +100,6 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0010, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
-      eat: [corpseDamage(3)],
     },
     description: 'A tiny crackling insect that moves only along the grid axes.',
   },
@@ -129,7 +122,6 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead000f, { key: "poison", turnsLeft: 5, potency: 1 }, "proc:poisoned")],
-      eat: [corpseStatusEffect("poison", 8, 2)],
     },
     description: 'A hissing serpent with venomous fangs.',
   },
@@ -198,7 +190,6 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0002, { key: "poison", turnsLeft: 5, potency: 2 }, "proc:poisoned")],
-      eat: [corpseStatusEffect("poison", 8, 2)],
     },
     description: 'A dog-sized arachnid with venomous fangs.',
   },
@@ -247,7 +238,6 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [drainOnHit(20, 0xdead0003, 3)],
-      eat: [corpseStatusEffect("mindwipe", 15, 1)],
     },
     description: 'A spectral horror. Physical attacks pass through it.',
   },
@@ -295,7 +285,6 @@ export const MONSTERS = [
     speed: 2,
     hooks: {
       onHit: [mindflayerBlastOnHit(20, 0xdead000e)],
-      eat: [corpseStatusEffect("mindwipe", 30, 2, "hallucination")],
     },
     description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
   },
@@ -374,7 +363,6 @@ export const MONSTERS = [
     hooks: {
       onHit: [drainOnHit(25, 0xdead000c, 2)],
       onDamaged: [statusEffectOnDamaged(20, 0xdead000d, { key: "regen", turnsLeft: 3, potency: 2 }, "proc:phylactery", true)],
-      eat: [corpseStatusEffect("mindwipe", 15, 1)],
     },
     description: 'An undead sorcerer sustained by a hidden phylactery.',
     lootTable: 'drop:lich',

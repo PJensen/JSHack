@@ -18,7 +18,7 @@ import {
   MONSTER_STATUS_PROC_DEFS,
 } from "../../rules/data/monsterStatusProcs.js";
 import { MATERIAL_REACTION_OUTCOME_IDS, MATERIAL_REACTION_RULES } from "../../rules/data/materialReactions.js";
-import { NUTRITION_BY_SIZE, CORPSE_EFFECTS } from "../../rules/data/food.js";
+import { NUTRITION_BY_SIZE, CORPSE_DEFS } from "../../rules/data/food.js";
 import { validateAll } from "../../rules/data/validate.js";
 
 /**
@@ -52,7 +52,7 @@ export function getGameDataLoadPlan() {
     {
       id: "food",
       label: "Loading nutrition defs",
-      total: Object.keys(NUTRITION_BY_SIZE).length + Object.keys(CORPSE_EFFECTS).length,
+      total: Object.keys(NUTRITION_BY_SIZE).length + Object.keys(CORPSE_DEFS).length,
     },
     { id: "apply", label: "Loading apply defs", total: APPLY_DEFS.length },
     { id: "effects", label: "Loading effect defs", total: EFFECT_DEFS.length },
@@ -179,10 +179,10 @@ export function loadGameData(opts = {}) {
         processed++;
         emit(ds, processed);
       }
-      const cKeys = Object.keys(CORPSE_EFFECTS);
+      const cKeys = Object.keys(CORPSE_DEFS);
       for (let i = 0; i < cKeys.length; i++) {
         const key = cKeys[i];
-        void CORPSE_EFFECTS[key];
+        void CORPSE_DEFS[key];
         completed++;
         processed++;
         emit(ds, processed);
