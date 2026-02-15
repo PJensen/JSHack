@@ -14,6 +14,7 @@ export function initOverlays() {
   const chest = ensurePanel('chest');
   const groundTip = ensureGroundTooltip(root);
   const stairTip = ensureStairTooltip(root);
+  const tombstoneTip = ensureTombstoneTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
   const memoryGraph = ensureMemoryGraph(root);
@@ -221,6 +222,18 @@ export function initOverlays() {
   });
   window.addEventListener('ui:hideStairTooltip', () => {
     stairTip.style.display = 'none';
+  });
+
+  // Tombstone tooltip lifecycle
+  window.addEventListener('ui:showTombstoneTooltip', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderTombstoneTooltip(tombstoneTip, d);
+    tombstoneTip.style.display = 'block';
+  });
+  window.addEventListener('ui:hideTombstoneTooltip', () => {
+    tombstoneTip.style.display = 'none';
   });
 
   // Passive updates to the always-on ticker
@@ -465,6 +478,55 @@ function renderStairTooltip(tip, detail) {
     }));
     tip.style.display = 'none';
   };
+}
+
+// --- Tombstone tooltip (epitaph sign at top of screen) ---------------------
+/** @param {HTMLElement} root */
+function ensureTombstoneTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'tombstone-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed',
+    left: '50%',
+    top: '24px',
+    transform: 'translateX(-50%)',
+    minWidth: '200px', maxWidth: '320px', pointerEvents: 'none', display: 'none',
+    background: 'rgba(30,28,24,0.95)', color: '#b0a890',
+    borderRadius: '4px',
+    border: '2px solid #6b6252',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
+    fontFamily: 'monospace', padding: '14px 20px', zIndex: 900,
+    textAlign: 'center', whiteSpace: 'pre-line'
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+/** @param {HTMLDivElement} tip @param {{epitaph?:string}} detail */
+function renderTombstoneTooltip(tip, detail) {
+  tip.innerHTML = '';
+
+  const header = document.createElement('div');
+  header.textContent = '\u2020 TOMBSTONE \u2020';
+  Object.assign(header.style, {
+    fontSize: '11px', letterSpacing: '3px', color: '#887860',
+    marginBottom: '8px', textTransform: 'uppercase'
+  });
+  tip.appendChild(header);
+
+  const rule = document.createElement('hr');
+  Object.assign(rule.style, {
+    border: 'none', borderTop: '1px solid #5a5040',
+    margin: '0 0 8px 0'
+  });
+  tip.appendChild(rule);
+
+  const text = document.createElement('div');
+  text.textContent = detail?.epitaph || 'The inscription has faded\u2026';
+  Object.assign(text.style, {
+    fontSize: '13px', lineHeight: '1.5', color: '#c8b898'
+  });
+  tip.appendChild(text);
 }
 
 function ensureSpellGestureHint(root) {

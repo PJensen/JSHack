@@ -60,6 +60,7 @@ import { Faction } from "./rules/components/Faction.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
+import TombstoneComponent from "./rules/components/Tombstone.js";
 import { installDeathShareListener } from "./rules/systems/shareDeathSystem.js";
 import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
@@ -1654,6 +1655,26 @@ world.on('moved', ({ id, to }) => {
       log('A shopkeeper is nearby. Bump to trade.');
       break;
     }
+  }
+
+  // Tombstone tooltip: show epitaph when standing on a tombstone
+  let tombstone = null;
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'tombstone') continue;
+    if (pos.x === to.x && pos.y === to.y) {
+      tombstone = { id: eid };
+      break;
+    }
+  }
+  if (tombstone) {
+    const tc = world.get(tombstone.id, TombstoneComponent);
+    try {
+      window.dispatchEvent(new CustomEvent('ui:showTombstoneTooltip', {
+        detail: { epitaph: tc?.epitaph || '' }
+      }));
+    } catch {}
+  } else {
+    try { window.dispatchEvent(new CustomEvent('ui:hideTombstoneTooltip')); } catch {}
   }
 });
 
