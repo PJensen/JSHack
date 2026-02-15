@@ -126,6 +126,15 @@ export function initOverlays() {
     show(applyPanel);
     window.dispatchEvent(new CustomEvent('ui:requestApplyToolsData'));
   });
+  window.addEventListener('ui:openApplyForTool', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const toolId = Number(e?.detail?.toolId || 0);
+    if (!Number.isInteger(toolId) || toolId <= 0) return;
+    _applyToolId = toolId;
+    show(applyPanel);
+    window.dispatchEvent(new CustomEvent('ui:requestApplyTargetsData', { detail: { toolId } }));
+  });
   window.addEventListener('ui:applyToolsData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -668,6 +677,11 @@ function hide(panel) { panel.style.display = 'none'; }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
 function renderInventory(panel, items) {
+  const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch {}
+  }
+
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
   const title = document.createElement('div');
@@ -754,8 +768,32 @@ function renderInventory(panel, items) {
 
   const hint = document.createElement('div');
   hint.style.marginTop = '8px'; hint.style.opacity = '0.85';
-  hint.textContent = '↑/↓ to select · Enter to Use · E=Equip · D=Drink · U=Use · S=Set Spell · Esc=Close · UNPAID items are stolen';
   el.appendChild(hint);
+
+  function triggerApplyForTool(it) {
+    const toolId = Number(it?.id || 0);
+    if (!Number.isInteger(toolId) || toolId <= 0) return;
+    window.dispatchEvent(new CustomEvent('ui:openApplyForTool', { detail: { toolId } }));
+  }
+
+  /** @param {any} it */
+  function enterActionLabel(it) {
+    if (!it) return 'None';
+    if (it.canApply) return 'Apply';
+    if (it.type === 'potion') return 'Drink';
+    if (it.type === 'equip' || it.type === 'ammo') return 'Equip';
+    if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food') return 'Use';
+    if (it.type === 'spell') return 'Set Spell';
+    return 'None';
+  }
+
+  function updateHint() {
+    const it = items[sel];
+    const applyHint = it?.canApply
+      ? ` · A=Apply${Number(it?.applyTargetCount || 0) > 0 ? '' : ' (no targets)'}`
+      : '';
+    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · E=Equip · D=Drink · U=Use${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
+  }
 
   /** @param {number} i */
   function setSel(i) {
@@ -766,11 +804,14 @@ function renderInventory(panel, items) {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? activeBg : baseBg;
     });
+    updateHint();
   }
 
   function defaultAction() {
     const it = items[sel]; if (!it) return;
-    if (it.type === 'potion') {
+    if (it.canApply) {
+      triggerApplyForTool(it);
+    } else if (it.type === 'potion') {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     } else if (it.type === 'equip' || it.type === 'ammo') {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
@@ -790,7 +831,8 @@ function renderInventory(panel, items) {
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
-    else if (k === 'Enter') { defaultAction(); e.preventDefault(); }
+    else if (k === 'Enter' || e.code === 'NumpadEnter') { defaultAction(); e.preventDefault(); }
+    else if (k === 'a' || k === 'A') { const it = items[sel]; if (it?.canApply) { triggerApplyForTool(it); e.preventDefault(); } }
     else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip' || it?.type === 'ammo') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
@@ -802,15 +844,23 @@ function renderInventory(panel, items) {
   /** @param {KeyboardEvent} e */
   /** @param {KeyboardEvent} e */
   const keyHandler = (e) => onKey(e);
-  window.addEventListener('keydown', keyHandler);
-  // Remove handler when panel hides
   const obs = new MutationObserver(() => {
     if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', keyHandler);
-      obs.disconnect();
+      detach();
     }
   });
+
+  const detach = () => {
+    window.removeEventListener('keydown', keyHandler);
+    obs.disconnect();
+    if ((/** @type {any} */ (panel))._inventoryDetach === detach) {
+      (/** @type {any} */ (panel))._inventoryDetach = null;
+    }
+  };
+
+  window.addEventListener('keydown', keyHandler);
   obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  (/** @type {any} */ (panel))._inventoryDetach = detach;
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,cost?:number}>} spells @param {string|null} activeId */
