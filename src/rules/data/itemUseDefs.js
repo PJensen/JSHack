@@ -81,6 +81,14 @@ export const ITEM_USE_ACTIONS = Object.freeze({
 /** @type {ItemUseDef[]} */
 export const ITEM_USE_DEFS = [
   {
+    id: "book_dead_open_deathlog",
+    matches: (ctx) => ctx.identity === "book_dead",
+    run: (ctx) => {
+      ctx.emit("deathlog:open", { actor: ctx.actorId });
+      return false; // not consumed — reusable artifact
+    },
+  },
+  {
     id: "wand_cast_from_identity",
     matches: createMatcher({
       itemTypes: [ITEM_USE_TYPE.WAND],

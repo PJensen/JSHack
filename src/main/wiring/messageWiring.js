@@ -277,6 +277,11 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     }
   });
 
+  world.on('deathlog:open', () => {
+    log('You open the Book of the Dead...', 'system');
+    window.dispatchEvent(new CustomEvent('ui:openDeathLog'));
+  });
+
   world.on('stair:traverse', ({ actor, targetId, direction }) => {
     log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`, 'system');
   });
