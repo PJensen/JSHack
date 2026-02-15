@@ -1,21 +1,79 @@
 import { CastSpellIntent } from "../components/Intents/CastSpellIntent.js";
 import { Brain } from "../components/Brain.js";
 import { Mana } from "../components/Mana.js";
+import { Status } from "../components/Status.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
+import { combatSeed, mulberry32 } from "../utils/rng.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
-// castSpellSystem — placeholder implementation that consumes CastSpellIntent
-// and emits a semantic event. Extend with actual spell resolution later.
+/**
+ * @param {any} status
+ * @param {string} type
+ * @returns {number}
+ */
+function statusStrength(status, type) {
+  if (!status || !Array.isArray(status.statuses)) return 0;
+  let total = 0;
+  for (const s of status.statuses) {
+    if (!s || s.type !== type) continue;
+    if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
+    const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
+    const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
+    total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
+  }
+  return total;
+}
+
+/**
+ * @param {string} value
+ * @returns {number}
+ */
+function hashString32(value) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i) & 0xff;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ id:string }} intendedSpell
+ * @param {string[]} learnedSpellIds
+ * @returns {{ kind: "normal"|"miscast"|"fizzle", spell: any }}
+ */
+function resolveConfusedCast(world, actor, intendedSpell, learnedSpellIds) {
+  const confusePower = statusStrength(world.get(actor, Status), "confused");
+  if (confusePower <= 0) return { kind: "normal", spell: intendedSpell };
+
+  const alternatives = [];
+  for (let i = 0; i < learnedSpellIds.length; i++) {
+    const id = String(learnedSpellIds[i] || "");
+    if (!id || id === intendedSpell.id) continue;
+    const def = getSpell(id);
+    if (def) alternatives.push(def);
+  }
+  if (alternatives.length === 0) return { kind: "fizzle", spell: intendedSpell };
+
+  const salt = hashString32(intendedSpell.id) ^ 0xC05FACE;
+  const r = mulberry32(combatSeed(world.seed, world.step, actor, alternatives.length, salt));
+  const idx = (r() * alternatives.length) | 0;
+  return { kind: "miscast", spell: alternatives[idx] };
+}
+
 /**
  * Resolve CastSpellIntent:
  * - Validate that actor knows the spell
  * - Check Mana and deduct cost
+ * - Confused casters miscast to another learned spell, or fizzle if none exists
  * - Emit 'castSpell' semantic event for bridge/display to react to
  * - Clear intent
  * Emits on failure:
- * - 'spell:unknown' | 'spell:not-known' | 'spell:oom'
+ * - 'spell:unknown' | 'spell:not-known' | 'spell:oom' | 'spell:fizzle'
  * @param {World} world
  */
 export function castSpellSystem(world) {
@@ -45,11 +103,14 @@ export function castSpellSystem(world) {
 
     /** @type {{ mana?: number, maxMana?:number }|null} */
     const mana = /** @type any */ (world.get(actor, Mana));
-    console.log('Casting spell', spell.id, 'for actor', actor, 'with mana', mana);
+
+    const confusion = resolveConfusedCast(world, actor, spell, brain.learnedSpellIds);
+    const resolvedSpell = confusion.spell;
+
     const have = Number(mana?.mana ?? 0);
-    const cost = Number(spell.manaCost || 0);
+    const cost = Number(resolvedSpell.manaCost || 0);
     if (have < cost) {
-      try { world.emit && world.emit('spell:oom', { actor, spellId: spell.id, need: cost, have }); } catch {}
+      try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: cost, have }); } catch {}
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -60,10 +121,35 @@ export function castSpellSystem(world) {
       mana.regenCooldown = MANA_REGEN_COOLDOWN;
     }
 
+    if (confusion.kind === "fizzle") {
+      try { world.emit && world.emit("spell:fizzle", { actor, spellId: spell.id, confused: true }); } catch {}
+      world.remove(actor, CastSpellIntent);
+      continue;
+    }
+
+    if (confusion.kind === "miscast") {
+      try {
+        world.emit && world.emit("spell:miscast", {
+          actor,
+          fromSpellId: spell.id,
+          toSpellId: resolvedSpell.id,
+          confused: true,
+        });
+      } catch {}
+    }
+
     // Run scripted behavior (pure rules)
-    try { runSpellScript(world, actor, spell, intent); } catch {}
+    try { runSpellScript(world, actor, resolvedSpell, intent); } catch {}
     // Emit semantic cast event that bridge/display can turn into effects
-    try { world.emit && world.emit('castSpell', { actor, spellId: spell.id, targetId: intent.targetId || actor }); } catch {}
+    try {
+      world.emit && world.emit('castSpell', {
+        actor,
+        spellId: resolvedSpell.id,
+        targetId: intent.targetId || actor,
+        miscast: confusion.kind === "miscast",
+        intendedSpellId: confusion.kind === "miscast" ? spell.id : undefined,
+      });
+    } catch {}
     world.remove(actor, CastSpellIntent);
   }
 }

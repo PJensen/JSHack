@@ -63,6 +63,24 @@ function attachHelpers(world, base) {
 }
 
 /**
+ * @param {any} status
+ * @param {string} type
+ * @returns {number}
+ */
+function statusStrength(status, type) {
+    if (!status || !Array.isArray(status.statuses)) return 0;
+    let total = 0;
+    for (const s of status.statuses) {
+        if (!s || s.type !== type) continue;
+        if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
+        const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
+        const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
+        total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
+    }
+    return total;
+}
+
+/**
  * Run monster definition hooks for a given trigger via runCallbackList.
  * @param {any} world
  * @param {number} entityId - the monster entity whose hooks to run
@@ -148,8 +166,33 @@ export function combatSystem(world) {
         const defHunger = defStatus?.statuses?.find(s => HUNGER_COMBAT_LEVELS.includes(s.type));
         const defHungerPenalty = defHunger ? Math.max(0, defHunger.potency || 0) : 0;
 
-        const attackBonus = Math.max(0, 1 + (atkEq?.attackDerived || 0) - atkDiseasePenalty - atkHungerPenalty);
-        const armorClass = 10 + Math.max(0, (defEq?.defenseDerived || 0) - defDiseasePenalty - defHungerPenalty);
+        // Status pass modifiers: weakened/cursed are penalties, blessed is a bonus.
+        const atkWeakenPenalty = statusStrength(atkStatus, 'weakened');
+        const defWeakenPenalty = statusStrength(defStatus, 'weakened');
+        const atkCursedPenalty = statusStrength(atkStatus, 'cursed');
+        const defCursedPenalty = statusStrength(defStatus, 'cursed');
+        const atkBlessedBonus = statusStrength(atkStatus, 'blessed');
+        const defBlessedBonus = statusStrength(defStatus, 'blessed');
+
+        const attackBonus = Math.max(
+            0,
+            1
+            + (atkEq?.attackDerived || 0)
+            - atkDiseasePenalty
+            - atkHungerPenalty
+            - atkWeakenPenalty
+            - atkCursedPenalty
+            + atkBlessedBonus
+        );
+        const armorClass = 10 + Math.max(
+            0,
+            (defEq?.defenseDerived || 0)
+            - defDiseasePenalty
+            - defHungerPenalty
+            - defWeakenPenalty
+            - defCursedPenalty
+            + defBlessedBonus
+        );
 
         // Deterministic d20 roll seeded by world + participants + step
         const seed = combatSeed(world.seed, world.step, attacker, defender);
