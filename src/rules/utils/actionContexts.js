@@ -5,12 +5,12 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Potion } from "../components/Potion.js";
 import { getSpell } from "../data/spells.js";
 import { createEntityProxy } from "../interaction/entityProxy.js";
-import { MutationQueue } from "../interaction/mutations.js";
+import { ActionTransaction } from "../interaction/mutations.js";
 import { runSpellScript } from "../scripts/spells.js";
 
 /**
  * Base helpers shared by first-class action contexts.
- * All mutations (damage, heal, pushEffect) are queued via MutationQueue.
+ * All mutations (damage, heal, pushEffect) are queued via ActionTransaction.
  * Call commit() to apply, or discard() to throw away.
  * Supports cancel()/fail() to prevent commit.
  */
@@ -20,7 +20,7 @@ export class RuleActionContext {
    */
   constructor(world) {
     this.world = world;
-    this._queue = new MutationQueue();
+    this._queue = new ActionTransaction();
     /** @type {Set<string>} */
     this._prevented = new Set();
   }
@@ -91,6 +91,16 @@ export class RuleActionContext {
    */
   pushEffect(entityId, effect) {
     this._queue.enqueue({ type: "pushEffect", entityId, effect: { stacks: 1, ...effect } });
+    return true;
+  }
+
+  /**
+   * Queue a low-level mutation op.
+   * Used by specialized action contexts that need extra mutation types.
+   * @param {import("../interaction/mutations.js").MutationOp} op
+   */
+  queueMutation(op) {
+    this._queue.enqueue(op);
     return true;
   }
 

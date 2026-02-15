@@ -3,6 +3,7 @@
 // Corpse eat behavior lives on corpse item data keyed by corpse identity.
 
 import {
+  cancelEat,
   corpseStatusEffect,
   corpseDamage,
   grantElectricResist,
@@ -64,6 +65,9 @@ export const CORPSE_DEFS = Object.freeze({
   }),
   corpse_eel: Object.freeze({
     onEat: Object.freeze([grantElectricResist]),
+  }),
+  corpse_test_cancel: Object.freeze({
+    onEat: Object.freeze([cancelEat("FAIL", "You cannot stomach that.", true)]),
   }),
 });
 

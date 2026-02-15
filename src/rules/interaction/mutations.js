@@ -1,11 +1,18 @@
 // rules/interaction/mutations.js
-// Append-only mutation queue for deferred world changes.
-// Callbacks enqueue ops; systems commit or discard after checking cancellation.
+// ActionTransaction is a rules-layer, action-local commit/discard buffer.
+//
+// IMPORTANT BOUNDARY:
+// - This is NOT an ECS-js scheduler or command queue replacement.
+// - ECS-js owns structural deferral via world.command(...) in src/lib/ecs-js/core.js.
+// - This module only provides all-or-nothing mutation commits for one action context.
+// - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Hunger } from "../components/Hunger.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Potion } from "../components/Potion.js";
+import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
 
 /**
@@ -70,6 +77,37 @@ export function applyMutation(world, op) {
       try { world.destroy(op.entityId); } catch {}
       break;
     }
+    case "nutrition": {
+      const hc = /** @type any */ (world.get(op.entityId, Hunger));
+      if (!hc) return;
+      const nutrition = Number(op.nutrition || 0);
+      if (!Number.isFinite(nutrition) || nutrition === 0) return;
+      const newHunger = Number(hc.hunger || 0) - nutrition;
+      if (newHunger < 0) {
+        hc.satiation = Math.min(Number(hc.satiation || 0) + Math.abs(newHunger), 200);
+        hc.hunger = 0;
+      } else {
+        hc.hunger = newHunger;
+      }
+      break;
+    }
+    case "grantElectricResistance": {
+      let resist = /** @type any */ (world.get(op.entityId, Resistances));
+      if (!resist) {
+        try { world.add(op.entityId, Resistances, {}); } catch {}
+        resist = /** @type any */ (world.get(op.entityId, Resistances));
+      }
+      if (!resist) return;
+      const minOhms = Number.isFinite(op.minOhms) ? Number(op.minOhms) : 2400;
+      const current = Number(resist?.electric?.ohms);
+      const nextOhms = Number.isFinite(current) ? Math.max(current, minOhms) : minOhms;
+      if (!resist.electric || typeof resist.electric !== "object") resist.electric = {};
+      resist.electric.ohms = nextOhms;
+      if (!Number.isFinite(resist.electric.fibrillationA)) {
+        resist.electric.fibrillationA = Number.isFinite(op.fibrillationA) ? Number(op.fibrillationA) : 0.03;
+      }
+      break;
+    }
     case "destroy": {
       try { world.destroy(op.entityId); } catch {}
       break;
@@ -82,11 +120,13 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'heal', entityId: number, amount: number }} HealOp
  * @typedef {{ type: 'pushEffect', entityId: number, effect: { key: string, turnsLeft: number, potency: number, stacks?: number, sourceId?: number } }} PushEffectOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
+ * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
+ * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | ConsumeOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
  */
 
-export class MutationQueue {
+export class ActionTransaction {
   constructor() {
     /** @type {MutationOp[]} */
     this._ops = [];

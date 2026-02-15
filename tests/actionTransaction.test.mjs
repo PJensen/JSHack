@@ -2,7 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
-import { MutationQueue, applyMutation } from '../src/rules/interaction/mutations.js';
+import { ActionTransaction, applyMutation } from '../src/rules/interaction/mutations.js';
 
 function makeWorld() {
   return new World({ seed: 1 });
@@ -13,7 +13,7 @@ Deno.test("enqueue damage: world unchanged until commit", () => {
   const e = world.create();
   world.add(e, Vitality, { maxHp: 20, hp: 20 });
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "damage", entityId: e, amount: 5, source: "test" });
 
   const vit = world.get(e, Vitality);
@@ -26,7 +26,7 @@ Deno.test("commit damage: Vitality.hp reduced", () => {
   const e = world.create();
   world.add(e, Vitality, { maxHp: 20, hp: 20 });
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "damage", entityId: e, amount: 7, source: "test" });
   const applied = q.commit(world);
 
@@ -40,7 +40,7 @@ Deno.test("commit heal: hp clamped to maxHp", () => {
   const e = world.create();
   world.add(e, Vitality, { maxHp: 10, hp: 3 });
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "heal", entityId: e, amount: 100 });
   q.commit(world);
 
@@ -51,7 +51,7 @@ Deno.test("commit pushEffect: ActiveEffects.effects has entry", () => {
   const world = makeWorld();
   const e = world.create();
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "pushEffect", entityId: e, effect: { key: "poison", turnsLeft: 5, potency: 2 } });
   q.commit(world);
 
@@ -67,7 +67,7 @@ Deno.test("commit multiple ops: all applied in order", () => {
   const e = world.create();
   world.add(e, Vitality, { maxHp: 20, hp: 20 });
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "damage", entityId: e, amount: 5, source: "a" });
   q.enqueue({ type: "heal", entityId: e, amount: 2 });
   q.enqueue({ type: "damage", entityId: e, amount: 3, source: "b" });
@@ -82,7 +82,7 @@ Deno.test("cancel: commit returns empty, world unchanged", () => {
   const e = world.create();
   world.add(e, Vitality, { maxHp: 20, hp: 20 });
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "damage", entityId: e, amount: 10, source: "test" });
   q.cancel("blind");
 
@@ -93,7 +93,7 @@ Deno.test("cancel: commit returns empty, world unchanged", () => {
 });
 
 Deno.test("cancel with structured reason", () => {
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.cancel({ code: "WELDED_WEAPON", message: "You cannot let go!", consumesTurn: true });
   assert(q.cancelled);
   assertEquals(q.cancelReason.code, "WELDED_WEAPON");
@@ -105,7 +105,7 @@ Deno.test("discard: returns discarded ops, world unchanged", () => {
   const e = world.create();
   world.add(e, Vitality, { maxHp: 20, hp: 20 });
 
-  const q = new MutationQueue();
+  const q = new ActionTransaction();
   q.enqueue({ type: "damage", entityId: e, amount: 5, source: "test" });
   const discarded = q.discard();
 
