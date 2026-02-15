@@ -41,7 +41,6 @@ import { materialReactionSystem } from "../rules/systems/materialReactionSystem.
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
 import "../rules/scripts/consumables.js";
-import "../rules/scripts/apply.js";
 
 /**
  * @param {World} world

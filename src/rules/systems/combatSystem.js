@@ -14,6 +14,7 @@ import { Stamina } from '../components/Stamina.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { getMonster } from '../data/monsters.js';
+import { MONSTER_COMBAT_TRIGGER } from '../data/monsterCombatProcs.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
@@ -62,7 +63,7 @@ function attachHelpers(world, base) {
 /**
  * @param {any} world
  * @param {number} entityId
- * @param {'onBeforeHit'|'onHit'} hookName
+ * @param {'onBeforeHit'|'onHit'|'onDamaged'} hookName
  * @param {any} ctx
  */
 function runMonsterHook(world, entityId, hookName, ctx) {
@@ -193,7 +194,7 @@ export function combatSystem(world) {
             }
         });
         // Innate monster pre-hit behavior from monster definition hooks
-        runMonsterHook(world, attacker, 'onBeforeHit', ctx);
+        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.BEFORE_HIT, ctx);
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -210,7 +211,7 @@ export function combatSystem(world) {
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
         // Innate monster on-hit behavior from monster definition hooks
-        runMonsterHook(world, attacker, 'onHit', hitCtx);
+        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.HIT, hitCtx);
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {

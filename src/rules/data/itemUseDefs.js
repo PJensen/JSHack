@@ -1,48 +1,53 @@
 // rules/data/itemUseDefs.js
-// Declarative item-use behavior definitions interpreted by useItemSystem.
+// Function-first item-use behavior definitions interpreted by useItemSystem.
+
+export const ITEM_USE_TYPE = Object.freeze({
+  WAND: "wand",
+  SCROLL: "scroll",
+  LEARN: "learn",
+  BOOK: "book",
+});
+
+export const ITEM_IDENTITY_PREFIX = Object.freeze({
+  WAND: "wand_",
+  SCROLL: "scroll_",
+  BOOK: "book_",
+});
 
 /**
- * @typedef {{
- *   itemTypes?: string[],
- *   identityPrefix?: string,
- * }} ItemUseMatch
+ * @param {import("../utils/actionContexts.js").ItemUseActionContext} ctx
+ * @param {{ itemTypes?: string[], identityPrefix?: string }} match
  */
+function matchesLegacyShape(ctx, match) {
+  if (!match || typeof match !== "object") return false;
+  const type = String(ctx.info?.type || "").toLowerCase();
+  const identity = String(ctx.identity || "").toLowerCase();
+  const itemTypes = Array.isArray(match.itemTypes)
+    ? match.itemTypes.map((v) => String(v || "").toLowerCase()).filter(Boolean)
+    : [];
+  const identityPrefix = String(match.identityPrefix || "").toLowerCase();
+  if (itemTypes.length > 0 && !itemTypes.includes(type)) return false;
+  if (identityPrefix && !identity.startsWith(identityPrefix)) return false;
+  return itemTypes.length > 0 || !!identityPrefix;
+}
 
 /**
- * @typedef {{
- *   world: any,
- *   actor: number,
- *   itemId: number,
- *   intent: { targetId?: number } | null,
- *   info: { type?: string, description?: string, count?: number } | null,
- *   identity: string,
- *   helpers: {
- *     castSpellFromIdentity: (opts:{ identityPrefix:string, targetMode?:"intentTarget"|"self"|"none", castEventSource?:string, consumeOnSuccess?:boolean }) => boolean,
- *     learnSpellFromIdentity: (opts:{ identityPrefix:string, consumeOnSuccess?:boolean }) => boolean,
- *     emit: (eventName:string, payload:Record<string, any>) => void,
- *   },
- * }} ItemUseActionContext
+ * @param {{ itemTypes?: string[], identityPrefix?: string }} match
  */
-
-/**
- * @typedef {{
- *   id: string,
- *   match: ItemUseMatch,
- *   action: (context: ItemUseActionContext) => boolean,
- * }} ItemUseDef
- */
+function createMatcher(match) {
+  return (ctx) => matchesLegacyShape(ctx, match);
+}
 
 export const ITEM_USE_ACTIONS = Object.freeze({
   /**
    * @param {{ identityPrefix:string, targetMode?:"intentTarget"|"self"|"none", castEventSource?:string, consumeOnSuccess?:boolean }} opts
-   * @returns {(context: ItemUseActionContext) => boolean}
    */
   castSpellFromIdentity(opts) {
     const identityPrefix = String(opts?.identityPrefix || "");
     const targetMode = /** @type {"intentTarget"|"self"|"none"} */ (String(opts?.targetMode || "self"));
     const castEventSource = opts?.castEventSource;
     const consumeOnSuccess = opts?.consumeOnSuccess !== false;
-    return ({ helpers }) => helpers.castSpellFromIdentity({
+    return (ctx) => ctx.castSpellFromIdentity({
       identityPrefix,
       targetMode,
       castEventSource,
@@ -52,54 +57,80 @@ export const ITEM_USE_ACTIONS = Object.freeze({
 
   /**
    * @param {{ identityPrefix:string, consumeOnSuccess?:boolean }} opts
-   * @returns {(context: ItemUseActionContext) => boolean}
    */
   learnSpellFromIdentity(opts) {
     const identityPrefix = String(opts?.identityPrefix || "");
     const consumeOnSuccess = opts?.consumeOnSuccess !== false;
-    return ({ helpers }) => helpers.learnSpellFromIdentity({
+    return (ctx) => ctx.learnSpellFromIdentity({
       identityPrefix,
       consumeOnSuccess,
     });
   },
 });
 
+/**
+ * @typedef {{
+ *   id: string,
+ *   matches?: (ctx: import("../utils/actionContexts.js").ItemUseActionContext) => boolean,
+ *   match?: { itemTypes?: string[], identityPrefix?: string },
+ *   run?: (ctx: import("../utils/actionContexts.js").ItemUseActionContext) => boolean,
+ *   action?: (ctx: import("../utils/actionContexts.js").ItemUseActionContext) => boolean,
+ * }} ItemUseDef
+ */
+
 /** @type {ItemUseDef[]} */
 export const ITEM_USE_DEFS = [
   {
     id: "wand_cast_from_identity",
-    match: {
-      itemTypes: ["wand"],
-      identityPrefix: "wand_",
-    },
-    action: ITEM_USE_ACTIONS.castSpellFromIdentity({
-      identityPrefix: "wand_",
+    matches: createMatcher({
+      itemTypes: [ITEM_USE_TYPE.WAND],
+      identityPrefix: ITEM_IDENTITY_PREFIX.WAND,
+    }),
+    run: ITEM_USE_ACTIONS.castSpellFromIdentity({
+      identityPrefix: ITEM_IDENTITY_PREFIX.WAND,
       targetMode: "intentTarget",
-      castEventSource: "wand",
+      castEventSource: ITEM_USE_TYPE.WAND,
       consumeOnSuccess: true,
     }),
   },
   {
     id: "scroll_cast_from_identity",
-    match: {
-      itemTypes: ["scroll"],
-      identityPrefix: "scroll_",
-    },
-    action: ITEM_USE_ACTIONS.castSpellFromIdentity({
-      identityPrefix: "scroll_",
+    matches: createMatcher({
+      itemTypes: [ITEM_USE_TYPE.SCROLL],
+      identityPrefix: ITEM_IDENTITY_PREFIX.SCROLL,
+    }),
+    run: ITEM_USE_ACTIONS.castSpellFromIdentity({
+      identityPrefix: ITEM_IDENTITY_PREFIX.SCROLL,
       targetMode: "self",
       consumeOnSuccess: true,
     }),
   },
   {
     id: "book_learn_from_identity",
-    match: {
-      itemTypes: ["learn", "book"],
-      identityPrefix: "book_",
-    },
-    action: ITEM_USE_ACTIONS.learnSpellFromIdentity({
-      identityPrefix: "book_",
+    matches: createMatcher({
+      itemTypes: [ITEM_USE_TYPE.LEARN, ITEM_USE_TYPE.BOOK],
+      identityPrefix: ITEM_IDENTITY_PREFIX.BOOK,
+    }),
+    run: ITEM_USE_ACTIONS.learnSpellFromIdentity({
+      identityPrefix: ITEM_IDENTITY_PREFIX.BOOK,
       consumeOnSuccess: true,
     }),
   },
 ];
+
+/**
+ * @param {import("../utils/actionContexts.js").ItemUseActionContext} ctx
+ */
+export function findItemUseDef(ctx) {
+  for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
+    const def = ITEM_USE_DEFS[i];
+    const matcher = typeof def.matches === "function"
+      ? def.matches
+      : (def.match ? (c) => matchesLegacyShape(c, def.match) : null);
+    if (!matcher) continue;
+    try {
+      if (matcher(ctx)) return def;
+    } catch {}
+  }
+  return null;
+}

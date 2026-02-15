@@ -10,19 +10,52 @@ import { Owner } from "../components/Owner.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
+import { runCorpseUseProc } from "../data/food.js";
+
+/**
+ * @param {any} world
+ * @param {number} actor
+ * @param {number} itemId
+ */
+function createCorpseUseContext(world, actor, itemId) {
+  return {
+    world,
+    actor,
+    itemId,
+    emit(eventName, payload) {
+      try { world.emit && world.emit(eventName, payload); } catch { /* */ }
+    },
+    pushEffect(effect) {
+      let ae = world.get(actor, ActiveEffects);
+      if (!ae) {
+        try { world.add(actor, ActiveEffects, { effects: [] }); ae = world.get(actor, ActiveEffects); } catch { /* */ }
+      }
+      if (!ae || !Array.isArray(ae.effects)) return;
+      ae.effects.push(effect);
+    },
+    damage(amount, source = "corpse") {
+      const vit = world.get(actor, Vitality);
+      if (!vit) return 0;
+      const dmg = Math.max(0, amount | 0);
+      if (dmg <= 0) return 0;
+      vit.hp = Math.max(0, (vit.hp | 0) - dmg);
+      try { world.emit && world.emit("damage", { id: actor, amount: dmg, source }); } catch { /* */ }
+      return dmg;
+    },
+  };
+}
 
 // Eat food: reduce hunger by nutrition, convert surplus to satiation,
-// and apply special corpse effects (poison, disease, shock, etc.)
-// Params: { nutrition: number, special?: string|null }
+// and run per-corpse callback effects.
+// Params: { nutrition: number, corpseType?: string }
 registerScript('consumable:eat', {
   [ScriptVerb.ItemUse]: (world, ctx) => {
     const actor = Number(ctx?.actor || 0) || 0;
     const itemId = Number(ctx?.itemId || 0) || 0;
     const nutrition = Number(ctx?.params?.nutrition || 0);
-    const special = ctx?.params?.special || null;
+    const corpseTypeParam = String(ctx?.params?.corpseType || "").toLowerCase();
 
     const hc = world.get(actor, Hunger);
-    if (!hc) return;
 
     // Check if this is a pet corpse being eaten (desecration!)
     if (itemId > 0 && world.has(itemId, Pet)) {
@@ -38,55 +71,25 @@ registerScript('consumable:eat', {
       } catch { /* */ }
     }
 
-    const newHunger = hc.hunger - nutrition;
-    if (newHunger < 0) {
-      hc.satiation = Math.min(hc.satiation + Math.abs(newHunger), 200);
-      hc.hunger = 0;
-    } else {
-      hc.hunger = newHunger;
-    }
-
-    try {
-      world.emit && world.emit('hunger:ate', {
-        actor, nutrition, newHunger: hc.hunger, satiation: hc.satiation,
-      });
-    } catch { /* */ }
-
-    if (!special) return;
-
-    let ae = world.get(actor, ActiveEffects);
-    if (!ae) {
-      try { world.add(actor, ActiveEffects, { effects: [] }); ae = world.get(actor, ActiveEffects); } catch { /* */ }
-    }
-    if (!ae) return;
-
-    switch (special) {
-      case 'poison':
-        ae.effects.push({ key: 'poison', turnsLeft: 8, potency: 2, stacks: 1, sourceId: actor });
-        try { world.emit && world.emit('hunger:sickened', { actor, type: 'poison' }); } catch { /* */ }
-        break;
-      case 'disease':
-        ae.effects.push({ key: 'disease', turnsLeft: 20, potency: 1, stacks: 1, sourceId: actor });
-        try { world.emit && world.emit('hunger:sickened', { actor, type: 'disease' }); } catch { /* */ }
-        break;
-      case 'shock': {
-        const vit = world.get(actor, Vitality);
-        if (vit) {
-          const dmg = 3;
-          vit.hp = Math.max(0, vit.hp - dmg);
-          try { world.emit && world.emit('damage', { id: actor, amount: dmg, source: 'corpse' }); } catch { /* */ }
-        }
-        break;
+    if (hc) {
+      const newHunger = hc.hunger - nutrition;
+      if (newHunger < 0) {
+        hc.satiation = Math.min(hc.satiation + Math.abs(newHunger), 200);
+        hc.hunger = 0;
+      } else {
+        hc.hunger = newHunger;
       }
-      case 'mindwipe':
-        ae.effects.push({ key: 'mindwipe', turnsLeft: 15, potency: 1, stacks: 1, sourceId: actor });
-        try { world.emit && world.emit('hunger:sickened', { actor, type: 'mindwipe' }); } catch { /* */ }
-        break;
-      case 'hallucination':
-        ae.effects.push({ key: 'mindwipe', turnsLeft: 30, potency: 2, stacks: 1, sourceId: actor });
-        try { world.emit && world.emit('hunger:sickened', { actor, type: 'hallucination' }); } catch { /* */ }
-        break;
+
+      try {
+        world.emit && world.emit('hunger:ate', {
+          actor, nutrition, newHunger: hc.hunger, satiation: hc.satiation,
+        });
+      } catch { /* */ }
     }
+
+    const corpseType = corpseTypeParam || String((world.get(itemId, NamedIdentity)?.identity || "").replace(/^corpse_/, ""));
+    if (!corpseType) return;
+    runCorpseUseProc(corpseType, createCorpseUseContext(world, actor, itemId));
   },
 });
 

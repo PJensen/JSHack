@@ -8,7 +8,7 @@ Deno.test("item-use data validates with callback actions", () => {
 });
 
 Deno.test("item-use data rejects non-function actions", () => {
-  const defs = ITEM_USE_DEFS.map((def, i) => (i === 0 ? { ...def, action: { bad: true } } : { ...def }));
+  const defs = ITEM_USE_DEFS.map((def, i) => (i === 0 ? { ...def, run: { bad: true } } : { ...def }));
 
   let threw = false;
   try {
