@@ -1,13 +1,13 @@
 import { ActiveEffects } from "../components/ActiveEffects.js";
-import { Brain } from "../components/Brain.js";
-import { degradeFloorMemory } from "../environment/dungeon/transition.js";
+import {
+  MONSTER_PROC_EVENT_SCHEMA,
+  MONSTER_PROC_TARGET,
+  MONSTER_PROC_TRIGGER,
+  MONSTER_STATUS_PROC_DEFS,
+} from "./monsterStatusProcs.js";
 import { combatSeed, mulberry32, rngInt } from "../utils/rng.js";
 
-export const MONSTER_COMBAT_TRIGGER = Object.freeze({
-  BEFORE_HIT: "onBeforeHit",
-  HIT: "onHit",
-  DAMAGED: "onDamaged",
-});
+export const MONSTER_COMBAT_TRIGGER = MONSTER_PROC_TRIGGER;
 
 /**
  * @typedef {{
@@ -109,141 +109,205 @@ export class MonsterCombatProcContext {
   }
 }
 
-/**
- * @param {(ctx: MonsterCombatProcContext) => void} fn
- */
-function wrap(fn) {
-  return ({ world, ctx }) => {
-    if (!world || !ctx) return;
-    try { fn(new MonsterCombatProcContext(world, ctx)); } catch {}
-  };
-}
-
-export const MONSTER_COMBAT_PROCS = Object.freeze({
-  rat: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(25, 0xdead0001)) return;
-      ctx.pushEffect(ctx.defender, { key: "disease", turnsLeft: 20, potency: 1, stacks: 1 });
-      ctx.emit("proc:diseased", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  goblin: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(20, 0xdead0005)) return;
-      ctx.pushEffect(ctx.defender, { key: "bleed", turnsLeft: 3, potency: 1, stacks: 1 });
-      ctx.emit("proc:bleeding", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  bat: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(15, 0xdead0006)) return;
-      ctx.pushEffect(ctx.defender, { key: "stun", turnsLeft: 1, potency: 1, stacks: 1 });
-      ctx.emit("proc:stunned", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  grid_bug: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(30, 0xdead0010)) return;
-      ctx.pushEffect(ctx.defender, { key: "shock", turnsLeft: 2, potency: 1, stacks: 1 });
-      ctx.emit("proc:shocked", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  snake: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(25, 0xdead000f)) return;
-      ctx.pushEffect(ctx.defender, { key: "poison", turnsLeft: 5, potency: 1, stacks: 1 });
-      ctx.emit("proc:poisoned", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  orc: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.BEFORE_HIT]: wrap((ctx) => {
-      if (!ctx.roll(25, 0xdead0007)) return;
+const MONSTER_EXTRA_COMBAT_PROC_DEFS = Object.freeze([
+  {
+    id: "orc_rage_before_hit",
+    monsterId: "orc",
+    trigger: MONSTER_PROC_TRIGGER.ON_BEFORE_HIT,
+    chancePct: 25,
+    seedSalt: 0xdead0007,
+    run: (ctx) => {
       ctx.damage += 2;
       ctx.emit("proc:rage", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  skeleton: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.DAMAGED]: wrap((ctx) => {
-      if (!ctx.roll(20, 0xdead0008)) return;
+    },
+  },
+  {
+    id: "skeleton_reassemble_on_damaged",
+    monsterId: "skeleton",
+    trigger: MONSTER_PROC_TRIGGER.ON_DAMAGED,
+    chancePct: 20,
+    seedSalt: 0xdead0008,
+    run: (ctx) => {
       ctx.heal(ctx.defender, 2);
       ctx.emit("proc:reassemble", { actor: ctx.defender });
-    }),
-  }),
-  spider: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(30, 0xdead0002)) return;
-      ctx.pushEffect(ctx.defender, { key: "poison", turnsLeft: 5, potency: 2, stacks: 1 });
-      ctx.emit("proc:poisoned", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  troll: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      ctx.pushEffect(ctx.attacker, { key: "regen", turnsLeft: 3, potency: 2, stacks: 1 });
-    }),
-    [MONSTER_COMBAT_TRIGGER.DAMAGED]: wrap((ctx) => {
-      if (!ctx.roll(30, 0xdead0009)) return;
+    },
+  },
+  {
+    id: "troll_regenerate_on_damaged",
+    monsterId: "troll",
+    trigger: MONSTER_PROC_TRIGGER.ON_DAMAGED,
+    chancePct: 30,
+    seedSalt: 0xdead0009,
+    run: (ctx) => {
       ctx.heal(ctx.defender, 1);
       ctx.emit("proc:regenerate", { actor: ctx.defender });
-    }),
-  }),
-  wraith: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(20, 0xdead0003)) return;
+    },
+  },
+  {
+    id: "wraith_touch_drain_on_hit",
+    monsterId: "wraith",
+    trigger: MONSTER_PROC_TRIGGER.ON_HIT,
+    chancePct: 20,
+    seedSalt: 0xdead0003,
+    run: (ctx) => {
       const amount = Math.max(1, Math.floor(ctx.damage / 3));
       ctx.healAttacker(amount);
       ctx.emit("proc:drain", { actor: ctx.attacker, target: ctx.defender, amount });
-    }),
-  }),
-  ogre: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(25, 0xdead000a)) return;
-      ctx.pushEffect(ctx.defender, { key: "stun", turnsLeft: 2, potency: 1, stacks: 1 });
-      ctx.emit("proc:stunned", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  floating_eye: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      const r = ctx.rng(0xdead000e);
-      if (rngInt(r, 1, 100) > 20) return;
-      const { depth } = degradeFloorMemory(r, { fraction: 0.3 });
-      const brain = ctx.world.get(ctx.defender, Brain);
-      if (brain) brain.learnedSpellIds = [];
-      ctx.pushEffect(ctx.defender, { key: "mindwipe", turnsLeft: 2, potency: 1, stacks: 1 });
-      ctx.emit("proc:mindwipe", { actor: ctx.attacker, target: ctx.defender, affectedDepth: depth });
-    }),
-  }),
-  demon: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(30, 0xdead000b)) return;
-      ctx.pushEffect(ctx.defender, { key: "burn", turnsLeft: 4, potency: 3, stacks: 1 });
-      ctx.emit("proc:burning", { actor: ctx.attacker, target: ctx.defender });
-    }),
-    [MONSTER_COMBAT_TRIGGER.DAMAGED]: wrap((ctx) => {
+    },
+  },
+  {
+    id: "demon_hellfire_retaliate_on_damaged",
+    monsterId: "demon",
+    trigger: MONSTER_PROC_TRIGGER.ON_DAMAGED,
+    chancePct: 100,
+    seedSalt: 0xdead0012,
+    run: (ctx) => {
       ctx.retaliate(2);
       ctx.emit("proc:hellfire", { actor: ctx.defender });
-    }),
-  }),
-  dragon: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(20, 0xdead0004)) return;
-      ctx.pushEffect(ctx.defender, { key: "burn", turnsLeft: 5, potency: 4, stacks: 1 });
-      ctx.emit("proc:burning", { actor: ctx.attacker, target: ctx.defender });
-    }),
-  }),
-  lich: Object.freeze({
-    [MONSTER_COMBAT_TRIGGER.HIT]: wrap((ctx) => {
-      if (!ctx.roll(25, 0xdead000c)) return;
+    },
+  },
+  {
+    id: "lich_drain_on_hit",
+    monsterId: "lich",
+    trigger: MONSTER_PROC_TRIGGER.ON_HIT,
+    chancePct: 25,
+    seedSalt: 0xdead000c,
+    run: (ctx) => {
       const amount = Math.max(1, Math.floor(ctx.damage / 2));
       ctx.healAttacker(amount);
       ctx.emit("proc:drain", { actor: ctx.attacker, target: ctx.defender, amount });
-    }),
-    [MONSTER_COMBAT_TRIGGER.DAMAGED]: wrap((ctx) => {
-      if (!ctx.roll(20, 0xdead000d)) return;
-      ctx.pushEffect(ctx.defender, { key: "regen", turnsLeft: 3, potency: 2, stacks: 1 });
-      ctx.emit("proc:phylactery", { actor: ctx.defender });
-    }),
-  }),
-});
+    },
+  },
+]);
+
+export const MONSTER_COMBAT_PROC_DEFS = Object.freeze([
+  ...MONSTER_STATUS_PROC_DEFS,
+  ...MONSTER_EXTRA_COMBAT_PROC_DEFS,
+]);
+
+/**
+ * @param {number} chancePct
+ * @param {() => number} rng
+ */
+function rollChance(chancePct, rng) {
+  if ((chancePct | 0) >= 100) return true;
+  return rngInt(rng, 1, 100) <= (chancePct | 0);
+}
+
+/**
+ * @param {any} def
+ * @param {MonsterCombatProcContext} ctx
+ */
+function getProcTarget(def, ctx) {
+  return def.target === MONSTER_PROC_TARGET.ATTACKER
+    ? ctx.attacker
+    : ctx.defender;
+}
+
+/**
+ * @param {any} def
+ * @param {MonsterCombatProcContext} ctx
+ * @param {any} extra
+ */
+function buildProcEventPayload(def, ctx, extra = {}) {
+  const schema = String(def?.eventSchema || MONSTER_PROC_EVENT_SCHEMA.ATTACKER_DEFENDER);
+  if (schema === MONSTER_PROC_EVENT_SCHEMA.DEFENDER_ONLY) {
+    return { actor: ctx.defender, ...extra };
+  }
+  return { actor: ctx.attacker, target: ctx.defender, ...extra };
+}
+
+/**
+ * @param {any} def
+ * @param {MonsterCombatProcContext} ctx
+ * @param {() => number} rng
+ * @param {{ degradeFloorMemory?:(rng:() => number, opts?:any) => { depth:number } } | null} deps
+ */
+function executeProc(def, ctx, rng, deps = null) {
+  if (typeof def.run === "function") {
+    def.run(ctx, rng);
+  }
+
+  if (typeof def.apply === "function") {
+    def.apply({
+      world: ctx.world,
+      ctx: { attacker: ctx.attacker, defender: ctx.defender, damage: ctx.damage },
+      rng,
+      degradeFloorMemory: deps?.degradeFloorMemory,
+      pushEffect: (entityId, effect) => ctx.pushEffect(entityId, effect),
+      emit: (event, payload) => ctx.emit(event, payload),
+      emitProc: (event, eventSchema, payload = {}) => {
+        ctx.emit(event, buildProcEventPayload({ eventSchema }, ctx, payload));
+      },
+    });
+  }
+
+  if (def.effect && typeof def.effect === "object") {
+    const targetId = getProcTarget(def, ctx);
+    ctx.pushEffect(targetId, def.effect);
+  }
+
+  if (def.emitEvent) {
+    ctx.emit(def.emitEvent, buildProcEventPayload(def, ctx));
+  }
+}
+
+/**
+ * @param {any} def
+ */
+function createProcRunner(def) {
+  return ({ world, ctx, deps }) => {
+    if (!world || !ctx) return;
+    try {
+      const procCtx = new MonsterCombatProcContext(world, ctx);
+      const procRng = procCtx.rng(def.seedSalt | 0);
+      if (!rollChance(def.chancePct, procRng)) return;
+      executeProc(def, procCtx, procRng, deps || null);
+    } catch {}
+  };
+}
+
+/**
+ * @param {any[]} defs
+ */
+function compileCombatHooks(defs) {
+  const byMonster = new Map();
+
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i];
+    const monsterId = String(def?.monsterId || "").toLowerCase();
+    const trigger = String(def?.trigger || "");
+    if (!monsterId || !trigger) continue;
+
+    let hookMap = byMonster.get(monsterId);
+    if (!hookMap) {
+      hookMap = Object.create(null);
+      byMonster.set(monsterId, hookMap);
+    }
+
+    if (!hookMap[trigger]) hookMap[trigger] = [];
+    hookMap[trigger].push(createProcRunner(def));
+  }
+
+  const out = Object.create(null);
+  for (const [monsterId, hookMap] of byMonster.entries()) {
+    /** @type {Record<string, Function>} */
+    const hooks = Object.create(null);
+    for (const trigger of Object.keys(hookMap)) {
+      const runners = hookMap[trigger];
+      hooks[trigger] = ({ world, ctx, deps }) => {
+        for (let i = 0; i < runners.length; i++) {
+          runners[i]({ world, ctx, deps });
+        }
+      };
+    }
+    out[monsterId] = Object.freeze(hooks);
+  }
+
+  return Object.freeze(out);
+}
+
+export const MONSTER_COMBAT_PROCS = compileCombatHooks(MONSTER_COMBAT_PROC_DEFS);
 
 /**
  * @param {string} monsterId
@@ -252,4 +316,3 @@ export const MONSTER_COMBAT_PROCS = Object.freeze({
 export function getMonsterCombatHooks(monsterId) {
   return MONSTER_COMBAT_PROCS[String(monsterId || "").toLowerCase()] || null;
 }
-
