@@ -817,7 +817,7 @@ function renderInventory(panel, items) {
     const applyHint = it?.canApply
       ? ` · A=Apply${Number(it?.applyTargetCount || 0) > 0 ? '' : ' (no targets)'}`
       : '';
-    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · E=Equip · D=Drink · U=Use${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
+    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · ,=Drop · E=Equip · D=Drink · U=Use${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
   }
 
   /** @param {number} i */
@@ -858,6 +858,7 @@ function renderInventory(panel, items) {
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
     else if (k === 'Enter' || e.code === 'NumpadEnter') { defaultAction(); e.preventDefault(); }
     else if (k === 'a' || k === 'A') { const it = items[sel]; if (it?.canApply) { triggerApplyForTool(it); e.preventDefault(); } }
+    else if (k === ',' || e.code === 'Comma') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip' || it?.type === 'ammo') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }

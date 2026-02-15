@@ -1716,6 +1716,21 @@ addEventListener('ui:requestUse', (ev) => {
   rulesHandler(action);
 });
 
+// When user requests dropping an inventory item
+addEventListener('ui:requestDrop', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const itemId = e?.detail?.itemId;
+  const count = e?.detail?.count;
+  if (!Number.isInteger(itemId)) return;
+  const payload = { itemId };
+  if (Number.isFinite(count) && count > 0) payload.count = count;
+  const action = { type: 'rules.dropItem', payload };
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler(action);
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+});
+
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
 cam.scale = TILE_PX;
