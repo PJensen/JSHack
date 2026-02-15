@@ -5,8 +5,8 @@ export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
   Object.assign(bar.style, {
-    position: 'fixed', left: '8px', right: '8px', bottom: '8px',
-    display: 'flex', gap: '8px', justifyContent: 'flex-end',
+    position: 'fixed', left: '8px', right: '8px', bottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
+    display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center',
     pointerEvents: 'auto', zIndex: 900
   });
 
@@ -263,6 +263,83 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
+  const commandButtons = [invBtn, useBtn, applyBtn, petBtn, castBtn, shootBtn, engraveBtn, prayBtn];
+  for (const btn of commandButtons) {
+    Object.assign(btn.style, {
+      minHeight: '44px',
+      fontSize: '13px',
+      whiteSpace: 'nowrap',
+      touchAction: 'manipulation'
+    });
+  }
+
+  const mobileLayoutMq = window.matchMedia('(max-width: 760px)');
+  const setDesktopLabel = (btn, text) => { btn.dataset.desktopLabel = String(text || ''); };
+  const setMobileLabel = (btn, text) => { btn.dataset.mobileLabel = String(text || ''); };
+  const refreshCommandLabels = () => {
+    const isMobile = mobileLayoutMq.matches;
+    for (const btn of commandButtons) {
+      const desktopText = String(btn.dataset.desktopLabel || btn.textContent || '');
+      const mobileText = String(btn.dataset.mobileLabel || desktopText);
+      btn.textContent = isMobile ? mobileText : desktopText;
+      btn.title = isMobile && mobileText !== desktopText ? desktopText : '';
+    }
+  };
+
+  setDesktopLabel(invBtn, 'Inventory'); setMobileLabel(invBtn, 'Bag');
+  setDesktopLabel(useBtn, 'Use'); setMobileLabel(useBtn, 'Use');
+  setDesktopLabel(applyBtn, 'Apply'); setMobileLabel(applyBtn, 'Tool');
+  setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
+  setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
+  setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
+  setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Mark');
+  setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
+
+  function applyCommandBarLayout() {
+    const isMobile = mobileLayoutMq.matches;
+    if (isMobile) {
+      Object.assign(bar.style, {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        alignItems: 'stretch',
+        justifyContent: 'stretch',
+        gap: '6px'
+      });
+      for (const btn of commandButtons) {
+        btn.style.width = '100%';
+        btn.style.minWidth = '0';
+        btn.style.padding = '10px 6px';
+        btn.style.fontSize = '12px';
+        btn.style.overflow = 'hidden';
+        btn.style.textOverflow = 'ellipsis';
+      }
+      refreshCommandLabels();
+      return;
+    }
+
+    Object.assign(bar.style, {
+      display: 'flex',
+      gridTemplateColumns: '',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: '8px'
+    });
+    for (const btn of commandButtons) {
+      btn.style.width = '';
+      btn.style.minWidth = '';
+      btn.style.padding = '8px 12px';
+      btn.style.fontSize = '13px';
+      btn.style.overflow = '';
+      btn.style.textOverflow = '';
+    }
+    refreshCommandLabels();
+  }
+
+  function syncActionBarHeight() {
+    const h = Math.max(44, Math.ceil(bar.getBoundingClientRect().height || 44));
+    document.documentElement.style.setProperty('--jshack-actionbar-height', `${h}px`);
+  }
+
   // Show/hide pet button based on pet existence
   window.addEventListener('ui:petExists', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -284,8 +361,9 @@ export function initHUD() {
       fleeing: 'Fleeing!',
       idle: 'Idle'
     };
-    petBtn.textContent = `Pet: ${stateLabels[state] || state}`;
+    setDesktopLabel(petBtn, `Pet: ${stateLabels[state] || state}`);
     petBtn.dataset.state = state; // Store for background reset
+    refreshCommandLabels();
     // Color code by state
     if (state === 'fleeing') {
       petBtn.style.background = '#3d1616'; // Red tint for danger
@@ -303,7 +381,8 @@ export function initHUD() {
     const name = String(e?.detail?.name || '').trim();
     const cost = Number(e?.detail?.cost || 0);
     const canCast = Boolean(e?.detail?.canCast ?? true);
-    castBtn.textContent = name ? (cost ? `Cast [${name}] (${cost})` : `Cast [${name}]`) : 'Cast';
+    setDesktopLabel(castBtn, name ? (cost ? `Cast [${name}] (${cost})` : `Cast [${name}]`) : 'Cast');
+    refreshCommandLabels();
     castBtn.disabled = !canCast;
     castBtn.style.opacity = canCast ? '1' : '0.6';
     castBtn.style.cursor = canCast ? 'pointer' : 'not-allowed';
@@ -382,6 +461,27 @@ export function initHUD() {
   bar.appendChild(prayBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
+
+  applyCommandBarLayout();
+  syncActionBarHeight();
+
+  if (typeof mobileLayoutMq.addEventListener === 'function') {
+    mobileLayoutMq.addEventListener('change', () => {
+      applyCommandBarLayout();
+      syncActionBarHeight();
+    });
+  } else if (typeof mobileLayoutMq.addListener === 'function') {
+    mobileLayoutMq.addListener(() => {
+      applyCommandBarLayout();
+      syncActionBarHeight();
+    });
+  }
+  window.addEventListener('resize', syncActionBarHeight);
+  if (typeof ResizeObserver !== 'undefined') {
+    const obs = new ResizeObserver(() => syncActionBarHeight());
+    obs.observe(bar);
+  }
+
   return { castBtn, invBtn, useBtn, shootBtn, engraveBtn, petBtn, prayBtn };
 }
 
@@ -530,7 +630,7 @@ function createQuickSlot() {
   Object.assign(el.style, {
     position: 'fixed',
     right: '8px',
-    bottom: '56px',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
