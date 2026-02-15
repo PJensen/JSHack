@@ -1,6 +1,5 @@
 import { defineArchetype } from "../../lib/ecs-js/archetype.js";
 import { Position } from "../components/Position.js";
-import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -14,7 +13,6 @@ export const Tombstone = defineArchetype(
   "Tombstone",
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Tombstone", identity: "tombstone" }],
-  [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "readTombstone", params: {} }],
   [Material, { kind: "stone" }],
   [TombstoneComponent, (p) => ({
