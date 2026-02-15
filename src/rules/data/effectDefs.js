@@ -78,5 +78,28 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["mindwiped"],
   },
+  {
+    id: "confused",
+    keys: ["confuse", "confused"],
+    operation: "none",
+    statuses: ["confused"],
+  },
+  {
+    id: "weakened",
+    keys: ["weaken", "weakened"],
+    operation: "none",
+    statuses: ["weakened"],
+  },
+  {
+    id: "cursed",
+    keys: ["curse", "cursed"],
+    operation: "none",
+    statuses: ["cursed"],
+  },
+  {
+    id: "blessed",
+    keys: ["bless", "blessed"],
+    operation: "none",
+    statuses: ["blessed"],
+  },
 ];
-
