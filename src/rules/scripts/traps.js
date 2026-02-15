@@ -50,7 +50,6 @@ registerScript('trap_snake', {
         attackDerived: snakeDef.attack,
         defenseDerived: snakeDef.defense,
         naturalDamageDice: snakeDef.damageDice,
-        naturalScript: snakeDef.script,
         sizeClass: snakeDef.sizeClass,
         massKg: snakeDef.massKg,
         resistances: snakeDef.resistances,

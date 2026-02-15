@@ -1,13 +1,12 @@
 import { assert } from "jsr:@std/assert";
 import { MONSTER_STATUS_PROC_DEFS } from "../src/rules/data/monsterStatusProcs.js";
-import { listRegisteredScripts } from "../src/rules/scripting.js";
-import "../src/rules/scripts/monsters.js";
 
-Deno.test("monster status proc defs are registered as scripts", () => {
-  const registered = new Set(listRegisteredScripts());
+Deno.test("monster status proc defs declare callable behavior or data effect", () => {
   for (let i = 0; i < MONSTER_STATUS_PROC_DEFS.length; i++) {
-    const script = MONSTER_STATUS_PROC_DEFS[i].script;
-    assert(registered.has(script), `expected script to be registered: ${script}`);
+    const def = MONSTER_STATUS_PROC_DEFS[i];
+    assert(
+      typeof def.apply === "function" || (def.effect && typeof def.effect === "object"),
+      `expected proc def ${def.id} to have apply callback or effect payload`,
+    );
   }
 });
-

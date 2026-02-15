@@ -5,7 +5,6 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Brain } from "../components/Brain.js";
 import { degradeFloorMemory } from "../environment/dungeon/transition.js";
 import { combatSeed, mulberry32, rngInt } from "../utils/rng.js";
-import { MONSTER_SCRIPT_IDS } from "./monsterScriptIds.js";
 
 function pushEffect(world, entityId, effect) {
   const ae = world.get(entityId, ActiveEffects);
@@ -50,7 +49,6 @@ export const MONSTERS = [
     massKg: 2,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    script: MONSTER_SCRIPT_IDS.RAT_BITE,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 25, 0xdead0001)) return;
@@ -76,7 +74,6 @@ export const MONSTERS = [
     massKg: 30,
     resistances: { kinetic: { DR: 2 } },
     speed: 2,
-    script: MONSTER_SCRIPT_IDS.GOBLIN_SHIV,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 20, 0xdead0005)) return;
@@ -103,7 +100,6 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    script: MONSTER_SCRIPT_IDS.BAT_SCREECH,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 15, 0xdead0006)) return;
@@ -130,7 +126,6 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 }, electric: { ohms: Infinity } },
     speed: 1,
-    script: MONSTER_SCRIPT_IDS.GRID_BUG_ZAP,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 30, 0xdead0010)) return;
@@ -157,7 +152,6 @@ export const MONSTERS = [
     massKg: 3,
     resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
     speed: 1,
-    script: MONSTER_SCRIPT_IDS.SNAKE_BITE,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 25, 0xdead000f)) return;
@@ -185,7 +179,6 @@ export const MONSTERS = [
     massKg: 95,
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
-    script: MONSTER_SCRIPT_IDS.ORC_RAGE,
     hooks: {
       onBeforeHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 25, 0xdead0007)) return;
@@ -214,7 +207,6 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
     },
     speed: 2,
-    script: MONSTER_SCRIPT_IDS.SKELETON_REASSEMBLE,
     hooks: {
       onDamaged: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 20, 0xdead0008)) return;
@@ -240,7 +232,6 @@ export const MONSTERS = [
     massKg: 15,
     resistances: { kinetic: { DR: 2 }, chemical: { toxMult: 0 } },
     speed: 1,
-    script: MONSTER_SCRIPT_IDS.SPIDER_BITE,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 30, 0xdead0002)) return;
@@ -268,7 +259,6 @@ export const MONSTERS = [
     massKg: 200,
     resistances: { kinetic: { DR: 10 }, thermal: { burnMult: 1.5 } },
     speed: 3,
-    script: MONSTER_SCRIPT_IDS.TROLL_SMASH,
     hooks: {
       onHit: ({ world, ctx }) => {
         pushEffect(world, ctx.attacker, { key: "regen", turnsLeft: 3, potency: 2, stacks: 1 });
@@ -300,7 +290,6 @@ export const MONSTERS = [
       electric: { ohms: 50 },
     },
     speed: 1,
-    script: MONSTER_SCRIPT_IDS.WRAITH_TOUCH,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 20, 0xdead0003)) return;
@@ -327,7 +316,6 @@ export const MONSTERS = [
     massKg: 250,
     resistances: { kinetic: { DR: 12 } },
     speed: 3,
-    script: MONSTER_SCRIPT_IDS.OGRE_CRUSH,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 25, 0xdead000a)) return;
@@ -358,7 +346,6 @@ export const MONSTERS = [
       electric: { ohms: 100 },
     },
     speed: 2,
-    script: MONSTER_SCRIPT_IDS.MINDFLAYER_BLAST,
     hooks: {
       onHit: ({ world, ctx }) => {
         const r = mulberry32(combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0xdead000e));
@@ -393,7 +380,6 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    script: MONSTER_SCRIPT_IDS.DEMON_HELLFIRE,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 30, 0xdead000b)) return;
@@ -426,7 +412,6 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    script: MONSTER_SCRIPT_IDS.DRAGON_CLAW,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 20, 0xdead0004)) return;
@@ -457,7 +442,6 @@ export const MONSTERS = [
       electric: { ohms: 200 },
     },
     speed: 3,
-    script: MONSTER_SCRIPT_IDS.LICH_DRAIN,
     hooks: {
       onHit: ({ world, ctx }) => {
         if (!rollChance(world, ctx, 25, 0xdead000c)) return;
@@ -498,4 +482,4 @@ export function getMonsterLootTable(def) {
   return def.lootTable || `drop:tier${def.tier}`;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, script:string|null, hooks?:Record<string, Function>|null, description:string, lootTable?:string }} MonsterDef */
+/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function>|null, description:string, lootTable?:string }} MonsterDef */
