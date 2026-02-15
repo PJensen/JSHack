@@ -1,7 +1,23 @@
 // rules/data/monsters.js
 // Central monster definitions. Each entry feeds into pickMonster() for spawning,
 // the Monster archetype for ECS creation, and the display palette for rendering.
-import { getMonsterCombatHooks } from "./monsterCombatProcs.js";
+//
+// All combat behavior lives here on the monster it governs — callbacks are
+// plain (ctx) => void functions invoked via runCallbackList.
+import {
+  statusEffectOnHit,
+  selfBuffOnHit,
+  drainOnHit,
+  bonusDamageOnBeforeHit,
+  healOnDamaged,
+  retaliateOnDamaged,
+  statusEffectOnDamaged,
+  mindflayerBlastOnHit,
+} from "./callbacks/combat.js";
+import {
+  corpseStatusEffect,
+  corpseDamage,
+} from "./callbacks/eat.js";
 
 export const MONSTERS = [
   // ── Tier 0 (floors 1-5) ────────────────────────────────────────────
@@ -21,7 +37,10 @@ export const MONSTERS = [
     massKg: 2,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    hooks: getMonsterCombatHooks('rat'),
+    hooks: {
+      onHit: [statusEffectOnHit(25, 0xdead0001, { key: "disease", turnsLeft: 20, potency: 1 }, "proc:diseased")],
+      eat: [corpseStatusEffect("disease", 20, 1)],
+    },
     description: 'A mangy rodent with beady eyes.',
   },
   {
@@ -40,7 +59,9 @@ export const MONSTERS = [
     massKg: 30,
     resistances: { kinetic: { DR: 2 } },
     speed: 2,
-    hooks: getMonsterCombatHooks('goblin'),
+    hooks: {
+      onHit: [statusEffectOnHit(20, 0xdead0005, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
+    },
     description: 'A sneering green-skinned runt armed with a rusty shiv.',
     lootTable: 'drop:goblin',
   },
@@ -60,7 +81,10 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 } },
     speed: 1,
-    hooks: getMonsterCombatHooks('bat'),
+    hooks: {
+      onHit: [statusEffectOnHit(15, 0xdead0006, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
+      eat: [corpseStatusEffect("disease", 20, 1)],
+    },
     description: 'A leathery-winged vermin that darts erratically.',
   },
 
@@ -80,7 +104,10 @@ export const MONSTERS = [
     massKg: 1,
     resistances: { kinetic: { DR: 0 }, electric: { ohms: Infinity } },
     speed: 1,
-    hooks: getMonsterCombatHooks('grid_bug'),
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0010, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
+      eat: [corpseDamage(3)],
+    },
     description: 'A tiny crackling insect that moves only along the grid axes.',
   },
 
@@ -100,7 +127,10 @@ export const MONSTERS = [
     massKg: 3,
     resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
     speed: 1,
-    hooks: getMonsterCombatHooks('snake'),
+    hooks: {
+      onHit: [statusEffectOnHit(25, 0xdead000f, { key: "poison", turnsLeft: 5, potency: 1 }, "proc:poisoned")],
+      eat: [corpseStatusEffect("poison", 8, 2)],
+    },
     description: 'A hissing serpent with venomous fangs.',
   },
 
@@ -121,7 +151,9 @@ export const MONSTERS = [
     massKg: 95,
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
-    hooks: getMonsterCombatHooks('orc'),
+    hooks: {
+      onBeforeHit: [bonusDamageOnBeforeHit(25, 0xdead0007, 2, "proc:rage")],
+    },
     description: 'A thick-skulled brute with a chipped cleaver.',
   },
   {
@@ -143,7 +175,9 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
     },
     speed: 2,
-    hooks: getMonsterCombatHooks('skeleton'),
+    hooks: {
+      onDamaged: [healOnDamaged(20, 0xdead0008, 2, "proc:reassemble")],
+    },
     description: 'Bones held together by spite. Resistant to piercing.',
   },
   {
@@ -162,7 +196,10 @@ export const MONSTERS = [
     massKg: 15,
     resistances: { kinetic: { DR: 2 }, chemical: { toxMult: 0 } },
     speed: 1,
-    hooks: getMonsterCombatHooks('spider'),
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0002, { key: "poison", turnsLeft: 5, potency: 2 }, "proc:poisoned")],
+      eat: [corpseStatusEffect("poison", 8, 2)],
+    },
     description: 'A dog-sized arachnid with venomous fangs.',
   },
 
@@ -183,7 +220,10 @@ export const MONSTERS = [
     massKg: 200,
     resistances: { kinetic: { DR: 10 }, thermal: { burnMult: 1.5 } },
     speed: 3,
-    hooks: getMonsterCombatHooks('troll'),
+    hooks: {
+      onHit: [selfBuffOnHit({ key: "regen", turnsLeft: 3, potency: 2 })],
+      onDamaged: [healOnDamaged(30, 0xdead0009, 1, "proc:regenerate")],
+    },
     description: 'A hulking regenerator. Weak to fire.',
   },
   {
@@ -205,7 +245,10 @@ export const MONSTERS = [
       electric: { ohms: 50 },
     },
     speed: 1,
-    hooks: getMonsterCombatHooks('wraith'),
+    hooks: {
+      onHit: [drainOnHit(20, 0xdead0003, 3)],
+      eat: [corpseStatusEffect("mindwipe", 15, 1)],
+    },
     description: 'A spectral horror. Physical attacks pass through it.',
   },
   {
@@ -224,7 +267,9 @@ export const MONSTERS = [
     massKg: 250,
     resistances: { kinetic: { DR: 12 } },
     speed: 3,
-    hooks: getMonsterCombatHooks('ogre'),
+    hooks: {
+      onHit: [statusEffectOnHit(25, 0xdead000a, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
+    },
     description: 'A lumbering slab of muscle and bad intentions.',
   },
 
@@ -248,7 +293,10 @@ export const MONSTERS = [
       electric: { ohms: 100 },
     },
     speed: 2,
-    hooks: getMonsterCombatHooks('floating_eye'),
+    hooks: {
+      onHit: [mindflayerBlastOnHit(20, 0xdead000e)],
+      eat: [corpseStatusEffect("mindwipe", 30, 2, "hallucination")],
+    },
     description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
   },
 
@@ -272,7 +320,10 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    hooks: getMonsterCombatHooks('demon'),
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead000b, { key: "burn", turnsLeft: 4, potency: 3 }, "proc:burning")],
+      onDamaged: [retaliateOnDamaged(2, "proc:hellfire")],
+    },
     description: 'Sulphur and malice given form. Immune to fire.',
   },
   {
@@ -294,7 +345,9 @@ export const MONSTERS = [
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
-    hooks: getMonsterCombatHooks('dragon'),
+    hooks: {
+      onHit: [statusEffectOnHit(20, 0xdead0004, { key: "burn", turnsLeft: 5, potency: 4 }, "proc:burning")],
+    },
     description: 'Scales like hammered bronze. The apex predator of the deep.',
     lootTable: 'drop:dragon',
   },
@@ -318,7 +371,11 @@ export const MONSTERS = [
       electric: { ohms: 200 },
     },
     speed: 3,
-    hooks: getMonsterCombatHooks('lich'),
+    hooks: {
+      onHit: [drainOnHit(25, 0xdead000c, 2)],
+      onDamaged: [statusEffectOnDamaged(20, 0xdead000d, { key: "regen", turnsLeft: 3, potency: 2 }, "proc:phylactery", true)],
+      eat: [corpseStatusEffect("mindwipe", 15, 1)],
+    },
     description: 'An undead sorcerer sustained by a hidden phylactery.',
     lootTable: 'drop:lich',
   },
@@ -346,4 +403,4 @@ export function getMonsterLootTable(def) {
   return def.lootTable || `drop:tier${def.tier}`;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function>|null, description:string, lootTable?:string }} MonsterDef */
+/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, description:string, lootTable?:string }} MonsterDef */

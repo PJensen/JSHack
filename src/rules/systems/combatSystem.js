@@ -14,7 +14,8 @@ import { Stamina } from '../components/Stamina.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { getMonster } from '../data/monsters.js';
-import { MONSTER_COMBAT_TRIGGER } from '../data/monsterCombatProcs.js';
+import { CombatCallbackContext } from '../data/callbacks/combat.js';
+import { runCallbackList } from '../interaction/dispatch.js';
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
@@ -62,21 +63,19 @@ function attachHelpers(world, base) {
 }
 
 /**
+ * Run monster definition hooks for a given trigger via runCallbackList.
  * @param {any} world
- * @param {number} entityId
+ * @param {number} entityId - the monster entity whose hooks to run
  * @param {'onBeforeHit'|'onHit'|'onDamaged'} hookName
- * @param {any} ctx
- * @param {{ degradeFloorMemory?:(rng:() => number, opts?:any) => { depth:number } } | null} deps
+ * @param {any} frame - combat frame (with heal/healAttacker/retaliate attached)
  */
-function runMonsterHook(world, entityId, hookName, ctx, deps = null) {
+function runMonsterHooks(world, entityId, hookName, frame) {
     const ni = world.get(entityId, NamedIdentity);
     const def = ni ? getMonster(ni.identity) : null;
-    const hook = def?.hooks?.[hookName];
-    if (typeof hook === 'function') {
-        try { hook({ world, ctx, deps }); } catch {}
-        return true;
-    }
-    return false;
+    const hooks = def?.hooks?.[hookName];
+    if (!Array.isArray(hooks) || hooks.length === 0) return;
+    const ctx = new CombatCallbackContext(world, frame, { degradeFloorMemory });
+    runCallbackList(hooks, ctx);
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
@@ -103,8 +102,6 @@ export function combatSystem(world) {
         const af = world.get(attacker, Faction)?.key || '';
         const df = world.get(defender, Faction)?.key || '';
         if (af && df && af === df) {
-            // treat as immune (same faction)
-            // world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
             world.remove(attacker, AttackIntent);
             continue;
         }
@@ -196,7 +193,7 @@ export function combatSystem(world) {
             }
         });
         // Innate monster pre-hit behavior from monster definition hooks
-        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.BEFORE_HIT, ctx, { degradeFloorMemory });
+        runMonsterHooks(world, attacker, 'onBeforeHit', ctx);
         // Recompute damage if modified
         let finalDmg = Math.max(0, Math.floor(ctx.damage));
 
@@ -213,7 +210,7 @@ export function combatSystem(world) {
         finalDmg = Math.max(0, Math.floor(hitCtx.damage));
         if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
         // Innate monster on-hit behavior from monster definition hooks
-        runMonsterHook(world, attacker, MONSTER_COMBAT_TRIGGER.HIT, hitCtx, { degradeFloorMemory });
+        runMonsterHooks(world, attacker, 'onHit', hitCtx);
         // Defender on-hit reactions (e.g., Thorns)
         const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
         forEachAffix(world, defender, /** @param {any} a */ (a) => {
@@ -233,6 +230,10 @@ export function combatSystem(world) {
             defVit.hp = Math.max(0, defVit.hp - finalDmg);
             world.emit('damaged', { target: defender, amount: finalDmg, source: attacker, critical: isCrit });
             if (defVit.hp <= 0) world.emit('died', { id: defender, killer: attacker });
+
+            // Defender on-damaged hooks (e.g., skeleton reassemble, troll regen, demon retaliate)
+            const damagedCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
+            runMonsterHooks(world, defender, 'onDamaged', damagedCtx);
         } else {
             // Zero damage after modifiers → treat as miss/blocked; include attacker for logs
             world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
