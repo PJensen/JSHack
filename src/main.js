@@ -66,6 +66,11 @@ import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
+import {
+  addItemEntityToInventory,
+  coalesceInventoryStacks,
+  findInventoryStackTargetForItem,
+} from "./rules/utils/inventoryStacking.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
 import { PetState } from "./rules/components/PetState.js";
@@ -327,23 +332,23 @@ if (!playerEntity(world)) {
     const eq = world.get(pe.id, Equipment);
     const daggerId = createItemById(world, 'dagger_quick');
     if (inv && eq && daggerId != null) {
-      inv.items.push(daggerId);
-      eq.weapon = daggerId;
+      const moved = addItemEntityToInventory(world, inv, daggerId);
+      eq.weapon = moved.mode === "stacked" ? moved.stackedIntoId : daggerId;
     }
     // Starting pickaxe: for digging through walls
     const pickaxeId = createItemById(world, 'iron_pickaxe');
     if (inv && pickaxeId != null) {
-      inv.items.push(pickaxeId);
+      addItemEntityToInventory(world, inv, pickaxeId);
     }
     // Starting touchstone: for testing gems
     const touchstoneId = createItemById(world, 'stone_touchstone');
     if (inv && touchstoneId != null) {
-      inv.items.push(touchstoneId);
+      addItemEntityToInventory(world, inv, touchstoneId);
     }
     // Book of the Dead: view past deaths
     const bookDeadId = createItemById(world, 'book_dead');
     if (inv && bookDeadId != null) {
-      inv.items.push(bookDeadId);
+      addItemEntityToInventory(world, inv, bookDeadId);
     }
   }
 }
@@ -409,7 +414,7 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
     const inv = world.get(pe.id, Inventory);
     if (inv && Array.isArray(inv.items)) {
       const scrollId = createFrom(world, ScrollOfMapping, {});
-      inv.items.push(scrollId);
+      addItemEntityToInventory(world, inv, scrollId);
     }
   }
 }
@@ -448,7 +453,7 @@ import { ScrollOfMapping } from "./rules/archetypes/Items.js";
             const createdItemId = createItemById(world, itemId, { count });
 
             if (createdItemId !== null) {
-              inv.items.push(createdItemId);
+              addItemEntityToInventory(world, inv, createdItemId);
               console.log(`[?give] Created ${count}x ${itemId}`);
             } else {
               console.warn(`[?give] Unknown item: "${itemId}"`);
@@ -562,6 +567,7 @@ addEventListener('ui:requestInventoryData', () => {
     const inv = world.get(p.id, Inventory);
     const eq = world.get(p.id, Equipment);
     if (inv && Array.isArray(inv.items)) {
+      coalesceInventoryStacks(world, inv);
       for (const id of inv.items) {
         const info = world.get(id, ItemInfo);
         if (info) {
@@ -721,7 +727,10 @@ addEventListener('ui:requestPickup', (e) => {
     // Check if the item is inside a chest inventory (no Position)
     if (!world.get(id, Position)) {
       const playerInv = world.get(pe.id, Inventory);
-      if (!playerInv || (playerInv.capacity != null && playerInv.items.length >= playerInv.capacity)) continue;
+      if (!playerInv) continue;
+      const stackIntoId = findInventoryStackTargetForItem(world, playerInv, id);
+      const hasCapacity = stackIntoId || playerInv.capacity == null || playerInv.items.length < playerInv.capacity;
+      if (!hasCapacity && !playerInv.items.includes(id)) continue;
       // Find and remove from the chest that holds it
       for (const [cid, , ni] of world.query(Position, NamedIdentity)) {
         if (ni.identity !== 'chest') continue;
@@ -730,7 +739,7 @@ addEventListener('ui:requestPickup', (e) => {
         const idx = cInv.items.indexOf(id);
         if (idx === -1) continue;
         cInv.items.splice(idx, 1);
-        playerInv.items.push(id);
+        addItemEntityToInventory(world, playerInv, id);
         const count = world.get(id, ItemInfo)?.count || 1;
         try { world.emit?.('item:pickup', { actor: pe.id, itemId: id, count }); } catch {}
         break;

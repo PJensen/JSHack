@@ -7,6 +7,10 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { ShopInventory } from "../../rules/components/ShopInventory.js";
 import { Unpaid } from "../../rules/components/Unpaid.js";
+import {
+  addItemEntityToInventory,
+  findInventoryStackTargetByIdentity,
+} from "../../rules/utils/inventoryStacking.js";
 import { resolveItemDisplayName } from "./itemName.js";
 import { isIdentified } from "../../rules/data/identification.js";
 import { getUnidentifiedGemValue } from "../../rules/data/gemPricing.js";
@@ -36,11 +40,42 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!pe) return 0;
     const inv = world.get(pe.id, Inventory);
     if (!inv) return 0;
+    let total = 0;
     for (const id of inv.items) {
       const info = world.get(id, ItemInfo);
-      if (info && info.type === "currency") return info.count || 0;
+      if (info && info.type === "currency") total += info.count || 0;
     }
-    return 0;
+    return total;
+  }
+
+  function spendGold(inv, amount) {
+    let remaining = Math.max(0, Number(amount || 0));
+    if (remaining <= 0) return true;
+    for (const gid of [...inv.items]) {
+      const gi = world.get(gid, ItemInfo);
+      if (!gi || gi.type !== "currency") continue;
+      const have = Math.max(0, Number(gi.count || 0));
+      if (have <= 0) continue;
+      const spend = Math.min(have, remaining);
+      world.mutate(gid, ItemInfo, (r) => { r.count = Math.max(0, (r.count || 0) - spend); });
+      remaining -= spend;
+      const next = world.get(gid, ItemInfo)?.count || 0;
+      if (next <= 0) {
+        const idx = inv.items.indexOf(gid);
+        if (idx !== -1) inv.items.splice(idx, 1);
+        try { world.destroy(gid); } catch {}
+      }
+      if (remaining <= 0) break;
+    }
+    return remaining <= 0;
+  }
+
+  function grantGold(inv, amount) {
+    const n = Math.max(0, Number(amount || 0));
+    if (n <= 0) return;
+    const gid = createFrom(world, GoldStack, {});
+    world.mutate(gid, ItemInfo, (r) => { r.count = n; });
+    addItemEntityToInventory(world, inv, gid);
   }
 
   /** Resolve sell value: unidentified gems use appearance-based pricing. */
@@ -235,26 +270,27 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!inv) return;
 
     // Check inventory capacity
-    const hasCapacity = inv.capacity == null || inv.items.length < inv.capacity;
+    const identity = world.get(itemId, NamedIdentity)?.identity || "";
+    const stackIntoId = identity
+      ? findInventoryStackTargetByIdentity(world, inv, identity)
+      : 0;
+    const hasCapacity = stackIntoId || inv.capacity == null || inv.items.length < inv.capacity;
     if (!hasCapacity) {
       log("Your pack is full.");
       return;
     }
 
-    // Deduct gold
-    for (const gid of inv.items) {
-      const gi = world.get(gid, ItemInfo);
-      if (gi && gi.type === "currency") {
-        world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) - price; });
-        break;
-      }
+    // Deduct gold across all currency stacks
+    if (!spendGold(inv, price)) {
+      log("You cannot afford that.");
+      return;
     }
 
     // Remove from floor and add to inventory
     try { world.remove(itemId, Position); } catch {}
     // Remove unpaid status (item is now paid for)
     try { world.remove(itemId, Unpaid); } catch {}
-    inv.items.push(itemId);
+    addItemEntityToInventory(world, inv, itemId);
 
     log(`You buy ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
 
@@ -307,21 +343,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       world.add(itemId, Unpaid, { shopkeeperId, price: resalePrice });
     }
 
-    let found = false;
-    for (const gid of inv.items) {
-      const gi = world.get(gid, ItemInfo);
-      if (gi && gi.type === "currency") {
-        world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) + price; });
-        found = true;
-        break;
-      }
-    }
-    if (!found && price > 0) {
-      const gid = createFrom(world, GoldStack, {});
-      try { world.remove(gid, Position); } catch {}
-      world.mutate(gid, ItemInfo, (r) => { r.count = price; });
-      inv.items.push(gid);
-    }
+    grantGold(inv, price);
 
     log(`You sell ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
 
@@ -446,13 +468,10 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       return;
     }
 
-    // Deduct gold
-    for (const gid of inv.items) {
-      const gi = world.get(gid, ItemInfo);
-      if (gi && gi.type === "currency") {
-        world.mutate(gid, ItemInfo, (r) => { r.count = (r.count || 0) - totalBill; });
-        break;
-      }
+    // Deduct gold across all currency stacks
+    if (!spendGold(inv, totalBill)) {
+      log(`You cannot afford that. You need ${totalBill} gold but only have ${gold}.`);
+      return;
     }
 
     // Remove Unpaid component from all items

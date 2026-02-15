@@ -19,6 +19,7 @@ import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
+import { addItemEntityToInventory } from '../../utils/inventoryStacking.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { isIdentified } from '../../data/identification.js';
@@ -330,7 +331,7 @@ export function materializeSpawn(world, spawn) {
           const eid = materializeDrop(world, drop, dummyPos);
           if (eid != null) {
             try { world.remove(eid, Position); } catch {}
-            inv.items.push(eid);
+            addItemEntityToInventory(world, inv, eid, { removePosition: false });
           }
         }
       }

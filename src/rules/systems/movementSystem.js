@@ -10,7 +10,6 @@ import { Stamina } from "../components/Stamina.js";
 import { Interactable } from "../components/Interactable.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Settings } from "../components/Settings.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Faction } from "../components/Faction.js";
@@ -20,6 +19,10 @@ import { Status } from "../components/Status.js";
 import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
+import {
+  addItemEntityToInventory,
+  findInventoryStackTargetForItem,
+} from "../utils/inventoryStacking.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -165,23 +168,15 @@ export function movementSystem(world) {
               const info = world.get(itemId, ItemInfo);
               if (!info || !info.type || !kinds.includes(info.type)) continue;
               const count = info.count || 1;
-              const ident = world.get(itemId, NamedIdentity)?.identity;
-              // find existing stack by identity
-              let stackTarget = 0;
-              for (const id of inv.items) {
-                const n = world.get(id, NamedIdentity);
-                if (n && n.identity === ident) { stackTarget = id; break; }
-              }
+              const stackTarget = findInventoryStackTargetForItem(world, inv, itemId);
               if (stackTarget) {
-                world.mutate(stackTarget, ItemInfo, /** @param {any} r */ (r) => { r.count = (r.count || 1) + count; });
-                world.destroy(itemId);
+                addItemEntityToInventory(world, inv, itemId);
               } else {
                 // capacity gate: allow if capacity not set or there's room
                 // Special case: currency ignores capacity so monsters can hoard gold even with capacity 0
                 const ignoreCapacity = info.type === 'currency';
                 if (ignoreCapacity || inv.capacity == null || inv.items.length < inv.capacity) {
-                  try { world.remove(itemId, Position); } catch {}
-                  inv.items.push(itemId);
+                  addItemEntityToInventory(world, inv, itemId);
                 } else {
                   // no capacity — skip silently for now
                 }
