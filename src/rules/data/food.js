@@ -104,6 +104,37 @@ export function getCorpseEatHooks(key) {
 export const RATION_NUTRITION = 400;
 export const IRON_RATION_NUTRITION = 600;
 
+// ── Food decay constants ─────────────────────────────────────────
+// Shelf life values and decay stage thresholds for the FoodDecay component.
+// Consumed by foodDecaySystem, consumable:eat script, and display name resolver.
+
+/** Default shelf life by food kind (turns in inventory before fully putrid). */
+export const SHELF_LIFE_RATION = 500;
+export const SHELF_LIFE_CORPSE = 150;
+
+/** Decay stage thresholds as fractions of shelfLife. */
+export const DECAY_STAGES = Object.freeze([
+  Object.freeze({ name: 'fresh',  maxFrac: 0.33, nutritionMult: 1.0,  sicknessChance: 0    }),
+  Object.freeze({ name: 'off',    maxFrac: 0.66, nutritionMult: 0.75, sicknessChance: 0    }),
+  Object.freeze({ name: 'rancid', maxFrac: 0.99, nutritionMult: 0.50, sicknessChance: 0.20 }),
+  Object.freeze({ name: 'putrid', maxFrac: Infinity, nutritionMult: 0.25, sicknessChance: 0.80 }),
+]);
+
+/**
+ * Resolve the current decay stage for a food item.
+ * @param {number} turnsHeld
+ * @param {number} shelfLife
+ * @returns {{ stage: string, nutritionMult: number, sicknessChance: number }}
+ */
+export function getDecayStage(turnsHeld, shelfLife) {
+  const frac = shelfLife > 0 ? turnsHeld / shelfLife : 1;
+  for (const s of DECAY_STAGES) {
+    if (frac <= s.maxFrac) return { stage: s.name, nutritionMult: s.nutritionMult, sicknessChance: s.sicknessChance };
+  }
+  const last = DECAY_STAGES[DECAY_STAGES.length - 1];
+  return { stage: last.name, nutritionMult: last.nutritionMult, sicknessChance: last.sicknessChance };
+}
+
 /** Corpse weight by sizeClass (for ItemInfo.weight). */
 export const CORPSE_WEIGHT = {
   XS: 1,
