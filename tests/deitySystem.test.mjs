@@ -21,7 +21,7 @@ Deno.test("deity wrath is applied in rules and emitted on world bus", () => {
 
   const damageEvents = [];
   const wrathEvents = [];
-  world.on("damage", (e) => damageEvents.push(e));
+  world.on("damaged", (e) => damageEvents.push(e));
   world.on("deity:wrath", (e) => wrathEvents.push(e));
 
   deity._emit("wrath", { intensity: 1.0, tick: 100 });

@@ -1203,20 +1203,11 @@ world.on('died', ({ id }) => {
   }
 });
 // Floating text hooks: damage (messages handled in messageWiring)
-world.on('damaged', ({ target, amount, critical, crit }) => {
+world.on('damaged', ({ target, amount, critical, crit, at }) => {
   const t = Number(target||0) || 0;
-  const pos = /** @type any */ (world.get(t, Position));
+  const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : /** @type any */ (world.get(t, Position));
   const pe = playerEntity(world);
   const isPlayer = !!pe && pe.id === t;
-  if (pos && Number.isFinite(amount)) {
-    const col = isPlayer ? '#ff6060' : '#ffd966';
-    ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
-  }
-});
-world.on('damage', ({ id, amount, at, critical, crit }) => {
-  const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : world.get(Number(id||0), Position);
-  const pe = playerEntity(world);
-  const isPlayer = !!pe && pe.id === Number(id||0);
   if (pos && Number.isFinite(amount)) {
     const col = isPlayer ? '#ff6060' : '#ffd966';
     ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });

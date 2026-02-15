@@ -147,10 +147,10 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('damaged', ({ target, amount, critical, crit, source }) => {
     const defName = nameOfEntity(target);
-    const atkName = nameOfEntity(source);
     const critTxt = (critical || crit) ? ' (CRIT!)' : '';
-    let weaponLabel = '';
     if (Number(source || 0)) {
+      const atkName = nameOfEntity(source);
+      let weaponLabel = '';
       const eq = world.get(Number(source || 0), Equipment);
       const wid = Number(eq?.weapon || 0);
       if (wid) {
@@ -159,16 +159,10 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
       } else if (world.has(Number(source || 0), Player)) {
         weaponLabel = ' with bare fists';
       }
+      log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`, 'combat');
+    } else {
+      log(`${defName} takes ${amount} damage${critTxt}.`, 'combat');
     }
-    log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`, 'combat');
-  });
-
-  world.on('damage', ({ id, amount, source, critical, crit }) => {
-    const who = nameOfEntity(id);
-    const atk = Number(source || 0) ? nameOfEntity(source) : null;
-    const critTxt = (critical || crit) ? ' (CRIT!)' : '';
-    if (atk) log(`${atk} hits ${who} for ${amount}${critTxt}.`, 'combat');
-    else log(`${who} takes ${amount} damage${critTxt}.`, 'combat');
   });
 
   world.on('healed', ({ id, amount }) => {

@@ -8,6 +8,7 @@ import { Hunger } from '../components/Hunger.js';
 import { Vitality } from '../components/Vitality.js';
 import { Status } from '../components/Status.js';
 import { HUNGER_STATUS_TYPES, HUNGER_POTENCY, getHungerLevel } from '../data/food.js';
+import { dealDamage } from '../utils/dealDamage.js';
 
 /**
  * hungerSystem — processes hunger escalation each tick.
@@ -32,21 +33,11 @@ export function hungerSystem(world) {
     if (vit) {
       // Starving: 1 HP damage every 5 turns
       if (level === 'starving' && turn % 5 === 0) {
-        const dmg = 1;
-        vit.hp = Math.max(0, vit.hp - dmg);
-        try { world.emit && world.emit('damage', { id, amount: dmg, source: 'starvation' }); } catch { /* */ }
-        if (vit.hp <= 0) {
-          try { world.emit && world.emit('died', { id, cause: 'starvation' }); } catch { /* */ }
-        }
+        dealDamage(world, { target: id, amount: 1, type: 'starvation', cause: 'starvation', bypassInvuln: true, bypassResist: true });
       }
       // Wasting: 2 HP damage every 3 turns
       if (level === 'wasting' && turn % 3 === 0) {
-        const dmg = 2;
-        vit.hp = Math.max(0, vit.hp - dmg);
-        try { world.emit && world.emit('damage', { id, amount: dmg, source: 'starvation' }); } catch { /* */ }
-        if (vit.hp <= 0) {
-          try { world.emit && world.emit('died', { id, cause: 'starvation' }); } catch { /* */ }
-        }
+        dealDamage(world, { target: id, amount: 2, type: 'starvation', cause: 'starvation', bypassInvuln: true, bypassResist: true });
       }
       // Satiated bonus: heal 1 HP every 5 turns
       if (hc.satiation > 0 && turn % 5 === 0) {

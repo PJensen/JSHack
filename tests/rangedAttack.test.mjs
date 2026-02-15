@@ -75,7 +75,7 @@ function setup(opts = {}) {
 function trackEvents(world, events) {
   events.length = 0;
   for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'damaged', 'died']) {
-    world.on(ev, (data) => events.push({ type: ev, ...data }));
+    world.on(ev, (data) => events.push({ _event: ev, ...data }));
   }
 }
 
@@ -88,8 +88,8 @@ Deno.test("ranged: hit with bow, ammo, LOS clear, in range", () => {
   const tv = world.get(target, Vitality);
   assert(tv.hp < 10, `target took damage (hp=${tv.hp})`);
   assert(!world.has(archer, RangedAttackIntent), 'intent removed');
-  assert(events.some(e => e.type === 'ranged:shot'), 'ranged:shot emitted');
-  assert(events.some(e => e.type === 'damaged'), 'damaged emitted');
+  assert(events.some(e => e._event === 'ranged:shot'), 'ranged:shot emitted');
+  assert(events.some(e => e._event === 'damaged'), 'damaged emitted');
 });
 
 Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
@@ -114,7 +114,7 @@ Deno.test("ranged: no ammo → ranged:no-ammo emitted", () => {
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
   assert(!world.has(archer, RangedAttackIntent), 'intent removed');
-  assert(events.some(e => e.type === 'ranged:no-ammo'), 'ranged:no-ammo emitted');
+  assert(events.some(e => e._event === 'ranged:no-ammo'), 'ranged:no-ammo emitted');
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'target undamaged');
 });
@@ -127,7 +127,7 @@ Deno.test("ranged: LOS blocked by wall → ranged:blocked emitted", () => {
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
   assert(!world.has(archer, RangedAttackIntent), 'intent removed');
-  assert(events.some(e => e.type === 'ranged:blocked'), 'ranged:blocked emitted');
+  assert(events.some(e => e._event === 'ranged:blocked'), 'ranged:blocked emitted');
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'target undamaged');
 });
@@ -139,7 +139,7 @@ Deno.test("ranged: out of range → ranged:out-of-range emitted", () => {
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 15, toY: 0 });
   rangedAttackSystem(world);
   assert(!world.has(archer, RangedAttackIntent), 'intent removed');
-  assert(events.some(e => e.type === 'ranged:out-of-range'), 'ranged:out-of-range emitted');
+  assert(events.some(e => e._event === 'ranged:out-of-range'), 'ranged:out-of-range emitted');
 });
 
 Deno.test("ranged: ammo count decrements", () => {
@@ -169,7 +169,7 @@ Deno.test("ranged: kill target → died emitted", () => {
   trackEvents(world, events);
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
-  assert(events.some(e => e.type === 'died' && e.id === target), 'died emitted');
+  assert(events.some(e => e._event === 'died' && e.id === target), 'died emitted');
 });
 
 Deno.test("ranged: same faction → no damage", () => {
@@ -181,5 +181,5 @@ Deno.test("ranged: same faction → no damage", () => {
   assert(!world.has(archer, RangedAttackIntent), 'intent removed');
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'same faction undamaged');
-  assert(!events.some(e => e.type === 'damaged'), 'no damage event');
+  assert(!events.some(e => e._event === 'damaged'), 'no damage event');
 });

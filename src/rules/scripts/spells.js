@@ -17,6 +17,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Physiology } from "../components/Physiology.js";
 import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
 /** @param {World} world @param {number} actor @param {{id:string,name:string,manaCost:number,[k:string]:any}} spell @param {{[k:string]:any}} intent */
@@ -90,14 +91,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     // Damage model: base 7 → attenuate per chain
     const base = 7;
     const dmg = Math.max(1, Math.round(base * Math.pow(0.7, i)));
-    const vit = /** @type any */ (world.get(targetId, Vitality));
-    if (vit) {
-      vit.hp = Math.max(0, (vit.hp|0) - dmg);
-      try { world.emit && world.emit('damage', { id: targetId, amount: dmg, at: segTo }); } catch {}
-      if ((vit.hp|0) <= 0) {
-        try { world.emit && world.emit('died', { id: targetId, at: segTo }); } catch {}
-      }
-    }
+    dealDamage(world, { target: targetId, amount: dmg, source: actor, type: 'electric', cause: 'spell:lightning', at: segTo });
   }
 };
 
@@ -154,14 +148,7 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
 
     // Damage attenuated by distance
     const dmg = Math.max(1, Math.round(BASE_DMG / t.dist));
-    const vit = /** @type any */ (world.get(t.id, Vitality));
-    if (vit) {
-      vit.hp = Math.max(0, (vit.hp | 0) - dmg);
-      try { world.emit && world.emit('damaged', { target: t.id, amount: dmg, source: actor }); } catch {}
-      if ((vit.hp | 0) <= 0) {
-        try { world.emit && world.emit('died', { id: t.id, killer: actor }); } catch {}
-      }
-    }
+    dealDamage(world, { target: t.id, amount: dmg, source: actor, type: 'physical', cause: 'spell:blastwave' });
   }
 
   try { world.emit && world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS }); } catch {}
@@ -207,13 +194,9 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     const dist = Math.max(Math.abs((pos.x | 0) - ox), Math.abs((pos.y | 0) - oy));
     if (dist > RADIUS) continue;
     const dmg = dist <= 1 ? BASE_DMG : Math.max(1, Math.floor(BASE_DMG / 2));
-    vit.hp = Math.max(0, (vit.hp | 0) - dmg);
-    try { world.emit && world.emit('damaged', { target: id, amount: dmg, source: actor }); } catch {}
-    if ((vit.hp | 0) <= 0) {
-      try { world.emit && world.emit('died', { id, killer: actor }); } catch {}
-    }
+    const result = dealDamage(world, { target: id, amount: dmg, source: actor, type: 'fire', cause: 'spell:meteor' });
     // Apply burning to survivors
-    if ((vit.hp | 0) > 0) {
+    if (result.applied && !result.killed) {
       const ae = /** @type any */ (world.get(id, ActiveEffects));
       const effect = { key: 'burn', turnsLeft: 4, potency: 3, stacks: 1 };
       if (ae && Array.isArray(ae.effects)) {
@@ -273,14 +256,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
 
   // Apply cold damage
-  const vit = /** @type any */ (world.get(target.id, Vitality));
-  if (vit) {
-    vit.hp = Math.max(0, (vit.hp | 0) - BASE_DMG);
-    try { world.emit && world.emit('damage', { id: target.id, amount: BASE_DMG, at: { x: target.x, y: target.y } }); } catch {}
-    if ((vit.hp | 0) <= 0) {
-      try { world.emit && world.emit('died', { id: target.id, at: { x: target.x, y: target.y } }); } catch {}
-    }
-  }
+  dealDamage(world, { target: target.id, amount: BASE_DMG, source: actor, type: 'cold', cause: 'spell:frost', at: { x: target.x, y: target.y } });
 
   // Compute frost duration from target mass: lighter = longer slow
   // Base 5 turns, -1 per 30kg above 40kg, min 2 turns
