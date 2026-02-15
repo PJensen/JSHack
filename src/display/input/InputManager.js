@@ -152,10 +152,17 @@ export class InputManager {
       return;
     }
 
-    // Pickup chooser (',' for get)
-    if (key === ",") {
+    // Death log: '#' (tombstone-themed)
+    if (key === "#") {
       e.preventDefault();
-      // Open chooser in display; chooser will submit specific items to rules
+      this._emit(makeAction(Actions.OpenDeathLog));
+      return;
+    }
+
+    // Pickup/interact chooser: ',' (get) and Enter as a convenience key.
+    if (key === "," || key === "Enter" || code === "NumpadEnter") {
+      e.preventDefault();
+      // Display decides whether this means pickup or contextual interaction.
       this._emit(makeAction(Actions.OpenPickupChooser));
       return;
     }
