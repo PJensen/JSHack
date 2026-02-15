@@ -54,7 +54,7 @@ export function getGameDataLoadPlan() {
       label: "Loading nutrition defs",
       total: Object.keys(NUTRITION_BY_SIZE).length + Object.keys(CORPSE_EFFECTS).length,
     },
-    { id: "apply", label: "Loading apply defs", total: Object.keys(APPLY_DEFS).length },
+    { id: "apply", label: "Loading apply defs", total: APPLY_DEFS.length },
     { id: "effects", label: "Loading effect defs", total: EFFECT_DEFS.length },
     { id: "itemUse", label: "Loading item use defs", total: ITEM_USE_DEFS.length },
     { id: "monsterProcs", label: "Loading monster proc defs", total: MONSTER_STATUS_PROC_DEFS.length },
@@ -191,10 +191,8 @@ export function loadGameData(opts = {}) {
     }
 
     if (ds.id === "apply") {
-      const keys = Object.keys(APPLY_DEFS);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        void APPLY_DEFS[key];
+      for (let i = 0; i < APPLY_DEFS.length; i++) {
+        void APPLY_DEFS[i];
         completed++;
         emit(ds, i + 1);
       }
@@ -243,6 +241,7 @@ export function loadGameData(opts = {}) {
         AFFIX_DEFS,
         MATERIAL_REACTION_RULES,
         MATERIAL_REACTION_OUTCOME_IDS,
+        APPLY_DEFS,
         ITEM_USE_DEFS,
         EFFECT_DEFS,
         EFFECT_OPERATION_IDS,

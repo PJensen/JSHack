@@ -127,24 +127,46 @@ export function validateItemUseDefs(ITEM_USE_DEFS, opts = {}) {
     if (defIds.has(id)) throw new Error(`item use def ${id}: duplicate id`);
     defIds.add(id);
 
-    const match = def?.match;
-    if (!match || typeof match !== 'object') throw new Error(`item use def ${id}: match object required`);
+    const hasMatcherFn = typeof def?.matches === 'function';
+    const hasLegacyMatch = !!(def?.match && typeof def.match === 'object');
+    if (!hasMatcherFn && !hasLegacyMatch) {
+      throw new Error(`item use def ${id}: matches function or legacy match object required`);
+    }
+    if (hasLegacyMatch) {
+      const match = def.match;
+      const itemTypes = Array.isArray(match.itemTypes) ? match.itemTypes : [];
+      const identityPrefix = String(match.identityPrefix || '');
+      if (itemTypes.length === 0 && !identityPrefix) {
+        throw new Error(`item use def ${id}: match requires itemTypes or identityPrefix`);
+      }
+      for (const type of itemTypes) {
+        if (typeof type !== 'string' || !type.trim()) throw new Error(`item use def ${id}: itemTypes must be non-empty strings`);
+      }
+      if (identityPrefix && (typeof identityPrefix !== 'string' || !identityPrefix.trim())) {
+        throw new Error(`item use def ${id}: identityPrefix must be non-empty string`);
+      }
+    }
 
-    const itemTypes = Array.isArray(match.itemTypes) ? match.itemTypes : [];
-    const identityPrefix = String(match.identityPrefix || '');
-    if (itemTypes.length === 0 && !identityPrefix) {
-      throw new Error(`item use def ${id}: match requires itemTypes or identityPrefix`);
-    }
-    for (const type of itemTypes) {
-      if (typeof type !== 'string' || !type.trim()) throw new Error(`item use def ${id}: itemTypes must be non-empty strings`);
-    }
-    if (identityPrefix && (typeof identityPrefix !== 'string' || !identityPrefix.trim())) {
-      throw new Error(`item use def ${id}: identityPrefix must be non-empty string`);
-    }
-
-    if (typeof def?.action !== 'function') throw new Error(`item use def ${id}: action function required`);
+    const action = def?.run ?? def?.action;
+    if (typeof action !== 'function') throw new Error(`item use def ${id}: run/action function required`);
   }
 
+  return true;
+}
+
+export function validateApplyDefs(APPLY_DEFS) {
+  if (!Array.isArray(APPLY_DEFS)) throw new Error('APPLY_DEFS must be an array');
+  const ids = new Set();
+  for (let i = 0; i < APPLY_DEFS.length; i++) {
+    const def = APPLY_DEFS[i];
+    const id = String(def?.id || '');
+    if (!id) throw new Error(`apply def[${i}]: id required`);
+    if (ids.has(id)) throw new Error(`apply def ${id}: duplicate id`);
+    ids.add(id);
+    if (typeof def?.canUseTool !== 'function') throw new Error(`apply def ${id}: canUseTool function required`);
+    if (typeof def?.canTarget !== 'function') throw new Error(`apply def ${id}: canTarget function required`);
+    if (typeof def?.run !== 'function') throw new Error(`apply def ${id}: run function required`);
+  }
   return true;
 }
 
@@ -283,6 +305,7 @@ export function validateAll({
   AFFIX_DEFS,
   MATERIAL_REACTION_RULES,
   MATERIAL_REACTION_OUTCOME_IDS,
+  APPLY_DEFS,
   ITEM_USE_DEFS,
   EFFECT_DEFS,
   EFFECT_OPERATION_IDS,
@@ -298,6 +321,9 @@ export function validateAll({
       : true)
     && (ITEM_USE_DEFS
       ? validateItemUseDefs(ITEM_USE_DEFS)
+      : true)
+    && (APPLY_DEFS
+      ? validateApplyDefs(APPLY_DEFS)
       : true)
     && (EFFECT_DEFS
       ? validateEffectDefs(EFFECT_DEFS, { operationIds: EFFECT_OPERATION_IDS })

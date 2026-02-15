@@ -1,5 +1,6 @@
 // rules/data/food.js
 // Nutrition data for food items and corpse nutrition calculations.
+import { Resistances } from "../components/Resistences.js";
 
 /**
  * Base nutrition by monster sizeClass.
@@ -24,20 +25,106 @@ export function computeCorpseNutrition(monsterDef) {
   return base + massBonus;
 }
 
+export const CORPSE_PROC_ID = Object.freeze({
+  DISEASE: "corpse:disease",
+  POISON: "corpse:poison",
+  SHOCK: "corpse:shock",
+  MINDWIPE: "corpse:mindwipe",
+  HALLUCINATION: "corpse:hallucination",
+  ELECTRIC_RESIST: "corpse:electric_resist",
+});
+
 /**
- * Some corpses are poisonous or have special effects when consumed.
- * Maps monster id -> special effect key.
- * null/undefined = safe to eat.
+ * Declarative corpse proc map.
+ * Monster id -> proc id.
+ * null/undefined = no special effect.
  */
-export const CORPSE_EFFECTS = {
-  rat:          'disease',        // mangy rodent, risk of disease
-  snake:        'poison',         // venomous snake
-  spider:       'poison',         // venomous spider
-  grid_bug:     'shock',          // electric jolt (minor damage)
-  wraith:       'mindwipe',       // spectral meal, disorienting
-  floating_eye: 'hallucination',  // psychedelic meat
-  lich:         'mindwipe',       // eldritch remains
-};
+export const CORPSE_EFFECTS = Object.freeze({
+  rat: CORPSE_PROC_ID.DISEASE,
+  bat: CORPSE_PROC_ID.DISEASE,
+  snake: CORPSE_PROC_ID.POISON,
+  spider: CORPSE_PROC_ID.POISON,
+  grid_bug: CORPSE_PROC_ID.SHOCK,
+  wraith: CORPSE_PROC_ID.MINDWIPE,
+  floating_eye: CORPSE_PROC_ID.HALLUCINATION,
+  lich: CORPSE_PROC_ID.MINDWIPE,
+  eel: CORPSE_PROC_ID.ELECTRIC_RESIST,
+});
+
+/**
+ * @param {{
+ *   world:any,
+ *   actor:number,
+ *   itemId:number,
+ *   pushEffect:(effect:{key:string,turnsLeft:number,potency:number,stacks?:number,sourceId?:number}) => void,
+ *   damage:(amount:number, source?:string) => number,
+ *   emit:(eventName:string, payload:any) => void,
+ * }} ctx
+ */
+function grantElectricResist(ctx) {
+  let resist = ctx.world.get(ctx.actor, Resistances);
+  if (!resist) {
+    try { ctx.world.add(ctx.actor, Resistances, {}); } catch {}
+    resist = ctx.world.get(ctx.actor, Resistances);
+  }
+  if (!resist) return;
+  const current = Number(resist?.electric?.ohms);
+  const nextOhms = Number.isFinite(current)
+    ? Math.max(current, 2400)
+    : 2400;
+  if (!resist.electric || typeof resist.electric !== "object") resist.electric = {};
+  resist.electric.ohms = nextOhms;
+  if (!Number.isFinite(resist.electric.fibrillationA)) resist.electric.fibrillationA = 0.03;
+  ctx.emit("hunger:resistance-gained", { actor: ctx.actor, type: "electric", ohms: nextOhms });
+}
+
+/**
+ * First-class callback table for corpse effects.
+ */
+export const CORPSE_USE_PROCS = Object.freeze({
+  [CORPSE_PROC_ID.DISEASE]: (ctx) => {
+    ctx.pushEffect({ key: "disease", turnsLeft: 20, potency: 1, stacks: 1, sourceId: ctx.itemId });
+    ctx.emit("hunger:sickened", { actor: ctx.actor, type: "disease" });
+  },
+  [CORPSE_PROC_ID.POISON]: (ctx) => {
+    ctx.pushEffect({ key: "poison", turnsLeft: 8, potency: 2, stacks: 1, sourceId: ctx.itemId });
+    ctx.emit("hunger:sickened", { actor: ctx.actor, type: "poison" });
+  },
+  [CORPSE_PROC_ID.SHOCK]: (ctx) => {
+    ctx.damage(3, "corpse");
+  },
+  [CORPSE_PROC_ID.MINDWIPE]: (ctx) => {
+    ctx.pushEffect({ key: "mindwipe", turnsLeft: 15, potency: 1, stacks: 1, sourceId: ctx.itemId });
+    ctx.emit("hunger:sickened", { actor: ctx.actor, type: "mindwipe" });
+  },
+  [CORPSE_PROC_ID.HALLUCINATION]: (ctx) => {
+    ctx.pushEffect({ key: "mindwipe", turnsLeft: 30, potency: 2, stacks: 1, sourceId: ctx.itemId });
+    ctx.emit("hunger:sickened", { actor: ctx.actor, type: "hallucination" });
+  },
+  [CORPSE_PROC_ID.ELECTRIC_RESIST]: (ctx) => {
+    grantElectricResist(ctx);
+  },
+});
+
+/**
+ * @param {string} corpseType
+ * @param {{
+ *   world:any,
+ *   actor:number,
+ *   itemId:number,
+ *   pushEffect:(effect:{key:string,turnsLeft:number,potency:number,stacks?:number,sourceId?:number}) => void,
+ *   damage:(amount:number, source?:string) => number,
+ *   emit:(eventName:string, payload:any) => void,
+ * }} ctx
+ */
+export function runCorpseUseProc(corpseType, ctx) {
+  const procId = CORPSE_EFFECTS[String(corpseType || "").toLowerCase()];
+  if (!procId) return false;
+  const fn = CORPSE_USE_PROCS[procId];
+  if (typeof fn !== "function") return false;
+  try { fn(ctx); } catch {}
+  return true;
+}
 
 /** Standard ration nutrition values. */
 export const RATION_NUTRITION = 400;

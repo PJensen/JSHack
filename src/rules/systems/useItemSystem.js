@@ -3,11 +3,9 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Consumable } from "../components/Consumable.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Brain } from "../components/Brain.js";
-import { ITEM_USE_DEFS } from "../data/itemUseDefs.js";
-import { getSpell } from "../data/spells.js";
-import { runSpellScript } from "../scripts/spells.js";
+import { findItemUseDef } from "../data/itemUseDefs.js";
 import { runScript, ScriptVerb } from "../scripting.js";
+import { ItemUseActionContext } from "../utils/actionContexts.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -26,140 +24,6 @@ import { runScript, ScriptVerb } from "../scripting.js";
  *   - 'spell:already-known' { actor, spellId }
  */
 
-/**
- * @param {{type?:string}|null} info
- * @param {string} identity
- * @param {{itemTypes?:string[], identityPrefix?:string}} match
- */
-function matchesUseDef(info, identity, match) {
-  if (!match || typeof match !== "object") return false;
-  const type = String(info?.type || "").toLowerCase();
-  const normalizedIdentity = String(identity || "").toLowerCase();
-
-  const itemTypes = Array.isArray(match.itemTypes)
-    ? match.itemTypes.map((v) => String(v || "").toLowerCase()).filter(Boolean)
-    : [];
-  const identityPrefix = String(match.identityPrefix || "").toLowerCase();
-
-  if (itemTypes.length > 0 && !itemTypes.includes(type)) return false;
-  if (identityPrefix && !normalizedIdentity.startsWith(identityPrefix)) return false;
-
-  return itemTypes.length > 0 || !!identityPrefix;
-}
-
-/**
- * @param {{type?:string}|null} info
- * @param {string} identity
- */
-function findUseDef(info, identity) {
-  for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
-    const def = ITEM_USE_DEFS[i];
-    if (matchesUseDef(info, identity, def.match)) return def;
-  }
-  return null;
-}
-
-/**
- * @param {string} identity
- * @param {string} prefix
- */
-function spellIdFromIdentity(identity, prefix) {
-  const normalizedIdentity = String(identity || "").toLowerCase();
-  const normalizedPrefix = String(prefix || "").toLowerCase();
-  if (!normalizedPrefix || !normalizedIdentity.startsWith(normalizedPrefix)) return "";
-  return normalizedIdentity.substring(normalizedPrefix.length);
-}
-
-/**
- * @param {World} world
- * @param {number} actor
- * @returns {{learnedSpellIds?:string[], intelligence?:number}|null}
- */
-function ensureBrain(world, actor) {
-  /** @type {{learnedSpellIds?:string[], intelligence?:number}|null} */
-  let brain = /** @type any */ (world.get(actor, Brain));
-  if (!brain) {
-    try { world.add(actor, Brain, {}); } catch {}
-    brain = /** @type any */ (world.get(actor, Brain));
-  }
-  return brain;
-}
-
-/**
- * @param {World} world
- * @param {number} actor
- * @param {{targetId?:number}|null} intent
- * @param {string} identity
- */
-function createUseActionHelpers(world, actor, intent, identity) {
-  return {
-    /**
-     * @param {{ identityPrefix:string, targetMode?:"intentTarget"|"self"|"none", castEventSource?:string, consumeOnSuccess?:boolean }} action
-     */
-    castSpellFromIdentity(action) {
-      const consumeOnSuccess = action.consumeOnSuccess !== false;
-      const spellId = spellIdFromIdentity(identity, String(action.identityPrefix || ""));
-      if (!spellId) return false;
-      const spell = getSpell(spellId);
-      if (!spell) return false;
-
-      const targetMode = String(action.targetMode || "self");
-      const runIntent = targetMode === "intentTarget" ? { targetId: intent?.targetId } : {};
-      try { runSpellScript(world, actor, spell, runIntent); } catch {}
-
-      const castEvent = {
-        actor,
-        spellId: spell.id,
-        targetId: targetMode === "intentTarget" ? (intent?.targetId || actor) : actor,
-      };
-      if (action.castEventSource) castEvent.source = action.castEventSource;
-      try { world.emit && world.emit("castSpell", castEvent); } catch {}
-      return consumeOnSuccess;
-    },
-
-    /**
-     * @param {{ identityPrefix:string, consumeOnSuccess?:boolean }} action
-     */
-    learnSpellFromIdentity(action) {
-      const consumeOnSuccess = action.consumeOnSuccess !== false;
-      const spellId = spellIdFromIdentity(identity, String(action.identityPrefix || ""));
-      if (!spellId) return false;
-      const spell = getSpell(spellId);
-      if (!spell) {
-        try { world.emit && world.emit("spell:learn-denied", { actor, reason: "unknown-spell", spellId }); } catch {}
-        return false;
-      }
-
-      const brain = ensureBrain(world, actor);
-      if (!brain) {
-        try { world.emit && world.emit("spell:learn-denied", { actor, reason: "no-brain", spellId: spell.id }); } catch {}
-        return false;
-      }
-      if (Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes(spell.id)) {
-        try { world.emit && world.emit("spell:already-known", { actor, spellId: spell.id }); } catch {}
-        return false;
-      }
-
-      if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-      brain.learnedSpellIds.push(spell.id);
-      try { world.emit && world.emit("spell:learned", { actor, spellId: spell.id }); } catch {}
-      return consumeOnSuccess;
-    },
-
-    /**
-     * @param {string} eventName
-     * @param {Record<string, any>} payload
-     */
-    emit(eventName, payload) {
-      try { world.emit && world.emit(eventName, payload); } catch {}
-    },
-  };
-}
-
-/**
- * @param {(context:any) => boolean} action
- * @param {any} context
- */
 function executeUseAction(action, context) {
   if (typeof action !== "function") return false;
   try {
@@ -201,18 +65,18 @@ export function useItemSystem(world) {
       try { runScript(cons.effectKey, ScriptVerb.ItemUse, world, { actor, itemId, params: { ...cons.effectParams } }); } catch {}
       consumed = true;
     } else if (info) {
-      const def = findUseDef(info, identity);
+      const context = new ItemUseActionContext({
+        world,
+        actor,
+        itemId,
+        intent,
+        info,
+        identity,
+      });
+      const def = findItemUseDef(context);
       if (def) {
-        const helpers = createUseActionHelpers(world, actor, intent, identity);
-        consumed = executeUseAction(def.action, {
-          world,
-          actor,
-          itemId,
-          intent,
-          info,
-          identity,
-          helpers,
-        });
+        const run = typeof def.run === "function" ? def.run : def.action;
+        consumed = executeUseAction(run, context);
       }
     }
 

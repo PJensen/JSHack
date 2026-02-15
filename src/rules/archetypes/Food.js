@@ -60,14 +60,15 @@ export const IronRation = defineArchetype(
  */
 export function createCorpse(world, monsterDef, pos) {
   const nutrition = computeCorpseNutrition(monsterDef);
-  const special = CORPSE_EFFECTS[monsterDef.id] || null;
+  const corpseType = String(monsterDef.id || "").toLowerCase();
+  const hasSpecialProc = !!CORPSE_EFFECTS[corpseType];
   const weight = CORPSE_WEIGHT[monsterDef.sizeClass] || 3;
 
   const id = world.create();
 
   world.add(id, Consumable, {
     effectKey: 'consumable:eat',
-    effectParams: { nutrition, special },
+    effectParams: { nutrition, corpseType },
     remainingUses: 1,
     potency: 0,
   });
@@ -76,7 +77,7 @@ export function createCorpse(world, monsterDef, pos) {
     type: "food",
     weight,
     value: Math.max(1, Math.floor(nutrition / 20)),
-    description: `The remains of a ${monsterDef.name}. ${special ? 'Looks questionable.' : 'Looks edible.'}`,
+    description: `The remains of a ${monsterDef.name}. ${hasSpecialProc ? 'Looks questionable.' : 'Looks edible.'}`,
     count: 1,
   });
 

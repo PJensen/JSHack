@@ -1,7 +1,7 @@
 import { ApplyIntent } from "../components/Intents/ApplyIntent.js";
 import { Inventory } from "../components/Inventory.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
-import { runScript, ScriptVerb } from "../scripting.js";
+import { findApplyDef } from "../data/applyDefs.js";
+import { ItemApplyActionContext } from "../utils/actionContexts.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -25,13 +25,10 @@ export function applySystem(world) {
       continue;
     }
 
-    const ni = /** @type any */ (world.get(toolId, NamedIdentity));
-    const identity = ni?.identity || '';
-
-    if (identity) {
-      try {
-        runScript(identity, ScriptVerb.ItemApply, world, { actor, toolId, targetId });
-      } catch {}
+    const def = findApplyDef(world, actor, toolId, targetId);
+    if (def && typeof def.run === "function") {
+      const ctx = new ItemApplyActionContext({ world, actor, toolId, targetId });
+      try { def.run(ctx); } catch {}
     }
 
     world.remove(actor, ApplyIntent);
