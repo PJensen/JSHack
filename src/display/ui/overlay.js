@@ -17,6 +17,7 @@ export function initOverlays() {
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
   const memoryGraph = ensureMemoryGraph(root);
+  const deathLog = ensurePanel('deathLog');
   const deathScreen = ensureDeathScreen(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
@@ -62,6 +63,7 @@ export function initOverlays() {
       hide(shop);
       hide(chest);
       hide(applyPanel);
+      hide(deathLog);
       // Close memory graph
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
@@ -280,6 +282,18 @@ export function initOverlays() {
       spellGestureHint.wrap.style.display = 'none';
       spellGestureTimer = 0;
     }, duration);
+  });
+
+  // Death log overlay (all past deaths)
+  window.addEventListener('ui:openDeathLog', () => {
+    show(deathLog);
+    window.dispatchEvent(new CustomEvent('ui:requestDeathLogData'));
+  });
+  window.addEventListener('ui:deathLogData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const records = (e?.detail?.records) || [];
+    renderDeathLog(deathLog, records);
   });
 
   // Death screen with social share
@@ -1870,6 +1884,169 @@ function rarityStyle(rarityName) {
   if (rn === 'epic') return { color: '#c47bff', fontWeight: 'bold' };
   if (rn === 'legendary') return { color: '#ff9f3b', fontWeight: 'bold' };
   return { color: '#ffffff', fontWeight: 'bold' };
+}
+
+// --- Death log overlay (past deaths from localStorage) ---------------------
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} records */
+function renderDeathLog(panel, records) {
+  const existingDetach = /** @type {any} */ (panel)._deathLogDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch {}
+  }
+
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+
+  // Header
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' });
+  const skull = document.createElement('span');
+  skull.textContent = '\u2620';
+  skull.style.fontSize = '22px';
+  const title = document.createElement('span');
+  title.textContent = 'Book of the Dead';
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '16px', color: '#ff9999' });
+  const countBadge = document.createElement('span');
+  countBadge.textContent = `${records.length} death${records.length !== 1 ? 's' : ''}`;
+  Object.assign(countBadge.style, { marginLeft: 'auto', opacity: '0.7', fontSize: '12px' });
+  header.appendChild(skull);
+  header.appendChild(title);
+  header.appendChild(countBadge);
+  el.appendChild(header);
+
+  if (!records.length) {
+    const empty = document.createElement('div');
+    empty.textContent = 'No deaths recorded yet. Stay alive out there.';
+    Object.assign(empty.style, { opacity: '0.6', padding: '20px 0', textAlign: 'center' });
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  Object.assign(list.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
+  el.appendChild(list);
+
+  let sel = 0;
+
+  const rows = records.map((rec, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', flexDirection: 'column', gap: '2px',
+      padding: '8px 10px', border: '1px solid #2d3b52', borderRadius: '6px',
+      background: '#0f1421', cursor: 'default',
+    });
+
+    // Top line: name, cause, depth
+    const top = document.createElement('div');
+    Object.assign(top.style, { display: 'flex', alignItems: 'center', gap: '8px' });
+
+    const name = document.createElement('span');
+    name.textContent = rec.playerName || 'Hero';
+    Object.assign(name.style, { fontWeight: 'bold', color: '#ff9999' });
+
+    const sep = document.createElement('span');
+    sep.textContent = '\u2014';
+    sep.style.opacity = '0.4';
+
+    const cause = document.createElement('span');
+    if (rec.cause === 'combat' && rec.killerName) {
+      cause.textContent = `Slain by ${rec.killerName}`;
+      cause.style.color = '#ff6b6b';
+    } else if (rec.cause === 'starvation') {
+      cause.textContent = 'Starved';
+      cause.style.color = '#ffcc66';
+    } else if (rec.cause === 'trap') {
+      cause.textContent = 'Trap';
+      cause.style.color = '#ff8844';
+    } else if (rec.cause === 'spell') {
+      cause.textContent = 'Magic';
+      cause.style.color = '#c47bff';
+    } else {
+      cause.textContent = rec.cause || 'unknown';
+      cause.style.color = '#aabbcc';
+    }
+
+    const depthLabel = document.createElement('span');
+    depthLabel.textContent = `Depth ${rec.depth || '?'}`;
+    Object.assign(depthLabel.style, { marginLeft: 'auto', color: '#88aacc', fontSize: '12px' });
+
+    top.appendChild(name);
+    top.appendChild(sep);
+    top.appendChild(cause);
+    top.appendChild(depthLabel);
+    row.appendChild(top);
+
+    // Bottom line: turn + timestamp
+    const bottom = document.createElement('div');
+    Object.assign(bottom.style, { display: 'flex', gap: '12px', fontSize: '11px', opacity: '0.55' });
+
+    if (rec.turn) {
+      const turnLabel = document.createElement('span');
+      turnLabel.textContent = `Turn ${rec.turn}`;
+      bottom.appendChild(turnLabel);
+    }
+    if (rec.timestamp) {
+      const dateLabel = document.createElement('span');
+      dateLabel.style.marginLeft = 'auto';
+      try {
+        dateLabel.textContent = new Date(rec.timestamp).toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+      } catch {
+        dateLabel.textContent = String(rec.timestamp);
+      }
+      bottom.appendChild(dateLabel);
+    }
+    row.appendChild(bottom);
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  Object.assign(hint.style, { marginTop: '10px', opacity: '0.6', fontSize: '11px', textAlign: 'center' });
+  hint.textContent = '\u2191/\u2193 scroll \u00b7 Esc=Close \u00b7 # to toggle';
+  el.appendChild(hint);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(records.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '1px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+    // Scroll selected row into view
+    rows[sel]?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(0); e.preventDefault(); }
+    else if (k === 'End') { setSel(records.length - 1); e.preventDefault(); }
+  }
+
+  setSel(0);
+  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+
+  const detach = () => {
+    window.removeEventListener('keydown', keyHandler);
+    obs.disconnect();
+    if ((/** @type {any} */ (panel))._deathLogDetach === detach) {
+      (/** @type {any} */ (panel))._deathLogDetach = null;
+    }
+  };
+
+  window.addEventListener('keydown', keyHandler);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') detach();
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  (/** @type {any} */ (panel))._deathLogDetach = detach;
 }
 
 // --- Death screen with social share ----------------------------------------

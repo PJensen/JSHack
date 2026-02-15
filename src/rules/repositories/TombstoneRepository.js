@@ -80,6 +80,35 @@ export class TombstoneRepository {
   }
 
   /**
+   * Get all tombstone records across every depth
+   * @returns {TombstoneRecord[]} Sorted by timestamp descending (most recent first)
+   */
+  getAll() {
+    const all = [];
+    try {
+      const storage = this._storage;
+      // Scan localStorage for all tombstone depth keys
+      if (typeof localStorage !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('jshack.tombstones.depth.')) {
+            const raw = storage.getItem(key);
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) all.push(...parsed);
+              } catch {}
+            }
+          }
+        }
+      }
+    } catch {}
+    // Sort by timestamp descending (most recent death first)
+    all.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    return all;
+  }
+
+  /**
    * Clear all tombstones (useful for testing)
    */
   clearAll() {

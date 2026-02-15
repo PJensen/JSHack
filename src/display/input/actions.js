@@ -28,6 +28,8 @@ export const Actions = Object.freeze({
   PickupItem: "rules.pickupItem", // payload: { itemId?:number, count?:number }
   // Apply a tool to a target inventory item
   OpenApplyChooser: "display.openApplyChooser", // payload: {}
+  // Death log (all past deaths from localStorage)
+  OpenDeathLog: "display.openDeathLog", // payload: {}
 });
 
 // Default routing from action → sink
@@ -49,6 +51,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.Zoom]: Sinks.display,
   [Actions.OpenPickupChooser]: Sinks.display,
   [Actions.OpenApplyChooser]: Sinks.display,
+  [Actions.OpenDeathLog]: Sinks.display,
 });
 
 // Utility to build an action object

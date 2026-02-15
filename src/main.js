@@ -483,9 +483,33 @@ const inputDisposers = [];
         break;
       }
       case "display.openPickupChooser": {
-        // Gather items at player's position. Open chooser only when there are >1 items.
+        // Contextual get/interact key:
+        // 1) If standing on a chest, open chest UI.
+        // 2) Otherwise run normal pickup flow.
         const p = playerEntity(world);
         if (!p) break;
+
+        let chestId = 0;
+        for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+          if (ni.identity !== 'chest') continue;
+          if (pos.x === p.pos.x && pos.y === p.pos.y) {
+            chestId = eid;
+            break;
+          }
+        }
+        if (chestId) {
+          const chestInv = world.get(chestId, Inventory);
+          try {
+            world.emit?.('chest:open', {
+              actor: p.id,
+              targetId: chestId,
+              chestItems: [...(chestInv?.items || [])],
+            });
+          } catch {}
+          break;
+        }
+
+        // Gather items at player's position. Open chooser only when there are >1 items.
         const ids = itemsAt(world, p.pos.x, p.pos.y);
         if (ids.length === 0) {
           break;
@@ -504,6 +528,9 @@ const inputDisposers = [];
       }
       case "display.openApplyChooser":
         window.dispatchEvent(new CustomEvent("ui:openApplyChooser"));
+        break;
+      case "display.openDeathLog":
+        window.dispatchEvent(new CustomEvent("ui:openDeathLog"));
         break;
       default:
         break;
@@ -657,6 +684,12 @@ addEventListener('ui:requestApply', (ev) => {
 addEventListener('ui:requestMessageLogData', () => {
   const entries = messageLog.getEntries();
   window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
+});
+
+// Provide death log records from tombstone repository
+addEventListener('ui:requestDeathLogData', () => {
+  const records = tombstoneRepo.getAll();
+  window.dispatchEvent(new CustomEvent('ui:deathLogData', { detail: { records } }));
 });
 
 // Active spell button click → cast (or open spell picker if none active)
