@@ -540,6 +540,8 @@ addEventListener('ui:requestInventoryData', () => {
             (eq.ring2 === id && 'ring2') ||
             (eq.ammo === id && 'ammo')
           )) || null;
+          const canApply = canUseApplyTool(world, p.id, id);
+          const applyTargetCount = canApply ? listApplyTargetsForTool(world, p.id, id).length : 0;
           items.push({
             id,
             type: info.type,
@@ -555,6 +557,8 @@ addEventListener('ui:requestInventoryData', () => {
             unpaid: world.has(id, Unpaid),
             unpaidPrice: world.get(id, Unpaid)?.price || 0,
             unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
+            canApply,
+            applyTargetCount,
           });
         }
       }
