@@ -375,7 +375,10 @@ function ensureGroundTooltip(root) {
   const tip = document.createElement('div');
   tip.id = 'ground-item-tooltip';
   Object.assign(tip.style, {
-    position: 'fixed', left: '50%', bottom: '64px', transform: 'translateX(-50%)',
+    position: 'fixed',
+    left: '50%',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 16px + env(safe-area-inset-bottom, 0px))',
+    transform: 'translateX(-50%)',
     minWidth: '220px', maxWidth: '70vw', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -391,7 +394,10 @@ function ensureStairTooltip(root) {
   const tip = document.createElement('div');
   tip.id = 'stair-tooltip';
   Object.assign(tip.style, {
-    position: 'fixed', left: '50%', bottom: '120px', transform: 'translateX(-50%)',
+    position: 'fixed',
+    left: '50%',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 72px + env(safe-area-inset-bottom, 0px))',
+    transform: 'translateX(-50%)',
     minWidth: '180px', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',

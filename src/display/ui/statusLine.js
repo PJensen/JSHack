@@ -8,7 +8,9 @@ export function initStatusLine() {
   const line = document.createElement('div');
   Object.assign(line.style, {
     position: 'fixed',
-    left: '8px', right: '8px', bottom: '48px',
+    left: '8px',
+    right: '8px',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))',
     textAlign: 'center',
     fontFamily: 'monospace',
     fontSize: 'min(12px, 3vw)',
