@@ -12,6 +12,7 @@ import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
+import { dealDamage } from '../utils/dealDamage.js';
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
@@ -126,13 +127,19 @@ export function rangedAttackSystem(world) {
 
     if (isCrit) dmg = Math.max(1, dmg * 2);
 
-    // Apply damage
-    defVit.hp = Math.max(0, defVit.hp - dmg);
-    world.emit?.('damaged', { target: defender, amount: dmg, source: attacker, critical: isCrit });
-    if (defVit.hp <= 0) world.emit?.('died', { id: defender, killer: attacker });
+    // Apply damage through canonical pipeline
+    const result = dealDamage(world, {
+      target: defender,
+      amount: dmg,
+      source: attacker,
+      type: 'pierce',
+      cause: 'ranged',
+      critical: isCrit,
+      bypassResist: true,
+    });
 
     // Fire arrows apply burning (3 turns, 2 dmg/turn)
-    if (ammoStyle === 'fire' && defVit.hp > 0) {
+    if (ammoStyle === 'fire' && result.applied && !result.killed) {
       const ae = world.get(defender, ActiveEffects);
       const effect = { key: 'burn', turnsLeft: 3, potency: 2, stacks: 1 };
       if (ae && Array.isArray(ae.effects)) {

@@ -4,6 +4,7 @@ import { Position } from "../components/Position.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 // Spike trap: deals percentage of max HP as damage.
 // Params: { percent?: number } // 0..1
@@ -16,11 +17,14 @@ registerScript('trap_spike', {
     const pos = world.get(target, Position);
     const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.2)));
     const amount = Math.max(1, Math.floor(vit.maxHp * pct));
-    vit.hp = Math.max(0, vit.hp - amount);
-    try { world.emit && world.emit('damaged', { target, amount, source: Number(ctx?.trapId || 0) || 0, at: pos ? { x: pos.x, y: pos.y } : undefined }); } catch {}
-    if (vit.hp <= 0) {
-      try { world.emit && world.emit('died', { id: target, killer: Number(ctx?.trapId || 0) || 0 }); } catch {}
-    }
+    dealDamage(world, {
+      target,
+      amount,
+      source: Number(ctx?.trapId || 0) || 0,
+      type: 'pierce',
+      cause: 'spike_trap',
+      at: pos ? { x: pos.x, y: pos.y } : undefined,
+    });
   }
 });
 

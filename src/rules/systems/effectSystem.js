@@ -4,6 +4,7 @@ import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
+import { dealDamage } from '../utils/dealDamage.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -28,6 +29,16 @@ function buildEffectIndex(defs) {
     return map;
 }
 
+/** Map effect keys to damage types for the pipeline. */
+function effectKeyToType(key) {
+    switch (key) {
+        case 'burn': case 'burning': return 'fire';
+        case 'poison': case 'poisoned': return 'poison';
+        case 'bleed': case 'bleeding': return 'slash';
+        default: return 'generic';
+    }
+}
+
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {number} id
@@ -35,15 +46,21 @@ function buildEffectIndex(defs) {
  * @param {"none"|"damage"|"heal"|string} operation
  * @param {number} potency
  * @param {number} stacks
+ * @param {string} key - effect key for damage type mapping
  */
-function applyEffectOperation(world, id, vit, operation, potency, stacks) {
+function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
     if (!vit) return;
     const amount = Math.max(0, potency * stacks);
 
     if (operation === 'damage') {
-        vit.hp = Math.max(0, vit.hp - amount);
-        try { world.emit && world.emit('damage', { id, amount }); } catch {}
-        if (vit.hp <= 0) { try { world.emit && world.emit('died', { id }); } catch {} }
+        dealDamage(world, {
+            target: id,
+            amount,
+            type: effectKeyToType(key),
+            cause: key || 'effect',
+            bypassInvuln: true,
+            bypassResist: true,
+        });
         return;
     }
 
@@ -103,7 +120,7 @@ export function effectSystem(world) {
             const def = EFFECTS_BY_KEY[key];
 
             if (def) {
-                applyEffectOperation(world, id, vit, def.operation, potency, stacks);
+                applyEffectOperation(world, id, vit, def.operation, potency, stacks, key);
                 for (let i = 0; i < def.statuses.length; i++) {
                     const statusType = String(def.statuses[i] || '');
                     if (!statusType) continue;

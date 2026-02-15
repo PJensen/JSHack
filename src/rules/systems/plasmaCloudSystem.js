@@ -2,7 +2,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
-import { applyTypedDamage } from "../utils/typedDamage.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -72,15 +72,13 @@ export function plasmaCloudSystem(world) {
         const dy = Math.abs((tpos.y | 0) - (pos.y | 0));
         if (Math.max(dx, dy) > radius) continue;
 
-        const hit = applyTypedDamage(world, id, {
+        const hit = dealDamage(world, {
+          target: id,
           amount: damage,
           type: "electric",
-          sourceId: cloudId,
+          source: cloudId,
           at: { x: tpos.x, y: tpos.y },
           cause: "plasma_cloud",
-          kind: "plasma_cloud",
-          immuneText: "plasma",
-          resistText: "grounded",
         });
         if (hit.applied) affectedIds.push(id);
       }

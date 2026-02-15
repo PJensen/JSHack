@@ -9,6 +9,7 @@ import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Vitality } from '../components/Vitality.js';
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { runScript, ScriptVerb } from '../scripting.js';
+import { dealDamage } from '../utils/dealDamage.js';
 
 const AFFIX_TRIGGERS_KEY = Symbol.for('jshack.affixTriggers');
 
@@ -30,9 +31,15 @@ function makeCtx(world, base) {
   // Attach helpers directly to the base object so scripts can mutate base.damage
   base.addBonus = (k, v) => { if (k === 'damage') base.damage += v; };
   base.retaliate = (amount) => {
-    const t = world.get(base.attacker, Vitality);
-    if (!t) return;
-    t.hp = Math.max(0, t.hp - Math.max(0, amount|0));
+    dealDamage(world, {
+      target: base.attacker,
+      amount: Math.max(0, amount | 0),
+      source: base.defender,
+      type: 'physical',
+      cause: 'retaliation',
+      bypassResist: true,
+      noTrigger: true,
+    });
   };
   base.heal = (entity, amount) => {
     const vit = world.get(entity, Vitality);
@@ -67,7 +74,8 @@ function runMonsterOnDamaged(world, entityId, ctx, deps = null) {
 export function installAffixTriggers(world) {
   if (!world || world[AFFIX_TRIGGERS_KEY]) return;
   // Handle defender-side reactions on damage. Attacker-side hooks are applied by combatSystem for determinism.
-  const off = world.on('damaged', ({ target, amount, source }) => {
+  const off = world.on('damaged', ({ target, amount, source, noTrigger }) => {
+    if (noTrigger) return;
     const base = { attacker: source, defender: target, weaponId: 0, damage: amount, world };
     const ctxT = makeCtx(world, base);
     // defender affixes with onDamaged

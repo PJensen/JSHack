@@ -17,6 +17,7 @@ import { Owner } from '../components/Owner.js';
 import { Vitality } from '../components/Vitality.js';
 import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
+import { dealDamage } from '../utils/dealDamage.js';
 
 /** @type {Map<string, import('../deity/Deity.js').Deity>} */
 const _deities = new Map();
@@ -160,7 +161,16 @@ function wireDeityMiracles(deity, deityId, world) {
       const newHp = Math.max(minHp, beforeHp - plannedDamage);
       const actualDamage = Math.max(0, beforeHp - newHp);
 
-      vit.hp = newHp;
+      if (actualDamage > 0) {
+        dealDamage(world, {
+          target: playerId,
+          amount: actualDamage,
+          type: 'divine',
+          cause: 'divine_wrath',
+          bypassInvuln: true,
+          bypassResist: true,
+        });
+      }
 
       let cursed = false;
       if (Number(intensity || 0) > 0.6) {
@@ -183,8 +193,6 @@ function wireDeityMiracles(deity, deityId, world) {
           status.statuses = statuses;
         }
       }
-
-      world.emit('damage', { id: playerId, amount: actualDamage, source: 0 });
       world.emit('deity:wrath', {
         playerId,
         deityId,

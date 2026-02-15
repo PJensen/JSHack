@@ -96,7 +96,7 @@ Deno.test("plasma cloud uses electric resistances", () => {
   assertEquals(world.get(vulnerable, Vitality).hp, 8); // 2 * (1000/500) = 4
   assertEquals(world.get(resistant, Vitality).hp, 11); // 2 * (1000/2000) = 1
   assertEquals(world.get(immune, Vitality).hp, 12); // Infinity ohms -> no damage
-  assert(statuses.some((s) => s.id === immune && String(s.kind) === "immune"), "immune status expected for grounded target");
+  assert(statuses.some((s) => s.id === immune && String(s.kind) === "resist"), "resist status expected for grounded target");
 });
 
 Deno.test("plasma cloud conductivity changes damage from worn material", () => {

@@ -20,7 +20,7 @@ import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
-import { isEntityInvulnerable } from '../utils/effectGuards.js';
+import { dealDamage } from '../utils/dealDamage.js';
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
@@ -43,9 +43,15 @@ function attachHelpers(world, base) {
     base.addBonus = (k, v) => { if (k === 'damage') base.damage += v; };
     /** @param {number} amount */
     base.retaliate = (amount) => {
-        const t = world.get(base.attacker, Vitality);
-        if (!t) return;
-        t.hp = Math.max(0, t.hp - Math.max(0, amount | 0));
+        dealDamage(world, {
+            target: base.attacker,
+            amount: Math.max(0, amount | 0),
+            source: base.defender,
+            type: 'physical',
+            cause: 'retaliation',
+            bypassResist: true,
+            noTrigger: true,
+        });
     };
     /** @param {number} entity @param {number} amount */
     base.heal = (entity, amount) => {
@@ -262,23 +268,23 @@ export function combatSystem(world) {
             }
         });
 
-        // Invulnerability gate: if defender has 'invulnerable' status active, nullify damage
-        const isInvuln = isEntityInvulnerable(world, defender);
-        if (isInvuln) {
-            finalDmg = 0;
-            world.emit?.('status', { id: defender, kind: 'immune', text: 'IMMUNE', source: attacker });
-        }
-
-    if (finalDmg > 0) {
-            defVit.hp = Math.max(0, defVit.hp - finalDmg);
-            world.emit('damaged', { target: defender, amount: finalDmg, source: attacker, critical: isCrit });
-            if (defVit.hp <= 0) world.emit('died', { id: defender, killer: attacker });
-
-            // Defender on-damaged hooks (e.g., skeleton reassemble, troll regen, demon retaliate)
-            const damagedCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-            runMonsterHooks(world, defender, 'onDamaged', damagedCtx);
+        // Route through canonical damage pipeline (handles invuln, events, death)
+        if (finalDmg > 0) {
+            const result = dealDamage(world, {
+                target: defender,
+                amount: finalDmg,
+                source: attacker,
+                type: 'physical',
+                cause: 'melee',
+                critical: isCrit,
+                bypassResist: true,
+            });
+            // dealDamage returns applied:false for invulnerable targets
+            if (!result.applied && result.reason !== 'invulnerable') {
+                world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
+            }
         } else {
-            // Zero damage after modifiers → treat as miss/blocked; include attacker for logs
+            // Zero damage after modifiers → treat as miss/blocked
             world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
         }
 

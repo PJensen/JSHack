@@ -14,6 +14,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Potion } from "../components/Potion.js";
 import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 /**
  * Apply a single mutation op to the world.
@@ -24,15 +25,13 @@ import { Vitality } from "../components/Vitality.js";
 export function applyMutation(world, op) {
   switch (op.type) {
     case "damage": {
-      const vit = /** @type any */ (world.get(op.entityId, Vitality));
-      if (!vit) return;
-      const dealt = Math.max(0, op.amount | 0);
-      if (dealt <= 0) return;
-      vit.hp = Math.max(0, (vit.hp | 0) - dealt);
-      try { world.emit?.("damage", { id: op.entityId, amount: dealt, source: op.source }); } catch {}
-      if ((vit.hp | 0) <= 0) {
-        try { world.emit?.("died", { id: op.entityId, cause: op.source }); } catch {}
-      }
+      dealDamage(world, {
+        target: op.entityId,
+        amount: op.amount | 0,
+        type: op.damageType || 'generic',
+        cause: typeof op.source === 'string' ? op.source : 'item',
+        source: typeof op.source === 'number' ? op.source : 0,
+      });
       break;
     }
     case "heal": {
