@@ -87,19 +87,6 @@ export function InteractionSystem(world, actor, targetId) {
                 }
             }
             break;
-
-        case "readBook":
-            {
-                const params = inter.params;
-                world.emit?.("interaction", {
-                    actor,
-                    targetId,
-                    action: "readBook",
-                    title: params?.title || "Book",
-                    text: params?.text || "",
-                });
-            }
-            break;
     }
     return true;
 }

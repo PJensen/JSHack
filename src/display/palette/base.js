@@ -66,7 +66,12 @@ export const basePalette = {
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },
 
   // Decorative dungeon books
-  dungeon_book: { glyph: "📖", fg: "#c8a882", glow: "#a08060" },
+  book_kitty:      { glyph: "📖", fg: "#ffcc88", glow: "#cc9955" },
+  book_snakes:     { glyph: "📖", fg: "#55aa44", glow: "#338822" },
+  book_spikes:     { glyph: "📖", fg: "#a84000", glow: "#d65d1f" },
+  book_touchstone: { glyph: "📖", fg: "#aaaaaa", glow: "#888888" },
+  book_corpses:    { glyph: "📖", fg: "#b89070", glow: "#a06030" },
+  book_gridbugs:   { glyph: "📖", fg: "#bb66ff", glow: "#44ccff" },
 
   // Traps (revealed after triggering)
   trap_spike: { glyph: "^", fg: "#a84000", glow: "#d65d1f" },

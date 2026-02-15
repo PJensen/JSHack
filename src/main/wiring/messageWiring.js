@@ -272,7 +272,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     }
   });
 
-  world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph, title, text }) => {
+  world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph }) => {
     if (action === 'toggleDoor') {
       log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`, 'system');
     }
@@ -288,20 +288,16 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
         log('The tombstone inscription has faded...', 'system');
       }
     }
-    if (action === 'readBook') {
-      if (text) {
-        log(`--- ${title || 'Book'} ---`, 'system');
-        log(text, 'system');
-        log('----------------', 'system');
-      } else {
-        log('The pages have crumbled to dust...', 'system');
-      }
-    }
   });
 
   world.on('deathlog:open', () => {
     log('You open the Book of the Dead...', 'system');
     window.dispatchEvent(new CustomEvent('ui:openDeathLog'));
+  });
+
+  world.on('book:open', ({ title, text }) => {
+    log(`You read ${title || 'a book'}...`, 'system');
+    window.dispatchEvent(new CustomEvent('ui:openBookReader', { detail: { title, text } }));
   });
 
   world.on('stair:traverse', ({ actor, targetId, direction }) => {
