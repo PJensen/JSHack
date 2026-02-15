@@ -1,6 +1,8 @@
 // rules/data/itemUseDefs.js
 // Function-first item-use behavior definitions interpreted by useItemSystem.
 
+import { getCatalogItem } from "./itemCatalog.js";
+
 export const ITEM_USE_TYPE = Object.freeze({
   WAND: "wand",
   SCROLL: "scroll",
@@ -86,6 +88,19 @@ export const ITEM_USE_DEFS = [
     run: (ctx) => {
       ctx.emit("deathlog:open", { actor: ctx.actorId });
       return false; // not consumed — reusable artifact
+    },
+  },
+  {
+    id: "book_flavor_open_reader",
+    matches: (ctx) => {
+      if (ctx.identity === "book_dead") return false;
+      const def = getCatalogItem(ctx.identity);
+      return !!(def && def.type === "book" && def.flavorText);
+    },
+    run: (ctx) => {
+      const def = getCatalogItem(ctx.identity);
+      ctx.emit("book:open", { actor: ctx.actorId, title: def.name, text: def.flavorText });
+      return false; // not consumed — reusable
     },
   },
   {

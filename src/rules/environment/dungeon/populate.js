@@ -15,7 +15,6 @@ import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
 import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
-import { DungeonBook } from '../../archetypes/DungeonBook.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
@@ -185,7 +184,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     const bx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
     const by = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
     const book = pickDungeonBook(rng);
-    spawns.push({ x: bx, y: by, kind: 'dungeon_book', params: book });
+    spawns.push({ x: bx, y: by, kind: 'book', params: { bookId: book.id } });
   }
 
   return spawns;
@@ -440,15 +439,6 @@ export function materializeSpawn(world, spawn) {
         killerName: data.killerName,
         turn: data.turn,
         epitaph: epitaph,
-      });
-    }
-    case 'dungeon_book': {
-      const { title, text } = spawn.params;
-      return createFrom(world, DungeonBook, {
-        x: spawn.x,
-        y: spawn.y,
-        title,
-        text,
       });
     }
     default:

@@ -18,6 +18,7 @@ export function initOverlays() {
   const gestureDebug = ensureGestureDebugLayer(root);
   const memoryGraph = ensureMemoryGraph(root);
   const deathLog = ensurePanel('deathLog');
+  const bookReader = ensurePanel('bookReader');
   const deathScreen = ensureDeathScreen(root);
 
   // Always-on, semi-transparent message ticker (non-modal)
@@ -64,6 +65,7 @@ export function initOverlays() {
       hide(chest);
       hide(applyPanel);
       hide(deathLog);
+      hide(bookReader);
       // Close memory graph
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
@@ -294,6 +296,15 @@ export function initOverlays() {
     const e = ev;
     const records = (e?.detail?.records) || [];
     renderDeathLog(deathLog, records);
+  });
+
+  // Book reader overlay (decorative dungeon books)
+  window.addEventListener('ui:openBookReader', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderBookReader(bookReader, d.title || 'Book', d.text || '');
+    show(bookReader);
   });
 
   // Death screen with social share
@@ -1884,6 +1895,48 @@ function rarityStyle(rarityName) {
   if (rn === 'epic') return { color: '#c47bff', fontWeight: 'bold' };
   if (rn === 'legendary') return { color: '#ff9f3b', fontWeight: 'bold' };
   return { color: '#ffffff', fontWeight: 'bold' };
+}
+
+// --- Book reader overlay (decorative dungeon books) ------------------------
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {string} title
+ * @param {string} text
+ */
+function renderBookReader(panel, title, text) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+
+  // Header
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' });
+  const icon = document.createElement('span');
+  icon.textContent = '\uD83D\uDCD6'; // 📖
+  icon.style.fontSize = '22px';
+  const heading = document.createElement('span');
+  heading.textContent = title;
+  Object.assign(heading.style, { fontWeight: 'bold', fontSize: '16px', color: '#c8a882' });
+  header.appendChild(icon);
+  header.appendChild(heading);
+  el.appendChild(header);
+
+  // Body text
+  const body = document.createElement('div');
+  Object.assign(body.style, {
+    padding: '14px 16px',
+    border: '1px solid #2d3b52', borderRadius: '6px',
+    background: '#0f1421',
+    lineHeight: '1.6', fontSize: '14px', color: '#cfe8ff',
+    whiteSpace: 'pre-wrap',
+  });
+  body.textContent = text;
+  el.appendChild(body);
+
+  // Hint
+  const hint = document.createElement('div');
+  Object.assign(hint.style, { marginTop: '12px', opacity: '0.6', fontSize: '11px', textAlign: 'center' });
+  hint.textContent = 'Esc=Close';
+  el.appendChild(hint);
 }
 
 // --- Death log overlay (past deaths from localStorage) ---------------------
