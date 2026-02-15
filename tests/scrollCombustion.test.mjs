@@ -11,8 +11,8 @@ import { createItemById } from "../src/rules/utils/itemFactory.js";
 
 Deno.test("burning status combusts scrolls on tile into ash", () => {
   const world = new World({ seed: 21 });
-  const burns = [];
-  world.on("item:burned", (e) => burns.push(e));
+  const transforms = [];
+  world.on("item:transformed", (e) => transforms.push(e));
 
   const scrollId = createItemById(world, "scroll_blastwave");
   assert(scrollId != null, "scroll item should be created");
@@ -36,9 +36,13 @@ Deno.test("burning status combusts scrolls on tile into ash", () => {
   assertEquals(mat.kind, "sand");
   assert(ni, "ash should have identity");
   assertEquals(ni.identity, "ash");
-  assertEquals(burns.length, 1);
-  assertEquals(burns[0]?.source, burner);
-  assertEquals(burns[0]?.kind, "burning");
+  assertEquals(transforms.length, 1);
+  assertEquals(transforms[0]?.source, burner);
+  assertEquals(transforms[0]?.cause, "burning");
+  assertEquals(transforms[0]?.scope, "ground");
+  assertEquals(transforms[0]?.ownerId, null);
+  assertEquals(transforms[0]?.from?.identity, "scroll_blastwave");
+  assertEquals(transforms[0]?.to?.identity, "ash");
 });
 
 Deno.test("non-burning entities do not trigger reactions", () => {
@@ -69,8 +73,8 @@ Deno.test("non-burning entities do not trigger reactions", () => {
 
 Deno.test("burning status combusts carried scrolls in inventory", () => {
   const world = new World({ seed: 23 });
-  const burns = [];
-  world.on("item:burned", (e) => burns.push(e));
+  const transforms = [];
+  world.on("item:transformed", (e) => transforms.push(e));
 
   const carrier = world.create();
   world.add(carrier, Position, { x: 2, y: 3 });
@@ -90,6 +94,10 @@ Deno.test("burning status combusts carried scrolls in inventory", () => {
   assertEquals(ni.identity, "ash");
   assertEquals(info.type, "junk");
   assertEquals(mat.kind, "sand");
-  assertEquals(burns.length, 1);
-  assertEquals(burns[0]?.source, carrier);
+  assertEquals(transforms.length, 1);
+  assertEquals(transforms[0]?.source, carrier);
+  assertEquals(transforms[0]?.scope, "inventory");
+  assertEquals(transforms[0]?.ownerId, carrier);
+  assertEquals(transforms[0]?.from?.identity, "scroll_blastwave");
+  assertEquals(transforms[0]?.to?.identity, "ash");
 });

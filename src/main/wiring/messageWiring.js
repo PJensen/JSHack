@@ -78,6 +78,19 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     }
   });
 
+  world.on('item:transformed', ({ itemId, ownerId, scope, from, to, cause }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    if (scope !== 'inventory' || Number(ownerId || 0) !== pe.id) return;
+    const fromLabel = bracketizeName(String(from?.name || nameOfItem(itemId)));
+    const toLabel = bracketizeName(String(to?.name || 'something else'));
+    if (String(cause || '') === 'burning') {
+      log(`${fromLabel} in your pack burns into ${toLabel}.`, 'system');
+      return;
+    }
+    log(`${fromLabel} in your pack transforms into ${toLabel}.`, 'system');
+  });
+
   // === Spell events ===
   world.on('castSpell', ({ actor, spellId, targetId }) => {
     const who = nameOfEntity(actor);
