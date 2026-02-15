@@ -200,9 +200,8 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     oy = tp.y | 0;
   }
 
-  // Apply AoE damage
+  // Apply AoE damage + burning
   for (const [id, pos] of world.query(Position)) {
-    if (id === actor) continue; // caster immune (optional: remove if self-damage desired)
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
     const dist = Math.max(Math.abs((pos.x | 0) - ox), Math.abs((pos.y | 0) - oy));
@@ -212,6 +211,23 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     try { world.emit && world.emit('damaged', { target: id, amount: dmg, source: actor }); } catch {}
     if ((vit.hp | 0) <= 0) {
       try { world.emit && world.emit('died', { id, killer: actor }); } catch {}
+    }
+    // Apply burning to survivors
+    if ((vit.hp | 0) > 0) {
+      const ae = /** @type any */ (world.get(id, ActiveEffects));
+      const effect = { key: 'burn', turnsLeft: 4, potency: 3, stacks: 1 };
+      if (ae && Array.isArray(ae.effects)) {
+        const existing = ae.effects.find(e => e.key === 'burn');
+        if (existing) {
+          existing.stacks = (existing.stacks || 1) + 1;
+          existing.turnsLeft = Math.max(existing.turnsLeft, 4);
+        } else {
+          ae.effects.push(effect);
+        }
+      } else {
+        try { world.add(id, ActiveEffects, { effects: [effect] }); } catch {}
+      }
+      try { world.emit && world.emit('proc:burning', { actor, target: id }); } catch {}
     }
   }
 
