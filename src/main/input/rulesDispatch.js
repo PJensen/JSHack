@@ -2,7 +2,7 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../rules/components/index.js";
+import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../rules/components/index.js";
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { itemsAt } from "../../rules/utils/queries.js";
@@ -119,6 +119,16 @@ export function makeRulesDispatcher(world, getActorId) {
         const intent = { targetId };
         if (Number.isFinite(count) && count > 0) intent.count = count;
         world?.add?.(actorId, PickupIntent, intent);
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.dropItem": {
+        const { itemId = 0, count = null } = action.payload || {};
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+
+        const intent = { itemId };
+        if (Number.isFinite(count) && count > 0) intent.count = count;
+        world?.add?.(actorId, DropIntent, intent);
         world?.tick?.(1);
         break;
       }
