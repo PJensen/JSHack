@@ -259,7 +259,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     }
   });
 
-  world.on('interaction', ({ action, result, items: droppedIds, targetId }) => {
+  world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph }) => {
     if (action === 'toggleDoor') {
       log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`, 'system');
     }
@@ -267,7 +267,6 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
       log('You open the chest!', 'system');
     }
     if (action === 'readTombstone') {
-      const { epitaph } = arguments[0];
       if (epitaph) {
         log('--- TOMBSTONE ---', 'system');
         log(epitaph, 'system');
