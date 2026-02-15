@@ -12,8 +12,6 @@ import { AttackIntent } from '../src/rules/components/Intents/AttackIntent.js';
 import { effectSystem } from '../src/rules/systems/effectSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
-// Side-effect: registers monster script handlers
-import '../src/rules/scripts/monsters.js';
 
 function scheduler(world) {
   try { effectSystem(world); } catch (e) { console.error('effect system error', e); }
@@ -131,7 +129,7 @@ Deno.test("disease stacking: pushEffect increments stacks and refreshes duration
   assertEquals(vit.hp, 20, 'disease should not deal damage');
 });
 
-Deno.test("rat naturalScript: disease stacks via full combat pipeline", () => {
+Deno.test("rat on-hit hook: disease stacks via full combat pipeline", () => {
   // Try many seeds to find one where the rat hits AND procs disease at least twice
   let foundSeed = -1;
   let maxStacks = 0;
@@ -154,7 +152,7 @@ Deno.test("rat naturalScript: disease stacks via full combat pipeline", () => {
     const rat = world.create();
     world.add(rat, NamedIdentity, { name: 'Rat', identity: 'rat' });
     world.add(rat, Vitality, { maxHp: 100, hp: 100 });
-    world.add(rat, Equipment, { naturalScript: 'monster:ratBite' });
+    world.add(rat, Equipment, {});
     world.add(rat, ActiveEffects, { effects: [] });
     world.add(rat, Faction, { key: 'enemy' });
     world.add(rat, Position, { x: 5, y: 6 });

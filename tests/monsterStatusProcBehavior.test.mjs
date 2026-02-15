@@ -2,19 +2,20 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Brain } from "../src/rules/components/Brain.js";
-import { ScriptVerb, runScript } from "../src/rules/scripting.js";
-import "../src/rules/scripts/monsters.js";
+import { getMonster } from "../src/rules/data/monsters.js";
 
 Deno.test("troll smash on-hit applies regen to attacker", () => {
   const world = new World({ seed: 123 });
   const attacker = world.create();
   const defender = world.create();
+  const hook = getMonster("troll")?.hooks?.onHit;
+  assert(typeof hook === "function", "troll onHit hook should exist");
 
-  runScript("monster:trollSmash", ScriptVerb.AffixOnHit, world, {
+  hook({ world, ctx: {
     attacker,
     defender,
     damage: 5,
-  });
+  }});
 
   const ae = world.get(attacker, ActiveEffects);
   assert(ae && Array.isArray(ae.effects), "attacker should gain active effects");
@@ -22,6 +23,8 @@ Deno.test("troll smash on-hit applies regen to attacker", () => {
 });
 
 Deno.test("lich drain on-damaged can emit phylactery event with defender actor", () => {
+  const hook = getMonster("lich")?.hooks?.onDamaged;
+  assert(typeof hook === "function", "lich onDamaged hook should exist");
   let found = false;
   for (let seed = 0; seed < 2048; seed++) {
     const world = new World({ seed });
@@ -31,11 +34,11 @@ Deno.test("lich drain on-damaged can emit phylactery event with defender actor",
 
     world.on("proc:phylactery", (evt) => { payload = evt; });
 
-    runScript("monster:lichDrain", ScriptVerb.AffixOnDamaged, world, {
+    hook({ world, ctx: {
       attacker,
       defender,
       damage: 4,
-    });
+    }});
 
     const ae = world.get(defender, ActiveEffects);
     if (ae && Array.isArray(ae.effects) && ae.effects.some((e) => e.key === "regen")) {
@@ -49,6 +52,8 @@ Deno.test("lich drain on-damaged can emit phylactery event with defender actor",
 });
 
 Deno.test("mind flayer on-hit callback can wipe spells and apply mindwipe", () => {
+  const hook = getMonster("floating_eye")?.hooks?.onHit;
+  assert(typeof hook === "function", "floating eye onHit hook should exist");
   let found = false;
   for (let seed = 0; seed < 4096; seed++) {
     const world = new World({ seed });
@@ -59,11 +64,11 @@ Deno.test("mind flayer on-hit callback can wipe spells and apply mindwipe", () =
 
     world.on("proc:mindwipe", (evt) => { payload = evt; });
 
-    runScript("monster:mindflayerBlast", ScriptVerb.AffixOnHit, world, {
+    hook({ world, ctx: {
       attacker,
       defender,
       damage: 7,
-    });
+    }});
 
     const ae = world.get(defender, ActiveEffects);
     if (ae && Array.isArray(ae.effects) && ae.effects.some((e) => e.key === "mindwipe")) {
