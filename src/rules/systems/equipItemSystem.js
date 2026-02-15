@@ -73,8 +73,7 @@ export function equipItemSystem(world) {
       if (Number.isInteger(eq.ammo) && eq.ammo > 0) pushToInventory(eq.ammo);
       eq.ammo = itemId; appliedSlot = 'ammo';
     } else {
-      // Unknown or unsupported slot: put item back and ignore
-      inv.items.push(itemId);
+      // Unknown or unsupported slot: item is already in inventory, ignore.
       world.remove(actor, EquipIntent);
       continue;
     }

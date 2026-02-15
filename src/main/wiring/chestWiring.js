@@ -2,7 +2,10 @@ import { Equipment } from "../../rules/components/Equipment.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { Position } from "../../rules/components/Position.js";
+import {
+  addItemEntityToInventory,
+  findInventoryStackTargetForItem,
+} from "../../rules/utils/inventoryStacking.js";
 
 const INSTALLED = Symbol.for("jshack:main:chestWiring:installed");
 
@@ -92,15 +95,16 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     if (idx === -1) return;
 
     const playerInv = world.get(pe.id, Inventory);
-    if (playerInv && playerInv.items.length >= playerInv.capacity) {
+    const stackIntoId = playerInv ? findInventoryStackTargetForItem(world, playerInv, itemId) : 0;
+    const needsSlot = playerInv ? (!stackIntoId && !playerInv.items.includes(itemId)) : false;
+    if (playerInv && playerInv.capacity != null && playerInv.items.length >= playerInv.capacity && needsSlot) {
       log("Your inventory is full.");
       return;
     }
 
     chestInv.items.splice(idx, 1);
     if (playerInv) {
-      try { world.remove(itemId, Position); } catch {}
-      playerInv.items.push(itemId);
+      addItemEntityToInventory(world, playerInv, itemId);
     }
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";

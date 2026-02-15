@@ -5,8 +5,11 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Settings } from "../components/Settings.js";
 import { Player } from "../components/Player.js";
-import { Unpaid } from "../components/Unpaid.js";
 import { forEachItemAt } from "../utils/tileQueryCache.js";
+import {
+    addItemEntityToInventory,
+    findInventoryStackTargetForItem,
+} from "../utils/inventoryStacking.js";
 
 // Helper: sum inventory weight
 function inventoryWeight(world, inv) {
@@ -16,36 +19,6 @@ function inventoryWeight(world, inv) {
         if (ii) total += (ii.weight || 0) * (ii.count || 1);
     }
     return total;
-}
-
-// Helper: find matching stack by identity
-function findStackTarget(world, inv, itemId) {
-    const ident = world.get(itemId, NamedIdentity)?.identity;
-    if (!ident) return 0;
-
-    // Unpaid items should not stack to preserve their Unpaid component
-    const isUnpaid = world.has(itemId, Unpaid);
-    if (isUnpaid) return 0;
-
-    for (const id of inv.items) {
-        if (id === itemId) continue;
-        const n = world.get(id, NamedIdentity);
-        if (n && n.identity === ident) return id;
-    }
-    return 0;
-}
-    
-function findStackTargetByIdentity(world, inv, identity, itemId = 0) {
-    if (!identity) return 0;
-
-    // Unpaid items should not stack
-    if (itemId > 0 && world.has(itemId, Unpaid)) return 0;
-
-    for (const id of inv.items) {
-        const n = world.get(id, NamedIdentity);
-        if (n && n.identity === identity) return id;
-    }
-    return 0;
 }
 
 export function itemPickupSystem(world) {
@@ -71,7 +44,7 @@ export function itemPickupSystem(world) {
         const takeCount = Math.min(info.count || 1, intent.count || info.count || 1);
 
         // capacity gate (counts stacks, not total items)
-        const stackIntoId = findStackTarget(world, inv, itemId);
+        const stackIntoId = findInventoryStackTargetForItem(world, inv, itemId);
         const needsSlot = stackIntoId ? false : !inv.items.includes(itemId);
         const hasCapacity = stackIntoId || inv.capacity == null || inv.items.length < inv.capacity;
         if (!hasCapacity && needsSlot) {
@@ -92,32 +65,25 @@ export function itemPickupSystem(world) {
         }
 
         // perform pickup
-        if (stackIntoId) {
-            // merge counts
-            world.mutate(stackIntoId, ItemInfo, (r) => { r.count = (r.count || 1) + takeCount; });
-            if (takeCount >= (info.count || 1)) {
-                world.destroy(itemId);
+        if (takeCount < (info.count || 1)) {
+            // leave residual on ground; create a new inventory copy for the taken amount
+            world.mutate(itemId, ItemInfo, (r) => { r.count -= takeCount; });
+            const copy = world.create();
+            const baseName = world.get(itemId, NamedIdentity);
+            if (baseName) world.add(copy, NamedIdentity, { name: baseName.name, identity: baseName.identity });
+            world.add(copy, ItemInfo, { ...info, count: takeCount });
+            const moved = addItemEntityToInventory(world, inv, copy, { removePosition: false });
+            if (moved.mode === "stacked") {
+                try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount, stackedIntoId: moved.stackedIntoId }); } catch { }
             } else {
-                world.mutate(itemId, ItemInfo, (r) => { r.count -= takeCount; });
-            }
-            try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount, stackedIntoId: stackIntoId }); } catch { }
-        } else {
-            // move item into inventory as its own stack
-            // remove from ground
-            world.remove(itemId, Position);
-            // split if partial pickup
-            if (takeCount < (info.count || 1)) {
-                // leave residual on ground; create a new inventory copy
-                world.mutate(itemId, ItemInfo, (r) => { r.count -= takeCount; });
-                const copy = world.create();
-                const baseName = world.get(itemId, NamedIdentity);
-                if (baseName) world.add(copy, NamedIdentity, { name: baseName.name, identity: baseName.identity });
-                world.add(copy, ItemInfo, { ...info, count: takeCount });
-                inv.items.push(copy);
                 try { world.emit && world.emit('item:pickup', { actor, itemId: copy, count: takeCount }); } catch { }
+            }
+        } else {
+            // whole stack
+            const moved = addItemEntityToInventory(world, inv, itemId);
+            if (moved.mode === "stacked") {
+                try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount, stackedIntoId: moved.stackedIntoId }); } catch { }
             } else {
-                // whole stack
-                inv.items.push(itemId);
                 try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount }); } catch { }
             }
         }
@@ -140,15 +106,7 @@ export function autoPickupPostMoveSystem(world) {
             const info = world.get(itemId, ItemInfo);
             if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
-            const name = world.get(itemId, NamedIdentity);
-            const stackTarget = findStackTargetByIdentity(world, inv, name?.identity, itemId);
-            if (stackTarget) {
-                world.mutate(stackTarget, ItemInfo, (r) => { r.count = (r.count || 1) + takeCount; });
-                world.destroy(itemId);
-            } else {
-                try { world.remove(itemId, Position); } catch {}
-                inv.items.push(itemId);
-            }
+            addItemEntityToInventory(world, inv, itemId);
             try { world.emit && world.emit('item:pickup', { actor: id, itemId, count: takeCount }); } catch {}
         });
     }
