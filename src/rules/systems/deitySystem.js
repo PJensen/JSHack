@@ -19,7 +19,7 @@ import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
 import { dealDamage } from '../utils/dealDamage.js';
 
-/** @type {Map<string, import('../deity/Deity.js').Deity>} */
+/** @type {Map<string, import('../../lib/deity-js/deity.js').Deity>} */
 const _deities = new Map();
 
 /** @type {WeakSet<import('../../lib/ecs-js/index.js').World>} */
@@ -374,7 +374,7 @@ export function getDeityInstance(deityId) {
  * Initialize and register a deity (called from main.js after player creation).
  * @param {string} deityId
  * @param {import('../../lib/ecs-js/index.js').World} world - needed to wire miracles
- * @returns {import('../deity/Deity.js').Deity|null}
+ * @returns {import('../../lib/deity-js/deity.js').Deity|null}
  */
 export function initDeity(deityId, world = null) {
   return ensureDeity(deityId, world);
