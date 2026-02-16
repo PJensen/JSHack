@@ -15,6 +15,7 @@ import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
 import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
+import { HomeBed, HomeChest, HomeSign, BerryBush, HerbPatch } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
@@ -427,6 +428,16 @@ export function materializeSpawn(world, spawn) {
       world.add(id, Position, { x: spawn.x, y: spawn.y });
       return id;
     }
+    case 'home_bed':
+      return createFrom(world, HomeBed, { x: spawn.x, y: spawn.y });
+    case 'home_chest':
+      return createFrom(world, HomeChest, { x: spawn.x, y: spawn.y });
+    case 'home_sign':
+      return createFrom(world, HomeSign, { x: spawn.x, y: spawn.y });
+    case 'harvest_berries':
+      return createFrom(world, BerryBush, { x: spawn.x, y: spawn.y });
+    case 'harvest_herbs':
+      return createFrom(world, HerbPatch, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);

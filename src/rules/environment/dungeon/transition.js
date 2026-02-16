@@ -5,6 +5,8 @@ import { DungeonState } from '../../components/DungeonState.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
+import { Inventory } from '../../components/Inventory.js';
+import { HarvestNode } from '../../components/HarvestNode.js';
 import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
 import { generateFloor } from './index.js';
@@ -13,6 +15,69 @@ import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
+/** @type {WeakMap<object, number[]>} */
+const _overworldStashCache = new WeakMap();
+/** @type {WeakMap<object, Map<string, {kind:string, ready:boolean, regrowTurns:number, turnsUntilReady:number}>>} */
+const _overworldHarvestCache = new WeakMap();
+
+function _harvestKey(x, y, kind) {
+  return `${x},${y},${String(kind || "")}`;
+}
+
+/**
+ * Capture persistent depth-0 state (stash chest + harvest regrowth).
+ * @param {import('../../../lib/ecs-js/index.js').World} world
+ */
+function _captureOverworldState(world) {
+  let stashItems = [];
+  for (const [id, ni] of world.query(NamedIdentity)) {
+    if (ni?.name !== 'Stash Chest') continue;
+    const inv = world.get(id, Inventory);
+    if (!inv || !Array.isArray(inv.items)) continue;
+    stashItems = inv.items.slice();
+    break;
+  }
+  _overworldStashCache.set(world, stashItems);
+
+  const harvest = new Map();
+  for (const [id, node, pos] of world.query(HarvestNode, Position)) {
+    harvest.set(_harvestKey(pos.x, pos.y, node.kind), {
+      kind: String(node.kind || ""),
+      ready: !!node.ready,
+      regrowTurns: Math.max(1, Number(node.regrowTurns || 1) | 0),
+      turnsUntilReady: Math.max(0, Number(node.turnsUntilReady || 0) | 0),
+    });
+  }
+  _overworldHarvestCache.set(world, harvest);
+}
+
+/**
+ * Restore persistent depth-0 state after overworld regeneration.
+ * @param {import('../../../lib/ecs-js/index.js').World} world
+ */
+function _restoreOverworldState(world) {
+  const stash = _overworldStashCache.get(world) || [];
+  for (const [id, ni] of world.query(NamedIdentity)) {
+    if (ni?.name !== 'Stash Chest') continue;
+    const inv = world.get(id, Inventory);
+    if (!inv || !Array.isArray(inv.items)) continue;
+    inv.items = stash.filter((eid) => Number.isInteger(eid) && eid > 0 && world.isAlive(eid));
+    break;
+  }
+
+  const harvest = _overworldHarvestCache.get(world);
+  if (!harvest || harvest.size === 0) return;
+  for (const [id, node, pos] of world.query(HarvestNode, Position)) {
+    const rec = harvest.get(_harvestKey(pos.x, pos.y, node.kind));
+    if (!rec) continue;
+    world.set(id, HarvestNode, {
+      kind: rec.kind,
+      ready: rec.ready,
+      regrowTurns: rec.regrowTurns,
+      turnsUntilReady: rec.turnsUntilReady,
+    });
+  }
+}
 
 /**
  * Transition the dungeon to a new depth.
@@ -45,6 +110,9 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   if (currentDepth > 0) {
     _exploredCache.set(currentDepth, saveExplored());
   }
+  if (currentDepth === 0) {
+    _captureOverworldState(world);
+  }
 
   // Destroy all entities from the current floor
   if (ds && Array.isArray(ds.floorEntityIds)) {
@@ -69,6 +137,9 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   const savedExplored = _exploredCache.get(newDepth);
   if (savedExplored) {
     restoreExplored(savedExplored);
+  }
+  if (newDepth === 0) {
+    _restoreOverworldState(world);
   }
 
   // If direction provided, arrive at the matching stair on the new floor

@@ -65,6 +65,10 @@ export const basePalette = {
 
   // Containers
   chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
+  bed_home: { glyph: "=", fg: "#9fc4d6", glow: "#5c7f90" },
+  house_sign: { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
+  berry_bush: { glyph: "%", fg: "#8b4ea9", glow: "#5a2d75" },
+  herb_patch: { glyph: ";", fg: "#63a85f", glow: "#3e6b3c" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },
@@ -89,6 +93,8 @@ export const basePalette = {
   // Food & Rations
   food_ration:      { glyph: "%", fg: "#c4a46c", glow: "#a08050" },
   food_iron_ration: { glyph: "%", fg: "#d4b87c", glow: "#b09860" },
+  food_wild_berries: { glyph: ":", fg: "#b476d7", glow: "#7a4c96" },
+  food_wild_herbs:   { glyph: ";", fg: "#73c56f", glow: "#4f8b4c" },
 
   // Corpses (inherit monster color, traditional '%' glyph)
   corpse_rat:          { glyph: "%", fg: "#b89070", glow: "#a06030" },

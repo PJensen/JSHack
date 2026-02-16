@@ -131,6 +131,22 @@ function getChunk(chunks, cx, cy) {
 
 /**
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} x
+ * @param {number} y
+ */
+function getWorldTile(chunks, x, y) {
+  const cx = Math.floor(x / CHUNK_SIZE);
+  const cy = Math.floor(y / CHUNK_SIZE);
+  const chunk = chunks.get(chunkKey(cx, cy));
+  if (!chunk) return TILE_WATER;
+  const lx = x - cx * CHUNK_SIZE;
+  const ly = y - cy * CHUNK_SIZE;
+  if (lx < 0 || ly < 0 || lx >= CHUNK_SIZE || ly >= CHUNK_SIZE) return TILE_WATER;
+  return chunk.tiles[ly * CHUNK_SIZE + lx];
+}
+
+/**
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
  * @param {number} cx
  * @param {number} cy
  * @param {number} seed
@@ -206,6 +222,21 @@ function carvePath(chunks, x0, y0, x1, y1) {
 }
 
 /**
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} x
+ * @param {number} y
+ * @param {string} kind
+ * @param {Record<string, any>} [params]
+ */
+function addSpawn(chunks, x, y, kind, params = {}) {
+  const cx = Math.floor(x / CHUNK_SIZE);
+  const cy = Math.floor(y / CHUNK_SIZE);
+  const chunk = chunks.get(chunkKey(cx, cy));
+  if (!chunk) return;
+  chunk.spawns.push({ x, y, kind, params });
+}
+
+/**
  * @param {number} worldSeed
  * @returns {{ extent:{minCX:number,maxCX:number,minCY:number,maxCY:number}, chunks:Array<{chunkX:number,chunkY:number,depth:number,seed:number,tiles:Uint8Array,rooms:any[],doors:any[],spawns:any[]}>, spawnX:number, spawnY:number }}
  */
@@ -259,6 +290,36 @@ export function generateOverworldChunks(worldSeed) {
   const spawnY = doorY + 1;
   fillDisk(chunks, spawnX, spawnY, 2);
   setWorldTile(chunks, spawnX, spawnY, TILE_GRASS);
+
+  // Home interactables
+  addSpawn(chunks, homeX - 2, homeY, "home_bed");
+  addSpawn(chunks, homeX + 2, homeY, "home_chest");
+  addSpawn(chunks, homeX - 3, doorY + 2, "home_sign");
+
+  // Harvest nodes around the clearing
+  const berrySpots = [
+    { x: homeX + 11, y: homeY - 4 },
+    { x: homeX + 8, y: homeY + 7 },
+    { x: homeX - 10, y: homeY + 5 },
+    { x: homeX - 12, y: homeY - 2 },
+  ];
+  const herbSpots = [
+    { x: homeX + 6, y: homeY - 9 },
+    { x: homeX - 7, y: homeY - 8 },
+    { x: homeX + 12, y: homeY + 2 },
+    { x: homeX - 5, y: homeY + 9 },
+  ];
+
+  for (const p of berrySpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER || t === TILE_MOUNTAIN) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_berries");
+  }
+  for (const p of herbSpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER || t === TILE_MOUNTAIN) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_herbs");
+  }
 
   const outChunks = [];
   for (const rec of chunks.values()) {
