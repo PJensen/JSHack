@@ -270,6 +270,15 @@ export function generateOverworldChunks(worldSeed) {
 
   const halfW = 5;
   const halfH = 3;
+  const doorX = homeX;
+  const doorY = homeY + halfH;
+  const spawnX = doorX;
+  const spawnY = doorY + 1;
+
+  // Clear spawn area before building the house so the disk doesn't overwrite walls/door
+  fillDisk(chunks, spawnX, spawnY, 2);
+  setWorldTile(chunks, spawnX, spawnY, TILE_GRASS);
+
   for (let y = homeY - halfH; y <= homeY + halfH; y++) {
     for (let x = homeX - halfW; x <= homeX + halfW; x++) {
       const border = x === homeX - halfW || x === homeX + halfW || y === homeY - halfH || y === homeY + halfH;
@@ -277,19 +286,12 @@ export function generateOverworldChunks(worldSeed) {
     }
   }
 
-  const doorX = homeX;
-  const doorY = homeY + halfH;
   setWorldTile(chunks, doorX, doorY, TILE_DOOR);
 
   const stairX = homeX + 8;
   const stairY = homeY + 1;
   carvePath(chunks, doorX, doorY + 1, stairX, stairY);
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
-
-  const spawnX = doorX;
-  const spawnY = doorY + 1;
-  fillDisk(chunks, spawnX, spawnY, 2);
-  setWorldTile(chunks, spawnX, spawnY, TILE_GRASS);
 
   // Home interactables
   addSpawn(chunks, homeX - 2, homeY, "home_bed");
