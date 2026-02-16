@@ -1163,6 +1163,7 @@ if (!world[INSTALLED]) {
 5. **Hacking is encouraged.** We're exploiting JavaScript and having fun. Clever tricks welcome.
 6. **No build step, ever.** Pure ES modules. This is non-negotiable.
 7. **Deno, not Node.** All tooling and testing uses Deno.
+8. **Do exactly what is asked.** Do not add content beyond the mechanism requested. If asked to build a pipeline, build the pipeline and one proof-of-concept. Stop. Do not invent items, affixes, catalog entries, loot table wiring, or fix unrelated "inconsistencies" unless explicitly asked. When the mechanism is done, ask what content the user wants on top of it.
 
 ### Roguelike-specific rules
 
