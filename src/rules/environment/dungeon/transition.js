@@ -181,6 +181,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });
   invalidateTileQueryCache(world);
+  world.tick(1);
 }
 
 /**
