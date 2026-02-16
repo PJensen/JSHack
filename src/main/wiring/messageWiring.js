@@ -282,6 +282,49 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
         log('The tombstone inscription has faded...', 'system');
       }
     }
+    if (action === 'readText') {
+      const inter = world.get(Number(targetId || 0), NamedIdentity);
+      if (inter?.identity === 'house_sign') {
+        log('Home sweet home. Rest, gather, and prepare for another descent.', 'system');
+      } else {
+        log('You read the sign.', 'system');
+      }
+    }
+  });
+
+  world.on('bed:rested', ({ actor }) => {
+    if (nameOfEntity(actor) === 'You') {
+      log('You rest in your bed and feel fully restored.', 'system');
+    } else {
+      log(`${nameOfEntity(actor)} rests for a while.`, 'system');
+    }
+  });
+
+  world.on('harvest:picked', ({ actor, kind, count, itemId }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const nodeLabel = String(kind || '') === 'herbs' ? 'herbs' : 'berries';
+    const itemLabel = itemId ? nameOfItem(itemId) : bracketizeName(nodeLabel);
+    log(`You harvest ${count} ${nodeLabel} (${itemLabel}).`, 'system');
+  });
+
+  world.on('harvest:empty', ({ actor, kind, turnsUntilReady }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const nodeLabel = String(kind || '') === 'herbs' ? 'herb patch' : 'berry bush';
+    const left = Math.max(0, Number(turnsUntilReady || 0) | 0);
+    if (left > 0) log(`The ${nodeLabel} is picked clean. (${left} turns to regrow)`, 'system');
+    else log(`The ${nodeLabel} has nothing ready right now.`, 'system');
+  });
+
+  world.on('harvest:regrown', ({ id, kind }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const ppos = world.get(pe.id, Position);
+    const pos = world.get(Number(id || 0), Position);
+    if (!ppos || !pos) return;
+    const dist = Math.max(Math.abs(ppos.x - pos.x), Math.abs(ppos.y - pos.y));
+    if (dist > 6) return;
+    const what = String(kind || '') === 'herbs' ? 'A herb patch looks fresh again.' : 'A berry bush ripens nearby.';
+    log(what, 'ambient');
   });
 
   world.on('deathlog:open', () => {
