@@ -24,8 +24,7 @@ const _floorEntityCache = new Map();
  */
 function _buildSnapshotRegistry(world) {
   const reg = new Map();
-  for (const [, store] of world._store) {
-    const comp = store?._comp;
+  for (const [, comp] of world._components) {
     if (!comp || typeof comp.name !== 'string' || !comp.name) continue;
     reg.set(comp.name, comp);
   }

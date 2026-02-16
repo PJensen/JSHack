@@ -1608,21 +1608,40 @@ world.on('harvest:picked', ({ actor, count, kind }) => {
 });
 
 // Stair traversal logic (messages handled in messageWiring)
-world.on('stair:traverse', ({ direction }) => {
+/** @type {{ direction: 'up' | 'down' } | null} */
+let _pendingStairTransition = null;
+
+function queueStairTransition(direction) {
+  const dir = direction === 'up' ? 'up' : (direction === 'down' ? 'down' : null);
+  if (!dir) return;
+  // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
+  if (_pendingStairTransition) return;
+  _pendingStairTransition = { direction: dir };
+}
+
+function flushPendingStairTransition() {
+  const pending = _pendingStairTransition;
+  if (!pending) return;
+  _pendingStairTransition = null;
+
   let currentDepth = 1;
   for (const [, state] of world.query(DungeonState)) {
     currentDepth = state.currentDepth;
     break;
   }
 
-  const newDepth = direction === 'down' ? currentDepth + 1 : currentDepth - 1;
+  const newDepth = pending.direction === 'down' ? currentDepth + 1 : currentDepth - 1;
   if (newDepth < 0) return;
 
-  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
+  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction: pending.direction, tombstoneRepo });
 
   // Invalidate cached world view
   _cachedView = null;
   _cachedStep = -1;
+}
+
+world.on('stair:traverse', ({ direction }) => {
+  queueStairTransition(direction);
 });
 
 // UI stair tooltip tap → trigger stair traverse
@@ -2179,6 +2198,7 @@ function frame(now) {
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
+  flushPendingStairTransition();
 
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
