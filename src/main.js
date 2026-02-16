@@ -108,6 +108,13 @@ const BOOT_STATIC_UNITS = 9;
 let _bootDoneUnits = 0;
 let _bootTotalUnits = BOOT_STATIC_UNITS;
 
+function hasValidFloorOverride() {
+  const raw = runtimeConfig?.params?.get("floor");
+  if (raw == null) return false;
+  const value = Number.parseInt(String(raw), 10);
+  return Number.isFinite(value) && value >= 0;
+}
+
 function hasSavegame() {
   try {
     return !!localStorage.getItem(SAVEGAME_KEY);
@@ -177,7 +184,8 @@ function readSavedSeed(save) {
   return (seed >>> 0);
 }
 
-const _pendingSavegame = readSavegamePayload();
+const _hasFloorOverride = hasValidFloorOverride();
+const _pendingSavegame = _hasFloorOverride ? null : readSavegamePayload();
 
 /**
  * @param {string} label
@@ -241,10 +249,10 @@ function resize() {
 }
 addEventListener("resize", resize);
 resize();
-updateBootProgress(hasSavegame() ? "Loading from Save" : "Loading...");
+updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
 
 // ---- App wires rules/ (no display logic here) ------------------------------
-const _bootSeed = readSavedSeed(_pendingSavegame) ?? 0xa77a77;
+const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xa77a77;
 const world = new World({ seed: _bootSeed });
 configureWorld(world);
 bootAdvance("Configured ECS systems");
@@ -368,7 +376,9 @@ const _tileKindMap = {
 }
 
 // Allow URL override: ?floor=0|1|... to choose start depth.
-const _startDepth = readSavedDepth(_pendingSavegame) ?? runtimeConfig.startDepth;
+const _startDepth = _hasFloorOverride
+  ? runtimeConfig.startDepth
+  : (readSavedDepth(_pendingSavegame) ?? runtimeConfig.startDepth);
 const _initialDepth = (Number.isFinite(_startDepth) && _startDepth >= 0) ? _startDepth : 0;
 const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth);
 const _bootChunkTotal = Math.max(
@@ -2777,8 +2787,22 @@ requestAnimationFrame((now) => {
 // ---- Minimal demo “scene” controls (display-only) --------------------------
 addEventListener("keydown", (e) => {
   const { key, code } = e;
+  const deleteSaveHotkey = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (code === "Backspace" || key === "Backspace");
   const zoomIn  = key === "+" || key === "=" || code === "Equal" || code === "NumpadAdd";
   const zoomOut = key === "-" || key === "_" || code === "Minus" || code === "NumpadSubtract";
+
+  if (deleteSaveHotkey) {
+    const hadSave = hasSavegame();
+    clearSavegamePayload();
+    messageLog.log({
+      text: hadSave
+        ? "Save game deleted. (Ctrl+Shift+Backspace)"
+        : "No save game found to delete.",
+      type: "system",
+    });
+    e.preventDefault();
+    return;
+  }
 
   if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
   if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }

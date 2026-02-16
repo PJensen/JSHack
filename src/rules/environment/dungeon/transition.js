@@ -92,6 +92,8 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   const cachedFloor = _floorEntityCache.get(newDepth);
   if (cachedFloor?.snapshot?.v === 1 && cachedFloor.snapshot.comps) {
+    /** @type {number[]} */
+    const createdIds = [];
     try {
       /** @type {Map<number, number>} */
       const oldToNew = new Map();
@@ -104,6 +106,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
         remapId(oldId) {
           const id = world.create();
           oldToNew.set(oldId, id);
+          createdIds.push(id);
           return id;
         },
       });
@@ -123,8 +126,19 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
         const eid = oldToNew.get(Number(oldId) | 0) || 0;
         if (eid > 0 && world.isAlive(eid)) restoredIds.push(eid);
       }
-      if (restoredIds.length > 0) entityIds = restoredIds;
+      if (restoredIds.length <= 0) throw new Error('restored floor is empty');
+
+      const hasStairAnchor = restoredIds.some((eid) => {
+        const ni = world.get(eid, NamedIdentity);
+        return ni?.identity === 'stair_up' || ni?.identity === 'stair_down';
+      });
+      if (!hasStairAnchor) throw new Error('restored floor missing stair anchor');
+
+      entityIds = restoredIds;
     } catch {
+      for (const eid of createdIds) {
+        try { world.destroy(eid); } catch {}
+      }
       entityIds = generatedEntityIds;
     }
   }

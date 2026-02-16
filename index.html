@@ -182,6 +182,15 @@
 			const bootQueue = [];
 
 			function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+			function hasValidFloorOverride() {
+				try {
+					const params = new URLSearchParams(window.location.search || '');
+					const raw = params.get('floor');
+					if (raw == null) return false;
+					const value = Number.parseInt(String(raw), 10);
+					return Number.isFinite(value) && value >= 0;
+				} catch { return false; }
+			}
 			function hasSavegame() {
 				try { return !!localStorage.getItem(saveKey); } catch { return false; }
 			}
@@ -240,7 +249,7 @@
 				if (!bootQueueRunning && bootQueue.length === 0) hideBootLoader();
 			};
 
-			if (hasSavegame()) bootLabel.textContent = 'Loading from Save';
+			if (hasSavegame() && !hasValidFloorOverride()) bootLabel.textContent = 'Loading from Save';
 			renderBoot();
 
 			const hash = new Date().getTime().toString(16);
