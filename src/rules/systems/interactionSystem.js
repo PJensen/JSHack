@@ -120,12 +120,12 @@ export function InteractionSystem(world, actor, targetId) {
                 const node = world.get(targetId, HarvestNode);
                 if (!node) break;
 
-                if (!node.ready || node.turnsUntilReady > 0) {
+                if (!node.ready) {
                     world.emit?.("harvest:empty", {
                         actor,
                         targetId,
                         kind: node.kind,
-                        turnsUntilReady: node.turnsUntilReady | 0,
+                        regrowCountdown: node.regrowCountdown | 0,
                     });
                     break;
                 }
@@ -154,7 +154,7 @@ export function InteractionSystem(world, actor, targetId) {
                     kind,
                     ready: false,
                     regrowTurns: node.regrowTurns,
-                    turnsUntilReady: node.regrowTurns,
+                    regrowCountdown: node.regrowTurns,
                 });
                 world.emit?.("harvest:picked", {
                     actor,

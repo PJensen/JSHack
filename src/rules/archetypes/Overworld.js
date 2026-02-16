@@ -41,7 +41,7 @@ export const BerryBush = defineArchetype(
   [NamedIdentity, { name: "Berry Bush", identity: "berry_bush" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "berries", ready: true, regrowTurns: 28, turnsUntilReady: 0 }],
+  [HarvestNode, { kind: "berries", ready: true, regrowTurns: 28, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "berries" } }],
 );
 
@@ -51,6 +51,6 @@ export const HerbPatch = defineArchetype(
   [NamedIdentity, { name: "Herb Patch", identity: "herb_patch" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "herbs", ready: true, regrowTurns: 20, turnsUntilReady: 0 }],
+  [HarvestNode, { kind: "herbs", ready: true, regrowTurns: 20, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "herbs" } }],
 );

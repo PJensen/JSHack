@@ -146,7 +146,7 @@ Deno.test("harvest node creates food and enters regrow cooldown", () => {
 
   const node = world.create();
   world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'berries' } });
-  world.add(node, HarvestNode, { kind: 'berries', ready: true, regrowTurns: 9, turnsUntilReady: 0 });
+  world.add(node, HarvestNode, { kind: 'berries', ready: true, regrowTurns: 9, regrowCountdown: 0 });
   world.add(node, Position, { x: 1, y: 1 });
 
   const events = [];
@@ -158,7 +158,7 @@ Deno.test("harvest node creates food and enters regrow cooldown", () => {
   assert(events.length === 1, 'harvest should emit picked event');
   const hn = world.get(node, HarvestNode);
   assert(hn.ready === false, 'node should become unready');
-  assert(hn.turnsUntilReady === 9, 'node should start regrow countdown');
+  assert(hn.regrowCountdown === 9, 'node should start regrow countdown');
 
   const inv = world.get(actor, Inventory);
   assert(inv.items.length >= 1, 'actor should receive harvested item');
@@ -174,7 +174,7 @@ Deno.test("harvest node reports empty while regrowing", () => {
   const actor = world.create();
   const node = world.create();
   world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'herbs' } });
-  world.add(node, HarvestNode, { kind: 'herbs', ready: false, regrowTurns: 7, turnsUntilReady: 5 });
+  world.add(node, HarvestNode, { kind: 'herbs', ready: false, regrowTurns: 7, regrowCountdown: 5 });
 
   const events = [];
   world.on('harvest:empty', (e) => events.push(e));
@@ -183,7 +183,7 @@ Deno.test("harvest node reports empty while regrowing", () => {
   interactionSystem(world);
 
   assert(events.length === 1, 'should emit empty harvest event');
-  assert(events[0].turnsUntilReady === 5, 'should include remaining regrow time');
+  assert(events[0].regrowCountdown === 5, 'should include remaining regrow time');
 });
 
 Deno.test("restAtBed restores hp, mana, and stamina", () => {
