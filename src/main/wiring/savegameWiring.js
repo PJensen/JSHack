@@ -2,9 +2,9 @@ import { serializeWorld } from "../../lib/ecs-js/serialization.js";
 import { getIdentifiedSnapshot } from "../../rules/data/identification.js";
 import { getGemPricingSnapshot } from "../../rules/data/gemPricing.js";
 import { getSavegameRegistryNames } from "./savegameSerializationRegistry.js";
+import { SAVEGAME_KEY } from "./savegameLoad.js";
 
 const INSTALLED = Symbol.for("jshack:main:savegameWiring:installed");
-const SAVE_KEY = "jshack:savegame:v1";
 
 /**
  * Minimal autosave wiring: persist a full world snapshot when the player rests at bed.
@@ -39,7 +39,7 @@ export function installSavegameWiring({ world, playerEntity, getActiveSpellId, l
     };
 
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      localStorage.setItem(SAVEGAME_KEY, JSON.stringify(payload));
       if (typeof log === "function") log("Game saved.");
     } catch {
       if (typeof log === "function") log("Save failed.");

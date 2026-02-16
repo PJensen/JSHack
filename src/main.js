@@ -4,7 +4,6 @@
 // ---- Imports ---------------------------------------------------------------
 // rules/ (app owns lifecycle only; no display code here)
 import { World } from "./lib/ecs-js/index.js";            // ECS World
-import { applySnapshot } from "./lib/ecs-js/serialization.js";
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 
@@ -33,7 +32,14 @@ import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
-import { buildSavegameSerializationRegistry } from "./main/wiring/savegameSerializationRegistry.js";
+import {
+  hasSavegame,
+  readSavegamePayload,
+  clearSavegamePayload,
+  readSavedDepth,
+  readSavedSeed,
+  restoreSnapshotFromSavegame,
+} from "./main/wiring/savegameLoad.js";
 import { loadGameData } from "./main/bootstrap/loadGameData.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
@@ -103,7 +109,6 @@ enableInputLockdown({ canvas });
 const runtimeConfig = readRuntimeConfig();
 const PERF = runtimeConfig.perf;
 const chosenDeityId = runtimeConfig.chosenDeityId;
-const SAVEGAME_KEY = "jshack:savegame:v1";
 const BOOT_STATIC_UNITS = 9;
 let _bootDoneUnits = 0;
 let _bootTotalUnits = BOOT_STATIC_UNITS;
@@ -113,75 +118,6 @@ function hasValidFloorOverride() {
   if (raw == null) return false;
   const value = Number.parseInt(String(raw), 10);
   return Number.isFinite(value) && value >= 0;
-}
-
-function hasSavegame() {
-  try {
-    return !!localStorage.getItem(SAVEGAME_KEY);
-  } catch {
-    return false;
-  }
-}
-
-function readSavegamePayload() {
-  try {
-    const raw = localStorage.getItem(SAVEGAME_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.v !== 1 || !parsed.world || parsed.world.v !== 1 || !parsed.world.comps) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function clearSavegamePayload() {
-  try { localStorage.removeItem(SAVEGAME_KEY); } catch {}
-}
-
-/**
- * Validate basic save invariants before mutating world state.
- * Requires exactly one player and a valid position for that player.
- * @param {any} save
- * @returns {{ ok: boolean, reason?: string, playerId?: number }}
- */
-function validateSaveSnapshot(save) {
-  const comps = save?.world?.comps;
-  if (!comps || typeof comps !== "object") return { ok: false, reason: "missing comps" };
-  const playerRows = Array.isArray(comps.Player) ? comps.Player : [];
-  if (playerRows.length !== 1) return { ok: false, reason: `expected 1 player, found ${playerRows.length}` };
-  const playerId = Number(playerRows[0]?.[0] || 0) | 0;
-  if (!(playerId > 0)) return { ok: false, reason: "invalid player id" };
-  const posRows = Array.isArray(comps.Position) ? comps.Position : [];
-  const posRow = posRows.find((row) => (Number(row?.[0] || 0) | 0) === playerId);
-  const pos = posRow?.[1];
-  if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
-    return { ok: false, reason: "player position missing/invalid" };
-  }
-  return { ok: true, playerId };
-}
-
-/**
- * @param {any} save
- * @returns {number|null}
- */
-function readSavedDepth(save) {
-  const rows = save?.world?.comps?.DungeonState;
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  const ds = rows[0]?.[1];
-  const depth = Number(ds?.currentDepth);
-  if (!Number.isFinite(depth) || depth < 0) return null;
-  return depth | 0;
-}
-
-/**
- * @param {any} save
- * @returns {number|null}
- */
-function readSavedSeed(save) {
-  const seed = Number(save?.world?.meta?.seed);
-  if (!Number.isFinite(seed)) return null;
-  return (seed >>> 0);
 }
 
 const _hasFloorOverride = hasValidFloorOverride();
@@ -413,10 +349,7 @@ let _savegameLoaded = false;
 if (_pendingSavegame) {
   updateBootProgress("Applying save snapshot...", _bootDoneUnits);
   try {
-    const validity = validateSaveSnapshot(_pendingSavegame);
-    if (!validity.ok) throw new Error(`invalid save: ${validity.reason}`);
-    const reg = buildSavegameSerializationRegistry(world);
-    applySnapshot(world, _pendingSavegame.world, reg, { mode: "replace" });
+    restoreSnapshotFromSavegame(world, _pendingSavegame);
     const savedSpell = _pendingSavegame?.app?.activeSpellId;
     if (typeof savedSpell === "string" && savedSpell.length > 0) _activeSpellId = savedSpell;
     _savegameLoaded = true;
