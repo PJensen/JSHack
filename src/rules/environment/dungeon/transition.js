@@ -113,10 +113,6 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
       world.time = prevTime;
       world.frame = prevFrame;
 
-      for (const eid of generatedEntityIds) {
-        try { world.destroy(eid); } catch {}
-      }
-
       const order = Array.isArray(cachedFloor.order) && cachedFloor.order.length
         ? cachedFloor.order
         : (Array.isArray(cachedFloor.snapshot.alive) ? cachedFloor.snapshot.alive : []);
@@ -132,6 +128,10 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
         return ni?.identity === 'stair_up' || ni?.identity === 'stair_down';
       });
       if (!hasStairAnchor) throw new Error('restored floor missing stair anchor');
+
+      for (const eid of generatedEntityIds) {
+        try { world.destroy(eid); } catch {}
+      }
 
       entityIds = restoredIds;
     } catch {
