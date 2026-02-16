@@ -1,7 +1,9 @@
 import { Equipment } from "../../rules/components/Equipment.js";
+import { DungeonState } from "../../rules/components/DungeonState.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Position } from "../../rules/components/Position.js";
 import { applySnapshot, serializeEntities } from "../../lib/ecs-js/serialization.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
 import {
@@ -10,8 +12,9 @@ import {
 } from "../../rules/utils/inventoryStacking.js";
 
 const INSTALLED = Symbol.for("jshack:main:chestWiring:installed");
-const STASH_KEY = "jshack:home:stash:v2";
-const LEGACY_STASH_KEY = "jshack:home:stash:v1";
+const CHESTS_KEY = "jshack:chests:v1";
+const LEGACY_STASH_KEY_V2 = "jshack:home:stash:v2";
+const LEGACY_STASH_KEY_V1 = "jshack:home:stash:v1";
 
 /**
  * @param {{
@@ -26,10 +29,88 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
   if (world[INSTALLED]) return;
   world[INSTALLED] = true;
 
-  /** @param {number} chestId */
-  function isStashChest(chestId) {
+  function currentDepth() {
+    for (const [, ds] of world.query(DungeonState)) {
+      return Number(ds?.currentDepth || 0) | 0;
+    }
+    return 0;
+  }
+
+  /**
+   * @param {number} chestId
+   * @returns {string|null}
+   */
+  function chestStorageKey(chestId) {
+    const pos = world.get(chestId, Position);
+    if (!pos) return null;
+    return `${currentDepth()}:${pos.x},${pos.y}`;
+  }
+
+  function readChestStore() {
+    try {
+      const raw = localStorage.getItem(CHESTS_KEY);
+      if (!raw) return { v: 1, chests: {} };
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.v !== 1 || typeof parsed.chests !== "object" || !parsed.chests) {
+        return { v: 1, chests: {} };
+      }
+      return parsed;
+    } catch {
+      return { v: 1, chests: {} };
+    }
+  }
+
+  /**
+   * @param {{ v:1, chests:Record<string, any> }} store
+   */
+  function writeChestStore(store) {
+    try { localStorage.setItem(CHESTS_KEY, JSON.stringify(store)); } catch {}
+  }
+
+  /**
+   * @param {number} chestId
+   * @returns {any|null}
+   */
+  function readLegacyStashPayload(chestId) {
     const ni = world.get(chestId, NamedIdentity);
-    return !!ni && ni.name === "Stash Chest";
+    if (!ni || ni.name !== "Stash Chest") return null;
+    let raw = null;
+    try {
+      raw = localStorage.getItem(LEGACY_STASH_KEY_V2);
+      if (!raw) raw = localStorage.getItem(LEGACY_STASH_KEY_V1);
+    } catch {}
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  /**
+   * @param {number} chestId
+   * @returns {any|null}
+   */
+  function getChestPayload(chestId) {
+    const key = chestStorageKey(chestId);
+    if (!key) return null;
+    const store = readChestStore();
+    if (store.chests[key]) return store.chests[key];
+
+    // One-way migration path from previous dedicated stash key.
+    const legacy = readLegacyStashPayload(chestId);
+    if (!legacy) return null;
+    store.chests[key] = legacy;
+    writeChestStore(store);
+    return legacy;
+  }
+
+  /**
+   * @param {number} chestId
+   * @param {any} payload
+   */
+  function setChestPayload(chestId, payload) {
+    const key = chestStorageKey(chestId);
+    if (!key) return;
+    const store = readChestStore();
+    store.chests[key] = payload;
+    writeChestStore(store);
   }
 
   /**
@@ -50,46 +131,19 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
    * @param {number} chestId
    * @returns {{ v:2, order:number[], snapshot:any }}
    */
-  function serializeStashSnapshot(chestId) {
+  function serializeChestSnapshot(chestId) {
     const inv = world.get(chestId, Inventory);
     const order = (inv?.items || []).filter((id) => Number.isInteger(id) && id > 0 && world.isAlive(id));
     return {
       v: 2,
       order,
-      snapshot: serializeEntities(world, order, { note: "home_stash" }),
+      snapshot: serializeEntities(world, order, { note: "chest_inventory" }),
     };
   }
 
-  /**
-   * @param {number} chestId
-   * @returns {Array<{identity:string,count:number,affixes:string[]}>}
-   */
-  function serializeChest(chestId) {
-    const inv = world.get(chestId, Inventory);
-    if (!inv || !Array.isArray(inv.items)) return [];
-    /** @type {Array<{identity:string,count:number,affixes:string[]}>} */
-    const rows = [];
-    for (const id of inv.items) {
-      const ni = world.get(id, NamedIdentity);
-      const info = world.get(id, ItemInfo);
-      const identity = String(ni?.identity || "");
-      if (!identity || !info) continue;
-      rows.push({
-        identity,
-        count: Math.max(1, Number(info.count || 1) | 0),
-        affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
-      });
-    }
-    return rows;
-  }
-
   /** @param {number} chestId */
-  function persistStash(chestId) {
-    if (!isStashChest(chestId)) return;
-    try {
-      const payload = serializeStashSnapshot(chestId);
-      localStorage.setItem(STASH_KEY, JSON.stringify(payload));
-    } catch {}
+  function persistChest(chestId) {
+    setChestPayload(chestId, serializeChestSnapshot(chestId));
   }
 
   /**
@@ -134,12 +188,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     for (const oldId of desiredOrder) {
       const itemId = oldToNew.get(Number(oldId) | 0) || 0;
       if (!(itemId > 0) || !world.isAlive(itemId)) continue;
-      if (!world.get(itemId, ItemInfo)) continue;
-      addItemEntityToInventory(world, inv, itemId, {
-        removePosition: true,
-        forceOwnStack: true,
-        allowUnpaidStack: true,
-      });
+      if (!inv.items.includes(itemId)) inv.items.push(itemId);
     }
     return true;
   }
@@ -148,29 +197,20 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
    * @param {number} chestId
    * @param {{ forceFromStorage?: boolean }} [opts]
    */
-  function hydrateStash(chestId, opts = {}) {
-    if (!isStashChest(chestId)) return;
+  function hydrateChest(chestId, opts = {}) {
     const inv = world.get(chestId, Inventory);
     if (!inv || !Array.isArray(inv.items)) return;
     const forceFromStorage = opts.forceFromStorage === true;
     if (!forceFromStorage && inv.items.length > 0) return; // already hydrated in current session
 
-    let raw = null;
-    try {
-      raw = localStorage.getItem(STASH_KEY);
-      if (!raw) raw = localStorage.getItem(LEGACY_STASH_KEY);
-    } catch {}
-    if (!raw) return;
-
     /** @type {{ v?:number, order?:number[], snapshot?:any, items?:Array<{identity?:string,count?:number,affixes?:string[]}> }|null} */
-    let parsed = null;
-    try { parsed = JSON.parse(raw); } catch { parsed = null; }
+    const parsed = getChestPayload(chestId);
     if (!parsed) return;
 
     if (forceFromStorage) inv.items.length = 0;
 
     if (hydrateSnapshotPayload(chestId, parsed)) {
-      persistStash(chestId);
+      persistChest(chestId);
       return;
     }
 
@@ -185,7 +225,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
       if (!(itemId > 0)) continue;
       addItemEntityToInventory(world, inv, itemId, { removePosition: false, forceOwnStack: true, allowUnpaidStack: true });
     }
-    persistStash(chestId);
+    persistChest(chestId);
   }
 
   function buildChestItemDetail(id) {
@@ -247,10 +287,15 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
   }
 
   world.on("chest:open", ({ targetId }) => {
-    hydrateStash(targetId, { forceFromStorage: true });
+    const chestId = Number(targetId || 0) | 0;
+    if (!(chestId > 0)) return;
     log("You open the chest.");
-    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId: targetId } })); } catch {}
-    dispatchChestData(targetId);
+    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId } })); } catch {}
+    // Run hydrate/render after tick flush so deferred ECS writes are visible.
+    setTimeout(() => {
+      hydrateChest(chestId, { forceFromStorage: true });
+      dispatchChestData(chestId);
+    }, 0);
   });
 
   addEventListener("ui:requestChestTake", (ev) => {
@@ -283,7 +328,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     }
 
     log(`You take ${bracketizeName(itemName)} from the chest.`);
-    persistStash(chestId);
+    persistChest(chestId);
 
     dispatchChestData(chestId);
     refreshInventoryUi();
@@ -337,7 +382,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
     addItemEntityToInventory(world, chestInv, itemId, { allowUnpaidStack: true });
     log(`You put ${bracketizeName(itemName)} in the chest.`);
-    persistStash(chestId);
+    persistChest(chestId);
 
     dispatchChestData(chestId);
     refreshInventoryUi();
