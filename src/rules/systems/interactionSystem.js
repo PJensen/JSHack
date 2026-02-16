@@ -13,7 +13,6 @@ import { Stamina } from "../components/Stamina.js";
 import TombstoneComponent from "../components/Tombstone.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { WildBerries, WildHerbs } from "../archetypes/Food.js";
-import { addItemEntityToInventory } from "../utils/inventoryStacking.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 
@@ -141,8 +140,11 @@ export function InteractionSystem(world, actor, targetId) {
                 let resultItemId = itemId;
                 const inv = world.get(actor, Inventory);
                 if (inv) {
-                    const moved = addItemEntityToInventory(world, inv, itemId);
-                    if (moved.mode === "stacked" && moved.stackedIntoId > 0) resultItemId = moved.stackedIntoId;
+                    // Components are deferred during tick, so
+                    // addItemEntityToInventory can't see ItemInfo yet.
+                    // Insert directly; coalesceInventoryStacks handles
+                    // stacking on the next UI refresh.
+                    if (!inv.items.includes(itemId)) inv.items.push(itemId);
                 } else {
                     const pos = world.get(actor, Position);
                     if (pos) world.add(itemId, Position, { x: pos.x, y: pos.y });
