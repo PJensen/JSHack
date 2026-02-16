@@ -10,6 +10,9 @@ const AFFIX_FIERCE = "affix:fierce";
 const AFFIX_GUARD = "affix:guard1";
 const AFFIX_LIFE = "affix:life1";
 const AFFIX_ATTUNED = "affix:attuned1";
+const AFFIX_FIRE_WARD = "affix:fireWard1";
+const AFFIX_POISON_WARD = "affix:poisonWard1";
+const AFFIX_KINETIC_WARD = "affix:kineticWard1";
 
 registerScript(AFFIX_THORNS, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
@@ -71,6 +74,24 @@ registerScript(AFFIX_ATTUNED, {
   },
 });
 
+registerScript(AFFIX_FIRE_WARD, {
+  [ScriptVerb.AffixPassive]: (_world, ctx) => {
+    ctx.addBonus("fireResist", 0.15);
+  },
+});
+
+registerScript(AFFIX_POISON_WARD, {
+  [ScriptVerb.AffixPassive]: (_world, ctx) => {
+    ctx.addBonus("poisonResist", 0.15);
+  },
+});
+
+registerScript(AFFIX_KINETIC_WARD, {
+  [ScriptVerb.AffixPassive]: (_world, ctx) => {
+    ctx.addBonus("kineticDR", 2);
+  },
+});
+
 export const AFFIX_DEFS = {
   thorns1: { name: "Thorns I", slots: ["armor"], triggers: ["onHit"], script: AFFIX_THORNS, weight: 30 },
   vamp1: { name: "Vampiric I", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_VAMP, weight: 20 },
@@ -78,6 +99,9 @@ export const AFFIX_DEFS = {
   guard1: { name: "Guarded", slots: ["armor"], passive: AFFIX_GUARD, triggers: [], weight: 25 },
   life1: { name: "Healthy", slots: ["armor", "ring"], passive: AFFIX_LIFE, triggers: [], weight: 22 },
   attuned1: { name: "Attuned", slots: ["ring"], passive: AFFIX_ATTUNED, triggers: [], weight: 20 },
+  fireWard1: { name: "Flame Ward", slots: ["armor", "shield"], passive: AFFIX_FIRE_WARD, triggers: [], weight: 18 },
+  poisonWard1: { name: "Venom Ward", slots: ["armor", "ring"], passive: AFFIX_POISON_WARD, triggers: [], weight: 18 },
+  kineticWard1: { name: "Fortified", slots: ["armor", "shield"], passive: AFFIX_KINETIC_WARD, triggers: [], weight: 15 },
 };
 
 export function listAffixes() { return Object.entries(AFFIX_DEFS).map(([id, rec]) => ({ id, ...rec })); }

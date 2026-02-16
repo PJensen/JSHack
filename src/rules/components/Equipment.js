@@ -13,6 +13,17 @@ export const Equipment = defineComponent('Equipment', {
   critChanceDerived: 0,
   critMultDerived: 0,
   manaRegenDerived: 0,
+  staminaRegenDerived: 0,
+  maxStaminaDerived: 0,
+  kineticDRDerived: 0,
+  fireResistDerived: 0,
+  poisonResistDerived: 0,
+  acidResistDerived: 0,
+  radiationResistDerived: 0,
+  electricOhmsDerived: 0,
+  bluntResistDerived: 0,
+  slashResistDerived: 0,
+  pierceResistDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });

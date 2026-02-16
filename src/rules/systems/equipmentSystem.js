@@ -16,7 +16,16 @@ function emptyDerived() {
     critMultDerived: 0,
     manaRegenDerived: 0,
     staminaRegenDerived: 0,
-    maxStaminaDerived: 0
+    maxStaminaDerived: 0,
+    kineticDRDerived: 0,
+    fireResistDerived: 0,
+    poisonResistDerived: 0,
+    acidResistDerived: 0,
+    radiationResistDerived: 0,
+    electricOhmsDerived: 0,
+    bluntResistDerived: 0,
+    slashResistDerived: 0,
+    pierceResistDerived: 0,
   };
 }
 
@@ -30,6 +39,15 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.manaRegen)) acc.manaRegenDerived += bonuses.manaRegen;
   if (Number.isFinite(bonuses.staminaRegen)) acc.staminaRegenDerived += bonuses.staminaRegen;
   if (Number.isFinite(bonuses.maxStamina)) acc.maxStaminaDerived += bonuses.maxStamina;
+  if (Number.isFinite(bonuses.kineticDR)) acc.kineticDRDerived += bonuses.kineticDR;
+  if (Number.isFinite(bonuses.fireResist)) acc.fireResistDerived += bonuses.fireResist;
+  if (Number.isFinite(bonuses.poisonResist)) acc.poisonResistDerived += bonuses.poisonResist;
+  if (Number.isFinite(bonuses.acidResist)) acc.acidResistDerived += bonuses.acidResist;
+  if (Number.isFinite(bonuses.radiationResist)) acc.radiationResistDerived += bonuses.radiationResist;
+  if (Number.isFinite(bonuses.electricOhms)) acc.electricOhmsDerived += bonuses.electricOhms;
+  if (Number.isFinite(bonuses.bluntResist)) acc.bluntResistDerived += bonuses.bluntResist;
+  if (Number.isFinite(bonuses.slashResist)) acc.slashResistDerived += bonuses.slashResist;
+  if (Number.isFinite(bonuses.pierceResist)) acc.pierceResistDerived += bonuses.pierceResist;
 }
 
 function runAffixPassives(world, ctx, affixIds) {
@@ -54,7 +72,26 @@ export function equipmentSystem(world) {
       applyBonuses(d, info.bonuses);
       // passive affixes
       const ctx = {
-        addBonus: (k, v) => { if (k in d) d[k] += v; else if (k === 'attack') d.attackDerived += v; else if (k === 'defense') d.defenseDerived += v; else if (k === 'maxHp') d.maxHpDerived += v; else if (k === 'critChance') d.critChanceDerived += v; else if (k === 'critMult') d.critMultDerived += v; else if (k === 'manaRegen') d.manaRegenDerived += v; else if (k === 'staminaRegen') d.staminaRegenDerived += v; else if (k === 'maxStamina') d.maxStaminaDerived += v; },
+        addBonus: (k, v) => {
+          if (k in d) d[k] += v;
+          else if (k === 'attack') d.attackDerived += v;
+          else if (k === 'defense') d.defenseDerived += v;
+          else if (k === 'maxHp') d.maxHpDerived += v;
+          else if (k === 'critChance') d.critChanceDerived += v;
+          else if (k === 'critMult') d.critMultDerived += v;
+          else if (k === 'manaRegen') d.manaRegenDerived += v;
+          else if (k === 'staminaRegen') d.staminaRegenDerived += v;
+          else if (k === 'maxStamina') d.maxStaminaDerived += v;
+          else if (k === 'kineticDR') d.kineticDRDerived += v;
+          else if (k === 'fireResist') d.fireResistDerived += v;
+          else if (k === 'poisonResist') d.poisonResistDerived += v;
+          else if (k === 'acidResist') d.acidResistDerived += v;
+          else if (k === 'radiationResist') d.radiationResistDerived += v;
+          else if (k === 'electricOhms') d.electricOhmsDerived += v;
+          else if (k === 'bluntResist') d.bluntResistDerived += v;
+          else if (k === 'slashResist') d.slashResistDerived += v;
+          else if (k === 'pierceResist') d.pierceResistDerived += v;
+        },
         entityId: id,
         itemId,
         world
@@ -71,5 +108,14 @@ export function equipmentSystem(world) {
     eq.manaRegenDerived = d.manaRegenDerived;
     eq.staminaRegenDerived = d.staminaRegenDerived;
     eq.maxStaminaDerived = d.maxStaminaDerived;
+    eq.kineticDRDerived = d.kineticDRDerived;
+    eq.fireResistDerived = d.fireResistDerived;
+    eq.poisonResistDerived = d.poisonResistDerived;
+    eq.acidResistDerived = d.acidResistDerived;
+    eq.radiationResistDerived = d.radiationResistDerived;
+    eq.electricOhmsDerived = d.electricOhmsDerived;
+    eq.bluntResistDerived = d.bluntResistDerived;
+    eq.slashResistDerived = d.slashResistDerived;
+    eq.pierceResistDerived = d.pierceResistDerived;
   }
 }
