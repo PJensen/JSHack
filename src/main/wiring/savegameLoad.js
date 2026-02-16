@@ -1,5 +1,7 @@
 import { applySnapshot } from "../../lib/ecs-js/serialization.js";
 import { buildSavegameSerializationRegistry } from "./savegameSerializationRegistry.js";
+import { clearSpatialIndex } from "../../rules/utils/spatialIndex.js";
+import { invalidateTileQueryCache } from "../../rules/utils/tileQueryCache.js";
 
 export const SAVEGAME_KEY = "jshack:savegame:v1";
 
@@ -110,6 +112,15 @@ export function restoreSnapshotFromSavegame(world, save) {
   const validity = validateSaveSnapshot(save);
   if (!validity.ok) throw new Error(`invalid save: ${validity.reason}`);
   const reg = buildSavegameSerializationRegistry(world);
+  const WorldCtor = world?.constructor;
+  if (WorldCtor && typeof WorldCtor.fromSnapshot === "function") {
+    // Validate/normalize through core API (throws on malformed or unknown data).
+    // We still apply the original payload to preserve exact saved entity/component rows.
+    WorldCtor.fromSnapshot(save.world, reg, { skipUnknown: false });
+  }
+
   applySnapshot(world, save.world, reg, { mode: "replace" });
+  clearSpatialIndex(world);
+  invalidateTileQueryCache(world);
   return { playerId: validity.playerId || 0 };
 }
