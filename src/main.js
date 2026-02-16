@@ -128,6 +128,32 @@ function readSavegamePayload() {
   }
 }
 
+function clearSavegamePayload() {
+  try { localStorage.removeItem(SAVEGAME_KEY); } catch {}
+}
+
+/**
+ * Validate basic save invariants before mutating world state.
+ * Requires exactly one player and a valid position for that player.
+ * @param {any} save
+ * @returns {{ ok: boolean, reason?: string, playerId?: number }}
+ */
+function validateSaveSnapshot(save) {
+  const comps = save?.world?.comps;
+  if (!comps || typeof comps !== "object") return { ok: false, reason: "missing comps" };
+  const playerRows = Array.isArray(comps.Player) ? comps.Player : [];
+  if (playerRows.length !== 1) return { ok: false, reason: `expected 1 player, found ${playerRows.length}` };
+  const playerId = Number(playerRows[0]?.[0] || 0) | 0;
+  if (!(playerId > 0)) return { ok: false, reason: "invalid player id" };
+  const posRows = Array.isArray(comps.Position) ? comps.Position : [];
+  const posRow = posRows.find((row) => (Number(row?.[0] || 0) | 0) === playerId);
+  const pos = posRow?.[1];
+  if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+    return { ok: false, reason: "player position missing/invalid" };
+  }
+  return { ok: true, playerId };
+}
+
 /**
  * @param {any} save
  * @returns {number|null}
@@ -377,6 +403,8 @@ let _savegameLoaded = false;
 if (_pendingSavegame) {
   updateBootProgress("Applying save snapshot...", _bootDoneUnits);
   try {
+    const validity = validateSaveSnapshot(_pendingSavegame);
+    if (!validity.ok) throw new Error(`invalid save: ${validity.reason}`);
     const reg = buildSavegameSerializationRegistry(world);
     applySnapshot(world, _pendingSavegame.world, reg, { mode: "replace" });
     const savedSpell = _pendingSavegame?.app?.activeSpellId;
@@ -385,9 +413,12 @@ if (_pendingSavegame) {
     updateBootProgress("Loaded save snapshot", _bootDoneUnits);
   } catch (err) {
     console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
+    clearSavegamePayload();
+    _activeSpellId = null;
     resetIdentification();
     identify('stone_touchstone');
     initGemPricing(createRng(world.seed ^ 0x6E45));
+    updateBootProgress("Save was invalid; starting new run", _bootDoneUnits);
   }
 }
 
