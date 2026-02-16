@@ -85,40 +85,64 @@ export function resolveResistance(world, targetId, rawAmount, type) {
   const resist = world.get(targetId, Resistances);
   if (!resist) return rawAmount;
 
+  const eq = world.get(targetId, Equipment);
+
   switch (type) {
     case 'electric':
     case 'plasma': {
-      const rMult = electricMultiplier(resist);
+      const ohmBonus = Number(eq?.electricOhmsDerived ?? 0);
+      const baseOhms = resist?.electric?.ohms;
+      const effectiveOhms = baseOhms === Infinity ? Infinity
+        : (Number.isFinite(baseOhms) ? baseOhms + ohmBonus : ohmBonus);
+      const rMult = electricMultiplier({ electric: { ohms: effectiveOhms } });
       if (rMult <= 0) return 0;
       const gMult = equippedConductivityMultiplier(world, targetId);
       return Math.max(0, Math.floor(rawAmount * rMult * gMult));
     }
     case 'blunt': {
-      const afterDR = Math.max(0, rawAmount - (resist.kinetic?.DR || 0));
-      return Math.max(0, Math.floor(afterDR * (resist.kinetic?.bluntMult ?? 1.0)));
+      const drBonus = Number(eq?.kineticDRDerived ?? 0);
+      const multBonus = Number(eq?.bluntResistDerived ?? 0);
+      const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
+      return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'slash': {
-      const afterDR = Math.max(0, rawAmount - (resist.kinetic?.DR || 0));
-      return Math.max(0, Math.floor(afterDR * (resist.kinetic?.slashMult ?? 1.0)));
+      const drBonus = Number(eq?.kineticDRDerived ?? 0);
+      const multBonus = Number(eq?.slashResistDerived ?? 0);
+      const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
+      return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'pierce': {
-      const afterDR = Math.max(0, rawAmount - (resist.kinetic?.DR || 0));
-      return Math.max(0, Math.floor(afterDR * (resist.kinetic?.pierceMult ?? 1.0)));
+      const drBonus = Number(eq?.kineticDRDerived ?? 0);
+      const multBonus = Number(eq?.pierceResistDerived ?? 0);
+      const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
+      return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'physical': {
-      return Math.max(0, rawAmount - (resist.kinetic?.DR || 0));
+      const drBonus = Number(eq?.kineticDRDerived ?? 0);
+      return Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
     }
     case 'fire': {
-      return Math.max(0, Math.floor(rawAmount * (resist.thermal?.burnMult ?? 1.0)));
+      const bonus = Number(eq?.fireResistDerived ?? 0);
+      const effectiveMult = Math.max(0, (resist.thermal?.burnMult ?? 1.0) - bonus);
+      return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'poison': {
-      return Math.max(0, Math.floor(rawAmount * (resist.chemical?.toxMult ?? 1.0)));
+      const bonus = Number(eq?.poisonResistDerived ?? 0);
+      const effectiveMult = Math.max(0, (resist.chemical?.toxMult ?? 1.0) - bonus);
+      return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'acid': {
-      return Math.max(0, Math.floor(rawAmount * (resist.chemical?.acidMult ?? 1.0)));
+      const bonus = Number(eq?.acidResistDerived ?? 0);
+      const effectiveMult = Math.max(0, (resist.chemical?.acidMult ?? 1.0) - bonus);
+      return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'radiation': {
-      return Math.max(0, Math.floor(rawAmount * (resist.radiation?.gamma ?? 1.0)));
+      const bonus = Number(eq?.radiationResistDerived ?? 0);
+      const effectiveMult = Math.max(0, (resist.radiation?.gamma ?? 1.0) - bonus);
+      return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     default:
       return rawAmount;
