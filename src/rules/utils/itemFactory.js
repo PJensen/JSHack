@@ -9,7 +9,7 @@ import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
 import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
-import { Ration, IronRation } from '../archetypes/Food.js';
+import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 
 /**
  * Centralized item creation registry.
@@ -22,6 +22,8 @@ const SIMPLE_ITEM_ARCHETYPES = {
   'ammo_fire_arrows': FireArrowsStack,
   'food_ration': Ration,
   'food_iron_ration': IronRation,
+  'food_wild_berries': WildBerries,
+  'food_wild_herbs': WildHerbs,
   'scroll_mapping': ScrollOfMapping,
 };
 
@@ -96,5 +98,5 @@ export function isValidItemId(itemId) {
 export function listAllItemIds() {
   const simpleIds = Object.keys(SIMPLE_ITEM_ARCHETYPES);
   const catalogIds = Object.keys(ITEM_CATALOG || {});
-  return [...simpleIds, ...catalogIds];
+  return Array.from(new Set([...simpleIds, ...catalogIds]));
 }

@@ -5,6 +5,7 @@ import { createRng } from '../../../lib/ecs-js/rng.js';
 import { floorSeed } from './seed.js';
 import { CHUNK_SIZE } from './constants.js';
 import { dungeonConfig } from './dungeonConfig.js';
+import { OVERWORLD_EXTENT } from './overworld.js';
 
 /**
  * @typedef {Object} StairPlacement
@@ -32,6 +33,23 @@ import { dungeonConfig } from './dungeonConfig.js';
  * @returns {FloorPlan}
  */
 export function generateFloorPlan(worldSeed, depth) {
+  if (depth === 0) {
+    return {
+      depth,
+      seed: floorSeed(worldSeed, depth),
+      downStairs: [{
+        chunkX: 0,
+        chunkY: 0,
+        localX: Math.floor(CHUNK_SIZE * 0.75),
+        localY: Math.floor(CHUNK_SIZE * 0.5),
+      }],
+      upStairs: [],
+      extent: { ...OVERWORLD_EXTENT },
+      difficultyMult: 0,
+      theme: 'overworld',
+    };
+  }
+
   const seed = floorSeed(worldSeed, depth);
   const rng = createRng(seed);
 
@@ -45,7 +63,7 @@ export function generateFloorPlan(worldSeed, depth) {
 
   // Up stairs: 1 near origin, except on floor 1
   const upStairs = [];
-  if (depth > 1) {
+  if (depth >= 1) {
     upStairs.push({
       chunkX: 0,
       chunkY: 0,

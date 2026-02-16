@@ -53,6 +53,46 @@ export const IronRation = defineArchetype(
   [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Iron Ration", identity: "food_iron_ration" })],
 );
 
+// Gathered from berry bushes in the overworld.
+export const WildBerries = defineArchetype(
+  "WildBerries",
+  [Consumable, {
+    effectKey: 'consumable:eat',
+    effectParams: { nutrition: 120, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "A handful of sweet wild berries.",
+    weight: 0.2,
+    value: 4,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Wild Berries", identity: "food_wild_berries" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.45) }],
+);
+
+// Gathered from herb patches in the overworld.
+export const WildHerbs = defineArchetype(
+  "WildHerbs",
+  [Consumable, {
+    effectKey: 'consumable:eat',
+    effectParams: { nutrition: 70, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "Fresh herbs with a sharp, earthy bite.",
+    weight: 0.15,
+    value: 3,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Wild Herbs", identity: "food_wild_herbs" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.40) }],
+);
+
 /**
  * createCorpse — creates a corpse entity from a killed monster.
  * Called from cleanupSystem when a monster dies.

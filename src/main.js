@@ -31,6 +31,15 @@ import { installMessageWiring } from "./main/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
+import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
+import {
+  hasSavegame,
+  readSavegamePayload,
+  clearSavegamePayload,
+  readSavedDepth,
+  readSavedSeed,
+  restoreSnapshotFromSavegame,
+} from "./main/wiring/savegameLoad.js";
 import { loadGameData } from "./main/bootstrap/loadGameData.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
@@ -58,6 +67,7 @@ import { initDeity } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { Faction } from "./rules/components/Faction.js";
 import { createFrom } from "./lib/ecs-js/archetype.js";
+import { ScrollOfMapping } from "./rules/archetypes/Items.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import TombstoneComponent from "./rules/components/Tombstone.js";
@@ -80,8 +90,8 @@ import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { canUseApplyTool, listApplyTargetsForTool } from "./rules/data/applyDefs.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
-import { resetIdentification, identify } from "./rules/data/identification.js";
-import { initGemPricing, resetGemPricing } from "./rules/data/gemPricing.js";
+import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
+import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 
 // ---- Canvas & sizing -------------------------------------------------------
@@ -102,6 +112,16 @@ const chosenDeityId = runtimeConfig.chosenDeityId;
 const BOOT_STATIC_UNITS = 9;
 let _bootDoneUnits = 0;
 let _bootTotalUnits = BOOT_STATIC_UNITS;
+
+function hasValidFloorOverride() {
+  const raw = runtimeConfig?.params?.get("floor");
+  if (raw == null) return false;
+  const value = Number.parseInt(String(raw), 10);
+  return Number.isFinite(value) && value >= 0;
+}
+
+const _hasFloorOverride = hasValidFloorOverride();
+const _pendingSavegame = _hasFloorOverride ? null : readSavegamePayload();
 
 /**
  * @param {string} label
@@ -165,18 +185,27 @@ function resize() {
 }
 addEventListener("resize", resize);
 resize();
-updateBootProgress("Loading...");
+updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
 
 // ---- App wires rules/ (no display logic here) ------------------------------
-const world = new World({ seed: 0xa77a77 });
+const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xa77a77;
+const world = new World({ seed: _bootSeed });
 configureWorld(world);
 bootAdvance("Configured ECS systems");
 
 // Initialize identification & gem pricing for this game run
 resetIdentification();
-identify('stone_touchstone');
-initGemPricing(createRng(world.seed ^ 0x6E45));
-bootAdvance("Prepared run-specific item state");
+if (_pendingSavegame) {
+  restoreIdentification(_pendingSavegame.identified);
+  if (!Array.isArray(_pendingSavegame.identified)) identify('stone_touchstone');
+  restoreGemPricing(_pendingSavegame.gemPricing);
+  if (!Array.isArray(_pendingSavegame.gemPricing)) initGemPricing(createRng(world.seed ^ 0x6E45));
+  bootAdvance("Prepared saved item state");
+} else {
+  identify('stone_touchstone');
+  initGemPricing(createRng(world.seed ^ 0x6E45));
+  bootAdvance("Prepared run-specific item state");
+}
 
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
@@ -252,9 +281,29 @@ function updateActiveSpellLabel() {
 // ---- Dungeon initialization -------------------------------------------------
 import { initDungeon, generateFloorPlan } from "./rules/environment/dungeon/index.js";
 import { transitionToDepth } from "./rules/environment/dungeon/transition.js";
-import { TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from "./rules/environment/dungeon/constants.js";
+import {
+  TILE_FLOOR,
+  TILE_WALL,
+  TILE_DOOR,
+  TILE_STAIR_DOWN,
+  TILE_STAIR_UP,
+  TILE_GRASS,
+  TILE_WATER,
+  TILE_MOUNTAIN,
+  TILE_TREE,
+} from "./rules/environment/dungeon/constants.js";
 import { dungeonConfig } from "./rules/environment/dungeon/dungeonConfig.js";
-const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 'floor', [TILE_STAIR_DOWN]: 'stair_down', [TILE_STAIR_UP]: 'stair_up' };
+const _tileKindMap = {
+  [TILE_FLOOR]: 'floor',
+  [TILE_WALL]: 'wall',
+  [TILE_DOOR]: 'floor',
+  [TILE_STAIR_DOWN]: 'stair_down',
+  [TILE_STAIR_UP]: 'stair_up',
+  [TILE_GRASS]: 'grass',
+  [TILE_WATER]: 'water',
+  [TILE_MOUNTAIN]: 'mountain',
+  [TILE_TREE]: 'tree',
+};
 
 // Allow URL override: ?dungeonScale=0.3 for compact debugging floors
 {
@@ -262,9 +311,11 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
   if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
 }
 
-// Allow URL override: ?floor=6 to skip straight to a specific depth
-const _startDepth = runtimeConfig.startDepth;
-const _initialDepth = (Number.isFinite(_startDepth) && _startDepth > 0) ? _startDepth : 1;
+// Allow URL override: ?floor=0|1|... to choose start depth.
+const _startDepth = _hasFloorOverride
+  ? runtimeConfig.startDepth
+  : (readSavedDepth(_pendingSavegame) ?? runtimeConfig.startDepth);
+const _initialDepth = (Number.isFinite(_startDepth) && _startDepth >= 0) ? _startDepth : 0;
 const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth);
 const _bootChunkTotal = Math.max(
   1,
@@ -294,6 +345,26 @@ const spawnPos = initDungeon(world, {
 _bootDoneUnits = _bootDungeonBase + _bootChunkUnits;
 updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
 
+let _savegameLoaded = false;
+if (_pendingSavegame) {
+  updateBootProgress("Applying save snapshot...", _bootDoneUnits);
+  try {
+    restoreSnapshotFromSavegame(world, _pendingSavegame);
+    const savedSpell = _pendingSavegame?.app?.activeSpellId;
+    if (typeof savedSpell === "string" && savedSpell.length > 0) _activeSpellId = savedSpell;
+    _savegameLoaded = true;
+    updateBootProgress("Loaded save snapshot", _bootDoneUnits);
+  } catch (err) {
+    console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
+    clearSavegamePayload();
+    _activeSpellId = null;
+    resetIdentification();
+    identify('stone_touchstone');
+    initGemPricing(createRng(world.seed ^ 0x6E45));
+    updateBootProgress("Save was invalid; starting new run", _bootDoneUnits);
+  }
+}
+
 // Diagnostic: log all stair entities so we can confirm they exist
 {
   let stairCount = 0;
@@ -306,167 +377,173 @@ updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
   if (stairCount === 0) console.warn('[DUNGEON] WARNING: No stair entities were created!');
 }
 
-// Create player at the spawn position (center of first room in origin chunk)
-if (!playerEntity(world)) {
-  createPlayer(world, { x: spawnPos.x, y: spawnPos.y, name: "Hero" });
-}
+if (!_savegameLoaded) {
+  // Create player at the spawn position (center of first room in origin chunk)
+  if (!playerEntity(world)) {
+    createPlayer(world, { x: spawnPos.x, y: spawnPos.y, name: "Hero" });
+  }
 
-// Set player stats
-{
-  const pe = playerEntity(world);
-  if (pe) {
-    // Mana
-    world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 0.1 });
-    // 10-turn invulnerability at start
-    const ae = world.get(pe.id, ActiveEffects);
-    if (ae && Array.isArray(ae.effects)) {
-      ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
-    } else {
-      world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
-    }
-    // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
-    world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
+  // Set player stats
+  {
+    const pe = playerEntity(world);
+    if (pe) {
+      // Mana
+      world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 0.1 });
+      // 10-turn invulnerability at start
+      const ae = world.get(pe.id, ActiveEffects);
+      if (ae && Array.isArray(ae.effects)) {
+        ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
+      } else {
+        world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
+      }
+      // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
+      world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
 
-    // Starting weapon: a simple dagger, equipped
-    const inv = world.get(pe.id, Inventory);
-    const eq = world.get(pe.id, Equipment);
-    const daggerId = createItemById(world, 'dagger_quick');
-    if (inv && eq && daggerId != null) {
-      const moved = addItemEntityToInventory(world, inv, daggerId);
-      eq.weapon = moved.mode === "stacked" ? moved.stackedIntoId : daggerId;
-    }
-    // Starting pickaxe: for digging through walls
-    const pickaxeId = createItemById(world, 'iron_pickaxe');
-    if (inv && pickaxeId != null) {
-      addItemEntityToInventory(world, inv, pickaxeId);
-    }
-    // Starting touchstone: for testing gems
-    const touchstoneId = createItemById(world, 'stone_touchstone');
-    if (inv && touchstoneId != null) {
-      addItemEntityToInventory(world, inv, touchstoneId);
-    }
-    // Book of the Dead: view past deaths
-    const bookDeadId = createItemById(world, 'book_dead');
-    if (inv && bookDeadId != null) {
-      addItemEntityToInventory(world, inv, bookDeadId);
+      // Starting weapon: a simple dagger, equipped
+      const inv = world.get(pe.id, Inventory);
+      const eq = world.get(pe.id, Equipment);
+      const daggerId = createItemById(world, 'dagger_quick');
+      if (inv && eq && daggerId != null) {
+        const moved = addItemEntityToInventory(world, inv, daggerId);
+        eq.weapon = moved.mode === "stacked" ? moved.stackedIntoId : daggerId;
+      }
+      // Starting pickaxe: for digging through walls
+      const pickaxeId = createItemById(world, 'iron_pickaxe');
+      if (inv && pickaxeId != null) {
+        addItemEntityToInventory(world, inv, pickaxeId);
+      }
+      // Starting touchstone: for testing gems
+      const touchstoneId = createItemById(world, 'stone_touchstone');
+      if (inv && touchstoneId != null) {
+        addItemEntityToInventory(world, inv, touchstoneId);
+      }
+      // Book of the Dead: view past deaths
+      const bookDeadId = createItemById(world, 'book_dead');
+      if (inv && bookDeadId != null) {
+        addItemEntityToInventory(world, inv, bookDeadId);
+      }
     }
   }
-}
 
-// Spawn pet (kitty) next to the player
-{
-  const pe = playerEntity(world);
-  if (pe) {
-    const ppos = world.get(pe.id, Position);
-    const spawnTile = findNearestValidTileAround(world, ppos, {
-      maxDistance: 1,
-      exclude: [{ x: ppos.x, y: ppos.y }],
-    });
-    const petId = world.create();
-    world.add(petId, Pet);
-    world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
-    world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
-    world.add(petId, Faction, { key: "pet" });
-    world.add(petId, Owner, { ownerId: pe.id });
-    world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
-    world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
-    // Pet combat components
-    world.add(petId, Vitality, { maxHp: 30, hp: 30 });
-    world.add(petId, Equipment, {
-      attackDerived: 2,   // Base attack bonus
-      defenseDerived: 2   // Base defense (armorClass = 10 + defense = 12)
-    });
-    // Pet state machine
-    world.add(petId, PetState, {
-      state: 'following',
-      targetX: null,
-      targetY: null,
-      targetItemId: 0,
-      stateEnteredTurn: world.step,
-      lastPlayerX: ppos.x,
-      lastPlayerY: ppos.y,
-      commandCooldown: 0,
-    });
+  // Spawn pet (kitty) next to the player
+  {
+    const pe = playerEntity(world);
+    if (pe) {
+      const ppos = world.get(pe.id, Position);
+      const spawnTile = findNearestValidTileAround(world, ppos, {
+        maxDistance: 1,
+        exclude: [{ x: ppos.x, y: ppos.y }],
+      });
+      const petId = world.create();
+      world.add(petId, Pet);
+      world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
+      world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+      world.add(petId, Faction, { key: "pet" });
+      world.add(petId, Owner, { ownerId: pe.id });
+      world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
+      world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
+      // Pet combat components
+      world.add(petId, Vitality, { maxHp: 30, hp: 30 });
+      world.add(petId, Equipment, {
+        attackDerived: 2,   // Base attack bonus
+        defenseDerived: 2   // Base defense (armorClass = 10 + defense = 12)
+      });
+      // Pet state machine
+      world.add(petId, PetState, {
+        state: 'following',
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: world.step,
+        lastPlayerX: ppos.x,
+        lastPlayerY: ppos.y,
+        commandCooldown: 0,
+      });
 
-    // Notify UI that pet exists
-    try {
-      window.dispatchEvent(new CustomEvent('ui:petExists', {
-        detail: { exists: true }
-      }));
-    } catch {}
-  }
-}
-
-// Deity: bind player to chosen deity (via ?deity=id querystring) and wire deity events to message log
-{
-  const pe = playerEntity(world);
-  if (pe) {
-    world.add(pe.id, Devotion, { deityId: chosenDeityId });
-    initDeity(chosenDeityId, world);
-  }
-}
-
-// Give player a Scroll of Mapping (reveals full dungeon — debug aid)
-import { ScrollOfMapping } from "./rules/archetypes/Items.js";
-{
-  const pe = playerEntity(world);
-  if (pe) {
-    const inv = world.get(pe.id, Inventory);
-    if (inv && Array.isArray(inv.items)) {
-      const scrollId = createFrom(world, ScrollOfMapping, {});
-      addItemEntityToInventory(world, inv, scrollId);
+      // Notify UI that pet exists
+      try {
+        window.dispatchEvent(new CustomEvent('ui:petExists', {
+          detail: { exists: true }
+        }));
+      } catch {}
     }
   }
-}
 
-// Process ?give query string parameter to spawn items in player inventory
-// Format: ?give=item_id*count,item_id*count
-// Example: ?give=gold*1000,potion_health*5,sword_plain*1
-{
-  const giveParam = runtimeConfig.giveParam;
-  if (giveParam) {
+  // Give player a Scroll of Mapping (reveals full dungeon — debug aid)
+  {
     const pe = playerEntity(world);
     if (pe) {
       const inv = world.get(pe.id, Inventory);
       if (inv && Array.isArray(inv.items)) {
-        // Parse comma-separated item specs
-        const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
+        const scrollId = createFrom(world, ScrollOfMapping, {});
+        addItemEntityToInventory(world, inv, scrollId);
+      }
+    }
+  }
 
-        for (const spec of specs) {
-          // Parse "item_id*count" format
-          const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
-          if (!match) {
-            console.warn(`[?give] Invalid format: "${spec}" (expected: item_id*count)`);
-            continue;
-          }
+  // Process ?give query string parameter to spawn items in player inventory
+  // Format: ?give=item_id*count,item_id*count
+  // Example: ?give=gold*1000,potion_health*5,sword_plain*1
+  {
+    const giveParam = runtimeConfig.giveParam;
+    if (giveParam) {
+      const pe = playerEntity(world);
+      if (pe) {
+        const inv = world.get(pe.id, Inventory);
+        if (inv && Array.isArray(inv.items)) {
+          // Parse comma-separated item specs
+          const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
 
-          const itemId = match[1];
-          const count = parseInt(match[2] || '1', 10);
-
-          if (!Number.isFinite(count) || count < 1) {
-            console.warn(`[?give] Invalid count for "${itemId}": ${match[2]}`);
-            continue;
-          }
-
-          try {
-            // Use centralized item factory
-            const createdItemId = createItemById(world, itemId, { count });
-
-            if (createdItemId !== null) {
-              addItemEntityToInventory(world, inv, createdItemId);
-              console.log(`[?give] Created ${count}x ${itemId}`);
-            } else {
-              console.warn(`[?give] Unknown item: "${itemId}"`);
+          for (const spec of specs) {
+            // Parse "item_id*count" format
+            const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
+            if (!match) {
+              console.warn(`[?give] Invalid format: "${spec}" (expected: item_id*count)`);
+              continue;
             }
-          } catch (err) {
-            console.error(`[?give] Error creating item "${itemId}":`, err);
+
+            const itemId = match[1];
+            const count = parseInt(match[2] || '1', 10);
+
+            if (!Number.isFinite(count) || count < 1) {
+              console.warn(`[?give] Invalid count for "${itemId}": ${match[2]}`);
+              continue;
+            }
+
+            try {
+              // Use centralized item factory
+              const createdItemId = createItemById(world, itemId, { count });
+
+              if (createdItemId !== null) {
+                addItemEntityToInventory(world, inv, createdItemId);
+                console.log(`[?give] Created ${count}x ${itemId}`);
+              } else {
+                console.warn(`[?give] Unknown item: "${itemId}"`);
+              }
+            } catch (err) {
+              console.error(`[?give] Error creating item "${itemId}":`, err);
+            }
           }
         }
       }
     }
   }
 }
-bootAdvance("Spawned player state");
+
+// Ensure deity state is initialized for current player (new game or loaded save).
+{
+  const pe = playerEntity(world);
+  if (pe) {
+    const dev = world.get(pe.id, Devotion);
+    const deityId = String(dev?.deityId || chosenDeityId || "");
+    if (deityId) {
+      if (!dev) world.add(pe.id, Devotion, { deityId });
+      initDeity(deityId, world);
+    }
+  }
+}
+
+bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
@@ -1517,22 +1594,54 @@ world.on('interaction', ({ action, items: droppedIds }) => {
   }
 });
 
+// Harvest updates: refresh inventory UI after gather actions.
+// Deferred so the tick's command queue (component adds) flushes first.
+world.on('harvest:picked', ({ actor, count, kind }) => {
+  setTimeout(() => {
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch {}
+  }, 0);
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== actor) return;
+  const label = String(kind || '') === 'herbs' ? 'herb' : 'berry';
+  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${Math.max(1, Number(count || 1) | 0)} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch {}
+});
+
 // Stair traversal logic (messages handled in messageWiring)
-world.on('stair:traverse', ({ direction }) => {
+/** @type {{ direction: 'up' | 'down' } | null} */
+let _pendingStairTransition = null;
+
+function queueStairTransition(direction) {
+  const dir = direction === 'up' ? 'up' : (direction === 'down' ? 'down' : null);
+  if (!dir) return;
+  // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
+  if (_pendingStairTransition) return;
+  _pendingStairTransition = { direction: dir };
+}
+
+function flushPendingStairTransition() {
+  const pending = _pendingStairTransition;
+  if (!pending) return;
+  _pendingStairTransition = null;
+
   let currentDepth = 1;
   for (const [, state] of world.query(DungeonState)) {
     currentDepth = state.currentDepth;
     break;
   }
 
-  const newDepth = direction === 'down' ? currentDepth + 1 : currentDepth - 1;
-  if (newDepth < 1) return;
+  const newDepth = pending.direction === 'down' ? currentDepth + 1 : currentDepth - 1;
+  if (newDepth < 0) return;
 
-  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
+  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction: pending.direction, tombstoneRepo });
 
   // Invalidate cached world view
   _cachedView = null;
   _cachedStep = -1;
+}
+
+world.on('stair:traverse', ({ direction }) => {
+  queueStairTransition(direction);
 });
 
 // UI stair tooltip tap → trigger stair traverse
@@ -1554,6 +1663,12 @@ addEventListener('ui:requestStairTraverse', (ev) => {
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installDigWiring({ world });
+installSavegameWiring({
+  world,
+  playerEntity,
+  getActiveSpellId: () => _activeSpellId,
+  log: (msg) => messageLog.log({ text: msg, type: 'system' }),
+});
 bootAdvance("Installed world/UI wiring");
 
 // Item equipped UI updates (message handled in messageWiring)
@@ -2083,6 +2198,7 @@ function frame(now) {
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
+  flushPendingStairTransition();
 
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
@@ -2624,8 +2740,22 @@ requestAnimationFrame((now) => {
 // ---- Minimal demo “scene” controls (display-only) --------------------------
 addEventListener("keydown", (e) => {
   const { key, code } = e;
+  const deleteSaveHotkey = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (code === "Backspace" || key === "Backspace");
   const zoomIn  = key === "+" || key === "=" || code === "Equal" || code === "NumpadAdd";
   const zoomOut = key === "-" || key === "_" || code === "Minus" || code === "NumpadSubtract";
+
+  if (deleteSaveHotkey) {
+    const hadSave = hasSavegame();
+    clearSavegamePayload();
+    messageLog.log({
+      text: hadSave
+        ? "Save game deleted. (Ctrl+Shift+Backspace)"
+        : "No save game found to delete.",
+      type: "system",
+    });
+    e.preventDefault();
+    return;
+  }
 
   if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
   if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }

@@ -75,16 +75,24 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     } catch {}
   }
 
+  function refreshInventoryUi() {
+    try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:requestUsableItemsData")); } catch {}
+  }
+
   world.on("chest:open", ({ targetId }) => {
+    const chestId = Number(targetId || 0) | 0;
+    if (!(chestId > 0)) return;
     log("You open the chest.");
-    dispatchChestData(targetId);
-    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId: targetId } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId } })); } catch {}
+    dispatchChestData(chestId);
   });
 
   addEventListener("ui:requestChestTake", (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    const { chestId, itemId } = e?.detail || {};
+    const chestId = Number(e?.detail?.chestId || 0) | 0;
+    const itemId = Number(e?.detail?.itemId || 0) | 0;
     const pe = playerEntity(world);
     if (!pe) return;
 
@@ -102,52 +110,69 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
       return;
     }
 
+    const itemName = world.get(itemId, NamedIdentity)?.name || "item";
+
     chestInv.items.splice(idx, 1);
     if (playerInv) {
       addItemEntityToInventory(world, playerInv, itemId);
     }
 
-    const itemName = world.get(itemId, NamedIdentity)?.name || "item";
     log(`You take ${bracketizeName(itemName)} from the chest.`);
 
     dispatchChestData(chestId);
+    refreshInventoryUi();
   });
 
   addEventListener("ui:requestChestPut", (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    const { chestId, itemId } = e?.detail || {};
+    const chestId = Number(e?.detail?.chestId || 0) | 0;
+    const itemId = Number(e?.detail?.itemId || 0) | 0;
     const pe = playerEntity(world);
     if (!pe) return;
 
     const chestInv = world.get(chestId, Inventory);
     if (!chestInv) return;
     const info = world.get(itemId, ItemInfo);
-    if (!info) return;
+    if (!info || !world.isAlive(itemId)) return;
 
-    if (chestInv.items.length >= chestInv.capacity) {
+    const stackIntoId = findInventoryStackTargetForItem(world, chestInv, itemId, { allowUnpaidStack: true });
+    const needsSlot = !stackIntoId && !chestInv.items.includes(itemId);
+    if (chestInv.capacity != null && chestInv.items.length >= chestInv.capacity && needsSlot) {
       log("The chest is full.");
       return;
     }
 
     const playerInv = world.get(pe.id, Inventory);
+    let ownedByPlayer = false;
     if (playerInv) {
       const idx = playerInv.items.indexOf(itemId);
-      if (idx !== -1) playerInv.items.splice(idx, 1);
+      if (idx !== -1) {
+        playerInv.items.splice(idx, 1);
+        ownedByPlayer = true;
+      }
     }
 
     const eq = world.get(pe.id, Equipment);
     if (eq) {
       for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo"]) {
-        if (eq[slot] === itemId) { eq[slot] = null; break; }
+        if (eq[slot] === itemId) {
+          eq[slot] = null;
+          ownedByPlayer = true;
+          break;
+        }
       }
     }
-
-    chestInv.items.push(itemId);
+    if (!ownedByPlayer) {
+      log("You don't seem to be carrying that.");
+      return;
+    }
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
+    addItemEntityToInventory(world, chestInv, itemId, { allowUnpaidStack: true });
     log(`You put ${bracketizeName(itemName)} in the chest.`);
 
     dispatchChestData(chestId);
+    refreshInventoryUi();
   });
 }
