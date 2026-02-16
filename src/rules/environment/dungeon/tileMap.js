@@ -4,22 +4,25 @@
 
 import {
   CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR,
-  TILE_STAIR_DOWN, TILE_STAIR_UP,
+  TILE_STAIR_DOWN, TILE_STAIR_UP, TILE_GRASS, TILE_WATER, TILE_MOUNTAIN, TILE_TREE,
 } from './constants.js';
 
 // chunk key: "cx,cy" -> Uint8Array (the chunk.tiles reference)
 const _chunks = new Map();
 
 // Precomputed walkability per tile type (indexed by TILE_* constants)
-const _walkable = new Uint8Array(6);
+const _walkable = new Uint8Array(10);
 _walkable[TILE_FLOOR]      = 1;
 _walkable[TILE_DOOR]       = 1; // floor underneath; door entity Collider overrides
 _walkable[TILE_STAIR_DOWN] = 1;
 _walkable[TILE_STAIR_UP]   = 1;
+_walkable[TILE_GRASS]      = 1;
 
 // Precomputed opacity per tile type
-const _opaque = new Uint8Array(6);
+const _opaque = new Uint8Array(10);
 _opaque[TILE_WALL] = 1;
+_opaque[TILE_MOUNTAIN] = 1;
+_opaque[TILE_TREE] = 1;
 
 /** @param {number} cx @param {number} cy */
 function _key(cx, cy) { return `${cx},${cy}`; }

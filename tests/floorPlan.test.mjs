@@ -19,14 +19,18 @@ Deno.test("floor plan is deterministic", () => {
   assert(a.difficultyMult === b.difficultyMult, 'same difficulty');
 });
 
-Deno.test("floor 1 has down stairs but no up stairs", () => {
-  const plan = generateFloorPlan(42, 1);
-  assert(plan.downStairs.length >= 1, 'has at least 1 down stair');
-  assert(plan.upStairs.length === 0, 'floor 1 has no up stairs');
+Deno.test("floor 0 is the overworld plan", () => {
+  const plan = generateFloorPlan(42, 0);
+  assert(plan.theme === 'overworld', 'depth 0 uses overworld theme');
+  assert(plan.downStairs.length >= 1, 'overworld has at least one down stair');
+  assert(plan.upStairs.length === 0, 'overworld has no up stairs');
 });
 
-Deno.test("floor 2+ has both down and up stairs", () => {
+Deno.test("floor 1+ has both down and up stairs", () => {
+  const p1 = generateFloorPlan(42, 1);
   const plan = generateFloorPlan(42, 2);
+  assert(p1.downStairs.length >= 1, 'floor 1 has down stairs');
+  assert(p1.upStairs.length >= 1, 'floor 1 has up stairs');
   assert(plan.downStairs.length >= 1, 'has down stairs');
   assert(plan.upStairs.length >= 1, 'has up stairs');
 });
