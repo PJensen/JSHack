@@ -85,10 +85,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     if (!(chestId > 0)) return;
     log("You open the chest.");
     try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId } })); } catch {}
-    // Run render after tick flush so deferred ECS writes are visible.
-    setTimeout(() => {
-      dispatchChestData(chestId);
-    }, 0);
+    dispatchChestData(chestId);
   });
 
   addEventListener("ui:requestChestTake", (ev) => {
