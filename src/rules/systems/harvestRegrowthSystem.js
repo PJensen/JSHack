@@ -9,16 +9,16 @@ import { HarvestNode } from "../components/HarvestNode.js";
 export function harvestRegrowthSystem(world) {
   for (const [id, node] of world.query(HarvestNode)) {
     if (node.ready) continue;
-    const left = Number(node.turnsUntilReady || 0);
+    const left = Number(node.regrowCountdown || 0);
     if (left > 1) {
-      world.mutate(id, HarvestNode, (r) => { r.turnsUntilReady = left - 1; });
+      world.mutate(id, HarvestNode, (r) => { r.regrowCountdown = left - 1; });
       continue;
     }
     world.set(id, HarvestNode, {
       kind: node.kind,
       ready: true,
       regrowTurns: node.regrowTurns,
-      turnsUntilReady: 0,
+      regrowCountdown: 0,
     });
     world.emit?.("harvest:regrown", { id, kind: node.kind });
   }

@@ -307,10 +307,10 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`You harvest ${count} ${nodeLabel} (${itemLabel}).`, 'system');
   });
 
-  world.on('harvest:empty', ({ actor, kind, turnsUntilReady }) => {
+  world.on('harvest:empty', ({ actor, kind, regrowCountdown }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const nodeLabel = String(kind || '') === 'herbs' ? 'herb patch' : 'berry bush';
-    const left = Math.max(0, Number(turnsUntilReady || 0) | 0);
+    const left = Math.max(0, Number(regrowCountdown || 0) | 0);
     if (left > 0) log(`The ${nodeLabel} is picked clean. (${left} turns to regrow)`, 'system');
     else log(`The ${nodeLabel} has nothing ready right now.`, 'system');
   });
