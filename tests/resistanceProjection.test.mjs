@@ -67,6 +67,16 @@ Deno.test("equipmentSystem: accumulates electricOhms from item bonuses", () => {
   assertEquals(eq.electricOhmsDerived, 500);
 });
 
+Deno.test("equipmentSystem: affix passive adds electric ohms", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const eq = world.get(actor, Equipment);
+  const armor = makeEquip(world, { name: 'Insulated Armor', id: 'insulated_armor', slot: 'armor', bonuses: {}, affixes: ['insulated1'] });
+  eq.armor = armor;
+  equipmentSystem(world);
+  assertEquals(eq.electricOhmsDerived, 600);
+});
+
 Deno.test("equipmentSystem: affix passive adds fire resistance", () => {
   const world = new World({ seed: 1 });
   const actor = makeActor(world);

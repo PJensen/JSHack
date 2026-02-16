@@ -49,6 +49,12 @@ export const EFFECT_DEFS = [
     statuses: ["stunned"],
   },
   {
+    id: "shock",
+    keys: ["shock", "shocked"],
+    operation: "none",
+    statuses: ["shocked"],
+  },
+  {
     id: "bleed",
     keys: ["bleed", "bleeding"],
     operation: "damage",
