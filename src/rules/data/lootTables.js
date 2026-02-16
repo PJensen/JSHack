@@ -78,8 +78,10 @@ export const LOOT_TABLES = {
   "sub:food": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "archetype", weight: 60, archetype: "Ration" },
-      { type: "archetype", weight: 40, archetype: "IronRation" },
+      { type: "archetype", weight: 45, archetype: "Ration" },
+      { type: "archetype", weight: 25, archetype: "IronRation" },
+      { type: "archetype", weight: 18, archetype: "WildBerries" },
+      { type: "archetype", weight: 12, archetype: "WildHerbs" },
     ],
   },
 

@@ -9,7 +9,7 @@ import { getGem, pickGem } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from './itemCatalogLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
-import { Ration, IronRation } from '../archetypes/Food.js';
+import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
@@ -23,6 +23,8 @@ const ARCHETYPE_MAP = {
   ScrollOfMapping,
   Ration,
   IronRation,
+  WildBerries,
+  WildHerbs,
 };
 
 // ── Resolution ──────────────────────────────────────────────────────
