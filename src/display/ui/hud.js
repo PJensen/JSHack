@@ -286,13 +286,13 @@ export function initHUD() {
     }
   };
 
-  setDesktopLabel(invBtn, 'Inventory'); setMobileLabel(invBtn, 'Bag');
+  setDesktopLabel(invBtn, 'Inventory'); setMobileLabel(invBtn, 'Inventory');
   setDesktopLabel(useBtn, 'Use'); setMobileLabel(useBtn, 'Use');
-  setDesktopLabel(applyBtn, 'Apply'); setMobileLabel(applyBtn, 'Tool');
+  setDesktopLabel(applyBtn, 'Apply'); setMobileLabel(applyBtn, 'Apply');
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
-  setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Mark');
+  setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Engrave');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
 
   function applyCommandBarLayout() {
