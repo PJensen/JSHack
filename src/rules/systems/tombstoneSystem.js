@@ -26,17 +26,12 @@ export function installTombstoneDeathListener(world, repository) {
       break;
     }
 
-    // Determine cause of death
-    let deathCause = 'unknown';
+    // Determine cause of death and killer attribution
+    let deathCause = cause || 'unknown';
     let killerName = null;
     let killerIdentity = null;
 
-    if (cause) {
-      // Environmental death (starvation, etc.)
-      deathCause = cause;
-    } else if (killer) {
-      // Combat or entity-caused death
-      deathCause = 'combat';
+    if (killer) {
       const killerIdent = world.get(killer, NamedIdentity);
       if (killerIdent) {
         killerName = killerIdent.name;

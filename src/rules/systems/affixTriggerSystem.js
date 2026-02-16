@@ -10,6 +10,8 @@ import { Vitality } from '../components/Vitality.js';
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { CombatCallbackContext } from '../data/callbacks/combat.js';
+import { runCallbackList } from '../interaction/dispatch.js';
 
 const AFFIX_TRIGGERS_KEY = Symbol.for('jshack.affixTriggers');
 
@@ -63,9 +65,15 @@ function makeCtx(world, base) {
 function runMonsterOnDamaged(world, entityId, ctx, deps = null) {
   const ni = world.get(entityId, NamedIdentity);
   const def = ni ? getMonster(ni.identity) : null;
-  const hook = def?.hooks?.onDamaged;
-  if (typeof hook === 'function') {
-    try { hook({ world, ctx, deps }); } catch {}
+  const hooks = def?.hooks?.onDamaged;
+  if (!hooks) return false;
+  if (Array.isArray(hooks) && hooks.length > 0) {
+    const cbCtx = new CombatCallbackContext(world, ctx, deps);
+    runCallbackList(hooks, cbCtx);
+    return true;
+  }
+  if (typeof hooks === 'function') {
+    try { hooks({ world, ctx, deps }); } catch {}
     return true;
   }
   return false;
