@@ -2,7 +2,9 @@
 // Scripts are registered via the central scripting router.
 import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Vitality } from "../components/Vitality.js";
 import { registerScript, ScriptVerb } from "../scripting.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 const AFFIX_THORNS = "affix:thorns1";
 const AFFIX_VAMP = "affix:vamp1";
@@ -13,6 +15,75 @@ const AFFIX_ATTUNED = "affix:attuned1";
 const AFFIX_FIRE_WARD = "affix:fireWard1";
 const AFFIX_POISON_WARD = "affix:poisonWard1";
 const AFFIX_KINETIC_WARD = "affix:kineticWard1";
+const AFFIX_CAUSTIC = "affix:caustic1";
+const AFFIX_CAPACITIVE = "affix:capacitive1";
+const AFFIX_INSULATED = "affix:insulated1";
+
+/**
+ * Push or stack an active effect directly on an entity.
+ * @param {any} world
+ * @param {number} entityId
+ * @param {{ key:string, turnsLeft:number, potency:number, stacks?:number }} effect
+ */
+function upsertEffect(world, entityId, effect) {
+  const ae = world.get(entityId, ActiveEffects);
+  if (ae && Array.isArray(ae.effects)) {
+    const existing = ae.effects.find((e) => e.key === effect.key);
+    if (existing) {
+      existing.stacks = (existing.stacks || 1) + 1;
+      existing.turnsLeft = Math.max(existing.turnsLeft || 0, effect.turnsLeft);
+      existing.potency = Math.max(existing.potency || 0, effect.potency);
+      return;
+    }
+    ae.effects.push({ stacks: 1, ...effect });
+    return;
+  }
+  try { world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {}
+}
+
+/**
+ * Deterministic combat proc roll.
+ * @param {any} world
+ * @param {number} attacker
+ * @param {number} defender
+ * @param {number} salt
+ * @param {number} chancePct
+ */
+function procRoll(world, attacker, defender, salt, chancePct) {
+  const pct = Math.max(0, Math.min(100, chancePct | 0));
+  if (pct >= 100) return true;
+  if (pct <= 0) return false;
+  const step = (world && world.step) | 0;
+  const seed = combatSeed(world?.seed ?? 0, step, attacker | 0, defender | 0, salt | 0);
+  const r = mulberry32(seed);
+  return rngInt(r, 1, 100) <= pct;
+}
+
+/**
+ * Apply a tiny typed bonus hit that cannot kill by itself.
+ * @param {any} world
+ * @param {any} ctx
+ * @param {string} type
+ * @param {number} amount
+ * @param {string} cause
+ */
+function applyNonLethalTypedChip(world, ctx, type, amount, cause) {
+  const attacker = (ctx && ctx.attacker) | 0;
+  const defender = (ctx && ctx.defender) | 0;
+  if (!(defender > 0) || !world || !world.isAlive?.(defender)) return 0;
+  if (!((ctx && ctx.damage) > 0)) return 0;
+  const vit = world.get(defender, Vitality);
+  if (!vit || (vit.hp | 0) <= 1) return 0;
+  const result = dealDamage(world, {
+    target: defender,
+    amount: Math.max(1, amount | 0),
+    source: attacker,
+    type,
+    cause,
+    noTrigger: true,
+  });
+  return Math.max(0, Number(result?.amount || 0));
+}
 
 registerScript(AFFIX_THORNS, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
@@ -92,6 +163,33 @@ registerScript(AFFIX_KINETIC_WARD, {
   },
 });
 
+registerScript(AFFIX_CAUSTIC, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    const dealt = applyNonLethalTypedChip(world, ctx, "acid", 1, "affix:caustic");
+    if (dealt > 0) {
+      try { world.emit && world.emit("proc:caustic", { actor: ctx.attacker, target: ctx.defender, amount: dealt }); } catch {}
+    }
+  },
+});
+
+registerScript(AFFIX_CAPACITIVE, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    const dealt = applyNonLethalTypedChip(world, ctx, "electric", 1, "affix:capacitive");
+    if (dealt > 0) {
+      try { world.emit && world.emit("proc:capacitive", { actor: ctx.attacker, target: ctx.defender, amount: dealt }); } catch {}
+    }
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee03, 35)) return;
+    upsertEffect(world, ctx.defender, { key: "shock", turnsLeft: 2, potency: 1, stacks: 1 });
+    try { world.emit && world.emit("proc:shocked", { actor: ctx.attacker, target: ctx.defender }); } catch {}
+  },
+});
+
+registerScript(AFFIX_INSULATED, {
+  [ScriptVerb.AffixPassive]: (_world, ctx) => {
+    ctx.addBonus("electricOhms", 600);
+  },
+});
+
 export const AFFIX_DEFS = {
   thorns1: { name: "Thorns I", slots: ["armor"], triggers: ["onHit"], script: AFFIX_THORNS, weight: 30 },
   vamp1: { name: "Vampiric I", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_VAMP, weight: 20 },
@@ -102,6 +200,9 @@ export const AFFIX_DEFS = {
   fireWard1: { name: "Flame Ward", slots: ["armor", "shield"], passive: AFFIX_FIRE_WARD, triggers: [], weight: 18 },
   poisonWard1: { name: "Venom Ward", slots: ["armor", "ring"], passive: AFFIX_POISON_WARD, triggers: [], weight: 18 },
   kineticWard1: { name: "Fortified", slots: ["armor", "shield"], passive: AFFIX_KINETIC_WARD, triggers: [], weight: 15 },
+  caustic1: { name: "Caustic", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_CAUSTIC, weight: 16 },
+  capacitive1: { name: "Capacitive", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_CAPACITIVE, weight: 15 },
+  insulated1: { name: "Insulated", slots: ["armor", "shield"], passive: AFFIX_INSULATED, triggers: [], weight: 16 },
 };
 
 export function listAffixes() { return Object.entries(AFFIX_DEFS).map(([id, rec]) => ({ id, ...rec })); }
