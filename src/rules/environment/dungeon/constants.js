@@ -11,6 +11,10 @@ export const TILE_WALL       = 2;
 export const TILE_DOOR       = 3;
 export const TILE_STAIR_DOWN = 4;
 export const TILE_STAIR_UP   = 5;
+export const TILE_GRASS      = 6;
+export const TILE_WATER      = 7;
+export const TILE_MOUNTAIN   = 8;
+export const TILE_TREE       = 9;
 
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 7;   // smallest BSP leaf dimension
@@ -19,4 +23,3 @@ export const ROOM_MARGIN     = 1;   // gap between room edge and leaf edge
 export const SPLIT_RATIO_MIN = 0.35;
 export const SPLIT_RATIO_MAX = 0.65;
 export const BSP_MAX_DEPTH   = 5;
-

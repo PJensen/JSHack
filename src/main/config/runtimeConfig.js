@@ -29,6 +29,11 @@ function parsePositiveInt(raw, fallback = null) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function parseNonNegativeInt(raw, fallback = null) {
+  const value = Number.parseInt(String(raw ?? ""), 10);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 export function buildPerfConfig(params) {
   const q = (
     params.get("quality") ||
@@ -54,7 +59,7 @@ export function readRuntimeConfig() {
   return {
     params,
     perf: buildPerfConfig(params),
-    startDepth: parsePositiveInt(params.get("floor"), 1) || 1,
+    startDepth: parseNonNegativeInt(params.get("floor"), 0) ?? 0,
     dungeonScale: parsePositiveFloat(params.get("dungeonScale"), null),
     chosenDeityId: params.get("deity") || "molkhar",
     giveParam: params.get("give") || "",

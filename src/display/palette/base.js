@@ -25,6 +25,10 @@ export const basePalette = {
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224" },
+  grass: { glyph: ",", fg: "#5c8f45", glow: "#355a2a" },
+  water: { glyph: "~", fg: "#4f84b9", glow: "#2d4d6f" },
+  mountain: { glyph: "^", fg: "#8f9398", glow: "#5a5d61" },
+  tree: { glyph: "T", fg: "#3f7b3d", glow: "#275026" },
   wall: { glyph: "#", fg: "#99a", glow: "#667" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },

@@ -252,9 +252,29 @@ function updateActiveSpellLabel() {
 // ---- Dungeon initialization -------------------------------------------------
 import { initDungeon, generateFloorPlan } from "./rules/environment/dungeon/index.js";
 import { transitionToDepth } from "./rules/environment/dungeon/transition.js";
-import { TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from "./rules/environment/dungeon/constants.js";
+import {
+  TILE_FLOOR,
+  TILE_WALL,
+  TILE_DOOR,
+  TILE_STAIR_DOWN,
+  TILE_STAIR_UP,
+  TILE_GRASS,
+  TILE_WATER,
+  TILE_MOUNTAIN,
+  TILE_TREE,
+} from "./rules/environment/dungeon/constants.js";
 import { dungeonConfig } from "./rules/environment/dungeon/dungeonConfig.js";
-const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 'floor', [TILE_STAIR_DOWN]: 'stair_down', [TILE_STAIR_UP]: 'stair_up' };
+const _tileKindMap = {
+  [TILE_FLOOR]: 'floor',
+  [TILE_WALL]: 'wall',
+  [TILE_DOOR]: 'floor',
+  [TILE_STAIR_DOWN]: 'stair_down',
+  [TILE_STAIR_UP]: 'stair_up',
+  [TILE_GRASS]: 'grass',
+  [TILE_WATER]: 'water',
+  [TILE_MOUNTAIN]: 'mountain',
+  [TILE_TREE]: 'tree',
+};
 
 // Allow URL override: ?dungeonScale=0.3 for compact debugging floors
 {
@@ -262,9 +282,9 @@ const _tileKindMap = { [TILE_FLOOR]: 'floor', [TILE_WALL]: 'wall', [TILE_DOOR]: 
   if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
 }
 
-// Allow URL override: ?floor=6 to skip straight to a specific depth
+// Allow URL override: ?floor=0|1|... to choose start depth.
 const _startDepth = runtimeConfig.startDepth;
-const _initialDepth = (Number.isFinite(_startDepth) && _startDepth > 0) ? _startDepth : 1;
+const _initialDepth = (Number.isFinite(_startDepth) && _startDepth >= 0) ? _startDepth : 0;
 const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth);
 const _bootChunkTotal = Math.max(
   1,
@@ -1526,7 +1546,7 @@ world.on('stair:traverse', ({ direction }) => {
   }
 
   const newDepth = direction === 'down' ? currentDepth + 1 : currentDepth - 1;
-  if (newDepth < 1) return;
+  if (newDepth < 0) return;
 
   transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
 
