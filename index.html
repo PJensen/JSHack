@@ -173,6 +173,7 @@
 			const bootLabel = document.getElementById('boot-label');
 			const bootFill = document.getElementById('boot-fill');
 			const bootFraction = document.getElementById('boot-fraction');
+			const saveKey = 'jshack:savegame:v1';
 			let bootDone = 0;
 			let bootTotal = 1;
 			let bootHidden = false;
@@ -181,6 +182,9 @@
 			const bootQueue = [];
 
 			function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+			function hasSavegame() {
+				try { return !!localStorage.getItem(saveKey); } catch { return false; }
+			}
 			function renderBoot() {
 				const pct = clamp01(bootDone / Math.max(1, bootTotal));
 				bootFill.style.width = `${(pct * 100).toFixed(2)}%`;
@@ -236,6 +240,7 @@
 				if (!bootQueueRunning && bootQueue.length === 0) hideBootLoader();
 			};
 
+			if (hasSavegame()) bootLabel.textContent = 'Loading from Save';
 			renderBoot();
 
 			const hash = new Date().getTime().toString(16);
