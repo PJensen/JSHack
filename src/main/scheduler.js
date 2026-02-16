@@ -38,6 +38,8 @@ import { plasmaCloudSystem } from "../rules/systems/plasmaCloudSystem.js";
 import { installGridBugDeathClouds } from "../rules/systems/gridBugDeathCloudSystem.js";
 import { materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
+import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
+import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -96,6 +98,8 @@ export function configureWorld(world) {
   registerSystem(plasmaCloudSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');
+  registerSystem(harvestRegrowthSystem, 'effects');
+  registerSystem(overworldAmbientSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase

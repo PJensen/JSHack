@@ -10,9 +10,26 @@ import { clearExplored, saveExplored, restoreExplored, degradeExplored } from '.
 import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
+import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
+/** @type {Map<number, { snapshot: any, order: number[] }>} floor entity snapshots keyed by depth */
+const _floorEntityCache = new Map();
+
+/**
+ * Build a runtime component registry from currently known stores.
+ * @param {import('../../../lib/ecs-js/index.js').World} world
+ * @returns {Map<string, any>}
+ */
+function _buildSnapshotRegistry(world) {
+  const reg = new Map();
+  for (const [, comp] of world._components) {
+    if (!comp || typeof comp.name !== 'string' || !comp.name) continue;
+    reg.set(comp.name, comp);
+  }
+  return reg;
+}
 
 /**
  * Transition the dungeon to a new depth.
@@ -42,8 +59,14 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   // Save explored map for the current floor before clearing
   const currentDepth = ds ? ds.currentDepth : 0;
-  if (currentDepth > 0) {
-    _exploredCache.set(currentDepth, saveExplored());
+  if (ds && Array.isArray(ds.floorEntityIds)) {
+    if (currentDepth > 0) _exploredCache.set(currentDepth, saveExplored());
+    const floorIds = ds.floorEntityIds
+      .filter((id) => Number.isInteger(id) && id > 0 && world.isAlive(id));
+    _floorEntityCache.set(currentDepth, {
+      snapshot: serializeEntities(world, floorIds, { note: `floor_depth_${currentDepth}` }),
+      order: floorIds.slice(),
+    });
   }
 
   // Destroy all entities from the current floor
@@ -63,7 +86,61 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
   const tombstoneRepo = opts.tombstoneRepo || null;
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
-  const { spawnX, spawnY, entityIds } = generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress);
+  const { spawnX, spawnY, entityIds: generatedEntityIds } = generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress);
+  let entityIds = generatedEntityIds;
+
+  const cachedFloor = _floorEntityCache.get(newDepth);
+  if (cachedFloor?.snapshot?.v === 1 && cachedFloor.snapshot.comps) {
+    /** @type {number[]} */
+    const createdIds = [];
+    try {
+      /** @type {Map<number, number>} */
+      const oldToNew = new Map();
+      const prevTime = +world.time || 0;
+      const prevFrame = world.frame | 0;
+
+      applySnapshot(world, cachedFloor.snapshot, _buildSnapshotRegistry(world), {
+        mode: 'append',
+        skipUnknown: true,
+        remapId(oldId) {
+          const id = world.create();
+          oldToNew.set(oldId, id);
+          createdIds.push(id);
+          return id;
+        },
+      });
+
+      world.time = prevTime;
+      world.frame = prevFrame;
+
+      const order = Array.isArray(cachedFloor.order) && cachedFloor.order.length
+        ? cachedFloor.order
+        : (Array.isArray(cachedFloor.snapshot.alive) ? cachedFloor.snapshot.alive : []);
+      const restoredIds = [];
+      for (const oldId of order) {
+        const eid = oldToNew.get(Number(oldId) | 0) || 0;
+        if (eid > 0 && world.isAlive(eid)) restoredIds.push(eid);
+      }
+      if (restoredIds.length <= 0) throw new Error('restored floor is empty');
+
+      const hasStairAnchor = restoredIds.some((eid) => {
+        const ni = world.get(eid, NamedIdentity);
+        return ni?.identity === 'stair_up' || ni?.identity === 'stair_down';
+      });
+      if (!hasStairAnchor) throw new Error('restored floor missing stair anchor');
+
+      for (const eid of generatedEntityIds) {
+        try { world.destroy(eid); } catch {}
+      }
+
+      entityIds = restoredIds;
+    } catch {
+      for (const eid of createdIds) {
+        try { world.destroy(eid); } catch {}
+      }
+      entityIds = generatedEntityIds;
+    }
+  }
 
   // Restore explored state if this floor was previously visited
   const savedExplored = _exploredCache.get(newDepth);
@@ -104,6 +181,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });
   invalidateTileQueryCache(world);
+  world.tick(1);
 }
 
 /**

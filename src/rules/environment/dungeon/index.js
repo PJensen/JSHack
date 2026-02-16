@@ -2,7 +2,19 @@
 // Public API for the BSP dungeon generator.
 // Floors are generated in one shot — no per-tick chunk management.
 
-export { CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
+export {
+  CHUNK_SIZE,
+  TILE_VOID,
+  TILE_FLOOR,
+  TILE_WALL,
+  TILE_DOOR,
+  TILE_STAIR_DOWN,
+  TILE_STAIR_UP,
+  TILE_GRASS,
+  TILE_WATER,
+  TILE_MOUNTAIN,
+  TILE_TREE,
+} from './constants.js';
 export { chunkSeed, floorSeed, edgeSeed } from './seed.js';
 export { generateChunk, edgeGate, findDoorPositions } from './chunk.js';
 export { materializeChunk } from './materialize.js';
@@ -27,6 +39,7 @@ import { CHUNK_SIZE, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
+import { generateOverworldChunks } from './overworld.js';
 
 /**
  * Generate all chunks for a floor and materialize everything at once.
@@ -40,6 +53,41 @@ import { clearSpatialIndex } from '../../utils/spatialIndex.js';
  * @returns {{ spawnX: number, spawnY: number, entityIds: number[] }}
  */
 export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null) {
+  if (depth === 0) {
+    const ow = generateOverworldChunks(worldSeed);
+    const totalChunks = ow.chunks.length;
+    let processedChunks = 0;
+
+    if (typeof onProgress === 'function') {
+      onProgress({ phase: 'chunks', depth, processed: 0, total: totalChunks });
+    }
+
+    const stairOpts = {
+      createStairDown: (w, x, y) => createFrom(w, StairDown, { x, y }),
+      createStairUp: (w, x, y) => createFrom(w, StairUp, { x, y }),
+    };
+
+    const allEntityIds = [];
+    for (const chunkData of ow.chunks) {
+      tileMapLoad(chunkData.chunkX, chunkData.chunkY, chunkData.tiles);
+      const ids = materializeChunk(world, chunkData, stairOpts);
+      allEntityIds.push(...ids);
+      processedChunks++;
+      if (typeof onProgress === 'function') {
+        onProgress({
+          phase: 'chunks',
+          depth,
+          processed: processedChunks,
+          total: totalChunks,
+          cx: chunkData.chunkX,
+          cy: chunkData.chunkY,
+        });
+      }
+    }
+
+    return { spawnX: ow.spawnX, spawnY: ow.spawnY, entityIds: allEntityIds };
+  }
+
   const floorPlan = generateFloorPlan(worldSeed, depth);
   const { extent } = floorPlan;
   const allEntityIds = [];
@@ -131,7 +179,8 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
  * @returns {{ x: number, y: number }} spawn position for the player
  */
 export function initDungeon(world, opts = {}) {
-  const depth = opts.startDepth || 1;
+  const depthArg = Number(opts.startDepth);
+  const depth = Number.isFinite(depthArg) ? Math.max(0, Math.floor(depthArg)) : 1;
   const worldSeed = world.seed >>> 0;
   const tombstoneRepo = opts.tombstoneRepo || null;
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;

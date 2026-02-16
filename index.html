@@ -173,14 +173,24 @@
 			const bootLabel = document.getElementById('boot-label');
 			const bootFill = document.getElementById('boot-fill');
 			const bootFraction = document.getElementById('boot-fraction');
+			const saveKey = 'jshack:savegame:v1';
 			let bootDone = 0;
 			let bootTotal = 1;
 			let bootHidden = false;
-			let bootDoneRequested = false;
-			let bootQueueRunning = false;
-			const bootQueue = [];
 
 			function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+			function hasValidFloorOverride() {
+				try {
+					const params = new URLSearchParams(window.location.search || '');
+					const raw = params.get('floor');
+					if (raw == null) return false;
+					const value = Number.parseInt(String(raw), 10);
+					return Number.isFinite(value) && value >= 0;
+				} catch { return false; }
+			}
+			function hasSavegame() {
+				try { return !!localStorage.getItem(saveKey); } catch { return false; }
+			}
 			function renderBoot() {
 				const pct = clamp01(bootDone / Math.max(1, bootTotal));
 				bootFill.style.width = `${(pct * 100).toFixed(2)}%`;
@@ -196,27 +206,6 @@
 				renderBoot();
 			}
 
-			function bootStepDelayMs() {
-				const rnd = 1 + Math.floor(Math.random() * 10); // 50..100
-				return 1 + rnd; // 100..150
-			}
-
-			function flushBootQueue() {
-				if (bootQueueRunning) return;
-				bootQueueRunning = true;
-				const run = () => {
-					const next = bootQueue.shift();
-					if (!next) {
-						bootQueueRunning = false;
-						if (bootDoneRequested) hideBootLoader();
-						return;
-					}
-					applyBootProgress(next);
-					setTimeout(run, bootStepDelayMs());
-				};
-				run();
-			}
-
 			function hideBootLoader() {
 				if (bootHidden) return;
 				bootHidden = true;
@@ -227,15 +216,14 @@
 			}
 
 			window.__JSHACK_BOOT_PROGRESS = (progress = {}) => {
-				bootQueue.push(progress);
-				flushBootQueue();
+				applyBootProgress(progress);
 			};
 
 			window.__JSHACK_BOOT_DONE = () => {
-				bootDoneRequested = true;
-				if (!bootQueueRunning && bootQueue.length === 0) hideBootLoader();
+				hideBootLoader();
 			};
 
+			if (hasSavegame() && !hasValidFloorOverride()) bootLabel.textContent = 'Loading from Save';
 			renderBoot();
 
 			const hash = new Date().getTime().toString(16);

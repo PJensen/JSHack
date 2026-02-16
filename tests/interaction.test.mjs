@@ -5,6 +5,13 @@ import { InteractIntent } from '../src/rules/components/Intents/InteractIntent.j
 import { DoorState } from '../src/rules/components/DoorState.js';
 import { Collider } from '../src/rules/components/Collider.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
+import { HarvestNode } from '../src/rules/components/HarvestNode.js';
+import { Position } from '../src/rules/components/Position.js';
+import { Vitality } from '../src/rules/components/Vitality.js';
+import { Mana } from '../src/rules/components/Mana.js';
+import { Stamina } from '../src/rules/components/Stamina.js';
+import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
 
 Deno.test("toggle door: closed → open → closed", () => {
@@ -130,4 +137,76 @@ Deno.test("read text emits event with textId", () => {
 
   assert(textEvents.length === 1, 'should emit readText event');
   assert(textEvents[0].textId === 'intro', `textId should be 'intro'`);
+});
+
+Deno.test("harvest node creates food and enters regrow cooldown", () => {
+  const world = new World({ seed: 17 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const node = world.create();
+  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'berries' } });
+  world.add(node, HarvestNode, { kind: 'berries', ready: true, regrowTurns: 9, regrowCountdown: 0 });
+  world.add(node, Position, { x: 1, y: 1 });
+
+  const events = [];
+  world.on('harvest:picked', (e) => events.push(e));
+
+  world.add(actor, InteractIntent, { targetId: node });
+  interactionSystem(world);
+
+  assert(events.length === 1, 'harvest should emit picked event');
+  const hn = world.get(node, HarvestNode);
+  assert(hn.ready === false, 'node should become unready');
+  assert(hn.regrowCountdown === 9, 'node should start regrow countdown');
+
+  const inv = world.get(actor, Inventory);
+  assert(inv.items.length >= 1, 'actor should receive harvested item');
+  const first = inv.items[0];
+  const ni = world.get(first, NamedIdentity);
+  const info = world.get(first, ItemInfo);
+  assert(ni.identity === 'food_wild_berries', `expected berries, got ${ni.identity}`);
+  assert((info.count || 0) >= 1, 'harvest count should be at least 1');
+});
+
+Deno.test("harvest node reports empty while regrowing", () => {
+  const world = new World({ seed: 19 });
+  const actor = world.create();
+  const node = world.create();
+  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'herbs' } });
+  world.add(node, HarvestNode, { kind: 'herbs', ready: false, regrowTurns: 7, regrowCountdown: 5 });
+
+  const events = [];
+  world.on('harvest:empty', (e) => events.push(e));
+
+  world.add(actor, InteractIntent, { targetId: node });
+  interactionSystem(world);
+
+  assert(events.length === 1, 'should emit empty harvest event');
+  assert(events[0].regrowCountdown === 5, 'should include remaining regrow time');
+});
+
+Deno.test("restAtBed restores hp, mana, and stamina", () => {
+  const world = new World({ seed: 23 });
+  const actor = world.create();
+  const bed = world.create();
+  world.add(actor, Vitality, { maxHp: 20, hp: 3 });
+  world.add(actor, Mana, { maxMana: 12, mana: 1, manaRegen: 0.1 });
+  world.add(actor, Stamina, { maxStamina: 100, stamina: 4, staminaRegen: 2, regenCooldown: 9 });
+  world.add(bed, Interactable, { action: 'restAtBed', params: null });
+
+  let rested = 0;
+  world.on('bed:rested', () => { rested++; });
+
+  world.add(actor, InteractIntent, { targetId: bed });
+  interactionSystem(world);
+
+  const v = world.get(actor, Vitality);
+  const m = world.get(actor, Mana);
+  const s = world.get(actor, Stamina);
+  assert(v.hp === v.maxHp, 'hp should be fully restored');
+  assert(m.mana === m.maxMana, 'mana should be fully restored');
+  assert(s.stamina === s.maxStamina, 'stamina should be fully restored');
+  assert((s.regenCooldown || 0) === 0, 'regen cooldown should be reset');
+  assert(rested === 1, 'rest event should fire');
 });

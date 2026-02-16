@@ -5,7 +5,16 @@ import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { Inventory } from "../components/Inventory.js";
+import { Position } from "../components/Position.js";
+import { HarvestNode } from "../components/HarvestNode.js";
+import { Vitality } from "../components/Vitality.js";
+import { Mana } from "../components/Mana.js";
+import { Stamina } from "../components/Stamina.js";
 import TombstoneComponent from "../components/Tombstone.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { WildBerries, WildHerbs } from "../archetypes/Food.js";
+import { ItemInfo } from "../components/ItemInfo.js";
+import { combatSeed, mulberry32 } from "../utils/rng.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -44,6 +53,24 @@ export function InteractionSystem(world, actor, targetId) {
 
         case "readText":
             world.emit("interaction", { actor, targetId, action: "readText", textId: inter.params?.textId });
+            break;
+
+        case "restAtBed":
+            {
+                const vit = world.get(actor, Vitality);
+                if (vit) {
+                    world.set(actor, Vitality, { maxHp: vit.maxHp, hp: vit.maxHp });
+                }
+                const mana = world.get(actor, Mana);
+                if (mana) {
+                    world.set(actor, Mana, { ...mana, mana: mana.maxMana });
+                }
+                const stamina = world.get(actor, Stamina);
+                if (stamina) {
+                    world.set(actor, Stamina, { ...stamina, stamina: stamina.maxStamina, regenCooldown: 0 });
+                }
+                world.emit?.("bed:rested", { actor, targetId });
+            }
             break;
 
         case "openShop":
@@ -85,6 +112,58 @@ export function InteractionSystem(world, actor, targetId) {
                         }
                     });
                 }
+            }
+            break;
+
+        case "harvestNode":
+            {
+                const node = world.get(targetId, HarvestNode);
+                if (!node) break;
+
+                if (!node.ready) {
+                    world.emit?.("harvest:empty", {
+                        actor,
+                        targetId,
+                        kind: node.kind,
+                        regrowCountdown: node.regrowCountdown | 0,
+                    });
+                    break;
+                }
+
+                const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, 0x48415256));
+                const kind = String(node.kind || "berries");
+                const baseCount = kind === "herbs" ? (1 + ((r() * 2) | 0)) : (1 + ((r() * 3) | 0));
+                const count = Math.max(1, baseCount | 0);
+                const itemId = createFrom(world, kind === "herbs" ? WildHerbs : WildBerries, {});
+                world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
+
+                let resultItemId = itemId;
+                const inv = world.get(actor, Inventory);
+                if (inv) {
+                    // Components are deferred during tick, so
+                    // addItemEntityToInventory can't see ItemInfo yet.
+                    // Insert directly; coalesceInventoryStacks handles
+                    // stacking on the next UI refresh.
+                    if (!inv.items.includes(itemId)) inv.items.push(itemId);
+                } else {
+                    const pos = world.get(actor, Position);
+                    if (pos) world.add(itemId, Position, { x: pos.x, y: pos.y });
+                }
+
+                world.set(targetId, HarvestNode, {
+                    kind,
+                    ready: false,
+                    regrowTurns: node.regrowTurns,
+                    regrowCountdown: node.regrowTurns,
+                });
+                world.emit?.("harvest:picked", {
+                    actor,
+                    targetId,
+                    kind,
+                    count,
+                    itemId: resultItemId,
+                    regrowTurns: node.regrowTurns,
+                });
             }
             break;
     }

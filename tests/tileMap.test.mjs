@@ -6,7 +6,7 @@ import {
 } from '../src/rules/environment/dungeon/tileMap.js';
 import {
   CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR,
-  TILE_STAIR_DOWN, TILE_STAIR_UP,
+  TILE_STAIR_DOWN, TILE_STAIR_UP, TILE_GRASS, TILE_WATER, TILE_MOUNTAIN, TILE_TREE,
 } from '../src/rules/environment/dungeon/constants.js';
 
 // Helper: create a chunk-sized Uint8Array filled with a value
@@ -68,6 +68,10 @@ Deno.test("isWalkable returns correct values for each tile type", () => {
   tiles[3] = TILE_DOOR;
   tiles[4] = TILE_STAIR_DOWN;
   tiles[5] = TILE_STAIR_UP;
+  tiles[6] = TILE_GRASS;
+  tiles[7] = TILE_WATER;
+  tiles[8] = TILE_MOUNTAIN;
+  tiles[9] = TILE_TREE;
   loadChunk(0, 0, tiles);
 
   assert(!isWalkable(0, 0), 'VOID not walkable');
@@ -76,6 +80,10 @@ Deno.test("isWalkable returns correct values for each tile type", () => {
   assert(isWalkable(3, 0), 'DOOR walkable');
   assert(isWalkable(4, 0), 'STAIR_DOWN walkable');
   assert(isWalkable(5, 0), 'STAIR_UP walkable');
+  assert(isWalkable(6, 0), 'GRASS walkable');
+  assert(!isWalkable(7, 0), 'WATER not walkable');
+  assert(!isWalkable(8, 0), 'MOUNTAIN not walkable');
+  assert(!isWalkable(9, 0), 'TREE not walkable');
   clearAll();
 });
 
@@ -88,6 +96,10 @@ Deno.test("isOpaque returns correct values for each tile type", () => {
   tiles[3] = TILE_DOOR;
   tiles[4] = TILE_STAIR_DOWN;
   tiles[5] = TILE_STAIR_UP;
+  tiles[6] = TILE_GRASS;
+  tiles[7] = TILE_WATER;
+  tiles[8] = TILE_MOUNTAIN;
+  tiles[9] = TILE_TREE;
   loadChunk(0, 0, tiles);
 
   assert(!isOpaque(0, 0), 'VOID not opaque');
@@ -96,6 +108,10 @@ Deno.test("isOpaque returns correct values for each tile type", () => {
   assert(!isOpaque(3, 0), 'DOOR not opaque');
   assert(!isOpaque(4, 0), 'STAIR_DOWN not opaque');
   assert(!isOpaque(5, 0), 'STAIR_UP not opaque');
+  assert(!isOpaque(6, 0), 'GRASS not opaque');
+  assert(!isOpaque(7, 0), 'WATER not opaque');
+  assert(isOpaque(8, 0), 'MOUNTAIN opaque');
+  assert(isOpaque(9, 0), 'TREE opaque');
   clearAll();
 });
 
