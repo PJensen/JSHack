@@ -177,9 +177,6 @@
 			let bootDone = 0;
 			let bootTotal = 1;
 			let bootHidden = false;
-			let bootDoneRequested = false;
-			let bootQueueRunning = false;
-			const bootQueue = [];
 
 			function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 			function hasValidFloorOverride() {
@@ -209,27 +206,6 @@
 				renderBoot();
 			}
 
-			function bootStepDelayMs() {
-				const rnd = 1 + Math.floor(Math.random() * 10); // 50..100
-				return 1 + rnd; // 100..150
-			}
-
-			function flushBootQueue() {
-				if (bootQueueRunning) return;
-				bootQueueRunning = true;
-				const run = () => {
-					const next = bootQueue.shift();
-					if (!next) {
-						bootQueueRunning = false;
-						if (bootDoneRequested) hideBootLoader();
-						return;
-					}
-					applyBootProgress(next);
-					setTimeout(run, bootStepDelayMs());
-				};
-				run();
-			}
-
 			function hideBootLoader() {
 				if (bootHidden) return;
 				bootHidden = true;
@@ -240,13 +216,11 @@
 			}
 
 			window.__JSHACK_BOOT_PROGRESS = (progress = {}) => {
-				bootQueue.push(progress);
-				flushBootQueue();
+				applyBootProgress(progress);
 			};
 
 			window.__JSHACK_BOOT_DONE = () => {
-				bootDoneRequested = true;
-				if (!bootQueueRunning && bootQueue.length === 0) hideBootLoader();
+				hideBootLoader();
 			};
 
 			if (hasSavegame() && !hasValidFloorOverride()) bootLabel.textContent = 'Loading from Save';
