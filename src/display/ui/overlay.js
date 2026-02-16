@@ -1843,13 +1843,16 @@ function renderChest(panel, data, state) {
 
     function doTransaction() {
       const it = currentItems[sel]; if (!it) return;
+      const chestId = Number(state.chestId || 0) | 0;
+      const itemId = Number(it.id || 0) | 0;
+      if (!(chestId > 0) || !(itemId > 0)) return;
       if (activeTab === 'take') {
         window.dispatchEvent(new CustomEvent('ui:requestChestTake', {
-          detail: { chestId: state.chestId, itemId: it.id }
+          detail: { chestId, itemId }
         }));
       } else {
         window.dispatchEvent(new CustomEvent('ui:requestChestPut', {
-          detail: { chestId: state.chestId, itemId: it.id }
+          detail: { chestId, itemId }
         }));
       }
     }

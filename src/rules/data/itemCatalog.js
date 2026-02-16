@@ -443,10 +443,35 @@ export const ITEM_CATALOG = {
     rarityName: "rare",
     description: "Encases an enemy in frost, slowing them. Lighter foes freeze longer. 3 charges.",
   },
+  food_wild_berries: {
+    id: "food_wild_berries",
+    catalogKind: "food",
+    name: "Wild Berries",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 4,
+    description: "A handful of sweet wild berries.",
+  },
+  food_wild_herbs: {
+    id: "food_wild_herbs",
+    catalogKind: "food",
+    name: "Wild Herbs",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 3,
+    description: "Fresh herbs with a sharp, earthy bite.",
+  },
 };
 
 export function listCatalogItems() { return Object.values(ITEM_CATALOG); }
 export function getCatalogItem(id) { return ITEM_CATALOG[id] || null; }
 export function isCatalogEquipment(def) { return !!def && String(def.catalogKind) === "equipment"; }
 export function isCatalogMagic(def) { return !!def && String(def.catalogKind) === "magic"; }
-

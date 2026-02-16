@@ -1537,6 +1537,16 @@ world.on('interaction', ({ action, items: droppedIds }) => {
   }
 });
 
+// Harvest updates: refresh inventory UI immediately after gather actions.
+world.on('harvest:picked', ({ actor, count, kind }) => {
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch {}
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== actor) return;
+  const label = String(kind || '') === 'herbs' ? 'herb' : 'berry';
+  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${Math.max(1, Number(count || 1) | 0)} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch {}
+});
+
 // Stair traversal logic (messages handled in messageWiring)
 world.on('stair:traverse', ({ direction }) => {
   let currentDepth = 1;
