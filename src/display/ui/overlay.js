@@ -857,6 +857,21 @@ function renderInventory(panel, items) {
   hint.style.marginTop = '8px'; hint.style.opacity = '0.85';
   el.appendChild(hint);
 
+  const details = document.createElement('div');
+  Object.assign(details.style, {
+    marginTop: '8px',
+    padding: '8px',
+    minHeight: '2.4em',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    color: '#cfe8ff',
+    opacity: '0.9',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+  });
+  el.appendChild(details);
+
   function triggerApplyForTool(it) {
     const toolId = Number(it?.id || 0);
     if (!Number.isInteger(toolId) || toolId <= 0) return;
@@ -880,6 +895,8 @@ function renderInventory(panel, items) {
       ? ` · A=Apply${Number(it?.applyTargetCount || 0) > 0 ? '' : ' (no targets)'}`
       : '';
     hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · ,=Drop · E=Equip · D=Drink · U=Use${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
+    const text = String(it?.description || '').trim();
+    details.textContent = text || '(no description)';
   }
 
   /** @param {number} i */
