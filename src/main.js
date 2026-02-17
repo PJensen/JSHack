@@ -66,8 +66,6 @@ import { Devotion } from "./rules/components/Devotion.js";
 import { initDeity } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { Faction } from "./rules/components/Faction.js";
-import { createFrom } from "./lib/ecs-js/archetype.js";
-import { ScrollOfMapping } from "./rules/archetypes/Items.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import TombstoneComponent from "./rules/components/Tombstone.js";
@@ -479,18 +477,6 @@ if (!_savegameLoaded) {
           detail: { exists: true }
         }));
       } catch {}
-    }
-  }
-
-  // Give player a Scroll of Mapping (reveals full dungeon — debug aid)
-  {
-    const pe = playerEntity(world);
-    if (pe) {
-      const inv = world.get(pe.id, Inventory);
-      if (inv && Array.isArray(inv.items)) {
-        const scrollId = createFrom(world, ScrollOfMapping, {});
-        addItemEntityToInventory(world, inv, scrollId);
-      }
     }
   }
 
