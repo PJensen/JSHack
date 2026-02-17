@@ -424,7 +424,7 @@ if (!_savegameLoaded) {
 
       // Useful inventory extras for demos.
       addStarterItem('potion_health', { count: 3 });
-      addStarterItem('wand_lightning');
+      addStarterItem('wand_frost');
       addStarterItem('stone_touchstone');
       addStarterItem('book_dead');
 
