@@ -424,7 +424,7 @@ function ensureGroundTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 16px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 32px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
     minWidth: '220px', maxWidth: '70vw', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
@@ -443,7 +443,7 @@ function ensureStairTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 72px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 96px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
     minWidth: '180px', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
