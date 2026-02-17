@@ -159,11 +159,16 @@ export class InputManager {
       return;
     }
 
-    // Pickup/interact chooser: ',' (get) and Enter as a convenience key.
-    if (key === "," || key === "Enter" || code === "NumpadEnter") {
+    // Pickup chooser: ',' (get)
+    if (key === ",") {
       e.preventDefault();
-      // Display decides whether this means pickup or contextual interaction.
       this._emit(makeAction(Actions.OpenPickupChooser));
+      return;
+    }
+    // Desktop stair traverse: Enter / NumpadEnter
+    if (key === "Enter" || code === "NumpadEnter") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.TraverseStairs));
       return;
     }
   }

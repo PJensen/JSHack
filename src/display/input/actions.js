@@ -24,6 +24,8 @@ export const Actions = Object.freeze({
   Zoom: "display.zoom", // payload: { factor:number } (pinch scale delta)
   // Open a chooser for items underfoot; display will query and let user pick
   OpenPickupChooser: "display.openPickupChooser", // payload: {}
+  // Request stair traversal from keyboard (desktop Enter)
+  TraverseStairs: "display.traverseStairs", // payload: {}
   // Direct rules pickup (used by chooser submission)
   PickupItem: "rules.pickupItem", // payload: { itemId?:number, count?:number }
   // Apply a tool to a target inventory item
@@ -50,6 +52,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.OpenMessageLog]: Sinks.display,
   [Actions.Zoom]: Sinks.display,
   [Actions.OpenPickupChooser]: Sinks.display,
+  [Actions.TraverseStairs]: Sinks.display,
   [Actions.OpenApplyChooser]: Sinks.display,
   [Actions.OpenDeathLog]: Sinks.display,
 });

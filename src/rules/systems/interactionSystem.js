@@ -89,10 +89,7 @@ export function InteractionSystem(world, actor, targetId) {
 
         case "descendStair":
         case "ascendStair":
-            world.emit?.("stair:traverse", {
-                actor, targetId,
-                direction: inter.action === "descendStair" ? "down" : "up",
-            });
+            // Stair traversal is app-owned (tooltip tap / Enter), not rules-interaction driven.
             break;
 
         case "readTombstone":

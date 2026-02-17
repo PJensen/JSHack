@@ -558,6 +558,20 @@ if (!_savegameLoaded) {
 
 bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 
+function findNearestStair(world, x, y) {
+  let nearestStair = null;
+  let nearestDist = Infinity;
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up') continue;
+    const dist = Math.max(Math.abs(pos.x - x), Math.abs(pos.y - y));
+    if (dist <= 1 && dist < nearestDist) {
+      nearestDist = dist;
+      nearestStair = { id: eid, identity: ni.identity };
+    }
+  }
+  return nearestStair;
+}
+
 // ---- Input setup (display/input → rules/display) ---------------------------
 const inputDisposers = [];
 {
@@ -625,6 +639,19 @@ const inputDisposers = [];
           });
           window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
         }
+        break;
+      }
+      case "display.traverseStairs": {
+        const p = playerEntity(world);
+        if (!p) break;
+        const stair = findNearestStair(world, p.pos.x, p.pos.y);
+        if (!stair) break;
+        const direction = stair.identity === 'stair_down' ? 'down' : 'up';
+        world.emit?.('stair:traverse', {
+          actor: p.id,
+          targetId: stair.id,
+          direction,
+        });
         break;
       }
       case "display.openApplyChooser":
@@ -1753,16 +1780,7 @@ world.on('moved', ({ id, to }) => {
   shopWiring.handlePlayerMoved();
 
   // Find stairs within Chebyshev distance 1
-  let nearestStair = null;
-  let nearestDist = Infinity;
-  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up') continue;
-    const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
-    if (dist <= 1 && dist < nearestDist) {
-      nearestDist = dist;
-      nearestStair = { id: eid, identity: ni.identity };
-    }
-  }
+  const nearestStair = findNearestStair(world, to.x, to.y);
 
   if (nearestStair) {
     const direction = nearestStair.identity === 'stair_down' ? 'down' : 'up';

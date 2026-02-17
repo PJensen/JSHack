@@ -139,6 +139,26 @@ Deno.test("read text emits event with textId", () => {
   assert(textEvents[0].textId === 'intro', `textId should be 'intro'`);
 });
 
+Deno.test("stairs do not emit stair traversal from interactionSystem", () => {
+  const world = new World({ seed: 1 });
+  const actor = world.create();
+  const stairDown = world.create();
+  const stairUp = world.create();
+
+  world.add(stairDown, Interactable, { action: 'descendStair', params: null });
+  world.add(stairUp, Interactable, { action: 'ascendStair', params: null });
+
+  const stairEvents = [];
+  world.on('stair:traverse', e => stairEvents.push(e));
+
+  world.add(actor, InteractIntent, { targetId: stairDown });
+  interactionSystem(world);
+  world.add(actor, InteractIntent, { targetId: stairUp });
+  interactionSystem(world);
+
+  assert(stairEvents.length === 0, 'stairs should be traversed only by UI flow');
+});
+
 Deno.test("harvest node creates food and enters regrow cooldown", () => {
   const world = new World({ seed: 17 });
   const actor = world.create();
