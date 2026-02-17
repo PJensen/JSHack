@@ -399,28 +399,41 @@ if (!_savegameLoaded) {
       // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
       world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
 
-      // Starting weapon: a simple dagger, equipped
       const inv = world.get(pe.id, Inventory);
       const eq = world.get(pe.id, Equipment);
-      const daggerId = createItemById(world, 'dagger_quick');
-      if (inv && eq && daggerId != null) {
-        const moved = addItemEntityToInventory(world, inv, daggerId);
-        eq.weapon = moved.mode === "stacked" ? moved.stackedIntoId : daggerId;
+      const addStarterItem = (itemId, opts = {}) => {
+        if (!inv) return 0;
+        const createdId = createItemById(world, itemId, opts);
+        if (!(createdId > 0)) return 0;
+        const moved = addItemEntityToInventory(world, inv, createdId);
+        if (!moved.ok) return 0;
+        return moved.mode === "stacked" ? moved.stackedIntoId : createdId;
+      };
+
+      // Demo loadout: fun melee setup with caster utility.
+      if (eq) {
+        eq.weapon = addStarterItem('stormtouched_mace') || null;
+        eq.armor = addStarterItem('leadweave_mantle') || null;
+        eq.shield = addStarterItem('grounded_buckler') || null;
+        eq.ring1 = addStarterItem('ring_arcana') || null;
+        eq.ring2 = addStarterItem('ring_endurance') || null;
       }
-      // Starting pickaxe: for digging through walls
-      const pickaxeId = createItemById(world, 'iron_pickaxe');
-      if (inv && pickaxeId != null) {
-        addItemEntityToInventory(world, inv, pickaxeId);
-      }
-      // Starting touchstone: for testing gems
-      const touchstoneId = createItemById(world, 'stone_touchstone');
-      if (inv && touchstoneId != null) {
-        addItemEntityToInventory(world, inv, touchstoneId);
-      }
-      // Book of the Dead: view past deaths
-      const bookDeadId = createItemById(world, 'book_dead');
-      if (inv && bookDeadId != null) {
-        addItemEntityToInventory(world, inv, bookDeadId);
+
+      // Keep a pickaxe around for digging fun.
+      addStarterItem('iron_pickaxe');
+
+      // Useful inventory extras for demos.
+      addStarterItem('potion_health', { count: 3 });
+      addStarterItem('wand_lightning');
+      addStarterItem('stone_touchstone');
+      addStarterItem('book_dead');
+
+      // Start with Lightning learned and first in brain order.
+      const brain = /** @type {{ learnedSpellIds?: string[] }|null } */ (world.get(pe.id, Brain));
+      if (brain) {
+        if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+        const filtered = brain.learnedSpellIds.filter((id) => id !== 'lightning');
+        brain.learnedSpellIds = ['lightning', ...filtered];
       }
     }
   }
