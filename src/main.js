@@ -1976,26 +1976,21 @@ function render(worldView) {
   }
 
   // Pass 2: entities (doors, stairs, monsters, items, player)
-  // When a tile contains both items and actors, slightly offset item glyphs
-  // so ground items (like corpses) remain visible under occupants.
-  const stackMeta = new Map(); // "x,y" -> { maxLayer:number, itemSeen:number }
+  // Keep only the top-most ground item glyph per tile.
+  const stackMeta = new Map(); // "x,y" -> topItemId
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-    const key = `${e.pos.x},${e.pos.y}`;
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
-    const meta = stackMeta.get(key);
-    if (!meta) stackMeta.set(key, { maxLayer: layer, itemSeen: 0 });
-    else if (layer > meta.maxLayer) meta.maxLayer = layer;
+    if (layer !== 100) continue;
+    // worldView.entities is sorted by id within a tile/layer; later ids are drawn on top.
+    stackMeta.set(`${e.pos.x},${e.pos.y}`, e.id);
   }
 
-  const ITEM_STACK_OFFSETS = [
-    [-0.18, 0.20],
-    [0.00, 0.20],
-    [0.18, 0.20],
-    [-0.10, 0.30],
-    [0.10, 0.30],
-  ];
+  // Draw order requirement:
+  // 1) actors/terrain entities first
+  // 2) top ground item second
+  const deferredItems = [];
 
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
@@ -2003,20 +1998,13 @@ function render(worldView) {
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
 
-    let drawX = e.pos.x;
-    let drawY = e.pos.y;
     if (layer === 100) {
-      const meta = stackMeta.get(`${e.pos.x},${e.pos.y}`);
-      if (meta && meta.maxLayer > layer) {
-        const idx = Math.min(meta.itemSeen, ITEM_STACK_OFFSETS.length - 1);
-        const [ox, oy] = ITEM_STACK_OFFSETS[idx];
-        meta.itemSeen += 1;
-        drawX += ox;
-        drawY += oy;
-      }
+      const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
+      if (topItemId === e.id) deferredItems.push(e);
+      continue;
     }
 
-    drawKind(glyphAtlas, bctx, k, drawX, drawY);
+    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
     if (PERF.quality !== 'low' && k === 'grid_bug') {
@@ -2121,6 +2109,12 @@ function render(worldView) {
 
       g.restore();
     }
+  }
+
+  for (let i = 0; i < deferredItems.length; i++) {
+    const e = deferredItems[i];
+    const k = (typeof e.kind === 'string') ? e.kind : 'default';
+    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
   }
 
   // Spell bolt VFX (world-space additive glow)
