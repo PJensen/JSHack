@@ -2,7 +2,7 @@ import { serializeWorld } from "../../lib/ecs-js/serialization.js";
 import { getIdentifiedSnapshot } from "../../rules/data/identification.js";
 import { getGemPricingSnapshot } from "../../rules/data/gemPricing.js";
 import { getSavegameRegistryNames } from "./savegameSerializationRegistry.js";
-import { SAVEGAME_KEY } from "./savegameLoad.js";
+import { SAVEGAME_KEY, clearSavegamePayload } from "./savegameLoad.js";
 
 const INSTALLED = Symbol.for("jshack:main:savegameWiring:installed");
 
@@ -44,5 +44,11 @@ export function installSavegameWiring({ world, playerEntity, getActiveSpellId, l
     } catch {
       if (typeof log === "function") log("Save failed.");
     }
+  });
+
+  world.on("died", ({ id }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(id || 0) !== pe.id) return;
+    clearSavegamePayload();
   });
 }
