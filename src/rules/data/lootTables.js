@@ -51,9 +51,10 @@ export const LOOT_TABLES = {
   "sub:scrolls": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "archetype", weight: 50, archetype: "ScrollOfMapping" },
+      { type: "archetype", weight: 45, archetype: "ScrollOfMapping" },
       { type: "item",      weight: 30, itemId: "scroll_blastwave" },
       { type: "archetype", weight: 20, archetype: "ArrowsStack" },
+      { type: "item",      weight: 5,  itemId: "scroll_homecoming" },
     ],
   },
 

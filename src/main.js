@@ -65,6 +65,7 @@ import { Vitality } from "./rules/components/Vitality.js";
 import { Devotion } from "./rules/components/Devotion.js";
 import { initDeity } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
+import { Interactable } from "./rules/components/Interactable.js";
 import { Faction } from "./rules/components/Faction.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
@@ -544,18 +545,21 @@ if (!_savegameLoaded) {
 
 bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 
-function findNearestStair(world, x, y) {
-  let nearestStair = null;
+function findNearestTraversalTarget(world, x, y) {
+  let nearest = null;
   let nearestDist = Infinity;
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up') continue;
+    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal') continue;
     const dist = Math.max(Math.abs(pos.x - x), Math.abs(pos.y - y));
-    if (dist <= 1 && dist < nearestDist) {
+    if (dist > 1) continue;
+    const prefer = dist < nearestDist
+      || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal');
+    if (prefer) {
       nearestDist = dist;
-      nearestStair = { id: eid, identity: ni.identity };
+      nearest = { id: eid, identity: ni.identity };
     }
   }
-  return nearestStair;
+  return nearest;
 }
 
 // ---- Input setup (display/input → rules/display) ---------------------------
@@ -630,12 +634,20 @@ const inputDisposers = [];
       case "display.traverseStairs": {
         const p = playerEntity(world);
         if (!p) break;
-        const stair = findNearestStair(world, p.pos.x, p.pos.y);
-        if (!stair) break;
-        const direction = stair.identity === 'stair_down' ? 'down' : 'up';
+        const target = findNearestTraversalTarget(world, p.pos.x, p.pos.y);
+        if (!target) break;
+        if (target.identity === 'return_portal') {
+          world.emit?.('portal:return', {
+            actor: p.id,
+            portalId: target.id,
+            targetId: target.id,
+          });
+          break;
+        }
+        const direction = target.identity === 'stair_down' ? 'down' : 'up';
         world.emit?.('stair:traverse', {
           actor: p.id,
-          targetId: stair.id,
+          targetId: target.id,
           direction,
         });
         break;
@@ -1634,7 +1646,15 @@ world.on('harvest:picked', ({ actor, count, kind }) => {
 });
 
 // Stair traversal logic (messages handled in messageWiring)
-/** @type {{ direction: 'up' | 'down' } | null} */
+const RETURN_PORTAL_IDENTITY = 'return_portal';
+
+/** @type {{
+ *   direction?: 'up' | 'down',
+ *   targetDepth?: number,
+ *   targetPos?: { x: number, y: number },
+ *   fragActorsAtTarget?: boolean,
+ *   returnTicket?: { depth: number, x: number, y: number } | null,
+ * } | null} */
 let _pendingStairTransition = null;
 
 function queueStairTransition(direction) {
@@ -1643,6 +1663,130 @@ function queueStairTransition(direction) {
   // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
   if (_pendingStairTransition) return;
   _pendingStairTransition = { direction: dir };
+}
+
+function queueDepthTransition(targetDepth, opts = {}) {
+  const depth = Number(targetDepth);
+  if (!Number.isFinite(depth)) return;
+  // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
+  if (_pendingStairTransition) return;
+  const x = Number(opts?.targetPos?.x);
+  const y = Number(opts?.targetPos?.y);
+  const targetPos = (Number.isFinite(x) && Number.isFinite(y))
+    ? { x: Math.floor(x), y: Math.floor(y) }
+    : undefined;
+  const tDepth = Number(opts?.returnTicket?.depth);
+  const tx = Number(opts?.returnTicket?.x);
+  const ty = Number(opts?.returnTicket?.y);
+  const returnTicket = (Number.isFinite(tDepth) && Number.isFinite(tx) && Number.isFinite(ty))
+    ? { depth: Math.max(0, Math.floor(tDepth)), x: Math.floor(tx), y: Math.floor(ty) }
+    : null;
+  _pendingStairTransition = {
+    targetDepth: Math.max(0, Math.floor(depth)),
+    targetPos,
+    fragActorsAtTarget: opts?.fragActorsAtTarget === true,
+    returnTicket,
+  };
+}
+
+function trackCurrentFloorEntity(entityId) {
+  const eid = Number(entityId) | 0;
+  if (!(eid > 0)) return;
+  for (const [id, ds] of world.query(DungeonState)) {
+    if (!Array.isArray(ds.floorEntityIds)) ds.floorEntityIds = [];
+    if (!ds.floorEntityIds.includes(eid)) ds.floorEntityIds.push(eid);
+    try { world.set(id, DungeonState, ds); } catch {}
+    break;
+  }
+}
+
+function untrackCurrentFloorEntity(entityId) {
+  const eid = Number(entityId) | 0;
+  if (!(eid > 0)) return;
+  for (const [id, ds] of world.query(DungeonState)) {
+    if (!Array.isArray(ds.floorEntityIds)) break;
+    const next = ds.floorEntityIds.filter((v) => (Number(v) | 0) !== eid);
+    ds.floorEntityIds = next;
+    try { world.set(id, DungeonState, ds); } catch {}
+    break;
+  }
+}
+
+function destroyReturnPortals() {
+  const ids = [];
+  for (const [id, ni] of world.query(NamedIdentity)) {
+    if (ni?.identity === RETURN_PORTAL_IDENTITY) ids.push(id);
+  }
+  for (const id of ids) {
+    try { world.destroy(id); } catch {}
+    untrackCurrentFloorEntity(id);
+  }
+}
+
+function spawnReturnPortal(ticket) {
+  const pe = playerEntity(world);
+  if (!pe) return 0;
+  destroyReturnPortals();
+
+  /** @type {{ x:number, y:number }|null} */
+  let bedPos = null;
+  /** @type {{ x:number, y:number }|null} */
+  let chestPos = null;
+  for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni?.identity === 'bed_home') {
+      bedPos = { x: pos.x | 0, y: pos.y | 0 };
+      continue;
+    }
+    if (ni?.identity === 'chest') {
+      chestPos = { x: pos.x | 0, y: pos.y | 0 };
+    }
+  }
+
+  const portalPos = (bedPos && chestPos)
+    ? {
+      x: Math.floor((bedPos.x + chestPos.x) / 2),
+      y: Math.floor((bedPos.y + chestPos.y) / 2),
+    }
+    : { x: pe.pos.x, y: pe.pos.y };
+
+  const portalId = world.create();
+  world.add(portalId, Position, { x: portalPos.x, y: portalPos.y });
+  world.add(portalId, NamedIdentity, { name: 'Return Portal', identity: RETURN_PORTAL_IDENTITY });
+  world.add(portalId, Interactable, {
+    action: 'returnPortal',
+    params: {
+      targetDepth: Math.max(0, Math.floor(Number(ticket?.depth || 0))),
+      targetX: Math.floor(Number(ticket?.x || 0)),
+      targetY: Math.floor(Number(ticket?.y || 0)),
+    },
+  });
+  trackCurrentFloorEntity(portalId);
+  try {
+    world.emit?.('portal:spawned', {
+      portalId,
+      at: { x: portalPos.x, y: portalPos.y },
+      targetDepth: Math.max(0, Math.floor(Number(ticket?.depth || 0))),
+      target: { x: Math.floor(Number(ticket?.x || 0)), y: Math.floor(Number(ticket?.y || 0)) },
+    });
+  } catch {}
+  return portalId;
+}
+
+function fragActorsAt(worldRef, x, y, excludeId = 0) {
+  const tx = Math.floor(Number(x));
+  const ty = Math.floor(Number(y));
+  let count = 0;
+  for (const [id, pos, _vit] of worldRef.query(Position, Vitality)) {
+    if (id === excludeId) continue;
+    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+    try { worldRef.destroy(id); } catch {}
+    untrackCurrentFloorEntity(id);
+    count++;
+  }
+  if (count > 0) {
+    try { worldRef.emit?.('portal:return:fragged', { count, at: { x: tx, y: ty } }); } catch {}
+  }
+  return count;
 }
 
 function flushPendingStairTransition() {
@@ -1656,10 +1800,40 @@ function flushPendingStairTransition() {
     break;
   }
 
-  const newDepth = pending.direction === 'down' ? currentDepth + 1 : currentDepth - 1;
-  if (newDepth < 0) return;
+  let newDepth = currentDepth;
+  if (Number.isFinite(pending.targetDepth)) {
+    newDepth = Math.max(0, Math.floor(Number(pending.targetDepth)));
+  } else if (pending.direction === 'down') {
+    newDepth = currentDepth + 1;
+  } else if (pending.direction === 'up') {
+    newDepth = currentDepth - 1;
+  }
+  if (newDepth < 0 || newDepth === currentDepth) return;
 
-  transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction: pending.direction, tombstoneRepo });
+  const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
+  if (hasTargetPos) {
+    transitionToDepth(
+      world,
+      newDepth,
+      { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 },
+      { tombstoneRepo },
+    );
+    if (pending.fragActorsAtTarget) {
+      const pe = playerEntity(world);
+      const playerId = pe?.id || 0;
+      fragActorsAt(world, pending.targetPos.x, pending.targetPos.y, playerId);
+      if (playerId > 0) {
+        world.set(playerId, Position, { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 });
+      }
+    }
+  } else {
+    const direction = newDepth > currentDepth ? 'down' : 'up';
+    transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
+  }
+
+  if (newDepth === 0 && pending.returnTicket && pending.returnTicket.depth > 0) {
+    spawnReturnPortal(pending.returnTicket);
+  }
 
   // Invalidate cached world view
   _cachedView = null;
@@ -1668,6 +1842,30 @@ function flushPendingStairTransition() {
 
 world.on('stair:traverse', ({ direction }) => {
   queueStairTransition(direction);
+});
+
+world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
+  queueDepthTransition(targetDepth, {
+    returnTicket: String(source || '') === 'scroll_homecoming' ? returnTicket : null,
+  });
+});
+
+world.on('portal:return', ({ portalId }) => {
+  const pid = Number(portalId) | 0;
+  if (!(pid > 0)) return;
+  const ni = world.get(pid, NamedIdentity);
+  if (ni?.identity !== RETURN_PORTAL_IDENTITY) return;
+  const inter = world.get(pid, Interactable);
+  const targetDepth = Number(inter?.params?.targetDepth);
+  const targetX = Number(inter?.params?.targetX);
+  const targetY = Number(inter?.params?.targetY);
+  if (!Number.isFinite(targetDepth) || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+  try { world.destroy(pid); } catch {}
+  untrackCurrentFloorEntity(pid);
+  queueDepthTransition(targetDepth, {
+    targetPos: { x: targetX, y: targetY },
+    fragActorsAtTarget: true,
+  });
 });
 
 // UI stair tooltip tap → trigger stair traverse
@@ -1679,11 +1877,19 @@ addEventListener('ui:requestStairTraverse', (ev) => {
   const pe = playerEntity(world);
   if (!pe) return;
 
-  world.emit?.('stair:traverse', {
-    actor: pe.id,
-    targetId: stairId,
-    direction
-  });
+  if (direction === 'return') {
+    world.emit?.('portal:return', {
+      actor: pe.id,
+      targetId: stairId,
+      portalId: stairId,
+    });
+  } else {
+    world.emit?.('stair:traverse', {
+      actor: pe.id,
+      targetId: stairId,
+      direction
+    });
+  }
 });
 
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
@@ -1765,14 +1971,16 @@ world.on('moved', ({ id, to }) => {
   if (!pe || pe.id !== id) return;
   shopWiring.handlePlayerMoved();
 
-  // Find stairs within Chebyshev distance 1
-  const nearestStair = findNearestStair(world, to.x, to.y);
+  // Find traversable targets (stairs or return portal) within Chebyshev distance 1
+  const nearestTarget = findNearestTraversalTarget(world, to.x, to.y);
 
-  if (nearestStair) {
-    const direction = nearestStair.identity === 'stair_down' ? 'down' : 'up';
+  if (nearestTarget) {
+    const direction = nearestTarget.identity === 'stair_down'
+      ? 'down'
+      : (nearestTarget.identity === 'stair_up' ? 'up' : 'return');
     try {
       window.dispatchEvent(new CustomEvent('ui:showStairTooltip', {
-        detail: { stairId: nearestStair.id, direction }
+        detail: { stairId: nearestTarget.id, direction }
       }));
     } catch {}
   } else {

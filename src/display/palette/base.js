@@ -44,6 +44,8 @@ export const basePalette = {
   // Scrolls
   scroll_mapping: { glyph: "?", fg: "#eeddaa", glow: "#ccbb88" },
   scroll_blastwave: { glyph: "?", fg: "#ffa333", glow: "#dd8811" },
+  scroll_homecoming: { glyph: "?", fg: "#9fe8ff", glow: "#62b7d5" },
+  return_portal: { glyph: "O", fg: "#7bd6ff", glow: "#3f98bb" },
   // Aliases to match rules identity so they render on the ground
   book_lightning: { glyph: "📓", fg: "#ffff66", glow: "#ffff66" },
   book_meteor: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
