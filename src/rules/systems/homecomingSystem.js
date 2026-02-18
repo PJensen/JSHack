@@ -6,8 +6,6 @@ import { Collider } from "../components/Collider.js";
 import { transitionToDepth } from "../environment/dungeon/transition.js";
 import { resolveTeleportDestination } from "../utils/teleport.js";
 
-const HOMECOMING_HANDLER_INSTALLED = Symbol.for("jshack:homecoming:handler:installed");
-
 function getDungeonState(world) {
   for (const [, ds] of world.query(DungeonState)) return ds;
   return null;
@@ -21,7 +19,12 @@ function clearReturnPortal(world, ds) {
   if (ds) ds.returnPortal = null;
 }
 
-function resolveHomecoming(world, req) {
+/**
+ * Resolve a homecoming request at a safe app-loop boundary.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{actor:number,anchorX:number,anchorY:number,departureDepth:number,departureX:number,departureY:number}} req
+ */
+export function resolveHomecomingRequest(world, req) {
   const actor = Number(req?.actor || 0) | 0;
   const anchor = { x: Number(req?.anchorX || 0) | 0, y: Number(req?.anchorY || 0) | 0 };
   const departure = {
@@ -82,18 +85,4 @@ function resolveHomecoming(world, req) {
     });
     world.emit?.("teleport:home", { actor, from: departure, to: { depth: 0, pos: homePos } });
   } catch {}
-}
-
-/**
- * Install an immediate event-driven homecoming resolver.
- * This avoids deferred intent visibility and applies teleport in the same action tick.
- * @param {import('../../lib/ecs-js/index.js').World} world
- */
-export function installHomecomingHandler(world) {
-  if (!world || world[HOMECOMING_HANDLER_INSTALLED]) return;
-  world[HOMECOMING_HANDLER_INSTALLED] = true;
-
-  world.on("homecoming:request", (req) => {
-    try { resolveHomecoming(world, req); } catch {}
-  });
 }

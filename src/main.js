@@ -279,6 +279,7 @@ function updateActiveSpellLabel() {
 // ---- Dungeon initialization -------------------------------------------------
 import { initDungeon, generateFloorPlan } from "./rules/environment/dungeon/index.js";
 import { transitionToDepth } from "./rules/environment/dungeon/transition.js";
+import { resolveHomecomingRequest } from "./rules/systems/homecomingSystem.js";
 import {
   TILE_FLOOR,
   TILE_WALL,
@@ -1663,6 +1664,36 @@ world.on('harvest:picked', ({ actor, count, kind }) => {
   try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${Math.max(1, Number(count || 1) | 0)} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch {}
 });
 
+// Homecoming resolution is queued to app loop boundary (same model as stairs)
+/** @type {{actor:number,anchorX:number,anchorY:number,departureDepth:number,departureX:number,departureY:number}|null} */
+let _pendingHomecomingRequest = null;
+
+function queueHomecomingRequest(req) {
+  if (!req) return;
+  _pendingHomecomingRequest = {
+    actor: Number(req.actor || 0) | 0,
+    anchorX: Number(req.anchorX || 0) | 0,
+    anchorY: Number(req.anchorY || 0) | 0,
+    departureDepth: Number(req.departureDepth || 0) | 0,
+    departureX: Number(req.departureX || 0) | 0,
+    departureY: Number(req.departureY || 0) | 0,
+  };
+}
+
+function flushPendingHomecomingRequest() {
+  const pending = _pendingHomecomingRequest;
+  if (!pending) return;
+  _pendingHomecomingRequest = null;
+
+  resolveHomecomingRequest(world, pending);
+  _cachedView = null;
+  _cachedStep = -1;
+}
+
+world.on('homecoming:request', (req) => {
+  queueHomecomingRequest(req);
+});
+
 // Stair traversal logic (messages handled in messageWiring)
 /** @type {{ direction: 'up' | 'down' } | null} */
 let _pendingStairTransition = null;
@@ -2240,6 +2271,7 @@ function frame(now) {
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
   flushPendingStairTransition();
+  flushPendingHomecomingRequest();
 
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
