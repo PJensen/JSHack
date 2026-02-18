@@ -53,6 +53,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "archetype", weight: 50, archetype: "ScrollOfMapping" },
       { type: "item",      weight: 30, itemId: "scroll_blastwave" },
+      { type: "item",      weight: 20, itemId: "scroll_homecoming" },
       { type: "archetype", weight: 20, archetype: "ArrowsStack" },
     ],
   },

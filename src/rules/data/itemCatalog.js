@@ -407,6 +407,17 @@ export const ITEM_CATALOG = {
     rarityName: "rare",
     description: "Casts Blast Wave without learning it.",
   },
+  scroll_homecoming: {
+    id: "scroll_homecoming",
+    catalogKind: "magic",
+    name: "Scroll of Homecoming",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "rare",
+    description: "Returns you home and leaves a temporary return portal.",
+  },
   wand_lightning: {
     id: "wand_lightning",
     catalogKind: "magic",

@@ -40,6 +40,7 @@ import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js
 import { clearExplored } from './exploredMap.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { generateOverworldChunks } from './overworld.js';
+import { findHomeAnchor } from '../../utils/teleport.js';
 
 /**
  * Generate all chunks for a floor and materialize everything at once.
@@ -193,10 +194,13 @@ export function initDungeon(world, opts = {}) {
 
   // Create dungeon state singleton
   const dsId = world.create();
+  const homeAnchor = depth === 0 ? findHomeAnchor(world) : null;
   world.add(dsId, DungeonState, {
     worldSeed,
     currentDepth: depth,
     floorEntityIds: entityIds,
+    homeAnchor,
+    returnPortal: null,
   });
 
   return { x: spawnX, y: spawnY };

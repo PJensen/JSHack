@@ -1067,6 +1067,36 @@ world.on('spell:frost', ({ actor, targetId, from, at, duration, mass, fizzle }) 
     });
   }
 });
+
+world.on('portal:opened', ({ at, radius = 3, color }) => {
+  if (!at || !fx?.pool) return;
+  const N = 42;
+  const hue = String(color || '#b04dff');
+  for (let i = 0; i < N; i++) {
+    const t = i / N;
+    const a = t * Math.PI * 2;
+    const r = 0.6 + (radius * 0.28) * t;
+    fx.pool.spawn({
+      x: at.x + Math.cos(a) * r,
+      y: at.y + Math.sin(a) * r,
+      vx: -Math.sin(a) * (0.3 + t * 0.4),
+      vy: Math.cos(a) * (0.3 + t * 0.4),
+      ax: 0,
+      ay: -0.03,
+      life: 0.65 + Math.random() * 0.35,
+      size0: 0.1,
+      size1: 0.02,
+      r: parseInt(hue.slice(1, 3), 16) || 176,
+      g: parseInt(hue.slice(3, 5), 16) || 77,
+      b: parseInt(hue.slice(5, 7), 16) || 255,
+      a0: 0.9,
+      a1: 0,
+      rot: a,
+      rotVel: 1.6,
+    });
+  }
+  startShake(cam, 3, 0.18);
+});
 // Arrow tracer VFX (world-space; display-only state)
 /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, dx:number, dy:number, len:number, style:string}>} */
 const _arrowFx = [];

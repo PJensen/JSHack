@@ -8,4 +8,6 @@ export const DungeonState = defineComponent('DungeonState', {
   worldSeed: 0,
   currentDepth: 1,
   floorEntityIds: [], // all entity IDs created for this floor
+  homeAnchor: null, // { depth:0, x:number, y:number }
+  returnPortal: null, // { portalId:number, fromDepth:number, fromPos:{x:number,y:number} }
 });

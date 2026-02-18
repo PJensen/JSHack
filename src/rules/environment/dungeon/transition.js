@@ -11,6 +11,7 @@ import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
+import { findHomeAnchor } from '../../utils/teleport.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
@@ -45,7 +46,7 @@ function _buildSnapshotRegistry(world) {
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
- * @param {{direction?: 'up'|'down', tombstoneRepo?: Object, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
+ * @param {{direction?: 'up'|'down', tombstoneRepo?: Object, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void, skipPostTick?: boolean}} [opts]
  */
 export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
@@ -170,6 +171,10 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     world.mutate(dungeonId, DungeonState, r => {
       r.currentDepth = newDepth;
       r.floorEntityIds = entityIds;
+      if (newDepth === 0) {
+        const anchor = findHomeAnchor(world);
+        if (anchor) r.homeAnchor = anchor;
+      }
     });
   }
 
@@ -181,7 +186,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });
   invalidateTileQueryCache(world);
-  world.tick(1);
+  if (!opts.skipPostTick) world.tick(1);
 }
 
 /**

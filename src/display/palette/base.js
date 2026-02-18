@@ -44,6 +44,7 @@ export const basePalette = {
   // Scrolls
   scroll_mapping: { glyph: "?", fg: "#eeddaa", glow: "#ccbb88" },
   scroll_blastwave: { glyph: "?", fg: "#ffa333", glow: "#dd8811" },
+  scroll_homecoming: { glyph: "?", fg: "#b37dff", glow: "#7a42cc" },
   // Aliases to match rules identity so they render on the ground
   book_lightning: { glyph: "📓", fg: "#ffff66", glow: "#ffff66" },
   book_meteor: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
@@ -69,6 +70,7 @@ export const basePalette = {
   house_sign: { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
   berry_bush: { glyph: "%", fg: "#8b4ea9", glow: "#5a2d75" },
   herb_patch: { glyph: ";", fg: "#63a85f", glow: "#3e6b3c" },
+  home_return_portal: { glyph: "◍", fg: "#c47bff", glow: "#8a3eea" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },

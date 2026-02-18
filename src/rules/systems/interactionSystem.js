@@ -11,10 +11,13 @@ import { Vitality } from "../components/Vitality.js";
 import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import TombstoneComponent from "../components/Tombstone.js";
+import { DungeonState } from "../components/DungeonState.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { WildBerries, WildHerbs } from "../archetypes/Food.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { transitionToDepth } from "../environment/dungeon/transition.js";
+import { resolveTeleportDestination } from "../utils/teleport.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -161,6 +164,32 @@ export function InteractionSystem(world, actor, targetId) {
                     itemId: resultItemId,
                     regrowTurns: node.regrowTurns,
                 });
+            }
+            break;
+
+        case "useReturnPortal":
+            {
+                let ds = null;
+                for (const [, state] of world.query(DungeonState)) { ds = state; break; }
+                const rp = ds?.returnPortal;
+                const fromDepth = Number(rp?.fromDepth ?? inter.params?.fromDepth);
+                const fromPos = rp?.fromPos || inter.params?.fromPos;
+                if (!Number.isInteger(fromDepth) || !fromPos || !Number.isInteger(fromPos.x) || !Number.isInteger(fromPos.y)) {
+                    world.emit?.("portal:failed", { actor, targetId, reason: "invalid-anchor" });
+                    break;
+                }
+
+                transitionToDepth(world, fromDepth, { x: fromPos.x, y: fromPos.y }, { skipPostTick: true });
+
+                const fallback = resolveTeleportDestination(world, { x: fromPos.x, y: fromPos.y }, {
+                    maxDistance: 3,
+                    exclude: [{ x: fromPos.x, y: fromPos.y }],
+                }) || { x: fromPos.x, y: fromPos.y };
+
+                world.set(actor, Position, fallback);
+                if (ds) ds.returnPortal = null;
+                try { world.destroy(targetId); } catch {}
+                world.emit?.("portal:returned", { actor, targetId, to: { depth: fromDepth, pos: fallback } });
             }
             break;
     }
