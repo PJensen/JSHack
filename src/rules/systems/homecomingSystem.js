@@ -38,7 +38,10 @@ export function resolveHomecomingRequest(world, req) {
     transitionToDepth(world, 0, { x: anchor.x, y: anchor.y }, { skipPostTick: true });
   }
 
-  const homePos = resolveTeleportDestination(world, anchor, { maxDistance: 3 });
+  const homePos = resolveTeleportDestination(world, anchor, {
+    maxDistance: 3,
+    exclude: [anchor],
+  });
   if (!homePos) {
     try { world.emit?.("teleport:failed", { actor, spellId: "homecoming", reason: "home-blocked" }); } catch {}
     return;
@@ -49,11 +52,8 @@ export function resolveHomecomingRequest(world, req) {
   if (!dsAfter) return;
   clearReturnPortal(world, dsAfter);
 
-  const portalSpot = resolveTeleportDestination(world, anchor, {
-    maxDistance: 3,
-    exclude: [homePos],
-  });
-  if (!portalSpot || departure.depth === 0) {
+  const portalSpot = { x: anchor.x, y: anchor.y };
+  if (departure.depth === 0) {
     try { world.emit?.("teleport:home", { actor, from: departure, to: { depth: 0, pos: homePos } }); } catch {}
     return;
   }

@@ -50,7 +50,8 @@ Deno.test("homecoming scroll returns home and portal returns to fallback tile", 
   assert(ds.returnPortal?.portalId > 0, "return portal should be created");
   const portalId = ds.returnPortal.portalId;
   const portalPos = world.get(portalId, Position);
-  assert(cheb(portalPos, ds.homeAnchor) <= 3, "portal should be within 3 tiles of canonical home anchor");
+  assertEquals(portalPos.x, ds.homeAnchor.x, "portal should be centered at canonical home anchor");
+  assertEquals(portalPos.y, ds.homeAnchor.y, "portal should be centered at canonical home anchor");
 
   world.add(player, InteractIntent, { targetId: portalId });
   interactionSystem(world);
@@ -131,4 +132,32 @@ Deno.test("homecoming works from default start depth with canonical anchor", () 
   const ds = [...world.query(DungeonState)][0][1];
   assertEquals(ds.currentDepth, 0, "should arrive home even when run starts at depth 1");
   assert(ds.homeAnchor && Number.isInteger(ds.homeAnchor.x) && Number.isInteger(ds.homeAnchor.y), "home anchor should be precomputed");
+});
+
+
+Deno.test("return portal sends player back to exact departure tile when free", () => {
+  const world = new World({ seed: 0xBEEF });
+  const requests = [];
+  world.on("homecoming:request", (e) => requests.push(e));
+  const spawn = initDungeon(world, { startDepth: 0 });
+  const player = createPlayer(world, { x: spawn.x, y: spawn.y, name: "Hero" });
+
+  transitionToDepth(world, 2, { x: 0, y: 0 }, { direction: "down", skipPostTick: true });
+  const departure = world.get(player, Position);
+
+  const inv = world.get(player, Inventory);
+  const scroll = createItemById(world, "scroll_homecoming");
+  inv.items.push(scroll);
+  world.add(player, UseIntent, { itemId: scroll });
+  useItemSystem(world);
+  flushHomecoming(world, requests);
+
+  const ds = [...world.query(DungeonState)][0][1];
+  const portalId = ds.returnPortal.portalId;
+  world.add(player, InteractIntent, { targetId: portalId });
+  interactionSystem(world);
+
+  const ppos = world.get(player, Position);
+  assertEquals(ppos.x, departure.x);
+  assertEquals(ppos.y, departure.y);
 });

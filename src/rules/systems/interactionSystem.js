@@ -183,7 +183,6 @@ export function InteractionSystem(world, actor, targetId) {
 
                 const fallback = resolveTeleportDestination(world, { x: fromPos.x, y: fromPos.y }, {
                     maxDistance: 3,
-                    exclude: [{ x: fromPos.x, y: fromPos.y }],
                 }) || { x: fromPos.x, y: fromPos.y };
 
                 world.set(actor, Position, fallback);
