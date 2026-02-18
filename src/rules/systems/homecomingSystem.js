@@ -1,4 +1,3 @@
-import { HomecomingIntent } from "../components/Intents/HomecomingIntent.js";
 import { Position } from "../components/Position.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -6,6 +5,8 @@ import { Interactable } from "../components/Interactable.js";
 import { Collider } from "../components/Collider.js";
 import { transitionToDepth } from "../environment/dungeon/transition.js";
 import { resolveTeleportDestination } from "../utils/teleport.js";
+
+const HOMECOMING_HANDLER_INSTALLED = Symbol.for("jshack:homecoming:handler:installed");
 
 function getDungeonState(world) {
   for (const [, ds] of world.query(DungeonState)) return ds;
@@ -20,68 +21,79 @@ function clearReturnPortal(world, ds) {
   if (ds) ds.returnPortal = null;
 }
 
-export function homecomingSystem(world) {
-  for (const [actor, intent] of world.query(HomecomingIntent)) {
-    try {
-      const anchor = { x: intent.anchorX | 0, y: intent.anchorY | 0 };
-      const departure = {
-        depth: intent.departureDepth | 0,
-        pos: { x: intent.departureX | 0, y: intent.departureY | 0 },
-      };
+function resolveHomecoming(world, req) {
+  const actor = Number(req?.actor || 0) | 0;
+  const anchor = { x: Number(req?.anchorX || 0) | 0, y: Number(req?.anchorY || 0) | 0 };
+  const departure = {
+    depth: Number(req?.departureDepth || 0) | 0,
+    pos: { x: Number(req?.departureX || 0) | 0, y: Number(req?.departureY || 0) | 0 },
+  };
 
-      if (departure.depth !== 0) {
-        transitionToDepth(world, 0, { x: anchor.x, y: anchor.y }, { skipPostTick: true });
-      }
+  if (!(actor > 0) || !world.isAlive(actor)) return;
 
-      const homePos = resolveTeleportDestination(world, anchor, { maxDistance: 3 });
-      if (!homePos) {
-        try { world.emit?.("teleport:failed", { actor, spellId: "homecoming", reason: "home-blocked" }); } catch {}
-        continue;
-      }
-      world.set(actor, Position, homePos);
-
-      const dsAfter = getDungeonState(world);
-      if (!dsAfter) continue;
-      clearReturnPortal(world, dsAfter);
-
-      const portalSpot = resolveTeleportDestination(world, anchor, {
-        maxDistance: 3,
-        exclude: [homePos],
-      });
-      if (!portalSpot || departure.depth === 0) {
-        try { world.emit?.("teleport:home", { actor, from: departure, to: { depth: 0, pos: homePos } }); } catch {}
-        continue;
-      }
-
-      const portalId = world.create();
-      world.add(portalId, Position, portalSpot);
-      world.add(portalId, NamedIdentity, { name: "Return Portal", identity: "home_return_portal" });
-      world.add(portalId, Collider, { solid: true, blocksSight: false });
-      world.add(portalId, Interactable, {
-        action: "useReturnPortal",
-        params: { fromDepth: departure.depth, fromPos: departure.pos },
-      });
-
-      dsAfter.returnPortal = {
-        portalId,
-        fromDepth: departure.depth,
-        fromPos: departure.pos,
-      };
-
-      try {
-        world.emit?.("portal:opened", {
-          actor,
-          portalId,
-          at: portalSpot,
-          color: "#b04dff",
-          style: "swirl",
-          radius: 3,
-          from: departure,
-        });
-        world.emit?.("teleport:home", { actor, from: departure, to: { depth: 0, pos: homePos } });
-      } catch {}
-    } finally {
-      try { world.remove(actor, HomecomingIntent); } catch {}
-    }
+  if (departure.depth !== 0) {
+    transitionToDepth(world, 0, { x: anchor.x, y: anchor.y }, { skipPostTick: true });
   }
+
+  const homePos = resolveTeleportDestination(world, anchor, { maxDistance: 3 });
+  if (!homePos) {
+    try { world.emit?.("teleport:failed", { actor, spellId: "homecoming", reason: "home-blocked" }); } catch {}
+    return;
+  }
+  world.set(actor, Position, homePos);
+
+  const dsAfter = getDungeonState(world);
+  if (!dsAfter) return;
+  clearReturnPortal(world, dsAfter);
+
+  const portalSpot = resolveTeleportDestination(world, anchor, {
+    maxDistance: 3,
+    exclude: [homePos],
+  });
+  if (!portalSpot || departure.depth === 0) {
+    try { world.emit?.("teleport:home", { actor, from: departure, to: { depth: 0, pos: homePos } }); } catch {}
+    return;
+  }
+
+  const portalId = world.create();
+  world.add(portalId, Position, portalSpot);
+  world.add(portalId, NamedIdentity, { name: "Return Portal", identity: "home_return_portal" });
+  world.add(portalId, Collider, { solid: true, blocksSight: false });
+  world.add(portalId, Interactable, {
+    action: "useReturnPortal",
+    params: { fromDepth: departure.depth, fromPos: departure.pos },
+  });
+
+  dsAfter.returnPortal = {
+    portalId,
+    fromDepth: departure.depth,
+    fromPos: departure.pos,
+  };
+
+  try {
+    world.emit?.("portal:opened", {
+      actor,
+      portalId,
+      at: portalSpot,
+      color: "#b04dff",
+      style: "swirl",
+      radius: 3,
+      from: departure,
+    });
+    world.emit?.("teleport:home", { actor, from: departure, to: { depth: 0, pos: homePos } });
+  } catch {}
+}
+
+/**
+ * Install an immediate event-driven homecoming resolver.
+ * This avoids deferred intent visibility and applies teleport in the same action tick.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ */
+export function installHomecomingHandler(world) {
+  if (!world || world[HOMECOMING_HANDLER_INSTALLED]) return;
+  world[HOMECOMING_HANDLER_INSTALLED] = true;
+
+  world.on("homecoming:request", (req) => {
+    try { resolveHomecoming(world, req); } catch {}
+  });
 }

@@ -39,7 +39,7 @@ import { CHUNK_SIZE, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
-import { generateOverworldChunks } from './overworld.js';
+import { generateOverworldChunks, getOverworldHomeAnchor } from './overworld.js';
 import { findHomeAnchor } from '../../utils/teleport.js';
 
 /**
@@ -194,7 +194,7 @@ export function initDungeon(world, opts = {}) {
 
   // Create dungeon state singleton
   const dsId = world.create();
-  const homeAnchor = depth === 0 ? findHomeAnchor(world) : null;
+  const homeAnchor = depth === 0 ? (findHomeAnchor(world) || getOverworldHomeAnchor()) : getOverworldHomeAnchor();
   world.add(dsId, DungeonState, {
     worldSeed,
     currentDepth: depth,

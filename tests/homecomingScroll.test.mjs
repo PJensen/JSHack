@@ -7,6 +7,7 @@ import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import { installHomecomingHandler } from "../src/rules/systems/homecomingSystem.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Collider } from "../src/rules/components/Collider.js";
@@ -22,6 +23,7 @@ Deno.test("homecoming scroll returns home and portal returns to fallback tile", 
   const world = new World({ seed: 0xC0FFEE });
   const spawn = initDungeon(world, { startDepth: 0 });
   const player = createPlayer(world, { x: spawn.x, y: spawn.y, name: "Hero" });
+  installHomecomingHandler(world);
 
   transitionToDepth(world, 2, { x: 0, y: 0 }, { direction: "down", skipPostTick: true });
 
@@ -57,6 +59,7 @@ Deno.test("homecoming scroll emits failure on invalid home anchor", () => {
   const world = new World({ seed: 1234 });
   const spawn = initDungeon(world, { startDepth: 0 });
   const player = createPlayer(world, { x: spawn.x, y: spawn.y, name: "Hero" });
+  installHomecomingHandler(world);
   const ds = [...world.query(DungeonState)][0][1];
   ds.homeAnchor = null;
 
@@ -79,6 +82,7 @@ Deno.test("homecoming resolves blocked home tile to nearby fallback", () => {
   const world = new World({ seed: 5678 });
   const spawn = initDungeon(world, { startDepth: 0 });
   const player = createPlayer(world, { x: spawn.x, y: spawn.y, name: "Hero" });
+  installHomecomingHandler(world);
   const ds = [...world.query(DungeonState)][0][1];
 
   const blocker = world.create();
@@ -96,3 +100,22 @@ Deno.test("homecoming resolves blocked home tile to nearby fallback", () => {
   assert(cheb(ppos, ds.homeAnchor) <= 3, "fallback home tile should remain within 3 tiles");
 });
 
+
+
+Deno.test("homecoming works from default start depth with canonical anchor", () => {
+  const world = new World({ seed: 2468 });
+  const spawn = initDungeon(world); // default startDepth 1
+  const player = createPlayer(world, { x: spawn.x, y: spawn.y, name: "Hero" });
+  installHomecomingHandler(world);
+
+  const inv = world.get(player, Inventory);
+  const scroll = createItemById(world, "scroll_homecoming");
+  inv.items.push(scroll);
+
+  world.add(player, UseIntent, { itemId: scroll });
+  useItemSystem(world);
+
+  const ds = [...world.query(DungeonState)][0][1];
+  assertEquals(ds.currentDepth, 0, "should arrive home even when run starts at depth 1");
+  assert(ds.homeAnchor && Number.isInteger(ds.homeAnchor.x) && Number.isInteger(ds.homeAnchor.y), "home anchor should be precomputed");
+});

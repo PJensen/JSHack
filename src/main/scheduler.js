@@ -16,7 +16,7 @@ import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
-import { homecomingSystem } from "../rules/systems/homecomingSystem.js";
+import { installHomecomingHandler } from "../rules/systems/homecomingSystem.js";
 import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
@@ -60,6 +60,8 @@ export function configureWorld(world) {
   installBumpInteractListener(world);
   // Install grid bug death-to-plasma-cloud trigger once per world
   installGridBugDeathClouds(world);
+  // Install immediate homecoming request handler once per world
+  installHomecomingHandler(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -75,7 +77,6 @@ export function configureWorld(world) {
   registerSystem(itemDropSystem, 'intents');
   registerSystem(rangedAttackSystem, 'intents');
   registerSystem(castSpellSystem, 'intents');
-  registerSystem(homecomingSystem, 'intents');
   registerSystem(engraveSystem, 'intents');
   // Shopkeeper system must run BEFORE movementSystem to block exits
   registerSystem(shopkeeperSystem, 'intents');

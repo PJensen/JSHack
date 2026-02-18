@@ -23,6 +23,22 @@ export const OVERWORLD_EXTENT = Object.freeze({
 
 function chunkKey(cx, cy) { return `${cx},${cy}`; }
 
+
+/**
+ * Compute canonical home anchor coordinates for depth-0 overworld.
+ * Anchor is the midpoint between home bed/chest (inside the house).
+ */
+export function getOverworldHomeAnchor() {
+  const extent = OVERWORLD_EXTENT;
+  const minX = extent.minCX * CHUNK_SIZE;
+  const maxX = (extent.maxCX + 1) * CHUNK_SIZE - 1;
+  const minY = extent.minCY * CHUNK_SIZE;
+  const maxY = (extent.maxCY + 1) * CHUNK_SIZE - 1;
+  const homeX = Math.floor((minX + maxX) / 2);
+  const homeY = Math.floor((minY + maxY) / 2);
+  return { depth: 0, x: homeX, y: homeY };
+}
+
 function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 function lerp(a, b, t) { return a + t * (b - a); }
 
@@ -259,12 +275,9 @@ export function generateOverworldChunks(worldSeed) {
     }
   }
 
-  const minX = extent.minCX * CHUNK_SIZE;
-  const maxX = (extent.maxCX + 1) * CHUNK_SIZE - 1;
-  const minY = extent.minCY * CHUNK_SIZE;
-  const maxY = (extent.maxCY + 1) * CHUNK_SIZE - 1;
-  const homeX = Math.floor((minX + maxX) / 2);
-  const homeY = Math.floor((minY + maxY) / 2);
+  const anchor = getOverworldHomeAnchor();
+  const homeX = anchor.x;
+  const homeY = anchor.y;
 
   fillDisk(chunks, homeX, homeY, 13);
 

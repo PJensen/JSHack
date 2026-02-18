@@ -16,7 +16,6 @@ import { Collider } from "../components/Collider.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Physiology } from "../components/Physiology.js";
 import { DungeonState } from "../components/DungeonState.js";
-import { HomecomingIntent } from "../components/Intents/HomecomingIntent.js";
 import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { dealDamage } from "../utils/dealDamage.js";
@@ -306,22 +305,15 @@ REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) 
   }
 
   try {
-    world.add(actor, HomecomingIntent, {
+    world.emit?.("homecoming:request", {
+      actor,
       anchorX: anchor.x | 0,
       anchorY: anchor.y | 0,
       departureDepth: Number(ds.currentDepth || 0) | 0,
       departureX: apos.x | 0,
       departureY: apos.y | 0,
     });
-  } catch {
-    world.set(actor, HomecomingIntent, {
-      anchorX: anchor.x | 0,
-      anchorY: anchor.y | 0,
-      departureDepth: Number(ds.currentDepth || 0) | 0,
-      departureX: apos.x | 0,
-      departureY: apos.y | 0,
-    });
-  }
+  } catch {}
 };
 
 /**
