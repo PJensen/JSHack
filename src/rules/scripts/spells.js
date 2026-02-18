@@ -15,26 +15,15 @@ import { Vitality } from "../components/Vitality.js";
 import { Collider } from "../components/Collider.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Physiology } from "../components/Physiology.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Interactable } from "../components/Interactable.js";
 import { DungeonState } from "../components/DungeonState.js";
+import { HomecomingIntent } from "../components/Intents/HomecomingIntent.js";
 import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
-import { transitionToDepth } from "../environment/dungeon/transition.js";
-import { resolveTeleportDestination } from "../utils/teleport.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { dealDamage } from "../utils/dealDamage.js";
 
 function getDungeonState(world) {
   for (const [, ds] of world.query(DungeonState)) return ds;
   return null;
-}
-
-function clearReturnPortal(world, ds) {
-  const portalId = Number(ds?.returnPortal?.portalId || 0) | 0;
-  if (portalId > 0 && world.isAlive(portalId)) {
-    try { world.destroy(portalId); } catch {}
-  }
-  if (ds) ds.returnPortal = null;
 }
 
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
@@ -304,7 +293,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   try { world.emit && world.emit('spell:frost', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y }, duration, mass: massKg }); } catch {}
 };
 
-// Homecoming — instant return to depth 0 home anchor and open a temporary return portal.
+// Homecoming — enqueue rules-side teleport intent for home return handling.
 REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   const ds = getDungeonState(world);
@@ -316,65 +305,23 @@ REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) 
     return;
   }
 
-  const departure = {
-    depth: Number(ds.currentDepth || 0) | 0,
-    pos: { x: apos.x | 0, y: apos.y | 0 },
-  };
-
-  if (departure.depth !== 0) {
-    transitionToDepth(world, 0, { x: anchor.x | 0, y: anchor.y | 0 }, { skipPostTick: true });
-  }
-
-  const homePos = resolveTeleportDestination(world, { x: anchor.x | 0, y: anchor.y | 0 }, { maxDistance: 3 });
-  if (!homePos) {
-    try { world.emit?.('teleport:failed', { actor, spellId: spell.id, reason: 'home-blocked' }); } catch {}
-    return;
-  }
-  world.set(actor, Position, homePos);
-
-  const dsAfter = getDungeonState(world);
-  if (!dsAfter) return;
-  clearReturnPortal(world, dsAfter);
-
-  const portalSpot = resolveTeleportDestination(world, { x: anchor.x | 0, y: anchor.y | 0 }, {
-    maxDistance: 3,
-    exclude: [homePos],
-  });
-  if (!portalSpot || departure.depth === 0) {
-    try { world.emit?.('teleport:home', { actor, from: departure, to: { depth: 0, pos: homePos } }); } catch {}
-    return;
-  }
-
-  const portalId = world.create();
-  world.add(portalId, Position, portalSpot);
-  world.add(portalId, NamedIdentity, { name: 'Return Portal', identity: 'home_return_portal' });
-  world.add(portalId, Collider, { solid: true, blocksSight: false });
-  world.add(portalId, Interactable, {
-    action: 'useReturnPortal',
-    params: {
-      fromDepth: departure.depth,
-      fromPos: departure.pos,
-    },
-  });
-
-  dsAfter.returnPortal = {
-    portalId,
-    fromDepth: departure.depth,
-    fromPos: departure.pos,
-  };
-
   try {
-    world.emit?.('portal:opened', {
-      actor,
-      portalId,
-      at: portalSpot,
-      color: '#b04dff',
-      style: 'swirl',
-      radius: 3,
-      from: departure,
+    world.add(actor, HomecomingIntent, {
+      anchorX: anchor.x | 0,
+      anchorY: anchor.y | 0,
+      departureDepth: Number(ds.currentDepth || 0) | 0,
+      departureX: apos.x | 0,
+      departureY: apos.y | 0,
     });
-    world.emit?.('teleport:home', { actor, from: departure, to: { depth: 0, pos: homePos } });
-  } catch {}
+  } catch {
+    world.set(actor, HomecomingIntent, {
+      anchorX: anchor.x | 0,
+      anchorY: anchor.y | 0,
+      departureDepth: Number(ds.currentDepth || 0) | 0,
+      departureX: apos.x | 0,
+      departureY: apos.y | 0,
+    });
+  }
 };
 
 /**

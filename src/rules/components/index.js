@@ -19,6 +19,7 @@ export { MoveIntent } from './Intents/MoveIntent.js';
 export { WaitIntent } from './Intents/WaitIntent.js';
 export { PrayIntent } from './Intents/PrayIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';
+export { HomecomingIntent } from './Intents/HomecomingIntent.js';
 export { AttackIntent } from './Intents/AttackIntent.js';
 export { EquipIntent } from './Intents/EquipIntent.js';
 export { Stamina } from './Stamina.js';
