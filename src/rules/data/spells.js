@@ -32,6 +32,13 @@ export const SPELL_DEFS = {
     minIntelligence: 0,
     script: 'blastwave',
   },
+  homecoming: {
+    id: 'homecoming',
+    name: 'Homecoming',
+    manaCost: 1,
+    minIntelligence: 0,
+    script: 'homecoming',
+  },
   frost: {
     id: 'frost',
     name: 'Frost',

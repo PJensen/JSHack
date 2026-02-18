@@ -341,6 +341,32 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`, 'system');
   });
 
+  world.on('portal:spawned', ({ portalId, at }) => {
+    log('A shimmering return portal tears open nearby.', 'system');
+  });
+
+  world.on('portal:return', ({ actor }) => {
+    const who = nameOfEntity(actor);
+    if (who === 'You') log('You step into the return portal.', 'system');
+    else log(`${who} steps into a return portal.`, 'system');
+  });
+
+  world.on('portal:return:fragged', ({ count, at }) => {
+    const n = Math.max(0, Number(count || 0) | 0);
+    if (n > 0) log(`Arrival shockwave obliterates ${n} occupant${n === 1 ? '' : 's'}.`, 'system');
+  });
+
+  world.on('dungeon:teleport-depth', ({ actor, targetDepth, source }) => {
+    if (String(source || '') !== 'scroll_homecoming') return;
+    if (Number(targetDepth) !== 0) return;
+    const who = nameOfEntity(actor);
+    if (who === 'You') {
+      log('The scroll turns to warm ash. A familiar pull carries you home.', 'system');
+    } else {
+      log(`${who} vanishes in a swirl of warm ash.`, 'system');
+    }
+  });
+
   // === Dig events ===
   world.on('tile:dug', ({ actor, x, y }) => {
     const who = nameOfEntity(actor);

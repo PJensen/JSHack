@@ -10,6 +10,7 @@
 const REGISTRY = Object.create(null);
 
 import { Position } from "../components/Position.js";
+import { DungeonState } from "../components/DungeonState.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
 import { Collider } from "../components/Collider.js";
@@ -152,6 +153,31 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
   }
 
   try { world.emit && world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS }); } catch {}
+};
+
+// Homecoming — queues an app-level teleport request back to dungeon depth 0.
+REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  let fromDepth = 0;
+  for (const [, ds] of world.query(DungeonState)) {
+    fromDepth = Number(ds?.currentDepth || 0) | 0;
+    break;
+  }
+
+  try {
+    world.emit && world.emit('dungeon:teleport-depth', {
+      actor,
+      source: 'scroll_homecoming',
+      targetDepth: 0,
+      returnTicket: {
+        depth: fromDepth,
+        x: apos.x | 0,
+        y: apos.y | 0,
+      },
+    });
+  } catch {}
 };
 
 // Meteor — AoE damage at target position. Full damage at radius 1, half at radius 2.

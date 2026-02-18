@@ -459,7 +459,10 @@ function ensureStairTooltip(root) {
 function renderStairTooltip(tip, detail) {
   tip.innerHTML = '';
   const dir = detail?.direction || 'down';
-  const label = dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs';
+  const isReturn = dir === 'return';
+  const label = isReturn
+    ? 'Return Portal'
+    : (dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs');
 
   const title = document.createElement('div');
   title.textContent = label;
@@ -469,7 +472,9 @@ function renderStairTooltip(tip, detail) {
   const hint = document.createElement('div');
   hint.style.opacity = '0.8';
   hint.style.fontSize = '12px';
-  hint.textContent = `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
+  hint.textContent = isReturn
+    ? 'Tap to return'
+    : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
   tip.appendChild(hint);
 
   tip.onclick = () => {
