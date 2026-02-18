@@ -18,6 +18,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { transitionToDepth } from "../environment/dungeon/transition.js";
 import { resolveTeleportDestination } from "../utils/teleport.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId) {
@@ -181,14 +182,36 @@ export function InteractionSystem(world, actor, targetId) {
 
                 transitionToDepth(world, fromDepth, { x: fromPos.x, y: fromPos.y }, { skipPostTick: true });
 
-                const fallback = resolveTeleportDestination(world, { x: fromPos.x, y: fromPos.y }, {
-                    maxDistance: 3,
-                }) || { x: fromPos.x, y: fromPos.y };
+                // Prefer exact return tile; fallback only when truly blocked by terrain/entity.
+                let blocked = false;
+                if (!isWalkable(fromPos.x, fromPos.y)) {
+                    blocked = true;
+                } else {
+                    for (const [eid, epos] of world.query(Position)) {
+                        if (eid === actor) continue;
+                        if (epos.x !== fromPos.x || epos.y !== fromPos.y) continue;
+                        const col = world.get(eid, Collider);
+                        const vit = world.get(eid, Vitality);
+                        if (col?.solid || (vit && (vit.hp ?? 0) > 0)) {
+                            blocked = true;
+                            break;
+                        }
+                    }
+                }
 
-                world.set(actor, Position, fallback);
+                const destination = blocked
+                    ? (resolveTeleportDestination(world, { x: fromPos.x, y: fromPos.y }, { maxDistance: 3 }) || { x: fromPos.x, y: fromPos.y })
+                    : { x: fromPos.x, y: fromPos.y };
+
+                world.set(actor, Position, destination);
                 if (ds) ds.returnPortal = null;
                 try { world.destroy(targetId); } catch {}
-                world.emit?.("portal:returned", { actor, targetId, to: { depth: fromDepth, pos: fallback } });
+                world.emit?.("portal:returned", {
+                    actor,
+                    targetId,
+                    to: { depth: fromDepth, pos: destination },
+                    exact: !blocked,
+                });
             }
             break;
     }
