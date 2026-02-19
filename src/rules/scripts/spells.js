@@ -19,6 +19,24 @@ import { Physiology } from "../components/Physiology.js";
 import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { findNearestValidTileAround } from "../utils/queries.js";
+import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { statusStrength } from "../utils/statusFacade.js";
+
+const BLINK_DIRS = Object.freeze([
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0],            [1, 0],
+  [-1, 1],  [0, 1],   [1, 1],
+]);
+
+/**
+ * @param {{x:number,y:number}} a
+ * @param {{x:number,y:number}} b
+ * @returns {number}
+ */
+function chebyshev(a, b) {
+  return Math.max(Math.abs((a.x | 0) - (b.x | 0)), Math.abs((a.y | 0) - (b.y | 0)));
+}
 
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
 /** @param {World} world @param {number} actor @param {{id:string,name:string,manaCost:number,[k:string]:any}} spell @param {{[k:string]:any}} intent */
@@ -155,6 +173,77 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
   try { world.emit && world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS }); } catch {}
 };
 
+// Blink — targeted teleport up to 10 tiles.
+// Confused/hallucinating casters blink in a deterministic random direction.
+REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const from = { x: apos.x | 0, y: apos.y | 0 };
+  const maxRange = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 10);
+  const confusedPower = statusStrength(world, actor, "confused");
+  const hallucinPower = (
+    statusStrength(world, actor, "hallucinating")
+    + statusStrength(world, actor, "hallucination")
+    + statusStrength(world, actor, "hallucinated")
+    + statusStrength(world, actor, "mindwiped")
+  );
+  const randomized = confusedPower > 0 || hallucinPower > 0;
+
+  let requested = null;
+  if (randomized) {
+    const posSalt = (((from.x & 0xffff) << 16) ^ (from.y & 0xffff)) >>> 0;
+    const r = mulberry32(combatSeed(world.seed, world.step, actor, posSalt, 0xB11E7));
+    const [dx, dy] = BLINK_DIRS[(r() * BLINK_DIRS.length) | 0];
+    const dist = 1 + ((r() * maxRange) | 0);
+    requested = { x: from.x + dx * dist, y: from.y + dy * dist };
+  } else {
+    const tx = Number(intent?.x);
+    const ty = Number(intent?.y);
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
+      try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange }); } catch {}
+      return;
+    }
+    requested = { x: tx | 0, y: ty | 0 };
+  }
+
+  const requestedDist = chebyshev(from, requested);
+  if (requestedDist <= 0 || requestedDist > maxRange) {
+    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange }); } catch {}
+    return;
+  }
+
+  const landing = findNearestValidTileAround(world, requested, {
+    maxDistance: 1,
+    exclude: [from],
+  });
+  if (!landing) {
+    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange }); } catch {}
+    return;
+  }
+
+  const landingDist = chebyshev(from, landing);
+  if (landingDist <= 0 || landingDist > maxRange) {
+    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange }); } catch {}
+    return;
+  }
+
+  world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
+  try { world.emit && world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } }); } catch {}
+  try {
+    world.emit && world.emit('spell:blink', {
+      actor,
+      spellId: spell.id,
+      from,
+      to: { x: landing.x | 0, y: landing.y | 0 },
+      requested,
+      randomized,
+      randomReason: randomized ? (confusedPower > 0 ? "confused" : "hallucinating") : null,
+      range: maxRange,
+    });
+  } catch {}
+};
+
 // Homecoming — queues an app-level teleport request back to dungeon depth 0.
 REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
@@ -187,14 +276,58 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
 
   const RADIUS = 2;
   const BASE_DMG = 10;
+  const MAX_R = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 12);
+  const confusedPower = statusStrength(world, actor, "confused");
+  const hallucinPower = (
+    statusStrength(world, actor, "hallucinating")
+    + statusStrength(world, actor, "hallucination")
+    + statusStrength(world, actor, "hallucinated")
+    + statusStrength(world, actor, "mindwiped")
+  );
+  const randomized = confusedPower > 0 || hallucinPower > 0;
 
-  // Determine impact center: prefer intent x/y, else auto-target nearest enemy
+  // Determine impact center:
+  // - disoriented cast: deterministic random target from caster LOS cone
+  // - directed cast: use intent x/y and validate LOS/range
+  // - fallback: nearest enemy in LOS (kept for non-targeting callers)
   let ox, oy;
-  if (intent && intent.x != null && intent.y != null) {
+  if (randomized) {
+    /** @type {Array<{x:number,y:number}>} */
+    const candidates = [];
+    for (let dy = -MAX_R; dy <= MAX_R; dy++) {
+      for (let dx = -MAX_R; dx <= MAX_R; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const tx = (apos.x | 0) + dx;
+        const ty = (apos.y | 0) + dy;
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (dist > MAX_R) continue;
+        if (!hasLOS(apos.x | 0, apos.y | 0, tx, ty, isOpaque)) continue;
+        candidates.push({ x: tx, y: ty });
+      }
+    }
+    if (candidates.length <= 0) {
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_los_target', range: MAX_R }); } catch {}
+      return;
+    }
+    const posSalt = (((apos.x | 0) & 0xffff) << 16) ^ ((apos.y | 0) & 0xffff);
+    const r = mulberry32(combatSeed(world.seed, world.step, actor, candidates.length, 0x0CE7E0A));
+    const pick = candidates[(r() * candidates.length) | 0];
+    ox = pick.x | 0;
+    oy = pick.y | 0;
+  } else if (intent && intent.x != null && intent.y != null) {
     ox = intent.x | 0;
     oy = intent.y | 0;
+    const dist = Math.max(Math.abs((ox | 0) - (apos.x | 0)), Math.abs((oy | 0) - (apos.y | 0)));
+    if (!(dist > 0) || dist > MAX_R) {
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } }); } catch {}
+      return;
+    }
+    if (!hasLOS(apos.x | 0, apos.y | 0, ox | 0, oy | 0, isOpaque)) {
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } }); } catch {}
+      return;
+    }
   } else {
-    // Auto-target nearest visible enemy with hp > 0
+    // Auto-target nearest visible enemy with hp > 0 (fallback path)
     let bestId = 0, bestD2 = Infinity;
     for (const [id, pos] of world.query(Position)) {
       if (id === actor) continue;
@@ -205,9 +338,13 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       const dx = (pos.x | 0) - (apos.x | 0);
       const dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
+      if (d2 > (MAX_R * MAX_R)) continue;
       if (d2 < bestD2 && hasLOS(apos.x | 0, apos.y | 0, pos.x | 0, pos.y | 0, isOpaque)) { bestId = id; bestD2 = d2; }
     }
-    if (!bestId) return;
+    if (!bestId) {
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R }); } catch {}
+      return;
+    }
     const tp = /** @type any */ (world.get(bestId, Position));
     ox = tp.x | 0;
     oy = tp.y | 0;
@@ -240,7 +377,15 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     }
   }
 
-  try { world.emit && world.emit('spell:meteor', { actor, origin: { x: ox, y: oy }, radius: RADIUS }); } catch {}
+  try {
+    world.emit && world.emit('spell:meteor', {
+      actor,
+      origin: { x: ox, y: oy },
+      radius: RADIUS,
+      randomized,
+      randomReason: randomized ? (confusedPower > 0 ? "confused" : "hallucinating") : null,
+    });
+  } catch {}
 };
 
 // Frost — auto-target nearest enemy in LOS; apply cold damage + slow effect scaled by mass.

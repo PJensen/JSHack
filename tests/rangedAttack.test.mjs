@@ -6,6 +6,8 @@ import { Equipment } from '../src/rules/components/Equipment.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Faction } from '../src/rules/components/Faction.js';
+import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { RangedAttackIntent } from '../src/rules/components/Intents/RangedAttackIntent.js';
 import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
@@ -14,19 +16,31 @@ import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dung
 function makeBow(world) {
   const id = world.create();
   world.add(id, ItemInfo, {
-    type: 'equip', slot: 'weapon', weight: 1, value: 0, description: 'Short Bow',
+    type: 'equip', slot: 'ranged', weight: 1, value: 0, description: 'Short Bow',
     count: 1, bonuses: { attack: 1 }, rarity: 1, rarityName: 'common', affixes: [],
     damageDice: '1d6', subtype: 'bow', range: 8,
   });
   return id;
 }
 
-function makeAmmo(world, count = 10) {
+function makeAmmo(world, countOrOpts = 10) {
+  const opts = (countOrOpts && typeof countOrOpts === 'object')
+    ? countOrOpts
+    : { count: countOrOpts };
+  const count = Number(opts.count ?? 10) | 0;
   const id = world.create();
+  const subtype = opts.subtype ? String(opts.subtype) : null;
   world.add(id, ItemInfo, {
     type: 'ammo', slot: '', weight: 0, value: 0, description: 'Arrows',
     count, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
+    subtype,
   });
+  if (opts.identity) {
+    world.add(id, NamedIdentity, {
+      name: String(opts.name || 'Arrows'),
+      identity: String(opts.identity),
+    });
+  }
   return id;
 }
 
@@ -54,12 +68,17 @@ function setup(opts = {}) {
   world.step = opts.step || 1;
 
   const bowId = makeBow(world);
-  const ammoId = makeAmmo(world, opts.ammoCount ?? 10);
+  const ammoId = makeAmmo(world, {
+    count: opts.ammoCount ?? 10,
+    subtype: opts.ammoSubtype,
+    identity: opts.ammoIdentity,
+    name: opts.ammoName,
+  });
 
   const archer = world.create();
   world.add(archer, Position, { x: opts.ax ?? 0, y: opts.ay ?? 0 });
   world.add(archer, Vitality, { maxHp: 20, hp: 20 });
-  world.add(archer, Equipment, { weapon: bowId, attackDerived: 1 });
+  world.add(archer, Equipment, { ranged: bowId, attackDerived: 1 });
   world.add(archer, Inventory, { items: [bowId, ammoId], capacity: 20 });
   world.add(archer, Faction, { key: opts.archerFaction || 'player' });
 
@@ -74,7 +93,7 @@ function setup(opts = {}) {
 
 function trackEvents(world, events) {
   events.length = 0;
-  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'damaged', 'died']) {
+  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'damaged', 'died', 'proc:burning']) {
     world.on(ev, (data) => events.push({ _event: ev, ...data }));
   }
 }
@@ -96,7 +115,7 @@ Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
   const events = [];
   const { world, archer, target } = setup();
   const swordId = makeSword(world);
-  world.set(archer, Equipment, { weapon: swordId, attackDerived: 1 });
+  world.set(archer, Equipment, { ranged: swordId, attackDerived: 1 });
   trackEvents(world, events);
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
@@ -109,7 +128,7 @@ Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
 Deno.test("ranged: no ammo → ranged:no-ammo emitted", () => {
   const events = [];
   const { world, archer, target } = setup();
-  world.set(archer, Inventory, { items: [world.get(archer, Equipment).weapon], capacity: 20 });
+  world.set(archer, Inventory, { items: [world.get(archer, Equipment).ranged], capacity: 20 });
   trackEvents(world, events);
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
@@ -182,4 +201,43 @@ Deno.test("ranged: same faction → no damage", () => {
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'same faction undamaged');
   assert(!events.some(e => e._event === 'damaged'), 'no damage event');
+});
+
+Deno.test("ranged: player to pet faction is non-hostile", () => {
+  const events = [];
+  const { world, archer, target } = setup({ archerFaction: 'player', targetFaction: 'pet' });
+  trackEvents(world, events);
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+  rangedAttackSystem(world);
+  assert(!world.has(archer, RangedAttackIntent), 'intent removed');
+  const tv = world.get(target, Vitality);
+  assert(tv.hp === 10, 'pet faction undamaged');
+  assert(!events.some(e => e._event === 'damaged'), 'no damage event');
+});
+
+Deno.test("ranged: fire ammo actor-impact hooks add damage and burning", () => {
+  const baseline = setup({ seed: 42, targetHp: 30 });
+  baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+  rangedAttackSystem(baseline.world);
+  const baselineHp = baseline.world.get(baseline.target, Vitality).hp;
+
+  const events = [];
+  const fire = setup({
+    seed: 42,
+    targetHp: 30,
+    ammoSubtype: 'fire',
+    ammoIdentity: 'ammo_fire_arrows',
+    ammoName: 'Fire Arrows',
+  });
+  trackEvents(fire.world, events);
+  fire.world.add(fire.archer, RangedAttackIntent, { targetId: fire.target, toX: 5, toY: 0 });
+  rangedAttackSystem(fire.world);
+
+  const fireHp = fire.world.get(fire.target, Vitality).hp;
+  const ae = fire.world.get(fire.target, ActiveEffects);
+  const hasBurn = !!(ae && Array.isArray(ae.effects) && ae.effects.some((e) => e.key === 'burn'));
+
+  assert(fireHp <= baselineHp - 1, `fire ammo should add at least +1 damage (baselineHp=${baselineHp}, fireHp=${fireHp})`);
+  assert(hasBurn, 'fire ammo should apply burn via actor-impact hook');
+  assert(events.some((e) => e._event === 'proc:burning'), 'fire ammo should emit proc:burning');
 });

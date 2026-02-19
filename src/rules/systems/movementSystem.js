@@ -15,10 +15,11 @@ import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Faction } from "../components/Faction.js";
 import { Player } from "../components/Player.js";
 import { Facing } from "../components/Facing.js";
-import { Status } from "../components/Status.js";
 import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
+import { areFactionsHostile } from "../utils/factionHostility.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { statusStrength } from "../utils/statusFacade.js";
 import {
   addItemEntityToInventory,
   findInventoryStackTargetForItem,
@@ -32,24 +33,6 @@ const MISSTEP_DIRS = Object.freeze([
   [-1, 0],            [1, 0],
   [-1, 1],  [0, 1],   [1, 1],
 ]);
-
-/**
- * @param {any} status
- * @param {string} type
- * @returns {number}
- */
-function statusStrength(status, type) {
-  if (!status || !Array.isArray(status.statuses)) return 0;
-  let total = 0;
-  for (const s of status.statuses) {
-    if (!s || s.type !== type) continue;
-    if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
-    const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
-    const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
-    total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
-  }
-  return total;
-}
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function movementSystem(world) {
@@ -70,7 +53,7 @@ export function movementSystem(world) {
       let mdy = intendedDy;
 
       // Confusion: movement inputs become a deterministic random misstep.
-      const confusePower = statusStrength(world.get(actor, Status), "confused");
+      const confusePower = statusStrength(world, actor, "confused");
       if (confusePower > 0 && (intendedDx !== 0 || intendedDy !== 0)) {
         const options = MISSTEP_DIRS.filter(([dx, dy]) => !(dx === intendedDx && dy === intendedDy));
         if (options.length > 0) {
@@ -103,12 +86,15 @@ export function movementSystem(world) {
         const manhattan = Math.abs(mdx) + Math.abs(mdy);
         if (manhattan === 1 && Number.isInteger(target) && target > 0 && target !== actor) {
           // Check faction: neutral/shopkeeper NPCs with Interactable trigger interaction, not attack
+          const actorFaction = world.get(actor, Faction);
           const fac = world.get(target, Faction);
           if (fac && (fac.key === 'shopkeeper' || fac.key === 'neutral') && world.has(target, Interactable)) {
             // Emit bump-interact event for cross-system communication without direct coupling
             try { world.emit?.("bump:interact", { actor, target }); } catch {}
-          } else {
+          } else if (areFactionsHostile(actorFaction?.key, fac?.key)) {
             try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+          } else {
+            // Non-hostile living blockers (e.g., pets and allied summons) should not trigger bump-attacks.
           }
         } else if (world.has(actor, Player)) {
           // No living target — try interactable (e.g., closed door, chest)

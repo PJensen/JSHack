@@ -7,7 +7,7 @@ const MAX_TOMBSTONES_PER_DEPTH = 20; // Prevent unbounded growth
  * TombstoneRepository - Manages persistence of player death records
  *
  * @typedef {Object} TombstoneRecord
- * @property {string} id - Unique identifier (ts_timestamp_random)
+ * @property {string} id - Deterministic identifier (ts_seed_step_hash)
  * @property {number} depth - Floor number where death occurred
  * @property {string} cause - Cause of death ('combat', 'starvation', 'trap', etc.)
  * @property {string|null} killerName - Name of killer entity (null for environmental)

@@ -7,7 +7,6 @@ import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
 import { Player } from '../components/Player.js';
-import { Status } from '../components/Status.js';
 import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { Position } from '../components/Position.js';
 import { Stamina } from '../components/Stamina.js';
@@ -19,8 +18,9 @@ import { runCallbackList } from '../interaction/dispatch.js';
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
-import { HUNGER_COMBAT_LEVELS } from '../data/food.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { areFactionsHostile } from '../utils/factionHostility.js';
+import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
@@ -69,24 +69,6 @@ function attachHelpers(world, base) {
 }
 
 /**
- * @param {any} status
- * @param {string} type
- * @returns {number}
- */
-function statusStrength(status, type) {
-    if (!status || !Array.isArray(status.statuses)) return 0;
-    let total = 0;
-    for (const s of status.statuses) {
-        if (!s || s.type !== type) continue;
-        if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
-        const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
-        const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
-        total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
-    }
-    return total;
-}
-
-/**
  * Run monster definition hooks for a given trigger via runCallbackList.
  * @param {any} world
  * @param {number} entityId - the monster entity whose hooks to run
@@ -122,16 +104,15 @@ export function combatSystem(world) {
             continue;
         }
 
-        // Friendly fire prevention: same faction cannot harm each other (assumption per request)
+        // Faction hostility gate: only hostile faction pairs can deal direct melee damage.
         const af = world.get(attacker, Faction)?.key || '';
         const df = world.get(defender, Faction)?.key || '';
-        if (af && df && af === df) {
+        if (!areFactionsHostile(af, df)) {
             world.remove(attacker, AttackIntent);
             continue;
         }
 
         const atkEq = world.get(attacker, Equipment);
-        const defEq = world.get(defender, Equipment);
 
         // Stamina gate: check if attacker has enough stamina for weapon
         const atkStam = world.get(attacker, Stamina);
@@ -157,48 +138,10 @@ export function combatSystem(world) {
             world.set(attacker, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
         }
 
-        // Disease penalty: each stack of 'disease' reduces attack/defense by potency
-        const atkStatus = world.get(attacker, Status);
-        const atkDisease = atkStatus?.statuses?.find(s => s.type === 'disease');
-        const atkDiseasePenalty = atkDisease ? Math.max(0, (atkDisease.potency || 1) * (atkDisease.stacks || 1)) : 0;
-
-        const defStatus = world.get(defender, Status);
-        const defDisease = defStatus?.statuses?.find(s => s.type === 'disease');
-        const defDiseasePenalty = defDisease ? Math.max(0, (defDisease.potency || 1) * (defDisease.stacks || 1)) : 0;
-
-        // Hunger penalty: hungry/famished/starving/wasting reduce attack and defense
-        const atkHunger = atkStatus?.statuses?.find(s => HUNGER_COMBAT_LEVELS.includes(s.type));
-        const atkHungerPenalty = atkHunger ? Math.max(0, atkHunger.potency || 0) : 0;
-        const defHunger = defStatus?.statuses?.find(s => HUNGER_COMBAT_LEVELS.includes(s.type));
-        const defHungerPenalty = defHunger ? Math.max(0, defHunger.potency || 0) : 0;
-
-        // Status pass modifiers: weakened/cursed are penalties, blessed is a bonus.
-        const atkWeakenPenalty = statusStrength(atkStatus, 'weakened');
-        const defWeakenPenalty = statusStrength(defStatus, 'weakened');
-        const atkCursedPenalty = statusStrength(atkStatus, 'cursed');
-        const defCursedPenalty = statusStrength(defStatus, 'cursed');
-        const atkBlessedBonus = statusStrength(atkStatus, 'blessed');
-        const defBlessedBonus = statusStrength(defStatus, 'blessed');
-
-        const attackBonus = Math.max(
-            0,
-            1
-            + (atkEq?.attackDerived || 0)
-            - atkDiseasePenalty
-            - atkHungerPenalty
-            - atkWeakenPenalty
-            - atkCursedPenalty
-            + atkBlessedBonus
-        );
-        const armorClass = 10 + Math.max(
-            0,
-            (defEq?.defenseDerived || 0)
-            - defDiseasePenalty
-            - defHungerPenalty
-            - defWeakenPenalty
-            - defCursedPenalty
-            + defBlessedBonus
-        );
+        const atkSnapshot = resolveCombatSnapshot(world, attacker, { mode: 'melee' });
+        const defSnapshot = resolveCombatSnapshot(world, defender, { mode: 'melee' });
+        const attackBonus = atkSnapshot.attackBonus;
+        const armorClass = defSnapshot.armorClass;
 
         // Deterministic d20 roll seeded by world + participants + step
         const seed = combatSeed(world.seed, world.step, attacker, defender);
@@ -229,7 +172,7 @@ export function combatSystem(world) {
         }
         const damageRoll = rollDice(baseDice, r);
         // Add a small portion of attack bonus as flat damage (DnD-ish flavor)
-        const flatBonus = Math.max(0, Math.floor((atkEq?.attackDerived || 0) / 2));
+        const flatBonus = atkSnapshot.damageFlatBonus;
         let dmg = Math.max(0, damageRoll + flatBonus);
         if (isCrit) dmg = Math.max(1, dmg * 2);
 

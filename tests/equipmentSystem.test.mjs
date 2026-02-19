@@ -21,13 +21,15 @@ Deno.test("equipment system derives stats from equipped items", () => {
 
   const sword = makeEquip(world, { name: 'Sword', id: 'sword_plain', slot: 'weapon', bonuses: { attack: 2 } });
   const armor = makeEquip(world, { name: 'Leather', id: 'leather_armor', slot: 'armor', bonuses: { defense: 1 }, affixes: ['life1'] });
+  const bow = makeEquip(world, { name: 'Short Bow', id: 'bow_short', slot: 'ranged', bonuses: { attack: 1 } });
 
   eq.weapon = sword;
   eq.armor = armor;
+  eq.ranged = bow;
 
   equipmentSystem(world);
 
-  assert(eq.attackDerived === 2, 'attack derived from sword');
+  assert(eq.attackDerived === 3, 'attack derived from sword + ranged item');
   assert(eq.defenseDerived === 1, 'defense derived from armor');
   assert(eq.maxHpDerived >= 5, 'life1 passive applied');
 });

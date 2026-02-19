@@ -6,6 +6,8 @@ import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { Brain } from "../../components/Brain.js";
 import { degradeExplored } from "../../environment/dungeon/exploredMap.js";
 import { combatSeed, mulberry32, rngInt } from "../../utils/rng.js";
+import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
+import { createStatusFacade } from "../../utils/statusFacade.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
 
@@ -13,6 +15,7 @@ import { combatSeed, mulberry32, rngInt } from "../../utils/rng.js";
  * Context passed to monster combat hook callbacks.
  * Provides roll(), pushEffect(), emit(), heal/healAttacker/retaliate
  * and cancel() for callback-list short-circuiting.
+ * Also exposes deterministic stat snapshots via ctx.stats.*.
  */
 export class CombatCallbackContext {
   /**
@@ -33,6 +36,16 @@ export class CombatCallbackContext {
     this._cancelled = false;
     this._cancelReason = null;
     this.deps = deps;
+    this.stats = createCombatStatFacade(world, {
+      attacker: () => this.attacker,
+      defender: () => this.defender,
+    });
+    this.status = createStatusFacade(world, {
+      actor: () => this.attacker,
+      attacker: () => this.attacker,
+      target: () => this.defender,
+      defender: () => this.defender,
+    });
   }
 
   get attacker() { return this._frame.attacker | 0; }
@@ -163,6 +176,27 @@ export function bonusDamageOnBeforeHit(chancePct, seedSalt, bonusDmg, emitEvent)
 }
 
 /**
+ * If defender has any matching active effect key, add flat bonus damage.
+ * Used by carrion shade to prey on already-afflicted targets.
+ * @param {number} bonusDmg
+ * @param {string[]} effectKeys
+ * @param {string} [emitEvent]
+ */
+export function bonusDamageIfTargetAfflicted(bonusDmg, effectKeys, emitEvent) {
+  const keySet = new Set((Array.isArray(effectKeys) ? effectKeys : [])
+    .map((k) => String(k || "").toLowerCase())
+    .filter(Boolean));
+  return (ctx) => {
+    if (keySet.size === 0) return;
+    const keys = Array.from(keySet.values());
+    const matched = keys.some((key) => ctx.status.effectStrength(ctx.defender, key) > 0);
+    if (!matched) return;
+    ctx.damage += Math.max(0, Number(bonusDmg || 0));
+    if (emitEvent) ctx.emit(emitEvent, { actor: ctx.attacker, target: ctx.defender });
+  };
+}
+
+/**
  * Roll → heal the damaged entity → emit event.
  * Used by skeleton (reassemble), troll (regenerate).
  */
@@ -200,6 +234,24 @@ export function statusEffectOnDamaged(chancePct, seedSalt, effect, emitEvent, de
         : { actor: ctx.attacker, target: ctx.defender };
       ctx.emit(emitEvent, payload);
     }
+  };
+}
+
+/**
+ * Roll → heal damaged entity by incoming damage, apply brief invulnerability,
+ * emit phase event, and cancel remaining onDamaged callbacks.
+ * @param {number} chancePct
+ * @param {number} seedSalt
+ * @param {string} [emitEvent]
+ */
+export function phaseOutOnDamaged(chancePct, seedSalt, emitEvent = "proc:phased") {
+  return (ctx) => {
+    if (!ctx.roll(chancePct, seedSalt)) return;
+    const healAmount = Math.max(0, Math.floor(Number(ctx.damage || 0)));
+    if (healAmount > 0) ctx.heal(ctx.defender, healAmount);
+    ctx.pushEffect(ctx.defender, { key: "invulnerable", turnsLeft: 1, potency: 1, stacks: 1 });
+    if (emitEvent) ctx.emit(emitEvent, { actor: ctx.defender, attacker: ctx.attacker, amount: healAmount });
+    ctx.cancel("PHASE_OUT");
   };
 }
 

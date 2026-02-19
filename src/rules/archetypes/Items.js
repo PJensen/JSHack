@@ -112,7 +112,6 @@ export const GemItem = defineArchetype(
 export const ScrollOfMapping = defineArchetype(
     "ScrollOfMapping",
     [Consumable, {
-        effectKey: 'consumable:mapping',
         effectParams: {},
         remainingUses: 1,
         potency: 0,

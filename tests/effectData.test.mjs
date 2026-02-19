@@ -27,6 +27,7 @@ Deno.test("effect data includes status pass foundation keys", () => {
     { id: "weakened", keys: ["weaken", "weakened"], status: "weakened" },
     { id: "cursed", keys: ["curse", "cursed"], status: "cursed" },
     { id: "blessed", keys: ["bless", "blessed"], status: "blessed" },
+    { id: "taunt", keys: ["taunt", "taunted"], status: "taunted" },
   ];
 
   for (const rec of expected) {

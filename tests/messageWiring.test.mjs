@@ -1,5 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { installMessageWiring } from "../src/main/wiring/messageWiring.js";
 
@@ -60,4 +62,57 @@ Deno.test("messageWiring ignores non-homecoming depth teleports", () => {
   });
 
   assertEquals(messageLog.entries.length, 0);
+});
+
+Deno.test("messageWiring logs apply coat outcomes and cryptic fallback", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Test Dagger", identity: "dagger_quick" });
+  world.add(targetId, ItemInfo, {
+    type: "equip",
+    slot: "weapon",
+    weight: 1,
+    value: 10,
+    description: "Dagger",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+
+  const messageLog = createMessageLog();
+  installMessageWiring({
+    world,
+    messageLog,
+    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
+    bracketizeName: (s) => `[${s}]`,
+    getSpell: () => null,
+  });
+
+  world.emit("item:applied", {
+    targetId,
+    result: {
+      type: "poison_coat",
+      coating: { kind: "poison", charges: 12 },
+      message: "You coat Test Dagger with poison (12 charges).",
+    },
+  });
+  world.emit("item:applied", {
+    targetId,
+    result: { type: "stonecoat", acBonus: 1, message: "You harden Test Dagger into living stone (AC +1)." },
+  });
+  world.emit("item:applied", {
+    targetId,
+    result: { type: "unknown_arcana" },
+  });
+
+  assertEquals(messageLog.entries.length, 3);
+  assert(messageLog.entries[0].text.includes("coat"), "poison coat message should mention coating");
+  assert(messageLog.entries[0].text.includes("12"), "poison coat message should include charges");
+  assert(messageLog.entries[1].text.includes("AC +1"), "stonecoat message should include AC bonus");
+  assert(messageLog.entries[2].text.includes("cryptic sheen"), "unknown apply result should use cryptic fallback");
 });

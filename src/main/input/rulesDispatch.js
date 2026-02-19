@@ -5,6 +5,7 @@
 import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../rules/components/index.js";
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
+import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 
 /**
@@ -15,6 +16,13 @@ import { itemsAt } from "../../rules/utils/queries.js";
  */
 export function makeRulesDispatcher(world, getActorId) {
   return function dispatch(action) {
+    // Display-side lock: used for brief blocking FX windows (e.g. thrown-item flight).
+    if (typeof window !== "undefined") {
+      try {
+        if (/** @type {any} */ (window).__JSHACK_INPUT_LOCKED === true) return;
+      } catch {}
+    }
+
     const actorId = (typeof getActorId === "function") ? getActorId() : 0;
     if (!actorId) return;
 
@@ -42,14 +50,19 @@ export function makeRulesDispatcher(world, getActorId) {
         break;
       }
       case "rules.castActiveSpell": {
-        const { spellId, targetId = actorId } = action.payload || {};
+        const { spellId, targetId = actorId, x = null, y = null } = action.payload || {};
         if (!spellId) {
           // No spell specified (keyboard shortcut); delegate to app-side
           // active spell resolution via the same path as the Cast button.
           try { window.dispatchEvent(new CustomEvent('ui:castActiveSpell')); } catch {}
           break;
         }
-        world?.add?.(actorId, CastSpellIntent, { spellId, targetId });
+        const cast = { spellId, targetId };
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          cast.x = Math.floor(Number(x));
+          cast.y = Math.floor(Number(y));
+        }
+        world?.add?.(actorId, CastSpellIntent, cast);
         world?.tick?.(1);
         break;
       }
@@ -61,9 +74,26 @@ export function makeRulesDispatcher(world, getActorId) {
         break;
       }
       case "rules.useItem": {
-        const { itemId = 0, targetId = actorId } = action.payload || {};
+        const { itemId = 0, targetId = actorId, x = null, y = null } = action.payload || {};
         if (!Number.isInteger(itemId) || itemId <= 0) break;
-        world?.add?.(actorId, UseIntent, { itemId, targetId });
+        const use = { itemId, targetId };
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          use.x = Math.floor(Number(x));
+          use.y = Math.floor(Number(y));
+        }
+        world?.add?.(actorId, UseIntent, use);
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.throwItem": {
+        const { itemId = 0, targetId = 0, x = null, y = null } = action.payload || {};
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+        const throwIntent = { itemId, targetId };
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          throwIntent.x = Math.floor(Number(x));
+          throwIntent.y = Math.floor(Number(y));
+        }
+        world?.add?.(actorId, ThrowIntent, throwIntent);
         world?.tick?.(1);
         break;
       }

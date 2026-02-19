@@ -7,6 +7,7 @@ export const Equipment = defineComponent('Equipment', {
   ring1: null,
   ring2: null,
   ammo: null,
+  ranged: null,
   attackDerived: 0,
   defenseDerived: 0,
   maxHpDerived: 0,

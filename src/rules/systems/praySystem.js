@@ -3,8 +3,8 @@ import { Devotion } from "../components/Devotion.js";
 import { Player } from "../components/Player.js";
 import { Vitality } from "../components/Vitality.js";
 import { Hunger } from "../components/Hunger.js";
-import { Status } from "../components/Status.js";
 import { getDeityInstance } from "./deitySystem.js";
+import { hasStatus } from "../utils/statusFacade.js";
 
 /**
  * praySystem — processes PrayIntent by calling deity.pray()
@@ -94,21 +94,18 @@ function assessDistress(world, playerId) {
     }
   }
 
-  // Check for harmful status effects
-  if (world.has(playerId, Status)) {
-    const status = world.get(playerId, Status);
-    for (const s of status.statuses || []) {
-      if (s.type === 'disease' || s.type === 'poisoned') {
-        needs.push('cure');
-        severity += 0.6;
-      } else if (s.type === 'cursed') {
-        needs.push('blessing');
-        severity += 0.7;
-      } else if (s.type === 'bleeding') {
-        needs.push('healing');
-        severity += 0.5;
-      }
-    }
+  // Check for harmful status effects (active-effects first).
+  if (hasStatus(world, playerId, 'disease') || hasStatus(world, playerId, 'poisoned')) {
+    needs.push('cure');
+    severity += 0.6;
+  }
+  if (hasStatus(world, playerId, 'cursed')) {
+    needs.push('blessing');
+    severity += 0.7;
+  }
+  if (hasStatus(world, playerId, 'bleeding')) {
+    needs.push('healing');
+    severity += 0.5;
   }
 
   // Cap severity at 1.0

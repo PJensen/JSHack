@@ -54,6 +54,8 @@ export function initHUD() {
   });
   const weaponLine = document.createElement('div');
   weaponLine.style.fontSize = '12px'; weaponLine.style.color = '#cfe8ff';
+  const rangedLine = document.createElement('div');
+  rangedLine.style.fontSize = '12px'; rangedLine.style.color = '#cfe8ff'; rangedLine.style.display = 'none';
   const ammoLine = document.createElement('div');
   ammoLine.style.fontSize = '12px'; ammoLine.style.color = '#cfe8ff'; ammoLine.style.display = 'none';
   const statusRow = document.createElement('div');
@@ -61,11 +63,29 @@ export function initHUD() {
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
   combatBox.appendChild(weaponLine);
+  combatBox.appendChild(rangedLine);
   combatBox.appendChild(ammoLine);
   combatBox.appendChild(statusRow);
   combatBox.appendChild(affixRow);
   vitals.appendChild(combatBox);
   root.appendChild(vitals);
+
+  // Help button — desktop only, top-left corner
+  const helpBtn = document.createElement('button');
+  helpBtn.textContent = '\u2139'; // ℹ information symbol
+  helpBtn.title = 'Help & Reference';
+  Object.assign(helpBtn.style, {
+    position: 'fixed', left: '8px', bottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
+    width: '36px', height: '36px',
+    padding: '0', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    fontSize: '20px', cursor: 'pointer',
+    pointerEvents: 'auto', zIndex: 910,
+    lineHeight: '36px', textAlign: 'center',
+    display: 'none'
+  });
+  helpBtn.addEventListener('click', () => window.open('./help/', '_blank'));
+  root.appendChild(helpBtn);
 
   // Inventory toggle button
   const invBtn = document.createElement('button');
@@ -137,6 +157,19 @@ export function initHUD() {
   });
   shootBtn.addEventListener('click', () => {
     try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
+  });
+
+  // Throw item button
+  const throwBtn = document.createElement('button');
+  throwBtn.id = 'btn-throw';
+  throwBtn.textContent = 'Throw';
+  Object.assign(throwBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  throwBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:openThrowChooser')); } catch {}
   });
 
   // Engrave button (to the right of Shoot)
@@ -263,7 +296,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [invBtn, useBtn, applyBtn, petBtn, castBtn, shootBtn, engraveBtn, prayBtn];
+  const commandButtons = [invBtn, useBtn, applyBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       minHeight: '44px',
@@ -292,11 +325,13 @@ export function initHUD() {
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
+  setDesktopLabel(throwBtn, 'Throw'); setMobileLabel(throwBtn, 'Throw');
   setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Engrave');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
+    helpBtn.style.display = isMobile ? 'none' : 'block';
     if (isMobile) {
       Object.assign(bar.style, {
         display: 'grid',
@@ -411,6 +446,7 @@ export function initHUD() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const weapon = e?.detail?.weapon || null;
+    const ranged = e?.detail?.ranged || null;
     const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
     const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
 
@@ -422,8 +458,30 @@ export function initHUD() {
       weaponLine.textContent = `Weapon: (none)`;
     }
 
+    const rangedCount = Math.max(0, Number(ranged?.count || 0) | 0);
+    const ammoCount = Math.max(0, Number(e?.detail?.ammo ?? 0) | 0);
+
+    // Ranged line
+    if (ranged && ranged.name) {
+      if (ranged?.isWand) {
+        rangedLine.textContent = `Ranged: [${String(ranged.name)}] (${rangedCount} ch)`;
+      } else {
+        rangedLine.textContent = `Ranged: [${String(ranged.name)}]`;
+      }
+      rangedLine.style.display = '';
+    } else {
+      rangedLine.style.display = 'none';
+    }
+
+    // Shoot button label follows ranged item type
+    let rangedLabel = 'Shoot';
+    if (ranged?.isWand) rangedLabel = `Zap (${rangedCount})`;
+    else if (ranged) rangedLabel = `Shoot (${ammoCount})`;
+    setDesktopLabel(shootBtn, rangedLabel);
+    setMobileLabel(shootBtn, rangedLabel);
+    refreshCommandLabels();
+
     // Ammo line (only visible when carrying arrows)
-    const ammoCount = Number(e?.detail?.ammo ?? 0);
     if (ammoCount > 0) {
       ammoLine.textContent = `Ammo: ${ammoCount}`;
       ammoLine.style.display = '';
@@ -457,6 +515,7 @@ export function initHUD() {
   bar.appendChild(petBtn); // Pet button after Apply
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
+  bar.appendChild(throwBtn);
   bar.appendChild(engraveBtn);
   bar.appendChild(prayBtn);
   root.appendChild(bar);
@@ -482,7 +541,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, invBtn, useBtn, shootBtn, engraveBtn, petBtn, prayBtn };
+  return { castBtn, invBtn, useBtn, shootBtn, throwBtn, engraveBtn, petBtn, prayBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
@@ -492,33 +551,33 @@ function ensureEffectsStack(container) {
   /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement, stacksEl: HTMLDivElement }>} */
   const byKey = new Map();
 
-  const _VIS = {
-    invulnerable: { name: 'Aegis', glyph: '\u{1F6E1}\uFE0F', hue: 190 },
-    burning:      { name: 'Burning', glyph: '\u{1F525}', hue: 20 },
-    poisoned:     { name: 'Poison', glyph: '\u2620\uFE0F', hue: 120 },
-    regenerating: { name: 'Regen', glyph: '\u{1F49A}', hue: 140 },
-    stunned:      { name: 'Stunned', glyph: '\u{1F4AB}', hue: 45 },
-    thorns:       { name: 'Thorns', glyph: '\u{1F339}', hue: 110 },
-    diseased:     { name: 'Disease', glyph: '\u{1F9A0}', hue: 55 },
-    bleeding:     { name: 'Bleed', glyph: '\u{1FA78}', hue: 350 },
+  // Keyed by canonical Status.type strings from effectDefs statuses[]
+  const VIS = {
+    invulnerable: { name: 'Aegis',     glyph: '\u{1F6E1}\uFE0F', hue: 190 },
+    burning:      { name: 'Burning',   glyph: '\u{1F525}',       hue: 20  },
+    poisoned:     { name: 'Poison',    glyph: '\u2620\uFE0F',    hue: 120 },
+    regen:        { name: 'Regen',     glyph: '\u{1F49A}',       hue: 140 },
+    stunned:      { name: 'Stunned',   glyph: '\u{1F4AB}',       hue: 45  },
+    thorns:       { name: 'Thorns',    glyph: '\u{1F339}',       hue: 110 },
+    disease:      { name: 'Disease',   glyph: '\u{1F9A0}',       hue: 55  },
+    bleeding:     { name: 'Bleed',     glyph: '\u{1FA78}',       hue: 350 },
+    shocked:      { name: 'Shocked',   glyph: '\u26A1',          hue: 55  },
+    frozen:       { name: 'Frozen',    glyph: '\u2744\uFE0F',    hue: 200 },
+    confused:     { name: 'Confused',  glyph: '\u{1F635}',       hue: 280 },
+    weakened:     { name: 'Weakened',  glyph: '\u{1FAB6}',       hue: 40  },
+    cursed:       { name: 'Cursed',    glyph: '\u{1F52E}',       hue: 270 },
+    blessed:      { name: 'Blessed',   glyph: '\u{1F31F}',       hue: 50  },
+    stoneskin:    { name: 'Stoneskin', glyph: '\u{1FAA8}',       hue: 220 },
+    taunted:      { name: 'Taunted',   glyph: '\u{1F624}',       hue: 0   },
+    mindwiped:    { name: 'Mindwipe',  glyph: '\u{1F9E0}',       hue: 300 },
     // Hunger levels
-    satiated:     { name: 'Satiated', glyph: '\u{1F60B}', hue: 130 },
-    peckish:      { name: 'Peckish', glyph: '\u{1F37D}\uFE0F', hue: 55 },
-    hungry:       { name: 'Hungry', glyph: '\u{1F356}', hue: 35 },
-    famished:     { name: 'Famished', glyph: '\u{1F9B4}', hue: 20 },
-    starving:     { name: 'Starving', glyph: '\u{1F480}', hue: 5 },
-    wasting:      { name: 'Wasting', glyph: '\u2620\uFE0F', hue: 350 },
+    satiated:     { name: 'Satiated',  glyph: '\u{1F60B}',       hue: 130 },
+    peckish:      { name: 'Peckish',   glyph: '\u{1F37D}\uFE0F', hue: 55  },
+    hungry:       { name: 'Hungry',    glyph: '\u{1F356}',       hue: 35  },
+    famished:     { name: 'Famished',  glyph: '\u{1F9B4}',       hue: 20  },
+    starving:     { name: 'Starving',  glyph: '\u{1F480}',       hue: 5   },
+    wasting:      { name: 'Wasting',   glyph: '\u2620\uFE0F',    hue: 350 },
   };
-  // Aliases: raw ActiveEffects keys → same VIS entry
-  _VIS.invuln = _VIS.invulnerable;
-  _VIS.burn   = _VIS.burning;
-  _VIS.poison = _VIS.poisoned;
-  _VIS.regen  = _VIS.regenerating;
-  _VIS.regeneration = _VIS.regenerating;
-  _VIS.stun   = _VIS.stunned;
-  _VIS.disease = _VIS.diseased;
-  _VIS.bleed  = _VIS.bleeding;
-  const VIS = _VIS;
 
   const hsla = (h, a = 0.2) => `hsla(${h} 80% 50% / ${a})`;
   const shadowColor = (h) => `hsl(${h} 55% 35%)`;
@@ -645,8 +704,8 @@ function createQuickSlot() {
 
   function actionable(it) {
     const t = String(it.type||'');
-    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food' || t === 'wand') return (it.count||0) > 0;
-    if (t === 'equip' || t === 'ammo') return true;
+    if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
+    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
     return false;
   }
 
@@ -670,7 +729,7 @@ function createQuickSlot() {
     if (t === 'potion') window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     else if (t === 'food') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
-    else if (t === 'equip' || t === 'ammo') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+    else if (t === 'equip' || t === 'ammo' || t === 'wand') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
     else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
   }
 
@@ -730,14 +789,15 @@ function renderQuickChip(it, h) {
   count.dataset.role = 'count';
   count.style.opacity = '0.8';
   count.style.fontSize = '12px';
-  count.textContent = (it.type === 'potion' || it.type === 'scroll' || it.type === 'food') ? `x${it.count||1}` : '';
+  if (it.type === 'wand') count.textContent = `${it.count || 1} ch`;
+  else count.textContent = (it.type === 'potion' || it.type === 'scroll' || it.type === 'food') ? `x${it.count || 1}` : '';
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip' || it.type === 'ammo') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'wand' ? 'Zap' : (it.type === 'learn' ? 'Learn' : 'Read'))));
+  btn.textContent = (it.type === 'equip' || it.type === 'ammo' || it.type === 'wand') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : 'Read')));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');

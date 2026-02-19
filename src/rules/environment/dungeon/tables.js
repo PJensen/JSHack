@@ -1,8 +1,29 @@
 // rules/environment/dungeon/tables.js
 // Loot tables and monster pools for depth-scaled entity placement.
 
-import { getMonstersByTier } from '../../data/monsters.js';
+import { getMonster, getMonstersByTier } from '../../data/monsters.js';
 import { resolveLootTable } from '../../data/lootResolver.js';
+
+/**
+ * Convert a monster definition into spawn-time params.
+ * @param {import('../../data/monsters.js').MonsterDef} def
+ * @param {number} depth
+ */
+function toMonsterSpawnParams(def, depth) {
+  return {
+    name: def.name,
+    identity: def.id,
+    maxHp: Math.floor(def.baseHp + depth * def.hpPerLevel),
+    faction: 'enemy',
+    attackDerived: def.attack,
+    defenseDerived: def.defense,
+    naturalDamageDice: def.damageDice,
+    sizeClass: def.sizeClass,
+    massKg: def.massKg,
+    resistances: def.resistances,
+    speed: def.speed,
+  };
+}
 
 /**
  * Pick monster parameters based on depth.
@@ -12,20 +33,8 @@ import { resolveLootTable } from '../../data/lootResolver.js';
 export function pickMonster(rng, depth) {
   const tier = Math.min(Math.floor((depth - 1) / 5), 3);
   const pool = getMonstersByTier(tier);
-  const t = rng.choice(pool);
-  return {
-    name: t.name,
-    identity: t.id,
-    maxHp: Math.floor(t.baseHp + depth * t.hpPerLevel),
-    faction: 'enemy',
-    attackDerived: t.attack,
-    defenseDerived: t.defense,
-    naturalDamageDice: t.damageDice,
-    sizeClass: t.sizeClass,
-    massKg: t.massKg,
-    resistances: t.resistances,
-    speed: t.speed,
-  };
+  const def = rng.choice(pool);
+  return toMonsterSpawnParams(def, depth);
 }
 
 /**
@@ -94,8 +103,18 @@ const PACK_SIZE_BY_CLASS = {
  * @returns {{monsterType:Object, packSize:number, depth:number}}
  */
 export function pickSpawner(rng, depth) {
-  // Get base monster using existing pickMonster logic
-  const monsterParams = pickMonster(rng, depth);
+  // Early-game nests are small vermin packs: rats or spiders.
+  // This keeps early spawners readable and dangerous without front-loading heavy monsters.
+  let monsterParams = null;
+  if (depth <= 5) {
+    const earlyPool = ['rat', 'spider']
+      .map((id) => getMonster(id))
+      .filter(Boolean);
+    if (earlyPool.length > 0) {
+      monsterParams = toMonsterSpawnParams(rng.choice(earlyPool), depth);
+    }
+  }
+  if (!monsterParams) monsterParams = pickMonster(rng, depth);
 
   // Look up pack size based on monster's size class
   const packRange = PACK_SIZE_BY_CLASS[monsterParams.sizeClass] || PACK_SIZE_BY_CLASS['M'];

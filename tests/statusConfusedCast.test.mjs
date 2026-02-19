@@ -71,3 +71,21 @@ Deno.test("castSpellSystem: confused caster fizzles when no alternate learned sp
   const mana = world.get(caster, Mana);
   assertEquals(mana.mana, 23, "fizzle should still consume mana for the attempted spell");
 });
+
+Deno.test("castSpellSystem: blink is not replaced by confusion miscast logic", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  world.setScheduler((w) => castSpellSystem(w));
+  const caster = configureCaster(world, ["blink", "lightning"]);
+
+  const castEvents = [];
+  const miscastEvents = [];
+  world.on("castSpell", (e) => castEvents.push(e));
+  world.on("spell:miscast", (e) => miscastEvents.push(e));
+
+  world.add(caster, CastSpellIntent, { spellId: "blink", x: 3, y: 3 });
+  world.tick(1);
+
+  assertEquals(miscastEvents.length, 0, "blink should preserve its script-driven confusion behavior");
+  assertEquals(castEvents.length, 1);
+  assertEquals(castEvents[0].spellId, "blink");
+});
