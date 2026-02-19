@@ -1,49 +1,53 @@
 import { Consumable } from "../../components/Consumable.js";
-import { findItemUseDef } from "../../data/itemUseDefs.js";
-import { runScript, ScriptVerb } from "../../scripting.js";
-import { ItemUseActionContext } from "../../utils/actionContexts.js";
+import { findUsePayload } from "../../content/items/usePayloads.js";
 
 /**
- * @param {any} action
- * @param {any} context
+ * @param {any} value
  */
-function executeUseAction(action, context) {
-  if (typeof action !== "function") return false;
-  try {
-    const out = action(context);
-    if (typeof out === "boolean") return out;
-    if (out && typeof out === "object" && typeof out.consumed === "boolean") return out.consumed;
-  } catch {}
-  return false;
+function normalizeUseHookResult(value) {
+  if (typeof value === "boolean") return { consumed: value };
+  if (value && typeof value === "object") {
+    return {
+      consumed: value.consumed === true,
+      cancelled: value.cancelled === true,
+      code: value.code,
+      message: value.message,
+      consumesTurn: value.consumesTurn,
+      detail: value.detail,
+    };
+  }
+  return { consumed: false };
 }
 
 /**
- * @param {any} result
+ * @param {any} ctx
+ * @param {any} payload
+ * @param {any} state
  */
-function normalizeScriptUseResult(result) {
-  if (typeof result === "boolean") return { consumed: result, cancelled: false };
-  if (result && typeof result === "object") {
-    return {
-      consumed: typeof result.consumed === "boolean" ? result.consumed : true,
-      cancelled: result.cancelled === true,
-      code: result.code,
-      message: result.message,
-      consumesTurn: result.consumesTurn,
-    };
+function runUseHooks(ctx, payload, state) {
+  const out = {};
+  const phases = [
+    ["beforeUse", payload.beforeUse],
+    ["onUse", payload.onUse],
+    ["afterUse", payload.afterUse],
+  ];
+  for (let i = 0; i < phases.length; i++) {
+    const [phase, fn] = phases[i];
+    if (typeof fn !== "function") continue;
+    out[phase] = fn(ctx, state);
+    if (ctx.cancelled) break;
   }
-  return { consumed: true, cancelled: false };
+  return out;
 }
 
 /**
  * Canonical use interaction pipeline.
- * Transitional note:
- * - Universal mechanics and inventory consumption use the runtime facets.
- * - Existing item-use defs/scripts are executed via a legacy adapter context
- *   until each family is migrated to first-class payload hooks.
+ * Hook-only note:
+ * - Runtime resolves use behavior through payload objects and helper callbacks.
+ * - No legacy item-use-def adapter remains in this pipeline.
  * @param {any} ctx
  */
 export function usePipeline(ctx) {
-  const world = ctx._world;
   const actor = ctx.actor | 0;
   const itemId = ctx.primary | 0;
   const intent = (ctx.params?.intent && typeof ctx.params.intent === "object")
@@ -52,14 +56,10 @@ export function usePipeline(ctx) {
 
   const metrics = {
     consumed: false,
+    payloadMatched: false,
     path: "none",
-    legacyCommittedOps: 0,
   };
 
-  if (!world) {
-    ctx.cancel({ code: "USE_GATE_RUNTIME", message: "Use runtime world unavailable." });
-    return { metrics };
-  }
   if (!(actor > 0) || !(itemId > 0)) {
     ctx.cancel({ code: "USE_GATE_INVALID", message: "Missing actor or item for use action." });
     return { metrics };
@@ -80,68 +80,57 @@ export function usePipeline(ctx) {
   const info = ctx.query.itemInfo(itemId);
   const cons = /** @type any */ (ctx.query.get(itemId, Consumable));
   const identity = String(ctx.query.identity(itemId) || "").toLowerCase();
+  const state = {
+    actor,
+    itemId,
+    identity,
+    info,
+    intent,
+    consumable: cons,
+    effectKey: String(cons?.effectKey || ""),
+    effectParams: (cons?.effectParams && typeof cons.effectParams === "object") ? cons.effectParams : {},
+  };
 
-  let consumed = false;
-  let payload = null;
+  const payload = findUsePayload(state);
+  if (!payload) {
+    return { metrics, payload: { defId: null, path: "none" } };
+  }
+  metrics.payloadMatched = true;
+  metrics.path = String(payload.source || "payload");
 
-  // Path 1: consumable script hook
-  if (cons && cons.effectKey) {
-    metrics.path = "consumable-script";
-    const scriptResult = normalizeScriptUseResult(
-      runScript(cons.effectKey, ScriptVerb.ItemUse, world, {
-        actor,
-        itemId,
-        params: { ...(cons.effectParams || {}) },
-      }),
-    );
-    if (scriptResult.cancelled) {
+  const hookOut = runUseHooks(ctx, payload, state);
+  if (!ctx.cancelled) {
+    const hookResult = normalizeUseHookResult(hookOut.onUse);
+    if (hookResult.cancelled) {
       ctx.cancel({
-        code: String(scriptResult.code || "USE_CANCELLED"),
-        message: String(scriptResult.message || "Use action cancelled."),
-        consumesTurn: scriptResult.consumesTurn === true,
+        code: String(hookResult.code || "USE_CANCELLED"),
+        message: String(hookResult.message || "Use action cancelled."),
+        consumesTurn: hookResult.consumesTurn === true,
+        detail: hookResult.detail,
       });
-      return { metrics };
     }
-    consumed = scriptResult.consumed === true;
-    payload = { scriptKey: String(cons.effectKey || ""), scriptResult };
-  } else if (info) {
-    // Path 2: item-use data defs (legacy adapter)
-    metrics.path = "item-use-def";
-    const legacyCtx = new ItemUseActionContext({
-      world,
-      actor,
-      itemId,
-      intent,
-      info,
-      identity,
-    });
-    const def = findItemUseDef(legacyCtx);
-    if (def) {
-      const run = typeof def.run === "function" ? def.run : def.action;
-      consumed = executeUseAction(run, legacyCtx);
-      payload = { defId: String(def.id || ""), identity };
-
-      if (legacyCtx.cancelled) {
-        legacyCtx.discard();
-        const reason = legacyCtx.cancelReason || { code: "USE_CANCELLED", message: "Use action cancelled." };
-        ctx.cancel(reason);
-        return { metrics, payload };
-      }
-
-      const committed = legacyCtx.commit();
-      metrics.legacyCommittedOps = Array.isArray(committed) ? committed.length : 0;
-    } else {
-      payload = { defId: null, identity };
+    if (!ctx.cancelled && hookResult.consumed) {
+      ctx.mutate.consume(itemId, actor);
+      ctx.io.emit("item:used", { actor, itemId });
+      metrics.consumed = true;
     }
-  } else {
-    metrics.path = "no-info";
+    return {
+      metrics,
+      payload: {
+        defId: String(payload.id || ""),
+        path: String(payload.source || "payload"),
+        hooks: hookOut,
+        hookResult,
+      },
+    };
   }
 
-  if (consumed) {
-    ctx.mutate.consume(itemId, actor);
-    ctx.io.emit("item:used", { actor, itemId });
-    metrics.consumed = true;
-  }
-
-  return { metrics, payload };
+  return {
+    metrics,
+    payload: {
+      defId: String(payload.id || ""),
+      path: String(payload.source || "payload"),
+      hooks: hookOut,
+    },
+  };
 }

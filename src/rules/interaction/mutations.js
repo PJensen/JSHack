@@ -15,6 +15,7 @@ import { Potion } from "../components/Potion.js";
 import { Resistances } from "../components/Resistences.js";
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
+import { Brain } from "../components/Brain.js";
 import { dealDamage } from "../utils/dealDamage.js";
 
 /**
@@ -143,6 +144,19 @@ export function applyMutation(world, op) {
       }
       break;
     }
+    case "learnSpell": {
+      const spellId = String(op.spellId || "");
+      if (!spellId) break;
+      let brain = /** @type any */ (world.get(op.entityId, Brain));
+      if (!brain) {
+        try { world.add(op.entityId, Brain, {}); } catch {}
+        brain = /** @type any */ (world.get(op.entityId, Brain));
+      }
+      if (!brain) break;
+      if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+      if (!brain.learnedSpellIds.includes(spellId)) brain.learnedSpellIds.push(spellId);
+      break;
+    }
     case "consume": {
       const inv = /** @type any */ (world.get(op.inventoryOwnerId, Inventory));
       if (!inv || !Array.isArray(inv.items)) return;
@@ -211,11 +225,12 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
  * @typedef {{ type: 'appendDamageChannels', entityId: number, channels: Array<Record<string, unknown>> }} AppendDamageChannelsOp
  * @typedef {{ type: 'patchItemInfo', entityId: number, patch: Record<string, unknown> }} PatchItemInfoOp
+ * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | LearnSpellOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
  */
 
 export class ActionTransaction {
