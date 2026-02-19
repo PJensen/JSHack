@@ -422,6 +422,7 @@ if (!_savegameLoaded) {
       addStarterItem('iron_pickaxe');
 
       // Useful inventory extras for demos.
+      addStarterItem('potion_stoneskin', { count: 3 });
       addStarterItem('potion_health', { count: 3 });
       addStarterItem('wand_frost');
       addStarterItem('stone_touchstone');
