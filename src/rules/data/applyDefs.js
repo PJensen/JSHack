@@ -1,5 +1,8 @@
 // rules/data/applyDefs.js
 // Function-first item-apply behavior definitions.
+//
+// @deprecated Legacy migration shim. Use payload hooks in
+// src/rules/content/items/applyPayloads.js instead.
 
 import { Inventory } from "../components/Inventory.js";
 import { getGem } from "./gems.js";

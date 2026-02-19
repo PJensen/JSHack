@@ -8,9 +8,13 @@ import { AFFIX_DEFS } from "../../rules/data/affixes.js";
 import { LOOT_TABLES } from "../../rules/data/lootTables.js";
 import { DEITY_DEFS } from "../../rules/data/deities.js";
 import { GEM_DEFS } from "../../rules/data/gems.js";
-import { APPLY_DEFS } from "../../rules/data/applyDefs.js";
+import { APPLY_PAYLOADS } from "../../rules/content/items/applyPayloads.js";
+import {
+  USE_EFFECT_PAYLOADS,
+  USE_ITEM_MATCHER_PAYLOADS,
+  USE_ITEM_PAYLOADS,
+} from "../../rules/content/items/usePayloads.js";
 import { EFFECT_DEFS, EFFECT_OPERATION_IDS } from "../../rules/data/effectDefs.js";
-import { ITEM_USE_DEFS } from "../../rules/data/itemUseDefs.js";
 import { MATERIAL_REACTION_OUTCOME_IDS, MATERIAL_REACTION_RULES } from "../../rules/data/materialReactions.js";
 import { NUTRITION_BY_SIZE, CORPSE_DEFS } from "../../rules/data/food.js";
 import { validateAll } from "../../rules/data/validate.js";
@@ -34,6 +38,8 @@ import { validateAll } from "../../rules/data/validate.js";
  * @returns {{ datasets: DataLoadPlanItem[], overallTotal: number }}
  */
 export function getGameDataLoadPlan() {
+  const useItemPayloadKeys = Object.keys(USE_ITEM_PAYLOADS);
+  const useEffectPayloadKeys = Object.keys(USE_EFFECT_PAYLOADS);
   /** @type {DataLoadPlanItem[]} */
   const datasets = [
     { id: "monsters", label: "Loading monster defs", total: MONSTERS.length },
@@ -48,9 +54,13 @@ export function getGameDataLoadPlan() {
       label: "Loading nutrition defs",
       total: Object.keys(NUTRITION_BY_SIZE).length + Object.keys(CORPSE_DEFS).length,
     },
-    { id: "apply", label: "Loading apply defs", total: APPLY_DEFS.length },
+    { id: "applyPayloads", label: "Loading apply payloads", total: APPLY_PAYLOADS.length },
     { id: "effects", label: "Loading effect defs", total: EFFECT_DEFS.length },
-    { id: "itemUse", label: "Loading item use defs", total: ITEM_USE_DEFS.length },
+    {
+      id: "usePayloads",
+      label: "Loading use payloads",
+      total: useItemPayloadKeys.length + USE_ITEM_MATCHER_PAYLOADS.length + useEffectPayloadKeys.length,
+    },
     { id: "materialReactions", label: "Loading material reactions", total: MATERIAL_REACTION_RULES.length },
     { id: "validate", label: "Validating data", total: 1 },
   ];
@@ -183,9 +193,9 @@ export function loadGameData(opts = {}) {
       continue;
     }
 
-    if (ds.id === "apply") {
-      for (let i = 0; i < APPLY_DEFS.length; i++) {
-        void APPLY_DEFS[i];
+    if (ds.id === "applyPayloads") {
+      for (let i = 0; i < APPLY_PAYLOADS.length; i++) {
+        void APPLY_PAYLOADS[i];
         completed++;
         emit(ds, i + 1);
       }
@@ -201,11 +211,29 @@ export function loadGameData(opts = {}) {
       continue;
     }
 
-    if (ds.id === "itemUse") {
-      for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
-        void ITEM_USE_DEFS[i];
+    if (ds.id === "usePayloads") {
+      let processed = 0;
+      const itemPayloadKeys = Object.keys(USE_ITEM_PAYLOADS);
+      for (let i = 0; i < itemPayloadKeys.length; i++) {
+        const key = itemPayloadKeys[i];
+        void USE_ITEM_PAYLOADS[key];
         completed++;
-        emit(ds, i + 1);
+        processed++;
+        emit(ds, processed);
+      }
+      for (let i = 0; i < USE_ITEM_MATCHER_PAYLOADS.length; i++) {
+        void USE_ITEM_MATCHER_PAYLOADS[i];
+        completed++;
+        processed++;
+        emit(ds, processed);
+      }
+      const effectPayloadKeys = Object.keys(USE_EFFECT_PAYLOADS);
+      for (let i = 0; i < effectPayloadKeys.length; i++) {
+        const key = effectPayloadKeys[i];
+        void USE_EFFECT_PAYLOADS[key];
+        completed++;
+        processed++;
+        emit(ds, processed);
       }
       continue;
     }
@@ -225,8 +253,10 @@ export function loadGameData(opts = {}) {
         AFFIX_DEFS,
         MATERIAL_REACTION_RULES,
         MATERIAL_REACTION_OUTCOME_IDS,
-        APPLY_DEFS,
-        ITEM_USE_DEFS,
+        APPLY_PAYLOADS,
+        USE_ITEM_PAYLOADS,
+        USE_ITEM_MATCHER_PAYLOADS,
+        USE_EFFECT_PAYLOADS,
         EFFECT_DEFS,
         EFFECT_OPERATION_IDS,
         MONSTERS,

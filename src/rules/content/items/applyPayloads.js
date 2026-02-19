@@ -1,3 +1,6 @@
+import { Inventory } from "../../components/Inventory.js";
+import { ItemInfo } from "../../components/ItemInfo.js";
+import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { getGem } from "../../data/gems.js";
 import { identify } from "../../data/identification.js";
 
@@ -109,6 +112,29 @@ export const APPLY_PAYLOADS = Object.freeze([
 ]);
 
 /**
+ * @param {{
+ *   identity: (entityId: number) => string,
+ *   itemInfo: (entityId: number) => any,
+ * }} reader
+ * @param {{ actor: number, toolId: number, targetId: number }} spec
+ * @returns {ApplyPayloadState}
+ */
+export function buildApplyPayloadState(reader, spec) {
+  const actor = spec?.actor | 0;
+  const toolId = spec?.toolId | 0;
+  const targetId = spec?.targetId | 0;
+  return {
+    actor,
+    toolId,
+    targetId,
+    toolIdentity: String(reader?.identity?.(toolId) || "").toLowerCase(),
+    targetIdentity: String(reader?.identity?.(targetId) || "").toLowerCase(),
+    toolInfo: reader?.itemInfo?.(toolId),
+    targetInfo: reader?.itemInfo?.(targetId),
+  };
+}
+
+/**
  * @param {ApplyPayloadState} state
  * @returns {ApplyPayloadDef | null}
  */
@@ -120,4 +146,60 @@ export function findApplyPayload(state) {
     } catch {}
   }
   return null;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ */
+function createWorldApplyPayloadReader(world) {
+  return {
+    identity(entityId) {
+      const ni = /** @type any */ (world.get(entityId | 0, NamedIdentity));
+      return String(ni?.identity || "");
+    },
+    itemInfo(entityId) {
+      return /** @type any */ (world.get(entityId | 0, ItemInfo));
+    },
+  };
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {number} toolId
+ */
+export function listApplyTargetsForTool(world, actor, toolId) {
+  const actorId = actor | 0;
+  const toolEntityId = toolId | 0;
+  if (!world || !(actorId > 0) || !(toolEntityId > 0)) return [];
+  if (!world.isAlive(actorId) || !world.isAlive(toolEntityId)) return [];
+
+  const inv = /** @type any */ (world.get(actorId, Inventory));
+  if (!inv || !Array.isArray(inv.items)) return [];
+  if (!inv.items.includes(toolEntityId)) return [];
+
+  const out = [];
+  const reader = createWorldApplyPayloadReader(world);
+  for (let i = 0; i < inv.items.length; i++) {
+    const targetId = inv.items[i] | 0;
+    if (!(targetId > 0) || targetId === toolEntityId) continue;
+    if (!world.isAlive(targetId)) continue;
+
+    const state = buildApplyPayloadState(reader, {
+      actor: actorId,
+      toolId: toolEntityId,
+      targetId,
+    });
+    if (findApplyPayload(state)) out.push(targetId);
+  }
+  return out;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {number} toolId
+ */
+export function canUseApplyTool(world, actor, toolId) {
+  return listApplyTargetsForTool(world, actor, toolId).length > 0;
 }
