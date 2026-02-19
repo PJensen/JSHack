@@ -118,6 +118,13 @@ export function createFacets(init) {
         effect: { ...effect },
       });
     },
+    patchItemInfo(entityId, patch) {
+      return tx.queueMutation({
+        type: "patchItemInfo",
+        entityId: entityId | 0,
+        patch: (patch && typeof patch === "object") ? { ...patch } : {},
+      });
+    },
     destroy(entityId) {
       return tx.queueMutation({ type: "destroy", entityId: entityId | 0 });
     },

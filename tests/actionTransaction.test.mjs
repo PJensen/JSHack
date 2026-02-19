@@ -3,6 +3,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { DamageSpec } from "../src/rules/components/DamageSpec.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ActionTransaction, applyMutation } from '../src/rules/interaction/mutations.js';
 
 function makeWorld() {
@@ -108,6 +109,36 @@ Deno.test("commit appendDamageChannels creates DamageSpec and appends channels",
   assertEquals(spec.channels.length, 1);
   assertEquals(spec.channels[0].type, "fire");
   assertEquals(spec.channels[0].amount, 4);
+});
+
+Deno.test("commit patchItemInfo merges item info fields", () => {
+  const world = makeWorld();
+  const e = world.create();
+  world.add(e, ItemInfo, {
+    type: "equip",
+    slot: "weapon",
+    weight: 1,
+    value: 1,
+    description: "",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+
+  const q = new ActionTransaction();
+  q.enqueue({
+    type: "patchItemInfo",
+    entityId: e,
+    patch: { coating: { kind: "poison", charges: 12 } },
+  });
+  q.commit(world);
+
+  const info = world.get(e, ItemInfo);
+  assert(info?.coating, "coating should be patched in");
+  assertEquals(info.coating.kind, "poison");
+  assertEquals(info.coating.charges, 12);
 });
 
 Deno.test("commit multiple ops: all applied in order", () => {
