@@ -15,12 +15,13 @@ function getHook(hookOwner, key) {
 /**
  * @param {any} ctx
  * @param {{
- *   beforeDrink?: ((ctx: any) => unknown) | null,
- *   onDrink?: ((ctx: any) => unknown) | null,
- *   afterDrink?: ((ctx: any) => unknown) | null,
+ *   beforeDrink?: ((ctx: any, state?: any) => unknown) | null,
+ *   onDrink?: ((ctx: any, state?: any) => unknown) | null,
+ *   afterDrink?: ((ctx: any, state?: any) => unknown) | null,
  * }} hooks
+ * @param {any} state
  */
-function runPayloadHooks(ctx, hooks) {
+function runPayloadHooks(ctx, hooks, state) {
   const payload = {};
   const phases = [
     ["beforeDrink", hooks.beforeDrink],
@@ -30,7 +31,7 @@ function runPayloadHooks(ctx, hooks) {
   for (let i = 0; i < phases.length; i++) {
     const [phase, hook] = phases[i];
     if (typeof hook !== "function") continue;
-    const out = hook(ctx);
+    const out = hook(ctx, state);
     payload[phase] = out;
     if (ctx.cancelled) break;
   }
@@ -138,12 +139,19 @@ export function drinkPipeline(ctx) {
   const paramsPayload = ctx.params?.payload && typeof ctx.params.payload === "object"
     ? ctx.params.payload
     : null;
+  const state = {
+    actor,
+    itemId,
+    target,
+    identity: String(ctx.query.identity(itemId) || "").toLowerCase(),
+    potion,
+  };
   const hooks = {
     beforeDrink: getHook(paramsPayload, "beforeDrink") || getHook(potion, "beforeDrink"),
     onDrink: getHook(paramsPayload, "onDrink") || getHook(potion, "onDrink"),
     afterDrink: getHook(paramsPayload, "afterDrink") || getHook(potion, "afterDrink"),
   };
-  const payload = runPayloadHooks(ctx, { beforeDrink: hooks.beforeDrink });
+  const payload = runPayloadHooks(ctx, { beforeDrink: hooks.beforeDrink }, state);
   if (ctx.cancelled) return { metrics, payload };
 
   ctx.mutate.consume(itemId, actor);
@@ -183,7 +191,7 @@ export function drinkPipeline(ctx) {
     metrics.queuedEffects += 1;
   }
 
-  const restPayload = runPayloadHooks(ctx, { onDrink: hooks.onDrink, afterDrink: hooks.afterDrink });
+  const restPayload = runPayloadHooks(ctx, { onDrink: hooks.onDrink, afterDrink: hooks.afterDrink }, state);
   Object.assign(payload, restPayload);
   if (ctx.cancelled) return { metrics, payload };
 

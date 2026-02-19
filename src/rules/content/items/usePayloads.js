@@ -1,4 +1,5 @@
 import { getCatalogItem } from "../../data/itemCatalog.js";
+import { getItemHooksByIdentity } from "./itemHooks.js";
 import {
   createCastSpellFromIdentityOnUse,
   createConsumableScriptOnUse,
@@ -99,6 +100,25 @@ export function findUsePayload(state) {
   const identity = String(state?.identity || "");
   const direct = USE_ITEM_PAYLOADS[identity];
   if (direct) return { ...direct, source: "identity" };
+
+  const hooks = getItemHooksByIdentity(identity);
+  const hasItemUseHooks = (
+    typeof hooks.beforeUse === "function"
+    || typeof hooks.onUse === "function"
+    || typeof hooks.afterUse === "function"
+    || typeof hooks.beforeThrow === "function"
+    || typeof hooks.onThrow === "function"
+    || typeof hooks.afterThrow === "function"
+  );
+  if (hasItemUseHooks) {
+    return {
+      id: `item:${identity}:hooks`,
+      source: "itemHooks",
+      beforeUse: hooks.beforeThrow || hooks.beforeUse,
+      onUse: hooks.onThrow || hooks.onUse,
+      afterUse: hooks.afterThrow || hooks.afterUse,
+    };
+  }
 
   for (let i = 0; i < USE_ITEM_MATCHER_PAYLOADS.length; i++) {
     const payload = USE_ITEM_MATCHER_PAYLOADS[i];

@@ -280,6 +280,99 @@ export const ITEM_CATALOG = {
   },
 
   // Magic / Usable
+  potion_stoneskin: {
+    id: "potion_stoneskin",
+    catalogKind: "magic",
+    name: "Potion of Stoneskin",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 60,
+    description: "Turns skin to granite, can harden gear, and can shatter into a taunting statue.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        const turns = ctx.helpers.int(10, 14);
+        const potency = ctx.helpers.int(2, 3);
+        ctx.helpers.addEffect(targetId, {
+          key: "stoneskin",
+          potency,
+          turnsLeft: turns,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_stoneskin", kind: "armor_buff" },
+        });
+        ctx.io.emit("status", { id: targetId, kind: "buff", text: "STONESKIN", source: actorId });
+        return { turns, potency };
+      },
+      on_throw: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const spawnAt = ctx.helpers.adjacentPoint(actorId);
+        const taunts = [
+          "A stone statue lurches upright and starts heckling you.",
+          "The shattered potion hardens into a taunting idol.",
+          "Granite dust spirals into a jeering stone sentinel.",
+        ];
+        const tauntMessage = ctx.helpers.pick(taunts, taunts[0]);
+        ctx.helpers.spawnMonster("stone_taunter", spawnAt, {
+          name: "Taunting Statue",
+          faction: "enemy",
+          tauntMessage,
+        });
+        ctx.io.emit("item:thrown", {
+          actor: actorId,
+          itemId: Number(state?.itemId || ctx.primary || 0) | 0,
+          at: spawnAt,
+          result: { type: "stone_statue" },
+        });
+        return { consumed: true, spawned: "stone_taunter", at: spawnAt };
+      },
+      on_dip: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const toolId = Number(state?.toolId || ctx.primary || 0) | 0;
+        const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+        if (!(targetId > 0) || !ctx.query.alive(targetId)) {
+          return { applied: false, consumedTool: false, resultType: "nothing" };
+        }
+
+        const info = ctx.query.itemInfo(targetId);
+        const bonuses = (info?.bonuses && typeof info.bonuses === "object")
+          ? { ...info.bonuses }
+          : {};
+        const baseDefense = Number(bonuses.defense || 0);
+        bonuses.defense = baseDefense + 1;
+
+        ctx.helpers.setMaterial(targetId, "stone");
+        ctx.helpers.patchItemInfo(targetId, {
+          bonuses,
+          description: `${String(info?.description || "Item")} Its surface is plated with living stone.`,
+        });
+        ctx.io.emit("item:applied", {
+          actor,
+          toolId,
+          targetId,
+          result: {
+            type: "stonecoat",
+            defenseBonus: 1,
+          },
+        });
+        return { applied: true, consumedTool: true, resultType: "stonecoat" };
+      },
+    },
+  },
   book_lightning: {
     id: "book_lightning",
     catalogKind: "magic",

@@ -1,6 +1,58 @@
 // rules/data/validate.js
 // Assert that item-catalog and affix data conform to expected shapes.
 
+const ITEM_HOOK_KEY_ALIASES = Object.freeze({
+  before_drink: 'beforeDrink',
+  on_drink: 'onDrink',
+  after_drink: 'afterDrink',
+  before_throw: 'beforeThrow',
+  on_throw: 'onThrow',
+  after_throw: 'afterThrow',
+  before_dip: 'beforeDip',
+  on_dip: 'onDip',
+  after_dip: 'afterDip',
+  before_use: 'beforeUse',
+  on_use: 'onUse',
+  after_use: 'afterUse',
+  before_apply: 'beforeApply',
+  on_apply: 'onApply',
+  after_apply: 'afterApply',
+});
+
+const ITEM_HOOK_KEYS = new Set([
+  'beforeDrink', 'onDrink', 'afterDrink',
+  'beforeThrow', 'onThrow', 'afterThrow',
+  'beforeDip', 'onDip', 'afterDip',
+  'beforeUse', 'onUse', 'afterUse',
+  'beforeApply', 'onApply', 'afterApply',
+  ...Object.keys(ITEM_HOOK_KEY_ALIASES),
+]);
+
+/**
+ * @param {string} itemId
+ * @param {Record<string, any>} source
+ * @param {string} sourceLabel
+ */
+function validateItemHookSurface(itemId, source, sourceLabel) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    throw new Error(`item ${itemId}: ${sourceLabel} must be an object`);
+  }
+
+  for (const [key, value] of Object.entries(source)) {
+    if (ITEM_HOOK_KEYS.has(key)) {
+      if (typeof value !== 'function') {
+        throw new Error(`item ${itemId}: ${sourceLabel}.${key} must be a function`);
+      }
+      continue;
+    }
+
+    const looksLikeHook = /^(before|on|after)([A-Z_].*)?$/.test(String(key || ''));
+    if (looksLikeHook) {
+      throw new Error(`item ${itemId}: ${sourceLabel}.${key} is not a supported item hook key`);
+    }
+  }
+}
+
 export function validateItemCatalog(ITEM_CATALOG) {
   if (typeof ITEM_CATALOG !== 'object' || !ITEM_CATALOG) throw new Error('ITEM_CATALOG must be an object');
   for (const [id, rec] of Object.entries(ITEM_CATALOG)) {
@@ -10,6 +62,10 @@ export function validateItemCatalog(ITEM_CATALOG) {
     if (typeof rec.catalogKind !== 'string' || !rec.catalogKind) throw new Error(`item ${id}: catalogKind required`);
     if (typeof rec.rarity !== 'number' || rec.rarity < 1) throw new Error(`item ${id}: rarity >= 1`);
     if (typeof rec.rarityName !== 'string' || !rec.rarityName) throw new Error(`item ${id}: rarityName required`);
+
+    validateItemHookSurface(id, rec, 'record');
+    if (rec.hooks != null) validateItemHookSurface(id, rec.hooks, 'hooks');
+    if (rec.potion != null) validateItemHookSurface(id, rec.potion, 'potion');
 
     if (rec.catalogKind === 'equipment') {
       if (rec.type !== 'equip') throw new Error(`item ${id}: equipment must have type 'equip'`);

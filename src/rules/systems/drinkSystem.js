@@ -3,6 +3,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { drinkPipeline } from "../interaction/verbs/drinkPipeline.js";
 import { getDrinkPayloadByIdentity } from "../content/items/drinkPayloads.js";
+import { getItemHooksByIdentity } from "../content/items/itemHooks.js";
 
 /**
  * drinkSystem — canonical intent consumer for the `drink` verb.
@@ -13,7 +14,13 @@ export function drinkSystem(world) {
     const itemId = intent.itemId | 0;
     const targetId = intent.targetId | 0;
     const identity = String(world.get(itemId, NamedIdentity)?.identity || "");
-    const payload = getDrinkPayloadByIdentity(identity);
+    const directHooks = getItemHooksByIdentity(identity);
+    const legacyPayload = getDrinkPayloadByIdentity(identity);
+    const payload = {
+      beforeDrink: directHooks.beforeDrink || legacyPayload?.beforeDrink,
+      onDrink: directHooks.onDrink || legacyPayload?.onDrink,
+      afterDrink: directHooks.afterDrink || legacyPayload?.afterDrink,
+    };
     let result = null;
 
     try {

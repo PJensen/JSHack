@@ -179,6 +179,7 @@ export function combatSystem(world) {
         const defCursedPenalty = statusStrength(defStatus, 'cursed');
         const atkBlessedBonus = statusStrength(atkStatus, 'blessed');
         const defBlessedBonus = statusStrength(defStatus, 'blessed');
+        const defStoneskinBonus = statusStrength(defStatus, 'stoneskin');
 
         const attackBonus = Math.max(
             0,
@@ -198,6 +199,7 @@ export function combatSystem(world) {
             - defWeakenPenalty
             - defCursedPenalty
             + defBlessedBonus
+            + defStoneskinBonus
         );
 
         // Deterministic d20 roll seeded by world + participants + step

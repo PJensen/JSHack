@@ -73,6 +73,7 @@ export function executeInteraction(world, spec) {
     breadcrumbs,
     warnings,
   });
+  const helpers = facets.fx;
 
   const ctx = {
     schemaVersion: INTERACTION_CTX_SCHEMA_VERSION,
@@ -89,6 +90,8 @@ export function executeInteraction(world, spec) {
     audit: facets.audit,
     rules: facets.rules,
     rng: facets.rng,
+    helpers,
+    fx: helpers,
     _breadcrumbs: breadcrumbs,
     /**
      * @param {unknown} reason

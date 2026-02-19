@@ -55,6 +55,7 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 30, itemId: "scroll_blastwave" },
       { type: "archetype", weight: 20, archetype: "ArrowsStack" },
       { type: "item",      weight: 5,  itemId: "scroll_homecoming" },
+      { type: "item",      weight: 8,  itemId: "potion_stoneskin" },
     ],
   },
 
@@ -111,6 +112,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:wands" },
+      { type: "item",      weight: 8,  itemId: "potion_stoneskin" },
       { type: "archetype", weight: 8,  archetype: "Ration" },
     ],
   },
@@ -198,6 +200,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:wands" },
+      { type: "item",      weight: 10, itemId: "potion_stoneskin" },
       { type: "archetype", weight: 10, archetype: "Ration" },
       { type: "gem",       weight: 4,  materials: ["gemstone", "glass"] },
     ],

@@ -3,6 +3,7 @@ import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { getGem } from "../../data/gems.js";
 import { identify } from "../../data/identification.js";
+import { getItemHooksByIdentity } from "./itemHooks.js";
 
 export const APPLY_RESULT = Object.freeze({
   NOTHING: "nothing",
@@ -145,6 +146,22 @@ export function findApplyPayload(state) {
       if (def.matches(state)) return def;
     } catch {}
   }
+
+  const hooks = getItemHooksByIdentity(state?.toolIdentity || "");
+  if (typeof hooks.onDip === "function") {
+    return {
+      id: `item:${String(state?.toolIdentity || "unknown")}:onDip`,
+      matches: () => true,
+      beforeApply: typeof hooks.beforeDip === "function"
+        ? (ctx, nextState) => hooks.beforeDip(ctx, nextState)
+        : undefined,
+      onApply: (ctx, nextState) => hooks.onDip(ctx, nextState),
+      afterApply: typeof hooks.afterDip === "function"
+        ? (ctx, nextState) => hooks.afterDip(ctx, nextState)
+        : undefined,
+    };
+  }
+
   return null;
 }
 
