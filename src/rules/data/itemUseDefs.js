@@ -1,4 +1,7 @@
 // rules/data/itemUseDefs.js
+//
+// @deprecated Legacy migration shim. Use payload hooks in
+// src/rules/content/items/usePayloads.js instead.
 // Function-first item-use behavior definitions interpreted by useItemSystem.
 
 import { getCatalogItem } from "./itemCatalog.js";

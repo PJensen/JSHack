@@ -367,6 +367,30 @@ export const MONSTERS = [
     description: 'An undead sorcerer sustained by a hidden phylactery.',
     lootTable: 'drop:lich',
   },
+  {
+    id: 'stone_taunter',
+    name: 'Taunting Statue',
+    tier: 99,
+    glyph: 'S',
+    fg: '#b8b8b8',
+    glow: '#7a7a7a',
+    baseHp: 18,
+    hpPerLevel: 0,
+    attack: 2,
+    defense: 4,
+    damageDice: '1d6',
+    sizeClass: 'M',
+    massKg: 240,
+    resistances: {
+      kinetic: { DR: 14, bluntMult: 0.7, slashMult: 0.5, pierceMult: 0.4 },
+      thermal: { burnMult: 0.6 },
+      chemical: { toxMult: 0.2 },
+      electric: { ohms: 2400 },
+    },
+    speed: 2,
+    hooks: null,
+    description: 'An animated stone idol that heckles anything that breathes.',
+  },
 ];
 
 /** Lookup helpers */
