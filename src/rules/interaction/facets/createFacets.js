@@ -1,6 +1,7 @@
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
+import { Position } from "../../components/Position.js";
 import { runSpellScript } from "../../scripts/spells.js";
 import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
@@ -43,6 +44,44 @@ function createDeterministicRng(seed) {
       return createDeterministicRng(forkSeed);
     },
   });
+}
+
+/**
+ * @param {string} expr
+ * @returns {{ count: number, sides: number, mod: number } | null}
+ */
+function parseDiceExpression(expr) {
+  const src = String(expr || "").trim().toLowerCase();
+  const match = /^(\d+)d(\d+)([+-]\d+)?$/.exec(src);
+  if (!match) return null;
+  const count = Math.max(1, Number(match[1]) | 0);
+  const sides = Math.max(1, Number(match[2]) | 0);
+  const mod = Number(match[3] || 0) | 0;
+  return { count, sides, mod };
+}
+
+/**
+ * @param {string} expr
+ * @param {{ int: (min: number, max: number) => number }} localRng
+ */
+function rollDiceExpression(expr, localRng) {
+  const parsed = parseDiceExpression(expr);
+  if (!parsed) return 0;
+  let total = parsed.mod;
+  for (let i = 0; i < parsed.count; i++) {
+    total += localRng.int(1, parsed.sides);
+  }
+  return total;
+}
+
+/**
+ * @param {number} probability
+ */
+function normalizeChanceInput(probability) {
+  const p = Number(probability || 0);
+  if (!(p > 0)) return 0;
+  if (p <= 1) return p * 100;
+  return p;
 }
 
 /**
@@ -127,6 +166,53 @@ export function createFacets(init) {
         patch: (patch && typeof patch === "object") ? { ...patch } : {},
       });
     },
+    setMaterial(entityId, kind) {
+      return tx.queueMutation({
+        type: "setMaterial",
+        entityId: entityId | 0,
+        kind: String(kind || ""),
+      });
+    },
+    spawnItem(itemId, x, y, opts = {}) {
+      const options = (opts && typeof opts === "object") ? opts : {};
+      return tx.queueMutation({
+        type: "spawnItem",
+        itemId: String(itemId || ""),
+        x: Number(x),
+        y: Number(y),
+        count: Number(options.count || 0) | 0,
+        affixes: Array.isArray(options.affixes) ? options.affixes.slice() : [],
+        ownerId: Number(options.ownerId || 0) | 0,
+        material: String(options.material || ""),
+        patchItemInfo: (options.patchItemInfo && typeof options.patchItemInfo === "object")
+          ? { ...options.patchItemInfo }
+          : {},
+        emitEvent: options.emitEvent !== false,
+      });
+    },
+    spawnMonster(monsterId, x, y, opts = {}) {
+      const options = (opts && typeof opts === "object") ? opts : {};
+      return tx.queueMutation({
+        type: "spawnMonster",
+        monsterId: String(monsterId || ""),
+        x: Number(x),
+        y: Number(y),
+        name: String(options.name || ""),
+        faction: String(options.faction || "enemy"),
+        maxHp: Number(options.maxHp),
+        attackDerived: Number(options.attackDerived),
+        defenseDerived: Number(options.defenseDerived),
+        naturalDamageDice: String(options.naturalDamageDice || ""),
+        sizeClass: String(options.sizeClass || ""),
+        massKg: Number(options.massKg),
+        resistances: (options.resistances && typeof options.resistances === "object")
+          ? { ...options.resistances }
+          : null,
+        speed: Number(options.speed),
+        tauntMessage: String(options.tauntMessage || ""),
+        emitEvent: options.emitEvent !== false,
+      });
+    },
     learnSpell(entityId, spellId) {
       return tx.queueMutation({
         type: "learnSpell",
@@ -199,5 +285,96 @@ export function createFacets(init) {
     },
   });
 
-  return { query, mutate, io, audit, rules, rng };
+  const fx = Object.freeze({
+    chance(probability) {
+      return rng.chance(normalizeChanceInput(probability));
+    },
+    int(min, max) {
+      return rng.int(min, max);
+    },
+    roll(diceExpr) {
+      return rollDiceExpression(String(diceExpr || ""), rng);
+    },
+    pick(values, fallback = null) {
+      if (!Array.isArray(values) || values.length <= 0) return fallback;
+      return values[rng.int(0, values.length - 1)];
+    },
+    pickWeighted(entries, fallback = null) {
+      if (!Array.isArray(entries) || entries.length <= 0) return fallback;
+      let total = 0;
+      for (let i = 0; i < entries.length; i++) {
+        total += Math.max(0, Number(entries[i]?.weight || 0));
+      }
+      if (!(total > 0)) return fallback;
+      let n = rng.next() * total;
+      for (let i = 0; i < entries.length; i++) {
+        const w = Math.max(0, Number(entries[i]?.weight || 0));
+        if (w <= 0) continue;
+        n -= w;
+        if (n <= 0) return entries[i]?.value ?? fallback;
+      }
+      return entries[entries.length - 1]?.value ?? fallback;
+    },
+    damage(entityId, amount, source = "interaction") {
+      return mutate.damage(entityId, amount, source);
+    },
+    heal(entityId, amount) {
+      return mutate.heal(entityId, amount);
+    },
+    addEffect(entityId, effect) {
+      return mutate.upsertTimedEffect(entityId, effect);
+    },
+    patchItemInfo(entityId, patch) {
+      return mutate.patchItemInfo(entityId, patch);
+    },
+    setMaterial(entityId, kind) {
+      return mutate.setMaterial(entityId, kind);
+    },
+    consume(itemId = primary, ownerId = actor) {
+      return mutate.consume(itemId, ownerId);
+    },
+    adjacentPoint(entityId = actor) {
+      const pos = query.get(entityId | 0, Position) || { x: 0, y: 0 };
+      const dirs = [
+        { x: 1, y: 0 },
+        { x: -1, y: 0 },
+        { x: 0, y: 1 },
+        { x: 0, y: -1 },
+      ];
+      const dir = dirs[rng.int(0, dirs.length - 1)];
+      return { x: (pos.x | 0) + dir.x, y: (pos.y | 0) + dir.y };
+    },
+    spawnItem(itemId, at = null, opts = {}) {
+      const fallback = query.get(actor, Position) || { x: 0, y: 0 };
+      const point = (at && typeof at === "object")
+        ? { x: Number(at.x), y: Number(at.y) }
+        : { x: Number.NaN, y: Number.NaN };
+      const x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
+      const y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
+      return mutate.spawnItem(itemId, x, y, opts);
+    },
+    spawnMonster(monsterId, at = null, opts = {}) {
+      const fallback = query.get(actor, Position) || { x: 0, y: 0 };
+      const point = (at && typeof at === "object")
+        ? { x: Number(at.x), y: Number(at.y) }
+        : { x: Number.NaN, y: Number.NaN };
+      const x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
+      const y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
+      return mutate.spawnMonster(monsterId, x, y, opts);
+    },
+    emit(event, payload = {}) {
+      return io.emit(event, payload);
+    },
+    message(text, type = "system") {
+      return io.message(text, type);
+    },
+    warn(code, detail) {
+      return audit.warn(code, detail);
+    },
+    queue(op) {
+      return mutate.queue(op);
+    },
+  });
+
+  return { query, mutate, io, audit, rules, rng, fx };
 }

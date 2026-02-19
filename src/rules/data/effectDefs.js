@@ -108,4 +108,10 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["blessed"],
   },
+  {
+    id: "stoneskin",
+    keys: ["stoneskin", "stone_skin"],
+    operation: "none",
+    statuses: ["stoneskin"],
+  },
 ];

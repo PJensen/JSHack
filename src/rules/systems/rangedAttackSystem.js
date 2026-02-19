@@ -8,11 +8,30 @@ import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
 import { Position } from '../components/Position.js';
+import { Status } from '../components/Status.js';
 import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
+
+/**
+ * @param {any} status
+ * @param {string} type
+ */
+function statusStrength(status, type) {
+  if (!status || !Array.isArray(status.statuses)) return 0;
+  let total = 0;
+  for (let i = 0; i < status.statuses.length; i++) {
+    const s = status.statuses[i];
+    if (!s || s.type !== type) continue;
+    if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
+    const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
+    const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
+    total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
+  }
+  return total;
+}
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
@@ -94,7 +113,9 @@ export function rangedAttackSystem(world) {
     // d20 roll
     const attackBonus = 1 + (eq?.attackDerived || 0);
     const defEq = world.get(defender, Equipment);
-    const armorClass = 10 + (defEq?.defenseDerived || 0);
+    const defStatus = world.get(defender, Status);
+    const defStoneskinBonus = statusStrength(defStatus, 'stoneskin');
+    const armorClass = 10 + (defEq?.defenseDerived || 0) + defStoneskinBonus;
     const rangePenalty = Math.floor(dist / 3);
 
     const seed = combatSeed(world.seed, world.step, attacker, defender);
@@ -180,4 +201,3 @@ function consumeAmmo(world, owner, ammoId, ammoInfo) {
     world.destroy(ammoId);
   }
 }
-

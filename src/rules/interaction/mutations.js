@@ -8,14 +8,23 @@
 // - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Collider } from "../components/Collider.js";
+import { Equipment } from "../components/Equipment.js";
+import { Faction } from "../components/Faction.js";
 import { Hunger } from "../components/Hunger.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import { Material } from "../components/Material.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Position } from "../components/Position.js";
 import { Potion } from "../components/Potion.js";
 import { Resistances } from "../components/Resistences.js";
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
+import { Speed } from "../components/Speed.js";
+import { buildCatalogItem } from "../data/itemCatalogLoader.js";
+import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
 
 /**
@@ -144,6 +153,154 @@ export function applyMutation(world, op) {
       }
       break;
     }
+    case "setMaterial": {
+      const kind = String(op.kind || "");
+      if (!kind) break;
+      let material = /** @type any */ (world.get(op.entityId, Material));
+      if (!material) {
+        try { world.add(op.entityId, Material, { kind }); } catch {}
+        material = /** @type any */ (world.get(op.entityId, Material));
+      }
+      if (material) material.kind = kind;
+      break;
+    }
+    case "spawnItem": {
+      const itemId = String(op.itemId || "");
+      if (!itemId) break;
+
+      let created = 0;
+      try {
+        created = buildCatalogItem(world, itemId, {
+          count: Number(op.count || 0) | 0,
+          affixes: Array.isArray(op.affixes) ? op.affixes.slice() : [],
+        });
+      } catch {
+        created = 0;
+      }
+      if (!(created > 0)) break;
+
+      const hasX = Number.isFinite(op.x);
+      const hasY = Number.isFinite(op.y);
+      const spawnX = hasX ? (Number(op.x) | 0) : 0;
+      const spawnY = hasY ? (Number(op.y) | 0) : 0;
+      if (hasX && hasY) {
+        if (world.has(created, Position)) {
+          try { world.set(created, Position, { x: spawnX, y: spawnY }); } catch {}
+        } else {
+          try { world.add(created, Position, { x: spawnX, y: spawnY }); } catch {}
+        }
+      }
+
+      const patchInfo = op.patchItemInfo && typeof op.patchItemInfo === "object"
+        ? /** @type Record<string, unknown> */ (op.patchItemInfo)
+        : null;
+      if (patchInfo) {
+        const info = /** @type any */ (world.get(created, ItemInfo));
+        if (info) {
+          const keys = Object.keys(patchInfo);
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const value = patchInfo[key];
+            if (value && typeof value === "object") {
+              info[key] = Array.isArray(value) ? value.slice() : { ...value };
+              continue;
+            }
+            info[key] = value;
+          }
+        }
+      }
+
+      const materialKind = String(op.material || "");
+      if (materialKind) {
+        let material = /** @type any */ (world.get(created, Material));
+        if (!material) {
+          try { world.add(created, Material, { kind: materialKind }); } catch {}
+          material = /** @type any */ (world.get(created, Material));
+        }
+        if (material) material.kind = materialKind;
+      }
+
+      const ownerId = op.ownerId | 0;
+      if (ownerId > 0) {
+        const inv = /** @type any */ (world.get(ownerId, Inventory));
+        if (inv && Array.isArray(inv.items)) {
+          if (!inv.items.includes(created)) inv.items.push(created);
+          try { world.remove(created, Position); } catch {}
+        }
+      }
+
+      if (op.emitEvent !== false) {
+        try {
+          world.emit?.("spawned", {
+            id: created,
+            kind: "item",
+            at: { x: spawnX, y: spawnY },
+          });
+        } catch {}
+      }
+      break;
+    }
+    case "spawnMonster": {
+      const monsterId = String(op.monsterId || "");
+      if (!monsterId) break;
+
+      const def = getMonster(monsterId);
+      if (!def) break;
+
+      const spawnX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
+      const spawnY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
+      const spawned = world.create();
+      const maxHp = Number.isFinite(op.maxHp) ? (Number(op.maxHp) | 0) : Math.max(1, Number(def.baseHp || 1) | 0);
+      const faction = String(op.faction || "enemy");
+      const attackDerived = Number.isFinite(op.attackDerived) ? Number(op.attackDerived) : Number(def.attack || 0);
+      const defenseDerived = Number.isFinite(op.defenseDerived) ? Number(op.defenseDerived) : Number(def.defense || 0);
+      const naturalDamageDice = String(op.naturalDamageDice || def.damageDice || "1d2");
+      const speed = Number.isFinite(op.speed) ? Number(op.speed) : Number(def.speed || 1);
+      const resistances = (op.resistances && typeof op.resistances === "object")
+        ? { ...op.resistances }
+        : ((def.resistances && typeof def.resistances === "object") ? { ...def.resistances } : {});
+
+      try { world.add(spawned, Position, { x: spawnX, y: spawnY }); } catch {}
+      try { world.add(spawned, NamedIdentity, { name: String(op.name || def.name || monsterId), identity: monsterId }); } catch {}
+      try { world.add(spawned, Faction, { key: faction }); } catch {}
+      try { world.add(spawned, Collider, { solid: true, blocksSight: false }); } catch {}
+      try { world.add(spawned, Inventory, { items: [], capacity: 0, weightLimit: null }); } catch {}
+      try {
+        world.add(spawned, Equipment, {
+          weapon: null,
+          armor: null,
+          ring1: null,
+          ring2: null,
+          attackDerived,
+          defenseDerived,
+          naturalDamageDice,
+          naturalScript: null,
+          maxHpDerived: 0,
+          critChanceDerived: 0,
+          critMultDerived: 0,
+        });
+      } catch {}
+      try { world.add(spawned, Vitality, { maxHp, hp: maxHp }); } catch {}
+      try { world.add(spawned, Speed, { actEvery: Math.max(1, Number(speed) | 0) }); } catch {}
+      try { world.add(spawned, ActiveEffects, { effects: [] }); } catch {}
+      try { world.add(spawned, Resistances, resistances); } catch {}
+
+      if (op.emitEvent !== false) {
+        try {
+          world.emit?.("spawned", {
+            id: spawned,
+            kind: "monster",
+            at: { x: spawnX, y: spawnY },
+          });
+        } catch {}
+      }
+
+      const tauntMessage = String(op.tauntMessage || "");
+      if (tauntMessage) {
+        try { world.emit?.("message", { text: tauntMessage, type: "warning" }); } catch {}
+      }
+      break;
+    }
     case "learnSpell": {
       const spellId = String(op.spellId || "");
       if (!spellId) break;
@@ -225,12 +382,15 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
  * @typedef {{ type: 'appendDamageChannels', entityId: number, channels: Array<Record<string, unknown>> }} AppendDamageChannelsOp
  * @typedef {{ type: 'patchItemInfo', entityId: number, patch: Record<string, unknown> }} PatchItemInfoOp
+ * @typedef {{ type: 'setMaterial', entityId: number, kind: string }} SetMaterialOp
+ * @typedef {{ type: 'spawnItem', itemId: string, x?: number, y?: number, count?: number, affixes?: string[], ownerId?: number, material?: string, patchItemInfo?: Record<string, unknown>, emitEvent?: boolean }} SpawnItemOp
+ * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, attackDerived?: number, defenseDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean }} SpawnMonsterOp
  * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | LearnSpellOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
  */
 
 export class ActionTransaction {
