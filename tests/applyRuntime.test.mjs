@@ -37,7 +37,6 @@ Deno.test("apply runtime uses payload hook for touchstone identify", () => {
   assertEquals(result.canceled, false);
   assertEquals(result.metrics.path, "payload");
   assertEquals(result.metrics.payloadMatched, true);
-  assertEquals(result.metrics.legacyCommittedOps, 0);
   assertEquals(isIdentified("gem_ruby"), true);
   assertEquals(appliedEvents.length, 1);
   assert(world.isAlive(toolId), "touchstone should not be consumed");
@@ -90,7 +89,6 @@ Deno.test("apply runtime payload hook coats weapon and consumes poison potion", 
   assertEquals(result.ok, true);
   assertEquals(result.metrics.path, "payload");
   assertEquals(result.metrics.consumedTool, true);
-  assertEquals(result.metrics.legacyCommittedOps, 0);
 
   const daggerInfo = world.get(dagger, ItemInfo);
   assert(daggerInfo?.coating, "weapon should gain coating");

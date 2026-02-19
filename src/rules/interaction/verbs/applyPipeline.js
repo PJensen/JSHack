@@ -1,5 +1,3 @@
-import { findApplyDef } from "../../data/applyDefs.js";
-import { ItemApplyActionContext } from "../../utils/actionContexts.js";
 import { findApplyPayload } from "../../content/items/applyPayloads.js";
 
 /**
@@ -40,9 +38,9 @@ function runApplyHooks(ctx, def, state) {
 
 /**
  * Canonical apply interaction pipeline.
- * Transitional note:
- * - Reuses existing apply defs through ItemApplyActionContext adapter.
- * - Runtime owns intent lifecycle/result envelope; defs remain unchanged.
+ * Hook-only note:
+ * - Runtime resolves apply behavior through payload hooks in content defs.
+ * - No legacy apply-def callback adapter remains in this pipeline.
  * @param {any} ctx
  */
 export function applyPipeline(ctx) {
@@ -54,10 +52,8 @@ export function applyPipeline(ctx) {
   const metrics = {
     applied: false,
     payloadMatched: false,
-    legacyMatched: false,
     path: "none",
     consumedTool: false,
-    legacyCommittedOps: 0,
   };
 
   if (!world) {
@@ -122,34 +118,5 @@ export function applyPipeline(ctx) {
       },
     };
   }
-
-  const def = findApplyDef(world, actor, toolId, targetId);
-  if (!def || typeof def.run !== "function") {
-    return { metrics, payload: { defId: null, path: "none" } };
-  }
-  metrics.legacyMatched = true;
-  metrics.path = "legacy";
-
-  const legacyCtx = new ItemApplyActionContext({ world, actor, toolId, targetId });
-  let runResult = null;
-  try { runResult = def.run(legacyCtx); } catch {}
-
-  if (legacyCtx.cancelled) {
-    legacyCtx.discard();
-    ctx.cancel(legacyCtx.cancelReason || { code: "APPLY_CANCELLED", message: "Apply action cancelled." });
-    return { metrics, payload: { defId: String(def.id || ""), runResult, path: "legacy" } };
-  }
-
-  const committed = legacyCtx.commit();
-  metrics.legacyCommittedOps = Array.isArray(committed) ? committed.length : 0;
-  metrics.applied = true;
-
-  return {
-    metrics,
-    payload: {
-      defId: String(def.id || ""),
-      runResult,
-      path: "legacy",
-    },
-  };
+  return { metrics, payload: { defId: null, path: "none" } };
 }
