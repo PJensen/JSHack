@@ -125,6 +125,13 @@ export function createFacets(init) {
         patch: (patch && typeof patch === "object") ? { ...patch } : {},
       });
     },
+    learnSpell(entityId, spellId) {
+      return tx.queueMutation({
+        type: "learnSpell",
+        entityId: entityId | 0,
+        spellId: String(spellId || ""),
+      });
+    },
     destroy(entityId) {
       return tx.queueMutation({ type: "destroy", entityId: entityId | 0 });
     },
