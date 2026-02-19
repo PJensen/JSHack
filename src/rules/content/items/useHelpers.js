@@ -1,8 +1,7 @@
 import { Brain } from "../../components/Brain.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
 import { getSpell } from "../../data/spells.js";
-import { runSpellScript } from "../../scripts/spells.js";
-import { runScript, ScriptVerb } from "../../scripting.js";
+import { ScriptVerb } from "../../scripting.js";
 
 /**
  * @param {any} result
@@ -47,15 +46,14 @@ export function createCastSpellFromIdentityOnUse(opts) {
   const consumeOnSuccess = opts?.consumeOnSuccess !== false;
 
   return (ctx, state) => {
-    const world = ctx._world;
-    if (!world) return { consumed: false };
+    if (typeof ctx?.rules?.runSpell !== "function") return { consumed: false };
     const spellId = spellIdFromIdentity(state.identity, identityPrefix);
     if (!spellId) return { consumed: false };
     const spell = getSpell(spellId);
     if (!spell) return { consumed: false };
 
     const runIntent = targetMode === "intentTarget" ? { targetId: state.intent?.targetId } : {};
-    try { runSpellScript(world, state.actor, spell, runIntent); } catch { return { consumed: false }; }
+    try { ctx.rules.runSpell(state.actor, spell, runIntent); } catch { return { consumed: false }; }
 
     const castEvent = {
       actor: state.actor,
@@ -110,10 +108,9 @@ export function createLearnSpellFromIdentityOnUse(opts) {
 export function createConsumableScriptOnUse(effectKey) {
   const key = String(effectKey || "");
   return (ctx, state) => {
-    const world = ctx._world;
-    if (!world || !key) return { consumed: false };
+    if (typeof ctx?.rules?.runScript !== "function" || !key) return { consumed: false };
     const scriptResult = normalizeScriptUseResult(
-      runScript(key, ScriptVerb.ItemUse, world, {
+      ctx.rules.runScript(key, ScriptVerb.ItemUse, {
         actor: state.actor,
         itemId: state.itemId,
         params: { ...(state.effectParams || {}) },

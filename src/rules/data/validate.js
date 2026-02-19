@@ -116,56 +116,72 @@ export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}
   return true;
 }
 
-export function validateItemUseDefs(ITEM_USE_DEFS, opts = {}) {
-  if (!Array.isArray(ITEM_USE_DEFS)) throw new Error('ITEM_USE_DEFS must be an array');
-  const defIds = new Set();
-
-  for (let i = 0; i < ITEM_USE_DEFS.length; i++) {
-    const def = ITEM_USE_DEFS[i];
-    const id = String(def?.id || '');
-    if (!id) throw new Error(`item use def[${i}]: id required`);
-    if (defIds.has(id)) throw new Error(`item use def ${id}: duplicate id`);
-    defIds.add(id);
-
-    const hasMatcherFn = typeof def?.matches === 'function';
-    const hasLegacyMatch = !!(def?.match && typeof def.match === 'object');
-    if (!hasMatcherFn && !hasLegacyMatch) {
-      throw new Error(`item use def ${id}: matches function or legacy match object required`);
-    }
-    if (hasLegacyMatch) {
-      const match = def.match;
-      const itemTypes = Array.isArray(match.itemTypes) ? match.itemTypes : [];
-      const identityPrefix = String(match.identityPrefix || '');
-      if (itemTypes.length === 0 && !identityPrefix) {
-        throw new Error(`item use def ${id}: match requires itemTypes or identityPrefix`);
-      }
-      for (const type of itemTypes) {
-        if (typeof type !== 'string' || !type.trim()) throw new Error(`item use def ${id}: itemTypes must be non-empty strings`);
-      }
-      if (identityPrefix && (typeof identityPrefix !== 'string' || !identityPrefix.trim())) {
-        throw new Error(`item use def ${id}: identityPrefix must be non-empty string`);
-      }
-    }
-
-    const action = def?.run ?? def?.action;
-    if (typeof action !== 'function') throw new Error(`item use def ${id}: run/action function required`);
+function validateHookPhaseFns(def, id, phaseKeys) {
+  let hasAnyHook = false;
+  for (const key of phaseKeys) {
+    const fn = def?.[key];
+    if (fn == null) continue;
+    hasAnyHook = true;
+    if (typeof fn !== 'function') throw new Error(`${id}: ${key} must be a function`);
   }
+  if (!hasAnyHook) throw new Error(`${id}: at least one hook phase is required`);
+}
 
+export function validateApplyPayloads(APPLY_PAYLOADS) {
+  if (!Array.isArray(APPLY_PAYLOADS)) throw new Error('APPLY_PAYLOADS must be an array');
+  const ids = new Set();
+  for (let i = 0; i < APPLY_PAYLOADS.length; i++) {
+    const def = APPLY_PAYLOADS[i];
+    const id = String(def?.id || '');
+    if (!id) throw new Error(`apply payload[${i}]: id required`);
+    if (ids.has(id)) throw new Error(`apply payload ${id}: duplicate id`);
+    ids.add(id);
+    if (typeof def?.matches !== 'function') throw new Error(`apply payload ${id}: matches function required`);
+    validateHookPhaseFns(def, `apply payload ${id}`, ['beforeApply', 'onApply', 'afterApply']);
+  }
   return true;
 }
 
-export function validateApplyDefs(APPLY_DEFS) {
-  if (!Array.isArray(APPLY_DEFS)) throw new Error('APPLY_DEFS must be an array');
+/**
+ * @param {Record<string, any>} payloads
+ * @param {string} label
+ */
+function validateNamedUsePayloadMap(payloads, label) {
+  if (typeof payloads !== 'object' || !payloads || Array.isArray(payloads)) {
+    throw new Error(`${label} must be an object`);
+  }
+  for (const [key, payload] of Object.entries(payloads)) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error(`${label}.${key} must be a payload object`);
+    }
+    const id = String(payload.id || key || '');
+    if (!id) throw new Error(`${label}.${key}: id required`);
+    validateHookPhaseFns(payload, `${label}.${key}`, ['beforeUse', 'onUse', 'afterUse']);
+  }
+  return true;
+}
+
+export function validateUseItemPayloads(USE_ITEM_PAYLOADS) {
+  return validateNamedUsePayloadMap(USE_ITEM_PAYLOADS, 'USE_ITEM_PAYLOADS');
+}
+
+export function validateUseEffectPayloads(USE_EFFECT_PAYLOADS) {
+  return validateNamedUsePayloadMap(USE_EFFECT_PAYLOADS, 'USE_EFFECT_PAYLOADS');
+}
+
+export function validateUseMatcherPayloads(USE_ITEM_MATCHER_PAYLOADS) {
+  if (!Array.isArray(USE_ITEM_MATCHER_PAYLOADS)) throw new Error('USE_ITEM_MATCHER_PAYLOADS must be an array');
   const ids = new Set();
-  for (let i = 0; i < APPLY_DEFS.length; i++) {
-    const def = APPLY_DEFS[i];
-    const id = String(def?.id || '');
-    if (!id) throw new Error(`apply def[${i}]: id required`);
-    if (ids.has(id)) throw new Error(`apply def ${id}: duplicate id`);
+  for (let i = 0; i < USE_ITEM_MATCHER_PAYLOADS.length; i++) {
+    const payload = USE_ITEM_MATCHER_PAYLOADS[i];
+    const id = String(payload?.id || '');
+    if (!id) throw new Error(`use matcher payload[${i}]: id required`);
+    if (ids.has(id)) throw new Error(`use matcher payload ${id}: duplicate id`);
     ids.add(id);
-    if (typeof def?.canUseTool !== 'function') throw new Error(`apply def ${id}: canUseTool function required`);
-    if (typeof def?.canTarget !== 'function') throw new Error(`apply def ${id}: canTarget function required`);
-    if (typeof def?.run !== 'function') throw new Error(`apply def ${id}: run function required`);
+    if (typeof payload?.matches !== 'function') {
+      throw new Error(`use matcher payload ${id}: matches function required`);
+    }
+    validateHookPhaseFns(payload, `use matcher payload ${id}`, ['beforeUse', 'onUse', 'afterUse']);
   }
   return true;
 }
@@ -251,8 +267,10 @@ export function validateAll({
   AFFIX_DEFS,
   MATERIAL_REACTION_RULES,
   MATERIAL_REACTION_OUTCOME_IDS,
-  APPLY_DEFS,
-  ITEM_USE_DEFS,
+  APPLY_PAYLOADS,
+  USE_ITEM_PAYLOADS,
+  USE_ITEM_MATCHER_PAYLOADS,
+  USE_EFFECT_PAYLOADS,
   EFFECT_DEFS,
   EFFECT_OPERATION_IDS,
   MONSTERS,
@@ -262,11 +280,17 @@ export function validateAll({
     && (MATERIAL_REACTION_RULES
       ? validateMaterialReactionRules(MATERIAL_REACTION_RULES, { outcomeIds: MATERIAL_REACTION_OUTCOME_IDS })
       : true)
-    && (ITEM_USE_DEFS
-      ? validateItemUseDefs(ITEM_USE_DEFS)
+    && (USE_ITEM_PAYLOADS
+      ? validateUseItemPayloads(USE_ITEM_PAYLOADS)
       : true)
-    && (APPLY_DEFS
-      ? validateApplyDefs(APPLY_DEFS)
+    && (USE_ITEM_MATCHER_PAYLOADS
+      ? validateUseMatcherPayloads(USE_ITEM_MATCHER_PAYLOADS)
+      : true)
+    && (USE_EFFECT_PAYLOADS
+      ? validateUseEffectPayloads(USE_EFFECT_PAYLOADS)
+      : true)
+    && (APPLY_PAYLOADS
+      ? validateApplyPayloads(APPLY_PAYLOADS)
       : true)
     && (EFFECT_DEFS
       ? validateEffectDefs(EFFECT_DEFS, { operationIds: EFFECT_OPERATION_IDS })

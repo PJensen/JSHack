@@ -1,4 +1,4 @@
-import { findApplyPayload } from "../../content/items/applyPayloads.js";
+import { buildApplyPayloadState, findApplyPayload } from "../../content/items/applyPayloads.js";
 
 /**
  * @param {any} value
@@ -44,7 +44,6 @@ function runApplyHooks(ctx, def, state) {
  * @param {any} ctx
  */
 export function applyPipeline(ctx) {
-  const world = ctx._world;
   const actor = ctx.actor | 0;
   const toolId = ctx.primary | 0;
   const targetId = ctx.target | 0;
@@ -56,10 +55,6 @@ export function applyPipeline(ctx) {
     consumedTool: false,
   };
 
-  if (!world) {
-    ctx.cancel({ code: "APPLY_GATE_RUNTIME", message: "Apply runtime world unavailable." });
-    return { metrics };
-  }
   if (!(actor > 0) || !(toolId > 0) || !(targetId > 0)) {
     ctx.cancel({ code: "APPLY_GATE_INVALID", message: "Missing actor/tool/target for apply action." });
     return { metrics };
@@ -77,15 +72,11 @@ export function applyPipeline(ctx) {
     return { metrics };
   }
 
-  const state = {
+  const state = buildApplyPayloadState(ctx.query, {
     actor,
     toolId,
     targetId,
-    toolIdentity: String(ctx.query.identity(toolId) || "").toLowerCase(),
-    targetIdentity: String(ctx.query.identity(targetId) || "").toLowerCase(),
-    toolInfo: ctx.query.itemInfo(toolId),
-    targetInfo: ctx.query.itemInfo(targetId),
-  };
+  });
 
   const payloadDef = findApplyPayload(state);
   if (payloadDef) {

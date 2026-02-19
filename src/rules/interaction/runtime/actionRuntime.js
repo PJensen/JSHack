@@ -83,7 +83,6 @@ export function executeInteraction(world, spec) {
     target,
     params,
     publicParams,
-    _world: world, // Transitional escape hatch for legacy adapters inside pipelines.
     query: facets.query,
     mutate: facets.mutate,
     io: facets.io,

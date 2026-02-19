@@ -1,6 +1,8 @@
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
+import { runSpellScript } from "../../scripts/spells.js";
+import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 
 /**
@@ -177,6 +179,23 @@ export function createFacets(init) {
       const preferred = target | 0;
       if (preferred > 0 && world.isAlive(preferred)) return preferred;
       return defaultId | 0;
+    },
+    runScript(ref, scriptVerb, context = {}) {
+      return runScript(
+        ref,
+        String(scriptVerb || ""),
+        world,
+        (context && typeof context === "object") ? { ...context } : {},
+      );
+    },
+    runSpell(actorId, spell, intent = {}) {
+      runSpellScript(
+        world,
+        actorId | 0,
+        spell,
+        (intent && typeof intent === "object") ? { ...intent } : {},
+      );
+      return true;
     },
   });
 
