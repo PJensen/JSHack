@@ -82,3 +82,30 @@ Deno.test("ctx.helpers queued ops are discarded when interaction cancels", () =>
   }
   assertEquals(foundSpawn, false);
 });
+
+Deno.test("ctx.fx remains an alias of ctx.helpers for compatibility", () => {
+  const world = new World({ seed: 5013 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+  world.add(actor, Position, { x: 7, y: 7 });
+
+  const spawned = [];
+  world.on("spawned", (ev) => spawned.push(ev));
+
+  const result = executeInteraction(world, {
+    verb: "helper-alias",
+    actor,
+    primary: actor,
+    target: actor,
+    params: {},
+    pipeline: (ctx) => {
+      assertEquals(ctx.fx, ctx.helpers);
+      ctx.fx.spawnItem("potion_stoneskin", { x: 7, y: 8 });
+      return { metrics: { helperAliasUsed: true } };
+    },
+  });
+
+  assertEquals(result.ok, true);
+  assertEquals(result.metrics.helperAliasUsed, true);
+  assert(spawned.length >= 1, "ctx.fx alias should queue helper ops");
+});
