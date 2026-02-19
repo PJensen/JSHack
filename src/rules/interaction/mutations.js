@@ -127,6 +127,22 @@ export function applyMutation(world, op) {
       }
       break;
     }
+    case "patchItemInfo": {
+      const info = /** @type any */ (world.get(op.entityId, ItemInfo));
+      if (!info || !op.patch || typeof op.patch !== "object") break;
+      const patch = /** @type Record<string, unknown> */ (op.patch);
+      const keys = Object.keys(patch);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = patch[key];
+        if (value && typeof value === "object") {
+          info[key] = Array.isArray(value) ? value.slice() : { ...value };
+          continue;
+        }
+        info[key] = value;
+      }
+      break;
+    }
     case "consume": {
       const inv = /** @type any */ (world.get(op.inventoryOwnerId, Inventory));
       if (!inv || !Array.isArray(inv.items)) return;
@@ -194,11 +210,12 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'pushEffect', entityId: number, effect: { key: string, turnsLeft: number, potency: number, stacks?: number, sourceId?: number } }} PushEffectOp
  * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
  * @typedef {{ type: 'appendDamageChannels', entityId: number, channels: Array<Record<string, unknown>> }} AppendDamageChannelsOp
+ * @typedef {{ type: 'patchItemInfo', entityId: number, patch: Record<string, unknown> }} PatchItemInfoOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
  */
 
 export class ActionTransaction {

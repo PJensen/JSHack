@@ -1,5 +1,42 @@
 import { findApplyDef } from "../../data/applyDefs.js";
 import { ItemApplyActionContext } from "../../utils/actionContexts.js";
+import { findApplyPayload } from "../../content/items/applyPayloads.js";
+
+/**
+ * @param {any} value
+ */
+function normalizeApplyHookResult(value) {
+  if (typeof value === "boolean") return { applied: value, consumedTool: false };
+  if (value && typeof value === "object") {
+    return {
+      applied: value.applied === true,
+      consumedTool: value.consumedTool === true,
+      resultType: value.resultType,
+    };
+  }
+  return { applied: false, consumedTool: false };
+}
+
+/**
+ * @param {any} ctx
+ * @param {any} def
+ * @param {any} state
+ */
+function runApplyHooks(ctx, def, state) {
+  const out = {};
+  const phases = [
+    ["beforeApply", def.beforeApply],
+    ["onApply", def.onApply],
+    ["afterApply", def.afterApply],
+  ];
+  for (let i = 0; i < phases.length; i++) {
+    const [phase, fn] = phases[i];
+    if (typeof fn !== "function") continue;
+    out[phase] = fn(ctx, state);
+    if (ctx.cancelled) break;
+  }
+  return out;
+}
 
 /**
  * Canonical apply interaction pipeline.
@@ -16,7 +53,10 @@ export function applyPipeline(ctx) {
 
   const metrics = {
     applied: false,
-    defMatched: false,
+    payloadMatched: false,
+    legacyMatched: false,
+    path: "none",
+    consumedTool: false,
     legacyCommittedOps: 0,
   };
 
@@ -41,11 +81,54 @@ export function applyPipeline(ctx) {
     return { metrics };
   }
 
+  const state = {
+    actor,
+    toolId,
+    targetId,
+    toolIdentity: String(ctx.query.identity(toolId) || "").toLowerCase(),
+    targetIdentity: String(ctx.query.identity(targetId) || "").toLowerCase(),
+    toolInfo: ctx.query.itemInfo(toolId),
+    targetInfo: ctx.query.itemInfo(targetId),
+  };
+
+  const payloadDef = findApplyPayload(state);
+  if (payloadDef) {
+    metrics.payloadMatched = true;
+    metrics.path = "payload";
+    const hookOut = runApplyHooks(ctx, payloadDef, state);
+    if (ctx.cancelled) {
+      return {
+        metrics,
+        payload: {
+          defId: String(payloadDef.id || ""),
+          hooks: hookOut,
+        },
+      };
+    }
+
+    const hookResult = normalizeApplyHookResult(hookOut.onApply);
+    metrics.applied = hookResult.applied;
+    metrics.consumedTool = hookResult.consumedTool;
+    if (hookResult.consumedTool) {
+      ctx.mutate.consume(toolId, actor);
+    }
+
+    return {
+      metrics,
+      payload: {
+        defId: String(payloadDef.id || ""),
+        hooks: hookOut,
+        hookResult,
+      },
+    };
+  }
+
   const def = findApplyDef(world, actor, toolId, targetId);
   if (!def || typeof def.run !== "function") {
-    return { metrics, payload: { defId: null } };
+    return { metrics, payload: { defId: null, path: "none" } };
   }
-  metrics.defMatched = true;
+  metrics.legacyMatched = true;
+  metrics.path = "legacy";
 
   const legacyCtx = new ItemApplyActionContext({ world, actor, toolId, targetId });
   let runResult = null;
@@ -54,7 +137,7 @@ export function applyPipeline(ctx) {
   if (legacyCtx.cancelled) {
     legacyCtx.discard();
     ctx.cancel(legacyCtx.cancelReason || { code: "APPLY_CANCELLED", message: "Apply action cancelled." });
-    return { metrics, payload: { defId: String(def.id || ""), runResult } };
+    return { metrics, payload: { defId: String(def.id || ""), runResult, path: "legacy" } };
   }
 
   const committed = legacyCtx.commit();
@@ -66,6 +149,7 @@ export function applyPipeline(ctx) {
     payload: {
       defId: String(def.id || ""),
       runResult,
+      path: "legacy",
     },
   };
 }
