@@ -2,6 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { DamageSpec } from "../src/rules/components/DamageSpec.js";
 import { ActionTransaction, applyMutation } from '../src/rules/interaction/mutations.js';
 
 function makeWorld() {
@@ -60,6 +61,53 @@ Deno.test("commit pushEffect: ActiveEffects.effects has entry", () => {
   assertEquals(ae.effects.length, 1);
   assertEquals(ae.effects[0].key, "poison");
   assertEquals(ae.effects[0].stacks, 1);
+});
+
+Deno.test("commit upsertTimedEffect refreshes existing matching effects", () => {
+  const world = makeWorld();
+  const e = world.create();
+  world.add(e, ActiveEffects, {
+    effects: [{ key: "regen", potency: 2, onsetLeft: 1, peakLeft: 0, turnsLeft: 4 }],
+  });
+
+  const q = new ActionTransaction();
+  q.enqueue({
+    type: "upsertTimedEffect",
+    entityId: e,
+    effect: {
+      key: "regen",
+      potency: 9,
+      onsetLeft: 0,
+      peakLeft: 0,
+      turnsLeft: 7,
+      stack: "refresh",
+    },
+  });
+  q.commit(world);
+
+  const ae = world.get(e, ActiveEffects);
+  assertEquals(ae.effects.length, 1);
+  assertEquals(ae.effects[0].potency, 9);
+  assertEquals(ae.effects[0].turnsLeft, 7);
+});
+
+Deno.test("commit appendDamageChannels creates DamageSpec and appends channels", () => {
+  const world = makeWorld();
+  const e = world.create();
+
+  const q = new ActionTransaction();
+  q.enqueue({
+    type: "appendDamageChannels",
+    entityId: e,
+    channels: [{ type: "fire", amount: 4 }],
+  });
+  q.commit(world);
+
+  const spec = world.get(e, DamageSpec);
+  assert(spec && Array.isArray(spec.channels));
+  assertEquals(spec.channels.length, 1);
+  assertEquals(spec.channels[0].type, "fire");
+  assertEquals(spec.channels[0].amount, 4);
 });
 
 Deno.test("commit multiple ops: all applied in order", () => {

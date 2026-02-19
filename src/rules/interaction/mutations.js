@@ -13,6 +13,7 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Potion } from "../components/Potion.js";
 import { Resistances } from "../components/Resistences.js";
+import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
 import { dealDamage } from "../utils/dealDamage.js";
 
@@ -50,6 +51,79 @@ export function applyMutation(world, op) {
       }
       if (ae && Array.isArray(ae.effects)) {
         ae.effects.push({ stacks: 1, ...op.effect });
+      }
+      break;
+    }
+    case "upsertTimedEffect": {
+      let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
+      if (!ae || !Array.isArray(ae.effects)) {
+        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {}
+        ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
+      }
+      if (!ae || !Array.isArray(ae.effects)) break;
+
+      const input = op.effect && typeof op.effect === "object" ? op.effect : {};
+      const key = String(input.key || "");
+      if (!key) break;
+      const turnsLeft = Math.max(0, Number(input.turnsLeft ?? input.duration ?? 0) | 0);
+      if (turnsLeft <= 0) break;
+
+      const normalized = {
+        key,
+        potency: Number(input.potency || 0),
+        onsetLeft: Math.max(0, Number(input.onsetLeft ?? input.onset ?? 0) | 0),
+        peakLeft: Math.max(0, Number(input.peakLeft ?? input.peak ?? 0) | 0),
+        turnsLeft,
+        startedAtTurn: Number.isFinite(input.startedAtTurn) ? (input.startedAtTurn | 0) : (world.step | 0),
+        sourceId: Number(input.sourceId || 0) | 0,
+        meta: (input.meta && typeof input.meta === "object") ? { ...input.meta } : {},
+      };
+
+      const stack = String(input.stack || "add");
+      const maxStacks = Math.max(1, Number(input.maxStacks ?? 1) | 0);
+      const existing = ae.effects.filter((x) => String(x?.key || "") === key);
+
+      if (stack === "refresh" && existing.length > 0) {
+        for (let i = 0; i < existing.length; i++) {
+          const rec = existing[i];
+          rec.potency = normalized.potency;
+          rec.onsetLeft = normalized.onsetLeft;
+          rec.peakLeft = normalized.peakLeft;
+          rec.turnsLeft = normalized.turnsLeft;
+          rec.startedAtTurn = normalized.startedAtTurn;
+          rec.sourceId = normalized.sourceId;
+          rec.meta = normalized.meta;
+        }
+        break;
+      }
+
+      if (stack === "cap" && existing.length >= maxStacks) {
+        let strongest = existing[0];
+        for (let i = 1; i < existing.length; i++) {
+          const rec = existing[i];
+          if (Number(rec?.potency || 0) > Number(strongest?.potency || 0)) strongest = rec;
+        }
+        strongest.turnsLeft = normalized.turnsLeft;
+        strongest.startedAtTurn = normalized.startedAtTurn;
+        break;
+      }
+
+      ae.effects.push(normalized);
+      break;
+    }
+    case "appendDamageChannels": {
+      const incoming = Array.isArray(op.channels) ? op.channels : [];
+      if (incoming.length === 0) break;
+      let spec = /** @type any */ (world.get(op.entityId, DamageSpec));
+      if (!spec || !Array.isArray(spec.channels)) {
+        try { world.add(op.entityId, DamageSpec, { channels: [] }); } catch {}
+        spec = /** @type any */ (world.get(op.entityId, DamageSpec));
+      }
+      if (!spec || !Array.isArray(spec.channels)) break;
+      for (let i = 0; i < incoming.length; i++) {
+        const channel = incoming[i];
+        if (!channel || typeof channel !== "object") continue;
+        spec.channels.push({ ...channel });
       }
       break;
     }
@@ -118,11 +192,13 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'damage', entityId: number, amount: number, source: string }} DamageOp
  * @typedef {{ type: 'heal', entityId: number, amount: number }} HealOp
  * @typedef {{ type: 'pushEffect', entityId: number, effect: { key: string, turnsLeft: number, potency: number, stacks?: number, sourceId?: number } }} PushEffectOp
+ * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
+ * @typedef {{ type: 'appendDamageChannels', entityId: number, channels: Array<Record<string, unknown>> }} AppendDamageChannelsOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
  */
 
 export class ActionTransaction {
