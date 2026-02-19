@@ -13,6 +13,18 @@ import { EatCallbackContext } from "../data/callbacks/eat.js";
 import { runCallbackList } from "../interaction/dispatch.js";
 import { FoodDecay } from "../components/FoodDecay.js";
 
+/**
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} chance
+ */
+function rollChance(world, chance) {
+  const pct = Number(chance || 0);
+  if (!(pct > 0)) return false;
+  const rand = typeof world?.rand === "function" ? Number(world.rand()) : Number.NaN;
+  if (!Number.isFinite(rand)) return false;
+  return rand < pct;
+}
+
 // Eat food: reduce hunger by nutrition, convert surplus to satiation,
 // and run per-corpse callback effects from corpse item data.
 // Params: { nutrition: number, corpseIdentity?: string }
@@ -32,7 +44,7 @@ registerScript('consumable:eat', {
     eatCtx.applyNutrition(nutrition);
 
     // Rancid/putrid food can cause sickness
-    if (decayInfo && decayInfo.sicknessChance > 0 && Math.random() < decayInfo.sicknessChance) {
+    if (decayInfo && rollChance(world, decayInfo.sicknessChance)) {
       eatCtx.pushEffect({ key: 'disease', turnsLeft: 15, potency: 1, stacks: 1, sourceId: itemId });
       eatCtx.emit('hunger:sickened', { actor, type: 'decay' });
     }
