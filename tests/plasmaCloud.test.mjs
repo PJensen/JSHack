@@ -8,7 +8,7 @@ import { Material } from "../src/rules/components/Material.js";
 import { Resistances } from "../src/rules/components/Resistences.js";
 import { Status } from "../src/rules/components/Status.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
-import { installGridBugDeathClouds } from "../src/rules/systems/gridBugDeathCloudSystem.js";
+import { installMonsterDeathHooks } from "../src/rules/systems/monsterDeathHookSystem.js";
 import { plasmaCloudSystem, spawnPlasmaCloud } from "../src/rules/systems/plasmaCloudSystem.js";
 
 function makeActor(world, x, y, hp, name = "Target", identity = "target") {
@@ -129,13 +129,13 @@ Deno.test("plasma cloud conductivity changes damage from worn material", () => {
   assert(woodHp > noGearHp, `wood should damp electric coupling (woodHp=${woodHp}, noGearHp=${noGearHp})`);
 });
 
-Deno.test("grid bug death installs once and spawns one cloud per bug per step", () => {
+Deno.test("monster onDeath hooks install once and spawn one cloud per bug per step", () => {
   const world = new World({ seed: 789 });
   const spawned = [];
   world.on("plasmaCloud:spawned", (data) => spawned.push(data));
 
-  installGridBugDeathClouds(world);
-  installGridBugDeathClouds(world); // idempotent
+  installMonsterDeathHooks(world);
+  installMonsterDeathHooks(world); // idempotent
 
   const bugId = makeActor(world, 4, 7, 3, "Grid Bug", "grid_bug");
   world.step = 10;

@@ -14,6 +14,7 @@ import { MeleeAttackIntent } from '../components/Intents/MeleeAttackIntent.js';
 import { Vitality } from '../components/Vitality.js';
 import { Faction } from '../components/Faction.js';
 import { findNearestValidTileAround } from '../utils/queries.js';
+import { areFactionsHostile } from '../utils/factionHostility.js';
 
 const FOLLOW_DISTANCE = 2;  // start following when farther than this
 const TELEPORT_DISTANCE = 10; // teleport if farther than this
@@ -279,9 +280,10 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
   // At guard position - look for enemies
   let closestEnemy = null;
   let closestDist = GUARD_RADIUS + 1;
+  const petFaction = world.get(petId, Faction)?.key || "";
 
   for (const [enemyId, fac, enemyPos] of world.query(Faction, Position)) {
-    if (fac.key !== 'enemy') continue;
+    if (!areFactionsHostile(petFaction, fac?.key)) continue;
 
     const edx = enemyPos.x - petPos.x;
     const edy = enemyPos.y - petPos.y;

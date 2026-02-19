@@ -13,7 +13,7 @@ export const Actions = Object.freeze({
   Wait: "rules.wait", // payload: {}
   Pray: "rules.pray", // payload: {}
   DrinkPotion: "rules.drinkPotion", // payload: { itemId?:number, targetId?:number }
-  CastActiveSpell: "rules.castActiveSpell", // payload: { spellId?:number, targetId?:number }
+  CastActiveSpell: "rules.castActiveSpell", // payload: { spellId?:number, targetId?:number, x?:number, y?:number }
   EquipItem: "rules.equipItem", // payload: { itemId:number }
   ShootRanged: "rules.shootRanged", // payload: {}
   Engrave: "rules.engrave", // payload: { text:string }

@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSHack — Help &amp; Reference</title>
+  <style>
+    :root {
+      /* exact game palette */
+      --bg:        #0b0e16;
+      --surface:   #0f1421;
+      --surface2:  #101626;
+      --surface3:  #1a2640;
+      --border:    #2d3b52;
+      --border2:   #33435f;
+      --text:      #cfe8ff;
+      --text-dim:  #8899aa;
+      --text-hi:   #dbeaff;
+      --accent:    #55aaff;
+      --accent2:   #99ccff;
+      /* item rarity — matches in-game */
+      --common:    #c8d8ea;
+      --magic:     #55aaff;
+      --rare:      #c47bff;
+      --legendary: #ff9f3b;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: linear-gradient(180deg, #0b0e16 0%, #0a0c14 100%) fixed;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 13px 24px;
+    }
+    header h1 {
+      color: #8bd4ff;
+      font-size: 17px;
+      letter-spacing: 3px;
+      text-shadow: 0 0 12px rgba(139,212,255,0.4);
+      text-transform: uppercase;
+    }
+    header h1 .at {
+      color: #cffff4;
+      text-shadow: 0 0 10px rgba(170,255,220,0.55);
+    }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: var(--surface2);
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-right: 1px solid var(--border);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 1.2px;
+      padding: 10px 22px;
+      text-transform: uppercase;
+      transition: color .12s, background .12s, border-color .12s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover  { background: var(--surface3); color: var(--text); }
+    .tab-btn.active {
+      background: var(--surface3);
+      border-bottom-color: var(--accent);
+      color: var(--accent);
+      text-shadow: 0 0 8px rgba(85,170,255,0.35);
+    }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; padding: 28px 24px; max-width: 1200px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Sections ── */
+    .section { margin-bottom: 44px; }
+
+    h2 {
+      color: var(--text-hi);
+      font-size: 12px;
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid var(--border2);
+      text-transform: uppercase;
+    }
+    h3 {
+      color: var(--accent2);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      margin: 20px 0 8px;
+      text-transform: uppercase;
+    }
+    p { margin-bottom: 10px; color: var(--text); }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; margin-bottom: 4px; }
+    table { border-collapse: collapse; width: 100%; font-size: 12px; }
+    th {
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 7px 11px;
+      text-align: left;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    td {
+      border: 1px solid var(--border);
+      padding: 6px 11px;
+      vertical-align: top;
+    }
+    tr:nth-child(odd)  td { background: var(--bg); }
+    tr:nth-child(even) td { background: var(--surface); }
+    tr:hover td { background: var(--surface3); }
+
+    /* ── Param key column ── */
+    .param-table td:first-child {
+      color: var(--accent);
+      font-weight: bold;
+      white-space: nowrap;
+      text-shadow: 0 0 6px rgba(85,170,255,0.2);
+    }
+    .param-table td:nth-child(2) { color: var(--text-dim); white-space: nowrap; }
+
+    /* ── Inline code ── */
+    code {
+      background: rgba(85,170,255,0.08);
+      border: 1px solid var(--border2);
+      border-radius: 3px;
+      color: var(--accent2);
+      font-family: inherit;
+      font-size: 11px;
+      padding: 1px 5px;
+    }
+
+    /* ── Info boxes ── */
+    .info-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .info-box {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .info-box .label {
+      color: var(--text-dim);
+      font-size: 10px;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .info-box .value { color: var(--text-hi); font-size: 12px; }
+
+    /* ── Sub-nav ── */
+    .subnav { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .subnav a {
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 1px;
+      padding: 6px 18px 8px;
+      text-decoration: none;
+      text-transform: uppercase;
+      border-bottom: 2px solid transparent;
+      transition: color .12s, border-color .12s, background .12s;
+    }
+    .subnav a:hover {
+      color: var(--text);
+      background: var(--surface3);
+      border-bottom-color: var(--border2);
+    }
+
+    /* ── Monster glyphs ── */
+    .glyph {
+      display: inline-block;
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1;
+      text-align: center;
+      text-shadow: 0 0 8px currentColor;
+      width: 20px;
+    }
+
+    /* ── Rarity labels ── */
+    .r-common    { color: var(--common); }
+    .r-magic     { color: var(--magic);     text-shadow: 0 0 6px rgba(85,170,255,0.4); }
+    .r-rare      { color: var(--rare);      text-shadow: 0 0 6px rgba(196,123,255,0.4); }
+    .r-legendary { color: var(--legendary); text-shadow: 0 0 6px rgba(255,159,59,0.5); }
+
+    /* ── Tier labels ── */
+    .t0  { color: #7ad47a; }
+    .t1  { color: #d4a84b; }
+    .t2  { color: #d46b4b; }
+    .t3  { color: #d44bab; }
+    .t99 { color: var(--text-dim); }
+
+    /* ── Tag chips — styled like in-game effect badges ── */
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: .2px;
+      margin: 1px 2px 1px 0;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    /* special/proc — cyan tint */
+    .tag-s {
+      background: rgba(85,170,255,0.12);
+      border: 1px solid rgba(85,170,255,0.28);
+      color: #7bbfff;
+    }
+    /* resist/immune — green tint */
+    .tag-r {
+      background: rgba(90,210,120,0.10);
+      border: 1px solid rgba(90,210,120,0.25);
+      color: #7bd47b;
+    }
+    /* weakness — orange-red tint */
+    .tag-w {
+      background: rgba(255,100,60,0.12);
+      border: 1px solid rgba(255,100,60,0.28);
+      color: #ff7755;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span class="at">@</span> JSHack — Help &amp; Reference</h1>
+</header>
+
+<nav class="tab-bar" role="tablist">
+  <button class="tab-btn active" data-tab="debugging">Debugging</button>
+  <button class="tab-btn"        data-tab="bestiary">Bestiary</button>
+  <button class="tab-btn"        data-tab="items">Item Index</button>
+  <button class="tab-btn"        data-tab="spells">Spells</button>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════════════ DEBUGGING -->
+<section id="debugging" class="tab-panel active">
+
+  <nav class="subnav">
+    <a href="#qs">Query String</a>
+    <a href="#savegame">Save Game</a>
+    <a href="#deaths">Deaths &amp; Tombstones</a>
+  </nav>
+
+  <!-- ── Query String ── -->
+  <div class="section" id="qs">
+    <h2>Query String Arguments</h2>
+    <p>Append these parameters to the game URL to control startup behaviour.</p>
+    <p>Example: <code>index.html?floor=5&amp;quality=low&amp;deity=atheism</code></p>
+
+    <h3>Game Start</h3>
+    <div class="table-wrap">
+      <table class="param-table">
+        <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>floor</td><td>int ≥ 0</td><td>0</td>
+            <td>Start at this dungeon depth. 0 = surface.</td>
+          </tr>
+          <tr>
+            <td>deity</td><td>string</td><td>molkhar</td>
+            <td>Starting deity ID. Determines worship on a new game.</td>
+          </tr>
+          <tr>
+            <td>give</td><td>string</td><td>—</td>
+            <td>
+              Give items to the player on game start. Comma-separated list of
+              <code>item_id</code> or <code>item_id*count</code> specs. Count defaults to
+              <code>1</code>. Unknown IDs and malformed specs are skipped with a console warning.<br><br>
+              Example: <code>?give=sword_plain,potion_stoneskin*3,ring_arcana</code>
+            </td>
+          </tr>
+          <tr>
+            <td>dungeonScale</td><td>float &gt; 0</td><td>—</td>
+            <td>Override the dungeon render scale factor.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Performance</h3>
+    <div class="table-wrap">
+      <table class="param-table">
+        <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Persisted to localStorage</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>quality</td><td>"high" | "low"</td><td>high</td>
+            <td><code>jshack.quality</code></td>
+            <td><em>low</em>: no glow, 512 particle cap, DPR cap 1. <em>high</em>: full effects, 4096 particles, DPR cap 3.</td>
+          </tr>
+          <tr>
+            <td>dprCap</td><td>float &gt; 0</td><td>1.5</td>
+            <td><code>jshack.dprCap</code></td>
+            <td>Device pixel ratio cap. Overridden by quality preset when quality is "high" or "low".</td>
+          </tr>
+          <tr>
+            <td>cameraLerp</td><td>number</td><td>0</td>
+            <td>No</td>
+            <td>Camera smoothing factor. 0 = instant snap to player.</td>
+          </tr>
+          <tr>
+            <td>rulesProfile</td><td>0 | 1</td><td>0</td>
+            <td><code>jshack.rulesProfile</code></td>
+            <td>Enable ECS rules-system profiling output to the browser console.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Death Share URL (incoming params)</h3>
+    <p>When a player shares their death via X/Twitter the link encodes these read-only parameters. They do not start a regular game session.</p>
+    <div class="table-wrap">
+      <table class="param-table">
+        <thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>d</td><td>Dungeon depth where death occurred.</td></tr>
+          <tr><td>s</td><td>Score at time of death.</td></tr>
+          <tr><td>seed</td><td>World seed as a hex string (e.g. <code>1A2B3C</code>).</td></tr>
+          <tr><td>k</td><td>Killer entity name (optional).</td></tr>
+          <tr><td>c</td><td>Cause string — <code>combat</code>, <code>starvation</code>, <code>trap</code>, etc. (optional).</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Save Game ── -->
+  <div class="section" id="savegame">
+    <h2>Save Game Details</h2>
+    <div class="info-row">
+      <div class="info-box">
+        <div class="label">localStorage key</div>
+        <div class="value"><code>jshack:savegame:v1</code></div>
+      </div>
+      <div class="info-box">
+        <div class="label">Saved when</div>
+        <div class="value">Player rests at a bed — <code>bed:rested</code> event</div>
+      </div>
+      <div class="info-box">
+        <div class="label">Cleared when</div>
+        <div class="value">Player dies — <code>died</code> event</div>
+      </div>
+    </div>
+    <div id="savegame-live"></div>
+  </div>
+
+  <!-- ── Deaths & Tombstones ── -->
+  <div class="section" id="deaths">
+    <h2>Deaths &amp; Tombstones</h2>
+    <div class="info-row">
+      <div class="info-box">
+        <div class="label">localStorage key pattern</div>
+        <div class="value"><code>jshack.tombstones.depth.{N}</code></div>
+      </div>
+      <div class="info-box">
+        <div class="label">Max records per depth</div>
+        <div class="value">20 — oldest dropped when limit is reached</div>
+      </div>
+    </div>
+    <div id="deaths-live"></div>
+  </div>
+
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════ BESTIARY -->
+<section id="bestiary" class="tab-panel">
+
+  <div class="section">
+    <h2>Bestiary</h2>
+    <p>Monsters by tier. Tier 0 spawns on floors 1–5, Tier 1 on 6–10, Tier 2 on 11–15, Tier 3 on floor 16+. Tier 99 = scripted/special spawn only.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Name</th>
+          <th>Tier</th>
+          <th>Base HP</th>
+          <th>+HP/lvl</th>
+          <th>ATK</th>
+          <th>DEF</th>
+          <th>Damage</th>
+          <th>Size</th>
+          <th>Mass</th>
+          <th>SPD</th>
+          <th>Special / Resistances</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Tier 0 -->
+        <tr>
+          <td><span class="glyph" style="color:#b89070">r</span></td>
+          <td>Rat</td>
+          <td><span class="t0">0</span></td>
+          <td>5</td><td>1.0</td><td>0</td><td>0</td><td>1d3</td><td>S</td><td>2 kg</td><td>1</td>
+          <td><span class="tag tag-s">Disease 25%</span></td>
+          <td>A mangy rodent with beady eyes.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#7ecc5a">g</span></td>
+          <td>Goblin</td>
+          <td><span class="t0">0</span></td>
+          <td>8</td><td>1.5</td><td>1</td><td>0</td><td>1d4</td><td>S</td><td>30 kg</td><td>2</td>
+          <td><span class="tag tag-s">Bleed 20%</span></td>
+          <td>A sneering green-skinned runt armed with a rusty shiv.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#9080b0">b</span></td>
+          <td>Bat</td>
+          <td><span class="t0">0</span></td>
+          <td>3</td><td>0.5</td><td>0</td><td>2</td><td>1d2</td><td>XS</td><td>1 kg</td><td>1</td>
+          <td><span class="tag tag-s">Stun 15%</span></td>
+          <td>A leathery-winged vermin that darts erratically.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#bb66ff">x</span></td>
+          <td>Grid Bug</td>
+          <td><span class="t0">0</span></td>
+          <td>3</td><td>0.5</td><td>0</td><td>0</td><td>1d2</td><td>XS</td><td>1 kg</td><td>1</td>
+          <td><span class="tag tag-s">Shock 30%</span> <span class="tag tag-r">Immune: electric</span></td>
+          <td>A tiny crackling insect that moves only along the grid axes.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#55aa44">S</span></td>
+          <td>Snake</td>
+          <td><span class="t0">0</span></td>
+          <td>4</td><td>0.8</td><td>1</td><td>0</td><td>1d3</td><td>XS</td><td>3 kg</td><td>1</td>
+          <td><span class="tag tag-s">Poison 25%</span> <span class="tag tag-r">Immune: poison</span></td>
+          <td>A hissing serpent with venomous fangs.</td>
+        </tr>
+
+        <!-- Tier 1 -->
+        <tr>
+          <td><span class="glyph" style="color:#cc6644">o</span></td>
+          <td>Orc</td>
+          <td><span class="t1">1</span></td>
+          <td>15</td><td>2.0</td><td>2</td><td>1</td><td>1d8</td><td>M</td><td>95 kg</td><td>2</td>
+          <td><span class="tag tag-s">Rage +2 dmg (25%)</span></td>
+          <td>A thick-skulled brute with a chipped cleaver.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#ddd8c8">s</span></td>
+          <td>Skeleton</td>
+          <td><span class="t1">1</span></td>
+          <td>12</td><td>1.8</td><td>1</td><td>2</td><td>1d6</td><td>M</td><td>25 kg</td><td>2</td>
+          <td>
+            <span class="tag tag-s">Self-heal 2 HP (20%)</span>
+            <span class="tag tag-r">Immune: poison</span>
+            <span class="tag tag-r">½ pierce/slash dmg</span>
+          </td>
+          <td>Bones held together by spite. Resistant to piercing and slashing.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#55bb55">x</span></td>
+          <td>Spider</td>
+          <td><span class="t1">1</span></td>
+          <td>10</td><td>1.5</td><td>2</td><td>1</td><td>1d4</td><td>S</td><td>15 kg</td><td>1</td>
+          <td><span class="tag tag-s">Poison 30%</span> <span class="tag tag-r">Immune: poison</span></td>
+          <td>A dog-sized arachnid with venomous fangs.</td>
+        </tr>
+
+        <!-- Tier 2 -->
+        <tr>
+          <td><span class="glyph" style="color:#66aa66">T</span></td>
+          <td>Troll</td>
+          <td><span class="t2">2</span></td>
+          <td>25</td><td>3.0</td><td>3</td><td>1</td><td>2d6</td><td>L</td><td>200 kg</td><td>3</td>
+          <td>
+            <span class="tag tag-s">Regen buff on hit</span>
+            <span class="tag tag-s">Self-heal 1 HP (30%)</span>
+            <span class="tag tag-w">1.5× fire dmg</span>
+          </td>
+          <td>A hulking regenerator. Weak to fire.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#aabbff">W</span></td>
+          <td>Wraith</td>
+          <td><span class="t2">2</span></td>
+          <td>18</td><td>2.5</td><td>3</td><td>4</td><td>1d8</td><td>M</td><td>5 kg</td><td>1</td>
+          <td><span class="tag tag-s">Drain 3 HP (20%)</span> <span class="tag tag-r">0.3× physical dmg</span></td>
+          <td>A spectral horror. Physical attacks pass through it.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#cc9966">O</span></td>
+          <td>Ogre</td>
+          <td><span class="t2">2</span></td>
+          <td>30</td><td>2.0</td><td>4</td><td>1</td><td>2d8</td><td>L</td><td>250 kg</td><td>3</td>
+          <td><span class="tag tag-s">Stun 25%</span></td>
+          <td>A lumbering slab of muscle and bad intentions.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#dd55ff">o</span></td>
+          <td>Floating Eye</td>
+          <td><span class="t2">2</span></td>
+          <td>38</td><td>3.5</td><td>5</td><td>5</td><td>2d6</td><td>M</td><td>75 kg</td><td>2</td>
+          <td>
+            <span class="tag tag-s">Mind Blast 20%</span>
+            <span class="tag tag-r">Immune: poison</span>
+            <span class="tag tag-r">High elec resist</span>
+          </td>
+          <td>A pulsing violet eye. Its gaze erases all memory.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#556677">c</span></td>
+          <td>Carrion Shade</td>
+          <td><span class="t2">2</span></td>
+          <td>20</td><td>2.5</td><td>3</td><td>3</td><td>1d8</td><td>M</td><td>8 kg</td><td>2</td>
+          <td>
+            <span class="tag tag-s">+dmg vs afflicted</span>
+            <span class="tag tag-s">Weaken 30%</span>
+            <span class="tag tag-s">Bleed 20%</span>
+            <span class="tag tag-s">Phase out 25%</span>
+            <span class="tag tag-r">Immune: poison</span>
+            <span class="tag tag-r">½ physical dmg</span>
+          </td>
+          <td>A shadow that coalesces around old blood. Strikes harder against the wounded and fades when cornered.</td>
+        </tr>
+
+        <!-- Tier 3 -->
+        <tr>
+          <td><span class="glyph" style="color:#ff4444">&amp;</span></td>
+          <td>Demon</td>
+          <td><span class="t3">3</span></td>
+          <td>40</td><td>4.0</td><td>5</td><td>4</td><td>2d8</td><td>L</td><td>180 kg</td><td>2</td>
+          <td>
+            <span class="tag tag-s">Burn 30%</span>
+            <span class="tag tag-s">Hellfire retaliation</span>
+            <span class="tag tag-r">Immune: fire</span>
+          </td>
+          <td>Sulphur and malice given form. Immune to fire.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#ffcc33">D</span></td>
+          <td>Dragon</td>
+          <td><span class="t3">3</span></td>
+          <td>50</td><td>5.0</td><td>6</td><td>6</td><td>3d8</td><td>XL</td><td>800 kg</td><td>2</td>
+          <td>
+            <span class="tag tag-s">Burn 20%</span>
+            <span class="tag tag-r">Immune: fire</span>
+            <span class="tag tag-r">0.7× pierce dmg</span>
+          </td>
+          <td>Scales like hammered bronze. The apex predator of the deep.</td>
+        </tr>
+        <tr>
+          <td><span class="glyph" style="color:#cc88ff">L</span></td>
+          <td>Lich</td>
+          <td><span class="t3">3</span></td>
+          <td>35</td><td>3.5</td><td>4</td><td>5</td><td>2d6</td><td>M</td><td>40 kg</td><td>3</td>
+          <td>
+            <span class="tag tag-s">Drain 2 HP (25%)</span>
+            <span class="tag tag-s">Phylactery regen (20%)</span>
+            <span class="tag tag-r">Immune: poison</span>
+            <span class="tag tag-r">High elec resist</span>
+            <span class="tag tag-r">½ physical dmg</span>
+          </td>
+          <td>An undead sorcerer sustained by a hidden phylactery.</td>
+        </tr>
+
+        <!-- Tier 99 -->
+        <tr>
+          <td><span class="glyph" style="color:#b8b8b8">S</span></td>
+          <td>Taunting Statue</td>
+          <td><span class="t99">99</span></td>
+          <td>18</td><td>0</td><td>2</td><td>4</td><td>1d6</td><td>M</td><td>240 kg</td><td>2</td>
+          <td>
+            <span class="tag tag-r">DR 14 physical</span>
+            <span class="tag tag-r">½ pierce/slash</span>
+            <span class="tag tag-r">0.6× fire</span>
+            <span class="tag tag-r">High elec resist</span>
+          </td>
+          <td>An animated stone idol that heckles anything that breathes. Spawned by throwing Potion of Stoneskin.</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════ ITEMS -->
+<section id="items" class="tab-panel">
+
+  <!-- Equipment -->
+  <div class="section">
+    <h2>Equipment</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Slot</th><th>Material</th><th>Rarity</th>
+            <th>Damage</th><th>Stamina</th><th>Bonuses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Weapons -->
+          <tr><td>Short Sword</td><td>weapon</td><td>steel</td><td><span class="r-common">Common</span></td><td>1d6</td><td>8</td><td>+2 ATK</td></tr>
+          <tr><td>Dagger</td><td>weapon</td><td>steel</td><td><span class="r-common">Common</span></td><td>1d4</td><td>5</td><td>+1 ATK</td></tr>
+          <tr><td>Iron Pickaxe</td><td>weapon</td><td>iron</td><td><span class="r-common">Common</span></td><td>1d4</td><td>25</td><td>+1 Dig</td></tr>
+          <tr><td>Short Bow</td><td>weapon</td><td>wood</td><td><span class="r-common">Common</span></td><td>1d6</td><td>6</td><td>+1 ATK, range 8</td></tr>
+          <tr><td>Axe</td><td>weapon</td><td>steel</td><td><span class="r-magic">Magic</span></td><td>1d8</td><td>12</td><td>+3 ATK</td></tr>
+          <tr><td>Warhammer</td><td>weapon</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>1d8</td><td>10</td><td>+2 ATK, +0.5 Crit Mult</td></tr>
+          <tr><td>Venomfang Dagger</td><td>weapon</td><td>steel</td><td><span class="r-magic">Magic</span></td><td>1d4</td><td>5</td><td>+1 ATK, +5% Crit Chance</td></tr>
+          <tr><td>Caustic Stiletto</td><td>weapon</td><td>steel</td><td><span class="r-rare">Rare</span></td><td>1d4</td><td>4</td><td>+1 ATK, 10% Acid Resist; <em>caustic</em> affix</td></tr>
+          <tr><td>Stormtouched Mace</td><td>weapon</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>1d6</td><td>8</td><td>+2 ATK; <em>capacitive</em> affix</td></tr>
+          <!-- Armor -->
+          <tr><td>Leather Armor</td><td>armor</td><td>leather</td><td><span class="r-common">Common</span></td><td>—</td><td>—</td><td>+1 DEF</td></tr>
+          <tr><td>Chainmail</td><td>armor</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+2 DEF</td></tr>
+          <tr><td>Leadweave Mantle</td><td>armor</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+1 DEF, 20% Slash Resist, 150Ω Elec, 15% Acid Resist</td></tr>
+          <!-- Shields -->
+          <tr><td>Wooden Shield</td><td>shield</td><td>wood</td><td><span class="r-common">Common</span></td><td>—</td><td>—</td><td>+1 DEF</td></tr>
+          <tr><td>Iron Shield</td><td>shield</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+2 DEF</td></tr>
+          <tr><td>Spiked Pavise</td><td>shield</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+2 DEF, 20% Pierce Resist, 15% Blunt Resist</td></tr>
+          <tr><td>Fireward Shield</td><td>shield</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+1 DEF, 20% Fire Resist</td></tr>
+          <tr><td>Grounded Buckler</td><td>shield</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+1 DEF; <em>insulated</em> affix</td></tr>
+          <!-- Rings -->
+          <tr><td>Ring of Health</td><td>ring</td><td>gold</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+5 Max HP</td></tr>
+          <tr><td>Ring of Precision</td><td>ring</td><td>silver</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+8% Crit Chance</td></tr>
+          <tr><td>Ring of Fire Resistance</td><td>ring</td><td>gold</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>30% Fire Resist</td></tr>
+          <tr><td>Ring of Poison Resistance</td><td>ring</td><td>silver</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>30% Poison Resist</td></tr>
+          <tr><td>Ring of Endurance</td><td>ring</td><td>gold</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+15 Max Stamina, +0.5 Stamina Regen</td></tr>
+          <tr><td>Ring of Arcana</td><td>ring</td><td>silver</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+0.5 Mana Regen</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Magic & Usable -->
+  <div class="section">
+    <h2>Magic &amp; Usable Items</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Type</th><th>Material</th><th>Rarity</th><th>Value</th><th>Effect / Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Tools -->
+          <tr>
+            <td>Touchstone</td><td>tool</td><td>mineral</td>
+            <td><span class="r-common">Common</span></td><td>45</td>
+            <td>Dip a gem to identify it by streak and hardness.</td>
+          </tr>
+          <!-- Potions -->
+          <tr>
+            <td>Potion of Poison</td><td>potion</td><td>glass</td>
+            <td><span class="r-common">Common</span></td><td>20</td>
+            <td><strong>Dip weapon:</strong> Applies poison coating (+12 charges).</td>
+          </tr>
+          <tr>
+            <td>Potion of Stoneskin</td><td>potion</td><td>glass</td>
+            <td><span class="r-magic">Magic</span></td><td>60</td>
+            <td>
+              <strong>Drink:</strong> Stoneskin buff 10–14 turns, potency 2–3.<br>
+              <strong>Throw:</strong> Shatters and spawns a Taunting Statue.<br>
+              <strong>Dip armor/weapon:</strong> Converts material to stone, +1 DEF.
+            </td>
+          </tr>
+          <!-- Scrolls -->
+          <tr>
+            <td>Scroll of Blast Wave</td><td>scroll</td><td>paper</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>One-shot Blast Wave cast — no spell knowledge required. Consumed on use.</td>
+          </tr>
+          <tr>
+            <td>Scroll of Homecoming</td><td>scroll</td><td>paper</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Instantly returns player to dungeon depth 0 (surface). Consumed on use.</td>
+          </tr>
+          <tr>
+            <td>Scroll of Mapping</td><td>scroll</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>100</td>
+            <td>Reveals the full map of the current floor.</td>
+          </tr>
+          <!-- Wands -->
+          <tr>
+            <td>Wand of Lightning</td><td>wand</td><td>wood</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Fires chain lightning at target. 3 charges, each consumed on use.</td>
+          </tr>
+          <tr>
+            <td>Wand of Meteor</td><td>wand</td><td>wood</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Calls down a meteor at target location. 2 charges.</td>
+          </tr>
+          <tr>
+            <td>Wand of Frost</td><td>wand</td><td>wood</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Encases target in frost, slowing movement. Lighter enemies freeze longer. 3 charges.</td>
+          </tr>
+          <!-- Spellbooks -->
+          <tr>
+            <td>Spellbook of Lightning</td><td>learn</td><td>paper</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Permanently teaches Lightning. Consumed on use.</td>
+          </tr>
+          <tr>
+            <td>Spellbook of Meteor</td><td>learn</td><td>paper</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Permanently teaches Meteor. Consumed on use.</td>
+          </tr>
+          <tr>
+            <td>Spellbook of Blast Wave</td><td>learn</td><td>paper</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Permanently teaches Blast Wave. Consumed on use.</td>
+          </tr>
+          <tr>
+            <td>Spellbook of Blink</td><td>learn</td><td>paper</td>
+            <td><span class="r-rare">Rare</span></td><td>—</td>
+            <td>Permanently teaches Blink. Consumed on use.</td>
+          </tr>
+          <!-- Flavor books -->
+          <tr>
+            <td>Book of the Dead</td><td>book</td><td>paper</td>
+            <td><span class="r-legendary">Legendary</span></td><td>—</td>
+            <td>Opens the death log — a record of every hero who came before. Reusable.</td>
+          </tr>
+          <tr>
+            <td>On the Care of Dungeon Cats</td><td>book</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>—</td>
+            <td>Flavor text: cats follow, fetch, and drop things unprompted. Reusable.</td>
+          </tr>
+          <tr>
+            <td>Snake Nest Husbandry</td><td>book</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>—</td>
+            <td>Flavor text: snake traps, 25% poison chance. Reusable.</td>
+          </tr>
+          <tr>
+            <td>The Spike Trap Quarterly, Vol. III</td><td>book</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>—</td>
+            <td>Flavor text: spike traps deal ~35% max HP. Reusable.</td>
+          </tr>
+          <tr>
+            <td>Touchstone: A Gemcutter's Manual</td><td>book</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>—</td>
+            <td>Flavor text: how to use the touchstone to identify gems. Reusable.</td>
+          </tr>
+          <tr>
+            <td>On Eating Monster Corpses</td><td>book</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>—</td>
+            <td>Hints: rat=disease, snake/spider=poison, floating eye=amnesia. Reusable.</td>
+          </tr>
+          <tr>
+            <td>A Field Guide to Grid Bugs</td><td>book</td><td>paper</td>
+            <td><span class="r-common">Common</span></td><td>—</td>
+            <td>Flavor text: grid bugs only move along cardinal axes. Reusable.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Food -->
+  <div class="section">
+    <h2>Food</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Rarity</th><th>Weight</th><th>Value</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ration</td><td><span class="r-common">Common</span></td><td>1.0</td><td>10</td><td>A dry but filling travel ration.</td></tr>
+          <tr><td>Iron Ration</td><td><span class="r-common">Common</span></td><td>1.5</td><td>25</td><td>A well-preserved military ration. Very filling.</td></tr>
+          <tr><td>Wild Berries</td><td><span class="r-common">Common</span></td><td>0.2</td><td>4</td><td>A handful of sweet wild berries.</td></tr>
+          <tr><td>Wild Herbs</td><td><span class="r-common">Common</span></td><td>0.15</td><td>3</td><td>Fresh herbs with a sharp, earthy bite.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════ SPELLS -->
+<section id="spells" class="tab-panel">
+
+  <div class="section">
+    <h2>Spells</h2>
+    <p>Spells are permanently learned from spellbooks, or fired once via scrolls and wands. Casting costs mana. Lightning additionally requires Intelligence ≥ 8.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Mana Cost</th><th>Min INT</th><th>Range</th><th>Targeting</th><th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Lightning</td><td>7</td><td>8</td><td>—</td><td>Target entity</td>
+          <td>Fires a bolt of chain lightning that arcs between nearby enemies.</td>
+        </tr>
+        <tr>
+          <td>Meteor</td><td>12</td><td>0</td><td>12</td><td>Target location</td>
+          <td>Calls down a meteor at the targeted tile. High area damage.</td>
+        </tr>
+        <tr>
+          <td>Blast Wave</td><td>7</td><td>0</td><td>—</td><td>Self (radial)</td>
+          <td>Releases a shockwave from the caster, pushing back all nearby enemies.</td>
+        </tr>
+        <tr>
+          <td>Blink</td><td>6</td><td>0</td><td>10</td><td>Target location</td>
+          <td>Teleports the caster to the targeted tile within range 10.</td>
+        </tr>
+        <tr>
+          <td>Homecoming</td><td>1</td><td>0</td><td>—</td><td>Self</td>
+          <td>Instantly returns the caster to dungeon depth 0 (the surface).</td>
+        </tr>
+        <tr>
+          <td>Frost</td><td>5</td><td>0</td><td>—</td><td>Target entity</td>
+          <td>Encases an enemy in frost, slowing movement. Lighter enemies freeze for longer.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" style="margin-top:32px;">
+    <h2>Acquisition</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Spell</th><th>Spellbook (permanent)</th><th>Scroll (one-shot)</th><th>Wand (charged)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lightning</td><td>Spellbook of Lightning</td><td>—</td><td>Wand of Lightning (3 ch.)</td></tr>
+          <tr><td>Meteor</td><td>Spellbook of Meteor</td><td>—</td><td>Wand of Meteor (2 ch.)</td></tr>
+          <tr><td>Blast Wave</td><td>Spellbook of Blast Wave</td><td>Scroll of Blast Wave</td><td>—</td></tr>
+          <tr><td>Blink</td><td>Spellbook of Blink</td><td>—</td><td>—</td></tr>
+          <tr><td>Homecoming</td><td>—</td><td>Scroll of Homecoming</td><td>—</td></tr>
+          <tr><td>Frost</td><td>—</td><td>—</td><td>Wand of Frost (3 ch.)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</section>
+
+
+<script>
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  const buttons = document.querySelectorAll('.tab-btn');
+  const panels  = document.querySelectorAll('.tab-panel');
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      buttons.forEach(b => b.classList.toggle('active', b === btn));
+      panels.forEach(p  => p.classList.toggle('active', p.id === target));
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  });
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function fmtDate(ms) {
+    if (!ms) return '—';
+    return new Date(ms).toLocaleString();
+  }
+
+  function empty(msg) {
+    return `<p style="color:var(--text-dim);font-style:italic;padding:8px 0">${msg}</p>`;
+  }
+
+  function lsGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+
+  // ── Save Game live data ────────────────────────────────────────────────────
+  function renderSavegame() {
+    const el = document.getElementById('savegame-live');
+    const raw = lsGet('jshack:savegame:v1');
+    if (!raw) { el.innerHTML = empty('No save game found in localStorage.'); return; }
+
+    let save;
+    try { save = JSON.parse(raw); } catch {
+      el.innerHTML = empty('Save data found but could not be parsed (corrupt JSON).'); return;
+    }
+
+    const seed = save.world?.meta?.seed;
+    const seedHex = (seed != null && seed !== 0) ? '0x' + seed.toString(16).toUpperCase() : '—';
+    const identifiedCount = save.identified ? Object.keys(save.identified).length : 0;
+    const gemCount        = save.gemPricing ? Object.keys(save.gemPricing).length : 0;
+    const componentCount  = Array.isArray(save.schema?.registry) ? save.schema.registry.length : '?';
+    const components      = Array.isArray(save.schema?.registry) ? save.schema.registry.join(', ') : '—';
+
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Schema version</td><td>${save.v ?? '—'}</td></tr>
+            <tr><td>Saved at</td><td>${fmtDate(save.savedAt)}</td></tr>
+            <tr><td>Reason</td><td><code>${save.reason ?? '—'}</code></td></tr>
+            <tr><td>World seed</td><td><code>${seedHex}</code></td></tr>
+            <tr><td>Active spell</td><td>${save.app?.activeSpellId ? '<code>' + save.app.activeSpellId + '</code>' : '—'}</td></tr>
+            <tr><td>Identified items</td><td>${identifiedCount}</td></tr>
+            <tr><td>Gem prices</td><td>${gemCount} entries</td></tr>
+            <tr><td>Registered components</td><td>${componentCount} — <span style="color:var(--text-dim);font-size:11px">${components}</span></td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── Deaths live data ───────────────────────────────────────────────────────
+  function renderDeaths() {
+    const el = document.getElementById('deaths-live');
+    const all = [];
+
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key?.startsWith('jshack.tombstones.depth.')) continue;
+        try {
+          const parsed = JSON.parse(localStorage.getItem(key));
+          if (Array.isArray(parsed)) all.push(...parsed);
+        } catch {}
+      }
+    } catch {}
+
+    if (all.length === 0) { el.innerHTML = empty('No death records found in localStorage.'); return; }
+
+    all.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    const rows = all.map(r => `
+      <tr>
+        <td>${r.depth ?? '—'}</td>
+        <td>${fmtDate(r.timestamp)}</td>
+        <td>${r.playerName ?? '—'}</td>
+        <td>${r.cause ?? '—'}</td>
+        <td>${r.killerName ?? '<span style="color:var(--text-dim)">—</span>'}</td>
+        <td>${r.turn ?? '—'}</td>
+        <td style="color:var(--text-dim);font-size:11px">${r.id ?? '—'}</td>
+      </tr>`).join('');
+
+    el.innerHTML = `
+      <p style="color:var(--text-dim);margin-bottom:10px">${all.length} record${all.length !== 1 ? 's' : ''} across all depths</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Depth</th><th>Date</th><th>Hero</th><th>Cause</th><th>Killed by</th><th>Turn</th><th>ID</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  renderSavegame();
+  renderDeaths();
+</script>
+
+</body>
+</html>

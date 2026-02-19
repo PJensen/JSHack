@@ -8,7 +8,7 @@ import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 
 // display/ camera + director utilities (pure display resources)
-import { createCamera, updateCamera, applyCamera } from "./display/camera/controller.js";
+import { createCamera, updateCamera, applyCamera, screenToWorld as cameraScreenToWorld } from "./display/camera/controller.js";
 import { updateShake, startShake } from "./display/camera/shake.js";
 import { zoomTo, jumpTo, easeTo } from "./display/camera/utils.js";
 
@@ -87,7 +87,7 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
-import { canUseApplyTool, listApplyTargetsForTool } from "./rules/data/applyDefs.js";
+import { listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
@@ -238,6 +238,60 @@ function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 // --- Active spell selection (app-side state) ---------------------------------
 /** @type {string|null} */
 let _activeSpellId = null;
+const TARGETED_SPELL_CONFIG = Object.freeze({
+  blink: Object.freeze({
+    fallbackRange: 10,
+    requiresLOS: false,
+    describePrompt(range) {
+      return `Choose blink destination (up to ${range} tiles). Tap a tile, or press Esc to cancel.`;
+    },
+  }),
+  meteor: Object.freeze({
+    fallbackRange: 12,
+    requiresLOS: true,
+    describePrompt(range) {
+      return `Tap meteor target (LOS, range ${range}). Tap cast again or press Esc to cancel.`;
+    },
+  }),
+});
+/** @type {{ spellId: string, spellName: string, range: number, requiresLOS: boolean }|null} */
+let _pendingSpellTargeting = null;
+/** @type {{ actorId: number, itemId: number, itemName: string, range: number }|null} */
+let _pendingThrowTargeting = null;
+/** @type {Array<{ itemId:number, from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, kind:string }>} */
+const _thrownItemFx = [];
+const _hiddenThrownItemIds = new Set();
+const THROW_FX_SPEED_TILES_PER_SEC = 26;
+const THROW_FX_MIN_DURATION = 0.09;
+const THROW_FX_MAX_DURATION = 0.32;
+const THROW_FX_ARC_HEIGHT = 0.38;
+
+/**
+ * @param {string} spellId
+ */
+function getTargetedSpellConfig(spellId) {
+  return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;
+}
+
+/**
+ * Keep display-side throw target prompt aligned with rules throw range.
+ * @param {number} weight
+ */
+function computeThrowRange(weight) {
+  const w = Number.isFinite(weight) && weight > 0 ? weight : 1;
+  const range = Math.round(6 - Math.log2(w + 1));
+  return Math.max(1, Math.min(8, range | 0));
+}
+
+function isSimUiBlocked() {
+  return _thrownItemFx.length > 0;
+}
+
+function syncSimInputLockFlag() {
+  try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = isSimUiBlocked(); } catch {}
+}
+syncSimInputLockFlag();
+
 function learnedSpells() {
   const pe = playerEntity(world);
   if (!pe) return [];
@@ -266,6 +320,9 @@ function ensureActiveSpell() {
 }
 function setActiveSpell(id) {
   _activeSpellId = (typeof id === 'string' && id.length) ? id : null;
+  if (_pendingSpellTargeting && _pendingSpellTargeting.spellId !== _activeSpellId) {
+    _pendingSpellTargeting = null;
+  }
   updateActiveSpellLabel();
 }
 function updateActiveSpellLabel() {
@@ -422,6 +479,7 @@ if (!_savegameLoaded) {
       addStarterItem('iron_pickaxe');
 
       // Useful inventory extras for demos.
+      addStarterItem('potion_stoneskin', { count: 3 });
       addStarterItem('potion_health', { count: 3 });
       addStarterItem('wand_frost');
       addStarterItem('stone_touchstone');
@@ -571,6 +629,7 @@ const inputDisposers = [];
   );
 
   const displayHandler = (action) => {
+    if (isSimUiBlocked()) return;
     switch (action.type) {
       case "display.openInventory":
         window.dispatchEvent(new CustomEvent("ui:openInventory"));
@@ -692,10 +751,12 @@ addEventListener('ui:requestInventoryData', () => {
             (eq.shield === id && 'shield') ||
             (eq.ring1 === id && 'ring1') ||
             (eq.ring2 === id && 'ring2') ||
-            (eq.ammo === id && 'ammo')
+            (eq.ammo === id && 'ammo') ||
+            (eq.ranged === id && 'ranged')
           )) || null;
-          const canApply = canUseApplyTool(world, p.id, id);
-          const applyTargetCount = canApply ? listApplyTargetsForTool(world, p.id, id).length : 0;
+          const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
+          const applyTargetCount = applyTargetIds.length;
+          const canApply = applyTargetCount > 0;
           items.push({
             id,
             type: info.type,
@@ -766,6 +827,30 @@ addEventListener('ui:requestUsableItemsData', () => {
   window.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
 });
 
+// Provide all inventory items to the throw-chooser overlay when requested
+addEventListener('ui:requestThrowableItemsData', () => {
+  const p = playerEntity(world);
+  const items = [];
+  if (p) {
+    const inv = world.get(p.id, Inventory);
+    if (inv && Array.isArray(inv.items)) {
+      for (const id of inv.items) {
+        const info = world.get(id, ItemInfo);
+        if (!info) continue;
+        items.push({
+          id,
+          type: info.type,
+          description: info.description,
+          count: info.count,
+          name: resolveItemDisplayName(world, id),
+          rarityName: info.rarityName,
+        });
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent('ui:throwableItemsData', { detail: { items } }));
+});
+
 // Provide applicable tools to the apply-tool chooser
 addEventListener('ui:requestApplyToolsData', () => {
   const p = playerEntity(world);
@@ -774,7 +859,8 @@ addEventListener('ui:requestApplyToolsData', () => {
     const inv = world.get(p.id, Inventory);
     if (inv && Array.isArray(inv.items)) {
       for (const id of inv.items) {
-        if (!canUseApplyTool(world, p.id, id)) continue;
+        const targetIds = listApplyTargetsForTool(world, p.id, id);
+        if (targetIds.length <= 0) continue;
         items.push({ id, name: resolveItemDisplayName(world, id) });
       }
     }
@@ -800,6 +886,7 @@ addEventListener('ui:requestApplyTargetsData', (ev) => {
 
 // When user confirms an apply action from the UI
 addEventListener('ui:requestApply', (ev) => {
+  if (isSimUiBlocked()) return;
   const toolId = ev?.detail?.toolId || 0;
   const targetItemId = ev?.detail?.targetItemId || 0;
   if (!toolId || !targetItemId) return;
@@ -821,17 +908,67 @@ addEventListener('ui:requestDeathLogData', () => {
 
 // Active spell button click → cast (or open spell picker if none active)
 addEventListener('ui:castActiveSpell', () => {
+  if (isSimUiBlocked()) return;
   const id = ensureActiveSpell();
   if (!id) {
     try { window.dispatchEvent(new CustomEvent('ui:openSpellPicker')); } catch {}
     return;
   }
+  _pendingThrowTargeting = null;
+
+  const targetedCfg = getTargetedSpellConfig(id);
+  if (targetedCfg) {
+    const spell = getSpell(id);
+    const spellName = String(spell?.name || id);
+    const range = Math.max(
+      1,
+      Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : (Number(targetedCfg.fallbackRange) | 0),
+    );
+    if (_pendingSpellTargeting?.spellId === id) {
+      _pendingSpellTargeting = null;
+      try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch {}
+      return;
+    }
+    _pendingSpellTargeting = {
+      spellId: id,
+      spellName,
+      range,
+      requiresLOS: targetedCfg.requiresLOS === true,
+    };
+    try {
+      messageLog.log({
+        text: targetedCfg.describePrompt(range),
+        type: 'system',
+      });
+    } catch {}
+    return;
+  }
+
+  _pendingSpellTargeting = null;
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: id } });
 });
 
+addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return;
+  if (_pendingSpellTargeting) {
+    const spellName = _pendingSpellTargeting.spellName;
+    _pendingSpellTargeting = null;
+    ev.preventDefault();
+    try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch {}
+    return;
+  }
+  if (_pendingThrowTargeting) {
+    const itemName = _pendingThrowTargeting.itemName;
+    _pendingThrowTargeting = null;
+    ev.preventDefault();
+    try { messageLog.log({ text: `${bracketizeName(itemName)} throw cancelled.`, type: 'system' }); } catch {}
+  }
+});
+
 // When user selects items from the pickup chooser overlay
 addEventListener('ui:requestPickup', (e) => {
+  if (isSimUiBlocked()) return;
   const arr = e.detail?.itemIds;
   if (!Array.isArray(arr) || !arr.length) return;
   const pe = playerEntity(world);
@@ -867,16 +1004,33 @@ addEventListener('ui:requestPickup', (e) => {
 
 // Ranged shoot button / 'r' key → auto-target nearest visible enemy and fire
 addEventListener('ui:shootRanged', () => {
+  if (isSimUiBlocked()) return;
   const pe = playerEntity(world);
   if (!pe) return;
   const eq = /** @type any */ (world.get(pe.id, Equipment));
-  const weaponId = Number(eq?.weapon || 0);
-  const weaponInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
-  if (!weaponInfo || weaponInfo.subtype !== 'bow') {
-    log('You need a bow to shoot.');
+  const rangedId = Number(eq?.ranged || 0);
+  const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
+  if (!rangedInfo) {
+    log('Nothing equipped in ranged slot.');
     return;
   }
-  const maxRange = weaponInfo.range || 8;
+
+  const isWand = rangedInfo.type === 'wand';
+  const isBow = rangedInfo.subtype === 'bow';
+  if (!isWand && !isBow) {
+    log('Nothing equipped in ranged slot.');
+    return;
+  }
+
+  let maxRange = Number(rangedInfo.range || 0);
+  if (!Number.isFinite(maxRange) || maxRange <= 0) {
+    const identity = String(world.get(rangedId, NamedIdentity)?.identity || '');
+    const spellId = identity.startsWith('wand_') ? identity.slice(5) : '';
+    const spell = spellId ? getSpell(spellId) : null;
+    maxRange = Number(spell?.range || 8);
+  }
+  maxRange = Math.max(1, maxRange | 0);
+
   const px = pe.pos.x | 0, py = pe.pos.y | 0;
   const blocked = buildBlocksVisionMap(world);
   const isBlocked = blockedCallback(blocked);
@@ -898,12 +1052,25 @@ addEventListener('ui:shootRanged', () => {
     log('No target in range.');
     return;
   }
+
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.rangedAttack', payload: { targetId: bestId } });
+  if (isBow) {
+    rulesHandler({ type: 'rules.rangedAttack', payload: { targetId: bestId } });
+    return;
+  }
+
+  const targetPos = world.get(bestId, Position);
+  const payload = { itemId: rangedId, targetId: bestId };
+  if (targetPos && Number.isFinite(targetPos.x) && Number.isFinite(targetPos.y)) {
+    payload.x = targetPos.x | 0;
+    payload.y = targetPos.y | 0;
+  }
+  rulesHandler({ type: 'rules.useItem', payload });
 });
 
 // Engrave button → prompt for text, then dispatch engrave action
 addEventListener('ui:engrave', () => {
+  if (isSimUiBlocked()) return;
   const pe = playerEntity(world);
   if (!pe) return;
   const text = prompt('Engrave what on the ground?');
@@ -914,6 +1081,7 @@ addEventListener('ui:engrave', () => {
 
 // Pray button → dispatch pray action
 addEventListener('ui:pray', () => {
+  if (isSimUiBlocked()) return;
   const pe = playerEntity(world);
   if (!pe) return;
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
@@ -1086,6 +1254,10 @@ const _arrowFx = [];
 const _arrowSparks = [];
 /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number }>} */
 const _plasmaCloudFx = new Map();
+/** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, pulseFlash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, medium:string, bubbleClock:number }>} */
+const _poisonCloudFx = new Map();
+/** @type {Array<{x:number, y:number, ttl:number, max:number, r0:number, r1:number, rise:number, phase:number}>} */
+const _poisonBubblePops = [];
 
 function spawnPlasmaCloudSparks(x, y, count = 8) {
   if (!fx?.pool) return;
@@ -1109,6 +1281,94 @@ function spawnPlasmaCloudSparks(x, y, count = 8) {
       a1: 0.0,
       rot: 0,
       rotVel: 0,
+    });
+  }
+}
+
+function spawnPoisonCloudMotes(x, y, count = 8) {
+  if (!fx?.pool) return;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.12 + Math.random() * 0.45;
+    fx.pool.spawn({
+      x: x + (Math.random() - 0.5) * 0.4,
+      y: y + (Math.random() - 0.5) * 0.4,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - (0.08 + Math.random() * 0.12),
+      ax: 0,
+      ay: -0.03,
+      life: 0.50 + Math.random() * 0.30,
+      size0: 0.09 + Math.random() * 0.05,
+      size1: 0.03,
+      r: 120 + ((Math.random() * 50) | 0),
+      g: 205 + ((Math.random() * 45) | 0),
+      b: 90 + ((Math.random() * 40) | 0),
+      a0: 0.52,
+      a1: 0.0,
+      rot: 0,
+      rotVel: (Math.random() - 0.5) * 0.9,
+    });
+  }
+}
+
+/**
+ * Choose a bubbling point within a cloud's Chebyshev footprint.
+ * @param {{x:number, y:number, radius:number}} cloud
+ */
+function randomPoisonBubblePoint(cloud) {
+  const r = Math.max(0, Number(cloud?.radius || 0) | 0);
+  if (r <= 0) {
+    return {
+      x: cloud.x + (Math.random() - 0.5) * 0.28,
+      y: cloud.y + (Math.random() - 0.5) * 0.28,
+    };
+  }
+  const ox = (Math.random() * (r * 2 + 1) - r) + (Math.random() - 0.5) * 0.25;
+  const oy = (Math.random() * (r * 2 + 1) - r) + (Math.random() - 0.5) * 0.25;
+  return { x: cloud.x + ox, y: cloud.y + oy };
+}
+
+function spawnPoisonBubblePop(x, y, strength = 1) {
+  const s = Math.max(1, Number(strength || 1) | 0);
+
+  if (fx?.pool) {
+    const count = 2 + s;
+    for (let i = 0; i < count; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.1; // mostly upward
+      const speed = 0.08 + Math.random() * 0.24;
+      fx.pool.spawn({
+        x: x + (Math.random() - 0.5) * 0.12,
+        y: y + (Math.random() - 0.5) * 0.08,
+        vx: Math.cos(angle) * speed * 0.6,
+        vy: Math.sin(angle) * speed - 0.04,
+        ax: 0,
+        ay: -0.04,
+        life: 0.18 + Math.random() * 0.20,
+        size0: 0.05 + Math.random() * 0.04,
+        size1: 0.01,
+        r: 170 + ((Math.random() * 45) | 0),
+        g: 240 + ((Math.random() * 15) | 0),
+        b: 150 + ((Math.random() * 40) | 0),
+        a0: 0.48,
+        a1: 0.0,
+        rot: 0,
+        rotVel: (Math.random() - 0.5) * 0.6,
+      });
+    }
+  }
+
+  const pops = 1 + ((Math.random() < 0.35 * s) ? 1 : 0);
+  for (let i = 0; i < pops; i++) {
+    const ttl = 0.28 + Math.random() * 0.22;
+    _poisonBubblePops.push({
+      x: x + (Math.random() - 0.5) * 0.10,
+      y: y + (Math.random() - 0.5) * 0.08,
+      ttl,
+      max: ttl,
+      r0: 0.02 + Math.random() * 0.04,
+      r1: 0.15 + Math.random() * 0.10,
+      rise: 0.08 + Math.random() * 0.10,
+      phase: Math.random() * Math.PI * 2,
     });
   }
 }
@@ -1193,6 +1453,154 @@ world.on('plasmaCloud:expired', ({ cloudId, at, radius }) => {
   cloud.fadeMax = 0.45;
   cloud.fadeLeft = cloud.fadeMax;
   cloud.flash = Math.max(cloud.flash, 0.16);
+});
+
+world.on('hazard:spawned', ({ hazardId, kind, at, radius, turnsLeft, medium }) => {
+  if (String(kind || '').toLowerCase() !== 'poison') return;
+  if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+  const id = Number(hazardId || 0) | 0;
+  if (!(id > 0)) return;
+  const r = Math.max(0, Number(radius || 1) | 0);
+  const ttl = Math.max(1, Number(turnsLeft || 1) | 0);
+  _poisonCloudFx.set(id, {
+    x: at.x,
+    y: at.y,
+    radius: r,
+    turnsLeft: ttl,
+    maxTurns: ttl,
+    pulseFlash: 0.20,
+    phase: Math.random() * Math.PI * 2,
+    fading: false,
+    fadeLeft: 0,
+    fadeMax: 0,
+    medium: String(medium || 'air').toLowerCase() === 'floor' ? 'floor' : 'air',
+    bubbleClock: 0.08 + Math.random() * 0.16,
+  });
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+      if (Math.random() < 0.85) spawnPoisonCloudMotes(at.x + dx, at.y + dy, 2);
+    }
+  }
+  const seedCloud = { x: at.x, y: at.y, radius: r };
+  const popBursts = Math.max(2, 1 + r);
+  for (let i = 0; i < popBursts; i++) {
+    const p = randomPoisonBubblePoint(seedCloud);
+    spawnPoisonBubblePop(p.x, p.y, Math.random() < 0.28 ? 2 : 1);
+  }
+});
+
+world.on('hazard:pulse', ({ hazardId, kind, at, radius, turnsLeft, affectedIds, medium }) => {
+  if (String(kind || '').toLowerCase() !== 'poison') return;
+  const id = Number(hazardId || 0) | 0;
+  if (!(id > 0)) return;
+  const r = Math.max(0, Number(radius || 1) | 0);
+  const ttl = Math.max(0, Number(turnsLeft || 0) | 0);
+  const prev = _poisonCloudFx.get(id);
+  const next = {
+    x: (at && Number.isFinite(at.x)) ? at.x : (prev?.x ?? 0),
+    y: (at && Number.isFinite(at.y)) ? at.y : (prev?.y ?? 0),
+    radius: r,
+    turnsLeft: ttl,
+    maxTurns: Math.max(prev?.maxTurns ?? 0, ttl),
+    pulseFlash: 0.24,
+    phase: prev?.phase ?? (Math.random() * Math.PI * 2),
+    fading: false,
+    fadeLeft: 0,
+    fadeMax: 0,
+    medium: String(medium || prev?.medium || 'air').toLowerCase() === 'floor' ? 'floor' : 'air',
+    bubbleClock: Number.isFinite(prev?.bubbleClock)
+      ? Math.max(0.04, Number(prev?.bubbleClock || 0))
+      : (0.08 + Math.random() * 0.14),
+  };
+  _poisonCloudFx.set(id, next);
+
+  if (Array.isArray(affectedIds)) {
+    for (let i = 0; i < affectedIds.length; i++) {
+      const tpos = world.get(Number(affectedIds[i] || 0), Position);
+      if (!tpos) continue;
+      spawnPoisonCloudMotes(tpos.x, tpos.y, 4);
+      if (Math.random() < 0.72) {
+        spawnPoisonBubblePop(
+          tpos.x + (Math.random() - 0.5) * 0.18,
+          tpos.y + (Math.random() - 0.5) * 0.12,
+          Math.random() < 0.22 ? 2 : 1,
+        );
+      }
+    }
+  } else {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+        if (Math.random() < 0.28) spawnPoisonCloudMotes(next.x + dx, next.y + dy, 2);
+      }
+    }
+    const popBursts = Math.max(1, r);
+    for (let i = 0; i < popBursts; i++) {
+      const p = randomPoisonBubblePoint(next);
+      spawnPoisonBubblePop(p.x, p.y, 1);
+    }
+  }
+});
+
+world.on('hazard:expired', ({ hazardId, kind, at, radius }) => {
+  if (String(kind || '').toLowerCase() !== 'poison') return;
+  const id = Number(hazardId || 0) | 0;
+  if (!(id > 0)) return;
+  const cloud = _poisonCloudFx.get(id);
+  if (!cloud) return;
+  if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) {
+    cloud.x = at.x;
+    cloud.y = at.y;
+  }
+  if (Number.isFinite(radius)) cloud.radius = Math.max(0, Number(radius) | 0);
+  cloud.fading = true;
+  cloud.fadeMax = 0.55;
+  cloud.fadeLeft = cloud.fadeMax;
+  cloud.pulseFlash = Math.max(cloud.pulseFlash, 0.12);
+  const popBursts = Math.max(1, 1 + (cloud.radius | 0));
+  for (let i = 0; i < popBursts; i++) {
+    const p = randomPoisonBubblePoint(cloud);
+    spawnPoisonBubblePop(p.x, p.y, 1);
+  }
+});
+
+function computeThrowFxDuration(distance) {
+  const d = Number.isFinite(distance) ? Math.max(0, Number(distance)) : 0;
+  if (d <= 0) return THROW_FX_MIN_DURATION;
+  const raw = d / THROW_FX_SPEED_TILES_PER_SEC;
+  return Math.max(THROW_FX_MIN_DURATION, Math.min(THROW_FX_MAX_DURATION, raw));
+}
+
+world.on('item:thrown', ({ itemId, from, to }) => {
+  const id = Number(itemId || 0) | 0;
+  if (!(id > 0)) return;
+  if (!from || !to) return;
+  const fx0 = Number(from.x);
+  const fy0 = Number(from.y);
+  const fx1 = Number(to.x);
+  const fy1 = Number(to.y);
+  if (!Number.isFinite(fx0) || !Number.isFinite(fy0) || !Number.isFinite(fx1) || !Number.isFinite(fy1)) return;
+  const dx = fx1 - fx0;
+  const dy = fy1 - fy0;
+  const dist = Math.hypot(dx, dy);
+  if (!(dist > 0)) return;
+
+  for (let i = _thrownItemFx.length - 1; i >= 0; i--) {
+    if ((_thrownItemFx[i].itemId | 0) !== id) continue;
+    _thrownItemFx.splice(i, 1);
+  }
+
+  _hiddenThrownItemIds.add(id);
+  _thrownItemFx.push({
+    itemId: id,
+    from: { x: fx0, y: fy0 },
+    to: { x: fx1, y: fy1 },
+    t: 0,
+    duration: computeThrowFxDuration(dist),
+    kind: "",
+  });
+  syncSimInputLockFlag();
 });
 
 world.on('ranged:shot', ({ attacker, target, hit, style }) => {
@@ -1590,6 +1998,14 @@ world.on('spell:learned', ({ spellId }) => {
   if (!_activeSpellId) {
     setActiveSpell(String(spellId));
   }
+  const learnedId = String(spellId || '');
+  if (learnedId === 'lightning' || learnedId === 'meteor' || learnedId === 'blastwave') {
+    try {
+      window.dispatchEvent(new CustomEvent('ui:showSpellGestureHint', {
+        detail: { id: learnedId, mode: 'learn', quality: 1 },
+      }));
+    } catch {}
+  }
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
 // Interaction UI logic (messages handled in messageWiring)
@@ -1870,6 +2286,7 @@ world.on('portal:return', ({ portalId }) => {
 
 // UI stair tooltip tap → trigger stair traverse
 addEventListener('ui:requestStairTraverse', (ev) => {
+  if (isSimUiBlocked()) return;
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const stairId = e?.detail?.stairId;
@@ -2046,6 +2463,7 @@ function bracketizeName(s) {
 
 // When user clicks an inventory item to drink
 addEventListener('ui:requestDrink', (ev) => {
+  if (isSimUiBlocked()) return;
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const itemId = e?.detail?.itemId;
@@ -2057,6 +2475,7 @@ addEventListener('ui:requestDrink', (ev) => {
 
 // When user clicks an inventory item to equip
 addEventListener('ui:requestEquip', (ev) => {
+  if (isSimUiBlocked()) return;
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const itemId = e?.detail?.itemId;
@@ -2068,6 +2487,7 @@ addEventListener('ui:requestEquip', (ev) => {
 
 // When user clicks an inventory item to use (e.g., read a spellbook)
 addEventListener('ui:requestUse', (ev) => {
+  if (isSimUiBlocked()) return;
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const itemId = e?.detail?.itemId;
@@ -2077,8 +2497,56 @@ addEventListener('ui:requestUse', (ev) => {
   rulesHandler(action);
 });
 
+// When user throws an inventory item
+addEventListener('ui:requestThrow', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const itemId = Number(e?.detail?.itemId || 0);
+  if (!Number.isInteger(itemId) || itemId <= 0) return;
+
+  const targetId = Number(e?.detail?.targetId || 0);
+  const x = Number(e?.detail?.x);
+  const y = Number(e?.detail?.y);
+  const hasTileTarget = Number.isFinite(x) && Number.isFinite(y);
+
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  if (hasTileTarget || (Number.isInteger(targetId) && targetId > 0)) {
+    _pendingThrowTargeting = null;
+    const payload = { itemId };
+    if (Number.isInteger(targetId) && targetId > 0) payload.targetId = targetId;
+    if (hasTileTarget) {
+      payload.x = Math.floor(x);
+      payload.y = Math.floor(y);
+    }
+    rulesHandler({ type: 'rules.throwItem', payload });
+    return;
+  }
+
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const inv = world.get(pe.id, Inventory);
+  if (!inv || !Array.isArray(inv.items) || !inv.items.includes(itemId)) {
+    try { messageLog.log({ text: 'You are not carrying that item.', type: 'system' }); } catch {}
+    return;
+  }
+
+  const itemName = resolveItemDisplayName(world, itemId) || 'item';
+  const info = world.get(itemId, ItemInfo);
+  const range = computeThrowRange(Number(info?.weight));
+  _pendingSpellTargeting = null;
+  _pendingThrowTargeting = { actorId: pe.id, itemId, itemName, range };
+  try {
+    messageLog.log({
+      text: `Throw ${bracketizeName(itemName)} where? Tap/click a tile (up to ${range}). Press Esc to cancel.`,
+      type: 'system',
+    });
+  } catch {}
+});
+
 // When user requests dropping an inventory item
 addEventListener('ui:requestDrop', (ev) => {
+  if (isSimUiBlocked()) return;
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const itemId = e?.detail?.itemId;
@@ -2097,6 +2565,104 @@ const cam = createCamera(); // { x,y, scale, target*, shake* }
 cam.scale = TILE_PX;
 cam.targetScale = TILE_PX;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
+
+// Tile-targeted spell casts and throws capture the next tap on the stage.
+canvas.addEventListener('pointerdown', (ev) => {
+  const pendingSpell = _pendingSpellTargeting;
+  const pendingThrow = _pendingThrowTargeting;
+  if (!pendingSpell?.spellId && !pendingThrow?.itemId) return;
+
+  const pe = playerEntity(world);
+  if (!pe) {
+    _pendingSpellTargeting = null;
+    _pendingThrowTargeting = null;
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const sx = (ev.clientX - rect.left) * (canvas.width / Math.max(1, rect.width));
+  const sy = (ev.clientY - rect.top) * (canvas.height / Math.max(1, rect.height));
+  const [wx, wy] = cameraScreenToWorld(cam, sx, sy, canvas);
+  const tx = Math.floor(wx);
+  const ty = Math.floor(wy);
+
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+
+  if (pendingSpell?.spellId) {
+    const px = pe.pos.x | 0;
+    const py = pe.pos.y | 0;
+    const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+    if (!(dist > 0) || dist > pendingSpell.range) {
+      try {
+        messageLog.log({
+          text: `${pendingSpell.spellName} target must be within ${pendingSpell.range} tiles.`,
+          type: 'system',
+        });
+      } catch {}
+      return;
+    }
+    if (pendingSpell.requiresLOS) {
+      const blocked = buildBlocksVisionMap(world);
+      const isBlocked = blockedCallback(blocked);
+      if (!hasLOS(px, py, tx, ty, isBlocked)) {
+        try {
+          messageLog.log({
+            text: `${pendingSpell.spellName} target must be in line of sight.`,
+            type: 'system',
+          });
+        } catch {}
+        return;
+      }
+    }
+
+    _pendingSpellTargeting = null;
+
+    const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+    rulesHandler({
+      type: 'rules.castActiveSpell',
+      payload: {
+        spellId: pendingSpell.spellId,
+        targetId: pe.id,
+        x: tx,
+        y: ty,
+      },
+    });
+    return;
+  }
+
+  if (!pendingThrow?.itemId) return;
+  if ((pendingThrow.actorId | 0) !== (pe.id | 0)) {
+    _pendingThrowTargeting = null;
+    return;
+  }
+
+  const px = pe.pos.x | 0;
+  const py = pe.pos.y | 0;
+  const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+  if (!(dist > 0)) {
+    try {
+      messageLog.log({
+        text: `${bracketizeName(pendingThrow.itemName)} must target another tile.`,
+        type: 'system',
+      });
+    } catch {}
+    return;
+  }
+
+  _pendingThrowTargeting = null;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({
+    type: 'rules.throwItem',
+    payload: {
+      itemId: pendingThrow.itemId,
+      x: tx,
+      y: ty,
+    },
+  });
+}, { capture: true });
+
 function worldToScreen({ x, y, size = 1 }) {
   const sx = (x - cam.x) * cam.scale + canvas.width / (ctx.getTransform().a || 1) * 0.5;
   const sy = (y - cam.y) * cam.scale + canvas.height / (ctx.getTransform().d || 1) * 0.5;
@@ -2208,6 +2774,7 @@ function render(worldView) {
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
     if (layer !== 100) continue;
+    if (_hiddenThrownItemIds.has(e.id)) continue;
     // worldView.entities is sorted by id within a tile/layer; later ids are drawn on top.
     stackMeta.set(`${e.pos.x},${e.pos.y}`, e.id);
   }
@@ -2342,12 +2909,15 @@ function render(worldView) {
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
   }
 
+  if (bctx) drawThrownItemEffects(bctx, worldView);
+
   // Spell bolt VFX (world-space additive glow)
   if (bctx) drawBoltEffects(bctx);
   if (bctx) drawMeteorEffects(bctx);
   if (bctx) drawBlastwaveEffects(bctx);
   if (bctx) drawFrostEffects(bctx);
   if (bctx) drawArrowEffects(bctx);
+  if (bctx) drawPoisonCloudEffects(bctx);
   if (bctx) drawPlasmaCloudEffects(bctx);
 
   // Particles (already in world space)
@@ -2428,6 +2998,8 @@ function frame(now) {
   updateBlastwaveFx(dtSec);
   updateFrostFx(dtSec);
   updateArrowFx(dtSec);
+  updateThrownItemFx(dtSec);
+  updatePoisonCloudFx(dtSec);
   updatePlasmaCloudFx(dtSec);
   ftext.step(dtSec);
 
@@ -2715,6 +3287,71 @@ function drawBlastwaveEffects(ctx) {
   ctx.restore();
 }
 
+function remapThrowArcProgress(t01) {
+  const t = Math.max(0, Math.min(1, Number(t01) || 0));
+  // Fast near release/impact, slower around apex.
+  const k = 0.74;
+  return t + (k / (2 * Math.PI)) * Math.sin(2 * Math.PI * t);
+}
+
+/** @param {number} dt */
+function updateThrownItemFx(dt) {
+  let changed = false;
+  for (let i = _thrownItemFx.length - 1; i >= 0; i--) {
+    const rec = _thrownItemFx[i];
+    rec.t += dt;
+    const done = rec.t >= rec.duration;
+    const gone = !world.isAlive(rec.itemId);
+    if (!done && !gone) continue;
+    _hiddenThrownItemIds.delete(rec.itemId);
+    _thrownItemFx.splice(i, 1);
+    changed = true;
+  }
+  if (changed) syncSimInputLockFlag();
+}
+
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {any} worldView
+ */
+function drawThrownItemEffects(ctx, worldView) {
+  if (!_thrownItemFx.length) return;
+
+  const kindById = new Map();
+  for (let i = 0; i < worldView.entities.length; i++) {
+    const e = worldView.entities[i];
+    if (!_hiddenThrownItemIds.has(e.id)) continue;
+    kindById.set(e.id, typeof e.kind === "string" ? e.kind : "default");
+  }
+
+  for (let i = 0; i < _thrownItemFx.length; i++) {
+    const rec = _thrownItemFx[i];
+    if (!rec.kind) rec.kind = kindById.get(rec.itemId) || "default";
+    const t01 = Math.max(0, Math.min(1, rec.t / Math.max(0.0001, rec.duration)));
+    const u = remapThrowArcProgress(t01);
+    const x = rec.from.x + (rec.to.x - rec.from.x) * u;
+    const yGround = rec.from.y + (rec.to.y - rec.from.y) * u;
+    const h = Math.sin(Math.PI * u);
+    const y = yGround - h * THROW_FX_ARC_HEIGHT;
+
+    // Ground shadow to sell "item is airborne".
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${(0.20 - h * 0.08).toFixed(3)})`;
+    if (typeof ctx.ellipse === "function") {
+      ctx.beginPath();
+      ctx.ellipse(x, yGround + 0.08, 0.22 + h * 0.08, 0.12 + h * 0.03, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, yGround + 0.08, 0.16 + h * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    drawKind(glyphAtlas, ctx, rec.kind, x, y);
+  }
+}
+
 // --- Arrow tracer update & draw --------------------------------------------
 /** @param {number} dt */
 function updateArrowFx(dt) {
@@ -2822,6 +3459,181 @@ function updatePlasmaCloudFx(dt) {
       cloud.flash = Math.max(cloud.flash, 0.12);
     }
   }
+}
+
+/** @param {number} dt */
+function updatePoisonCloudFx(dt) {
+  for (const [hazardId, cloud] of _poisonCloudFx) {
+    cloud.pulseFlash = Math.max(0, cloud.pulseFlash - dt);
+    cloud.bubbleClock = Number.isFinite(cloud.bubbleClock)
+      ? Number(cloud.bubbleClock)
+      : (0.08 + Math.random() * 0.16);
+
+    if (!cloud.fading) {
+      cloud.bubbleClock -= dt;
+      while (cloud.bubbleClock <= 0) {
+        const p = randomPoisonBubblePoint(cloud);
+        const dense = cloud.medium === 'floor';
+        const strength = (dense && Math.random() < 0.32) ? 2 : 1;
+        spawnPoisonBubblePop(p.x, p.y, strength);
+        cloud.bubbleClock += (dense ? 0.10 : 0.15) + Math.random() * (dense ? 0.12 : 0.18);
+      }
+    }
+
+    if (cloud.fading) {
+      cloud.fadeLeft = Math.max(0, cloud.fadeLeft - dt);
+      if (cloud.fadeLeft <= 0) {
+        _poisonCloudFx.delete(hazardId);
+      }
+      continue;
+    }
+    if (!world.isAlive(hazardId)) {
+      cloud.fading = true;
+      cloud.fadeMax = 0.45;
+      cloud.fadeLeft = Math.max(cloud.fadeLeft, cloud.fadeMax);
+      cloud.pulseFlash = Math.max(cloud.pulseFlash, 0.10);
+    }
+  }
+
+  for (let i = _poisonBubblePops.length - 1; i >= 0; i--) {
+    const pop = _poisonBubblePops[i];
+    pop.ttl = Math.max(0, pop.ttl - dt);
+    pop.y -= pop.rise * dt;
+    pop.phase += dt * 6.0;
+    if (pop.ttl <= 0) _poisonBubblePops.splice(i, 1);
+  }
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function drawPoisonCloudEffects(ctx) {
+  if (!_poisonCloudFx.size && !_poisonBubblePops.length) return;
+  ctx.save();
+  const TAU = Math.PI * 2;
+
+  for (const cloud of _poisonCloudFx.values()) {
+    const cx = cloud.x;
+    const cy = cloud.y;
+    const r = Math.max(0, cloud.radius | 0);
+    const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 4.7 + cloud.phase);
+    const wobble = 0.5 + 0.5 * Math.sin(_fxTime * 2.1 + cloud.phase * 0.8);
+    const lifeFactor = Math.max(0.32, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+    const fadeFactor = cloud.fading
+      ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+      : 1;
+    const pulseBoost = cloud.pulseFlash > 0 ? (cloud.pulseFlash / 0.24) : 0;
+    const alphaScale = lifeFactor * fadeFactor;
+
+    // A poisonous fog should read as murky and viscous, not crackling.
+    ctx.globalCompositeOperation = 'source-over';
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (dist > r) continue;
+
+        const tx = cx + dx;
+        const ty = cy + dy;
+        const ring = 1 - (dist / (r + 1));
+        const alpha = (0.08 + ring * 0.10 + wobble * 0.04 + pulseBoost * 0.06) * alphaScale;
+
+        ctx.fillStyle = `rgba(78,155,56,${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 0.66 + 0.05 * wobble, 0, TAU);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(145,212,102,${(alpha * 0.35).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 0.36 + 0.03 * pulse, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    // Slowly undulating perimeter, biased toward dense floor-slick pooling.
+    const points = [];
+    const pointCount = Math.max(10, 12 + r * 6);
+    const baseR = r + 0.88;
+    const driftX = 0.05 * Math.sin(_fxTime * 1.2 + cloud.phase);
+    const driftY = 0.05 * Math.cos(_fxTime * 1.0 + cloud.phase * 0.6);
+    for (let i = 0; i < pointCount; i++) {
+      const t = i / pointCount;
+      const a = t * TAU;
+      const noise =
+        0.10 * Math.sin(_fxTime * 2.7 + a * 2.4 + cloud.phase) +
+        0.06 * Math.sin(_fxTime * 3.6 + a * 4.2 - cloud.phase * 0.4);
+      const rr = baseR + noise + 0.05 * wobble;
+      points.push({
+        x: cx + driftX + Math.cos(a) * rr,
+        y: cy + driftY + Math.sin(a) * (rr * 0.92),
+      });
+    }
+    if (points.length >= 3) {
+      const p0 = points[0];
+      const p1 = points[1];
+      const firstMid = { x: (p0.x + p1.x) * 0.5, y: (p0.y + p1.y) * 0.5 };
+      ctx.beginPath();
+      ctx.moveTo(firstMid.x, firstMid.y);
+      for (let i = 1; i <= points.length; i++) {
+        const p = points[i % points.length];
+        const n = points[(i + 1) % points.length];
+        const mid = { x: (p.x + n.x) * 0.5, y: (p.y + n.y) * 0.5 };
+        ctx.quadraticCurveTo(p.x, p.y, mid.x, mid.y);
+      }
+      ctx.closePath();
+
+      const fillA = (0.10 + wobble * 0.06 + pulseBoost * 0.08) * alphaScale;
+      ctx.fillStyle = `rgba(84,150,62,${fillA.toFixed(3)})`;
+      ctx.fill();
+
+      const edgeA = (0.16 + wobble * 0.05 + pulseBoost * 0.08) * alphaScale;
+      ctx.strokeStyle = `rgba(168,228,132,${edgeA.toFixed(3)})`;
+      ctx.lineWidth = 0.06;
+      ctx.stroke();
+    }
+
+    // Faint toxic core, intentionally less luminous than plasma.
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(196,248,128,${((0.05 + pulse * 0.05 + pulseBoost * 0.07) * alphaScale).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 0.24 + pulse * 0.06, 0, TAU);
+    ctx.fill();
+  }
+
+  if (_poisonBubblePops.length) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < _poisonBubblePops.length; i++) {
+      const pop = _poisonBubblePops[i];
+      const max = (pop.max > 0) ? pop.max : 1;
+      const t = pop.max > 0 ? (1 - (pop.ttl / max)) : 1;
+      const u = Math.max(0, Math.min(1, t));
+      const alive = Math.max(0, Math.min(1, pop.ttl / max));
+      const rr = pop.r0 + (pop.r1 - pop.r0) * u;
+      const wob = 0.015 * Math.sin(_fxTime * 6.5 + pop.phase);
+      const x = pop.x + wob;
+      const y = pop.y;
+
+      const ringA = (0.24 * alive) + 0.02;
+      ctx.strokeStyle = `rgba(176,255,132,${ringA.toFixed(3)})`;
+      ctx.lineWidth = 0.045 + (1 - u) * 0.015;
+      ctx.beginPath();
+      ctx.arc(x, y, rr, 0, TAU);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(90,196,68,${(ringA * 0.65).toFixed(3)})`;
+      ctx.lineWidth = 0.028;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.01, rr * 0.68), 0, TAU);
+      ctx.stroke();
+
+      const coreA = (0.10 + (1 - u) * 0.18) * alive;
+      if (coreA > 0.01) {
+        ctx.fillStyle = `rgba(206,255,170,${coreA.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(0.008, (1 - u) * 0.055), 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+
+  ctx.restore();
 }
 
 /** @param {CanvasRenderingContext2D} ctx */

@@ -9,11 +9,14 @@ import {
   selfBuffOnHit,
   drainOnHit,
   bonusDamageOnBeforeHit,
+  bonusDamageIfTargetAfflicted,
   healOnDamaged,
   retaliateOnDamaged,
   statusEffectOnDamaged,
+  phaseOutOnDamaged,
   mindflayerBlastOnHit,
 } from "./callbacks/combat.js";
+import { spawnPlasmaCloudOnDeath } from "./callbacks/death.js";
 
 export const MONSTERS = [
   // ── Tier 0 (floors 1-5) ────────────────────────────────────────────
@@ -100,6 +103,7 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0010, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
+      onDeath: [spawnPlasmaCloudOnDeath({ turnsLeft: 3, radius: 1, damage: 2 })],
     },
     description: 'A tiny crackling insect that moves only along the grid axes.',
   },
@@ -288,6 +292,36 @@ export const MONSTERS = [
     },
     description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
   },
+  {
+    id: 'carrion_shade',
+    name: 'Carrion Shade',
+    tier: 2,
+    glyph: 'c',
+    fg: '#556677',
+    glow: '#334455',
+    baseHp: 20,
+    hpPerLevel: 2.5,
+    attack: 3,
+    defense: 3,
+    damageDice: '1d8',
+    sizeClass: 'M',
+    massKg: 8,
+    resistances: {
+      kinetic: { DR: 4, bluntMult: 0.5, slashMult: 0.5, pierceMult: 0.5 },
+      chemical: { toxMult: 0 },
+    },
+    speed: 2,
+    hooks: {
+      onBeforeHit: [bonusDamageIfTargetAfflicted(3, ["bleed", "poison", "disease", "burn"], "proc:shade_feed")],
+      onHit: [
+        statusEffectOnHit(30, 0xdead0100, { key: "weakened", turnsLeft: 3, potency: 1 }, "proc:weakened"),
+        statusEffectOnHit(20, 0xdead0101, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding"),
+      ],
+      onDamaged: [phaseOutOnDamaged(25, 0xdead0102)],
+    },
+    description: 'A shadow that coalesces around old blood. It strikes harder against the wounded and fades when cornered.',
+    lootTable: 'drop:tier2',
+  },
 
   // ── Tier 3 (floors 16+) ────────────────────────────────────────────
   {
@@ -366,6 +400,30 @@ export const MONSTERS = [
     },
     description: 'An undead sorcerer sustained by a hidden phylactery.',
     lootTable: 'drop:lich',
+  },
+  {
+    id: 'stone_taunter',
+    name: 'Taunting Statue',
+    tier: 99,
+    glyph: 'S',
+    fg: '#b8b8b8',
+    glow: '#7a7a7a',
+    baseHp: 45,
+    hpPerLevel: 0,
+    attack: 2,
+    defense: 4,
+    damageDice: '1d6',
+    sizeClass: 'M',
+    massKg: 240,
+    resistances: {
+      kinetic: { DR: 14, bluntMult: 0.7, slashMult: 0.5, pierceMult: 0.4 },
+      thermal: { burnMult: 0.6 },
+      chemical: { toxMult: 0.2 },
+      electric: { ohms: 2400 },
+    },
+    speed: 2,
+    hooks: null,
+    description: 'An animated stone idol that heckles anything that breathes.',
   },
 ];
 

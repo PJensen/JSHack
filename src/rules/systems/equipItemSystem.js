@@ -25,7 +25,7 @@ export function equipItemSystem(world) {
     if (idx === -1) { world.remove(actor, EquipIntent); continue; }
 
     const info = world.get(itemId, ItemInfo);
-    if (!info || (info.type !== 'equip' && info.type !== 'ammo')) { world.remove(actor, EquipIntent); continue; }
+    if (!info || (info.type !== 'equip' && info.type !== 'ammo' && info.type !== 'wand')) { world.remove(actor, EquipIntent); continue; }
 
     // Ensure Equipment component exists
     let eq = world.get(actor, Equipment);
@@ -72,6 +72,9 @@ export function equipItemSystem(world) {
     } else if (slot === 'ammo' || info.type === 'ammo') {
       if (Number.isInteger(eq.ammo) && eq.ammo > 0) pushToInventory(eq.ammo);
       eq.ammo = itemId; appliedSlot = 'ammo';
+    } else if (slot === 'ranged') {
+      if (Number.isInteger(eq.ranged) && eq.ranged > 0) pushToInventory(eq.ranged);
+      eq.ranged = itemId; appliedSlot = 'ranged';
     } else {
       // Unknown or unsupported slot: item is already in inventory, ignore.
       world.remove(actor, EquipIntent);
@@ -79,7 +82,7 @@ export function equipItemSystem(world) {
     }
 
     // Ensure count is 1 when equipped (no stacking on body) — except ammo, which stacks
-    if (info.type !== 'ammo' && (info.count | 0) > 1) {
+    if (info.type !== 'ammo' && info.type !== 'wand' && (info.count | 0) > 1) {
       world.mutate(itemId, ItemInfo, (r) => { r.count = 1; });
     }
 

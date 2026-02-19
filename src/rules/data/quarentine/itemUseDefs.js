@@ -1,4 +1,7 @@
-// rules/data/itemUseDefs.js
+// rules/data/quarentine/itemUseDefs.js
+//
+// @deprecated Legacy migration shim. Do not import in runtime/UI paths.
+// Use item-def hooks + resolver shell in src/rules/content/items/usePayloads.js.
 // Function-first item-use behavior definitions interpreted by useItemSystem.
 
 import { getCatalogItem } from "./itemCatalog.js";

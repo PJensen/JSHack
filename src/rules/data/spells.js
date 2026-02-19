@@ -23,6 +23,7 @@ export const SPELL_DEFS = {
     name: 'Meteor',
     manaCost: 12,
     minIntelligence: 0,
+    range: 12,
     script: 'meteor',
   },
   blastwave: {
@@ -31,6 +32,14 @@ export const SPELL_DEFS = {
     manaCost: 7,
     minIntelligence: 0,
     script: 'blastwave',
+  },
+  blink: {
+    id: 'blink',
+    name: 'Blink',
+    manaCost: 6,
+    minIntelligence: 0,
+    range: 10,
+    script: 'blink',
   },
   homecoming: {
     id: 'homecoming',

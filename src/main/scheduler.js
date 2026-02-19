@@ -9,6 +9,7 @@ import { itemDropSystem } from "../rules/systems/itemDropSystem.js";
 import { equipItemSystem } from "../rules/systems/equipItemSystem.js";
 import { useItemSystem } from "../rules/systems/useItemSystem.js";
 import { applySystem } from "../rules/systems/applySystem.js";
+import { throwSystem } from "../rules/systems/throwSystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
@@ -17,6 +18,7 @@ import { waitSystem } from "../rules/systems/waitSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
+import { installTauntListener, tauntSteeringSystem } from "../rules/systems/tauntSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
@@ -34,8 +36,8 @@ import { engraveSystem, installEngraveListeners } from "../rules/systems/engrave
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
-import { plasmaCloudSystem } from "../rules/systems/plasmaCloudSystem.js";
-import { installGridBugDeathClouds } from "../rules/systems/gridBugDeathCloudSystem.js";
+import { hazardSystem } from "../rules/systems/hazardSystem.js";
+import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
@@ -43,7 +45,6 @@ import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
-import "../rules/scripts/consumables.js";
 
 /**
  * @param {World} world
@@ -57,8 +58,10 @@ export function configureWorld(world) {
   installEngraveListeners(world);
   // Install bump-interact listener for immediate interactions (doors, chests, NPCs)
   installBumpInteractListener(world);
-  // Install grid bug death-to-plasma-cloud trigger once per world
-  installGridBugDeathClouds(world);
+  // Install monster death hooks once per world
+  installMonsterDeathHooks(world);
+  // Install taunt listeners once per world
+  installTauntListener(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
@@ -69,6 +72,7 @@ export function configureWorld(world) {
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
+  registerSystem(throwSystem, 'intents');
   registerSystem(applySystem, 'intents');
   registerSystem(equipItemSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
@@ -77,6 +81,8 @@ export function configureWorld(world) {
   registerSystem(engraveSystem, 'intents');
   // Shopkeeper system must run BEFORE movementSystem to block exits
   registerSystem(shopkeeperSystem, 'intents');
+  // Taunt steering can override enemy movement intents before movement resolves.
+  registerSystem(tauntSteeringSystem, 'intents');
   registerSystem(movementSystem, 'intents');
   // interactionSystem must run AFTER movementSystem: bump-to-interact adds
   // InteractIntent during movement; processing it in the same tick prevents
@@ -95,7 +101,7 @@ export function configureWorld(world) {
   registerSystem(hungerSystem, 'effects');
   // Food decay ticks after hunger (rot inventory food each turn)
   registerSystem(foodDecaySystem, 'effects');
-  registerSystem(plasmaCloudSystem, 'effects');
+  registerSystem(hazardSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');
   registerSystem(harvestRegrowthSystem, 'effects');

@@ -2,6 +2,7 @@ import { getCatalogItem } from "./itemCatalog.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Potion } from "../components/Potion.js";
 import { ScriptRef } from "../components/ScriptRef.js";
 
 /**
@@ -41,6 +42,18 @@ export function buildCatalogItem(world, itemId, opts = {}) {
   };
   world.add(id, ItemInfo, info);
 
+  if (String(def.type || "").toLowerCase() === "potion") {
+    const potionDef = (def.potion && typeof def.potion === "object") ? def.potion : {};
+    world.add(id, Potion, {
+      name: String(def.name || potionDef.name || "Potion"),
+      route: String(potionDef.route || "oral"),
+      doses: Math.max(1, Number(potionDef.doses ?? count) | 0),
+      channels: Array.isArray(potionDef.channels) ? potionDef.channels.slice() : [],
+      effects: Array.isArray(potionDef.effects) ? potionDef.effects.map((e) => ({ ...e })) : [],
+      toxicity: (potionDef.toxicity && typeof potionDef.toxicity === "object") ? { ...potionDef.toxicity } : null,
+    });
+  }
+
   if (typeof def.material === "string" && def.material) {
     world.add(id, Material, { kind: def.material });
   }
@@ -50,4 +63,3 @@ export function buildCatalogItem(world, itemId, opts = {}) {
 
   return id;
 }
-

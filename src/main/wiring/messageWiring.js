@@ -136,6 +136,58 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(msg, 'system');
   });
 
+  world.on('spell:blink', ({ actor, randomized, randomReason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (randomized) {
+      const why = randomReason === 'confused' ? 'confused' : 'hallucinating';
+      log(`Your ${why} mind yanks the blink off-course.`, 'system');
+      return;
+    }
+    log('Space folds and you blink to your mark.', 'system');
+  });
+
+  world.on('spell:blink:failed', ({ actor, reason, range }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'no_target') {
+      log('Blink needs a destination tile.', 'system');
+      return;
+    }
+    if (reason === 'out_of_range') {
+      log(`Blink destination is out of range (${Number(range || 10) | 0} tiles).`, 'system');
+      return;
+    }
+    if (reason === 'no_safe_landing') {
+      log('Blink fizzles: no safe landing tile.', 'system');
+      return;
+    }
+    log('Blink fizzles.', 'system');
+  });
+
+  world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (randomized) {
+      const why = randomReason === 'confused' ? 'confused' : 'hallucinating';
+      log(`Your ${why} mind drags the meteor off-course.`, 'system');
+    }
+  });
+
+  world.on('spell:meteor:failed', ({ actor, reason, range }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'no_target') {
+      log('Meteor needs a target tile.', 'system');
+      return;
+    }
+    if (reason === 'out_of_range') {
+      log(`Meteor target is out of range (${Number(range || 12) | 0} tiles).`, 'system');
+      return;
+    }
+    if (reason === 'blocked_los') {
+      log('Meteor target must be in line of sight.', 'system');
+      return;
+    }
+    log('Meteor fizzles.', 'system');
+  });
+
   // === Combat events ===
   world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
     const weaponInfo = world.get(weaponId, ItemInfo);
@@ -376,15 +428,21 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   // === Apply events ===
   world.on('item:applied', ({ targetId, result }) => {
     if (!result) return;
+    const targetName = nameOfItem(targetId);
     if (result.type === 'touchstone') {
-      const targetName = nameOfItem(targetId) || result.appearance || 'gem';
+      const touchstoneName = targetName || result.appearance || 'gem';
       if (result.hardness === 'hard') {
-        log(`You rub ${targetName} on the touchstone... it makes a hard white streak!`, 'system');
+        log(`You rub ${touchstoneName} on the touchstone... it makes a hard white streak!`, 'system');
       } else {
-        log(`You rub ${targetName} on the touchstone... it leaves a dull scratch.`, 'system');
+        log(`You rub ${touchstoneName} on the touchstone... it leaves a dull scratch.`, 'system');
       }
+    } else if (typeof result.message === 'string' && result.message.trim().length > 0) {
+      // Apply hook-provided text keeps behavior hackable in content files.
+      log(result.message, 'system');
     } else if (result.type === 'nothing') {
       log(`Nothing happens.`, 'system');
+    } else {
+      log(`A cryptic sheen crawls over ${targetName}, then vanishes.`, 'system');
     }
   });
 

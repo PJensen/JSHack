@@ -91,6 +91,12 @@ export const EFFECT_DEFS = [
     statuses: ["confused"],
   },
   {
+    id: "intoxication",
+    keys: ["intoxicated", "intoxication", "hangover", "drunk"],
+    operation: "none",
+    statuses: ["confused"],
+  },
+  {
     id: "weakened",
     keys: ["weaken", "weakened"],
     operation: "none",
@@ -107,5 +113,17 @@ export const EFFECT_DEFS = [
     keys: ["bless", "blessed"],
     operation: "none",
     statuses: ["blessed"],
+  },
+  {
+    id: "stoneskin",
+    keys: ["stoneskin", "stone_skin"],
+    operation: "none",
+    statuses: ["stoneskin"],
+  },
+  {
+    id: "taunt",
+    keys: ["taunt", "taunted"],
+    operation: "none",
+    statuses: ["taunted"],
   },
 ];

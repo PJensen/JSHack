@@ -3,6 +3,35 @@ import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Player } from '../components/Player.js';
 import { DungeonState } from '../components/DungeonState.js';
 
+const TOMBSTONE_LISTENER_INSTALLED = Symbol.for('jshack:tombstone:listener:installed');
+const TOMBSTONE_EPOCH_MS = 1704067200000; // 2024-01-01T00:00:00.000Z
+
+/**
+ * @param {string} text
+ * @returns {number}
+ */
+function hashText32(text) {
+  let h = 0x811c9dc5;
+  const src = String(text || '');
+  for (let i = 0; i < src.length; i++) {
+    h ^= src.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/**
+ * @param {World} world
+ * @param {{ playerId: number, depth: number, cause: string, killerIdentity: string | null }} spec
+ */
+function buildTombstoneId(world, spec) {
+  const seed = world.seed >>> 0;
+  const step = Math.max(0, world.step | 0);
+  const payload = `${seed}:${step}:${spec.playerId | 0}:${spec.depth | 0}:${spec.cause}:${spec.killerIdentity || ''}`;
+  const hash = hashText32(payload).toString(16);
+  return `ts_${seed.toString(16)}_${step}_${hash}`;
+}
+
 /**
  * Install tombstone death listener
  * Captures player deaths and saves them to the tombstone repository
@@ -11,6 +40,8 @@ import { DungeonState } from '../components/DungeonState.js';
  */
 export function installTombstoneDeathListener(world, repository) {
   if (!world || !repository) return;
+  if (world[TOMBSTONE_LISTENER_INSTALLED]) return;
+  world[TOMBSTONE_LISTENER_INSTALLED] = true;
 
   world.on('died', ({ id, killer, cause }) => {
     // Only capture player deaths
@@ -39,15 +70,23 @@ export function installTombstoneDeathListener(world, repository) {
       }
     }
 
+    const turn = Math.max(0, world.step | 0);
+    const timestamp = TOMBSTONE_EPOCH_MS + (turn * 1000);
+
     // Create tombstone record
     const record = {
-      id: `ts_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      id: buildTombstoneId(world, {
+        playerId: id | 0,
+        depth: depth | 0,
+        cause: String(deathCause || 'unknown'),
+        killerIdentity,
+      }),
       depth,
       cause: deathCause,
       killerName,
       killerIdentity,
-      timestamp: Date.now(),
-      turn: world.step || 0,
+      timestamp,
+      turn,
       playerName: ident?.name || 'Hero'
     };
 

@@ -327,7 +327,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
 
     const eq = world.get(pe.id, Equipment);
     if (eq) {
-      for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo"]) {
+      for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo", "ranged"]) {
         if (eq[slot] === itemId) { eq[slot] = null; break; }
       }
     }
@@ -413,7 +413,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
 
     const eq = world.get(pe.id, Equipment);
     if (eq) {
-      for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo"]) {
+      for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo", "ranged"]) {
         if (eq[slot] === itemId) { eq[slot] = null; break; }
       }
     }
