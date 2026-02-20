@@ -4,7 +4,7 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * HarvestNode — interactive gatherable node that regrows over time.
  */
 export const HarvestNode = defineComponent("HarvestNode", {
-  kind: "berries",      // logical node kind: 'berries' | 'herbs'
+  kind: "berries",      // logical node kind: 'berries' | 'herbs' | 'thorn_bramble' | 'venom_fern'
   ready: true,          // true when it can be harvested
   regrowTurns: 40,      // turns required to regrow after harvest
   regrowCountdown: 0,   // countdown while !ready

@@ -89,6 +89,32 @@ export const WildHerbs = defineArchetype(
   [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.40) }],
 );
 
+// Harvested from thorn brambles; used for alchemy recipes.
+export const ThornPods = defineArchetype(
+  "ThornPods",
+  [ItemInfo, {
+    type: "ingredient",
+    description: "Hardened thorn pods packed with sharp resin.",
+    weight: 0.2,
+    value: 6,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Thorn Pods", identity: "reagent_thorn_pod" })],
+);
+
+// Harvested from venom ferns; used for alchemy recipes.
+export const VenomFronds = defineArchetype(
+  "VenomFronds",
+  [ItemInfo, {
+    type: "ingredient",
+    description: "Slick venom fronds that reek of bitter alkaloids.",
+    weight: 0.2,
+    value: 7,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Venom Fronds", identity: "reagent_venom_frond" })],
+);
+
 /**
  * createCorpse — creates a corpse entity from a killed monster.
  * Called from cleanupSystem when a monster dies.

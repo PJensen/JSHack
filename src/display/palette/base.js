@@ -103,6 +103,8 @@ export const basePalette = {
   food_iron_ration: { glyph: "%", fg: "#d4b87c", glow: "#b09860" },
   food_wild_berries: { glyph: ":", fg: "#b476d7", glow: "#7a4c96" },
   food_wild_herbs:   { glyph: ";", fg: "#73c56f", glow: "#4f8b4c" },
+  reagent_thorn_pod: { glyph: "✶", fg: "#a08f63", glow: "#6f6242" },
+  reagent_venom_frond: { glyph: "☤", fg: "#9ccc69", glow: "#5f8d3c" },
 
   // Corpses (inherit monster color, traditional '%' glyph)
   corpse_rat:          { glyph: "%", fg: "#b89070", glow: "#a06030" },

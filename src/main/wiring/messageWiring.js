@@ -49,6 +49,40 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     return label ? bracketizeName(label) : `item ${n}`;
   }
 
+  const ingredientLabels = Object.freeze({
+    berries: "berries",
+    herbs: "herbs",
+    thornPods: "thorn pods",
+    venomFronds: "venom fronds",
+  });
+
+  function formatIngredientBag(rec, { includeZero = false } = {}) {
+    const src = (rec && typeof rec === "object") ? rec : {};
+    const parts = [];
+    for (const key of Object.keys(ingredientLabels)) {
+      const n = Math.max(0, Number(src[key] || 0) | 0);
+      if (!includeZero && n <= 0) continue;
+      parts.push(`${n} ${ingredientLabels[key]}`);
+    }
+    return parts.join(", ");
+  }
+
+  function harvestYieldLabel(kind) {
+    const k = String(kind || "").toLowerCase();
+    if (k === "herbs") return "herbs";
+    if (k === "thorn_bramble") return "thorn pods";
+    if (k === "venom_fern") return "venom fronds";
+    return "berries";
+  }
+
+  function harvestNodeLabel(kind) {
+    const k = String(kind || "").toLowerCase();
+    if (k === "herbs") return "herb patch";
+    if (k === "thorn_bramble") return "thorn bramble";
+    if (k === "venom_fern") return "venom fern";
+    return "berry bush";
+  }
+
   // === Ambient sound events ===
   world.on('ambient:sound', ({ text }) => {
     log(text, 'ambient');
@@ -354,14 +388,14 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('harvest:picked', ({ actor, kind, count, itemId }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const nodeLabel = String(kind || '') === 'herbs' ? 'herbs' : 'berries';
-    const itemLabel = itemId ? nameOfItem(itemId) : bracketizeName(nodeLabel);
-    log(`You harvest ${count} ${nodeLabel} (${itemLabel}).`, 'system');
+    const yieldLabel = harvestYieldLabel(kind);
+    const itemLabel = itemId ? nameOfItem(itemId) : bracketizeName(yieldLabel);
+    log(`You harvest ${count} ${yieldLabel} (${itemLabel}).`, 'system');
   });
 
   world.on('harvest:empty', ({ actor, kind, regrowCountdown }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const nodeLabel = String(kind || '') === 'herbs' ? 'herb patch' : 'berry bush';
+    const nodeLabel = harvestNodeLabel(kind);
     const left = Math.max(0, Number(regrowCountdown || 0) | 0);
     if (left > 0) log(`The ${nodeLabel} is picked clean. (${left} turns to regrow)`, 'system');
     else log(`The ${nodeLabel} has nothing ready right now.`, 'system');
@@ -375,7 +409,13 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (!ppos || !pos) return;
     const dist = Math.max(Math.abs(ppos.x - pos.x), Math.abs(ppos.y - pos.y));
     if (dist > 6) return;
-    const what = String(kind || '') === 'herbs' ? 'A herb patch looks fresh again.' : 'A berry bush ripens nearby.';
+    const k = String(kind || "").toLowerCase();
+    const what = (
+      k === "herbs" ? "A herb patch looks fresh again."
+        : (k === "thorn_bramble" ? "A thorn bramble thickens nearby."
+          : (k === "venom_fern" ? "A venom fern unfurls fresh fronds nearby."
+            : "A berry bush ripens nearby."))
+    );
     log(what, 'ambient');
   });
 
@@ -394,9 +434,8 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('alchemy:open', ({ actor, ingredients }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const berries = Math.max(0, Number(ingredients?.berries || 0) | 0);
-    const herbs = Math.max(0, Number(ingredients?.herbs || 0) | 0);
-    log(`You open the alchemy bench. (${berries} berries, ${herbs} herbs)`, 'system');
+    const summary = formatIngredientBag(ingredients, { includeZero: true });
+    log(`You open the alchemy bench. (${summary || "no reagents"})`, 'system');
   });
 
   world.on('alchemy:crafted', ({ actor, recipeLabel, outputName, outputCount }) => {
@@ -410,12 +449,8 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   world.on('alchemy:result', ({ actor, result, missing, recipeKey }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (result === 'missing_ingredients') {
-      const mb = Math.max(0, Number(missing?.berries || 0) | 0);
-      const mh = Math.max(0, Number(missing?.herbs || 0) | 0);
-      const bits = [];
-      if (mb > 0) bits.push(`${mb} berries`);
-      if (mh > 0) bits.push(`${mh} herbs`);
-      log(`Missing ingredients for ${recipeKey || 'that recipe'}: ${bits.join(' + ')}.`, 'system');
+      const bits = formatIngredientBag(missing);
+      log(`Missing ingredients for ${recipeKey || 'that recipe'}: ${bits || "requirements not met"}.`, 'system');
       return;
     }
     if (result === 'unknown_recipe') {
