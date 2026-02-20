@@ -9,7 +9,6 @@ import { Resistances } from "../src/rules/components/Resistences.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Hunger } from "../src/rules/components/Hunger.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
-import "../src/rules/scripts/consumables.js";
 
 Deno.test("eating eel corpse grants electric resistance", () => {
   const world = new World({ seed: 0xC0FFEE });

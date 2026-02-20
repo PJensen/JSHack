@@ -4,13 +4,11 @@ import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
-import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
-import { Potion } from "../src/rules/components/Potion.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { isIdentified, resetIdentification } from "../src/rules/data/identification.js";
 
-Deno.test("touchstone apply def identifies gem targets", () => {
+Deno.test("touchstone apply hook identifies gem targets", () => {
   resetIdentification();
   const world = new World({ seed: 1001 });
   const actor = world.create();
@@ -30,36 +28,21 @@ Deno.test("touchstone apply def identifies gem targets", () => {
   assert(world.isAlive(touchstone), "touchstone should not be consumed");
 });
 
-Deno.test("poison potion apply def coats weapon and consumes the potion", () => {
+Deno.test("poison potion apply hook coats weapon and consumes the potion", () => {
   const world = new World({ seed: 1002 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
   const inv = world.get(actor, Inventory);
+  const appliedEvents = [];
+  world.on("item:applied", (ev) => appliedEvents.push(ev));
 
-  const potion = world.create();
-  world.add(potion, NamedIdentity, { name: "Potion of Poison", identity: "potion_poison" });
-  world.add(potion, ItemInfo, {
-    type: "potion",
-    slot: "",
-    weight: 1,
-    value: 20,
-    description: "A toxic brew.",
-    count: 1,
-    bonuses: {},
-    rarity: 1,
-    rarityName: "common",
-    affixes: [],
-  });
-  world.add(potion, Potion, {
-    name: "Potion of Poison",
-    route: "oral",
-    doses: 1,
-    channels: [],
-    effects: [],
-    toxicity: null,
-  });
+  const potion = createItemById(world, "potion_poison");
+  assert(potion != null, "poison potion should be creatable from item catalog");
 
   const dagger = buildCatalogItem(world, "dagger_quick");
+  const daggerInfoBefore = world.get(dagger, ItemInfo);
+  daggerInfoBefore.coating = { kind: "poison", charges: 5 };
+  world.set(dagger, ItemInfo, daggerInfoBefore);
   inv.items.push(potion, dagger);
 
   world.add(actor, ApplyIntent, { itemId: potion, targetItemId: dagger });
@@ -68,8 +51,19 @@ Deno.test("poison potion apply def coats weapon and consumes the potion", () => 
   const daggerInfo = world.get(dagger, ItemInfo);
   assert(daggerInfo?.coating, "dagger should receive a coating payload");
   assertEquals(daggerInfo.coating.kind, "poison");
-  assert(daggerInfo.coating.charges >= 12, "poison coating should set charges");
+  assertEquals(daggerInfo.coating.charges, 17, "poison coating should add granted charges on top of existing");
+  assertEquals(appliedEvents.length, 1);
+  assert(String(appliedEvents[0]?.result?.type || ""), "poison_coat");
+  assert(
+    String(appliedEvents[0]?.result?.message || "").includes("poison"),
+    "poison apply hook should provide message text in result payload",
+  );
+  assertEquals(Number(appliedEvents[0]?.result?.chargesGranted || 0), 12);
+  assertEquals(Number(appliedEvents[0]?.result?.chargesTotal || 0), 17);
+  assert(
+    String(appliedEvents[0]?.result?.message || "").includes("17"),
+    "poison apply message should interpolate computed total charges",
+  );
   assert(!world.isAlive(potion), "poison potion should be consumed");
   assert(!inv.items.includes(potion), "consumed potion should be removed from inventory");
 });
-

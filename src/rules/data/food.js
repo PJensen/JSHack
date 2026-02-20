@@ -8,6 +8,7 @@ import {
   corpseDamage,
   grantElectricResist,
 } from "./callbacks/eat.js";
+import { HUNGER_COMBAT_LEVELS } from "./hungerCombatLevels.js";
 
 /**
  * Base nutrition by monster sizeClass.
@@ -106,7 +107,7 @@ export const IRON_RATION_NUTRITION = 600;
 
 // ── Food decay constants ─────────────────────────────────────────
 // Shelf life values and decay stage thresholds for the FoodDecay component.
-// Consumed by foodDecaySystem, consumable:eat script, and display name resolver.
+// Consumed by foodDecaySystem, native food-use hooks, and display name resolver.
 
 /** Default shelf life by food kind (turns in inventory before fully putrid). */
 export const SHELF_LIFE_RATION = 500;
@@ -169,7 +170,7 @@ export const HUNGER_POTENCY = Object.freeze({
 });
 
 /** Levels that apply a combat penalty (frozen array for status lookups). */
-export const HUNGER_COMBAT_LEVELS = Object.freeze(['hungry', 'famished', 'starving', 'wasting']);
+export { HUNGER_COMBAT_LEVELS };
 
 /** Levels that throttle mana regen, mapped to multiplier. */
 export const HUNGER_MANA_MULT = Object.freeze({

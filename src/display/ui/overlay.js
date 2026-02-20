@@ -3,12 +3,38 @@
 
 import { ensureMemoryGraph } from './memoryGraph.js';
 
+/**
+ * @param {any} it
+ */
+function isInventoryItemEquippable(it) {
+  const type = String(it?.type || '');
+  const slot = String(it?.slot || '').toLowerCase();
+  return type === 'equip' || type === 'ammo' || type === 'wand' || slot === 'ranged';
+}
+
+/**
+ * Resolve default inventory enter-action for the selected row.
+ * Potions intentionally prioritize `drink` over `apply`.
+ * @param {any} it
+ * @returns {"none"|"apply"|"drink"|"equip"|"use"|"set-spell"}
+ */
+export function getInventoryDefaultAction(it) {
+  if (!it) return 'none';
+  if (it.type === 'potion') return 'drink';
+  if (it.canApply) return 'apply';
+  if (isInventoryItemEquippable(it)) return 'equip';
+  if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food') return 'use';
+  if (it.type === 'spell') return 'set-spell';
+  return 'none';
+}
+
 export function initOverlays() {
   const root = ensureRoot();
   const inv = ensurePanel('inventory');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const usePanel = ensurePanel('use');
+  const throwPanel = ensurePanel('throw');
   const spells = ensurePanel('spells');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
@@ -61,6 +87,7 @@ export function initOverlays() {
       hide(log);
       hide(pick);
       hide(usePanel);
+      hide(throwPanel);
       hide(spells);
       hide(shop);
       hide(chest);
@@ -123,11 +150,25 @@ export function initOverlays() {
     renderUseChooser(usePanel, items);
   });
 
+  // Throw-item chooser
+  window.addEventListener('ui:openThrowChooser', () => {
+    show(throwPanel);
+    window.dispatchEvent(new CustomEvent('ui:requestThrowableItemsData'));
+  });
+  window.addEventListener('ui:throwableItemsData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const items = (e?.detail?.items) || [];
+    renderThrowChooser(throwPanel, items);
+  });
+
   // Apply-tool chooser (two-step: pick tool, then pick target)
   const applyPanel = ensurePanel('apply');
   let _applyToolId = 0;
   window.addEventListener('ui:openApplyChooser', () => {
     _applyToolId = 0;
+    // Keep modal overlays exclusive; prevents touch click-through into inventory rows.
+    hide(inv);
     show(applyPanel);
     window.dispatchEvent(new CustomEvent('ui:requestApplyToolsData'));
   });
@@ -137,6 +178,8 @@ export function initOverlays() {
     const toolId = Number(e?.detail?.toolId || 0);
     if (!Number.isInteger(toolId) || toolId <= 0) return;
     _applyToolId = toolId;
+    // Opening apply from inventory should not leave inventory interactive behind it.
+    hide(inv);
     show(applyPanel);
     window.dispatchEvent(new CustomEvent('ui:requestApplyTargetsData', { detail: { toolId } }));
   });
@@ -264,20 +307,21 @@ export function initOverlays() {
     const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
     let duration = mode === 'learn' ? 2600 : 900;
     if (id === 'meteor' && mode === 'cast') duration = 1800;
-    if (id === 'lightning' || id === 'blastwave') {
+    if (id === 'lightning') {
       spellGestureHint.glyph.textContent = 'Z';
-      if (id === 'blastwave') {
-        // Warmer tint for blast wave
-        spellGestureHint.glyph.style.textShadow = '0 0 16px rgba(255,170,80,0.55), 0 0 30px rgba(255,140,50,0.35)';
-        spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,170,80,0.45))';
-        spellGestureHint.caption.textContent = mode === 'learn' ? 'Draw a Z to unleash Blast Wave!' : '';
-      } else {
-        spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
-        spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
-        spellGestureHint.caption.textContent = mode === 'learn'
-          ? 'Draw a Z to unleash Lightning!'
-          : '';
-      }
+      spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+      spellGestureHint.caption.textContent = mode === 'learn'
+        ? 'Draw a Z to unleash Lightning!'
+        : '';
+      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
+    } else if (id === 'blastwave') {
+      spellGestureHint.glyph.textContent = '◯';
+      spellGestureHint.glyph.style.textShadow = '0 0 16px rgba(255,170,80,0.55), 0 0 30px rgba(255,140,50,0.35)';
+      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,170,80,0.45))';
+      spellGestureHint.caption.textContent = mode === 'learn'
+        ? 'Draw a circle to unleash Blast Wave!'
+        : '';
       spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
     } else {
       spellGestureHint.glyph.textContent = '/';
@@ -385,7 +429,10 @@ function drawGestureDebug(layer, points, active, recognized) {
   const canvas = layer.canvas;
   // Clear
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!Array.isArray(points) || points.length === 0) return;
+  const hasPoints = Array.isArray(points) && points.length > 0;
+  const show = !!(active || recognized || hasPoints);
+  canvas.style.display = show ? 'block' : 'none';
+  if (!show || !hasPoints) return;
 
   // Draw path
   ctx.save();
@@ -409,9 +456,13 @@ function drawGestureDebug(layer, points, active, recognized) {
   // Recognition bounds
   if (recognized && recognized.bounds) {
     const b = recognized.bounds;
+    const bx = Number.isFinite(Number(b.x)) ? Number(b.x) : Number(b.minX || 0);
+    const by = Number.isFinite(Number(b.y)) ? Number(b.y) : Number(b.minY || 0);
+    const bw = Number.isFinite(Number(b.w)) ? Number(b.w) : Number(b.width || 0);
+    const bh = Number.isFinite(Number(b.h)) ? Number(b.h) : Number(b.height || 0);
     ctx.strokeStyle = 'rgba(120,200,255,0.7)';
     ctx.lineWidth = 2;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.strokeRect(bx, by, bw, bh);
   }
   ctx.restore();
 }
@@ -834,7 +885,10 @@ function renderInventory(panel, items) {
     slot.style.opacity = '0.7'; slot.textContent = it.slot ? `(${it.slot})` : '';
 
     const qty = document.createElement('span');
-    qty.style.marginLeft = 'auto'; qty.style.opacity = '0.8'; qty.textContent = `x${it.count ?? 1}`;
+    qty.style.marginLeft = 'auto';
+    qty.style.opacity = '0.8';
+    const count = Math.max(0, Number(it.count ?? 1) | 0);
+    qty.textContent = it.type === 'wand' ? `${count} ch` : `x${count}`;
 
     const unpaidTag = document.createElement('span');
     if (it.unpaid) {
@@ -885,12 +939,12 @@ function renderInventory(panel, items) {
 
   /** @param {any} it */
   function enterActionLabel(it) {
-    if (!it) return 'None';
-    if (it.canApply) return 'Apply';
-    if (it.type === 'potion') return 'Drink';
-    if (it.type === 'equip' || it.type === 'ammo') return 'Equip';
-    if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food') return 'Use';
-    if (it.type === 'spell') return 'Set Spell';
+    const action = getInventoryDefaultAction(it);
+    if (action === 'apply') return 'Apply';
+    if (action === 'drink') return 'Drink';
+    if (action === 'equip') return 'Equip';
+    if (action === 'use') return 'Use';
+    if (action === 'set-spell') return 'Set Spell';
     return 'None';
   }
 
@@ -899,7 +953,7 @@ function renderInventory(panel, items) {
     const applyHint = it?.canApply
       ? ` · A=Apply${Number(it?.applyTargetCount || 0) > 0 ? '' : ' (no targets)'}`
       : '';
-    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · ,=Drop · E=Equip · D=Drink · U=Use${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
+    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · ,=Drop · E=Equip · D=Drink · U=Use · T=Throw${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
     const text = String(it?.description || '').trim();
     details.textContent = text || '(no description)';
   }
@@ -918,15 +972,16 @@ function renderInventory(panel, items) {
 
   function defaultAction() {
     const it = items[sel]; if (!it) return;
-    if (it.canApply) {
+    const action = getInventoryDefaultAction(it);
+    if (action === 'apply') {
       triggerApplyForTool(it);
-    } else if (it.type === 'potion') {
+    } else if (action === 'drink') {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
-    } else if (it.type === 'equip' || it.type === 'ammo') {
+    } else if (action === 'equip') {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-    } else if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food') {
+    } else if (action === 'use') {
       window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
-    } else if (it.type === 'spell') {
+    } else if (action === 'set-spell') {
       const spellId = String(it.id || '').replace(/^spell:/, '');
       if (spellId) window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } }));
     }
@@ -943,9 +998,10 @@ function renderInventory(panel, items) {
     else if (k === 'Enter' || e.code === 'NumpadEnter') { defaultAction(); e.preventDefault(); }
     else if (k === 'a' || k === 'A') { const it = items[sel]; if (it?.canApply) { triggerApplyForTool(it); e.preventDefault(); } }
     else if (k === ',' || e.code === 'Comma') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } })); e.preventDefault(); } }
-    else if (k === 'e' || k === 'E') { const it = items[sel]; if (it?.type === 'equip' || it?.type === 'ammo') { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 'e' || k === 'E') { const it = items[sel]; if (isInventoryItemEquippable(it)) { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 't' || k === 'T') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } })); hide(panel); e.preventDefault(); } }
     else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
   }
 
@@ -1266,7 +1322,7 @@ function renderUseChooser(panel, items) {
 
   const hint = document.createElement('div');
   hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
-  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Use \u00b7 Esc=Close';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Use \u00b7 T=Throw \u00b7 Esc=Close';
   el.appendChild(hint);
 
   function setSel(i) {
@@ -1296,6 +1352,113 @@ function renderUseChooser(panel, items) {
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
     else if (k === 'Enter') { useSelected(); e.preventDefault(); }
+    else if (k === 't' || k === 'T') {
+      const it = items[sel];
+      if (it && Number.isInteger(it.id) && it.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
+        hide(panel);
+        e.preventDefault();
+      }
+    }
+  }
+
+  window.addEventListener('keydown', onKey);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', onKey);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
+function renderThrowChooser(panel, items) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+  const title = document.createElement('div');
+  title.textContent = 'Throw which item?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(nothing to throw)';
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  let sel = 0;
+
+  const rows = items.map((it, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      width: '100%', padding: '6px 8px',
+      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer'
+    });
+
+    const name = document.createElement('span');
+    const rn = String(it.rarityName || 'common').toLowerCase();
+    const rs = rarityStyle(rn);
+    name.textContent = bracketize(sanitize(it.name || it.description || it.type));
+    Object.assign(name.style, rs);
+
+    const typeLabel = document.createElement('span');
+    typeLabel.style.opacity = '0.6';
+    typeLabel.style.fontSize = '12px';
+    typeLabel.textContent = it.type || '';
+
+    const qty = document.createElement('span');
+    qty.style.marginLeft = 'auto'; qty.style.opacity = '0.8';
+    qty.textContent = it.count > 1 ? `x${it.count}` : '';
+
+    row.appendChild(name);
+    row.appendChild(typeLabel);
+    row.appendChild(qty);
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => throwSelected());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Select item \u00b7 then tap target \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(items.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+
+  function throwSelected() {
+    const it = items[sel]; if (!it) return;
+    window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
+    hide(panel);
+  }
+
+  setSel(0);
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Enter') { throwSelected(); e.preventDefault(); }
   }
 
   window.addEventListener('keydown', onKey);
@@ -1344,7 +1507,11 @@ function renderApplyToolChooser(panel, tools, onSelect) {
     name.textContent = bracketize(sanitize(it.name || 'tool'));
     row.appendChild(name);
     row.addEventListener('mouseenter', () => setSel(idx));
-    row.addEventListener('click', () => pickTool());
+    row.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      pickTool();
+    });
     list.appendChild(row);
     return row;
   });
@@ -1429,7 +1596,11 @@ function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
     }
 
     row.addEventListener('mouseenter', () => setSel(idx));
-    row.addEventListener('click', () => pickTarget());
+    row.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      pickTarget();
+    });
     list.appendChild(row);
     return row;
   });

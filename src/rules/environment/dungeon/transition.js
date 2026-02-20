@@ -181,7 +181,10 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });
   invalidateTileQueryCache(world);
-  world.tick(1);
+  // Transition can run in isolated tests/worlds with no scheduler installed.
+  if (typeof world.scheduler === 'function') {
+    world.tick(1);
+  }
 }
 
 /**

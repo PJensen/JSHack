@@ -7,7 +7,6 @@ import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
-import "../src/rules/scripts/consumables.js";
 
 Deno.test("use runtime resolves wand payload object and consumes one charge", () => {
   const world = new World({ seed: 3301 });
@@ -25,7 +24,7 @@ Deno.test("use runtime resolves wand payload object and consumes one charge", ()
   assertEquals(results.length, 1);
   assertEquals(results[0].verb, "use");
   assertEquals(results[0].ok, true);
-  assertEquals(results[0].metrics.path, "matcher");
+  assertEquals(results[0].metrics.path, "itemHooks");
   assertEquals(results[0].metrics.payloadMatched, true);
 
   const info = world.get(wand, ItemInfo);
@@ -54,7 +53,7 @@ Deno.test("use runtime resolves corpse consumable payload object and can cancel"
 
   assertEquals(results.length, 1);
   assertEquals(results[0].verb, "use");
-  assertEquals(results[0].metrics.path, "effect");
+  assertEquals(results[0].metrics.path, "matcher");
   assertEquals(results[0].metrics.payloadMatched, true);
-  assertEquals(results[0].canceled, true, "cursed meal should cancel through payload script");
+  assertEquals(results[0].canceled, true, "cursed meal should cancel through payload hooks");
 });

@@ -3,11 +3,18 @@ import { createRng } from '../src/lib/ecs-js/rng.js';
 import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { populateChunk, materializeSpawn } from '../src/rules/environment/dungeon/populate.js';
-import { pickMonster, pickItem } from '../src/rules/environment/dungeon/tables.js';
+import { pickMonster, pickItem, pickSpawner } from '../src/rules/environment/dungeon/tables.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
+import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { MonsterSpawner } from '../src/rules/components/MonsterSpawner.js';
+import { Player } from '../src/rules/components/Player.js';
+import { buildWorldView } from '../src/bridge/schema/worldView.js';
+import { buildPalette } from '../src/display/palette/index.js';
+import { clearAll as clearTileMap } from '../src/rules/environment/dungeon/tileMap.js';
+import { clearExplored } from '../src/rules/environment/dungeon/exploredMap.js';
 
 Deno.test("pickMonster returns valid params", () => {
   const rng = createRng(42);
@@ -28,6 +35,26 @@ Deno.test("pickMonster scales HP with depth", () => {
   const m20 = pickMonster(rng2, 20);
   // Same monster template but different HP due to depth
   assert(m20.maxHp > m1.maxHp, `deeper monsters have more HP: ${m1.maxHp} vs ${m20.maxHp}`);
+});
+
+Deno.test("pickSpawner uses rat/spider pool on shallow depth", () => {
+  const rngFirst = {
+    next: () => 0,
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+  const first = pickSpawner(rngFirst, 1);
+  assert(first.monsterType.identity === 'rat', `expected rat, got ${first.monsterType.identity}`);
+
+  const rngSecond = {
+    next: () => 0,
+    int: (min, max) => (typeof max === 'number' ? max : min),
+    choice: (arr) => arr[arr.length - 1],
+    float: (min, max) => (typeof max === 'number' ? max : min),
+  };
+  const second = pickSpawner(rngSecond, 1);
+  assert(second.monsterType.identity === 'spider', `expected spider, got ${second.monsterType.identity}`);
 });
 
 Deno.test("pickItem returns valid kinds", () => {
@@ -66,6 +93,107 @@ Deno.test("populateChunk scales monster count with depth", () => {
   const monsters5 = spawns5.filter(s => s.kind === 'monster').length;
   // Higher difficulty should yield more monsters (or equal due to rng variance)
   assert(monsters5 >= monsters1, `depth 5 (${monsters5}) >= depth 1 (${monsters1})`);
+});
+
+Deno.test("populateChunk can generate a shallow spawner", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 2; y < 12; y++) {
+    for (let x = 2; x < 12; x++) {
+      tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+    }
+  }
+
+  const chunk = {
+    chunkX: 1,
+    chunkY: 1,
+    tiles,
+    rooms: [{ x: CHUNK_SIZE + 2, y: CHUNK_SIZE + 2, w: 10, h: 10 }],
+    doors: [],
+  };
+  const floorPlan = { depth: 1, difficultyMult: 1.0 };
+  const rng = {
+    next: () => 0, // Always pass chance gates.
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const spawners = spawns.filter((s) => s.kind === 'spawner');
+  assert(spawners.length > 0, 'expected at least one spawner');
+  assert(spawners[0].params?.monsterType?.identity === 'rat', 'expected shallow spawner monster to be rat');
+});
+
+Deno.test("populateChunk shallow spawners can be both rat and spider", () => {
+  const seen = new Set();
+  for (let seed = 1; seed <= 200; seed++) {
+    const chunk = generateChunk(seed, 1, 0, 0);
+    const rng = createRng(seed * 1337);
+    const spawns = populateChunk(chunk, { depth: 1, difficultyMult: 1.0 }, rng);
+    for (const sp of spawns) {
+      if (sp.kind !== 'spawner') continue;
+      const identity = sp.params?.monsterType?.identity;
+      if (identity === 'rat' || identity === 'spider') seen.add(identity);
+    }
+    if (seen.size === 2) break;
+  }
+
+  assert(seen.has('rat'), 'expected to observe a rat spawner');
+  assert(seen.has('spider'), 'expected to observe a spider spawner');
+});
+
+Deno.test("spawner wiring: kind -> identity -> worldView -> palette", () => {
+  // Keep singleton maps from prior tests from affecting visibility assertions.
+  clearTileMap();
+  clearExplored();
+
+  const world = new World({ seed: 42 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 0, y: 0 });
+
+  const spawnerId = materializeSpawn(world, {
+    x: 1,
+    y: 0,
+    kind: 'spawner',
+    params: {
+      monsterType: {
+        name: 'Rat',
+        identity: 'rat',
+        maxHp: 5,
+        faction: 'enemy',
+        attackDerived: 0,
+        defenseDerived: 0,
+        naturalDamageDice: '1d3',
+        sizeClass: 'S',
+        massKg: 2,
+        resistances: { kinetic: { DR: 0 } },
+        speed: 1,
+      },
+      packSize: 3,
+      depth: 1,
+    },
+  });
+
+  assert(spawnerId != null, 'spawner entity should be created');
+  const ni = world.get(spawnerId, NamedIdentity);
+  assert(ni?.identity === 'spawner', `expected identity 'spawner', got ${ni?.identity}`);
+
+  const spawner = world.get(spawnerId, MonsterSpawner);
+  assert(spawner && spawner.spawnParams?.identity === 'rat', 'spawner should keep monster spawn identity');
+
+  const view = buildWorldView(world);
+  const viewRec = view.entities.find((e) => e.id === spawnerId);
+  assert(viewRec?.kind === 'spawner', `expected worldView kind 'spawner', got ${viewRec?.kind}`);
+
+  const palette = buildPalette();
+  const spawnerLook = palette.spawner;
+  assert(
+    spawnerLook && typeof spawnerLook.glyph === 'string' && spawnerLook.glyph.length > 0,
+    'palette should include a spawner glyph'
+  );
 });
 
 Deno.test("materializeSpawn creates monster entity", () => {

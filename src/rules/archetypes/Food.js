@@ -18,7 +18,6 @@ import {
 export const Ration = defineArchetype(
   "Ration",
   [Consumable, {
-    effectKey: 'consumable:eat',
     effectParams: { nutrition: RATION_NUTRITION, special: null },
     remainingUses: 1,
     potency: 0,
@@ -38,7 +37,6 @@ export const Ration = defineArchetype(
 export const IronRation = defineArchetype(
   "IronRation",
   [Consumable, {
-    effectKey: 'consumable:eat',
     effectParams: { nutrition: IRON_RATION_NUTRITION, special: null },
     remainingUses: 1,
     potency: 0,
@@ -57,7 +55,6 @@ export const IronRation = defineArchetype(
 export const WildBerries = defineArchetype(
   "WildBerries",
   [Consumable, {
-    effectKey: 'consumable:eat',
     effectParams: { nutrition: 120, special: null },
     remainingUses: 1,
     potency: 0,
@@ -77,7 +74,6 @@ export const WildBerries = defineArchetype(
 export const WildHerbs = defineArchetype(
   "WildHerbs",
   [Consumable, {
-    effectKey: 'consumable:eat',
     effectParams: { nutrition: 70, special: null },
     remainingUses: 1,
     potency: 0,
@@ -112,7 +108,6 @@ export function createCorpse(world, monsterDef, pos) {
   const id = world.create();
 
   world.add(id, Consumable, {
-    effectKey: 'consumable:eat',
     effectParams: { nutrition, corpseIdentity },
     remainingUses: 1,
     potency: 0,

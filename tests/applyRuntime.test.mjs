@@ -5,12 +5,10 @@ import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { resetIdentification, isIdentified } from "../src/rules/data/identification.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
-import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
-import { Potion } from "../src/rules/components/Potion.js";
 import { executeInteraction } from "../src/rules/interaction/runtime/actionRuntime.js";
 import { applyPipeline } from "../src/rules/interaction/verbs/applyPipeline.js";
 
-Deno.test("apply runtime uses payload hook for touchstone identify", () => {
+Deno.test("apply runtime uses item-def hook for touchstone identify", () => {
   resetIdentification();
   const world = new World({ seed: 2201 });
   const actor = world.create();
@@ -42,34 +40,14 @@ Deno.test("apply runtime uses payload hook for touchstone identify", () => {
   assert(world.isAlive(toolId), "touchstone should not be consumed");
 });
 
-Deno.test("apply runtime payload hook coats weapon and consumes poison potion", () => {
+Deno.test("apply runtime item-def hook coats weapon and consumes poison potion", () => {
   const world = new World({ seed: 2202 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
   const inv = world.get(actor, Inventory);
 
-  const potion = world.create();
-  world.add(potion, NamedIdentity, { name: "Potion of Poison", identity: "potion_poison" });
-  world.add(potion, ItemInfo, {
-    type: "potion",
-    slot: "",
-    weight: 1,
-    value: 10,
-    description: "",
-    count: 1,
-    bonuses: {},
-    rarity: 1,
-    rarityName: "common",
-    affixes: [],
-  });
-  world.add(potion, Potion, {
-    name: "Potion of Poison",
-    route: "oral",
-    doses: 1,
-    channels: [],
-    effects: [],
-    toxicity: null,
-  });
+  const potion = createItemById(world, "potion_poison");
+  assert(potion != null, "poison potion should be creatable from item catalog");
 
   const dagger = buildCatalogItem(world, "dagger_quick");
   inv.items.push(potion, dagger);

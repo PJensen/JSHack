@@ -8,12 +8,16 @@ import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
 import { Position } from '../components/Position.js';
-import { Status } from '../components/Status.js';
+import { NamedIdentity } from '../components/NamedIdentity.js';
 import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
-import { ActiveEffects } from '../components/ActiveEffects.js';
 import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
+import { getAmmoHooks } from '../data/ammo.js';
+import { ProjectileImpactCallbackContext } from '../data/callbacks/projectile.js';
+import { runCallbackList } from '../interaction/dispatch.js';
+import { areFactionsHostile } from '../utils/factionHostility.js';
 
 /**
  * @param {any} status
@@ -54,9 +58,9 @@ export function rangedAttackSystem(world) {
     const defVit = world.get(defender, Vitality);
     if (!atkVit || !defVit) { world.remove(attacker, RangedAttackIntent); continue; }
 
-    // Require a bow-type weapon
+    // Require a bow in the ranged slot
     const eq = world.get(attacker, Equipment);
-    const weaponId = eq?.weapon || 0;
+    const weaponId = eq?.ranged || 0;
     const weaponInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
     if (!weaponInfo || weaponInfo.subtype !== 'bow') {
       world.remove(attacker, RangedAttackIntent);
@@ -84,17 +88,36 @@ export function rangedAttackSystem(world) {
       continue;
     }
 
-    // LOS check
+    const ammoIdentity = String(
+      world.get(ammoId, NamedIdentity)?.identity
+      || ammoInfo.subtype
+      || 'ammo_arrows',
+    ).toLowerCase();
+    const ammoStyle = ammoInfo.subtype || (ammoIdentity.includes('fire') ? 'fire' : 'plain');
+
     const ax = apos.x | 0, ay = apos.y | 0;
     const tx = dpos.x | 0, ty = dpos.y | 0;
+    const dist = Math.max(Math.abs(tx - ax), Math.abs(ty - ay));
+
+    // LOS check
     if (!hasLOS(ax, ay, tx, ty, isBlocked)) {
+      runAmmoCallbacks(world, ammoIdentity, 'onProjectileWallImpact', {
+        phase: 'projectile-wall-impact',
+        attacker,
+        defender,
+        ammoId,
+        ammoIdentity,
+        ammoInfo,
+        style: ammoStyle,
+        distance: dist,
+        damage: 0,
+      });
       world.emit?.('ranged:blocked', { attacker, target: defender });
       world.remove(attacker, RangedAttackIntent);
       continue;
     }
 
     // Range check (Chebyshev distance)
-    const dist = Math.max(Math.abs(tx - ax), Math.abs(ty - ay));
     const maxRange = weaponInfo.range || 8;
     if (dist > maxRange) {
       world.emit?.('ranged:out-of-range', { attacker, target: defender, distance: dist, range: maxRange });
@@ -105,17 +128,16 @@ export function rangedAttackSystem(world) {
     // Faction check
     const af = world.get(attacker, Faction)?.key || '';
     const df = world.get(defender, Faction)?.key || '';
-    if (af && df && af === df) {
+    if (!areFactionsHostile(af, df)) {
       world.remove(attacker, RangedAttackIntent);
       continue;
     }
 
     // d20 roll
-    const attackBonus = 1 + (eq?.attackDerived || 0);
-    const defEq = world.get(defender, Equipment);
-    const defStatus = world.get(defender, Status);
-    const defStoneskinBonus = statusStrength(defStatus, 'stoneskin');
-    const armorClass = 10 + (defEq?.defenseDerived || 0) + defStoneskinBonus;
+    const atkSnapshot = resolveCombatSnapshot(world, attacker, { mode: 'ranged' });
+    const defSnapshot = resolveCombatSnapshot(world, defender, { mode: 'ranged' });
+    const attackBonus = atkSnapshot.attackBonus;
+    const armorClass = defSnapshot.armorClass;
     const rangePenalty = Math.floor(dist / 3);
 
     const seed = combatSeed(world.seed, world.step, attacker, defender);
@@ -125,10 +147,23 @@ export function rangedAttackSystem(world) {
     const isCrit = d20 === 20;
     const isNat1 = d20 === 1;
 
-    // Ammo style (for VFX and bonus effects)
-    const ammoStyle = ammoInfo.subtype || 'plain';
-
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
+      runAmmoCallbacks(world, ammoIdentity, 'onProjectileMiss', {
+        phase: 'projectile-miss',
+        attacker,
+        defender,
+        ammoId,
+        ammoIdentity,
+        ammoInfo,
+        style: ammoStyle,
+        distance: dist,
+        damage: 0,
+        d20,
+        totalToHit,
+        armorClass,
+        critical: isCrit,
+        rng: r,
+      });
       world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
       // Consume ammo even on miss
       consumeAmmo(world, attacker, ammoId, ammoInfo);
@@ -140,13 +175,30 @@ export function rangedAttackSystem(world) {
     // Roll damage
     const baseDice = weaponInfo.damageDice || '1d6';
     const damageRoll = rollDice(baseDice, r);
-    const flatBonus = Math.max(0, Math.floor((eq?.attackDerived || 0) / 2));
+    const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(1, damageRoll + flatBonus);
 
-    // Ammo bonus damage (fire arrows: +1d4)
-    if (ammoStyle === 'fire') dmg += rollDice('1d4', r);
-
     if (isCrit) dmg = Math.max(1, dmg * 2);
+
+    const actorImpactCtx = runAmmoCallbacks(world, ammoIdentity, 'onProjectileActorImpact', {
+      phase: 'projectile-actor-impact',
+      attacker,
+      defender,
+      ammoId,
+      ammoIdentity,
+      ammoInfo,
+      style: ammoStyle,
+      distance: dist,
+      damage: dmg,
+      d20,
+      totalToHit,
+      armorClass,
+      critical: isCrit,
+      rng: r,
+    });
+    if (actorImpactCtx) {
+      dmg = Math.max(0, actorImpactCtx.damage);
+    }
 
     // Apply damage through canonical pipeline
     const result = dealDamage(world, {
@@ -159,22 +211,9 @@ export function rangedAttackSystem(world) {
       bypassResist: true,
     });
 
-    // Fire arrows apply burning (3 turns, 2 dmg/turn)
-    if (ammoStyle === 'fire' && result.applied && !result.killed) {
-      const ae = world.get(defender, ActiveEffects);
-      const effect = { key: 'burn', turnsLeft: 3, potency: 2, stacks: 1 };
-      if (ae && Array.isArray(ae.effects)) {
-        const existing = ae.effects.find(e => e.key === 'burn');
-        if (existing) {
-          existing.stacks = (existing.stacks || 1) + 1;
-          existing.turnsLeft = Math.max(existing.turnsLeft, 3);
-        } else {
-          ae.effects.push(effect);
-        }
-      } else {
-        try { world.add(defender, ActiveEffects, { effects: [effect] }); } catch {}
-      }
-      world.emit?.('proc:burning', { actor: attacker, target: defender });
+    if (actorImpactCtx) {
+      actorImpactCtx.resolveDamageResult(result);
+      actorImpactCtx.flushResolved();
     }
 
     // Consume ammo
@@ -183,6 +222,21 @@ export function rangedAttackSystem(world) {
     world.emit?.('ranged:shot', { attacker, target: defender, hit: true, damage: dmg, style: ammoStyle });
     world.remove(attacker, RangedAttackIntent);
   }
+}
+
+/**
+ * @param {any} world
+ * @param {string} ammoIdentity
+ * @param {string} hookName
+ * @param {any} frame
+ * @returns {ProjectileImpactCallbackContext|null}
+ */
+function runAmmoCallbacks(world, ammoIdentity, hookName, frame) {
+  const hooks = getAmmoHooks(ammoIdentity, hookName);
+  if (!Array.isArray(hooks) || hooks.length === 0) return null;
+  const ctx = new ProjectileImpactCallbackContext(world, frame);
+  runCallbackList(hooks, ctx);
+  return ctx;
 }
 
 /** Decrement ammo count; destroy entity if last arrow. */

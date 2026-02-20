@@ -90,7 +90,7 @@ export const basePalette = {
   snake:    { glyph: "S", fg: "#55aa44", glow: "#338822" },
 
   // Spawners (monster nests)
-  spawner: { glyph: "%", fg: "#8b4513", glow: "#663311" },
+  spawner: { glyph: "◍", fg: "#8b4513", glow: "#663311" },
 
   // Food & Rations
   food_ration:      { glyph: "%", fg: "#c4a46c", glow: "#a08050" },

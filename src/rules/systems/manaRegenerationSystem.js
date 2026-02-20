@@ -1,7 +1,7 @@
 import { Mana } from '../components/Mana.js';
 import { Equipment } from '../components/Equipment.js';
-import { Status } from '../components/Status.js';
 import { HUNGER_MANA_MULT } from '../data/food.js';
+import { statusStrength } from '../utils/statusFacade.js';
 
 
 /**
@@ -25,11 +25,13 @@ export function manaRegenerationSystem(world) {
             const eq = world.get(entity, Equipment);
             const bonus = Number(eq?.manaRegenDerived ?? 0);
             // Hunger penalty: famished halves regen, starving/wasting stops it
-            const _stat = world.get(entity, Status);
             let _hungerMult = 1.0;
-            if (_stat && Array.isArray(_stat.statuses)) {
-                const _hs = _stat.statuses.find(s => s.type in HUNGER_MANA_MULT);
-                if (_hs) _hungerMult = HUNGER_MANA_MULT[_hs.type];
+            const _hungerTypes = Object.keys(HUNGER_MANA_MULT);
+            for (let i = 0; i < _hungerTypes.length; i++) {
+                const _type = _hungerTypes[i];
+                if (statusStrength(world, entity, _type) > 0) {
+                    _hungerMult = Math.min(_hungerMult, Number(HUNGER_MANA_MULT[_type] || 1));
+                }
             }
             const rate = (baseRate + bonus) * _hungerMult;
             manaComp.mana = Math.min(manaComp.maxMana, manaComp.mana + rate);

@@ -2,7 +2,6 @@ import { DrinkIntent } from "../components/Intents/DrinkIntent.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { drinkPipeline } from "../interaction/verbs/drinkPipeline.js";
-import { getDrinkPayloadByIdentity } from "../content/items/drinkPayloads.js";
 import { getItemHooksByIdentity } from "../content/items/itemHooks.js";
 
 /**
@@ -15,11 +14,10 @@ export function drinkSystem(world) {
     const targetId = intent.targetId | 0;
     const identity = String(world.get(itemId, NamedIdentity)?.identity || "");
     const directHooks = getItemHooksByIdentity(identity);
-    const legacyPayload = getDrinkPayloadByIdentity(identity);
     const payload = {
-      beforeDrink: directHooks.beforeDrink || legacyPayload?.beforeDrink,
-      onDrink: directHooks.onDrink || legacyPayload?.onDrink,
-      afterDrink: directHooks.afterDrink || legacyPayload?.afterDrink,
+      beforeDrink: directHooks.beforeDrink,
+      onDrink: directHooks.onDrink,
+      afterDrink: directHooks.afterDrink,
     };
     let result = null;
 

@@ -1,8 +1,8 @@
-// rules/data/applyDefs.js
-// Function-first item-apply behavior definitions.
+// rules/data/quarentine/applyDefs.js
+// Quarantined legacy apply-def adapter.
 //
-// @deprecated Legacy migration shim. Use payload hooks in
-// src/rules/content/items/applyPayloads.js instead.
+// @deprecated Legacy migration shim. Do not import in runtime/UI paths.
+// Use item-def hooks + resolver shell in src/rules/content/items/applyPayloads.js.
 
 import { Inventory } from "../components/Inventory.js";
 import { getGem } from "./gems.js";

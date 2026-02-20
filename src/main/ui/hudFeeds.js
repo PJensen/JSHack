@@ -23,7 +23,7 @@ export function createHudFeeds(world, deps) {
   const { getPlayerMana } = deps;
 
   let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
-  let lastCombatHud = { weaponId: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
+  let lastCombatHud = { weaponId: -1, rangedId: -1, rangedCount: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
   let lastDepth = -1;
   let lastPetExists = false;
   let lastPetState = "";
@@ -59,11 +59,16 @@ export function createHudFeeds(world, deps) {
     const st = /** @type any */ (world.get(pe.id, ActiveEffects));
     const semanticStatus = /** @type any */ (world.get(pe.id, Status));
     const wid = Number(eq?.weapon || 0);
+    const rangedId = Number(eq?.ranged || 0);
     const atk = Number(eq?.attackDerived || 0);
     const def = Number(eq?.defenseDerived || 0);
     const wInfo = wid ? world.get(wid, ItemInfo) : null;
+    const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
+    const rangedCount = Number(rangedInfo?.count || 0);
     const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : "";
+    const rangedName = rangedId ? (world.get(rangedId, NamedIdentity)?.name || rangedInfo?.description || rangedInfo?.type) : "";
     const dmgDice = wInfo?.damageDice || "";
+    const rangedType = String(rangedInfo?.type || "");
     /** @type {Map<string, { key: string, turns: number, stacks: number }>} */
     const statusMap = new Map();
     if (Array.isArray(st?.effects)) {
@@ -114,6 +119,7 @@ export function createHudFeeds(world, deps) {
       pushAffixes(Number(eq.armor || 0));
       pushAffixes(Number(eq.ring1 || 0));
       pushAffixes(Number(eq.ring2 || 0));
+      pushAffixes(Number(eq.ranged || 0));
     }
     const affixNames = affixIds
       .filter((id) => !/^thorns/i.test(String(id)))
@@ -130,12 +136,13 @@ export function createHudFeeds(world, deps) {
       }
     }
 
-    if (lastCombatHud.weaponId !== wid || lastCombatHud.atk !== atk || lastCombatHud.def !== def ||
+    if (lastCombatHud.weaponId !== wid || lastCombatHud.rangedId !== rangedId || lastCombatHud.rangedCount !== rangedCount || lastCombatHud.atk !== atk || lastCombatHud.def !== def ||
       lastCombatHud.statusSig !== statusSig || lastCombatHud.affixSig !== affixSig || lastCombatHud.ammo !== ammo) {
-      lastCombatHud = { weaponId: wid, atk, def, statusSig, affixSig, ammo };
+      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, statusSig, affixSig, ammo };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateCombatHUD", { detail: {
           weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk } : null,
+          ranged: rangedId ? { id: rangedId, name: rangedName || null, isWand: rangedType === 'wand', count: rangedCount } : null,
           defense: def,
           statuses,
           affixes: affixNames,

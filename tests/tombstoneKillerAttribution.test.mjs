@@ -146,3 +146,39 @@ Deno.test("tombstone: mutual kill — player kills demon, hellfire kills player,
 
   assert(found, "expected at least one seed where both player and demon die in same combat chain");
 });
+
+Deno.test("tombstone: deterministic id/timestamp for same seed + step + outcome", () => {
+  /**
+   * @returns {any}
+   */
+  function runRecord() {
+    const world = new World({ seed: 7001 });
+    world.step = 77;
+    const repo = makeRepo();
+    installTombstoneDeathListener(world, repo);
+
+    const ds = world.create();
+    world.add(ds, DungeonState, { worldSeed: 7001, currentDepth: 2, floorEntityIds: [] });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Vitality, { maxHp: 20, hp: 1 });
+    world.add(player, Position, { x: 2, y: 3 });
+    world.add(player, NamedIdentity, { name: "Hero", identity: "hero" });
+
+    const killer = world.create();
+    world.add(killer, Vitality, { maxHp: 30, hp: 30 });
+    world.add(killer, NamedIdentity, { name: "Orc Warrior", identity: "orc" });
+
+    dealDamage(world, { target: player, amount: 10, source: killer, type: "physical", cause: "melee" });
+    assertEquals(repo.records.length, 1);
+    return repo.records[0];
+  }
+
+  const a = runRecord();
+  const b = runRecord();
+  assertEquals(a.id, b.id, "id should be deterministic");
+  assertEquals(a.timestamp, b.timestamp, "timestamp should be deterministic");
+  assertEquals(a.turn, 77);
+  assert(a.timestamp > 0, "timestamp should remain positive and sortable");
+});

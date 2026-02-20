@@ -1,4 +1,4 @@
-import { buildApplyPayloadState, findApplyPayload } from "../../content/items/applyPayloads.js";
+import { resolveApplyPayload } from "../../content/items/applyPayloads.js";
 
 /**
  * @param {any} value
@@ -72,13 +72,11 @@ export function applyPipeline(ctx) {
     return { metrics };
   }
 
-  const state = buildApplyPayloadState(ctx.query, {
+  const { state, payloadDef } = resolveApplyPayload(ctx.query, {
     actor,
     toolId,
     targetId,
   });
-
-  const payloadDef = findApplyPayload(state);
   if (payloadDef) {
     metrics.payloadMatched = true;
     metrics.path = "payload";

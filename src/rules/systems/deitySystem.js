@@ -18,6 +18,7 @@ import { Vitality } from '../components/Vitality.js';
 import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { hasStatus } from '../utils/statusFacade.js';
 
 /** @type {Map<string, import('../../lib/deity-js/deity.js').Deity>} */
 const _deities = new Map();
@@ -317,28 +318,24 @@ function assessPlayerNeeds(world, playerId) {
     }
   }
 
-  // Check status effects
-  if (world.has(playerId, Status)) {
-    const status = world.get(playerId, Status);
-    let maxUrgency = 0;
-    let needsBlessing = false;
+  // Check status effects (active-effects first).
+  let maxUrgency = 0;
+  let needsBlessing = false;
+  if (hasStatus(world, playerId, 'cursed')) {
+    needsBlessing = true;
+    maxUrgency = Math.max(maxUrgency, 0.8);
+  }
+  if (hasStatus(world, playerId, 'disease') || hasStatus(world, playerId, 'poisoned')) {
+    maxUrgency = Math.max(maxUrgency, 0.7);
+  }
+  if (hasStatus(world, playerId, 'bleeding')) {
+    maxUrgency = Math.max(maxUrgency, 0.6);
+  }
 
-    for (const s of status.statuses || []) {
-      if (s.type === 'cursed') {
-        needsBlessing = true;
-        maxUrgency = Math.max(maxUrgency, 0.8);
-      } else if (s.type === 'disease' || s.type === 'poisoned') {
-        maxUrgency = Math.max(maxUrgency, 0.7);
-      } else if (s.type === 'bleeding') {
-        maxUrgency = Math.max(maxUrgency, 0.6);
-      }
-    }
-
-    if (needsBlessing) {
-      needs.push({ type: 'blessing', urgency: maxUrgency });
-    } else if (maxUrgency > 0) {
-      needs.push({ type: 'cure', urgency: maxUrgency });
-    }
+  if (needsBlessing) {
+    needs.push({ type: 'blessing', urgency: maxUrgency });
+  } else if (maxUrgency > 0) {
+    needs.push({ type: 'cure', urgency: maxUrgency });
   }
 
   // Sort by urgency descending and return just the types
