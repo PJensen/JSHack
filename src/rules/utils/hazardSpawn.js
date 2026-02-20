@@ -1,4 +1,5 @@
 import { HazardArea } from "../components/HazardArea.js";
+import { DungeonState } from "../components/DungeonState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 
@@ -21,6 +22,21 @@ function titleCase(text) {
   const src = String(text || "");
   if (!src) return "";
   return `${src.slice(0, 1).toUpperCase()}${src.slice(1)}`;
+}
+
+/**
+ * Track runtime-created hazards as floor-owned entities so transitions can
+ * serialize/destroy them with the rest of the current floor.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} entityId
+ */
+function attachToCurrentFloor(world, entityId) {
+  if (!(entityId > 0)) return;
+  for (const [, ds] of world.query(DungeonState)) {
+    if (!ds || !Array.isArray(ds.floorEntityIds)) break;
+    if (!ds.floorEntityIds.includes(entityId)) ds.floorEntityIds.push(entityId);
+    break;
+  }
 }
 
 /**
@@ -83,6 +99,7 @@ export function spawnHazard(world, params) {
     meta,
   });
   try { world.add(hazardId, NamedIdentity, { name, identity }); } catch { /* */ }
+  attachToCurrentFloor(world, hazardId);
 
   try {
     world.emit?.("hazard:spawned", {

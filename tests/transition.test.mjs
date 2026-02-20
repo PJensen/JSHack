@@ -3,9 +3,12 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
+import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { transitionToDepth } from '../src/rules/environment/dungeon/transition.js';
 import { initDungeon } from '../src/rules/environment/dungeon/index.js';
 import { loadedChunkCount, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { spawnPlasmaCloud } from "../src/rules/utils/spawnPlasmaCloud.js";
 
 function makePlayerAt(world, x, y) {
   const id = world.create();
@@ -84,4 +87,38 @@ Deno.test("transitionToDepth updates floorEntityIds", () => {
     assert(Array.isArray(ds.floorEntityIds), 'floorEntityIds is array');
     assert(ds.floorEntityIds.length > 0, 'new floor has entities');
   }
+});
+
+Deno.test("transitionToDepth destroys tracked hazards from prior floor", () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  const spawn = initDungeon(world);
+  makePlayerAt(world, spawn.x, spawn.y);
+
+  const cloudId = spawnPlasmaCloud(world, {
+    x: spawn.x + 1,
+    y: spawn.y,
+    turnsLeft: 3,
+    radius: 1,
+    damage: 2,
+  });
+  assert(cloudId > 0, "plasma cloud should spawn");
+  assert(world.isAlive(cloudId), "cloud should be alive before transition");
+
+  let tracked = false;
+  for (const [, ds] of world.query(DungeonState)) {
+    tracked = Array.isArray(ds.floorEntityIds) && ds.floorEntityIds.includes(cloudId);
+    break;
+  }
+  assert(tracked, "spawned cloud should be tracked on current floor");
+
+  transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
+
+  let plasmaHazards = 0;
+  for (const [, hazard, ident] of world.query(HazardArea, NamedIdentity)) {
+    const kind = String(hazard?.kind || "").toLowerCase();
+    const identity = String(ident?.identity || "");
+    if (kind === "plasma" || identity === "plasma_cloud") plasmaHazards++;
+  }
+  assert(plasmaHazards === 0, "tracked cloud hazards should not survive transition");
 });
