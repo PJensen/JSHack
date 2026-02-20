@@ -1,8 +1,10 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { executeInteraction } from "../src/rules/interaction/runtime/actionRuntime.js";
 import {
+  isApplyTool,
   listApplyTargetsForTool,
   resolveApplyPayloadForWorld,
 } from "../src/rules/content/items/applyPayloads.js";
@@ -100,4 +102,47 @@ Deno.test("apply target listing and payload resolver agree for hook-native on_di
   assertEquals(runtimeResult.ok, true);
   assertEquals(runtimeResult.metrics.path, "payload");
   assertEquals(runtimeResult.metrics.payloadMatched, true);
+});
+
+Deno.test("apply target listing accepts legacy touchstone identity aliases", () => {
+  resetIdentification();
+  const world = new World({ seed: 7303 });
+  const actor = createActorWithInventory(world);
+  const inv = world.get(actor, Inventory);
+
+  const toolId = createItemById(world, "stone_touchstone");
+  const gemId = createItemById(world, "gem_ruby");
+  inv.items.push(toolId, gemId);
+
+  // Simulate old savegame identity before item catalog key migration.
+  world.add(toolId, NamedIdentity, { name: "Touchstone", identity: "touchstone" });
+
+  const listedTargets = listApplyTargetsForTool(world, actor, toolId);
+  const targetSet = toIdSet(listedTargets);
+  assert(targetSet.has(gemId), "legacy touchstone identity should still list gem targets");
+
+  const runtimeResult = executeInteraction(world, {
+    verb: "apply",
+    actor,
+    primary: toolId,
+    target: gemId,
+    params: {},
+    pipeline: applyPipeline,
+  });
+  assertEquals(runtimeResult.ok, true);
+  assertEquals(runtimeResult.metrics.path, "payload");
+  assertEquals(runtimeResult.metrics.payloadMatched, true);
+});
+
+Deno.test("apply tool detection keeps touchstone selectable with zero targets", () => {
+  const world = new World({ seed: 7304 });
+  const actor = createActorWithInventory(world);
+  const inv = world.get(actor, Inventory);
+
+  const toolId = createItemById(world, "stone_touchstone");
+  inv.items.push(toolId);
+
+  const listedTargets = listApplyTargetsForTool(world, actor, toolId);
+  assertEquals(listedTargets.length, 0);
+  assertEquals(isApplyTool(world, actor, toolId), true);
 });

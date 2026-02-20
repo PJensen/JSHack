@@ -1162,7 +1162,26 @@ export const ITEM_CATALOG = {
   },
 };
 
+const ITEM_CATALOG_ID_ALIASES = Object.freeze({
+  // Save compatibility: pre-catalog touchstone identity
+  touchstone: "stone_touchstone",
+});
+
+/**
+ * @param {string} id
+ * @returns {string}
+ */
+function resolveCatalogItemId(id) {
+  const key = String(id || "").trim().toLowerCase();
+  if (!key) return "";
+  return ITEM_CATALOG_ID_ALIASES[key] || key;
+}
+
 export function listCatalogItems() { return Object.values(ITEM_CATALOG); }
-export function getCatalogItem(id) { return ITEM_CATALOG[id] || null; }
+export function getCatalogItem(id) {
+  const key = resolveCatalogItemId(id);
+  if (!key) return null;
+  return ITEM_CATALOG[key] || null;
+}
 export function isCatalogEquipment(def) { return !!def && String(def.catalogKind) === "equipment"; }
 export function isCatalogMagic(def) { return !!def && String(def.catalogKind) === "magic"; }
