@@ -19,6 +19,24 @@ import { ProjectileImpactCallbackContext } from '../data/callbacks/projectile.js
 import { runCallbackList } from '../interaction/dispatch.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 
+/**
+ * @param {any} status
+ * @param {string} type
+ */
+function statusStrength(status, type) {
+  if (!status || !Array.isArray(status.statuses)) return 0;
+  let total = 0;
+  for (let i = 0; i < status.statuses.length; i++) {
+    const s = status.statuses[i];
+    if (!s || s.type !== type) continue;
+    if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
+    const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
+    const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
+    total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
+  }
+  return total;
+}
+
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
   const intents = world.query(RangedAttackIntent);
