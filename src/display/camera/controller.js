@@ -52,3 +52,20 @@ export function screenToWorld(cam, sx, sy, canvas) {
   const wy = (sy - cy - cam.shakeY) / cam.scale + cam.y;
   return [wx, wy];
 }
+
+/**
+ * Convert a pointer/touch client point (CSS px) into world coordinates.
+ * Keeps targeting stable across DPR by using the canvas CSS viewport size.
+ */
+export function clientToWorld(cam, clientX, clientY, canvas) {
+  if (!canvas || typeof canvas.getBoundingClientRect !== "function") {
+    return [cam.x, cam.y];
+  }
+  const rect = canvas.getBoundingClientRect();
+  const sx = Number(clientX) - rect.left;
+  const sy = Number(clientY) - rect.top;
+  if (!Number.isFinite(sx) || !Number.isFinite(sy)) {
+    return [cam.x, cam.y];
+  }
+  return screenToWorld(cam, sx, sy, { width: rect.width, height: rect.height });
+}
