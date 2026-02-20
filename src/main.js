@@ -87,7 +87,7 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
-import { listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
+import { isApplyTool, listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
@@ -756,7 +756,7 @@ addEventListener('ui:requestInventoryData', () => {
           )) || null;
           const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
           const applyTargetCount = applyTargetIds.length;
-          const canApply = applyTargetCount > 0;
+          const canApply = isApplyTool(world, p.id, id);
           items.push({
             id,
             type: info.type,
@@ -859,8 +859,7 @@ addEventListener('ui:requestApplyToolsData', () => {
     const inv = world.get(p.id, Inventory);
     if (inv && Array.isArray(inv.items)) {
       for (const id of inv.items) {
-        const targetIds = listApplyTargetsForTool(world, p.id, id);
-        if (targetIds.length <= 0) continue;
+        if (!isApplyTool(world, p.id, id)) continue;
         items.push({ id, name: resolveItemDisplayName(world, id) });
       }
     }

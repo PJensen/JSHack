@@ -166,3 +166,33 @@ export function listApplyTargetsForTool(world, actor, toolId) {
 export function canUseApplyTool(world, actor, toolId) {
   return listApplyTargetsForTool(world, actor, toolId).length > 0;
 }
+
+/**
+ * Returns true if an inventory item is an apply-capable tool, even when there
+ * are currently no valid targets.
+ *
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {number} toolId
+ */
+export function isApplyTool(world, actor, toolId) {
+  const actorId = actor | 0;
+  const toolEntityId = toolId | 0;
+  if (!world || !(actorId > 0) || !(toolEntityId > 0)) return false;
+  if (!world.isAlive(actorId) || !world.isAlive(toolEntityId)) return false;
+
+  const inv = /** @type any */ (world.get(actorId, Inventory));
+  if (!inv || !Array.isArray(inv.items)) return false;
+  if (!inv.items.includes(toolEntityId)) return false;
+
+  const reader = createWorldApplyPayloadReader(world);
+  const state = buildApplyPayloadState(reader, {
+    actor: actorId,
+    toolId: toolEntityId,
+    targetId: 0,
+  });
+  const hooks = getItemHooksByIdentity(state.toolIdentity);
+  if (typeof hooks.onDip === "function") return true;
+
+  return listApplyTargetsForTool(world, actorId, toolEntityId).length > 0;
+}
