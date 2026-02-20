@@ -65,6 +65,8 @@ export const LOOT_TABLES = {
       { type: "item", weight: 35, itemId: "book_lightning" },
       { type: "item", weight: 35, itemId: "book_meteor" },
       { type: "item", weight: 30, itemId: "book_blastwave" },
+      { type: "item", weight: 25, itemId: "book_frost" },
+      { type: "item", weight: 20, itemId: "book_blink" },
     ],
   },
 

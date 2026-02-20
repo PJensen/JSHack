@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { PlasmaCloud } from "../src/rules/components/PlasmaCloud.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -16,6 +17,41 @@ function makeActor(world, x, y, hp, name = "Target", identity = "target") {
   world.add(id, NamedIdentity, { name, identity });
   return id;
 }
+
+Deno.test("spawnHazard tracks hazards in DungeonState.floorEntityIds", () => {
+  const world = new World({ seed: 9200 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, {
+    worldSeed: 9200,
+    currentDepth: 1,
+    floorEntityIds: [11, 12],
+  });
+
+  const hazardId = spawnHazard(world, {
+    x: 3,
+    y: 4,
+    kind: "poison",
+    turnsLeft: 2,
+    radius: 1,
+    tickDamage: 1,
+  });
+  assert(hazardId > 0, "spawnHazard should return a valid hazard id");
+
+  const ds = world.get(dungeonId, DungeonState);
+  assert(ds.floorEntityIds.includes(hazardId), "new hazard should be tracked on current floor");
+
+  // Spawning a second hazard should append once, not duplicate existing IDs.
+  const hazardId2 = spawnHazard(world, {
+    x: 5,
+    y: 6,
+    kind: "poison",
+    turnsLeft: 2,
+    radius: 1,
+    tickDamage: 1,
+  });
+  const ids = ds.floorEntityIds.filter((id) => id === hazardId2);
+  assertEquals(ids.length, 1);
+});
 
 Deno.test("hazardSystem ticks generic floor hazard and expires it", () => {
   const world = new World({ seed: 9201 });

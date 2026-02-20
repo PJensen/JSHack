@@ -858,6 +858,23 @@ export const ITEM_CATALOG = {
       }),
     },
   },
+  book_frost: {
+    id: "book_frost",
+    catalogKind: "magic",
+    name: "Spellbook of Frost",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "rare",
+    description: "Grants the ability to cast Frost.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
   book_dead: {
     id: "book_dead",
     catalogKind: "magic",
