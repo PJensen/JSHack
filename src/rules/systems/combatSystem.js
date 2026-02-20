@@ -22,6 +22,8 @@ import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 
+const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
+
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
     const eq = world.get(entityId, Equipment);
@@ -84,153 +86,177 @@ function runMonsterHooks(world, entityId, hookName, frame) {
     runCallbackList(hooks, ctx);
 }
 
+/**
+ * Install immediate bump-attack listener once per world.
+ * Bump attacks are emitted from movement as events so they can resolve within
+ * the same tick even when intent adds are deferred.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ */
+export function installBumpAttackListener(world) {
+    if (!world || world[BUMP_ATTACK_INSTALLED]) return;
+    world[BUMP_ATTACK_INSTALLED] = true;
+
+    world.on('bump:attack', ({ attacker, target }) => {
+        const source = Number(attacker || 0) | 0;
+        const defender = Number(target || 0) | 0;
+        if (!(source > 0) || !(defender > 0) || source === defender) return;
+        try { resolveMeleeAttack(world, source, defender); } catch {}
+    });
+}
+
+/**
+ * Resolve one melee attack attempt immediately.
+ * Shared by AttackIntent processing and bump-attack event handling.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} attacker
+ * @param {number} defender
+ */
+export function resolveMeleeAttack(world, attacker, defender) {
+    const source = Number(attacker || 0) | 0;
+    const target = Number(defender || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    if (!world.isAlive(target)) return;
+
+    const atkVit = world.get(source, Vitality);
+    const defVit = world.get(target, Vitality);
+    if (!atkVit || !defVit) return;
+
+    // Range gate: only allow melee from orthogonal adjacency (no diagonals, no ranged)
+    const apos = world.get(source, Position);
+    const dpos = world.get(target, Position);
+    if (!apos || !dpos || (Math.abs((apos.x|0) - (dpos.x|0)) + Math.abs((apos.y|0) - (dpos.y|0))) !== 1) {
+        // Out of range: silently consume intent without emitting a MISS far away
+        // (prevents confusing "MISS" feedback when monsters are not adjacent)
+        return;
+    }
+
+    // Faction hostility gate: only hostile faction pairs can deal direct melee damage.
+    const af = world.get(source, Faction)?.key || '';
+    const df = world.get(target, Faction)?.key || '';
+    if (!areFactionsHostile(af, df)) return;
+
+    const atkEq = world.get(source, Equipment);
+
+    // Stamina gate: check if attacker has enough stamina for weapon
+    const atkStam = world.get(source, Stamina);
+    let weaponId = atkEq?.weapon || 0;
+    let staminaCost = 3; // default unarmed cost
+
+    if (weaponId) {
+        const weaponInfo = world.get(weaponId, ItemInfo);
+        staminaCost = Number(weaponInfo?.staminaCost ?? 8);
+    }
+
+    if (atkStam) {
+        const have = Number(atkStam.stamina ?? 0);
+        if (have < staminaCost) {
+            // Insufficient stamina - block attack, message, consume turn
+            world.emit?.('attack:insufficient-stamina', {
+                attacker: source, defender: target, weaponId, need: staminaCost, have
+            });
+            return;
+        }
+        // Deduct stamina and suppress regen this turn
+        world.set(source, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
+    }
+
+    const atkSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });
+    const defSnapshot = resolveCombatSnapshot(world, target, { mode: 'melee' });
+    const attackBonus = atkSnapshot.attackBonus;
+    const armorClass = defSnapshot.armorClass;
+
+    // Deterministic d20 roll seeded by world + participants + step
+    const seed = combatSeed(world.seed, world.step, source, target);
+    const r = mulberry32(seed);
+    const d20 = rngInt(r, 1, 20);
+    const totalToHit = d20 + attackBonus;
+    const isCrit = d20 === 20;
+    const isNat1 = d20 === 1;
+
+    if (!isCrit && (isNat1 || totalToHit < armorClass)) {
+        // Miss (include attacker for better UX logging)
+        world.emit?.('status', { id: target, kind: 'miss', text: 'MISS', source });
+        return;
+    }
+
+    // Base damage from weapon dice (or fallback)
+    weaponId = atkEq?.weapon || 0;
+    let baseDice = null;
+    if (weaponId) {
+        const info = world.get(weaponId, ItemInfo);
+        baseDice = (info && info.damageDice) ? String(info.damageDice) : null;
+    }
+    if (!baseDice) {
+        // Fallbacks: use natural damage dice (claws/bite) if defined, else defaults
+        const isPlayer = world.has(source, Player);
+        baseDice = isPlayer ? '1d2' : (atkEq?.naturalDamageDice || '1d8');
+    }
+    const damageRoll = rollDice(baseDice, r);
+    // Add a small portion of attack bonus as flat damage (DnD-ish flavor)
+    const flatBonus = atkSnapshot.damageFlatBonus;
+    let dmg = Math.max(0, damageRoll + flatBonus);
+    if (isCrit) dmg = Math.max(1, dmg * 2);
+
+    // Pre-hit hooks
+    const ctx = attachHelpers(world, { attacker: source, defender: target, weaponId: weaponId || 0, damage: dmg, world });
+    world.emit('beforeHit', ctx);
+    forEachAffix(world, source, /** @param {any} a */ (a) => {
+        if (a.triggers?.includes('onBeforeHit') && a.script) {
+            runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
+        }
+    });
+    // Innate monster pre-hit behavior from monster definition hooks
+    runMonsterHooks(world, source, 'onBeforeHit', ctx);
+    // Recompute damage if modified
+    let finalDmg = Math.max(0, Math.floor(ctx.damage));
+
+    const hitCtx = attachHelpers(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
+    world.emit('hit', hitCtx);
+    let hasVamp = false;
+    // Attacker on-hit affixes (e.g., vampiric)
+    forEachAffix(world, source, /** @param {any} a */ (a) => {
+        if (a.triggers?.includes('onHit') && a.script) {
+            runScript(a.script, ScriptVerb.AffixOnHit, world, hitCtx);
+            if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true;
+        }
+    });
+    finalDmg = Math.max(0, Math.floor(hitCtx.damage));
+    if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+    // Innate monster on-hit behavior from monster definition hooks
+    runMonsterHooks(world, source, 'onHit', hitCtx);
+    // Defender on-hit reactions (e.g., Thorns)
+    const defCtx = attachHelpers(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
+    forEachAffix(world, target, /** @param {any} a */ (a) => {
+        if (a.triggers?.includes('onHit') && a.script) {
+            runScript(a.script, ScriptVerb.AffixOnHit, world, defCtx);
+        }
+    });
+
+    // Route through canonical damage pipeline (handles invuln, events, death)
+    if (finalDmg > 0) {
+        const result = dealDamage(world, {
+            target,
+            amount: finalDmg,
+            source,
+            type: 'physical',
+            cause: 'melee',
+            critical: isCrit,
+            bypassResist: true,
+        });
+        // dealDamage returns applied:false for invulnerable targets
+        if (!result.applied && result.reason !== 'invulnerable') {
+            world.emit?.('status', { id: target, kind: 'miss', text: 'MISS', source });
+        }
+    } else {
+        // Zero damage after modifiers → treat as miss/blocked
+        world.emit?.('status', { id: target, kind: 'miss', text: 'MISS', source });
+    }
+}
+
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
-        const defender = intent.targetId | 0;
-        if (!world.isAlive(defender)) { world.remove(attacker, AttackIntent); continue; }
-
-        const atkVit = world.get(attacker, Vitality);
-        const defVit = world.get(defender, Vitality);
-        if (!atkVit || !defVit) { world.remove(attacker, AttackIntent); continue; }
-
-        // Range gate: only allow melee from orthogonal adjacency (no diagonals, no ranged)
-        const apos = world.get(attacker, Position);
-        const dpos = world.get(defender, Position);
-        if (!apos || !dpos || (Math.abs((apos.x|0) - (dpos.x|0)) + Math.abs((apos.y|0) - (dpos.y|0))) !== 1) {
-            // Out of range: silently consume intent without emitting a MISS far away
-            // (prevents confusing "MISS" feedback when monsters are not adjacent)
-            world.remove(attacker, AttackIntent);
-            continue;
-        }
-
-        // Faction hostility gate: only hostile faction pairs can deal direct melee damage.
-        const af = world.get(attacker, Faction)?.key || '';
-        const df = world.get(defender, Faction)?.key || '';
-        if (!areFactionsHostile(af, df)) {
-            world.remove(attacker, AttackIntent);
-            continue;
-        }
-
-        const atkEq = world.get(attacker, Equipment);
-
-        // Stamina gate: check if attacker has enough stamina for weapon
-        const atkStam = world.get(attacker, Stamina);
-        let weaponId = atkEq?.weapon || 0;
-        let staminaCost = 3; // default unarmed cost
-
-        if (weaponId) {
-            const weaponInfo = world.get(weaponId, ItemInfo);
-            staminaCost = Number(weaponInfo?.staminaCost ?? 8);
-        }
-
-        if (atkStam) {
-            const have = Number(atkStam.stamina ?? 0);
-            if (have < staminaCost) {
-                // Insufficient stamina - block attack, message, consume turn
-                world.emit?.('attack:insufficient-stamina', {
-                    attacker, defender, weaponId, need: staminaCost, have
-                });
-                world.remove(attacker, AttackIntent);
-                continue;
-            }
-            // Deduct stamina and suppress regen this turn
-            world.set(attacker, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
-        }
-
-        const atkSnapshot = resolveCombatSnapshot(world, attacker, { mode: 'melee' });
-        const defSnapshot = resolveCombatSnapshot(world, defender, { mode: 'melee' });
-        const attackBonus = atkSnapshot.attackBonus;
-        const armorClass = defSnapshot.armorClass;
-
-        // Deterministic d20 roll seeded by world + participants + step
-        const seed = combatSeed(world.seed, world.step, attacker, defender);
-        const r = mulberry32(seed);
-        const d20 = rngInt(r, 1, 20);
-        const totalToHit = d20 + attackBonus;
-        const isCrit = d20 === 20;
-        const isNat1 = d20 === 1;
-
-        if (!isCrit && (isNat1 || totalToHit < armorClass)) {
-            // Miss (include attacker for better UX logging)
-            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
-            world.remove(attacker, AttackIntent);
-            continue;
-        }
-
-        // Base damage from weapon dice (or fallback)
-        weaponId = atkEq?.weapon || 0;
-        let baseDice = null;
-        if (weaponId) {
-            const info = world.get(weaponId, ItemInfo);
-            baseDice = (info && info.damageDice) ? String(info.damageDice) : null;
-        }
-        if (!baseDice) {
-            // Fallbacks: use natural damage dice (claws/bite) if defined, else defaults
-            const isPlayer = world.has(attacker, Player);
-            baseDice = isPlayer ? '1d2' : (atkEq?.naturalDamageDice || '1d8');
-        }
-        const damageRoll = rollDice(baseDice, r);
-        // Add a small portion of attack bonus as flat damage (DnD-ish flavor)
-        const flatBonus = atkSnapshot.damageFlatBonus;
-        let dmg = Math.max(0, damageRoll + flatBonus);
-        if (isCrit) dmg = Math.max(1, dmg * 2);
-
-        // Pre-hit hooks
-        const ctx = attachHelpers(world, { attacker, defender, weaponId: weaponId || 0, damage: dmg, world });
-        world.emit('beforeHit', ctx);
-        forEachAffix(world, attacker, /** @param {any} a */ (a) => {
-            if (a.triggers?.includes('onBeforeHit') && a.script) {
-                runScript(a.script, ScriptVerb.AffixOnBeforeHit, world, ctx);
-            }
-        });
-        // Innate monster pre-hit behavior from monster definition hooks
-        runMonsterHooks(world, attacker, 'onBeforeHit', ctx);
-        // Recompute damage if modified
-        let finalDmg = Math.max(0, Math.floor(ctx.damage));
-
-        const hitCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-        world.emit('hit', hitCtx);
-        let hasVamp = false;
-        // Attacker on-hit affixes (e.g., vampiric)
-        forEachAffix(world, attacker, /** @param {any} a */ (a) => {
-            if (a.triggers?.includes('onHit') && a.script) {
-                runScript(a.script, ScriptVerb.AffixOnHit, world, hitCtx);
-                if (a.name && a.name.toLowerCase().includes('vamp')) hasVamp = true;
-            }
-        });
-        finalDmg = Math.max(0, Math.floor(hitCtx.damage));
-        if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
-        // Innate monster on-hit behavior from monster definition hooks
-        runMonsterHooks(world, attacker, 'onHit', hitCtx);
-        // Defender on-hit reactions (e.g., Thorns)
-        const defCtx = attachHelpers(world, { attacker, defender, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-        forEachAffix(world, defender, /** @param {any} a */ (a) => {
-            if (a.triggers?.includes('onHit') && a.script) {
-                runScript(a.script, ScriptVerb.AffixOnHit, world, defCtx);
-            }
-        });
-
-        // Route through canonical damage pipeline (handles invuln, events, death)
-        if (finalDmg > 0) {
-            const result = dealDamage(world, {
-                target: defender,
-                amount: finalDmg,
-                source: attacker,
-                type: 'physical',
-                cause: 'melee',
-                critical: isCrit,
-                bypassResist: true,
-            });
-            // dealDamage returns applied:false for invulnerable targets
-            if (!result.applied && result.reason !== 'invulnerable') {
-                world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
-            }
-        } else {
-            // Zero damage after modifiers → treat as miss/blocked
-            world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
-        }
-
-        world.remove(attacker, AttackIntent);
+        try { resolveMeleeAttack(world, attacker, intent.targetId | 0); } catch {}
+        try { world.remove(attacker, AttackIntent); } catch {}
     }
 }

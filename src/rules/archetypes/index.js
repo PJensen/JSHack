@@ -15,7 +15,7 @@ export {
   VenomFronds,
   createCorpse,
 } from './Food.js';
-export { SpikeTrap, SnakeTrap } from './Traps.js';
+export { SpikeTrap, SnakeTrap, ShockTrap } from './Traps.js';
 export { MagicItem } from './Items.js';
 export {
   HomeBed,

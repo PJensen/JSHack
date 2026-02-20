@@ -27,3 +27,16 @@ export const SnakeTrap = defineArchetype(
         armed: true,
     })],
 );
+
+// Shock trap — electric damage + shocked status on trigger
+export const ShockTrap = defineArchetype(
+    "ShockTrap",
+    [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+    [Trap, (p) => ({
+        type: 'shock',
+        script: 'trap_shock',
+        params: p.trapParams ?? { percent: 0.15 },
+        revealed: false,
+        armed: true,
+    })],
+);

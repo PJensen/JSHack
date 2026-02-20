@@ -89,7 +89,8 @@ export function resolveResistance(world, targetId, rawAmount, type) {
 
   switch (type) {
     case 'electric':
-    case 'plasma': {
+    case 'plasma':
+    case 'lightning': {
       const ohmBonus = Number(eq?.electricOhmsDerived ?? 0);
       const baseOhms = resist?.electric?.ohms;
       const effectiveOhms = baseOhms === Infinity ? Infinity

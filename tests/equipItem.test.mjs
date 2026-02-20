@@ -121,3 +121,25 @@ Deno.test("equip item system: weapon, armor, rings, shield, ranged, swap, and ed
   equipItemSystem(world);
   assert(!world.has(actor, EquipIntent), 'intent consumed even for non-equip item');
 });
+
+Deno.test("equip item system: selecting an already equipped starter item unequips it", () => {
+  const world = new World({ seed: 2 });
+
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+  world.add(actor, Equipment, {});
+
+  const starterSword = makeItem(world, { id: 'starter_sword', name: 'Starter Sword', slot: 'weapon' });
+  const inv = world.get(actor, Inventory);
+  inv.items.push(starterSword);
+
+  const eq = world.get(actor, Equipment);
+  eq.weapon = starterSword; // Simulate "starts equipped"
+
+  world.add(actor, EquipIntent, { itemId: starterSword });
+  equipItemSystem(world);
+
+  assert(eq.weapon == null, 'starter weapon should unequip when selected again');
+  assert(inv.items.includes(starterSword), 'unequipped item remains in inventory');
+  assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
+});

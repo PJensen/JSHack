@@ -587,6 +587,40 @@ if (!_savegameLoaded) {
       }
     }
   }
+
+  // Process ?effects query string parameter to apply status effects to the player.
+  // Format: ?effects=key*turns,key*turns   (turns defaults to 5 if omitted)
+  // Example: ?effects=bleed*2,poison*10,burning,confused*3
+  {
+    const effectsParam = runtimeConfig.effectsParam;
+    if (effectsParam) {
+      const pe = playerEntity(world);
+      if (pe) {
+        const ae = world.get(pe.id, ActiveEffects);
+        const specs = effectsParam.split(',').map(s => s.trim()).filter(Boolean);
+        for (const spec of specs) {
+          const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
+          if (!match) {
+            console.warn(`[?effects] Invalid format: "${spec}" (expected: key or key*turns)`);
+            continue;
+          }
+          const key = match[1].toLowerCase();
+          const turnsLeft = parseInt(match[2] || '5', 10);
+          if (!Number.isFinite(turnsLeft) || turnsLeft < 1) {
+            console.warn(`[?effects] Invalid turns for "${key}": ${match[2]}`);
+            continue;
+          }
+          const effect = { key, turnsLeft, potency: 1, stacks: 1 };
+          if (ae && Array.isArray(ae.effects)) {
+            ae.effects.push(effect);
+          } else {
+            world.add(pe.id, ActiveEffects, { effects: [effect] });
+          }
+          console.log(`[?effects] Applied ${key} for ${turnsLeft} turn(s)`);
+        }
+      }
+    }
+  }
 }
 
 // Ensure deity state is initialized for current player (new game or loaded save).
@@ -734,10 +768,85 @@ initPetMenu();
 initStatusLine();
 bootAdvance("Initialized HUD and overlays");
 
+/**
+ * Build the same ground-item context used by overlays and inventory actions.
+ * Excludes currency by design.
+ * @param {number} actorId
+ * @param {number} x
+ * @param {number} y
+ */
+function buildGroundPickupDetailAt(actorId, x, y) {
+  const tx = Number.isFinite(x) ? (x | 0) : 0;
+  const ty = Number.isFinite(y) ? (y | 0) : 0;
+  const ids = [...itemsAt(world, tx, ty)];
+  // Include chest contents on the tile.
+  let hasChest = false;
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'chest' || pos.x !== tx || pos.y !== ty) continue;
+    hasChest = true;
+    const inv = world.get(eid, Inventory);
+    if (!inv || !Array.isArray(inv.items)) continue;
+    for (const itemId of inv.items) ids.push(itemId);
+  }
+
+  const nonCurrencyItems = [];
+  for (const itemId of ids) {
+    const info = world.get(itemId, ItemInfo);
+    if (!info || info.type === 'currency') continue;
+    const affixes = Array.isArray(info.affixes) ? info.affixes.slice() : [];
+    const bonuses = info.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {};
+    nonCurrencyItems.push({
+      id: itemId,
+      type: info.type || 'item',
+      name: resolveItemDisplayName(world, itemId),
+      count: info.count || 1,
+      rarityName: info.rarityName || 'common',
+      description: info.description || '',
+      bonuses,
+      affixes,
+    });
+  }
+
+  if (!nonCurrencyItems.length) return null;
+
+  if (hasChest || nonCurrencyItems.length > 1) {
+    return {
+      mode: 'multi',
+      count: nonCurrencyItems.length,
+      items: nonCurrencyItems.map((it) => ({
+        id: it.id,
+        type: it.type,
+        name: it.name,
+        count: it.count,
+        rarityName: it.rarityName,
+      })),
+      fromChest: hasChest,
+    };
+  }
+
+  const single = nonCurrencyItems[0];
+  const set = world.get(actorId, Settings);
+  const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
+  return {
+    mode: 'single',
+    item: {
+      id: single.id,
+      name: single.name,
+      rarityName: single.rarityName,
+      description: single.description,
+      count: single.count,
+      bonuses: single.bonuses,
+      affixes: single.affixes,
+    },
+    pickupRange,
+  };
+}
+
 // Provide inventory data to overlay when requested
 addEventListener('ui:requestInventoryData', () => {
   const p = playerEntity(world);
   const items = [];
+  let ground = null;
   if (p) {
     const inv = world.get(p.id, Inventory);
     const eq = world.get(p.id, Equipment);
@@ -799,8 +908,9 @@ addEventListener('ui:requestInventoryData', () => {
         equippedSlot: _activeSpellId === sid ? 'brain' : null,
       });
     }
+    ground = buildGroundPickupDetailAt(p.id, p.pos.x, p.pos.y);
   }
-  window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items } }));
+  window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items, ground } }));
 });
 
 // Provide usable items to the use-chooser overlay when requested
@@ -2640,61 +2750,21 @@ world.on('item:equipped', ({ itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail: { itemId } })); } catch {}
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
+world.on('item:unequipped', ({ itemId }) => {
+  try { window.dispatchEvent(new CustomEvent('ui:itemUnequipped', { detail: { itemId } })); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+});
 
 // When player moves, show a mobile-friendly ground item tooltip for non-currency items on the tile
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== id) return;
-  const ids = itemsAt(world, to.x, to.y);
-  // Also include items from chests at this tile
-  let hasChest = false;
-  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (ni.identity !== 'chest' || pos.x !== to.x || pos.y !== to.y) continue;
-    hasChest = true;
-    const inv = world.get(eid, Inventory);
-    if (inv) for (const itemId of inv.items) ids.push(itemId);
-  }
-  // Filter out currency; we want deliberate pickup for non-gold
-  const nonCurrency = ids.filter((eid) => {
-    const info = world.get(eid, ItemInfo);
-    return info && info.type !== 'currency';
-  });
-  if (!nonCurrency.length) {
+  const detail = buildGroundPickupDetailAt(pe.id, to.x, to.y);
+  if (!detail) {
     try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch {}
     return;
   }
-  // Chest items always use the chooser with "Open Chest" label
-  if (hasChest || nonCurrency.length > 1) {
-    const items = nonCurrency.map((eid) => {
-      const info = world.get(eid, ItemInfo);
-      return { id: eid, type: info?.type || 'item', name: resolveItemDisplayName(world, eid), count: info?.count || 1 };
-    });
-    try {
-      window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: { mode: 'multi', count: items.length, items, fromChest: hasChest } }));
-    } catch {}
-    return;
-  }
-  // Single item: build tooltip content
-  const itemId = nonCurrency[0];
-  const info = world.get(itemId, ItemInfo);
-  const set = world.get(pe.id, Settings);
-  const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
-  const affixes = Array.isArray(info?.affixes) ? info.affixes.slice() : [];
-  const bonuses = info?.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {};
-  const payload = {
-    mode: 'single',
-    item: {
-      id: itemId,
-      name: resolveItemDisplayName(world, itemId),
-      rarityName: info?.rarityName || 'common',
-      description: info?.description || '',
-      count: info?.count || 1,
-      bonuses,
-      affixes
-    },
-    pickupRange
-  };
-  try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail: payload })); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch {}
 });
 
 // When player moves, show stair tooltip if near stairs
@@ -2762,11 +2832,17 @@ world.on('moved', ({ id, to }) => {
   }
 });
 
-// Hide ground tooltip after pickups to avoid stale UI
+// Refresh ground tooltip after pickups so remaining items stay discoverable.
 world.on('item:pickup', ({ actor, itemId }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
-  try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch {}
+  const detail = buildGroundPickupDetailAt(pe.id, pe.pos.x, pe.pos.y);
+  if (detail) {
+    try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch {}
+  } else {
+    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch {}
+  }
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
 });
 
 /** @param {string} s */
@@ -2987,8 +3063,37 @@ fx.ctx = bctx;
 // Avoid expensive per-particle transforms: draw in world units under camera transform
 fx.worldToScreen = (p) => ({ x: p.x, y: p.y, size: p.size });
 
-// Burning fire emitter tracking (display-only reconciliation)
+// Per-entity particle emitter tracking sets (display-only, reconciled each frame)
 const _burningEmitters = new Set();
+const _bleedEmitters   = new Set();
+const _poisonEmitters  = new Set();
+const _regenEmitters   = new Set();
+const _shockEmitters   = new Set();
+const _frozenEmitters  = new Set();
+const _cursedEmitters  = new Set();
+const _blessedEmitters = new Set();
+
+/** Reconcile a per-entity continuous particle emitter for one status tag. */
+function reconcileStatusEmitter(view, fx, origins, trackerSet, tag, prefix, cfg) {
+  const nowActive = new Set();
+  for (let i = 0; i < view.entities.length; i++) {
+    const e = view.entities[i];
+    if (Array.isArray(e.tags) && e.tags.includes(tag)) {
+      nowActive.add(e.id);
+      if (!trackerSet.has(e.id)) {
+        fx.ensureEmitter(`${prefix}:${e.id}`, { continuous: true, ...cfg });
+        trackerSet.add(e.id);
+      }
+      origins.push({ key: `${prefix}:${e.id}`, x: e.pos.x, y: e.pos.y });
+    }
+  }
+  for (const id of trackerSet) {
+    if (!nowActive.has(id)) {
+      fx.removeEmitter(`${prefix}:${id}`);
+      trackerSet.delete(id);
+    }
+  }
+}
 
 // Floating combat text (display-only, world-space)
 const ftext = new FloatText();
@@ -3145,6 +3250,110 @@ function render(worldView) {
       bctx.restore();
     }
 
+    // Glyph-FX: frozen — pulsing icy blue radial glow (outer halo + bright inner core)
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('frozen')) {
+      bctx.save();
+      bctx.globalCompositeOperation = 'lighter';
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 1.4);
+      const cx = e.pos.x, cy = e.pos.y;
+      // Outer halo — wide, soft
+      const rOuter = 0.70 + 0.08 * pulse;
+      const outer = bctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+      outer.addColorStop(0,   `rgba(160,230,255,${(0.45 + 0.20 * pulse).toFixed(3)})`);
+      outer.addColorStop(0.5, `rgba(80,180,255,${(0.20 + 0.10 * pulse).toFixed(3)})`);
+      outer.addColorStop(1,   'rgba(40,120,255,0)');
+      bctx.fillStyle = outer;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+      bctx.fill();
+      // Inner core — tight, bright
+      const rInner = 0.28 + 0.04 * pulse;
+      const inner = bctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+      inner.addColorStop(0, `rgba(220,245,255,${(0.55 + 0.25 * pulse).toFixed(3)})`);
+      inner.addColorStop(1, 'rgba(100,200,255,0)');
+      bctx.fillStyle = inner;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+      bctx.fill();
+      bctx.restore();
+    }
+
+    // Glyph-FX: electric shock — soft aura with sparks orbiting outside the glyph
+    // Glyph-FX: electric shock — chaotic arcs from center, geometry rerolled every discharge
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('shocked')) {
+      bctx.save();
+      const cx = e.pos.x, cy = e.pos.y;
+      const _sid = (e.id || 0) | 0;
+      // Static hash: stable per-arc properties (base angle, frequency, phase)
+      const _sh  = (n) => ((Math.imul(n * 73 + 1, 2654435761) ^ Math.imul(_sid | 1, 1664525)) >>> 0) / 4294967296;
+      // Fire-event hash: rerolls geometry on every new discharge
+      const _shF = (i, fi, s) => ((Math.imul((i * 97 + fi * 31 + s + 1) * 73 + 1, 2654435761) ^ Math.imul(_sid | 1, 1664525)) >>> 0) / 4294967296;
+
+      bctx.globalCompositeOperation = 'lighter';
+      bctx.lineCap = 'round'; bctx.lineJoin = 'round';
+
+      // Soft ambient glow
+      const _aura = 0.60 + 0.40 * Math.sin(_fxTime * 2.3 + _sh(99) * Math.PI * 2);
+      const _fg = bctx.createRadialGradient(cx, cy, 0.05, cx, cy, 0.80);
+      _fg.addColorStop(0,   `rgba(100,210,255,${(0.22 * _aura).toFixed(3)})`);
+      _fg.addColorStop(0.6, `rgba(40,140,220,${(0.08 * _aura).toFixed(3)})`);
+      _fg.addColorStop(1,   'rgba(0,80,200,0)');
+      bctx.fillStyle = _fg;
+      bctx.beginPath(); bctx.arc(cx, cy, 0.80, 0, Math.PI * 2); bctx.fill();
+
+      // 14 arcs — each fires at its own rate, geometry randomised per discharge
+      for (let _i = 0; _i < 14; _i++) {
+        const _baseAng = _sh(_i * 5 + 1) * Math.PI * 2;   // stable base direction
+        const _freq    = 3.0 + _sh(_i * 5 + 2) * 10.0;   // 3–13 Hz, wide spread
+        const _phase   = _sh(_i * 5 + 3) * Math.PI * 2;
+        const _bright  = Math.max(0, Math.sin(_fxTime * _freq + _phase));
+        if (_bright < 0.05) continue;
+
+        // Fire-event counter — integer that increments each new discharge
+        const _fi = Math.floor(_fxTime * _freq + _phase) | 0;
+
+        // Geometry rerolled every discharge via _shF
+        const _ang  = _baseAng + (_shF(_i, _fi, 0) - 0.5) * 0.9;       // angle wobbles ±0.45 rad
+        const _len  = 0.35 + _shF(_i, _fi, 1) * 0.40;                  // 0.35–0.75
+        const _perp = _ang + Math.PI / 2;
+        // Two kink points — independently jittered perpendicular each fire
+        const _j1   = (_shF(_i, _fi, 2) - 0.5) * _len * 0.70;
+        const _j2   = (_shF(_i, _fi, 3) - 0.5) * _len * 0.50;
+        const _t1   = 0.30 + _shF(_i, _fi, 4) * 0.20;                  // kink 1 at 30–50%
+        const _t2   = 0.62 + _shF(_i, _fi, 5) * 0.18;                  // kink 2 at 62–80%
+        const _k1x  = cx + Math.cos(_ang) * _len * _t1 + Math.cos(_perp) * _j1;
+        const _k1y  = cy + Math.sin(_ang) * _len * _t1 + Math.sin(_perp) * _j1;
+        const _k2x  = cx + Math.cos(_ang) * _len * _t2 + Math.cos(_perp) * _j2;
+        const _k2y  = cy + Math.sin(_ang) * _len * _t2 + Math.sin(_perp) * _j2;
+        const _ex   = cx + Math.cos(_ang) * _len;
+        const _ey   = cy + Math.sin(_ang) * _len;
+        const _alpha = 0.55 + 0.45 * _bright;
+
+        const _drawArc = () => { bctx.beginPath(); bctx.moveTo(cx, cy); bctx.lineTo(_k1x, _k1y); bctx.lineTo(_k2x, _k2y); bctx.lineTo(_ex, _ey); bctx.stroke(); };
+
+        // Cyan glow
+        bctx.save();
+        bctx.globalAlpha = _alpha * 0.40;
+        bctx.lineWidth = 0.12; bctx.strokeStyle = 'rgba(60,200,255,0.90)';
+        _drawArc();
+        bctx.restore();
+        // White-hot core
+        bctx.save();
+        bctx.globalAlpha = _alpha;
+        bctx.lineWidth = 0.045; bctx.strokeStyle = 'rgba(235,250,255,0.98)';
+        _drawArc();
+        bctx.restore();
+        // Tip spark
+        bctx.save();
+        bctx.globalAlpha = _alpha * 0.85;
+        bctx.fillStyle = 'rgba(210,245,255,0.95)';
+        bctx.beginPath(); bctx.arc(_ex, _ey, 0.050, 0, Math.PI * 2); bctx.fill();
+        bctx.restore();
+      }
+
+      bctx.restore();
+    }
+
     // Glyph-FX: simple green thorn spikes ring when wearing Thorns gear
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('thorns')) {
       /** @type {CanvasRenderingContext2D} */
@@ -3212,6 +3421,40 @@ function render(worldView) {
       g.beginPath(); g.arc(cx, cy, rOuter, 0, Math.PI * 2); g.stroke();
 
       g.restore();
+    }
+
+    // Glyph-FX: spinning 4-point stars above confused entities
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('confused')) {
+      bctx.save();
+      bctx.globalCompositeOperation = 'lighter';
+      bctx.lineWidth = 0.035;
+      bctx.globalAlpha = 0.9;
+      for (let j = 0; j < 3; j++) {
+        const ang = _fxTime * 2.2 + (j / 3) * Math.PI * 2;
+        const sx = e.pos.x + Math.cos(ang) * 0.32;
+        const sy = e.pos.y + Math.sin(ang) * 0.12 - 0.52; // flattened orbit above head
+        const r = 0.10;
+        bctx.strokeStyle = j === 1 ? '#ffffff' : '#ffe033';
+        bctx.beginPath();
+        bctx.moveTo(sx - r, sy);           bctx.lineTo(sx + r, sy);
+        bctx.moveTo(sx, sy - r);           bctx.lineTo(sx, sy + r);
+        bctx.moveTo(sx - r*0.7, sy - r*0.7); bctx.lineTo(sx + r*0.7, sy + r*0.7);
+        bctx.moveTo(sx + r*0.7, sy - r*0.7); bctx.lineTo(sx - r*0.7, sy + r*0.7);
+        bctx.stroke();
+      }
+      bctx.restore();
+    }
+
+    // Glyph-FX: bleeding wound — pulsing red aura (particles handle the trail)
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('bleeding')) {
+      bctx.save();
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 7.0 + e.id * 0.3);
+      bctx.globalCompositeOperation = 'source-over';
+      bctx.fillStyle = `rgba(160,0,0,${(0.08 + 0.07 * pulse).toFixed(3)})`;
+      bctx.beginPath();
+      bctx.arc(e.pos.x, e.pos.y, 0.44 + 0.04 * pulse, 0, Math.PI * 2);
+      bctx.fill();
+      bctx.restore();
     }
   }
 
@@ -3341,45 +3584,68 @@ function frame(now) {
     followEntity(cam, view.player.pos, dtSec, 6.0);
   }
 
-  // Burning particle emitter reconciliation + advance particles
+  // Status particle emitter reconciliation + advance particles
   if (PERF.particleCapacity > 0) {
-    const _emitterOrigins = [];
-    const nowBurning = new Set();
-    for (let i = 0; i < view.entities.length; i++) {
-      const e = view.entities[i];
-      if (Array.isArray(e.tags) && e.tags.includes('burning')) {
-        nowBurning.add(e.id);
-        if (!_burningEmitters.has(e.id)) {
-          fx.ensureEmitter(`burn:${e.id}`, {
-            continuous: true,
-            rate: 18,
-            angle: -Math.PI / 2,
-            spread: Math.PI / 5,
-            speed: 0.8,
-            speedJitter: 0.4,
-            ax: 0, ay: -0.5,
-            life: 0.7,
-            lifeJitter: 0.3,
-            size: 0.28,
-            sizeEnd: 0.06,
-            color: '#ff8c00',
-            alpha0: 0.9,
-            alpha1: 0.0,
-            offsetX: 0,
-            offsetY: -0.15,
-          });
-          _burningEmitters.add(e.id);
-        }
-        _emitterOrigins.push({ key: `burn:${e.id}`, x: e.pos.x, y: e.pos.y });
-      }
+    const origins = [];
+    reconcileStatusEmitter(view, fx, origins, _burningEmitters, 'burning', 'burn', {
+      rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5,
+      speed: 0.8, speedJitter: 0.4, ax: 0, ay: -0.5,
+      life: 0.7, lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06,
+      color: '#ff8c00', alpha0: 0.9, alpha1: 0.0, offsetX: 0, offsetY: -0.15,
+    });
+    reconcileStatusEmitter(view, fx, origins, _bleedEmitters, 'bleeding', 'bleed', {
+      rate: 14, angle: Math.PI / 2, spread: Math.PI / 8,
+      speed: 0.55, speedJitter: 0.3, ax: 0, ay: 1.2,
+      life: 0.9, lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05,
+      color: '#bb1111', alpha0: 0.9, alpha1: 0.0,
+    });
+    reconcileStatusEmitter(view, fx, origins, _poisonEmitters, 'poisoned', 'poison', {
+      rate: 8, angle: Math.PI / 2, spread: Math.PI / 6,
+      speed: 0.3, speedJitter: 0.15, ax: 0, ay: 0.15,
+      life: 1.0, lifeJitter: 0.4, size: 0.12, sizeEnd: 0.04,
+      color: '#33ff55', alpha0: 0.8, alpha1: 0.0,
+    });
+    reconcileStatusEmitter(view, fx, origins, _regenEmitters, 'regen', 'regen', {
+      rate: 10, angle: -Math.PI / 2, spread: Math.PI / 4,
+      speed: 0.4, speedJitter: 0.15, ax: 0, ay: -0.1,
+      life: 1.0, lifeJitter: 0.4, size: 0.10, sizeEnd: 0.02,
+      color: '#44ff88', alpha0: 0.7, alpha1: 0.0,
+    });
+    reconcileStatusEmitter(view, fx, origins, _shockEmitters, 'shocked', 'shock', {
+      rate: 30, angle: 0, spread: Math.PI * 2,
+      speed: 1.2, speedJitter: 0.8, ax: 0, ay: 0,
+      life: 0.2, lifeJitter: 0.1, size: 0.10, sizeEnd: 0.02,
+      color: '#00ccff', alpha0: 1.0, alpha1: 0.0,
+    });
+    reconcileStatusEmitter(view, fx, origins, _frozenEmitters, 'frozen', 'frozen', {
+      rate: 15, angle: 0, spread: Math.PI * 2,
+      speed: 0.22, speedJitter: 0.14, ax: 0, ay: 0.04,
+      life: 1.8, lifeJitter: 0.5, size: 0.12, sizeEnd: 0.04,
+      color: '#aaeeff', alpha0: 0.6, alpha1: 0.0,
+    });
+    reconcileStatusEmitter(view, fx, origins, _cursedEmitters, 'cursed', 'cursed', {
+      rate: 12, angle: -Math.PI / 2, spread: Math.PI,
+      speed: 0.5, speedJitter: 0.3, ax: 0, ay: -0.25,
+      life: 1.2, lifeJitter: 0.4, size: 0.14, sizeEnd: 0.02,
+      color: '#8822cc', alpha0: 0.7, alpha1: 0.0,
+    });
+    reconcileStatusEmitter(view, fx, origins, _blessedEmitters, 'blessed', 'blessed', {
+      rate: 10, angle: -Math.PI / 2, spread: Math.PI / 3,
+      speed: 0.6, speedJitter: 0.2, ax: 0, ay: -0.35,
+      life: 1.0, lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02,
+      color: '#ffcc00', alpha0: 0.8, alpha1: 0.0,
+    });
+    fx.step(dtSec, origins);
+  }
+
+  // Hallucination: Lissajous world-sway applied as a world-unit cam offset after follow.
+  // cam.x/y are in world units; 0.15 ≈ 4px at default zoom — visually clear, not nauseating.
+  if (view.player) {
+    const pe = view.entities.find(e => e.id === view.player.id);
+    if (pe && Array.isArray(pe.tags) && (pe.tags.includes('hallucinating') || pe.tags.includes('intoxicated'))) {
+      cam.x += Math.sin(_fxTime * 0.27 * Math.PI * 2) * 0.15;
+      cam.y += Math.sin(_fxTime * 0.41 * Math.PI * 2 + 1.3) * 0.15;
     }
-    for (const id of _burningEmitters) {
-      if (!nowBurning.has(id)) {
-        fx.removeEmitter(`burn:${id}`);
-        _burningEmitters.delete(id);
-      }
-    }
-    fx.step(dtSec, _emitterOrigins);
   }
 
   render(view);
@@ -4328,6 +4594,10 @@ function jitterLine(a, b, segments = 9, amp = 0.08) {
   }
   return out;
 }
+// Initial world tick — runs all systems once so status effects, equipment stats,
+// and other derived state are fully resolved before the first frame renders.
+stepSim(1);
+
 bootAdvance("Starting render loop");
 requestAnimationFrame((now) => {
   frame(now);

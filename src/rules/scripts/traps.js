@@ -1,6 +1,7 @@
 import { registerScript, ScriptVerb } from "../scripting.js";
 import { Vitality } from "../components/Vitality.js";
 import { Position } from "../components/Position.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
@@ -25,6 +26,34 @@ registerScript('trap_spike', {
       cause: 'spike_trap',
       at: pos ? { x: pos.x, y: pos.y } : undefined,
     });
+  }
+});
+
+// Shock trap: deals electric damage and applies the 'shocked' status for 2 turns.
+// Params: { percent?: number } // 0..1 fraction of max HP
+registerScript('trap_shock', {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const target = Number(ctx?.targetId || 0) || 0;
+    if (!world.isAlive(target)) return;
+    const vit = world.get(target, Vitality);
+    if (!vit) return;
+    const pos = world.get(target, Position);
+    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.15)));
+    const amount = Math.max(1, Math.floor(vit.maxHp * pct));
+    dealDamage(world, {
+      target,
+      amount,
+      source: Number(ctx?.trapId || 0) || 0,
+      type: 'lightning',
+      cause: 'shock_trap',
+      at: pos ? { x: pos.x, y: pos.y } : undefined,
+    });
+    // Apply shocked via ActiveEffects so effectSystem picks it up
+    const _ae = world.get(target, ActiveEffects);
+    if (_ae && Array.isArray(_ae.effects)) {
+      // ~5% maxHp per tick for 2 ticks — painful follow-on jolt
+      _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: Math.max(2, Math.floor(vit.maxHp * 0.05)) });
+    }
   }
 });
 

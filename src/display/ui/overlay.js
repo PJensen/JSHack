@@ -17,17 +17,28 @@ function isInventoryItemEquippable(it) {
 }
 
 /**
- * Resolve default inventory enter-action for the selected row.
- * Potions intentionally prioritize `drink` over `apply`.
  * @param {any} it
- * @returns {"none"|"apply"|"drink"|"equip"|"use"|"set-spell"}
+ */
+function isInventoryItemUsable(it) {
+  if (!it) return false;
+  return it.type === 'potion'
+    || it.type === 'learn'
+    || it.type === 'book'
+    || it.type === 'scroll'
+    || it.type === 'wand'
+    || it.type === 'food';
+}
+
+/**
+ * Resolve default inventory enter-action for the selected row.
+ * @param {any} it
+ * @returns {"none"|"apply"|"equip"|"use"|"set-spell"}
  */
 export function getInventoryDefaultAction(it) {
   if (!it) return 'none';
-  if (it.type === 'potion') return 'drink';
-  if (it.canApply) return 'apply';
   if (isInventoryItemEquippable(it)) return 'equip';
-  if (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food') return 'use';
+  if (isInventoryItemUsable(it)) return 'use';
+  if (it.canApply && Number(it.applyTargetCount || 0) > 0) return 'apply';
   if (it.type === 'spell') return 'set-spell';
   return 'none';
 }
@@ -107,6 +118,10 @@ export function initOverlays() {
         memoryGraph.hide();
         memoryGraph.stopSampling();
       }
+      if ((/** @type {any} */ (ticker))._expanded) {
+        (/** @type {any} */ (ticker))._expanded = false;
+        renderMessageTicker(ticker, (/** @type {any} */ (ticker))._entries || []);
+      }
     }
   });
 
@@ -115,7 +130,8 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const items = (e?.detail?.items) || [];
-    renderInventory(inv, items);
+    const ground = e?.detail?.ground || null;
+    renderInventory(inv, items, ground);
   });
   window.addEventListener('ui:messageLogData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -853,6 +869,7 @@ function ensurePanel(kind) {
   Object.assign(inner.style, {
     position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
     width: 'min(600px, 90vw)', maxHeight: '80vh', overflow: 'auto',
+    boxSizing: 'border-box',
     border: '1px solid #2d3b52', borderRadius: '8px', padding: '12px',
     background: '#0b0e16', boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
   });
@@ -881,8 +898,8 @@ function show(panel) {
 /** @param {HTMLDivElement} panel */
 function hide(panel) { panel.style.display = 'none'; }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
-function renderInventory(panel, items) {
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] */
+function renderInventory(panel, items, ground) {
   const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch {}
@@ -890,6 +907,7 @@ function renderInventory(panel, items) {
 
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
+  el.style.overflowX = 'hidden';
   const title = document.createElement('div');
   title.textContent = 'Inventory';
   title.style.fontWeight = 'bold';
@@ -897,6 +915,9 @@ function renderInventory(panel, items) {
   el.appendChild(title);
 
   if (!items.length) {
+    (/** @type {any} */ (panel))._inventorySelectionKey = '';
+    (/** @type {any} */ (panel))._inventorySelectionIndex = 0;
+    (/** @type {any} */ (panel))._inventoryScrollTop = 0;
     const empty = document.createElement('div');
     empty.textContent = '(empty)';
     el.appendChild(empty);
@@ -908,7 +929,20 @@ function renderInventory(panel, items) {
   list.style.display = 'flex';
   list.style.flexDirection = 'column';
   list.style.gap = '4px';
+  list.style.maxHeight = '42vh';
+  list.style.overflowY = 'auto';
+  list.style.overflowX = 'hidden';
   el.appendChild(list);
+
+  const savedSelectionKey = String((/** @type {any} */ (panel))._inventorySelectionKey || '');
+  const savedSelectionIndex = Number((/** @type {any} */ (panel))._inventorySelectionIndex || 0);
+  const savedScrollTop = Number((/** @type {any} */ (panel))._inventoryScrollTop || 0);
+  if (Number.isFinite(savedScrollTop) && savedScrollTop > 0) {
+    list.scrollTop = savedScrollTop;
+  }
+  list.addEventListener('scroll', () => {
+    (/** @type {any} */ (panel))._inventoryScrollTop = list.scrollTop;
+  });
 
   let sel = 0;
   /** @param {string} rarityName */
@@ -925,6 +959,7 @@ function renderInventory(panel, items) {
     Object.assign(row.style, {
       display: 'flex', alignItems: 'center', gap: '8px',
       width: '100%', padding: '6px 8px',
+      boxSizing: 'border-box',
       background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px'
     });
     if (it.unpaid) {
@@ -939,10 +974,15 @@ function renderInventory(panel, items) {
     star.style.width = '1ch';
     star.style.color = '#ffd27d';
 
-  const name = document.createElement('span');
+    const name = document.createElement('span');
     const rs = rarityStyle(it.rarityName);
-  name.textContent = bracketize(sanitize(it.name || it.description || it.type));
+    name.textContent = bracketize(sanitize(it.name || it.description || it.type));
     name.style.color = rs.color; name.style.fontWeight = rs.weight;
+    name.style.flex = '1 1 auto';
+    name.style.minWidth = '0';
+    name.style.overflow = 'hidden';
+    name.style.textOverflow = 'ellipsis';
+    name.style.whiteSpace = 'nowrap';
 
     const slot = document.createElement('span');
     slot.style.opacity = '0.7'; slot.textContent = it.slot ? `(${it.slot})` : '';
@@ -969,21 +1009,46 @@ function renderInventory(panel, items) {
     if (it.unpaid) row.appendChild(unpaidTag);
     row.appendChild(qty);
 
-    row.addEventListener('mouseenter', () => { setSel(idx); });
-    row.addEventListener('click', () => defaultAction());
+    row.addEventListener('click', () => { setSel(idx); });
+    row.addEventListener('dblclick', () => {
+      setSel(idx);
+      defaultAction();
+    });
     list.appendChild(row);
     return row;
   });
 
   const hint = document.createElement('div');
-  hint.style.marginTop = '8px'; hint.style.opacity = '0.85';
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.style.whiteSpace = 'normal';
+  hint.style.overflowWrap = 'anywhere';
+  hint.style.wordBreak = 'break-word';
   el.appendChild(hint);
+
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    marginTop: '8px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    minHeight: '48px',
+    alignItems: 'center',
+    width: '100%',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+  });
+  el.appendChild(actions);
 
   const details = document.createElement('div');
   Object.assign(details.style, {
     marginTop: '8px',
     padding: '8px',
-    minHeight: '2.4em',
+    minHeight: '4.8em',
     border: '1px solid #2d3b52',
     borderRadius: '6px',
     background: '#0a111f',
@@ -991,6 +1056,7 @@ function renderInventory(panel, items) {
     opacity: '0.9',
     whiteSpace: 'normal',
     wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   });
   el.appendChild(details);
 
@@ -1004,8 +1070,7 @@ function renderInventory(panel, items) {
   function enterActionLabel(it) {
     const action = getInventoryDefaultAction(it);
     if (action === 'apply') return 'Apply';
-    if (action === 'drink') return 'Drink';
-    if (action === 'equip') return 'Equip';
+    if (action === 'equip') return it?.equipped ? 'Unequip' : 'Equip';
     if (action === 'use') return 'Use';
     if (action === 'set-spell') return 'Set Spell';
     return 'None';
@@ -1013,41 +1078,205 @@ function renderInventory(panel, items) {
 
   function updateHint() {
     const it = items[sel];
-    const applyHint = it?.canApply
-      ? ` · A=Apply${Number(it?.applyTargetCount || 0) > 0 ? '' : ' (no targets)'}`
+    const groundAction = resolveGroundPickupAction();
+    const canApplyTool = !!it?.canApply;
+    const hasApplyTargets = !!(canApplyTool && Number(it?.applyTargetCount || 0) > 0);
+    const applyHint = canApplyTool
+      ? (hasApplyTargets ? ' · A=Apply' : ' · A=Apply (no targets)')
       : '';
-    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · ,=Drop · E=Equip · D=Drink · U=Use · T=Throw${applyHint} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
+    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
     const text = String(it?.description || '').trim();
     details.textContent = text || '(no description)';
+    renderInventoryActions();
   }
 
-  /** @param {number} i */
-  function setSel(i) {
+  function createActionButton(label, onClick, opts) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    decorateButton(btn);
+    btn.style.minHeight = '44px';
+    btn.style.padding = '8px 12px';
+    if (opts?.disabled) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+      if (opts?.disabledReason) btn.title = String(opts.disabledReason);
+    }
+    if (opts?.primary) {
+      btn.style.background = '#173458';
+      btn.style.borderColor = '#5fb3ff';
+      btn.style.fontWeight = '700';
+      btn.style.color = '#e9f5ff';
+      btn.style.boxShadow = '0 0 0 1px rgba(95,179,255,0.2)';
+      btn.title = 'Default action (Enter)';
+    }
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function renderInventoryActions() {
+    const it = items[sel];
+    actions.innerHTML = '';
+    if (!it) return;
+
+    const hasItemId = Number.isInteger(it.id) && it.id > 0;
+    const canApplyTool = !!it?.canApply;
+    const hasApplyTargets = !!(canApplyTool && Number(it.applyTargetCount || 0) > 0);
+    const available = [];
+    if (isInventoryItemEquippable(it) && hasItemId) {
+      available.push({ key: 'equip', label: it.equipped ? 'Unequip' : 'Equip', enabled: true });
+    }
+    if (isInventoryItemUsable(it) && hasItemId) {
+      available.push({ key: 'use', label: 'Use', enabled: true });
+    }
+    if (canApplyTool && hasItemId) {
+      available.push({
+        key: 'apply',
+        label: 'Apply',
+        enabled: hasApplyTargets,
+        disabledReason: hasApplyTargets ? '' : 'No valid targets in inventory',
+      });
+    }
+    if (it.type === 'spell') {
+      const spellId = String(it.id || '').replace(/^spell:/, '');
+      if (spellId) {
+        available.push({ key: 'set-spell', label: it.equipped ? 'Active Spell' : 'Set Spell', enabled: true });
+      }
+    }
+    if (hasItemId) {
+      available.push({ key: 'throw', label: 'Throw', enabled: true });
+    }
+    if (hasItemId) {
+      available.push({ key: 'drop', label: 'Drop', enabled: true });
+    }
+
+    const defaultKey = getInventoryDefaultAction(it);
+    const order = {
+      equip: 1,
+      use: 2,
+      apply: 3,
+      'set-spell': 4,
+      throw: 5,
+      drop: 6,
+    };
+    available.sort((a, b) => {
+      const ar = a.key === defaultKey ? 0 : (order[a.key] || 90);
+      const br = b.key === defaultKey ? 0 : (order[b.key] || 90);
+      return ar - br;
+    });
+    const defaultIndex = available.findIndex((entry) => entry.key === defaultKey && entry.enabled !== false);
+    const firstEnabledIndex = available.findIndex((entry) => entry.enabled !== false);
+    const primaryIndex = defaultIndex >= 0 ? defaultIndex : firstEnabledIndex;
+    available.forEach((entry, i) => {
+      actions.appendChild(createActionButton(entry.label, () => {
+        dispatchInventoryAction(it, entry.key);
+      }, {
+        primary: i === primaryIndex,
+        disabled: entry.enabled === false,
+        disabledReason: entry.disabledReason,
+      }));
+    });
+
+    const groundAction = resolveGroundPickupAction();
+    if (groundAction) {
+      actions.appendChild(createActionButton(groundAction.label, groundAction.run));
+    }
+  }
+
+  /**
+   * @param {any} it
+   * @param {"apply"|"equip"|"use"|"set-spell"|"throw"|"drop"} actionKey
+   */
+  function dispatchInventoryAction(it, actionKey) {
+    if (!it) return;
+    if (actionKey === 'apply') {
+      if (it?.canApply && Number(it?.applyTargetCount || 0) > 0) {
+        triggerApplyForTool(it);
+      }
+      return;
+    }
+    if (actionKey === 'equip') {
+      if (isInventoryItemEquippable(it) && Number.isInteger(it.id) && it.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+      }
+      return;
+    }
+    if (actionKey === 'use') {
+      if (!isInventoryItemUsable(it) || !Number.isInteger(it.id) || it.id <= 0) return;
+      if (it.type === 'potion') {
+        window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+      }
+      return;
+    }
+    if (actionKey === 'set-spell') {
+      const spellId = String(it.id || '').replace(/^spell:/, '');
+      if (spellId) {
+        window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } }));
+      }
+      return;
+    }
+    if (actionKey === 'throw') {
+      if (Number.isInteger(it.id) && it.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
+        hide(panel);
+      }
+      return;
+    }
+    if (actionKey === 'drop') {
+      if (Number.isInteger(it.id) && it.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } }));
+      }
+    }
+  }
+
+  function resolveGroundPickupAction() {
+    if (!ground || typeof ground !== 'object') return null;
+    const mode = String(ground.mode || '');
+    if (mode === 'single') {
+      const itemId = Number(ground?.item?.id || 0);
+      if (!Number.isInteger(itemId) || itemId <= 0) return null;
+      return {
+        label: 'Pickup',
+        run: () => {
+          window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: [itemId] } }));
+        },
+      };
+    }
+    const items = Array.isArray(ground.items) ? ground.items.filter((it) => Number.isInteger(it?.id) && it.id > 0) : [];
+    if (!items.length) return null;
+    const fromChest = ground.fromChest === true;
+    return {
+      label: fromChest ? 'Open Chest' : `Pickup (${items.length})`,
+      run: () => {
+        window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
+      },
+    };
+  }
+
+  /** @param {number} i @param {{ensureVisible?:boolean}} [opts] */
+  function setSel(i, opts) {
     sel = Math.max(0, Math.min(items.length - 1, i|0));
+    (/** @type {any} */ (panel))._inventorySelectionKey = String(items[sel]?.id ?? '');
+    (/** @type {any} */ (panel))._inventorySelectionIndex = sel;
     rows.forEach((r, j) => {
       const baseBg = items[j]?.unpaid ? 'rgba(65, 35, 10, 0.75)' : '#0f1421';
       const activeBg = items[j]?.unpaid ? 'rgba(85, 45, 14, 0.9)' : '#0b1323';
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? activeBg : baseBg;
     });
+    if (opts?.ensureVisible !== false) {
+      rows[sel]?.scrollIntoView({ block: 'nearest' });
+    }
     updateHint();
   }
 
   function defaultAction() {
     const it = items[sel]; if (!it) return;
     const action = getInventoryDefaultAction(it);
-    if (action === 'apply') {
-      triggerApplyForTool(it);
-    } else if (action === 'drink') {
-      window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
-    } else if (action === 'equip') {
-      window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-    } else if (action === 'use') {
-      window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
-    } else if (action === 'set-spell') {
-      const spellId = String(it.id || '').replace(/^spell:/, '');
-      if (spellId) window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } }));
-    }
+    if (action === 'none') return;
+    dispatchInventoryAction(it, action);
   }
 
   /** @param {KeyboardEvent} e */
@@ -1059,17 +1288,42 @@ function renderInventory(panel, items) {
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
     else if (k === 'Enter' || e.code === 'NumpadEnter') { defaultAction(); e.preventDefault(); }
-    else if (k === 'a' || k === 'A') { const it = items[sel]; if (it?.canApply) { triggerApplyForTool(it); e.preventDefault(); } }
+    else if (k === 'a' || k === 'A') { const it = items[sel]; if (it?.canApply && Number(it?.applyTargetCount || 0) > 0) { triggerApplyForTool(it); e.preventDefault(); } }
     else if (k === ',' || e.code === 'Comma') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'e' || k === 'E') { const it = items[sel]; if (isInventoryItemEquippable(it)) { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
-    else if (k === 'u' || k === 'U') { const it = items[sel]; if (it && (it.type === 'learn' || it.type === 'book' || it.type === 'scroll' || it.type === 'wand' || it.type === 'food')) { window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 'u' || k === 'U') {
+      const it = items[sel];
+      if (isInventoryItemUsable(it)) {
+        if (it.type === 'potion') {
+          window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+        } else {
+          window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+        }
+        e.preventDefault();
+      }
+    }
     else if (k === 't' || k === 'T') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } })); hide(panel); e.preventDefault(); } }
     else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
+    else if (k === 'p' || k === 'P') {
+      const groundAction = resolveGroundPickupAction();
+      if (groundAction) {
+        groundAction.run();
+        e.preventDefault();
+      }
+    }
   }
 
   // Activate keyboard navigation while panel is open
-  setSel(0);
+  let initialSel = 0;
+  if (savedSelectionKey) {
+    const found = items.findIndex((it) => String(it?.id ?? '') === savedSelectionKey);
+    if (found >= 0) initialSel = found;
+    else if (Number.isFinite(savedSelectionIndex)) initialSel = Math.max(0, Math.min(items.length - 1, savedSelectionIndex | 0));
+  } else if (Number.isFinite(savedSelectionIndex)) {
+    initialSel = Math.max(0, Math.min(items.length - 1, savedSelectionIndex | 0));
+  }
+  setSel(initialSel, { ensureVisible: false });
   /** @param {KeyboardEvent} e */
   /** @param {KeyboardEvent} e */
   const keyHandler = (e) => onKey(e);
@@ -2158,13 +2412,38 @@ function decorateButton(btn) {
 function ensureMessageTicker(root) {
   const box = document.createElement('div');
   Object.assign(box.style, {
-    position: 'fixed', left: '8px', top: '8px',
-    maxWidth: '40vw', maxHeight: '40vh', overflow: 'hidden',
-    display: 'flex', flexDirection: 'column', gap: '2px',
-    pointerEvents: 'none', zIndex: 850,
-    opacity: '0.75', color: '#cfe8ff', fontFamily: 'monospace', fontSize: '12px',
-    background: 'rgba(10, 14, 22, 0.35)',
-    borderRadius: '6px', padding: '6px 8px', border: '1px solid rgba(45,59,82,0.5)'
+    position: 'fixed',
+    left: 'calc(8px + env(safe-area-inset-left, 0px))',
+    top: 'calc(8px + env(safe-area-inset-top, 0px))',
+    width: 'min(58vw, 560px)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '3px',
+    pointerEvents: 'auto',
+    zIndex: 850,
+    color: '#cfe8ff',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    lineHeight: '1.25',
+    background: 'rgba(10, 14, 22, 0.42)',
+    borderRadius: '8px',
+    padding: '7px 9px',
+    border: '1px solid rgba(45,59,82,0.56)',
+    boxShadow: '0 4px 18px rgba(0,0,0,0.35)',
+    backdropFilter: 'blur(1.5px)',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    userSelect: 'none',
+    transition: 'width 140ms ease-out, max-height 140ms ease-out, background 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out',
+  });
+  (/** @type {any} */ (box))._entries = [];
+  (/** @type {any} */ (box))._expanded = false;
+  box.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const next = !(/** @type {any} */ (box))._expanded;
+    (/** @type {any} */ (box))._expanded = next;
+    renderMessageTicker(box, (/** @type {any} */ (box))._entries || []);
   });
   root.appendChild(box);
   return box;
@@ -2173,12 +2452,121 @@ function ensureMessageTicker(root) {
 /** @param {HTMLElement} container @param {Array<any>} entries */
 function renderMessageTicker(container, entries) {
   if (!container) return;
-  // Show last ~8 messages with oldest at top, newest at bottom
-  const recent = entries.slice(-8);
+  const store = /** @type {any} */ (container);
+  const allEntries = Array.isArray(entries) ? entries.slice() : [];
+  store._entries = allEntries;
+  const expanded = !!store._expanded;
+  if (expanded) {
+    Object.assign(container.style, {
+      width: 'min(86vw, 760px)',
+      maxHeight: 'min(50vh, 430px)',
+      gap: '6px',
+      fontSize: '13px',
+      lineHeight: '1.3',
+      padding: '10px 12px',
+      background: 'rgba(8,12,18,0.88)',
+      border: '1px solid rgba(80,120,170,0.82)',
+      boxShadow: '0 12px 34px rgba(0,0,0,0.52)',
+      backdropFilter: 'blur(4px)',
+      cursor: 'pointer',
+    });
+  } else {
+    Object.assign(container.style, {
+      width: 'min(58vw, 560px)',
+      maxHeight: '',
+      gap: '3px',
+      fontSize: '12px',
+      lineHeight: '1.25',
+      padding: '7px 9px',
+      background: 'rgba(10, 14, 22, 0.42)',
+      border: '1px solid rgba(45,59,82,0.56)',
+      boxShadow: '0 4px 18px rgba(0,0,0,0.35)',
+      backdropFilter: 'blur(1.5px)',
+      cursor: 'pointer',
+    });
+  }
+
   container.innerHTML = '';
+  if (!allEntries.length) return;
+
+  if (expanded) {
+    const header = document.createElement('div');
+    header.textContent = 'Message Log';
+    Object.assign(header.style, {
+      fontWeight: '700',
+      letterSpacing: '0.02em',
+      color: '#cfe8ff',
+      textShadow: '0 1px 0 rgba(0,0,0,0.45)',
+    });
+    container.appendChild(header);
+
+    const sub = document.createElement('div');
+    sub.textContent = 'Tap/click to collapse';
+    Object.assign(sub.style, {
+      fontSize: '11px',
+      opacity: '0.72',
+      marginTop: '-2px',
+      marginBottom: '2px',
+    });
+    container.appendChild(sub);
+
+    const list = document.createElement('div');
+    Object.assign(list.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+      overflowY: 'auto',
+      maxHeight: 'min(40vh, 320px)',
+      paddingRight: '2px',
+    });
+
+    const expandedEntries = allEntries.slice().reverse();
+
+    if (!expandedEntries.length) {
+      const empty = document.createElement('div');
+      empty.textContent = 'No messages yet.';
+      Object.assign(empty.style, { opacity: '0.78', fontStyle: 'italic' });
+      list.appendChild(empty);
+    } else {
+      for (let i = 0; i < expandedEntries.length; i++) {
+        const m = expandedEntries[i];
+        const row = document.createElement('div');
+        if (typeof m === 'string') {
+          row.textContent = m;
+          row.style.color = getMessageColor('default');
+        } else if (m && typeof m === 'object') {
+          row.textContent = String(m.text || '');
+          row.style.color = getMessageColor(String(m.type || 'default'));
+        } else {
+          row.textContent = String(m ?? '');
+          row.style.color = getMessageColor('default');
+        }
+        row.style.opacity = i === 0 ? '1' : '0.9';
+        row.style.textShadow = '0 1px 0 rgba(0,0,0,0.42)';
+        row.style.whiteSpace = 'nowrap';
+        row.style.overflow = 'hidden';
+        row.style.textOverflow = 'ellipsis';
+        list.appendChild(row);
+      }
+    }
+    container.appendChild(list);
+    return;
+  }
+
+  // Collapsed mode: newest 3 messages with recency blur hierarchy.
+  const recent = allEntries.slice(-3).reverse();
+  if (!recent.length) return;
+
+  const tierStyles = [
+    { blurPx: 0, opacity: 1.0, textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)' },
+    { blurPx: 0.65, opacity: 0.86, textShadow: '0 1px 0 rgba(0,0,0,0.38), 0 0 4px rgba(0,0,0,0.2)' },
+    { blurPx: 1.25, opacity: 0.72, textShadow: '0 1px 0 rgba(0,0,0,0.32), 0 0 3px rgba(0,0,0,0.16)' },
+  ];
+
   for (let i = 0; i < recent.length; i++) {
     const m = recent[i];
     const row = document.createElement('div');
+    const tier = tierStyles[Math.min(i, tierStyles.length - 1)];
     // Handle both plain strings (legacy) and message objects with types
     if (typeof m === 'string') {
       row.textContent = m;
@@ -2188,7 +2576,14 @@ function renderMessageTicker(container, entries) {
     } else {
       row.textContent = String(m ?? '');
     }
-    row.style.textShadow = '0 1px 0 rgba(0,0,0,0.4)';
+    row.style.textShadow = tier.textShadow;
+    row.style.opacity = String(tier.opacity);
+    row.style.filter = `blur(${tier.blurPx}px)`;
+    row.style.whiteSpace = 'nowrap';
+    row.style.overflow = 'hidden';
+    row.style.textOverflow = 'ellipsis';
+    row.style.transformOrigin = 'left center';
+    row.style.transform = i === 0 ? 'scale(1)' : (i === 1 ? 'scale(0.995)' : 'scale(0.99)');
     container.appendChild(row);
   }
 }

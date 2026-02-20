@@ -18,6 +18,7 @@ import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Vitality } from '../components/Vitality.js';
 import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
+import { ActiveEffects } from '../components/ActiveEffects.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
 
@@ -351,6 +352,15 @@ function wireDeityMiracles(deity, deityId, world) {
             deityId,
             Math.max(0.25, WRATH_DEBT_CONSUME_PER_WRATH * Math.max(0.5, Number(intensity || 0)))
           );
+        }
+
+      }
+
+      // Lightning strike shocks the player via the ActiveEffects pipeline
+      if (actualDamage > 0) {
+        const _ae = world.get(playerId, ActiveEffects);
+        if (_ae && Array.isArray(_ae.effects)) {
+          _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: 1 });
         }
       }
 

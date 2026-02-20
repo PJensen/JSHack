@@ -1,5 +1,6 @@
 // display/ui/hud.js
 // Minimal HUD with an Active Spell button.
+import { createConcentricGauge } from './concentricGauge.js';
 
 export function initHUD() {
   const root = ensureRoot();
@@ -10,65 +11,68 @@ export function initHUD() {
     pointerEvents: 'auto', zIndex: 900
   });
 
-  // Top-right vitals (HP/Mana) bars
+  // Top-right HUD cluster for gauge + active effects.
+  const topRightHud = document.createElement('div');
+  Object.assign(topRightHud.style, {
+    position: 'fixed',
+    right: 'calc(8px + env(safe-area-inset-right, 0px))',
+    top: 'calc(8px + env(safe-area-inset-top, 0px))',
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    maxWidth: 'min(96vw, 720px)',
+    pointerEvents: 'none',
+    zIndex: 905,
+  });
+
+  // Top-right concentric vitals gauge (HP/Mana/Stamina)
   const vitals = document.createElement('div');
   Object.assign(vitals.style, {
-    position: 'fixed', right: '8px', top: '8px',
-    display: 'flex', flexDirection: 'column', gap: '6px',
-    width: 'min(260px, 45vw)', pointerEvents: 'none', zIndex: 900,
-    fontFamily: 'monospace'
+    position: 'relative',
+    width: 'min(188px, 44vw)',
+    height: 'min(188px, 44vw)',
+    flex: '0 0 auto',
+    pointerEvents: 'none',
   });
+  const vitalsGauge = createConcentricGauge(vitals, {
+    health: 1,
+    mana: 1,
+    stamina: 1,
+    hpValue: 1,
+    hpMax: 1,
+    manaValue: 1,
+    manaMax: 1,
+    staminaValue: 1,
+    staminaMax: 1,
+  }, { showReadout: true });
 
-  /** @param {string} label @param {string} fg @param {string} bg */
-  function makeBar(label, fg, bg) {
-    const row = document.createElement('div');
-    row.style.display = 'flex'; row.style.flexDirection = 'column'; row.style.gap = '2px';
-    const cap = document.createElement('div');
-    cap.textContent = label;
-    cap.style.fontSize = '12px';
-    cap.style.opacity = '0.9';
-    cap.style.textAlign = 'left';
-    const box = document.createElement('div');
-    Object.assign(box.style, { position: 'relative', height: '12px', borderRadius: '6px', background: bg, border: '1px solid #2d3b52' });
-    const fill = document.createElement('div');
-    Object.assign(fill.style, { position: 'absolute', left: 0, top: 0, bottom: 0, width: '0%', background: fg, borderRadius: '6px' });
-    const text = document.createElement('div');
-    Object.assign(text.style, { position: 'absolute', right: '6px', top: '-18px', fontSize: '11px', color: '#cfe8ff', opacity: '0.9' });
-    box.appendChild(fill); box.appendChild(text);
-    row.appendChild(cap); row.appendChild(box);
-    return { row, box, fill, text };
-  }
-
-  const hp = makeBar('HP', 'linear-gradient(90deg,#7bff7b,#3ad13a)', '#0f1421');
-  const mp = makeBar('Mana', 'linear-gradient(90deg,#55aaff,#2d7dd2)', '#0f1421');
-  const st = makeBar('Stamina', 'linear-gradient(90deg,#ffc530,#ff8c00)', '#0f1421');
-  vitals.appendChild(hp.row); vitals.appendChild(mp.row); vitals.appendChild(st.row);
-
-  // Combat HUD: weapon/context and effects chips
-  const combatBox = document.createElement('div');
-  Object.assign(combatBox.style, {
-    display: 'flex', flexDirection: 'column', gap: '4px',
-    marginTop: '6px', padding: '6px 8px', borderRadius: '6px',
+  // Active effects HUD: anchored against the gauge in the top-right cluster.
+  const effectsHud = document.createElement('div');
+  Object.assign(effectsHud.style, {
+    position: 'relative',
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px',
+    marginTop: '0', padding: '6px 8px', borderRadius: '6px',
     background: 'rgba(10,14,22,0.55)', border: '1px solid #2d3b52',
-    pointerEvents: 'none'
+    maxWidth: 'min(48vw, 460px)',
+    pointerEvents: 'none',
   });
-  const weaponLine = document.createElement('div');
-  weaponLine.style.fontSize = '12px'; weaponLine.style.color = '#cfe8ff';
-  const rangedLine = document.createElement('div');
-  rangedLine.style.fontSize = '12px'; rangedLine.style.color = '#cfe8ff'; rangedLine.style.display = 'none';
-  const ammoLine = document.createElement('div');
-  ammoLine.style.fontSize = '12px'; ammoLine.style.color = '#cfe8ff'; ammoLine.style.display = 'none';
   const statusRow = document.createElement('div');
-  Object.assign(statusRow.style, { display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start' });
+  Object.assign(statusRow.style, {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    alignContent: 'flex-start'
+  });
   const affixRow = document.createElement('div');
-  Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', gap: '4px' });
-  combatBox.appendChild(weaponLine);
-  combatBox.appendChild(rangedLine);
-  combatBox.appendChild(ammoLine);
-  combatBox.appendChild(statusRow);
-  combatBox.appendChild(affixRow);
-  vitals.appendChild(combatBox);
-  root.appendChild(vitals);
+  Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '4px' });
+  effectsHud.appendChild(statusRow);
+  effectsHud.appendChild(affixRow);
+  topRightHud.appendChild(effectsHud);
+  topRightHud.appendChild(vitals);
+  root.appendChild(topRightHud);
+  vitalsGauge.draw();
 
   // Help button — desktop only, top-left corner
   const helpBtn = document.createElement('button');
@@ -98,32 +102,6 @@ export function initHUD() {
   });
   invBtn.addEventListener('click', () => {
     try { window.dispatchEvent(new CustomEvent('ui:toggleInventory')); } catch {}
-  });
-
-  // Use item button (opens filtered usable-item picker)
-  const useBtn = document.createElement('button');
-  useBtn.id = 'btn-use';
-  useBtn.textContent = 'Use';
-  Object.assign(useBtn.style, {
-    padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer'
-  });
-  useBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:openUseChooser')); } catch {}
-  });
-
-  // Apply tool button (opens apply-tool picker for touchstone, etc.)
-  const applyBtn = document.createElement('button');
-  applyBtn.id = 'btn-apply';
-  applyBtn.textContent = 'Apply';
-  Object.assign(applyBtn.style, {
-    padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer'
-  });
-  applyBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:openApplyChooser')); } catch {}
   });
 
   const castBtn = document.createElement('button');
@@ -185,19 +163,6 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
   });
 
-  // Pray button (to the right of Engrave)
-  const prayBtn = document.createElement('button');
-  prayBtn.id = 'btn-pray';
-  prayBtn.textContent = 'Pray';
-  Object.assign(prayBtn.style, {
-    padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer'
-  });
-  prayBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch {}
-  });
-
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
@@ -207,6 +172,26 @@ export function initHUD() {
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
     cursor: 'pointer',
     display: 'none' // Hidden by default, shown when pet exists
+  });
+
+  const ACTION_ICONS = Object.freeze({
+    inventory: '\u{1F392}',   // 🎒
+    cast: '\u2726',           // ✦
+    shoot: '\u{1F3F9}',       // 🏹
+    zap: '\u26A1',            // ⚡
+    throw: '\u2934',          // ⤴
+    engrave: '\u270E',        // ✎
+    petDefault: '\u{1F43E}',  // 🐾
+  });
+
+  const PET_STATE_ICONS = Object.freeze({
+    following: '\u{1F43E}',    // 🐾
+    staying: '\u2693',         // ⚓
+    fetching: '\u{1F9B4}',     // 🦴
+    returning: '\u21A9',       // ↩
+    guarding: '\u{1F6E1}\uFE0F', // 🛡️
+    fleeing: '\u{1F4A8}',      // 💨
+    idle: '\u{1F4A4}',         // 💤
   });
 
   // Long-press detection for state rotation vs menu (touch and mouse interface)
@@ -296,11 +281,15 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [invBtn, useBtn, applyBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn];
+  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       minHeight: '44px',
-      fontSize: '13px',
+      minWidth: '44px',
+      fontSize: '22px',
+      lineHeight: '1',
+      display: 'grid',
+      placeItems: 'center',
       whiteSpace: 'nowrap',
       touchAction: 'manipulation'
     });
@@ -309,29 +298,39 @@ export function initHUD() {
   const mobileLayoutMq = window.matchMedia('(max-width: 760px)');
   const setDesktopLabel = (btn, text) => { btn.dataset.desktopLabel = String(text || ''); };
   const setMobileLabel = (btn, text) => { btn.dataset.mobileLabel = String(text || ''); };
+  const setDesktopIcon = (btn, text) => { btn.dataset.desktopIcon = String(text || ''); };
+  const setMobileIcon = (btn, text) => { btn.dataset.mobileIcon = String(text || ''); };
   const refreshCommandLabels = () => {
     const isMobile = mobileLayoutMq.matches;
     for (const btn of commandButtons) {
       const desktopText = String(btn.dataset.desktopLabel || btn.textContent || '');
       const mobileText = String(btn.dataset.mobileLabel || desktopText);
-      btn.textContent = isMobile ? mobileText : desktopText;
-      btn.title = isMobile && mobileText !== desktopText ? desktopText : '';
+      const desktopIcon = String(btn.dataset.desktopIcon || btn.textContent || '');
+      const mobileIcon = String(btn.dataset.mobileIcon || desktopIcon);
+      const visibleText = isMobile ? mobileText : desktopText;
+      btn.textContent = isMobile ? mobileIcon : desktopIcon;
+      btn.title = desktopText || visibleText || '';
+      btn.setAttribute('aria-label', desktopText || visibleText || 'Action');
     }
   };
 
   setDesktopLabel(invBtn, 'Inventory'); setMobileLabel(invBtn, 'Inventory');
-  setDesktopLabel(useBtn, 'Use'); setMobileLabel(useBtn, 'Use');
-  setDesktopLabel(applyBtn, 'Apply'); setMobileLabel(applyBtn, 'Apply');
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(throwBtn, 'Throw'); setMobileLabel(throwBtn, 'Throw');
   setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Engrave');
-  setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
+  setDesktopIcon(invBtn, ACTION_ICONS.inventory); setMobileIcon(invBtn, ACTION_ICONS.inventory);
+  setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
+  setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
+  setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
+  setDesktopIcon(throwBtn, ACTION_ICONS.throw); setMobileIcon(throwBtn, ACTION_ICONS.throw);
+  setDesktopIcon(engraveBtn, ACTION_ICONS.engrave); setMobileIcon(engraveBtn, ACTION_ICONS.engrave);
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
-    helpBtn.style.display = isMobile ? 'none' : 'block';
+    // Temporarily hidden per UX direction.
+    helpBtn.style.display = 'none';
     if (isMobile) {
       Object.assign(bar.style, {
         display: 'grid',
@@ -343,8 +342,8 @@ export function initHUD() {
       for (const btn of commandButtons) {
         btn.style.width = '100%';
         btn.style.minWidth = '0';
-        btn.style.padding = '10px 6px';
-        btn.style.fontSize = '12px';
+        btn.style.padding = '8px 4px';
+        btn.style.fontSize = '20px';
         btn.style.overflow = 'hidden';
         btn.style.textOverflow = 'ellipsis';
       }
@@ -361,9 +360,9 @@ export function initHUD() {
     });
     for (const btn of commandButtons) {
       btn.style.width = '';
-      btn.style.minWidth = '';
-      btn.style.padding = '8px 12px';
-      btn.style.fontSize = '13px';
+      btn.style.minWidth = '44px';
+      btn.style.padding = '8px 10px';
+      btn.style.fontSize = '22px';
       btn.style.overflow = '';
       btn.style.textOverflow = '';
     }
@@ -396,7 +395,12 @@ export function initHUD() {
       fleeing: 'Fleeing!',
       idle: 'Idle'
     };
-    setDesktopLabel(petBtn, `Pet: ${stateLabels[state] || state}`);
+    const stateLabel = `Pet: ${stateLabels[state] || state}`;
+    setDesktopLabel(petBtn, stateLabel);
+    setMobileLabel(petBtn, stateLabel);
+    const stateIcon = PET_STATE_ICONS[state] || ACTION_ICONS.petDefault;
+    setDesktopIcon(petBtn, stateIcon);
+    setMobileIcon(petBtn, stateIcon);
     petBtn.dataset.state = state; // Store for background reset
     refreshCommandLabels();
     // Color code by state
@@ -423,7 +427,7 @@ export function initHUD() {
     castBtn.style.cursor = canCast ? 'pointer' : 'not-allowed';
   });
 
-  // Update vitals bars
+  // Update vitals gauge
   window.addEventListener('ui:updateVitals', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -433,12 +437,17 @@ export function initHUD() {
     const hpf = Math.max(0, Math.min(1, hpVal / hpMax));
     const mpf = Math.max(0, Math.min(1, mpVal / mpMax));
     const stf = Math.max(0, Math.min(1, stVal / stMax));
-    hp.fill.style.width = `${(hpf * 100).toFixed(1)}%`;
-    mp.fill.style.width = `${(mpf * 100).toFixed(1)}%`;
-    st.fill.style.width = `${(stf * 100).toFixed(1)}%`;
-    hp.text.textContent = `${hpVal}/${hpMax}`;
-    mp.text.textContent = `${mpVal}/${mpMax}`;
-    st.text.textContent = `${stVal}/${stMax}`;
+    vitalsGauge.set({
+      health: hpf,
+      mana: mpf,
+      stamina: stf,
+      hpValue: hpVal,
+      hpMax,
+      manaValue: mpVal,
+      manaMax: mpMax,
+      staminaValue: stVal,
+      staminaMax: stMax,
+    });
   });
 
   // Update combat HUD details
@@ -450,44 +459,22 @@ export function initHUD() {
     const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
     const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
 
-    // Weapon line
-    if (weapon && weapon.name) {
-      const dd = weapon.damageDice ? `, ${weapon.damageDice}` : '';
-      weaponLine.textContent = `Weapon: [${String(weapon.name)}]${dd ? ` (${dd})` : ''}`;
-    } else {
-      weaponLine.textContent = `Weapon: (none)`;
-    }
-
     const rangedCount = Math.max(0, Number(ranged?.count || 0) | 0);
     const ammoCount = Math.max(0, Number(e?.detail?.ammo ?? 0) | 0);
 
-    // Ranged line
-    if (ranged && ranged.name) {
-      if (ranged?.isWand) {
-        rangedLine.textContent = `Ranged: [${String(ranged.name)}] (${rangedCount} ch)`;
-      } else {
-        rangedLine.textContent = `Ranged: [${String(ranged.name)}]`;
-      }
-      rangedLine.style.display = '';
-    } else {
-      rangedLine.style.display = 'none';
-    }
-
     // Shoot button label follows ranged item type
     let rangedLabel = 'Shoot';
-    if (ranged?.isWand) rangedLabel = `Zap (${rangedCount})`;
+    let rangedIcon = ACTION_ICONS.shoot;
+    if (ranged?.isWand) {
+      rangedLabel = `Zap (${rangedCount})`;
+      rangedIcon = ACTION_ICONS.zap;
+    }
     else if (ranged) rangedLabel = `Shoot (${ammoCount})`;
     setDesktopLabel(shootBtn, rangedLabel);
     setMobileLabel(shootBtn, rangedLabel);
+    setDesktopIcon(shootBtn, rangedIcon);
+    setMobileIcon(shootBtn, rangedIcon);
     refreshCommandLabels();
-
-    // Ammo line (only visible when carrying arrows)
-    if (ammoCount > 0) {
-      ammoLine.textContent = `Ammo: ${ammoCount}`;
-      ammoLine.style.display = '';
-    } else {
-      ammoLine.style.display = 'none';
-    }
 
     // Effects stack (badges + pie timers)
     ensureEffectsStack(statusRow).update(statuses);
@@ -507,17 +494,14 @@ export function initHUD() {
     }
   });
 
-  // Right-aligned bar: Inventory appears left of Cast by append order
+  // Right-aligned bar: compact core actions only.
   const quick = createQuickSlot();
   bar.appendChild(invBtn);
-  bar.appendChild(useBtn);
-  bar.appendChild(applyBtn);
-  bar.appendChild(petBtn); // Pet button after Apply
+  bar.appendChild(petBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(throwBtn);
   bar.appendChild(engraveBtn);
-  bar.appendChild(prayBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
 
@@ -541,7 +525,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, invBtn, useBtn, shootBtn, throwBtn, engraveBtn, petBtn, prayBtn };
+  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
@@ -563,7 +547,8 @@ function ensureEffectsStack(container) {
     bleeding:     { name: 'Bleed',     glyph: '\u{1FA78}',       hue: 350 },
     shocked:      { name: 'Shocked',   glyph: '\u26A1',          hue: 55  },
     frozen:       { name: 'Frozen',    glyph: '\u2744\uFE0F',    hue: 200 },
-    confused:     { name: 'Confused',  glyph: '\u{1F635}',       hue: 280 },
+    confused:     { name: 'Confused',     glyph: '\u{1F635}',       hue: 280 },
+    hallucinating: { name: 'Hallucinating', glyph: '\u{1F300}',      hue: 210 },
     weakened:     { name: 'Weakened',  glyph: '\u{1FAB6}',       hue: 40  },
     cursed:       { name: 'Cursed',    glyph: '\u{1F52E}',       hue: 270 },
     blessed:      { name: 'Blessed',   glyph: '\u{1F31F}',       hue: 50  },

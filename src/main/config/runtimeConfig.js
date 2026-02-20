@@ -62,6 +62,7 @@ export function readRuntimeConfig() {
     startDepth: parseNonNegativeInt(params.get("floor"), 0) ?? 0,
     dungeonScale: parsePositiveFloat(params.get("dungeonScale"), null),
     chosenDeityId: params.get("deity") || "molkhar",
-    giveParam: params.get("give") || "",
+    giveParam:    params.get("give")    || "",
+    effectsParam: params.get("effects") || "",
   };
 }

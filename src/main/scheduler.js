@@ -23,7 +23,7 @@ import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
 import { movementSystem } from "../rules/systems/movementSystem.js";
-import { combatSystem } from "../rules/systems/combatSystem.js";
+import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
@@ -58,6 +58,8 @@ export function configureWorld(world) {
   installEngraveListeners(world);
   // Install bump-interact listener for immediate interactions (doors, chests, NPCs)
   installBumpInteractListener(world);
+  // Install bump-attack listener for immediate melee-on-bump resolution
+  installBumpAttackListener(world);
   // Install monster death hooks once per world
   installMonsterDeathHooks(world);
   // Install taunt listeners once per world

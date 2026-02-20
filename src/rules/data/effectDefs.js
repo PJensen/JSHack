@@ -51,7 +51,7 @@ export const EFFECT_DEFS = [
   {
     id: "shock",
     keys: ["shock", "shocked"],
-    operation: "none",
+    operation: "damage",
     statuses: ["shocked"],
   },
   {
@@ -95,6 +95,12 @@ export const EFFECT_DEFS = [
     keys: ["intoxicated", "intoxication", "hangover", "drunk"],
     operation: "none",
     statuses: ["confused"],
+  },
+  {
+    id: "hallucinating",
+    keys: ["hallucinating", "hallucination"],
+    operation: "none",
+    statuses: ["hallucinating"],
   },
   {
     id: "weakened",
