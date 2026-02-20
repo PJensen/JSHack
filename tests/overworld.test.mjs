@@ -61,12 +61,18 @@ Deno.test("overworld includes home interactables and harvest nodes", () => {
   let chest = 0;
   let berry = 0;
   let herbs = 0;
+  let bench = 0;
+  let thorn = 0;
+  let venom = 0;
   for (const [, ni] of world.query(NamedIdentity)) {
     if (ni.identity === "bed_home") bed++;
     if (ni.identity === "house_sign") sign++;
     if (ni.identity === "chest") chest++;
     if (ni.identity === "berry_bush") berry++;
     if (ni.identity === "herb_patch") herbs++;
+    if (ni.identity === "alchemy_bench") bench++;
+    if (ni.identity === "thorn_bramble") thorn++;
+    if (ni.identity === "venom_fern") venom++;
   }
 
   assert(bed >= 1, "expected at least one bed_home");
@@ -74,6 +80,9 @@ Deno.test("overworld includes home interactables and harvest nodes", () => {
   assert(chest >= 1, "expected at least one chest");
   assert(berry >= 1, "expected berry bushes");
   assert(herbs >= 1, "expected herb patches");
+  assert(bench >= 1, "expected an alchemy bench");
+  assert(thorn >= 1, "expected dangerous thorn brambles");
+  assert(venom >= 1, "expected dangerous venom ferns");
 });
 
 Deno.test("can transition depth 0 -> 1 -> 0", () => {

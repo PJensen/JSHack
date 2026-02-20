@@ -54,3 +54,32 @@ export const HerbPatch = defineArchetype(
   [HarvestNode, { kind: "herbs", ready: true, regrowTurns: 20, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "herbs" } }],
 );
+
+export const ThornBramble = defineArchetype(
+  "ThornBramble",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Thorn Bramble", identity: "thorn_bramble" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, { kind: "thorn_bramble", ready: true, regrowTurns: 30, regrowCountdown: 0 }],
+  [Interactable, { action: "harvestNode", params: { kind: "thorn_bramble" } }],
+);
+
+export const VenomFern = defineArchetype(
+  "VenomFern",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Venom Fern", identity: "venom_fern" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, { kind: "venom_fern", ready: true, regrowTurns: 34, regrowCountdown: 0 }],
+  [Interactable, { action: "harvestNode", params: { kind: "venom_fern" } }],
+);
+
+export const AlchemyBench = defineArchetype(
+  "AlchemyBench",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Alchemy Bench", identity: "alchemy_bench" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "brewAlchemy", params: null }],
+);

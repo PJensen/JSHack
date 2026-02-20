@@ -37,6 +37,8 @@ export const basePalette = {
   gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
   // Potions
   potion_health: { glyph: "🧪", fg: "#66ff99", glow: "#5cff9a" },
+  potion_poison: { glyph: "🧪", fg: "#84d26d", glow: "#4a8f3f" },
+  potion_stoneskin: { glyph: "🧪", fg: "#b0b3be", glow: "#6f7485" },
   // Spellbooks
   spellbook_fire: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
   spellbook_ice: { glyph: "📘", fg: "#4da6ff", glow: "#4da6ff" },
@@ -69,8 +71,12 @@ export const basePalette = {
   chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
   bed_home: { glyph: "=", fg: "#9fc4d6", glow: "#5c7f90" },
   house_sign: { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
+  alchemy_bench: { glyph: "⚗", fg: "#93def6", glow: "#4f7fa1" },
   berry_bush: { glyph: "%", fg: "#8b4ea9", glow: "#5a2d75" },
   herb_patch: { glyph: ";", fg: "#63a85f", glow: "#3e6b3c" },
+  thorn_bramble: { glyph: "☘", fg: "#7ea157", glow: "#415b2e" },
+  venom_fern: { glyph: "☣", fg: "#a5d95c", glow: "#648431" },
+  venom_spores: { glyph: "◌", fg: "#9dd46f", glow: "#5f8d3c" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },

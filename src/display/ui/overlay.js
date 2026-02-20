@@ -36,6 +36,7 @@ export function initOverlays() {
   const usePanel = ensurePanel('use');
   const throwPanel = ensurePanel('throw');
   const spells = ensurePanel('spells');
+  const alchemy = ensurePanel('alchemy');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
   const groundTip = ensureGroundTooltip(root);
@@ -89,6 +90,7 @@ export function initOverlays() {
       hide(usePanel);
       hide(throwPanel);
       hide(spells);
+      hide(alchemy);
       hide(shop);
       hide(chest);
       hide(applyPanel);
@@ -225,6 +227,32 @@ export function initOverlays() {
     const e = ev;
     const d = e?.detail || {};
     renderShop(shop, d, _shopState);
+  });
+
+  // Alchemy bench overlay
+  let _alchemyState = { benchId: 0, ingredients: { berries: 0, herbs: 0 }, recipes: [] };
+  window.addEventListener('ui:openAlchemyBench', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _alchemyState.benchId = Number(d.benchId || 0) | 0;
+    show(alchemy);
+    renderAlchemyBench(alchemy, _alchemyState);
+  });
+  window.addEventListener('ui:closeAlchemyBench', () => {
+    _alchemyState.benchId = 0;
+    hide(alchemy);
+  });
+  window.addEventListener('ui:alchemyBenchData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _alchemyState = {
+      benchId: Number(d.benchId || _alchemyState.benchId || 0) | 0,
+      ingredients: d.ingredients && typeof d.ingredients === 'object' ? d.ingredients : { berries: 0, herbs: 0 },
+      recipes: Array.isArray(d.recipes) ? d.recipes : [],
+    };
+    renderAlchemyBench(alchemy, _alchemyState);
   });
 
   // Chest overlay
@@ -2359,6 +2387,143 @@ function renderDeathLog(panel, records) {
   });
   obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
   (/** @type {any} */ (panel))._deathLogDetach = detach;
+}
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{ benchId:number, ingredients?:{berries?:number, herbs?:number}, recipes?:any[] }} state
+ */
+function renderAlchemyBench(panel, state) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = '⚗ Alchemy Bench';
+  Object.assign(title.style, {
+    fontWeight: 'bold',
+    marginBottom: '8px',
+    color: '#9fe8ff',
+    fontSize: '18px',
+  });
+  el.appendChild(title);
+
+  const subtitle = document.createElement('div');
+  subtitle.textContent = 'Pick a recipe and distill it into vials.';
+  Object.assign(subtitle.style, {
+    opacity: '0.86',
+    marginBottom: '10px',
+    fontSize: '12px',
+  });
+  el.appendChild(subtitle);
+
+  const berries = Math.max(0, Number(state?.ingredients?.berries || 0) | 0);
+  const herbs = Math.max(0, Number(state?.ingredients?.herbs || 0) | 0);
+
+  const stock = document.createElement('div');
+  Object.assign(stock.style, {
+    display: 'flex',
+    gap: '12px',
+    marginBottom: '10px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0f1421',
+  });
+  const berriesLabel = document.createElement('div');
+  berriesLabel.textContent = `Berries: ${berries}`;
+  const herbsLabel = document.createElement('div');
+  herbsLabel.textContent = `Herbs: ${herbs}`;
+  stock.appendChild(berriesLabel);
+  stock.appendChild(herbsLabel);
+  el.appendChild(stock);
+
+  const list = document.createElement('div');
+  Object.assign(list.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  });
+  el.appendChild(list);
+
+  const recipes = Array.isArray(state?.recipes) ? state.recipes : [];
+  if (!recipes.length) {
+    const empty = document.createElement('div');
+    empty.textContent = 'The bench is quiet.';
+    empty.style.opacity = '0.7';
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const recipe of recipes) {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'grid',
+      gridTemplateColumns: '1fr auto',
+      gap: '8px',
+      alignItems: 'center',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      padding: '8px',
+      background: '#101726',
+    });
+
+    const textWrap = document.createElement('div');
+    const label = document.createElement('div');
+    label.textContent = String(recipe?.label || 'Recipe');
+    label.style.fontWeight = 'bold';
+    label.style.color = '#cfe8ff';
+
+    const req = document.createElement('div');
+    const outCount = Math.max(1, Number(recipe?.outputCount || 1) | 0);
+    req.textContent = `Needs ${Math.max(0, Number(recipe?.berries || 0) | 0)} berries + ${Math.max(0, Number(recipe?.herbs || 0) | 0)} herbs → ${outCount} ${String(recipe?.outputName || 'item')}`;
+    req.style.opacity = '0.78';
+    req.style.fontSize = '12px';
+
+    const flavor = document.createElement('div');
+    flavor.textContent = String(recipe?.flavor || '');
+    flavor.style.opacity = '0.62';
+    flavor.style.fontSize = '11px';
+
+    textWrap.appendChild(label);
+    textWrap.appendChild(req);
+    if (String(recipe?.flavor || '').trim()) textWrap.appendChild(flavor);
+
+    const brewBtn = document.createElement('button');
+    const canCraft = !!recipe?.canCraft;
+    brewBtn.textContent = canCraft ? 'Distill' : 'Missing';
+    brewBtn.disabled = !canCraft || !(state?.benchId > 0);
+    Object.assign(brewBtn.style, {
+      minWidth: '92px',
+      height: '34px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: canCraft ? '#12314f' : '#1a1a1a',
+      color: canCraft ? '#b7e6ff' : '#8892a0',
+      fontWeight: 'bold',
+      cursor: canCraft ? 'pointer' : 'default',
+    });
+    brewBtn.addEventListener('click', () => {
+      const key = String(recipe?.key || '');
+      if (!key || !(state?.benchId > 0)) return;
+      window.dispatchEvent(new CustomEvent('ui:requestAlchemyBrew', {
+        detail: { benchId: state.benchId, recipe: key },
+      }));
+    });
+
+    row.appendChild(textWrap);
+    row.appendChild(brewBtn);
+    list.appendChild(row);
+  }
+
+  const hint = document.createElement('div');
+  hint.textContent = 'Esc closes the bench.';
+  Object.assign(hint.style, {
+    marginTop: '10px',
+    opacity: '0.6',
+    fontSize: '11px',
+    textAlign: 'center',
+  });
+  el.appendChild(hint);
 }
 
 // --- Death screen with social share ----------------------------------------
