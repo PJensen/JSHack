@@ -7,7 +7,7 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 /** @type {WeakMap<object, { nextTick:number }>} */
 const _stateByWorld = new WeakMap();
 
-const HOME_IDENTITIES = new Set(["bed_home", "house_sign", "berry_bush", "herb_patch"]);
+const HOME_IDENTITIES = new Set(["bed_home", "house_sign", "berry_bush", "herb_patch", "alchemy_bench"]);
 const HOME_LINES = Object.freeze([
   "A clean breeze carries the scent of pine and damp soil.",
   "Somewhere nearby, a kettle softly rattles over embers.",

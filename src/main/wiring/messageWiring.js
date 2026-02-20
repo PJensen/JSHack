@@ -379,6 +379,58 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(what, 'ambient');
   });
 
+  world.on('harvest:danger', ({ actor, kind, effect, damage }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const n = Math.max(0, Number(damage || 0) | 0);
+    if (effect === 'thorns') {
+      log(`The thorn bramble bites your hands${n > 0 ? ` for ${n}` : ''}.`, 'combat');
+      return;
+    }
+    if (effect === 'spores') {
+      const dmgText = n > 0 ? ` You take ${n} poison damage.` : '';
+      log(`Venom spores burst from the fern.${dmgText}`, 'combat');
+    }
+  });
+
+  world.on('alchemy:open', ({ actor, ingredients }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const berries = Math.max(0, Number(ingredients?.berries || 0) | 0);
+    const herbs = Math.max(0, Number(ingredients?.herbs || 0) | 0);
+    log(`You open the alchemy bench. (${berries} berries, ${herbs} herbs)`, 'system');
+  });
+
+  world.on('alchemy:crafted', ({ actor, recipeLabel, outputName, outputCount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const count = Math.max(1, Number(outputCount || 1) | 0);
+    const recipe = bracketizeName(String(recipeLabel || 'brew'));
+    const out = bracketizeName(String(outputName || 'vial'));
+    log(`You distill ${recipe} and craft ${count} ${out}.`, 'system');
+  });
+
+  world.on('alchemy:result', ({ actor, result, missing, recipeKey }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (result === 'missing_ingredients') {
+      const mb = Math.max(0, Number(missing?.berries || 0) | 0);
+      const mh = Math.max(0, Number(missing?.herbs || 0) | 0);
+      const bits = [];
+      if (mb > 0) bits.push(`${mb} berries`);
+      if (mh > 0) bits.push(`${mh} herbs`);
+      log(`Missing ingredients for ${recipeKey || 'that recipe'}: ${bits.join(' + ')}.`, 'system');
+      return;
+    }
+    if (result === 'unknown_recipe') {
+      log('That alchemy recipe is unknown.', 'system');
+      return;
+    }
+    if (result === 'no_inventory') {
+      log('You need an inventory to carry brewed vials.', 'system');
+      return;
+    }
+    if (result === 'brew_failed') {
+      log('The brew collapses into sludge.', 'system');
+    }
+  });
+
   world.on('deathlog:open', () => {
     log('You open the Book of the Dead...', 'system');
     window.dispatchEvent(new CustomEvent('ui:openDeathLog'));

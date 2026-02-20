@@ -296,6 +296,7 @@ export function generateOverworldChunks(worldSeed) {
   // Home interactables
   addSpawn(chunks, homeX - 2, homeY, "home_bed");
   addSpawn(chunks, homeX + 2, homeY, "home_chest");
+  addSpawn(chunks, homeX, homeY - 1, "alchemy_bench");
   addSpawn(chunks, homeX - 3, doorY + 2, "home_sign");
 
   // Harvest nodes around the clearing
@@ -311,16 +312,36 @@ export function generateOverworldChunks(worldSeed) {
     { x: homeX + 12, y: homeY + 2 },
     { x: homeX - 5, y: homeY + 9 },
   ];
+  const thornSpots = [
+    { x: homeX + 14, y: homeY - 1 },
+    { x: homeX - 13, y: homeY + 1 },
+    { x: homeX + 4, y: homeY + 12 },
+  ];
+  const venomSpots = [
+    { x: homeX + 10, y: homeY - 10 },
+    { x: homeX - 9, y: homeY - 11 },
+    { x: homeX - 2, y: homeY + 13 },
+  ];
 
   for (const p of berrySpots) {
     const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER || t === TILE_MOUNTAIN) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_berries");
   }
   for (const p of herbSpots) {
     const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER || t === TILE_MOUNTAIN) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_herbs");
+  }
+  for (const p of thornSpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_thorn_bramble");
+  }
+  for (const p of venomSpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_venom_fern");
   }
 
   const outChunks = [];

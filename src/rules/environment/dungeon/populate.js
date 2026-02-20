@@ -15,7 +15,16 @@ import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
 import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
-import { HomeBed, HomeChest, HomeSign, BerryBush, HerbPatch } from '../../archetypes/Overworld.js';
+import {
+  HomeBed,
+  HomeChest,
+  HomeSign,
+  BerryBush,
+  HerbPatch,
+  ThornBramble,
+  VenomFern,
+  AlchemyBench,
+} from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
@@ -439,6 +448,12 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, BerryBush, { x: spawn.x, y: spawn.y });
     case 'harvest_herbs':
       return createFrom(world, HerbPatch, { x: spawn.x, y: spawn.y });
+    case 'harvest_thorn_bramble':
+      return createFrom(world, ThornBramble, { x: spawn.x, y: spawn.y });
+    case 'harvest_venom_fern':
+      return createFrom(world, VenomFern, { x: spawn.x, y: spawn.y });
+    case 'alchemy_bench':
+      return createFrom(world, AlchemyBench, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);

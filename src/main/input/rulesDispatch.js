@@ -6,6 +6,7 @@ import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, Picku
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
+import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 
 /**
@@ -159,6 +160,15 @@ export function makeRulesDispatcher(world, getActorId) {
         const intent = { itemId };
         if (Number.isFinite(count) && count > 0) intent.count = count;
         world?.add?.(actorId, DropIntent, intent);
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.brewAlchemy": {
+        const { benchId = 0, recipe = "" } = action.payload || {};
+        if (!Number.isInteger(benchId) || benchId <= 0) break;
+        const recipeKey = String(recipe || "").trim().toLowerCase();
+        if (!recipeKey) break;
+        world?.add?.(actorId, InteractIntent, { targetId: benchId, mode: "brew", recipe: recipeKey });
         world?.tick?.(1);
         break;
       }

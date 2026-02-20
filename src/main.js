@@ -30,6 +30,7 @@ import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
 import { installMessageWiring } from "./main/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
+import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
@@ -2394,6 +2395,15 @@ addEventListener('ui:requestStairTraverse', (ev) => {
 
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
+installAlchemyWiring({
+  world,
+  playerEntity,
+  dispatchRules: (action) => {
+    const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+    rulesHandler(action);
+  },
+  log: (msg) => messageLog.log({ text: msg, type: "system" }),
+});
 installDigWiring({ world });
 installSavegameWiring({
   world,

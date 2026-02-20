@@ -9,4 +9,13 @@ export { Spawner } from './Spawner.js';
 export { Ration, IronRation, WildBerries, WildHerbs, createCorpse } from './Food.js';
 export { SpikeTrap, SnakeTrap } from './Traps.js';
 export { MagicItem } from './Items.js';
-export { HomeBed, HomeChest, HomeSign, BerryBush, HerbPatch } from './Overworld.js';
+export {
+  HomeBed,
+  HomeChest,
+  HomeSign,
+  BerryBush,
+  HerbPatch,
+  ThornBramble,
+  VenomFern,
+  AlchemyBench,
+} from './Overworld.js';

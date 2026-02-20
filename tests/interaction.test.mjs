@@ -12,6 +12,9 @@ import { Mana } from '../src/rules/components/Mana.js';
 import { Stamina } from '../src/rules/components/Stamina.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
+import { HazardArea } from '../src/rules/components/HazardArea.js';
+import { createFrom } from '../src/lib/ecs-js/archetype.js';
+import { WildBerries, WildHerbs } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
 
 Deno.test("toggle door: closed → open → closed", () => {
@@ -229,4 +232,106 @@ Deno.test("restAtBed restores hp, mana, and stamina", () => {
   assert(s.stamina === s.maxStamina, 'stamina should be fully restored');
   assert((s.regenCooldown || 0) === 0, 'regen cooldown should be reset');
   assert(rested === 1, 'rest event should fire');
+});
+
+Deno.test("thorn bramble harvest hurts actor and yields berries", () => {
+  const world = new World({ seed: 81 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Position, { x: 4, y: 4 });
+  world.add(actor, Vitality, { maxHp: 20, hp: 20 });
+
+  const node = world.create();
+  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'thorn_bramble' } });
+  world.add(node, HarvestNode, { kind: 'thorn_bramble', ready: true, regrowTurns: 11, regrowCountdown: 0 });
+  world.add(node, Position, { x: 5, y: 4 });
+
+  const dangerEvents = [];
+  world.on('harvest:danger', (e) => dangerEvents.push(e));
+
+  world.add(actor, InteractIntent, { targetId: node });
+  interactionSystem(world);
+
+  assert(dangerEvents.some((e) => e.effect === 'thorns'), 'thorn harvest should emit danger event');
+  const vit = world.get(actor, Vitality);
+  assert(vit.hp < vit.maxHp, 'thorn harvest should damage actor');
+
+  const inv = world.get(actor, Inventory);
+  assert(inv.items.length >= 1, 'actor should receive harvested item');
+  const first = inv.items[0];
+  const ni = world.get(first, NamedIdentity);
+  assert(ni.identity === 'food_wild_berries', `expected berries, got ${ni.identity}`);
+});
+
+Deno.test("venom fern harvest spawns poison hazard and hurts actor", () => {
+  const world = new World({ seed: 82 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Position, { x: 6, y: 6 });
+  world.add(actor, Vitality, { maxHp: 18, hp: 18 });
+
+  const node = world.create();
+  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'venom_fern' } });
+  world.add(node, HarvestNode, { kind: 'venom_fern', ready: true, regrowTurns: 14, regrowCountdown: 0 });
+  world.add(node, Position, { x: 7, y: 6 });
+
+  const dangerEvents = [];
+  world.on('harvest:danger', (e) => dangerEvents.push(e));
+
+  world.add(actor, InteractIntent, { targetId: node });
+  interactionSystem(world);
+
+  assert(dangerEvents.some((e) => e.effect === 'spores'), 'venom fern should emit spores danger event');
+  const vit = world.get(actor, Vitality);
+  assert(vit.hp < vit.maxHp, 'venom fern harvest should damage actor');
+
+  let foundHazard = false;
+  for (const [, ni, hazard] of world.query(NamedIdentity, HazardArea)) {
+    if (ni.identity === 'venom_spores' && String(hazard.kind) === 'poison') {
+      foundHazard = true;
+      break;
+    }
+  }
+  assert(foundHazard, 'venom fern harvest should create poison hazard');
+});
+
+Deno.test("alchemy bench opens minigame data and can brew poison", () => {
+  const world = new World({ seed: 93 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Position, { x: 3, y: 3 });
+
+  const berries = createFrom(world, WildBerries, {});
+  world.mutate(berries, ItemInfo, (r) => { r.count = 3; });
+  const herbs = createFrom(world, WildHerbs, {});
+  world.mutate(herbs, ItemInfo, (r) => { r.count = 4; });
+  const inv = world.get(actor, Inventory);
+  inv.items.push(berries, herbs);
+
+  const bench = world.create();
+  world.add(bench, Interactable, { action: 'brewAlchemy', params: null });
+  world.add(bench, Position, { x: 4, y: 3 });
+
+  const openEvents = [];
+  const crafted = [];
+  world.on('alchemy:open', (e) => openEvents.push(e));
+  world.on('alchemy:crafted', (e) => crafted.push(e));
+
+  world.add(actor, InteractIntent, { targetId: bench });
+  interactionSystem(world);
+  assert(openEvents.length === 1, 'bench interaction should emit alchemy:open');
+  assert(openEvents[0].recipes.some((r) => r.key === 'venom_draft'), 'venom recipe should be offered');
+
+  world.add(actor, InteractIntent, { targetId: bench, mode: 'brew', recipe: 'venom_draft' });
+  interactionSystem(world);
+  assert(crafted.length === 1, 'brew mode should craft a potion');
+  assert(crafted[0].outputIdentity === 'potion_poison', 'should craft poison potion');
+
+  const invAfter = world.get(actor, Inventory);
+  let poisonCount = 0;
+  for (const id of invAfter.items) {
+    const ni = world.get(id, NamedIdentity);
+    if (ni?.identity === 'potion_poison') poisonCount++;
+  }
+  assert(poisonCount >= 1, 'inventory should contain crafted poison potion');
 });
