@@ -117,3 +117,49 @@ Deno.test("killing your own pet is a grave deity offense", () => {
   assert(wrathAfter > wrathBefore, "pet murder should increase wrath");
   assert(wrathAfter >= 0.45, "pet murder should be severe enough to enter danger territory");
 });
+
+Deno.test("wrath damage scales from severity and can remove mercy floor", () => {
+  const world = new World({ seed: 0x51A1 });
+  const playerId = createPlayer(world, { name: "Hero" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "molkhar" });
+  else world.add(playerId, Devotion, { deityId: "molkhar" });
+  if (world.has(playerId, Vitality)) world.set(playerId, Vitality, { hp: 100, maxHp: 100 });
+  else world.add(playerId, Vitality, { hp: 100, maxHp: 100 });
+  if (world.has(playerId, Status)) world.set(playerId, Status, { statuses: [] });
+  else world.add(playerId, Status, { statuses: [] });
+
+  const deity = initDeity("molkhar", world);
+  assert(deity, "deity should initialize");
+  deitySystem(world); // install listeners
+
+  const damageEvents = [];
+  const wrathEvents = [];
+  world.on("damaged", (e) => damageEvents.push(e));
+  world.on("deity:wrath", (e) => wrathEvents.push(e));
+
+  deity._emit("wrath", { intensity: 1.0, tick: 100 });
+  const baseDamage = Number(damageEvents[0]?.amount || 0);
+  assert(baseDamage > 0, "baseline wrath should deal damage");
+  assert((world.get(playerId, Vitality)?.hp || 0) > 0, "baseline wrath should keep mercy floor");
+
+  // Reset health/status, then apply a horrifying offense severity payload.
+  world.set(playerId, Vitality, { hp: 100, maxHp: 100 });
+  world.set(playerId, Status, { statuses: [] });
+  world.emit("deity:offense", {
+    playerId,
+    deityId: "molkhar",
+    offense: "pet_corpse_desecration",
+    severity: "horrifying",
+    desecrateStacks: 48,
+  });
+
+  deity._emit("wrath", { intensity: 1.0, tick: 140 });
+  const scaledDamage = Number(damageEvents[1]?.amount || 0);
+  const vit = world.get(playerId, Vitality);
+
+  assert(scaledDamage > baseDamage, "severity should scale wrath damage above baseline");
+  assertEquals(vit?.hp || 0, 0, "horrifying severity should remove mercy floor on high-intensity wrath");
+  assertEquals(wrathEvents.length, 2, "should emit both wrath events");
+  assert(Number(wrathEvents[1]?.severityScale || 1) > 1, "scaled wrath event should report multiplier");
+  assert(Number(wrathEvents[1]?.wrathDebt || 0) > 0, "scaled wrath event should report wrath debt");
+});

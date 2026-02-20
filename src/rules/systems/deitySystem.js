@@ -27,11 +27,22 @@ const _deities = new Map();
 /** @type {WeakSet<import('../../lib/ecs-js/index.js').World>} */
 const _wired = new WeakSet();
 const WORLD_EVENTS_INSTALLED = Symbol.for('jshack:deity:worldEvents:installed');
+const WRATH_DEBT_KEY = Symbol.for('jshack:deity:wrathDebt');
 
 /** @type {WeakMap<import('../../lib/deity-js/deity.js').Deity, WeakSet<import('../../lib/ecs-js/index.js').World>>} */
 const _miraclesWired = new WeakMap();
 const PET_KILL_DESECRATE_STACKS = 12;
 const PET_CORPSE_DESECRATE_STACKS = 48;
+const WRATH_DEBT_CAP = 2.5;
+const WRATH_DEBT_DAMAGE_FACTOR = 0.55;
+const WRATH_DEBT_MERCY_REDUCTION = 0.02;
+const WRATH_DEBT_NO_MERCY_THRESHOLD = 1.25;
+const WRATH_DEBT_CONSUME_PER_WRATH = 0.6;
+const OFFENSE_SEVERITY_WEIGHTS = Object.freeze({
+  minor: 0.15,
+  grave: 0.45,
+  horrifying: 0.9,
+});
 
 /** Get (or lazily create) a Deity instance for a given deityId. */
 function ensureDeity(deityId, world = null) {
@@ -90,6 +101,89 @@ function stackDesecration(deity, count, type) {
 }
 
 /**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {Map<string, number>}
+ */
+function ensureWrathDebtStore(world) {
+  const current = world[WRATH_DEBT_KEY];
+  if (current instanceof Map) return current;
+  const created = new Map();
+  world[WRATH_DEBT_KEY] = created;
+  return created;
+}
+
+/**
+ * @param {number} playerId
+ * @param {string} deityId
+ * @returns {string}
+ */
+function wrathDebtSlot(playerId, deityId) {
+  return `${deityId}:${playerId}`;
+}
+
+/**
+ * Convert offense severity metadata into wrath debt delta.
+ * @param {string} severity
+ * @param {number} desecrateStacks
+ * @returns {number}
+ */
+function severityToWrathDebt(severity, desecrateStacks) {
+  const key = String(severity || '').toLowerCase();
+  const base = Number(OFFENSE_SEVERITY_WEIGHTS[key] ?? OFFENSE_SEVERITY_WEIGHTS.minor);
+  const stacks = Math.max(0, Number(desecrateStacks || 0) | 0);
+  const stackBonus = Math.min(0.9, stacks * 0.015);
+  return Math.max(0, base + stackBonus);
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{ playerId: number, deityId: string, severity?: string, desecrateStacks?: number }} spec
+ * @returns {number} current wrath debt after applying
+ */
+function addWrathDebt(world, spec) {
+  const playerId = Number(spec?.playerId || 0) | 0;
+  const deityId = String(spec?.deityId || '');
+  if (!(playerId > 0) || !deityId) return 0;
+
+  const delta = severityToWrathDebt(spec?.severity || 'minor', Number(spec?.desecrateStacks || 0));
+  if (!(delta > 0)) return 0;
+
+  const store = ensureWrathDebtStore(world);
+  const slot = wrathDebtSlot(playerId, deityId);
+  const current = Math.max(0, Number(store.get(slot) || 0));
+  const next = Math.min(WRATH_DEBT_CAP, current + delta);
+  store.set(slot, next);
+  return next;
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @param {string} deityId
+ * @returns {number}
+ */
+function getWrathDebt(world, playerId, deityId) {
+  const store = ensureWrathDebtStore(world);
+  return Math.max(0, Number(store.get(wrathDebtSlot(playerId, deityId)) || 0));
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @param {string} deityId
+ * @param {number} amount
+ */
+function spendWrathDebt(world, playerId, deityId, amount) {
+  const store = ensureWrathDebtStore(world);
+  const slot = wrathDebtSlot(playerId, deityId);
+  const current = Math.max(0, Number(store.get(slot) || 0));
+  if (!(current > 0)) return;
+  const next = Math.max(0, current - Math.max(0, Number(amount || 0)));
+  if (next > 0) store.set(slot, next);
+  else store.delete(slot);
+}
+
+/**
  * Install world-event hooks that feed the deity.
  * Called once per world instance.
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -98,6 +192,20 @@ function wireWorldEvents(world) {
   if (world[WORLD_EVENTS_INSTALLED] || _wired.has(world)) return;
   world[WORLD_EVENTS_INSTALLED] = true;
   _wired.add(world);
+
+  // Severity metadata from major offenses accumulates wrath debt.
+  world.on('deity:offense', ({ playerId, deityId, severity, desecrateStacks }) => {
+    const pid = Number(playerId || 0) | 0;
+    if (!(pid > 0) || !world.has(pid, Player)) return;
+    const did = String(deityId || world.get(pid, Devotion)?.deityId || '');
+    if (!did) return;
+    addWrathDebt(world, {
+      playerId: pid,
+      deityId: did,
+      severity: String(severity || 'minor'),
+      desecrateStacks: Number(desecrateStacks || 0),
+    });
+  });
 
   // Kill events → deity.action('kill') + optional offering
   world.on('died', ({ id, killer }) => {
@@ -215,9 +323,14 @@ function wireDeityMiracles(deity, deityId, world) {
       if (!vit) continue;
 
       const beforeHp = Math.max(0, Number(vit.hp || 0));
-      const damagePercent = 0.5 + (Number(intensity || 0) * 0.35);
+      const wrathDebt = getWrathDebt(world, playerId, deityId);
+      const severityScale = 1 + (wrathDebt * WRATH_DEBT_DAMAGE_FACTOR);
+      const damagePercent = (0.5 + (Number(intensity || 0) * 0.35)) * severityScale;
       const plannedDamage = Math.max(1, Math.floor(beforeHp * damagePercent));
-      const minHp = Math.max(1, Math.floor(Number(vit.maxHp || 1) * 0.05));
+      const mercyRatio = (wrathDebt >= WRATH_DEBT_NO_MERCY_THRESHOLD)
+        ? 0
+        : Math.max(0, 0.05 - (wrathDebt * WRATH_DEBT_MERCY_REDUCTION));
+      const minHp = Math.max(0, Math.floor(Number(vit.maxHp || 1) * mercyRatio));
       const newHp = Math.max(minHp, beforeHp - plannedDamage);
       const actualDamage = Math.max(0, beforeHp - newHp);
 
@@ -230,6 +343,15 @@ function wireDeityMiracles(deity, deityId, world) {
           bypassInvuln: true,
           bypassResist: true,
         });
+
+        if (wrathDebt > 0) {
+          spendWrathDebt(
+            world,
+            playerId,
+            deityId,
+            Math.max(0.25, WRATH_DEBT_CONSUME_PER_WRATH * Math.max(0.5, Number(intensity || 0)))
+          );
+        }
       }
 
       let cursed = false;
@@ -260,6 +382,8 @@ function wireDeityMiracles(deity, deityId, world) {
         intensity: Number(intensity || 0),
         damage: actualDamage,
         cursed,
+        severityScale,
+        wrathDebt,
         tick,
       });
     }

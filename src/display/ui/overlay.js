@@ -52,6 +52,8 @@ export function initOverlays() {
   const deathLog = ensurePanel('deathLog');
   const bookReader = ensurePanel('bookReader');
   const deathScreen = ensureDeathScreen(root);
+  const WRATH_DEATH_SCREEN_DELAY_MS = 320;
+  let deathScreenShowTimer = 0;
 
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
@@ -407,8 +409,26 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const d = e?.detail || {};
-    renderDeathScreen(deathScreen, d);
-    deathScreen.style.display = 'block';
+    const showDeathScreen = () => {
+      renderDeathScreen(deathScreen, d);
+      deathScreen.style.display = 'block';
+    };
+
+    if (deathScreenShowTimer) {
+      window.clearTimeout(deathScreenShowTimer);
+      deathScreenShowTimer = 0;
+    }
+
+    if (String(d?.cause || '').toLowerCase() === 'divine_wrath') {
+      // Let divine strike VFX read before the opaque death panel takes over.
+      deathScreenShowTimer = window.setTimeout(() => {
+        deathScreenShowTimer = 0;
+        showDeathScreen();
+      }, WRATH_DEATH_SCREEN_DELAY_MS);
+      return;
+    }
+
+    showDeathScreen();
   });
 
   return { root, inv, log, ticker };
