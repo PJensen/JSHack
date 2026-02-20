@@ -8,7 +8,7 @@ import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 
 // display/ camera + director utilities (pure display resources)
-import { createCamera, updateCamera, applyCamera, screenToWorld as cameraScreenToWorld } from "./display/camera/controller.js";
+import { createCamera, updateCamera, applyCamera, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
 import { updateShake, startShake } from "./display/camera/shake.js";
 import { zoomTo, jumpTo, easeTo } from "./display/camera/utils.js";
 
@@ -2579,10 +2579,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     return;
   }
 
-  const rect = canvas.getBoundingClientRect();
-  const sx = (ev.clientX - rect.left) * (canvas.width / Math.max(1, rect.width));
-  const sy = (ev.clientY - rect.top) * (canvas.height / Math.max(1, rect.height));
-  const [wx, wy] = cameraScreenToWorld(cam, sx, sy, canvas);
+  const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
   const tx = Math.floor(wx);
   const ty = Math.floor(wy);
 
