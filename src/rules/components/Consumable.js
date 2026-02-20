@@ -2,7 +2,7 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
 
 /**
  * Consumable component representing items that can be consumed/used.
- * @property {string} effectKey - String key into the scripting registry for the use effect.
+ * @property {string} [effectKey] - Legacy script key (optional during migration).
  * @property {object} effectParams - Plain data passed to the script handler as context.params.
  * @property {number} remainingUses - Number of uses left for the consumable item.
  * @property {object} meta - Additional metadata for the consumable item.
@@ -12,13 +12,14 @@ export const Consumable = defineComponent(
   {
     effectKey: '',
     effectParams: {},
+    potency: 0,
     remainingUses: 1,
     meta: { },
   },
   {
     validate(rec) {
-      if (typeof rec.effectKey !== "string" || !rec.effectKey)
-        throw new Error("Consumable.validate(): effectKey must be a non-empty string");
+      if (rec.effectKey != null && typeof rec.effectKey !== "string")
+        throw new Error("Consumable.validate(): effectKey must be a string when provided");
 
       if (rec.effectParams != null && typeof rec.effectParams !== "object")
         throw new Error("Consumable.validate(): effectParams must be an object or null");

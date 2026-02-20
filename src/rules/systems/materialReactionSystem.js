@@ -3,8 +3,8 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
-import { Status } from "../components/Status.js";
 import { MATERIAL_REACTION_RULES } from "../data/materialReactions.js";
+import { hasAnyStatus } from "../utils/statusFacade.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
 
@@ -17,21 +17,6 @@ function ensureSeenState(world) {
   const created = { step: -1, ids: new Set() };
   world[SEEN_KEY] = created;
   return created;
-}
-
-/**
- * @param {any} status
- * @param {string[]} statusTypes
- */
-function hasAnyStatus(status, statusTypes) {
-  if (!status || !Array.isArray(status.statuses) || !Array.isArray(statusTypes) || statusTypes.length === 0) return false;
-  const wanted = new Set(statusTypes.map((s) => String(s || "").toLowerCase()).filter(Boolean));
-  if (wanted.size === 0) return false;
-  return status.statuses.some((s) => {
-    const type = String(s?.type || "").toLowerCase();
-    const duration = Number(s?.duration || 0) | 0;
-    return duration > 0 && wanted.has(type);
-  });
 }
 
 function transmuteToAsh(world, id, info, mat) {
@@ -213,10 +198,10 @@ export function materialReactionSystem(world) {
   }
   const seen = seenState.ids;
 
-  for (const [sourceId, sourcePos, sourceStatus] of world.query(Position, Status)) {
+  for (const [sourceId, sourcePos] of world.query(Position)) {
     for (let r = 0; r < MATERIAL_REACTION_RULES.length; r++) {
       const rule = MATERIAL_REACTION_RULES[r];
-      if (!hasAnyStatus(sourceStatus, rule.sourceStatuses)) continue;
+      if (!hasAnyStatus(world, sourceId, rule.sourceStatuses)) continue;
 
       for (let s = 0; s < rule.itemScopes.length; s++) {
         const scope = rule.itemScopes[s];

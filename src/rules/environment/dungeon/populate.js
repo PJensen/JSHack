@@ -45,15 +45,16 @@ import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
 export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
-  const SPAWNER_FRACTION = 0.03; // 3% of monster budget becomes spawners (~1 every 3-5 rooms)
+  const SPAWNER_CHANCE_PER_MONSTER = 0.06; // Convert room monster budget into a per-room nest chance.
 
   for (const room of chunk.rooms) {
     const area = room.w * room.h;
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(20, 30) * diff));
-    const spawnerBudget = Math.floor(totalMonsterBudget * SPAWNER_FRACTION);
-    const monsterBudget = totalMonsterBudget - spawnerBudget;
+    const spawnerChance = Math.min(0.45, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
+    const spawnerBudget = totalMonsterBudget > 0 && rng.next() < spawnerChance ? 1 : 0;
+    const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
     // Place spawners (create monster packs)
     for (let i = 0; i < spawnerBudget; i++) {

@@ -4,10 +4,10 @@
 import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { Speed } from "../components/Speed.js";
-import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Player } from "../components/Player.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
+import { statusStrength } from "../utils/statusFacade.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
@@ -31,13 +31,9 @@ export function aiChaseSystem(world) {
 
     // Frost slow: layer on top of base Speed — each stack doubles the cadence
     // 1 stack → act half as often, 2 → third, 3 → quarter
-    const ae = world.get(id, ActiveEffects);
-    if (ae && Array.isArray(ae.effects)) {
-      const frost = ae.effects.find(/** @param {any} e */ (e) => e.key === 'frost');
-      if (frost) {
-        const stacks = Math.min(frost.stacks || 1, 3);
-        actEvery = actEvery * (1 + stacks);
-      }
+    const frostStacks = Math.min(3, statusStrength(world, id, "frozen"));
+    if (frostStacks > 0) {
+      actEvery = actEvery * (1 + frostStacks);
     }
 
     if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;

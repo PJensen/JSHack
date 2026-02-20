@@ -2,9 +2,12 @@ import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
+import { Brain } from "../../components/Brain.js";
 import { runSpellScript } from "../../scripts/spells.js";
 import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
+import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
+import { createStatusFacade } from "../../utils/statusFacade.js";
 
 /**
  * @param {string} text
@@ -101,6 +104,16 @@ export function createFacets(init) {
   const { world, tx, actor, primary, target, verb, eventBuffer, breadcrumbs, warnings } = init;
   const rngSeed = combatSeed(world.seed >>> 0, world.step | 0, actor | 0, primary | 0, (target | 0) ^ hashText32(verb));
   const rng = createDeterministicRng(rngSeed);
+  const stats = createCombatStatFacade(world, {
+    actor: () => actor,
+    primary: () => primary,
+    target: () => target,
+  });
+  const status = createStatusFacade(world, {
+    actor: () => actor,
+    primary: () => primary,
+    target: () => target,
+  });
 
   const query = Object.freeze({
     alive(entityId) {
@@ -125,6 +138,39 @@ export function createFacets(init) {
     name(entityId) {
       const ni = /** @type any */ (world.get(entityId | 0, NamedIdentity));
       return String(ni?.name || "");
+    },
+    brain(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Brain));
+    },
+    combatSnapshot(entityId, mode = "melee") {
+      return stats.snapshot(entityId | 0, mode);
+    },
+    combatStat(entityId, key, mode = "melee") {
+      return stats.value(entityId | 0, key, mode);
+    },
+    resolveDamage(entityId, rawAmount, type = "physical") {
+      return stats.resolveDamage(entityId | 0, rawAmount, type);
+    },
+    mitigation(entityId, rawAmount, type = "physical") {
+      return stats.mitigation(entityId | 0, rawAmount, type);
+    },
+    statusSnapshot(entityId) {
+      return status.snapshot(entityId | 0);
+    },
+    statusStrength(entityId, statusType) {
+      return status.statusStrength(entityId | 0, statusType);
+    },
+    hasStatus(entityId, statusType) {
+      return status.hasStatus(entityId | 0, statusType);
+    },
+    hasAnyStatus(entityId, statusTypes) {
+      return status.hasAnyStatus(entityId | 0, statusTypes);
+    },
+    effectStrength(entityId, effectKey) {
+      return status.effectStrength(entityId | 0, effectKey);
+    },
+    hasEffect(entityId, effectKey) {
+      return status.hasEffect(entityId | 0, effectKey);
     },
   });
 
@@ -213,6 +259,13 @@ export function createFacets(init) {
         emitEvent: options.emitEvent !== false,
       });
     },
+    spawnHazard(spec = {}) {
+      const rec = (spec && typeof spec === "object") ? { ...spec } : {};
+      return tx.queueMutation({
+        type: "spawnHazard",
+        spec: rec,
+      });
+    },
     learnSpell(entityId, spellId) {
       return tx.queueMutation({
         type: "learnSpell",
@@ -295,6 +348,42 @@ export function createFacets(init) {
     roll(diceExpr) {
       return rollDiceExpression(String(diceExpr || ""), rng);
     },
+    combatSnapshot(entityId = actor, mode = "melee") {
+      return stats.snapshot(entityId | 0, mode);
+    },
+    armorClass(entityId = actor, mode = "melee") {
+      return stats.armorClass(entityId | 0, mode);
+    },
+    attackBonus(entityId = actor, mode = "melee") {
+      return stats.attackBonus(entityId | 0, mode);
+    },
+    combatStat(entityId = actor, key = "armorClass", mode = "melee") {
+      return stats.value(entityId | 0, String(key || ""), mode);
+    },
+    resolveDamage(entityId = actor, rawAmount = 0, type = "physical") {
+      return stats.resolveDamage(entityId | 0, rawAmount, type);
+    },
+    mitigation(entityId = actor, rawAmount = 0, type = "physical") {
+      return stats.mitigation(entityId | 0, rawAmount, type);
+    },
+    statusSnapshot(entityId = actor) {
+      return status.snapshot(entityId | 0);
+    },
+    statusStrength(entityId = actor, statusType = "") {
+      return status.statusStrength(entityId | 0, statusType);
+    },
+    hasStatus(entityId = actor, statusType = "") {
+      return status.hasStatus(entityId | 0, statusType);
+    },
+    hasAnyStatus(entityId = actor, statusTypes = []) {
+      return status.hasAnyStatus(entityId | 0, statusTypes);
+    },
+    effectStrength(entityId = actor, effectKey = "") {
+      return status.effectStrength(entityId | 0, effectKey);
+    },
+    hasEffect(entityId = actor, effectKey = "") {
+      return status.hasEffect(entityId | 0, effectKey);
+    },
     pick(values, fallback = null) {
       if (!Array.isArray(values) || values.length <= 0) return fallback;
       return values[rng.int(0, values.length - 1)];
@@ -362,6 +451,16 @@ export function createFacets(init) {
       const y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
       return mutate.spawnMonster(monsterId, x, y, opts);
     },
+    hazardSpawn(spec = {}, at = null) {
+      const rec = (spec && typeof spec === "object") ? { ...spec } : {};
+      const fallback = query.get(actor, Position) || { x: 0, y: 0 };
+      const point = (at && typeof at === "object")
+        ? { x: Number(at.x), y: Number(at.y) }
+        : { x: Number(rec.x), y: Number(rec.y) };
+      rec.x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
+      rec.y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
+      return mutate.spawnHazard(rec);
+    },
     emit(event, payload = {}) {
       return io.emit(event, payload);
     },
@@ -376,5 +475,5 @@ export function createFacets(init) {
     },
   });
 
-  return { query, mutate, io, audit, rules, rng, fx };
+  return { query, mutate, io, audit, rules, rng, fx, stats, status };
 }

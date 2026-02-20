@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Code In / Code Out</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  body { background: #1e1e2e; color: #cdd6f4; font-family: monospace; margin: 40px; }
+  h1   { font-size: 1.2rem; color: #cba6f7; margin-bottom: 4px; }
+  p    { color: #6c7086; font-size: 0.8rem; margin-top: 0; margin-bottom: 24px; }
+  .chart-wrap { max-width: 900px; background: #181825; border-radius: 12px; padding: 28px; }
+</style>
+</head>
+<body>
+<h1>Code In / Code Out — JSHack</h1>
+<p>Lines inserted vs. deleted per day across all commits</p>
+<div class="chart-wrap">
+  <canvas id="chart"></canvas>
+</div>
+<script>
+const labels = [
+  "Oct 15","Nov 1","Nov 2","Nov 3","Nov 4",
+  "Feb 7","Feb 8","Feb 9","Feb 10","Feb 11",
+  "Feb 12","Feb 13","Feb 14","Feb 15","Feb 16",
+  "Feb 17","Feb 18","Feb 19"
+];
+
+const inserted = [4006,1959,2423,2752,1,4292,5475,5103,799,547,2326,7630,7848,4105,3693,619,3421,3158];
+const deleted  = [0,808,653,184,1,606,2207,143,57,90,374,1204,2299,1751,760,81,534,1087];
+
+const net = inserted.map((v, i) => v - deleted[i]);
+
+new Chart(document.getElementById('chart'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: 'Lines Added',
+        data: inserted,
+        backgroundColor: 'rgba(166,227,161,0.75)',
+        borderColor:     'rgba(166,227,161,1)',
+        borderWidth: 1,
+        order: 2,
+      },
+      {
+        label: 'Lines Removed',
+        data: deleted,
+        backgroundColor: 'rgba(243,139,168,0.75)',
+        borderColor:     'rgba(243,139,168,1)',
+        borderWidth: 1,
+        order: 2,
+      },
+      {
+        label: 'Net Change',
+        data: net,
+        type: 'line',
+        borderColor: 'rgba(203,166,247,0.9)',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: 'rgba(203,166,247,1)',
+        tension: 0.3,
+        order: 1,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        labels: { color: '#cdd6f4', font: { family: 'monospace' } }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks:  { color: '#6c7086', font: { family: 'monospace' } },
+        grid:   { color: 'rgba(108,112,134,0.2)' }
+      },
+      y: {
+        ticks:  { color: '#6c7086', font: { family: 'monospace' },
+                  callback: v => v.toLocaleString() },
+        grid:   { color: 'rgba(108,112,134,0.2)' }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

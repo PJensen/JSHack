@@ -7,14 +7,14 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { equipItemSystem } from '../src/rules/systems/equipItemSystem.js';
 
-function makeItem(world, { id, name, slot }) {
+function makeItem(world, { id, name, slot, type = 'equip', count = 1 }) {
   const eid = world.create();
   world.add(eid, NamedIdentity, { name, identity: id });
-  world.add(eid, ItemInfo, { type: 'equip', slot, weight: 1, value: 0, description: '', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [] });
+  world.add(eid, ItemInfo, { type, slot, weight: 1, value: 0, description: '', count, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [] });
   return eid;
 }
 
-Deno.test("equip item system: weapon, armor, rings, shield, swap, and edge cases", () => {
+Deno.test("equip item system: weapon, armor, rings, shield, ranged, swap, and edge cases", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
@@ -84,6 +84,25 @@ Deno.test("equip item system: weapon, armor, rings, shield, swap, and edge cases
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
   assert(eq.shield === shield, `shield should be buckler, got ${eq.shield}`);
+
+  // Equip ranged bow
+  const bow = makeItem(world, { id: 'bow_short', name: 'Short Bow', slot: 'ranged', type: 'equip' });
+  inv.items.push(bow);
+  world.add(actor, EquipIntent, { itemId: bow });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.ranged === bow, `ranged should be short bow, got ${eq.ranged}`);
+
+  // Equip ranged wand; previous ranged item should be displaced.
+  const wand = makeItem(world, { id: 'wand_frost', name: 'Wand of Frost', slot: 'ranged', type: 'wand', count: 3 });
+  inv.items.push(wand);
+  world.add(actor, EquipIntent, { itemId: wand });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  const wandInfo = world.get(wand, ItemInfo);
+  assert(eq.ranged === wand, `ranged should be wand, got ${eq.ranged}`);
+  assert(inv.items.includes(bow), 'displaced bow should be back in inventory');
+  assert((wandInfo?.count || 0) === 3, `wand charges should be preserved, got ${(wandInfo?.count || 0)}`);
 
   // Invalid: item not in inventory
   const ghost = makeItem(world, { id: 'ghost', name: 'Ghost Blade', slot: 'weapon' });

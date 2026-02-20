@@ -25,7 +25,10 @@ import { Brain } from "../components/Brain.js";
 import { Speed } from "../components/Speed.js";
 import { buildCatalogItem } from "../data/itemCatalogLoader.js";
 import { getMonster } from "../data/monsters.js";
+import { markExplored } from "../environment/dungeon/exploredMap.js";
+import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { spawnHazard } from "../utils/hazardSpawn.js";
 
 /**
  * Apply a single mutation op to the world.
@@ -337,6 +340,36 @@ export function applyMutation(world, op) {
       try { world.destroy(op.entityId); } catch {}
       break;
     }
+    case "dropFromInventory": {
+      const inv = /** @type any */ (world.get(op.inventoryOwnerId, Inventory));
+      if (!inv || !Array.isArray(inv.items)) return;
+      const idx = inv.items.indexOf(op.entityId);
+      if (idx === -1) return;
+
+      inv.items.splice(idx, 1);
+
+      const x = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
+      const y = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
+      if (world.has(op.entityId, Position)) {
+        try { world.set(op.entityId, Position, { x, y }); } catch {}
+      } else {
+        try { world.add(op.entityId, Position, { x, y }); } catch {}
+      }
+
+      if (op.emitEvent !== false) {
+        const info = /** @type any */ (world.get(op.entityId, ItemInfo));
+        const count = Math.max(1, Number(info?.count || 1) | 0);
+        try {
+          world.emit?.("item:dropped", {
+            actor: op.inventoryOwnerId | 0,
+            itemId: op.entityId | 0,
+            count,
+            at: { x, y },
+          });
+        } catch {}
+      }
+      break;
+    }
     case "nutrition": {
       const hc = /** @type any */ (world.get(op.entityId, Hunger));
       if (!hc) return;
@@ -368,6 +401,17 @@ export function applyMutation(world, op) {
       }
       break;
     }
+    case "revealLoadedMap": {
+      forEachLoadedTile((x, y) => markExplored(x, y));
+      break;
+    }
+    case "spawnHazard": {
+      const spec = (op.spec && typeof op.spec === "object")
+        ? { ...op.spec }
+        : {};
+      spawnHazard(world, /** @type any */ (spec));
+      break;
+    }
     case "destroy": {
       try { world.destroy(op.entityId); } catch {}
       break;
@@ -387,10 +431,13 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, attackDerived?: number, defenseDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean }} SpawnMonsterOp
  * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
+ * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
+ * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
+ * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | NutritionOp | GrantElectricResistanceOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp} MutationOp
  */
 
 export class ActionTransaction {

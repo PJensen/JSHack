@@ -1,30 +1,12 @@
 import { CastSpellIntent } from "../components/Intents/CastSpellIntent.js";
 import { Brain } from "../components/Brain.js";
 import { Mana } from "../components/Mana.js";
-import { Status } from "../components/Status.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { statusStrength } from "../utils/statusFacade.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
-
-/**
- * @param {any} status
- * @param {string} type
- * @returns {number}
- */
-function statusStrength(status, type) {
-  if (!status || !Array.isArray(status.statuses)) return 0;
-  let total = 0;
-  for (const s of status.statuses) {
-    if (!s || s.type !== type) continue;
-    if (!Number.isInteger(s.duration) || s.duration <= 0) continue;
-    const potency = Number.isFinite(s.potency) ? Number(s.potency) : 1;
-    const stacks = Number.isInteger(s.stacks) && s.stacks > 0 ? s.stacks : 1;
-    total += Math.max(1, Math.round(Math.max(0, potency) * stacks));
-  }
-  return total;
-}
 
 /**
  * @param {string} value
@@ -47,8 +29,12 @@ function hashString32(value) {
  * @returns {{ kind: "normal"|"miscast"|"fizzle", spell: any }}
  */
 function resolveConfusedCast(world, actor, intendedSpell, learnedSpellIds) {
-  const confusePower = statusStrength(world.get(actor, Status), "confused");
+  const confusePower = statusStrength(world, actor, "confused");
   if (confusePower <= 0) return { kind: "normal", spell: intendedSpell };
+  // Blink handles confusion/hallucination inside its own targeting rules.
+  if (String(intendedSpell?.id || "") === "blink") {
+    return { kind: "normal", spell: intendedSpell };
+  }
 
   const alternatives = [];
   for (let i = 0; i < learnedSpellIds.length; i++) {

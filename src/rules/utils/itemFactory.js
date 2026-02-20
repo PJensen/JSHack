@@ -34,12 +34,14 @@ const SIMPLE_ITEM_ARCHETYPES = {
  * @param {import('../../lib/ecs-js/index.js').World} world - ECS world
  * @param {string} itemId - Item identifier (e.g., 'gold', 'sword_plain', 'book_lightning')
  * @param {Object} opts - Options
- * @param {number} [opts.count=1] - Stack count for stackable items
+ * @param {number} [opts.count] - Optional explicit stack count override
  * @param {string[]} [opts.affixes=[]] - Affix IDs for equipment
  * @returns {number|null} - Created entity ID, or null if unknown item
  */
 export function createItemById(world, itemId, opts = {}) {
-  const count = opts.count || 1;
+  const rawCount = Number(opts?.count);
+  const hasExplicitCount = Number.isFinite(rawCount) && rawCount > 0;
+  const count = hasExplicitCount ? (rawCount | 0) : 0;
   const affixes = opts.affixes || [];
 
   // 1. Check simple archetypes (gold, potions, food, ammo, etc.)
@@ -54,8 +56,10 @@ export function createItemById(world, itemId, opts = {}) {
 
   // 2. Check unified catalog definitions
   const catalogDef = getCatalogItem(itemId);
-  if (catalogDef && isCatalogEquipment(catalogDef)) {
-    return buildCatalogItem(world, itemId, { affixes, count });
+  if (catalogDef && (isCatalogEquipment(catalogDef) || isCatalogMagic(catalogDef))) {
+    const buildOpts = { affixes };
+    if (hasExplicitCount) buildOpts.count = count;
+    return buildCatalogItem(world, itemId, buildOpts);
   }
 
   // 3. Check gem definitions
@@ -70,9 +74,6 @@ export function createItemById(world, itemId, opts = {}) {
     });
     return id;
   }
-
-  // 4. Check magic items (wands, scrolls, spellbooks) from unified catalog
-  if (catalogDef && isCatalogMagic(catalogDef)) return buildCatalogItem(world, itemId, { count });
 
   // Unknown item
   return null;

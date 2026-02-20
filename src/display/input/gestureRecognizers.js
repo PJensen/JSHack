@@ -259,3 +259,96 @@ export function recognizeMeteorGesture(points) {
     normalizedPath: resampled,
   };
 }
+
+/**
+ * Recognize a roughly circular loop for Blast Wave.
+ * @param {{x:number,y:number}[]} points
+ * @returns {{ quality:number, bounds:{minX:number,minY:number,width:number,height:number}, normalizedPath:{x:number,y:number}[] }|null}
+ */
+export function recognizeBlastwaveGesture(points) {
+  if (!Array.isArray(points) || points.length < 8) return null;
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let totalLength = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (!p) continue;
+    const x = Number(p.x);
+    const y = Number(p.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (i > 0) {
+      const q = points[i - 1];
+      totalLength += Math.hypot(x - q.x, y - q.y);
+    }
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const diameter = Math.max(width, height);
+  if (diameter < Math.max(16, MIN_BOUNDS * 0.7)) return null;
+  if (totalLength < MIN_TOTAL_LENGTH) return null;
+
+  const aspect = width / Math.max(1e-6, height);
+  if (aspect < 0.58 || aspect > 1.72) return null;
+
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const radii = [];
+  let sumR = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const r = Math.hypot(p.x - cx, p.y - cy);
+    radii.push(r);
+    sumR += r;
+  }
+  const meanR = sumR / Math.max(1, radii.length);
+  if (meanR < 6) return null;
+
+  let variance = 0;
+  for (let i = 0; i < radii.length; i++) {
+    const d = radii[i] - meanR;
+    variance += d * d;
+  }
+  variance /= Math.max(1, radii.length);
+  const std = Math.sqrt(variance);
+  const roundness = 1 - Math.min(1, std / Math.max(1, meanR * 0.45));
+  if (roundness < 0.33) return null;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const closure = 1 - Math.min(1, Math.hypot(last.x - first.x, last.y - first.y) / Math.max(1, meanR * 1.7));
+  if (closure < 0.2) return null;
+
+  let sweep = 0;
+  let prevA = Math.atan2(first.y - cy, first.x - cx);
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i];
+    const a = Math.atan2(p.y - cy, p.x - cx);
+    let da = a - prevA;
+    while (da > Math.PI) da -= Math.PI * 2;
+    while (da < -Math.PI) da += Math.PI * 2;
+    sweep += Math.abs(da);
+    prevA = a;
+  }
+  const sweepTurns = sweep / (Math.PI * 2);
+  if (sweepTurns < 0.72) return null;
+
+  const normalized = points.map((p) => ({
+    x: clamp01((p.x - minX) / (width || 1)),
+    y: clamp01((p.y - minY) / (height || 1)),
+  }));
+  const quality = Math.max(0, Math.min(1,
+    (roundness * 0.45)
+    + (closure * 0.3)
+    + (Math.min(1, sweepTurns) * 0.25)
+  ));
+  return {
+    quality,
+    bounds: { minX, minY, width, height },
+    normalizedPath: resamplePolyline(normalized, 32),
+  };
+}

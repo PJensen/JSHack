@@ -90,6 +90,8 @@ export function executeInteraction(world, spec) {
     audit: facets.audit,
     rules: facets.rules,
     rng: facets.rng,
+    stats: facets.stats,
+    status: facets.status,
     helpers,
     fx: helpers,
     _breadcrumbs: breadcrumbs,

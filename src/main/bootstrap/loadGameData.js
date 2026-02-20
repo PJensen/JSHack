@@ -4,13 +4,13 @@
 import { MONSTERS } from "../../rules/data/monsters.js";
 import { SPELL_DEFS } from "../../rules/data/spells.js";
 import { ITEM_CATALOG } from "../../rules/data/itemCatalog.js";
+import { AMMO_DEFS } from "../../rules/data/ammo.js";
 import { AFFIX_DEFS } from "../../rules/data/affixes.js";
 import { LOOT_TABLES } from "../../rules/data/lootTables.js";
 import { DEITY_DEFS } from "../../rules/data/deities.js";
 import { GEM_DEFS } from "../../rules/data/gems.js";
 import { APPLY_PAYLOADS } from "../../rules/content/items/applyPayloads.js";
 import {
-  USE_EFFECT_PAYLOADS,
   USE_ITEM_MATCHER_PAYLOADS,
   USE_ITEM_PAYLOADS,
 } from "../../rules/content/items/usePayloads.js";
@@ -39,7 +39,6 @@ import { validateAll } from "../../rules/data/validate.js";
  */
 export function getGameDataLoadPlan() {
   const useItemPayloadKeys = Object.keys(USE_ITEM_PAYLOADS);
-  const useEffectPayloadKeys = Object.keys(USE_EFFECT_PAYLOADS);
   /** @type {DataLoadPlanItem[]} */
   const datasets = [
     { id: "monsters", label: "Loading monster defs", total: MONSTERS.length },
@@ -59,7 +58,7 @@ export function getGameDataLoadPlan() {
     {
       id: "usePayloads",
       label: "Loading use payloads",
-      total: useItemPayloadKeys.length + USE_ITEM_MATCHER_PAYLOADS.length + useEffectPayloadKeys.length,
+      total: useItemPayloadKeys.length + USE_ITEM_MATCHER_PAYLOADS.length,
     },
     { id: "materialReactions", label: "Loading material reactions", total: MATERIAL_REACTION_RULES.length },
     { id: "validate", label: "Validating data", total: 1 },
@@ -227,14 +226,6 @@ export function loadGameData(opts = {}) {
         processed++;
         emit(ds, processed);
       }
-      const effectPayloadKeys = Object.keys(USE_EFFECT_PAYLOADS);
-      for (let i = 0; i < effectPayloadKeys.length; i++) {
-        const key = effectPayloadKeys[i];
-        void USE_EFFECT_PAYLOADS[key];
-        completed++;
-        processed++;
-        emit(ds, processed);
-      }
       continue;
     }
 
@@ -250,13 +241,13 @@ export function loadGameData(opts = {}) {
     if (ds.id === "validate") {
       validateAll({
         ITEM_CATALOG,
+        AMMO_DEFS,
         AFFIX_DEFS,
         MATERIAL_REACTION_RULES,
         MATERIAL_REACTION_OUTCOME_IDS,
         APPLY_PAYLOADS,
         USE_ITEM_PAYLOADS,
         USE_ITEM_MATCHER_PAYLOADS,
-        USE_EFFECT_PAYLOADS,
         EFFECT_DEFS,
         EFFECT_OPERATION_IDS,
         MONSTERS,

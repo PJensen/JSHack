@@ -54,6 +54,37 @@ Deno.test("wand use resolves from data defs, emits cast, and decrements charges"
   assertEquals(cast.targetId, target);
 });
 
+Deno.test("wand meteor still works without explicit x/y targeting payload", () => {
+  const world = new World({ seed: 104 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { x: 5, y: 5, name: "Caster" });
+  const inv = world.get(player, Inventory);
+  assert(inv && Array.isArray(inv.items), "player should have inventory");
+
+  const target = world.create();
+  world.add(target, Position, { x: 7, y: 5 });
+  world.add(target, Faction, { key: "enemy" });
+  world.add(target, Vitality, { hp: 20, maxHp: 20 });
+
+  const wand = buildCatalogItem(world, "wand_meteor");
+  assert(wand != null, "wand should be creatable");
+  inv.items.push(wand);
+
+  const castEvents = [];
+  world.on("castSpell", (e) => castEvents.push(e));
+
+  world.add(player, UseIntent, { itemId: wand, targetId: target });
+  world.tick(1);
+
+  const info = world.get(wand, ItemInfo);
+  assert(info, "wand should still exist after one use");
+  assertEquals(info.count, 1);
+
+  const cast = castEvents.find((e) => e.spellId === "meteor");
+  assert(cast, "wand meteor should still emit castSpell");
+});
+
 Deno.test("scroll use resolves from data defs, emits cast, and consumes item", () => {
   const world = new World({ seed: 102 });
   world.setScheduler((w) => scheduler(w));

@@ -5,6 +5,7 @@ const ITEM_HOOK_KEY_ALIASES = Object.freeze({
   before_drink: 'beforeDrink',
   on_drink: 'onDrink',
   after_drink: 'afterDrink',
+  can_dip_target: 'canDipTarget',
   before_throw: 'beforeThrow',
   on_throw: 'onThrow',
   after_throw: 'afterThrow',
@@ -21,11 +22,25 @@ const ITEM_HOOK_KEY_ALIASES = Object.freeze({
 
 const ITEM_HOOK_KEYS = new Set([
   'beforeDrink', 'onDrink', 'afterDrink',
+  'canDipTarget',
   'beforeThrow', 'onThrow', 'afterThrow',
   'beforeDip', 'onDip', 'afterDip',
   'beforeUse', 'onUse', 'afterUse',
   'beforeApply', 'onApply', 'afterApply',
   ...Object.keys(ITEM_HOOK_KEY_ALIASES),
+]);
+
+const AMMO_HOOK_KEY_ALIASES = Object.freeze({
+  on_projectile_actor_impact: "onProjectileActorImpact",
+  on_projectile_wall_impact: "onProjectileWallImpact",
+  on_projectile_miss: "onProjectileMiss",
+});
+
+const AMMO_HOOK_KEYS = new Set([
+  "onProjectileActorImpact",
+  "onProjectileWallImpact",
+  "onProjectileMiss",
+  ...Object.keys(AMMO_HOOK_KEY_ALIASES),
 ]);
 
 /**
@@ -74,6 +89,36 @@ export function validateItemCatalog(ITEM_CATALOG) {
       if (rec.bonuses) {
         for (const [k, v] of Object.entries(rec.bonuses)) {
           if (typeof v !== 'number') throw new Error(`item ${id}: bonus ${k} must be number`);
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * @param {Record<string, any>} AMMO_DEFS
+ */
+export function validateAmmoDefs(AMMO_DEFS) {
+  if (typeof AMMO_DEFS !== "object" || !AMMO_DEFS) throw new Error("AMMO_DEFS must be an object");
+
+  for (const [id, rec] of Object.entries(AMMO_DEFS)) {
+    if (!rec || typeof rec !== "object" || Array.isArray(rec)) {
+      throw new Error(`ammo ${id}: def must be an object`);
+    }
+    if (String(rec.id || id) !== id) throw new Error(`ammo ${id}: id mismatch`);
+    const hooksSurface = rec.hooks && typeof rec.hooks === "object" ? rec.hooks : rec;
+    for (const [key, value] of Object.entries(hooksSurface)) {
+      if (key === "id" || key === "name" || key === "hooks") continue;
+      if (!AMMO_HOOK_KEYS.has(key)) {
+        throw new Error(`ammo ${id}: unknown hook key '${key}'`);
+      }
+      if (!Array.isArray(value)) {
+        throw new Error(`ammo ${id}: hook '${key}' must be an array`);
+      }
+      for (let i = 0; i < value.length; i++) {
+        if (typeof value[i] !== "function") {
+          throw new Error(`ammo ${id}: hook '${key}' entry ${i} must be a function`);
         }
       }
     }
@@ -221,10 +266,6 @@ export function validateUseItemPayloads(USE_ITEM_PAYLOADS) {
   return validateNamedUsePayloadMap(USE_ITEM_PAYLOADS, 'USE_ITEM_PAYLOADS');
 }
 
-export function validateUseEffectPayloads(USE_EFFECT_PAYLOADS) {
-  return validateNamedUsePayloadMap(USE_EFFECT_PAYLOADS, 'USE_EFFECT_PAYLOADS');
-}
-
 export function validateUseMatcherPayloads(USE_ITEM_MATCHER_PAYLOADS) {
   if (!Array.isArray(USE_ITEM_MATCHER_PAYLOADS)) throw new Error('USE_ITEM_MATCHER_PAYLOADS must be an array');
   const ids = new Set();
@@ -285,7 +326,7 @@ export function validateEffectDefs(EFFECT_DEFS, opts = {}) {
 }
 
 const VALID_HOOK_KEYS = new Set([
-  'onHit', 'onBeforeHit', 'onDamaged',
+  'onHit', 'onBeforeHit', 'onDamaged', 'onDeath',
 ]);
 
 export function validateHookCallbacks(defs, opts = {}) {
@@ -320,18 +361,21 @@ export function validateHookCallbacks(defs, opts = {}) {
 
 export function validateAll({
   ITEM_CATALOG,
+  AMMO_DEFS,
   AFFIX_DEFS,
   MATERIAL_REACTION_RULES,
   MATERIAL_REACTION_OUTCOME_IDS,
   APPLY_PAYLOADS,
   USE_ITEM_PAYLOADS,
   USE_ITEM_MATCHER_PAYLOADS,
-  USE_EFFECT_PAYLOADS,
   EFFECT_DEFS,
   EFFECT_OPERATION_IDS,
   MONSTERS,
 }) {
   return validateItemCatalog(ITEM_CATALOG)
+    && (AMMO_DEFS
+      ? validateAmmoDefs(AMMO_DEFS)
+      : true)
     && validateAffixes(AFFIX_DEFS)
     && (MATERIAL_REACTION_RULES
       ? validateMaterialReactionRules(MATERIAL_REACTION_RULES, { outcomeIds: MATERIAL_REACTION_OUTCOME_IDS })
@@ -341,9 +385,6 @@ export function validateAll({
       : true)
     && (USE_ITEM_MATCHER_PAYLOADS
       ? validateUseMatcherPayloads(USE_ITEM_MATCHER_PAYLOADS)
-      : true)
-    && (USE_EFFECT_PAYLOADS
-      ? validateUseEffectPayloads(USE_EFFECT_PAYLOADS)
       : true)
     && (APPLY_PAYLOADS
       ? validateApplyPayloads(APPLY_PAYLOADS)

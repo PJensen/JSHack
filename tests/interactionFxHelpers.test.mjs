@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -108,4 +109,54 @@ Deno.test("ctx.fx remains an alias of ctx.helpers for compatibility", () => {
   assertEquals(result.ok, true);
   assertEquals(result.metrics.helperAliasUsed, true);
   assert(spawned.length >= 1, "ctx.fx alias should queue helper ops");
+});
+
+Deno.test("ctx.helpers.hazardSpawn queues generic hazards with medium metadata", () => {
+  const world = new World({ seed: 5014 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+  world.add(actor, Position, { x: 3, y: 3 });
+
+  const spawned = [];
+  world.on("hazard:spawned", (ev) => spawned.push(ev));
+
+  const result = executeInteraction(world, {
+    verb: "helper-hazard",
+    actor,
+    primary: actor,
+    target: actor,
+    params: {},
+    pipeline: (ctx) => {
+      ctx.helpers.hazardSpawn({
+        kind: "poison",
+        medium: "floor",
+        turnsLeft: 4,
+        radius: 2,
+        tickDamage: 3,
+        damageType: "poison",
+        cause: "toxic_slick",
+      }, { x: 6, y: 7 });
+      return { metrics: { hazardHelperUsed: true } };
+    },
+  });
+
+  assertEquals(result.ok, true);
+  assertEquals(result.metrics.hazardHelperUsed, true);
+  assertEquals(spawned.length, 1);
+  assertEquals(spawned[0].kind, "poison");
+  assertEquals(spawned[0].medium, "floor");
+  assertEquals(spawned[0].at?.x, 6);
+  assertEquals(spawned[0].at?.y, 7);
+
+  let found = null;
+  for (const [id, pos, hazard] of world.query(Position, HazardArea)) {
+    if ((pos.x | 0) === 6 && (pos.y | 0) === 7) {
+      found = { id, hazard };
+      break;
+    }
+  }
+  assert(found, "hazard should be created at requested tile");
+  assertEquals(String(found.hazard.kind), "poison");
+  assertEquals(String(found.hazard.medium), "floor");
+  assertEquals(Number(found.hazard.tickDamage), 3);
 });

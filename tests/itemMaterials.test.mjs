@@ -42,6 +42,14 @@ Deno.test("createItemById routes magic items through materialized loader", () =>
   assert(mat && mat.kind === "paper", "spellbook should carry paper material");
 });
 
+Deno.test("createItemById keeps wand default charges when count is omitted", () => {
+  const world = new World({ seed: 15 });
+  const id = createItemById(world, "wand_frost");
+  assert(id != null, "wand should be creatable");
+  const info = world.get(id, ItemInfo);
+  assert(info && info.count === 10, `wand should spawn with catalog charges, got ${info?.count}`);
+});
+
 Deno.test("simple archetype items carry baseline materials", () => {
   const world = new World({ seed: 14 });
 

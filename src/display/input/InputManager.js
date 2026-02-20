@@ -1,8 +1,20 @@
 // display/input/InputManager.js
-// ULTRA BASIC touch controls - no fancy gestures, just simple taps
+// Mobile-first pointer controls with spell gesture recognition.
 // This module is display-only and must not import rules.
 
+import {
+  recognizeBlastwaveGesture,
+  recognizeLightningGesture,
+  recognizeMeteorGesture,
+} from "./gestureRecognizers.js";
 import { Actions, makeAction } from "./actions.js";
+
+const TAP_SLOP_PX = 14;
+const SAMPLE_MIN_DIST_PX = 3;
+const MAX_GESTURE_POINTS = 64;
+const MIN_GESTURE_POINTS = 6;
+const CAST_MIN_QUALITY = 0.42;
+const GESTURE_CLEAR_DELAY_MS = 180;
 
 export class InputManager {
   constructor(targetEl, options = {}) {
@@ -10,15 +22,34 @@ export class InputManager {
     this.handlers = new Set();
     this.hotspots = new Map(); // id -> { element, action }
     this._canvas = options.canvas || null;
+    this._touchFeedback = options.touchFeedback !== false;
+    this._gestureClearTimer = 0;
+    this._gesture = {
+      active: false,
+      pointerId: -1,
+      pointerType: "",
+      rect: null,
+      localPoints: [],
+      viewPoints: [],
+      moved: false,
+    };
 
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
+    this._onPointerMove = (e) => this._handlePointerMove(e);
+    this._onPointerUp = (e) => this._handlePointerUp(e);
+    this._onPointerCancel = (e) => this._handlePointerCancel(e);
 
     this._bind();
   }
 
   dispose() {
     this._unbind();
+    if (this._gestureClearTimer) {
+      clearTimeout(this._gestureClearTimer);
+      this._gestureClearTimer = 0;
+    }
+    this._resetGestureState();
     this.handlers.clear();
     this.hotspots.clear();
   }
@@ -51,12 +82,18 @@ export class InputManager {
     this.target.addEventListener("keydown", this._onKeyDown);
     const el = this._canvas || this.target;
     el.addEventListener("pointerdown", this._onPointerDown, { passive: false });
+    el.addEventListener("pointermove", this._onPointerMove, { passive: false });
+    el.addEventListener("pointerup", this._onPointerUp, { passive: false });
+    el.addEventListener("pointercancel", this._onPointerCancel, { passive: false });
   }
 
   _unbind() {
     this.target.removeEventListener("keydown", this._onKeyDown);
     const el = this._canvas || this.target;
     el.removeEventListener("pointerdown", this._onPointerDown);
+    el.removeEventListener("pointermove", this._onPointerMove);
+    el.removeEventListener("pointerup", this._onPointerUp);
+    el.removeEventListener("pointercancel", this._onPointerCancel);
   }
 
   _handleKeyDown(e) {
@@ -124,8 +161,8 @@ export class InputManager {
       return;
     }
 
-    // Ranged attack: 'r'
-    if (key?.toLowerCase() === "r") {
+    // Ranged attack / zap: 'r' or 'z'
+    if (key?.toLowerCase() === "r" || key?.toLowerCase() === "z") {
       e.preventDefault();
       this._emit(makeAction(Actions.ShootRanged));
       return;
@@ -174,38 +211,208 @@ export class InputManager {
   }
 
   _handlePointerDown(e) {
-    e.preventDefault();
-    
-    // Get canvas dimensions
     const canvas = this._canvas;
     if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Convert to canvas center coordinates
+    if (e.pointerType === "mouse") {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      this._emitMoveTap(e.clientX, e.clientY, canvas.getBoundingClientRect());
+      return;
+    }
+    if (this._gesture.active) return;
+    if (typeof e.isPrimary === "boolean" && !e.isPrimary) return;
+
+    e.preventDefault();
+    if (this._gestureClearTimer) {
+      clearTimeout(this._gestureClearTimer);
+      this._gestureClearTimer = 0;
+    }
+    this._gesture.active = true;
+    this._gesture.pointerId = Number(e.pointerId);
+    this._gesture.pointerType = String(e.pointerType || "");
+    this._gesture.rect = canvas.getBoundingClientRect();
+    this._gesture.localPoints = [];
+    this._gesture.viewPoints = [];
+    this._gesture.moved = false;
+    this._appendGesturePoint(e);
+    this._emitGestureProgress(true, null);
+    try {
+      if (typeof canvas.setPointerCapture === "function") canvas.setPointerCapture(e.pointerId);
+    } catch {}
+  }
+
+  _handlePointerMove(e) {
+    if (!this._gesture.active) return;
+    if (Number(e.pointerId) !== this._gesture.pointerId) return;
+
+    e.preventDefault();
+    this._appendGesturePoint(e);
+    this._emitGestureProgress(true, null);
+  }
+
+  _handlePointerUp(e) {
+    if (!this._gesture.active) return;
+    if (Number(e.pointerId) !== this._gesture.pointerId) return;
+
+    e.preventDefault();
+    this._appendGesturePoint(e);
+
+    let recognized = null;
+    if (this._gesture.moved && this._gesture.localPoints.length >= MIN_GESTURE_POINTS) {
+      recognized = this._recognizeSpellGesture(this._gesture.localPoints, CAST_MIN_QUALITY);
+    }
+
+    if (recognized?.spellId) {
+      this._emit(makeAction(Actions.CastActiveSpell, { spellId: recognized.spellId }));
+      this._emitUi("ui:showSpellGestureHint", {
+        id: recognized.spellId,
+        mode: "cast",
+        quality: recognized.quality,
+      });
+      this._emitGestureProgress(false, recognized);
+      this._resetGestureState();
+      this._gestureClearTimer = setTimeout(() => {
+        this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
+        this._gestureClearTimer = 0;
+      }, GESTURE_CLEAR_DELAY_MS);
+      return;
+    }
+
+    const last = this._gesture.localPoints[this._gesture.localPoints.length - 1];
+    if (last) this._emitMoveFromLocalPoint(last, this._gesture.rect);
+    this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
+    this._resetGestureState();
+  }
+
+  _handlePointerCancel(e) {
+    if (!this._gesture.active) return;
+    if (Number(e.pointerId) !== this._gesture.pointerId) return;
+    e.preventDefault();
+    this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
+    this._resetGestureState();
+  }
+
+  _resetGestureState() {
+    const canvas = this._canvas;
+    const pointerId = this._gesture.pointerId;
+    this._gesture.active = false;
+    this._gesture.pointerId = -1;
+    this._gesture.pointerType = "";
+    this._gesture.rect = null;
+    this._gesture.localPoints = [];
+    this._gesture.viewPoints = [];
+    this._gesture.moved = false;
+    try {
+      if (canvas && pointerId >= 0 && typeof canvas.releasePointerCapture === "function") {
+        canvas.releasePointerCapture(pointerId);
+      }
+    } catch {}
+  }
+
+  _appendGesturePoint(e) {
+    const rect = this._gesture.rect || this._canvas?.getBoundingClientRect();
+    if (!rect) return;
+    const localX = Number(e.clientX) - rect.left;
+    const localY = Number(e.clientY) - rect.top;
+    const viewX = Number(e.clientX);
+    const viewY = Number(e.clientY);
+    if (!Number.isFinite(localX) || !Number.isFinite(localY)) return;
+    if (!Number.isFinite(viewX) || !Number.isFinite(viewY)) return;
+
+    const points = this._gesture.localPoints;
+    const last = points[points.length - 1];
+    if (last) {
+      const d = Math.hypot(localX - last.x, localY - last.y);
+      if (d < SAMPLE_MIN_DIST_PX) return;
+    }
+    points.push({ x: localX, y: localY });
+    this._gesture.viewPoints.push({ x: viewX, y: viewY });
+    if (points.length > MAX_GESTURE_POINTS) {
+      points.shift();
+      this._gesture.viewPoints.shift();
+    }
+
+    const first = points[0];
+    if (!first) return;
+    const distFromStart = Math.hypot(localX - first.x, localY - first.y);
+    this._gesture.moved = this._gesture.moved || distFromStart >= TAP_SLOP_PX;
+  }
+
+  _emitGestureProgress(active, recognized) {
+    if (!this._touchFeedback) return;
+    this._emitUi("ui:gestureProgress", {
+      points: this._gesture.viewPoints.slice(),
+      active: !!active,
+      recognized: recognized || null,
+    });
+  }
+
+  _recognizeSpellGesture(localPoints, minQuality) {
+    if (!Array.isArray(localPoints) || localPoints.length < MIN_GESTURE_POINTS) return null;
+    const z = recognizeLightningGesture(localPoints);
+    const slash = recognizeMeteorGesture(localPoints);
+    const circle = recognizeBlastwaveGesture(localPoints);
+    const candidates = [];
+    if (z && Number(z.quality) >= minQuality) {
+      candidates.push({
+        spellId: "lightning",
+        quality: Number(z.quality),
+        bounds: this._boundsToViewport(z.bounds),
+      });
+    }
+    if (slash && Number(slash.quality) >= minQuality) {
+      candidates.push({
+        spellId: "meteor",
+        quality: Number(slash.quality),
+        bounds: this._boundsToViewport(slash.bounds),
+      });
+    }
+    if (circle && Number(circle.quality) >= minQuality) {
+      candidates.push({
+        spellId: "blastwave",
+        quality: Number(circle.quality),
+        bounds: this._boundsToViewport(circle.bounds),
+      });
+    }
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => b.quality - a.quality);
+    return candidates[0];
+  }
+
+  _boundsToViewport(bounds) {
+    const rect = this._gesture.rect;
+    if (!bounds || !rect) return null;
+    return {
+      x: rect.left + Number(bounds.minX || 0),
+      y: rect.top + Number(bounds.minY || 0),
+      w: Number(bounds.width || 0),
+      h: Number(bounds.height || 0),
+    };
+  }
+
+  _emitMoveTap(clientX, clientY, rect) {
+    const x = Number(clientX) - rect.left;
+    const y = Number(clientY) - rect.top;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    this._emitMoveFromLocalPoint({ x, y }, rect);
+  }
+
+  _emitMoveFromLocalPoint(point, rect) {
+    if (!point || !rect) return;
     const centerX = rect.width * 0.5;
     const centerY = rect.height * 0.5;
-    
-    const dx = x - centerX;
-    const dy = y - centerY;
-    
-    // Determine direction based on which quadrant/region was tapped
+    const dx = point.x - centerX;
+    const dy = point.y - centerY;
     if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal movement
-      if (dx > 0) {
-        this._emit(makeAction(Actions.Move, { dx: 1, dy: 0 })); // Right
-      } else {
-        this._emit(makeAction(Actions.Move, { dx: -1, dy: 0 })); // Left
-      }
-    } else {
-      // Vertical movement
-      if (dy > 0) {
-        this._emit(makeAction(Actions.Move, { dx: 0, dy: 1 })); // Down
-      } else {
-        this._emit(makeAction(Actions.Move, { dx: 0, dy: -1 })); // Up
-      }
+      this._emit(makeAction(Actions.Move, { dx: dx > 0 ? 1 : -1, dy: 0 }));
+      return;
     }
+    this._emit(makeAction(Actions.Move, { dx: 0, dy: dy > 0 ? 1 : -1 }));
+  }
+
+  _emitUi(name, detail) {
+    try {
+      this.target?.dispatchEvent?.(new CustomEvent(name, { detail }));
+    } catch {}
   }
 }

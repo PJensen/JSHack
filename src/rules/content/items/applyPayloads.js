@@ -1,15 +1,7 @@
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
-import { getGem } from "../../data/gems.js";
-import { identify } from "../../data/identification.js";
 import { getItemHooksByIdentity } from "./itemHooks.js";
-
-export const APPLY_RESULT = Object.freeze({
-  NOTHING: "nothing",
-  TOUCHSTONE: "touchstone",
-  POISON_COAT: "poison_coat",
-});
 
 /**
  * @typedef {{
@@ -33,84 +25,12 @@ export const APPLY_RESULT = Object.freeze({
  * }} ApplyPayloadDef
  */
 
-/** @type {ApplyPayloadDef[]} */
-export const APPLY_PAYLOADS = Object.freeze([
-  {
-    id: "touchstone_identify_gem",
-    matches: (state) => {
-      if (state.toolIdentity !== "stone_touchstone") return false;
-      return String(state.targetInfo?.type || "") === "gem";
-    },
-    onApply: (ctx, state) => {
-      const gem = getGem(state.targetIdentity);
-      if (!gem) {
-        ctx.io.emit("item:applied", {
-          actor: state.actor,
-          toolId: state.toolId,
-          targetId: state.targetId,
-          result: { type: APPLY_RESULT.NOTHING },
-        });
-        return { applied: true, consumedTool: false, resultType: APPLY_RESULT.NOTHING };
-      }
-
-      const wasNew = identify(state.targetIdentity);
-      const result = {
-        type: APPLY_RESULT.TOUCHSTONE,
-        gemName: gem.name,
-        appearance: gem.appearance,
-        hardness: gem.hardness,
-        material: gem.material,
-        identified: true,
-        newlyIdentified: wasNew,
-      };
-
-      ctx.io.emit("item:applied", {
-        actor: state.actor,
-        toolId: state.toolId,
-        targetId: state.targetId,
-        result,
-      });
-      if (wasNew) {
-        ctx.io.emit("item:identified", {
-          actor: state.actor,
-          identity: state.targetIdentity,
-          name: gem.name,
-          appearance: gem.appearance,
-          category: "gem",
-        });
-      }
-
-      return { applied: true, consumedTool: false, resultType: APPLY_RESULT.TOUCHSTONE };
-    },
-  },
-  {
-    id: "poison_potion_coat_weapon",
-    matches: (state) => {
-      if (state.toolIdentity !== "potion_poison") return false;
-      const toolType = String(state.toolInfo?.type || "");
-      const targetType = String(state.targetInfo?.type || "");
-      const targetSlot = String(state.targetInfo?.slot || "");
-      return toolType === "potion" && targetType === "equip" && targetSlot === "weapon";
-    },
-    onApply: (ctx, state) => {
-      const targetInfo = state.targetInfo;
-      if (!targetInfo) return { applied: false, consumedTool: false, resultType: APPLY_RESULT.NOTHING };
-      const nextCharges = Math.max(1, Number(targetInfo?.coating?.charges || 0) + 12);
-      const coating = { kind: "poison", charges: nextCharges };
-      ctx.mutate.patchItemInfo(state.targetId, { coating });
-      ctx.io.emit("item:applied", {
-        actor: state.actor,
-        toolId: state.toolId,
-        targetId: state.targetId,
-        result: {
-          type: APPLY_RESULT.POISON_COAT,
-          coating,
-        },
-      });
-      return { applied: true, consumedTool: true, resultType: APPLY_RESULT.POISON_COAT };
-    },
-  },
-]);
+/**
+ * Reserved for cross-item matcher payloads only.
+ * Item-specific apply behavior should live on item-def hooks.
+ * @type {ApplyPayloadDef[]}
+ */
+export const APPLY_PAYLOADS = Object.freeze([]);
 
 /**
  * @param {{
@@ -140,29 +60,45 @@ export function buildApplyPayloadState(reader, spec) {
  * @returns {ApplyPayloadDef | null}
  */
 export function findApplyPayload(state) {
-  for (let i = 0; i < APPLY_PAYLOADS.length; i++) {
-    const def = APPLY_PAYLOADS[i];
-    try {
-      if (def.matches(state)) return def;
-    } catch {}
-  }
-
   const hooks = getItemHooksByIdentity(state?.toolIdentity || "");
-  if (typeof hooks.onDip === "function") {
-    return {
-      id: `item:${String(state?.toolIdentity || "unknown")}:onDip`,
-      matches: () => true,
-      beforeApply: typeof hooks.beforeDip === "function"
-        ? (ctx, nextState) => hooks.beforeDip(ctx, nextState)
-        : undefined,
-      onApply: (ctx, nextState) => hooks.onDip(ctx, nextState),
-      afterApply: typeof hooks.afterDip === "function"
-        ? (ctx, nextState) => hooks.afterDip(ctx, nextState)
-        : undefined,
-    };
+  if (typeof hooks.onDip !== "function") return null;
+
+  if (typeof hooks.canDipTarget === "function") {
+    try {
+      if (!hooks.canDipTarget(state)) return null;
+    } catch {
+      return null;
+    }
   }
 
-  return null;
+  return {
+    id: `item:${String(state?.toolIdentity || "unknown")}:onDip`,
+    matches: () => true,
+    beforeApply: typeof hooks.beforeDip === "function"
+      ? (ctx, nextState) => hooks.beforeDip(ctx, nextState)
+      : undefined,
+    onApply: (ctx, nextState) => hooks.onDip(ctx, nextState),
+    afterApply: typeof hooks.afterDip === "function"
+      ? (ctx, nextState) => hooks.afterDip(ctx, nextState)
+      : undefined,
+  };
+}
+
+/**
+ * Resolve the canonical apply payload for a tool/target pair from any reader.
+ * Shared by runtime pipeline and UI targetability helpers.
+ *
+ * @param {{
+ *   identity: (entityId: number) => string,
+ *   itemInfo: (entityId: number) => any,
+ * }} reader
+ * @param {{ actor: number, toolId: number, targetId: number }} spec
+ * @returns {{ state: ApplyPayloadState, payloadDef: ApplyPayloadDef | null }}
+ */
+export function resolveApplyPayload(reader, spec) {
+  const state = buildApplyPayloadState(reader, spec);
+  const payloadDef = findApplyPayload(state);
+  return { state, payloadDef };
 }
 
 /**
@@ -178,6 +114,16 @@ function createWorldApplyPayloadReader(world) {
       return /** @type any */ (world.get(entityId | 0, ItemInfo));
     },
   };
+}
+
+/**
+ * World-backed resolver wrapper for apply payload lookup.
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {{ actor: number, toolId: number, targetId: number }} spec
+ */
+export function resolveApplyPayloadForWorld(world, spec) {
+  const reader = createWorldApplyPayloadReader(world);
+  return resolveApplyPayload(reader, spec);
 }
 
 /**
@@ -202,12 +148,12 @@ export function listApplyTargetsForTool(world, actor, toolId) {
     if (!(targetId > 0) || targetId === toolEntityId) continue;
     if (!world.isAlive(targetId)) continue;
 
-    const state = buildApplyPayloadState(reader, {
+    const { payloadDef } = resolveApplyPayload(reader, {
       actor: actorId,
       toolId: toolEntityId,
       targetId,
     });
-    if (findApplyPayload(state)) out.push(targetId);
+    if (payloadDef) out.push(targetId);
   }
   return out;
 }

@@ -87,7 +87,6 @@ export function usePipeline(ctx) {
     info,
     intent,
     consumable: cons,
-    effectKey: String(cons?.effectKey || ""),
     effectParams: (cons?.effectParams && typeof cons.effectParams === "object") ? cons.effectParams : {},
   };
 
