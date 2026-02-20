@@ -32,9 +32,71 @@ const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
 const _solidRecs = new Map();    // id -> { id, x, y }
 
+const DISPLAY_STATUS_TAGS = new Set([
+	'invulnerable',
+	'stunned',
+	'poisoned',
+	'burning',
+	'regen',
+	'thorns',
+	'disease',
+	'bleeding',
+	'shocked',
+	'frozen',
+	'confused',
+	'weakened',
+	'cursed',
+	'blessed',
+	'mindwiped',
+	'stoneskin',
+	'taunted',
+	'hallucinating',
+	'intoxicated',
+	'satiated',
+	'peckish',
+	'hungry',
+	'famished',
+	'starving',
+	'wasting',
+]);
+
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
 let _lastFovStep = -1;
+
+/**
+ * @param {string} rawType
+ */
+function normalizeDisplayStatusType(rawType) {
+	const type = String(rawType || '').toLowerCase();
+	switch (type) {
+		case 'poison': return 'poisoned';
+		case 'burn': return 'burning';
+		case 'bleed': return 'bleeding';
+		case 'shock': return 'shocked';
+		case 'frost': return 'frozen';
+		case 'confuse': return 'confused';
+		case 'bless': return 'blessed';
+		case 'curse': return 'cursed';
+		default: return type;
+	}
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {EntityView} rec
+ */
+function projectDisplayTags(world, id, rec) {
+	/** @type {any} */ const stat = /** @type any */ (world.get(id, Status));
+	if (!stat || !Array.isArray(stat.statuses)) return;
+	for (let i = 0; i < stat.statuses.length; i++) {
+		const s = stat.statuses[i];
+		const t = normalizeDisplayStatusType(s?.type);
+		if (!t || !DISPLAY_STATUS_TAGS.has(t)) continue;
+		if (!rec.tags.includes(t)) rec.tags.push(t);
+	}
+}
 
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -124,18 +186,8 @@ export function buildWorldView(world) {
 				rec.tags.length = 0;
 			}
 
-			// Project select status types into tags for display-only logic
-			/** @type {any} */ const stat = /** @type any */ (world.get(id, Status));
-			if (stat && Array.isArray(stat.statuses)) {
-				for (let i = 0; i < stat.statuses.length; i++) {
-					const s = stat.statuses[i];
-					const t = String(s.type || '').toLowerCase();
-					if (!t) continue;
-					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regen' || t === 'thorns' || t === 'disease' || t === 'bleeding' || t === 'satiated' || t === 'peckish' || t === 'hungry' || t === 'famished' || t === 'starving' || t === 'wasting') {
-						rec.tags.push(t);
-					}
-				}
-			}
+			// Project select status types into tags for display-only logic.
+			projectDisplayTags(world, id, rec);
 
 			_allEntities.push(rec);
 
@@ -182,18 +234,8 @@ export function buildWorldView(world) {
 				rec.tags.length = 0;
 			}
 
-			// Project select status types into tags for display-only logic
-			/** @type {any} */ const stat = /** @type any */ (world.get(id, Status));
-			if (stat && Array.isArray(stat.statuses)) {
-				for (let i = 0; i < stat.statuses.length; i++) {
-					const s = stat.statuses[i];
-					const t = String(s.type || '').toLowerCase();
-					if (!t) continue;
-					if (t === 'invulnerable' || t === 'stunned' || t === 'poisoned' || t === 'burning' || t === 'regen' || t === 'thorns' || t === 'disease' || t === 'bleeding' || t === 'satiated' || t === 'peckish' || t === 'hungry' || t === 'famished' || t === 'starving' || t === 'wasting') {
-						rec.tags.push(t);
-					}
-				}
-			}
+			// Project select status types into tags for display-only logic.
+			projectDisplayTags(world, id, rec);
 
 			_allEntities.push(rec);
 			if (isPlayer) {

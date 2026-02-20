@@ -81,6 +81,10 @@ export function pickTrap(rng, depth) {
     const count = Math.min(5, 2 + Math.floor(depth / 5));
     return { type: 'snake', script: 'trap_snake', params: { count } };
   }
+  // Shock traps appear from depth 3+, 20% base chance
+  if (depth >= 3 && rng.next() < 0.20) {
+    return { type: 'shock', script: 'trap_shock', params: { percent: 0.15 } };
+  }
   // Spike damage: 35% of max HP at all depths
   const percent = 0.35;
   return { type: 'spike', script: 'trap_spike', params: { percent } };

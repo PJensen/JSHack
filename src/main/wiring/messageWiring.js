@@ -586,4 +586,8 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     const label = name ? bracketizeName(name) : `item ${itemId}`;
     log(`You equip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
   });
+  world.on('item:unequipped', ({ actor, itemId, slot, name }) => {
+    const label = name ? bracketizeName(name) : `item ${itemId}`;
+    log(`You unequip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
+  });
 }

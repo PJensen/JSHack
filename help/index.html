@@ -248,6 +248,26 @@
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    /* ── Effects tab ── */
+    .op-damage { color: #ff7755; }
+    .op-heal   { color: #7bd47b; }
+    .op-none   { color: var(--text-dim); }
+    .effect-test-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 11px;
+      padding: 2px 8px;
+      border: 1px solid rgba(85,170,255,0.3);
+      border-radius: 3px;
+      background: rgba(85,170,255,0.07);
+      transition: background .12s, border-color .12s;
+      white-space: nowrap;
+    }
+    .effect-test-link:hover {
+      background: rgba(85,170,255,0.18);
+      border-color: rgba(85,170,255,0.6);
+    }
   </style>
 </head>
 <body>
@@ -261,6 +281,7 @@
   <button class="tab-btn"        data-tab="bestiary">Bestiary</button>
   <button class="tab-btn"        data-tab="items">Item Index</button>
   <button class="tab-btn"        data-tab="spells">Spells</button>
+  <button class="tab-btn"        data-tab="effects">Effects</button>
 </nav>
 
 
@@ -873,6 +894,18 @@
 </section>
 
 
+<!-- ═══════════════════════════════════════════════════ EFFECTS -->
+<section id="effects" class="tab-panel">
+
+  <div class="section">
+    <h2>Effects</h2>
+    <p>Sourced directly from <code>rules/data/effectDefs.js</code>. The <em>Test in Game</em> link applies the effect to the player for 200 turns.</p>
+    <div id="effects-table-container"></div>
+  </div>
+
+</section>
+
+
 <script>
   // ── Tab switching ──────────────────────────────────────────────────────────
   const buttons = document.querySelectorAll('.tab-btn');
@@ -982,6 +1015,47 @@
 
   renderSavegame();
   renderDeaths();
+</script>
+
+<script type="module">
+  // ── Effects table — sourced from effectDefs.js ─────────────────────────────
+  import { EFFECT_DEFS } from '../src/rules/data/effectDefs.js';
+
+  const base = window.location.origin + '/';
+
+  const opClass = { damage: 'op-damage', heal: 'op-heal', none: 'op-none' };
+
+  const rows = EFFECT_DEFS.map(def => {
+    const keys = def.keys.map(k => `<code>${k}</code>`).join(' ');
+    const statuses = def.statuses.map(s => `<code>${s}</code>`).join(' ');
+    const op = def.operation;
+    const testKey = def.keys[0];
+    const href = `${base}?effects=${testKey}*200`;
+    return `
+      <tr>
+        <td>${def.id}</td>
+        <td>${keys}</td>
+        <td><span class="${opClass[op] ?? 'op-none'}">${op}</span></td>
+        <td>${statuses}</td>
+        <td><a class="effect-test-link" href="${href}" target="_blank">Test ↗</a></td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('effects-table-container').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Keys</th>
+            <th>Operation</th>
+            <th>Statuses</th>
+            <th>Test in Game</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 </script>
 
 </body>

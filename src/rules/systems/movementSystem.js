@@ -92,7 +92,20 @@ export function movementSystem(world) {
             // Emit bump-interact event for cross-system communication without direct coupling
             try { world.emit?.("bump:interact", { actor, target }); } catch {}
           } else if (areFactionsHostile(actorFaction?.key, fac?.key)) {
-            try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+            // Prefer immediate event-driven bump-attack resolution so attacks
+            // can land in the same tick when structural intent adds are deferred.
+            // Fallback to AttackIntent when no listener is installed (e.g. unit tests).
+            if (!world.has(actor, AttackIntent)) {
+              let handled = 0;
+              try {
+                handled = Number(world.emit?.("bump:attack", { attacker: actor, target }) || 0);
+              } catch {
+                handled = 0;
+              }
+              if (handled <= 0) {
+                try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+              }
+            }
           } else {
             // Non-hostile living blockers (e.g., pets and allied summons) should not trigger bump-attacks.
           }

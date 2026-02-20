@@ -12,7 +12,7 @@ import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping 
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
 import { pickMonster, pickItem, pickTrap, pickSpawner } from './tables.js';
 import { Chest } from '../../archetypes/Chest.js';
-import { SpikeTrap, SnakeTrap } from '../../archetypes/Traps.js';
+import { SpikeTrap, SnakeTrap, ShockTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
 import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
 import {
@@ -54,14 +54,14 @@ import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
 export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
-  const SPAWNER_CHANCE_PER_MONSTER = 0.06; // Convert room monster budget into a per-room nest chance.
+  const SPAWNER_CHANCE_PER_MONSTER = 0.35; // Convert room monster budget into a per-room nest chance.
 
   for (const room of chunk.rooms) {
     const area = room.w * room.h;
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(20, 30) * diff));
-    const spawnerChance = Math.min(0.45, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
+    const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
     const spawnerBudget = totalMonsterBudget > 0 && rng.next() < spawnerChance ? 1 : 0;
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
@@ -350,7 +350,7 @@ export function materializeSpawn(world, spawn) {
     }
     case 'trap': {
       const p = spawn.params;
-      const arch = p.type === 'snake' ? SnakeTrap : SpikeTrap;
+      const arch = p.type === 'snake' ? SnakeTrap : p.type === 'shock' ? ShockTrap : SpikeTrap;
       return createFrom(world, arch, {
         x: spawn.x, y: spawn.y,
         trapParams: p.params || {},

@@ -35,6 +35,7 @@ function effectKeyToType(key) {
         case 'burn': case 'burning': return 'fire';
         case 'poison': case 'poisoned': return 'poison';
         case 'bleed': case 'bleeding': return 'slash';
+        case 'shock': case 'shocked': return 'lightning';
         default: return 'generic';
     }
 }
@@ -58,8 +59,6 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
             amount,
             type: effectKeyToType(key),
             cause: key || 'effect',
-            bypassInvuln: true,
-            bypassResist: true,
         });
         return;
     }

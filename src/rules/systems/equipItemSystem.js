@@ -7,10 +7,11 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 /**
  * equipItemSystem — resolves EquipIntent:
  * - validates that item is in actor's inventory and is equippable
+ * - toggles off when selecting an already equipped item
  * - determines target slot from ItemInfo.slot
  * - swaps out existing item in that slot back into inventory
  * - moves item from inventory into the equipment slot
- * - clears intent and emits an 'equipped' event
+ * - clears intent and emits equip/unequip events
  */
 export function equipItemSystem(world) {
   for (const [actor, intent] of world.query(EquipIntent)) {
@@ -35,7 +36,32 @@ export function equipItemSystem(world) {
     }
     if (!eq) { world.remove(actor, EquipIntent); continue; }
 
-  // Determine target slot
+    // Toggle path: selecting an item that's already equipped unequips it.
+    const equippedSlot = (
+      (eq.weapon === itemId && 'weapon') ||
+      (eq.armor === itemId && 'armor') ||
+      (eq.shield === itemId && 'shield') ||
+      (eq.ring1 === itemId && 'ring1') ||
+      (eq.ring2 === itemId && 'ring2') ||
+      (eq.ammo === itemId && 'ammo') ||
+      (eq.ranged === itemId && 'ranged') ||
+      null
+    );
+    if (equippedSlot) {
+      eq[equippedSlot] = null;
+      try {
+        world.emit && world.emit('item:unequipped', {
+          actor,
+          itemId,
+          slot: equippedSlot,
+          name: world.get(itemId, NamedIdentity)?.name,
+        });
+      } catch {}
+      world.remove(actor, EquipIntent);
+      continue;
+    }
+
+    // Determine target slot
     const slot = (info.slot || '').toLowerCase();
     let appliedSlot = null;
 
