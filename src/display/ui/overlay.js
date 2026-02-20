@@ -4,6 +4,9 @@
 import { ensureMemoryGraph } from './memoryGraph.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
 
+const PANEL_Z_BASE = 1200;
+let _panelZCounter = PANEL_Z_BASE;
+
 /**
  * @param {any} it
  */
@@ -816,6 +819,7 @@ function ensurePanel(kind) {
     background: 'rgba(6,9,14,0.85)', color: '#cfe8ff',
     backdropFilter: 'blur(4px)',
     fontFamily: 'monospace',
+    zIndex: String(PANEL_Z_BASE),
   });
 
   // Tapping/clicking outside the inner content should close the overlay.
@@ -849,7 +853,11 @@ function ensurePanel(kind) {
 }
 
 /** @param {HTMLDivElement} panel */
-function show(panel) { panel.style.display = 'block'; }
+function show(panel) {
+  _panelZCounter += 1;
+  panel.style.zIndex = String(_panelZCounter);
+  panel.style.display = 'block';
+}
 /** @param {HTMLDivElement} panel */
 function hide(panel) { panel.style.display = 'none'; }
 
@@ -2405,7 +2413,7 @@ function ensureDeathScreen(root) {
     position: 'fixed', left: '0', top: '0', right: '0', bottom: '0',
     display: 'none', pointerEvents: 'auto',
     background: 'rgba(0,0,0,0.88)',
-    fontFamily: 'monospace', zIndex: 1100,
+    fontFamily: 'monospace', zIndex: '1300',
   });
   root.appendChild(panel);
   return panel;
