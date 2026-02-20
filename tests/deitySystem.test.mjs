@@ -2,9 +2,13 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { Devotion } from "../src/rules/components/Devotion.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Owner } from "../src/rules/components/Owner.js";
+import { Pet } from "../src/rules/components/Pet.js";
 import { Status } from "../src/rules/components/Status.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
-import { initDeity } from "../src/rules/systems/deitySystem.js";
+import { dealDamage } from "../src/rules/utils/dealDamage.js";
+import { deitySystem, getDeityInstance, initDeity } from "../src/rules/systems/deitySystem.js";
 
 Deno.test("deity wrath is applied in rules and emitted on world bus", () => {
   const world = new World({ seed: 0xC0FFEE });
@@ -70,4 +74,46 @@ Deno.test("deity demand and utterance are cooldown-gated and forwarded", () => {
   assertEquals(utteranceEvents.length, 2);
   assertEquals(moodEvents.length, 1);
   assertEquals(moodEvents[0].to, "wrath");
+});
+
+Deno.test("killing your own pet is a grave deity offense", () => {
+  const world = new World({ seed: 0xFA11 });
+  const playerId = createPlayer(world, { name: "Hero" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+  else world.add(playerId, Devotion, { deityId: "seraphine" });
+
+  initDeity("seraphine", world);
+  deitySystem(world); // install listeners + baseline tick
+  const deity = getDeityInstance("seraphine");
+  assert(deity, "deity should initialize");
+  const wrathBefore = deity._queryPrecise().wrath;
+
+  const kittyId = world.create();
+  world.add(kittyId, Pet);
+  world.add(kittyId, Owner, { ownerId: playerId });
+  world.add(kittyId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+  world.add(kittyId, Vitality, { hp: 1, maxHp: 1 });
+
+  const offenses = [];
+  world.on("deity:offense", (ev) => offenses.push(ev));
+
+  const result = dealDamage(world, {
+    target: kittyId,
+    source: playerId,
+    amount: 1,
+    type: "physical",
+    cause: "test_pet_murder",
+    bypassInvuln: true,
+    bypassResist: true,
+  });
+  assert(result.killed, "pet should die from killing blow");
+
+  deitySystem(world); // process added desecration load
+  const wrathAfter = deity._queryPrecise().wrath;
+
+  assertEquals(offenses.length, 1, "should emit one deity offense");
+  assertEquals(offenses[0].offense, "pet_murder");
+  assertEquals(offenses[0].playerId, playerId);
+  assert(wrathAfter > wrathBefore, "pet murder should increase wrath");
+  assert(wrathAfter >= 0.45, "pet murder should be severe enough to enter danger territory");
 });

@@ -25,6 +25,18 @@ export function installDeityUiWiring(world, { log }) {
     if (cursed) logDeity(`You feel ${deityName}'s curse upon you!`);
   });
 
+  world.on("deity:offense", ({ deityName, offense, victimName, corpseName }) => {
+    if (offense === "pet_murder") {
+      logDeity(`${deityName} is horrified that you slew ${victimName || "your companion"}.`);
+      return;
+    }
+    if (offense === "pet_corpse_desecration") {
+      logDeity(`${deityName} recoils as you defile ${corpseName || "your companion's remains"}.`);
+      return;
+    }
+    logDeity(`${deityName} condemns your sacrilege.`);
+  });
+
   world.on("deity:demand", ({ deityName }) => {
     logDeity(`${deityName} hungers for an offering!`);
   });
