@@ -2464,6 +2464,21 @@ function renderDeathScreen(panel, detail) {
     box.appendChild(document.createElement('br'));
   }
 
+  // JS-Hack link
+  const jshackLink = document.createElement('a');
+  jshackLink.href = 'https://pjensen.github.io/JSHack/';
+  jshackLink.target = '_blank';
+  jshackLink.rel = 'noopener';
+  jshackLink.textContent = 'Play JS-Hack';
+  Object.assign(jshackLink.style, {
+    display: 'inline-block', fontSize: '12px', color: '#7aacdf',
+    textDecoration: 'none', marginBottom: '10px', opacity: '0.8',
+  });
+  jshackLink.addEventListener('mouseenter', () => { jshackLink.style.opacity = '1'; });
+  jshackLink.addEventListener('mouseleave', () => { jshackLink.style.opacity = '0.8'; });
+  box.appendChild(jshackLink);
+  box.appendChild(document.createElement('br'));
+
   // Dismiss hint
   const hint = document.createElement('div');
   hint.textContent = 'Press any key to continue';
