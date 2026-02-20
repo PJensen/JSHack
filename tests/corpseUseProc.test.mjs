@@ -8,7 +8,12 @@ import { Consumable } from "../src/rules/components/Consumable.js";
 import { Resistances } from "../src/rules/components/Resistences.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Hunger } from "../src/rules/components/Hunger.js";
+import { Owner } from "../src/rules/components/Owner.js";
+import { Pet } from "../src/rules/components/Pet.js";
+import { Devotion } from "../src/rules/components/Devotion.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
+import { deitySystem, getDeityInstance, initDeity } from "../src/rules/systems/deitySystem.js";
 
 Deno.test("eating eel corpse grants electric resistance", () => {
   const world = new World({ seed: 0xC0FFEE });
@@ -100,4 +105,54 @@ Deno.test("eat cancellation prevents nutrition/effects and does not consume item
   assertEquals(cancelled[0].code, "FAIL");
   assertEquals(cancelled[0].message, "You cannot stomach that.");
   assertEquals(cancelled[0].consumesTurn, true);
+});
+
+Deno.test("eating your own pet corpse is horrifying and spikes wrath without instant death", () => {
+  const world = new World({ seed: 0xD1E7 });
+  const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+  if (world.has(player, Devotion)) world.set(player, Devotion, { deityId: "seraphine" });
+  else world.add(player, Devotion, { deityId: "seraphine" });
+  if (world.has(player, Vitality)) world.set(player, Vitality, { hp: 30, maxHp: 30 });
+  else world.add(player, Vitality, { hp: 30, maxHp: 30 });
+
+  initDeity("seraphine", world);
+  deitySystem(world); // install listeners + baseline tick
+  const deity = getDeityInstance("seraphine");
+  assert(deity, "deity should be initialized");
+  const wrathBefore = deity._queryPrecise().wrath;
+
+  const inv = world.get(player, Inventory);
+  assert(inv && Array.isArray(inv.items), "player should have inventory");
+
+  const kittyCorpse = createCorpse(world, {
+    id: "kitty",
+    name: "Kitty",
+    sizeClass: "S",
+    massKg: 5,
+    tier: 0,
+  }, { x: 0, y: 0 });
+  world.add(kittyCorpse, Pet);
+  world.add(kittyCorpse, Owner, { ownerId: player });
+  inv.items.push(kittyCorpse);
+
+  const died = [];
+  const offenses = [];
+  const wrathEvents = [];
+  world.on("died", (ev) => died.push(ev));
+  world.on("deity:offense", (ev) => offenses.push(ev));
+  world.on("deity:wrath", (ev) => wrathEvents.push(ev));
+
+  world.add(player, UseIntent, { itemId: kittyCorpse, targetId: player });
+  useItemSystem(world);
+  deitySystem(world); // resolve new desecration load into deity mood
+
+  const vit = world.get(player, Vitality);
+  const wrathAfter = deity._queryPrecise().wrath;
+  assert((vit?.hp || 0) > 0, "deity punishment should follow deity timing, not immediate execution");
+  assertEquals(died.length, 0, "corpse desecration should not instantly kill");
+  assertEquals(offenses.length, 1, "should emit one deity offense event");
+  assertEquals(offenses[0].offense, "pet_corpse_desecration");
+  assert(wrathAfter > wrathBefore, "desecrating your own pet corpse should increase wrath sharply");
+  assert(wrathAfter >= 0.45, "horrifying offense should push wrath into danger territory");
+  assertEquals(wrathEvents.length, 0, "wrath effects should still respect deity cooldown timing");
 });

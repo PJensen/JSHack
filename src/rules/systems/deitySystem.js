@@ -14,6 +14,7 @@ import { getDeity } from '../data/deities.js';
 import { Player } from '../components/Player.js';
 import { Pet } from '../components/Pet.js';
 import { Owner } from '../components/Owner.js';
+import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Vitality } from '../components/Vitality.js';
 import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
@@ -25,9 +26,12 @@ const _deities = new Map();
 
 /** @type {WeakSet<import('../../lib/ecs-js/index.js').World>} */
 const _wired = new WeakSet();
+const WORLD_EVENTS_INSTALLED = Symbol.for('jshack:deity:worldEvents:installed');
 
 /** @type {WeakMap<import('../../lib/deity-js/deity.js').Deity, WeakSet<import('../../lib/ecs-js/index.js').World>>} */
 const _miraclesWired = new WeakMap();
+const PET_KILL_DESECRATE_STACKS = 12;
+const PET_CORPSE_DESECRATE_STACKS = 48;
 
 /** Get (or lazily create) a Deity instance for a given deityId. */
 function ensureDeity(deityId, world = null) {
@@ -55,24 +59,76 @@ function ensureDeity(deityId, world = null) {
 }
 
 /**
+ * Resolve a player's deity instance from Devotion.
+ * Creates the deity lazily if needed so event handling never drops first-use signals.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @returns {{ deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }|null}
+ */
+function resolvePlayerDeity(world, playerId) {
+  const actor = Number(playerId || 0) | 0;
+  if (!(actor > 0) || !world.has(actor, Player)) return null;
+  const dev = world.get(actor, Devotion);
+  const deityId = String(dev?.deityId || '');
+  if (!deityId) return null;
+  const deity = ensureDeity(deityId, world);
+  if (!deity) return null;
+  return { deityId, deity };
+}
+
+/**
+ * Push repeated desecrate records when an offense is exceptionally taboo.
+ * @param {import('../../lib/deity-js/deity.js').Deity} deity
+ * @param {number} count
+ * @param {string} type
+ */
+function stackDesecration(deity, count, type) {
+  const n = Math.max(0, Number(count || 0) | 0);
+  for (let i = 0; i < n; i++) {
+    deity.desecrate(type);
+  }
+}
+
+/**
  * Install world-event hooks that feed the deity.
  * Called once per world instance.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 function wireWorldEvents(world) {
-  if (_wired.has(world)) return;
+  if (world[WORLD_EVENTS_INSTALLED] || _wired.has(world)) return;
+  world[WORLD_EVENTS_INSTALLED] = true;
   _wired.add(world);
 
   // Kill events → deity.action('kill') + optional offering
   world.on('died', ({ id, killer }) => {
     if (!killer) return;
-    if (!world.has(killer, Player)) return;
-    const dev = world.get(killer, Devotion);
-    if (!dev?.deityId) return;
-    const deity = _deities.get(dev.deityId);
-    if (!deity) return;
-    const def = getDeity(dev.deityId);
-    deity.action('kill', { magnitude: 0.5, target: String(id) });
+    const resolved = resolvePlayerDeity(world, killer);
+    if (!resolved) return;
+    const { deityId, deity } = resolved;
+
+    const victim = Number(id || 0) | 0;
+    const owner = world.get(victim, Owner);
+    const ownerId = Number(owner?.ownerId || 0) | 0;
+    const murderedOwnPet = world.has(victim, Pet) && ownerId > 0 && ownerId === (Number(killer || 0) | 0);
+    if (murderedOwnPet) {
+      const victimName = String(world.get(victim, NamedIdentity)?.name || 'companion');
+      deity.action('betray', { magnitude: 1.0, target: victimName });
+      stackDesecration(deity, PET_KILL_DESECRATE_STACKS, 'pet_murder');
+      world.emit('deity:offense', {
+        playerId: Number(killer || 0) | 0,
+        deityId,
+        deityName: deity.name,
+        offense: 'pet_murder',
+        severity: 'grave',
+        victimId: victim,
+        victimName,
+        desecrateStacks: PET_KILL_DESECRATE_STACKS,
+      });
+      return;
+    }
+
+    const def = getDeity(deityId);
+    deity.action('kill', { magnitude: 0.5, target: String(victim) });
     // War gods treat kills as implicit blood offerings (resets neglect clock)
     if (def?.killsAreOfferings) {
       deity.offer('blood', { value: 0.3, alignment: def.alignment ?? 'neutral' });
@@ -81,34 +137,38 @@ function wireWorldEvents(world) {
 
   // Heal events → deity.action('heal')
   world.on('healed', ({ id }) => {
-    if (!world.has(id, Player)) return;
-    const dev = world.get(id, Devotion);
-    if (!dev?.deityId) return;
-    const deity = _deities.get(dev.deityId);
-    if (!deity) return;
+    const resolved = resolvePlayerDeity(world, id);
+    if (!resolved) return;
+    const { deity } = resolved;
     deity.action('heal', { magnitude: 0.3, target: 'self' });
   });
 
-  // Pet death → deity.action('betray') — killing your own companion
-  world.on('pet:died', ({ ownerId, name }) => {
-    if (!world.has(ownerId, Player)) return;
-    const dev = world.get(ownerId, Devotion);
-    if (!dev?.deityId) return;
-    const deity = _deities.get(dev.deityId);
-    if (!deity) return;
-    // Betrayal is a serious offense — magnitude reflects the bond broken
-    deity.action('betray', { magnitude: 0.8, target: name || 'companion' });
-  });
+  // Eating pet corpse → deity.desecrate(), with heavy escalation for your own companion.
+  world.on('corpse:desecrated', ({ actor, ownerId, corpseName }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const { deityId, deity } = resolved;
+    const actorId = Number(actor || 0) | 0;
+    const ownPetCorpse = (Number(ownerId || 0) | 0) === actorId;
+    const label = String(corpseName || 'pet_corpse');
+    const stacks = ownPetCorpse ? PET_CORPSE_DESECRATE_STACKS : 1;
 
-  // Eating pet corpse → deity.desecrate() — ultimate disrespect
-  world.on('corpse:desecrated', ({ actor, corpseName }) => {
-    if (!world.has(actor, Player)) return;
-    const dev = world.get(actor, Devotion);
-    if (!dev?.deityId) return;
-    const deity = _deities.get(dev.deityId);
-    if (!deity) return;
-    // Direct desecration — eating your companion's remains
-    deity.desecrate(corpseName || 'pet_corpse');
+    if (ownPetCorpse) {
+      deity.action('betray', { magnitude: 1.0, target: label });
+    }
+    stackDesecration(deity, stacks, ownPetCorpse ? 'pet_corpse_desecration' : label);
+
+    if (ownPetCorpse) {
+      world.emit('deity:offense', {
+        playerId: actorId,
+        deityId,
+        deityName: deity.name,
+        offense: 'pet_corpse_desecration',
+        severity: 'horrifying',
+        corpseName: label,
+        desecrateStacks: stacks,
+      });
+    }
   });
 
   // Hitting your own pet → deity.action('betray') with lower magnitude
@@ -121,10 +181,9 @@ function wireWorldEvents(world) {
     const owner = world.get(target, Owner);
     if (!owner || owner.ownerId !== source) return;
 
-    const dev = world.get(source, Devotion);
-    if (!dev?.deityId) return;
-    const deity = _deities.get(dev.deityId);
-    if (!deity) return;
+    const resolved = resolvePlayerDeity(world, source);
+    if (!resolved) return;
+    const { deity } = resolved;
 
     // Lesser betrayal than killing — scale by damage dealt
     const magnitude = Math.min(0.3, (amount || 1) * 0.05);

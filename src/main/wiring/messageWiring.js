@@ -1,6 +1,7 @@
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Owner } from "../../rules/components/Owner.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { Player } from "../../rules/components/Player.js";
 import { Position } from "../../rules/components/Position.js";
@@ -256,8 +257,22 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`${who} heals ${amount}.`, 'system');
   });
 
-  world.on('died', ({ id }) => {
+  world.on('died', ({ id, killer }) => {
     const who = nameOfEntity(id);
+    const pe = playerEntity(world);
+    const playerId = Number(pe?.id || 0) | 0;
+    const deadId = Number(id || 0) | 0;
+    const killerId = Number(killer || 0) | 0;
+
+    if (world.has(deadId, Pet)) {
+      const owner = world.get(deadId, Owner);
+      const ownerId = Number(owner?.ownerId || 0) | 0;
+      if (playerId > 0 && ownerId === playerId && killerId === playerId) {
+        log(`You kill ${who}. The act is unforgivable.`, 'deity');
+        return;
+      }
+    }
+
     log(`${who} dies.`, 'combat');
   });
 
@@ -333,6 +348,21 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   world.on('pet:teleported', ({ petId, from, to }) => {
     const petName = nameOfEntity(petId);
     log(`${petName} teleports to your side.`, 'system');
+  });
+
+  world.on('corpse:desecrated', ({ actor, ownerId, corpseName }) => {
+    const pe = playerEntity(world);
+    const playerId = Number(pe?.id || 0) | 0;
+    const actorId = Number(actor || 0) | 0;
+    if (!(playerId > 0) || actorId !== playerId) return;
+
+    const label = bracketizeName(String(corpseName || "pet corpse"));
+    const desecratedOwnPet = (Number(ownerId || 0) | 0) === playerId;
+    if (desecratedOwnPet) {
+      log(`You consume ${label}. It is horrifying. The heavens will remember this.`, 'deity');
+      return;
+    }
+    log(`You desecrate ${label}.`, 'deity');
   });
 
   // === Environment events ===
