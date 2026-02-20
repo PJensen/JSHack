@@ -20,8 +20,13 @@ export function installDeityUiWiring(world, { log }) {
     if (message) logDeity(message);
   });
 
-  world.on("deity:wrath", ({ deityName, damage, cursed }) => {
-    logDeity(`${deityName}'s WRATH strikes you down! (-${damage} HP, barely alive!)`);
+  world.on("deity:wrath", ({ deityName, damage, cursed, severityScale }) => {
+    const scale = Number(severityScale || 1);
+    if (scale > 1.05) {
+      logDeity(`${deityName}'s WRATH crashes down with amplified fury! (-${damage} HP)`);
+    } else {
+      logDeity(`${deityName}'s WRATH crashes down! (-${damage} HP)`);
+    }
     if (cursed) logDeity(`You feel ${deityName}'s curse upon you!`);
   });
 
