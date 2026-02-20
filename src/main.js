@@ -1138,6 +1138,90 @@ world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex=0 }) =>
     startShake(cam, 4, 0.18);
   }
 });
+// Blink VFX (world-space; display-only state)
+/** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, phase:number, randomized:boolean}>} */
+const _blinkFx = [];
+
+function spawnBlinkBurst(x, y, intensity = 1) {
+  const scale = PERF.quality === 'low' ? 0.7 : (PERF.quality === 'high' ? 1.2 : 1.0);
+  const count = Math.max(4, Math.round((8 + intensity * 8) * scale));
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.4;
+    const speed = 0.45 + Math.random() * 1.35;
+    const life = 0.16 + Math.random() * 0.28;
+    fx.pool.spawn({
+      x: x + (Math.random() - 0.5) * 0.12,
+      y: y + (Math.random() - 0.5) * 0.12,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 0.05,
+      ax: 0,
+      ay: 0.12,
+      life,
+      size0: 0.09 + Math.random() * 0.09,
+      size1: 0.02,
+      r: 130 + ((Math.random() * 50) | 0),
+      g: 210 + ((Math.random() * 40) | 0),
+      b: 255,
+      a0: 0.92,
+      a1: 0.0,
+      rot: 0,
+      rotVel: (Math.random() - 0.5) * 2.2,
+    });
+  }
+}
+
+world.on('spell:blink', ({ from, to, randomized }) => {
+  if (!from || !to) return;
+  if (!Number.isFinite(from.x) || !Number.isFinite(from.y)) return;
+  if (!Number.isFinite(to.x) || !Number.isFinite(to.y)) return;
+
+  const src = { x: from.x, y: from.y };
+  const dst = { x: to.x, y: to.y };
+  _blinkFx.push({
+    from: src,
+    to: dst,
+    ttl: 0.26,
+    max: 0.26,
+    phase: Math.random() * Math.PI * 2,
+    randomized: !!randomized,
+  });
+
+  const intensity = randomized ? 1.15 : 1.0;
+  spawnBlinkBurst(src.x, src.y, intensity);
+  spawnBlinkBurst(dst.x, dst.y, intensity);
+
+  const dx = dst.x - src.x;
+  const dy = dst.y - src.y;
+  const dist = Math.hypot(dx, dy);
+  const sparkleCount = Math.max(6, Math.min(22, Math.round(dist * 1.8)));
+  const sparkScale = PERF.quality === 'low' ? 0.6 : 1.0;
+  const sparkleCountScaled = Math.max(4, Math.round(sparkleCount * sparkScale));
+  for (let i = 0; i < sparkleCountScaled; i++) {
+    const t = (i + Math.random()) / Math.max(1, sparkleCountScaled);
+    const x = src.x + dx * t + (Math.random() - 0.5) * 0.18;
+    const y = src.y + dy * t + (Math.random() - 0.5) * 0.18;
+    fx.pool.spawn({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      ax: 0,
+      ay: 0.04,
+      life: 0.10 + Math.random() * 0.20,
+      size0: 0.05 + Math.random() * 0.04,
+      size1: 0.01,
+      r: 190 + ((Math.random() * 40) | 0),
+      g: 235 + ((Math.random() * 20) | 0),
+      b: 255,
+      a0: 0.7,
+      a1: 0.0,
+      rot: 0,
+      rotVel: 0,
+    });
+  }
+
+  startShake(cam, randomized ? 4 : 3, randomized ? 0.14 : 0.12);
+});
 // Meteor impact VFX (world-space; display-only state)
 /** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
 const _meteorFx = [];
@@ -2909,6 +2993,7 @@ function render(worldView) {
 
   // Spell bolt VFX (world-space additive glow)
   if (bctx) drawBoltEffects(bctx);
+  if (bctx) drawBlinkEffects(bctx);
   if (bctx) drawMeteorEffects(bctx);
   if (bctx) drawBlastwaveEffects(bctx);
   if (bctx) drawFrostEffects(bctx);
@@ -2990,6 +3075,7 @@ function frame(now) {
   updateShake(cam, dtSec);
   // Display-only VFX lifetimes
   updateBoltFx(dtSec);
+  updateBlinkFx(dtSec);
   updateMeteorFx(dtSec);
   updateBlastwaveFx(dtSec);
   updateFrostFx(dtSec);
@@ -3116,6 +3202,81 @@ function drawBoltEffects(ctx) {
     ctx.lineWidth = 0.045;
     pathPolyline(ctx, core); ctx.stroke();
   }
+  ctx.restore();
+}
+
+/** @param {number} dt */
+function updateBlinkFx(dt) {
+  for (let i = _blinkFx.length - 1; i >= 0; i--) {
+    _blinkFx[i].ttl -= dt;
+    if (_blinkFx[i].ttl <= 0) _blinkFx.splice(i, 1);
+  }
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function drawBlinkEffects(ctx) {
+  if (!_blinkFx.length) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const TAU = Math.PI * 2;
+
+  for (const eff of _blinkFx) {
+    const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
+    const t = 1 - alpha;
+    const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 15.0 + eff.phase);
+
+    const dx = eff.to.x - eff.from.x;
+    const dy = eff.to.y - eff.from.y;
+    const dist = Math.hypot(dx, dy);
+    const segments = Math.max(7, Math.min(18, Math.round(dist * 2.0)));
+    const amp = (0.04 + pulse * 0.10) * alpha;
+    const arc = jitterLine(eff.from, eff.to, segments, amp);
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(130,220,255,${(0.22 * alpha).toFixed(3)})`;
+    ctx.lineWidth = 0.18;
+    pathPolyline(ctx, arc);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(210,245,255,${(0.80 * alpha).toFixed(3)})`;
+    ctx.lineWidth = 0.045;
+    pathPolyline(ctx, jitterLine(eff.from, eff.to, segments + 2, amp * 0.55));
+    ctx.stroke();
+
+    const sparkEvery = Math.max(1, Math.floor(arc.length / 6));
+    for (let i = 1; i < arc.length - 1; i += sparkEvery) {
+      const p = arc[i];
+      if (!p) continue;
+      const size = 0.03 + pulse * 0.03;
+      ctx.fillStyle = `rgba(215,250,255,${(0.55 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, size, 0, TAU);
+      ctx.fill();
+    }
+
+    const fromR = 0.20 + t * 0.85 + pulse * 0.05;
+    const toR = 0.24 + t * 1.05 + pulse * 0.06;
+    const flare = eff.randomized ? 1.2 : 1.0;
+
+    ctx.strokeStyle = `rgba(150,220,255,${(0.65 * alpha * flare).toFixed(3)})`;
+    ctx.lineWidth = 0.08;
+    ctx.beginPath();
+    ctx.arc(eff.from.x, eff.from.y, fromR, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(eff.to.x, eff.to.y, toR, 0, TAU);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(230,250,255,${(0.20 * alpha * flare).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(eff.from.x, eff.from.y, Math.max(0.05, fromR * 0.42), 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(eff.to.x, eff.to.y, Math.max(0.05, toR * 0.40), 0, TAU);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 
