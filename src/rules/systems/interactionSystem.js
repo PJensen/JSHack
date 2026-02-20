@@ -10,221 +10,16 @@ import { HarvestNode } from "../components/HarvestNode.js";
 import { Vitality } from "../components/Vitality.js";
 import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
 import TombstoneComponent from "../components/Tombstone.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { WildBerries, WildHerbs } from "../archetypes/Food.js";
-import { HealthPotion } from "../archetypes/Items.js";
+import { WildBerries, WildHerbs, ThornPods, VenomFronds } from "../archetypes/Food.js";
 import { ItemInfo } from "../components/ItemInfo.js";
-import { buildCatalogItem } from "../data/itemCatalogLoader.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../content/alchemy/benchGame.js";
 
-const BERRY_IDENTITY = "food_wild_berries";
-const HERB_IDENTITY = "food_wild_herbs";
 const HARVEST_SEED_SALT = 0x48415256;
-
-const ALCHEMY_RECIPES = Object.freeze([
-  Object.freeze({
-    key: "vital_tonic",
-    label: "Vital Tonic",
-    outputIdentity: "potion_health",
-    outputName: "Health Potion",
-    berries: 2,
-    herbs: 1,
-    flavor: "A bright tonic that closes wounds.",
-  }),
-  Object.freeze({
-    key: "venom_draft",
-    label: "Venom Draft",
-    outputIdentity: "potion_poison",
-    outputName: "Potion of Poison",
-    berries: 1,
-    herbs: 2,
-    flavor: "A bitter poison perfect for coating blades.",
-  }),
-  Object.freeze({
-    key: "caustic_venom",
-    label: "Caustic Venom",
-    outputIdentity: "potion_poison",
-    outputName: "Potion of Poison",
-    outputCount: 2,
-    berries: 2,
-    herbs: 3,
-    flavor: "A hotter batch that often yields two vials.",
-  }),
-  Object.freeze({
-    key: "stone_skin_tincture",
-    label: "Stone Skin Tincture",
-    outputIdentity: "potion_stoneskin",
-    outputName: "Potion of Stoneskin",
-    berries: 2,
-    herbs: 3,
-    flavor: "Granular suspension that hardens flesh and gear.",
-  }),
-]);
-
-function findAlchemyRecipe(key) {
-  const recipeKey = String(key || "").toLowerCase();
-  if (!recipeKey) return null;
-  for (const recipe of ALCHEMY_RECIPES) {
-    if (recipe.key === recipeKey) return recipe;
-  }
-  return null;
-}
-
-function countInventoryIdentity(world, inv, identity) {
-  if (!inv || !Array.isArray(inv.items) || !identity) return 0;
-  let total = 0;
-  for (const itemId of inv.items) {
-    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
-    const ni = world.get(itemId, NamedIdentity);
-    if (!ni || ni.identity !== identity) continue;
-    const info = world.get(itemId, ItemInfo);
-    total += Math.max(1, Number(info?.count || 1) | 0);
-  }
-  return total | 0;
-}
-
-function consumeInventoryIdentity(world, inv, identity, amount) {
-  if (!inv || !Array.isArray(inv.items)) return false;
-  let remaining = Math.max(0, Number(amount || 0) | 0);
-  if (remaining <= 0) return true;
-
-  for (let i = 0; i < inv.items.length && remaining > 0; i++) {
-    const itemId = Number(inv.items[i] || 0) | 0;
-    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
-    const ni = world.get(itemId, NamedIdentity);
-    if (!ni || ni.identity !== identity) continue;
-    const info = world.get(itemId, ItemInfo);
-    const stackCount = Math.max(1, Number(info?.count || 1) | 0);
-    if (stackCount <= remaining) {
-      remaining -= stackCount;
-      inv.items.splice(i, 1);
-      i -= 1;
-      try { world.destroy(itemId); } catch {}
-      continue;
-    }
-    const nextCount = Math.max(0, stackCount - remaining);
-    remaining = 0;
-    world.mutate(itemId, ItemInfo, (rec) => { rec.count = nextCount; });
-  }
-
-  return remaining <= 0;
-}
-
-function buildAlchemyProduct(world, recipe) {
-  if (!recipe) return 0;
-  if (recipe.outputIdentity === "potion_health") {
-    return createFrom(world, HealthPotion, {});
-  }
-  try {
-    return buildCatalogItem(world, recipe.outputIdentity, { count: 1 });
-  } catch {
-    return 0;
-  }
-}
-
-function emitAlchemyOpen(world, actor, targetId, inv) {
-  const berries = countInventoryIdentity(world, inv, BERRY_IDENTITY);
-  const herbs = countInventoryIdentity(world, inv, HERB_IDENTITY);
-  const recipes = ALCHEMY_RECIPES.map((recipe) => ({
-    key: recipe.key,
-    label: recipe.label,
-    outputName: recipe.outputName,
-    outputIdentity: recipe.outputIdentity,
-    outputCount: Math.max(1, Number(recipe.outputCount || 1) | 0),
-    berries: recipe.berries,
-    herbs: recipe.herbs,
-    canCraft: berries >= recipe.berries && herbs >= recipe.herbs,
-    flavor: recipe.flavor,
-  }));
-  world.emit?.("alchemy:open", {
-    actor,
-    targetId,
-    ingredients: { berries, herbs },
-    recipes,
-  });
-}
-
-function craftAtBench(world, actor, targetId, recipeKey) {
-  const inv = world.get(actor, Inventory);
-  if (!inv) {
-    world.emit?.("alchemy:result", {
-      actor,
-      targetId,
-      result: "no_inventory",
-      recipeKey: String(recipeKey || ""),
-    });
-    return;
-  }
-
-  const recipe = findAlchemyRecipe(recipeKey);
-  if (!recipe) {
-    emitAlchemyOpen(world, actor, targetId, inv);
-    world.emit?.("alchemy:result", {
-      actor,
-      targetId,
-      result: "unknown_recipe",
-      recipeKey: String(recipeKey || ""),
-    });
-    return;
-  }
-
-  const haveBerries = countInventoryIdentity(world, inv, BERRY_IDENTITY);
-  const haveHerbs = countInventoryIdentity(world, inv, HERB_IDENTITY);
-  const missingBerries = Math.max(0, recipe.berries - haveBerries);
-  const missingHerbs = Math.max(0, recipe.herbs - haveHerbs);
-  if (missingBerries > 0 || missingHerbs > 0) {
-    emitAlchemyOpen(world, actor, targetId, inv);
-    world.emit?.("alchemy:result", {
-      actor,
-      targetId,
-      result: "missing_ingredients",
-      recipeKey: recipe.key,
-      missing: { berries: missingBerries, herbs: missingHerbs },
-      have: { berries: haveBerries, herbs: haveHerbs },
-      need: { berries: recipe.berries, herbs: recipe.herbs },
-    });
-    return;
-  }
-
-  if (!consumeInventoryIdentity(world, inv, BERRY_IDENTITY, recipe.berries)) {
-    world.emit?.("alchemy:result", { actor, targetId, result: "consume_failed", recipeKey: recipe.key });
-    return;
-  }
-  if (!consumeInventoryIdentity(world, inv, HERB_IDENTITY, recipe.herbs)) {
-    world.emit?.("alchemy:result", { actor, targetId, result: "consume_failed", recipeKey: recipe.key });
-    return;
-  }
-
-  const outCount = Math.max(1, Number(recipe.outputCount || 1) | 0);
-  const craftedItemIds = [];
-  for (let i = 0; i < outCount; i++) {
-    const itemId = buildAlchemyProduct(world, recipe);
-    if (!(itemId > 0)) continue;
-    craftedItemIds.push(itemId);
-    if (!inv.items.includes(itemId)) inv.items.push(itemId);
-  }
-  if (!craftedItemIds.length) {
-    world.emit?.("alchemy:result", { actor, targetId, result: "brew_failed", recipeKey: recipe.key });
-    return;
-  }
-
-  world.emit?.("alchemy:crafted", {
-    actor,
-    targetId,
-    recipeKey: recipe.key,
-    recipeLabel: recipe.label,
-    outputIdentity: recipe.outputIdentity,
-    outputName: recipe.outputName,
-    outputCount: craftedItemIds.length,
-    itemIds: craftedItemIds.slice(),
-    cost: { berries: recipe.berries, herbs: recipe.herbs },
-  });
-  emitAlchemyOpen(world, actor, targetId, inv);
-}
 
 // One-off helper invoked by the per-tick interactionSystem below
 export function InteractionSystem(world, actor, targetId, intent = null) {
@@ -270,10 +65,10 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
         case "brewAlchemy":
             {
                 if (interactionMode !== "brew" || !requestedRecipe) {
-                    emitAlchemyOpen(world, actor, targetId, world.get(actor, Inventory));
+                    emitAlchemyBenchOpen(world, actor, targetId);
                     break;
                 }
-                craftAtBench(world, actor, targetId, requestedRecipe);
+                brewAtAlchemyBench(world, actor, targetId, requestedRecipe);
             }
             break;
 
@@ -351,7 +146,6 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
 
                 const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, HARVEST_SEED_SALT));
                 const kind = String(node.kind || "berries").toLowerCase();
-                const isHerbNode = (kind === "herbs" || kind === "venom_fern");
                 const minCount = (kind === "venom_fern" || kind === "thorn_bramble") ? 2 : 1;
                 const maxCount = kind === "herbs"
                     ? 2
@@ -361,7 +155,12 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
                 const spread = Math.max(1, (maxCount - minCount + 1) | 0);
                 const baseCount = minCount + ((r() * spread) | 0);
                 const count = Math.max(1, baseCount | 0);
-                const itemId = createFrom(world, isHerbNode ? WildHerbs : WildBerries, {});
+                const harvestArchetype = kind === "venom_fern"
+                    ? VenomFronds
+                    : (kind === "thorn_bramble"
+                        ? ThornPods
+                        : (kind === "herbs" ? WildHerbs : WildBerries));
+                const itemId = createFrom(world, harvestArchetype, {});
                 world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
 
                 let resultItemId = itemId;

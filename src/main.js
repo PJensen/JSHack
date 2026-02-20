@@ -2141,8 +2141,19 @@ world.on('harvest:picked', ({ actor, count, kind }) => {
   }, 0);
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
-  const label = String(kind || '') === 'herbs' ? 'herb' : 'berry';
-  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${Math.max(1, Number(count || 1) | 0)} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch {}
+  const qty = Math.max(1, Number(count || 1) | 0);
+  const k = String(kind || '').toLowerCase();
+  const labels = (
+    k === 'herbs'
+      ? { one: 'herb', many: 'herbs' }
+      : (k === 'thorn_bramble'
+        ? { one: 'thorn pod', many: 'thorn pods' }
+        : (k === 'venom_fern'
+          ? { one: 'venom frond', many: 'venom fronds' }
+          : { one: 'berry', many: 'berries' }))
+  );
+  const label = qty === 1 ? labels.one : labels.many;
+  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch {}
 });
 
 // Stair traversal logic (messages handled in messageWiring)

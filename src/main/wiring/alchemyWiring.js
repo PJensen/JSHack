@@ -1,6 +1,12 @@
 import { Position } from "../../rules/components/Position.js";
 
 const INSTALLED = Symbol.for("jshack:main:alchemyWiring:installed");
+const EMPTY_INGREDIENTS = Object.freeze({
+  berries: 0,
+  herbs: 0,
+  thornPods: 0,
+  venomFronds: 0,
+});
 
 /**
  * @param {{
@@ -39,7 +45,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
       window.dispatchEvent(new CustomEvent("ui:alchemyBenchData", {
         detail: {
           benchId,
-          ingredients: ingredients && typeof ingredients === "object" ? ingredients : { berries: 0, herbs: 0 },
+          ingredients: ingredients && typeof ingredients === "object" ? ingredients : { ...EMPTY_INGREDIENTS },
           recipes: Array.isArray(recipes) ? recipes : [],
         },
       }));
