@@ -261,7 +261,7 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
 export function interactionSystem(world) {
     for (const [actor, intent] of world.query(InteractIntent)) {
         try { InteractionSystem(world, actor, intent.targetId || 0, intent); } catch (e) { console.error('[interactionSystem] InteractionSystem failed:', e); }
-        try { world.remove(actor, InteractIntent); } catch {}
+        try { world.remove(actor, InteractIntent); } catch {} // ECS: may not exist
     }
 }
 
