@@ -29,6 +29,7 @@ import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
+import { createThrowFxController } from "./main/fx/throwFxController.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
@@ -226,39 +227,13 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
 let _pendingSpellTargeting = null;
 /** @type {{ actorId: number, itemId: number, itemName: string, range: number }|null} */
 let _pendingThrowTargeting = null;
-/** @type {Array<{ itemId:number, from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, kind:string }>} */
-const _thrownItemFx = [];
-const _hiddenThrownItemIds = new Set();
-const THROW_FX_SPEED_TILES_PER_SEC = 26;
-const THROW_FX_MIN_DURATION = 0.09;
-const THROW_FX_MAX_DURATION = 0.32;
-const THROW_FX_ARC_HEIGHT = 0.38;
+const throwFx = createThrowFxController({ world });
 
-/**
- * @param {string} spellId
- */
 function getTargetedSpellConfig(spellId) {
   return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;
 }
-
-/**
- * Keep display-side throw target prompt aligned with rules throw range.
- * @param {number} weight
- */
-function computeThrowRange(weight) {
-  const w = Number.isFinite(weight) && weight > 0 ? weight : 1;
-  const range = Math.round(6 - Math.log2(w + 1));
-  return Math.max(1, Math.min(8, range | 0));
-}
-
-function isSimUiBlocked() {
-  return _thrownItemFx.length > 0;
-}
-
-function syncSimInputLockFlag() {
-  try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = isSimUiBlocked(); } catch (e) { console.debug('[main] input lock flag sync failed:', e); }
-}
-syncSimInputLockFlag();
+function computeThrowRange(weight) { return throwFx.computeThrowRange(weight); }
+function isSimUiBlocked() { return throwFx.isBlocking(); }
 
 const spellCtrl = createActiveSpellController(world);
 
@@ -1593,43 +1568,7 @@ world.on('hazard:expired', ({ hazardId, kind, at, radius }) => {
   }
 });
 
-function computeThrowFxDuration(distance) {
-  const d = Number.isFinite(distance) ? Math.max(0, Number(distance)) : 0;
-  if (d <= 0) return THROW_FX_MIN_DURATION;
-  const raw = d / THROW_FX_SPEED_TILES_PER_SEC;
-  return Math.max(THROW_FX_MIN_DURATION, Math.min(THROW_FX_MAX_DURATION, raw));
-}
-
-world.on('item:thrown', ({ itemId, from, to }) => {
-  const id = Number(itemId || 0) | 0;
-  if (!(id > 0)) return;
-  if (!from || !to) return;
-  const fx0 = Number(from.x);
-  const fy0 = Number(from.y);
-  const fx1 = Number(to.x);
-  const fy1 = Number(to.y);
-  if (!Number.isFinite(fx0) || !Number.isFinite(fy0) || !Number.isFinite(fx1) || !Number.isFinite(fy1)) return;
-  const dx = fx1 - fx0;
-  const dy = fy1 - fy0;
-  const dist = Math.hypot(dx, dy);
-  if (!(dist > 0)) return;
-
-  for (let i = _thrownItemFx.length - 1; i >= 0; i--) {
-    if ((_thrownItemFx[i].itemId | 0) !== id) continue;
-    _thrownItemFx.splice(i, 1);
-  }
-
-  _hiddenThrownItemIds.add(id);
-  _thrownItemFx.push({
-    itemId: id,
-    from: { x: fx0, y: fy0 },
-    to: { x: fx1, y: fy1 },
-    t: 0,
-    duration: computeThrowFxDuration(dist),
-    kind: "",
-  });
-  syncSimInputLockFlag();
-});
+throwFx.installListeners();
 
 world.on('ranged:shot', ({ attacker, target, hit, style }) => {
   const apos = world.get(Number(attacker||0), Position);
@@ -2814,7 +2753,7 @@ function render(worldView) {
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
     if (layer !== 100) continue;
-    if (_hiddenThrownItemIds.has(e.id)) continue;
+    if (throwFx.isItemHidden(e.id)) continue;
     // worldView.entities is sorted by id within a tile/layer; later ids are drawn on top.
     stackMeta.set(`${e.pos.x},${e.pos.y}`, e.id);
   }
@@ -3087,7 +3026,7 @@ function render(worldView) {
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
   }
 
-  if (bctx) drawThrownItemEffects(bctx, worldView);
+  if (bctx) throwFx.draw(bctx, worldView, glyphAtlas);
 
   // Spell bolt VFX (world-space additive glow)
   if (bctx) drawBoltEffects(bctx);
@@ -3183,7 +3122,7 @@ function frame(now) {
   updateBlastwaveFx(dtSec);
   updateFrostFx(dtSec);
   updateArrowFx(dtSec);
-  updateThrownItemFx(dtSec);
+  throwFx.tick(dtSec);
   updatePoisonCloudFx(dtSec);
   updatePlasmaCloudFx(dtSec);
   ftext.step(dtSec);
@@ -3737,70 +3676,6 @@ function drawBlastwaveEffects(ctx) {
   ctx.restore();
 }
 
-function remapThrowArcProgress(t01) {
-  const t = Math.max(0, Math.min(1, Number(t01) || 0));
-  // Fast near release/impact, slower around apex.
-  const k = 0.74;
-  return t + (k / (2 * Math.PI)) * Math.sin(2 * Math.PI * t);
-}
-
-/** @param {number} dt */
-function updateThrownItemFx(dt) {
-  let changed = false;
-  for (let i = _thrownItemFx.length - 1; i >= 0; i--) {
-    const rec = _thrownItemFx[i];
-    rec.t += dt;
-    const done = rec.t >= rec.duration;
-    const gone = !world.isAlive(rec.itemId);
-    if (!done && !gone) continue;
-    _hiddenThrownItemIds.delete(rec.itemId);
-    _thrownItemFx.splice(i, 1);
-    changed = true;
-  }
-  if (changed) syncSimInputLockFlag();
-}
-
-/**
- * @param {CanvasRenderingContext2D} ctx
- * @param {any} worldView
- */
-function drawThrownItemEffects(ctx, worldView) {
-  if (!_thrownItemFx.length) return;
-
-  const kindById = new Map();
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
-    if (!_hiddenThrownItemIds.has(e.id)) continue;
-    kindById.set(e.id, typeof e.kind === "string" ? e.kind : "default");
-  }
-
-  for (let i = 0; i < _thrownItemFx.length; i++) {
-    const rec = _thrownItemFx[i];
-    if (!rec.kind) rec.kind = kindById.get(rec.itemId) || "default";
-    const t01 = Math.max(0, Math.min(1, rec.t / Math.max(0.0001, rec.duration)));
-    const u = remapThrowArcProgress(t01);
-    const x = rec.from.x + (rec.to.x - rec.from.x) * u;
-    const yGround = rec.from.y + (rec.to.y - rec.from.y) * u;
-    const h = Math.sin(Math.PI * u);
-    const y = yGround - h * THROW_FX_ARC_HEIGHT;
-
-    // Ground shadow to sell "item is airborne".
-    ctx.save();
-    ctx.fillStyle = `rgba(0,0,0,${(0.20 - h * 0.08).toFixed(3)})`;
-    if (typeof ctx.ellipse === "function") {
-      ctx.beginPath();
-      ctx.ellipse(x, yGround + 0.08, 0.22 + h * 0.08, 0.12 + h * 0.03, 0, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, yGround + 0.08, 0.16 + h * 0.04, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    drawKind(glyphAtlas, ctx, rec.kind, x, y);
-  }
-}
 
 // --- Arrow tracer update & draw --------------------------------------------
 /** @param {number} dt */
