@@ -152,22 +152,10 @@ Deno.test("payload and hook content files do not use ctx._world escape hatch", a
   assertEquals(offenders, [], `Payload/hook files must not use ctx._world: ${offenders.join(", ")}`);
 });
 
-Deno.test("active source files do not import quarentine legacy data", async () => {
+Deno.test("quarantine folder has been removed", async () => {
   const root = Deno.cwd();
-  const srcDir = join(root, "src");
-  const files = await listJsFiles(srcDir);
-  const offenders = [];
-
-  for (let i = 0; i < files.length; i++) {
-    const absPath = files[i];
-    const relPath = absPath.slice(root.length + 1);
-    if (relPath.startsWith("src/rules/data/quarentine/")) continue;
-    const text = await Deno.readTextFile(absPath);
-    if (
-      text.includes("rules/data/quarentine/")
-      || text.includes("data/quarentine/")
-    ) offenders.push(relPath);
-  }
-
-  assertEquals(offenders, [], `Quarentine files must stay unreferenced by active source: ${offenders.join(", ")}`);
+  const dir = join(root, "src", "rules", "data", "quarentine");
+  let exists = false;
+  try { await Deno.stat(dir); exists = true; } catch { /* expected */ }
+  assertEquals(exists, false, "quarentine/ folder should no longer exist");
 });

@@ -6,8 +6,7 @@ export async function loadVersion() {
   if (!res.ok) throw new Error('not ok');
   const text = (await res.text()).trim();
   window.VERSION = text;
-  // Optional: uncomment to see version on startup
-  console.log('Loaded version:', window.VERSION);
+  // Version loaded silently. Use window.VERSION to check.
 }
 
 // Start loading the version but do not use top-level await.
