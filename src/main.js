@@ -30,6 +30,8 @@ import { installSceneControls } from "./main/debug/sceneControls.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
 import { createThrowFxController } from "./main/fx/throwFxController.js";
+import { createBoltFxController } from "./main/fx/boltFxController.js";
+import { pathPolyline, jitterLine } from "./main/fx/fxGeom.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
@@ -834,229 +836,6 @@ installMessageWiring({
 // Dismiss the quick-slot chip when item is used
 world.on('drank', ({ itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
-});
-// Bolt segments for display VFX (world-space; display-only state)
-/** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, chainIndex:number}>} */
-const _boltFx = [];
-/** @type {Array<{x:number,y:number, ttl:number}>} */
-const _lightPulses = [];
-/**
- * Wrath effects are intentionally data-driven so gods can use different visuals later.
- * `behavior` is the switch for future non-lightning wrath spell families.
- */
-const DEITY_WRATH_VFX = Object.freeze({
-  default: Object.freeze({
-    behavior: 'lightning_bolt',
-    outer: Object.freeze([95, 165, 255]),
-    mid: Object.freeze([170, 220, 255]),
-    core: Object.freeze([235, 250, 255]),
-    pulse: Object.freeze([210, 245, 255]),
-    spark: Object.freeze([130, 210, 255]),
-    baseShake: 5,
-  }),
-  molkhar: Object.freeze({
-    behavior: 'lightning_bolt',
-    outer: Object.freeze([255, 85, 40]),
-    mid: Object.freeze([255, 170, 95]),
-    core: Object.freeze([255, 240, 220]),
-    pulse: Object.freeze([255, 205, 150]),
-    spark: Object.freeze([255, 155, 90]),
-    baseShake: 6,
-  }),
-  seraphine: Object.freeze({
-    behavior: 'lightning_bolt',
-    outer: Object.freeze([110, 180, 255]),
-    mid: Object.freeze([185, 225, 255]),
-    core: Object.freeze([245, 255, 255]),
-    pulse: Object.freeze([225, 250, 255]),
-    spark: Object.freeze([165, 220, 255]),
-    baseShake: 5,
-  }),
-  loki: Object.freeze({
-    behavior: 'lightning_bolt',
-    outer: Object.freeze([145, 105, 255]),
-    mid: Object.freeze([205, 165, 255]),
-    core: Object.freeze([250, 240, 255]),
-    pulse: Object.freeze([230, 205, 255]),
-    spark: Object.freeze([195, 145, 255]),
-    baseShake: 6,
-  }),
-  gaia: Object.freeze({
-    behavior: 'lightning_bolt',
-    outer: Object.freeze([95, 185, 140]),
-    mid: Object.freeze([165, 225, 185]),
-    core: Object.freeze([240, 255, 245]),
-    pulse: Object.freeze([205, 245, 220]),
-    spark: Object.freeze([140, 210, 165]),
-    baseShake: 5,
-  }),
-});
-/** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, amp:number, branch:boolean, outer:[number,number,number], mid:[number,number,number], core:[number,number,number]}>} */
-const _deityWrathBoltFx = [];
-/** @type {Array<{x:number,y:number, ttl:number, max:number, pulse:[number,number,number]}>} */
-const _deityWrathPulses = [];
-/** @type {Array<{ttl:number, max:number, color:[number,number,number]}>} */
-const _deityWrathScreenFlash = [];
-/** @type {Array<{x:number,y:number, ttl:number, max:number, amp:number, color:[number,number,number]}>} */
-const _deityWrathScreenBoltFx = [];
-
-/**
- * @param {number} v
- */
-function clamp01(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return 0;
-  if (n <= 0) return 0;
-  if (n >= 1) return 1;
-  return n;
-}
-
-/**
- * @param {string} deityId
- */
-function getWrathVfxProfile(deityId) {
-  const key = String(deityId || '').toLowerCase();
-  return DEITY_WRATH_VFX[key] || DEITY_WRATH_VFX.default;
-}
-
-/**
- * Spawn downward "sky strike" lightning for deity wrath.
- * Origin is fixed at y=0 and x=player.x, then forks downward to the target.
- * @param {{ playerId:number, deityId?:string, intensity?:number, severityScale?:number, wrathDebt?:number }} payload
- */
-function spawnDeityWrathLightning(payload) {
-  const playerId = Number(payload?.playerId || 0) | 0;
-  if (!(playerId > 0)) return;
-  const pos = world.get(playerId, Position);
-  if (!pos) return;
-
-  const x = Number(pos.x);
-  const yTarget = Number(pos.y);
-  if (!Number.isFinite(x) || !Number.isFinite(yTarget)) return;
-
-  const profile = getWrathVfxProfile(payload?.deityId || '');
-  if (profile.behavior !== 'lightning_bolt') return;
-
-  const intensity = clamp01(Number(payload?.intensity || 0));
-  const severityScale = Math.max(1, Number(payload?.severityScale || 1));
-  const wrathDebt = Math.max(0, Number(payload?.wrathDebt || 0));
-
-  const ttlMain = 0.28
-    + Math.min(0.14, intensity * 0.10)
-    + Math.min(0.14, (severityScale - 1) * 0.08);
-  const mainAmp = 0.08 + Math.min(0.18, (severityScale - 1) * 0.08 + wrathDebt * 0.03);
-
-  _deityWrathBoltFx.push({
-    from: { x, y: 0 },
-    to: { x, y: yTarget },
-    ttl: ttlMain,
-    max: ttlMain,
-    amp: mainAmp,
-    branch: false,
-    outer: profile.outer,
-    mid: profile.mid,
-    core: profile.core,
-  });
-  _deityWrathPulses.push({
-    x,
-    y: yTarget,
-    ttl: 0.32,
-    max: 0.32,
-    pulse: profile.pulse,
-  });
-  _deityWrathScreenBoltFx.push({
-    x,
-    y: yTarget,
-    ttl: ttlMain + 0.12,
-    max: ttlMain + 0.12,
-    amp: 6 + Math.min(10, (severityScale - 1) * 5 + wrathDebt * 2.5),
-    color: profile.core,
-  });
-
-  const branchCount = Math.max(2, 2 + Math.floor((severityScale - 1) * 3 + Math.min(3, wrathDebt * 2)));
-  for (let i = 0; i < branchCount; i++) {
-    const tStart = 0.12 + Math.random() * 0.68;
-    const yStart = yTarget * tStart;
-    const xStart = x + (Math.random() - 0.5) * 0.26;
-    const yEnd = Math.min(yTarget + 1.6, yStart + 0.9 + Math.random() * (2.4 + severityScale));
-    const xEnd = xStart + (Math.random() - 0.5) * (0.8 + severityScale * 0.35);
-    const ttl = ttlMain * (0.65 + Math.random() * 0.25);
-    _deityWrathBoltFx.push({
-      from: { x: xStart, y: yStart },
-      to: { x: xEnd, y: yEnd },
-      ttl,
-      max: ttl,
-      amp: mainAmp * 0.75,
-      branch: true,
-      outer: profile.outer,
-      mid: profile.mid,
-      core: profile.core,
-    });
-    _deityWrathPulses.push({
-      x: xEnd,
-      y: yEnd,
-      ttl: 0.16 + Math.random() * 0.12,
-      max: 0.26,
-      pulse: profile.pulse,
-    });
-  }
-
-  if (fx?.pool) {
-    const lineLength = Math.max(1, Math.abs(yTarget));
-    const sparkCount = Math.max(14, Math.round(lineLength * (0.7 + Math.min(2.2, severityScale))));
-    for (let i = 0; i < sparkCount; i++) {
-      const t = Math.random();
-      fx.pool.spawn({
-        x: x + (Math.random() - 0.5) * 0.34,
-        y: yTarget * t + (Math.random() - 0.5) * 0.08,
-        vx: (Math.random() - 0.5) * 0.35,
-        vy: 0.8 + Math.random() * (2.1 + severityScale),
-        ax: 0,
-        ay: 0.9,
-        life: 0.14 + Math.random() * 0.26,
-        size0: 0.06 + Math.random() * 0.05,
-        size1: 0.01,
-        r: profile.spark[0],
-        g: profile.spark[1],
-        b: profile.spark[2],
-        a0: 0.82,
-        a1: 0.0,
-        rot: 0,
-        rotVel: (Math.random() - 0.5) * 2.4,
-      });
-    }
-  }
-
-  const shakePower = Math.min(
-    12,
-    Math.round(profile.baseShake + intensity * 3 + (severityScale - 1) * 4 + Math.min(2.5, wrathDebt * 1.5))
-  );
-  const shakeDur = 0.14 + Math.min(0.18, intensity * 0.07 + (severityScale - 1) * 0.05);
-  startShake(cam, shakePower, shakeDur);
-
-  const flashDuration = 0.12 + Math.min(0.12, intensity * 0.06 + (severityScale - 1) * 0.04);
-  _deityWrathScreenFlash.push({
-    ttl: flashDuration,
-    max: flashDuration,
-    color: profile.pulse,
-  });
-}
-
-world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex=0 }) => {
-  if (from && to) {
-    _boltFx.push({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.14, max: 0.14, chainIndex: Number(chainIndex||0) });
-    _lightPulses.push({ x: to.x, y: to.y, ttl: 0.12 });
-    startShake(cam, 4, 0.18);
-  }
-});
-world.on('deity:wrath', ({ playerId, deityId, intensity, severityScale, wrathDebt }) => {
-  spawnDeityWrathLightning({
-    playerId: Number(playerId || 0),
-    deityId: String(deityId || ''),
-    intensity: Number(intensity || 0),
-    severityScale: Number(severityScale || 1),
-    wrathDebt: Number(wrathDebt || 0),
-  });
 });
 // Blink VFX (world-space; display-only state)
 /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, phase:number, randomized:boolean}>} */
@@ -2635,6 +2414,10 @@ const _frozenEmitters  = new Set();
 const _cursedEmitters  = new Set();
 const _blessedEmitters = new Set();
 
+// Bolt / deity-wrath FX controller (depends on cam + fx)
+const boltFx = createBoltFxController({ world, cam, fx });
+boltFx.installListeners();
+
 /** Reconcile a per-entity continuous particle emitter for one status tag. */
 function reconcileStatusEmitter(view, fx, origins, trackerSet, tag, prefix, cfg) {
   const nowActive = new Set();
@@ -3029,8 +2812,8 @@ function render(worldView) {
   if (bctx) throwFx.draw(bctx, worldView, glyphAtlas);
 
   // Spell bolt VFX (world-space additive glow)
-  if (bctx) drawBoltEffects(bctx);
-  if (bctx) drawDeityWrathEffects(bctx);
+  if (bctx) boltFx.drawBolts(bctx);
+  if (bctx) boltFx.drawDeityWrath(bctx);
   if (bctx) drawBlinkEffects(bctx);
   if (bctx) drawMeteorEffects(bctx);
   if (bctx) drawBlastwaveEffects(bctx);
@@ -3054,11 +2837,9 @@ function render(worldView) {
   ctx.restore();
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
-  if (_deityWrathScreenFlash.length) {
-    drawDeityWrathScreenFlash(ctx, W, H);
-  }
-  if (_deityWrathScreenBoltFx.length) {
-    drawDeityWrathScreenBolts(ctx, W, H);
+  if (boltFx.hasScreenEffects()) {
+    boltFx.drawScreenFlash(ctx, W, H);
+    boltFx.drawScreenBolts(ctx, W, H);
   }
 
   // HUD
@@ -3115,8 +2896,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   // Display-only VFX lifetimes
-  updateBoltFx(dtSec);
-  updateDeityWrathFx(dtSec);
+  boltFx.tick(dtSec);
   updateBlinkFx(dtSec);
   updateMeteorFx(dtSec);
   updateBlastwaveFx(dtSec);
@@ -3210,232 +2990,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// Update VFX lifetimes between frames
-/** @param {number} dt */
-function updateBoltFx(dt) {
-  if (_boltFx && _boltFx.length) {
-    for (const eff of _boltFx) eff.ttl -= dt;
-    for (let i = _boltFx.length - 1; i >= 0; i--) {
-      const seg = _boltFx[i];
-      if (!seg) continue;
-      if (seg.ttl <= 0) _boltFx.splice(i, 1);
-    }
-  }
-  if (_lightPulses && _lightPulses.length) {
-    for (const f of _lightPulses) f.ttl -= dt;
-    for (let i = _lightPulses.length - 1; i >= 0; i--) {
-      const p = _lightPulses[i];
-      if (!p) continue;
-      if (p.ttl <= 0) _lightPulses.splice(i, 1);
-    }
-  }
-}
-
-// Draw current bolt effects under camera transform
-/** @param {CanvasRenderingContext2D} ctx */
-function drawBoltEffects(ctx) {
-  if ((!_boltFx || !_boltFx.length) && (!_lightPulses || !_lightPulses.length)) return;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  // Light pulses at endpoints
-  for (const p of _lightPulses) {
-    const a = Math.max(0, Math.min(1, p.ttl / 0.12));
-    ctx.fillStyle = `rgba(180,240,255,${0.18 * a})`;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = `rgba(255,255,220,${0.10 * a})`;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 0.35, 0, Math.PI * 2); ctx.fill();
-  }
-  // Bolts
-  for (const eff of _boltFx) {
-    const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
-    const pts = jitterLine(eff.from, eff.to, 11, 0.10 * alpha);
-
-    // Outer glow
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(120,200,255,${0.18 * alpha})`;
-    ctx.lineWidth = 0.22;
-    pathPolyline(ctx, pts); ctx.stroke();
-
-    // Mid glow
-    ctx.strokeStyle = `rgba(160,220,255,${0.35 * alpha})`;
-    ctx.lineWidth = 0.10;
-    pathPolyline(ctx, pts); ctx.stroke();
-
-    // Core
-  const core = jitterLine(eff.from, eff.to, 13, 0.05 * alpha);
-    ctx.strokeStyle = `rgba(230,255,255,${0.9 * alpha})`;
-    ctx.lineWidth = 0.045;
-    pathPolyline(ctx, core); ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** @param {number} dt */
-function updateDeityWrathFx(dt) {
-  if (_deityWrathBoltFx.length) {
-    for (let i = _deityWrathBoltFx.length - 1; i >= 0; i--) {
-      const seg = _deityWrathBoltFx[i];
-      seg.ttl -= dt;
-      if (seg.ttl <= 0) _deityWrathBoltFx.splice(i, 1);
-    }
-  }
-  if (_deityWrathPulses.length) {
-    for (let i = _deityWrathPulses.length - 1; i >= 0; i--) {
-      const pulse = _deityWrathPulses[i];
-      pulse.ttl -= dt;
-      if (pulse.ttl <= 0) _deityWrathPulses.splice(i, 1);
-    }
-  }
-  if (_deityWrathScreenFlash.length) {
-    for (let i = _deityWrathScreenFlash.length - 1; i >= 0; i--) {
-      const flash = _deityWrathScreenFlash[i];
-      flash.ttl -= dt;
-      if (flash.ttl <= 0) _deityWrathScreenFlash.splice(i, 1);
-    }
-  }
-  if (_deityWrathScreenBoltFx.length) {
-    for (let i = _deityWrathScreenBoltFx.length - 1; i >= 0; i--) {
-      const bolt = _deityWrathScreenBoltFx[i];
-      bolt.ttl -= dt;
-      if (bolt.ttl <= 0) _deityWrathScreenBoltFx.splice(i, 1);
-    }
-  }
-}
-
-/**
- * @param {[number, number, number]} rgb
- * @param {number} alpha
- */
-function rgba(rgb, alpha) {
-  const a = Math.max(0, Math.min(1, Number(alpha || 0)));
-  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
-}
-
-/** @param {CanvasRenderingContext2D} ctx */
-function drawDeityWrathEffects(ctx) {
-  if (!_deityWrathBoltFx.length && !_deityWrathPulses.length) return;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  for (let i = 0; i < _deityWrathPulses.length; i++) {
-    const pulse = _deityWrathPulses[i];
-    const a = Math.max(0, Math.min(1, pulse.ttl / Math.max(0.0001, pulse.max)));
-    const outerR = 0.24 + (1 - a) * 0.7;
-    const innerR = 0.08 + (1 - a) * 0.26;
-    ctx.fillStyle = rgba(pulse.pulse, 0.16 * a);
-    ctx.beginPath();
-    ctx.arc(pulse.x, pulse.y, outerR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = `rgba(255,255,245,${(0.12 * a).toFixed(3)})`;
-    ctx.beginPath();
-    ctx.arc(pulse.x, pulse.y, innerR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  for (let i = 0; i < _deityWrathBoltFx.length; i++) {
-    const seg = _deityWrathBoltFx[i];
-    const alpha = Math.max(0, Math.min(1, seg.ttl / Math.max(0.0001, seg.max)));
-    const len = Math.max(1, Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y));
-    const points = Math.max(8, Math.min(24, Math.floor(len * (seg.branch ? 1.3 : 1.6))));
-    const pts = jitterLine(seg.from, seg.to, points, seg.amp * alpha);
-
-    const widthScale = seg.branch ? 0.72 : 1.0;
-    ctx.strokeStyle = rgba(seg.outer, 0.22 * alpha);
-    ctx.lineWidth = 0.24 * widthScale;
-    pathPolyline(ctx, pts);
-    ctx.stroke();
-
-    ctx.strokeStyle = rgba(seg.mid, 0.42 * alpha);
-    ctx.lineWidth = 0.11 * widthScale;
-    pathPolyline(ctx, pts);
-    ctx.stroke();
-
-    const core = jitterLine(seg.from, seg.to, points + 2, seg.amp * 0.45 * alpha);
-    ctx.strokeStyle = rgba(seg.core, 0.95 * alpha);
-    ctx.lineWidth = 0.05 * widthScale;
-    pathPolyline(ctx, core);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-/**
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} width
- * @param {number} height
- */
-function drawDeityWrathScreenFlash(ctx, width, height) {
-  let strongest = null;
-  for (let i = 0; i < _deityWrathScreenFlash.length; i++) {
-    const flash = _deityWrathScreenFlash[i];
-    if (!strongest || flash.ttl > strongest.ttl) strongest = flash;
-  }
-  if (!strongest) return;
-  const a = Math.max(0, Math.min(1, strongest.ttl / Math.max(0.0001, strongest.max)));
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = rgba(strongest.color, 0.18 * a);
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = `rgba(255,255,255,${(0.05 * a).toFixed(3)})`;
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
-}
-
-/**
- * Screen-space fallback wrath bolt: guaranteed visible from top of viewport.
- * Keeps requested semantics: strike falls from y=0 with x aligned to player x.
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} width
- * @param {number} height
- */
-function drawDeityWrathScreenBolts(ctx, width, height) {
-  if (!_deityWrathScreenBoltFx.length) return;
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  const halfW = width * 0.5;
-  const halfH = height * 0.5;
-  const scale = Number(cam.scale || 1);
-
-  for (let i = 0; i < _deityWrathScreenBoltFx.length; i++) {
-    const bolt = _deityWrathScreenBoltFx[i];
-    const alpha = Math.max(0, Math.min(1, bolt.ttl / Math.max(0.0001, bolt.max)));
-    const sx = (bolt.x - cam.x) * scale + halfW;
-    const sy = (bolt.y - cam.y) * scale + halfH;
-    if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
-    if (sx < -80 || sx > width + 80 || sy < -120) continue;
-
-    const endY = Math.max(0, Math.min(height + 120, sy));
-    const start = { x: sx, y: 0 };
-    const end = { x: sx + (Math.random() - 0.5) * 8, y: endY };
-    const segments = Math.max(10, Math.min(26, Math.floor((endY / 34) + 10)));
-    const pts = jitterLine(start, end, segments, bolt.amp * alpha);
-
-    ctx.strokeStyle = rgba(bolt.color, 0.25 * alpha);
-    ctx.lineWidth = 7.5;
-    pathPolyline(ctx, pts);
-    ctx.stroke();
-
-    ctx.strokeStyle = rgba(bolt.color, 0.78 * alpha);
-    ctx.lineWidth = 3.2;
-    pathPolyline(ctx, pts);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(255,255,255,${(0.95 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 1.4;
-    pathPolyline(ctx, jitterLine(start, end, segments + 2, (bolt.amp * 0.42) * alpha));
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
 
 /** @param {number} dt */
 function updateBlinkFx(dt) {
@@ -4056,37 +3610,6 @@ function drawPlasmaCloudEffects(ctx) {
   ctx.restore();
 }
 
-/** @param {CanvasRenderingContext2D} ctx 
-  *  @param {{x:number,y:number}[]} pts */
-function pathPolyline(ctx, pts) {
-  if (!pts.length) return; 
-  const first = pts[0];
-  if (!first) return;
-  ctx.beginPath();
-  ctx.moveTo(first.x, first.y);
-  for (let i = 1; i < pts.length; i++) {
-    const p = pts[i];
-    if (!p) continue;
-    ctx.lineTo(p.x, p.y);
-  }
-}
-
-/** @param {{x:number,y:number}} a 
-  *  @param {{x:number,y:number}} b 
-  *  @param {number} [segments] 
-  *  @param {number} [amp] */
-function jitterLine(a, b, segments = 9, amp = 0.08) {
-  const out = [];
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len; // perpendicular
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const j = (i === 0 || i === segments) ? 0 : (Math.random() * 2 - 1) * amp;
-    out.push({ x: a.x + dx * t + nx * j, y: a.y + dy * t + ny * j });
-  }
-  return out;
-}
 // Initial world tick — runs all systems once so status effects, equipment stats,
 // and other derived state are fully resolved before the first frame renders.
 stepSim(1);
