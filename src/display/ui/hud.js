@@ -44,7 +44,7 @@ export function initHUD() {
     manaMax: 1,
     staminaValue: 1,
     staminaMax: 1,
-  }, { showReadout: false });
+  });
 
   // Active effects HUD: vertical stack below the gauge on the right side.
   const effectsHud = document.createElement('div');
@@ -730,11 +730,7 @@ function createQuickSlot() {
 
   function dispatchAction(it) {
     const t = String(it.type||'');
-    if (t === 'potion') window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
-    else if (t === 'food') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
-    else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
-    else if (t === 'equip' || t === 'ammo' || t === 'wand') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-    else if (t === 'gem' || t === 'tool') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    if (t === 'equip' || t === 'ammo' || t === 'wand') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
     else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
   }
 
@@ -802,7 +798,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip' || it.type === 'ammo' || it.type === 'wand') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : (it.type === 'gem' ? 'Appraise' : (it.type === 'tool' ? 'Use' : 'Read')))));
+  btn.textContent = (it.type === 'equip' || it.type === 'ammo' || it.type === 'wand') ? 'Equip' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : (it.type === 'gem' ? 'Appraise' : 'Use')));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');
