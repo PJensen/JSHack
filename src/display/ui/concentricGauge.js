@@ -59,8 +59,8 @@ function readTheme(root) {
     stamina: css.getPropertyValue('--rg-stamina').trim() || '#ffd54a',
     track: css.getPropertyValue('--rg-track').trim() || 'rgba(255,255,255,0.10)',
     glow: css.getPropertyValue('--rg-glow').trim() || 'rgba(255,255,255,0.10)',
-    base: Number.parseFloat(css.getPropertyValue('--rg-thickness')) || 8,
-    gap: Number.parseFloat(css.getPropertyValue('--rg-gap')) || 5,
+    base: Number.parseFloat(css.getPropertyValue('--rg-thickness')) || 11,
+    gap: Number.parseFloat(css.getPropertyValue('--rg-gap')) || 4,
   };
 }
 
@@ -186,8 +186,8 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
     border: '1px solid rgba(255,255,255,0.10)',
   });
 
-  root.style.setProperty('--rg-thickness', root.style.getPropertyValue('--rg-thickness') || '8');
-  root.style.setProperty('--rg-gap', root.style.getPropertyValue('--rg-gap') || '5');
+  root.style.setProperty('--rg-thickness', root.style.getPropertyValue('--rg-thickness') || '11');
+  root.style.setProperty('--rg-gap', root.style.getPropertyValue('--rg-gap') || '4');
   root.style.setProperty('--rg-track', root.style.getPropertyValue('--rg-track') || 'rgba(255,255,255,0.10)');
   root.style.setProperty('--rg-glow', root.style.getPropertyValue('--rg-glow') || 'rgba(255,255,255,0.10)');
   root.style.setProperty('--rg-health', root.style.getPropertyValue('--rg-health') || '#7bff7b');
@@ -242,9 +242,9 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
     const cy = h / 2;
     const theme = readTheme(root);
 
-    const thHealth = Math.round(theme.base * 2.10);
-    const thMana = Math.round(theme.base * 1.0);
-    const thStamina = Math.round(theme.base * 0.72);
+    const thHealth = Math.round(theme.base * 1.80);
+    const thMana = Math.round(theme.base * 1.20);
+    const thStamina = Math.round(theme.base * 0.90);
 
     const outerPad = Math.round(theme.base * 0.9);
     const maxR = Math.min(w, h) / 2 - outerPad;

@@ -30,8 +30,8 @@ export function initHUD() {
   const vitals = document.createElement('div');
   Object.assign(vitals.style, {
     position: 'relative',
-    width: 'min(188px, 44vw)',
-    height: 'min(188px, 44vw)',
+    width: 'min(188px, 22vw)',
+    height: 'min(188px, 22vw)',
     flex: '0 0 auto',
     pointerEvents: 'none',
   });
@@ -163,6 +163,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
   });
 
+  // Pray button
+  const prayBtn = document.createElement('button');
+  prayBtn.id = 'btn-pray';
+  prayBtn.textContent = 'Pray';
+  Object.assign(prayBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  prayBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch {}
+  });
+
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
@@ -181,6 +194,7 @@ export function initHUD() {
     zap: '\u26A1',            // ⚡
     throw: '\u2934',          // ⤴
     engrave: '\u270E',        // ✎
+    pray: '\u{1F64F}',        // 🙏
     petDefault: '\u{1F43E}',  // 🐾
   });
 
@@ -281,7 +295,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn];
+  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       minHeight: '44px',
@@ -320,17 +334,23 @@ export function initHUD() {
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(throwBtn, 'Throw'); setMobileLabel(throwBtn, 'Throw');
   setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Engrave');
+  setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopIcon(invBtn, ACTION_ICONS.inventory); setMobileIcon(invBtn, ACTION_ICONS.inventory);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(throwBtn, ACTION_ICONS.throw); setMobileIcon(throwBtn, ACTION_ICONS.throw);
   setDesktopIcon(engraveBtn, ACTION_ICONS.engrave); setMobileIcon(engraveBtn, ACTION_ICONS.engrave);
+  setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
     // Temporarily hidden per UX direction.
     helpBtn.style.display = 'none';
+    // Resize vitals gauge for mobile vs desktop
+    const gaugeSize = isMobile ? 'min(110px, 26vw)' : 'min(188px, 22vw)';
+    vitals.style.width = gaugeSize;
+    vitals.style.height = gaugeSize;
     if (isMobile) {
       Object.assign(bar.style, {
         display: 'grid',
@@ -502,6 +522,7 @@ export function initHUD() {
   bar.appendChild(shootBtn);
   bar.appendChild(throwBtn);
   bar.appendChild(engraveBtn);
+  bar.appendChild(prayBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
 
@@ -525,7 +546,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, petBtn };
+  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
