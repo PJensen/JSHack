@@ -31,7 +31,7 @@ export function equipItemSystem(world) {
     // Ensure Equipment component exists
     let eq = world.get(actor, Equipment);
     if (!eq) {
-      try { world.add(actor, Equipment, {}); } catch {}
+      try { world.add(actor, Equipment, {}); } catch {} // ECS: may already exist
       eq = world.get(actor, Equipment);
     }
     if (!eq) { world.remove(actor, EquipIntent); continue; }
@@ -56,7 +56,7 @@ export function equipItemSystem(world) {
           slot: equippedSlot,
           name: world.get(itemId, NamedIdentity)?.name,
         });
-      } catch {}
+      } catch (e) { console.debug('[equipItemSystem] emit item:unequipped failed:', e); }
       world.remove(actor, EquipIntent);
       continue;
     }
@@ -113,7 +113,7 @@ export function equipItemSystem(world) {
     }
 
     // Emit events for UI/logging
-    try { world.emit && world.emit('item:equipped', { actor, itemId, slot: appliedSlot || slot, name: world.get(itemId, NamedIdentity)?.name }); } catch {}
+    try { world.emit && world.emit('item:equipped', { actor, itemId, slot: appliedSlot || slot, name: world.get(itemId, NamedIdentity)?.name }); } catch (e) { console.debug('[equipItemSystem] emit item:equipped failed:', e); }
 
     // Clear intent
     world.remove(actor, EquipIntent);

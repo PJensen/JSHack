@@ -104,7 +104,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
       petState.targetX = null;
       petState.targetY = null;
       petState.targetItemId = 0;
-      try { world.emit?.('pet:state:auto', { petId, newState: 'fleeing', reason: 'low_health' }); } catch {}
+      try { world.emit?.('pet:state:auto', { petId, newState: 'fleeing', reason: 'low_health' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
       return;
     }
   }
@@ -115,7 +115,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
     if (vit && (vit.hp / vit.maxHp) >= FLEE_THRESHOLD + 0.1) { // +0.1 for hysteresis
       petState.state = 'following';
       petState.stateEnteredTurn = world.step;
-      try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'health_restored' }); } catch {}
+      try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'health_restored' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
       return;
     }
   }
@@ -135,7 +135,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
       });
       if (teleportTile) {
         world.set(petId, Position, teleportTile);
-        try { world.emit?.('pet:teleported', { petId, from: petPos, to: teleportTile }); } catch {}
+        try { world.emit?.('pet:teleported', { petId, from: petPos, to: teleportTile }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:teleported failed:', e); }
       }
       return;
     }
@@ -149,7 +149,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
       petState.stateEnteredTurn = world.step;
       petState.targetX = null;
       petState.targetY = null;
-      try { world.emit?.('pet:state:auto', { petId, newState: 'returning', reason: 'item_picked_up' }); } catch {}
+      try { world.emit?.('pet:state:auto', { petId, newState: 'returning', reason: 'item_picked_up' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
       return;
     }
 
@@ -161,7 +161,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
         petState.targetX = null;
         petState.targetY = null;
         petState.stateEnteredTurn = world.step;
-        try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'fetch_target_lost' }); } catch {}
+        try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'fetch_target_lost' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
         return;
       }
     }
@@ -218,7 +218,7 @@ function behaviorFetching(world, petId, petState, petPos, playerPos) {
       if (!world.has(petId, PickupIntent)) {
         try {
           world.add(petId, PickupIntent, { targetId: petState.targetItemId, count: null });
-        } catch {}
+        } catch {} // ECS: may already exist
       }
     }
     return;
@@ -244,7 +244,7 @@ function behaviorReturning(world, petId, petState, petPos, playerPos, playerId) 
     petState.state = 'following';
     petState.targetItemId = 0;
     petState.stateEnteredTurn = world.step;
-    try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'delivery_complete' }); } catch {}
+    try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'delivery_complete' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
     return;
   }
 
@@ -299,7 +299,7 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
           sourceId: petId,
           targetId: closestEnemy
         });
-      } catch {}
+      } catch {} // ECS: may already exist
     }
   } else if (closestEnemy && closestDist > 1) {
     // Chase enemy if within guard radius
@@ -351,7 +351,7 @@ function moveToward(world, petId, targetX, targetY) {
   if ((mx | my) === 0) return;
 
   if (!world.has(petId, MoveIntent)) {
-    try { world.add(petId, MoveIntent, { dx: mx, dy: my }); } catch {}
+    try { world.add(petId, MoveIntent, { dx: mx, dy: my }); } catch {} // ECS: may already exist
   }
 }
 
@@ -367,7 +367,7 @@ function deliverItemsToPlayer(world, petId, playerId, playerPos) {
                      world.get(itemId, ItemInfo)?.description || 'item';
     try {
       world.add(itemId, Position, { x: playerPos.x, y: playerPos.y });
-    } catch {}
+    } catch {} // ECS: may already exist
     try {
       world.emit?.('pet:deliver', {
         petId,
@@ -375,7 +375,7 @@ function deliverItemsToPlayer(world, petId, playerId, playerPos) {
         itemId,
         itemName
       });
-    } catch {}
+    } catch (e) { console.debug('[petBehaviorSystem] emit pet:deliver failed:', e); }
   }
   petInv.items.length = 0;
 }

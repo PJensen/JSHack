@@ -34,6 +34,6 @@ export function installDigWiring({ world }) {
     if (gemId == null) return;
 
     world.add(gemId, Position, { x, y });
-    try { world.emit?.('item:dropped', { itemId: gemId, count: 1, at: { x, y } }); } catch {}
+    try { world.emit?.('item:dropped', { itemId: gemId, count: 1, at: { x, y } }); } catch (e) { console.debug('[digWiring] emit item:dropped failed:', e); }
   });
 }

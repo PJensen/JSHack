@@ -75,7 +75,7 @@ export function materializeChunk(world, chunk, opts = {}) {
                 shopkeeperId: room.shopkeeperId,
                 price: sp._calculatedPrice
               });
-            } catch {}
+            } catch {} // ECS: may already exist
           }
         }
       }

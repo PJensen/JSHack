@@ -185,7 +185,7 @@ export function movementSystem(world) {
           }
         }
       }
-    } catch {}
+    } catch (e) { console.error('[movementSystem] movement resolution failed:', e); }
     // Consume the intent regardless
     try { world.remove(actor, MoveIntent); } catch {}
   }

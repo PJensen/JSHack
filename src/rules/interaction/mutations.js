@@ -59,7 +59,7 @@ export function applyMutation(world, op) {
     case "pushEffect": {
       let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       if (!ae || !Array.isArray(ae.effects)) {
-        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {}
+        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
         ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       }
       if (ae && Array.isArray(ae.effects)) {
@@ -70,7 +70,7 @@ export function applyMutation(world, op) {
     case "upsertTimedEffect": {
       let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       if (!ae || !Array.isArray(ae.effects)) {
-        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {}
+        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
         ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       }
       if (!ae || !Array.isArray(ae.effects)) break;
@@ -129,7 +129,7 @@ export function applyMutation(world, op) {
       if (incoming.length === 0) break;
       let spec = /** @type any */ (world.get(op.entityId, DamageSpec));
       if (!spec || !Array.isArray(spec.channels)) {
-        try { world.add(op.entityId, DamageSpec, { channels: [] }); } catch {}
+        try { world.add(op.entityId, DamageSpec, { channels: [] }); } catch {} // ECS: may already exist
         spec = /** @type any */ (world.get(op.entityId, DamageSpec));
       }
       if (!spec || !Array.isArray(spec.channels)) break;
@@ -161,7 +161,7 @@ export function applyMutation(world, op) {
       if (!kind) break;
       let material = /** @type any */ (world.get(op.entityId, Material));
       if (!material) {
-        try { world.add(op.entityId, Material, { kind }); } catch {}
+        try { world.add(op.entityId, Material, { kind }); } catch {} // ECS: may already exist
         material = /** @type any */ (world.get(op.entityId, Material));
       }
       if (material) material.kind = kind;
@@ -188,9 +188,9 @@ export function applyMutation(world, op) {
       const spawnY = hasY ? (Number(op.y) | 0) : 0;
       if (hasX && hasY) {
         if (world.has(created, Position)) {
-          try { world.set(created, Position, { x: spawnX, y: spawnY }); } catch {}
+          try { world.set(created, Position, { x: spawnX, y: spawnY }); } catch {} // ECS: component may not exist
         } else {
-          try { world.add(created, Position, { x: spawnX, y: spawnY }); } catch {}
+          try { world.add(created, Position, { x: spawnX, y: spawnY }); } catch {} // ECS: may already exist
         }
       }
 
@@ -217,7 +217,7 @@ export function applyMutation(world, op) {
       if (materialKind) {
         let material = /** @type any */ (world.get(created, Material));
         if (!material) {
-          try { world.add(created, Material, { kind: materialKind }); } catch {}
+          try { world.add(created, Material, { kind: materialKind }); } catch {} // ECS: may already exist
           material = /** @type any */ (world.get(created, Material));
         }
         if (material) material.kind = materialKind;
@@ -228,7 +228,7 @@ export function applyMutation(world, op) {
         const inv = /** @type any */ (world.get(ownerId, Inventory));
         if (inv && Array.isArray(inv.items)) {
           if (!inv.items.includes(created)) inv.items.push(created);
-          try { world.remove(created, Position); } catch {}
+          try { world.remove(created, Position); } catch {} // ECS: may not exist
         }
       }
 
@@ -239,7 +239,7 @@ export function applyMutation(world, op) {
             kind: "item",
             at: { x: spawnX, y: spawnY },
           });
-        } catch {}
+        } catch (e) { console.debug('[mutations] emit spawned failed:', e); }
       }
       break;
     }
@@ -263,11 +263,11 @@ export function applyMutation(world, op) {
         ? { ...op.resistances }
         : ((def.resistances && typeof def.resistances === "object") ? { ...def.resistances } : {});
 
-      try { world.add(spawned, Position, { x: spawnX, y: spawnY }); } catch {}
-      try { world.add(spawned, NamedIdentity, { name: String(op.name || def.name || monsterId), identity: monsterId }); } catch {}
-      try { world.add(spawned, Faction, { key: faction }); } catch {}
-      try { world.add(spawned, Collider, { solid: true, blocksSight: false }); } catch {}
-      try { world.add(spawned, Inventory, { items: [], capacity: 0, weightLimit: null }); } catch {}
+      try { world.add(spawned, Position, { x: spawnX, y: spawnY }); } catch {} // ECS: may already exist
+      try { world.add(spawned, NamedIdentity, { name: String(op.name || def.name || monsterId), identity: monsterId }); } catch {} // ECS: may already exist
+      try { world.add(spawned, Faction, { key: faction }); } catch {} // ECS: may already exist
+      try { world.add(spawned, Collider, { solid: true, blocksSight: false }); } catch {} // ECS: may already exist
+      try { world.add(spawned, Inventory, { items: [], capacity: 0, weightLimit: null }); } catch {} // ECS: may already exist
       try {
         world.add(spawned, Equipment, {
           weapon: null,
@@ -282,11 +282,11 @@ export function applyMutation(world, op) {
           critChanceDerived: 0,
           critMultDerived: 0,
         });
-      } catch {}
-      try { world.add(spawned, Vitality, { maxHp, hp: maxHp }); } catch {}
-      try { world.add(spawned, Speed, { actEvery: Math.max(1, Number(speed) | 0) }); } catch {}
-      try { world.add(spawned, ActiveEffects, { effects: [] }); } catch {}
-      try { world.add(spawned, Resistances, resistances); } catch {}
+      } catch {} // ECS: may already exist
+      try { world.add(spawned, Vitality, { maxHp, hp: maxHp }); } catch {} // ECS: may already exist
+      try { world.add(spawned, Speed, { actEvery: Math.max(1, Number(speed) | 0) }); } catch {} // ECS: may already exist
+      try { world.add(spawned, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
+      try { world.add(spawned, Resistances, resistances); } catch {} // ECS: may already exist
 
       if (op.emitEvent !== false) {
         try {
@@ -295,12 +295,12 @@ export function applyMutation(world, op) {
             kind: "monster",
             at: { x: spawnX, y: spawnY },
           });
-        } catch {}
+        } catch (e) { console.debug('[mutations] emit spawned failed:', e); }
       }
 
       const tauntMessage = String(op.tauntMessage || "");
       if (tauntMessage) {
-        try { world.emit?.("message", { text: tauntMessage, type: "warning" }); } catch {}
+        try { world.emit?.("message", { text: tauntMessage, type: "warning" }); } catch (e) { console.debug('[mutations] emit message failed:', e); }
       }
       break;
     }
@@ -309,7 +309,7 @@ export function applyMutation(world, op) {
       if (!spellId) break;
       let brain = /** @type any */ (world.get(op.entityId, Brain));
       if (!brain) {
-        try { world.add(op.entityId, Brain, {}); } catch {}
+        try { world.add(op.entityId, Brain, {}); } catch {} // ECS: may already exist
         brain = /** @type any */ (world.get(op.entityId, Brain));
       }
       if (!brain) break;
@@ -337,7 +337,7 @@ export function applyMutation(world, op) {
       }
 
       inv.items.splice(idx, 1);
-      try { world.destroy(op.entityId); } catch {}
+      try { world.destroy(op.entityId); } catch {} // ECS: entity may already be destroyed
       break;
     }
     case "dropFromInventory": {
@@ -351,9 +351,9 @@ export function applyMutation(world, op) {
       const x = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
       const y = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
       if (world.has(op.entityId, Position)) {
-        try { world.set(op.entityId, Position, { x, y }); } catch {}
+        try { world.set(op.entityId, Position, { x, y }); } catch {} // ECS: component may not exist
       } else {
-        try { world.add(op.entityId, Position, { x, y }); } catch {}
+        try { world.add(op.entityId, Position, { x, y }); } catch {} // ECS: may already exist
       }
 
       if (op.emitEvent !== false) {
@@ -366,7 +366,7 @@ export function applyMutation(world, op) {
             count,
             at: { x, y },
           });
-        } catch {}
+        } catch (e) { console.debug('[mutations] emit item:dropped failed:', e); }
       }
       break;
     }
@@ -387,7 +387,7 @@ export function applyMutation(world, op) {
     case "grantElectricResistance": {
       let resist = /** @type any */ (world.get(op.entityId, Resistances));
       if (!resist) {
-        try { world.add(op.entityId, Resistances, {}); } catch {}
+        try { world.add(op.entityId, Resistances, {}); } catch {} // ECS: may already exist
         resist = /** @type any */ (world.get(op.entityId, Resistances));
       }
       if (!resist) return;
@@ -413,7 +413,7 @@ export function applyMutation(world, op) {
       break;
     }
     case "destroy": {
-      try { world.destroy(op.entityId); } catch {}
+      try { world.destroy(op.entityId); } catch {} // ECS: entity may already be destroyed
       break;
     }
   }

@@ -341,7 +341,7 @@ export function materializeSpawn(world, spawn) {
         for (const drop of drops) {
           const eid = materializeDrop(world, drop, dummyPos);
           if (eid != null) {
-            try { world.remove(eid, Position); } catch {}
+            try { world.remove(eid, Position); } catch {} // ECS: may not exist
             addItemEntityToInventory(world, inv, eid, { removePosition: false });
           }
         }

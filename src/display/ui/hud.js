@@ -98,7 +98,7 @@ export function initHUD() {
     cursor: 'pointer'
   });
   invBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:toggleInventory')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:toggleInventory')); } catch (e) { console.debug('[hud] dispatch ui:toggleInventory:', e); }
   });
 
   const castBtn = document.createElement('button');
@@ -131,7 +131,7 @@ export function initHUD() {
     cursor: 'pointer'
   });
   shootBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch (e) { console.debug('[hud] dispatch ui:shootRanged:', e); }
   });
 
   // Throw item button
@@ -144,7 +144,7 @@ export function initHUD() {
     cursor: 'pointer'
   });
   throwBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:openThrowChooser')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:openThrowChooser')); } catch (e) { console.debug('[hud] dispatch ui:openThrowChooser:', e); }
   });
 
   // Engrave button (to the right of Shoot)
@@ -157,7 +157,7 @@ export function initHUD() {
     cursor: 'pointer'
   });
   engraveBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:engrave')); } catch (e) { console.debug('[hud] dispatch ui:engrave:', e); }
   });
 
   // Pray button
@@ -170,7 +170,7 @@ export function initHUD() {
     cursor: 'pointer'
   });
   prayBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch (e) { console.debug('[hud] dispatch ui:pray:', e); }
   });
 
   // Pet control button (touch/press interface)
@@ -239,7 +239,7 @@ export function initHUD() {
     resetBackground();
     // If not a long press, rotate state
     if (!isLongPress) {
-      try { window.dispatchEvent(new CustomEvent('ui:rotatePetState')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('ui:rotatePetState')); } catch (e) { console.debug('[hud] dispatch ui:rotatePetState:', e); }
     }
     isLongPress = false;
   }

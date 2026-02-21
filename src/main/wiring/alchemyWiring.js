@@ -40,7 +40,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
     const benchId = Number(targetId || 0) | 0;
     if (!(benchId > 0)) return;
     activeBenchId = benchId;
-    try { window.dispatchEvent(new CustomEvent("ui:openAlchemyBench", { detail: { benchId } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:openAlchemyBench", { detail: { benchId } })); } catch (e) { console.debug('[alchemyWiring] dispatch ui:openAlchemyBench:', e); }
     try {
       window.dispatchEvent(new CustomEvent("ui:alchemyBenchData", {
         detail: {
@@ -49,7 +49,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
           recipes: Array.isArray(recipes) ? recipes : [],
         },
       }));
-    } catch {}
+    } catch (e) { console.debug('[alchemyWiring] dispatch ui:alchemyBenchData:', e); }
   });
 
   world.on("moved", ({ id }) => {
@@ -58,7 +58,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
     if (!(activeBenchId > 0)) return;
     if (isPlayerAdjacentTo(activeBenchId)) return;
     activeBenchId = 0;
-    try { window.dispatchEvent(new CustomEvent("ui:closeAlchemyBench")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:closeAlchemyBench")); } catch (e) { console.debug('[alchemyWiring] dispatch ui:closeAlchemyBench:', e); }
   });
 
   addEventListener("ui:requestAlchemyBrew", (ev) => {
@@ -70,7 +70,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
     if (!isPlayerAdjacentTo(benchId)) {
       writeLog("You need to stand next to the alchemy bench.");
       activeBenchId = 0;
-      try { window.dispatchEvent(new CustomEvent("ui:closeAlchemyBench")); } catch {}
+      try { window.dispatchEvent(new CustomEvent("ui:closeAlchemyBench")); } catch (e) { console.debug('[alchemyWiring] dispatch ui:closeAlchemyBench:', e); }
       return;
     }
     dispatchRules({ type: "rules.brewAlchemy", payload: { benchId, recipe } });

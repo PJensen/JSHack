@@ -49,7 +49,7 @@ export function drinkSystem(world) {
       };
     }
 
-    try { world.emit?.("interaction:result", result); } catch {}
-    try { world.remove(actor, DrinkIntent); } catch {}
+    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[drinkSystem] emit interaction:result failed:', e); }
+    try { world.remove(actor, DrinkIntent); } catch {} // ECS: may not exist
   }
 }

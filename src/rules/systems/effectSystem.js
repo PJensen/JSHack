@@ -133,7 +133,7 @@ export function effectSystem(world) {
             } else {
                 // Fallback: optional callback dispatch by name (future-friendly)
                 if (e.cbKey && typeof effectCallbacks[e.cbKey] === 'function') {
-                    try { effectCallbacks[e.cbKey]({ world, id, e, vit, statusMap: nextStatuses }); } catch {}
+                    try { effectCallbacks[e.cbKey]({ world, id, e, vit, statusMap: nextStatuses }); } catch (err) { console.error('[effectSystem] callback "' + e.cbKey + '" failed:', err); }
                 }
                 // Unknown types still tick down but do nothing by default
             }

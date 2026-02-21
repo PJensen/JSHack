@@ -21,19 +21,19 @@ export function generateShopStock(world, depth, rng) {
     const potionCount = rng.int(3, 5);
     for (let i = 0; i < potionCount; i++) {
         const id = createFrom(world, HealthPotion, {});
-        try { world.remove(id, Position); } catch {}
+        try { world.remove(id, Position); } catch {} // ECS: may not exist
         items.push(id);
     }
 
     const arrowCount = rng.int(1, 2);
     for (let i = 0; i < arrowCount; i++) {
         const id = createFrom(world, ArrowsStack, {});
-        try { world.remove(id, Position); } catch {}
+        try { world.remove(id, Position); } catch {} // ECS: may not exist
         items.push(id);
     }
 
     const scrollId = createFrom(world, ScrollOfMapping, {});
-    try { world.remove(scrollId, Position); } catch {}
+    try { world.remove(scrollId, Position); } catch {} // ECS: may not exist
     items.push(scrollId);
 
     // Depth-scaled random equipment from the shop:equipment table
@@ -43,7 +43,7 @@ export function generateShopStock(world, depth, rng) {
         if (drop.kind === "gold") continue; // shops don't sell gold
         const eid = materializeDrop(world, drop, dummyPos);
         if (eid != null) {
-            try { world.remove(eid, Position); } catch {}
+            try { world.remove(eid, Position); } catch {} // ECS: may not exist
             // Scale value by depth for equipment
             const info = world.get(eid, ItemInfo);
             if (info && info.value > 0) {
@@ -73,17 +73,17 @@ export function generateShopItem(world, depth, rng) {
     // Staples appear often to keep early shops useful.
     if (roll < 0.35) {
         const id = createFrom(world, HealthPotion, {});
-        try { world.remove(id, Position); } catch {}
+        try { world.remove(id, Position); } catch {} // ECS: may not exist
         return id;
     }
     if (roll < 0.50) {
         const id = createFrom(world, ArrowsStack, {});
-        try { world.remove(id, Position); } catch {}
+        try { world.remove(id, Position); } catch {} // ECS: may not exist
         return id;
     }
     if (roll < 0.60) {
         const id = createFrom(world, ScrollOfMapping, {});
-        try { world.remove(id, Position); } catch {}
+        try { world.remove(id, Position); } catch {} // ECS: may not exist
         return id;
     }
 
@@ -94,7 +94,7 @@ export function generateShopItem(world, depth, rng) {
         if (drop.kind === "gold") continue;
         const eid = materializeDrop(world, drop, dummyPos);
         if (eid == null) continue;
-        try { world.remove(eid, Position); } catch {}
+        try { world.remove(eid, Position); } catch {} // ECS: may not exist
         const info = world.get(eid, ItemInfo);
         if (info && info.value > 0) {
             const depthMult = 1 + (depth - 1) * 0.15;
@@ -107,6 +107,6 @@ export function generateShopItem(world, depth, rng) {
 
     // Fallback so shop_item spawn always materializes.
     const fallback = createFrom(world, HealthPotion, {});
-    try { world.remove(fallback, Position); } catch {}
+    try { world.remove(fallback, Position); } catch {} // ECS: may not exist
     return fallback;
 }

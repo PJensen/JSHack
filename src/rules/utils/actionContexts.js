@@ -119,7 +119,7 @@ export class RuleActionContext {
    * @param {Record<string, any>} payload
    */
   emit(eventName, payload) {
-    try { this.world.emit && this.world.emit(eventName, payload); } catch {}
+    try { this.world.emit && this.world.emit(eventName, payload); } catch (e) { console.debug('[actionContexts] emit ' + eventName + ' failed:', e); }
   }
 
   /**
@@ -214,7 +214,7 @@ export class ItemUseActionContext extends RuleActionContext {
   ensureBrain() {
     let brain = /** @type any */ (this.world.get(this._actorId, Brain));
     if (!brain) {
-      try { this.world.add(this._actorId, Brain, {}); } catch {}
+      try { this.world.add(this._actorId, Brain, {}); } catch {} // ECS: may already exist
       brain = /** @type any */ (this.world.get(this._actorId, Brain));
     }
     return brain || null;

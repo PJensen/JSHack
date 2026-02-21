@@ -97,12 +97,12 @@ export class TombstoneRepository {
               try {
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed)) all.push(...parsed);
-              } catch {}
+              } catch (e) { console.warn('[TombstoneRepository] corrupt tombstone JSON at', key, e); }
             }
           }
         }
       }
-    } catch {}
+    } catch (e) { console.warn('[TombstoneRepository] getAll scan failed:', e); }
     // Sort by timestamp descending (most recent death first)
     all.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     return all;

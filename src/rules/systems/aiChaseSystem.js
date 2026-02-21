@@ -55,6 +55,6 @@ export function aiChaseSystem(world) {
     // If both zero (same tile), do nothing
     if ((dx | dy) === 0) return;
 
-    try { world.add(id, MoveIntent, { dx, dy }); } catch {}
+    try { world.add(id, MoveIntent, { dx, dy }); } catch {} // ECS: may already exist
   });
 }

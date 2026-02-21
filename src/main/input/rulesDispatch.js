@@ -21,7 +21,7 @@ export function makeRulesDispatcher(world, getActorId) {
     if (typeof window !== "undefined") {
       try {
         if (/** @type {any} */ (window).__JSHACK_INPUT_LOCKED === true) return;
-      } catch {}
+      } catch (e) { console.debug('[rulesDispatch] input lock check failed:', e); }
     }
 
     const actorId = (typeof getActorId === "function") ? getActorId() : 0;
@@ -55,7 +55,7 @@ export function makeRulesDispatcher(world, getActorId) {
         if (!spellId) {
           // No spell specified (keyboard shortcut); delegate to app-side
           // active spell resolution via the same path as the Cast button.
-          try { window.dispatchEvent(new CustomEvent('ui:castActiveSpell')); } catch {}
+          try { window.dispatchEvent(new CustomEvent('ui:castActiveSpell')); } catch (e) { console.debug('[rulesDispatch] dispatch ui:castActiveSpell:', e); }
           break;
         }
         const cast = { spellId, targetId };
@@ -100,7 +100,7 @@ export function makeRulesDispatcher(world, getActorId) {
       }
       case "rules.shootRanged": {
         // No explicit target; delegate to app-side auto-targeting
-        try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch {}
+        try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch (e) { console.debug('[rulesDispatch] dispatch ui:shootRanged:', e); }
         break;
       }
       case "rules.rangedAttack": {

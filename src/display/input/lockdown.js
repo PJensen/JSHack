@@ -84,7 +84,7 @@ export function enableInputLockdown({ canvas = null } = {}) {
     // 5) Pointer capture on the canvas keeps interactions owned by app
     if (canvas) {
       on(canvas, "pointerdown", (e) => {
-        try { canvas.setPointerCapture?.(e.pointerId); } catch {}
+        try { canvas.setPointerCapture?.(e.pointerId); } catch {} // pointer capture may not be supported
         // Prevent any default like text selection or image drag
         e.preventDefault();
       }, { passive: false, capture: true });

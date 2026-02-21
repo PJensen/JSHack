@@ -54,7 +54,7 @@ export function readSavegamePayload(storage) {
 export function clearSavegamePayload(storage) {
   const store = resolveStorage(storage);
   if (!store) return;
-  try { store.removeItem(SAVEGAME_KEY); } catch {}
+  try { store.removeItem(SAVEGAME_KEY); } catch (e) { console.warn('[savegameLoad] storage operation failed:', e); }
 }
 
 /**

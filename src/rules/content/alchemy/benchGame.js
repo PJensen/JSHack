@@ -119,7 +119,7 @@ function consumeByIdentity(world, inv, identity, amount) {
       remaining -= stackCount;
       inv.items.splice(i, 1);
       i -= 1;
-      try { world.destroy(itemId); } catch {}
+      try { world.destroy(itemId); } catch {} // ECS: entity may already be destroyed
       continue;
     }
     const nextCount = Math.max(0, stackCount - remaining);

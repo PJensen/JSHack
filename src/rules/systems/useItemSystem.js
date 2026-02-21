@@ -54,10 +54,10 @@ export function useItemSystem(world) {
           message: detail?.message,
           consumesTurn: detail?.consumesTurn,
         });
-      } catch {}
+      } catch (e) { console.debug('[useItemSystem] emit item:use-cancelled failed:', e); }
     }
 
-    try { world.emit?.("interaction:result", result); } catch {}
-    try { world.remove(actor, UseIntent); } catch {}
+    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[useItemSystem] emit interaction:result failed:', e); }
+    try { world.remove(actor, UseIntent); } catch {} // ECS: may not exist
   }
 }

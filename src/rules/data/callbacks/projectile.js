@@ -125,7 +125,7 @@ export class ProjectileImpactCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    try { this.world.emit && this.world.emit(eventName, payload); } catch {}
+    try { this.world.emit && this.world.emit(eventName, payload); } catch (e) { console.debug('[projectile] emit ' + eventName + ' failed:', e); }
   }
 
   /**
@@ -146,7 +146,7 @@ export class ProjectileImpactCallbackContext {
       ae.effects.push({ stacks: 1, ...effect });
       return;
     }
-    try { this.world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {}
+    try { this.world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {} // ECS: may already exist
   }
 
   /**
@@ -170,7 +170,7 @@ export class ProjectileImpactCallbackContext {
     const queue = this._resolvedQueue.slice();
     this._resolvedQueue.length = 0;
     for (let i = 0; i < queue.length; i++) {
-      try { queue[i](this); } catch {}
+      try { queue[i](this); } catch (e) { console.error('[projectile] resolved callback failed:', e); }
     }
   }
 }

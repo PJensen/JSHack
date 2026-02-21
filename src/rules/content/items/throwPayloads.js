@@ -41,7 +41,7 @@ export function findThrowPayload(state) {
     const payload = THROW_ITEM_MATCHER_PAYLOADS[i];
     try {
       if (payload.matches(state)) return { ...payload, source: "matcher" };
-    } catch {}
+    } catch (e) { console.error('[throwPayloads] matcher failed:', e); }
   }
 
   return null;

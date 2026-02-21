@@ -48,7 +48,7 @@ export function createHudFeeds(world, deps) {
       lastVitals = { hp, maxHp, mana: mana.mana, maxMana: mana.maxMana, stamina, maxStamina };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateVitals", { detail: lastVitals }));
-      } catch {}
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:updateVitals:', e); }
     }
   }
 
@@ -148,7 +148,7 @@ export function createHudFeeds(world, deps) {
           affixes: affixNames,
           ammo,
         } }));
-      } catch {}
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:updateCombatHUD:', e); }
     }
   }
 
@@ -159,7 +159,7 @@ export function createHudFeeds(world, deps) {
         lastDepth = d;
         try {
           window.dispatchEvent(new CustomEvent("ui:updateDepth", { detail: { depth: d } }));
-        } catch {}
+        } catch (e) { console.debug('[hudFeeds] dispatch ui:updateDepth:', e); }
       }
       break;
     }
@@ -184,7 +184,7 @@ export function createHudFeeds(world, deps) {
         window.dispatchEvent(new CustomEvent("ui:petExists", {
           detail: { exists: petExists }
         }));
-      } catch {}
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:petExists:', e); }
     }
 
     // Update state if changed
@@ -194,7 +194,7 @@ export function createHudFeeds(world, deps) {
         window.dispatchEvent(new CustomEvent("ui:updatePetButton", {
           detail: { state: petState }
         }));
-      } catch {}
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:updatePetButton:', e); }
     }
   }
 

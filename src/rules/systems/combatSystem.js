@@ -100,7 +100,7 @@ export function installBumpAttackListener(world) {
         const source = Number(attacker || 0) | 0;
         const defender = Number(target || 0) | 0;
         if (!(source > 0) || !(defender > 0) || source === defender) return;
-        try { resolveMeleeAttack(world, source, defender); } catch {}
+        try { resolveMeleeAttack(world, source, defender); } catch (e) { console.error('[combatSystem] resolveMeleeAttack failed:', e); }
     });
 }
 
@@ -256,7 +256,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
-        try { resolveMeleeAttack(world, attacker, intent.targetId | 0); } catch {}
+        try { resolveMeleeAttack(world, attacker, intent.targetId | 0); } catch (e) { console.error('[combatSystem] resolveMeleeAttack failed:', e); }
         try { world.remove(attacker, AttackIntent); } catch {}
     }
 }

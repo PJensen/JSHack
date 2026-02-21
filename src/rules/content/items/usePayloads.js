@@ -215,7 +215,7 @@ export function findUsePayload(state) {
     const payload = USE_ITEM_MATCHER_PAYLOADS[i];
     try {
       if (payload.matches(state)) return { ...payload, source: "matcher" };
-    } catch {}
+    } catch (e) { console.error('[usePayloads] matcher failed:', e); }
   }
 
   return null;
