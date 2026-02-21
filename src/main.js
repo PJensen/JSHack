@@ -27,6 +27,7 @@ import { createHudFeeds } from "./main/ui/hudFeeds.js";
 import { createActiveSpellController } from "./main/spells/activeSpellController.js";
 import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
+import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
@@ -97,21 +98,18 @@ import { resetIdentification, identify, restoreIdentification } from "./rules/da
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng } from "./lib/ecs-js/rng.js";
 
-// ---- Canvas & sizing -------------------------------------------------------
-const canvas = document.getElementById("stage");
-const ctx = canvas.getContext("2d", { alpha: false });
-ctx.imageSmoothingEnabled = false;
-// Optional backbuffer to mirror DPR and present once per frame (reduces state churn)
-const back = document.createElement('canvas');
-const bctx = back.getContext('2d', { alpha: false });
-bctx.imageSmoothingEnabled = false;
+// ---- Config & canvas -------------------------------------------------------
+const runtimeConfig = readRuntimeConfig();
+const PERF = runtimeConfig.perf;
+const chosenDeityId = runtimeConfig.chosenDeityId;
+const TILE_PX = 28;
+
+const _canvasSetup = createCanvasSetup({ canvasId: 'stage', TILE_PX, dprCap: PERF.dprCap });
+const { canvas, ctx, back, bctx } = _canvasSetup;
 
 // Lock down browser-driven inputs/scroll/zoom so the app fully controls them
 enableInputLockdown({ canvas });
 
-const runtimeConfig = readRuntimeConfig();
-const PERF = runtimeConfig.perf;
-const chosenDeityId = runtimeConfig.chosenDeityId;
 const BOOT_STATIC_UNITS = 9;
 let _bootDoneUnits = 0;
 let _bootTotalUnits = BOOT_STATIC_UNITS;
@@ -156,38 +154,6 @@ function finishBoot() {
   } catch (e) { console.debug('[main] boot done callback failed:', e); }
 }
 
-// Use tile-sized world units: 1 world unit == 1 tile on screen
-const TILE_PX = 28;
-
-let _cssW = 0, _cssH = 0, _dpr = 1;
-function resize() {
-  // Limit device pixel ratio and align CSS size to tile grid to avoid fractional resampling
-  const rawDpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-  const maxCap = Math.max(1, Math.floor(PERF.dprCap || 1));
-  const dpr = Math.max(1, Math.min(rawDpr, maxCap));
-
-  const vw = Math.max(1, (window.innerWidth | 0));
-  const vh = Math.max(1, (window.innerHeight | 0));
-  const cols = Math.max(1, Math.floor(vw / TILE_PX));
-  const rows = Math.max(1, Math.floor(vh / TILE_PX));
-  const cssW = cols * TILE_PX;
-  const cssH = rows * TILE_PX;
-
-  canvas.style.width = cssW + "px";
-  canvas.style.height = cssH + "px";
-  canvas.width = cssW * dpr;
-  canvas.height = cssH * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  // Backbuffer mirrors visible canvas size and DPR transform
-  back.width = canvas.width;
-  back.height = canvas.height;
-  bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  _cssW = cssW; _cssH = cssH; _dpr = dpr;
-}
-addEventListener("resize", resize);
-resize();
 updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
 
 // ---- App wires rules/ (no display logic here) ------------------------------
@@ -3016,8 +2982,8 @@ bootAdvance("Prepared render resources");
 let _bgGradH = 0; let _bgGrad = null;
 let _fxTime = 0; // display-side time accumulator for simple glyph FX
 function render(worldView) {
-  const W = _cssW;
-  const H = _cssH;
+  const W = _canvasSetup.cssW;
+  const H = _canvasSetup.cssH;
 
   // Background (cache gradient by height to avoid per-frame allocations)
   bctx.save();
