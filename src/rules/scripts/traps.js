@@ -6,6 +6,7 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { attach } from "../../lib/ecs-js/hierarchy.js";
 
 // Spike trap: deals percentage of max HP as damage.
 // Params: { percent?: number } // 0..1
@@ -73,7 +74,7 @@ registerScript('trap_snake', {
     const offsets = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
     for (let i = 0; i < count && i < offsets.length; i++) {
       const [dx, dy] = offsets[i];
-      createFrom(world, Monster, {
+      const child = createFrom(world, Monster, {
         x: trapPos.x + dx,
         y: trapPos.y + dy,
         name: snakeDef.name,
@@ -88,6 +89,8 @@ registerScript('trap_snake', {
         resistances: snakeDef.resistances,
         speed: snakeDef.speed,
       });
+      // Attach to the trap entity so destroySubtree cleans up on floor transition.
+      try { attach(world, child, trapId); } catch {}
     }
   }
 });

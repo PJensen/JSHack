@@ -4,6 +4,7 @@ import { Vitality } from "../components/Vitality.js";
 import { Owner } from "../components/Owner.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
+import { attach } from "../../lib/ecs-js/hierarchy.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
@@ -42,6 +43,9 @@ export function monsterSpawnerSystem(world) {
       const params = Object.assign({ x: sx, y: sy }, sp.spawnParams || {});
       const child = createFrom(world, Monster, params);
       try { world.add(child, Owner, { ownerId: id }); } catch {}
+
+      // Attach child to spawner via hierarchy so destroySubtree cleans it up on floor transition.
+      try { attach(world, child, id); } catch {}
 
       world.mutate(id, MonsterSpawner, (r) => {
         r.spawnedSoFar = Math.min(r.totalToSpawn, (r.spawnedSoFar | 0) + 1);
