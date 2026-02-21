@@ -42,10 +42,10 @@ export function monsterSpawnerSystem(world) {
 
       const params = Object.assign({ x: sx, y: sy }, sp.spawnParams || {});
       const child = createFrom(world, Monster, params);
-      try { world.add(child, Owner, { ownerId: id }); } catch {}
+      try { world.add(child, Owner, { ownerId: id }); } catch {} // ECS: may already exist
 
       // Attach child to spawner via hierarchy so destroySubtree cleans it up on floor transition.
-      try { attach(world, child, id); } catch {}
+      try { attach(world, child, id); } catch {} // hierarchy attach may fail if already linked
 
       world.mutate(id, MonsterSpawner, (r) => {
         r.spawnedSoFar = Math.min(r.totalToSpawn, (r.spawnedSoFar | 0) + 1);

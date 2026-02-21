@@ -257,6 +257,6 @@ export function resolveMeleeAttack(world, attacker, defender) {
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
         try { resolveMeleeAttack(world, attacker, intent.targetId | 0); } catch (e) { console.error('[combatSystem] resolveMeleeAttack failed:', e); }
-        try { world.remove(attacker, AttackIntent); } catch {}
+        try { world.remove(attacker, AttackIntent); } catch {} // ECS: may not exist
     }
 }

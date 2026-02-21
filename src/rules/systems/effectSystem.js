@@ -84,7 +84,7 @@ export function effectSystem(world) {
         if (ae.effects.length === 0) {
             // If no active effects, clear Status if present
             if (world.has(id, Status)) {
-                try { world.set(id, Status, { statuses: [] }); } catch {}
+                try { world.set(id, Status, { statuses: [] }); } catch {} // ECS: component may not exist
             }
             continue;
         }
@@ -93,7 +93,7 @@ export function effectSystem(world) {
         let vit = world.get(id, Vitality);
         if (!vit) {
             // Add a default Vitality if missing to make effects universal
-            try { world.add(id, Vitality, { maxHp: 10, hp: 10 }); } catch {}
+            try { world.add(id, Vitality, { maxHp: 10, hp: 10 }); } catch {} // ECS: may already exist
             vit = world.get(id, Vitality);
         }
         const hadStatus = world.has(id, Status);

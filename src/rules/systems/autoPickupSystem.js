@@ -31,7 +31,7 @@ export function autoPickupSystem(world) {
       const takeCount = info.count || 1;
       addItemEntityToInventory(world, inv, itemId);
 
-      try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount }); } catch {}
+      try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount }); } catch (e) { console.debug('[autoPickupSystem] emit item:pickup failed:', e); }
     }
   }
 }

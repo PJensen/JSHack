@@ -67,7 +67,7 @@ export function movementSystem(world) {
               from: { dx: intendedDx, dy: intendedDy },
               to: { dx: mdx, dy: mdy },
             });
-          } catch {}
+          } catch (e) { console.debug('[movementSystem] emit status:confused-misstep failed:', e); }
         }
       }
 
@@ -90,7 +90,7 @@ export function movementSystem(world) {
           const fac = world.get(target, Faction);
           if (fac && (fac.key === 'shopkeeper' || fac.key === 'neutral') && world.has(target, Interactable)) {
             // Emit bump-interact event for cross-system communication without direct coupling
-            try { world.emit?.("bump:interact", { actor, target }); } catch {}
+            try { world.emit?.("bump:interact", { actor, target }); } catch (e) { console.debug('[movementSystem] emit bump:interact failed:', e); }
           } else if (areFactionsHostile(actorFaction?.key, fac?.key)) {
             // Prefer immediate event-driven bump-attack resolution so attacks
             // can land in the same tick when structural intent adds are deferred.
@@ -103,7 +103,7 @@ export function movementSystem(world) {
                 handled = 0;
               }
               if (handled <= 0) {
-                try { world.add(actor, AttackIntent, { targetId: target }); } catch {}
+                try { world.add(actor, AttackIntent, { targetId: target }); } catch {} // ECS: may already exist
               }
             }
           } else {
@@ -115,7 +115,7 @@ export function movementSystem(world) {
           // Emit bump-interact event for cross-system communication without direct coupling
           const targetId = interactables.get(k);
           if (targetId) {
-            try { world.emit?.("bump:interact", { actor, target: targetId }); } catch {}
+            try { world.emit?.("bump:interact", { actor, target: targetId }); } catch (e) { console.debug('[movementSystem] emit bump:interact failed:', e); }
           } else if (getTile(nx, ny) === TILE_WALL) {
             // Dig: if the player has a pickaxe equipped (weapon with dig bonus), mine the wall.
             const eq = world.get(actor, Equipment);
@@ -134,9 +134,9 @@ export function movementSystem(world) {
                       setTile(nx+dx, ny+dy, TILE_WALL);
                     }
                   }
-                  try { world.emit?.("tile:dug", { actor, x: nx, y: ny }); } catch {}
+                  try { world.emit?.("tile:dug", { actor, x: nx, y: ny }); } catch (e) { console.debug('[movementSystem] emit tile:dug failed:', e); }
                 } else {
-                  try { world.emit?.("attack:insufficient-stamina", { attacker: actor, need: cost, have: Number(stam?.stamina ?? 0) }); } catch {}
+                  try { world.emit?.("attack:insufficient-stamina", { attacker: actor, need: cost, have: Number(stam?.stamina ?? 0) }); } catch (e) { console.debug('[movementSystem] emit attack:insufficient-stamina failed:', e); }
                 }
               }
             }
@@ -180,13 +180,13 @@ export function movementSystem(world) {
                   // no capacity — skip silently for now
                 }
               }
-              try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch {}
+              try { world.emit && world.emit('item:pickup', { actor, itemId, count }); } catch (e) { console.debug('[movementSystem] emit item:pickup failed:', e); }
             }
           }
         }
       }
     } catch (e) { console.error('[movementSystem] movement resolution failed:', e); }
     // Consume the intent regardless
-    try { world.remove(actor, MoveIntent); } catch {}
+    try { world.remove(actor, MoveIntent); } catch {} // ECS: may not exist
   }
 }
