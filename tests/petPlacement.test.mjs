@@ -1,7 +1,8 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { findNearestValidTileAround } from '../src/rules/utils/queries.js';
-import { petFollowSystem } from '../src/rules/systems/petFollowSystem.js';
+import { petBehaviorSystem } from '../src/rules/systems/petBehaviorSystem.js';
+import { Vitality } from '../src/rules/components/Vitality.js';
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
@@ -45,6 +46,7 @@ Deno.test('pet teleport keeps current position when nearby tiles are blocked', (
   const petId = world.create();
   world.add(petId, Pet);
   world.add(petId, Position, { x: 20, y: 20 });
+  world.add(petId, Vitality, { hp: 10, maxHp: 10 });
 
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -55,7 +57,7 @@ Deno.test('pet teleport keeps current position when nearby tiles are blocked', (
     }
   }
 
-  petFollowSystem(world);
+  petBehaviorSystem(world);
 
   const petPos = world.get(petId, Position);
   assertEquals(petPos, { x: 20, y: 20 });

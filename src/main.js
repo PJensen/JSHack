@@ -427,11 +427,11 @@ if (_pendingSavegame) {
   let stairCount = 0;
   for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
     if (ni.identity === 'stair_down' || ni.identity === 'stair_up') {
-      console.log(`[DUNGEON] ${ni.identity} entity #${id} at (${pos.x}, ${pos.y})`);
+      if (runtimeConfig.debug) console.log(`[DUNGEON] ${ni.identity} entity #${id} at (${pos.x}, ${pos.y})`);
       stairCount++;
     }
   }
-  if (stairCount === 0) console.warn('[DUNGEON] WARNING: No stair entities were created!');
+  if (stairCount === 0 && runtimeConfig.debug) console.warn('[DUNGEON] WARNING: No stair entities were created!');
 }
 
 if (!_savegameLoaded) {
@@ -575,7 +575,7 @@ if (!_savegameLoaded) {
 
               if (createdItemId !== null) {
                 addItemEntityToInventory(world, inv, createdItemId);
-                console.log(`[?give] Created ${count}x ${itemId}`);
+                console.debug(`[?give] Created ${count}x ${itemId}`);
               } else {
                 console.warn(`[?give] Unknown item: "${itemId}"`);
               }
@@ -616,7 +616,7 @@ if (!_savegameLoaded) {
           } else {
             world.add(pe.id, ActiveEffects, { effects: [effect] });
           }
-          console.log(`[?effects] Applied ${key} for ${turnsLeft} turn(s)`);
+          console.debug(`[?effects] Applied ${key} for ${turnsLeft} turn(s)`);
         }
       }
     }
@@ -3507,11 +3507,6 @@ function render(worldView) {
     ctx.font = "12px monospace";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    // const s = fx.stats();
-    // ctx.fillText(`particles: ${s.active}/${s.capacity}  emitters:${s.emitters}`, 8, 8); // DEBUG
-    // const fpsInt = Math.max(0, Math.round(_fpsEMA || 0));
-    // ctx.fillText(`fx fps: ${fpsInt}`, 8, 24); // DEBUG
-
     // Optional rules profiler overlay (top 3 systems by last tick duration)
     const prof = /** @type any */ (window).__JSHACK_RULES_PROF;
     if (prof && prof.lastTick) {
@@ -4631,7 +4626,7 @@ addEventListener("keydown", (e) => {
     // Debug: toggle camera between nearest down-stair and player
     if (cam._detached) {
       cam._detached = false;
-      console.log('[DEBUG] Camera re-attached to player');
+      if (runtimeConfig.debug) console.log('[DEBUG] Camera re-attached to player');
     } else {
       let best = null, bestDist = Infinity;
       const pp = playerEntity(world);
@@ -4645,10 +4640,10 @@ addEventListener("keydown", (e) => {
       }
       if (best) {
         cam._detached = true;
-        console.log(`[DEBUG] Easing to stair_down at (${best.x}, ${best.y})`);
+        if (runtimeConfig.debug) console.log(`[DEBUG] Easing to stair_down at (${best.x}, ${best.y})`);
         easeTo(cam, { x: best.x, y: best.y, dur: 0.8 });
       } else {
-        console.warn('[DEBUG] No stair_down entity found on this floor!');
+        if (runtimeConfig.debug) console.warn('[DEBUG] No stair_down entity found on this floor!');
       }
     }
     e.preventDefault(); return;
