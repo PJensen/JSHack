@@ -31,7 +31,7 @@ export function trapSystem(world) {
       const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
       const name = trapNames[t.type] || 'Trap';
       const identity = 'trap_' + (t.type || 'spike');
-      try { world.add(tid, NamedIdentity, { name, identity }); } catch {}
+      try { world.add(tid, NamedIdentity, { name, identity }); } catch {} // ECS: may already exist
     }
 
     // Run scripted behavior
@@ -46,6 +46,6 @@ export function trapSystem(world) {
     }
 
     // Reveal and disarm
-    try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {}
+    try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {} // ECS: component may not exist
   }
 }

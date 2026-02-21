@@ -38,7 +38,7 @@ export function createActiveSpellController(world) {
       window.dispatchEvent(new CustomEvent("ui:updateActiveSpellLabel", {
         detail: { id: activeSpellId, name, cost, canCast }
       }));
-    } catch {}
+    } catch (e) { console.debug('[activeSpellController] dispatch ui:updateActiveSpellLabel:', e); }
   }
 
   function ensureActiveSpell() {

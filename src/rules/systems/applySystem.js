@@ -53,10 +53,10 @@ export function applySystem(world) {
           message: detail?.message,
           consumesTurn: detail?.consumesTurn,
         });
-      } catch {}
+      } catch (e) { console.debug('[applySystem] emit item:apply-cancelled failed:', e); }
     }
 
-    try { world.emit?.("interaction:result", result); } catch {}
-    try { world.remove(actor, ApplyIntent); } catch {}
+    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[applySystem] emit interaction:result failed:', e); }
+    try { world.remove(actor, ApplyIntent); } catch {} // ECS: may not exist
   }
 }

@@ -74,7 +74,7 @@ export function castSpellSystem(world) {
     }
     const spell = getSpell(spellId);
     if (!spell) {
-      try { world.emit && world.emit('spell:unknown', { actor, spellId }); } catch {}
+      try { world.emit && world.emit('spell:unknown', { actor, spellId }); } catch (e) { console.debug('[castSpellSystem] emit spell:unknown failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -82,7 +82,7 @@ export function castSpellSystem(world) {
     /** @type {{ learnedSpellIds?: string[] }|null} */
     const brain = /** @type any */ (world.get(actor, Brain));
     if (!brain || !Array.isArray(brain.learnedSpellIds) || !brain.learnedSpellIds.includes(spell.id)) {
-      try { world.emit && world.emit('spell:not-known', { actor, spellId: spell.id }); } catch {}
+      try { world.emit && world.emit('spell:not-known', { actor, spellId: spell.id }); } catch (e) { console.debug('[castSpellSystem] emit spell:not-known failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -96,7 +96,7 @@ export function castSpellSystem(world) {
     const have = Number(mana?.mana ?? 0);
     const cost = Number(resolvedSpell.manaCost || 0);
     if (have < cost) {
-      try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: cost, have }); } catch {}
+      try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: cost, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -108,7 +108,7 @@ export function castSpellSystem(world) {
     }
 
     if (confusion.kind === "fizzle") {
-      try { world.emit && world.emit("spell:fizzle", { actor, spellId: spell.id, confused: true }); } catch {}
+      try { world.emit && world.emit("spell:fizzle", { actor, spellId: spell.id, confused: true }); } catch (e) { console.debug('[castSpellSystem] emit spell:fizzle failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -121,11 +121,11 @@ export function castSpellSystem(world) {
           toSpellId: resolvedSpell.id,
           confused: true,
         });
-      } catch {}
+      } catch (e) { console.debug('[castSpellSystem] emit spell:miscast failed:', e); }
     }
 
     // Run scripted behavior (pure rules)
-    try { runSpellScript(world, actor, resolvedSpell, intent); } catch {}
+    try { runSpellScript(world, actor, resolvedSpell, intent); } catch (e) { console.error('[castSpellSystem] runSpellScript failed for "' + (resolvedSpell?.id || '?') + '":', e); }
     // Emit semantic cast event that bridge/display can turn into effects
     try {
       world.emit && world.emit('castSpell', {
@@ -135,7 +135,7 @@ export function castSpellSystem(world) {
         miscast: confusion.kind === "miscast",
         intendedSpellId: confusion.kind === "miscast" ? spell.id : undefined,
       });
-    } catch {}
+    } catch (e) { console.debug('[castSpellSystem] emit castSpell failed:', e); }
     world.remove(actor, CastSpellIntent);
   }
 }

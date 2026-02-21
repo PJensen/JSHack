@@ -46,7 +46,7 @@ export class DeathCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    try { this.world.emit?.(eventName, payload); } catch {}
+    try { this.world.emit?.(eventName, payload); } catch (e) { console.debug('[death] emit ' + eventName + ' failed:', e); }
   }
 
   /**

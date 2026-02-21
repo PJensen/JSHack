@@ -902,7 +902,7 @@ function hide(panel) { panel.style.display = 'none'; }
 function renderInventory(panel, items, ground) {
   const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
   if (typeof existingDetach === 'function') {
-    try { existingDetach(); } catch {}
+    try { existingDetach(); } catch (e) { console.debug('[overlay] inventory detach failed:', e); }
   }
 
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
@@ -2661,7 +2661,7 @@ function renderBookReader(panel, title, text) {
 function renderDeathLog(panel, records) {
   const existingDetach = /** @type {any} */ (panel)._deathLogDetach;
   if (typeof existingDetach === 'function') {
-    try { existingDetach(); } catch {}
+    try { existingDetach(); } catch (e) { console.debug('[overlay] deathLog detach failed:', e); }
   }
 
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);

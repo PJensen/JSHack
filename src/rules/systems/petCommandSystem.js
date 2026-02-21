@@ -58,7 +58,7 @@ export function petCommandSystem(world) {
     if (petState.commandCooldown > 0) {
       try {
         world.emit?.('pet:command:cooldown', { petId, cooldown: petState.commandCooldown });
-      } catch {}
+      } catch (e) { console.debug('[petCommandSystem] emit pet:command:cooldown failed:', e); }
       world.remove(intentId, PetCommandIntent);
       continue;
     }
@@ -110,10 +110,10 @@ export function petCommandSystem(world) {
             petState.targetItemId = itemId;
           } else {
             // Invalid fetch target
-            try { world.emit?.('pet:command:invalid', { petId, reason: 'item_not_on_ground' }); } catch {}
+            try { world.emit?.('pet:command:invalid', { petId, reason: 'item_not_on_ground' }); } catch (e) { console.debug('[petCommandSystem] emit pet:command:invalid failed:', e); }
           }
         } else {
-          try { world.emit?.('pet:command:invalid', { petId, reason: 'item_not_found' }); } catch {}
+          try { world.emit?.('pet:command:invalid', { petId, reason: 'item_not_found' }); } catch (e) { console.debug('[petCommandSystem] emit pet:command:invalid failed:', e); }
         }
         break;
 
@@ -136,7 +136,7 @@ export function petCommandSystem(world) {
           newState: petState.state,
           command: intent.command
         });
-      } catch {}
+      } catch (e) { console.debug('[petCommandSystem] emit pet:state:changed failed:', e); }
     }
 
     // Remove intent

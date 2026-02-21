@@ -63,7 +63,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       if (next <= 0) {
         const idx = inv.items.indexOf(gid);
         if (idx !== -1) inv.items.splice(idx, 1);
-        try { world.destroy(gid); } catch {}
+        try { world.destroy(gid); } catch {} // ECS: entity may already be destroyed
       }
       if (remaining <= 0) break;
     }
@@ -187,7 +187,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         sellDiscount,
         mode,
       } }));
-    } catch {}
+    } catch (e) { console.debug('[shopWiring] dispatch ui:shopData:', e); }
   }
 
   function isPlayerAdjacentToEntity(entityId) {
@@ -214,7 +214,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   function closeShopUI() {
     activeShopSession.shopkeeperId = 0;
     activeShopSession.mode = "browse";
-    try { window.dispatchEvent(new CustomEvent("ui:closeShop")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:closeShop")); } catch (e) { console.debug('[shopWiring] dispatch ui:closeShop:', e); }
   }
 
   world.on("shop:open", ({ actor, targetId, buyMarkup, sellDiscount }) => {
@@ -232,7 +232,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       mode: "browse",
     };
     dispatchShopData(targetId, markup, discount, "browse");
-    try { window.dispatchEvent(new CustomEvent("ui:openShop", { detail: { shopkeeperId: targetId, buyMarkup: markup, sellDiscount: discount, mode: "browse" } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:openShop", { detail: { shopkeeperId: targetId, buyMarkup: markup, sellDiscount: discount, mode: "browse" } })); } catch (e) { console.debug('[shopWiring] dispatch ui:openShop:', e); }
   });
 
   addEventListener("ui:requestBuy", (ev) => {
@@ -287,9 +287,9 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
 
     // Remove from floor and add to inventory
-    try { world.remove(itemId, Position); } catch {}
+    try { world.remove(itemId, Position); } catch {} // ECS: may not exist
     // Remove unpaid status (item is now paid for)
-    try { world.remove(itemId, Unpaid); } catch {}
+    try { world.remove(itemId, Unpaid); } catch {} // ECS: may not exist
     addItemEntityToInventory(world, inv, itemId);
 
     log(`You buy ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
@@ -375,7 +375,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       window.dispatchEvent(new CustomEvent("ui:openShop", {
         detail: { shopkeeperId, buyMarkup: markup, sellDiscount: discount, mode: 'checkout' }
       }));
-    } catch {}
+    } catch (e) { console.debug('[shopWiring] dispatch ui:openShop:', e); }
   });
 
   // Handle item pickup - notify when picking up unpaid items
@@ -478,7 +478,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     for (const itemId of unpaidItemIds) {
       try {
         world.remove(itemId, Unpaid);
-      } catch {}
+      } catch {} // ECS: may not exist
     }
 
     log(`You pay ${totalBill} gold for your purchases. "Thank you, come again!"`);

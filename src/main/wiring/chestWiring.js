@@ -72,19 +72,19 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
       window.dispatchEvent(new CustomEvent("ui:chestData", { detail: {
         chestId, chestItems, playerItems,
       } }));
-    } catch {}
+    } catch (e) { console.debug('[chestWiring] dispatch ui:chestData:', e); }
   }
 
   function refreshInventoryUi() {
-    try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
-    try { window.dispatchEvent(new CustomEvent("ui:requestUsableItemsData")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch (e) { console.debug('[chestWiring] dispatch ui:requestInventoryData:', e); }
+    try { window.dispatchEvent(new CustomEvent("ui:requestUsableItemsData")); } catch (e) { console.debug('[chestWiring] dispatch ui:requestUsableItemsData:', e); }
   }
 
   world.on("chest:open", ({ targetId }) => {
     const chestId = Number(targetId || 0) | 0;
     if (!(chestId > 0)) return;
     log("You open the chest.");
-    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId } })); } catch (e) { console.debug('[chestWiring] dispatch ui:openChest:', e); }
     dispatchChestData(chestId);
   });
 

@@ -90,7 +90,7 @@ registerScript('trap_snake', {
         speed: snakeDef.speed,
       });
       // Attach to the trap entity so destroySubtree cleans up on floor transition.
-      try { attach(world, child, trapId); } catch {}
+      try { attach(world, child, trapId); } catch (e) { console.error('[traps] hierarchy attach failed:', e); }
     }
   }
 });

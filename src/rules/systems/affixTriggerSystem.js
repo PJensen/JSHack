@@ -73,7 +73,7 @@ function runMonsterOnDamaged(world, entityId, ctx, deps = null) {
     return true;
   }
   if (typeof hooks === 'function') {
-    try { hooks({ world, ctx, deps }); } catch {}
+    try { hooks({ world, ctx, deps }); } catch (e) { console.debug('[affixTriggerSystem] onDamaged hook failed:', e); }
     return true;
   }
   return false;

@@ -75,7 +75,7 @@ export class InputManager {
   }
 
   _emit(action) {
-    for (const h of this.handlers) try { h(action); } catch { }
+    for (const h of this.handlers) try { h(action); } catch (e) { console.debug('[InputManager] handler failed:', e); }
   }
 
   _bind() {
@@ -105,7 +105,7 @@ export class InputManager {
         // Allow UI overlays to consume keys like arrows/enter without moving the player
         return;
       }
-    } catch {}
+    } catch (e) { console.debug('[InputManager] panel query failed:', e); }
 
     // Open Inventory: 'i'
     if (key?.toLowerCase() === 'i') {
@@ -238,7 +238,7 @@ export class InputManager {
     this._emitGestureProgress(true, null);
     try {
       if (typeof canvas.setPointerCapture === "function") canvas.setPointerCapture(e.pointerId);
-    } catch {}
+    } catch {} // pointer capture may not be supported
   }
 
   _handlePointerMove(e) {
@@ -306,7 +306,7 @@ export class InputManager {
       if (canvas && pointerId >= 0 && typeof canvas.releasePointerCapture === "function") {
         canvas.releasePointerCapture(pointerId);
       }
-    } catch {}
+    } catch {} // pointer capture may not be supported
   }
 
   _appendGesturePoint(e) {
@@ -413,6 +413,6 @@ export class InputManager {
   _emitUi(name, detail) {
     try {
       this.target?.dispatchEvent?.(new CustomEvent(name, { detail }));
-    } catch {}
+    } catch (e) { console.debug('[InputManager] dispatch ' + name + ':', e); }
   }
 }

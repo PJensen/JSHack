@@ -80,7 +80,7 @@ export class CombatCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    try { this.world.emit && this.world.emit(eventName, payload); } catch {}
+    try { this.world.emit && this.world.emit(eventName, payload); } catch (e) { console.debug('[combat] emit ' + eventName + ' failed:', e); }
   }
 
   /**
@@ -101,7 +101,7 @@ export class CombatCallbackContext {
       ae.effects.push({ stacks: 1, ...effect });
       return;
     }
-    try { this.world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {}
+    try { this.world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {} // ECS: may already exist
   }
 
   /** @param {number} entityId @param {number} amount */

@@ -152,10 +152,10 @@ export function throwSystem(world) {
           message: detail?.message,
           consumesTurn: detail?.consumesTurn,
         });
-      } catch {}
+      } catch (e) { console.debug('[throwSystem] emit item:throw-cancelled failed:', e); }
     }
 
-    try { world.emit?.("interaction:result", result); } catch {}
-    try { world.remove(actor, ThrowIntent); } catch {}
+    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[throwSystem] emit interaction:result failed:', e); }
+    try { world.remove(actor, ThrowIntent); } catch {} // ECS: may not exist
   }
 }

@@ -568,7 +568,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     const displayName = bracketizeName(name);
     log(`You identify the ${appearance}: it's ${displayName}!`, 'system');
     // Trigger inventory refresh so names update immediately
-    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[messageWiring] dispatch ui:requestInventoryData:', e); }
   });
 
   // === Food decay events ===

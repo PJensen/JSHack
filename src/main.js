@@ -137,7 +137,7 @@ function updateBootProgress(label, done = _bootDoneUnits) {
         total: Math.max(1, _bootTotalUnits),
       });
     }
-  } catch {}
+  } catch (e) { console.debug('[main] boot progress update failed:', e); }
 }
 
 /** @param {string} label */
@@ -150,7 +150,7 @@ function finishBoot() {
   try {
     const fn = /** @type {any} */ (window).__JSHACK_BOOT_DONE;
     if (typeof fn === 'function') fn();
-  } catch {}
+  } catch (e) { console.debug('[main] boot done callback failed:', e); }
 }
 
 // Use tile-sized world units: 1 world unit == 1 tile on screen
@@ -289,7 +289,7 @@ function isSimUiBlocked() {
 }
 
 function syncSimInputLockFlag() {
-  try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = isSimUiBlocked(); } catch {}
+  try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = isSimUiBlocked(); } catch (e) { console.debug('[main] input lock flag sync failed:', e); }
 }
 syncSimInputLockFlag();
 
@@ -332,7 +332,7 @@ function updateActiveSpellLabel() {
   const cost = Number(s?.manaCost || 0);
   const { mana } = getPlayerMana();
   const canCast = mana >= cost && !!_activeSpellId;
-  try { window.dispatchEvent(new CustomEvent('ui:updateActiveSpellLabel', { detail: { id: _activeSpellId, name, cost, canCast } })); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:updateActiveSpellLabel', { detail: { id: _activeSpellId, name, cost, canCast } })); } catch (e) { console.debug('[main] dispatch ui:updateActiveSpellLabel:', e); }
 }
 
 // ---- Dungeon initialization -------------------------------------------------
@@ -536,7 +536,7 @@ if (!_savegameLoaded) {
         window.dispatchEvent(new CustomEvent('ui:petExists', {
           detail: { exists: true }
         }));
-      } catch {}
+      } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
     }
   }
 
@@ -704,7 +704,7 @@ const inputDisposers = [];
               targetId: chestId,
               chestItems: [...(chestInv?.items || [])],
             });
-          } catch {}
+          } catch (e) { console.debug('[main] emit chest:open failed:', e); }
           break;
         }
 
@@ -1021,7 +1021,7 @@ addEventListener('ui:castActiveSpell', () => {
   if (isSimUiBlocked()) return;
   const id = ensureActiveSpell();
   if (!id) {
-    try { window.dispatchEvent(new CustomEvent('ui:openSpellPicker')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:openSpellPicker')); } catch (e) { console.debug('[main] dispatch ui:openSpellPicker:', e); }
     return;
   }
   _pendingThrowTargeting = null;
@@ -1036,7 +1036,7 @@ addEventListener('ui:castActiveSpell', () => {
     );
     if (_pendingSpellTargeting?.spellId === id) {
       _pendingSpellTargeting = null;
-      try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch {}
+      try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
       return;
     }
     _pendingSpellTargeting = {
@@ -1050,7 +1050,7 @@ addEventListener('ui:castActiveSpell', () => {
         text: targetedCfg.describePrompt(range),
         type: 'system',
       });
-    } catch {}
+    } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
   }
 
@@ -1065,14 +1065,14 @@ addEventListener('keydown', (ev) => {
     const spellName = _pendingSpellTargeting.spellName;
     _pendingSpellTargeting = null;
     ev.preventDefault();
-    try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch {}
+    try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
   }
   if (_pendingThrowTargeting) {
     const itemName = _pendingThrowTargeting.itemName;
     _pendingThrowTargeting = null;
     ev.preventDefault();
-    try { messageLog.log({ text: `${bracketizeName(itemName)} throw cancelled.`, type: 'system' }); } catch {}
+    try { messageLog.log({ text: `${bracketizeName(itemName)} throw cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
   }
 });
 
@@ -1103,7 +1103,7 @@ addEventListener('ui:requestPickup', (e) => {
         cInv.items.splice(idx, 1);
         addItemEntityToInventory(world, playerInv, id);
         const count = world.get(id, ItemInfo)?.count || 1;
-        try { world.emit?.('item:pickup', { actor: pe.id, itemId: id, count }); } catch {}
+        try { world.emit?.('item:pickup', { actor: pe.id, itemId: id, count }); } catch (e) { console.debug('[main] emit item:pickup failed:', e); }
         break;
       }
     } else {
@@ -1202,7 +1202,7 @@ addEventListener('ui:pray', () => {
 addEventListener('ui:requestSpellData', () => {
   const spells = learnedSpells();
   const activeSpellId = ensureActiveSpell();
-  try { window.dispatchEvent(new CustomEvent('ui:spellData', { detail: { spells, activeSpellId } })); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:spellData', { detail: { spells, activeSpellId } })); } catch (e) { console.debug('[main] dispatch ui:spellData:', e); }
 });
 addEventListener('ui:selectActiveSpell', (ev) => {
   /** @type {CustomEvent} */ // @ts-ignore
@@ -1211,7 +1211,7 @@ addEventListener('ui:selectActiveSpell', (ev) => {
   if (typeof spellId === 'string' && spellId.length) {
     setActiveSpell(spellId);
     // Refresh inventory so the brain-slot active marker updates
-    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
   }
 });
 
@@ -1219,7 +1219,7 @@ addEventListener('ui:selectActiveSpell', (ev) => {
 const messageLog = createMessageLog({
   maxEntries: 50,
   onUpdate: (entries) => {
-    try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries } })); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries } })); } catch (e) { console.debug('[main] dispatch ui:updateMessageTicker:', e); }
   },
 });
 // Message formatting and logging now handled in messageWiring module
@@ -1235,7 +1235,7 @@ installMessageWiring({
 
 // Dismiss the quick-slot chip when item is used
 world.on('drank', ({ itemId }) => {
-  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
 });
 // Bolt segments for display VFX (world-space; display-only state)
 /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, chainIndex:number}>} */
@@ -2117,7 +2117,7 @@ world.on('proc:fierce', ({ actor, target }) => {
 world.on('healed', ({ id, amount }) => {
   const pos = world.get(Number(id||0), Position);
   if (pos && Number.isFinite(amount)) {
-    try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch {}
+    try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch (e) { console.debug('[main] ftext failed:', e); }
   }
 });
 // Pet death UI notification (message handled in messageWiring)
@@ -2127,7 +2127,7 @@ world.on('died', ({ id }) => {
       window.dispatchEvent(new CustomEvent('ui:petExists', {
         detail: { exists: false }
       }));
-    } catch {}
+    } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
   }
 });
 // Floating text hooks: damage (messages handled in messageWiring)
@@ -2147,12 +2147,12 @@ world.on('status', ({ id, kind, at, text }) => {
   if (!pos) return;
   const style = (String(kind||'')).toLowerCase() === 'miss' ? 'miss' : ((String(kind||'')).toLowerCase() === 'immune' ? 'immune' : 'status');
   const label = String(text || kind || '').toUpperCase() || (style === 'miss' ? 'MISS' : (style === 'immune' ? 'IMMUNE' : 'STATUS'));
-  try { ftext.addStatus(pos.x, pos.y, label, { style }); } catch {}
+  try { ftext.addStatus(pos.x, pos.y, label, { style }); } catch (e) { console.debug('[main] ftext failed:', e); }
 });
 // Ranged combat floating text (messages handled in messageWiring)
 world.on('ranged:no-ammo', ({ attacker }) => {
   const pos = world.get(Number(attacker||0), Position);
-  if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch {}
+  if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch (e) { console.debug('[main] ftext failed:', e); }
 });
 // Insufficient stamina floating flavor text (message handled in messageWiring)
 const _staminaLines = [
@@ -2169,7 +2169,7 @@ world.on('attack:insufficient-stamina', ({ attacker }) => {
   const pos = world.get(Number(attacker || 0), Position);
   if (pos) {
     const line = _staminaLines[Math.floor(Math.random() * _staminaLines.length)];
-    try { ftext.addStatus(pos.x, pos.y - 0.3, line, { color: '#ff8c00', life: 1.0 }); } catch {}
+    try { ftext.addStatus(pos.x, pos.y - 0.3, line, { color: '#ff8c00', life: 1.0 }); } catch (e) { console.debug('[main] ftext failed:', e); }
   }
 });
 world.on('item:pickup', ({ actor, itemId, count }) => {
@@ -2200,11 +2200,11 @@ world.on('item:pickup', ({ actor, itemId }) => {
         }
       }
     }));
-  } catch {}
+  } catch (e) { console.debug('[main] dispatch ui:recentPickup:', e); }
 });
 // Pet deliver UI refresh (message handled in messageWiring)
 world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
 // Pet state UI updates (messages handled in messageWiring)
@@ -2213,7 +2213,7 @@ world.on('pet:state:changed', ({ newState }) => {
     window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
       detail: { state: newState }
     }));
-  } catch {}
+  } catch (e) { console.debug('[main] dispatch ui:updatePetButton:', e); }
 });
 
 world.on('pet:state:auto', ({ newState }) => {
@@ -2221,7 +2221,7 @@ world.on('pet:state:auto', ({ newState }) => {
     window.dispatchEvent(new CustomEvent('ui:updatePetButton', {
       detail: { state: newState }
     }));
-  } catch {}
+  } catch (e) { console.debug('[main] dispatch ui:updatePetButton:', e); }
 });
 
 // Handle UI pet commands (instant, no tick consumed)
@@ -2303,7 +2303,7 @@ window.addEventListener('ui:petCommand', (ev) => {
           newState: petState.state,
           command
         });
-      } catch {}
+      } catch (e) { console.debug('[main] emit pet:state:changed failed:', e); }
     }
 
     break; // Only one pet for now
@@ -2379,7 +2379,7 @@ window.addEventListener('ui:rotatePetState', () => {
           newState: petState.state,
           command
         });
-      } catch {}
+      } catch (e) { console.debug('[main] emit pet:state:changed failed:', e); }
     }
 
     break; // Only one pet for now
@@ -2388,14 +2388,14 @@ window.addEventListener('ui:rotatePetState', () => {
 
 // Engrave floating text (messages handled in messageWiring)
 world.on('engrave', ({ text, x, y }) => {
-  try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch {}
+  try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch (e) { console.debug('[main] ftext failed:', e); }
 });
 
 // Refresh inventory UI when any item is used (consumed/learned/etc.)
 world.on('item:used', ({ actor, itemId }) => {
   // Dismiss the quick-slot chip for this item
-  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch {}
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 // Spell learning logic (messages handled in messageWiring)
 world.on('spell:learned', ({ spellId }) => {
@@ -2409,9 +2409,9 @@ world.on('spell:learned', ({ spellId }) => {
       window.dispatchEvent(new CustomEvent('ui:showSpellGestureHint', {
         detail: { id: learnedId, mode: 'learn', quality: 1 },
       }));
-    } catch {}
+    } catch (e) { console.debug('[main] dispatch ui:showSpellGestureHint:', e); }
   }
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 // Interaction UI logic (messages handled in messageWiring)
 world.on('interaction', ({ action, items: droppedIds }) => {
@@ -2444,11 +2444,11 @@ world.on('interaction', ({ action, items: droppedIds }) => {
         window.dispatchEvent(new CustomEvent('ui:showGroundItem', {
           detail: { mode: 'single', item: it, pickupRange: 2 }
         }));
-      } catch {}
+      } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
     } else if (nonCurrency.length > 1) {
       try {
         window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items: nonCurrency } }));
-      } catch {}
+      } catch (e) { console.debug('[main] dispatch ui:openPickupChooser:', e); }
     }
   }
 });
@@ -2457,8 +2457,8 @@ world.on('interaction', ({ action, items: droppedIds }) => {
 // Deferred so the tick's command queue (component adds) flushes first.
 world.on('harvest:picked', ({ actor, count, kind }) => {
   setTimeout(() => {
-    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
-    try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
+    try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch (e) { console.debug('[main] dispatch ui:requestUsableItemsData:', e); }
   }, 0);
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
@@ -2474,7 +2474,7 @@ world.on('harvest:picked', ({ actor, count, kind }) => {
           : { one: 'berry', many: 'berries' }))
   );
   const label = qty === 1 ? labels.one : labels.many;
-  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch {}
+  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch (e) { console.debug('[main] ftext failed:', e); }
 });
 
 // Stair traversal logic (messages handled in messageWiring)
@@ -2527,7 +2527,7 @@ function trackCurrentFloorEntity(entityId) {
   for (const [id, ds] of world.query(DungeonState)) {
     if (!Array.isArray(ds.floorEntityIds)) ds.floorEntityIds = [];
     if (!ds.floorEntityIds.includes(eid)) ds.floorEntityIds.push(eid);
-    try { world.set(id, DungeonState, ds); } catch {}
+    try { world.set(id, DungeonState, ds); } catch {} // ECS: component may not exist
     break;
   }
 }
@@ -2539,7 +2539,7 @@ function untrackCurrentFloorEntity(entityId) {
     if (!Array.isArray(ds.floorEntityIds)) break;
     const next = ds.floorEntityIds.filter((v) => (Number(v) | 0) !== eid);
     ds.floorEntityIds = next;
-    try { world.set(id, DungeonState, ds); } catch {}
+    try { world.set(id, DungeonState, ds); } catch {} // ECS: component may not exist
     break;
   }
 }
@@ -2550,7 +2550,7 @@ function destroyReturnPortals() {
     if (ni?.identity === RETURN_PORTAL_IDENTITY) ids.push(id);
   }
   for (const id of ids) {
-    try { world.destroy(id); } catch {}
+    try { world.destroy(id); } catch {} // ECS: entity may already be destroyed
     untrackCurrentFloorEntity(id);
   }
 }
@@ -2600,7 +2600,7 @@ function spawnReturnPortal(ticket) {
       targetDepth: Math.max(0, Math.floor(Number(ticket?.depth || 0))),
       target: { x: Math.floor(Number(ticket?.x || 0)), y: Math.floor(Number(ticket?.y || 0)) },
     });
-  } catch {}
+  } catch (e) { console.debug('[main] emit portal:spawned failed:', e); }
   return portalId;
 }
 
@@ -2611,12 +2611,12 @@ function fragActorsAt(worldRef, x, y, excludeId = 0) {
   for (const [id, pos, _vit] of worldRef.query(Position, Vitality)) {
     if (id === excludeId) continue;
     if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
-    try { worldRef.destroy(id); } catch {}
+    try { worldRef.destroy(id); } catch {} // ECS: entity may already be destroyed
     untrackCurrentFloorEntity(id);
     count++;
   }
   if (count > 0) {
-    try { worldRef.emit?.('portal:return:fragged', { count, at: { x: tx, y: ty } }); } catch {}
+    try { worldRef.emit?.('portal:return:fragged', { count, at: { x: tx, y: ty } }); } catch (e) { console.debug('[main] emit portal:return:fragged failed:', e); }
   }
   return count;
 }
@@ -2692,7 +2692,7 @@ world.on('portal:return', ({ portalId }) => {
   const targetX = Number(inter?.params?.targetX);
   const targetY = Number(inter?.params?.targetY);
   if (!Number.isFinite(targetDepth) || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
-  try { world.destroy(pid); } catch {}
+  try { world.destroy(pid); } catch {} // ECS: entity may already be destroyed
   untrackCurrentFloorEntity(pid);
   queueDepthTransition(targetDepth, {
     targetPos: { x: targetX, y: targetY },
@@ -2747,12 +2747,12 @@ bootAdvance("Installed world/UI wiring");
 
 // Item equipped UI updates (message handled in messageWiring)
 world.on('item:equipped', ({ itemId }) => {
-  try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail: { itemId } })); } catch {}
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemEquipped:', e); }
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 world.on('item:unequipped', ({ itemId }) => {
-  try { window.dispatchEvent(new CustomEvent('ui:itemUnequipped', { detail: { itemId } })); } catch {}
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:itemUnequipped', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUnequipped:', e); }
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
 // When player moves, show a mobile-friendly ground item tooltip for non-currency items on the tile
@@ -2761,10 +2761,10 @@ world.on('moved', ({ id, to }) => {
   if (!pe || pe.id !== id) return;
   const detail = buildGroundPickupDetailAt(pe.id, to.x, to.y);
   if (!detail) {
-    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch (e) { console.debug('[main] dispatch ui:hideGroundItem:', e); }
     return;
   }
-  try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
 });
 
 // When player moves, show stair tooltip if near stairs
@@ -2784,9 +2784,9 @@ world.on('moved', ({ id, to }) => {
       window.dispatchEvent(new CustomEvent('ui:showStairTooltip', {
         detail: { stairId: nearestTarget.id, direction }
       }));
-    } catch {}
+    } catch (e) { console.debug('[main] dispatch ui:showStairTooltip:', e); }
   } else {
-    try { window.dispatchEvent(new CustomEvent('ui:hideStairTooltip')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:hideStairTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideStairTooltip:', e); }
   }
 
   // Check for adjacent shopkeeper
@@ -2814,9 +2814,9 @@ world.on('moved', ({ id, to }) => {
       window.dispatchEvent(new CustomEvent('ui:showTombstoneTooltip', {
         detail: { epitaph: tc?.epitaph || '' }
       }));
-    } catch {}
+    } catch (e) { console.debug('[main] dispatch ui:showTombstoneTooltip:', e); }
   } else {
-    try { window.dispatchEvent(new CustomEvent('ui:hideTombstoneTooltip')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:hideTombstoneTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTombstoneTooltip:', e); }
   }
 });
 
@@ -2838,11 +2838,11 @@ world.on('item:pickup', ({ actor, itemId }) => {
   if (!pe || pe.id !== actor) return;
   const detail = buildGroundPickupDetailAt(pe.id, pe.pos.x, pe.pos.y);
   if (detail) {
-    try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
   } else {
-    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch {}
+    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch (e) { console.debug('[main] dispatch ui:hideGroundItem:', e); }
   }
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
 /** @param {string} s */
@@ -2918,7 +2918,7 @@ addEventListener('ui:requestThrow', (ev) => {
   if (!pe) return;
   const inv = world.get(pe.id, Inventory);
   if (!inv || !Array.isArray(inv.items) || !inv.items.includes(itemId)) {
-    try { messageLog.log({ text: 'You are not carrying that item.', type: 'system' }); } catch {}
+    try { messageLog.log({ text: 'You are not carrying that item.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
   }
 
@@ -2932,7 +2932,7 @@ addEventListener('ui:requestThrow', (ev) => {
       text: `Throw ${bracketizeName(itemName)} where? Tap/click a tile (up to ${range}). Press Esc to cancel.`,
       type: 'system',
     });
-  } catch {}
+  } catch (e) { console.debug('[main] messageLog failed:', e); }
 });
 
 // When user requests dropping an inventory item
@@ -2948,7 +2948,7 @@ addEventListener('ui:requestDrop', (ev) => {
   const action = { type: 'rules.dropItem', payload };
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler(action);
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
 // ---- Display camera (resource) ---------------------------------------------
@@ -2988,7 +2988,7 @@ canvas.addEventListener('pointerdown', (ev) => {
           text: `${pendingSpell.spellName} target must be within ${pendingSpell.range} tiles.`,
           type: 'system',
         });
-      } catch {}
+      } catch (e) { console.debug('[main] messageLog failed:', e); }
       return;
     }
     if (pendingSpell.requiresLOS) {
@@ -3000,7 +3000,7 @@ canvas.addEventListener('pointerdown', (ev) => {
             text: `${pendingSpell.spellName} target must be in line of sight.`,
             type: 'system',
           });
-        } catch {}
+        } catch (e) { console.debug('[main] messageLog failed:', e); }
         return;
       }
     }
@@ -3035,7 +3035,7 @@ canvas.addEventListener('pointerdown', (ev) => {
         text: `${bracketizeName(pendingThrow.itemName)} must target another tile.`,
         type: 'system',
       });
-    } catch {}
+    } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
   }
 
@@ -3106,7 +3106,7 @@ try {
    * @param {any} [opts]
    */
   (x,y,text,opts)=> ftext.add(x,y,text,opts||{});
-} catch {}
+} catch (e) { console.debug('[main] float_text global setup failed:', e); }
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();

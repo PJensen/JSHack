@@ -48,13 +48,13 @@ export function praySystem(world) {
               deityId: devotion.deityId,
               distress
             });
-          } catch { /* */ }
+          } catch (e) { console.debug('[praySystem] emit prayer failed:', e); }
         }
       }
     }
 
     // Consume the intent
-    try { world.remove(id, PrayIntent); } catch {}
+    try { world.remove(id, PrayIntent); } catch {} // ECS: may not exist
   }
 }
 

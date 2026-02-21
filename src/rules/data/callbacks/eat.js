@@ -79,7 +79,7 @@ export class EatCallbackContext extends RuleActionContext {
     }
     for (let i = 0; i < this._postCommitEvents.length; i++) {
       const entry = this._postCommitEvents[i];
-      try { this.world.emit && this.world.emit(entry.eventName, entry.payload); } catch {}
+      try { this.world.emit && this.world.emit(entry.eventName, entry.payload); } catch (e) { console.debug('[eat] emit ' + entry.eventName + ' failed:', e); }
     }
     this._postCommitEvents.length = 0;
     return applied;

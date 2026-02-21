@@ -260,7 +260,7 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
 // Per-tick system: consumes InteractIntent and dispatches to InteractionSystem
 export function interactionSystem(world) {
     for (const [actor, intent] of world.query(InteractIntent)) {
-        try { InteractionSystem(world, actor, intent.targetId || 0, intent); } catch {}
+        try { InteractionSystem(world, actor, intent.targetId || 0, intent); } catch (e) { console.error('[interactionSystem] InteractionSystem failed:', e); }
         try { world.remove(actor, InteractIntent); } catch {}
     }
 }
@@ -281,6 +281,6 @@ export function installBumpInteractListener(world) {
   world[BUMP_INTERACT_INSTALLED] = true;
 
   world.on("bump:interact", ({ actor, target }) => {
-    try { InteractionSystem(world, actor, target); } catch {}
+    try { InteractionSystem(world, actor, target); } catch (e) { console.error('[interactionSystem] bump InteractionSystem failed:', e); }
   });
 }

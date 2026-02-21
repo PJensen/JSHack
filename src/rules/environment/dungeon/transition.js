@@ -132,13 +132,13 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
       if (!hasStairAnchor) throw new Error('restored floor missing stair anchor');
 
       for (const eid of generatedEntityIds) {
-        try { world.destroy(eid); } catch {}
+        try { world.destroy(eid); } catch {} // ECS: entity may already be destroyed
       }
 
       entityIds = restoredIds;
     } catch {
       for (const eid of createdIds) {
-        try { world.destroy(eid); } catch {}
+        try { world.destroy(eid); } catch {} // ECS: entity may already be destroyed
       }
       entityIds = generatedEntityIds;
     }

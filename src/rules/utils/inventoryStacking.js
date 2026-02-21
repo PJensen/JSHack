@@ -180,7 +180,7 @@ export function addItemEntityToInventory(world, inv, itemId, opts = {}) {
   }
 
   if (opts.removePosition !== false) {
-    try { world.remove(itemId, Position); } catch {}
+    try { world.remove(itemId, Position); } catch {} // ECS: may not exist
   }
   if (!inv.items.includes(itemId)) inv.items.push(itemId);
   return { ok: true, mode: "added", itemId, stackedIntoId: 0, count };

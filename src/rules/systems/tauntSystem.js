@@ -34,7 +34,7 @@ function readPoint(raw, fallback) {
 function ensureActiveEffects(world, entityId) {
   let ae = world.get(entityId, ActiveEffects);
   if (!ae || !Array.isArray(ae.effects)) {
-    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
+    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
     ae = world.get(entityId, ActiveEffects);
   }
   if (!ae || !Array.isArray(ae.effects)) return null;
@@ -154,7 +154,7 @@ function applyTauntArea(world, payload) {
         source: sourceId,
         at: { x: pos.x | 0, y: pos.y | 0 },
       });
-    } catch {}
+    } catch (e) { console.debug('[tauntSystem] emit status failed:', e); }
   });
 }
 

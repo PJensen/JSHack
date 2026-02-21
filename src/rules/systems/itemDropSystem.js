@@ -19,7 +19,7 @@ export function itemDropSystem(world) {
       inv.items.splice(idx, 1);
       // put the item back on ground
       world.add(itemId, Position, { x: pos.x, y: pos.y });
-      try { world.emit && world.emit('item:dropped', { actor, itemId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch {}
+      try { world.emit && world.emit('item:dropped', { actor, itemId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
     } else {
       // split stack: create a new ground entity with dropCount
       world.mutate(itemId, ItemInfo, (r)=>{ r.count -= dropCount; });
@@ -28,7 +28,7 @@ export function itemDropSystem(world) {
       if (ni) world.add(newId, NamedIdentity, { name: ni.name, identity: ni.identity });
       world.add(newId, ItemInfo, { ...info, count: dropCount });
       world.add(newId, Position, { x: pos.x, y: pos.y });
-      try { world.emit && world.emit('item:dropped', { actor, itemId: newId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch {}
+      try { world.emit && world.emit('item:dropped', { actor, itemId: newId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
     }
 
     world.remove(actor, DropIntent);

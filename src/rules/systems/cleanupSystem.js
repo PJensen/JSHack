@@ -41,7 +41,7 @@ export function cleanupSystem(world) {
           // If the item was an inventory-only copy, it may lack Position; add it at corpse location
           try { world.add(itemId, Position, { x: pos.x, y: pos.y }); } catch { /* already had pos or deferred */ }
           // Emit event for display/bridges
-          try { world.emit && world.emit('item:dropped', { actor: id, itemId, count: info?.count || 1, at: { x: pos.x, y: pos.y } }); } catch {}
+          try { world.emit && world.emit('item:dropped', { actor: id, itemId, count: info?.count || 1, at: { x: pos.x, y: pos.y } }); } catch (e) { console.debug('[cleanupSystem] emit item:dropped failed:', e); }
         }
         // Clear inventory to reflect that items are no longer held
         inv.items.length = 0;

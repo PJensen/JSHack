@@ -76,7 +76,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   }
   if (!first) {
     // Nothing visible to hit; emit a short self-burst semantic
-    try { world.emit && world.emit('spell:bolt', { actor, targetId: actor, spellId: spell.id, from: {x: apos.x, y: apos.y}, to: {x: apos.x, y: apos.y}, chainIndex: 0 }); } catch {}
+    try { world.emit && world.emit('spell:bolt', { actor, targetId: actor, spellId: spell.id, from: {x: apos.x, y: apos.y}, to: {x: apos.x, y: apos.y}, chainIndex: 0 }); } catch (e) { console.debug('[spells] emit spell:bolt failed:', e); }
     return;
   }
 
@@ -105,7 +105,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     const segFrom = (i === 0) ? { x: apos.x, y: apos.y } : { x: chain[i-1].x, y: chain[i-1].y };
     const segTo = { x: chain[i].x, y: chain[i].y };
     const targetId = chain[i].id;
-    try { world.emit && world.emit('spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i }); } catch {}
+    try { world.emit && world.emit('spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i }); } catch (e) { console.debug('[spells] emit spell:bolt failed:', e); }
 
     // Damage model: base 7 → attenuate per chain
     const base = 7;
@@ -170,7 +170,7 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
     dealDamage(world, { target: t.id, amount: dmg, source: actor, type: 'physical', cause: 'spell:blastwave' });
   }
 
-  try { world.emit && world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS }); } catch {}
+  try { world.emit && world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS }); } catch (e) { console.debug('[spells] emit spell:blastwave failed:', e); }
 };
 
 // Blink — targeted teleport up to 10 tiles.
@@ -201,7 +201,7 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
     const tx = Number(intent?.x);
     const ty = Number(intent?.y);
     if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
-      try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange }); } catch {}
+      try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange }); } catch (e) { console.debug('[spells] emit spell:blink:failed failed:', e); }
       return;
     }
     requested = { x: tx | 0, y: ty | 0 };
@@ -209,7 +209,7 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
 
   const requestedDist = chebyshev(from, requested);
   if (requestedDist <= 0 || requestedDist > maxRange) {
-    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange }); } catch {}
+    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange }); } catch (e) { console.debug('[spells] emit spell:blink:failed failed:', e); }
     return;
   }
 
@@ -218,18 +218,18 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
     exclude: [from],
   });
   if (!landing) {
-    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange }); } catch {}
+    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange }); } catch (e) { console.debug('[spells] emit spell:blink:failed failed:', e); }
     return;
   }
 
   const landingDist = chebyshev(from, landing);
   if (landingDist <= 0 || landingDist > maxRange) {
-    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange }); } catch {}
+    try { world.emit && world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange }); } catch (e) { console.debug('[spells] emit spell:blink:failed failed:', e); }
     return;
   }
 
   world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
-  try { world.emit && world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } }); } catch {}
+  try { world.emit && world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } }); } catch (e) { console.debug('[spells] emit moved failed:', e); }
   try {
     world.emit && world.emit('spell:blink', {
       actor,
@@ -241,7 +241,7 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
       randomReason: randomized ? (confusedPower > 0 ? "confused" : "hallucinating") : null,
       range: maxRange,
     });
-  } catch {}
+  } catch (e) { console.debug('[spells] emit spell:blink failed:', e); }
 };
 
 // Homecoming — queues an app-level teleport request back to dungeon depth 0.
@@ -266,7 +266,7 @@ REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) 
         y: apos.y | 0,
       },
     });
-  } catch {}
+  } catch (e) { console.debug('[spells] emit dungeon:teleport-depth failed:', e); }
 };
 
 // Meteor — AoE damage at target position. Full damage at radius 1, half at radius 2.
@@ -306,7 +306,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       }
     }
     if (candidates.length <= 0) {
-      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_los_target', range: MAX_R }); } catch {}
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_los_target', range: MAX_R }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
     const posSalt = (((apos.x | 0) & 0xffff) << 16) ^ ((apos.y | 0) & 0xffff);
@@ -319,11 +319,11 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     oy = intent.y | 0;
     const dist = Math.max(Math.abs((ox | 0) - (apos.x | 0)), Math.abs((oy | 0) - (apos.y | 0)));
     if (!(dist > 0) || dist > MAX_R) {
-      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } }); } catch {}
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
     if (!hasLOS(apos.x | 0, apos.y | 0, ox | 0, oy | 0, isOpaque)) {
-      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } }); } catch {}
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
   } else {
@@ -342,7 +342,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       if (d2 < bestD2 && hasLOS(apos.x | 0, apos.y | 0, pos.x | 0, pos.y | 0, isOpaque)) { bestId = id; bestD2 = d2; }
     }
     if (!bestId) {
-      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R }); } catch {}
+      try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
     const tp = /** @type any */ (world.get(bestId, Position));
@@ -371,9 +371,9 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
           ae.effects.push(effect);
         }
       } else {
-        try { world.add(id, ActiveEffects, { effects: [effect] }); } catch {}
+        try { world.add(id, ActiveEffects, { effects: [effect] }); } catch {} // ECS: may already exist
       }
-      try { world.emit && world.emit('proc:burning', { actor, target: id }); } catch {}
+      try { world.emit && world.emit('proc:burning', { actor, target: id }); } catch (e) { console.debug('[spells] emit proc:burning failed:', e); }
     }
   }
 
@@ -385,7 +385,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       randomized,
       randomReason: randomized ? (confusedPower > 0 ? "confused" : "hallucinating") : null,
     });
-  } catch {}
+  } catch (e) { console.debug('[spells] emit spell:meteor failed:', e); }
 };
 
 // Frost — auto-target nearest enemy in LOS; apply cold damage + slow effect scaled by mass.
@@ -422,7 +422,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
   if (!target) {
     // No valid target; emit a fizzle pulse at caster
-    try { world.emit && world.emit('spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, fizzle: true }); } catch {}
+    try { world.emit && world.emit('spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
     return;
   }
 
@@ -440,7 +440,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   // Apply frost effect via ActiveEffects (ECS-compliant: read-then-mutate)
   let ae = /** @type any */ (world.get(target.id, ActiveEffects));
   if (!ae) {
-    try { world.add(target.id, ActiveEffects, { effects: [] }); } catch {}
+    try { world.add(target.id, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
     ae = /** @type any */ (world.get(target.id, ActiveEffects));
   }
   if (ae && Array.isArray(ae.effects)) {
@@ -454,7 +454,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
 
   // Emit semantic event for display VFX
-  try { world.emit && world.emit('spell:frost', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y }, duration, mass: massKg }); } catch {}
+  try { world.emit && world.emit('spell:frost', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y }, duration, mass: massKg }); } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
 };
 
 /**
@@ -468,7 +468,7 @@ export function runSpellScript(world, actor, spell, intent) {
   const key = String(spell?.script || '') || '';
   const fn = key ? REGISTRY[key] : null;
   if (typeof fn === 'function') {
-    try { fn(world, actor, spell, intent || {}); } catch {}
+    try { fn(world, actor, spell, intent || {}); } catch (e) { console.error('[spells] script "' + key + '" failed:', e); }
   }
 }
 

@@ -52,6 +52,6 @@ export function monsterSpawnerSystem(world) {
         r.lastSpawnStep = now;
         r.activeChildren.push(child);
       });
-    } catch {}
+    } catch (e) { console.error('[monsterSpawnerSystem] spawner tick failed:', e); }
   }
 }

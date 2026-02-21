@@ -71,7 +71,7 @@ export function shopkeeperSystem(world) {
             bill,
             room: currentlyInShop.room,
           });
-        } catch {}
+        } catch (e) { console.debug('[shopkeeperSystem] emit shop:exit-blocked failed:', e); }
       }
     }
   }
