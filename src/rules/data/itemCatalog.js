@@ -1177,6 +1177,33 @@ export const ITEM_CATALOG = {
       on_use: EAT_ON_USE,
     },
   },
+  food_mushrooms: {
+    id: "food_mushrooms",
+    catalogKind: "food",
+    name: "Dungeon Mushrooms",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 3,
+    description: "Pale mushrooms from the dungeon depths. Probably safe.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const result = EAT_ON_USE(ctx, state);
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.mutate.pushEffect(actor, {
+          key: "hallucinating",
+          turnsLeft: 30,
+          potency: 1,
+          stacks: 1,
+        });
+        ctx.io.emit("mushroom:hallucinate", { actor });
+        return result;
+      },
+    },
+  },
 };
 
 const ITEM_CATALOG_ID_ALIASES = Object.freeze({
