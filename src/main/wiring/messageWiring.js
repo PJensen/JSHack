@@ -437,6 +437,11 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log('You touch the shrine. A faint warmth pulses through you.', 'system');
   });
 
+  world.on('mushroom:hallucinate', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The mushrooms make your head swim. The walls begin to shift...', 'system');
+  });
+
   world.on('harvest:picked', ({ actor, kind, count, itemId }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const yieldLabel = harvestYieldLabel(kind);
