@@ -78,6 +78,16 @@ export const basePalette = {
   venom_fern: { glyph: "☣", fg: "#a5d95c", glow: "#648431" },
   venom_spores: { glyph: "◌", fg: "#9dd46f", glow: "#5f8d3c" },
 
+  // Room features
+  fountain:    { glyph: "⛲", fg: "#66bbee", glow: "#3388aa" },
+  altar:       { glyph: "⛩", fg: "#cc99ff", glow: "#9966cc" },
+  shrine:      { glyph: "⛫", fg: "#ffdd66", glow: "#ccaa33" },
+  statue:      { glyph: "🗿", fg: "#ccccdd", glow: "#9999ab" },
+  sarcophagus: { glyph: "⚰", fg: "#aaa8a0", glow: "#777570" },
+  pillar:      { glyph: "╥", fg: "#99a",    glow: "#667"    },
+  weapon_rack: { glyph: "⚔", fg: "#bbbbcc", glow: "#888899" },
+  mushrooms:   { glyph: "🍄", fg: "#88cc88", glow: "#558855" },
+
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },
 
@@ -103,6 +113,7 @@ export const basePalette = {
   food_iron_ration: { glyph: "%", fg: "#d4b87c", glow: "#b09860" },
   food_wild_berries: { glyph: ":", fg: "#b476d7", glow: "#7a4c96" },
   food_wild_herbs:   { glyph: ";", fg: "#73c56f", glow: "#4f8b4c" },
+  food_mushrooms:    { glyph: "🍄", fg: "#c8b898", glow: "#8a7a5a" },
   reagent_thorn_pod: { glyph: "✶", fg: "#a08f63", glow: "#6f6242" },
   reagent_venom_frond: { glyph: "☤", fg: "#9ccc69", glow: "#5f8d3c" },
 

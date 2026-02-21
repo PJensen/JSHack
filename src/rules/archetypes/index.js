@@ -13,6 +13,7 @@ export {
   WildHerbs,
   ThornPods,
   VenomFronds,
+  DungeonMushrooms,
   createCorpse,
 } from './Food.js';
 export { SpikeTrap, SnakeTrap, ShockTrap } from './Traps.js';
@@ -27,3 +28,13 @@ export {
   VenomFern,
   AlchemyBench,
 } from './Overworld.js';
+export {
+  Fountain,
+  Altar,
+  Shrine,
+  Statue,
+  Sarcophagus,
+  Pillar,
+  WeaponRack,
+  Mushrooms,
+} from './RoomFeatures.js';

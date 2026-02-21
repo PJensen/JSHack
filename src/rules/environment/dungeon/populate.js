@@ -34,6 +34,32 @@ import { CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } fro
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { isIdentified } from '../../data/identification.js';
 import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
+import {
+  Fountain, Altar, Shrine, Statue,
+  Sarcophagus, Pillar, WeaponRack, Mushrooms,
+} from '../../archetypes/RoomFeatures.js';
+
+// Weighted room feature table. Weight determines relative likelihood.
+const ROOM_FEATURES = [
+  { kind: 'fountain',    weight: 8 },
+  { kind: 'altar',       weight: 6 },
+  { kind: 'shrine',      weight: 6 },
+  { kind: 'statue',      weight: 10 },
+  { kind: 'sarcophagus', weight: 7 },
+  { kind: 'pillar',      weight: 10 },
+  { kind: 'weapon_rack', weight: 6 },
+  { kind: 'mushrooms',   weight: 8 },
+];
+const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
+
+function pickRoomFeature(rng) {
+  let roll = rng.next() * ROOM_FEATURE_TOTAL_WEIGHT;
+  for (const f of ROOM_FEATURES) {
+    roll -= f.weight;
+    if (roll <= 0) return f.kind;
+  }
+  return ROOM_FEATURES[ROOM_FEATURES.length - 1].kind;
+}
 
 /**
  * @typedef {Object} SpawnPoint
@@ -56,8 +82,22 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const diff = floorPlan.difficultyMult;
   const SPAWNER_CHANCE_PER_MONSTER = 0.35; // Convert room monster budget into a per-room nest chance.
 
+  // Identify the player's entry room so we don't clutter it with a feature
+  const entryRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
+    ? chunk.rooms[0]
+    : null;
+
   for (const room of chunk.rooms) {
     const area = room.w * room.h;
+
+    // Place a room feature (~50% of non-entry rooms get one)
+    const isEntryRoom = room === entryRoom;
+    if (!isEntryRoom && rng.next() < 0.50) {
+      const featureKind = pickRoomFeature(rng);
+      const cx = room.x + Math.floor(room.w / 2);
+      const cy = room.y + Math.floor(room.h / 2);
+      spawns.push({ x: cx, y: cy, kind: featureKind, params: {} });
+    }
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(20, 30) * diff));
@@ -469,6 +509,23 @@ export function materializeSpawn(world, spawn) {
         epitaph: epitaph,
       });
     }
+    // Room features
+    case 'fountain':
+      return createFrom(world, Fountain, { x: spawn.x, y: spawn.y });
+    case 'altar':
+      return createFrom(world, Altar, { x: spawn.x, y: spawn.y });
+    case 'shrine':
+      return createFrom(world, Shrine, { x: spawn.x, y: spawn.y });
+    case 'statue':
+      return createFrom(world, Statue, { x: spawn.x, y: spawn.y });
+    case 'sarcophagus':
+      return createFrom(world, Sarcophagus, { x: spawn.x, y: spawn.y });
+    case 'pillar':
+      return createFrom(world, Pillar, { x: spawn.x, y: spawn.y });
+    case 'weapon_rack':
+      return createFrom(world, WeaponRack, { x: spawn.x, y: spawn.y });
+    case 'mushrooms':
+      return createFrom(world, Mushrooms, { x: spawn.x, y: spawn.y });
     default:
       return null;
   }

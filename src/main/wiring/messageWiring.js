@@ -73,6 +73,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (k === "herbs") return "herbs";
     if (k === "thorn_bramble") return "thorn pods";
     if (k === "venom_fern") return "venom fronds";
+    if (k === "mushrooms") return "mushrooms";
     return "berries";
   }
 
@@ -81,6 +82,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (k === "herbs") return "herb patch";
     if (k === "thorn_bramble") return "thorn bramble";
     if (k === "venom_fern") return "venom fern";
+    if (k === "mushrooms") return "mushroom patch";
     return "berry bush";
   }
 
@@ -414,6 +416,25 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     } else {
       log(`${nameOfEntity(actor)} rests for a while.`, 'system');
     }
+  });
+
+  // Room feature events
+  world.on('fountain:drink', ({ actor, effect, amount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (effect === 'heal') log(`You drink from the fountain and feel refreshed. (+${amount} HP)`, 'system');
+    else if (effect === 'mana') log(`You drink from the fountain. Magical energy surges through you. (+${amount} MP)`, 'system');
+    else if (effect === 'poison') log(`You drink from the fountain. It was contaminated! (-${amount} HP)`, 'combat');
+    else log('You drink from the fountain. The water is stale.', 'system');
+  });
+
+  world.on('altar:pray', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You kneel at the altar and pray...', 'system');
+  });
+
+  world.on('shrine:touch', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You touch the shrine. A faint warmth pulses through you.', 'system');
   });
 
   world.on('harvest:picked', ({ actor, kind, count, itemId }) => {

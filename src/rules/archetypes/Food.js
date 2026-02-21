@@ -89,6 +89,25 @@ export const WildHerbs = defineArchetype(
   [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.40) }],
 );
 
+// Picked from dungeon mushroom patches.
+export const DungeonMushrooms = defineArchetype(
+  "DungeonMushrooms",
+  [Consumable, {
+    effectParams: { nutrition: 100, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "Pale mushrooms from the dungeon depths. Probably safe.",
+    weight: 0.15,
+    value: 3,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Dungeon Mushrooms", identity: "food_mushrooms" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.35) }],
+);
+
 // Harvested from thorn brambles; used for alchemy recipes.
 export const ThornPods = defineArchetype(
   "ThornPods",

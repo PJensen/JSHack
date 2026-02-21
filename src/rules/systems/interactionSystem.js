@@ -12,7 +12,7 @@ import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import TombstoneComponent from "../components/Tombstone.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { WildBerries, WildHerbs, ThornPods, VenomFronds } from "../archetypes/Food.js";
+import { WildBerries, WildHerbs, ThornPods, VenomFronds, DungeonMushrooms } from "../archetypes/Food.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
@@ -129,6 +129,62 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
             }
             break;
 
+        case "drinkFountain":
+            {
+                const vit = world.get(actor, Vitality);
+                if (!vit) break;
+                const fSeed = combatSeed(world.seed, world.step, actor | 0, targetId | 0, 0xF0C5);
+                const r = mulberry32(fSeed);
+                const roll = r();
+                if (roll < 0.50) {
+                    // Heal 20-40% max HP
+                    const healAmt = Math.max(1, Math.floor(vit.maxHp * (0.2 + r() * 0.2)));
+                    const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
+                    world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
+                    world.emit?.("fountain:drink", { actor, targetId, effect: "heal", amount: healAmt });
+                } else if (roll < 0.75) {
+                    // Restore mana
+                    const mana = world.get(actor, Mana);
+                    if (mana && mana.maxMana > 0) {
+                        const amt = Math.max(1, Math.floor(mana.maxMana * 0.3));
+                        world.set(actor, Mana, { ...mana, mana: Math.min(mana.maxMana, mana.mana + amt) });
+                        world.emit?.("fountain:drink", { actor, targetId, effect: "mana", amount: amt });
+                    } else {
+                        const healAmt = Math.max(1, Math.floor(vit.maxHp * 0.15));
+                        const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
+                        world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
+                        world.emit?.("fountain:drink", { actor, targetId, effect: "heal", amount: healAmt });
+                    }
+                } else if (roll < 0.90) {
+                    world.emit?.("fountain:drink", { actor, targetId, effect: "nothing", amount: 0 });
+                } else {
+                    // Poison
+                    const dmgAmt = Math.max(1, Math.floor(vit.maxHp * (0.05 + r() * 0.05)));
+                    dealDamage(world, {
+                        target: actor,
+                        amount: dmgAmt,
+                        type: "poison",
+                        source: targetId,
+                        cause: "fountain",
+                    });
+                    world.emit?.("fountain:drink", { actor, targetId, effect: "poison", amount: dmgAmt });
+                }
+            }
+            break;
+
+        case "prayAltar":
+            {
+                world.emit?.("prayer", { actor, distress: null, altarBonus: true });
+                world.emit?.("altar:pray", { actor, targetId });
+            }
+            break;
+
+        case "touchShrine":
+            {
+                world.emit?.("shrine:touch", { actor, targetId });
+            }
+            break;
+
         case "harvestNode":
             {
                 const node = world.get(targetId, HarvestNode);
@@ -159,7 +215,9 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
                     ? VenomFronds
                     : (kind === "thorn_bramble"
                         ? ThornPods
-                        : (kind === "herbs" ? WildHerbs : WildBerries));
+                        : (kind === "mushrooms"
+                            ? DungeonMushrooms
+                            : (kind === "herbs" ? WildHerbs : WildBerries)));
                 const itemId = createFrom(world, harvestArchetype, {});
                 world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
 
