@@ -42,6 +42,8 @@ import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
+import { installFloatTextWiring } from "./main/wiring/floatTextWiring.js";
+import { installEventUiWiring } from "./main/wiring/eventUiWiring.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
   hasSavegame,
@@ -842,141 +844,6 @@ world.on('drank', ({ itemId }) => {
 
 throwFx.installListeners();
 
-// Proc VFX: vampiric life-steal
-world.on('proc:vampiric', ({ actor, target, amount }) => {
-  const apos = world.get(Number(actor || 0), Position);
-  const tpos = world.get(Number(target || 0), Position);
-  if (!apos) return;
-  ftext.addStatus(apos.x, apos.y - 0.3, 'LIFESTEAL', { color: '#ff4040', life: 0.6 });
-  if (tpos) {
-    const dx = apos.x - tpos.x, dy = apos.y - tpos.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    for (let i = 0; i < 6; i++) {
-      const spd = 1.5 + Math.random() * 1.0;
-      fx.pool.spawn({
-        x: tpos.x + (Math.random() - 0.5) * 0.3,
-        y: tpos.y + (Math.random() - 0.5) * 0.3,
-        vx: (dx / dist) * spd + (Math.random() - 0.5) * 0.5,
-        vy: (dy / dist) * spd + (Math.random() - 0.5) * 0.5,
-        ax: 0, ay: 0,
-        life: 0.35 + Math.random() * 0.15,
-        size0: 0.15, size1: 0.04,
-        r: 200, g: 50, b: 50,
-        a0: 0.85, a1: 0.0,
-        rot: 0, rotVel: 0
-      });
-    }
-  }
-});
-// Proc VFX: thorns retaliation
-world.on('proc:thorns', ({ actor, target }) => {
-  const tpos = world.get(Number(target || 0), Position);
-  if (!tpos) return;
-  ftext.addStatus(tpos.x, tpos.y - 0.3, 'THORNS', { color: '#78ff78', life: 0.6 });
-  for (let i = 0; i < 5; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const spd = 0.8 + Math.random() * 0.6;
-    fx.pool.spawn({
-      x: tpos.x, y: tpos.y,
-      vx: Math.cos(angle) * spd,
-      vy: Math.sin(angle) * spd,
-      ax: 0, ay: 0,
-      life: 0.2 + Math.random() * 0.15,
-      size0: 0.12, size1: 0.03,
-      r: 120, g: 255, b: 120,
-      a0: 0.9, a1: 0.0,
-      rot: 0, rotVel: 0
-    });
-  }
-});
-// Proc VFX: burning applied (one-shot ignite burst)
-world.on('proc:burning', ({ actor, target }) => {
-  const tpos = world.get(Number(target || 0), Position);
-  if (!tpos) return;
-  ftext.addStatus(tpos.x, tpos.y - 0.3, 'BURNING', { color: '#ff6600', life: 0.6 });
-  for (let i = 0; i < 8; i++) {
-    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.6;
-    const spd = 0.6 + Math.random() * 0.8;
-    fx.pool.spawn({
-      x: tpos.x + (Math.random() - 0.5) * 0.2,
-      y: tpos.y + (Math.random() - 0.5) * 0.2,
-      vx: Math.cos(angle) * spd,
-      vy: Math.sin(angle) * spd,
-      ax: 0, ay: -0.4,
-      life: 0.3 + Math.random() * 0.2,
-      size0: 0.18, size1: 0.04,
-      r: 255, g: 140 + (Math.random() * 60) | 0, b: 20,
-      a0: 0.9, a1: 0.0,
-      rot: 0, rotVel: 0
-    });
-  }
-});
-// Proc VFX: fierce bonus damage
-world.on('proc:fierce', ({ actor, target }) => {
-  const tpos = world.get(Number(target || 0), Position);
-  if (!tpos) return;
-  ftext.addStatus(tpos.x, tpos.y + 0.3, '+1', { color: '#ffa040', life: 0.4 });
-});
-// Spell and attack error messages now handled in messageWiring
-// Heal floating text (message handled in messageWiring)
-world.on('healed', ({ id, amount }) => {
-  const pos = world.get(Number(id||0), Position);
-  if (pos && Number.isFinite(amount)) {
-    try { ftext.addHeal(pos.x, pos.y, amount, { color: '#7BFF7B' }); } catch (e) { console.debug('[main] ftext failed:', e); }
-  }
-});
-// Pet death UI notification (message handled in messageWiring)
-world.on('died', ({ id }) => {
-  if (world.has(id, Pet)) {
-    try {
-      window.dispatchEvent(new CustomEvent('ui:petExists', {
-        detail: { exists: false }
-      }));
-    } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
-  }
-});
-// Floating text hooks: damage (messages handled in messageWiring)
-world.on('damaged', ({ target, amount, critical, crit, at }) => {
-  const t = Number(target||0) || 0;
-  const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : /** @type any */ (world.get(t, Position));
-  const pe = playerEntity(world);
-  const isPlayer = !!pe && pe.id === t;
-  if (pos && Number.isFinite(amount)) {
-    const col = isPlayer ? '#ff6060' : '#ffd966';
-    ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
-  }
-});
-// Status floating text (messages handled in messageWiring)
-world.on('status', ({ id, kind, at, text }) => {
-  const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : world.get(Number(id||0), Position);
-  if (!pos) return;
-  const style = (String(kind||'')).toLowerCase() === 'miss' ? 'miss' : ((String(kind||'')).toLowerCase() === 'immune' ? 'immune' : 'status');
-  const label = String(text || kind || '').toUpperCase() || (style === 'miss' ? 'MISS' : (style === 'immune' ? 'IMMUNE' : 'STATUS'));
-  try { ftext.addStatus(pos.x, pos.y, label, { style }); } catch (e) { console.debug('[main] ftext failed:', e); }
-});
-// Ranged combat floating text (messages handled in messageWiring)
-world.on('ranged:no-ammo', ({ attacker }) => {
-  const pos = world.get(Number(attacker||0), Position);
-  if (pos) try { ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' }); } catch (e) { console.debug('[main] ftext failed:', e); }
-});
-// Insufficient stamina floating flavor text (message handled in messageWiring)
-const _staminaLines = [
-  'Too exhausted!',
-  'Your arms feel heavy...',
-  'You can barely lift your weapon!',
-  'You gasp for breath...',
-  'Your muscles refuse!',
-  'Not enough strength...',
-  'You stagger with fatigue!',
-  'Your body protests!',
-];
-world.on('attack:insufficient-stamina', ({ attacker }) => {
-  const pos = world.get(Number(attacker || 0), Position);
-  if (pos) {
-    const line = _staminaLines[Math.floor(Math.random() * _staminaLines.length)];
-    try { ftext.addStatus(pos.x, pos.y - 0.3, line, { color: '#ff8c00', life: 1.0 }); } catch (e) { console.debug('[main] ftext failed:', e); }
-  }
-});
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type !== 'currency') return;
@@ -1191,96 +1058,6 @@ window.addEventListener('ui:rotatePetState', () => {
   }
 });
 
-// Engrave floating text (messages handled in messageWiring)
-world.on('engrave', ({ text, x, y }) => {
-  try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch (e) { console.debug('[main] ftext failed:', e); }
-});
-
-// Refresh inventory UI when any item is used (consumed/learned/etc.)
-world.on('item:used', ({ actor, itemId }) => {
-  // Dismiss the quick-slot chip for this item
-  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
-});
-// Spell learning logic (messages handled in messageWiring)
-world.on('spell:learned', ({ spellId }) => {
-  // Set active spell if none selected
-  if (!_activeSpellId) {
-    setActiveSpell(String(spellId));
-  }
-  const learnedId = String(spellId || '');
-  if (learnedId === 'lightning' || learnedId === 'meteor' || learnedId === 'blastwave') {
-    try {
-      window.dispatchEvent(new CustomEvent('ui:showSpellGestureHint', {
-        detail: { id: learnedId, mode: 'learn', quality: 1 },
-      }));
-    } catch (e) { console.debug('[main] dispatch ui:showSpellGestureHint:', e); }
-  }
-  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
-});
-// Interaction UI logic (messages handled in messageWiring)
-world.on('interaction', ({ action, items: droppedIds }) => {
-  if (action === 'openChest') {
-    // Auto-pickup currency drops silently
-    const nonCurrency = [];
-    if (Array.isArray(droppedIds)) {
-      for (const eid of droppedIds) {
-        const info = world.get(eid, ItemInfo);
-        if (!info) continue;
-        if (info.type === 'currency') {
-          const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-          rulesHandler({ type: 'rules.pickupItem', payload: { itemId: eid } });
-        } else {
-          nonCurrency.push({
-            id: eid,
-            type: info.type || 'item',
-            name: resolveItemDisplayName(world, eid),
-            count: info.count || 1,
-            rarityName: info.rarityName || 'common',
-            bonuses: info.bonuses || {},
-            affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
-          });
-        }
-      }
-    }
-    if (nonCurrency.length === 1) {
-      const it = nonCurrency[0];
-      try {
-        window.dispatchEvent(new CustomEvent('ui:showGroundItem', {
-          detail: { mode: 'single', item: it, pickupRange: 2 }
-        }));
-      } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
-    } else if (nonCurrency.length > 1) {
-      try {
-        window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items: nonCurrency } }));
-      } catch (e) { console.debug('[main] dispatch ui:openPickupChooser:', e); }
-    }
-  }
-});
-
-// Harvest updates: refresh inventory UI after gather actions.
-// Deferred so the tick's command queue (component adds) flushes first.
-world.on('harvest:picked', ({ actor, count, kind }) => {
-  setTimeout(() => {
-    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
-    try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch (e) { console.debug('[main] dispatch ui:requestUsableItemsData:', e); }
-  }, 0);
-  const pe = playerEntity(world);
-  if (!pe || pe.id !== actor) return;
-  const qty = Math.max(1, Number(count || 1) | 0);
-  const k = String(kind || '').toLowerCase();
-  const labels = (
-    k === 'herbs'
-      ? { one: 'herb', many: 'herbs' }
-      : (k === 'thorn_bramble'
-        ? { one: 'thorn pod', many: 'thorn pods' }
-        : (k === 'venom_fern'
-          ? { one: 'venom frond', many: 'venom fronds' }
-          : { one: 'berry', many: 'berries' }))
-  );
-  const label = qty === 1 ? labels.one : labels.many;
-  try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch (e) { console.debug('[main] ftext failed:', e); }
-});
 
 // Stair traversal logic (messages handled in messageWiring)
 const RETURN_PORTAL_IDENTITY = 'return_portal';
@@ -1922,6 +1699,8 @@ try {
    */
   (x,y,text,opts)=> ftext.add(x,y,text,opts||{});
 } catch (e) { console.debug('[main] float_text global setup failed:', e); }
+installFloatTextWiring({ world, ftext, fx });
+installEventUiWiring({ world, ftext, getActiveSpellId: () => _activeSpellId, setActiveSpell });
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
