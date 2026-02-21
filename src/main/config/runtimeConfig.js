@@ -64,5 +64,6 @@ export function readRuntimeConfig() {
     chosenDeityId: params.get("deity") || "molkhar",
     giveParam:    params.get("give")    || "",
     effectsParam: params.get("effects") || "",
+    debug:        params.has("debug"),
   };
 }

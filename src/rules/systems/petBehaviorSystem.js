@@ -15,11 +15,7 @@ import { Vitality } from '../components/Vitality.js';
 import { Faction } from '../components/Faction.js';
 import { findNearestValidTileAround } from '../utils/queries.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
-
-const FOLLOW_DISTANCE = 2;  // start following when farther than this
-const TELEPORT_DISTANCE = 10; // teleport if farther than this
-const GUARD_RADIUS = 5; // how far from guard position pet will chase
-const FLEE_THRESHOLD = 0.25; // flee when hp below this fraction
+import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
 
 /**
  * petBehaviorSystem - state-aware pet AI
