@@ -2425,12 +2425,11 @@ function ensureMessageTicker(root) {
     fontFamily: 'monospace',
     fontSize: '12px',
     lineHeight: '1.25',
-    background: 'rgba(10, 14, 22, 0.42)',
+    background: 'rgba(10, 14, 22, 0.72)',
     borderRadius: '8px',
     padding: '7px 9px',
     border: '1px solid rgba(45,59,82,0.56)',
     boxShadow: '0 4px 18px rgba(0,0,0,0.35)',
-    backdropFilter: 'blur(1.5px)',
     overflow: 'hidden',
     cursor: 'pointer',
     userSelect: 'none',
@@ -2464,10 +2463,9 @@ function renderMessageTicker(container, entries) {
       fontSize: '13px',
       lineHeight: '1.3',
       padding: '10px 12px',
-      background: 'rgba(8,12,18,0.88)',
+      background: 'rgba(8,12,18,0.92)',
       border: '1px solid rgba(80,120,170,0.82)',
       boxShadow: '0 12px 34px rgba(0,0,0,0.52)',
-      backdropFilter: 'blur(4px)',
       cursor: 'pointer',
     });
   } else {
@@ -2478,10 +2476,9 @@ function renderMessageTicker(container, entries) {
       fontSize: '12px',
       lineHeight: '1.25',
       padding: '7px 9px',
-      background: 'rgba(10, 14, 22, 0.42)',
+      background: 'rgba(10, 14, 22, 0.72)',
       border: '1px solid rgba(45,59,82,0.56)',
       boxShadow: '0 4px 18px rgba(0,0,0,0.35)',
-      backdropFilter: 'blur(1.5px)',
       cursor: 'pointer',
     });
   }
@@ -2553,14 +2550,14 @@ function renderMessageTicker(container, entries) {
     return;
   }
 
-  // Collapsed mode: newest 3 messages with recency blur hierarchy.
+  // Collapsed mode: newest 3 messages with recency opacity hierarchy.
   const recent = allEntries.slice(-3).reverse();
   if (!recent.length) return;
 
   const tierStyles = [
-    { blurPx: 0, opacity: 1.0, textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)' },
-    { blurPx: 0.65, opacity: 0.86, textShadow: '0 1px 0 rgba(0,0,0,0.38), 0 0 4px rgba(0,0,0,0.2)' },
-    { blurPx: 1.25, opacity: 0.72, textShadow: '0 1px 0 rgba(0,0,0,0.32), 0 0 3px rgba(0,0,0,0.16)' },
+    { opacity: 1.0, textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)' },
+    { opacity: 0.62, textShadow: '0 1px 0 rgba(0,0,0,0.38), 0 0 4px rgba(0,0,0,0.2)' },
+    { opacity: 0.38, textShadow: '0 1px 0 rgba(0,0,0,0.32), 0 0 3px rgba(0,0,0,0.16)' },
   ];
 
   for (let i = 0; i < recent.length; i++) {
@@ -2578,7 +2575,7 @@ function renderMessageTicker(container, entries) {
     }
     row.style.textShadow = tier.textShadow;
     row.style.opacity = String(tier.opacity);
-    row.style.filter = `blur(${tier.blurPx}px)`;
+    row.style.filter = '';
     row.style.whiteSpace = 'nowrap';
     row.style.overflow = 'hidden';
     row.style.textOverflow = 'ellipsis';
