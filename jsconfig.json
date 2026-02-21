@@ -1,19 +1,19 @@
-// {
-//     "compilerOptions": {
-//         "checkJs": true,
-//         "allowJs": true,
-//         "noEmit": true,
-//         "strict": true,
-//         "target": "ES2020",
-//         "module": "ESNext",
-//         "moduleResolution": "Bundler",
-//         "exactOptionalPropertyTypes": true,
-//         "noUncheckedIndexedAccess": true,
-//         "useUnknownInCatchVariables": true
-//     },
-//     "exclude": [
-//         "dist",
-//         "build",
-//         "node_modules"
-//     ]
-// }
+{
+    "compilerOptions": {
+        "checkJs": true,
+        "allowJs": true,
+        "noEmit": true,
+        "strict": true,
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "exactOptionalPropertyTypes": true,
+        "noUncheckedIndexedAccess": true,
+        "useUnknownInCatchVariables": true
+    },
+    "exclude": [
+        "dist",
+        "build",
+        "node_modules"
+    ]
+}
