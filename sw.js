@@ -50,8 +50,8 @@ self.addEventListener('fetch', (event) => {
             referrer: req.referrer,
             referrerPolicy: req.referrerPolicy,
             integrity: req.integrity,
-            keepalive: req.keepalive,
         });
-        event.respondWith(fetch(alt));
+        // Fall back to original request on network error so the page can still load
+        event.respondWith(fetch(alt).catch(() => fetch(req)));
     }
 });
