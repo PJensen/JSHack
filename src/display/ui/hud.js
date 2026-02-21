@@ -11,17 +11,16 @@ export function initHUD() {
     pointerEvents: 'auto', zIndex: 900
   });
 
-  // Top-right HUD cluster for gauge + active effects.
+  // Top-right HUD cluster for gauge + active effects (vertical stack).
   const topRightHud = document.createElement('div');
   Object.assign(topRightHud.style, {
     position: 'fixed',
     right: 'calc(8px + env(safe-area-inset-right, 0px))',
     top: 'calc(8px + env(safe-area-inset-top, 0px))',
     display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-end',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
     gap: '8px',
-    maxWidth: 'min(96vw, 720px)',
     pointerEvents: 'none',
     zIndex: 905,
   });
@@ -47,30 +46,28 @@ export function initHUD() {
     staminaMax: 1,
   }, { showReadout: true });
 
-  // Active effects HUD: anchored against the gauge in the top-right cluster.
+  // Active effects HUD: vertical stack below the gauge on the right side.
   const effectsHud = document.createElement('div');
   Object.assign(effectsHud.style, {
     position: 'relative',
     display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px',
-    marginTop: '0', padding: '6px 8px', borderRadius: '6px',
+    padding: '6px 8px', borderRadius: '6px',
     background: 'rgba(10,14,22,0.55)', border: '1px solid #2d3b52',
-    maxWidth: 'min(48vw, 460px)',
     pointerEvents: 'none',
   });
   const statusRow = document.createElement('div');
   Object.assign(statusRow.style, {
     display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: '8px',
-    alignContent: 'flex-start'
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '6px',
   });
   const affixRow = document.createElement('div');
-  Object.assign(affixRow.style, { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '4px' });
+  Object.assign(affixRow.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' });
   effectsHud.appendChild(statusRow);
   effectsHud.appendChild(affixRow);
-  topRightHud.appendChild(effectsHud);
   topRightHud.appendChild(vitals);
+  topRightHud.appendChild(effectsHud);
   root.appendChild(topRightHud);
   vitalsGauge.draw();
 
@@ -711,6 +708,7 @@ function createQuickSlot() {
   function actionable(it) {
     const t = String(it.type||'');
     if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
+    if (t === 'gem' || t === 'tool') return true;
     if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
     return false;
   }
@@ -736,6 +734,7 @@ function createQuickSlot() {
     else if (t === 'food') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     else if (t === 'scroll' || t === 'learn' || t === 'book') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     else if (t === 'equip' || t === 'ammo' || t === 'wand') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+    else if (t === 'gem' || t === 'tool') window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
   }
 
@@ -803,7 +802,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip' || it.type === 'ammo' || it.type === 'wand') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : 'Read')));
+  btn.textContent = (it.type === 'equip' || it.type === 'ammo' || it.type === 'wand') ? 'Equip' : (it.type === 'potion' ? 'Drink' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : (it.type === 'gem' ? 'Appraise' : (it.type === 'tool' ? 'Use' : 'Read')))));
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');
