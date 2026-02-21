@@ -44,7 +44,7 @@ export function initHUD() {
     manaMax: 1,
     staminaValue: 1,
     staminaMax: 1,
-  }, { showReadout: true });
+  }, { showReadout: false });
 
   // Active effects HUD: vertical stack below the gauge on the right side.
   const effectsHud = document.createElement('div');
