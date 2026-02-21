@@ -14,13 +14,18 @@ self.addEventListener('activate', (event) => {
     self.clients && self.clients.claim && self.clients.claim();
 });
 
-function getVersionParam() {
-    try {
-        const url = new URL(self.registration?.active?.scriptURL || self.location.href);
-        return url.searchParams.get('v') || Date.now().toString(16);
-    } catch (_) {
-        return Date.now().toString(16);
+/** Cache-bust stamp: generated once per SW lifecycle (install). */
+let _versionStamp = Date.now().toString(16);
+
+/** Try to read the ?v= from the page's main module (passed via message). */
+self.addEventListener('message', (event) => {
+    if (event.data?.type === 'set-version' && event.data.v) {
+        _versionStamp = String(event.data.v);
     }
+});
+
+function getVersionParam() {
+    return _versionStamp;
 }
 
 self.addEventListener('fetch', (event) => {

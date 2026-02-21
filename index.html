@@ -230,9 +230,19 @@
 			renderBoot();
 
 			const hash = new Date().getTime().toString(16);
-			// Register a dev service worker to bust module cache on mobile
+			// Register the dev service worker once (stable URL prevents reinstall races).
+			// The SW itself busts module caches internally via the ?v= param it reads
+			// from its own scriptURL, so we only need the hash on the entry module.
 			if ('serviceWorker' in navigator) {
-			try { navigator.serviceWorker.register(`./sw.js?v=${hash}`); } catch {}
+			try {
+				navigator.serviceWorker.register('./sw.js').then((reg) => {
+					const sw = reg.active || reg.installing || reg.waiting;
+					if (sw) sw.postMessage({ type: 'set-version', v: hash });
+					reg.addEventListener('updatefound', () => {
+						if (reg.installing) reg.installing.postMessage({ type: 'set-version', v: hash });
+					});
+				});
+			} catch {}
 		}
 		const script = document.createElement('script');
 		script.type = 'module';

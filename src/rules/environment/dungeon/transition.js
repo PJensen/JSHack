@@ -11,6 +11,7 @@ import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
+import { destroySubtree } from '../../../lib/ecs-js/hierarchy.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
@@ -69,10 +70,11 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     });
   }
 
-  // Destroy all entities from the current floor
+  // Destroy all entities from the current floor (destroySubtree cascades to
+  // hierarchy children, e.g. monsters spawned at runtime by spawner nests).
   if (ds && Array.isArray(ds.floorEntityIds)) {
     for (const eid of ds.floorEntityIds) {
-      try { world.destroy(eid); } catch (_) { /* already gone */ }
+      try { destroySubtree(world, eid); } catch (_) { /* already gone */ }
     }
   }
 

@@ -85,7 +85,7 @@ export const Creature = defineArchetype(
   [Wounds, { list: [] }],
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
-  [Speed, (p) => ({ actEvery: p.speed ?? 1 })],
+  [Speed, (p) => ({ actEvery: Math.max(1, 4 - (p.speed ?? 1)) })],
 );
 
 // Human (humanoid defaults, neutral faction)

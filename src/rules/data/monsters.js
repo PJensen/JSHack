@@ -78,7 +78,7 @@ export const MONSTERS = [
     sizeClass: 'XS',
     massKg: 1,
     resistances: { kinetic: { DR: 0 } },
-    speed: 1,
+    speed: 3,
     hooks: {
       onHit: [statusEffectOnHit(15, 0xdead0006, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
     },
@@ -123,7 +123,7 @@ export const MONSTERS = [
     sizeClass: 'XS',
     massKg: 3,
     resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
-    speed: 1,
+    speed: 2,
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead000f, { key: "poison", turnsLeft: 5, potency: 1 }, "proc:poisoned")],
     },
