@@ -616,7 +616,7 @@ const { buildGroundPickupDetailAt } = installInventoryDataProvider({
   world,
   getActiveSpellId: () => _activeSpellId,
   isSimUiBlocked,
-  messageLog,
+  getMessageLog: () => messageLog,
   tombstoneRepo,
 });
 

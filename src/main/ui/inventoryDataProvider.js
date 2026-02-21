@@ -27,12 +27,12 @@ const _installed = Symbol.for('inventoryDataProvider');
  *   world: import('../../lib/ecs-js/index.js').World,
  *   getActiveSpellId: () => string|null,
  *   isSimUiBlocked: () => boolean,
- *   messageLog: { getEntries(): any[] },
+ *   getMessageLog: () => { getEntries(): any[] },
  *   tombstoneRepo: { getAll(): any[] },
  * }} deps
  * @returns {{ buildGroundPickupDetailAt: (actorId: number, x: number, y: number) => object|null }}
  */
-export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiBlocked, messageLog, tombstoneRepo }) {
+export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiBlocked, getMessageLog, tombstoneRepo }) {
   if (/** @type {any} */ (world)[_installed]) return { buildGroundPickupDetailAt };
   /** @type {any} */ (world)[_installed] = true;
 
@@ -268,7 +268,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
 
   // Provide message log entries
   addEventListener('ui:requestMessageLogData', () => {
-    const entries = messageLog.getEntries();
+    const entries = getMessageLog().getEntries();
     window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
   });
 
