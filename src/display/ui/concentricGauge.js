@@ -131,40 +131,73 @@ function ensureCenterReadout(root) {
     const box = document.createElement('div');
     box.className = 'rg-centerBox';
     Object.assign(box.style, {
-      textAlign: 'center',
-      padding: '8px 10px',
-      borderRadius: '12px',
-      background: 'rgba(0,0,0,0.22)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-      minWidth: '104px',
-      color: 'rgba(255,255,255,0.86)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '0px',
+      width: '62%',
+      height: '62%',
+      borderRadius: '50%',
+      color: 'rgba(255,255,255,0.92)',
       fontFamily: 'monospace',
     });
-    const big = document.createElement('div');
-    big.setAttribute('data-rg-big', '');
-    Object.assign(big.style, {
-      fontSize: '20px',
-      fontWeight: '700',
-      lineHeight: '1.05',
+
+    // HP row
+    const hpRow = document.createElement('div');
+    hpRow.setAttribute('data-rg-hp', '');
+    Object.assign(hpRow.style, {
+      fontSize: '13px', fontWeight: '700', lineHeight: '1.15',
+      color: 'var(--rg-health, #7bff7b)',
+      textShadow: '0 0 6px rgba(123,255,123,0.3)',
+      textAlign: 'center',
     });
-    const sub = document.createElement('div');
-    sub.setAttribute('data-rg-sub', '');
-    Object.assign(sub.style, {
-      marginTop: '4px',
-      fontSize: '10px',
-      letterSpacing: '0.04em',
-      color: 'rgba(255,255,255,0.62)',
+
+    // Mana row
+    const mpRow = document.createElement('div');
+    mpRow.setAttribute('data-rg-mp', '');
+    Object.assign(mpRow.style, {
+      fontSize: '11px', fontWeight: '600', lineHeight: '1.15',
+      color: 'var(--rg-mana, #55aaff)',
+      textShadow: '0 0 6px rgba(85,170,255,0.3)',
+      textAlign: 'center',
     });
-    box.appendChild(big);
-    box.appendChild(sub);
+
+    // Stamina row
+    const stRow = document.createElement('div');
+    stRow.setAttribute('data-rg-st', '');
+    Object.assign(stRow.style, {
+      fontSize: '11px', fontWeight: '600', lineHeight: '1.15',
+      color: 'var(--rg-stamina, #ffc530)',
+      textShadow: '0 0 6px rgba(255,197,48,0.3)',
+      textAlign: 'center',
+    });
+
+    box.appendChild(hpRow);
+    box.appendChild(mpRow);
+    box.appendChild(stRow);
     center.appendChild(box);
     root.appendChild(center);
   }
   return {
-    big: root.querySelector('[data-rg-big]'),
-    sub: root.querySelector('[data-rg-sub]'),
+    hp: root.querySelector('[data-rg-hp]'),
+    mp: root.querySelector('[data-rg-mp]'),
+    st: root.querySelector('[data-rg-st]'),
+    box: root.querySelector('.rg-centerBox'),
   };
+}
+
+function updateReadout(readout, state) {
+  if (!readout.hp && !readout.mp && !readout.st) return;
+  const hpVal = Math.max(0, Math.floor(Number(state.hpValue) || 0));
+  const hpMax = Math.max(1, Math.floor(Number(state.hpMax) || 1));
+  const mpVal = Math.max(0, Math.floor(Number(state.manaValue) || 0));
+  const mpMax = Math.max(1, Math.floor(Number(state.manaMax) || 1));
+  const stVal = Math.max(0, Math.floor(Number(state.staminaValue) || 0));
+  const stMax = Math.max(1, Math.floor(Number(state.staminaMax) || 1));
+  if (readout.hp) readout.hp.textContent = `${hpVal}/${hpMax}`;
+  if (readout.mp) readout.mp.textContent = `${mpVal}/${mpMax}`;
+  if (readout.st) readout.st.textContent = `${stVal}/${stMax}`;
 }
 
 export function createConcentricGauge(root, initial = {}, opts = {}) {
@@ -205,7 +238,7 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
   if (!ctx) throw new Error('createConcentricGauge: 2d context unavailable');
 
   const showReadout = opts.showReadout !== false;
-  const readout = showReadout ? ensureCenterReadout(root) : { big: null, sub: null };
+  const readout = showReadout ? ensureCenterReadout(root) : { hp: null, mp: null, st: null, box: null };
 
   const state = {
     health: clamp01(initial.health ?? 1),
@@ -250,16 +283,7 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
     const maxR = Math.min(w, h) / 2 - outerPad;
 
     if (!(maxR > 0)) {
-      if (readout.big || readout.sub) {
-        const hpVal = Math.max(0, Math.floor(Number(state.hpValue) || 0));
-        const hpMax = Math.max(1, Math.floor(Number(state.hpMax) || 1));
-        const mpVal = Math.max(0, Math.floor(Number(state.manaValue) || 0));
-        const mpMax = Math.max(1, Math.floor(Number(state.manaMax) || 1));
-        const stVal = Math.max(0, Math.floor(Number(state.staminaValue) || 0));
-        const stMax = Math.max(1, Math.floor(Number(state.staminaMax) || 1));
-        if (readout.big) readout.big.textContent = `${hpVal}/${hpMax} HP`;
-        if (readout.sub) readout.sub.textContent = `M ${mpVal}/${mpMax}  S ${stVal}/${stMax}`;
-      }
+      updateReadout(readout, state);
       return;
     }
 
@@ -290,17 +314,7 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
     ctx.fill();
     ctx.restore();
 
-    if (readout.big || readout.sub) {
-      const hpVal = Math.max(0, Math.floor(Number(state.hpValue) || 0));
-      const hpMax = Math.max(1, Math.floor(Number(state.hpMax) || 1));
-      const mpVal = Math.max(0, Math.floor(Number(state.manaValue) || 0));
-      const mpMax = Math.max(1, Math.floor(Number(state.manaMax) || 1));
-      const stVal = Math.max(0, Math.floor(Number(state.staminaValue) || 0));
-      const stMax = Math.max(1, Math.floor(Number(state.staminaMax) || 1));
-
-      if (readout.big) readout.big.textContent = `${hpVal}/${hpMax} HP`;
-      if (readout.sub) readout.sub.textContent = `M ${mpVal}/${mpMax}  S ${stVal}/${stMax}`;
-    }
+    updateReadout(readout, state);
   }
 
   function stop() {
