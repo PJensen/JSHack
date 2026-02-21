@@ -34,7 +34,7 @@ function effectKeyToType(key) {
     switch (key) {
         case 'burn': case 'burning': return 'fire';
         case 'poison': case 'poisoned': return 'poison';
-        case 'bleed': case 'bleeding': return 'slash';
+        case 'bleed': case 'bleeding': return 'generic';
         case 'shock': case 'shocked': return 'lightning';
         default: return 'generic';
     }
