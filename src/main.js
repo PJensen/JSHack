@@ -10,7 +10,7 @@ import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
 import { updateShake, startShake } from "./display/camera/shake.js";
-import { zoomTo, jumpTo, easeTo } from "./display/camera/utils.js";
+import { zoomTo } from "./display/camera/utils.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
 import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
@@ -24,6 +24,9 @@ import { initHUD } from "./display/ui/hud.js";
 import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
 import { createHudFeeds } from "./main/ui/hudFeeds.js";
+import { createActiveSpellController } from "./main/spells/activeSpellController.js";
+import { applyDebugCommands } from "./main/debug/debugCommands.js";
+import { installSceneControls } from "./main/debug/sceneControls.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
@@ -293,46 +296,22 @@ function syncSimInputLockFlag() {
 }
 syncSimInputLockFlag();
 
-function learnedSpells() {
-  const pe = playerEntity(world);
-  if (!pe) return [];
-  /** @type {{ learnedSpellIds?: string[] }|null} */
-  const brain = /** @type any */ (world.get(pe.id, Brain));
-  const ids = Array.isArray(brain?.learnedSpellIds) ? brain.learnedSpellIds : [];
-  return ids.map((id) => ({ id, ...(getSpell(id) || {}) }));
-}
-function getPlayerMana() {
-  const pe = playerEntity(world);
-  if (!pe) return { mana: 0, maxMana: 0 };
-  /** @type {{ mana?:number, maxMana?:number }|null} */
-  const m = /** @type any */ (world.get(pe.id, Mana));
-  return { mana: Number(m?.mana || 0), maxMana: Number(m?.maxMana || 0) };
-}
+const spellCtrl = createActiveSpellController(world);
 
 // Initialize HUD feed updaters with stamina support
-const hudFeeds = createHudFeeds(world, { getPlayerMana });
+const hudFeeds = createHudFeeds(world, { getPlayerMana: spellCtrl.getPlayerMana });
 
 function ensureActiveSpell() {
-  if (_activeSpellId) return _activeSpellId;
-  const list = learnedSpells();
-  _activeSpellId = (list[0]?.id) || null;
-  updateActiveSpellLabel();
-  return _activeSpellId;
+  const id = spellCtrl.ensureActiveSpell();
+  _activeSpellId = spellCtrl.getActiveSpellId();
+  return id;
 }
 function setActiveSpell(id) {
-  _activeSpellId = (typeof id === 'string' && id.length) ? id : null;
+  spellCtrl.setActiveSpell(id);
+  _activeSpellId = spellCtrl.getActiveSpellId();
   if (_pendingSpellTargeting && _pendingSpellTargeting.spellId !== _activeSpellId) {
     _pendingSpellTargeting = null;
   }
-  updateActiveSpellLabel();
-}
-function updateActiveSpellLabel() {
-  const s = _activeSpellId ? getSpell(_activeSpellId) : null;
-  const name = s?.name || (_activeSpellId || '');
-  const cost = Number(s?.manaCost || 0);
-  const { mana } = getPlayerMana();
-  const canCast = mana >= cost && !!_activeSpellId;
-  try { window.dispatchEvent(new CustomEvent('ui:updateActiveSpellLabel', { detail: { id: _activeSpellId, name, cost, canCast } })); } catch (e) { console.debug('[main] dispatch ui:updateActiveSpellLabel:', e); }
 }
 
 // ---- Dungeon initialization -------------------------------------------------
@@ -408,13 +387,13 @@ if (_pendingSavegame) {
   try {
     restoreSnapshotFromSavegame(world, _pendingSavegame);
     const savedSpell = _pendingSavegame?.app?.activeSpellId;
-    if (typeof savedSpell === "string" && savedSpell.length > 0) _activeSpellId = savedSpell;
+    if (typeof savedSpell === "string" && savedSpell.length > 0) { _activeSpellId = savedSpell; spellCtrl.setActiveSpell(savedSpell); }
     _savegameLoaded = true;
     updateBootProgress("Loaded save snapshot", _bootDoneUnits);
   } catch (err) {
     console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
     clearSavegamePayload();
-    _activeSpellId = null;
+    _activeSpellId = null; spellCtrl.setActiveSpell(null);
     resetIdentification();
     identify('stone_touchstone');
     initGemPricing(createRng(world.seed ^ 0x6E45));
@@ -540,87 +519,7 @@ if (!_savegameLoaded) {
     }
   }
 
-  // Process ?give query string parameter to spawn items in player inventory
-  // Format: ?give=item_id*count,item_id*count
-  // Example: ?give=gold*1000,potion_health*5,sword_plain*1
-  {
-    const giveParam = runtimeConfig.giveParam;
-    if (giveParam) {
-      const pe = playerEntity(world);
-      if (pe) {
-        const inv = world.get(pe.id, Inventory);
-        if (inv && Array.isArray(inv.items)) {
-          // Parse comma-separated item specs
-          const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
-
-          for (const spec of specs) {
-            // Parse "item_id*count" format
-            const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
-            if (!match) {
-              console.warn(`[?give] Invalid format: "${spec}" (expected: item_id*count)`);
-              continue;
-            }
-
-            const itemId = match[1];
-            const count = parseInt(match[2] || '1', 10);
-
-            if (!Number.isFinite(count) || count < 1) {
-              console.warn(`[?give] Invalid count for "${itemId}": ${match[2]}`);
-              continue;
-            }
-
-            try {
-              // Use centralized item factory
-              const createdItemId = createItemById(world, itemId, { count });
-
-              if (createdItemId !== null) {
-                addItemEntityToInventory(world, inv, createdItemId);
-                console.debug(`[?give] Created ${count}x ${itemId}`);
-              } else {
-                console.warn(`[?give] Unknown item: "${itemId}"`);
-              }
-            } catch (err) {
-              console.error(`[?give] Error creating item "${itemId}":`, err);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Process ?effects query string parameter to apply status effects to the player.
-  // Format: ?effects=key*turns,key*turns   (turns defaults to 5 if omitted)
-  // Example: ?effects=bleed*2,poison*10,burning,confused*3
-  {
-    const effectsParam = runtimeConfig.effectsParam;
-    if (effectsParam) {
-      const pe = playerEntity(world);
-      if (pe) {
-        const ae = world.get(pe.id, ActiveEffects);
-        const specs = effectsParam.split(',').map(s => s.trim()).filter(Boolean);
-        for (const spec of specs) {
-          const match = spec.match(/^([a-z_]+)(?:\*(\d+))?$/i);
-          if (!match) {
-            console.warn(`[?effects] Invalid format: "${spec}" (expected: key or key*turns)`);
-            continue;
-          }
-          const key = match[1].toLowerCase();
-          const turnsLeft = parseInt(match[2] || '5', 10);
-          if (!Number.isFinite(turnsLeft) || turnsLeft < 1) {
-            console.warn(`[?effects] Invalid turns for "${key}": ${match[2]}`);
-            continue;
-          }
-          const effect = { key, turnsLeft, potency: 1, stacks: 1 };
-          if (ae && Array.isArray(ae.effects)) {
-            ae.effects.push(effect);
-          } else {
-            world.add(pe.id, ActiveEffects, { effects: [effect] });
-          }
-          console.debug(`[?effects] Applied ${key} for ${turnsLeft} turn(s)`);
-        }
-      }
-    }
-  }
+  applyDebugCommands({ world, runtimeConfig });
 }
 
 // Ensure deity state is initialized for current player (new game or loaded save).
@@ -1200,7 +1099,7 @@ addEventListener('ui:pray', () => {
 
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
-  const spells = learnedSpells();
+  const spells = spellCtrl.learnedSpells();
   const activeSpellId = ensureActiveSpell();
   try { window.dispatchEvent(new CustomEvent('ui:spellData', { detail: { spells, activeSpellId } })); } catch (e) { console.debug('[main] dispatch ui:spellData:', e); }
 });
@@ -4599,57 +4498,7 @@ requestAnimationFrame((now) => {
   finishBoot();
 });
 
-// ---- Minimal demo “scene” controls (display-only) --------------------------
-addEventListener("keydown", (e) => {
-  const { key, code } = e;
-  const deleteSaveHotkey = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (code === "Backspace" || key === "Backspace");
-  const zoomIn  = key === "+" || key === "=" || code === "Equal" || code === "NumpadAdd";
-  const zoomOut = key === "-" || key === "_" || code === "Minus" || code === "NumpadSubtract";
-
-  if (deleteSaveHotkey) {
-    const hadSave = hasSavegame();
-    clearSavegamePayload();
-    messageLog.log({
-      text: hadSave
-        ? "Save game deleted. (Ctrl+Shift+Backspace)"
-        : "No save game found to delete.",
-      type: "system",
-    });
-    e.preventDefault();
-    return;
-  }
-
-  if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
-  if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }
-  if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, TILE_PX); e.preventDefault(); return; }
-  if (key === "9") {
-    // Debug: toggle camera between nearest down-stair and player
-    if (cam._detached) {
-      cam._detached = false;
-      if (runtimeConfig.debug) console.log('[DEBUG] Camera re-attached to player');
-    } else {
-      let best = null, bestDist = Infinity;
-      const pp = playerEntity(world);
-      const px = pp ? world.get(pp.id, Position)?.x ?? 0 : 0;
-      const py = pp ? world.get(pp.id, Position)?.y ?? 0 : 0;
-      for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
-        if (ni.identity === 'stair_down') {
-          const d = Math.abs(pos.x - px) + Math.abs(pos.y - py);
-          if (d < bestDist) { bestDist = d; best = pos; }
-        }
-      }
-      if (best) {
-        cam._detached = true;
-        if (runtimeConfig.debug) console.log(`[DEBUG] Easing to stair_down at (${best.x}, ${best.y})`);
-        easeTo(cam, { x: best.x, y: best.y, dur: 0.8 });
-      } else {
-        if (runtimeConfig.debug) console.warn('[DEBUG] No stair_down entity found on this floor!');
-      }
-    }
-    e.preventDefault(); return;
-  }
-  if ((key || "").toLowerCase() === "x") { startShake(cam, 6, 0.35); e.preventDefault(); return; }
-});
+installSceneControls({ world, cam, TILE_PX, messageLog, runtimeConfig });
 
 // Cache WorldView per rules step; if the sim hasn't advanced, reuse the view
 let _cachedView = null; let _cachedStep = -1;
