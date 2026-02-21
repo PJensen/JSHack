@@ -12,11 +12,8 @@ import { Unpaid } from "../../rules/components/Unpaid.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Settings } from "../../rules/components/Settings.js";
 import { getSpell } from "../../rules/data/spells.js";
-import {
-  coalesceInventoryStacks,
-  listApplyTargetsForTool,
-} from "../../rules/utils/inventoryStacking.js";
-import { isApplyTool } from "../../rules/content/items/applyPayloads.js";
+import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js";
+import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
 import { resolveItemDisplayName } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 
