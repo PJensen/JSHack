@@ -76,6 +76,15 @@ export const WeaponRack = defineArchetype(
   [Interactable, { action: "browseRack", params: null }],
 );
 
+export const Web = defineArchetype(
+  "Web",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Web", identity: "web" }],
+  [Material, { kind: "organic" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "clearWeb", params: null }],
+);
+
 export const Mushrooms = defineArchetype(
   "Mushrooms",
   [Position, (p) => ({ x: p.x, y: p.y })],

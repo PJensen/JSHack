@@ -470,6 +470,16 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  // ── Webs ───────────────────────────────────────────────────────────────────
+
+  clearWeb: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      world.emit?.("web:cleared", { actor, targetId });
+      try { world.destroy(targetId); } catch {}
+    },
+  },
+
   // ── Sarcophagus ────────────────────────────────────────────────────────────
   //
   // One-time interaction: disturbing the sarcophagus awakens its occupant.

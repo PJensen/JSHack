@@ -10,14 +10,14 @@ export const basePalette = {
   player_cleric:  { glyph: "@", fg: "#ffe066", glow: "#cca830" },
   monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },  // fallback
   // Tier 0
-  rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" },
+  rat:      { glyph: "🐀", fg: "#b89070", glow: "#a06030" },
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
-  bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" },
+  bat:      { glyph: "🦇", fg: "#9080b0", glow: "#605080" },
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
   // Tier 1
   orc:      { glyph: "o", fg: "#cc6644", glow: "#993320" },
-  skeleton: { glyph: "s", fg: "#ddd8c8", glow: "#aaa590" },
-  spider:   { glyph: "x", fg: "#55bb55", glow: "#338833" },
+  skeleton: { glyph: "💀", fg: "#ddd8c8", glow: "#aaa590" },
+  spider:   { glyph: "🕷", fg: "#55bb55", glow: "#338833" },
   // Tier 2
   troll:    { glyph: "T", fg: "#66aa66", glow: "#448844" },
   wraith:   { glyph: "W", fg: "#aabbff", glow: "#7799dd" },
@@ -105,6 +105,7 @@ export const basePalette = {
   pillar:      { glyph: "╥", fg: "#99a",    glow: "#667"    },
   weapon_rack: { glyph: "⚔", fg: "#bbbbcc", glow: "#888899" },
   mushrooms:   { glyph: "🍄", fg: "#88cc88", glow: "#558855" },
+  web:         { glyph: "🕸", fg: "#c8c8c8", glow: "#888888" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },

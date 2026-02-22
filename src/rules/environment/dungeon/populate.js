@@ -42,7 +42,7 @@ import { isIdentified } from '../../data/identification.js';
 import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
 import {
   Fountain, Altar, Shrine, Statue,
-  Sarcophagus, Pillar, WeaponRack, Mushrooms,
+  Sarcophagus, Pillar, WeaponRack, Mushrooms, Web,
 } from '../../archetypes/RoomFeatures.js';
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -114,25 +114,33 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
     // Place spawners (create monster packs)
+    let roomHasSpider = false;
     for (let i = 0; i < spawnerBudget; i++) {
       const mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-      spawns.push({
-        x: mx, y: my,
-        kind: 'spawner',
-        params: pickSpawner(rng, floorPlan.depth),
-      });
+      const sp = pickSpawner(rng, floorPlan.depth);
+      spawns.push({ x: mx, y: my, kind: 'spawner', params: sp });
+      if (sp.monsterType?.identity === 'spider') roomHasSpider = true;
     }
 
     // Place individual monsters
     for (let i = 0; i < monsterBudget; i++) {
       const mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-      spawns.push({
-        x: mx, y: my,
-        kind: 'monster',
-        params: pickMonster(rng, floorPlan.depth),
-      });
+      const mp = pickMonster(rng, floorPlan.depth);
+      spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
+      if (mp.identity === 'spider') roomHasSpider = true;
+    }
+
+    // Scatter webs across ~30% of floor tiles in spider rooms
+    if (roomHasSpider) {
+      for (let wy = room.y + 1; wy < room.y + room.h - 1; wy++) {
+        for (let wx = room.x + 1; wx < room.x + room.w - 1; wx++) {
+          if (rng.next() < 0.30) {
+            spawns.push({ x: wx, y: wy, kind: 'web', params: {} });
+          }
+        }
+      }
     }
 
     // Item density: ~1 per 40-60 floor tiles (scarce — items should feel good to find)
@@ -563,6 +571,8 @@ export function materializeSpawn(world, spawn) {
     }
     case 'mushrooms':
       return createFrom(world, Mushrooms, { x: spawn.x, y: spawn.y });
+    case 'web':
+      return createFrom(world, Web, { x: spawn.x, y: spawn.y });
     default:
       return null;
   }
