@@ -94,7 +94,7 @@ export const LOOT_TABLES = {
   "drop:tier0": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 15 },
+      { type: "nothing",   weight: 50 },
       { type: "gold",      weight: 30, count: { base: 5, perDepth: 2 } },
       { type: "archetype", weight: 25, archetype: "HealthPotion" },
       { type: "table",     weight: 20, tableId: "sub:equip_common" },
@@ -106,7 +106,7 @@ export const LOOT_TABLES = {
   "drop:tier1": {
     rolls: { min: 1, max: 3 },
     entries: [
-      { type: "nothing",   weight: 10 },
+      { type: "nothing",   weight: 35 },
       { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
       { type: "archetype", weight: 15, archetype: "HealthPotion" },
       { type: "table",     weight: 15, tableId: "sub:equip_common" },
