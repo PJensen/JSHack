@@ -38,6 +38,7 @@ import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
+import { installScoreListener } from "../rules/systems/scoreSystem.js";
 import { materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
@@ -64,6 +65,8 @@ export function configureWorld(world) {
   installMonsterDeathHooks(world);
   // Install taunt listeners once per world
   installTauntListener(world);
+  // Award monster maxHp to player score on kill
+  installScoreListener(world);
 
   // Phase: intents (consume queued intents)
   // Producers first (AI), then consumers (movement, interactions, etc.)
