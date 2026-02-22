@@ -344,6 +344,38 @@ export function generateOverworldChunks(worldSeed) {
     addSpawn(chunks, p.x, p.y, "harvest_venom_fern");
   }
 
+  // Mining nodes — placed well afield (28–48 tiles from home)
+  const ironSpots = [
+    { x: homeX + 35, y: homeY - 22 },  // NE
+    { x: homeX - 33, y: homeY + 27 },  // SW
+    { x: homeX + 26, y: homeY + 38 },  // SE
+  ];
+  const coalSpots = [
+    { x: homeX - 42, y: homeY - 18 },  // NW
+    { x: homeX + 44, y: homeY + 15 },  // E
+    { x: homeX - 20, y: homeY - 44 },  // N
+  ];
+  const stoneSpots = [
+    { x: homeX + 28, y: homeY - 32 },  // NE
+    { x: homeX - 36, y: homeY + 30 },  // SW
+  ];
+
+  for (const p of ironSpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_iron_ore");
+  }
+  for (const p of coalSpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_coal_ore");
+  }
+  for (const p of stoneSpots) {
+    const t = getWorldTile(chunks, p.x, p.y);
+    if (t === TILE_WATER) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addSpawn(chunks, p.x, p.y, "harvest_stone");
+  }
+
   const outChunks = [];
   for (const rec of chunks.values()) {
     outChunks.push({

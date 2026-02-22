@@ -14,6 +14,9 @@ export {
   ThornPods,
   VenomFronds,
   DungeonMushrooms,
+  IronOre,
+  CoalOre,
+  StoneChip,
   createCorpse,
 } from './Food.js';
 export { SpikeTrap, SnakeTrap, ShockTrap } from './Traps.js';
@@ -26,6 +29,9 @@ export {
   HerbPatch,
   ThornBramble,
   VenomFern,
+  OreVeinIron,
+  OreVeinCoal,
+  OreVeinStone,
   AlchemyBench,
 } from './Overworld.js';
 export {

@@ -134,6 +134,45 @@ export const VenomFronds = defineArchetype(
   [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Venom Fronds", identity: "reagent_venom_frond" })],
 );
 
+// Mined from iron ore veins in the overworld.
+export const IronOre = defineArchetype(
+  "IronOre",
+  [ItemInfo, {
+    type: "material",
+    description: "A chunk of raw iron ore, heavy and rust-red.",
+    weight: 2.0,
+    value: 12,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Iron Ore", identity: "ore_iron" })],
+);
+
+// Mined from coal seams in the overworld.
+export const CoalOre = defineArchetype(
+  "CoalOre",
+  [ItemInfo, {
+    type: "material",
+    description: "A lump of coal, black and crumbly.",
+    weight: 1.5,
+    value: 6,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Coal", identity: "ore_coal" })],
+);
+
+// Chipped from stone outcroppings in the overworld.
+export const StoneChip = defineArchetype(
+  "StoneChip",
+  [ItemInfo, {
+    type: "material",
+    description: "A rough chip of grey stone.",
+    weight: 1.0,
+    value: 2,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Stone Chip", identity: "ore_stone" })],
+);
+
 /**
  * createCorpse — creates a corpse entity from a killed monster.
  * Called from cleanupSystem when a monster dies.
