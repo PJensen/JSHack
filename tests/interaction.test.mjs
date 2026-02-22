@@ -170,7 +170,10 @@ Deno.test("harvest node creates food and enters regrow cooldown", () => {
 
   const node = world.create();
   world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'berries' } });
-  world.add(node, HarvestNode, { kind: 'berries', ready: true, regrowTurns: 9, regrowCountdown: 0 });
+  world.add(node, HarvestNode, {
+    kind: 'berries', ready: true, regrowTurns: 9, regrowCountdown: 0,
+    yield: 'food_wild_berries', yieldMin: 1, yieldMax: 3,
+  });
   world.add(node, Position, { x: 1, y: 1 });
 
   const events = [];
@@ -244,7 +247,11 @@ Deno.test("thorn bramble harvest hurts actor and yields thorn pods", () => {
 
   const node = world.create();
   world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'thorn_bramble' } });
-  world.add(node, HarvestNode, { kind: 'thorn_bramble', ready: true, regrowTurns: 11, regrowCountdown: 0 });
+  world.add(node, HarvestNode, {
+    kind: 'thorn_bramble', ready: true, regrowTurns: 11, regrowCountdown: 0,
+    yield: 'reagent_thorn_pod', yieldMin: 2, yieldMax: 4,
+    danger: { type: 'physical', dmgMin: 1, dmgMax: 3, cause: 'thorn_bramble' },
+  });
   world.add(node, Position, { x: 5, y: 4 });
 
   const dangerEvents = [];
@@ -253,7 +260,7 @@ Deno.test("thorn bramble harvest hurts actor and yields thorn pods", () => {
   world.add(actor, InteractIntent, { targetId: node });
   interactionSystem(world);
 
-  assert(dangerEvents.some((e) => e.effect === 'thorns'), 'thorn harvest should emit danger event');
+  assert(dangerEvents.some((e) => e.effect === 'physical'), 'thorn harvest should emit physical danger event');
   const vit = world.get(actor, Vitality);
   assert(vit.hp < vit.maxHp, 'thorn harvest should damage actor');
 
@@ -273,7 +280,12 @@ Deno.test("venom fern harvest spawns poison hazard and hurts actor", () => {
 
   const node = world.create();
   world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'venom_fern' } });
-  world.add(node, HarvestNode, { kind: 'venom_fern', ready: true, regrowTurns: 14, regrowCountdown: 0 });
+  world.add(node, HarvestNode, {
+    kind: 'venom_fern', ready: true, regrowTurns: 14, regrowCountdown: 0,
+    yield: 'reagent_venom_frond', yieldMin: 2, yieldMax: 3,
+    danger: { type: 'poison', dmgMin: 1, dmgMax: 2, cause: 'venom_fern' },
+    hazard: { kind: 'poison', turnsLeft: 2, tickDamage: 1, identity: 'venom_spores', name: 'Venom Spores' },
+  });
   world.add(node, Position, { x: 7, y: 6 });
 
   const dangerEvents = [];
@@ -282,7 +294,7 @@ Deno.test("venom fern harvest spawns poison hazard and hurts actor", () => {
   world.add(actor, InteractIntent, { targetId: node });
   interactionSystem(world);
 
-  assert(dangerEvents.some((e) => e.effect === 'spores'), 'venom fern should emit spores danger event');
+  assert(dangerEvents.some((e) => e.effect === 'poison'), 'venom fern should emit poison danger event');
   const vit = world.get(actor, Vitality);
   assert(vit.hp < vit.maxHp, 'venom fern harvest should damage actor');
 
@@ -370,4 +382,127 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
   const venomAfter = countIdentity('reagent_venom_frond');
   assert(thornAfter < thornBefore, 'thorn pod inventory should be consumed');
   assert(venomAfter < venomBefore, 'venom frond inventory should be consumed');
+});
+
+// ── Sarcophagus ───────────────────────────────────────────────────────────────
+
+Deno.test("sarcophagus: spawns skeleton on first interaction", () => {
+  const world = new World({ seed: 42 });
+
+  const actor = world.create();
+  const sarc = world.create();
+  world.add(sarc, Interactable, { action: 'openSarcophagus', params: null });
+  world.add(sarc, Position, { x: 5, y: 5 });
+
+  const events = [];
+  world.on('sarcophagus:opened', (e) => events.push(e));
+
+  world.add(actor, InteractIntent, { targetId: sarc });
+  interactionSystem(world);
+
+  assert(events.length === 1, 'should emit sarcophagus:opened');
+  assert(events[0].targetId === sarc, 'event should reference the sarcophagus');
+
+  let skeletonFound = false;
+  for (const [, ni] of world.query(NamedIdentity)) {
+    if (ni.identity === 'skeleton') { skeletonFound = true; break; }
+  }
+  assert(skeletonFound, 'a skeleton should be spawned');
+});
+
+Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
+  const world = new World({ seed: 43 });
+
+  const actor = world.create();
+  const sarc = world.create();
+  world.add(sarc, Interactable, { action: 'openSarcophagus', params: null });
+  world.add(sarc, Position, { x: 3, y: 3 });
+
+  world.add(actor, InteractIntent, { targetId: sarc });
+  interactionSystem(world);
+
+  assert(!world.has(sarc, Interactable), 'sarcophagus should lose Interactable after opening');
+
+  // Second interaction should be a no-op (no Interactable component).
+  const events = [];
+  world.on('sarcophagus:opened', (e) => events.push(e));
+  world.add(actor, InteractIntent, { targetId: sarc });
+  interactionSystem(world);
+
+  assert(events.length === 0, 'second interaction should do nothing');
+});
+
+// ── Altar — two-phase offering ────────────────────────────────────────────────
+
+Deno.test("altar: phase 1 emits offer prompt with inventory items", () => {
+  const world = new World({ seed: 50 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: 'prayAltar', params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  // Put an item in inventory.
+  const itemId = world.create();
+  world.add(itemId, ItemInfo, {
+    type: 'potion', slot: 'bag', weight: 1, value: 50,
+    description: 'test', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
+  });
+  world.get(actor, Inventory).items.push(itemId);
+
+  const prompts = [];
+  world.on('altar:offerPrompt', (e) => prompts.push(e));
+
+  world.add(actor, InteractIntent, { targetId: altar });
+  interactionSystem(world);
+
+  assert(prompts.length === 1, 'should emit altar:offerPrompt');
+  assert(prompts[0].items.includes(itemId), 'prompt should include the offerable item');
+});
+
+Deno.test("altar: phase 2 consumes item and emits altar:offered", () => {
+  const world = new World({ seed: 51 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: 'prayAltar', params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const itemId = world.create();
+  world.add(itemId, ItemInfo, {
+    type: 'potion', slot: 'bag', weight: 1, value: 50,
+    description: 'test', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
+  });
+  world.get(actor, Inventory).items.push(itemId);
+
+  const offered = [];
+  world.on('altar:offered', (e) => offered.push(e));
+
+  // Phase 2: offer the selected item.
+  world.add(actor, InteractIntent, { targetId: altar, mode: 'offer', itemId });
+  interactionSystem(world);
+
+  assert(offered.length === 1, 'should emit altar:offered');
+  assert(offered[0].itemValue === 50, 'should report the item value');
+  const inv = world.get(actor, Inventory);
+  assert(!inv.items.includes(itemId), 'offered item should be removed from inventory');
+});
+
+Deno.test("altar: offer fails gracefully when item is not in inventory", () => {
+  const world = new World({ seed: 52 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: 'prayAltar', params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const failures = [];
+  world.on('altar:offerFailed', (e) => failures.push(e));
+
+  // Try to offer an item that isn't in inventory.
+  world.add(actor, InteractIntent, { targetId: altar, mode: 'offer', itemId: 9999 });
+  interactionSystem(world);
+
+  assert(failures.length === 1, 'should emit altar:offerFailed');
+  assert(failures[0].reason === 'not_owned', 'should explain the failure reason');
 });
