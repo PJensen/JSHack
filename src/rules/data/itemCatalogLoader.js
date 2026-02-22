@@ -32,6 +32,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     description: def.description || def.desc || def.name || "",
     count,
     bonuses: def.bonuses || {},
+    twoHanded: def.twoHanded || false,
     rarity: def.rarity || 1,
     rarityName: def.rarityName || "common",
     affixes: Array.isArray(opts.affixes) ? opts.affixes.slice() : [],

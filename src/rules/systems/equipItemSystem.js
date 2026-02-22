@@ -79,6 +79,11 @@ export function equipItemSystem(world) {
     if (slot === 'weapon') {
       if (Number.isInteger(eq.weapon) && eq.weapon > 0) pushToInventory(eq.weapon);
       eq.weapon = itemId; appliedSlot = 'weapon';
+      // two-handers occupy both hands — kick out any equipped shield
+      if (info.twoHanded && Number.isInteger(eq.shield) && eq.shield > 0) {
+        pushToInventory(eq.shield);
+        eq.shield = null;
+      }
     } else if (slot === 'armor') {
       if (Number.isInteger(eq.armor) && eq.armor > 0) pushToInventory(eq.armor);
       eq.armor = itemId; appliedSlot = 'armor';
@@ -93,6 +98,14 @@ export function equipItemSystem(world) {
         eq.ring1 = itemId; appliedSlot = 'ring1';
       }
     } else if (slot === 'shield') {
+      // can't equip a shield while wielding a two-handed weapon — kick it out first
+      if (Number.isInteger(eq.weapon) && eq.weapon > 0) {
+        const weaponInfo = world.get(eq.weapon, ItemInfo);
+        if (weaponInfo?.twoHanded) {
+          pushToInventory(eq.weapon);
+          eq.weapon = null;
+        }
+      }
       if (Number.isInteger(eq.shield) && eq.shield > 0) pushToInventory(eq.shield);
       eq.shield = itemId; appliedSlot = 'shield';
     } else if (slot === 'ammo' || info.type === 'ammo') {

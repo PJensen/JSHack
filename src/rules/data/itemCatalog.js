@@ -344,6 +344,36 @@ const MAPPING_ON_USE = createMappingOnUseHook();
 
 export const ITEM_CATALOG = {
   // Equipment
+  staff_oak: {
+    id: "staff_oak",
+    catalogKind: "equipment",
+    name: "Oak Staff",
+    type: "equip",
+    slot: "weapon",
+    twoHanded: true,
+    material: "wood",
+    rarity: 1,
+    rarityName: "common",
+    bonuses: { attack: 1, manaRegen: 0.05 },
+    damageDice: "1d6",
+    staminaCost: 7,
+    description: "A sturdy staff of ancient oak. Channels natural energies.",
+  },
+  longsword: {
+    id: "longsword",
+    catalogKind: "equipment",
+    name: "Longsword",
+    type: "equip",
+    slot: "weapon",
+    twoHanded: true,
+    material: "steel",
+    rarity: 1,
+    rarityName: "common",
+    bonuses: { attack: 3 },
+    damageDice: "1d8",
+    staminaCost: 12,
+    description: "A long steel blade wielded with both hands.",
+  },
   sword_plain: {
     id: "sword_plain",
     catalogKind: "equipment",

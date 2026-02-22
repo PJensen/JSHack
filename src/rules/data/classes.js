@@ -17,7 +17,7 @@ export const CLASS_DEFS = {
       visionRange: 12,
     },
     equipment: {
-      weapon: 'iron_pickaxe',
+      weapon: 'staff_oak',
       armor: null,
       shield: null,
     },
