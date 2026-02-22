@@ -126,6 +126,22 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  // ── Weapon racks ───────────────────────────────────────────────────────────
+
+  browseRack: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const inv = world.get(targetId, Inventory);
+      if (inv) {
+        world.emit?.("rack:browse", {
+          actor,
+          targetId,
+          rackItems: [...(inv.items || [])],
+        });
+      }
+    },
+  },
+
   // ── Crafting ───────────────────────────────────────────────────────────────
 
   brewAlchemy: {

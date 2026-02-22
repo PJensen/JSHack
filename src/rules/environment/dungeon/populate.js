@@ -102,7 +102,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const featureKind = pickRoomFeature(rng);
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
-      spawns.push({ x: cx, y: cy, kind: featureKind, params: {} });
+      spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
     }
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
@@ -540,8 +540,25 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, Sarcophagus, { x: spawn.x, y: spawn.y });
     case 'pillar':
       return createFrom(world, Pillar, { x: spawn.x, y: spawn.y });
-    case 'weapon_rack':
-      return createFrom(world, WeaponRack, { x: spawn.x, y: spawn.y });
+    case 'weapon_rack': {
+      const id = createFrom(world, WeaponRack, { x: spawn.x, y: spawn.y });
+      const d = /** @type {any} */ (spawn.params)?.depth || 1;
+      const tableId = d >= 8 ? 'rack:weapons:magic' : 'rack:weapons';
+      const rackSeed = ((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0xBAC5) >>> 0;
+      const rackRng = createRng(rackSeed);
+      const drops = resolveLootTable(tableId, rackRng, d);
+      const inv = /** @type {any} */ (world.get(id, Inventory));
+      if (inv) {
+        for (const drop of drops) {
+          const eid = materializeDrop(world, drop, { x: spawn.x, y: spawn.y });
+          if (eid != null) {
+            try { world.remove(eid, Position); } catch {}
+            addItemEntityToInventory(world, inv, eid, { removePosition: false });
+          }
+        }
+      }
+      return id;
+    }
     case 'mushrooms':
       return createFrom(world, Mushrooms, { x: spawn.x, y: spawn.y });
     default:
