@@ -33,6 +33,9 @@ export {
   OreVeinCoal,
   OreVeinStone,
   AlchemyBench,
+  Anvil,
+  Furnace,
+  CookingFire,
 } from './Overworld.js';
 export {
   Fountain,

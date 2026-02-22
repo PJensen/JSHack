@@ -27,6 +27,9 @@ import {
   OreVeinCoal,
   OreVeinStone,
   AlchemyBench,
+  Anvil,
+  Furnace,
+  CookingFire,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
@@ -503,6 +506,12 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, OreVeinStone, { x: spawn.x, y: spawn.y });
     case 'alchemy_bench':
       return createFrom(world, AlchemyBench, { x: spawn.x, y: spawn.y });
+    case 'anvil':
+      return createFrom(world, Anvil, { x: spawn.x, y: spawn.y });
+    case 'furnace':
+      return createFrom(world, Furnace, { x: spawn.x, y: spawn.y });
+    case 'cooking_fire':
+      return createFrom(world, CookingFire, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);

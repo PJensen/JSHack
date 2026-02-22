@@ -297,7 +297,13 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, homeX - 2, homeY, "home_bed");
   addSpawn(chunks, homeX + 2, homeY, "home_chest");
   addSpawn(chunks, homeX, homeY - 1, "alchemy_bench");
+  addSpawn(chunks, homeX + 3, homeY + 1, "furnace");
   addSpawn(chunks, homeX - 3, doorY + 2, "home_sign");
+  // Outside crafting & fire
+  setWorldTile(chunks, homeX + 10, homeY + 5, TILE_GRASS);
+  addSpawn(chunks, homeX + 10, homeY + 5, "anvil");
+  setWorldTile(chunks, homeX - 6, homeY + 7, TILE_GRASS);
+  addSpawn(chunks, homeX - 6, homeY + 7, "cooking_fire");
 
   // Harvest nodes around the clearing
   const berrySpots = [
