@@ -1708,6 +1708,7 @@ const _blessedEmitters = new Set();
 const _fountainEmitters = new Set();
 const _furnaceEmitters  = new Set();
 const _cookFireEmitters = new Set();
+const _torchEmitters    = new Set();
 
 // Static emitter config tables — built once at module init, used every frame.
 // Replaces repeated reconcileStatusEmitter() calls with a single entity pass.
@@ -1727,6 +1728,7 @@ const _KIND_EMITTER_CFG = {
   fountain:     { tracker: _fountainEmitters, prefix: 'fountain', cfg: { continuous: true, rate: 16, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 1.4,  speedJitter: 0.5, ax: 0, ay:  2.5,  life: 1.2,  lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08, color: '#66ccff', alpha0: 0.7,  alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
   furnace:      { tracker: _furnaceEmitters,  prefix: 'furnace',  cfg: { continuous: true, rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.9,  speedJitter: 0.3, ax: 0, ay: -0.1,  life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04, color: '#ff6600', alpha0: 0.88, alpha1: 0.0, offsetX: 0, offsetY:  0.1 } },
   cooking_fire: { tracker: _cookFireEmitters, prefix: 'cfire',    cfg: { continuous: true, rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05, life: 0.9,  lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04, color: '#ff8800', alpha0: 0.75, alpha1: 0.0, offsetX: 0, offsetY:  0   } },
+  torch:        { tracker: _torchEmitters,    prefix: 'torch',    cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5,  speedJitter: 0.4, ax: 0, ay: -0.3,  life: 0.6,  lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: '#ffaa33', alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.1 } },
 };
 // Reusable set for tracking which emitter keys are active in the current frame
 const _seenEmitterKeys = new Set();
