@@ -55,7 +55,7 @@ export const Sarcophagus = defineArchetype(
   [NamedIdentity, { name: "Sarcophagus", identity: "sarcophagus" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
-  [Interactable, { action: "openSarcophagus", params: null }],
+  [Interactable, (/** @type {any} */ p) => ({ action: "openSarcophagus", params: { depth: p.depth || 1 } })],
 );
 
 export const Pillar = defineArchetype(

@@ -537,7 +537,7 @@ export function materializeSpawn(world, spawn) {
     case 'statue':
       return createFrom(world, Statue, { x: spawn.x, y: spawn.y });
     case 'sarcophagus':
-      return createFrom(world, Sarcophagus, { x: spawn.x, y: spawn.y });
+      return createFrom(world, Sarcophagus, { x: spawn.x, y: spawn.y, depth: /** @type {any} */ (spawn.params)?.depth || 1 });
     case 'pillar':
       return createFrom(world, Pillar, { x: spawn.x, y: spawn.y });
     case 'weapon_rack': {
