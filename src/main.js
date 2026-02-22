@@ -40,6 +40,7 @@ import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
 import { installMessageWiring } from "./main/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
+import { installRackWiring } from "./main/wiring/rackWiring.js";
 import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installFloatTextWiring } from "./main/wiring/floatTextWiring.js";
@@ -1348,6 +1349,7 @@ addEventListener('ui:requestStairTraverse', (ev) => {
 
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
+installRackWiring({ world, log: (msg) => messageLog.log({ text: msg, type: 'system' }) });
 installAlchemyWiring({
   world,
   playerEntity,
@@ -1416,6 +1418,16 @@ world.on('moved', ({ id, to }) => {
     const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
     if (dist === 1) {
       log('A shopkeeper is nearby. Bump to trade.');
+      break;
+    }
+  }
+
+  // Check for adjacent weapon rack
+  for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (ni.identity !== 'weapon_rack') continue;
+    const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
+    if (dist === 1) {
+      log('A weapon rack is here. Bump to browse.');
       break;
     }
   }

@@ -71,7 +71,7 @@ export const WeaponRack = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Weapon Rack", identity: "weapon_rack" }],
   [Material, { kind: "iron" }],
-  [Collider, { solid: false, blocksSight: false }],
+  [Collider, { solid: true, blocksSight: false }],
   [Inventory, { items: [], capacity: 6, weightLimit: null }],
   [Interactable, { action: "browseRack", params: null }],
 );

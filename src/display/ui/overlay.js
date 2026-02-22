@@ -54,6 +54,7 @@ export function initOverlays() {
   const alchemy = ensurePanel('alchemy');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
+  const rack = ensurePanel('rack');
   const groundTip = ensureGroundTooltip(root);
   const stairTip = ensureStairTooltip(root);
   const tombstoneTip = ensureTombstoneTooltip(root);
@@ -110,6 +111,7 @@ export function initOverlays() {
       hide(alchemy);
       hide(shop);
       hide(chest);
+      hide(rack);
       hide(applyPanel);
       hide(deathLog);
       hide(bookReader);
@@ -297,6 +299,22 @@ export function initOverlays() {
     const e = ev;
     const d = e?.detail || {};
     renderChest(chest, d, _chestState);
+  });
+
+  // Rack overlay
+  let _rackState = { rackId: 0 };
+  window.addEventListener('ui:openRack', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _rackState.rackId = d.rackId || 0;
+    show(rack);
+  });
+  window.addEventListener('ui:rackData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderRack(rack, d, _rackState);
   });
 
   // Ground item tooltip lifecycle
@@ -2956,4 +2974,110 @@ function renderDeathScreen(panel, detail) {
     window.addEventListener('keydown', onKey, { once: true });
     panel.addEventListener('pointerdown', onTap);
   }, 600);
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{rackId:number}} state */
+function renderRack(panel, data, state) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+
+  const rackItems = /** @type {any[]} */ ((/** @type {any} */ (data))?.rackItems || []);
+
+  // Header
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' });
+  const title = document.createElement('div');
+  title.textContent = 'Weapon Rack';
+  title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
+  header.appendChild(title);
+  el.appendChild(header);
+
+  const listContainer = document.createElement('div');
+  listContainer.style.maxHeight = '50vh'; listContainer.style.overflow = 'auto';
+  el.appendChild(listContainer);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
+  el.appendChild(hint);
+
+  if (!rackItems.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(rack is empty)';
+    listContainer.appendChild(empty);
+    hint.textContent = 'Esc=Close';
+    return;
+  }
+
+  let sel = 0;
+  const rows = rackItems.map((it, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      width: '100%', padding: '6px 8px',
+      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer', marginBottom: '4px',
+    });
+
+    const name = document.createElement('span');
+    const rn = String(it.rarityName || 'common').toLowerCase();
+    const rs = rarityStyle(rn);
+    name.textContent = bracketize(sanitize(it.name || 'item'));
+    Object.assign(name.style, rs);
+    row.appendChild(name);
+
+    if ((it.count || 1) > 1) {
+      const qty = document.createElement('span');
+      qty.style.opacity = '0.7'; qty.textContent = `x${it.count}`;
+      row.appendChild(qty);
+    }
+
+    if (it.slot) {
+      const slotBadge = document.createElement('span');
+      slotBadge.textContent = it.slot;
+      Object.assign(slotBadge.style, { marginLeft: 'auto', opacity: '0.5', fontSize: '11px' });
+      row.appendChild(slotBadge);
+    }
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => doTake());
+    listContainer.appendChild(row);
+    return row;
+  });
+
+  function setSel(/** @type {number} */ i) {
+    sel = Math.max(0, Math.min(rackItems.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+
+  setSel(0);
+  hint.textContent = '↑/↓ select · Enter=Take · Esc=Close';
+
+  function doTake() {
+    const it = rackItems[sel]; if (!it) return;
+    const rackId = Number(state.rackId || 0) | 0;
+    const itemId = Number(it.id || 0) | 0;
+    if (!(rackId > 0) || !(itemId > 0)) return;
+    window.dispatchEvent(new CustomEvent('ui:requestRackTake', { detail: { rackId, itemId } }));
+  }
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Enter') { doTake(); e.preventDefault(); }
+  }
+
+  window.addEventListener('keydown', onKey);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', onKey);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
