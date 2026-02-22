@@ -284,6 +284,36 @@ export const LOOT_TABLES = {
       { type: "gem",       weight: 5,  materials: ["gemstone", "glass"] },
     ],
   },
+
+  // ── Weapon rack tables ────────────────────────────────────────────
+  // 1-3 items; "nothing" entries model empty slots on the rack.
+
+  "rack:weapons": {
+    rolls: { min: 1, max: 3 },
+    entries: [
+      { type: "nothing", weight: 20 },
+      { type: "equip",   weight: 25, pool: ["sword_plain"],   affixChance: 0 },
+      { type: "equip",   weight: 25, pool: ["dagger_quick"],  affixChance: 0 },
+      { type: "equip",   weight: 20, pool: ["axe_heavy"],     affixChance: 0 },
+      { type: "equip",   weight: 20, pool: ["bow_short"],     affixChance: 0 },
+      { type: "equip",   weight: 18, pool: ["iron_mace"],     affixChance: 0 },
+      { type: "equip",   weight: 15, pool: ["longsword"],     affixChance: 0 },
+      { type: "equip",   weight: 10, pool: ["iron_pickaxe"],  affixChance: 0 },
+    ],
+  },
+
+  "rack:weapons:magic": {
+    rolls: { min: 1, max: 3 },
+    entries: [
+      { type: "nothing", weight: 15 },
+      { type: "equip",   weight: 22, pool: ["longsword"],          affixChance: 0.40, affixCountMax: 1 },
+      { type: "equip",   weight: 20, pool: ["axe_heavy"],          affixChance: 0.30, affixCountMax: 1 },
+      { type: "equip",   weight: 18, pool: ["warhammer"],          affixChance: 0.35, affixCountMax: 1 },
+      { type: "equip",   weight: 16, pool: ["venomfang_dagger"],   affixChance: 0.30, affixCountMax: 1 },
+      { type: "equip",   weight: 14, pool: ["caustic_stiletto"],   affixChance: 0 },
+      { type: "equip",   weight: 12, pool: ["stormtouched_mace"],  affixChance: 0 },
+    ],
+  },
 };
 
-export function getTable(id) { return LOOT_TABLES[id] || null; }
+export function getTable(id) { return /** @type {any} */ (LOOT_TABLES)[id] || null; }

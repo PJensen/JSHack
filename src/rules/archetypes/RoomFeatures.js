@@ -7,6 +7,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Interactable } from "../components/Interactable.js";
 import { Collider } from "../components/Collider.js";
 import { Material } from "../components/Material.js";
+import { Inventory } from "../components/Inventory.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 
 // --- Interactive features ---
@@ -71,6 +72,8 @@ export const WeaponRack = defineArchetype(
   [NamedIdentity, { name: "Weapon Rack", identity: "weapon_rack" }],
   [Material, { kind: "iron" }],
   [Collider, { solid: false, blocksSight: false }],
+  [Inventory, { items: [], capacity: 6, weightLimit: null }],
+  [Interactable, { action: "browseRack", params: null }],
 );
 
 export const Mushrooms = defineArchetype(
@@ -79,6 +82,9 @@ export const Mushrooms = defineArchetype(
   [NamedIdentity, { name: "Mushrooms", identity: "mushrooms" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "mushrooms", ready: true, regrowTurns: 280, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "mushrooms" } }],
+  [HarvestNode, {
+    kind: "mushrooms", ready: true, regrowTurns: 280, regrowCountdown: 0,
+    yield: "food_mushrooms", yieldMin: 1, yieldMax: 3,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
