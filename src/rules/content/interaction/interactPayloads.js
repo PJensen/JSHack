@@ -459,23 +459,39 @@ export const INTERACT_PAYLOADS = {
 
   openSarcophagus: {
     onInteract(ctx) {
-      const { world, actor, targetId } = ctx;
+      const { world, actor, targetId, params } = ctx;
       const pos = world.get(targetId, Position);
-      if (pos) {
+      if (!pos) return;
+
+      const depth = ((params?.depth) | 0) || 1;
+
+      // Scale the undead guardian by depth tier.
+      let name, identity, maxHp, attackDerived, defenseDerived, naturalDamageDice, count;
+      if (depth >= 13) {
+        name = "Skeleton Lord";     identity = "skeleton_lord";
+        maxHp = 50; attackDerived = 20; defenseDerived = 12; naturalDamageDice = "2d8"; count = 2;
+      } else if (depth >= 9) {
+        name = "Skeleton Champion"; identity = "skeleton_champion";
+        maxHp = 35; attackDerived = 14; defenseDerived = 8;  naturalDamageDice = "2d6"; count = 2;
+      } else if (depth >= 5) {
+        name = "Skeleton Warrior";  identity = "skeleton_warrior";
+        maxHp = 20; attackDerived = 8;  defenseDerived = 4;  naturalDamageDice = "1d8"; count = 1;
+      } else {
+        name = "Skeleton";          identity = "skeleton";
+        maxHp = 12; attackDerived = 4;  defenseDerived = 2;  naturalDamageDice = "1d6"; count = 1;
+      }
+
+      for (let i = 0; i < count; i++) {
+        // Scatter multi-spawns so they don't stack on the same tile.
+        const ox = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1);
         createFrom(world, Monster, {
-          x: pos.x,
-          y: pos.y,
-          name: "Skeleton",
-          identity: "skeleton",
-          faction: "enemy",
-          maxHp: 12,
-          attackDerived: 4,
-          defenseDerived: 2,
-          naturalDamageDice: "1d6",
-          speed: 1,
+          x: pos.x + ox, y: pos.y,
+          name, identity, faction: "enemy",
+          maxHp, attackDerived, defenseDerived, naturalDamageDice, speed: 1,
         });
       }
-      world.emit?.("sarcophagus:opened", { actor, targetId });
+
+      world.emit?.("sarcophagus:opened", { actor, targetId, depth, spawned: count });
     },
     afterInteract(ctx) {
       // One-time use — the sarcophagus can never be disturbed again.
