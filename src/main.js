@@ -2257,7 +2257,7 @@ function frame(now) {
             continuous: true,
             rate: 16, angle: -Math.PI / 2, spread: Math.PI / 3,
             speed: 1.4, speedJitter: 0.5, ax: 0, ay: 2.5,
-            life: 0.7, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08,
+            life: 1.2, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08,
             color: '#66ccff', alpha0: 0.7, alpha1: 0.0,
             offsetX: 0, offsetY: -0.3,
           });
