@@ -354,6 +354,22 @@ export function generateOverworldChunks(worldSeed) {
         || t === TILE_TREE;
   }
 
+  // Spiral search from (hintX, hintY) for the nearest mountain tile within maxR.
+  function findMountainSpot(/** @type {number} */ hintX, /** @type {number} */ hintY, /** @type {number} */ maxR) {
+    for (let r = 0; r <= maxR; r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue; // perimeter only
+          const t = getWorldTile(chunks, hintX + dx, hintY + dy);
+          if (t === TILE_MOUNTAIN || t === TILE_MOUNTAIN_B || t === TILE_MOUNTAIN_C) {
+            return { x: hintX + dx, y: hintY + dy };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   for (const p of berrySpots) {
     if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_berries");
@@ -388,16 +404,22 @@ export function generateOverworldChunks(worldSeed) {
   ];
 
   for (const p of ironSpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_iron_ore");
+    const m = findMountainSpot(p.x, p.y, 14);
+    const pos = m ?? p;
+    setWorldTile(chunks, pos.x, pos.y, TILE_GRASS);
+    addSpawn(chunks, pos.x, pos.y, "harvest_iron_ore");
   }
   for (const p of coalSpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_coal_ore");
+    const m = findMountainSpot(p.x, p.y, 14);
+    const pos = m ?? p;
+    setWorldTile(chunks, pos.x, pos.y, TILE_GRASS);
+    addSpawn(chunks, pos.x, pos.y, "harvest_coal_ore");
   }
   for (const p of stoneSpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_stone");
+    const m = findMountainSpot(p.x, p.y, 14);
+    const pos = m ?? p;
+    setWorldTile(chunks, pos.x, pos.y, TILE_GRASS);
+    addSpawn(chunks, pos.x, pos.y, "harvest_stone");
   }
 
   const outChunks = [];

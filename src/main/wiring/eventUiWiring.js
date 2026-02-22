@@ -126,16 +126,18 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
     if (!pe || pe.id !== actor) return;
     const qty = Math.max(1, Number(count || 1) | 0);
     const k = String(kind || '').toLowerCase();
-    const labels = (
-      k === 'herbs'
-        ? { one: 'herb', many: 'herbs' }
-        : (k === 'thorn_bramble'
-          ? { one: 'thorn pod', many: 'thorn pods' }
-          : (k === 'venom_fern'
-            ? { one: 'venom frond', many: 'venom fronds' }
-            : { one: 'berry', many: 'berries' }))
-    );
-    const label = qty === 1 ? labels.one : labels.many;
-    try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: '#b6e38d', life: 1.0 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
+    const LABELS = /** @type {Record<string,{one:string,many:string,color:string}>} */ ({
+      berries:       { one: 'berry',        many: 'berries',      color: '#b6e38d' },
+      herbs:         { one: 'herb',         many: 'herbs',        color: '#b6e38d' },
+      thorn_bramble: { one: 'thorn pod',    many: 'thorn pods',   color: '#b6e38d' },
+      venom_fern:    { one: 'venom frond',  many: 'venom fronds', color: '#b6e38d' },
+      mushrooms:     { one: 'mushroom',     many: 'mushrooms',    color: '#b6e38d' },
+      iron_ore:      { one: 'iron ore',     many: 'iron ore',     color: '#c07850' },
+      coal_ore:      { one: 'coal',         many: 'coal',         color: '#909090' },
+      stone:         { one: 'stone chip',   many: 'stone chips',  color: '#a0a8b0' },
+    });
+    const entry = LABELS[k] ?? { one: k, many: k, color: '#b6e38d' };
+    const label = qty === 1 ? entry.one : entry.many;
+    try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: entry.color, life: 1.0 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
   });
 }
