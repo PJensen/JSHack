@@ -2255,11 +2255,11 @@ function frame(now) {
         if (!_fountainEmitters.has(e.id)) {
           fx.ensureEmitter(`fountain:${e.id}`, {
             continuous: true,
-            rate: 14, angle: -Math.PI / 2, spread: Math.PI / 12,
-            speed: 0.9, speedJitter: 0.35, ax: 0, ay: -0.45,
-            life: 0.85, lifeJitter: 0.25, size: 0.5, sizeEnd: 0.15,
-            color: '#66ccff', alpha0: 0.75, alpha1: 0.0,
-            offsetX: 0, offsetY: -0.5,
+            rate: 16, angle: -Math.PI / 2, spread: Math.PI / 3,
+            speed: 1.4, speedJitter: 0.5, ax: 0, ay: 2.5,
+            life: 0.7, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08,
+            color: '#66ccff', alpha0: 0.7, alpha1: 0.0,
+            offsetX: 0, offsetY: -0.3,
           });
           _fountainEmitters.add(e.id);
         }
