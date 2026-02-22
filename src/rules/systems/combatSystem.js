@@ -21,6 +21,7 @@ import { runScript, ScriptVerb } from '../scripting.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
+import { hasEffect } from '../utils/statusFacade.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 

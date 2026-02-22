@@ -111,12 +111,15 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
 
       // Sacred rooms (altar or shrine) get a torch in each corner when the room
       // is large enough to have four obvious, distinct inner corner tiles.
+      // Sacred rooms (altar or shrine) get a torch in each floor corner when the
+      // room is large enough to have four obvious, distinct corner tiles.
+      // room.x/y is the first floor tile; walls are carved outside at x-1, y-1.
       const isSacred = featureKind === 'altar' || featureKind === 'shrine';
       if (isSacred && room.w >= 4 && room.h >= 4) {
-        spawns.push({ x: room.x + 1,             y: room.y + 1,             kind: 'torch', params: {} });
-        spawns.push({ x: room.x + room.w - 2,    y: room.y + 1,             kind: 'torch', params: {} });
-        spawns.push({ x: room.x + 1,             y: room.y + room.h - 2,    kind: 'torch', params: {} });
-        spawns.push({ x: room.x + room.w - 2,    y: room.y + room.h - 2,    kind: 'torch', params: {} });
+        spawns.push({ x: room.x,             y: room.y,             kind: 'torch', params: {} });
+        spawns.push({ x: room.x + room.w - 1, y: room.y,             kind: 'torch', params: {} });
+        spawns.push({ x: room.x,             y: room.y + room.h - 1, kind: 'torch', params: {} });
+        spawns.push({ x: room.x + room.w - 1, y: room.y + room.h - 1, kind: 'torch', params: {} });
       }
     }
 

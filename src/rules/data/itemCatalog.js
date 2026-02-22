@@ -1308,6 +1308,12 @@ export const ITEM_CATALOG = {
           potency: 1,
           stacks: 1,
         });
+        ctx.mutate.pushEffect(actor, {
+          key: "berserk",
+          turnsLeft: 30,
+          potency: 1,
+          stacks: 1,
+        });
         ctx.io.emit("mushroom:hallucinate", { actor });
         return result;
       },
