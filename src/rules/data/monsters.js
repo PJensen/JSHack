@@ -24,7 +24,7 @@ export const MONSTERS = [
     id: 'rat',
     name: 'Rat',
     tier: 0,
-    glyph: '🐀',
+    glyph: 'r', // 🐀
     fg: '#b89070',
     glow: '#a06030',
     baseHp: 5,
@@ -67,7 +67,7 @@ export const MONSTERS = [
     id: 'bat',
     name: 'Bat',
     tier: 0,
-    glyph: '🦇',
+    glyph: 'b', // 🦇
     fg: '#9080b0',
     glow: '#605080',
     baseHp: 3,
@@ -156,7 +156,7 @@ export const MONSTERS = [
     id: 'skeleton',
     name: 'Skeleton',
     tier: 1,
-    glyph: '💀',
+    glyph: 's', // 💀
     fg: '#ddd8c8',
     glow: '#aaa590',
     baseHp: 12,
@@ -180,7 +180,7 @@ export const MONSTERS = [
     id: 'spider',
     name: 'Spider',
     tier: 1,
-    glyph: '🕷',
+    glyph: 'x', // 🕷
     fg: '#55bb55',
     glow: '#338833',
     baseHp: 10,
