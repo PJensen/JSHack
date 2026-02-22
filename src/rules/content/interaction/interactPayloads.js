@@ -131,14 +131,32 @@ export const INTERACT_PAYLOADS = {
   browseRack: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
-      const inv = world.get(targetId, Inventory);
-      if (inv) {
-        world.emit?.("rack:browse", {
-          actor,
-          targetId,
-          rackItems: [...(inv.items || [])],
-        });
+      const rackInv = /** @type {any} */ (world.get(targetId, Inventory));
+      const rackPos = world.get(targetId, Position);
+      if (!rackInv || !rackPos) return;
+
+      if (!rackInv.items || rackInv.items.length === 0) {
+        world.emit?.("rack:empty", { actor, targetId });
+        return;
       }
+
+      const actorPos = world.get(actor, Position);
+      const dropPos = actorPos ?? rackPos;
+
+      // Pull one weapon off the rack and fling it at the player.
+      const itemId = rackInv.items.shift();
+      world.add(itemId, Position, { x: dropPos.x, y: dropPos.y });
+      world.emit?.("item:thrown", {
+        itemId,
+        from: { x: rackPos.x, y: rackPos.y },
+        to:   { x: dropPos.x, y: dropPos.y },
+      });
+
+      // Rack is now passable — player can walk through it.
+      const col = world.get(targetId, Collider);
+      if (col) world.set(targetId, Collider, { solid: false, blocksSight: col.blocksSight });
+
+      world.emit?.("rack:looted", { actor, targetId, count: 1 });
     },
   },
 
