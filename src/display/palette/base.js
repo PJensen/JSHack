@@ -3,7 +3,11 @@
 
 export const basePalette = {
   // Actors
-  player: { glyph: "@", fg: "#e8f7ff", glow: "#6cf" },
+  player:         { glyph: "@", fg: "#e8f7ff", glow: "#6cf" },
+  player_druid:   { glyph: "@", fg: "#7ecc5a", glow: "#4a9030" },
+  player_warden:  { glyph: "@", fg: "#e85050", glow: "#a03030" },
+  player_outlaw:  { glyph: "@", fg: "#d4a0ff", glow: "#9060cc" },
+  player_cleric:  { glyph: "@", fg: "#ffe066", glow: "#cca830" },
   monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },  // fallback
   // Tier 0
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" },
