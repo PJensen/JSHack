@@ -1,0 +1,486 @@
+// src/rules/content/interaction/interactPayloads.js
+//
+// All interactable hook payloads, keyed by Interactable.action string.
+//
+// Each payload may define:
+//   beforeInteract(ctx)  — gates and pre-checks; call ctx.cancel() to abort
+//   onInteract(ctx)      — main interaction logic
+//   afterInteract(ctx)   — cleanup, state changes, and event emission
+//
+// ctx shape: see interactRunner.js
+//
+// This file is the single authoritative registry of what every interactable
+// thing in the world does. Adding a new interaction = adding a new key here.
+
+import { DoorState } from "../../components/DoorState.js";
+import { Collider } from "../../components/Collider.js";
+import { Inventory } from "../../components/Inventory.js";
+import { Vitality } from "../../components/Vitality.js";
+import { Mana } from "../../components/Mana.js";
+import { Stamina } from "../../components/Stamina.js";
+import { ShopInventory } from "../../components/ShopInventory.js";
+import { HarvestNode } from "../../components/HarvestNode.js";
+import { Equipment } from "../../components/Equipment.js";
+import { Position } from "../../components/Position.js";
+import { ItemInfo } from "../../components/ItemInfo.js";
+import { Interactable } from "../../components/Interactable.js";
+import TombstoneComponent from "../../components/Tombstone.js";
+import { createFrom } from "../../../lib/ecs-js/archetype.js";
+import {
+  WildBerries, WildHerbs, ThornPods, VenomFronds,
+  DungeonMushrooms, IronOre, CoalOre, StoneChip,
+} from "../../archetypes/Food.js";
+import { Monster } from "../../archetypes/Creatures.js";
+import { combatSeed, mulberry32 } from "../../utils/rng.js";
+import { spawnHazard } from "../../utils/hazardSpawn.js";
+import { dealDamage } from "../../utils/dealDamage.js";
+import { getCatalogItem } from "../../data/itemCatalog.js";
+import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
+
+// Maps catalog item IDs → archetypes for harvest yield entity creation.
+const CATALOG_ARCHETYPES = {
+  "food_wild_berries":   WildBerries,
+  "food_wild_herbs":     WildHerbs,
+  "food_mushrooms":      DungeonMushrooms,
+  "reagent_thorn_pod":   ThornPods,
+  "reagent_venom_frond": VenomFronds,
+  "ore_iron":            IronOre,
+  "ore_coal":            CoalOre,
+  "ore_stone":           StoneChip,
+};
+
+const HARVEST_SEED_SALT = 0x48415256;
+
+// ─── Payload definitions ──────────────────────────────────────────────────────
+
+export const INTERACT_PAYLOADS = {
+
+  // ── Doors ──────────────────────────────────────────────────────────────────
+
+  toggleDoor: {
+    beforeInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const ds = world.get(targetId, DoorState);
+      if (ds?.locked) {
+        world.emit?.("interaction", { actor, targetId, action: "toggleDoor", result: "locked" });
+        ctx.cancel("LOCKED", "The door is locked.");
+      }
+    },
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const ds = world.get(targetId, DoorState);
+      const nowOpen = !(ds?.open);
+      if (ds) world.set(targetId, DoorState, { open: nowOpen });
+      const col = world.get(targetId, Collider);
+      if (col) world.set(targetId, Collider, { solid: !nowOpen, blocksSight: !nowOpen });
+      world.emit?.("interaction", {
+        actor, targetId,
+        action: "toggleDoor",
+        result: nowOpen ? "opened" : "closed",
+      });
+    },
+  },
+
+  // ── Chests / containers ────────────────────────────────────────────────────
+
+  openChest: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const inv = world.get(targetId, Inventory);
+      if (inv) {
+        world.emit?.("chest:open", {
+          actor,
+          targetId,
+          chestItems: [...(inv.items || [])],
+        });
+      }
+    },
+  },
+
+  // ── Signs & text ───────────────────────────────────────────────────────────
+
+  readText: {
+    onInteract(ctx) {
+      const { world, actor, targetId, params } = ctx;
+      world.emit?.("interaction", { actor, targetId, action: "readText", textId: params?.textId });
+    },
+  },
+
+  readTombstone: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const tombstone = world.get(targetId, TombstoneComponent);
+      if (tombstone) {
+        world.emit?.("interaction", {
+          actor, targetId,
+          action: "readTombstone",
+          epitaph: tombstone.epitaph,
+          tombstoneData: {
+            playerName: tombstone.playerName,
+            depth: tombstone.depth,
+            cause: tombstone.cause,
+            killerName: tombstone.killerName,
+          },
+        });
+      }
+    },
+  },
+
+  // ── Crafting ───────────────────────────────────────────────────────────────
+
+  brewAlchemy: {
+    onInteract(ctx) {
+      const { world, actor, targetId, intent } = ctx;
+      const interactionMode = String(intent?.mode || "").toLowerCase();
+      const requestedRecipe = String(intent?.recipe || "").toLowerCase();
+      if (interactionMode !== "brew" || !requestedRecipe) {
+        emitAlchemyBenchOpen(world, actor, targetId);
+        return;
+      }
+      brewAtAlchemyBench(world, actor, targetId, requestedRecipe);
+    },
+  },
+
+  // ── Rest & recovery ────────────────────────────────────────────────────────
+
+  restAtBed: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const vit = world.get(actor, Vitality);
+      if (vit) world.set(actor, Vitality, { maxHp: vit.maxHp, hp: vit.maxHp });
+      const mana = world.get(actor, Mana);
+      if (mana) world.set(actor, Mana, { ...mana, mana: mana.maxMana });
+      const stamina = world.get(actor, Stamina);
+      if (stamina) world.set(actor, Stamina, { ...stamina, stamina: stamina.maxStamina, regenCooldown: 0 });
+      world.emit?.("bed:rested", { actor, targetId });
+    },
+  },
+
+  // ── Commerce ───────────────────────────────────────────────────────────────
+
+  openShop: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const shop = world.get(targetId, ShopInventory);
+      if (shop) {
+        world.emit?.("shop:open", {
+          actor, targetId,
+          shopItems: [...(shop.items || [])],
+          buyMarkup: shop.buyMarkup ?? 1.0,
+          sellDiscount: shop.sellDiscount ?? 0.5,
+        });
+      }
+    },
+  },
+
+  // ── Stairs ─────────────────────────────────────────────────────────────────
+  // Traversal is owned by the UI/app layer (tooltip tap / Enter key).
+  // These entries exist so the interactable component is valid and the system
+  // returns true, but they are intentional no-ops in the rules layer.
+
+  descendStair: { onInteract() {} },
+  ascendStair:  { onInteract() {} },
+
+  // ── Fountain ───────────────────────────────────────────────────────────────
+
+  drinkFountain: {
+    beforeInteract(ctx) {
+      const { world, actor } = ctx;
+      if (!world.get(actor, Vitality)) {
+        ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
+      }
+    },
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const vit = world.get(actor, Vitality);
+      const fSeed = combatSeed(world.seed, world.step, actor | 0, targetId | 0, 0xF0C5);
+      const r = mulberry32(fSeed);
+      const roll = r();
+
+      if (roll < 0.50) {
+        const healAmt = Math.max(1, Math.floor(vit.maxHp * (0.2 + r() * 0.2)));
+        const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
+        world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
+        world.emit?.("fountain:drink", { actor, targetId, effect: "heal", amount: healAmt });
+
+      } else if (roll < 0.75) {
+        const mana = world.get(actor, Mana);
+        if (mana && mana.maxMana > 0) {
+          const amt = Math.max(1, Math.floor(mana.maxMana * 0.3));
+          world.set(actor, Mana, { ...mana, mana: Math.min(mana.maxMana, mana.mana + amt) });
+          world.emit?.("fountain:drink", { actor, targetId, effect: "mana", amount: amt });
+        } else {
+          const healAmt = Math.max(1, Math.floor(vit.maxHp * 0.15));
+          const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
+          world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
+          world.emit?.("fountain:drink", { actor, targetId, effect: "heal", amount: healAmt });
+        }
+
+      } else if (roll < 0.90) {
+        world.emit?.("fountain:drink", { actor, targetId, effect: "nothing", amount: 0 });
+
+      } else {
+        const dmgAmt = Math.max(1, Math.floor(vit.maxHp * (0.05 + r() * 0.05)));
+        dealDamage(world, {
+          target: actor,
+          amount: dmgAmt,
+          type: "poison",
+          source: targetId,
+          cause: "fountain",
+        });
+        world.emit?.("fountain:drink", { actor, targetId, effect: "poison", amount: dmgAmt });
+      }
+    },
+  },
+
+  // ── Altar ──────────────────────────────────────────────────────────────────
+  //
+  // Two-phase flow:
+  //   Phase 1 (no mode): gather offerable items, emit prompt, emit prayers.
+  //   Phase 2 (intent.mode === "offer", intent.itemId > 0): consume the chosen
+  //     item and emit the divine response.
+
+  prayAltar: {
+    onInteract(ctx) {
+      const { world, actor, targetId, intent } = ctx;
+
+      if (String(intent?.mode || "").toLowerCase() === "offer" && (intent?.itemId | 0) > 0) {
+        _altarExecuteOffer(world, actor, targetId, intent.itemId | 0);
+        return;
+      }
+
+      // Phase 1 — collect offerable items and prompt the UI.
+      const inv = world.get(actor, Inventory);
+      const offerableItems = [];
+      if (inv && Array.isArray(inv.items)) {
+        for (const iid of inv.items) {
+          if (!world.isAlive(iid)) continue;
+          if (!world.get(iid, ItemInfo)) continue;
+          offerableItems.push(iid);
+        }
+      }
+      world.emit?.("altar:offerPrompt", { actor, targetId, items: offerableItems });
+      world.emit?.("prayer", { actor, distress: null, altarBonus: true });
+      world.emit?.("altar:pray", { actor, targetId });
+    },
+  },
+
+  // ── Shrine ─────────────────────────────────────────────────────────────────
+
+  touchShrine: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      world.emit?.("shrine:touch", { actor, targetId });
+    },
+  },
+
+  // ── Harvest nodes ──────────────────────────────────────────────────────────
+
+  harvestNode: {
+    beforeInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const node = world.get(targetId, HarvestNode);
+
+      if (!node) {
+        ctx.cancel("NO_NODE");
+        return;
+      }
+
+      if (!node.ready) {
+        world.emit?.("harvest:empty", {
+          actor, targetId,
+          kind: node.kind,
+          regrowCountdown: node.regrowCountdown | 0,
+        });
+        ctx.cancel("NOT_READY");
+        return;
+      }
+
+      // Tool + stamina gate (data-driven: node.requiresTool matches equipment bonus key).
+      if (node.requiresTool) {
+        const eq = world.get(actor, Equipment);
+        const weaponId = eq?.weapon || 0;
+        const wInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
+        if (!wInfo?.bonuses?.[node.requiresTool]) {
+          world.emit?.("harvest:no_tool", {
+            actor, targetId, kind: node.kind, requiredTool: node.requiresTool,
+          });
+          ctx.cancel("NO_TOOL");
+          return;
+        }
+        const stam = world.get(actor, Stamina);
+        const cost = Number(wInfo.staminaCost ?? 25);
+        if (stam && Number(stam.stamina ?? 0) < cost) {
+          world.emit?.("harvest:no_stamina", { actor, targetId, kind: node.kind, cost });
+          ctx.cancel("NO_STAMINA");
+          return;
+        }
+        // Deduct stamina here so onInteract can focus on the reward.
+        if (stam) stam.stamina = Math.max(0, Number(stam.stamina) - cost);
+      }
+
+      // Cache node on ctx.data for downstream phases.
+      ctx.data.node = node;
+    },
+
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const node = ctx.data.node;
+
+      const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, HARVEST_SEED_SALT));
+      const spread = Math.max(1, (node.yieldMax - node.yieldMin + 1) | 0);
+      const count = Math.max(1, (node.yieldMin + ((r() * spread) | 0)) | 0);
+
+      // Yield item — drops at actor's feet if inventory is full or overweight.
+      let resultItemId = 0;
+      const catalogId = node.yield;
+      const arch = catalogId ? CATALOG_ARCHETYPES[catalogId] : null;
+      if (arch) {
+        const def = getCatalogItem(catalogId);
+        const inv = world.get(actor, Inventory);
+        const actorPos = world.get(actor, Position);
+
+        let overweight = false;
+        if (inv?.weightLimit != null) {
+          const addWeight = (def?.weight || 0) * count;
+          let curWeight = 0;
+          for (const iid of inv.items) {
+            const ii = world.get(iid, ItemInfo);
+            if (ii) curWeight += (ii.weight || 0) * (ii.count || 1);
+          }
+          overweight = curWeight + addWeight > inv.weightLimit;
+        }
+        const overCapacity = inv != null && inv.capacity != null && inv.items.length >= inv.capacity;
+
+        const itemId = createFrom(world, arch, {});
+        world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
+        resultItemId = itemId;
+
+        if (inv && !overweight && !overCapacity) {
+          if (!inv.items.includes(itemId)) inv.items.push(itemId);
+        } else {
+          if (actorPos) world.add(itemId, Position, { x: actorPos.x, y: actorPos.y });
+          if (inv) {
+            world.emit?.("harvest:overweight", {
+              actor, targetId, kind: node.kind, count,
+              reason: overweight ? "weight" : "capacity",
+            });
+          }
+        }
+      }
+
+      // Danger and hazard side-effects (fully data-driven from HarvestNode component).
+      const actorPos = world.get(actor, Position);
+      if (node.danger) {
+        const dmg = node.danger.dmgMin + ((r() * (node.danger.dmgMax - node.danger.dmgMin + 1)) | 0);
+        const hit = dealDamage(world, {
+          target: actor,
+          amount: dmg,
+          type: node.danger.type || "physical",
+          source: targetId,
+          cause: node.danger.cause || node.kind,
+          at: actorPos ? { x: actorPos.x, y: actorPos.y } : undefined,
+        });
+        world.emit?.("harvest:danger", {
+          actor, targetId, kind: node.kind,
+          effect: node.danger.type,
+          damage: hit.applied ? hit.amount : 0,
+        });
+      }
+      if (node.hazard) {
+        const hazardAt = actorPos || world.get(targetId, Position);
+        let hazardId = 0;
+        if (hazardAt) {
+          hazardId = spawnHazard(world, {
+            x: hazardAt.x,
+            y: hazardAt.y,
+            kind: node.hazard.kind,
+            medium: "floor",
+            turnsLeft: node.hazard.turnsLeft ?? 2,
+            radius: 0,
+            tickDamage: node.hazard.tickDamage ?? 1,
+            damageType: node.hazard.kind,
+            cause: node.kind,
+            sourceId: targetId,
+            sourceKind: node.kind,
+            identity: node.hazard.identity || node.hazard.kind,
+            name: node.hazard.name || node.hazard.kind,
+            meta: { source: node.kind + "_harvest" },
+          });
+        }
+        world.emit?.("harvest:danger", { actor, targetId, kind: node.kind, effect: "hazard", hazardId });
+      }
+
+      // Stash yield info for afterInteract.
+      ctx.data.count = count;
+      ctx.data.resultItemId = resultItemId;
+    },
+
+    afterInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const node = ctx.data.node;
+
+      // Start regrowth countdown.
+      world.mutate(targetId, HarvestNode, (n) => {
+        n.ready = false;
+        n.regrowCountdown = n.regrowTurns;
+      });
+
+      world.emit?.("harvest:picked", {
+        actor, targetId,
+        kind: node.kind,
+        count: ctx.data.count,
+        itemId: ctx.data.resultItemId,
+        regrowTurns: node.regrowTurns,
+      });
+    },
+  },
+
+  // ── Sarcophagus ────────────────────────────────────────────────────────────
+  //
+  // One-time interaction: disturbing the sarcophagus awakens its occupant.
+  // Removes Interactable so it cannot be triggered again.
+
+  openSarcophagus: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const pos = world.get(targetId, Position);
+      if (pos) {
+        createFrom(world, Monster, {
+          x: pos.x,
+          y: pos.y,
+          name: "Skeleton",
+          identity: "skeleton",
+          faction: "enemy",
+          maxHp: 12,
+          attackDerived: 4,
+          defenseDerived: 2,
+          naturalDamageDice: "1d6",
+          speed: 1,
+        });
+      }
+      world.emit?.("sarcophagus:opened", { actor, targetId });
+    },
+    afterInteract(ctx) {
+      // One-time use — the sarcophagus can never be disturbed again.
+      try { ctx.world.remove(ctx.targetId, Interactable); } catch {}
+    },
+  },
+
+};
+
+// ─── Altar offer helper ───────────────────────────────────────────────────────
+
+function _altarExecuteOffer(world, actor, targetId, itemId) {
+  const inv = world.get(actor, Inventory);
+  if (!inv || !Array.isArray(inv.items) || !inv.items.includes(itemId)) {
+    world.emit?.("altar:offerFailed", { actor, targetId, itemId, reason: "not_owned" });
+    return;
+  }
+  const info = world.get(itemId, ItemInfo);
+  const itemValue = (info?.value || 0) * Math.max(1, info?.count || 1);
+  inv.items = inv.items.filter((id) => id !== itemId);
+  try { world.destroy(itemId); } catch {}
+  world.emit?.("altar:offered", { actor, targetId, itemValue });
+  world.emit?.("prayer", { actor, distress: null, altarBonus: true, offered: true, itemValue });
+}
