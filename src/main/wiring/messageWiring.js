@@ -466,16 +466,13 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`You ${verb} ${count} ${yieldLabel} (${itemLabel}).`, 'system');
   });
 
-  world.on('harvest:empty', ({ actor, kind, regrowCountdown }) => {
+  world.on('harvest:empty', ({ actor, kind }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const nodeLabel = harvestNodeLabel(kind);
-    const left = Math.max(0, Number(regrowCountdown || 0) | 0);
     if (isOreKind(kind)) {
-      if (left > 0) log(`The ${nodeLabel} is exhausted. (${left} turns to replenish)`, 'system');
-      else log(`The ${nodeLabel} has nothing to mine right now.`, 'system');
+      log(`The ${nodeLabel} is exhausted.`, 'system');
     } else {
-      if (left > 0) log(`The ${nodeLabel} is picked clean. (${left} turns to regrow)`, 'system');
-      else log(`The ${nodeLabel} has nothing ready right now.`, 'system');
+      log(`The ${nodeLabel} is picked clean.`, 'system');
     }
   });
 
