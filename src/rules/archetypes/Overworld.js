@@ -41,7 +41,7 @@ export const BerryBush = defineArchetype(
   [NamedIdentity, { name: "Berry Bush", identity: "berry_bush" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "berries", ready: true, regrowTurns: 56, regrowCountdown: 0 }],
+  [HarvestNode, { kind: "berries", ready: true, regrowTurns: 256, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "berries" } }],
 );
 
@@ -51,7 +51,7 @@ export const HerbPatch = defineArchetype(
   [NamedIdentity, { name: "Herb Patch", identity: "herb_patch" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "herbs", ready: true, regrowTurns: 40, regrowCountdown: 0 }],
+  [HarvestNode, { kind: "herbs", ready: true, regrowTurns: 240, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "herbs" } }],
 );
 
@@ -61,7 +61,7 @@ export const ThornBramble = defineArchetype(
   [NamedIdentity, { name: "Thorn Bramble", identity: "thorn_bramble" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "thorn_bramble", ready: true, regrowTurns: 60, regrowCountdown: 0 }],
+  [HarvestNode, { kind: "thorn_bramble", ready: true, regrowTurns: 260, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "thorn_bramble" } }],
 );
 
@@ -71,7 +71,7 @@ export const VenomFern = defineArchetype(
   [NamedIdentity, { name: "Venom Fern", identity: "venom_fern" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "venom_fern", ready: true, regrowTurns: 68, regrowCountdown: 0 }],
+  [HarvestNode, { kind: "venom_fern", ready: true, regrowTurns: 268, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "venom_fern" } }],
 );
 
