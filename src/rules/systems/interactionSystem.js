@@ -174,6 +174,19 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
 
         case "prayAltar":
             {
+                const inv = world.get(actor, Inventory);
+                const offerableItems = [];
+                if (inv && Array.isArray(inv.items)) {
+                    for (const iid of inv.items) {
+                        if (!world.isAlive(iid)) continue;
+                        const info = world.get(iid, ItemInfo);
+                        if (!info) continue;
+                        // Currency (gold) and food/equipment/potions can all be offered
+                        offerableItems.push(iid);
+                    }
+                }
+                world.emit?.("altar:offerPrompt", { actor, targetId, items: offerableItems });
+                // Also pray as before
                 world.emit?.("prayer", { actor, distress: null, altarBonus: true });
                 world.emit?.("altar:pray", { actor, targetId });
             }

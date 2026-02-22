@@ -4,7 +4,7 @@
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { isWalkable, getTile, setTile, isLoaded } from "../environment/dungeon/tileMap.js";
-import { TILE_VOID, TILE_WALL, TILE_FLOOR } from "../environment/dungeon/constants.js";
+import { TILE_VOID, TILE_WALL, TILE_FLOOR, TILE_TREE, TILE_GRASS } from "../environment/dungeon/constants.js";
 import { Equipment } from "../components/Equipment.js";
 import { Stamina } from "../components/Stamina.js";
 import { Interactable } from "../components/Interactable.js";
@@ -135,6 +135,24 @@ export function movementSystem(world) {
                     }
                   }
                   try { world.emit?.("tile:dug", { actor, x: nx, y: ny }); } catch (e) { console.debug('[movementSystem] emit tile:dug failed:', e); }
+                } else {
+                  try { world.emit?.("attack:insufficient-stamina", { attacker: actor, need: cost, have: Number(stam?.stamina ?? 0) }); } catch (e) { console.debug('[movementSystem] emit attack:insufficient-stamina failed:', e); }
+                }
+              }
+            }
+          } else if (getTile(nx, ny) === TILE_TREE) {
+            // Chop: if the player has an axe equipped (weapon with chop bonus), fell the tree.
+            const eq = world.get(actor, Equipment);
+            const weaponId = eq?.weapon || 0;
+            if (weaponId) {
+              const wInfo = world.get(weaponId, ItemInfo);
+              if (wInfo?.bonuses?.chop) {
+                const stam = world.get(actor, Stamina);
+                const cost = Number(wInfo.staminaCost ?? 10);
+                if (stam && (Number(stam.stamina ?? 0) >= cost)) {
+                  world.set(actor, Stamina, { ...stam, stamina: stam.stamina - cost, regenCooldown: STAMINA_REGEN_COOLDOWN });
+                  setTile(nx, ny, TILE_GRASS);
+                  try { world.emit?.("tile:chopped", { actor, x: nx, y: ny }); } catch (e) { console.debug('[movementSystem] emit tile:chopped failed:', e); }
                 } else {
                   try { world.emit?.("attack:insufficient-stamina", { attacker: actor, need: cost, have: Number(stam?.stamina ?? 0) }); } catch (e) { console.debug('[movementSystem] emit attack:insufficient-stamina failed:', e); }
                 }
