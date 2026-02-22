@@ -24,6 +24,9 @@ import {
   addItemEntityToInventory,
   findInventoryStackTargetForItem,
 } from "../utils/inventoryStacking.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Web } from "../archetypes/RoomFeatures.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -167,6 +170,12 @@ export function movementSystem(world) {
         world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
         // Reserve the destination so subsequent movers in this tick can't step into the same tile
         blocking.add(k);
+
+        // Spiders leave a web on the tile they depart
+        const ni = world.get(actor, NamedIdentity);
+        if (ni?.identity === 'spider') {
+          createFrom(world, Web, { x: from.x, y: from.y });
+        }
 
         // Immediate auto-pickup for actors with Settings.autoPickup (defaults true)
         // Focused on currency to avoid unexpected heavy pickups.

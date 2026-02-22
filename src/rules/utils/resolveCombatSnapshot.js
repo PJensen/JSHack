@@ -70,6 +70,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     cursed: statusStrength(world, id, "cursed"),
     blessed: statusStrength(world, id, "blessed"),
     stoneskin: statusStrength(world, id, "stoneskin"),
+    berserk: statusStrength(world, id, "berserk"),
   };
 
   /** @type {Array<{stat:'attack'|'defense', source:string, value:number, reason:string}>} */
@@ -136,6 +137,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     attackBonus,
     armorClass: 10 + defenseContribution,
     damageFlatBonus: Math.max(0, Math.floor(attackDerived / 2)),
+    damageMult: statusTotals.berserk > 0 ? 4 : 1,
     attackDerived,
     defenseDerived,
     status: Object.freeze({ ...statusTotals }),
