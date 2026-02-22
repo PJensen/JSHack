@@ -1771,6 +1771,8 @@ let _fxTime = 0; // display-side time accumulator for simple glyph FX
 const _stackMeta = new Map();
 /** @type {{ key: string, x: number, y: number }[]} */
 const _origins = [];
+/** @type {number[]} flat buffer [tile, x, y, ...] for explored-not-visible tiles */
+const _exploredTileBuffer = [];
 function render(worldView) {
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
@@ -1799,31 +1801,34 @@ function render(worldView) {
   const vy1 = cam.y + viewHalfH + 1;
 
   // Pass 1: tiles from TileMap grid (3-state fog-of-war)
-  // Two sub-passes to avoid per-tile globalAlpha thrashing:
-  //   A) visible tiles at full alpha
-  //   B) explored-only tiles at a single dimmed alpha
+  // Single viewport scan: draw visible tiles immediately, buffer explored-not-visible
+  // tiles into a flat array, then flush at reduced alpha. This halves the
+  // forEachTileInRect iteration cost vs two separate passes (critical in large
+  // open areas like the overworld where explored tile count grows with exploration).
   if (worldView.tileGrid) {
     const isVisible = worldView.isVisible;
     const isExplored = worldView.isExplored;
     const tx0 = Math.floor(vx0), ty0 = Math.floor(vy0);
     const tx1 = Math.ceil(vx1),  ty1 = Math.ceil(vy1);
-    // Pass 1A: visible tiles
     /** @type {Record<number, string>} */ const tileKinds = /** @type {any} */ (_tileKindMap);
+    _exploredTileBuffer.length = 0;
     worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
       if (isVisible && isVisible(x, y)) {
         const kind = tileKinds[tile];
         if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+      } else if (isExplored && isExplored(x, y)) {
+        _exploredTileBuffer.push(tile, x, y);
       }
     });
-    // Pass 1B: explored-but-not-visible tiles (single alpha set for the whole pass)
-    bctx.globalAlpha = 0.35;
-    worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
-      if (isExplored && isExplored(x, y) && !(isVisible && isVisible(x, y))) {
-        const kind = tileKinds[tile];
-        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+    // Flush explored-not-visible buffer at a single reduced alpha (no per-tile state changes)
+    if (_exploredTileBuffer.length > 0) {
+      bctx.globalAlpha = 0.35;
+      for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
+        const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
+        if (kind) drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
       }
-    });
-    bctx.globalAlpha = 1.0;
+      bctx.globalAlpha = 1.0;
+    }
   }
 
   // Pass 1.5: engravings on the ground (between tiles and entities)
