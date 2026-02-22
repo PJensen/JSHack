@@ -1681,6 +1681,7 @@ const _shockEmitters   = new Set();
 const _frozenEmitters  = new Set();
 const _cursedEmitters  = new Set();
 const _blessedEmitters = new Set();
+const _fountainEmitters = new Set();
 
 // FX controllers (depend on cam + fx)
 const boltFx = createBoltFxController({ world, cam, fx });
@@ -2244,6 +2245,33 @@ function frame(now) {
       life: 1.0, lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02,
       color: '#ffcc00', alpha0: 0.8, alpha1: 0.0,
     });
+    // Persistent fountain water-jet emitters (matched by entity kind, not status tag)
+    {
+      const nowActive = new Set();
+      for (let i = 0; i < view.entities.length; i++) {
+        const e = view.entities[i];
+        if (e.kind !== 'fountain') continue;
+        nowActive.add(e.id);
+        if (!_fountainEmitters.has(e.id)) {
+          fx.ensureEmitter(`fountain:${e.id}`, {
+            continuous: true,
+            rate: 14, angle: -Math.PI / 2, spread: Math.PI / 12,
+            speed: 0.9, speedJitter: 0.35, ax: 0, ay: -0.45,
+            life: 0.85, lifeJitter: 0.25, size: 0.5, sizeEnd: 0.15,
+            color: '#66ccff', alpha0: 0.75, alpha1: 0.0,
+            offsetX: 0, offsetY: -0.5,
+          });
+          _fountainEmitters.add(e.id);
+        }
+        origins.push({ key: `fountain:${e.id}`, x: e.pos.x, y: e.pos.y });
+      }
+      for (const id of _fountainEmitters) {
+        if (!nowActive.has(id)) {
+          fx.removeEmitter(`fountain:${id}`);
+          _fountainEmitters.delete(id);
+        }
+      }
+    }
     fx.step(dtSec, origins);
   }
 
