@@ -23,6 +23,9 @@ import {
   HerbPatch,
   ThornBramble,
   VenomFern,
+  OreVeinIron,
+  OreVeinCoal,
+  OreVeinStone,
   AlchemyBench,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
@@ -492,6 +495,12 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, ThornBramble, { x: spawn.x, y: spawn.y });
     case 'harvest_venom_fern':
       return createFrom(world, VenomFern, { x: spawn.x, y: spawn.y });
+    case 'harvest_iron_ore':
+      return createFrom(world, OreVeinIron, { x: spawn.x, y: spawn.y });
+    case 'harvest_coal_ore':
+      return createFrom(world, OreVeinCoal, { x: spawn.x, y: spawn.y });
+    case 'harvest_stone':
+      return createFrom(world, OreVeinStone, { x: spawn.x, y: spawn.y });
     case 'alchemy_bench':
       return createFrom(world, AlchemyBench, { x: spawn.x, y: spawn.y });
     case 'tombstone': {

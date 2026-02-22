@@ -7,12 +7,13 @@ import { ShopInventory } from "../components/ShopInventory.js";
 import { Inventory } from "../components/Inventory.js";
 import { Position } from "../components/Position.js";
 import { HarvestNode } from "../components/HarvestNode.js";
+import { Equipment } from "../components/Equipment.js";
 import { Vitality } from "../components/Vitality.js";
 import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import TombstoneComponent from "../components/Tombstone.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { WildBerries, WildHerbs, ThornPods, VenomFronds, DungeonMushrooms } from "../archetypes/Food.js";
+import { WildBerries, WildHerbs, ThornPods, VenomFronds, DungeonMushrooms, IronOre, CoalOre, StoneChip } from "../archetypes/Food.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
@@ -215,12 +216,37 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
 
                 const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, HARVEST_SEED_SALT));
                 const kind = String(node.kind || "berries").toLowerCase();
-                const minCount = (kind === "venom_fern" || kind === "thorn_bramble") ? 2 : 1;
+
+                const ORE_KINDS = new Set(["iron_ore", "coal_ore", "stone"]);
+                if (ORE_KINDS.has(kind)) {
+                    const eq = world.get(actor, Equipment);
+                    const weaponId = eq?.weapon || 0;
+                    const wInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
+                    if (!wInfo?.bonuses?.dig) {
+                        world.emit?.("harvest:no_tool", { actor, targetId, kind, requiredTool: "pickaxe" });
+                        break;
+                    }
+                    const stam = world.get(actor, Stamina);
+                    const cost = Number(wInfo.staminaCost ?? 25);
+                    if (stam && Number(stam.stamina ?? 0) < cost) {
+                        world.emit?.("harvest:no_stamina", { actor, targetId, kind, cost });
+                        break;
+                    }
+                    if (stam) stam.stamina = Math.max(0, Number(stam.stamina) - cost);
+                }
+
+                const minCount = (kind === "venom_fern" || kind === "thorn_bramble" || kind === "coal_ore" || kind === "stone") ? 2 : 1;
                 const maxCount = kind === "herbs"
                     ? 2
                     : (kind === "venom_fern"
                         ? 3
-                        : (kind === "thorn_bramble" ? 4 : 3));
+                        : (kind === "thorn_bramble"
+                            ? 4
+                            : (kind === "iron_ore"
+                                ? 3
+                                : (kind === "coal_ore"
+                                    ? 4
+                                    : (kind === "stone" ? 5 : 3)))));
                 const spread = Math.max(1, (maxCount - minCount + 1) | 0);
                 const baseCount = minCount + ((r() * spread) | 0);
                 const count = Math.max(1, baseCount | 0);
@@ -230,7 +256,13 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
                         ? ThornPods
                         : (kind === "mushrooms"
                             ? DungeonMushrooms
-                            : (kind === "herbs" ? WildHerbs : WildBerries)));
+                            : (kind === "iron_ore"
+                                ? IronOre
+                                : (kind === "coal_ore"
+                                    ? CoalOre
+                                    : (kind === "stone"
+                                        ? StoneChip
+                                        : (kind === "herbs" ? WildHerbs : WildBerries))))));
                 const itemId = createFrom(world, harvestArchetype, {});
                 world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
 
