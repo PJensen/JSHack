@@ -98,11 +98,13 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
 
     // Place a room feature (~50% of non-entry rooms get one)
     const isEntryRoom = room === entryRoom;
+    let roomHasWeaponRack = false;
     if (!isEntryRoom && rng.next() < 0.50) {
       const featureKind = pickRoomFeature(rng);
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
       spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
+      if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
     }
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
@@ -155,8 +157,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
     }
 
-    // Chest: ~13% chance per room (rare find)
-    if (rng.next() < 0.13) {
+    // Chest: ~13% chance per room (rare find). Weapon racks count as equivalent — skip if the room already has one.
+    if (!roomHasWeaponRack && rng.next() < 0.13) {
       const chx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const chy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
       const d = floorPlan.depth;
