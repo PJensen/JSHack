@@ -19,6 +19,19 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../content/alchemy/benchGame.js";
+import { getCatalogItem } from "../data/itemCatalog.js";
+
+// Maps catalog item ids to archetypes for entity creation during harvest.
+const CATALOG_ARCHETYPES = {
+    "food_wild_berries":   WildBerries,
+    "food_wild_herbs":     WildHerbs,
+    "food_mushrooms":      DungeonMushrooms,
+    "reagent_thorn_pod":   ThornPods,
+    "reagent_venom_frond": VenomFronds,
+    "ore_iron":            IronOre,
+    "ore_coal":            CoalOre,
+    "ore_stone":           StoneChip,
+};
 
 const HARVEST_SEED_SALT = 0x48415256;
 
@@ -214,142 +227,109 @@ export function InteractionSystem(world, actor, targetId, intent = null) {
                     break;
                 }
 
-                const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, HARVEST_SEED_SALT));
-                const kind = String(node.kind || "berries").toLowerCase();
-
-                const ORE_KINDS = new Set(["iron_ore", "coal_ore", "stone"]);
-                if (ORE_KINDS.has(kind)) {
+                // Tool + stamina gate (data-driven: node.requiresTool matches equipment bonus key)
+                if (node.requiresTool) {
                     const eq = world.get(actor, Equipment);
                     const weaponId = eq?.weapon || 0;
                     const wInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
-                    if (!wInfo?.bonuses?.dig) {
-                        world.emit?.("harvest:no_tool", { actor, targetId, kind, requiredTool: "pickaxe" });
+                    if (!wInfo?.bonuses?.[node.requiresTool]) {
+                        world.emit?.("harvest:no_tool", { actor, targetId, kind: node.kind, requiredTool: node.requiresTool });
                         break;
                     }
                     const stam = world.get(actor, Stamina);
                     const cost = Number(wInfo.staminaCost ?? 25);
                     if (stam && Number(stam.stamina ?? 0) < cost) {
-                        world.emit?.("harvest:no_stamina", { actor, targetId, kind, cost });
+                        world.emit?.("harvest:no_stamina", { actor, targetId, kind: node.kind, cost });
                         break;
                     }
                     if (stam) stam.stamina = Math.max(0, Number(stam.stamina) - cost);
                 }
 
-                const minCount = (kind === "venom_fern" || kind === "thorn_bramble" || kind === "coal_ore" || kind === "stone") ? 2 : 1;
-                const maxCount = kind === "herbs"
-                    ? 2
-                    : (kind === "venom_fern"
-                        ? 3
-                        : (kind === "thorn_bramble"
-                            ? 4
-                            : (kind === "iron_ore"
-                                ? 3
-                                : (kind === "coal_ore"
-                                    ? 4
-                                    : (kind === "stone" ? 5 : 3)))));
-                const spread = Math.max(1, (maxCount - minCount + 1) | 0);
-                const baseCount = minCount + ((r() * spread) | 0);
-                const count = Math.max(1, baseCount | 0);
-                const harvestArchetype = kind === "venom_fern"
-                    ? VenomFronds
-                    : (kind === "thorn_bramble"
-                        ? ThornPods
-                        : (kind === "mushrooms"
-                            ? DungeonMushrooms
-                            : (kind === "iron_ore"
-                                ? IronOre
-                                : (kind === "coal_ore"
-                                    ? CoalOre
-                                    : (kind === "stone"
-                                        ? StoneChip
-                                        : (kind === "herbs" ? WildHerbs : WildBerries))))));
-                const itemId = createFrom(world, harvestArchetype, {});
-                world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
+                const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, HARVEST_SEED_SALT));
+                const spread = Math.max(1, (node.yieldMax - node.yieldMin + 1) | 0);
+                const count = Math.max(1, (node.yieldMin + ((r() * spread) | 0)) | 0);
 
-                let resultItemId = itemId;
-                const inv = world.get(actor, Inventory);
-                if (inv) {
-                    // Components are deferred during tick, so
-                    // addItemEntityToInventory can't see ItemInfo yet.
-                    // Insert directly; coalesceInventoryStacks handles
-                    // stacking on the next UI refresh.
-                    if (!inv.items.includes(itemId)) inv.items.push(itemId);
-                } else {
-                    const pos = world.get(actor, Position);
-                    if (pos) world.add(itemId, Position, { x: pos.x, y: pos.y });
+                // Yield item — weight-gated, drops at feet if inventory is full/over limit
+                let resultItemId = 0;
+                const catalogId = node.yield;
+                const arch = catalogId ? CATALOG_ARCHETYPES[catalogId] : null;
+                if (arch) {
+                    const def = getCatalogItem(catalogId);
+                    const inv = world.get(actor, Inventory);
+                    const actorPos = world.get(actor, Position);
+
+                    // Weight gate using catalog data (before entity creation)
+                    let overweight = false;
+                    if (inv?.weightLimit != null) {
+                        const addWeight = (def?.weight || 0) * count;
+                        let curWeight = 0;
+                        for (const iid of inv.items) {
+                            const ii = world.get(iid, ItemInfo);
+                            if (ii) curWeight += (ii.weight || 0) * (ii.count || 1);
+                        }
+                        overweight = curWeight + addWeight > inv.weightLimit;
+                    }
+                    const overCapacity = inv != null && inv.capacity != null && inv.items.length >= inv.capacity;
+
+                    const itemId = createFrom(world, arch, {});
+                    world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
+                    resultItemId = itemId;
+
+                    if (inv && !overweight && !overCapacity) {
+                        // Components are deferred during tick, so addItemEntityToInventory
+                        // can't see ItemInfo yet. Insert directly; coalesceInventoryStacks
+                        // handles stacking on the next UI refresh.
+                        if (!inv.items.includes(itemId)) inv.items.push(itemId);
+                    } else {
+                        if (actorPos) world.add(itemId, Position, { x: actorPos.x, y: actorPos.y });
+                        if (inv) world.emit?.("harvest:overweight", { actor, targetId, kind: node.kind, count, reason: overweight ? "weight" : "capacity" });
+                    }
                 }
 
-                world.set(targetId, HarvestNode, {
-                    kind,
-                    ready: false,
-                    regrowTurns: node.regrowTurns,
-                    regrowCountdown: node.regrowTurns,
-                });
-
+                // Danger side-effects (data-driven: node.danger / node.hazard)
                 const actorPos = world.get(actor, Position);
-                if (kind === "thorn_bramble") {
-                    const thornDmg = 1 + ((r() * 3) | 0);
+                if (node.danger) {
+                    const dmg = node.danger.dmgMin + ((r() * (node.danger.dmgMax - node.danger.dmgMin + 1)) | 0);
                     const hit = dealDamage(world, {
                         target: actor,
-                        amount: thornDmg,
-                        type: "physical",
+                        amount: dmg,
+                        type: node.danger.type || "physical",
                         source: targetId,
-                        cause: "thorn_bramble",
+                        cause: node.danger.cause || node.kind,
                         at: actorPos ? { x: actorPos.x, y: actorPos.y } : undefined,
                     });
-                    if (hit.applied) {
-                        world.emit?.("harvest:danger", {
-                            actor,
-                            targetId,
-                            kind,
-                            effect: "thorns",
-                            damage: hit.amount,
-                        });
-                    }
-                } else if (kind === "venom_fern") {
-                    const poisonDmg = 1 + ((r() * 2) | 0);
-                    const hit = dealDamage(world, {
-                        target: actor,
-                        amount: poisonDmg,
-                        type: "poison",
-                        source: targetId,
-                        cause: "venom_fern",
-                        at: actorPos ? { x: actorPos.x, y: actorPos.y } : undefined,
-                    });
+                    world.emit?.("harvest:danger", { actor, targetId, kind: node.kind, effect: node.danger.type, damage: hit.applied ? hit.amount : 0 });
+                }
+                if (node.hazard) {
                     const hazardAt = actorPos || world.get(targetId, Position);
                     let hazardId = 0;
                     if (hazardAt) {
                         hazardId = spawnHazard(world, {
                             x: hazardAt.x,
                             y: hazardAt.y,
-                            kind: "poison",
+                            kind: node.hazard.kind,
                             medium: "floor",
-                            turnsLeft: 2,
+                            turnsLeft: node.hazard.turnsLeft ?? 2,
                             radius: 0,
-                            tickDamage: 1,
-                            damageType: "poison",
-                            cause: "venom_fern",
+                            tickDamage: node.hazard.tickDamage ?? 1,
+                            damageType: node.hazard.kind,
+                            cause: node.kind,
                             sourceId: targetId,
-                            sourceKind: "venom_fern",
-                            identity: "venom_spores",
-                            name: "Venom Spores",
-                            meta: { source: "venom_fern_harvest" },
+                            sourceKind: node.kind,
+                            identity: node.hazard.identity || node.hazard.kind,
+                            name: node.hazard.name || node.hazard.kind,
+                            meta: { source: node.kind + "_harvest" },
                         });
                     }
-                    world.emit?.("harvest:danger", {
-                        actor,
-                        targetId,
-                        kind,
-                        effect: "spores",
-                        damage: hit.applied ? hit.amount : 0,
-                        hazardId,
-                    });
+                    world.emit?.("harvest:danger", { actor, targetId, kind: node.kind, effect: "hazard", hazardId });
                 }
+
+                world.mutate(targetId, HarvestNode, (n) => { n.ready = false; n.regrowCountdown = n.regrowTurns; });
 
                 world.emit?.("harvest:picked", {
                     actor,
                     targetId,
-                    kind,
+                    kind: node.kind,
                     count,
                     itemId: resultItemId,
                     regrowTurns: node.regrowTurns,

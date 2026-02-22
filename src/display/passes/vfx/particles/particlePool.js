@@ -7,6 +7,18 @@
 
 import { makeRng } from '../../../../shared/utils/rng.js';
 
+// Scratch object reused on every worldToScreen call — avoids per-particle allocation.
+const _P = { x: 0, y: 0, size: 0 };
+// Cache packed-integer rgb key → rgb string; particle colours come from a small emitter
+// palette so hit rate is near 100% and the Map stays tiny.
+const _rgbCache = new Map();
+function cachedRgb(r, g, b) {
+  const key = ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+  let s = _rgbCache.get(key);
+  if (s === undefined) { s = `rgb(${r},${g},${b})`; _rgbCache.set(key, s); }
+  return s;
+}
+
 export class ParticlePool {
   constructor(capacity = 4096) {
     this.cap = capacity;
@@ -85,17 +97,17 @@ export class ParticlePool {
       const u = 1 - (this.life[i] / this.lifeMax[i]);         // 0→1 over life
       const size = this.size0[i] + (this.size1[i]-this.size0[i])*u;
       const alpha = (this.a0[i] + (this.a1[i]-this.a0[i])*u) * alphaScale;
-      const P = worldToScreen({ x: this.x[i], y: this.y[i], size });
+      worldToScreen(this.x[i], this.y[i], size, _P);
 
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = `rgb(${this.r[i]|0},${this.g[i]|0},${this.b[i]|0})`;
+      ctx.fillStyle = cachedRgb(this.r[i]|0, this.g[i]|0, this.b[i]|0);
       if (shape === 'rect') {
-        const r = P.size * 0.5;
-        ctx.fillRect(P.x - r, P.y - r, P.size, P.size);
+        const r = _P.size * 0.5;
+        ctx.fillRect(_P.x - r, _P.y - r, _P.size, _P.size);
       } else {
         // Circle
         ctx.beginPath();
-        ctx.arc(P.x, P.y, P.size*0.5, 0, Math.PI*2);
+        ctx.arc(_P.x, _P.y, _P.size*0.5, 0, Math.PI*2);
         ctx.fill();
       }
     }
@@ -223,7 +235,7 @@ export class ParticleFX {
     this.emitters = new Map(); // key -> ParticleEmitter
     this.seedBase = seedBase >>> 0;
     this.ctx = null;
-    this.worldToScreen = p => ({ x:p.x, y:p.y, size:p.size }); // inject real camera
+    this.worldToScreen = (x, y, size, out) => { out.x = x; out.y = y; out.size = size; }; // inject real camera
   }
 
   // key is arbitrary: entity id, "room:3", etc.
