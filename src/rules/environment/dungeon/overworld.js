@@ -9,8 +9,14 @@ import {
   TILE_DOOR,
   TILE_STAIR_DOWN,
   TILE_GRASS,
+  TILE_GRASS_A,
+  TILE_GRASS_C,
+  TILE_GRASS_D,
   TILE_WATER,
+  TILE_WATER_DEEP,
   TILE_MOUNTAIN,
+  TILE_MOUNTAIN_B,
+  TILE_MOUNTAIN_C,
   TILE_TREE,
 } from "./constants.js";
 
@@ -170,13 +176,26 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
       const ridge = Math.pow(elev, 1.35);
       const moist = fbm01(wx + 1000 + saltX, wy - 777 + saltY, perm, moistCfg);
 
-      let tile = TILE_GRASS;
-      if (elev < 0.30) {
+      let tile;
+      if (elev < 0.18) {
+        tile = TILE_WATER_DEEP;
+      } else if (elev < 0.30) {
         tile = TILE_WATER;
-      } else if (ridge > 0.68) {
+      } else if (ridge > 0.78) {
+        tile = TILE_MOUNTAIN_C;
+      } else if (ridge > 0.65) {
+        tile = TILE_MOUNTAIN_B;
+      } else if (ridge > 0.54) {
         tile = TILE_MOUNTAIN;
       } else if (moist > 0.62 && elev >= 0.24 && elev <= 0.75) {
         tile = TILE_TREE;
+      } else {
+        // Grass variant: cheap high-freq noise for texture
+        const gv = (perlin2((wx + 2000) * 0.28, (wy + 3000) * 0.28, perm) + 1) * 0.5;
+        if (gv < 0.25)       tile = TILE_GRASS_A;
+        else if (gv < 0.55)  tile = TILE_GRASS;
+        else if (gv < 0.82)  tile = TILE_GRASS_C;
+        else                 tile = TILE_GRASS_D;
       }
       chunk.tiles[ly * CHUNK_SIZE + lx] = tile;
     }
@@ -329,24 +348,26 @@ export function generateOverworldChunks(worldSeed) {
     { x: homeX - 2, y: homeY + 13 },
   ];
 
+  function _impassable(/** @type {number | undefined} */ t) {
+    return t === TILE_WATER || t === TILE_WATER_DEEP
+        || t === TILE_MOUNTAIN || t === TILE_MOUNTAIN_B || t === TILE_MOUNTAIN_C
+        || t === TILE_TREE;
+  }
+
   for (const p of berrySpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_berries");
   }
   for (const p of herbSpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_herbs");
   }
   for (const p of thornSpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_thorn_bramble");
   }
   for (const p of venomSpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER || t === TILE_MOUNTAIN || t === TILE_TREE) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_venom_fern");
   }
 
@@ -367,18 +388,15 @@ export function generateOverworldChunks(worldSeed) {
   ];
 
   for (const p of ironSpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_iron_ore");
   }
   for (const p of coalSpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_coal_ore");
   }
   for (const p of stoneSpots) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t === TILE_WATER) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addSpawn(chunks, p.x, p.y, "harvest_stone");
   }
 
