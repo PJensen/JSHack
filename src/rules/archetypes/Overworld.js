@@ -113,3 +113,27 @@ export const AlchemyBench = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "brewAlchemy", params: null }],
 );
+
+export const Anvil = defineArchetype(
+  "Anvil",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Anvil", identity: "anvil" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Furnace = defineArchetype(
+  "Furnace",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Furnace", identity: "furnace" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const CookingFire = defineArchetype(
+  "CookingFire",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Cooking Fire", identity: "cooking_fire" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+);

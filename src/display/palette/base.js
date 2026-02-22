@@ -81,6 +81,14 @@ export const basePalette = {
   thorn_bramble: { glyph: "☘", fg: "#7ea157", glow: "#415b2e" },
   venom_fern: { glyph: "☣", fg: "#a5d95c", glow: "#648431" },
   venom_spores: { glyph: "◌", fg: "#9dd46f", glow: "#5f8d3c" },
+  // Mining nodes
+  ore_vein_iron:  { glyph: "◈", fg: "#c0754a", glow: "#8a3e1e" },
+  ore_vein_coal:  { glyph: "◆", fg: "#3a3a3a", glow: "#1a1a1a" },
+  ore_vein_stone: { glyph: "◇", fg: "#8a8e93", glow: "#555a5e" },
+  // Crafting stations
+  anvil:        { glyph: "⚒", fg: "#9aacba", glow: "#4a6070" },
+  furnace:      { glyph: "♨", fg: "#ff8533", glow: "#cc4400" },
+  cooking_fire: { glyph: "🔥", fg: "#ff9944", glow: "#dd5500" },
 
   // Room features
   fountain:    { glyph: "⛲", fg: "#66bbee", glow: "#3388aa" },
@@ -120,6 +128,10 @@ export const basePalette = {
   food_mushrooms:    { glyph: "🍄", fg: "#c8b898", glow: "#8a7a5a" },
   reagent_thorn_pod: { glyph: "✶", fg: "#a08f63", glow: "#6f6242" },
   reagent_venom_frond: { glyph: "☤", fg: "#9ccc69", glow: "#5f8d3c" },
+  // Ore items (dropped from mining nodes)
+  ore_iron:  { glyph: "≡", fg: "#b86840", glow: "#7a3a18" },
+  ore_coal:  { glyph: "■", fg: "#404040", glow: "#202020" },
+  ore_stone: { glyph: "▪", fg: "#878b90", glow: "#50565c" },
 
   // Corpses (inherit monster color, traditional '%' glyph)
   corpse_rat:          { glyph: "%", fg: "#b89070", glow: "#a06030" },

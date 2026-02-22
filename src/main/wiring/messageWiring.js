@@ -74,6 +74,9 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (k === "thorn_bramble") return "thorn pods";
     if (k === "venom_fern") return "venom fronds";
     if (k === "mushrooms") return "mushrooms";
+    if (k === "iron_ore") return "iron ore";
+    if (k === "coal_ore") return "coal";
+    if (k === "stone") return "stone chips";
     return "berries";
   }
 
@@ -83,7 +86,15 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (k === "thorn_bramble") return "thorn bramble";
     if (k === "venom_fern") return "venom fern";
     if (k === "mushrooms") return "mushroom patch";
+    if (k === "iron_ore") return "iron vein";
+    if (k === "coal_ore") return "coal seam";
+    if (k === "stone") return "stone outcrop";
     return "berry bush";
+  }
+
+  function isOreKind(kind) {
+    const k = String(kind || "").toLowerCase();
+    return k === "iron_ore" || k === "coal_ore" || k === "stone";
   }
 
   // === Ambient sound events ===
@@ -451,15 +462,21 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (nameOfEntity(actor) !== 'You') return;
     const yieldLabel = harvestYieldLabel(kind);
     const itemLabel = itemId ? nameOfItem(itemId) : bracketizeName(yieldLabel);
-    log(`You harvest ${count} ${yieldLabel} (${itemLabel}).`, 'system');
+    const verb = isOreKind(kind) ? 'mine' : 'harvest';
+    log(`You ${verb} ${count} ${yieldLabel} (${itemLabel}).`, 'system');
   });
 
   world.on('harvest:empty', ({ actor, kind, regrowCountdown }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const nodeLabel = harvestNodeLabel(kind);
     const left = Math.max(0, Number(regrowCountdown || 0) | 0);
-    if (left > 0) log(`The ${nodeLabel} is picked clean. (${left} turns to regrow)`, 'system');
-    else log(`The ${nodeLabel} has nothing ready right now.`, 'system');
+    if (isOreKind(kind)) {
+      if (left > 0) log(`The ${nodeLabel} is exhausted. (${left} turns to replenish)`, 'system');
+      else log(`The ${nodeLabel} has nothing to mine right now.`, 'system');
+    } else {
+      if (left > 0) log(`The ${nodeLabel} is picked clean. (${left} turns to regrow)`, 'system');
+      else log(`The ${nodeLabel} has nothing ready right now.`, 'system');
+    }
   });
 
   world.on('harvest:regrown', ({ id, kind }) => {
@@ -471,13 +488,27 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     const dist = Math.max(Math.abs(ppos.x - pos.x), Math.abs(ppos.y - pos.y));
     if (dist > 6) return;
     const k = String(kind || "").toLowerCase();
-    const what = (
-      k === "herbs" ? "A herb patch looks fresh again."
-        : (k === "thorn_bramble" ? "A thorn bramble thickens nearby."
-          : (k === "venom_fern" ? "A venom fern unfurls fresh fronds nearby."
-            : "A berry bush ripens nearby."))
-    );
+    let what;
+    if (k === "iron_ore") what = "An iron vein shimmers with fresh ore nearby.";
+    else if (k === "coal_ore") what = "A coal seam darkens with fresh deposits nearby.";
+    else if (k === "stone") what = "A stone outcrop juts up fresh rock nearby.";
+    else if (k === "herbs") what = "A herb patch looks fresh again.";
+    else if (k === "thorn_bramble") what = "A thorn bramble thickens nearby.";
+    else if (k === "venom_fern") what = "A venom fern unfurls fresh fronds nearby.";
+    else what = "A berry bush ripens nearby.";
     log(what, 'ambient');
+  });
+
+  world.on('harvest:no_tool', ({ actor, kind }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const nodeLabel = harvestNodeLabel(kind);
+    log(`You need a pickaxe to mine the ${nodeLabel}.`, 'system');
+  });
+
+  world.on('harvest:no_stamina', ({ actor, kind, cost }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const nodeLabel = harvestNodeLabel(kind);
+    log(`You're too exhausted to mine the ${nodeLabel}. (${cost} stamina needed)`, 'system');
   });
 
   world.on('harvest:danger', ({ actor, kind, effect, damage }) => {

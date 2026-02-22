@@ -1682,6 +1682,8 @@ const _frozenEmitters  = new Set();
 const _cursedEmitters  = new Set();
 const _blessedEmitters = new Set();
 const _fountainEmitters = new Set();
+const _furnaceEmitters  = new Set();
+const _cookFireEmitters = new Set();
 
 // FX controllers (depend on cam + fx)
 const boltFx = createBoltFxController({ world, cam, fx });
@@ -2333,6 +2335,60 @@ function frame(now) {
         if (!nowActive.has(id)) {
           fx.removeEmitter(`fountain:${id}`);
           _fountainEmitters.delete(id);
+        }
+      }
+    }
+    // Furnace fire emitters
+    {
+      const nowActive = new Set();
+      for (let i = 0; i < view.entities.length; i++) {
+        const e = view.entities[i];
+        if (e.kind !== 'furnace') continue;
+        nowActive.add(e.id);
+        if (!_furnaceEmitters.has(e.id)) {
+          fx.ensureEmitter(`furnace:${e.id}`, {
+            continuous: true,
+            rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5,
+            speed: 0.9, speedJitter: 0.3, ax: 0, ay: -0.1,
+            life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04,
+            color: '#ff6600', alpha0: 0.88, alpha1: 0.0,
+            offsetX: 0, offsetY: 0.1,
+          });
+          _furnaceEmitters.add(e.id);
+        }
+        origins.push({ key: `furnace:${e.id}`, x: e.pos.x, y: e.pos.y });
+      }
+      for (const id of _furnaceEmitters) {
+        if (!nowActive.has(id)) {
+          fx.removeEmitter(`furnace:${id}`);
+          _furnaceEmitters.delete(id);
+        }
+      }
+    }
+    // Cooking fire emitters
+    {
+      const nowActive = new Set();
+      for (let i = 0; i < view.entities.length; i++) {
+        const e = view.entities[i];
+        if (e.kind !== 'cooking_fire') continue;
+        nowActive.add(e.id);
+        if (!_cookFireEmitters.has(e.id)) {
+          fx.ensureEmitter(`cfire:${e.id}`, {
+            continuous: true,
+            rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3,
+            speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05,
+            life: 0.9, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04,
+            color: '#ff8800', alpha0: 0.75, alpha1: 0.0,
+            offsetX: 0, offsetY: 0,
+          });
+          _cookFireEmitters.add(e.id);
+        }
+        origins.push({ key: `cfire:${e.id}`, x: e.pos.x, y: e.pos.y });
+      }
+      for (const id of _cookFireEmitters) {
+        if (!nowActive.has(id)) {
+          fx.removeEmitter(`cfire:${id}`);
+          _cookFireEmitters.delete(id);
         }
       }
     }
