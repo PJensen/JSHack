@@ -21,7 +21,6 @@ import { runScript, ScriptVerb } from '../scripting.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
-import { hasEffect } from '../utils/statusFacade.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -104,11 +103,6 @@ export function installBumpAttackListener(world) {
         try { resolveMeleeAttack(world, source, defender); } catch (e) { console.error('[combatSystem] resolveMeleeAttack failed:', e); }
     });
 
-    world.on('beforeHit', (ctx) => {
-        if (hasEffect(ctx.world, ctx.attacker, 'berserk')) {
-            ctx.damage = ctx.damage * 4;
-        }
-    });
 }
 
 /**
@@ -203,6 +197,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
     const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(0, damageRoll + flatBonus);
     if (isCrit) dmg = Math.max(1, dmg * 2);
+    if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
     // Pre-hit hooks
     const ctx = attachHelpers(world, { attacker: source, defender: target, weaponId: weaponId || 0, damage: dmg, world });
