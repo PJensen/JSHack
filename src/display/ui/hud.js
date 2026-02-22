@@ -85,7 +85,7 @@ export function initHUD() {
     lineHeight: '36px', textAlign: 'center',
     display: 'none'
   });
-  helpBtn.addEventListener('click', () => window.open('./help/', '_blank'));
+  helpBtn.addEventListener('click', () => window.open('./tools/help/', '_blank'));
   root.appendChild(helpBtn);
 
   // Inventory toggle button

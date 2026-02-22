@@ -53,6 +53,16 @@
       color: #cffff4;
       text-shadow: 0 0 10px rgba(170,255,220,0.55);
     }
+    header .tool-links {
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    header .tool-links a {
+      color: var(--accent2);
+      text-decoration: none;
+    }
+    header .tool-links a:hover { text-decoration: underline; }
 
     /* ── Tab bar ── */
     .tab-bar {
@@ -274,6 +284,10 @@
 
 <header>
   <h1><span class="at">@</span> JSHack — Help &amp; Reference</h1>
+  <p class="tool-links">dev tools:
+    <a href="../emitter-test.html" target="_blank">Emitter Test</a> ·
+    <a href="../jshack_fx_builder.html" target="_blank">FX Builder</a>
+  </p>
 </header>
 
 <nav class="tab-bar" role="tablist">
