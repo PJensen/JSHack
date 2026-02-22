@@ -16,6 +16,14 @@ export const TILE_WATER      = 7;
 export const TILE_MOUNTAIN   = 8;
 export const TILE_TREE       = 9;
 
+// Overworld terrain variants (visual only — all grass variants walkable, mountain variants opaque)
+export const TILE_GRASS_A      = 10; // sparse/bare  '
+export const TILE_GRASS_C      = 11; // medium-dense ;
+export const TILE_GRASS_D      = 12; // thick/lush   `
+export const TILE_MOUNTAIN_B   = 13; // mid-peak     ∧
+export const TILE_MOUNTAIN_C   = 14; // high-peak    ▲
+export const TILE_WATER_DEEP   = 15; // open water   ≈
+
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 7;   // smallest BSP leaf dimension
 export const MIN_ROOM_SIZE   = 4;   // smallest room interior (excl. walls)

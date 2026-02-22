@@ -29,9 +29,15 @@ export const basePalette = {
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224" },
-  grass: { glyph: ",", fg: "#5c8f45", glow: "#355a2a" },
-  water: { glyph: "~", fg: "#4f84b9", glow: "#2d4d6f" },
-  mountain: { glyph: "^", fg: "#8f9398", glow: "#5a5d61" },
+  grass_a:  { glyph: "'", fg: "#cce07a", glow: "#8ab850" },  // sparse/bare
+  grass:    { glyph: ",", fg: "#90c858", glow: "#5a9038" },  // light
+  grass_c:  { glyph: ";", fg: "#6aaa42", glow: "#447828" },  // medium
+  grass_d:  { glyph: "`", fg: "#94c04e", glow: "#5a8030" },  // thick/lush
+  water:      { glyph: "~", fg: "#5ea8d4", glow: "#3a6a90" },  // shallow
+  water_deep: { glyph: "≈", fg: "#3a6fa0", glow: "#1e3f60" },  // open/deep
+  mountain:   { glyph: "^", fg: "#9da0a4", glow: "#5a5d61" },  // foothills
+  mountain_b: { glyph: "∧", fg: "#bec1c4", glow: "#6e7174" },  // mid-peak
+  mountain_c: { glyph: "▲", fg: "#e0e3e6", glow: "#969ea4" },  // high-peak
   tree: { glyph: "T", fg: "#3f7b3d", glow: "#275026" },
   wall: { glyph: "#", fg: "#99a", glow: "#667" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },

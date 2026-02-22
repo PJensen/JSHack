@@ -272,8 +272,14 @@ import {
   TILE_STAIR_DOWN,
   TILE_STAIR_UP,
   TILE_GRASS,
+  TILE_GRASS_A,
+  TILE_GRASS_C,
+  TILE_GRASS_D,
   TILE_WATER,
+  TILE_WATER_DEEP,
   TILE_MOUNTAIN,
+  TILE_MOUNTAIN_B,
+  TILE_MOUNTAIN_C,
   TILE_TREE,
 } from "./rules/environment/dungeon/constants.js";
 import { dungeonConfig } from "./rules/environment/dungeon/dungeonConfig.js";
@@ -283,9 +289,15 @@ const _tileKindMap = {
   [TILE_DOOR]: 'floor',
   [TILE_STAIR_DOWN]: 'stair_down',
   [TILE_STAIR_UP]: 'stair_up',
-  [TILE_GRASS]: 'grass',
-  [TILE_WATER]: 'water',
-  [TILE_MOUNTAIN]: 'mountain',
+  [TILE_GRASS]:   'grass',
+  [TILE_GRASS_A]: 'grass_a',
+  [TILE_GRASS_C]: 'grass_c',
+  [TILE_GRASS_D]: 'grass_d',
+  [TILE_WATER]:      'water',
+  [TILE_WATER_DEEP]: 'water_deep',
+  [TILE_MOUNTAIN]:   'mountain',
+  [TILE_MOUNTAIN_B]: 'mountain_b',
+  [TILE_MOUNTAIN_C]: 'mountain_c',
   [TILE_TREE]: 'tree',
 };
 
