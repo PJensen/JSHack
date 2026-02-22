@@ -106,6 +106,7 @@ export const basePalette = {
   weapon_rack: { glyph: "⚔", fg: "#bbbbcc", glow: "#888899" },
   mushrooms:   { glyph: "🍄", fg: "#88cc88", glow: "#558855" },
   web:         { glyph: "🕸", fg: "#c8c8c8", glow: "#888888" },
+  torch:       { glyph: "|", fg: "#ffaa44", glow: "#ff6600" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },

@@ -97,3 +97,10 @@ export const Mushrooms = defineArchetype(
   }],
   [Interactable, { action: "harvestNode", params: null }],
 );
+
+export const Torch = defineArchetype(
+  "Torch",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Torch", identity: "torch" }],
+  [Material, { kind: "wood" }],
+);

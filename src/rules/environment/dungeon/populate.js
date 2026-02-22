@@ -42,7 +42,7 @@ import { isIdentified } from '../../data/identification.js';
 import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
 import {
   Fountain, Altar, Shrine, Statue,
-  Sarcophagus, Pillar, WeaponRack, Mushrooms, Web,
+  Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch,
 } from '../../archetypes/RoomFeatures.js';
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -55,6 +55,7 @@ const ROOM_FEATURES = [
   { kind: 'pillar',      weight: 10 },
   { kind: 'weapon_rack', weight: 6 },
   { kind: 'mushrooms',   weight: 8 },
+  { kind: 'torch',       weight: 2 }, // very rare standalone
 ];
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
 
@@ -99,12 +100,24 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Place a room feature (~50% of non-entry rooms get one)
     const isEntryRoom = room === entryRoom;
     let roomHasWeaponRack = false;
+    let decorationPos = null;
     if (!isEntryRoom && rng.next() < 0.50) {
       const featureKind = pickRoomFeature(rng);
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
       spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
       if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
+      decorationPos = { x: cx, y: cy };
+
+      // Sacred rooms (altar or shrine) get a torch in each corner when the room
+      // is large enough to have four obvious, distinct inner corner tiles.
+      const isSacred = featureKind === 'altar' || featureKind === 'shrine';
+      if (isSacred && room.w >= 4 && room.h >= 4) {
+        spawns.push({ x: room.x + 1,             y: room.y + 1,             kind: 'torch', params: {} });
+        spawns.push({ x: room.x + room.w - 2,    y: room.y + 1,             kind: 'torch', params: {} });
+        spawns.push({ x: room.x + 1,             y: room.y + room.h - 2,    kind: 'torch', params: {} });
+        spawns.push({ x: room.x + room.w - 2,    y: room.y + room.h - 2,    kind: 'torch', params: {} });
+      }
     }
 
     // Monster density: ~1 per 20-30 floor tiles, scaled by depth
@@ -114,13 +127,21 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
     // Place spawners (create monster packs)
+    // Never place a spawner on top of a dungeon decoration.
     let roomHasSpider = false;
+    const roomSpawners = [];
     for (let i = 0; i < spawnerBudget; i++) {
-      const mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      let mx, my, attempts = 0;
+      do {
+        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+        attempts++;
+      } while (decorationPos && mx === decorationPos.x && my === decorationPos.y && attempts < 10);
       const sp = pickSpawner(rng, floorPlan.depth);
+      const isSpiderSpawner = sp.monsterType?.identity === 'spider';
       spawns.push({ x: mx, y: my, kind: 'spawner', params: sp });
-      if (sp.monsterType?.identity === 'spider') roomHasSpider = true;
+      if (isSpiderSpawner) roomHasSpider = true;
+      roomSpawners.push({ x: mx, y: my, isSpider: isSpiderSpawner });
     }
 
     // Place individual monsters
@@ -132,12 +153,16 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       if (mp.identity === 'spider') roomHasSpider = true;
     }
 
-    // Scatter webs across ~30% of floor tiles in spider rooms
+    // Scatter webs across ~30% of floor tiles in spider rooms.
+    // Don't place webs on non-spider spawners; spider spawners are the exception.
     if (roomHasSpider) {
       for (let wy = room.y + 1; wy < room.y + room.h - 1; wy++) {
         for (let wx = room.x + 1; wx < room.x + room.w - 1; wx++) {
           if (rng.next() < 0.30) {
-            spawns.push({ x: wx, y: wy, kind: 'web', params: {} });
+            const spawnerHere = roomSpawners.find(s => s.x === wx && s.y === wy);
+            if (!spawnerHere || spawnerHere.isSpider) {
+              spawns.push({ x: wx, y: wy, kind: 'web', params: {} });
+            }
           }
         }
       }
@@ -573,6 +598,8 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, Mushrooms, { x: spawn.x, y: spawn.y });
     case 'web':
       return createFrom(world, Web, { x: spawn.x, y: spawn.y });
+    case 'torch':
+      return createFrom(world, Torch, { x: spawn.x, y: spawn.y });
     default:
       return null;
   }
