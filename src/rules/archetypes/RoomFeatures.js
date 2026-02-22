@@ -78,6 +78,6 @@ export const Mushrooms = defineArchetype(
   [NamedIdentity, { name: "Mushrooms", identity: "mushrooms" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "mushrooms", ready: true, regrowTurns: 80, regrowCountdown: 0 }],
+  [HarvestNode, { kind: "mushrooms", ready: true, regrowTurns: 280, regrowCountdown: 0 }],
   [Interactable, { action: "harvestNode", params: { kind: "mushrooms" } }],
 );
