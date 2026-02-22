@@ -164,7 +164,7 @@ export function buildWorldView(world) {
 			if (door) {
 				kind = door.open ? "door_open" : "door_closed";
 			} else if (isPlayer) {
-				kind = "player";
+				kind = ident?.identity || "player";
 			} else {
 				kind = ident?.identity || ident?.name || "default";
 			}
@@ -212,7 +212,7 @@ export function buildWorldView(world) {
 			if (door) {
 				kind = door.open ? "door_open" : "door_closed";
 			} else if (isPlayer) {
-				kind = "player";
+				kind = ident?.identity || "player";
 			} else {
 				kind = ident?.identity || ident?.name || "default";
 			}

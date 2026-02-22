@@ -375,6 +375,7 @@ function _finalizeNewGame(classData) {
       createPlayer(world, {
         x: spawnPos.x, y: spawnPos.y,
         name: classData?.name ?? "Hero",
+        identity: classDef ? `player_${classDef.id}` : "player",
         maxHp: stats.maxHp ?? 20,
         maxStamina: stats.maxStamina ?? 100,
         staminaRegen: stats.staminaRegen ?? 2.0,
