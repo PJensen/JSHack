@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FX Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #ddd; font-family: monospace; font-size: 13px;
+         display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── Tab bar ─────────────────────────────────────────────────────── */
+  #tabs { display: flex; align-items: center; background: #161616; border-bottom: 1px solid #2a2a2a;
+          padding: 0 8px; height: 34px; flex-shrink: 0; gap: 0; }
+  #tabs-label { color: #444; font-size: 11px; margin-right: 12px; letter-spacing: 1px;
+                text-transform: uppercase; }
+  .tab-btn { padding: 0 18px; height: 34px; border: none; background: transparent; color: #666;
+             cursor: pointer; font-family: monospace; font-size: 12px; border-right: 1px solid #1e1e1e; }
+  .tab-btn.active  { color: #9de; border-bottom: 2px solid #66ccff; }
+  .tab-btn:hover:not(.active) { color: #aaa; }
+
+  /* ── Main layout ─────────────────────────────────────────────────── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center;
+                 background: #0a0a0a; }
+  canvas { border: 1px solid #2e2e2e; display: block; }
+
+  /* ── Sidebar ─────────────────────────────────────────────────────── */
+  #sidebar { background: #1a1a1a; border-left: 1px solid #333; display: flex;
+             flex-direction: column; overflow: hidden; width: 288px; min-width: 288px; }
+  #sidebar.wide { width: 364px; min-width: 364px; }
+
+  /* ── Panel base ──────────────────────────────────────────────────── */
+  .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── Controls ────────────────────────────────────────────────────── */
+  .ctrl-scroll { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .section-label { color: #777; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+                   margin-top: 5px; padding-bottom: 2px; border-bottom: 1px solid #242424; }
+  .row { display: flex; align-items: center; gap: 6px; }
+  .row label { width: 88px; min-width: 88px; color: #999; font-size: 12px; }
+  .row input[type=range] { flex: 1; accent-color: #66ccff; cursor: pointer; }
+  .row .val { width: 46px; min-width: 46px; text-align: right; color: #eee; font-size: 12px; }
+  .row input[type=color] { width: 36px; height: 22px; border: none; background: none; cursor: pointer; padding: 0; }
+  .row input[type=checkbox] { width: 15px; height: 15px; accent-color: #66ccff; cursor: pointer; }
+  .row input[type=text]   { flex: 1; background: #0f0f0f; border: 1px solid #2e2e2e; color: #ddd;
+                             padding: 2px 6px; font-family: monospace; font-size: 12px; }
+  .row select { flex: 1; background: #0f0f0f; border: 1px solid #2e2e2e; color: #ddd;
+                padding: 2px 4px; font-family: monospace; font-size: 12px; cursor: pointer; }
+
+  /* ── Bottom section ──────────────────────────────────────────────── */
+  .bottom-section { padding: 8px 10px; border-top: 1px solid #242424; display: flex;
+                    flex-direction: column; gap: 7px; flex-shrink: 0; }
+  .btn-row { display: flex; gap: 6px; }
+  .btn { padding: 6px 10px; border: none; border-radius: 3px; cursor: pointer;
+         font-family: monospace; font-size: 12px; flex: 1; }
+  .btn-blue  { background: #1d3f58; color: #9de; }
+  .btn-blue:hover  { background: #264d66; }
+  .btn-amber { background: #3a2a10; color: #fca; }
+  .btn-amber:hover { background: #4a3818; }
+  .btn-green { background: #1a3020; color: #8fb; }
+  .btn-green:hover { background: #234030; }
+  pre.output { background: #0d1117; border: 1px solid #1e1e1e; border-radius: 3px;
+               padding: 8px; font-size: 10px; color: #9de; white-space: pre; overflow: auto;
+               max-height: 150px; display: none; }
+  .stats-bar { font-size: 10px; color: #555; padding: 3px 10px; border-top: 1px solid #1c1c1c;
+               flex-shrink: 0; }
+
+  /* ── Glyph editor ────────────────────────────────────────────────── */
+  .ctrl-fixed { flex-shrink: 0; padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+  #glyph-editor { flex: 1; background: #0c1017; color: #c8dff0; font-family: 'Courier New', monospace;
+                  font-size: 12px; border: none; resize: none; padding: 8px 10px; outline: none;
+                  border-top: 1px solid #1e1e1e; line-height: 1.55; min-height: 100px; }
+  #compile-status { font-size: 10px; height: 16px; padding: 1px 10px; flex-shrink: 0; }
+  #compile-status.ok  { color: #8fb; }
+  #compile-status.err { color: #f88; }
+</style>
+</head>
+<body>
+
+<div id="tabs">
+  <span id="tabs-label">FX Builder</span>
+  <button class="tab-btn active" data-tab="particles">Particles &mdash; ParticleFX</button>
+  <button class="tab-btn" data-tab="glyph">Glyph VFX &mdash; GlyphVfxManager</button>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="c" width="760" height="540"></canvas>
+  </div>
+
+  <div id="sidebar">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         PARTICLES PANEL
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="particles-panel" class="panel active">
+      <div class="ctrl-scroll">
+
+        <div class="section-label">Emitter</div>
+        <div class="row">
+          <label>continuous</label>
+          <input type="checkbox" id="continuous" checked>
+        </div>
+        <div class="row">
+          <label>rate</label>
+          <input type="range" id="rate" min="0" max="100" step="1" value="16">
+          <span class="val" id="rate-v">16</span>
+        </div>
+
+        <div class="section-label">Direction</div>
+        <div class="row">
+          <label>angle</label>
+          <input type="range" id="angle" min="-3.1416" max="3.1416" step="0.01" value="-1.5708">
+          <span class="val" id="angle-v">-1.57</span>
+        </div>
+        <div class="row">
+          <label>spread</label>
+          <input type="range" id="spread" min="0" max="3.1416" step="0.01" value="1.0472">
+          <span class="val" id="spread-v">1.05</span>
+        </div>
+
+        <div class="section-label">Speed</div>
+        <div class="row">
+          <label>speed</label>
+          <input type="range" id="speed" min="0" max="10" step="0.05" value="1.4">
+          <span class="val" id="speed-v">1.40</span>
+        </div>
+        <div class="row">
+          <label>speedJitter</label>
+          <input type="range" id="speedJitter" min="0" max="1" step="0.01" value="0.5">
+          <span class="val" id="speedJitter-v">0.50</span>
+        </div>
+
+        <div class="section-label">Acceleration</div>
+        <div class="row">
+          <label>ax</label>
+          <input type="range" id="ax" min="-10" max="10" step="0.05" value="0">
+          <span class="val" id="ax-v">0.00</span>
+        </div>
+        <div class="row">
+          <label>ay</label>
+          <input type="range" id="ay" min="-10" max="10" step="0.05" value="2.5">
+          <span class="val" id="ay-v">2.50</span>
+        </div>
+
+        <div class="section-label">Life</div>
+        <div class="row">
+          <label>life</label>
+          <input type="range" id="life" min="0.05" max="5" step="0.05" value="0.7">
+          <span class="val" id="life-v">0.70</span>
+        </div>
+        <div class="row">
+          <label>lifeJitter</label>
+          <input type="range" id="lifeJitter" min="0" max="1" step="0.01" value="0.3">
+          <span class="val" id="lifeJitter-v">0.30</span>
+        </div>
+
+        <div class="section-label">Size</div>
+        <div class="row">
+          <label>size</label>
+          <input type="range" id="size" min="0.01" max="3" step="0.01" value="0.35">
+          <span class="val" id="size-v">0.35</span>
+        </div>
+        <div class="row">
+          <label>sizeEnd</label>
+          <input type="range" id="sizeEnd" min="0" max="3" step="0.01" value="0.08">
+          <span class="val" id="sizeEnd-v">0.08</span>
+        </div>
+
+        <div class="section-label">Color &amp; Alpha</div>
+        <div class="row">
+          <label>color</label>
+          <input type="color" id="color" value="#66ccff">
+          <span class="val" id="color-v">#66ccff</span>
+        </div>
+        <div class="row">
+          <label>alpha0</label>
+          <input type="range" id="alpha0" min="0" max="1" step="0.01" value="0.7">
+          <span class="val" id="alpha0-v">0.70</span>
+        </div>
+        <div class="row">
+          <label>alpha1</label>
+          <input type="range" id="alpha1" min="0" max="1" step="0.01" value="0">
+          <span class="val" id="alpha1-v">0.00</span>
+        </div>
+
+        <div class="section-label">Offset</div>
+        <div class="row">
+          <label>offsetX</label>
+          <input type="range" id="offsetX" min="-5" max="5" step="0.05" value="0">
+          <span class="val" id="offsetX-v">0.00</span>
+        </div>
+        <div class="row">
+          <label>offsetY</label>
+          <input type="range" id="offsetY" min="-5" max="5" step="0.05" value="-0.3">
+          <span class="val" id="offsetY-v">-0.30</span>
+        </div>
+
+        <div class="section-label">Render</div>
+        <div class="row">
+          <label>scale (px/u)</label>
+          <input type="range" id="scale" min="8" max="128" step="1" value="48">
+          <span class="val" id="scale-v">48</span>
+        </div>
+        <div class="row">
+          <label>blend</label>
+          <select id="blend-mode">
+            <option value="lighter">lighter</option>
+            <option value="source-over">source-over</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>alphaScale</label>
+          <input type="range" id="alphaScale" min="0.5" max="1" step="0.01" value="1">
+          <span class="val" id="alphaScale-v">1.00</span>
+        </div>
+
+      </div><!-- /ctrl-scroll -->
+
+      <div class="bottom-section">
+        <div class="btn-row">
+          <button class="btn btn-amber" id="burst-btn">Burst</button>
+          <button class="btn btn-blue"  id="export-btn">Export</button>
+        </div>
+        <pre class="output" id="p-output"></pre>
+      </div>
+      <div class="stats-bar" id="p-stats">particles: 0 &nbsp;·&nbsp; emitters: 0 &nbsp;·&nbsp; cap: 0</div>
+    </div><!-- /particles-panel -->
+
+
+    <!-- ══════════════════════════════════════════════════════════════
+         GLYPH VFX PANEL
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="glyph-panel" class="panel">
+
+      <div class="ctrl-fixed">
+
+        <div class="section-label">Envelope</div>
+        <div class="row">
+          <label>onsetMs</label>
+          <input type="range" id="onsetMs" min="0" max="2000" step="10" value="300">
+          <span class="val" id="onsetMs-v">300</span>
+        </div>
+        <div class="row">
+          <label>steadyMs</label>
+          <input type="range" id="steadyMs" min="0" max="3000" step="10" value="0">
+          <span class="val" id="steadyMs-v">0</span>
+        </div>
+        <div class="row">
+          <label>comedownMs</label>
+          <input type="range" id="comedownMs" min="0" max="2000" step="10" value="400">
+          <span class="val" id="comedownMs-v">400</span>
+        </div>
+        <div class="row">
+          <label>easing</label>
+          <select id="easing">
+            <option value="linear">linear</option>
+            <option value="quad" selected>quad</option>
+            <option value="exp">exp</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>holdSteady</label>
+          <input type="checkbox" id="holdSteady" checked>
+        </div>
+        <div class="row">
+          <label>scaleMax</label>
+          <input type="range" id="scaleMax" min="0" max="0.5" step="0.01" value="0.12">
+          <span class="val" id="scaleMax-v">0.12</span>
+        </div>
+        <div class="row">
+          <label>jitterMax</label>
+          <input type="range" id="jitterMax" min="0" max="24" step="0.5" value="4">
+          <span class="val" id="jitterMax-v">4.0</span>
+        </div>
+
+        <div class="section-label">Glyph</div>
+        <div class="row">
+          <label>char</label>
+          <input type="text" id="glyph-char" value="@" maxlength="4" style="width:36px;flex:none;">
+          &nbsp;
+          <label style="width:auto;color:#999;font-size:12px;">size</label>
+          <input type="range" id="glyph-size" min="16" max="128" step="2" value="72">
+          <span class="val" id="glyph-size-v">72</span>
+        </div>
+        <div class="row">
+          <label>seed</label>
+          <input type="range" id="glyph-seed" min="1" max="999" step="1" value="42">
+          <span class="val" id="glyph-seed-v">42</span>
+        </div>
+
+        <div class="section-label">Options</div>
+        <div class="row">
+          <label>applyGlobally</label>
+          <input type="checkbox" id="applyGlobally" checked>
+          &nbsp;
+          <label style="width:auto;color:#999;font-size:12px;">drawBase</label>
+          <input type="checkbox" id="drawBase" checked>
+        </div>
+
+        <div class="section-label">Presets</div>
+        <div class="row">
+          <select id="preset-select" style="flex:1;"></select>
+          <button class="btn btn-green" id="preset-load-btn" style="flex:none;width:60px;padding:4px 0;">Load</button>
+        </div>
+      </div><!-- /ctrl-fixed -->
+
+      <div id="compile-status" class="ok">ready</div>
+      <textarea id="glyph-editor" spellcheck="false"></textarea>
+
+      <div class="bottom-section">
+        <div class="btn-row">
+          <button class="btn btn-green" id="restart-btn">Restart</button>
+          <button class="btn btn-amber" id="comedown-btn">Comedown</button>
+          <button class="btn btn-blue"  id="g-export-btn">Export</button>
+        </div>
+        <pre class="output" id="g-output"></pre>
+      </div>
+      <div class="stats-bar" id="g-stats">effects: 0</div>
+
+    </div><!-- /glyph-panel -->
+
+  </div><!-- /sidebar -->
+</div><!-- /main -->
+
+<script type="module">
+import { ParticleFX } from '../src/display/passes/vfx/particles/particlePool.js';
+import { GlyphVfxManager } from '../src/display/passes/vfx/glyph/glyph_vfx.js';
+
+// ─── Shared canvas ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const CX     = canvas.width  * 0.5;
+const CY     = canvas.height * 0.5;
+
+function drawCrosshair() {
+  ctx.strokeStyle = '#282828';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(CX - 14, CY); ctx.lineTo(CX + 14, CY);
+  ctx.moveTo(CX, CY - 14); ctx.lineTo(CX, CY + 14);
+  ctx.stroke();
+}
+
+// ─── Tab switching ──────────────────────────────────────────────────────────
+let currentTab = 'particles';
+const sidebar  = document.getElementById('sidebar');
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    if (tab === currentTab) return;
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn')
+      .forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('particles-panel').classList.toggle('active', tab === 'particles');
+    document.getElementById('glyph-panel').classList.toggle('active', tab === 'glyph');
+    sidebar.classList.toggle('wide', tab === 'glyph');
+    if (tab === 'glyph') glyphRestart();
+  });
+});
+
+// ─── Utilities ──────────────────────────────────────────────────────────────
+const num = id => parseFloat(document.getElementById(id).value);
+const fmt = v  => parseFloat(v.toPrecision(4)).toString();
+
+function wireSlider(id, decimals = 2) {
+  const el  = document.getElementById(id);
+  const val = document.getElementById(id + '-v');
+  if (!el || !val) return;
+  el.addEventListener('input', () => {
+    val.textContent = parseFloat(el.value).toFixed(decimals);
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTICLES TAB  —  uses ParticleFX exactly as main.js does
+// ══════════════════════════════════════════════════════════════════════════
+
+let pxPerUnit = 48;
+
+// Instantiate ParticleFX with the same pattern as main.js
+const fx = new ParticleFX({ capacity: 8192, seedBase: 0xC0FFEE });
+fx.ctx = ctx;
+fx.worldToScreen = ({ x, y, size }) => ({
+  x: CX + x * pxPerUnit,
+  y: CY + y * pxPerUnit,
+  size: size * pxPerUnit,
+});
+
+function readParticleConfig() {
+  return {
+    continuous:  document.getElementById('continuous').checked,
+    rate:        num('rate'),
+    angle:       num('angle'),
+    spread:      num('spread'),
+    speed:       num('speed'),
+    speedJitter: num('speedJitter'),
+    ax:          num('ax'),
+    ay:          num('ay'),
+    life:        num('life'),
+    lifeJitter:  num('lifeJitter'),
+    size:        num('size'),
+    sizeEnd:     num('sizeEnd'),
+    color:       document.getElementById('color').value,
+    alpha0:      num('alpha0'),
+    alpha1:      num('alpha1'),
+    offsetX:     num('offsetX'),
+    offsetY:     num('offsetY'),
+  };
+}
+
+function rebuildEmitter() {
+  pxPerUnit = num('scale');
+  document.getElementById('scale-v').textContent = pxPerUnit;
+  // Mirror what game does: remove stale emitter, re-ensure with new config
+  fx.removeEmitter('preview');
+  fx.ensureEmitter('preview', readParticleConfig());
+}
+
+// Wire sliders
+['rate','angle','spread','speed','speedJitter','ax','ay',
+ 'life','lifeJitter','size','sizeEnd','alpha0','alpha1',
+ 'offsetX','offsetY','alphaScale'].forEach(id => wireSlider(id));
+
+['rate','angle','spread','speed','speedJitter','ax','ay',
+ 'life','lifeJitter','size','sizeEnd','alpha0','alpha1',
+ 'offsetX','offsetY'].forEach(id => {
+  document.getElementById(id).addEventListener('input', rebuildEmitter);
+});
+document.getElementById('scale').addEventListener('input', rebuildEmitter);
+document.getElementById('continuous').addEventListener('change', rebuildEmitter);
+document.getElementById('color').addEventListener('input', () => {
+  document.getElementById('color-v').textContent = document.getElementById('color').value;
+  rebuildEmitter();
+});
+
+// Burst — one-shot via ParticleFX just like game does for status on-hit bursts
+document.getElementById('burst-btn').addEventListener('click', () => {
+  const cfg = readParticleConfig();
+  const burstCount = Math.max(4, Math.round(cfg.rate * cfg.life));
+  const key = 'burst:' + Date.now();
+  fx.ensureEmitter(key, { ...cfg, continuous: false, burstCount });
+  fx.step(0, [{ key, x: 0, y: 0 }]);   // dt=0 triggers burst, no pool step
+  fx.pool.step(0);                       // compact without moving
+  fx.removeEmitter(key);                 // emitter done; particles live in pool
+});
+
+// Export — produces the ensureEmitter call you'd paste into game code
+document.getElementById('export-btn').addEventListener('click', () => {
+  const c = readParticleConfig();
+  const out =
+`fx.ensureEmitter('yourKey', {
+  continuous: ${c.continuous},
+  rate: ${fmt(c.rate)}, angle: ${fmt(c.angle)}, spread: ${fmt(c.spread)},
+  speed: ${fmt(c.speed)}, speedJitter: ${fmt(c.speedJitter)}, ax: ${fmt(c.ax)}, ay: ${fmt(c.ay)},
+  life: ${fmt(c.life)}, lifeJitter: ${fmt(c.lifeJitter)}, size: ${fmt(c.size)}, sizeEnd: ${fmt(c.sizeEnd)},
+  color: '${c.color}', alpha0: ${fmt(c.alpha0)}, alpha1: ${fmt(c.alpha1)},
+  offsetX: ${fmt(c.offsetX)}, offsetY: ${fmt(c.offsetY)},
+});`;
+  const el = document.getElementById('p-output');
+  el.textContent = out;
+  el.style.display = 'block';
+});
+
+function tickParticles(dt) {
+  drawCrosshair();
+  // Mirror main.js update pattern
+  fx.step(dt, [{ key: 'preview', x: 0, y: 0 }]);
+  fx.render({
+    mode:       document.getElementById('blend-mode').value,
+    alphaScale: num('alphaScale'),
+  });
+  const s = fx.stats();
+  document.getElementById('p-stats').textContent =
+    `particles: ${s.active} \u00b7 emitters: ${s.emitters} \u00b7 cap: ${s.capacity}`;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// GLYPH VFX TAB  —  uses GlyphVfxManager exactly as the engine does
+// ══════════════════════════════════════════════════════════════════════════
+
+const vfx = new GlyphVfxManager({ drawBase: false });
+let glyphEffectId = null;
+let compiledFn    = null;
+
+// ── Presets ─────────────────────────────────────────────────────────────────
+const PRESETS = {
+
+'Neon Pulse': `const a = env ? env.gain : 1;
+const pulse = 0.5 + 0.5 * Math.sin(t * 5.5);
+ctx.save();
+ctx.font = size + 'px monospace';
+ctx.textBaseline = 'alphabetic';
+ctx.lineWidth = Math.max(1, size * 0.06);
+ctx.strokeStyle = \`rgba(80,255,200,\${0.9 * a * pulse})\`;
+ctx.globalAlpha = 0.85 * a;
+ctx.strokeText(glyph, x - size * 0.5, y);
+ctx.globalAlpha = 0.3 * a;
+ctx.fillStyle = 'rgba(8,28,22,1)';
+ctx.fillText(glyph, x - size * 0.5, y);
+ctx.restore();`,
+
+'Wobble Glow': `const a = env ? env.gain : 1;
+const wobX = Math.sin(t * 3.7 + seed) * size * 0.04 * a;
+const wobY = Math.cos(t * 2.9 + seed * 1.3) * size * 0.03 * a;
+ctx.save();
+ctx.globalAlpha = 0.6 * a;
+ctx.shadowColor = '#ff9900';
+ctx.shadowBlur = 20 * a;
+ctx.font = size + 'px monospace';
+ctx.textBaseline = 'alphabetic';
+ctx.fillStyle = '#ffcc44';
+ctx.fillText(glyph, x - size * 0.5 + wobX, y + wobY);
+ctx.restore();`,
+
+'Ember Flicker': `const a = env ? env.gain : 1;
+const rand = n => { const v = Math.sin(seed * 113 + n * 17.31) * 43758.5; return (v % 1 + 1) % 1; };
+const flicker = 0.65 + 0.35 * Math.sin(t * 13.7 + seed);
+const hue = 10 + rand(t * 3 | 0) * 30;
+ctx.save();
+ctx.font = size + 'px monospace';
+ctx.textBaseline = 'alphabetic';
+ctx.globalAlpha = 0.9 * a * flicker;
+ctx.fillStyle = \`hsl(\${hue},100%,62%)\`;
+ctx.shadowColor = \`hsl(\${hue},100%,48%)\`;
+ctx.shadowBlur = 28 * a;
+ctx.fillText(glyph, x - size * 0.5, y);
+ctx.restore();`,
+
+'Bleed': `const a = env ? env.gain : 1;
+const rand = n => { const v = Math.sin(seed * 997 + n * 12.9898) * 43758.5; return (v % 1 + 1) % 1; };
+ctx.save();
+const drops = 6;
+for (let i = 0; i < drops; i++) {
+  const ox = (rand(i) - 0.5) * size * 0.7;
+  const speed = 0.35 + rand(i + 10) * 0.9;
+  const phase = (t * speed + rand(i + 20)) % 1.0;
+  const dy = phase * size * 1.6;
+  ctx.globalAlpha = (1 - phase) * 0.75 * a;
+  ctx.fillStyle = '#cc1122';
+  ctx.beginPath();
+  ctx.ellipse(x + ox, y + dy * 0.4, size * 0.035, size * 0.06 + dy * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+ctx.restore();`,
+
+'Glitch Slice': `const a = env ? env.gain : 1;
+if (a < 0.05) return;
+const rand = n => { const v = Math.sin(seed * 997 + n * 12.9898) * 43758.5; return (v % 1 + 1) % 1; };
+ctx.save();
+ctx.font = size + 'px monospace';
+ctx.textBaseline = 'alphabetic';
+const slices = 3 + (a * 4 | 0);
+const sliceH = size / slices;
+for (let i = 0; i < slices; i++) {
+  const jx = (rand(i + (t * 18 | 0)) - 0.5) * size * 0.28 * a;
+  const sy = y - size * 0.9 + i * sliceH;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x - size * 0.6 + jx, sy, size * 1.2, sliceH);
+  ctx.clip();
+  ctx.globalAlpha = 0.85 * a;
+  ctx.fillStyle = i % 2 === 0 ? '#ff4466' : '#44aaff';
+  ctx.fillText(glyph, x - size * 0.5 + jx, y);
+  ctx.restore();
+}
+ctx.restore();`,
+
+'Ash Decay': `const u = env ? env.u : (0.5 + 0.5 * Math.sin(t));
+const a = env ? env.gain : 1;
+const rand = n => { const v = Math.sin(seed * 997 + n * 13.7) * 43758.5; return (v % 1 + 1) % 1; };
+ctx.save();
+ctx.globalAlpha = Math.max(0, 1 - u * 1.3) * 0.9;
+ctx.font = size + 'px monospace';
+ctx.textBaseline = 'alphabetic';
+ctx.fillStyle = '#c0c0c0';
+ctx.fillText(glyph, x - size * 0.5, y);
+ctx.globalCompositeOperation = 'destination-out';
+const holes = u * 70 | 0;
+for (let i = 0; i < holes; i++) {
+  const hx = x - size * 0.5 + rand(i) * size;
+  const hy = y - size * 0.9  + rand(i + 50) * size * 0.95;
+  const rad = size * (0.007 + 0.024 * u);
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.arc(hx, hy, rad, 0, Math.PI * 2);
+  ctx.fill();
+}
+ctx.restore();`,
+
+'Frozen': `const a = env ? env.gain : 1;
+const rand = n => { const v = Math.sin(seed * 419 + n * 7.11) * 21942.1; return (v % 1 + 1) % 1; };
+ctx.save();
+// Ice tint overlay
+ctx.globalAlpha = 0.4 * a;
+ctx.globalCompositeOperation = 'source-atop';
+ctx.font = size + 'px monospace';
+ctx.textBaseline = 'alphabetic';
+ctx.fillStyle = '#aaddff';
+ctx.fillText(glyph, x - size * 0.5, y);
+// Crystal spikes
+ctx.globalCompositeOperation = 'source-over';
+const spikes = 7;
+for (let i = 0; i < spikes; i++) {
+  const ang = (Math.PI * 2 * i / spikes) + rand(i) * 0.6 + t * 0.2;
+  const r0 = size * 0.4;
+  const r1 = r0 + rand(i + 10) * size * 0.35 * a;
+  const cx2 = x, cy2 = y - size * 0.4;
+  ctx.globalAlpha = (0.4 + rand(i + 20) * 0.4) * a;
+  ctx.strokeStyle = '#ccefff';
+  ctx.lineWidth = 1 + rand(i) * 2;
+  ctx.beginPath();
+  ctx.moveTo(cx2 + Math.cos(ang) * r0, cy2 + Math.sin(ang) * r0);
+  ctx.lineTo(cx2 + Math.cos(ang) * r1, cy2 + Math.sin(ang) * r1);
+  ctx.stroke();
+}
+ctx.restore();`,
+
+};
+
+// Populate preset dropdown
+const presetSelect = document.getElementById('preset-select');
+Object.keys(PRESETS).forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  presetSelect.appendChild(opt);
+});
+document.getElementById('glyph-editor').value = PRESETS['Neon Pulse'];
+
+document.getElementById('preset-load-btn').addEventListener('click', () => {
+  const body = PRESETS[presetSelect.value];
+  if (body) {
+    document.getElementById('glyph-editor').value = body;
+    if (compileEffect()) glyphRestart();
+  }
+});
+
+// ── Glyph slider wiring ──────────────────────────────────────────────────────
+wireSlider('onsetMs',    0);
+wireSlider('steadyMs',   0);
+wireSlider('comedownMs', 0);
+wireSlider('scaleMax',   2);
+wireSlider('jitterMax',  1);
+wireSlider('glyph-size', 0);
+wireSlider('glyph-seed', 0);
+
+['onsetMs','steadyMs','comedownMs','scaleMax','jitterMax',
+ 'glyph-size','glyph-seed'].forEach(id => {
+  document.getElementById(id).addEventListener('input', glyphRestart);
+});
+document.getElementById('easing').addEventListener('change', glyphRestart);
+document.getElementById('holdSteady').addEventListener('change', glyphRestart);
+document.getElementById('applyGlobally').addEventListener('change', glyphRestart);
+document.getElementById('glyph-char').addEventListener('input', glyphRestart);
+document.getElementById('glyph-editor').addEventListener('input', () => {
+  if (compileEffect()) glyphRestart();
+});
+
+// ── Compile ──────────────────────────────────────────────────────────────────
+function compileEffect() {
+  const body   = document.getElementById('glyph-editor').value;
+  const status = document.getElementById('compile-status');
+  try {
+    compiledFn = new Function(
+      'ctx','glyph','x','y','size','t','dt','seed','baselineY','env',
+      body
+    );
+    status.textContent = 'compiled ok';
+    status.className   = 'ok';
+    return true;
+  } catch (err) {
+    compiledFn = null;
+    status.textContent = String(err.message).slice(0, 80);
+    status.className   = 'err';
+    return false;
+  }
+}
+
+// ── readEnvelopeParams ───────────────────────────────────────────────────────
+function readEnvelopeParams() {
+  return {
+    onsetMs:    num('onsetMs'),
+    steadyMs:   num('steadyMs'),
+    comedownMs: num('comedownMs'),
+    easing:     document.getElementById('easing').value,
+    holdSteady: document.getElementById('holdSteady').checked,
+    scaleMax:   num('scaleMax'),
+    jitterMax:  num('jitterMax'),
+  };
+}
+
+// ── glyphRestart ─────────────────────────────────────────────────────────────
+// Mirror the engine pattern: clear effects, add fresh one via addEffect()
+function glyphRestart() {
+  if (!compiledFn && !compileEffect()) return;
+  vfx.clear();
+  glyphEffectId = null;
+  const glyph  = document.getElementById('glyph-char').value || '@';
+  const size   = num('glyph-size');
+  const seed   = num('glyph-seed') | 0;
+  const params = readEnvelopeParams();
+  const applyGlobally = document.getElementById('applyGlobally').checked;
+
+  // addEffect() signature matches GlyphVfxManager.addEffect()
+  glyphEffectId = vfx.addEffect({
+    fn: compiledFn,
+    glyph,
+    x: CX, y: CY,
+    size,
+    seed,
+    params,
+    opts: { applyGlobally, drawBase: false },
+  });
+}
+
+document.getElementById('restart-btn').addEventListener('click', glyphRestart);
+
+// requestComedown() — same API the engine uses when a status expires
+document.getElementById('comedown-btn').addEventListener('click', () => {
+  if (glyphEffectId != null) vfx.requestComedown(glyphEffectId);
+});
+
+// Export — produces game-ready addEffect() call + named function
+document.getElementById('g-export-btn').addEventListener('click', () => {
+  const body   = document.getElementById('glyph-editor').value;
+  const glyph  = document.getElementById('glyph-char').value || '@';
+  const size   = num('glyph-size');
+  const seed   = num('glyph-seed') | 0;
+  const params = readEnvelopeParams();
+  const applyGlobally = document.getElementById('applyGlobally').checked;
+
+  const indented = body.split('\n').map(l => '  ' + l).join('\n');
+  const out =
+`function myEffect(ctx, glyph, x, y, size, t, dt, seed, baselineY, env) {
+${indented}
+}
+
+vfx.addEffect({
+  fn: myEffect,
+  glyph: '${glyph}',
+  x: gx, y: gy, size: ${size},
+  seed: ${seed},
+  params: {
+    onsetMs: ${params.onsetMs}, steadyMs: ${params.steadyMs}, comedownMs: ${params.comedownMs},
+    easing: '${params.easing}', holdSteady: ${params.holdSteady},
+    scaleMax: ${params.scaleMax}, jitterMax: ${params.jitterMax},
+  },
+  opts: { applyGlobally: ${applyGlobally} },
+});`;
+  const el = document.getElementById('g-output');
+  el.textContent = out;
+  el.style.display = 'block';
+});
+
+// ── tickGlyph ────────────────────────────────────────────────────────────────
+function tickGlyph(nowSec) {
+  // Roguelike grid background
+  ctx.fillStyle = '#0c0c0c';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const size  = num('glyph-size');
+  const glyph = document.getElementById('glyph-char').value || '@';
+  const cellW = size * 0.6;
+  const cellH = size;
+
+  // Subtle cell grid
+  ctx.strokeStyle = '#181818';
+  ctx.lineWidth = 1;
+  for (let dx = -7; dx <= 7; dx++) {
+    for (let dy = -4; dy <= 4; dy++) {
+      ctx.strokeRect(CX + dx * cellW - cellW * 0.5, CY + dy * cellH - cellH * 0.85, cellW, cellH);
+    }
+  }
+
+  // Surrounding dim glyphs for context
+  ctx.font = size + 'px monospace';
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#222';
+  for (let dx = -7; dx <= 7; dx++) {
+    for (let dy = -4; dy <= 4; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      ctx.fillText('.', CX + dx * cellW, CY + dy * cellH);
+    }
+  }
+  ctx.textAlign = 'left';
+
+  // Center base glyph (drawn before VFX pass, as engine does it)
+  if (document.getElementById('drawBase').checked) {
+    ctx.save();
+    ctx.font = size + 'px monospace';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#999';
+    ctx.fillText(glyph, CX - size * 0.5, CY);
+    ctx.restore();
+  }
+
+  // GlyphVfxManager update + render — mirrors the engine's VFX pass exactly
+  vfx.update(nowSec);
+  vfx.render(ctx);
+
+  document.getElementById('g-stats').textContent =
+    `effects: ${vfx.effects.size}`;
+}
+
+
+// ─── Main loop ───────────────────────────────────────────────────────────────
+let last = null;
+function frame(ts) {
+  const dt = last ? Math.min((ts - last) / 1000, 0.05) : 0.016;
+  last = ts;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (currentTab === 'particles') {
+    tickParticles(dt);
+  } else {
+    tickGlyph(ts / 1000);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+compileEffect();
+rebuildEmitter();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
