@@ -1859,16 +1859,80 @@ function render(worldView) {
       bctx.restore();
     }
 
-    // Glyph-FX: show an invulnerability shimmer ring when tagged
+    // Glyph-FX: invulnerability aegis ward — rotating hex ward, gold aura, sweeping spark
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
+      const cx = e.pos.x, cy = e.pos.y;
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.2);
+      const spin  = _fxTime * 1.4;
+      const rCore = 0.50 + 0.046 * pulse;
+      const rRing = rCore * 1.22;
+
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
-      bctx.strokeStyle = 'rgba(160,255,255,0.9)';
-      bctx.lineWidth = 0.08; // world units
-      const r = 0.45 + 0.06 * Math.sin(_fxTime * 6.0);
+
+      // soft inner aura — warm gold radial gradient
+      const _invAura = bctx.createRadialGradient(cx, cy, 0, cx, cy, rCore * 1.1);
+      _invAura.addColorStop(0, `rgba(255,255,200,${(0.12 + 0.10 * pulse).toFixed(3)})`);
+      _invAura.addColorStop(1, `rgba(240,200,100,${(0.08 + 0.10 * pulse).toFixed(3)})`);
+      bctx.fillStyle = _invAura;
       bctx.beginPath();
-      bctx.arc(e.pos.x, e.pos.y, r, 0, Math.PI * 2);
+      bctx.arc(cx, cy, rCore * 1.1, 0, Math.PI * 2);
+      bctx.fill();
+
+      // outer ring — warm gold stroke
+      bctx.lineWidth = 0.032;
+      bctx.strokeStyle = `rgba(255,240,160,${(0.40 + 0.25 * pulse).toFixed(3)})`;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rRing, 0, Math.PI * 2);
       bctx.stroke();
+
+      // chroma fringe — faint blue outer ring for refractive look
+      bctx.strokeStyle = `rgba(120,220,255,${(0.18 + 0.12 * pulse).toFixed(3)})`;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rRing * 1.04, 0, Math.PI * 2);
+      bctx.stroke();
+
+      // rotating hex ward
+      bctx.save();
+      bctx.translate(cx, cy);
+      bctx.rotate(spin);
+      const _invSides = 6;
+      const _invHexR  = rCore * 0.80;
+      bctx.globalAlpha = 0.45 + 0.25 * pulse;
+      bctx.lineWidth = 0.018;
+      bctx.strokeStyle = 'rgba(255,230,160,0.9)';
+      bctx.beginPath();
+      for (let i = 0; i < _invSides; i++) {
+        const ang = (i / _invSides) * Math.PI * 2;
+        const px = Math.cos(ang) * _invHexR, py = Math.sin(ang) * _invHexR;
+        if (i === 0) bctx.moveTo(px, py); else bctx.lineTo(px, py);
+      }
+      bctx.closePath();
+      bctx.stroke();
+
+      // rune dots at hex vertices
+      bctx.globalAlpha = 0.70;
+      bctx.fillStyle = 'rgba(255,255,210,0.9)';
+      for (let i = 0; i < _invSides; i++) {
+        const ang = (i / _invSides) * Math.PI * 2;
+        const px = Math.cos(ang) * _invHexR, py = Math.sin(ang) * _invHexR;
+        const s = 1 + 0.4 * Math.sin(_fxTime * 6 + i * 1.047);
+        bctx.beginPath();
+        bctx.arc(px, py, 0.015 * s, 0, Math.PI * 2);
+        bctx.fill();
+      }
+      bctx.restore();
+
+      // sweeping specular spark along the outer ring
+      const _invSweepA = (_fxTime * 2.6) % (Math.PI * 2);
+      const _invSx = cx + Math.cos(_invSweepA) * rRing;
+      const _invSy = cy + Math.sin(_invSweepA) * rRing;
+      bctx.globalAlpha = 0.40 + 0.35 * pulse;
+      bctx.fillStyle = 'rgba(255,255,255,0.95)';
+      bctx.beginPath();
+      bctx.ellipse(_invSx, _invSy, 0.05, 0.014, _invSweepA, 0, Math.PI * 2);
+      bctx.fill();
+
       bctx.restore();
     }
 
