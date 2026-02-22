@@ -1,6 +1,12 @@
 export const weapons = {
-  sword_plain:   { glyph:")", fg:"#e8e2b0", glow:"#e8e2b0" },
-  dagger_quick:  { glyph:")", fg:"#f7d794", glow:"#f7d794" },
-  axe_heavy:     { glyph:")", fg:"#e0c070", glow:"#e0c070" },
-  bow_short:     { glyph:"}", fg:"#c4a46c", glow:"#a08050" }
+  sword_plain:        { glyph:")",  fg:"#e8e2b0", glow:"#e8e2b0" },
+  dagger_quick:       { glyph:")",  fg:"#f7d794", glow:"#f7d794" },
+  axe_heavy:          { glyph:")",  fg:"#e0c070", glow:"#e0c070" },
+  bow_short:          { glyph:"}",  fg:"#c4a46c", glow:"#a08050" },
+  longsword:          { glyph:"/",  fg:"#c8cce0", glow:"#9098b8" },
+  iron_mace:          { glyph:")",  fg:"#9090a0", glow:"#707080" },
+  warhammer:          { glyph:"T",  fg:"#a8a0b8", glow:"#706880" },
+  venomfang_dagger:   { glyph:")",  fg:"#80c060", glow:"#40a030" },
+  caustic_stiletto:   { glyph:"/",  fg:"#a0cc40", glow:"#70a020" },
+  stormtouched_mace:  { glyph:")",  fg:"#8090e0", glow:"#4060cc" },
 };
