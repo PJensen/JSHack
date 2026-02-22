@@ -1682,7 +1682,7 @@ function worldToScreen({ x, y, size = 1 }) {
 const fx = new ParticleFX({ capacity: PERF.particleCapacity, seedBase: (world.seed >>> 0) });
 fx.ctx = bctx;
 // Avoid expensive per-particle transforms: draw in world units under camera transform
-fx.worldToScreen = (p) => ({ x: p.x, y: p.y, size: p.size });
+fx.worldToScreen = (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ size, /** @type {{x:number,y:number,size:number}} */ out) => { out.x = x; out.y = y; out.size = size; };
 
 // Per-entity particle emitter tracking sets (display-only, reconciled each frame)
 const _burningEmitters = new Set();
@@ -1697,6 +1697,28 @@ const _fountainEmitters = new Set();
 const _furnaceEmitters  = new Set();
 const _cookFireEmitters = new Set();
 
+// Static emitter config tables — built once at module init, used every frame.
+// Replaces repeated reconcileStatusEmitter() calls with a single entity pass.
+/** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
+const _STATUS_EMITTER_CFG = {
+  burning:  { tracker: _burningEmitters, prefix: 'burn',    cfg: { rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5,  speed: 0.8,  speedJitter: 0.4,  ax: 0, ay: -0.5,  life: 0.7,  lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06, color: '#ff8c00', alpha0: 0.9,  alpha1: 0.0, offsetX: 0, offsetY: -0.15 } },
+  bleeding: { tracker: _bleedEmitters,   prefix: 'bleed',   cfg: { rate: 14, angle:  Math.PI / 2, spread: Math.PI / 8,  speed: 0.55, speedJitter: 0.3,  ax: 0, ay:  1.2,  life: 0.9,  lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05, color: '#bb1111', alpha0: 0.9,  alpha1: 0.0 } },
+  poisoned: { tracker: _poisonEmitters,  prefix: 'poison',  cfg: { rate:  8, angle:  Math.PI / 2, spread: Math.PI / 6,  speed: 0.3,  speedJitter: 0.15, ax: 0, ay:  0.15, life: 1.0,  lifeJitter: 0.4, size: 0.12, sizeEnd: 0.04, color: '#33ff55', alpha0: 0.8,  alpha1: 0.0 } },
+  regen:    { tracker: _regenEmitters,   prefix: 'regen',   cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 4,  speed: 0.4,  speedJitter: 0.15, ax: 0, ay: -0.1,  life: 1.0,  lifeJitter: 0.4, size: 0.10, sizeEnd: 0.02, color: '#44ff88', alpha0: 0.7,  alpha1: 0.0 } },
+  shocked:  { tracker: _shockEmitters,   prefix: 'shock',   cfg: { rate: 30, angle:  0,            spread: Math.PI * 2,  speed: 1.2,  speedJitter: 0.8,  ax: 0, ay:  0,    life: 0.2,  lifeJitter: 0.1, size: 0.10, sizeEnd: 0.02, color: '#00ccff', alpha0: 1.0,  alpha1: 0.0 } },
+  frozen:   { tracker: _frozenEmitters,  prefix: 'frozen',  cfg: { rate: 15, angle:  0,            spread: Math.PI * 2,  speed: 0.22, speedJitter: 0.14, ax: 0, ay:  0.04, life: 1.8,  lifeJitter: 0.5, size: 0.12, sizeEnd: 0.04, color: '#aaeeff', alpha0: 0.6,  alpha1: 0.0 } },
+  cursed:   { tracker: _cursedEmitters,  prefix: 'cursed',  cfg: { rate: 12, angle: -Math.PI / 2, spread: Math.PI,      speed: 0.5,  speedJitter: 0.3,  ax: 0, ay: -0.25, life: 1.2,  lifeJitter: 0.4, size: 0.14, sizeEnd: 0.02, color: '#8822cc', alpha0: 0.7,  alpha1: 0.0 } },
+  blessed:  { tracker: _blessedEmitters, prefix: 'blessed', cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 3,  speed: 0.6,  speedJitter: 0.2,  ax: 0, ay: -0.35, life: 1.0,  lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02, color: '#ffcc00', alpha0: 0.8,  alpha1: 0.0 } },
+};
+/** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
+const _KIND_EMITTER_CFG = {
+  fountain:     { tracker: _fountainEmitters, prefix: 'fountain', cfg: { continuous: true, rate: 16, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 1.4,  speedJitter: 0.5, ax: 0, ay:  2.5,  life: 1.2,  lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08, color: '#66ccff', alpha0: 0.7,  alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
+  furnace:      { tracker: _furnaceEmitters,  prefix: 'furnace',  cfg: { continuous: true, rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.9,  speedJitter: 0.3, ax: 0, ay: -0.1,  life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04, color: '#ff6600', alpha0: 0.88, alpha1: 0.0, offsetX: 0, offsetY:  0.1 } },
+  cooking_fire: { tracker: _cookFireEmitters, prefix: 'cfire',    cfg: { continuous: true, rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05, life: 0.9,  lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04, color: '#ff8800', alpha0: 0.75, alpha1: 0.0, offsetX: 0, offsetY:  0   } },
+};
+// Reusable set for tracking which emitter keys are active in the current frame
+const _seenEmitterKeys = new Set();
+
 // FX controllers (depend on cam + fx)
 const boltFx = createBoltFxController({ world, cam, fx });
 boltFx.installListeners();
@@ -1706,28 +1728,6 @@ const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTim
 spellAreaFx.installListeners();
 const cloudFx = createCloudFxController({ world, cam, fx, getFxTime: () => _fxTime });
 cloudFx.installListeners();
-
-/** Reconcile a per-entity continuous particle emitter for one status tag. */
-function reconcileStatusEmitter(view, fx, origins, trackerSet, tag, prefix, cfg) {
-  const nowActive = new Set();
-  for (let i = 0; i < view.entities.length; i++) {
-    const e = view.entities[i];
-    if (Array.isArray(e.tags) && e.tags.includes(tag)) {
-      nowActive.add(e.id);
-      if (!trackerSet.has(e.id)) {
-        fx.ensureEmitter(`${prefix}:${e.id}`, { continuous: true, ...cfg });
-        trackerSet.add(e.id);
-      }
-      origins.push({ key: `${prefix}:${e.id}`, x: e.pos.x, y: e.pos.y });
-    }
-  }
-  for (const id of trackerSet) {
-    if (!nowActive.has(id)) {
-      fx.removeEmitter(`${prefix}:${id}`);
-      trackerSet.delete(id);
-    }
-  }
-}
 
 // Floating combat text (display-only, world-space)
 const ftext = new FloatText();
@@ -1752,6 +1752,11 @@ bootAdvance("Prepared render resources");
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
 let _fxTime = 0; // display-side time accumulator for simple glyph FX
+
+// Reusable render buffers — hoisted out of hot functions to avoid per-frame GC
+const _stackMeta = new Map();
+/** @type {{ key: string, x: number, y: number }[]} */
+const _origins = [];
 function render(worldView) {
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
@@ -1780,24 +1785,31 @@ function render(worldView) {
   const vy1 = cam.y + viewHalfH + 1;
 
   // Pass 1: tiles from TileMap grid (3-state fog-of-war)
+  // Two sub-passes to avoid per-tile globalAlpha thrashing:
+  //   A) visible tiles at full alpha
+  //   B) explored-only tiles at a single dimmed alpha
   if (worldView.tileGrid) {
     const isVisible = worldView.isVisible;
     const isExplored = worldView.isExplored;
-    worldView.tileGrid.forEachTileInRect(
-      Math.floor(vx0), Math.floor(vy0), Math.ceil(vx1), Math.ceil(vy1),
-      (x, y, tile) => {
-        if (isVisible && isVisible(x, y)) {
-          const kind = _tileKindMap[tile];
-          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
-        } else if (isExplored && isExplored(x, y)) {
-          bctx.globalAlpha = 0.35;
-          const kind = _tileKindMap[tile];
-          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
-          bctx.globalAlpha = 1.0;
-        }
-        // unexplored: skip — background gradient is already black
+    const tx0 = Math.floor(vx0), ty0 = Math.floor(vy0);
+    const tx1 = Math.ceil(vx1),  ty1 = Math.ceil(vy1);
+    // Pass 1A: visible tiles
+    /** @type {Record<number, string>} */ const tileKinds = /** @type {any} */ (_tileKindMap);
+    worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
+      if (isVisible && isVisible(x, y)) {
+        const kind = tileKinds[tile];
+        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
       }
-    );
+    });
+    // Pass 1B: explored-but-not-visible tiles (single alpha set for the whole pass)
+    bctx.globalAlpha = 0.35;
+    worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
+      if (isExplored && isExplored(x, y) && !(isVisible && isVisible(x, y))) {
+        const kind = tileKinds[tile];
+        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+      }
+    });
+    bctx.globalAlpha = 1.0;
   }
 
   // Pass 1.5: engravings on the ground (between tiles and entities)
@@ -1821,7 +1833,8 @@ function render(worldView) {
 
   // Pass 2: entities (doors, stairs, monsters, items, player)
   // Keep only the top-most ground item glyph per tile.
-  const stackMeta = new Map(); // "x,y" -> topItemId
+  _stackMeta.clear(); // "x,y" -> topItemId
+  const stackMeta = _stackMeta;
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
@@ -2274,133 +2287,54 @@ function frame(now) {
 
   // Status particle emitter reconciliation + advance particles
   if (PERF.particleCapacity > 0) {
-    const origins = [];
-    reconcileStatusEmitter(view, fx, origins, _burningEmitters, 'burning', 'burn', {
-      rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5,
-      speed: 0.8, speedJitter: 0.4, ax: 0, ay: -0.5,
-      life: 0.7, lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06,
-      color: '#ff8c00', alpha0: 0.9, alpha1: 0.0, offsetX: 0, offsetY: -0.15,
-    });
-    reconcileStatusEmitter(view, fx, origins, _bleedEmitters, 'bleeding', 'bleed', {
-      rate: 14, angle: Math.PI / 2, spread: Math.PI / 8,
-      speed: 0.55, speedJitter: 0.3, ax: 0, ay: 1.2,
-      life: 0.9, lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05,
-      color: '#bb1111', alpha0: 0.9, alpha1: 0.0,
-    });
-    reconcileStatusEmitter(view, fx, origins, _poisonEmitters, 'poisoned', 'poison', {
-      rate: 8, angle: Math.PI / 2, spread: Math.PI / 6,
-      speed: 0.3, speedJitter: 0.15, ax: 0, ay: 0.15,
-      life: 1.0, lifeJitter: 0.4, size: 0.12, sizeEnd: 0.04,
-      color: '#33ff55', alpha0: 0.8, alpha1: 0.0,
-    });
-    reconcileStatusEmitter(view, fx, origins, _regenEmitters, 'regen', 'regen', {
-      rate: 10, angle: -Math.PI / 2, spread: Math.PI / 4,
-      speed: 0.4, speedJitter: 0.15, ax: 0, ay: -0.1,
-      life: 1.0, lifeJitter: 0.4, size: 0.10, sizeEnd: 0.02,
-      color: '#44ff88', alpha0: 0.7, alpha1: 0.0,
-    });
-    reconcileStatusEmitter(view, fx, origins, _shockEmitters, 'shocked', 'shock', {
-      rate: 30, angle: 0, spread: Math.PI * 2,
-      speed: 1.2, speedJitter: 0.8, ax: 0, ay: 0,
-      life: 0.2, lifeJitter: 0.1, size: 0.10, sizeEnd: 0.02,
-      color: '#00ccff', alpha0: 1.0, alpha1: 0.0,
-    });
-    reconcileStatusEmitter(view, fx, origins, _frozenEmitters, 'frozen', 'frozen', {
-      rate: 15, angle: 0, spread: Math.PI * 2,
-      speed: 0.22, speedJitter: 0.14, ax: 0, ay: 0.04,
-      life: 1.8, lifeJitter: 0.5, size: 0.12, sizeEnd: 0.04,
-      color: '#aaeeff', alpha0: 0.6, alpha1: 0.0,
-    });
-    reconcileStatusEmitter(view, fx, origins, _cursedEmitters, 'cursed', 'cursed', {
-      rate: 12, angle: -Math.PI / 2, spread: Math.PI,
-      speed: 0.5, speedJitter: 0.3, ax: 0, ay: -0.25,
-      life: 1.2, lifeJitter: 0.4, size: 0.14, sizeEnd: 0.02,
-      color: '#8822cc', alpha0: 0.7, alpha1: 0.0,
-    });
-    reconcileStatusEmitter(view, fx, origins, _blessedEmitters, 'blessed', 'blessed', {
-      rate: 10, angle: -Math.PI / 2, spread: Math.PI / 3,
-      speed: 0.6, speedJitter: 0.2, ax: 0, ay: -0.35,
-      life: 1.0, lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02,
-      color: '#ffcc00', alpha0: 0.8, alpha1: 0.0,
-    });
-    // Persistent fountain water-jet emitters (matched by entity kind, not status tag)
-    {
-      const nowActive = new Set();
-      for (let i = 0; i < view.entities.length; i++) {
-        const e = view.entities[i];
-        if (e.kind !== 'fountain') continue;
-        nowActive.add(e.id);
-        if (!_fountainEmitters.has(e.id)) {
-          fx.ensureEmitter(`fountain:${e.id}`, {
-            continuous: true,
-            rate: 16, angle: -Math.PI / 2, spread: Math.PI / 3,
-            speed: 1.4, speedJitter: 0.5, ax: 0, ay: 2.5,
-            life: 1.2, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08,
-            color: '#66ccff', alpha0: 0.7, alpha1: 0.0,
-            offsetX: 0, offsetY: -0.3,
-          });
-          _fountainEmitters.add(e.id);
+    _origins.length = 0;
+    const origins = _origins;
+    // Single entity pass for all status + kind emitters (replaces 11 separate scans)
+    _seenEmitterKeys.clear();
+    for (let i = 0; i < view.entities.length; i++) {
+      const e = view.entities[i];
+      if (Array.isArray(e.tags)) {
+        for (let t = 0; t < e.tags.length; t++) {
+          const sc = _STATUS_EMITTER_CFG[e.tags[t]];
+          if (!sc) continue;
+          const key = `${sc.prefix}:${e.id}`;
+          _seenEmitterKeys.add(key);
+          if (!sc.tracker.has(e.id)) {
+            fx.ensureEmitter(key, { continuous: true, ...sc.cfg });
+            sc.tracker.add(e.id);
+          }
+          origins.push({ key, x: e.pos.x, y: e.pos.y });
         }
-        origins.push({ key: `fountain:${e.id}`, x: e.pos.x, y: e.pos.y });
       }
-      for (const id of _fountainEmitters) {
-        if (!nowActive.has(id)) {
-          fx.removeEmitter(`fountain:${id}`);
-          _fountainEmitters.delete(id);
+      const kc = _KIND_EMITTER_CFG[e.kind];
+      if (kc) {
+        const key = `${kc.prefix}:${e.id}`;
+        _seenEmitterKeys.add(key);
+        if (!kc.tracker.has(e.id)) {
+          fx.ensureEmitter(key, kc.cfg);
+          kc.tracker.add(e.id);
+        }
+        origins.push({ key, x: e.pos.x, y: e.pos.y });
+      }
+    }
+    // Remove emitters for entities that left the view
+    for (const tag in _STATUS_EMITTER_CFG) {
+      const sc = _STATUS_EMITTER_CFG[tag];
+      if (!sc) continue;
+      for (const id of sc.tracker) {
+        if (!_seenEmitterKeys.has(`${sc.prefix}:${id}`)) {
+          fx.removeEmitter(`${sc.prefix}:${id}`);
+          sc.tracker.delete(id);
         }
       }
     }
-    // Furnace fire emitters
-    {
-      const nowActive = new Set();
-      for (let i = 0; i < view.entities.length; i++) {
-        const e = view.entities[i];
-        if (e.kind !== 'furnace') continue;
-        nowActive.add(e.id);
-        if (!_furnaceEmitters.has(e.id)) {
-          fx.ensureEmitter(`furnace:${e.id}`, {
-            continuous: true,
-            rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5,
-            speed: 0.9, speedJitter: 0.3, ax: 0, ay: -0.1,
-            life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04,
-            color: '#ff6600', alpha0: 0.88, alpha1: 0.0,
-            offsetX: 0, offsetY: 0.1,
-          });
-          _furnaceEmitters.add(e.id);
-        }
-        origins.push({ key: `furnace:${e.id}`, x: e.pos.x, y: e.pos.y });
-      }
-      for (const id of _furnaceEmitters) {
-        if (!nowActive.has(id)) {
-          fx.removeEmitter(`furnace:${id}`);
-          _furnaceEmitters.delete(id);
-        }
-      }
-    }
-    // Cooking fire emitters
-    {
-      const nowActive = new Set();
-      for (let i = 0; i < view.entities.length; i++) {
-        const e = view.entities[i];
-        if (e.kind !== 'cooking_fire') continue;
-        nowActive.add(e.id);
-        if (!_cookFireEmitters.has(e.id)) {
-          fx.ensureEmitter(`cfire:${e.id}`, {
-            continuous: true,
-            rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3,
-            speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05,
-            life: 0.9, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04,
-            color: '#ff8800', alpha0: 0.75, alpha1: 0.0,
-            offsetX: 0, offsetY: 0,
-          });
-          _cookFireEmitters.add(e.id);
-        }
-        origins.push({ key: `cfire:${e.id}`, x: e.pos.x, y: e.pos.y });
-      }
-      for (const id of _cookFireEmitters) {
-        if (!nowActive.has(id)) {
-          fx.removeEmitter(`cfire:${id}`);
-          _cookFireEmitters.delete(id);
+    for (const kind in _KIND_EMITTER_CFG) {
+      const kc = _KIND_EMITTER_CFG[kind];
+      if (!kc) continue;
+      for (const id of kc.tracker) {
+        if (!_seenEmitterKeys.has(`${kc.prefix}:${id}`)) {
+          fx.removeEmitter(`${kc.prefix}:${id}`);
+          kc.tracker.delete(id);
         }
       }
     }

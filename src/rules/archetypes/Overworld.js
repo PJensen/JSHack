@@ -41,8 +41,11 @@ export const BerryBush = defineArchetype(
   [NamedIdentity, { name: "Berry Bush", identity: "berry_bush" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "berries", ready: true, regrowTurns: 256, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "berries" } }],
+  [HarvestNode, {
+    kind: "berries", ready: true, regrowTurns: 256, regrowCountdown: 0,
+    yield: "food_wild_berries", yieldMin: 1, yieldMax: 3,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const HerbPatch = defineArchetype(
@@ -51,8 +54,11 @@ export const HerbPatch = defineArchetype(
   [NamedIdentity, { name: "Herb Patch", identity: "herb_patch" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "herbs", ready: true, regrowTurns: 240, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "herbs" } }],
+  [HarvestNode, {
+    kind: "herbs", ready: true, regrowTurns: 240, regrowCountdown: 0,
+    yield: "food_wild_herbs", yieldMin: 1, yieldMax: 2,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const ThornBramble = defineArchetype(
@@ -61,8 +67,12 @@ export const ThornBramble = defineArchetype(
   [NamedIdentity, { name: "Thorn Bramble", identity: "thorn_bramble" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "thorn_bramble", ready: true, regrowTurns: 260, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "thorn_bramble" } }],
+  [HarvestNode, {
+    kind: "thorn_bramble", ready: true, regrowTurns: 260, regrowCountdown: 0,
+    yield: "reagent_thorn_pod", yieldMin: 2, yieldMax: 4,
+    danger: { type: "physical", dmgMin: 1, dmgMax: 3, cause: "thorn_bramble" },
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const VenomFern = defineArchetype(
@@ -71,8 +81,13 @@ export const VenomFern = defineArchetype(
   [NamedIdentity, { name: "Venom Fern", identity: "venom_fern" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "venom_fern", ready: true, regrowTurns: 268, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "venom_fern" } }],
+  [HarvestNode, {
+    kind: "venom_fern", ready: true, regrowTurns: 268, regrowCountdown: 0,
+    yield: "reagent_venom_frond", yieldMin: 2, yieldMax: 3,
+    danger: { type: "poison", dmgMin: 1, dmgMax: 2, cause: "venom_fern" },
+    hazard: { kind: "poison", turnsLeft: 2, tickDamage: 1, identity: "venom_spores", name: "Venom Spores" },
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const OreVeinIron = defineArchetype(
@@ -81,8 +96,12 @@ export const OreVeinIron = defineArchetype(
   [NamedIdentity, { name: "Iron Vein", identity: "ore_vein_iron" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "iron_ore", ready: true, regrowTurns: 400, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "iron_ore" } }],
+  [HarvestNode, {
+    kind: "iron_ore", ready: true, regrowTurns: 400, regrowCountdown: 0,
+    yield: "ore_iron", yieldMin: 1, yieldMax: 3,
+    requiresTool: "dig",
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const OreVeinCoal = defineArchetype(
@@ -91,8 +110,12 @@ export const OreVeinCoal = defineArchetype(
   [NamedIdentity, { name: "Coal Seam", identity: "ore_vein_coal" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "coal_ore", ready: true, regrowTurns: 300, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "coal_ore" } }],
+  [HarvestNode, {
+    kind: "coal_ore", ready: true, regrowTurns: 300, regrowCountdown: 0,
+    yield: "ore_coal", yieldMin: 2, yieldMax: 4,
+    requiresTool: "dig",
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const OreVeinStone = defineArchetype(
@@ -101,8 +124,12 @@ export const OreVeinStone = defineArchetype(
   [NamedIdentity, { name: "Stone Outcrop", identity: "ore_vein_stone" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
-  [HarvestNode, { kind: "stone", ready: true, regrowTurns: 250, regrowCountdown: 0 }],
-  [Interactable, { action: "harvestNode", params: { kind: "stone" } }],
+  [HarvestNode, {
+    kind: "stone", ready: true, regrowTurns: 250, regrowCountdown: 0,
+    yield: "ore_stone", yieldMin: 2, yieldMax: 5,
+    requiresTool: "dig",
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
 );
 
 export const AlchemyBench = defineArchetype(
