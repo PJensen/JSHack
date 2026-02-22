@@ -132,4 +132,10 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["taunted"],
   },
+  {
+    id: "berserk",
+    keys: ["berserk", "berserking"],
+    operation: "none",
+    statuses: ["berserk"],
+  },
 ];
