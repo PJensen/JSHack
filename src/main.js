@@ -1861,7 +1861,7 @@ function render(worldView) {
 
     // Glyph-FX: invulnerability aegis ward — rotating hex ward, gold aura, sweeping spark
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
-      const cx = e.pos.x, cy = e.pos.y;
+      const cx = e.pos.x, cy = e.pos.y + 0.09;
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.2);
       const spin  = _fxTime * 1.4;
       const rCore = 0.50 + 0.046 * pulse;
