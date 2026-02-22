@@ -432,6 +432,11 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log('You kneel at the altar and pray...', 'system');
   });
 
+  world.on('altar:offered', ({ actor, deityName, itemName }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You place ${itemName} on the altar as an offering to ${deityName}.`, 'system');
+  });
+
   world.on('shrine:touch', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     log('You touch the shrine. A faint warmth pulses through you.', 'system');
@@ -566,6 +571,11 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   world.on('tile:dug', ({ actor, x, y }) => {
     const who = nameOfEntity(actor);
     log(`${who} dig${who === 'You' ? '' : 's'} through the wall.`, 'system');
+  });
+
+  world.on('tile:chopped', ({ actor, x, y }) => {
+    const who = nameOfEntity(actor);
+    log(`${who} chop${who === 'You' ? '' : 's'} down the tree.`, 'system');
   });
 
   // === Apply events ===

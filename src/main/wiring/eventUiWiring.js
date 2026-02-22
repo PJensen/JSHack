@@ -88,6 +88,33 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
     }
   });
 
+  // Altar offering: present the player's inventory so they can choose an item to offer.
+  world.on('altar:offerPrompt', ({ actor, targetId, items }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== actor) return;
+    if (!Array.isArray(items) || items.length === 0) return;
+    const offerableItems = [];
+    for (const iid of items) {
+      const info = world.get(iid, ItemInfo);
+      if (!info) continue;
+      offerableItems.push({
+        id: iid,
+        type: info.type || 'item',
+        name: resolveItemDisplayName(world, iid),
+        count: info.count || 1,
+        rarityName: info.rarityName || 'common',
+        value: info.value || 0,
+      });
+    }
+    if (offerableItems.length > 0) {
+      try {
+        window.dispatchEvent(new CustomEvent('ui:altarOfferPrompt', {
+          detail: { altarId: targetId, items: offerableItems },
+        }));
+      } catch (e) { console.debug('[eventUiWiring] dispatch ui:altarOfferPrompt:', e); }
+    }
+  });
+
   // Harvest updates: refresh inventory UI after gather actions.
   // Deferred so the tick's command queue (component adds) flushes first.
   world.on('harvest:picked', ({ actor, count, kind }) => {

@@ -379,7 +379,7 @@ export const ITEM_CATALOG = {
     material: "steel",
     rarity: 2,
     rarityName: "magic",
-    bonuses: { attack: 3 },
+    bonuses: { attack: 3, chop: 1 },
     damageDice: "1d8",
     staminaCost: 12,
   },

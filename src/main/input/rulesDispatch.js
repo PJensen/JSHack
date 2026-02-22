@@ -2,7 +2,7 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo } from "../../rules/components/index.js";
+import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, Position, ItemInfo, Inventory } from "../../rules/components/index.js";
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
@@ -170,6 +170,29 @@ export function makeRulesDispatcher(world, getActorId) {
         if (!recipeKey) break;
         world?.add?.(actorId, InteractIntent, { targetId: benchId, mode: "brew", recipe: recipeKey });
         world?.tick?.(1);
+        break;
+      }
+      case "rules.altarOffer": {
+        const { itemId = 0 } = action.payload || {};
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+        const info = world?.get?.(itemId, ItemInfo);
+        if (!info) break;
+        // Remove item from player inventory
+        const inv = world?.get?.(actorId, Inventory);
+        if (inv && Array.isArray(inv.items)) {
+          const idx = inv.items.indexOf(itemId);
+          if (idx >= 0) inv.items.splice(idx, 1);
+        }
+        // Compute offering value from item rarity/value
+        const rarity = Number(info.rarity || 1);
+        const baseValue = Number(info.value || 0);
+        const offerValue = Math.min(1, Math.max(0.05, (baseValue > 0 ? baseValue / 200 : rarity * 0.2)));
+        // Destroy the item
+        try { world?.destroy?.(itemId); } catch {}
+        // Emit offering event for deity system
+        world?.emit?.("altar:offer", { actor: actorId, itemId, itemName: info.name || info.description || "item", value: offerValue });
+        // Refresh inventory UI
+        try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
         break;
       }
     }

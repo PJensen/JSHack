@@ -298,6 +298,15 @@ function wireWorldEvents(world) {
     const magnitude = Math.min(0.3, (amount || 1) * 0.05);
     deity.action('betray', { magnitude, target: 'companion' });
   });
+
+  // Altar offerings → deity.offer()
+  world.on('altar:offer', ({ actor, itemName, value }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const { deity } = resolved;
+    deity.offer('item', { value: value || 0.3, alignment: 'neutral', itemName });
+    world.emit?.('altar:offered', { actor, deityName: deity.name, itemName, value });
+  });
 }
 
 /**
