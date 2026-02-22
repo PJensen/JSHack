@@ -17,6 +17,7 @@ import { forEachInRect, ensureSpatialIndex } from '../../rules/utils/spatialInde
 import { Engraving } from '../../rules/components/Engraving.js';
 import { PlasmaCloud } from "../../rules/components/PlasmaCloud.js";
 import { HazardArea } from "../../rules/components/HazardArea.js";
+import { Trap } from "../../rules/components/Trap.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number }} EntityView */
@@ -154,6 +155,9 @@ export function buildWorldView(world) {
 		const y1 = _view.player.pos.y + viewR;
 		forEachInRect(world, x0, y0, x1, y1, (id, pos) => {
 			if (world.has(id, PlasmaCloud) || world.has(id, HazardArea)) return;
+			// Hide unrevealed traps — completely invisible until triggered
+			/** @type {any} */ const trap = /** @type any */ (world.get(id, Trap));
+			if (trap && !trap.revealed) return;
 			const isPlayer = _view.player && id === _view.player.id;
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
@@ -202,6 +206,9 @@ export function buildWorldView(world) {
 	} else {
 		for (const [id, pos] of world.query(Position)) {
 			if (world.has(id, PlasmaCloud) || world.has(id, HazardArea)) continue;
+			// Hide unrevealed traps — completely invisible until triggered
+			/** @type {any} */ const trap2 = /** @type any */ (world.get(id, Trap));
+			if (trap2 && !trap2.revealed) continue;
 			const isPlayer = world.has(id, Player);
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
