@@ -78,6 +78,15 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     }
   }
 
+  // Sweep orphaned floor-local entities not captured in floorEntityIds:
+  // runtime-spawned monsters whose spawner was killed, web trail entities,
+  // sarcophagus skeletons, loot drops, etc. The player and DungeonState
+  // entity are permanent and must be preserved.
+  for (const [eid] of world.query(Position)) {
+    if (world.has(eid, Player) || world.has(eid, DungeonState)) continue;
+    try { if (world.isAlive(eid)) destroySubtree(world, eid); } catch (_) {}
+  }
+
   // Clear tile data and fog-of-war
   clearTileMap();
   clearExplored();
