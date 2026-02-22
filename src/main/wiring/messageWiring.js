@@ -455,7 +455,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('mushroom:hallucinate', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The mushrooms make your head swim. The walls begin to shift...', 'system');
+    log('The mushrooms make your head swim. The walls begin to shift... and a furious rage surges through you!', 'system');
   });
 
   world.on('harvest:picked', ({ actor, kind, count, itemId }) => {

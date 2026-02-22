@@ -103,6 +103,12 @@ export function installBumpAttackListener(world) {
         if (!(source > 0) || !(defender > 0) || source === defender) return;
         try { resolveMeleeAttack(world, source, defender); } catch (e) { console.error('[combatSystem] resolveMeleeAttack failed:', e); }
     });
+
+    world.on('beforeHit', (ctx) => {
+        if (hasEffect(ctx.world, ctx.attacker, 'berserk')) {
+            ctx.damage = ctx.damage * 4;
+        }
+    });
 }
 
 /**
