@@ -93,7 +93,7 @@ export const CLASS_DEFS = {
       visionRange: 10,
     },
     equipment: {
-      weapon: 'sword_plain',
+      weapon: 'iron_mace',
       armor: 'leather_armor',
       shield: 'shield_wood',
     },
