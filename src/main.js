@@ -102,6 +102,9 @@ import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng } from "./lib/ecs-js/rng.js";
+import { getClass, listClassIds } from "./rules/data/classes.js";
+import { getDeity } from "./rules/data/deities.js";
+import { showCharCreation } from "./display/ui/charCreation.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -358,18 +361,34 @@ if (_pendingSavegame) {
   if (stairCount === 0 && runtimeConfig.debug) console.warn('[DUNGEON] WARNING: No stair entities were created!');
 }
 
-if (!_savegameLoaded) {
-  // Create player at the spawn position (center of first room in origin chunk)
-  if (!playerEntity(world)) {
-    createPlayer(world, { x: spawnPos.x, y: spawnPos.y, name: "Hero" });
-  }
+// _finalizeNewGame: called after character creation confirms (new game)
+// or immediately (savegame loaded). Creates the player, applies class loadout,
+// initializes deity, then starts the simulation and render loop.
+function _finalizeNewGame(classData) {
+  const classDef = classData ? getClass(classData.classId) : null;
 
-  // Set player stats
-  {
+  if (!_savegameLoaded) {
+    const stats = classDef?.stats ?? {};
+
+    // Create player at the spawn position with class stats
+    if (!playerEntity(world)) {
+      createPlayer(world, {
+        x: spawnPos.x, y: spawnPos.y,
+        name: classData?.name ?? "Hero",
+        maxHp: stats.maxHp ?? 20,
+        maxStamina: stats.maxStamina ?? 100,
+        staminaRegen: stats.staminaRegen ?? 2.0,
+      });
+    }
+
     const pe = playerEntity(world);
     if (pe) {
-      // Mana
-      world.add(pe.id, Mana, { mana: 50, maxMana: 50, manaRegen: 0.1 });
+      // Mana from class
+      world.add(pe.id, Mana, {
+        mana: stats.maxMana ?? 50,
+        maxMana: stats.maxMana ?? 50,
+        manaRegen: stats.manaRegen ?? 0.1,
+      });
       // 10-turn invulnerability at start
       const ae = world.get(pe.id, ActiveEffects);
       if (ae && Array.isArray(ae.effects)) {
@@ -380,6 +399,14 @@ if (!_savegameLoaded) {
       // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
       world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
 
+      // Brain stats from class (intelligence, visionRange)
+      const brain = /** @type {{ learnedSpellIds?: string[], intelligence?: number, visionRange?: number }|null } */ (world.get(pe.id, Brain));
+      if (brain) {
+        if (stats.intelligence != null) brain.intelligence = stats.intelligence;
+        if (stats.visionRange != null) brain.visionRange = stats.visionRange;
+      }
+
+      // Class-driven loadout
       const inv = world.get(pe.id, Inventory);
       const eq = world.get(pe.id, Equipment);
       const addStarterItem = (itemId, opts = {}) => {
@@ -391,96 +418,95 @@ if (!_savegameLoaded) {
         return moved.mode === "stacked" ? moved.stackedIntoId : createdId;
       };
 
-      // Demo loadout: fun melee setup with caster utility.
-      if (eq) {
-        eq.weapon = addStarterItem('stormtouched_mace') || null;
-        eq.armor = addStarterItem('leadweave_mantle') || null;
-        eq.shield = addStarterItem('grounded_buckler') || null;
-        eq.ring1 = addStarterItem('ring_arcana') || null;
-        eq.ring2 = addStarterItem('ring_endurance') || null;
+      if (eq && classDef) {
+        if (classDef.equipment.weapon) eq.weapon = addStarterItem(classDef.equipment.weapon) || null;
+        if (classDef.equipment.armor) eq.armor = addStarterItem(classDef.equipment.armor) || null;
+        if (classDef.equipment.shield) eq.shield = addStarterItem(classDef.equipment.shield) || null;
+      }
+      if (classDef) {
+        for (const { itemId, count } of classDef.inventoryItems) {
+          addStarterItem(itemId, { count });
+        }
       }
 
-      // Keep a pickaxe around for digging fun.
-      addStarterItem('iron_pickaxe');
-
-      // Useful inventory extras for demos.
-      addStarterItem('potion_stoneskin', { count: 3 });
-      addStarterItem('potion_health', { count: 3 });
-      addStarterItem('wand_frost');
-      addStarterItem('stone_touchstone');
-      addStarterItem('book_dead');
-
-      // Start with Lightning learned and first in brain order.
-      const brain = /** @type {{ learnedSpellIds?: string[] }|null } */ (world.get(pe.id, Brain));
-      if (brain) {
+      // Starting spell from class
+      if (brain && classDef?.startingSpell) {
         if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-        const filtered = brain.learnedSpellIds.filter((id) => id !== 'lightning');
-        brain.learnedSpellIds = ['lightning', ...filtered];
+        const filtered = brain.learnedSpellIds.filter((id) => id !== classDef.startingSpell);
+        brain.learnedSpellIds = [classDef.startingSpell, ...filtered];
       }
     }
+
+    // Spawn pet (kitty) next to the player
+    {
+      const pe = playerEntity(world);
+      if (pe) {
+        const ppos = world.get(pe.id, Position);
+        const spawnTile = findNearestValidTileAround(world, ppos, {
+          maxDistance: 1,
+          exclude: [{ x: ppos.x, y: ppos.y }],
+        });
+        const petId = world.create();
+        world.add(petId, Pet);
+        world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
+        world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+        world.add(petId, Faction, { key: "pet" });
+        world.add(petId, Owner, { ownerId: pe.id });
+        world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
+        world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
+        world.add(petId, Vitality, { maxHp: 30, hp: 30 });
+        world.add(petId, Equipment, {
+          attackDerived: 2,
+          defenseDerived: 2
+        });
+        world.add(petId, PetState, {
+          state: 'following',
+          targetX: null,
+          targetY: null,
+          targetItemId: 0,
+          stateEnteredTurn: world.step,
+          lastPlayerX: ppos.x,
+          lastPlayerY: ppos.y,
+          commandCooldown: 0,
+        });
+        try {
+          window.dispatchEvent(new CustomEvent('ui:petExists', {
+            detail: { exists: true }
+          }));
+        } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
+      }
+    }
+
+    applyDebugCommands({ world, runtimeConfig });
   }
 
-  // Spawn pet (kitty) next to the player
+  // Ensure deity state is initialized for current player (new game or loaded save).
   {
     const pe = playerEntity(world);
     if (pe) {
-      const ppos = world.get(pe.id, Position);
-      const spawnTile = findNearestValidTileAround(world, ppos, {
-        maxDistance: 1,
-        exclude: [{ x: ppos.x, y: ppos.y }],
-      });
-      const petId = world.create();
-      world.add(petId, Pet);
-      world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
-      world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
-      world.add(petId, Faction, { key: "pet" });
-      world.add(petId, Owner, { ownerId: pe.id });
-      world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
-      world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
-      // Pet combat components
-      world.add(petId, Vitality, { maxHp: 30, hp: 30 });
-      world.add(petId, Equipment, {
-        attackDerived: 2,   // Base attack bonus
-        defenseDerived: 2   // Base defense (armorClass = 10 + defense = 12)
-      });
-      // Pet state machine
-      world.add(petId, PetState, {
-        state: 'following',
-        targetX: null,
-        targetY: null,
-        targetItemId: 0,
-        stateEnteredTurn: world.step,
-        lastPlayerX: ppos.x,
-        lastPlayerY: ppos.y,
-        commandCooldown: 0,
-      });
-
-      // Notify UI that pet exists
-      try {
-        window.dispatchEvent(new CustomEvent('ui:petExists', {
-          detail: { exists: true }
-        }));
-      } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
+      const dev = world.get(pe.id, Devotion);
+      const deityId = String(dev?.deityId || classDef?.deityId || chosenDeityId || "");
+      if (deityId) {
+        if (!dev) world.add(pe.id, Devotion, { deityId });
+        initDeity(deityId, world);
+      }
     }
   }
 
-  applyDebugCommands({ world, runtimeConfig });
-}
+  bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 
-// Ensure deity state is initialized for current player (new game or loaded save).
-{
-  const pe = playerEntity(world);
-  if (pe) {
-    const dev = world.get(pe.id, Devotion);
-    const deityId = String(dev?.deityId || chosenDeityId || "");
-    if (deityId) {
-      if (!dev) world.add(pe.id, Devotion, { deityId });
-      initDeity(deityId, world);
-    }
-  }
-}
+  // Initial world tick — runs all systems once so status effects, equipment stats,
+  // and other derived state are fully resolved before the first frame renders.
+  stepSim(1);
 
-bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
+  bootAdvance("Starting render loop");
+  requestAnimationFrame((now) => {
+    frame(now);
+    finishBoot();
+  });
+
+  installSceneControls({ world, cam, TILE_PX, messageLog, runtimeConfig });
+}
 
 function findNearestTraversalTarget(world, x, y) {
   let nearest = null;
@@ -2237,17 +2263,31 @@ function frame(now) {
 
 
 
-// Initial world tick — runs all systems once so status effects, equipment stats,
-// and other derived state are fully resolved before the first frame renders.
-stepSim(1);
-
-bootAdvance("Starting render loop");
-requestAnimationFrame((now) => {
-  frame(now);
+// ---- Character creation gate -------------------------------------------------
+// Savegames bypass char creation; new games show the selection screen first.
+if (_savegameLoaded) {
+  _finalizeNewGame(null);
+} else {
+  // Fade out the boot loader so the char creation panel is visible
   finishBoot();
-});
 
-installSceneControls({ world, cam, TILE_PX, messageLog, runtimeConfig });
+  const classDisplayData = listClassIds().map(id => {
+    const cls = getClass(id);
+    const deity = getDeity(cls.deityId);
+    return {
+      id: cls.id,
+      name: cls.name,
+      description: cls.description,
+      deityName: deity?.name ?? cls.deityId,
+      deityAlignment: deity?.alignment ?? '',
+    };
+  });
+
+  showCharCreation({
+    classes: classDisplayData,
+    onConfirm: (result) => _finalizeNewGame(result),
+  });
+}
 
 // Cache WorldView per rules step; if the sim hasn't advanced, reuse the view
 let _cachedView = null; let _cachedStep = -1;

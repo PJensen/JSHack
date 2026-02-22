@@ -127,8 +127,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       });
     }
 
-    // Item density: ~1 per 15-25 floor tiles
-    const itemBudget = Math.max(0, Math.floor(area / rng.int(15, 25)));
+    // Item density: ~1 per 40-60 floor tiles (scarce — items should feel good to find)
+    const itemBudget = Math.max(0, Math.floor(area / rng.int(40, 60)));
     for (let i = 0; i < itemBudget; i++) {
       const ix = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const iy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
@@ -149,8 +149,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
     }
 
-    // Chest: ~30% chance per room
-    if (rng.next() < 0.30) {
+    // Chest: ~13% chance per room (rare find)
+    if (rng.next() < 0.13) {
       const chx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const chy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
       const d = floorPlan.depth;
