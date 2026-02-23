@@ -72,20 +72,31 @@ export function cookAtFire(world, actor, targetId, corpseItemId) {
 
   const fromName = ni.name || "corpse";
 
-  const result = transmogrify(world, corpseItemId, "food_ration");
-  if (!result.ok) {
-    world.emit?.("cooking:failed", { actor, targetId, itemId: corpseItemId, reason: "transmogrify_failed" });
-    return;
-  }
+  // Exit tick context so transmogrify's template entity creation and the
+  // FoodDecay reset are immediate rather than deferred. Without this,
+  // world.add() during a tick queues ops that haven't been applied yet,
+  // so transmogrify's world.get() on the template returns null and the
+  // corpse-to-ration conversion silently does nothing.
+  const wasTicking = world._inTick;
+  world._inTick = false;
+  try {
+    const result = transmogrify(world, corpseItemId, "food_ration");
+    if (!result.ok) {
+      world.emit?.("cooking:failed", { actor, targetId, itemId: corpseItemId, reason: "transmogrify_failed" });
+      return;
+    }
 
-  // Reset decay — freshly cooked food with ration shelf life.
-  if (world.has(corpseItemId, FoodDecay)) {
-    world.mutate(corpseItemId, FoodDecay, (fd) => {
-      fd.turnsHeld = 0;
-      fd.shelfLife = SHELF_LIFE_RATION;
-    });
-  } else {
-    world.add(corpseItemId, FoodDecay, { turnsHeld: 0, shelfLife: SHELF_LIFE_RATION });
+    // Reset decay — freshly cooked food with ration shelf life.
+    if (world.has(corpseItemId, FoodDecay)) {
+      world.mutate(corpseItemId, FoodDecay, (fd) => {
+        fd.turnsHeld = 0;
+        fd.shelfLife = SHELF_LIFE_RATION;
+      });
+    } else {
+      world.add(corpseItemId, FoodDecay, { turnsHeld: 0, shelfLife: SHELF_LIFE_RATION });
+    }
+  } finally {
+    world._inTick = wasTicking;
   }
 
   world.emit?.("cooking:cooked", {
@@ -93,7 +104,7 @@ export function cookAtFire(world, actor, targetId, corpseItemId) {
     targetId,
     itemId: corpseItemId,
     fromName,
-    toIdentity: result.to,
+    toIdentity: "food_ration",
   });
 
   // Refresh the cooking UI with updated inventory.
