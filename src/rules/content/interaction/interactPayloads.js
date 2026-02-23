@@ -36,6 +36,7 @@ import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
+import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -172,6 +173,19 @@ export const INTERACT_PAYLOADS = {
         return;
       }
       brewAtAlchemyBench(world, actor, targetId, requestedRecipe);
+    },
+  },
+
+  // ── Cooking ───────────────────────────────────────────────────────────────
+
+  cookFood: {
+    onInteract(ctx) {
+      const { world, actor, targetId, intent } = ctx;
+      if (String(intent?.mode || "") === "cook" && (intent?.itemId | 0) > 0) {
+        cookAtFire(world, actor, targetId, intent.itemId | 0);
+        return;
+      }
+      emitCookingFireOpen(world, actor, targetId);
     },
   },
 

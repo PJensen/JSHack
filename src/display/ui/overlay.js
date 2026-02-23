@@ -3,6 +3,7 @@
 
 import { ensureMemoryGraph } from './memoryGraph.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
+import { renderCookingFire } from './cookingFireOverlay.js';
 
 const PANEL_Z_BASE = 1200;
 let _panelZCounter = PANEL_Z_BASE;
@@ -52,6 +53,7 @@ export function initOverlays() {
   const throwPanel = ensurePanel('throw');
   const spells = ensurePanel('spells');
   const alchemy = ensurePanel('alchemy');
+  const cooking = ensurePanel('cooking');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
@@ -109,6 +111,7 @@ export function initOverlays() {
       hide(throwPanel);
       hide(spells);
       hide(alchemy);
+      hide(cooking);
       hide(shop);
       hide(chest);
       hide(rack);
@@ -283,6 +286,36 @@ export function initOverlays() {
       recipes: Array.isArray(d.recipes) ? d.recipes : [],
     };
     renderAlchemyBench(alchemy, _alchemyState);
+  });
+
+  // Cooking fire overlay
+  let _cookingState = {
+    fireId: 0,
+    corpses: [],
+    herbs: { count: 0 },
+  };
+  window.addEventListener('ui:openCookingFire', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _cookingState.fireId = Number(d.fireId || 0) | 0;
+    show(cooking);
+    renderCookingFire(cooking, _cookingState);
+  });
+  window.addEventListener('ui:closeCookingFire', () => {
+    _cookingState.fireId = 0;
+    hide(cooking);
+  });
+  window.addEventListener('ui:cookingFireData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _cookingState = {
+      fireId: Number(d.fireId || _cookingState.fireId || 0) | 0,
+      corpses: Array.isArray(d.corpses) ? d.corpses : [],
+      herbs: d.herbs && typeof d.herbs === 'object' ? d.herbs : { count: 0 },
+    };
+    renderCookingFire(cooking, _cookingState);
   });
 
   // Chest overlay

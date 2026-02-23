@@ -14,6 +14,8 @@ import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { HazardArea } from '../src/rules/components/HazardArea.js';
 import { Potion } from '../src/rules/components/Potion.js';
+import { Consumable } from '../src/rules/components/Consumable.js';
+import { FoodDecay } from '../src/rules/components/FoodDecay.js';
 import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { WildBerries, WildHerbs, ThornPods, VenomFronds } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
@@ -505,4 +507,118 @@ Deno.test("altar: offer fails gracefully when item is not in inventory", () => {
 
   assert(failures.length === 1, 'should emit altar:offerFailed');
   assert(failures[0].reason === 'not_owned', 'should explain the failure reason');
+});
+
+// ── Cooking fire ──────────────────────────────────────────────────────────────
+
+Deno.test("cooking fire: phase 1 emits cooking:open with corpses and herbs", () => {
+  const world = new World({ seed: 70 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Position, { x: 3, y: 3 });
+
+  // Add a corpse to inventory.
+  const corpse = world.create();
+  world.add(corpse, NamedIdentity, { name: "Rat Corpse", identity: "corpse_rat" });
+  world.add(corpse, ItemInfo, { type: "food", weight: 2, value: 5, count: 1 });
+  world.add(corpse, Consumable, { effectParams: { nutrition: 150, corpseIdentity: "corpse_rat" }, remainingUses: 1, potency: 0 });
+  world.add(corpse, FoodDecay, { turnsHeld: 20, shelfLife: 150 });
+  const inv = world.get(actor, Inventory);
+  inv.items.push(corpse);
+
+  // Add herbs to inventory.
+  const herbs = createFrom(world, WildHerbs, {});
+  world.mutate(herbs, ItemInfo, (r) => { r.count = 3; });
+  inv.items.push(herbs);
+
+  const fire = world.create();
+  world.add(fire, Interactable, { action: 'cookFood', params: null });
+  world.add(fire, Position, { x: 4, y: 3 });
+
+  const openEvents = [];
+  world.on('cooking:open', (e) => openEvents.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fire });
+  interactionSystem(world);
+
+  assert(openEvents.length === 1, 'should emit cooking:open');
+  assert(Array.isArray(openEvents[0].corpses), 'should include corpses array');
+  assert(openEvents[0].corpses.length === 1, 'should list the one corpse');
+  assert(openEvents[0].corpses[0] === corpse, 'corpse entity id should match');
+  assert(openEvents[0].herbs.count === 3, 'should count herbs');
+});
+
+Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
+  const world = new World({ seed: 71 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Position, { x: 3, y: 3 });
+
+  // Add a corpse to inventory.
+  const corpse = world.create();
+  world.add(corpse, NamedIdentity, { name: "Orc Corpse", identity: "corpse_orc" });
+  world.add(corpse, ItemInfo, { type: "food", weight: 4, value: 10, count: 1 });
+  world.add(corpse, Consumable, { effectParams: { nutrition: 300, corpseIdentity: "corpse_orc" }, remainingUses: 1, potency: 0 });
+  world.add(corpse, FoodDecay, { turnsHeld: 50, shelfLife: 150 });
+  const inv = world.get(actor, Inventory);
+  inv.items.push(corpse);
+
+  const fire = world.create();
+  world.add(fire, Interactable, { action: 'cookFood', params: null });
+  world.add(fire, Position, { x: 4, y: 3 });
+
+  const cooked = [];
+  world.on('cooking:cooked', (e) => cooked.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fire, mode: 'cook', itemId: corpse });
+  interactionSystem(world);
+
+  assert(cooked.length === 1, 'should emit cooking:cooked');
+  assert(cooked[0].itemId === corpse, 'cooked event should reference the item');
+
+  // The corpse entity should now be a ration (same entity id, new identity).
+  const ni = world.get(corpse, NamedIdentity);
+  assert(ni.identity === 'food_ration', `expected food_ration, got ${ni.identity}`);
+  assert(inv.items.includes(corpse), 'ration should still be in inventory');
+
+  // FoodDecay should be reset to fresh with ration shelf life.
+  const fd = world.get(corpse, FoodDecay);
+  assert(fd.turnsHeld === 0, 'turnsHeld should be reset to 0');
+  assert(fd.shelfLife === 500, `shelfLife should be 500 (ration), got ${fd.shelfLife}`);
+});
+
+Deno.test("cooking fire: no corpses emits cooking:open with empty list", () => {
+  const world = new World({ seed: 72 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const fire = world.create();
+  world.add(fire, Interactable, { action: 'cookFood', params: null });
+
+  const openEvents = [];
+  world.on('cooking:open', (e) => openEvents.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fire });
+  interactionSystem(world);
+
+  assert(openEvents.length === 1, 'should emit cooking:open');
+  assert(openEvents[0].corpses.length === 0, 'corpses should be empty');
+});
+
+Deno.test("cooking fire: cooking item not in inventory emits cooking:failed", () => {
+  const world = new World({ seed: 73 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const fire = world.create();
+  world.add(fire, Interactable, { action: 'cookFood', params: null });
+
+  const failures = [];
+  world.on('cooking:failed', (e) => failures.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fire, mode: 'cook', itemId: 9999 });
+  interactionSystem(world);
+
+  assert(failures.length === 1, 'should emit cooking:failed');
+  assert(failures[0].reason === 'not_owned', 'reason should be not_owned');
 });
