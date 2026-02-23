@@ -24,6 +24,7 @@ import { Equipment } from "../../components/Equipment.js";
 import { Position } from "../../components/Position.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { Interactable } from "../../components/Interactable.js";
+import { ObjectState } from "../../components/ObjectState.js";
 import TombstoneComponent from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
@@ -186,6 +187,22 @@ export const INTERACT_PAYLOADS = {
         return;
       }
       emitCookingFireOpen(world, actor, targetId);
+    },
+  },
+
+  // ── Furnace ────────────────────────────────────────────────────────────────
+
+  toggleFurnace: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const os = world.get(targetId, ObjectState);
+      const nowLit = os?.state !== "lit";
+      if (os) world.set(targetId, ObjectState, { state: nowLit ? "lit" : "unlit" });
+      world.emit?.("interaction", {
+        actor, targetId,
+        action: "toggleFurnace",
+        result: nowLit ? "lit" : "extinguished",
+      });
     },
   },
 

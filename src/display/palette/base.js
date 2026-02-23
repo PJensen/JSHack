@@ -93,7 +93,8 @@ export const basePalette = {
   ore_vein_stone: { glyph: "◇", fg: "#8a8e93", glow: "#555a5e" },
   // Crafting stations
   anvil:        { glyph: "⚒", fg: "#9aacba", glow: "#4a6070" },
-  furnace:      { glyph: "🫕", fg: "#ff8533", glow: "#cc4400" },
+  furnace:       { glyph: "🫕", fg: "#ff8533", glow: "#cc4400" },
+  furnace_unlit: { glyph: "🫕", fg: "#8a6040", glow: "#553320" },
   cooking_fire: { glyph: "♨", fg: "#ff9944", glow: "#dd5500" },
 
   // Room features
