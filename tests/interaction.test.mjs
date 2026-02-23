@@ -550,6 +550,7 @@ Deno.test("cooking fire: phase 1 emits cooking:open with corpses and herbs", () 
 
 Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   const world = new World({ seed: 71 });
+  world.setScheduler((w) => { interactionSystem(w); });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
   world.add(actor, Position, { x: 3, y: 3 });
@@ -570,8 +571,9 @@ Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   const cooked = [];
   world.on('cooking:cooked', (e) => cooked.push(e));
 
+  // Dispatch through tick() like the real game does, so ECS deferral is active.
   world.add(actor, InteractIntent, { targetId: fire, mode: 'cook', itemId: corpse });
-  interactionSystem(world);
+  world.tick(1);
 
   assert(cooked.length === 1, 'should emit cooking:cooked');
   assert(cooked[0].itemId === corpse, 'cooked event should reference the item');
