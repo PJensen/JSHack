@@ -17,7 +17,7 @@ registerScript('trap_spike', {
     const vit = world.get(target, Vitality);
     if (!vit) return;
     const pos = world.get(target, Position);
-    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.2)));
+    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.5)));
     const amount = Math.max(1, Math.floor(vit.maxHp * pct));
     dealDamage(world, {
       target,
@@ -39,7 +39,7 @@ registerScript('trap_shock', {
     const vit = world.get(target, Vitality);
     if (!vit) return;
     const pos = world.get(target, Position);
-    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.15)));
+    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.30)));
     const amount = Math.max(1, Math.floor(vit.maxHp * pct));
     dealDamage(world, {
       target,
@@ -52,8 +52,8 @@ registerScript('trap_shock', {
     // Apply shocked via ActiveEffects so effectSystem picks it up
     const _ae = world.get(target, ActiveEffects);
     if (_ae && Array.isArray(_ae.effects)) {
-      // ~5% maxHp per tick for 2 ticks — painful follow-on jolt
-      _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: Math.max(2, Math.floor(vit.maxHp * 0.05)) });
+      // ~8% maxHp per tick for 3 ticks — brutal follow-on jolt
+      _ae.effects.push({ key: 'shock', turnsLeft: 3, potency: Math.max(3, Math.floor(vit.maxHp * 0.08)) });
     }
   }
 });
@@ -69,7 +69,7 @@ registerScript('trap_snake', {
     const snakeDef = getMonster('snake');
     if (!snakeDef) return;
 
-    const count = Number(ctx?.params?.count ?? 3);
+    const count = Number(ctx?.params?.count ?? 4);
     // Offsets for adjacent tiles (cardinal + diagonal)
     const offsets = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
     for (let i = 0; i < count && i < offsets.length; i++) {

@@ -76,18 +76,18 @@ export function pickItem(rng, depth) {
  * @returns {{type:string, script:string, params:Object}}
  */
 export function pickTrap(rng, depth) {
-  // Snake traps appear from depth 6+ (tier 1), increasing in likelihood
-  if (depth >= 6 && rng.next() < Math.min(0.4, 0.1 + depth * 0.03)) {
-    const count = Math.min(5, 2 + Math.floor(depth / 5));
+  const roll = rng.next();
+  // Snake traps: 25% chance, snake count scales with depth
+  if (roll < 0.25) {
+    const count = Math.min(6, 3 + Math.floor(depth / 4));
     return { type: 'snake', script: 'trap_snake', params: { count } };
   }
-  // Shock traps appear from depth 3+, 20% base chance
-  if (depth >= 3 && rng.next() < 0.20) {
-    return { type: 'shock', script: 'trap_shock', params: { percent: 0.15 } };
+  // Shock traps: 30% chance
+  if (roll < 0.55) {
+    return { type: 'shock', script: 'trap_shock', params: { percent: 0.30 } };
   }
-  // Spike damage: 35% of max HP at all depths
-  const percent = 0.35;
-  return { type: 'spike', script: 'trap_spike', params: { percent } };
+  // Spike traps: remaining 45%
+  return { type: 'spike', script: 'trap_spike', params: { percent: 0.50 } };
 }
 
 // Pack size by monster size class - how many monsters to spawn per pack

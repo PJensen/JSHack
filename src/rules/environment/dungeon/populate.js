@@ -184,8 +184,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       });
     }
 
-    // Trap density: ~1 per 50-80 floor tiles
-    const trapBudget = Math.max(0, Math.floor(area / rng.int(50, 80)));
+    // Trap density: ~1 per 20-35 floor tiles
+    const trapBudget = Math.max(1, Math.floor(area / rng.int(20, 35)));
     for (let i = 0; i < trapBudget; i++) {
       const tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
