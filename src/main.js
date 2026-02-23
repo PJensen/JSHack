@@ -843,6 +843,15 @@ addEventListener('ui:pray', () => {
   rulesHandler({ type: 'rules.pray', payload: {} });
 });
 
+// Disarm trap button → dispatch disarm action
+addEventListener('ui:disarmTrap', () => {
+  if (isSimUiBlocked()) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.disarmTrap', payload: {} });
+});
+
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
   const spells = spellCtrl.learnedSpells();
@@ -2305,6 +2314,7 @@ function frame(now) {
   hudFeeds.updateCombatHUD();
   hudFeeds.updateDepthHUD();
   hudFeeds.updatePetHUD();
+  hudFeeds.updateTrapHUD();
 
   // Render
   const view = getCachedView();

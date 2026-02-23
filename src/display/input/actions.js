@@ -17,6 +17,7 @@ export const Actions = Object.freeze({
   EquipItem: "rules.equipItem", // payload: { itemId:number }
   ShootRanged: "rules.shootRanged", // payload: {}
   Engrave: "rules.engrave", // payload: { text:string }
+  DisarmTrap: "rules.disarmTrap", // payload: { trapId?:number }
 
   // Display-directed UI
   OpenInventory: "display.openInventory", // payload: {}
@@ -46,6 +47,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.EquipItem]: Sinks.rules,
   [Actions.ShootRanged]: Sinks.rules,
   [Actions.Engrave]: Sinks.rules,
+  [Actions.DisarmTrap]: Sinks.rules,
 
   // Display-directed UI actions
   [Actions.OpenInventory]: Sinks.display,
