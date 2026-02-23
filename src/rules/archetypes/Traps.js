@@ -12,6 +12,7 @@ export const SpikeTrap = defineArchetype(
         params: p.trapParams ?? { percent: 0.35 },
         revealed: false,
         armed: true,
+        difficulty: p.difficulty ?? 8,
     })],
 );
 
@@ -25,6 +26,7 @@ export const SnakeTrap = defineArchetype(
         params: p.trapParams ?? { count: 2 },
         revealed: false,
         armed: true,
+        difficulty: p.difficulty ?? 12,
     })],
 );
 
@@ -38,5 +40,6 @@ export const ShockTrap = defineArchetype(
         params: p.trapParams ?? { percent: 0.15 },
         revealed: false,
         armed: true,
+        difficulty: p.difficulty ?? 15,
     })],
 );

@@ -44,3 +44,4 @@ export { RoomMetadata } from './RoomMetadata.js';
 export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';
 export { ObjectState } from './ObjectState.js';
+export { DisarmIntent } from './Intents/DisarmIntent.js';

@@ -27,6 +27,7 @@ import { combatSystem, installBumpAttackListener } from "../rules/systems/combat
 import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
+import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
 import { staminaRegenerationSystem } from "../rules/systems/staminaRegenerationSystem.js";
 import { monsterSpawnerSystem } from "../rules/systems/monsterSpawnerSystem.js";
@@ -96,6 +97,8 @@ export function configureWorld(world) {
   registerSystem(combatSystem, 'intents');
   // Run pickup after movement so stepping onto items can pick them up immediately
   registerSystem(itemPickupSystem, 'intents');
+  // Disarm attempts resolve before traps trigger (so disarming prevents stepping-trigger)
+  registerSystem(disarmTrapSystem, 'intents');
   // Traps trigger after movement (player steps onto trap tile)
   registerSystem(trapSystem, 'intents');
 

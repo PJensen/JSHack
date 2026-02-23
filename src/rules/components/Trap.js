@@ -8,6 +8,7 @@ export const Trap = defineComponent(
     armed: true,      // triggers once when armed
     script: "",       // script key to execute on trigger
     params: null,     // optional script params
+    difficulty: 10,   // DC for disarm check (1d20 >= difficulty = success)
   },
   {
     validate(rec) {
