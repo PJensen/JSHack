@@ -172,6 +172,14 @@ export function makeRulesDispatcher(world, getActorId) {
         world?.tick?.(1);
         break;
       }
+      case "rules.cookFood": {
+        const { fireId = 0, itemId: cookItemId = 0 } = action.payload || {};
+        if (!Number.isInteger(fireId) || fireId <= 0) break;
+        if (!Number.isInteger(cookItemId) || cookItemId <= 0) break;
+        world?.add?.(actorId, InteractIntent, { targetId: fireId, mode: "cook", itemId: cookItemId });
+        world?.tick?.(1);
+        break;
+      }
       case "rules.altarOffer": {
         const { itemId = 0 } = action.payload || {};
         if (!Number.isInteger(itemId) || itemId <= 0) break;

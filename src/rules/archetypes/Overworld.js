@@ -162,5 +162,6 @@ export const CookingFire = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Cooking Fire", identity: "cooking_fire" }],
   [Material, { kind: "wood" }],
-  [Collider, { solid: false, blocksSight: false }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "cookFood", params: null }],
 );
