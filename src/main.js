@@ -62,6 +62,7 @@ import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
 import { Position } from "./rules/components/Position.js";
 import { Player } from "./rules/components/Player.js";
+import { Trap } from "./rules/components/Trap.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
 import { createPlayer } from "./rules/archetypes/Player.js";
 import { followEntity } from "./display/camera/follow.js";
@@ -843,15 +844,6 @@ addEventListener('ui:pray', () => {
   rulesHandler({ type: 'rules.pray', payload: {} });
 });
 
-// Disarm trap button → dispatch disarm action
-addEventListener('ui:disarmTrap', () => {
-  if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.disarmTrap', payload: {} });
-});
-
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
   const spells = spellCtrl.learnedSpells();
@@ -1357,6 +1349,16 @@ addEventListener('ui:requestStairTraverse', (ev) => {
   }
 });
 
+// UI trap tooltip tap → attempt disarm
+addEventListener('ui:requestDisarmTrap', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const trapId = e?.detail?.trapId || 0;
+  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+  rulesHandler({ type: 'rules.disarmTrap', payload: { trapId } });
+});
+
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installRackWiring({ world, log: (msg) => messageLog.log({ text: msg, type: 'system' }) });
@@ -1429,6 +1431,26 @@ world.on('moved', ({ id, to }) => {
     } catch (e) { console.debug('[main] dispatch ui:showStairTooltip:', e); }
   } else {
     try { window.dispatchEvent(new CustomEvent('ui:hideStairTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideStairTooltip:', e); }
+  }
+
+  // Trap tooltip: show when standing on an armed trap
+  let foundTrap = null;
+  for (const [tid, tpos, t] of world.query(Position, Trap)) {
+    if (!tpos || !t || !t.armed) continue;
+    if (tpos.x === to.x && tpos.y === to.y) {
+      const ni = world.get(tid, NamedIdentity);
+      foundTrap = { id: tid, name: ni?.name || t.type, difficulty: t.difficulty };
+      break;
+    }
+  }
+  if (foundTrap) {
+    try {
+      window.dispatchEvent(new CustomEvent('ui:showTrapTooltip', {
+        detail: { trapId: foundTrap.id, trapType: foundTrap.name, difficulty: foundTrap.difficulty }
+      }));
+    } catch (e) { console.debug('[main] dispatch ui:showTrapTooltip:', e); }
+  } else {
+    try { window.dispatchEvent(new CustomEvent('ui:hideTrapTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTrapTooltip:', e); }
   }
 
   // Check for adjacent shopkeeper
@@ -2314,7 +2336,6 @@ function frame(now) {
   hudFeeds.updateCombatHUD();
   hudFeeds.updateDepthHUD();
   hudFeeds.updatePetHUD();
-  hudFeeds.updateTrapHUD();
 
   // Render
   const view = getCachedView();

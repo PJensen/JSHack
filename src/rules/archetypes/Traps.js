@@ -1,6 +1,7 @@
 import { defineArchetype } from "../../lib/ecs-js/archetype.js";
 import { Position } from "../components/Position.js";
 import { Trap } from "../components/Trap.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 
 // Spike trap — percentage-based HP damage on trigger
 export const SpikeTrap = defineArchetype(
@@ -14,6 +15,7 @@ export const SpikeTrap = defineArchetype(
         armed: true,
         difficulty: p.difficulty ?? 8,
     })],
+    [NamedIdentity, () => ({ name: 'Spike Trap', identity: 'trap_spike' })],
 );
 
 // Snake trap — spawns snakes on trigger
@@ -28,6 +30,7 @@ export const SnakeTrap = defineArchetype(
         armed: true,
         difficulty: p.difficulty ?? 12,
     })],
+    [NamedIdentity, () => ({ name: 'Snake Trap', identity: 'trap_snake' })],
 );
 
 // Shock trap — electric damage + shocked status on trigger
@@ -42,4 +45,5 @@ export const ShockTrap = defineArchetype(
         armed: true,
         difficulty: p.difficulty ?? 15,
     })],
+    [NamedIdentity, () => ({ name: 'Shock Trap', identity: 'trap_shock' })],
 );
