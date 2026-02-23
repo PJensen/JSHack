@@ -5,13 +5,9 @@
 
 import { DisarmIntent } from "../components/Intents/DisarmIntent.js";
 import { Position } from "../components/Position.js";
-import { Player } from "../components/Player.js";
 import { Trap } from "../components/Trap.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
 import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
 import { runScript, ScriptVerb } from "../scripting.js";
-
-const TRAP_NAMES = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
 
 /**
  * Find the best trap candidate: prefer a specific trapId if provided,
@@ -38,14 +34,6 @@ function findTrap(world, actorPos, trapId) {
   return null;
 }
 
-/** Ensure the trap has a NamedIdentity for log messages. */
-function ensureName(world, tid, t) {
-  if (world.get(tid, NamedIdentity)) return;
-  const name = TRAP_NAMES[t.type] || 'Trap';
-  const identity = 'trap_' + (t.type || 'unknown');
-  try { world.add(tid, NamedIdentity, { name, identity }); } catch {} // ECS: may already exist
-}
-
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function disarmTrapSystem(world) {
   for (const [actorId, intent] of world.query(DisarmIntent)) {
@@ -64,7 +52,6 @@ export function disarmTrapSystem(world) {
     }
 
     const [tid, t] = found;
-    ensureName(world, tid, t);
 
     // Reveal the trap (player has found it)
     if (!t.revealed) {

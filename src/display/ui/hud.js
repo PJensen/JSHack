@@ -173,20 +173,6 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch (e) { console.debug('[hud] dispatch ui:pray:', e); }
   });
 
-  // Disarm trap button (context action — shown when standing on a trap)
-  const disarmBtn = document.createElement('button');
-  disarmBtn.id = 'btn-disarm';
-  disarmBtn.textContent = 'Disarm';
-  Object.assign(disarmBtn.style, {
-    padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid #52382d', background: '#261010', color: '#ffd6cf',
-    cursor: 'pointer',
-    display: 'none' // Hidden by default, shown when trap is nearby
-  });
-  disarmBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:disarmTrap')); } catch (e) { console.debug('[hud] dispatch ui:disarmTrap:', e); }
-  });
-
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
@@ -206,7 +192,6 @@ export function initHUD() {
     throw: '\u2934',          // ⤴
     engrave: '\u270E',        // ✎
     pray: '\u{1F64F}',        // 🙏
-    disarm: '\u{1F9F0}',      // 🧰
     petDefault: '\u{1F43E}',  // 🐾
   });
 
@@ -307,7 +292,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn, disarmBtn];
+  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       minHeight: '44px',
@@ -347,7 +332,6 @@ export function initHUD() {
   setDesktopLabel(throwBtn, 'Throw'); setMobileLabel(throwBtn, 'Throw');
   setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Engrave');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
-  setDesktopLabel(disarmBtn, 'Disarm'); setMobileLabel(disarmBtn, 'Disarm');
   setDesktopIcon(invBtn, ACTION_ICONS.inventory); setMobileIcon(invBtn, ACTION_ICONS.inventory);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
@@ -355,7 +339,6 @@ export function initHUD() {
   setDesktopIcon(throwBtn, ACTION_ICONS.throw); setMobileIcon(throwBtn, ACTION_ICONS.throw);
   setDesktopIcon(engraveBtn, ACTION_ICONS.engrave); setMobileIcon(engraveBtn, ACTION_ICONS.engrave);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
-  setDesktopIcon(disarmBtn, ACTION_ICONS.disarm); setMobileIcon(disarmBtn, ACTION_ICONS.disarm);
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
@@ -444,21 +427,6 @@ export function initHUD() {
       petBtn.style.background = '#16263d'; // Blue tint for combat
     } else {
       petBtn.style.background = '#101626'; // Default
-    }
-  });
-
-  // Show/hide disarm button based on trap proximity
-  window.addEventListener('ui:trapNearby', (ev) => {
-    /** @type {CustomEvent} */ // @ts-ignore
-    const e = ev;
-    const nearby = Boolean(e?.detail?.nearby);
-    const trapType = String(e?.detail?.trapType || 'Trap');
-    disarmBtn.style.display = nearby ? '' : 'none';
-    if (nearby) {
-      const label = `Disarm ${trapType}`;
-      setDesktopLabel(disarmBtn, label);
-      setMobileLabel(disarmBtn, label);
-      refreshCommandLabels();
     }
   });
 
@@ -552,7 +520,6 @@ export function initHUD() {
   bar.appendChild(throwBtn);
   bar.appendChild(engraveBtn);
   bar.appendChild(prayBtn);
-  bar.appendChild(disarmBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
 
@@ -576,7 +543,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn, disarmBtn };
+  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------

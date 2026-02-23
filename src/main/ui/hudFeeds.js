@@ -13,8 +13,6 @@ import { Hunger } from "../../rules/components/Hunger.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
-import { Trap } from "../../rules/components/Trap.js";
-import { Position } from "../../rules/components/Position.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -29,8 +27,6 @@ export function createHudFeeds(world, deps) {
   let lastDepth = -1;
   let lastPetExists = false;
   let lastPetState = "";
-  let lastTrapNearby = false;
-  let lastTrapType = "";
 
   function updateVitalsHUD() {
     const pe = playerEntity(world);
@@ -202,42 +198,10 @@ export function createHudFeeds(world, deps) {
     }
   }
 
-  const TRAP_NAMES = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
-
-  function updateTrapHUD() {
-    const pe = playerEntity(world);
-    if (!pe) return;
-    const ppos = world.get(pe.id, Position);
-    if (!ppos) return;
-
-    // Check player's tile for an armed trap
-    let trapNearby = false;
-    let trapType = "";
-    for (const [, tpos, t] of world.query(Position, Trap)) {
-      if (!tpos || !t || !t.armed) continue;
-      if (tpos.x === ppos.x && tpos.y === ppos.y) {
-        trapNearby = true;
-        trapType = TRAP_NAMES[t.type] || 'Trap';
-        break;
-      }
-    }
-
-    if (trapNearby !== lastTrapNearby || trapType !== lastTrapType) {
-      lastTrapNearby = trapNearby;
-      lastTrapType = trapType;
-      try {
-        window.dispatchEvent(new CustomEvent("ui:trapNearby", {
-          detail: { nearby: trapNearby, trapType }
-        }));
-      } catch (e) { console.debug('[hudFeeds] dispatch ui:trapNearby:', e); }
-    }
-  }
-
   return {
     updateVitalsHUD,
     updateCombatHUD,
     updateDepthHUD,
     updatePetHUD,
-    updateTrapHUD,
   };
 }

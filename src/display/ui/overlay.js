@@ -59,6 +59,7 @@ export function initOverlays() {
   const rack = ensurePanel('rack');
   const groundTip = ensureGroundTooltip(root);
   const stairTip = ensureStairTooltip(root);
+  const trapTip = ensureTrapTooltip(root);
   const tombstoneTip = ensureTombstoneTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
@@ -374,6 +375,18 @@ export function initOverlays() {
     stairTip.style.display = 'none';
   });
 
+  // Trap tooltip lifecycle
+  window.addEventListener('ui:showTrapTooltip', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderTrapTooltip(trapTip, d);
+    trapTip.style.display = 'block';
+  });
+  window.addEventListener('ui:hideTrapTooltip', () => {
+    trapTip.style.display = 'none';
+  });
+
   // Tombstone tooltip lifecycle
   window.addEventListener('ui:showTombstoneTooltip', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -656,6 +669,50 @@ function renderStairTooltip(tip, detail) {
   tip.onclick = () => {
     window.dispatchEvent(new CustomEvent('ui:requestStairTraverse', {
       detail: { stairId: detail?.stairId, direction: dir }
+    }));
+    tip.style.display = 'none';
+  };
+}
+
+// --- Trap tooltip (tap to disarm) ------------------------------------------
+/** @param {HTMLElement} root */
+function ensureTrapTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'trap-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed',
+    left: '50%',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 96px + env(safe-area-inset-bottom, 0px))',
+    transform: 'translateX(-50%)',
+    minWidth: '180px', pointerEvents: 'auto', display: 'none',
+    background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '10px',
+    border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    fontFamily: 'monospace', padding: '10px 16px', zIndex: 850,
+    textAlign: 'center', cursor: 'pointer'
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+/** @param {HTMLDivElement} tip @param {{trapId?:number, trapType?:string, difficulty?:number}} detail */
+function renderTrapTooltip(tip, detail) {
+  tip.innerHTML = '';
+  const trapType = detail?.trapType || 'Trap';
+
+  const title = document.createElement('div');
+  title.textContent = trapType;
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' });
+  tip.appendChild(title);
+
+  const hint = document.createElement('div');
+  hint.style.opacity = '0.8';
+  hint.style.fontSize = '12px';
+  hint.textContent = 'Tap to disarm';
+  tip.appendChild(hint);
+
+  tip.onclick = () => {
+    window.dispatchEvent(new CustomEvent('ui:requestDisarmTrap', {
+      detail: { trapId: detail?.trapId }
     }));
     tip.style.display = 'none';
   };
