@@ -10,7 +10,7 @@ export const SpikeTrap = defineArchetype(
     [Trap, (p) => ({
         type: 'spike',
         script: 'trap_spike',
-        params: p.trapParams ?? { percent: 0.35 },
+        params: p.trapParams ?? { percent: 0.50 },
         revealed: false,
         armed: true,
         difficulty: p.difficulty ?? 8,
@@ -25,7 +25,7 @@ export const SnakeTrap = defineArchetype(
     [Trap, (p) => ({
         type: 'snake',
         script: 'trap_snake',
-        params: p.trapParams ?? { count: 2 },
+        params: p.trapParams ?? { count: 4 },
         revealed: false,
         armed: true,
         difficulty: p.difficulty ?? 12,
@@ -40,7 +40,7 @@ export const ShockTrap = defineArchetype(
     [Trap, (p) => ({
         type: 'shock',
         script: 'trap_shock',
-        params: p.trapParams ?? { percent: 0.15 },
+        params: p.trapParams ?? { percent: 0.30 },
         revealed: false,
         armed: true,
         difficulty: p.difficulty ?? 15,
