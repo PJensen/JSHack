@@ -43,3 +43,4 @@ export { Unpaid } from './Unpaid.js';
 export { RoomMetadata } from './RoomMetadata.js';
 export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';
+export { ObjectState } from './ObjectState.js';

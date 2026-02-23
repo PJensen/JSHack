@@ -9,6 +9,7 @@ import { Collider } from "../../rules/components/Collider.js";
 import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
+import { ObjectState } from "../../rules/components/ObjectState.js";
 import { getTile, forEachTileInRect } from '../../rules/environment/dungeon/tileMap.js';
 import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
@@ -161,12 +162,15 @@ export function buildWorldView(world) {
 			const isPlayer = _view.player && id === _view.player.id;
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
+			/** @type {any} */ const objState = /** @type any */ (world.get(id, ObjectState));
 			/** @type {any} */ const col = /** @type any */ (world.get(id, Collider));
 			/** @type {any} */ const itemInfo = /** @type any */ (world.get(id, ItemInfo));
 
 			let kind = "default";
 			if (door) {
 				kind = door.open ? "door_open" : "door_closed";
+			} else if (objState && ident?.identity === "furnace") {
+				kind = objState.state === "lit" ? "furnace" : "furnace_unlit";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
@@ -212,12 +216,15 @@ export function buildWorldView(world) {
 			const isPlayer = world.has(id, Player);
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
+			/** @type {any} */ const objState = /** @type any */ (world.get(id, ObjectState));
 			/** @type {any} */ const col = /** @type any */ (world.get(id, Collider));
 			/** @type {any} */ const itemInfo = /** @type any */ (world.get(id, ItemInfo));
 
 			let kind = "default";
 			if (door) {
 				kind = door.open ? "door_open" : "door_closed";
+			} else if (objState && ident?.identity === "furnace") {
+				kind = objState.state === "lit" ? "furnace" : "furnace_unlit";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {

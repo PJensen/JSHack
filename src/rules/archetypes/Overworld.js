@@ -6,6 +6,7 @@ import { Collider } from "../components/Collider.js";
 import { Material } from "../components/Material.js";
 import { Inventory } from "../components/Inventory.js";
 import { HarvestNode } from "../components/HarvestNode.js";
+import { ObjectState } from "../components/ObjectState.js";
 
 export const HomeBed = defineArchetype(
   "HomeBed",
@@ -155,6 +156,8 @@ export const Furnace = defineArchetype(
   [NamedIdentity, { name: "Furnace", identity: "furnace" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "toggleFurnace", params: null }],
+  [ObjectState, { state: "unlit" }],
 );
 
 export const CookingFire = defineArchetype(
