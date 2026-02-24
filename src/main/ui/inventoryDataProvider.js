@@ -16,6 +16,7 @@ import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js"
 import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
 import { resolveItemDisplayName } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
+import { getAffix } from "../../rules/data/affixes.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 
@@ -36,6 +37,59 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   if (/** @type {any} */ (world)[_installed]) return { buildGroundPickupDetailAt };
   /** @type {any} */ (world)[_installed] = true;
 
+  function resolveAffixes(rawAffixes) {
+    return (Array.isArray(rawAffixes) ? rawAffixes : []).map(aid => {
+      const def = getAffix(aid);
+      return { id: aid, name: def?.name || aid, description: def?.description || '' };
+    });
+  }
+
+  function buildItemDisplayData(info, itemId) {
+    return {
+      id: itemId,
+      type: info.type || 'item',
+      name: resolveItemDisplayName(world, itemId),
+      slot: info.slot || '',
+      count: info.count || 1,
+      rarityName: info.rarityName || 'common',
+      description: info.description || '',
+      bonuses: info.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {},
+      affixes: resolveAffixes(info.affixes),
+      damageDice: info.damageDice || null,
+      staminaCost: info.staminaCost ?? null,
+      twoHanded: !!info.twoHanded,
+    };
+  }
+
+  const _slotMap = {
+    weapon: ['weapon'],
+    armor: ['armor'],
+    shield: ['shield'],
+    ring: ['ring1', 'ring2'],
+    ammo: ['ammo'],
+    ranged: ['ranged'],
+  };
+
+  function buildEquippedComparison(eq, slot, currentItemId) {
+    const fields = _slotMap[slot];
+    if (!fields) return null;
+    for (const field of fields) {
+      const eqId = eq[field];
+      if (!Number.isInteger(eqId) || eqId <= 0 || eqId === currentItemId) continue;
+      const eqInfo = world.get(eqId, ItemInfo);
+      if (!eqInfo) continue;
+      return {
+        name: resolveItemDisplayName(world, eqId),
+        bonuses: eqInfo.bonuses || {},
+        damageDice: eqInfo.damageDice || null,
+        staminaCost: eqInfo.staminaCost ?? null,
+        twoHanded: !!eqInfo.twoHanded,
+        affixes: resolveAffixes(eqInfo.affixes),
+      };
+    }
+    return null;
+  }
+
   function buildGroundPickupDetailAt(actorId, x, y) {
     const tx = Number.isFinite(x) ? (x | 0) : 0;
     const ty = Number.isFinite(y) ? (y | 0) : 0;
@@ -54,18 +108,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     for (const itemId of ids) {
       const info = world.get(itemId, ItemInfo);
       if (!info || info.type === 'currency') continue;
-      const affixes = Array.isArray(info.affixes) ? info.affixes.slice() : [];
-      const bonuses = info.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {};
-      nonCurrencyItems.push({
-        id: itemId,
-        type: info.type || 'item',
-        name: resolveItemDisplayName(world, itemId),
-        count: info.count || 1,
-        rarityName: info.rarityName || 'common',
-        description: info.description || '',
-        bonuses,
-        affixes,
-      });
+      nonCurrencyItems.push(buildItemDisplayData(info, itemId));
     }
 
     if (!nonCurrencyItems.length) return null;
@@ -74,13 +117,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       return {
         mode: 'multi',
         count: nonCurrencyItems.length,
-        items: nonCurrencyItems.map((it) => ({
-          id: it.id,
-          type: it.type,
-          name: it.name,
-          count: it.count,
-          rarityName: it.rarityName,
-        })),
+        items: nonCurrencyItems,
         fromChest: hasChest,
       };
     }
@@ -90,15 +127,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
     return {
       mode: 'single',
-      item: {
-        id: single.id,
-        name: single.name,
-        rarityName: single.rarityName,
-        description: single.description,
-        count: single.count,
-        bonuses: single.bonuses,
-        affixes: single.affixes,
-      },
+      item: single,
       pickupRange,
     };
   }
@@ -129,17 +158,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
             const applyTargetCount = applyTargetIds.length;
             const canApply = isApplyTool(world, p.id, id);
             items.push({
-              id,
-              type: info.type,
-              description: info.description,
-              count: info.count,
-              slot: info.slot,
-              name: resolveItemDisplayName(world, id),
-              rarityName: info.rarityName,
-              bonuses: info.bonuses || {},
-              affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
+              ...buildItemDisplayData(info, id),
               equipped: Boolean(equippedSlot),
               equippedSlot,
+              equippedComparison: null,
               unpaid: world.has(id, Unpaid),
               unpaidPrice: world.get(id, Unpaid)?.price || 0,
               unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
@@ -170,6 +192,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
           equippedSlot: activeSpellId === sid ? 'brain' : null,
         });
       }
+      // Attach comparison data for unequipped equippable items
+      if (eq) {
+        for (const it of items) {
+          if (it.equipped || !(it.type === 'equip' || it.type === 'ammo' || it.type === 'wand' || it.slot === 'ranged')) continue;
+          it.equippedComparison = buildEquippedComparison(eq, it.slot, it.id);
+        }
+      }
       ground = buildGroundPickupDetailAt(p.id, p.pos.x, p.pos.y);
     }
     window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items, ground } }));
@@ -186,14 +215,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         for (const id of inv.items) {
           const info = world.get(id, ItemInfo);
           if (!info || !USABLE_TYPES.has(info.type)) continue;
-          items.push({
-            id,
-            type: info.type,
-            description: info.description,
-            count: info.count,
-            name: resolveItemDisplayName(world, id),
-            rarityName: info.rarityName,
-          });
+          items.push(buildItemDisplayData(info, id));
         }
       }
     }
@@ -210,14 +232,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         for (const id of inv.items) {
           const info = world.get(id, ItemInfo);
           if (!info) continue;
-          items.push({
-            id,
-            type: info.type,
-            description: info.description,
-            count: info.count,
-            name: resolveItemDisplayName(world, id),
-            rarityName: info.rarityName,
-          });
+          items.push(buildItemDisplayData(info, id));
         }
       }
     }
