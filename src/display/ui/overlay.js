@@ -959,14 +959,26 @@ function renderGroundTooltip(tip, detail) {
     }
   }
 
-  // Affixes (names only for now)
+  // Affixes (name + description)
   const aff = Array.isArray(it.affixes) ? it.affixes : [];
   if (aff.length) {
     const sep = document.createElement('div'); sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '6px 0 4px'; tip.appendChild(sep);
     for (const a of aff) {
+      const affixName = typeof a === 'object' ? a.name : humanize(String(a));
+      const affixDesc = typeof a === 'object' ? a.description : '';
       const line = document.createElement('div');
-      line.textContent = humanize(String(a));
-      line.style.opacity = '0.9';
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = affixName;
+      nameSpan.style.color = '#a8d8ff';
+      nameSpan.style.fontWeight = 'bold';
+      line.appendChild(nameSpan);
+      if (affixDesc) {
+        const descSpan = document.createElement('span');
+        descSpan.textContent = ` \u2014 ${affixDesc}`;
+        descSpan.style.color = '#8ab8d8';
+        descSpan.style.fontStyle = 'italic';
+        line.appendChild(descSpan);
+      }
       tip.appendChild(line);
     }
   }
@@ -991,6 +1003,183 @@ function renderGroundTooltip(tip, detail) {
 function humanize(k) {
   const s = String(k || '').replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase().trim();
   return s;
+}
+
+/**
+ * Render a structured WoW-style item detail panel into the given container.
+ * @param {HTMLElement} container
+ * @param {any} it  item data from inventoryDataProvider
+ */
+function renderItemDetails(container, it) {
+  container.innerHTML = '';
+  if (!it) {
+    container.textContent = '(no description)';
+    return;
+  }
+
+  // --- Item name (rarity-colored) ---
+  const title = document.createElement('div');
+  title.textContent = bracketize(sanitize(it.name || 'item'));
+  Object.assign(title.style, rarityStyle(it.rarityName));
+  title.style.marginBottom = '2px';
+  container.appendChild(title);
+
+  // --- Slot label ---
+  if (it.slot) {
+    const slotLine = document.createElement('div');
+    const label = humanize(it.slot);
+    slotLine.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+    slotLine.style.opacity = '0.6';
+    slotLine.style.fontSize = '12px';
+    container.appendChild(slotLine);
+  }
+
+  // --- Weapon stats (damage dice, stamina cost, two-handed) ---
+  const isWeapon = it.slot === 'weapon' || it.slot === 'ranged';
+  if (isWeapon && (it.damageDice || it.staminaCost != null)) {
+    const sep = document.createElement('div');
+    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
+    container.appendChild(sep);
+
+    if (it.damageDice) {
+      const line = document.createElement('div');
+      line.textContent = `Damage: ${String(it.damageDice)}`;
+      line.style.color = '#ffd7a0';
+      container.appendChild(line);
+    }
+    if (it.staminaCost != null) {
+      const line = document.createElement('div');
+      line.textContent = `Stamina: ${it.staminaCost}`;
+      line.style.color = '#ffd7a0';
+      container.appendChild(line);
+    }
+    if (it.twoHanded) {
+      const line = document.createElement('div');
+      line.textContent = 'Two-Handed';
+      line.style.color = '#ffd7a0';
+      line.style.fontStyle = 'italic';
+      container.appendChild(line);
+    }
+  }
+
+  // --- Bonuses ---
+  const bonuses = it.bonuses && typeof it.bonuses === 'object' ? it.bonuses : {};
+  const bonusKeys = Object.keys(bonuses).filter(k => {
+    const v = Number(bonuses[k]);
+    return Number.isFinite(v) && v !== 0;
+  });
+
+  if (bonusKeys.length) {
+    const sep = document.createElement('div');
+    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
+    container.appendChild(sep);
+
+    for (const k of bonusKeys) {
+      const v = Number(bonuses[k]);
+      const sign = v > 0 ? '+' : '';
+      const line = document.createElement('div');
+      line.textContent = `${sign}${v} ${humanize(k)}`;
+      line.style.color = '#aaffaa';
+      container.appendChild(line);
+    }
+  }
+
+  // --- Affixes (name + description) ---
+  const affixes = Array.isArray(it.affixes) ? it.affixes : [];
+  if (affixes.length) {
+    const sep = document.createElement('div');
+    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
+    container.appendChild(sep);
+
+    for (const a of affixes) {
+      const affixName = typeof a === 'object' ? a.name : humanize(String(a));
+      const affixDesc = typeof a === 'object' ? a.description : '';
+
+      const line = document.createElement('div');
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = affixName;
+      nameSpan.style.color = '#a8d8ff';
+      nameSpan.style.fontWeight = 'bold';
+      line.appendChild(nameSpan);
+
+      if (affixDesc) {
+        const descSpan = document.createElement('span');
+        descSpan.textContent = ` \u2014 ${affixDesc}`;
+        descSpan.style.color = '#8ab8d8';
+        descSpan.style.fontStyle = 'italic';
+        line.appendChild(descSpan);
+      }
+      container.appendChild(line);
+    }
+  }
+
+  // --- Comparison deltas vs equipped item ---
+  const cmp = it.equippedComparison;
+  if (cmp) {
+    const sep = document.createElement('div');
+    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
+    container.appendChild(sep);
+
+    const cmpTitle = document.createElement('div');
+    cmpTitle.textContent = `vs ${sanitize(cmp.name || 'equipped')}`;
+    cmpTitle.style.opacity = '0.7';
+    cmpTitle.style.fontSize = '11px';
+    cmpTitle.style.marginBottom = '2px';
+    container.appendChild(cmpTitle);
+
+    const cmpBonuses = cmp.bonuses && typeof cmp.bonuses === 'object' ? cmp.bonuses : {};
+    const allKeys = new Set([...Object.keys(bonuses), ...Object.keys(cmpBonuses)]);
+
+    for (const k of allKeys) {
+      const mine = Number(bonuses[k]) || 0;
+      const theirs = Number(cmpBonuses[k]) || 0;
+      const delta = mine - theirs;
+      if (delta === 0) continue;
+
+      const line = document.createElement('div');
+      const sign = delta > 0 ? '+' : '';
+      line.textContent = `${sign}${delta} ${humanize(k)}`;
+      line.style.color = delta > 0 ? '#55ff55' : '#ff5555';
+      line.style.fontWeight = 'bold';
+      container.appendChild(line);
+    }
+
+    // Damage dice comparison (show side-by-side if different)
+    if ((it.damageDice || cmp.damageDice) && it.damageDice !== cmp.damageDice) {
+      const line = document.createElement('div');
+      line.textContent = `Damage: ${it.damageDice || 'none'} vs ${cmp.damageDice || 'none'}`;
+      line.style.color = '#cccccc';
+      line.style.fontSize = '11px';
+      container.appendChild(line);
+    }
+
+    // Stamina cost comparison
+    if (it.staminaCost != null && cmp.staminaCost != null && it.staminaCost !== cmp.staminaCost) {
+      const delta = it.staminaCost - cmp.staminaCost;
+      const line = document.createElement('div');
+      const sign = delta > 0 ? '+' : '';
+      line.textContent = `${sign}${delta} stamina cost`;
+      // Lower stamina cost is better, so invert the color
+      line.style.color = delta < 0 ? '#55ff55' : '#ff5555';
+      line.style.fontWeight = 'bold';
+      container.appendChild(line);
+    }
+  }
+
+  // --- Flavor text at bottom ---
+  const desc = String(it.description || '').trim();
+  if (desc) {
+    const sep = document.createElement('div');
+    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
+    container.appendChild(sep);
+
+    const flavor = document.createElement('div');
+    flavor.textContent = desc;
+    flavor.style.fontStyle = 'italic';
+    flavor.style.opacity = '0.7';
+    flavor.style.fontSize = '12px';
+    container.appendChild(flavor);
+  }
 }
 
 /** @param {string} kind */
@@ -1234,8 +1423,7 @@ function renderInventory(panel, items, ground) {
       ? (hasApplyTargets ? ' · A=Apply' : ' · A=Apply (no targets)')
       : '';
     hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
-    const text = String(it?.description || '').trim();
-    details.textContent = text || '(no description)';
+    renderItemDetails(details, it);
     renderInventoryActions();
   }
 
@@ -1694,6 +1882,15 @@ function renderPickupChooser(panel, items) {
   actions.appendChild(btnCancel);
   el.appendChild(actions);
 
+  const details = document.createElement('div');
+  Object.assign(details.style, {
+    marginTop: '8px', padding: '8px', minHeight: '4.8em',
+    border: '1px solid #2d3b52', borderRadius: '6px',
+    background: '#0a111f', color: '#cfe8ff', opacity: '0.9',
+    whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere',
+  });
+  el.appendChild(details);
+
   /** @param {number} i */
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i|0));
@@ -1701,6 +1898,7 @@ function renderPickupChooser(panel, items) {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
+    renderItemDetails(details, items[sel]);
   }
 
   /** @param {KeyboardEvent} e */
@@ -1791,12 +1989,22 @@ function renderUseChooser(panel, items) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Use \u00b7 T=Throw \u00b7 Esc=Close';
   el.appendChild(hint);
 
+  const details = document.createElement('div');
+  Object.assign(details.style, {
+    marginTop: '8px', padding: '8px', minHeight: '4.8em',
+    border: '1px solid #2d3b52', borderRadius: '6px',
+    background: '#0a111f', color: '#cfe8ff', opacity: '0.9',
+    whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere',
+  });
+  el.appendChild(details);
+
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i | 0));
     rows.forEach((r, j) => {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
+    renderItemDetails(details, items[sel]);
   }
 
   function useSelected() {
@@ -1902,12 +2110,22 @@ function renderThrowChooser(panel, items) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Select item \u00b7 then tap target \u00b7 Esc=Close';
   el.appendChild(hint);
 
+  const details = document.createElement('div');
+  Object.assign(details.style, {
+    marginTop: '8px', padding: '8px', minHeight: '4.8em',
+    border: '1px solid #2d3b52', borderRadius: '6px',
+    background: '#0a111f', color: '#cfe8ff', opacity: '0.9',
+    whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere',
+  });
+  el.appendChild(details);
+
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i | 0));
     rows.forEach((r, j) => {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
+    renderItemDetails(details, items[sel]);
   }
 
   function throwSelected() {
