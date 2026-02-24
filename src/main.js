@@ -224,21 +224,21 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
     fallbackRange: 10,
     requiresLOS: false,
     describePrompt(range) {
-      return `Choose blink destination (up to ${range} tiles). Tap a tile, or press Esc to cancel.`;
+      return `Choose blink destination (up to ${range} tiles). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
   }),
   meteor: Object.freeze({
     fallbackRange: 12,
     requiresLOS: true,
     describePrompt(range) {
-      return `Tap meteor target (LOS, range ${range}). Tap cast again or press Esc to cancel.`;
+      return `Choose meteor target (LOS, range ${range}). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
   }),
   phase_strike: Object.freeze({
     fallbackRange: 10,
     requiresLOS: false,
     describePrompt(range) {
-      return `Choose Phase Strike destination (up to ${range} tiles). Tap a tile, or press Esc to cancel.`;
+      return `Choose Phase Strike destination (up to ${range} tiles). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
   }),
 });
@@ -246,6 +246,8 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
 let _pendingSpellTargeting = null;
 /** @type {{ actorId: number, itemId: number, itemName: string, range: number }|null} */
 let _pendingThrowTargeting = null;
+/** @type {{ x: number, y: number }|null} Keyboard targeting cursor (tile coords) */
+let _targetCursor = null;
 const throwFx = createThrowFxController({ world });
 
 function getTargetedSpellConfig(spellId) {
@@ -705,6 +707,7 @@ addEventListener('ui:castActiveSpell', () => {
     );
     if (_pendingSpellTargeting?.spellId === id) {
       _pendingSpellTargeting = null;
+      _targetCursor = null;
       try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
       return;
     }
@@ -714,6 +717,9 @@ addEventListener('ui:castActiveSpell', () => {
       range,
       requiresLOS: targetedCfg.requiresLOS === true,
     };
+    // Initialize keyboard cursor at player position
+    const _pe = playerEntity(world);
+    if (_pe) _targetCursor = { x: _pe.pos.x | 0, y: _pe.pos.y | 0 };
     try {
       messageLog.log({
         text: targetedCfg.describePrompt(range),
@@ -733,6 +739,7 @@ addEventListener('keydown', (ev) => {
   if (_pendingSpellTargeting) {
     const spellName = _pendingSpellTargeting.spellName;
     _pendingSpellTargeting = null;
+    _targetCursor = null;
     ev.preventDefault();
     try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
@@ -740,10 +747,83 @@ addEventListener('keydown', (ev) => {
   if (_pendingThrowTargeting) {
     const itemName = _pendingThrowTargeting.itemName;
     _pendingThrowTargeting = null;
+    _targetCursor = null;
     ev.preventDefault();
     try { messageLog.log({ text: `${bracketizeName(itemName)} throw cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
   }
 });
+
+// Keyboard targeting: arrow/vim/numpad keys move cursor, Enter confirms target
+addEventListener('keydown', (ev) => {
+  if (!_pendingSpellTargeting && !_pendingThrowTargeting) return;
+  if (!_targetCursor) return;
+
+  // Direction keys → dx/dy
+  /** @type {Record<string, number[]>} */
+  const KEY_DIR = {
+    ArrowLeft:  [-1,  0], ArrowRight: [1,  0],
+    ArrowUp:    [ 0, -1], ArrowDown:  [0,  1],
+    h: [-1,  0], l: [1,  0], k: [ 0, -1], j: [0,  1],
+    y: [-1, -1], u: [1, -1], b: [-1,  1], n: [1,  1],
+  };
+  const dir = KEY_DIR[ev.key];
+  if (dir && _targetCursor) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    _targetCursor.x += dir[0];
+    _targetCursor.y += dir[1];
+    return;
+  }
+
+  // Enter confirms the target
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const pe = playerEntity(world);
+    if (!pe) { _pendingSpellTargeting = null; _pendingThrowTargeting = null; _targetCursor = null; return; }
+    const tx = _targetCursor.x | 0;
+    const ty = _targetCursor.y | 0;
+    const px = pe.pos.x | 0;
+    const py = pe.pos.y | 0;
+
+    if (_pendingSpellTargeting?.spellId) {
+      const pending = _pendingSpellTargeting;
+      const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+      if (!(dist > 0) || dist > pending.range) {
+        try { messageLog.log({ text: `${pending.spellName} target must be within ${pending.range} tiles.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+        return;
+      }
+      if (pending.requiresLOS) {
+        const blocked = buildBlocksVisionMap(world);
+        const isBlocked = blockedCallback(blocked);
+        if (!hasLOS(px, py, tx, ty, isBlocked)) {
+          try { messageLog.log({ text: `${pending.spellName} target must be in line of sight.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+          return;
+        }
+      }
+      _pendingSpellTargeting = null;
+      _targetCursor = null;
+      const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+      rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: tx, y: ty } });
+      return;
+    }
+
+    if (_pendingThrowTargeting?.itemId) {
+      const pending = _pendingThrowTargeting;
+      if ((pending.actorId | 0) !== (pe.id | 0)) { _pendingThrowTargeting = null; _targetCursor = null; return; }
+      const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+      if (!(dist > 0)) {
+        try { messageLog.log({ text: `${bracketizeName(pending.itemName)} must target another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+        return;
+      }
+      _pendingThrowTargeting = null;
+      _targetCursor = null;
+      const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+      rulesHandler({ type: 'rules.throwItem', payload: { itemId: pending.itemId, x: tx, y: ty } });
+      return;
+    }
+  }
+}, { capture: true });
 
 // When user selects items from the pickup chooser overlay
 addEventListener('ui:requestPickup', (e) => {
@@ -1626,9 +1706,10 @@ addEventListener('ui:requestThrow', (ev) => {
   const range = computeThrowRange(Number(info?.weight));
   _pendingSpellTargeting = null;
   _pendingThrowTargeting = { actorId: pe.id, itemId, itemName, range };
+  _targetCursor = { x: pe.pos.x | 0, y: pe.pos.y | 0 };
   try {
     messageLog.log({
-      text: `Throw ${bracketizeName(itemName)} where? Tap/click a tile (up to ${range}). Press Esc to cancel.`,
+      text: `Throw ${bracketizeName(itemName)} where? Tap/click a tile or use arrow keys + Enter (up to ${range}). Press Esc to cancel.`,
       type: 'system',
     });
   } catch (e) { console.debug('[main] messageLog failed:', e); }
@@ -1666,6 +1747,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (!pe) {
     _pendingSpellTargeting = null;
     _pendingThrowTargeting = null;
+    _targetCursor = null;
     return;
   }
 
@@ -1705,6 +1787,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     }
 
     _pendingSpellTargeting = null;
+    _targetCursor = null;
 
     const rulesHandler = makeRulesDispatcher(world, () => pe.id);
     rulesHandler({
@@ -1722,6 +1805,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (!pendingThrow?.itemId) return;
   if ((pendingThrow.actorId | 0) !== (pe.id | 0)) {
     _pendingThrowTargeting = null;
+    _targetCursor = null;
     return;
   }
 
@@ -1739,6 +1823,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   }
 
   _pendingThrowTargeting = null;
+  _targetCursor = null;
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({
     type: 'rules.throwItem',
@@ -2275,6 +2360,32 @@ function render(worldView) {
   if (bctx) projectileFx.draw(bctx);
   if (bctx) cloudFx.drawPoison(bctx);
   if (bctx) cloudFx.drawPlasma(bctx);
+
+  // Keyboard targeting cursor reticle (world-space)
+  if (bctx && _targetCursor && (_pendingSpellTargeting || _pendingThrowTargeting)) {
+    bctx.save();
+    const cx = _targetCursor.x + 0.5;
+    const cy = _targetCursor.y + 0.5;
+    const pulse = 0.6 + 0.4 * Math.sin(_fxTime * 6.0);
+    // Outer pulsing ring
+    bctx.strokeStyle = `rgba(255,220,80,${(0.7 * pulse).toFixed(3)})`;
+    bctx.lineWidth = 0.08;
+    bctx.beginPath();
+    bctx.arc(cx, cy, 0.42, 0, Math.PI * 2);
+    bctx.stroke();
+    // Corner brackets (crosshair feel)
+    const s = 0.46;
+    const l = 0.14;
+    bctx.strokeStyle = `rgba(255,255,200,${(0.85 * pulse).toFixed(3)})`;
+    bctx.lineWidth = 0.06;
+    bctx.beginPath();
+    bctx.moveTo(cx - s, cy - s + l); bctx.lineTo(cx - s, cy - s); bctx.lineTo(cx - s + l, cy - s);
+    bctx.moveTo(cx + s, cy - s + l); bctx.lineTo(cx + s, cy - s); bctx.lineTo(cx + s - l, cy - s);
+    bctx.moveTo(cx - s, cy + s - l); bctx.lineTo(cx - s, cy + s); bctx.lineTo(cx - s + l, cy + s);
+    bctx.moveTo(cx + s, cy + s - l); bctx.lineTo(cx + s, cy + s); bctx.lineTo(cx + s - l, cy + s);
+    bctx.stroke();
+    bctx.restore();
+  }
 
   // Particles (already in world space)
   fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
