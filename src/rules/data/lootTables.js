@@ -58,6 +58,10 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 12, itemId: "potion_adrenaline" },
       { type: "item",      weight: 10, itemId: "potion_stoneskin" },
       { type: "item",      weight: 7,  itemId: "potion_poison" },
+      { type: "item",      weight: 5,  itemId: "potion_resist_fire" },
+      { type: "item",      weight: 5,  itemId: "potion_resist_poison" },
+      { type: "item",      weight: 5,  itemId: "potion_resist_electric" },
+      { type: "item",      weight: 5,  itemId: "potion_resist_acid" },
     ],
   },
 

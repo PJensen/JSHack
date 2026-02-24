@@ -4,6 +4,7 @@ import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
 import { Equipment } from "../components/Equipment.js";
 import { Material } from "../components/Material.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { isEntityInvulnerable } from "./effectGuards.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
 import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
@@ -71,6 +72,22 @@ export function equippedConductivityMultiplier(world, targetId) {
   );
 }
 
+// ── Active-effect resist bonus ───────────────────────────────────────
+/** Sum raw potency of active resist effects matching the given key. */
+function activeResistBonus(world, targetId, effectKey) {
+  const ae = world.get(targetId, ActiveEffects);
+  if (!ae || !Array.isArray(ae.effects)) return 0;
+  let total = 0;
+  for (let i = 0; i < ae.effects.length; i++) {
+    const e = ae.effects[i];
+    if (!e || e.key !== effectKey) continue;
+    if (Number.isInteger(e.onsetLeft) && e.onsetLeft > 0) continue;
+    if (!((e.turnsLeft | 0) > 0)) continue;
+    total += Number(e.potency) || 0;
+  }
+  return total;
+}
+
 // ── Resistance resolution ───────────────────────────────────────────
 
 /**
@@ -91,7 +108,8 @@ export function resolveResistance(world, targetId, rawAmount, type) {
     case 'electric':
     case 'plasma':
     case 'lightning': {
-      const ohmBonus = Number(eq?.electricOhmsDerived ?? 0);
+      const potionOhms = activeResistBonus(world, targetId, "resist_electric") * 1000;
+      const ohmBonus = Number(eq?.electricOhmsDerived ?? 0) + potionOhms;
       const baseOhms = resist?.electric?.ohms;
       const effectiveOhms = baseOhms === Infinity ? Infinity
         : (Number.isFinite(baseOhms) ? baseOhms + ohmBonus : ohmBonus);
@@ -126,17 +144,17 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       return Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
     }
     case 'fire': {
-      const bonus = Number(eq?.fireResistDerived ?? 0);
+      const bonus = Number(eq?.fireResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_fire");
       const effectiveMult = Math.max(0, (resist.thermal?.burnMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'poison': {
-      const bonus = Number(eq?.poisonResistDerived ?? 0);
+      const bonus = Number(eq?.poisonResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_poison");
       const effectiveMult = Math.max(0, (resist.chemical?.toxMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'acid': {
-      const bonus = Number(eq?.acidResistDerived ?? 0);
+      const bonus = Number(eq?.acidResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_acid");
       const effectiveMult = Math.max(0, (resist.chemical?.acidMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
