@@ -64,12 +64,13 @@ function readTheme(root) {
   };
 }
 
-function ringGradient(ctx, cx, cy, r, color) {
+function ringGradient(ctx, cx, cy, r, color, flash) {
+  const f = flash || 0;
   const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r * 1.25);
-  g.addColorStop(0, 'rgba(255,255,255,0.20)');
+  g.addColorStop(0, `rgba(255,255,255,${(0.30 + f * 0.40).toFixed(2)})`);
   g.addColorStop(0.18, color);
   g.addColorStop(0.55, color);
-  g.addColorStop(1, 'rgba(0,0,0,0.20)');
+  g.addColorStop(1, 'rgba(0,0,0,0.06)');
   return g;
 }
 
@@ -85,17 +86,18 @@ function drawTrack(ctx, cx, cy, r, thickness, trackColor) {
   ctx.restore();
 }
 
-function drawArc(ctx, cx, cy, r, thickness, t, color, glowColor) {
+function drawArc(ctx, cx, cy, r, thickness, t, color, glowColor, flash) {
   if (!(r > 0) || !(thickness > 0)) return;
+  const f = flash || 0;
   const start = -Math.PI / 2;
   const end = start + (Math.PI * 2) * clamp01(t);
 
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineWidth = thickness;
-  ctx.shadowBlur = Math.max(6, thickness * 0.9);
-  ctx.shadowColor = glowColor;
-  ctx.strokeStyle = ringGradient(ctx, cx, cy, r, color);
+  ctx.shadowBlur = Math.max(8, thickness * 1.2) + f * 20;
+  ctx.shadowColor = color;
+  ctx.strokeStyle = ringGradient(ctx, cx, cy, r, color, f);
   ctx.beginPath();
   ctx.arc(cx, cy, r, start, end);
   ctx.stroke();
@@ -253,6 +255,36 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
     anim: null,
   };
 
+  const flash = { health: 0, mana: 0, stamina: 0 };
+  let flashRaf = 0;
+  let flashT = 0;
+  const FLASH_DECAY = 3.5;
+
+  function tickFlash() {
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - flashT) / 1000);
+    flashT = now;
+    flash.health = Math.max(0, flash.health - dt * FLASH_DECAY);
+    flash.mana = Math.max(0, flash.mana - dt * FLASH_DECAY);
+    flash.stamina = Math.max(0, flash.stamina - dt * FLASH_DECAY);
+    draw();
+    if (flash.health > 0.01 || flash.mana > 0.01 || flash.stamina > 0.01) {
+      flashRaf = requestAnimationFrame(tickFlash);
+    } else {
+      flash.health = flash.mana = flash.stamina = 0;
+      flashRaf = 0;
+      draw();
+    }
+  }
+
+  function triggerFlash(ring) {
+    flash[ring] = 1;
+    if (!flashRaf) {
+      flashT = performance.now();
+      flashRaf = requestAnimationFrame(tickFlash);
+    }
+  }
+
   function sizeCanvas() {
     const rect = root.getBoundingClientRect();
     const cap = Math.max(1, readDprCap(root));
@@ -299,9 +331,9 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
     drawTrack(ctx, cx, cy, rMana, thMana, theme.track);
     drawTrack(ctx, cx, cy, rStamina, thStamina, theme.track);
 
-    drawArc(ctx, cx, cy, rHealth, thHealth, state.health, theme.health, theme.glow);
-    drawArc(ctx, cx, cy, rMana, thMana, state.mana, theme.mana, theme.glow);
-    drawArc(ctx, cx, cy, rStamina, thStamina, state.stamina, theme.stamina, theme.glow);
+    drawArc(ctx, cx, cy, rHealth, thHealth, state.health, theme.health, theme.glow, flash.health);
+    drawArc(ctx, cx, cy, rMana, thMana, state.mana, theme.mana, theme.glow, flash.mana);
+    drawArc(ctx, cx, cy, rStamina, thStamina, state.stamina, theme.stamina, theme.glow, flash.stamina);
 
     ctx.save();
     const vR = Math.max(2, rStamina - thStamina * 0.8);
@@ -326,9 +358,21 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
 
   function set(values = {}) {
     stop();
-    if ('health' in values) state.health = clamp01(values.health);
-    if ('mana' in values) state.mana = clamp01(values.mana);
-    if ('stamina' in values) state.stamina = clamp01(values.stamina);
+    if ('health' in values) {
+      const v = clamp01(values.health);
+      if (Math.abs(v - state.health) > 0.005) triggerFlash('health');
+      state.health = v;
+    }
+    if ('mana' in values) {
+      const v = clamp01(values.mana);
+      if (Math.abs(v - state.mana) > 0.005) triggerFlash('mana');
+      state.mana = v;
+    }
+    if ('stamina' in values) {
+      const v = clamp01(values.stamina);
+      if (Math.abs(v - state.stamina) > 0.005) triggerFlash('stamina');
+      state.stamina = v;
+    }
     if ('hpValue' in values) state.hpValue = Number(values.hpValue ?? state.hpValue);
     if ('hpMax' in values) state.hpMax = Number(values.hpMax ?? state.hpMax);
     if ('manaValue' in values) state.manaValue = Number(values.manaValue ?? state.manaValue);
@@ -341,6 +385,9 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
 
   function animateTo(target = {}, ms = 200) {
     stop();
+    if ('health' in target && Math.abs(clamp01(target.health ?? state.health) - state.health) > 0.005) triggerFlash('health');
+    if ('mana' in target && Math.abs(clamp01(target.mana ?? state.mana) - state.mana) > 0.005) triggerFlash('mana');
+    if ('stamina' in target && Math.abs(clamp01(target.stamina ?? state.stamina) - state.stamina) > 0.005) triggerFlash('stamina');
     const duration = Math.max(1, Number(ms) || 1);
     const start = { health: state.health, mana: state.mana, stamina: state.stamina };
     const end = {
@@ -378,6 +425,7 @@ export function createConcentricGauge(root, initial = {}, opts = {}) {
 
   function destroy() {
     stop();
+    if (flashRaf) { cancelAnimationFrame(flashRaf); flashRaf = 0; }
     if (ro) ro.disconnect();
   }
 
