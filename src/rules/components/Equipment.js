@@ -8,12 +8,14 @@ export const Equipment = defineComponent('Equipment', {
   ring2: null,
   ammo: null,
   ranged: null,
+  feet: null,
   attackDerived: 0,
   defenseDerived: 0,
   maxHpDerived: 0,
   critChanceDerived: 0,
   critMultDerived: 0,
   manaRegenDerived: 0,
+  maxManaDerived: 0,
   staminaRegenDerived: 0,
   maxStaminaDerived: 0,
   kineticDRDerived: 0,
@@ -25,6 +27,7 @@ export const Equipment = defineComponent('Equipment', {
   bluntResistDerived: 0,
   slashResistDerived: 0,
   pierceResistDerived: 0,
+  luckDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });

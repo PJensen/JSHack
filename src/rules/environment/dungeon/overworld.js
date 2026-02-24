@@ -18,6 +18,7 @@ import {
   TILE_MOUNTAIN_B,
   TILE_MOUNTAIN_C,
   TILE_TREE,
+  TILE_SHALLOW_WATER,
 } from "./constants.js";
 
 export const OVERWORLD_EXTENT = Object.freeze({
@@ -311,6 +312,28 @@ export function generateOverworldChunks(worldSeed) {
   const stairY = homeY + 1;
   carvePath(chunks, doorX, doorY + 1, stairX, stairY);
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
+
+  // Pond — ellipse with Perlin wobble, northwest of the house
+  const pondCX = homeX - 12;
+  const pondCY = homeY + 6;
+  const pondRX = 3;
+  const pondRY = 2.5;
+  const pondWobble = 0.35;
+  const pondFreq = 0.5;
+  for (let py = Math.floor(pondCY - pondRY - 2); py <= pondCY + pondRY + 2; py++) {
+    for (let px = Math.floor(pondCX - pondRX - 2); px <= pondCX + pondRX + 2; px++) {
+      const dx = (px - pondCX) / pondRX;
+      const dy = (py - pondCY) / pondRY;
+      const dist = dx * dx + dy * dy;
+      const n = perlin2((px + 5000) * pondFreq, (py + 5000) * pondFreq, perm);
+      const edge = 1.0 + n * pondWobble;
+      if (dist >= edge) continue;
+      const cur = getWorldTile(chunks, px, py);
+      if (cur !== TILE_GRASS && cur !== TILE_GRASS_A
+       && cur !== TILE_GRASS_C && cur !== TILE_GRASS_D) continue;
+      setWorldTile(chunks, px, py, dist < edge * 0.55 ? TILE_WATER : TILE_SHALLOW_WATER);
+    }
+  }
 
   // Home interactables
   addSpawn(chunks, homeX - 2, homeY, "home_bed");

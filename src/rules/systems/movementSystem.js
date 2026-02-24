@@ -27,6 +27,7 @@ import {
 import { resolveBump } from "../data/bumpResolvers.js";
 import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { DoorState } from "../components/DoorState.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -54,6 +55,13 @@ export function installSpiderWebListener(world) {
     try {
       const ni = world.get(id, NamedIdentity);
       if (ni?.identity === "spider") {
+        const snap = getTileQuerySnapshot(world);
+        const ids = snap.byCell.get(key(from.x, from.y));
+        let hasDoor = false;
+        if (ids) for (const eid of ids) {
+          if (world.has(eid, DoorState)) { hasDoor = true; break; }
+        }
+        if (hasDoor) return;
         createFrom(world, Web, { x: from.x, y: from.y });
       }
     } catch (e) {

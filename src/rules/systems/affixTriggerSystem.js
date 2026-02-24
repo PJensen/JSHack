@@ -18,7 +18,7 @@ const AFFIX_TRIGGERS_KEY = Symbol.for('jshack.affixTriggers');
 function eachAffix(world, entityId, cb) {
   const eq = world.get(entityId, Equipment);
   if (!eq) return;
-  for (const slotId of [eq.weapon, eq.armor, eq.ring1, eq.ring2]) {
+  for (const slotId of [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.feet]) {
     if (!Number.isInteger(slotId)) continue;
     const info = world.get(slotId, ItemInfo);
     if (!info || !Array.isArray(info.affixes)) continue;

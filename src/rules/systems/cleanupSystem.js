@@ -85,8 +85,8 @@ export function cleanupSystem(world) {
 
           // Drop a corpse for the killed monster or pet
           // Pets ALWAYS drop corpses (100% chance)
-          // Other monsters: Base 75% chance, +8% per tier (higher tier = more guaranteed)
-          const corpseChance = wasPet ? 1.0 : Math.min(1.0, 0.75 + (effectiveMonsterDef.tier || 0) * 0.08);
+          // Other monsters: Base 25% chance, +10% per tier (higher tier = more likely)
+          const corpseChance = wasPet ? 1.0 : Math.min(1.0, 0.25 + (effectiveMonsterDef.tier || 0) * 0.10);
           // Use the RNG if available, otherwise just check corpseChance directly
           let shouldCreateCorpse = false;
           if (monsterDef) {

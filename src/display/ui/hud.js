@@ -467,9 +467,18 @@ export function initHUD() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const name = String(e?.detail?.name || '').trim();
+    const symbol = String(e?.detail?.symbol || '').trim();
     const cost = Number(e?.detail?.cost || 0);
     const canCast = Boolean(e?.detail?.canCast ?? true);
     setDesktopLabel(castBtn, name ? (cost ? `Cast [${name}] (${cost})` : `Cast [${name}]`) : 'Cast');
+    if (symbol) {
+      setDesktopIcon(castBtn, symbol);
+      setMobileIcon(castBtn, symbol);
+    } else {
+      setDesktopIcon(castBtn, ACTION_ICONS.cast);
+      setMobileIcon(castBtn, ACTION_ICONS.cast);
+    }
+    setBarLabel(castBtn, name || 'Cast');
     refreshCommandLabels();
     castBtn.disabled = !canCast;
     castBtn.style.opacity = canCast ? '1' : '0.6';
@@ -541,6 +550,20 @@ export function initHUD() {
         affixRow.appendChild(chip);
       }
     }
+
+    // Weapon coating chip
+    const coating = weapon?.coating;
+    if (coating && coating.kind) {
+      const charges = Number(coating.charges || 0);
+      const chip = document.createElement('div');
+      const coatColor = coating.color || '#88ee88';
+      chip.textContent = `\u2022 ${String(coating.kind)}` + (charges > 0 ? ` (${charges})` : '');
+      Object.assign(chip.style, {
+        fontSize: '11px', padding: '2px 6px', borderRadius: '999px',
+        background: 'rgba(80,200,80,0.18)', color: coatColor, border: '1px solid #2d5234'
+      });
+      affixRow.appendChild(chip);
+    }
   });
 
   // Right-aligned bar: compact core actions only.
@@ -605,6 +628,14 @@ function ensureEffectsStack(container) {
     stoneskin:    { name: 'Stoneskin', glyph: '\u{1FAA8}',       hue: 220 },
     taunted:      { name: 'Taunted',   glyph: '\u{1F624}',       hue: 0   },
     mindwiped:    { name: 'Mindwipe',  glyph: '\u{1F9E0}',       hue: 300 },
+    berserk:      { name: 'Berserk',   glyph: '\u2694\uFE0F',    hue: 0   },
+    energized:    { name: 'Energized', glyph: '\u{1F4AA}',       hue: 60  },
+    mana_surge:   { name: 'Mana Surge', glyph: '\u{1F4A0}',      hue: 250 },
+    lucky:        { name: 'Lucky',     glyph: '\u{1F340}',       hue: 100 },
+    resist_fire:  { name: 'Fire Res',  glyph: '\u{1F9EF}',       hue: 15  },
+    resist_poison: { name: 'Poison Res', glyph: '\u{1F9EA}',     hue: 130 },
+    resist_electric: { name: 'Elec Res', glyph: '\u{1F50C}',     hue: 50  },
+    resist_acid:  { name: 'Acid Res',  glyph: '\u{1F9F4}',       hue: 80  },
     // Hunger levels
     satiated:     { name: 'Satiated',  glyph: '\u{1F60B}',       hue: 130 },
     peckish:      { name: 'Peckish',   glyph: '\u{1F37D}\uFE0F', hue: 55  },

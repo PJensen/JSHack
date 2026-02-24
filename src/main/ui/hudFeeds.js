@@ -17,16 +17,17 @@ import { PetState } from "../../rules/components/PetState.js";
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
  * @param {import('../../lib/ecs-js/index.js').World} world
- * @param {{ getPlayerMana: () => { mana: number, maxMana: number } }} deps
+ * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void }} deps
  */
 export function createHudFeeds(world, deps) {
-  const { getPlayerMana } = deps;
+  const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel } = deps;
 
   let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
   let lastCombatHud = { weaponId: -1, rangedId: -1, rangedCount: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
   let lastDepth = -1;
   let lastPetExists = false;
   let lastPetState = "";
+  let lastSpellMana = -1;
 
   function updateVitalsHUD() {
     const pe = playerEntity(world);
@@ -68,6 +69,8 @@ export function createHudFeeds(world, deps) {
     const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : "";
     const rangedName = rangedId ? (world.get(rangedId, NamedIdentity)?.name || rangedInfo?.description || rangedInfo?.type) : "";
     const dmgDice = wInfo?.damageDice || "";
+    const wCoating = wInfo?.coating && typeof wInfo.coating === 'object' ? wInfo.coating : null;
+    const coatingSig = wCoating ? `${wCoating.kind}:${wCoating.charges || 0}` : "";
     const rangedType = String(rangedInfo?.type || "");
     /** @type {Map<string, { key: string, turns: number, stacks: number }>} */
     const statusMap = new Map();
@@ -120,6 +123,7 @@ export function createHudFeeds(world, deps) {
       pushAffixes(Number(eq.ring1 || 0));
       pushAffixes(Number(eq.ring2 || 0));
       pushAffixes(Number(eq.ranged || 0));
+      pushAffixes(Number(eq.feet || 0));
     }
     const affixNames = affixIds
       .filter((id) => !/^thorns/i.test(String(id)))
@@ -137,11 +141,11 @@ export function createHudFeeds(world, deps) {
     }
 
     if (lastCombatHud.weaponId !== wid || lastCombatHud.rangedId !== rangedId || lastCombatHud.rangedCount !== rangedCount || lastCombatHud.atk !== atk || lastCombatHud.def !== def ||
-      lastCombatHud.statusSig !== statusSig || lastCombatHud.affixSig !== affixSig || lastCombatHud.ammo !== ammo) {
-      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, statusSig, affixSig, ammo };
+      lastCombatHud.statusSig !== statusSig || lastCombatHud.affixSig !== affixSig || lastCombatHud.ammo !== ammo || lastCombatHud.coatingSig !== coatingSig) {
+      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, statusSig, affixSig, ammo, coatingSig };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateCombatHUD", { detail: {
-          weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk } : null,
+          weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk, coating: wCoating } : null,
           ranged: rangedId ? { id: rangedId, name: rangedName || null, isWand: rangedType === 'wand', count: rangedCount } : null,
           defense: def,
           statuses,
@@ -198,10 +202,20 @@ export function createHudFeeds(world, deps) {
     }
   }
 
+  function updateActiveSpellHUD() {
+    ensureActiveSpell();
+    const { mana } = getPlayerMana();
+    if (mana !== lastSpellMana) {
+      lastSpellMana = mana;
+      updateActiveSpellLabel();
+    }
+  }
+
   return {
     updateVitalsHUD,
     updateCombatHUD,
     updateDepthHUD,
     updatePetHUD,
+    updateActiveSpellHUD,
   };
 }

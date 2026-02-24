@@ -59,6 +59,7 @@ export function initOverlays() {
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
   const groundTip = ensureGroundTooltip(root);
+  _itemTooltip = ensureItemTooltip(root);
   const stairTip = ensureStairTooltip(root);
   const trapTip = ensureTrapTooltip(root);
   const tombstoneTip = ensureTombstoneTooltip(root);
@@ -665,6 +666,115 @@ function ensureGroundTooltip(root) {
   return tip;
 }
 
+// --- Floating item tooltip (WoW/Diablo style, shared across all panels) -----
+let _itemTooltip = null;
+
+/** @param {HTMLElement} root */
+function ensureItemTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'item-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed',
+    display: 'none',
+    maxWidth: '280px',
+    pointerEvents: 'none',
+    background: 'rgba(14,18,26,0.96)',
+    color: '#dbeaff',
+    borderRadius: '10px',
+    border: '1px solid #33435f',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    fontFamily: 'monospace',
+    padding: '10px 12px',
+    zIndex: '1400',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
+    fontSize: '13px',
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+/**
+ * Position the tooltip near the anchor element.
+ * @param {HTMLElement} tip
+ * @param {HTMLElement} anchorEl
+ */
+function positionTooltip(tip, anchorEl) {
+  if (!anchorEl) return;
+  const GAP = 8;
+  const MARGIN = 8;
+  const ar = anchorEl.getBoundingClientRect();
+  const tw = tip.offsetWidth;
+  const th = tip.offsetHeight;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const narrow = vw < 500 || ar.width > vw * 0.6;
+
+  let x, y;
+  let placed = false;
+
+  if (!narrow) {
+    // Try right of anchor
+    x = ar.right + GAP;
+    y = ar.top + (ar.height / 2) - (th / 2);
+    if (x + tw + MARGIN <= vw && y >= MARGIN && y + th + MARGIN <= vh) {
+      placed = true;
+    }
+    // Try left of anchor
+    if (!placed) {
+      x = ar.left - GAP - tw;
+      y = ar.top + (ar.height / 2) - (th / 2);
+      if (x >= MARGIN && y >= MARGIN && y + th + MARGIN <= vh) {
+        placed = true;
+      }
+    }
+  }
+
+  // Try above anchor
+  if (!placed) {
+    x = ar.left + (ar.width / 2) - (tw / 2);
+    y = ar.top - GAP - th;
+    if (y >= MARGIN) {
+      placed = true;
+    }
+  }
+
+  // Fallback: below anchor
+  if (!placed) {
+    x = ar.left + (ar.width / 2) - (tw / 2);
+    y = ar.bottom + GAP;
+  }
+
+  // Clamp to viewport
+  x = Math.max(MARGIN, Math.min(vw - tw - MARGIN, x));
+  y = Math.max(MARGIN, Math.min(vh - th - MARGIN, y));
+
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+
+/**
+ * Show the floating item tooltip near the given anchor element.
+ * @param {any} item
+ * @param {HTMLElement} anchorEl
+ */
+function showItemTooltip(item, anchorEl) {
+  const tip = _itemTooltip;
+  if (!tip) return;
+  if (!item) { hideItemTooltip(); return; }
+  // Anchor inside a hidden panel has no offsetParent — skip showing the
+  // tooltip so it doesn't end up at 0,0 (top-left corner).
+  if (anchorEl && !anchorEl.offsetParent) { hideItemTooltip(); return; }
+  renderItemDetails(tip, item);
+  tip.style.display = 'block';
+  positionTooltip(tip, anchorEl);
+}
+
+function hideItemTooltip() {
+  if (_itemTooltip) _itemTooltip.style.display = 'none';
+}
+
 // --- Stair tooltip (tap to descend/ascend) ---------------------------------
 /** @param {HTMLElement} root */
 function ensureStairTooltip(root) {
@@ -877,111 +987,71 @@ function renderGroundTooltip(tip, detail) {
   tip.innerHTML = '';
   const mode = detail?.mode || 'single';
   if (mode === 'multi') {
+    const fromChest = !!detail?.fromChest;
     const row = document.createElement('div');
     row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
     const lbl = document.createElement('div');
-    lbl.textContent = detail?.fromChest ? 'Open Chest' : `${detail?.count || (detail?.items?.length || 0)} items nearby`;
+    lbl.textContent = fromChest ? 'Open Chest' : `${detail?.count || (detail?.items?.length || 0)} items nearby`;
     lbl.style.fontWeight = 'bold';
     const hint = document.createElement('div');
-    hint.textContent = 'Tap to choose'; hint.style.marginLeft = 'auto'; hint.style.opacity = '0.8';
+    hint.textContent = fromChest ? 'Tap to open' : 'Tap to choose'; hint.style.marginLeft = 'auto'; hint.style.opacity = '0.8';
     row.appendChild(lbl); row.appendChild(hint);
     tip.appendChild(row);
+
+    const items = Array.isArray(detail?.items) ? detail.items : [];
+    // Only show item preview for ground items, not chests
+    if (!fromChest && items.length) {
+      const itemList = document.createElement('div');
+      itemList.style.marginTop = '6px';
+      itemList.style.display = 'flex';
+      itemList.style.flexDirection = 'column';
+      itemList.style.gap = '2px';
+      const maxPreview = 5;
+      const shown = items.slice(0, maxPreview);
+      for (const it of shown) {
+        const line = document.createElement('div');
+        const rarity = String(it.rarityName || 'common').toLowerCase();
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = bracketize(sanitize(it.name || it.type || 'item'));
+        Object.assign(nameSpan.style, rarityStyle(rarity));
+        line.appendChild(nameSpan);
+        const aff = Array.isArray(it.affixes) ? it.affixes : [];
+        if (aff.length) {
+          const affSpan = document.createElement('span');
+          affSpan.textContent = ' \u2014 ' + aff.map(a => typeof a === 'object' ? a.name : humanize(String(a))).join(', ');
+          affSpan.style.color = '#8ab8d8';
+          affSpan.style.fontStyle = 'italic';
+          affSpan.style.fontSize = '12px';
+          line.appendChild(affSpan);
+        }
+        itemList.appendChild(line);
+      }
+      if (items.length > maxPreview) {
+        const more = document.createElement('div');
+        more.textContent = `...and ${items.length - maxPreview} more`;
+        more.style.opacity = '0.6';
+        more.style.fontSize = '12px';
+        itemList.appendChild(more);
+      }
+      tip.appendChild(itemList);
+    }
+
     tip.onclick = () => {
-      const items = Array.isArray(detail?.items) ? detail.items : [];
-      window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
+      if (fromChest) {
+        const chestId = Number(detail?.chestId || 0) | 0;
+        if (chestId > 0) {
+          window.dispatchEvent(new CustomEvent('ui:tapOpenChest', { detail: { chestId } }));
+        }
+      } else {
+        window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
+      }
       tip.style.display = 'none';
     };
     return;
   }
 
   const it = detail?.item || {};
-  const title = document.createElement('div');
-  const rarity = String(it.rarityName || 'common').toLowerCase();
-  const name = bracketize(sanitize(it.name || 'item'));
-  title.textContent = name;
-  Object.assign(title.style, rarityStyle(rarity));
-  title.style.marginBottom = '6px';
-  tip.appendChild(title);
-
-  // Bonus lines
-  const bonuses = it.bonuses && typeof it.bonuses === 'object' ? it.bonuses : {};
-  const bonusKeys = Object.keys(bonuses);
-  // Damage summary (if present)
-  const dmgWrap = document.createElement('div');
-  let hasDmg = false;
-  if (it.damageDice) {
-    const line = document.createElement('div');
-    line.textContent = `Damage: ${String(it.damageDice)}`;
-    line.style.color = '#ffd7a0';
-    dmgWrap.appendChild(line);
-    hasDmg = true;
-  }
-  if (Number.isFinite(Number(bonuses.attack))) {
-    const v = Number(bonuses.attack);
-    const line = document.createElement('div');
-    const sign = v > 0 ? '+' : '';
-    line.textContent = `Attack: ${sign}${v}`;
-    line.style.color = '#ffd7a0';
-    dmgWrap.appendChild(line);
-    hasDmg = true;
-  }
-  if (Number.isFinite(Number(bonuses.damage))) {
-    const v = Number(bonuses.damage);
-    const line = document.createElement('div');
-    const sign = v > 0 ? '+' : '';
-    line.textContent = `Damage Bonus: ${sign}${v}`;
-    line.style.color = '#ffd7a0';
-    dmgWrap.appendChild(line);
-    hasDmg = true;
-  }
-  if (Number.isFinite(Number(bonuses.critChance)) || Number.isFinite(Number(bonuses.critMult))) {
-    const cc = Number(bonuses.critChance) || 0;
-    const cm = Number(bonuses.critMult) || 0;
-    const line = document.createElement('div');
-    line.textContent = `Crit: ${cc ? `${cc}%` : '—'}${cm ? ` x${cm.toFixed(2)}` : ''}`;
-    line.style.color = '#ffd7a0';
-    dmgWrap.appendChild(line);
-    hasDmg = true;
-  }
-  if (hasDmg) {
-    const sep = document.createElement('div'); sep.textContent = '—'; sep.style.opacity = '0.4'; sep.style.margin = '6px 0 4px';
-    tip.appendChild(sep);
-    tip.appendChild(dmgWrap);
-  }
-  if (bonusKeys.length) {
-    for (const k of bonusKeys) {
-      const v = Number(bonuses[k]);
-      if (!Number.isFinite(v) || v === 0) continue;
-      const line = document.createElement('div');
-      const sign = v > 0 ? '+' : '';
-      line.textContent = `${sign}${v} ${humanize(k)}`;
-      tip.appendChild(line);
-    }
-  }
-
-  // Affixes (name + description)
-  const aff = Array.isArray(it.affixes) ? it.affixes : [];
-  if (aff.length) {
-    const sep = document.createElement('div'); sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '6px 0 4px'; tip.appendChild(sep);
-    for (const a of aff) {
-      const affixName = typeof a === 'object' ? a.name : humanize(String(a));
-      const affixDesc = typeof a === 'object' ? a.description : '';
-      const line = document.createElement('div');
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = affixName;
-      nameSpan.style.color = '#a8d8ff';
-      nameSpan.style.fontWeight = 'bold';
-      line.appendChild(nameSpan);
-      if (affixDesc) {
-        const descSpan = document.createElement('span');
-        descSpan.textContent = ` \u2014 ${affixDesc}`;
-        descSpan.style.color = '#8ab8d8';
-        descSpan.style.fontStyle = 'italic';
-        line.appendChild(descSpan);
-      }
-      tip.appendChild(line);
-    }
-  }
+  renderItemDetails(tip, it);
 
   // Footer hint
   const foot = document.createElement('div');
@@ -1017,30 +1087,38 @@ function renderItemDetails(container, it) {
     return;
   }
 
-  // --- Item name (rarity-colored) ---
+  // --- Item name + slot on one line: [Oak Staff] weapon ---
   const title = document.createElement('div');
-  title.textContent = bracketize(sanitize(it.name || 'item'));
-  Object.assign(title.style, rarityStyle(it.rarityName));
-  title.style.marginBottom = '2px';
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = bracketize(sanitize(it.name || 'item'));
+  Object.assign(nameSpan.style, rarityStyle(it.rarityName));
+  title.appendChild(nameSpan);
+  if (it.slot) {
+    const slotSpan = document.createElement('span');
+    const slotLabel = humanize(it.slot);
+    slotSpan.textContent = ' ' + slotLabel.charAt(0).toUpperCase() + slotLabel.slice(1);
+    slotSpan.style.opacity = '0.6';
+    slotSpan.style.fontSize = '12px';
+    title.appendChild(slotSpan);
+  }
+  title.style.marginBottom = '4px';
   container.appendChild(title);
 
-  // --- Slot label ---
-  if (it.slot) {
-    const slotLine = document.createElement('div');
-    const label = humanize(it.slot);
-    slotLine.textContent = label.charAt(0).toUpperCase() + label.slice(1);
-    slotLine.style.opacity = '0.6';
-    slotLine.style.fontSize = '12px';
-    container.appendChild(slotLine);
+  // --- Consumable effect description (potions, scrolls, food, wands) ---
+  const isConsumable = it.type === 'potion' || it.type === 'scroll' || it.type === 'food' || it.type === 'wand' || it.type === 'learn' || it.type === 'book';
+  const consumableDesc = isConsumable ? String(it.description || '').trim() : '';
+  if (consumableDesc) {
+    const effectLine = document.createElement('div');
+    effectLine.textContent = consumableDesc;
+    effectLine.style.color = '#c8e0ff';
+    effectLine.style.fontSize = '13px';
+    effectLine.style.marginBottom = '2px';
+    container.appendChild(effectLine);
   }
 
   // --- Weapon stats (damage dice, stamina cost, two-handed) ---
   const isWeapon = it.slot === 'weapon' || it.slot === 'ranged';
   if (isWeapon && (it.damageDice || it.staminaCost != null)) {
-    const sep = document.createElement('div');
-    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
-    container.appendChild(sep);
-
     if (it.damageDice) {
       const line = document.createElement('div');
       line.textContent = `Damage: ${String(it.damageDice)}`;
@@ -1062,6 +1140,26 @@ function renderItemDetails(container, it) {
     }
   }
 
+  // --- Coating (poison, etc.) ---
+  const coat = it.coating;
+  if (coat && coat.kind) {
+    const line = document.createElement('div');
+    line.style.display = 'flex'; line.style.alignItems = 'center'; line.style.gap = '6px';
+    line.style.marginTop = '2px';
+    const dot = document.createElement('span');
+    const coatColor = coat.color || '#66dd66';
+    dot.textContent = '\u2022';
+    dot.style.color = coatColor;
+    line.appendChild(dot);
+    const label = document.createElement('span');
+    const charges = Number(coat.charges || 0);
+    label.textContent = `${humanize(coat.kind)} coated` + (charges > 0 ? ` (${charges} charges)` : '');
+    label.style.color = coatColor;
+    label.style.fontWeight = 'bold';
+    line.appendChild(label);
+    container.appendChild(line);
+  }
+
   // --- Bonuses ---
   const bonuses = it.bonuses && typeof it.bonuses === 'object' ? it.bonuses : {};
   const bonusKeys = Object.keys(bonuses).filter(k => {
@@ -1070,10 +1168,6 @@ function renderItemDetails(container, it) {
   });
 
   if (bonusKeys.length) {
-    const sep = document.createElement('div');
-    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
-    container.appendChild(sep);
-
     for (const k of bonusKeys) {
       const v = Number(bonuses[k]);
       const sign = v > 0 ? '+' : '';
@@ -1087,20 +1181,16 @@ function renderItemDetails(container, it) {
   // --- Affixes (name + description) ---
   const affixes = Array.isArray(it.affixes) ? it.affixes : [];
   if (affixes.length) {
-    const sep = document.createElement('div');
-    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
-    container.appendChild(sep);
-
     for (const a of affixes) {
       const affixName = typeof a === 'object' ? a.name : humanize(String(a));
       const affixDesc = typeof a === 'object' ? a.description : '';
 
       const line = document.createElement('div');
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = affixName;
-      nameSpan.style.color = '#a8d8ff';
-      nameSpan.style.fontWeight = 'bold';
-      line.appendChild(nameSpan);
+      const affixNameSpan = document.createElement('span');
+      affixNameSpan.textContent = affixName;
+      affixNameSpan.style.color = '#a8d8ff';
+      affixNameSpan.style.fontWeight = 'bold';
+      line.appendChild(affixNameSpan);
 
       if (affixDesc) {
         const descSpan = document.createElement('span');
@@ -1144,7 +1234,6 @@ function renderItemDetails(container, it) {
       container.appendChild(line);
     }
 
-    // Damage dice comparison (show side-by-side if different)
     if ((it.damageDice || cmp.damageDice) && it.damageDice !== cmp.damageDice) {
       const line = document.createElement('div');
       line.textContent = `Damage: ${it.damageDice || 'none'} vs ${cmp.damageDice || 'none'}`;
@@ -1153,31 +1242,26 @@ function renderItemDetails(container, it) {
       container.appendChild(line);
     }
 
-    // Stamina cost comparison
     if (it.staminaCost != null && cmp.staminaCost != null && it.staminaCost !== cmp.staminaCost) {
       const delta = it.staminaCost - cmp.staminaCost;
       const line = document.createElement('div');
       const sign = delta > 0 ? '+' : '';
       line.textContent = `${sign}${delta} stamina cost`;
-      // Lower stamina cost is better, so invert the color
       line.style.color = delta < 0 ? '#55ff55' : '#ff5555';
       line.style.fontWeight = 'bold';
       container.appendChild(line);
     }
   }
 
-  // --- Flavor text at bottom ---
+  // --- Flavor text at bottom (skip for consumables already shown above) ---
   const desc = String(it.description || '').trim();
-  if (desc) {
-    const sep = document.createElement('div');
-    sep.textContent = '────────────'; sep.style.opacity = '0.4'; sep.style.margin = '4px 0';
-    container.appendChild(sep);
-
+  if (desc && !consumableDesc) {
     const flavor = document.createElement('div');
     flavor.textContent = desc;
     flavor.style.fontStyle = 'italic';
     flavor.style.opacity = '0.7';
     flavor.style.fontSize = '12px';
+    flavor.style.marginTop = '3px';
     container.appendChild(flavor);
   }
 }
@@ -1234,7 +1318,7 @@ function show(panel) {
   panel.style.display = 'block';
 }
 /** @param {HTMLDivElement} panel */
-function hide(panel) { panel.style.display = 'none'; }
+function hide(panel) { panel.style.display = 'none'; hideItemTooltip(); }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] */
 function renderInventory(panel, items, ground) {
@@ -1343,6 +1427,13 @@ function renderInventory(panel, items, ground) {
 
     row.appendChild(star);
     row.appendChild(name);
+    if (it.coating && it.coating.kind) {
+      const dot = document.createElement('span');
+      dot.textContent = '\u2022';
+      dot.style.color = it.coating.color || '#66dd66';
+      dot.style.fontSize = '14px';
+      row.appendChild(dot);
+    }
     row.appendChild(slot);
     if (it.unpaid) row.appendChild(unpaidTag);
     row.appendChild(qty);
@@ -1382,22 +1473,6 @@ function renderInventory(panel, items, ground) {
   });
   el.appendChild(actions);
 
-  const details = document.createElement('div');
-  Object.assign(details.style, {
-    marginTop: '8px',
-    padding: '8px',
-    minHeight: '4.8em',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    background: '#0a111f',
-    color: '#cfe8ff',
-    opacity: '0.9',
-    whiteSpace: 'normal',
-    wordBreak: 'break-word',
-    overflowWrap: 'anywhere',
-  });
-  el.appendChild(details);
-
   function triggerApplyForTool(it) {
     const toolId = Number(it?.id || 0);
     if (!Number.isInteger(toolId) || toolId <= 0) return;
@@ -1423,7 +1498,7 @@ function renderInventory(panel, items, ground) {
       ? (hasApplyTargets ? ' · A=Apply' : ' · A=Apply (no targets)')
       : '';
     hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
-    renderItemDetails(details, it);
+    showItemTooltip(it, rows[sel]);
     renderInventoryActions();
   }
 
@@ -1581,11 +1656,20 @@ function renderInventory(panel, items, ground) {
         },
       };
     }
+    const fromChest = ground.fromChest === true;
+    const groundChestId = Number(ground.chestId || 0) | 0;
+    if (fromChest && groundChestId > 0) {
+      return {
+        label: 'Open Chest',
+        run: () => {
+          window.dispatchEvent(new CustomEvent('ui:tapOpenChest', { detail: { chestId: groundChestId } }));
+        },
+      };
+    }
     const items = Array.isArray(ground.items) ? ground.items.filter((it) => Number.isInteger(it?.id) && it.id > 0) : [];
     if (!items.length) return null;
-    const fromChest = ground.fromChest === true;
     return {
-      label: fromChest ? 'Open Chest' : `Pickup (${items.length})`,
+      label: `Pickup (${items.length})`,
       run: () => {
         window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
       },
@@ -1683,7 +1767,7 @@ function renderInventory(panel, items, ground) {
   (/** @type {any} */ (panel))._inventoryDetach = detach;
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,cost?:number}>} spells @param {string|null} activeId */
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,symbol?:string,cost?:number}>} spells @param {string|null} activeId */
 function renderSpellPicker(panel, spells, activeId) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
@@ -1711,6 +1795,12 @@ function renderSpellPicker(panel, spells, activeId) {
       padding: '6px 8px', border: '1px solid #2d3b52', borderRadius: '6px',
       background: sp.id === activeId ? '#0b1323' : '#0f1421', cursor: 'pointer'
     });
+    if (sp.symbol) {
+      const sym = document.createElement('span');
+      sym.textContent = sp.symbol;
+      sym.style.fontSize = '18px';
+      row.appendChild(sym);
+    }
     const name = document.createElement('span');
     name.textContent = sp.name ? `[${sp.name}]` : `[${sp.id}]`;
     const cost = document.createElement('span');
@@ -1882,15 +1972,6 @@ function renderPickupChooser(panel, items) {
   actions.appendChild(btnCancel);
   el.appendChild(actions);
 
-  const details = document.createElement('div');
-  Object.assign(details.style, {
-    marginTop: '8px', padding: '8px', minHeight: '4.8em',
-    border: '1px solid #2d3b52', borderRadius: '6px',
-    background: '#0a111f', color: '#cfe8ff', opacity: '0.9',
-    whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere',
-  });
-  el.appendChild(details);
-
   /** @param {number} i */
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i|0));
@@ -1898,7 +1979,7 @@ function renderPickupChooser(panel, items) {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
-    renderItemDetails(details, items[sel]);
+    showItemTooltip(items[sel], rows[sel]);
   }
 
   /** @param {KeyboardEvent} e */
@@ -1989,22 +2070,13 @@ function renderUseChooser(panel, items) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Use \u00b7 T=Throw \u00b7 Esc=Close';
   el.appendChild(hint);
 
-  const details = document.createElement('div');
-  Object.assign(details.style, {
-    marginTop: '8px', padding: '8px', minHeight: '4.8em',
-    border: '1px solid #2d3b52', borderRadius: '6px',
-    background: '#0a111f', color: '#cfe8ff', opacity: '0.9',
-    whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere',
-  });
-  el.appendChild(details);
-
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i | 0));
     rows.forEach((r, j) => {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
-    renderItemDetails(details, items[sel]);
+    showItemTooltip(items[sel], rows[sel]);
   }
 
   function useSelected() {
@@ -2110,22 +2182,13 @@ function renderThrowChooser(panel, items) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Select item \u00b7 then tap target \u00b7 Esc=Close';
   el.appendChild(hint);
 
-  const details = document.createElement('div');
-  Object.assign(details.style, {
-    marginTop: '8px', padding: '8px', minHeight: '4.8em',
-    border: '1px solid #2d3b52', borderRadius: '6px',
-    background: '#0a111f', color: '#cfe8ff', opacity: '0.9',
-    whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere',
-  });
-  el.appendChild(details);
-
   function setSel(i) {
     sel = Math.max(0, Math.min(items.length - 1, i | 0));
     rows.forEach((r, j) => {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
-    renderItemDetails(details, items[sel]);
+    showItemTooltip(items[sel], rows[sel]);
   }
 
   function throwSelected() {
@@ -2432,6 +2495,7 @@ function renderShop(panel, data, state) {
         r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
         r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
       });
+      showItemTooltip(unpaidItems[sel], rows[sel]);
     }
 
     function payBill() {
@@ -2561,6 +2625,7 @@ function renderShop(panel, data, state) {
         r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
         r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
       });
+      showItemTooltip(currentItems[sel], rows[sel]);
     }
 
     setSel(0);
@@ -2647,12 +2712,13 @@ function renderChest(panel, data, state) {
   el.appendChild(tabBar);
 
   const listContainer = document.createElement('div');
-  listContainer.style.maxHeight = '50vh'; listContainer.style.overflow = 'auto';
+  listContainer.style.maxHeight = '36vh'; listContainer.style.overflow = 'auto';
   el.appendChild(listContainer);
 
   const hint = document.createElement('div');
   hint.style.marginTop = '8px'; hint.style.opacity = '0.85'; hint.style.fontSize = '12px';
   el.appendChild(hint);
+
 
   let sel = 0;
   let currentItems = [];
@@ -2674,6 +2740,7 @@ function renderChest(panel, data, state) {
       empty.textContent = activeTab === 'take' ? '(chest is empty)' : '(nothing to store)';
       listContainer.appendChild(empty);
       hint.textContent = 'Tab=Switch \u00b7 Esc=Close';
+      hideItemTooltip();
       return;
     }
 
@@ -2693,6 +2760,13 @@ function renderChest(panel, data, state) {
       Object.assign(name.style, rs);
 
       row.appendChild(name);
+      if (it.coating && it.coating.kind) {
+        const dot = document.createElement('span');
+        dot.textContent = '\u2022';
+        dot.style.color = it.coating.color || '#66dd66';
+        dot.style.fontSize = '14px';
+        row.appendChild(dot);
+      }
       if (it.count > 1) {
         const qty = document.createElement('span');
         qty.style.opacity = '0.7'; qty.textContent = `x${it.count}`;
@@ -2711,6 +2785,7 @@ function renderChest(panel, data, state) {
         r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
         r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
       });
+      showItemTooltip(currentItems[sel], rows[sel]);
     }
 
     setSel(0);
@@ -3399,6 +3474,7 @@ function renderRack(panel, data, state) {
       r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
       r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
     });
+    showItemTooltip(rackItems[sel], rows[sel]);
   }
 
   setSel(0);

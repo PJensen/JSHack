@@ -4,6 +4,8 @@
 import { Position } from "../../rules/components/Position.js";
 import { startShake } from "../../display/camera/shake.js";
 import { clamp01, rgba, pathPolyline, jitterLine } from "./fxGeom.js";
+import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
 
 const DEITY_WRATH_VFX = Object.freeze({
   default: Object.freeze({
@@ -62,17 +64,17 @@ function getWrathVfxProfile(deityId) {
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool?: { spawn(p:object):void } } }} deps
  */
 export function createBoltFxController({ world, cam, fx }) {
-  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, chainIndex:number}>} */
+  /** @type {LineFx[]} */
   const _boltFx = [];
-  /** @type {Array<{x:number,y:number, ttl:number}>} */
+  /** @type {PulseFx[]} */
   const _lightPulses = [];
-  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, amp:number, branch:boolean, outer:[number,number,number], mid:[number,number,number], core:[number,number,number]}>} */
+  /** @type {DeityBoltFx[]} */
   const _deityBolts = [];
-  /** @type {Array<{x:number,y:number, ttl:number, max:number, pulse:[number,number,number]}>} */
+  /** @type {PulseFx[]} */
   const _deityPulses = [];
-  /** @type {Array<{ttl:number, max:number, color:[number,number,number]}>} */
+  /** @type {ScreenFlashFx[]} */
   const _screenFlash = [];
-  /** @type {Array<{x:number,y:number, ttl:number, max:number, amp:number, color:[number,number,number]}>} */
+  /** @type {ScreenBoltFx[]} */
   const _screenBolts = [];
 
   function _spawnDeityWrath(payload) {
@@ -97,19 +99,19 @@ export function createBoltFxController({ world, cam, fx }) {
       + Math.min(0.14, (severityScale - 1) * 0.08);
     const mainAmp = 0.08 + Math.min(0.18, (severityScale - 1) * 0.08 + wrathDebt * 0.03);
 
-    _deityBolts.push({
+    _deityBolts.push(new DeityBoltFx({
       from: { x, y: 0 },
       to: { x, y: yTarget },
-      ttl: ttlMain, max: ttlMain, amp: mainAmp, branch: false,
+      ttl: ttlMain, amp: mainAmp, branch: false,
       outer: profile.outer, mid: profile.mid, core: profile.core,
-    });
-    _deityPulses.push({ x, y: yTarget, ttl: 0.32, max: 0.32, pulse: profile.pulse });
-    _screenBolts.push({
+    }));
+    _deityPulses.push(new PulseFx({ x, y: yTarget, ttl: 0.32, color: profile.pulse }));
+    _screenBolts.push(new ScreenBoltFx({
       x, y: yTarget,
-      ttl: ttlMain + 0.12, max: ttlMain + 0.12,
+      ttl: ttlMain + 0.12,
       amp: 6 + Math.min(10, (severityScale - 1) * 5 + wrathDebt * 2.5),
       color: profile.core,
-    });
+    }));
 
     const branchCount = Math.max(2, 2 + Math.floor((severityScale - 1) * 3 + Math.min(3, wrathDebt * 2)));
     for (let i = 0; i < branchCount; i++) {
@@ -119,16 +121,16 @@ export function createBoltFxController({ world, cam, fx }) {
       const yEnd = Math.min(yTarget + 1.6, yStart + 0.9 + Math.random() * (2.4 + severityScale));
       const xEnd = xStart + (Math.random() - 0.5) * (0.8 + severityScale * 0.35);
       const ttl = ttlMain * (0.65 + Math.random() * 0.25);
-      _deityBolts.push({
+      _deityBolts.push(new DeityBoltFx({
         from: { x: xStart, y: yStart }, to: { x: xEnd, y: yEnd },
-        ttl, max: ttl, amp: mainAmp * 0.75, branch: true,
+        ttl, amp: mainAmp * 0.75, branch: true,
         outer: profile.outer, mid: profile.mid, core: profile.core,
-      });
-      _deityPulses.push({
+      }));
+      _deityPulses.push(new PulseFx({
         x: xEnd, y: yEnd,
         ttl: 0.16 + Math.random() * 0.12, max: 0.26,
-        pulse: profile.pulse,
-      });
+        color: profile.pulse,
+      }));
     }
 
     if (fx?.pool) {
@@ -136,18 +138,18 @@ export function createBoltFxController({ world, cam, fx }) {
       const sparkCount = Math.max(14, Math.round(lineLength * (0.7 + Math.min(2.2, severityScale))));
       for (let i = 0; i < sparkCount; i++) {
         const t = Math.random();
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x: x + (Math.random() - 0.5) * 0.34,
           y: yTarget * t + (Math.random() - 0.5) * 0.08,
           vx: (Math.random() - 0.5) * 0.35,
           vy: 0.8 + Math.random() * (2.1 + severityScale),
-          ax: 0, ay: 0.9,
+          ay: 0.9,
           life: 0.14 + Math.random() * 0.26,
           size0: 0.06 + Math.random() * 0.05, size1: 0.01,
           r: profile.spark[0], g: profile.spark[1], b: profile.spark[2],
-          a0: 0.82, a1: 0.0, rot: 0,
+          a0: 0.82,
           rotVel: (Math.random() - 0.5) * 2.4,
-        });
+        }));
       }
     }
 
@@ -159,14 +161,14 @@ export function createBoltFxController({ world, cam, fx }) {
     startShake(cam, shakePower, shakeDur);
 
     const flashDuration = 0.12 + Math.min(0.12, intensity * 0.06 + (severityScale - 1) * 0.04);
-    _screenFlash.push({ ttl: flashDuration, max: flashDuration, color: profile.pulse });
+    _screenFlash.push(new ScreenFlashFx({ ttl: flashDuration, color: profile.pulse }));
   }
 
   function installListeners() {
     world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex = 0 }) => {
       if (from && to) {
-        _boltFx.push({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.14, max: 0.14, chainIndex: Number(chainIndex || 0) });
-        _lightPulses.push({ x: to.x, y: to.y, ttl: 0.12 });
+        _boltFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.14, chainIndex: Number(chainIndex || 0) }));
+        _lightPulses.push(new PulseFx({ x: to.x, y: to.y, ttl: 0.12 }));
         startShake(cam, 4, 0.18);
       }
     });
@@ -184,40 +186,40 @@ export function createBoltFxController({ world, cam, fx }) {
   function tick(dt) {
     // Spell bolts
     if (_boltFx.length) {
-      for (const eff of _boltFx) eff.ttl -= dt;
+      for (const eff of _boltFx) eff.tick(dt);
       for (let i = _boltFx.length - 1; i >= 0; i--) {
-        if (_boltFx[i] && _boltFx[i].ttl <= 0) _boltFx.splice(i, 1);
+        if (_boltFx[i].expired) _boltFx.splice(i, 1);
       }
     }
     if (_lightPulses.length) {
-      for (const f of _lightPulses) f.ttl -= dt;
+      for (const f of _lightPulses) f.tick(dt);
       for (let i = _lightPulses.length - 1; i >= 0; i--) {
-        if (_lightPulses[i] && _lightPulses[i].ttl <= 0) _lightPulses.splice(i, 1);
+        if (_lightPulses[i].expired) _lightPulses.splice(i, 1);
       }
     }
     // Deity wrath
     if (_deityBolts.length) {
       for (let i = _deityBolts.length - 1; i >= 0; i--) {
-        _deityBolts[i].ttl -= dt;
-        if (_deityBolts[i].ttl <= 0) _deityBolts.splice(i, 1);
+        _deityBolts[i].tick(dt);
+        if (_deityBolts[i].expired) _deityBolts.splice(i, 1);
       }
     }
     if (_deityPulses.length) {
       for (let i = _deityPulses.length - 1; i >= 0; i--) {
-        _deityPulses[i].ttl -= dt;
-        if (_deityPulses[i].ttl <= 0) _deityPulses.splice(i, 1);
+        _deityPulses[i].tick(dt);
+        if (_deityPulses[i].expired) _deityPulses.splice(i, 1);
       }
     }
     if (_screenFlash.length) {
       for (let i = _screenFlash.length - 1; i >= 0; i--) {
-        _screenFlash[i].ttl -= dt;
-        if (_screenFlash[i].ttl <= 0) _screenFlash.splice(i, 1);
+        _screenFlash[i].tick(dt);
+        if (_screenFlash[i].expired) _screenFlash.splice(i, 1);
       }
     }
     if (_screenBolts.length) {
       for (let i = _screenBolts.length - 1; i >= 0; i--) {
-        _screenBolts[i].ttl -= dt;
-        if (_screenBolts[i].ttl <= 0) _screenBolts.splice(i, 1);
+        _screenBolts[i].tick(dt);
+        if (_screenBolts[i].expired) _screenBolts.splice(i, 1);
       }
     }
   }
@@ -227,14 +229,14 @@ export function createBoltFxController({ world, cam, fx }) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const p of _lightPulses) {
-      const a = Math.max(0, Math.min(1, p.ttl / 0.12));
+      const a = p.alpha;
       ctx.fillStyle = `rgba(180,240,255,${0.18 * a})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, 0.6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = `rgba(255,255,220,${0.10 * a})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, 0.35, 0, Math.PI * 2); ctx.fill();
     }
     for (const eff of _boltFx) {
-      const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
+      const alpha = eff.alpha;
       const pts = jitterLine(eff.from, eff.to, 11, 0.10 * alpha);
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.strokeStyle = `rgba(120,200,255,${0.18 * alpha})`;
@@ -260,10 +262,10 @@ export function createBoltFxController({ world, cam, fx }) {
 
     for (let i = 0; i < _deityPulses.length; i++) {
       const pulse = _deityPulses[i];
-      const a = Math.max(0, Math.min(1, pulse.ttl / Math.max(0.0001, pulse.max)));
-      const outerR = 0.24 + (1 - a) * 0.7;
-      const innerR = 0.08 + (1 - a) * 0.26;
-      ctx.fillStyle = rgba(pulse.pulse, 0.16 * a);
+      const a = pulse.alpha;
+      const outerR = 0.24 + pulse.progress * 0.7;
+      const innerR = 0.08 + pulse.progress * 0.26;
+      ctx.fillStyle = rgba(pulse.color, 0.16 * a);
       ctx.beginPath(); ctx.arc(pulse.x, pulse.y, outerR, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = `rgba(255,255,245,${(0.12 * a).toFixed(3)})`;
       ctx.beginPath(); ctx.arc(pulse.x, pulse.y, innerR, 0, Math.PI * 2); ctx.fill();
@@ -271,7 +273,7 @@ export function createBoltFxController({ world, cam, fx }) {
 
     for (let i = 0; i < _deityBolts.length; i++) {
       const seg = _deityBolts[i];
-      const alpha = Math.max(0, Math.min(1, seg.ttl / Math.max(0.0001, seg.max)));
+      const alpha = seg.alpha;
       const len = Math.max(1, Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y));
       const points = Math.max(8, Math.min(24, Math.floor(len * (seg.branch ? 1.3 : 1.6))));
       const pts = jitterLine(seg.from, seg.to, points, seg.amp * alpha);
@@ -298,7 +300,7 @@ export function createBoltFxController({ world, cam, fx }) {
       if (!strongest || flash.ttl > strongest.ttl) strongest = flash;
     }
     if (!strongest) return;
-    const a = Math.max(0, Math.min(1, strongest.ttl / Math.max(0.0001, strongest.max)));
+    const a = strongest.alpha;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = rgba(strongest.color, 0.18 * a);
@@ -320,7 +322,7 @@ export function createBoltFxController({ world, cam, fx }) {
 
     for (let i = 0; i < _screenBolts.length; i++) {
       const bolt = _screenBolts[i];
-      const alpha = Math.max(0, Math.min(1, bolt.ttl / Math.max(0.0001, bolt.max)));
+      const alpha = bolt.alpha;
       const sx = (bolt.x - cam.x) * scale + halfW;
       const sy = (bolt.y - cam.y) * scale + halfH;
       if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;

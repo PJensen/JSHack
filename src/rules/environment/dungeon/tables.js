@@ -22,6 +22,7 @@ function toMonsterSpawnParams(def, depth) {
     massKg: def.massKg,
     resistances: def.resistances,
     speed: def.speed,
+    equipment: def.equipment || null,
   };
 }
 

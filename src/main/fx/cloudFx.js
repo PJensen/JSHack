@@ -3,6 +3,8 @@
 
 import { startShake } from "../../display/camera/shake.js";
 import { Position } from "../../rules/components/Position.js";
+import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { BubblePopFx } from "./fxEntries.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getFxTime: () => number }} deps
@@ -12,7 +14,7 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
   const _plasmaCloudFx = new Map();
   /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, pulseFlash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, medium:string, bubbleClock:number }>} */
   const _poisonCloudFx = new Map();
-  /** @type {Array<{x:number, y:number, ttl:number, max:number, r0:number, r1:number, rise:number, phase:number}>} */
+  /** @type {BubblePopFx[]} */
   const _poisonBubblePops = [];
 
   // --- Particle helpers ---
@@ -21,13 +23,11 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 0.4 + Math.random() * 1.2;
-      fx.pool.spawn({
+      fx.pool.spawn(new Particle({
         x: x + (Math.random() - 0.5) * 0.35,
         y: y + (Math.random() - 0.5) * 0.35,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        ax: 0,
-        ay: 0,
         life: 0.22 + Math.random() * 0.18,
         size0: 0.09 + Math.random() * 0.06,
         size1: 0.02,
@@ -35,10 +35,7 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
         g: 235 + ((Math.random() * 20) | 0),
         b: 255,
         a0: 0.9,
-        a1: 0.0,
-        rot: 0,
-        rotVel: 0,
-      });
+      }));
     }
   }
 
@@ -47,12 +44,11 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 0.12 + Math.random() * 0.45;
-      fx.pool.spawn({
+      fx.pool.spawn(new Particle({
         x: x + (Math.random() - 0.5) * 0.4,
         y: y + (Math.random() - 0.5) * 0.4,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - (0.08 + Math.random() * 0.12),
-        ax: 0,
         ay: -0.03,
         life: 0.50 + Math.random() * 0.30,
         size0: 0.09 + Math.random() * 0.05,
@@ -61,10 +57,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
         g: 205 + ((Math.random() * 45) | 0),
         b: 90 + ((Math.random() * 40) | 0),
         a0: 0.52,
-        a1: 0.0,
-        rot: 0,
         rotVel: (Math.random() - 0.5) * 0.9,
-      });
+      }));
     }
   }
 
@@ -93,12 +87,11 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.1; // mostly upward
         const speed = 0.08 + Math.random() * 0.24;
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x: x + (Math.random() - 0.5) * 0.12,
           y: y + (Math.random() - 0.5) * 0.08,
           vx: Math.cos(angle) * speed * 0.6,
           vy: Math.sin(angle) * speed - 0.04,
-          ax: 0,
           ay: -0.04,
           life: 0.18 + Math.random() * 0.20,
           size0: 0.05 + Math.random() * 0.04,
@@ -107,26 +100,22 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
           g: 240 + ((Math.random() * 15) | 0),
           b: 150 + ((Math.random() * 40) | 0),
           a0: 0.48,
-          a1: 0.0,
-          rot: 0,
           rotVel: (Math.random() - 0.5) * 0.6,
-        });
+        }));
       }
     }
 
     const pops = 1 + ((Math.random() < 0.35 * s) ? 1 : 0);
     for (let i = 0; i < pops; i++) {
-      const ttl = 0.28 + Math.random() * 0.22;
-      _poisonBubblePops.push({
+      _poisonBubblePops.push(new BubblePopFx({
         x: x + (Math.random() - 0.5) * 0.10,
         y: y + (Math.random() - 0.5) * 0.08,
-        ttl,
-        max: ttl,
+        ttl: 0.28 + Math.random() * 0.22,
         r0: 0.02 + Math.random() * 0.04,
         r1: 0.15 + Math.random() * 0.10,
         rise: 0.08 + Math.random() * 0.10,
         phase: Math.random() * Math.PI * 2,
-      });
+      }));
     }
   }
 
@@ -187,11 +176,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
 
     // Bubble pops
     for (let i = _poisonBubblePops.length - 1; i >= 0; i--) {
-      const pop = _poisonBubblePops[i];
-      pop.ttl = Math.max(0, pop.ttl - dt);
-      pop.y -= pop.rise * dt;
-      pop.phase += dt * 6.0;
-      if (pop.ttl <= 0) _poisonBubblePops.splice(i, 1);
+      _poisonBubblePops[i].tick(dt);
+      if (_poisonBubblePops[i].expired) _poisonBubblePops.splice(i, 1);
     }
   }
 
@@ -294,11 +280,9 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
       ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < _poisonBubblePops.length; i++) {
         const pop = _poisonBubblePops[i];
-        const max = (pop.max > 0) ? pop.max : 1;
-        const t = pop.max > 0 ? (1 - (pop.ttl / max)) : 1;
-        const u = Math.max(0, Math.min(1, t));
-        const alive = Math.max(0, Math.min(1, pop.ttl / max));
-        const rr = pop.r0 + (pop.r1 - pop.r0) * u;
+        const u = pop.progress;
+        const alive = pop.alpha;
+        const rr = pop.radius;
         const wob = 0.015 * Math.sin(_fxTime * 6.5 + pop.phase);
         const x = pop.x + wob;
         const y = pop.y;

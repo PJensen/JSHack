@@ -1,4 +1,4 @@
-import { assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { AttackIntent } from '../src/rules/components/Intents/AttackIntent.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
@@ -6,6 +6,8 @@ import { Vitality } from '../src/rules/components/Vitality.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Resistances } from '../src/rules/components/Resistences.js';
+import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { Faction } from '../src/rules/components/Faction.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { installAffixTriggers } from '../src/rules/systems/affixTriggerSystem.js';
@@ -113,4 +115,63 @@ Deno.test("insulated affix mitigates capacitive electric chip", () => {
   const hpInsulated = worldB.get(foeB, Vitality).hp;
 
   assert(hpInsulated === hpPlain + 1, `insulated should absorb 1-point electric chip (plain=${hpPlain}, insulated=${hpInsulated})`);
+});
+
+Deno.test("poison weapon coating procs DOT at 25% and consumes one charge on proc", () => {
+  function runOne(seed) {
+    const world = new World({ seed });
+    installAffixTriggers(world);
+
+    const weapon = makeEquip(world, {
+      id: 'test_poison_coated_blade',
+      name: 'Poison Coated Blade',
+      slot: 'weapon',
+      bonuses: { attack: 12 },
+      affixes: [],
+    });
+
+    const weaponInfo = world.get(weapon, ItemInfo);
+    weaponInfo.coating = { kind: 'poison', charges: 3 };
+
+    const attacker = makeActor(world, 'Hero', { weapon }, 20);
+    const defender = makeActor(world, 'Target Dummy', {}, 50);
+    world.add(attacker, Faction, { key: 'player' });
+    world.add(defender, Faction, { key: 'enemy' });
+    world.add(attacker, Position, { x: 2, y: 2 });
+    world.add(defender, Position, { x: 2, y: 3 });
+
+    equipmentSystem(world);
+    world.add(attacker, AttackIntent, { targetId: defender });
+    combatSystem(world);
+
+    const updatedInfo = world.get(weapon, ItemInfo);
+    const chargesAfter = Math.max(0, Number(updatedInfo?.coating?.charges || 0) | 0);
+    const ae = world.get(defender, ActiveEffects);
+    const poison = ae?.effects?.find((e) => e.key === 'poison');
+    return {
+      procced: Boolean(poison),
+      chargesAfter,
+      turnsLeft: Number(poison?.turnsLeft || 0),
+      potency: Number(poison?.potency || 0),
+    };
+  }
+
+  let foundProc = false;
+  let foundNoProc = false;
+  for (let seed = 1; seed <= 256; seed++) {
+    const r = runOne(seed);
+    if (r.procced) {
+      foundProc = true;
+      assertEquals(r.chargesAfter, 2, 'proc should consume exactly one coating charge');
+      assertEquals(r.turnsLeft, 4, 'proc should apply poison for 4 turns');
+      assertEquals(r.potency, 2, 'proc should apply poison potency 2');
+    } else {
+      foundNoProc = true;
+      assertEquals(r.chargesAfter, 3, 'non-proc should not consume coating charge');
+    }
+    if (foundProc && foundNoProc) break;
+  }
+
+  assert(foundProc, 'expected at least one deterministic seed to trigger poison coating proc');
+  assert(foundNoProc, 'expected at least one deterministic seed to not trigger poison coating proc');
 });

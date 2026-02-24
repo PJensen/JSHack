@@ -6,7 +6,9 @@
 import { DisarmIntent } from "../components/Intents/DisarmIntent.js";
 import { Position } from "../components/Position.js";
 import { Trap } from "../components/Trap.js";
-import { mulberry32, rngInt, combatSeed } from "../utils/rng.js";
+import { Equipment } from "../components/Equipment.js";
+import { mulberry32, rngInt, combatSeed, pct } from "../utils/rng.js";
+import { statusStrength } from "../utils/statusFacade.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
 /**
@@ -64,7 +66,18 @@ export function disarmTrapSystem(world) {
     const roll = rngInt(rng, 1, 20);
     const dc = t.difficulty || 10;
 
-    if (roll >= dc) {
+    // Luck modifier: positive luck gives a lucky save on failure,
+    // negative luck can fumble a success.
+    let success = roll >= dc;
+    const eq = world.get(actorId, Equipment);
+    const luck = Number(eq?.luckDerived || 0) + statusStrength(world, actorId, "lucky");
+    if (!success && luck > 0) {
+      success = pct(rng, luck);
+    } else if (success && luck < 0) {
+      success = !pct(rng, -luck);
+    }
+
+    if (success) {
       // Success — disarm harmlessly
       try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {}
       world.emit?.('trap:disarmed', {

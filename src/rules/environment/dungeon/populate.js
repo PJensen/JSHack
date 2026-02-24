@@ -6,6 +6,7 @@ import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Position } from '../../components/Position.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
 import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
+import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopItem } from '../../data/shopStock.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
@@ -385,6 +386,25 @@ function countRoomEntrances(room, chunk) {
 }
 
 /**
+ * Equip a monster entity with items defined in its equipment spec.
+ * @param {import('../../../lib/ecs-js/index.js').World} world
+ * @param {number} entityId
+ * @param {{ranged?:string, ammo?:string}} equipment
+ */
+export function equipMonster(world, entityId, equipment) {
+  const eq = world.get(entityId, Equipment);
+  if (!eq) return;
+  if (equipment.ranged) {
+    const bowId = buildCatalogItem(world, equipment.ranged);
+    eq.ranged = bowId;
+  }
+  if (equipment.ammo) {
+    const arrowId = createFrom(world, ArrowsStack, {});
+    eq.ammo = arrowId;
+  }
+}
+
+/**
  * Materialize a spawn point into an ECS entity.
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {SpawnPoint} spawn
@@ -394,7 +414,7 @@ export function materializeSpawn(world, spawn) {
   switch (spawn.kind) {
     case 'monster': {
       const p = spawn.params;
-      return createFrom(world, Monster, {
+      const id = createFrom(world, Monster, {
         x: spawn.x, y: spawn.y,
         name: p.name,
         identity: p.identity,
@@ -409,6 +429,8 @@ export function materializeSpawn(world, spawn) {
         resistances: p.resistances,
         speed: p.speed,
       });
+      if (p.equipment) equipMonster(world, id, p.equipment);
+      return id;
     }
     case 'gold': {
       const id = createFrom(world, GoldStack, {});

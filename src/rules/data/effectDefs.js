@@ -6,13 +6,14 @@ export const EFFECT_OPERATION_IDS = Object.freeze([
   "damage",
   "heal",
   "stamina_restore",
+  "mana_restore",
 ]);
 
 /**
  * @typedef {{
  *   id: string,
  *   keys: string[],
- *   operation: "none" | "damage" | "heal" | "stamina_restore",
+ *   operation: "none" | "damage" | "heal" | "stamina_restore" | "mana_restore",
  *   statuses: string[],
  * }} EffectDef
  */
@@ -152,6 +153,18 @@ export const EFFECT_DEFS = [
     statuses: ["energized"],
   },
   {
+    id: "mana_restore",
+    keys: ["mana_restore"],
+    operation: "mana_restore",
+    statuses: ["mana_surge"],
+  },
+  {
+    id: "mana_regen_boost",
+    keys: ["mana_regen_boost"],
+    operation: "mana_restore",
+    statuses: ["mana_surge"],
+  },
+  {
     id: "resist_fire",
     keys: ["resist_fire"],
     operation: "none",
@@ -174,5 +187,11 @@ export const EFFECT_DEFS = [
     keys: ["resist_acid"],
     operation: "none",
     statuses: ["resist_acid"],
+  },
+  {
+    id: "lucky",
+    keys: ["lucky"],
+    operation: "none",
+    statuses: ["lucky"],
   },
 ];

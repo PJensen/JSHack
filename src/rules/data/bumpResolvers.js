@@ -14,6 +14,7 @@
 import { Faction } from "../components/Faction.js";
 import { Interactable } from "../components/Interactable.js";
 import { Player } from "../components/Player.js";
+import { Pet } from "../components/Pet.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { Equipment } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
@@ -81,6 +82,31 @@ const hostileMelee = {
     if (handled <= 0) {
       try { world.add(actor, AttackIntent, { targetId: ctx.target }); } catch {}
     }
+  },
+};
+
+/** Pet swap: player walks into own pet, swap positions (classic roguelike behavior). */
+const petSwap = {
+  name: "pet-swap",
+  test(world, actor, ctx) {
+    if (!world.has(actor, Player)) return false;
+    if (!isManhattan1(ctx.mdx, ctx.mdy)) return false;
+    if (!(ctx.target > 0) || ctx.target === actor) return false;
+    return world.has(ctx.target, Pet);
+  },
+  resolve(world, actor, ctx) {
+    const actorPos = world.get(actor, Position);
+    const petPos = world.get(ctx.target, Position);
+    if (!actorPos || !petPos) return;
+
+    const aFrom = { x: actorPos.x, y: actorPos.y };
+    const pFrom = { x: petPos.x, y: petPos.y };
+
+    world.set(ctx.target, Position, aFrom);
+    world.set(actor, Position, pFrom);
+
+    emitSafe(world, "moved", { id: ctx.target, from: pFrom, to: aFrom });
+    emitSafe(world, "moved", { id: actor, from: aFrom, to: pFrom });
   },
 };
 
@@ -211,6 +237,7 @@ const tileReaction = {
 /** @type {BumpResolver[]} */
 export const BUMP_RESOLVERS = [
   hostileMelee,
+  petSwap,
   npcInteract,
   objectInteract,
   pushEntity,

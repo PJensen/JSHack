@@ -45,6 +45,7 @@ export function equipItemSystem(world) {
       (eq.ring2 === itemId && 'ring2') ||
       (eq.ammo === itemId && 'ammo') ||
       (eq.ranged === itemId && 'ranged') ||
+      (eq.feet === itemId && 'feet') ||
       null
     );
     if (equippedSlot) {
@@ -114,6 +115,9 @@ export function equipItemSystem(world) {
     } else if (slot === 'ranged') {
       if (Number.isInteger(eq.ranged) && eq.ranged > 0) pushToInventory(eq.ranged);
       eq.ranged = itemId; appliedSlot = 'ranged';
+    } else if (slot === 'feet') {
+      if (Number.isInteger(eq.feet) && eq.feet > 0) pushToInventory(eq.feet);
+      eq.feet = itemId; appliedSlot = 'feet';
     } else {
       // Unknown or unsupported slot: item is already in inventory, ignore.
       world.remove(actor, EquipIntent);

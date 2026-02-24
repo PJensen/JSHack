@@ -3,13 +3,15 @@
 
 import { startShake } from "../../display/camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
+import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { RadialFx, LineFx, BlinkFx, PhaseStrikeFx } from "./fxEntries.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number }} deps
  */
 export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime }) {
   // --- Blink state ---
-  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number, phase:number, randomized:boolean}>} */
+  /** @type {BlinkFx[]} */
   const _blinkFx = [];
 
   function spawnBlinkBurst(x, y, intensity = 1) {
@@ -19,12 +21,11 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.4;
       const speed = 0.45 + Math.random() * 1.35;
       const life = 0.16 + Math.random() * 0.28;
-      fx.pool.spawn({
+      fx.pool.spawn(new Particle({
         x: x + (Math.random() - 0.5) * 0.12,
         y: y + (Math.random() - 0.5) * 0.12,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - 0.05,
-        ax: 0,
         ay: 0.12,
         life,
         size0: 0.09 + Math.random() * 0.09,
@@ -33,57 +34,55 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         g: 210 + ((Math.random() * 40) | 0),
         b: 255,
         a0: 0.92,
-        a1: 0.0,
-        rot: 0,
         rotVel: (Math.random() - 0.5) * 2.2,
-      });
+      }));
     }
   }
 
   // --- Meteor state ---
-  /** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
+  /** @type {RadialFx[]} */
   const _meteorFx = [];
 
   // --- Blastwave state ---
-  /** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
+  /** @type {RadialFx[]} */
   const _blastwaveFx = [];
 
   // --- Frost state ---
-  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, ttl:number, max:number}>} */
+  /** @type {LineFx[]} */
   const _frostBeamFx = [];
-  /** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
+  /** @type {RadialFx[]} */
   const _frostImpactFx = [];
 
   // --- Phase Strike state ---
-  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, hits:Array<{x:number,y:number}>, ttl:number, max:number, phase:number}>} */
+  /** @type {PhaseStrikeFx[]} */
   const _phaseStrikeFx = [];
 
   // --- Tick ---
   /** @param {number} dt */
   function tick(dt) {
     for (let i = _blinkFx.length - 1; i >= 0; i--) {
-      _blinkFx[i].ttl -= dt;
-      if (_blinkFx[i].ttl <= 0) _blinkFx.splice(i, 1);
+      _blinkFx[i].tick(dt);
+      if (_blinkFx[i].expired) _blinkFx.splice(i, 1);
     }
     for (let i = _meteorFx.length - 1; i >= 0; i--) {
-      _meteorFx[i].ttl -= dt;
-      if (_meteorFx[i].ttl <= 0) _meteorFx.splice(i, 1);
+      _meteorFx[i].tick(dt);
+      if (_meteorFx[i].expired) _meteorFx.splice(i, 1);
     }
     for (let i = _blastwaveFx.length - 1; i >= 0; i--) {
-      _blastwaveFx[i].ttl -= dt;
-      if (_blastwaveFx[i].ttl <= 0) _blastwaveFx.splice(i, 1);
+      _blastwaveFx[i].tick(dt);
+      if (_blastwaveFx[i].expired) _blastwaveFx.splice(i, 1);
     }
     for (let i = _frostBeamFx.length - 1; i >= 0; i--) {
-      _frostBeamFx[i].ttl -= dt;
-      if (_frostBeamFx[i].ttl <= 0) _frostBeamFx.splice(i, 1);
+      _frostBeamFx[i].tick(dt);
+      if (_frostBeamFx[i].expired) _frostBeamFx.splice(i, 1);
     }
     for (let i = _frostImpactFx.length - 1; i >= 0; i--) {
-      _frostImpactFx[i].ttl -= dt;
-      if (_frostImpactFx[i].ttl <= 0) _frostImpactFx.splice(i, 1);
+      _frostImpactFx[i].tick(dt);
+      if (_frostImpactFx[i].expired) _frostImpactFx.splice(i, 1);
     }
     for (let i = _phaseStrikeFx.length - 1; i >= 0; i--) {
-      _phaseStrikeFx[i].ttl -= dt;
-      if (_phaseStrikeFx[i].ttl <= 0) _phaseStrikeFx.splice(i, 1);
+      _phaseStrikeFx[i].tick(dt);
+      if (_phaseStrikeFx[i].expired) _phaseStrikeFx.splice(i, 1);
     }
   }
 
@@ -97,8 +96,8 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     const _fxTime = getFxTime();
 
     for (const eff of _blinkFx) {
-      const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
-      const t = 1 - alpha;
+      const alpha = eff.alpha;
+      const t = eff.progress;
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 15.0 + eff.phase);
 
       const dx = eff.to.x - eff.from.x;
@@ -163,7 +162,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const m of _meteorFx) {
-      const t = 1 - m.ttl / m.max; // 0→1 over lifetime
+      const t = m.progress; // 0→1 over lifetime
       // Phase 1: bright white impact flash
       if (t < 0.15) {
         const flashT = t / 0.15;
@@ -192,7 +191,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const bw of _blastwaveFx) {
-      const t = 1 - bw.ttl / bw.max; // 0→1
+      const t = bw.progress; // 0→1
       // Expanding ring
       const ringR = t * (bw.radius + 0.5);
       const ringA = 0.6 * (1 - t);
@@ -224,7 +223,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
 
     // Frost beam: icy ray from caster to target with jittered crystalline edges
     for (const eff of _frostBeamFx) {
-      const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
+      const alpha = eff.alpha;
       const pts = jitterLine(eff.from, eff.to, 14, 0.07 * alpha);
 
       // Outer frost glow (wide, pale cyan)
@@ -247,7 +246,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
 
     // Impact crystallisation: expanding hexagonal frost bloom
     for (const imp of _frostImpactFx) {
-      const t = 1 - imp.ttl / imp.max; // 0→1 over lifetime
+      const t = imp.progress; // 0→1 over lifetime
 
       // Phase 1: bright white flash on impact (first 12%)
       if (t < 0.12) {
@@ -301,8 +300,8 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     const _fxTime = getFxTime();
 
     for (const eff of _phaseStrikeFx) {
-      const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
-      const t = 1 - alpha;
+      const alpha = eff.alpha;
+      const t = eff.progress;
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 18.0 + eff.phase);
 
       const dx = eff.to.x - eff.from.x;
@@ -390,14 +389,13 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
 
       const src = { x: from.x, y: from.y };
       const dst = { x: to.x, y: to.y };
-      _blinkFx.push({
+      _blinkFx.push(new BlinkFx({
         from: src,
         to: dst,
         ttl: 0.26,
-        max: 0.26,
         phase: Math.random() * Math.PI * 2,
         randomized: !!randomized,
-      });
+      }));
 
       const intensity = randomized ? 1.15 : 1.0;
       spawnBlinkBurst(src.x, src.y, intensity);
@@ -413,12 +411,11 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         const t = (i + Math.random()) / Math.max(1, sparkleCountScaled);
         const x = src.x + dx * t + (Math.random() - 0.5) * 0.18;
         const y = src.y + dy * t + (Math.random() - 0.5) * 0.18;
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x,
           y,
           vx: (Math.random() - 0.5) * 0.35,
           vy: (Math.random() - 0.5) * 0.35,
-          ax: 0,
           ay: 0.04,
           life: 0.10 + Math.random() * 0.20,
           size0: 0.05 + Math.random() * 0.04,
@@ -427,10 +424,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
           g: 235 + ((Math.random() * 20) | 0),
           b: 255,
           a0: 0.7,
-          a1: 0.0,
-          rot: 0,
-          rotVel: 0,
-        });
+        }));
       }
 
       startShake(cam, randomized ? 4 : 3, randomized ? 0.14 : 0.12);
@@ -438,7 +432,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
 
     world.on('spell:meteor', ({ actor, origin, radius }) => {
       if (origin && Number.isFinite(origin.x)) {
-        _meteorFx.push({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.45, max: 0.45 });
+        _meteorFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.45 }));
         startShake(cam, 7, 0.30);
         // Fire particle burst
         const N = 30;
@@ -446,43 +440,40 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
           const angle = Math.random() * Math.PI * 2;
           const spd = 1.0 + Math.random() * 2.5;
           const life = 0.3 + Math.random() * 0.4;
-          fx.pool.spawn({
+          fx.pool.spawn(new Particle({
             x: origin.x + (Math.random() - 0.5) * 0.4,
             y: origin.y + (Math.random() - 0.5) * 0.4,
             vx: Math.cos(angle) * spd,
             vy: Math.sin(angle) * spd,
-            ax: 0, ay: 0.8,
+            ay: 0.8,
             life,
             size0: 0.25 + Math.random() * 0.15,
             size1: 0.04,
             r: 255, g: 140 + Math.random() * 80 | 0, b: 30,
-            a0: 0.95, a1: 0.0,
-            rot: 0, rotVel: 0
-          });
+            a0: 0.95,
+          }));
         }
       }
     });
 
     world.on('spell:blastwave', ({ actor, origin, knockbacks, radius }) => {
       if (origin && Number.isFinite(origin.x)) {
-        _blastwaveFx.push({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.35, max: 0.35 });
+        _blastwaveFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.35 }));
         startShake(cam, 5, 0.22);
         // Radial particle burst
         const N = 24;
         for (let i = 0; i < N; i++) {
           const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
           const spd = 2.0 + Math.random() * 1.5;
-          fx.pool.spawn({
+          fx.pool.spawn(new Particle({
             x: origin.x, y: origin.y,
             vx: Math.cos(angle) * spd,
             vy: Math.sin(angle) * spd,
-            ax: 0, ay: 0,
             life: 0.25 + Math.random() * 0.15,
             size0: 0.18, size1: 0.03,
             r: 200, g: 220, b: 255,
-            a0: 0.8, a1: 0.0,
-            rot: 0, rotVel: 0
-          });
+            a0: 0.8,
+          }));
         }
       }
     });
@@ -491,9 +482,9 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       if (fizzle) return; // no target; skip VFX
       if (!from || !at) return;
       // Icy beam from caster → target
-      _frostBeamFx.push({ from: { x: from.x, y: from.y }, to: { x: at.x, y: at.y }, ttl: 0.22, max: 0.22 });
+      _frostBeamFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: at.x, y: at.y }, ttl: 0.22 }));
       // Impact crystallisation burst at target
-      _frostImpactFx.push({ x: at.x, y: at.y, radius: 0.8, ttl: 0.55, max: 0.55 });
+      _frostImpactFx.push(new RadialFx({ x: at.x, y: at.y, radius: 0.8, ttl: 0.55 }));
       // Light camera shake (cold snap)
       startShake(cam, 3, 0.14);
       // Ice shard particles radiating outward from impact
@@ -502,37 +493,36 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
         const spd = 0.6 + Math.random() * 1.8;
         const life = 0.35 + Math.random() * 0.35;
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x: at.x + (Math.random() - 0.5) * 0.3,
           y: at.y + (Math.random() - 0.5) * 0.3,
           vx: Math.cos(angle) * spd,
           vy: Math.sin(angle) * spd - 0.4, // slight upward drift
-          ax: 0, ay: 0.3, // gentle downward settle
+          ay: 0.3, // gentle downward settle
           life,
           size0: 0.12 + Math.random() * 0.10,
           size1: 0.02,
           r: 140 + (Math.random() * 60 | 0), g: 220 + (Math.random() * 35 | 0), b: 255,
-          a0: 0.9, a1: 0.0,
+          a0: 0.9,
           rot: Math.random() * Math.PI * 2,
-          rotVel: (Math.random() - 0.5) * 4
-        });
+          rotVel: (Math.random() - 0.5) * 4,
+        }));
       }
       // Slow-falling snowflake motes (lingering cold)
       const M = 8;
       for (let i = 0; i < M; i++) {
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x: at.x + (Math.random() - 0.5) * 1.2,
           y: at.y + (Math.random() - 0.5) * 0.6,
           vx: (Math.random() - 0.5) * 0.3,
           vy: 0.2 + Math.random() * 0.3,
-          ax: 0, ay: 0,
           life: 0.7 + Math.random() * 0.5,
           size0: 0.06 + Math.random() * 0.05,
           size1: 0.01,
           r: 220, g: 240, b: 255,
-          a0: 0.6, a1: 0.0,
-          rot: 0, rotVel: (Math.random() - 0.5) * 2
-        });
+          a0: 0.6,
+          rotVel: (Math.random() - 0.5) * 2,
+        }));
       }
     });
 
@@ -545,14 +535,13 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       const dst = { x: to.x, y: to.y };
       const hitPositions = Array.isArray(hits) ? hits.map(h => ({ x: h.x, y: h.y })) : [];
 
-      _phaseStrikeFx.push({
+      _phaseStrikeFx.push(new PhaseStrikeFx({
         from: src,
         to: dst,
         hits: hitPositions,
         ttl: 0.32,
-        max: 0.32,
         phase: Math.random() * Math.PI * 2,
-      });
+      }));
 
       // Purple particle burst at source and destination
       const scale = PERF.quality === 'low' ? 0.7 : (PERF.quality === 'high' ? 1.2 : 1.0);
@@ -561,21 +550,21 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         for (let i = 0; i < burstCount; i++) {
           const angle = (Math.PI * 2 * i / burstCount) + (Math.random() - 0.5) * 0.4;
           const speed = 0.5 + Math.random() * 1.4;
-          fx.pool.spawn({
+          fx.pool.spawn(new Particle({
             x: pos.x + (Math.random() - 0.5) * 0.12,
             y: pos.y + (Math.random() - 0.5) * 0.12,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed - 0.05,
-            ax: 0, ay: 0.12,
+            ay: 0.12,
             life: 0.18 + Math.random() * 0.26,
             size0: 0.10 + Math.random() * 0.09,
             size1: 0.02,
             r: 180 + ((Math.random() * 50) | 0),
             g: 80 + ((Math.random() * 60) | 0),
             b: 255,
-            a0: 0.92, a1: 0.0,
-            rot: 0, rotVel: (Math.random() - 0.5) * 2.2,
-          });
+            a0: 0.92,
+            rotVel: (Math.random() - 0.5) * 2.2,
+          }));
         }
       }
 
@@ -588,21 +577,20 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       const sparkleCountScaled = Math.max(4, Math.round(sparkleCount * sparkScale));
       for (let i = 0; i < sparkleCountScaled; i++) {
         const t = (i + Math.random()) / Math.max(1, sparkleCountScaled);
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x: src.x + pdx * t + (Math.random() - 0.5) * 0.18,
           y: src.y + pdy * t + (Math.random() - 0.5) * 0.18,
           vx: (Math.random() - 0.5) * 0.35,
           vy: (Math.random() - 0.5) * 0.35,
-          ax: 0, ay: 0.04,
+          ay: 0.04,
           life: 0.12 + Math.random() * 0.22,
           size0: 0.05 + Math.random() * 0.04,
           size1: 0.01,
           r: 210 + ((Math.random() * 30) | 0),
           g: 160 + ((Math.random() * 40) | 0),
           b: 255,
-          a0: 0.75, a1: 0.0,
-          rot: 0, rotVel: 0,
-        });
+          a0: 0.75,
+        }));
       }
 
       // Violet impact bursts at each hit enemy
@@ -611,22 +599,22 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         for (let i = 0; i < impactCount; i++) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 0.8 + Math.random() * 1.6;
-          fx.pool.spawn({
+          fx.pool.spawn(new Particle({
             x: h.x + (Math.random() - 0.5) * 0.15,
             y: h.y + (Math.random() - 0.5) * 0.15,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            ax: 0, ay: 0.2,
+            ay: 0.2,
             life: 0.14 + Math.random() * 0.20,
             size0: 0.12 + Math.random() * 0.08,
             size1: 0.02,
             r: 220 + ((Math.random() * 35) | 0),
             g: 120 + ((Math.random() * 60) | 0),
             b: 255,
-            a0: 0.95, a1: 0.0,
+            a0: 0.95,
             rot: Math.random() * Math.PI * 2,
             rotVel: (Math.random() - 0.5) * 3,
-          });
+          }));
         }
       }
 

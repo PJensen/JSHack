@@ -243,7 +243,7 @@ Deno.test("bumpResolvers: insufficient stamina emits event, does not modify tile
 
 Deno.test("bumpResolvers: resolvers are in expected priority order", () => {
   const names = BUMP_RESOLVERS.map(r => r.name);
-  assertEquals(names, ["hostile-melee", "npc-interact", "object-interact", "push-entity", "tile-reaction"]);
+  assertEquals(names, ["hostile-melee", "pet-swap", "npc-interact", "object-interact", "push-entity", "tile-reaction"]);
 });
 
 // ── no match ────────────────────────────────────────────────────────

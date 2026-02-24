@@ -20,6 +20,7 @@ export const CLASS_DEFS = {
       weapon: 'staff_oak',
       armor: null,
       shield: null,
+      feet: 'sandals_hemp',
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 2 },
@@ -45,6 +46,7 @@ export const CLASS_DEFS = {
       weapon: 'axe_heavy',
       armor: 'leather_armor',
       shield: null,
+      feet: 'boots_leather',
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 1 },
@@ -70,10 +72,13 @@ export const CLASS_DEFS = {
       weapon: 'dagger_quick',
       armor: null,
       shield: null,
+      feet: 'boots_leather',
+
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_blastwave', count: 1 },
+      { itemId: 'potion_poison', count: 2 },
     ],
     startingSpell: 'phase_strike',
   },
@@ -96,6 +101,7 @@ export const CLASS_DEFS = {
       weapon: 'iron_mace',
       armor: 'leather_armor',
       shield: 'shield_wood',
+      feet: 'shoes_cloth',
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 2 },

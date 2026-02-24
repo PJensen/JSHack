@@ -48,6 +48,51 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "sub:equip_early_proc": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 20, pool: ["sparking_knife"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["smoldering_club"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["chipped_fang"], affixChance: 0 },
+      { type: "equip", weight: 18, pool: ["leech_blade"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["rusted_buckler"], affixChance: 0 },
+      { type: "equip", weight: 12, pool: ["brawler_band"], affixChance: 0 },
+    ],
+  },
+
+  "sub:equip_rare": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 20, pool: ["nightfang_dagger"], affixChance: 0 },
+      { type: "equip", weight: 18, pool: ["caustic_stiletto"], affixChance: 0 },
+      { type: "equip", weight: 18, pool: ["stormtouched_mace"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["grounded_buckler"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["warhammer_of_fury"], affixChance: 0 },
+    ],
+  },
+
+  "sub:equip_epic": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 18, pool: ["pyreheart_mace"], affixChance: 0 },
+      { type: "equip", weight: 18, pool: ["glacial_edge"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["ring_of_fury"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["witchfire_sword"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["howling_maul"], affixChance: 0 },
+      { type: "equip", weight: 12, pool: ["wardkeeper_shield"], affixChance: 0 },
+      { type: "equip", weight: 12, pool: ["serpent_ring"], affixChance: 0 },
+    ],
+  },
+
+  "sub:equip_legendary": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 35, pool: ["stormcaller_blade"], affixChance: 0 },
+      { type: "equip", weight: 35, pool: ["soulreaver_axe"], affixChance: 0 },
+      { type: "equip", weight: 30, pool: ["aegis_of_the_ancient"], affixChance: 0 },
+    ],
+  },
+
   "sub:potions": {
     rolls: { min: 1, max: 1 },
     entries: [
@@ -109,25 +154,28 @@ export const LOOT_TABLES = {
   // ── Monster tier defaults ─────────────────────────────────────────
 
   "drop:tier0": {
-    rolls: { min: 1, max: 2 },
+    rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 50 },
+      { type: "nothing",   weight: 150 },
       { type: "gold",      weight: 30, count: { base: 5, perDepth: 2 } },
       { type: "archetype", weight: 15, archetype: "HealthPotion" },
       { type: "table",     weight: 12, tableId: "sub:potions" },
       { type: "table",     weight: 20, tableId: "sub:equip_common" },
+      { type: "table",     weight: 8,  tableId: "sub:equip_early_proc" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "archetype", weight: 10, archetype: "Ration" },
     ],
   },
 
   "drop:tier1": {
-    rolls: { min: 1, max: 3 },
+    rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 35 },
+      { type: "nothing",   weight: 100 },
       { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
       { type: "table",     weight: 18, tableId: "sub:potions" },
       { type: "table",     weight: 15, tableId: "sub:equip_common" },
+      { type: "table",     weight: 7,  tableId: "sub:equip_early_proc" },
+      { type: "table",     weight: 4,  tableId: "sub:equip_rare" },
       { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "ring_health", "ring_fire_resist", "ring_poison_resist", "warhammer", "venomfang_dagger", "ring_endurance"], affixChance: 0.20, affixCountMax: 1 },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
@@ -137,11 +185,14 @@ export const LOOT_TABLES = {
   },
 
   "drop:tier2": {
-    rolls: { min: 2, max: 3 },
+    rolls: { min: 1, max: 2 },
     entries: [
+      { type: "nothing",   weight: 60 },
       { type: "gold",      weight: 20, count: { base: 15, perDepth: 5 } },
       { type: "table",     weight: 18, tableId: "sub:potions" },
       { type: "table",     weight: 20, tableId: "sub:equip_magic" },
+      { type: "table",     weight: 10, tableId: "sub:equip_rare" },
+      { type: "table",     weight: 6,  tableId: "sub:equip_epic" },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
       { type: "equip",     weight: 15, pool: ["ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "ring_endurance"], affixChance: 0.40, affixCountMax: 1 },
@@ -151,8 +202,9 @@ export const LOOT_TABLES = {
   },
 
   "drop:tier3": {
-    rolls: { min: 3, max: 5 },
+    rolls: { min: 1, max: 2 },
     entries: [
+      { type: "nothing",   weight: 30 },
       { type: "gold",      weight: 15, count: { base: 30, perDepth: 8 } },
       { type: "table",     weight: 15, tableId: "sub:potions" },
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
@@ -162,6 +214,8 @@ export const LOOT_TABLES = {
         affixChance: 0.80, affixCountMax: 2 },
       { type: "equip",     weight: 8,  pool: ["caustic_stiletto", "stormtouched_mace", "grounded_buckler"],
         affixChance: 0 },
+      { type: "table",     weight: 10, tableId: "sub:equip_epic" },
+      { type: "table",     weight: 5,  tableId: "sub:equip_legendary" },
       { type: "table",     weight: 12, tableId: "sub:wands" },
     ],
   },
@@ -169,10 +223,12 @@ export const LOOT_TABLES = {
   // ── Monster-specific overrides ────────────────────────────────────
 
   "drop:goblin": {
-    rolls: { min: 1, max: 3 },
+    rolls: { min: 1, max: 1 },
     entries: [
+      { type: "nothing",   weight: 120 },
       { type: "gold",      weight: 30, count: { base: 5, perDepth: 3 } },
       { type: "equip",     weight: 25, pool: ["dagger_quick"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "table",     weight: 5,  tableId: "sub:equip_early_proc" },
       { type: "archetype", weight: 20, archetype: "ArrowsStack" },
       { type: "archetype", weight: 15, archetype: "HealthPotion" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
@@ -180,13 +236,16 @@ export const LOOT_TABLES = {
   },
 
   "drop:dragon": {
-    rolls: { min: 3, max: 5 },
+    rolls: { min: 1, max: 3 },
     entries: [
+      { type: "nothing",   weight: 20 },
       { type: "gold",      weight: 30, count: { base: 50, perDepth: 10 } },
       { type: "equip",     weight: 25, pool: ["axe_heavy", "chain_armor", "shield_iron", "ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "shield_fireward", "warhammer", "leadweave_mantle", "ring_endurance", "shield_spiked_pavise"],
         affixChance: 0.80, affixCountMax: 2 },
       { type: "equip",     weight: 10, pool: ["caustic_stiletto", "stormtouched_mace", "grounded_buckler"],
         affixChance: 0 },
+      { type: "table",     weight: 12, tableId: "sub:equip_epic" },
+      { type: "table",     weight: 8,  tableId: "sub:equip_legendary" },
       { type: "table",     weight: 20, tableId: "sub:spellbooks" },
       { type: "archetype", weight: 15, archetype: "HealthPotion" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
@@ -194,67 +253,67 @@ export const LOOT_TABLES = {
   },
 
   "drop:lich": {
-    rolls: { min: 2, max: 4 },
+    rolls: { min: 1, max: 2 },
     entries: [
+      { type: "nothing",   weight: 25 },
       { type: "table",     weight: 30, tableId: "sub:spellbooks" },
       { type: "gold",      weight: 20, count: { base: 20, perDepth: 5 } },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "equip",     weight: 15, pool: ["ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "ring_endurance"],
         affixChance: 0.50, affixCountMax: 2 },
+      { type: "table",     weight: 6,  tableId: "sub:equip_epic" },
       { type: "archetype", weight: 15, archetype: "HealthPotion" },
       { type: "table",     weight: 10, tableId: "sub:wands" },
     ],
   },
 
   // ── Chest tables ──────────────────────────────────────────────────
+  // Max 1 weapon per chest - equipment split into weapon vs armor/jewelry
 
   "chest:basic": {
-    rolls: { min: 2, max: 4 },
+    rolls: { min: 1, max: 2 },
     entries: [
-      { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
-      { type: "table",     weight: 20, tableId: "sub:potions" },
-      { type: "table",     weight: 15, tableId: "sub:equip_common" },
-      { type: "archetype", weight: 10, archetype: "ArrowsStack" },
-      { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
-      { type: "table",     weight: 10, tableId: "sub:scrolls" },
-      { type: "table",     weight: 15, tableId: "sub:spellbooks" },
-      { type: "table",     weight: 5,  tableId: "sub:wands" },
+      { type: "gold",      weight: 30, count: { base: 8, perDepth: 3 } },
+      { type: "table",     weight: 25, tableId: "sub:potions" },
+      { type: "equip",     weight: 12, pool: ["sword_plain", "dagger_quick", "bow_short"], affixChance: 0 },
+      { type: "equip",     weight: 12, pool: ["leather_armor", "shield_wood"], affixChance: 0 },
+      { type: "equip",     weight: 6,  pool: ["sparking_knife", "smoldering_club", "chipped_fang"], affixChance: 0 },
+      { type: "archetype", weight: 12, archetype: "ArrowsStack" },
+      { type: "table",     weight: 15, tableId: "sub:scrolls" },
+      { type: "table",     weight: 18, tableId: "sub:spellbooks" },
+      { type: "table",     weight: 8,  tableId: "sub:wands" },
       { type: "archetype", weight: 10, archetype: "Ration" },
-      { type: "gem",       weight: 4,  materials: ["gemstone", "glass"] },
+      { type: "gem",       weight: 5,  materials: ["gemstone", "glass"] },
     ],
   },
 
   "chest:magic": {
-    rolls: { min: 3, max: 5 },
+    rolls: { min: 2, max: 3 },
     entries: [
-      { type: "gold",      weight: 20, count: { base: 15, perDepth: 5 } },
-      { type: "table",     weight: 25, tableId: "sub:equip_magic" },
-      { type: "table",     weight: 18, tableId: "sub:potions" },
-      { type: "table",     weight: 15, tableId: "sub:spellbooks" },
-      { type: "table",     weight: 15, tableId: "sub:scrolls" },
-      { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "shield_iron", "shield_fireward", "warhammer", "venomfang_dagger", "leadweave_mantle", "shield_spiked_pavise"],
-        affixChance: 0.50, affixCountMax: 2 },
-      { type: "equip",     weight: 6,  pool: ["caustic_stiletto", "stormtouched_mace", "grounded_buckler"],
-        affixChance: 0 },
-      { type: "table",     weight: 10, tableId: "sub:wands" },
+      { type: "gold",      weight: 25, count: { base: 15, perDepth: 5 } },
+      { type: "table",     weight: 22, tableId: "sub:potions" },
+      { type: "equip",     weight: 15, pool: ["axe_heavy", "longsword", "warhammer", "venomfang_dagger"], affixChance: 0.40, affixCountMax: 1 },
+      { type: "equip",     weight: 15, pool: ["chain_armor", "shield_iron", "shield_fireward", "ring_health", "ring_precision", "ring_fire_resist"], affixChance: 0.40, affixCountMax: 1 },
+      { type: "equip",     weight: 8,  pool: ["caustic_stiletto", "stormtouched_mace"], affixChance: 0 },
+      { type: "table",     weight: 20, tableId: "sub:spellbooks" },
+      { type: "table",     weight: 18, tableId: "sub:scrolls" },
+      { type: "table",     weight: 12, tableId: "sub:wands" },
       { type: "archetype", weight: 8,  archetype: "IronRation" },
-      { type: "gem",       weight: 6,  materials: ["gemstone", "glass"] },
+      { type: "gem",       weight: 8,  materials: ["gemstone", "glass"] },
     ],
   },
 
   "chest:legendary": {
-    rolls: { min: 4, max: 6 },
+    rolls: { min: 2, max: 4 },
     entries: [
-      { type: "equip",     weight: 30, pool: ["axe_heavy", "chain_armor", "shield_iron", "ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "shield_fireward", "warhammer", "venomfang_dagger", "leadweave_mantle", "ring_endurance", "shield_spiked_pavise"],
-        affixChance: 0.90, affixCountMax: 3 },
-      { type: "equip",     weight: 12, pool: ["caustic_stiletto", "stormtouched_mace", "grounded_buckler"],
-        affixChance: 0 },
-      { type: "gold",      weight: 20, count: { base: 40, perDepth: 8 } },
-      { type: "table",     weight: 20, tableId: "sub:spellbooks" },
-      { type: "table",     weight: 15, tableId: "sub:scrolls" },
-      { type: "archetype", weight: 15, archetype: "HealthPotion" },
-      { type: "table",     weight: 12, tableId: "sub:wands" },
-      { type: "gem",       weight: 8,  materials: ["gemstone"] },
+      { type: "gold",      weight: 25, count: { base: 40, perDepth: 8 } },
+      { type: "equip",     weight: 18, pool: ["nightfang_dagger", "pyreheart_mace", "glacial_edge", "witchfire_sword", "howling_maul", "stormcaller_blade", "soulreaver_axe"], affixChance: 0.70, affixCountMax: 2 },
+      { type: "equip",     weight: 18, pool: ["ring_health", "ring_precision", "ring_arcana", "ring_endurance", "ring_of_fury", "serpent_ring", "wardkeeper_shield", "aegis_of_the_ancient"], affixChance: 0.70, affixCountMax: 2 },
+      { type: "table",     weight: 25, tableId: "sub:spellbooks" },
+      { type: "table",     weight: 20, tableId: "sub:scrolls" },
+      { type: "archetype", weight: 18, archetype: "HealthPotion" },
+      { type: "table",     weight: 15, tableId: "sub:wands" },
+      { type: "gem",       weight: 10, materials: ["gemstone"] },
     ],
   },
 

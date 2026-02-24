@@ -11,7 +11,7 @@ import { Position } from '../components/Position.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
-import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
+import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { getAmmoHooks } from '../data/ammo.js';
@@ -127,7 +127,7 @@ export function rangedAttackSystem(world) {
     const r = mulberry32(seed);
     const d20 = rngInt(r, 1, 20);
     const totalToHit = d20 + attackBonus - rangePenalty;
-    const isCrit = d20 === 20;
+    let isCrit = d20 === 20;
     const isNat1 = d20 === 1;
 
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
@@ -161,7 +161,13 @@ export function rangedAttackSystem(world) {
     const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(1, damageRoll + flatBonus);
 
-    if (isCrit) dmg = Math.max(1, dmg * 2);
+    // Secondary crit check: critChanceDerived (decimal) + luck (integer %)
+    if (!isCrit) {
+      const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0);
+      if (critPct > 0) isCrit = pct(r, critPct);
+    }
+    const critMult = 2 + (atkSnapshot.critMult || 0);
+    if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
 
     const actorImpactCtx = runAmmoCallbacks(world, ammoIdentity, 'onProjectileActorImpact', {
       phase: 'projectile-actor-impact',

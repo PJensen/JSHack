@@ -20,9 +20,12 @@ export function manaRegenerationSystem(world) {
             continue;
         }
 
-        if (manaComp.mana < manaComp.maxMana) {
+        const eq = world.get(entity, Equipment);
+        const maxBonus = Number(eq?.maxManaDerived ?? 0);
+        const effectiveMaxMana = manaComp.maxMana + maxBonus;
+
+        if (manaComp.mana < effectiveMaxMana) {
             const baseRate = Number(manaComp.manaRegen ?? 0);
-            const eq = world.get(entity, Equipment);
             const bonus = Number(eq?.manaRegenDerived ?? 0);
             // Hunger penalty: famished halves regen, starving/wasting stops it
             let _hungerMult = 1.0;
@@ -34,7 +37,7 @@ export function manaRegenerationSystem(world) {
                 }
             }
             const rate = (baseRate + bonus) * _hungerMult;
-            manaComp.mana = Math.min(manaComp.maxMana, manaComp.mana + rate);
+            manaComp.mana = Math.min(effectiveMaxMana, manaComp.mana + rate);
         }
     }
 }
