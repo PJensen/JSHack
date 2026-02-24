@@ -57,6 +57,9 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
 
   const attackDerived = Number(eq?.attackDerived || 0);
   const defenseDerived = Number(eq?.defenseDerived || 0);
+  const luckDerived = Number(eq?.luckDerived || 0) + statusStrength(world, id, "lucky");
+  const critChanceDerived = Number(eq?.critChanceDerived || 0);
+  const critMultDerived = Number(eq?.critMultDerived || 0);
 
   let hunger = 0;
   for (let i = 0; i < HUNGER_COMBAT_LEVELS.length; i++) {
@@ -140,6 +143,9 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     damageMult: statusTotals.berserk > 0 ? 4 : 1,
     attackDerived,
     defenseDerived,
+    luck: luckDerived,
+    critChance: critChanceDerived,
+    critMult: critMultDerived,
     status: Object.freeze({ ...statusTotals }),
     modifiers: Object.freeze(modifiers),
   };

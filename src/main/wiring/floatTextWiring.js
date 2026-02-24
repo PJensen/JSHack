@@ -5,6 +5,7 @@
 import { Position } from "../../rules/components/Position.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { playerEntity } from "../../rules/utils/queries.js";
+import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
 
 const _installed = Symbol.for('jshack:main:floatTextWiring:installed');
 
@@ -42,18 +43,16 @@ export function installFloatTextWiring({ world, ftext, fx }) {
       const dist = Math.hypot(dx, dy) || 1;
       for (let i = 0; i < 6; i++) {
         const spd = 1.5 + Math.random() * 1.0;
-        fx.pool.spawn({
+        fx.pool.spawn(new Particle({
           x: tpos.x + (Math.random() - 0.5) * 0.3,
           y: tpos.y + (Math.random() - 0.5) * 0.3,
           vx: (dx / dist) * spd + (Math.random() - 0.5) * 0.5,
           vy: (dy / dist) * spd + (Math.random() - 0.5) * 0.5,
-          ax: 0, ay: 0,
           life: 0.35 + Math.random() * 0.15,
           size0: 0.15, size1: 0.04,
           r: 200, g: 50, b: 50,
-          a0: 0.85, a1: 0.0,
-          rot: 0, rotVel: 0
-        });
+          a0: 0.85,
+        }));
       }
     }
   });
@@ -66,17 +65,15 @@ export function installFloatTextWiring({ world, ftext, fx }) {
     for (let i = 0; i < 5; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = 0.8 + Math.random() * 0.6;
-      fx.pool.spawn({
+      fx.pool.spawn(new Particle({
         x: tpos.x, y: tpos.y,
         vx: Math.cos(angle) * spd,
         vy: Math.sin(angle) * spd,
-        ax: 0, ay: 0,
         life: 0.2 + Math.random() * 0.15,
         size0: 0.12, size1: 0.03,
         r: 120, g: 255, b: 120,
-        a0: 0.9, a1: 0.0,
-        rot: 0, rotVel: 0
-      });
+        a0: 0.9,
+      }));
     }
   });
 
@@ -88,18 +85,17 @@ export function installFloatTextWiring({ world, ftext, fx }) {
     for (let i = 0; i < 8; i++) {
       const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.6;
       const spd = 0.6 + Math.random() * 0.8;
-      fx.pool.spawn({
+      fx.pool.spawn(new Particle({
         x: tpos.x + (Math.random() - 0.5) * 0.2,
         y: tpos.y + (Math.random() - 0.5) * 0.2,
         vx: Math.cos(angle) * spd,
         vy: Math.sin(angle) * spd,
-        ax: 0, ay: -0.4,
+        ay: -0.4,
         life: 0.3 + Math.random() * 0.2,
         size0: 0.18, size1: 0.04,
         r: 255, g: 140 + (Math.random() * 60) | 0, b: 20,
-        a0: 0.9, a1: 0.0,
-        rot: 0, rotVel: 0
-      });
+        a0: 0.9,
+      }));
     }
   });
 

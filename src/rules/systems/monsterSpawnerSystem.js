@@ -5,6 +5,7 @@ import { Owner } from "../components/Owner.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
+import { equipMonster } from "../environment/dungeon/populate.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
@@ -42,6 +43,7 @@ export function monsterSpawnerSystem(world) {
 
       const params = Object.assign({ x: sx, y: sy }, sp.spawnParams || {});
       const child = createFrom(world, Monster, params);
+      if (params.equipment) equipMonster(world, child, params.equipment);
       try { world.add(child, Owner, { ownerId: id }); } catch {} // ECS: may already exist
 
       // Attach child to spawner via hierarchy so destroySubtree cleans it up on floor transition.

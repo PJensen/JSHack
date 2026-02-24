@@ -3,30 +3,32 @@
 
 import { startShake } from "../../display/camera/shake.js";
 import { Position } from "../../rules/components/Position.js";
+import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { ArrowFx, ArrowSparkFx } from "./fxEntries.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } } }} deps
  */
 export function createProjectileFxController({ world, cam, fx }) {
-  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, dx:number, dy:number, len:number, style:string}>} */
+  /** @type {ArrowFx[]} */
   const _arrowFx = [];
-  /** @type {Array<{x:number, y:number, ttl:number, style:string}>} */
+  /** @type {ArrowSparkFx[]} */
   const _arrowSparks = [];
 
   /** @param {number} dt */
   function tick(dt) {
     for (let i = _arrowFx.length - 1; i >= 0; i--) {
       const a = _arrowFx[i];
-      a.t += dt;
-      if (a.t >= a.duration) {
+      a.tick(dt);
+      if (a.arrived) {
         // Arrow arrived — spawn impact spark
-        _arrowSparks.push({ x: a.to.x, y: a.to.y, ttl: 0.18, style: a.style || 'plain' });
+        _arrowSparks.push(new ArrowSparkFx({ x: a.to.x, y: a.to.y, ttl: 0.18, style: a.style || 'plain' }));
         _arrowFx.splice(i, 1);
       }
     }
     for (let i = _arrowSparks.length - 1; i >= 0; i--) {
-      _arrowSparks[i].ttl -= dt;
-      if (_arrowSparks[i].ttl <= 0) _arrowSparks.splice(i, 1);
+      _arrowSparks[i].tick(dt);
+      if (_arrowSparks[i].expired) _arrowSparks.splice(i, 1);
     }
   }
 
@@ -37,7 +39,7 @@ export function createProjectileFxController({ world, cam, fx }) {
 
     // Draw flying arrows
     for (const a of _arrowFx) {
-      const progress = Math.min(1, a.t / a.duration);
+      const progress = a.progress;
       const isFire = a.style === 'fire';
       // Current head position (lerp from→to)
       const hx = a.from.x + (a.to.x - a.from.x) * progress;
@@ -78,7 +80,7 @@ export function createProjectileFxController({ world, cam, fx }) {
 
     // Impact sparks
     for (const s of _arrowSparks) {
-      const alpha = Math.max(0, s.ttl / 0.18);
+      const alpha = s.alpha;
       const isFire = s.style === 'fire';
       if (isFire) {
         // Fire impact: orange-red burst
@@ -111,23 +113,23 @@ export function createProjectileFxController({ world, cam, fx }) {
       const speed = 18; // tiles per second
       const duration = Math.max(0.06, Math.min(0.4, len / speed));
       const s = String(style || 'plain');
-      _arrowFx.push({
+      _arrowFx.push(new ArrowFx({
         from: { x: apos.x, y: apos.y }, to: { x: dpos.x, y: dpos.y },
-        t: 0, duration, dx: dx / len, dy: dy / len, len, style: s
-      });
+        duration, dx: dx / len, dy: dy / len, len, style: s
+      }));
       startShake(cam, s === 'fire' ? 3 : 2, s === 'fire' ? 0.10 : 0.08);
       // Fire arrow: spawn trailing embers
       if (s === 'fire' && fx?.pool) {
         for (let i = 0; i < 4; i++) {
-          fx.pool.spawn({
+          fx.pool.spawn(new Particle({
             x: apos.x + dx / len * 0.5, y: apos.y + dy / len * 0.5,
             vx: (dx / len) * 3 + (Math.random() - 0.5) * 1.5,
             vy: (dy / len) * 3 + (Math.random() - 0.5) * 1.5,
-            ax: 0, ay: 0.4, life: 0.25 + Math.random() * 0.15,
+            ay: 0.4, life: 0.25 + Math.random() * 0.15,
             size0: 0.12 + Math.random() * 0.08, size1: 0.02,
             r: 255, g: 160 + Math.random() * 60 | 0, b: 30,
-            a0: 0.9, a1: 0, rot: 0, rotVel: 0
-          });
+            a0: 0.9,
+          }));
         }
       }
     });

@@ -14,16 +14,21 @@ export const basePalette = {
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
   bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" }, // 🦇
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
+  skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   // Tier 1
+  bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },
   orc:      { glyph: "o", fg: "#cc6644", glow: "#993320" },
   skeleton: { glyph: "s", fg: "#ddd8c8", glow: "#aaa590" }, // 💀
   spider:   { glyph: "x", fg: "#55bb55", glow: "#338833" }, // 🕷
   // Tier 2
+  skeletal_marksman: { glyph: "s", fg: "#e0c8a0", glow: "#b89060" },
+  skeleton_sharpshooter: { glyph: "s", fg: "#c0bca8", glow: "#807c68" },
   troll:    { glyph: "T", fg: "#66aa66", glow: "#448844" },
   wraith:   { glyph: "W", fg: "#aabbff", glow: "#7799dd" },
   ogre:     { glyph: "O", fg: "#cc9966", glow: "#996633" },
   floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
   // Tier 3
+  death_archer: { glyph: "s", fg: "#a0a8b0", glow: "#6070a0" },
   demon:    { glyph: "&", fg: "#ff4444", glow: "#cc0000" },
   dragon:   { glyph: "D", fg: "#ffcc33", glow: "#dd9900" },
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
@@ -152,6 +157,11 @@ export const basePalette = {
   corpse_bat:          { glyph: "%", fg: "#9080b0", glow: "#605080" },
   corpse_grid_bug:     { glyph: "%", fg: "#bb66ff", glow: "#44ccff" },
   corpse_snake:        { glyph: "%", fg: "#55aa44", glow: "#338822" },
+  corpse_skeleton_archer: { glyph: "%", fg: "#c8c4b0", glow: "#908870" },
+  corpse_bone_bowman:     { glyph: "%", fg: "#d8d4c0", glow: "#a8a490" },
+  corpse_skeletal_marksman: { glyph: "%", fg: "#e0c8a0", glow: "#b89060" },
+  corpse_skeleton_sharpshooter: { glyph: "%", fg: "#c0bca8", glow: "#807c68" },
+  corpse_death_archer:    { glyph: "%", fg: "#a0a8b0", glow: "#6070a0" },
   corpse_orc:          { glyph: "%", fg: "#cc6644", glow: "#993320" },
   corpse_skeleton:     { glyph: "%", fg: "#ddd8c8", glow: "#aaa590" },
   corpse_spider:       { glyph: "%", fg: "#55bb55", glow: "#338833" },

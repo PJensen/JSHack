@@ -19,6 +19,26 @@ function cachedRgb(r, g, b) {
   return s;
 }
 
+/**
+ * Rigid data class for a single particle spawn payload.
+ * Enforces the exact field contract that ParticlePool.spawn() reads,
+ * with sensible defaults for the commonly-zero fields.
+ */
+export class Particle {
+  constructor({ x, y, vx, vy, ax = 0, ay = 0, life,
+                size0, size1, r, g, b, a0, a1 = 0,
+                rot = 0, rotVel = 0 }) {
+    this.x = x;        this.y = y;
+    this.vx = vx;      this.vy = vy;
+    this.ax = ax;       this.ay = ay;
+    this.life = life;
+    this.size0 = size0; this.size1 = size1;
+    this.r = r;         this.g = g;   this.b = b;
+    this.a0 = a0;       this.a1 = a1;
+    this.rot = rot;     this.rotVel = rotVel;
+  }
+}
+
 export class ParticlePool {
   constructor(capacity = 4096) {
     this.cap = capacity;
@@ -214,7 +234,7 @@ export class ParticleEmitter {
     const spd   = this.speed * (1 - sj*0.5 + rnd()*sj);
     const life  = this.life  * (1 - lj*0.5 + rnd()*lj);
 
-    pool.spawn({
+    pool.spawn(new Particle({
       x: ox + this.offsetX,
       y: oy + this.offsetY,
       vx: Math.cos(theta)*spd + this.vx + ovx,
@@ -224,8 +244,8 @@ export class ParticleEmitter {
       size0: this.size, size1: this.sizeEnd,
       r: this.r, g: this.g, b: this.b,
       a0: this.alpha0, a1: this.alpha1,
-      rot: 0, rotVel: this.rotVel
-    });
+      rotVel: this.rotVel,
+    }));
   }
 }
 

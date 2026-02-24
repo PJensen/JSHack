@@ -1,24 +1,35 @@
 // src/rules/systems/aiChaseSystem.js
 // Very simple AI: monsters attempt to step toward the player each tick.
+// Ranged enemies (with Equipment.ranged + ammo) shoot when in range and LOS.
 
 import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { Speed } from "../components/Speed.js";
 import { Player } from "../components/Player.js";
+import { Equipment } from "../components/Equipment.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { RangedAttackIntent } from "../components/Intents/RangedAttackIntent.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { hasLOS } from "../../shared/math/gridLOS.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
 export function aiChaseSystem(world) {
-  // Identify the player position (first found)
+  // Identify the player position and entity ID (first found)
+  let playerId = 0;
   let playerPos = null;
   for (const [id, _p, pos] of world.query(Player, Position)) {
+    playerId = id;
     playerPos = { x: pos.x, y: pos.y };
     break;
   }
   if (!playerPos) return;
+
+  // Lazily built blocking map for LOS checks (only when a ranged enemy needs it)
+  let _isBlocked = null;
 
   // For each enemy-faction entity, add a MoveIntent toward player if none queued
   forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
@@ -43,6 +54,22 @@ export function aiChaseSystem(world) {
 
     const dxp = playerPos.x - pos.x;
     const dyp = playerPos.y - pos.y;
+
+    // Ranged attack: if equipped with a bow and ammo, prefer shooting over chasing
+    const eq = world.get(id, Equipment);
+    if (eq && eq.ranged && eq.ammo && world.isAlive(eq.ammo)) {
+      const weaponInfo = eq.ranged ? world.get(eq.ranged, ItemInfo) : null;
+      const maxRange = weaponInfo?.range || 8;
+      const dist = Math.max(Math.abs(dxp), Math.abs(dyp));
+      if (dist > 1 && dist <= maxRange) {
+        if (!_isBlocked) _isBlocked = blockedCallback(buildBlocksVisionMap(world));
+        if (hasLOS(pos.x | 0, pos.y | 0, playerPos.x | 0, playerPos.y | 0, _isBlocked)) {
+          try { world.add(id, RangedAttackIntent, { targetId: playerId }); } catch {}
+          return;
+        }
+      }
+    }
+
     const dx0 = Math.sign(dxp) | 0;
     const dy0 = Math.sign(dyp) | 0;
 

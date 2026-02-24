@@ -14,9 +14,8 @@ import { Settings } from "../../rules/components/Settings.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js";
 import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
-import { resolveItemDisplayName } from "../wiring/itemName.js";
+import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
-import { getAffix } from "../../rules/data/affixes.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 
@@ -37,27 +36,21 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   if (/** @type {any} */ (world)[_installed]) return { buildGroundPickupDetailAt };
   /** @type {any} */ (world)[_installed] = true;
 
-  function resolveAffixes(rawAffixes) {
-    return (Array.isArray(rawAffixes) ? rawAffixes : []).map(aid => {
-      const def = getAffix(aid);
-      return { id: aid, name: def?.name || aid, description: def?.description || '' };
-    });
-  }
-
   function buildItemDisplayData(info, itemId) {
-    return {
+    return _buildItemDisplayData(world, itemId) || {
       id: itemId,
       type: info.type || 'item',
       name: resolveItemDisplayName(world, itemId),
       slot: info.slot || '',
-      count: info.count || 1,
-      rarityName: info.rarityName || 'common',
-      description: info.description || '',
-      bonuses: info.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {},
-      affixes: resolveAffixes(info.affixes),
-      damageDice: info.damageDice || null,
-      staminaCost: info.staminaCost ?? null,
-      twoHanded: !!info.twoHanded,
+      count: 1,
+      rarityName: 'common',
+      description: '',
+      bonuses: {},
+      affixes: [],
+      damageDice: null,
+      staminaCost: null,
+      twoHanded: false,
+      coating: null,
     };
   }
 
@@ -95,10 +88,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const ty = Number.isFinite(y) ? (y | 0) : 0;
     const ids = [...itemsAt(world, tx, ty)];
     // Include chest contents on the tile.
-    let hasChest = false;
+    let chestId = 0;
     for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
       if (ni.identity !== 'chest' || pos.x !== tx || pos.y !== ty) continue;
-      hasChest = true;
+      chestId = eid;
       const inv = world.get(eid, Inventory);
       if (!inv || !Array.isArray(inv.items)) continue;
       for (const itemId of inv.items) ids.push(itemId);
@@ -111,14 +104,23 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       nonCurrencyItems.push(buildItemDisplayData(info, itemId));
     }
 
-    if (!nonCurrencyItems.length) return null;
+    if (!nonCurrencyItems.length && !chestId) return null;
 
-    if (hasChest || nonCurrencyItems.length > 1) {
+    if (chestId) {
       return {
         mode: 'multi',
         count: nonCurrencyItems.length,
         items: nonCurrencyItems,
-        fromChest: hasChest,
+        fromChest: true,
+        chestId,
+      };
+    }
+    if (nonCurrencyItems.length > 1) {
+      return {
+        mode: 'multi',
+        count: nonCurrencyItems.length,
+        items: nonCurrencyItems,
+        fromChest: false,
       };
     }
 
@@ -152,7 +154,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
               (eq.ring1 === id && 'ring1') ||
               (eq.ring2 === id && 'ring2') ||
               (eq.ammo === id && 'ammo') ||
-              (eq.ranged === id && 'ranged')
+              (eq.ranged === id && 'ranged') ||
+              (eq.feet === id && 'feet')
             )) || null;
             const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
             const applyTargetCount = applyTargetIds.length;
@@ -184,7 +187,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
           description: `Mana ${s.manaCost}`,
           count: 1,
           slot: 'brain',
-          name: s.name,
+          name: s.symbol ? `${s.symbol} ${s.name}` : s.name,
           rarityName: 'rare',
           bonuses: {},
           affixes: [],

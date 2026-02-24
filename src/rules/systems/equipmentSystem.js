@@ -15,6 +15,7 @@ function emptyDerived() {
     critChanceDerived: 0,
     critMultDerived: 0,
     manaRegenDerived: 0,
+    maxManaDerived: 0,
     staminaRegenDerived: 0,
     maxStaminaDerived: 0,
     kineticDRDerived: 0,
@@ -26,6 +27,7 @@ function emptyDerived() {
     bluntResistDerived: 0,
     slashResistDerived: 0,
     pierceResistDerived: 0,
+    luckDerived: 0,
   };
 }
 
@@ -37,6 +39,7 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.critChance)) acc.critChanceDerived += bonuses.critChance;
   if (Number.isFinite(bonuses.critMult)) acc.critMultDerived += bonuses.critMult;
   if (Number.isFinite(bonuses.manaRegen)) acc.manaRegenDerived += bonuses.manaRegen;
+  if (Number.isFinite(bonuses.maxMana)) acc.maxManaDerived += bonuses.maxMana;
   if (Number.isFinite(bonuses.staminaRegen)) acc.staminaRegenDerived += bonuses.staminaRegen;
   if (Number.isFinite(bonuses.maxStamina)) acc.maxStaminaDerived += bonuses.maxStamina;
   if (Number.isFinite(bonuses.kineticDR)) acc.kineticDRDerived += bonuses.kineticDR;
@@ -48,6 +51,7 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.bluntResist)) acc.bluntResistDerived += bonuses.bluntResist;
   if (Number.isFinite(bonuses.slashResist)) acc.slashResistDerived += bonuses.slashResist;
   if (Number.isFinite(bonuses.pierceResist)) acc.pierceResistDerived += bonuses.pierceResist;
+  if (Number.isFinite(bonuses.luck)) acc.luckDerived += bonuses.luck;
 }
 
 function runAffixPassives(world, ctx, affixIds) {
@@ -63,7 +67,7 @@ export function equipmentSystem(world) {
     const d = emptyDerived();
 
     // equip slots contain entity ids of items
-    const slots = [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.ranged];
+    const slots = [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.ranged, eq.feet];
     for (const itemId of slots) {
       if (!Number.isInteger(itemId)) continue;
       const info = world.get(itemId, ItemInfo);
@@ -80,6 +84,7 @@ export function equipmentSystem(world) {
           else if (k === 'critChance') d.critChanceDerived += v;
           else if (k === 'critMult') d.critMultDerived += v;
           else if (k === 'manaRegen') d.manaRegenDerived += v;
+          else if (k === 'maxMana') d.maxManaDerived += v;
           else if (k === 'staminaRegen') d.staminaRegenDerived += v;
           else if (k === 'maxStamina') d.maxStaminaDerived += v;
           else if (k === 'kineticDR') d.kineticDRDerived += v;
@@ -91,6 +96,7 @@ export function equipmentSystem(world) {
           else if (k === 'bluntResist') d.bluntResistDerived += v;
           else if (k === 'slashResist') d.slashResistDerived += v;
           else if (k === 'pierceResist') d.pierceResistDerived += v;
+          else if (k === 'luck') d.luckDerived += v;
         },
         entityId: id,
         itemId,
@@ -106,6 +112,7 @@ export function equipmentSystem(world) {
     eq.critChanceDerived = d.critChanceDerived;
     eq.critMultDerived = d.critMultDerived;
     eq.manaRegenDerived = d.manaRegenDerived;
+    eq.maxManaDerived = d.maxManaDerived;
     eq.staminaRegenDerived = d.staminaRegenDerived;
     eq.maxStaminaDerived = d.maxStaminaDerived;
     eq.kineticDRDerived = d.kineticDRDerived;
@@ -117,5 +124,6 @@ export function equipmentSystem(world) {
     eq.bluntResistDerived = d.bluntResistDerived;
     eq.slashResistDerived = d.slashResistDerived;
     eq.pierceResistDerived = d.pierceResistDerived;
+    eq.luckDerived = d.luckDerived;
   }
 }

@@ -130,7 +130,56 @@ export const MONSTERS = [
     description: 'A hissing serpent with venomous fangs.',
   },
 
+  {
+    id: 'skeleton_archer',
+    name: 'Skeleton Archer',
+    tier: 0,
+    glyph: 's',
+    fg: '#c8c4b0',
+    glow: '#908870',
+    baseHp: 6,
+    hpPerLevel: 1,
+    attack: 2,
+    defense: 0,
+    damageDice: '1d4',
+    sizeClass: 'M',
+    massKg: 25,
+    resistances: {
+      kinetic: { DR: 2, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+    },
+    speed: 2,
+    hooks: null,
+    description: 'A rattling skeleton clutching a short bow.',
+    equipment: { ranged: 'bow_short', ammo: 'arrows' },
+  },
+
   // ── Tier 1 (floors 6-10) ───────────────────────────────────────────
+  {
+    id: 'bone_bowman',
+    name: 'Bone Bowman',
+    tier: 1,
+    glyph: 's',
+    fg: '#d8d4c0',
+    glow: '#a8a490',
+    baseHp: 10,
+    hpPerLevel: 1.5,
+    attack: 3,
+    defense: 1,
+    damageDice: '1d6',
+    sizeClass: 'M',
+    massKg: 25,
+    resistances: {
+      kinetic: { DR: 4, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+    },
+    speed: 2,
+    hooks: {
+      onHit: [statusEffectOnHit(20, 0xdead0020, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
+    },
+    description: 'A skeletal bowman with practiced aim. Its arrows leave jagged wounds.',
+    equipment: { ranged: 'bow_short', ammo: 'arrows' },
+  },
   {
     id: 'orc',
     name: 'Orc',
@@ -199,6 +248,56 @@ export const MONSTERS = [
   },
 
   // ── Tier 2 (floors 11-15) ──────────────────────────────────────────
+  {
+    id: 'skeletal_marksman',
+    name: 'Skeletal Marksman',
+    tier: 2,
+    glyph: 's',
+    fg: '#e0c8a0',
+    glow: '#b89060',
+    baseHp: 16,
+    hpPerLevel: 2,
+    attack: 4,
+    defense: 2,
+    damageDice: '1d8',
+    sizeClass: 'M',
+    massKg: 28,
+    resistances: {
+      kinetic: { DR: 6, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+    },
+    speed: 2,
+    hooks: {
+      onHit: [statusEffectOnHit(20, 0xdead0021, { key: "burn", turnsLeft: 3, potency: 2 }, "proc:burning")],
+    },
+    description: 'A grim skeleton nocking arrows tipped with alchemical fire.',
+    equipment: { ranged: 'bow_short', ammo: 'fire_arrows' },
+  },
+  {
+    id: 'skeleton_sharpshooter',
+    name: 'Skeleton Sharpshooter',
+    tier: 2,
+    glyph: 's',
+    fg: '#c0bca8',
+    glow: '#807c68',
+    baseHp: 14,
+    hpPerLevel: 2,
+    attack: 5,
+    defense: 3,
+    damageDice: '1d6',
+    sizeClass: 'M',
+    massKg: 25,
+    resistances: {
+      kinetic: { DR: 6, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+    },
+    speed: 2,
+    hooks: {
+      onHit: [statusEffectOnHit(15, 0xdead0022, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
+    },
+    description: 'A headless torso that somehow never misses.',
+    equipment: { ranged: 'bow_short', ammo: 'arrows' },
+  },
   {
     id: 'troll',
     name: 'Troll',
@@ -325,6 +424,32 @@ export const MONSTERS = [
 
   // ── Tier 3 (floors 16+) ────────────────────────────────────────────
   {
+    id: 'death_archer',
+    name: 'Death Archer',
+    tier: 3,
+    glyph: 's',
+    fg: '#a0a8b0',
+    glow: '#6070a0',
+    baseHp: 28,
+    hpPerLevel: 3,
+    attack: 5,
+    defense: 4,
+    damageDice: '2d6',
+    sizeClass: 'M',
+    massKg: 30,
+    resistances: {
+      kinetic: { DR: 8, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+      electric: { ohms: 50 },
+    },
+    speed: 2,
+    hooks: {
+      onHit: [drainOnHit(20, 0xdead0023, 3)],
+    },
+    description: 'An ancient undead marksman wreathed in cold flame. Its arrows sap the life from their targets.',
+    equipment: { ranged: 'bow_short', ammo: 'fire_arrows' },
+  },
+  {
     id: 'demon',
     name: 'Demon',
     tier: 3,
@@ -449,4 +574,4 @@ export function getMonsterLootTable(def) {
   return def.lootTable || `drop:tier${def.tier}`;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, description:string, lootTable?:string }} MonsterDef */
+/** @typedef {{ id:string, name:string, tier:number, glyph:string, fg:string, glow:string, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */

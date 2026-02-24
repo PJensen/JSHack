@@ -6,6 +6,7 @@ import {
   addItemEntityToInventory,
   findInventoryStackTargetForItem,
 } from "../../rules/utils/inventoryStacking.js";
+import { buildItemDisplayData } from "./itemName.js";
 
 const INSTALLED = Symbol.for("jshack:main:chestWiring:installed");
 
@@ -23,20 +24,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
   world[INSTALLED] = true;
 
   function buildChestItemDetail(id) {
-    const info = world.get(id, ItemInfo);
-    const name = world.get(id, NamedIdentity);
-    if (!info) return null;
-    return {
-      id,
-      name: name?.name || info.description || info.type || "item",
-      type: info.type,
-      slot: info.slot,
-      count: info.count || 1,
-      rarityName: info.rarityName || "common",
-      description: info.description || "",
-      bonuses: info.bonuses || {},
-      affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
-    };
+    return buildItemDisplayData(world, id);
   }
 
   function dispatchChestData(chestId) {
@@ -55,16 +43,8 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
         for (const id of playerInv.items) {
           const info = world.get(id, ItemInfo);
           if (!info || info.type === "currency") continue;
-          const name = world.get(id, NamedIdentity);
-          playerItems.push({
-            id,
-            name: name?.name || info.description || info.type || "item",
-            type: info.type,
-            slot: info.slot,
-            count: info.count || 1,
-            rarityName: info.rarityName || "common",
-            description: info.description || "",
-          });
+          const detail = buildItemDisplayData(world, id);
+          if (detail) playerItems.push(detail);
         }
       }
     }

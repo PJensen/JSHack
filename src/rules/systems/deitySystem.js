@@ -20,6 +20,8 @@ import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Faction } from '../components/Faction.js';
+import { Equipment } from '../components/Equipment.js';
+import { ItemInfo } from '../components/ItemInfo.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
 
@@ -534,13 +536,41 @@ function wireDeityMiracles(deity, deityId, world) {
       const needs = assessPlayerNeeds(world, playerId);
 
       if (needs.length === 0) {
-        // Player is fine — just log the blessing
-        world.emit('deity:miracle', {
-          playerId,
-          deityId,
-          effect: 'blessing',
-          message: `${deity.name} smiles upon you.`
-        });
+        // Player is fine — grant luck (affix on item or temporary buff)
+        let grantedAffix = false;
+        const eq = world.get(playerId, Equipment);
+        if (eq) {
+          const slots = [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.feet];
+          for (const itemId of slots) {
+            if (!Number.isInteger(itemId)) continue;
+            const info = world.get(itemId, ItemInfo);
+            if (!info || !Array.isArray(info.affixes)) continue;
+            if (info.affixes.includes('lucky1')) continue;
+            info.affixes.push('lucky1');
+            grantedAffix = true;
+            const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+            world.emit('deity:miracle', {
+              playerId,
+              deityId,
+              effect: 'lucky_affix',
+              message: `${deity.name} blesses your ${itemName} with fortune!`
+            });
+            break;
+          }
+        }
+        if (!grantedAffix) {
+          // No eligible item — grant 200-turn lucky buff
+          const ae = world.get(playerId, ActiveEffects);
+          if (ae && Array.isArray(ae.effects)) {
+            ae.effects.push({ key: 'lucky', turnsLeft: 200, potency: 3 });
+          }
+          world.emit('deity:miracle', {
+            playerId,
+            deityId,
+            effect: 'lucky_buff',
+            message: `${deity.name} bestows fortune upon you!`
+          });
+        }
         return;
       }
 

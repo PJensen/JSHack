@@ -16,11 +16,12 @@ import { getMonster } from '../data/monsters.js';
 import { CombatCallbackContext } from '../data/callbacks/combat.js';
 import { runCallbackList } from '../interaction/dispatch.js';
 import { degradeFloorMemory } from '../environment/dungeon/transition.js';
-import { mulberry32, rngInt, rollDice, combatSeed } from '../utils/rng.js';
+import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { runScript, ScriptVerb } from '../scripting.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
+import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -28,7 +29,7 @@ const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 function forEachAffix(world, entityId, fn) {
     const eq = world.get(entityId, Equipment);
     if (!eq) return;
-    for (const slotId of [eq.weapon, eq.armor, eq.ring1, eq.ring2]) {
+    for (const slotId of [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.feet]) {
         if (!Number.isInteger(slotId)) continue;
         const info = world.get(slotId, ItemInfo);
         if (!info || !Array.isArray(info.affixes)) continue;
@@ -171,7 +172,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
     const r = mulberry32(seed);
     const d20 = rngInt(r, 1, 20);
     const totalToHit = d20 + attackBonus;
-    const isCrit = d20 === 20;
+    let isCrit = d20 === 20;
     const isNat1 = d20 === 1;
 
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
@@ -196,7 +197,13 @@ export function resolveMeleeAttack(world, attacker, defender) {
     // Add a small portion of attack bonus as flat damage (DnD-ish flavor)
     const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(0, damageRoll + flatBonus);
-    if (isCrit) dmg = Math.max(1, dmg * 2);
+    // Secondary crit check: critChanceDerived (decimal) + luck (integer %)
+    if (!isCrit) {
+      const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0);
+      if (critPct > 0) isCrit = pct(r, critPct);
+    }
+    const critMult = 2 + (atkSnapshot.critMult || 0);
+    if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
     // Pre-hit hooks
@@ -224,6 +231,14 @@ export function resolveMeleeAttack(world, attacker, defender) {
     });
     finalDmg = Math.max(0, Math.floor(hitCtx.damage));
     if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+
+    applyWeaponCoatingOnHit(world, {
+        attacker: source,
+        defender: target,
+        weaponId,
+        didHit: finalDmg > 0,
+    });
+
     // Innate monster on-hit behavior from monster definition hooks
     runMonsterHooks(world, source, 'onHit', hitCtx);
     // Defender on-hit reactions (e.g., Thorns)

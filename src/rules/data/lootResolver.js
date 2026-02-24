@@ -12,6 +12,8 @@ import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '
 import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
+import { Brain } from '../components/Brain.js';
+import { Player } from '../components/Player.js';
 
 const MAX_NESTING = 5;
 
@@ -35,18 +37,24 @@ const ARCHETYPE_MAP = {
  * @param {Object} rng - createRng() instance
  * @param {number} depth - current dungeon depth
  * @param {number} [nest=0] - recursion guard
+ * @param {Object} [opts] - optional context
+ * @param {ReadonlySet<string>} [opts.knownSpells] - spells the player already knows (weight → 0)
  * @returns {Array<{kind:string, params:Object}>}
  */
-export function resolveLootTable(tableId, rng, depth, nest = 0) {
+export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
   if (nest >= MAX_NESTING) return [];
   const table = LOOT_TABLES[tableId];
   if (!table) return [];
 
   const results = [];
   const rollCount = rng.int(table.rolls.min, table.rolls.max);
+  
+  // Chest tables enforce max 1 weapon rule
+  const isChest = tableId.startsWith("chest:");
+  let weaponCount = 0;
 
   for (let r = 0; r < rollCount; r++) {
-    const entry = weightedPick(table.entries, rng);
+    const entry = weightedPick(table.entries, rng, opts);
     if (!entry) continue;
 
     switch (entry.type) {
@@ -67,6 +75,16 @@ export function resolveLootTable(tableId, rng, depth, nest = 0) {
       case "equip": {
         const equipId = rng.choice(entry.pool);
         if (!equipId) break;
+        
+        // Check weapon limit for chests
+        if (isChest) {
+          const def = getCatalogItem(equipId);
+          if (def && def.slot === "weapon") {
+            if (weaponCount >= 1) break; // Skip this weapon
+            weaponCount++;
+          }
+        }
+        
         const affixes = rollAffixes(rng, equipId, entry.affixChance || 0, entry.affixCountMax || 1);
         results.push({ kind: "equip", params: { equipId, affixes } });
         break;
@@ -83,7 +101,7 @@ export function resolveLootTable(tableId, rng, depth, nest = 0) {
       }
 
       case "table": {
-        const nested = resolveLootTable(entry.tableId, rng, depth, nest + 1);
+        const nested = resolveLootTable(entry.tableId, rng, depth, nest + 1, opts);
         results.push(...nested);
         break;
       }
@@ -94,17 +112,37 @@ export function resolveLootTable(tableId, rng, depth, nest = 0) {
 }
 
 /**
+ * Return effective weight for an entry, accounting for known-spell suppression.
+ * Spellbook entries (itemId starting with "book_") whose spell the player already
+ * knows are weighted at 0 so the RNG picks something else.
+ * @param {Object} entry
+ * @param {Object} [opts]
+ * @returns {number}
+ */
+function effectiveWeight(entry, opts) {
+  const w = entry.weight || 0;
+  if (w <= 0) return 0;
+  if (!opts?.knownSpells) return w;
+  if (entry.type !== "item") return w;
+  const id = entry.itemId || "";
+  if (!id.startsWith("book_")) return w;
+  const spellId = id.slice(5); // strip "book_" prefix
+  return opts.knownSpells.has(spellId) ? 0 : w;
+}
+
+/**
  * Weighted random pick from entries.
  * @param {Array} entries
  * @param {Object} rng
+ * @param {Object} [opts] - passed to effectiveWeight for known-spell filtering
  * @returns {Object|null}
  */
-function weightedPick(entries, rng) {
-  const total = entries.reduce((s, e) => s + (e.weight || 0), 0);
+function weightedPick(entries, rng, opts) {
+  const total = entries.reduce((s, e) => s + effectiveWeight(e, opts), 0);
   if (total <= 0) return null;
   let roll = rng.float(0, total);
   for (const entry of entries) {
-    roll -= (entry.weight || 0);
+    roll -= effectiveWeight(entry, opts);
     if (roll <= 0) return entry;
   }
   return entries[entries.length - 1];
@@ -215,7 +253,25 @@ export function materializeDrop(world, drop, pos) {
 }
 
 /**
+ * Build a Set of spell IDs the player currently knows.
+ * Returns null if no player or no Brain component is found.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {Set<string>|null}
+ */
+function getPlayerKnownSpells(world) {
+  for (const [id] of world.query(Player)) {
+    const brain = world.get(id, Brain);
+    if (brain && Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.length > 0) {
+      return new Set(brain.learnedSpellIds);
+    }
+    return null;
+  }
+  return null;
+}
+
+/**
  * Convenience: resolve a table and materialize all drops at a position.
+ * Known spells are automatically suppressed from spellbook drops.
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {string} tableId
  * @param {Object} rng - createRng() instance
@@ -224,7 +280,9 @@ export function materializeDrop(world, drop, pos) {
  * @returns {number[]} entity IDs created
  */
 export function dropLoot(world, tableId, rng, depth, pos) {
-  const drops = resolveLootTable(tableId, rng, depth);
+  const knownSpells = getPlayerKnownSpells(world);
+  const opts = knownSpells ? { knownSpells } : undefined;
+  const drops = resolveLootTable(tableId, rng, depth, 0, opts);
   const ids = [];
   for (const drop of drops) {
     const eid = materializeDrop(world, drop, pos);

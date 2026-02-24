@@ -3,6 +3,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { createPlayer } from '../src/rules/archetypes/Player.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
+import { Mana } from '../src/rules/components/Mana.js';
 import { Status } from '../src/rules/components/Status.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
@@ -199,4 +200,54 @@ Deno.test("bleed effect deals damage over time and expires", () => {
   world.tick(1);
   st = world.get(player, Status);
   assert(!st.statuses.some(s => s.type === 'bleeding'), 'bleeding status cleared after expiry');
+});
+
+Deno.test("mana_restore effect restores mana over time and expires", () => {
+  const world = new World({ seed: 7 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Hero', maxHp: 10, hp: 10 });
+  const mana = world.get(player, Mana);
+  mana.maxMana = 50;
+  mana.mana = 20;
+
+  const ae = world.get(player, ActiveEffects);
+  ae.effects.push({ key: 'mana_restore', turnsLeft: 3, potency: 5 });
+
+  world.tick(1);
+  let st = world.get(player, Status);
+  assertEquals(mana.mana, 25, 'mana_restore tick 1 restores 5 mana');
+  assert(st && st.statuses.some(s => s.type === 'mana_surge'), 'status mana_surge present');
+
+  world.tick(1);
+  assertEquals(mana.mana, 30, 'mana_restore tick 2 restores 5 mana');
+
+  world.tick(1);
+  assertEquals(mana.mana, 35, 'mana_restore tick 3 restores 5 mana');
+
+  world.tick(1);
+  st = world.get(player, Status);
+  assert(!st.statuses.some(s => s.type === 'mana_surge'), 'mana_surge status cleared after expiry');
+});
+
+Deno.test("mana_restore respects maxMana + equipment cap", () => {
+  const world = new World({ seed: 7 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Hero', maxHp: 10, hp: 10 });
+  const mana = world.get(player, Mana);
+  mana.maxMana = 30;
+  mana.mana = 28;
+
+  const eq = world.get(player, Equipment);
+  eq.maxManaDerived = 5;
+
+  const ae = world.get(player, ActiveEffects);
+  ae.effects.push({ key: 'mana_restore', turnsLeft: 3, potency: 10 });
+
+  world.tick(1);
+  assertEquals(mana.mana, 35, 'mana capped at maxMana(30) + maxManaDerived(5) = 35');
+
+  world.tick(1);
+  assertEquals(mana.mana, 35, 'mana stays at cap on subsequent ticks');
 });

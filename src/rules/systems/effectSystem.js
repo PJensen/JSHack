@@ -4,6 +4,7 @@ import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
 import { Stamina } from '../components/Stamina.js';
+import { Mana } from '../components/Mana.js';
 import { Equipment } from '../components/Equipment.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
@@ -83,6 +84,18 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         stam.stamina = Math.min(cap, stam.stamina + amount);
         const delta = stam.stamina - before;
         if (delta > 0) { try { world.emit && world.emit('stamina_restored', { id, amount: delta }); } catch {} }
+    }
+
+    if (operation === 'mana_restore') {
+        const mana = world.get(id, Mana);
+        if (!mana) return;
+        const eq = world.get(id, Equipment);
+        const maxBonus = Number(eq?.maxManaDerived ?? 0);
+        const cap = mana.maxMana + maxBonus;
+        const before = mana.mana;
+        mana.mana = Math.min(cap, mana.mana + amount);
+        const delta = mana.mana - before;
+        if (delta > 0) { try { world.emit && world.emit('mana_restored', { id, amount: delta }); } catch {} }
     }
 }
 

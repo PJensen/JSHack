@@ -5,11 +5,12 @@
 /**
  * @param {{
  *   classes: Array<{ id: string, name: string, description: string, deityName: string, deityAlignment: string }>,
- *   onConfirm: (result: { name: string, classId: string }) => void,
+ *   defaultSeed?: number,
+ *   onConfirm: (result: { name: string, classId: string, seed: number }) => void,
  * }} opts
  * @returns {{ dispose: () => void }}
  */
-export function showCharCreation({ classes, onConfirm }) {
+export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
   let selectedClassId = null;
 
   // ---- backdrop (full-viewport, blocks all input) ----
@@ -69,6 +70,50 @@ export function showCharCreation({ classes, onConfirm }) {
   nameInput.addEventListener('focus', () => { nameInput.style.borderColor = '#4a6a9a'; });
   nameInput.addEventListener('blur', () => { nameInput.style.borderColor = '#2d3b52'; });
   box.appendChild(nameInput);
+
+  // ---- seed input ----
+  const seedLabel = document.createElement('label');
+  seedLabel.textContent = 'Seed';
+  Object.assign(seedLabel.style, {
+    display: 'block', fontSize: '13px', color: '#6a8ab0',
+    marginBottom: '4px', textAlign: 'left',
+  });
+  box.appendChild(seedLabel);
+
+  const seedInput = document.createElement('input');
+  seedInput.type = 'text';
+  seedInput.value = '0x' + (defaultSeed >>> 0).toString(16).toUpperCase();
+  seedInput.maxLength = 16;
+  seedInput.setAttribute('autocomplete', 'off');
+  seedInput.setAttribute('spellcheck', 'false');
+  Object.assign(seedInput.style, {
+    display: 'block', width: '100%', boxSizing: 'border-box',
+    minHeight: '44px', padding: '8px 12px',
+    fontSize: '18px', fontFamily: 'monospace',
+    background: '#111827', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px',
+    outline: 'none', marginBottom: '4px',
+  });
+  seedInput.addEventListener('focus', () => { seedInput.style.borderColor = '#4a6a9a'; });
+  seedInput.addEventListener('blur', () => { seedInput.style.borderColor = '#2d3b52'; });
+  box.appendChild(seedInput);
+
+  const seedHint = document.createElement('div');
+  seedHint.textContent = 'Hex or number';
+  Object.assign(seedHint.style, {
+    fontSize: '11px', color: '#4a6080',
+    marginBottom: '20px', textAlign: 'left',
+  });
+  box.appendChild(seedHint);
+
+  /** Parse the seed input — accepts hex (0x...) or plain integers. Returns null if invalid. */
+  function parseSeed(raw) {
+    const s = (raw || '').trim();
+    if (!s) return null;
+    if (/^0x[0-9a-f]+$/i.test(s)) return parseInt(s, 16) >>> 0;
+    if (/^[0-9]+$/.test(s)) return parseInt(s, 10) >>> 0;
+    return null;
+  }
 
   // ---- class section ----
   const classLabel = document.createElement('div');
@@ -159,7 +204,8 @@ export function showCharCreation({ classes, onConfirm }) {
     e.stopPropagation();
     if (confirmBtn.disabled) return;
     const name = (nameInput.value || '').trim() || 'Hero';
-    onConfirm({ name, classId: selectedClassId });
+    const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
+    onConfirm({ name, classId: selectedClassId, seed });
     dispose();
   });
   box.appendChild(confirmBtn);
@@ -175,7 +221,8 @@ export function showCharCreation({ classes, onConfirm }) {
     if (e.key === 'Enter' && !confirmBtn.disabled) {
       e.preventDefault();
       const name = (nameInput.value || '').trim() || 'Hero';
-      onConfirm({ name, classId: selectedClassId });
+      const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
+      onConfirm({ name, classId: selectedClassId, seed });
       dispose();
     }
   });

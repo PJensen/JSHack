@@ -15,6 +15,7 @@ import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
 import { Facing } from "../components/Facing.js";
 import { Score } from "../components/Score.js";
+import { Faction } from "../components/Faction.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
@@ -40,7 +41,8 @@ export const PlayerArchetype = defineArchetype(
   [Stamina, (p) => ({ maxStamina: p.maxStamina ?? 100, stamina: p.stamina ?? 100, staminaRegen: p.staminaRegen ?? 2.0 })],
   [Brain, {}],
   [Facing, { dx: 0, dy: 0 }],
-  [Score, {}]
+  [Score, {}],
+  [Faction, { key: "player" }]
 );
 
 export function createPlayer(world, params = {}) {
@@ -65,6 +67,7 @@ export function createPlayer(world, params = {}) {
     world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
     world.add(id, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 2.0 });
     world.add(id, Score, {});
+    world.add(id, Faction, { key: "player" });
     return id;
   })();
 }

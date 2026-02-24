@@ -13,6 +13,7 @@ import { Position } from "../components/Position.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
+import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Physiology } from "../components/Physiology.js";
@@ -579,6 +580,62 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
 
   // Emit semantic event for display VFX
   try { world.emit && world.emit('spell:frost', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y }, duration, mass: massKg }); } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
+};
+
+// Heal — restore HP to self or target. Range 6 tiles, heals 20-35 HP based on caster intelligence.
+REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  // Determine target: intent position or self
+  let targetId = actor;
+  let targetPos = { x: apos.x, y: apos.y };
+
+  const tx = Number(intent?.x);
+  const ty = Number(intent?.y);
+  if (Number.isFinite(tx) && Number.isFinite(ty)) {
+    const maxRange = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 6);
+    const dist = chebyshev(apos, { x: tx | 0, y: ty | 0 });
+    if (dist <= maxRange) {
+      // Find entity at target position
+      for (const [id, p] of world.query(Position)) {
+        if (p.x === (tx | 0) && p.y === (ty | 0)) {
+          const fac = /** @type any */ (world.get(id, Faction));
+          // Can heal allies or self, not enemies
+          if (!fac || fac.key === 'ally' || id === actor) {
+            targetId = id;
+            targetPos = { x: p.x, y: p.y };
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Check if target needs healing
+  const vit = /** @type any */ (world.get(targetId, Vitality));
+  if (!vit || (vit.hp | 0) >= (vit.maxHp | 0)) {
+    // No healing needed
+    try { world.emit && world.emit('spell:heal', { actor, targetId, at: targetPos, amount: 0, reason: 'full_health' }); } catch (e) { console.debug('[spells] emit spell:heal failed:', e); }
+    return;
+  }
+
+  // Calculate heal amount: 20-35 based on intelligence (if available)
+  const brain = /** @type any */ (world.get(actor, Brain));
+  const intBonus = brain?.intelligence ? Math.floor((brain.intelligence - 10) / 2) : 0;
+  const healSalt = (((apos.x | 0) & 0xffff) << 16) ^ ((apos.y | 0) & 0xffff);
+  const r = mulberry32(combatSeed(world.seed, world.step, actor, targetId, healSalt));
+  const baseHeal = 20 + (r() * 16) | 0; // 20-35
+  const amount = Math.max(1, baseHeal + intBonus);
+
+  // Apply healing
+  const oldHp = vit.hp | 0;
+  vit.hp = Math.min(vit.maxHp | 0, oldHp + amount);
+  const actualHeal = vit.hp - oldHp;
+
+  // Emit events
+  try { world.emit && world.emit('healed', { id: targetId, amount: actualHeal }); } catch (e) { console.debug('[spells] emit healed failed:', e); }
+  try { world.emit && world.emit('spell:heal', { actor, targetId, at: targetPos, amount: actualHeal }); } catch (e) { console.debug('[spells] emit spell:heal failed:', e); }
 };
 
 /**

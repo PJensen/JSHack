@@ -32,6 +32,7 @@ import {
   DungeonMushrooms, IronOre, CoalOre, StoneChip,
 } from "../../archetypes/Food.js";
 import { Monster } from "../../archetypes/Creatures.js";
+import { equipMonster } from "../../environment/dungeon/populate.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
@@ -536,18 +537,29 @@ export const INTERACT_PAYLOADS = {
         name = "Skeleton Warrior";  identity = "skeleton_warrior";
         maxHp = 20; attackDerived = 8;  defenseDerived = 4;  naturalDamageDice = "1d8"; count = 1;
       } else {
-        name = "Skeleton";          identity = "skeleton";
-        maxHp = 12; attackDerived = 4;  defenseDerived = 2;  naturalDamageDice = "1d6"; count = 1;
+        // ~33% chance of a skeleton archer at low depths
+        const seed = combatSeed(world.seed, world.step, targetId, 0x5A5C);
+        const isArcher = (mulberry32(seed)() < 0.33);
+        if (isArcher) {
+          name = "Skeleton Archer"; identity = "skeleton_archer";
+          maxHp = 6;  attackDerived = 2;  defenseDerived = 0;  naturalDamageDice = "1d4"; count = 1;
+        } else {
+          name = "Skeleton";        identity = "skeleton";
+          maxHp = 12; attackDerived = 4;  defenseDerived = 2;  naturalDamageDice = "1d6"; count = 1;
+        }
       }
 
       for (let i = 0; i < count; i++) {
         // Scatter multi-spawns so they don't stack on the same tile.
         const ox = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1);
-        createFrom(world, Monster, {
+        const eid = createFrom(world, Monster, {
           x: pos.x + ox, y: pos.y,
           name, identity, faction: "enemy",
           maxHp, attackDerived, defenseDerived, naturalDamageDice, speed: 1,
         });
+        if (identity === "skeleton_archer") {
+          equipMonster(world, eid, { ranged: "bow_short", ammo: "arrows" });
+        }
       }
 
       world.emit?.("sarcophagus:opened", { actor, targetId, depth, spawned: count });

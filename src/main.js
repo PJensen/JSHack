@@ -104,7 +104,7 @@ import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
-import { createRng } from "./lib/ecs-js/rng.js";
+import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
 import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
@@ -168,7 +168,7 @@ function finishBoot() {
 updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
 
 // ---- App wires rules/ (no display logic here) ------------------------------
-const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xa77a77;
+const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xC0FFEE;
 const world = new World({ seed: _bootSeed });
 configureWorld(world);
 bootAdvance("Configured ECS systems");
@@ -259,7 +259,11 @@ function isSimUiBlocked() { return throwFx.isBlocking(); }
 const spellCtrl = createActiveSpellController(world);
 
 // Initialize HUD feed updaters with stamina support
-const hudFeeds = createHudFeeds(world, { getPlayerMana: spellCtrl.getPlayerMana });
+const hudFeeds = createHudFeeds(world, {
+  getPlayerMana: spellCtrl.getPlayerMana,
+  ensureActiveSpell: () => spellCtrl.ensureActiveSpell(),
+  updateActiveSpellLabel: () => spellCtrl.updateActiveSpellLabel(),
+});
 
 function ensureActiveSpell() {
   const id = spellCtrl.ensureActiveSpell();
@@ -336,7 +340,7 @@ const _bootDungeonBase = _bootDoneUnits;
 updateBootProgress(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
 
 // Initialize the procedural dungeon (entire floor generated up front)
-const spawnPos = initDungeon(world, {
+let spawnPos = initDungeon(world, {
   startDepth: _startDepth,
   tombstoneRepo,
   onProgress: (progress) => {
@@ -390,6 +394,22 @@ if (_pendingSavegame) {
 // initializes deity, then starts the simulation and render loop.
 function _finalizeNewGame(classData) {
   const classDef = classData ? getClass(classData.classId) : null;
+
+  // If the player chose a different seed, regenerate the world
+  if (classData && typeof classData.seed === 'number') {
+    const chosenSeed = classData.seed >>> 0;
+    if (chosenSeed !== (world.seed >>> 0)) {
+      // Re-seed the world RNG
+      world.seed = chosenSeed;
+      world.rand = mulberry32(chosenSeed);
+      // Destroy all existing entities (the pre-generated dungeon)
+      for (const id of Array.from(world.alive)) world.destroy(id);
+      // Re-init gem pricing with the new seed
+      initGemPricing(createRng(world.seed ^ 0x6E45));
+      // Regenerate the dungeon
+      spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
+    }
+  }
 
   if (!_savegameLoaded) {
     const stats = classDef?.stats ?? {};
@@ -447,6 +467,7 @@ function _finalizeNewGame(classData) {
         if (classDef.equipment.weapon) eq.weapon = addStarterItem(classDef.equipment.weapon) || null;
         if (classDef.equipment.armor) eq.armor = addStarterItem(classDef.equipment.armor) || null;
         if (classDef.equipment.shield) eq.shield = addStarterItem(classDef.equipment.shield) || null;
+        if (classDef.equipment.feet) eq.feet = addStarterItem(classDef.equipment.feet) || null;
       }
       if (classDef) {
         for (const { itemId, count } of classDef.inventoryItems) {
@@ -459,6 +480,7 @@ function _finalizeNewGame(classData) {
         if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
         const filtered = brain.learnedSpellIds.filter((id) => id !== classDef.startingSpell);
         brain.learnedSpellIds = [classDef.startingSpell, ...filtered];
+        setActiveSpell(classDef.startingSpell);
       }
     }
 
@@ -824,6 +846,23 @@ addEventListener('keydown', (ev) => {
     }
   }
 }, { capture: true });
+
+// When user taps "Open Chest" on the ground tooltip
+addEventListener('ui:tapOpenChest', (e) => {
+  if (isSimUiBlocked()) return;
+  const chestId = Number(e.detail?.chestId || 0) | 0;
+  if (!(chestId > 0)) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const chestInv = world.get(chestId, Inventory);
+  try {
+    world.emit?.('chest:open', {
+      actor: pe.id,
+      targetId: chestId,
+      chestItems: [...(chestInv?.items || [])],
+    });
+  } catch (err) { console.debug('[main] emit chest:open failed:', err); }
+});
 
 // When user selects items from the pickup chooser overlay
 addEventListener('ui:requestPickup', (e) => {
@@ -1867,7 +1906,7 @@ const _torchEmitters    = new Set();
 const _STATUS_EMITTER_CFG = {
   burning:  { tracker: _burningEmitters, prefix: 'burn',    cfg: { rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5,  speed: 0.8,  speedJitter: 0.4,  ax: 0, ay: -0.5,  life: 0.7,  lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06, color: '#ff8c00', alpha0: 0.9,  alpha1: 0.0, offsetX: 0, offsetY: -0.15 } },
   bleeding: { tracker: _bleedEmitters,   prefix: 'bleed',   cfg: { rate: 14, angle:  Math.PI / 2, spread: Math.PI / 8,  speed: 0.55, speedJitter: 0.3,  ax: 0, ay:  1.2,  life: 0.9,  lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05, color: '#bb1111', alpha0: 0.9,  alpha1: 0.0 } },
-  poisoned: { tracker: _poisonEmitters,  prefix: 'poison',  cfg: { rate:  8, angle:  Math.PI / 2, spread: Math.PI / 6,  speed: 0.3,  speedJitter: 0.15, ax: 0, ay:  0.15, life: 1.0,  lifeJitter: 0.4, size: 0.12, sizeEnd: 0.04, color: '#33ff55', alpha0: 0.8,  alpha1: 0.0 } },
+  poisoned: { tracker: _poisonEmitters,  prefix: 'poison',  cfg: { rate:  4, angle:  0,            spread: Math.PI * 2,  speed: 0.15, speedJitter: 0.10, ax: 0, ay: -0.04, life: 1.6,  lifeJitter: 0.5, size: 0.08, sizeEnd: 0.03, color: '#33ff55', alpha0: 0.35, alpha1: 0.0 } },
   regen:    { tracker: _regenEmitters,   prefix: 'regen',   cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 4,  speed: 0.4,  speedJitter: 0.15, ax: 0, ay: -0.1,  life: 1.0,  lifeJitter: 0.4, size: 0.10, sizeEnd: 0.02, color: '#44ff88', alpha0: 0.7,  alpha1: 0.0 } },
   shocked:  { tracker: _shockEmitters,   prefix: 'shock',   cfg: { rate: 30, angle:  0,            spread: Math.PI * 2,  speed: 1.2,  speedJitter: 0.8,  ax: 0, ay:  0,    life: 0.2,  lifeJitter: 0.1, size: 0.10, sizeEnd: 0.02, color: '#00ccff', alpha0: 1.0,  alpha1: 0.0 } },
   frozen:   { tracker: _frozenEmitters,  prefix: 'frozen',  cfg: { rate: 15, angle:  0,            spread: Math.PI * 2,  speed: 0.22, speedJitter: 0.14, ax: 0, ay:  0.04, life: 1.8,  lifeJitter: 0.5, size: 0.12, sizeEnd: 0.04, color: '#aaeeff', alpha0: 0.6,  alpha1: 0.0 } },
@@ -2339,6 +2378,36 @@ function render(worldView) {
       bctx.fill();
       bctx.restore();
     }
+
+    // Glyph-FX: poisoned — pulsing green glow
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('poisoned')) {
+      bctx.save();
+      bctx.globalCompositeOperation = 'lighter';
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.5 + e.id * 1.3);
+      const cx = e.pos.x, cy = e.pos.y;
+      // Outer soft glow
+      const rOuter = 0.62 + 0.08 * pulse;
+      const outerGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+      const outerA = 0.30 + 0.15 * pulse;
+      outerGrad.addColorStop(0, `rgba(50,220,70,${outerA.toFixed(3)})`);
+      outerGrad.addColorStop(0.5, `rgba(40,190,55,${(outerA * 0.5).toFixed(3)})`);
+      outerGrad.addColorStop(1, 'rgba(20,140,35,0)');
+      bctx.fillStyle = outerGrad;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+      bctx.fill();
+      // Inner bright core
+      const rInner = 0.30 + 0.05 * pulse;
+      const innerGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+      const innerA = 0.35 + 0.20 * pulse;
+      innerGrad.addColorStop(0, `rgba(100,255,120,${innerA.toFixed(3)})`);
+      innerGrad.addColorStop(1, 'rgba(60,230,80,0)');
+      bctx.fillStyle = innerGrad;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+      bctx.fill();
+      bctx.restore();
+    }
   }
 
   for (let i = 0; i < deferredItems.length; i++) {
@@ -2473,6 +2542,7 @@ function frame(now) {
   hudFeeds.updateCombatHUD();
   hudFeeds.updateDepthHUD();
   hudFeeds.updatePetHUD();
+  hudFeeds.updateActiveSpellHUD();
 
   // Render
   const view = getCachedView();
@@ -2577,6 +2647,7 @@ if (_savegameLoaded) {
 
   showCharCreation({
     classes: classDisplayData,
+    defaultSeed: _bootSeed,
     onConfirm: (result) => _finalizeNewGame(result),
   });
 }

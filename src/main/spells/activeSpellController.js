@@ -31,12 +31,13 @@ export function createActiveSpellController(world) {
   function updateActiveSpellLabel() {
     const spell = activeSpellId ? getSpell(activeSpellId) : null;
     const name = spell?.name || activeSpellId || "";
+    const symbol = spell?.symbol || "";
     const cost = Number(spell?.manaCost || 0);
     const { mana } = getPlayerMana();
     const canCast = mana >= cost && !!activeSpellId;
     try {
       window.dispatchEvent(new CustomEvent("ui:updateActiveSpellLabel", {
-        detail: { id: activeSpellId, name, cost, canCast }
+        detail: { id: activeSpellId, name, symbol, cost, canCast }
       }));
     } catch (e) { console.debug('[activeSpellController] dispatch ui:updateActiveSpellLabel:', e); }
   }

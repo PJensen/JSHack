@@ -11,7 +11,7 @@ import {
   addItemEntityToInventory,
   findInventoryStackTargetByIdentity,
 } from "../../rules/utils/inventoryStacking.js";
-import { resolveItemDisplayName } from "./itemName.js";
+import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { isIdentified } from "../../rules/data/identification.js";
 import { getUnidentifiedGemValue } from "../../rules/data/gemPricing.js";
 
@@ -93,21 +93,12 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   }
 
   function buildShopItemDetail(id, markup) {
+    const base = buildItemDisplayData(world, id);
+    if (!base) return null;
     const info = world.get(id, ItemInfo);
-    if (!info) return null;
-    return {
-      id,
-      name: resolveItemDisplayName(world, id),
-      type: info.type,
-      slot: info.slot,
-      count: info.count || 1,
-      value: info.value || 0,
-      buyPrice: Math.ceil((info.value || 0) * markup),
-      rarityName: info.rarityName || "common",
-      description: info.description || "",
-      bonuses: info.bonuses || {},
-      affixes: Array.isArray(info.affixes) ? info.affixes.slice() : [],
-    };
+    base.value = info?.value || 0;
+    base.buyPrice = Math.ceil((info?.value || 0) * markup);
+    return base;
   }
 
   function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount, mode = 'browse') {
@@ -142,34 +133,19 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
           const unpaid = world.get(id, Unpaid);
           if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
             // This is an unpaid item from this shop
-            const detail = {
-              id,
-              name: resolveItemDisplayName(world, id),
-              type: info.type,
-              slot: info.slot,
-              count: info.count || 1,
-              value: info.value || 0,
-              price: unpaid.price,
-              unpaid: true,
-              rarityName: info.rarityName || "common",
-              description: info.description || "",
-            };
+            const detail = buildItemDisplayData(world, id) || { id, name: resolveItemDisplayName(world, id) };
+            detail.value = info.value || 0;
+            detail.price = unpaid.price;
+            detail.unpaid = true;
             unpaidItems.push(detail);
             totalBill += unpaid.price;
           } else if (info.type !== "currency") {
             // Regular item for selling
             const sellValue = resolveItemSellValue(id);
-            playerItems.push({
-              id,
-              name: resolveItemDisplayName(world, id),
-              type: info.type,
-              slot: info.slot,
-              count: info.count || 1,
-              value: sellValue,
-              sellPrice: Math.floor(sellValue * sellDiscount),
-              rarityName: info.rarityName || "common",
-              description: info.description || "",
-            });
+            const detail = buildItemDisplayData(world, id) || { id, name: resolveItemDisplayName(world, id) };
+            detail.value = sellValue;
+            detail.sellPrice = Math.floor(sellValue * sellDiscount);
+            playerItems.push(detail);
           }
         }
       }
