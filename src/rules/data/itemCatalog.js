@@ -741,7 +741,7 @@ export const ITEM_CATALOG = {
       on_drink: (ctx, state) => {
         const actorId = Number(state?.actor || ctx.actor || 0) | 0;
         const targetId = ctx.rules.resolveTarget(actorId);
-        const turns = ctx.helpers.int(10, 14);
+        const turns = ctx.helpers.int(30, 40);
         const potency = ctx.helpers.int(2, 3);
         ctx.helpers.addEffect(targetId, {
           key: "stoneskin",
@@ -936,10 +936,158 @@ export const ITEM_CATALOG = {
       doses: 1,
       channels: [],
       effects: [
-        { key: "stamina_regen_boost", potency: 3, onset: 0, peak: 0, duration: 10,
+        { key: "stamina_regen_boost", potency: 3, onset: 0, peak: 0, duration: 25,
           stack: "refresh", maxStacks: 1 },
       ],
       toxicity: null,
+    },
+  },
+  potion_resist_fire: {
+    id: "potion_resist_fire",
+    catalogKind: "magic",
+    name: "Potion of Fire Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "An icy draught that coats the drinker in a shimmering heat ward.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_fire",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_fire", kind: "resist_buff" },
+        });
+        ctx.io.emit("status", { id: targetId, kind: "buff", text: "FIRE RESIST", source: Number(state?.actor || ctx.actor || 0) | 0 });
+        return { resist: "fire", duration: 40 };
+      },
+    },
+  },
+  potion_resist_poison: {
+    id: "potion_resist_poison",
+    catalogKind: "magic",
+    name: "Potion of Poison Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A bitter emerald tonic that fortifies the body against toxins.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_poison",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_poison", kind: "resist_buff" },
+        });
+        ctx.io.emit("status", { id: targetId, kind: "buff", text: "POISON RESIST", source: Number(state?.actor || ctx.actor || 0) | 0 });
+        return { resist: "poison", duration: 40 };
+      },
+    },
+  },
+  potion_resist_electric: {
+    id: "potion_resist_electric",
+    catalogKind: "magic",
+    name: "Potion of Lightning Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A crackling blue elixir that grounds the drinker against electrical surges.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_electric",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_electric", kind: "resist_buff" },
+        });
+        ctx.io.emit("status", { id: targetId, kind: "buff", text: "LIGHTNING RESIST", source: Number(state?.actor || ctx.actor || 0) | 0 });
+        return { resist: "electric", duration: 40 };
+      },
+    },
+  },
+  potion_resist_acid: {
+    id: "potion_resist_acid",
+    catalogKind: "magic",
+    name: "Potion of Acid Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A thick amber syrup that shields the skin from corrosive burns.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_acid",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_acid", kind: "resist_buff" },
+        });
+        ctx.io.emit("status", { id: targetId, kind: "buff", text: "ACID RESIST", source: Number(state?.actor || ctx.actor || 0) | 0 });
+        return { resist: "acid", duration: 40 };
+      },
     },
   },
   book_lightning: {

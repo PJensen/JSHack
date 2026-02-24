@@ -151,4 +151,28 @@ export const EFFECT_DEFS = [
     operation: "stamina_restore",
     statuses: ["energized"],
   },
+  {
+    id: "resist_fire",
+    keys: ["resist_fire"],
+    operation: "none",
+    statuses: ["resist_fire"],
+  },
+  {
+    id: "resist_poison",
+    keys: ["resist_poison"],
+    operation: "none",
+    statuses: ["resist_poison"],
+  },
+  {
+    id: "resist_electric",
+    keys: ["resist_electric"],
+    operation: "none",
+    statuses: ["resist_electric"],
+  },
+  {
+    id: "resist_acid",
+    keys: ["resist_acid"],
+    operation: "none",
+    statuses: ["resist_acid"],
+  },
 ];
