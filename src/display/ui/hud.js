@@ -454,7 +454,7 @@ export function initHUD() {
     const hpf = Math.max(0, Math.min(1, hpVal / hpMax));
     const mpf = Math.max(0, Math.min(1, mpVal / mpMax));
     const stf = Math.max(0, Math.min(1, stVal / stMax));
-    vitalsGauge.set({
+    vitalsGauge.animateTo({
       health: hpf,
       mana: mpf,
       stamina: stf,
@@ -464,7 +464,7 @@ export function initHUD() {
       manaMax: mpMax,
       staminaValue: stVal,
       staminaMax: stMax,
-    });
+    }, 250);
   });
 
   // Update combat HUD details
