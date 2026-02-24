@@ -75,7 +75,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_blastwave', count: 1 },
     ],
-    startingSpell: 'blink',
+    startingSpell: 'phase_strike',
   },
 
   cleric: {

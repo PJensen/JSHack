@@ -462,7 +462,7 @@ Deno.test("altar: phase 1 emits offer prompt with inventory items", () => {
   assert(prompts[0].items.includes(itemId), 'prompt should include the offerable item');
 });
 
-Deno.test("altar: phase 2 consumes item and emits altar:offered", () => {
+Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
   const world = new World({ seed: 51 });
 
   const actor = world.create();
@@ -477,15 +477,16 @@ Deno.test("altar: phase 2 consumes item and emits altar:offered", () => {
   });
   world.get(actor, Inventory).items.push(itemId);
 
-  const offered = [];
-  world.on('altar:offered', (e) => offered.push(e));
+  const offers = [];
+  world.on('altar:offer', (e) => offers.push(e));
 
   // Phase 2: offer the selected item.
   world.add(actor, InteractIntent, { targetId: altar, mode: 'offer', itemId });
   interactionSystem(world);
 
-  assert(offered.length === 1, 'should emit altar:offered');
-  assert(offered[0].itemValue === 50, 'should report the item value');
+  assert(offers.length === 1, 'should emit altar:offer');
+  assert(offers[0].value === 0.25, 'should report normalized value (50/200)');
+  assert(offers[0].itemName === 'test', 'should report item name');
   const inv = world.get(actor, Inventory);
   assert(!inv.items.includes(itemId), 'offered item should be removed from inventory');
 });

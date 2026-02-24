@@ -3,6 +3,8 @@
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
+import { Stamina } from '../components/Stamina.js';
+import { Equipment } from '../components/Equipment.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 
@@ -68,6 +70,19 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         vit.hp = Math.min(vit.maxHp, vit.hp + amount);
         const delta = vit.hp - before;
         if (delta > 0) { try { world.emit && world.emit('healed', { id, amount: delta }); } catch {} }
+        return;
+    }
+
+    if (operation === 'stamina_restore') {
+        const stam = world.get(id, Stamina);
+        if (!stam) return;
+        const eq = world.get(id, Equipment);
+        const maxBonus = Number(eq?.maxStaminaDerived ?? 0);
+        const cap = stam.maxStamina + maxBonus;
+        const before = stam.stamina;
+        stam.stamina = Math.min(cap, stam.stamina + amount);
+        const delta = stam.stamina - before;
+        if (delta > 0) { try { world.emit && world.emit('stamina_restored', { id, amount: delta }); } catch {} }
     }
 }
 

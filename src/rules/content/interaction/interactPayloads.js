@@ -569,9 +569,12 @@ function _altarExecuteOffer(world, actor, targetId, itemId) {
     return;
   }
   const info = world.get(itemId, ItemInfo);
-  const itemValue = (info?.value || 0) * Math.max(1, info?.count || 1);
+  const rawValue = (info?.value || 0) * Math.max(1, info?.count || 1);
+  const value = Math.min(1, Math.max(0.05, rawValue > 0 ? rawValue / 200 : 0.1));
+  const itemName = info?.name || info?.description || "item";
   inv.items = inv.items.filter((id) => id !== itemId);
   try { world.destroy(itemId); } catch {}
-  world.emit?.("altar:offered", { actor, targetId, itemValue });
-  world.emit?.("prayer", { actor, distress: null, altarBonus: true, offered: true, itemValue });
+  // Emit altar:offer so the deity system records the offering and emits altar:offered.
+  world.emit?.("altar:offer", { actor, targetId, itemName, value });
+  world.emit?.("prayer", { actor, distress: null, altarBonus: true, offered: true, itemValue: value });
 }

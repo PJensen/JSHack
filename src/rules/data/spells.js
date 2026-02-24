@@ -55,6 +55,14 @@ export const SPELL_DEFS = {
     minIntelligence: 0,
     script: 'frost',
   },
+  phase_strike: {
+    id: 'phase_strike',
+    name: 'Phase Strike',
+    manaCost: 10,
+    minIntelligence: 0,
+    range: 10,
+    script: 'phase_strike',
+  },
 };
 
 /**

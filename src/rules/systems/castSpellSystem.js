@@ -32,7 +32,7 @@ function resolveConfusedCast(world, actor, intendedSpell, learnedSpellIds) {
   const confusePower = statusStrength(world, actor, "confused");
   if (confusePower <= 0) return { kind: "normal", spell: intendedSpell };
   // Blink handles confusion/hallucination inside its own targeting rules.
-  if (String(intendedSpell?.id || "") === "blink") {
+  if (String(intendedSpell?.id || "") === "blink" || String(intendedSpell?.id || "") === "phase_strike") {
     return { kind: "normal", spell: intendedSpell };
   }
 

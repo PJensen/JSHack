@@ -182,6 +182,13 @@ export class InputManager {
       return;
     }
 
+    // Deity mood graph toggle: '9'
+    if (key === '9') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:toggleDeityMoodGraph'));
+      return;
+    }
+
     // Apply tool: 'A' (Shift+A)
     if (key === "A") {
       e.preventDefault();

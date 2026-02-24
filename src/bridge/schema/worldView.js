@@ -51,6 +51,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'blessed',
 	'mindwiped',
 	'stoneskin',
+	'energized',
 	'taunted',
 	'hallucinating',
 	'intoxicated',

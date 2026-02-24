@@ -24,6 +24,11 @@ export const TILE_MOUNTAIN_B   = 13; // mid-peak     ∧
 export const TILE_MOUNTAIN_C   = 14; // high-peak    ▲
 export const TILE_WATER_DEEP   = 15; // open water   ≈
 
+// Hazard / special terrain tiles
+export const TILE_ICE            = 16; // slippery ice — instant chain slide
+export const TILE_SHALLOW_WATER  = 17; // shallow pool — extinguishes burn
+export const TILE_LAVA           = 18; // molten rock  — scorches on step
+
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 7;   // smallest BSP leaf dimension
 export const MIN_ROOM_SIZE   = 4;   // smallest room interior (excl. walls)

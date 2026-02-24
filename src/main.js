@@ -78,7 +78,7 @@ import { FloatText } from "./display/passes/vfx/text/floatText.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
 import { Devotion } from "./rules/components/Devotion.js";
-import { initDeity } from "./rules/systems/deitySystem.js";
+import { initDeity, getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { Interactable } from "./rules/components/Interactable.js";
 import { Faction } from "./rules/components/Faction.js";
@@ -232,6 +232,13 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
     requiresLOS: true,
     describePrompt(range) {
       return `Tap meteor target (LOS, range ${range}). Tap cast again or press Esc to cancel.`;
+    },
+  }),
+  phase_strike: Object.freeze({
+    fallbackRange: 10,
+    requiresLOS: false,
+    describePrompt(range) {
+      return `Choose Phase Strike destination (up to ${range} tiles). Tap a tile, or press Esc to cancel.`;
     },
   }),
 });
@@ -654,6 +661,22 @@ initPetMenu();
 initStatusLine();
 bootAdvance("Initialized HUD and overlays");
 
+// Register deity mood sampler for the debug graph (key 9).
+// The sampler closure bridges rules-layer deity data to the display-layer graph.
+window.dispatchEvent(new CustomEvent('debug:registerDeityMoodSampler', {
+  detail: {
+    sampler: () => {
+      const pe = playerEntity(world);
+      if (!pe) return null;
+      const dev = /** @type {any} */ (world.get(pe.id, Devotion));
+      if (!dev?.deityId) return null;
+      const deity = getDeityInstance(dev.deityId);
+      if (!deity) return null;
+      return deity._queryPrecise();
+    }
+  }
+}));
+
 const { buildGroundPickupDetailAt } = installInventoryDataProvider({
   world,
   getActiveSpellId: () => _activeSpellId,
@@ -897,19 +920,21 @@ world.on('item:pickup', ({ actor, itemId, count }) => {
   }
 });
 // Dispatch quick-slot notification for non-currency pickups
-world.on('item:pickup', ({ actor, itemId }) => {
+world.on('item:pickup', ({ actor, itemId, stackedIntoId }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
-  const info = world.get(itemId, ItemInfo);
+  // When stacked, the original entity is destroyed; use the surviving stack entity.
+  const resolvedId = (stackedIntoId > 0) ? stackedIntoId : itemId;
+  const info = world.get(resolvedId, ItemInfo);
   if (!info || info.type === 'currency') return;
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
         item: {
-          id: Number(itemId),
+          id: Number(resolvedId),
           type: info.type || 'item',
           slot: info.slot || '',
-          name: resolveItemDisplayName(world, itemId),
+          name: resolveItemDisplayName(world, resolvedId),
           count: info.count || 1
         }
       }
@@ -2196,8 +2221,8 @@ function render(worldView) {
       g.restore();
     }
 
-    // Glyph-FX: spinning 4-point stars above confused entities
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('confused')) {
+    // Glyph-FX: spinning 4-point stars above confused/stunned entities
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && (e.tags.includes('confused') || e.tags.includes('stunned'))) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       bctx.lineWidth = 0.035;
@@ -2246,6 +2271,7 @@ function render(worldView) {
   if (bctx) spellAreaFx.drawMeteor(bctx);
   if (bctx) spellAreaFx.drawBlastwave(bctx);
   if (bctx) spellAreaFx.drawFrost(bctx);
+  if (bctx) spellAreaFx.drawPhaseStrike(bctx);
   if (bctx) projectileFx.draw(bctx);
   if (bctx) cloudFx.drawPoison(bctx);
   if (bctx) cloudFx.drawPlasma(bctx);

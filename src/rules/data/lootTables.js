@@ -48,6 +48,19 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "sub:potions": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "archetype", weight: 30, archetype: "HealthPotion" },
+      { type: "item",      weight: 18, itemId: "potion_vigor" },
+      { type: "item",      weight: 20, itemId: "potion_endurance" },
+      { type: "item",      weight: 15, itemId: "potion_second_wind" },
+      { type: "item",      weight: 12, itemId: "potion_adrenaline" },
+      { type: "item",      weight: 10, itemId: "potion_stoneskin" },
+      { type: "item",      weight: 7,  itemId: "potion_poison" },
+    ],
+  },
+
   "sub:scrolls": {
     rolls: { min: 1, max: 1 },
     entries: [
@@ -96,7 +109,8 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 50 },
       { type: "gold",      weight: 30, count: { base: 5, perDepth: 2 } },
-      { type: "archetype", weight: 25, archetype: "HealthPotion" },
+      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 12, tableId: "sub:potions" },
       { type: "table",     weight: 20, tableId: "sub:equip_common" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "archetype", weight: 10, archetype: "Ration" },
@@ -108,13 +122,12 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 35 },
       { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
-      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 18, tableId: "sub:potions" },
       { type: "table",     weight: 15, tableId: "sub:equip_common" },
       { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "ring_health", "ring_fire_resist", "ring_poison_resist", "warhammer", "venomfang_dagger", "ring_endurance"], affixChance: 0.20, affixCountMax: 1 },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:wands" },
-      { type: "item",      weight: 8,  itemId: "potion_stoneskin" },
       { type: "archetype", weight: 8,  archetype: "Ration" },
     ],
   },
@@ -123,7 +136,7 @@ export const LOOT_TABLES = {
     rolls: { min: 2, max: 3 },
     entries: [
       { type: "gold",      weight: 20, count: { base: 15, perDepth: 5 } },
-      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 18, tableId: "sub:potions" },
       { type: "table",     weight: 20, tableId: "sub:equip_magic" },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
@@ -137,7 +150,7 @@ export const LOOT_TABLES = {
     rolls: { min: 3, max: 5 },
     entries: [
       { type: "gold",      weight: 15, count: { base: 30, perDepth: 8 } },
-      { type: "archetype", weight: 10, archetype: "HealthPotion" },
+      { type: "table",     weight: 15, tableId: "sub:potions" },
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
       { type: "table",     weight: 20, tableId: "sub:spellbooks" },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
@@ -195,14 +208,13 @@ export const LOOT_TABLES = {
     rolls: { min: 2, max: 4 },
     entries: [
       { type: "gold",      weight: 25, count: { base: 8, perDepth: 3 } },
-      { type: "archetype", weight: 20, archetype: "HealthPotion" },
+      { type: "table",     weight: 20, tableId: "sub:potions" },
       { type: "table",     weight: 15, tableId: "sub:equip_common" },
       { type: "archetype", weight: 10, archetype: "ArrowsStack" },
       { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
       { type: "table",     weight: 5,  tableId: "sub:wands" },
-      { type: "item",      weight: 10, itemId: "potion_stoneskin" },
       { type: "archetype", weight: 10, archetype: "Ration" },
       { type: "gem",       weight: 4,  materials: ["gemstone", "glass"] },
     ],
@@ -213,7 +225,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "gold",      weight: 20, count: { base: 15, perDepth: 5 } },
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
-      { type: "archetype", weight: 15, archetype: "HealthPotion" },
+      { type: "table",     weight: 18, tableId: "sub:potions" },
       { type: "table",     weight: 15, tableId: "sub:spellbooks" },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "equip",     weight: 10, pool: ["axe_heavy", "chain_armor", "shield_iron", "shield_fireward", "warhammer", "venomfang_dagger", "leadweave_mantle", "shield_spiked_pavise"],
@@ -262,7 +274,7 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "gold",      weight: 30, count: { base: 5, perDepth: 2 } },
-      { type: "archetype", weight: 22, archetype: "HealthPotion" },
+      { type: "table",     weight: 22, tableId: "sub:potions" },
       { type: "table",     weight: 18, tableId: "sub:equip_common" },
       { type: "archetype", weight: 10, archetype: "ArrowsStack" },
       { type: "archetype", weight: 5,  archetype: "FireArrowsStack" },
@@ -277,7 +289,7 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "gold",      weight: 35, count: { base: 10, perDepth: 4 } },
-      { type: "archetype", weight: 20, archetype: "HealthPotion" },
+      { type: "table",     weight: 22, tableId: "sub:potions" },
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },

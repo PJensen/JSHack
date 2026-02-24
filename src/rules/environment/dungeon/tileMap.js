@@ -7,24 +7,28 @@ import {
   TILE_STAIR_DOWN, TILE_STAIR_UP, TILE_GRASS, TILE_MOUNTAIN, TILE_TREE,
   TILE_GRASS_A, TILE_GRASS_C, TILE_GRASS_D,
   TILE_MOUNTAIN_B, TILE_MOUNTAIN_C,
+  TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
 } from './constants.js';
 
 // chunk key: "cx,cy" -> Uint8Array (the chunk.tiles reference)
 const _chunks = new Map();
 
 // Precomputed walkability per tile type (indexed by TILE_* constants)
-const _walkable = new Uint8Array(16);
-_walkable[TILE_FLOOR]      = 1;
-_walkable[TILE_DOOR]       = 1; // floor underneath; door entity Collider overrides
-_walkable[TILE_STAIR_DOWN] = 1;
-_walkable[TILE_STAIR_UP]   = 1;
-_walkable[TILE_GRASS]      = 1;
-_walkable[TILE_GRASS_A]    = 1;
-_walkable[TILE_GRASS_C]    = 1;
-_walkable[TILE_GRASS_D]    = 1;
+const _walkable = new Uint8Array(32);
+_walkable[TILE_FLOOR]         = 1;
+_walkable[TILE_DOOR]          = 1; // floor underneath; door entity Collider overrides
+_walkable[TILE_STAIR_DOWN]    = 1;
+_walkable[TILE_STAIR_UP]      = 1;
+_walkable[TILE_GRASS]         = 1;
+_walkable[TILE_GRASS_A]       = 1;
+_walkable[TILE_GRASS_C]       = 1;
+_walkable[TILE_GRASS_D]       = 1;
+_walkable[TILE_ICE]           = 1;
+_walkable[TILE_SHALLOW_WATER] = 1;
+_walkable[TILE_LAVA]          = 1;
 
 // Precomputed opacity per tile type
-const _opaque = new Uint8Array(16);
+const _opaque = new Uint8Array(32);
 _opaque[TILE_WALL]       = 1;
 _opaque[TILE_MOUNTAIN]   = 1;
 _opaque[TILE_MOUNTAIN_B] = 1;

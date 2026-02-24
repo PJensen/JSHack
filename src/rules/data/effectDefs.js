@@ -5,13 +5,14 @@ export const EFFECT_OPERATION_IDS = Object.freeze([
   "none",
   "damage",
   "heal",
+  "stamina_restore",
 ]);
 
 /**
  * @typedef {{
  *   id: string,
  *   keys: string[],
- *   operation: "none" | "damage" | "heal",
+ *   operation: "none" | "damage" | "heal" | "stamina_restore",
  *   statuses: string[],
  * }} EffectDef
  */
@@ -137,5 +138,17 @@ export const EFFECT_DEFS = [
     keys: ["berserk", "berserking"],
     operation: "none",
     statuses: ["berserk"],
+  },
+  {
+    id: "stamina_restore",
+    keys: ["stamina_restore"],
+    operation: "stamina_restore",
+    statuses: ["energized"],
+  },
+  {
+    id: "stamina_regen_boost",
+    keys: ["stamina_regen_boost"],
+    operation: "stamina_restore",
+    statuses: ["energized"],
   },
 ];

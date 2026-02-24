@@ -9,6 +9,7 @@ import { Collider } from "../components/Collider.js";
 import { Material } from "../components/Material.js";
 import { Inventory } from "../components/Inventory.js";
 import { HarvestNode } from "../components/HarvestNode.js";
+import { Pushable } from "../components/Pushable.js";
 
 // --- Interactive features ---
 
@@ -47,6 +48,7 @@ export const Statue = defineArchetype(
   [NamedIdentity, { name: "Statue", identity: "statue" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: true }],
+  [Pushable],
 );
 
 export const Sarcophagus = defineArchetype(
