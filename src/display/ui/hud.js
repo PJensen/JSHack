@@ -295,6 +295,7 @@ export function initHUD() {
   const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
+      position: 'relative',
       minHeight: '44px',
       minWidth: '44px',
       fontSize: '22px',
@@ -311,6 +312,7 @@ export function initHUD() {
   const setMobileLabel = (btn, text) => { btn.dataset.mobileLabel = String(text || ''); };
   const setDesktopIcon = (btn, text) => { btn.dataset.desktopIcon = String(text || ''); };
   const setMobileIcon = (btn, text) => { btn.dataset.mobileIcon = String(text || ''); };
+  const setBarLabel = (btn, text) => { btn.dataset.barLabel = String(text || ''); };
   const refreshCommandLabels = () => {
     const isMobile = mobileLayoutMq.matches;
     for (const btn of commandButtons) {
@@ -319,7 +321,30 @@ export function initHUD() {
       const desktopIcon = String(btn.dataset.desktopIcon || btn.textContent || '');
       const mobileIcon = String(btn.dataset.mobileIcon || desktopIcon);
       const visibleText = isMobile ? mobileText : desktopText;
-      btn.textContent = isMobile ? mobileIcon : desktopIcon;
+      const icon = isMobile ? mobileIcon : desktopIcon;
+      const barLabel = btn.dataset.barLabel || '';
+      btn.textContent = '';
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = icon;
+      iconSpan.style.lineHeight = '1';
+      btn.appendChild(iconSpan);
+      if (barLabel) {
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = barLabel;
+        Object.assign(labelSpan.style, {
+          position: 'absolute',
+          bottom: '2px',
+          left: '0',
+          right: '0',
+          textAlign: 'center',
+          fontSize: '9px',
+          lineHeight: '1',
+          opacity: '0.7',
+          letterSpacing: '0.3px',
+          pointerEvents: 'none',
+        });
+        btn.appendChild(labelSpan);
+      }
       btn.title = desktopText || visibleText || '';
       btn.setAttribute('aria-label', desktopText || visibleText || 'Action');
     }
@@ -339,6 +364,13 @@ export function initHUD() {
   setDesktopIcon(throwBtn, ACTION_ICONS.throw); setMobileIcon(throwBtn, ACTION_ICONS.throw);
   setDesktopIcon(engraveBtn, ACTION_ICONS.engrave); setMobileIcon(engraveBtn, ACTION_ICONS.engrave);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
+  setBarLabel(invBtn, 'Bag');
+  setBarLabel(petBtn, 'Pet');
+  setBarLabel(castBtn, 'Cast');
+  setBarLabel(shootBtn, 'Shoot');
+  setBarLabel(throwBtn, 'Throw');
+  setBarLabel(engraveBtn, 'Engrave');
+  setBarLabel(prayBtn, 'Pray');
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
@@ -396,7 +428,7 @@ export function initHUD() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const exists = Boolean(e?.detail?.exists);
-    petBtn.style.display = exists ? '' : 'none';
+    petBtn.style.display = exists ? 'grid' : 'none';
   });
   // Update button based on pet state
   window.addEventListener('ui:updatePetButton', (ev) => {
