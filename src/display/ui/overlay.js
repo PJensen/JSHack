@@ -2,6 +2,7 @@
 // Minimal UI overlays for inventory and message log; display-only.
 
 import { ensureMemoryGraph } from './memoryGraph.js';
+import { createDebugGraph } from './debugGraph.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 
@@ -64,6 +65,27 @@ export function initOverlays() {
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
   const memoryGraph = ensureMemoryGraph(root);
+  const deityGraph = createDebugGraph({
+    id: 'deity-mood-graph-layer',
+    title: 'Deity Mood',
+    width: 240,
+    height: 160,
+    position: { left: '8px', bottom: '204px' },
+    zIndex: 910,
+    series: [
+      { key: 'wrath',     color: '#ff4444', label: 'Wrath' },
+      { key: 'serenity',  color: '#4488ff', label: 'Serenity' },
+      { key: 'hunger',    color: '#ff8800', label: 'Hunger' },
+      { key: 'amusement', color: '#44cc44', label: 'Amusement' },
+      { key: 'sorrow',    color: '#aa44ff', label: 'Sorrow' },
+      { key: 'chaos',     color: '#ff44ff', label: 'Chaos' },
+    ],
+    maxPoints: 60,
+    sampleInterval: 1000,
+    normalizedY: true,
+    unavailableMessage: 'No deity data',
+  });
+  root.appendChild(deityGraph.canvas);
   const deathLog = ensurePanel('deathLog');
   const bookReader = ensurePanel('bookReader');
   const deathScreen = ensureDeathScreen(root);
@@ -98,6 +120,21 @@ export function initOverlays() {
       memoryGraph.startSampling();
     }
   });
+  // Toggle deity mood graph
+  window.addEventListener('ui:toggleDeityMoodGraph', () => {
+    if (deityGraph.canvas.style.display === 'block') {
+      deityGraph.hide();
+      deityGraph.stopSampling();
+    } else {
+      deityGraph.show();
+      deityGraph.startSampling();
+    }
+  });
+  // Late-bind deity mood sampler from main.js
+  window.addEventListener('debug:registerDeityMoodSampler', (ev) => {
+    const fn = /** @type {CustomEvent} */ (ev).detail?.sampler;
+    if (typeof fn === 'function') deityGraph.setSampler(fn);
+  });
   window.addEventListener('ui:openMessageLog', () => {
     show(log);
     // Request messages; app may respond with ui:messageLogData
@@ -119,10 +156,14 @@ export function initOverlays() {
       hide(applyPanel);
       hide(deathLog);
       hide(bookReader);
-      // Close memory graph
+      // Close debug graphs
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
         memoryGraph.stopSampling();
+      }
+      if (deityGraph.canvas.style.display === 'block') {
+        deityGraph.hide();
+        deityGraph.stopSampling();
       }
       if ((/** @type {any} */ (ticker))._expanded) {
         (/** @type {any} */ (ticker))._expanded = false;

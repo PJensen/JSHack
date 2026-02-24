@@ -4,6 +4,8 @@
 import { DungeonState } from '../../components/DungeonState.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
+import { Pet } from '../../components/Pet.js';
+import { PetState } from '../../components/PetState.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
@@ -80,10 +82,10 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   // Sweep orphaned floor-local entities not captured in floorEntityIds:
   // runtime-spawned monsters whose spawner was killed, web trail entities,
-  // sarcophagus skeletons, loot drops, etc. The player and DungeonState
-  // entity are permanent and must be preserved.
+  // sarcophagus skeletons, loot drops, etc. The player, DungeonState,
+  // and pet entities are permanent and must be preserved.
   for (const [eid] of world.query(Position)) {
-    if (world.has(eid, Player) || world.has(eid, DungeonState)) continue;
+    if (world.has(eid, Player) || world.has(eid, DungeonState) || world.has(eid, Pet)) continue;
     try { if (world.isAlive(eid)) destroySubtree(world, eid); } catch (_) {}
   }
 
@@ -188,6 +190,21 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   for (const [id] of world.query(Player)) {
     world.set(id, Position, { x: destinationPos.x, y: destinationPos.y });
     break;
+  }
+
+  // Move pets to destination and reset floor-specific state
+  for (const [id] of world.query(Pet, PetState)) {
+    world.set(id, Position, { x: destinationPos.x, y: destinationPos.y });
+    world.mutate(id, PetState, r => {
+      if (r.state === 'fetching' || r.state === 'returning' || r.state === 'guarding' || r.state === 'staying') {
+        r.state = 'following';
+      }
+      r.targetX = null;
+      r.targetY = null;
+      r.targetItemId = 0;
+      r.lastPlayerX = destinationPos.x;
+      r.lastPlayerY = destinationPos.y;
+    });
   }
 
   world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });

@@ -36,7 +36,11 @@ import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { addItemEntityToInventory } from '../../utils/inventoryStacking.js';
-import { CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
+import {
+  CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
+  TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
+} from './constants.js';
+import { setTile, getTile } from './tileMap.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { isIdentified } from '../../data/identification.js';
 import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
@@ -184,8 +188,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       });
     }
 
-    // Trap density: ~1 per 20-35 floor tiles
-    const trapBudget = Math.max(1, Math.floor(area / rng.int(20, 35)));
+    // Trap density: ~1 per 30-50 floor tiles
+    const trapBudget = Math.max(1, Math.floor(area / rng.int(30, 50)));
     for (let i = 0; i < trapBudget; i++) {
       const tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
@@ -200,6 +204,34 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const d = floorPlan.depth;
       const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
       spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
+    }
+
+    // Hazard tile patches — paint ice / shallow water / lava near room center
+    if (!isEntryRoom && room.w >= 4 && room.h >= 4) {
+      const depth = floorPlan.depth;
+      const patchTile =
+        depth >= 12 && rng.next() < 0.05 ? TILE_LAVA :
+        depth >= 8  && rng.next() < 0.08 ? TILE_SHALLOW_WATER :
+        depth >= 3  && rng.next() < 0.08 ? TILE_ICE :
+        0;
+      if (patchTile) {
+        const pcx = room.x + Math.floor(room.w / 2);
+        const pcy = room.y + Math.floor(room.h / 2);
+        const painted = [];
+        // Diamond/cross pattern: center + cardinal neighbors (3-5 tiles)
+        const offsets = [[0,0], [-1,0], [1,0], [0,-1], [0,1]];
+        for (const [ox, oy] of offsets) {
+          const px = pcx + ox;
+          const py = pcy + oy;
+          if (px >= room.x && px < room.x + room.w &&
+              py >= room.y && py < room.y + room.h) {
+            painted.push({ x: px, y: py, tile: patchTile });
+          }
+        }
+        if (painted.length > 0) {
+          spawns.push({ x: 0, y: 0, kind: 'tile_paint', params: { tiles: painted } });
+        }
+      }
     }
   }
 
@@ -603,6 +635,16 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, Web, { x: spawn.x, y: spawn.y });
     case 'torch':
       return createFrom(world, Torch, { x: spawn.x, y: spawn.y });
+    case 'tile_paint': {
+      const tiles = /** @type {any} */ (spawn.params)?.tiles;
+      if (Array.isArray(tiles)) {
+        for (const t of tiles) {
+          // Only paint over floor tiles to avoid overwriting doors/stairs
+          if (getTile(t.x, t.y) === TILE_FLOOR) setTile(t.x, t.y, t.tile);
+        }
+      }
+      return null;
+    }
     default:
       return null;
   }

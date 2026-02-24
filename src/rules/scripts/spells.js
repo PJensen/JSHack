@@ -18,6 +18,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Physiology } from "../components/Physiology.js";
 import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
+import { bresenhamLine } from "../../shared/math/bresenham.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
@@ -242,6 +243,129 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
       range: maxRange,
     });
   } catch (e) { console.debug('[spells] emit spell:blink failed:', e); }
+};
+
+// Phase Strike — offensive blink that damages and stuns enemies along the teleport path.
+REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const from = { x: apos.x | 0, y: apos.y | 0 };
+  const maxRange = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 10);
+  const confusedPower = statusStrength(world, actor, "confused");
+  const hallucinPower = (
+    statusStrength(world, actor, "hallucinating")
+    + statusStrength(world, actor, "hallucination")
+    + statusStrength(world, actor, "hallucinated")
+    + statusStrength(world, actor, "mindwiped")
+  );
+  const randomized = confusedPower > 0 || hallucinPower > 0;
+
+  let requested = null;
+  if (randomized) {
+    const posSalt = (((from.x & 0xffff) << 16) ^ (from.y & 0xffff)) >>> 0;
+    const r = mulberry32(combatSeed(world.seed, world.step, actor, posSalt, 0xB11E7));
+    const [dx, dy] = BLINK_DIRS[(r() * BLINK_DIRS.length) | 0];
+    const dist = 1 + ((r() * maxRange) | 0);
+    requested = { x: from.x + dx * dist, y: from.y + dy * dist };
+  } else {
+    const tx = Number(intent?.x);
+    const ty = Number(intent?.y);
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
+      try { world.emit && world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange }); } catch (e) { console.debug('[spells] emit spell:phase_strike:failed failed:', e); }
+      return;
+    }
+    requested = { x: tx | 0, y: ty | 0 };
+  }
+
+  const requestedDist = chebyshev(from, requested);
+  if (requestedDist <= 0 || requestedDist > maxRange) {
+    try { world.emit && world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange }); } catch (e) { console.debug('[spells] emit spell:phase_strike:failed failed:', e); }
+    return;
+  }
+
+  const landing = findNearestValidTileAround(world, requested, {
+    maxDistance: 1,
+    exclude: [from],
+  });
+  if (!landing) {
+    try { world.emit && world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange }); } catch (e) { console.debug('[spells] emit spell:phase_strike:failed failed:', e); }
+    return;
+  }
+
+  const landingDist = chebyshev(from, landing);
+  if (landingDist <= 0 || landingDist > maxRange) {
+    try { world.emit && world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange }); } catch (e) { console.debug('[spells] emit spell:phase_strike:failed failed:', e); }
+    return;
+  }
+
+  // Build a spatial lookup of living enemies on this floor
+  /** @type {Map<string, Array<{id:number, x:number, y:number}>>} */
+  const enemyByTile = new Map();
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || fac.key !== 'enemy') continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const key = (p.x | 0) + ',' + (p.y | 0);
+    let list = enemyByTile.get(key);
+    if (!list) { list = []; enemyByTile.set(key, list); }
+    list.push({ id, x: p.x | 0, y: p.y | 0 });
+  }
+
+  // Walk the Bresenham line and collect hit enemies (no duplicates)
+  const STRIKE_DMG = 6;
+  const STUN_TURNS = 3;
+  /** @type {Array<{id:number, x:number, y:number}>} */
+  const hits = [];
+  const hitIds = new Set();
+  for (const [bx, by] of bresenhamLine(from.x, from.y, landing.x | 0, landing.y | 0)) {
+    const list = enemyByTile.get(bx + ',' + by);
+    if (!list) continue;
+    for (const ent of list) {
+      if (hitIds.has(ent.id)) continue;
+      hitIds.add(ent.id);
+      hits.push(ent);
+    }
+  }
+
+  // Teleport the actor
+  world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
+  try { world.emit && world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } }); } catch (e) { console.debug('[spells] emit moved failed:', e); }
+
+  // Apply damage and stun to each hit enemy
+  for (const h of hits) {
+    dealDamage(world, { target: h.id, amount: STRIKE_DMG, source: actor, type: 'physical', cause: 'spell:phase_strike', at: { x: h.x, y: h.y } });
+    // Apply stun via ActiveEffects
+    let ae = /** @type any */ (world.get(h.id, ActiveEffects));
+    if (!ae) {
+      try { world.add(h.id, ActiveEffects, { effects: [] }); } catch {}
+      ae = /** @type any */ (world.get(h.id, ActiveEffects));
+    }
+    if (ae && Array.isArray(ae.effects)) {
+      const existing = ae.effects.find(/** @param {any} e */ (e) => e.key === 'stun');
+      if (existing) {
+        existing.turnsLeft = Math.max(existing.turnsLeft, STUN_TURNS);
+      } else {
+        ae.effects.push({ key: 'stun', turnsLeft: STUN_TURNS, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
+      }
+    }
+  }
+
+  try {
+    world.emit && world.emit('spell:phase_strike', {
+      actor,
+      spellId: spell.id,
+      from,
+      to: { x: landing.x | 0, y: landing.y | 0 },
+      requested,
+      hits: hits.map(h => ({ id: h.id, x: h.x, y: h.y })),
+      randomized,
+      randomReason: randomized ? (confusedPower > 0 ? "confused" : "hallucinating") : null,
+      range: maxRange,
+    });
+  } catch (e) { console.debug('[spells] emit spell:phase_strike failed:', e); }
 };
 
 // Homecoming — queues an app-level teleport request back to dungeon depth 0.

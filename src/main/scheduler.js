@@ -22,7 +22,8 @@ import { installTauntListener, tauntSteeringSystem } from "../rules/systems/taun
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
-import { movementSystem } from "../rules/systems/movementSystem.js";
+import { movementSystem, installSpiderWebListener, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
+import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
@@ -44,9 +45,31 @@ import { materialReactionSystem } from "../rules/systems/materialReactionSystem.
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
+import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
+
+/**
+ * Run all systems in a phase with _inTick temporarily set to false so
+ * structural mutations (add/remove) execute immediately rather than
+ * being deferred to end-of-tick.  Necessary for AI intent producers
+ * whose world.add(MoveIntent) must be visible to movementSystem in the
+ * same tick.  Mirrors the pattern World.tick() uses during its own
+ * post-scheduler command-queue flush (core.js _inTick toggle).
+ * @param {World} world
+ * @param {number} dt
+ * @param {string} phase
+ */
+function runPhaseImmediate(world, dt, phase) {
+  const prev = world._inTick;
+  world._inTick = false;
+  try {
+    for (const fn of getOrderedSystems(phase)) fn(world, dt);
+  } finally {
+    world._inTick = prev;
+  }
+}
 
 /**
  * @param {World} world
@@ -68,12 +91,21 @@ export function configureWorld(world) {
   installTauntListener(world);
   // Award monster maxHp to player score on kill
   installScoreListener(world);
+  // Spiders leave webs on departure (reacts to "moved" event)
+  installSpiderWebListener(world);
+  // Auto-pickup currency etc. when any actor moves onto a tile (reacts to "moved" event)
+  installMoveAutoPickupListener(world);
+  // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)
+  installTileStepEffectListener(world);
 
-  // Phase: intents (consume queued intents)
-  // Producers first (AI), then consumers (movement, interactions, etc.)
-  registerSystem(aiChaseSystem, 'intents');
-  registerSystem(petCommandSystem, 'intents'); // Process pet commands first
-  registerSystem(petBehaviorSystem, 'intents'); // Then execute pet behaviors
+  // Phase: ai (intent producers — runs with immediate mutations so
+  // MoveIntents are visible to movementSystem in the same tick)
+  registerSystem(intentValidationSystem, 'ai');
+  registerSystem(aiChaseSystem, 'ai');
+  registerSystem(petCommandSystem, 'ai');
+  registerSystem(petBehaviorSystem, 'ai');
+
+  // Phase: intents (intent consumers + steering)
   registerSystem(waitSystem, 'intents');
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
@@ -128,8 +160,11 @@ export function configureWorld(world) {
   // Keep spatial index in sync after structural changes
   registerSystem(spatialIndexSystem, 'cleanup');
 
-  // Compose scheduler: order of phases matters
-  const baseScheduler = composeScheduler('intents', 'effects', 'cleanup');
+  // Compose scheduler: ai phase runs with immediate mutations, rest deferred
+  const baseScheduler = composeScheduler(
+    (w, dt) => runPhaseImmediate(w, dt, 'ai'),
+    'intents', 'effects', 'cleanup'
+  );
   const profEnabled = shouldProfileRules();
   if (!profEnabled) {
     world.setScheduler(baseScheduler);
@@ -137,8 +172,8 @@ export function configureWorld(world) {
   }
 
   // Build profiled scheduler: measure per system and per phase using high-res timer
-  /** @type {Array<'intents'|'effects'|'cleanup'>} */
-  const phases = ['intents', 'effects', 'cleanup'];
+  /** @type {Array<'ai'|'intents'|'effects'|'cleanup'>} */
+  const phases = ['ai', 'intents', 'effects', 'cleanup'];
   /** @type {Record<string, Function[]>} */
   const phaseSystems = Object.create(null);
   for (const ph of phases) phaseSystems[ph] = getOrderedSystems(ph);
@@ -154,13 +189,20 @@ export function configureWorld(world) {
       const list = phaseSystems[ph] || [];
       let phStart = performance.now();
       const sysTimes = [];
-      for (let i = 0; i < list.length; i++) {
-        /** @type {Function} */
-        const fn = /** @type any */ (list[i] || (()=>{}));
-        const s0 = performance.now();
-        fn(w, dt);
-        const s1 = performance.now();
-        sysTimes.push({ name: fn.name || `sys${i}`, ms: s1 - s0 });
+      // AI phase runs with immediate mutations (not deferred)
+      const immediate = (ph === 'ai');
+      if (immediate) w._inTick = false;
+      try {
+        for (let i = 0; i < list.length; i++) {
+          /** @type {Function} */
+          const fn = /** @type any */ (list[i] || (()=>{}));
+          const s0 = performance.now();
+          fn(w, dt);
+          const s1 = performance.now();
+          sysTimes.push({ name: fn.name || `sys${i}`, ms: s1 - s0 });
+        }
+      } finally {
+        if (immediate) w._inTick = true;
       }
       const phEnd = performance.now();
       tick.phases[ph] = { totalMs: phEnd - phStart, systems: sysTimes };

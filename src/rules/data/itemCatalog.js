@@ -4,6 +4,9 @@ import { getSpell } from "./spells.js";
 import { getGem } from "./gems.js";
 import { identify } from "./identification.js";
 import { createEatOnUseHook, createMappingOnUseHook } from "../content/items/useNativeHooks.js";
+import { Vitality } from "../components/Vitality.js";
+import { Stamina } from "../components/Stamina.js";
+import { Equipment } from "../components/Equipment.js";
 
 /**
  * @param {string} identity
@@ -832,6 +835,111 @@ export const ITEM_CATALOG = {
         });
         return { applied: true, consumedTool: true, resultType: "stonecoat" };
       },
+    },
+  },
+  potion_vigor: {
+    id: "potion_vigor",
+    catalogKind: "magic",
+    name: "Potion of Vigor",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 40,
+    description: "A crimson draught that mends wounds in a single heartbeat.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        const vit = ctx.query.get(targetId, Vitality);
+        if (!vit) return { healed: 0 };
+        const amount = Math.max(1, Math.floor(vit.maxHp * 0.25));
+        ctx.helpers.heal(targetId, amount);
+        return { healed: amount };
+      },
+    },
+  },
+  potion_adrenaline: {
+    id: "potion_adrenaline",
+    catalogKind: "magic",
+    name: "Potion of Adrenaline",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 45,
+    description: "A jolt of pure energy that instantly restores all stamina.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        const stam = ctx.query.get(targetId, Stamina);
+        if (!stam) return { restored: 0 };
+        const eq = ctx.query.get(targetId, Equipment);
+        const maxBonus = Number(eq?.maxStaminaDerived ?? 0);
+        const cap = stam.maxStamina + maxBonus;
+        const before = stam.stamina;
+        stam.stamina = cap;
+        return { restored: stam.stamina - before };
+      },
+    },
+  },
+  potion_endurance: {
+    id: "potion_endurance",
+    catalogKind: "magic",
+    name: "Potion of Endurance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 35,
+    description: "Liquid lightning that floods the muscles with stamina.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "stamina_restore", potency: 1, onset: 0, peak: 0, duration: 100,
+          stack: "refresh", maxStacks: 1 },
+      ],
+      toxicity: null,
+    },
+  },
+  potion_second_wind: {
+    id: "potion_second_wind",
+    catalogKind: "magic",
+    name: "Potion of Second Wind",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 50,
+    description: "A cool teal elixir that quickens stamina recovery for several turns.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "stamina_regen_boost", potency: 3, onset: 0, peak: 0, duration: 10,
+          stack: "refresh", maxStacks: 1 },
+      ],
+      toxicity: null,
     },
   },
   book_lightning: {

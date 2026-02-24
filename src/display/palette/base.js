@@ -46,9 +46,13 @@ export const basePalette = {
   stair_up:   { glyph: "<", fg: "#ccc", glow: "#888" },
   gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
   // Potions
-  potion_health: { glyph: "🧪", fg: "#66ff99", glow: "#5cff9a" },
-  potion_poison: { glyph: "🧪", fg: "#84d26d", glow: "#4a8f3f" },
-  potion_stoneskin: { glyph: "🧪", fg: "#b0b3be", glow: "#6f7485" },
+  potion_health:      { glyph: "!", fg: "#66ff99", glow: "#5cff9a" },
+  potion_vigor:       { glyph: "!", fg: "#ff4466", glow: "#cc2244" },
+  potion_endurance:   { glyph: "!", fg: "#ffcc33", glow: "#cc9900" },
+  potion_second_wind: { glyph: "!", fg: "#44ddee", glow: "#22aacc" },
+  potion_adrenaline:  { glyph: "!", fg: "#ff8822", glow: "#cc5500" },
+  potion_poison:      { glyph: "!", fg: "#84d26d", glow: "#4a8f3f" },
+  potion_stoneskin:   { glyph: "!", fg: "#b0b3be", glow: "#6f7485" },
   // Spellbooks
   spellbook_fire: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },
   spellbook_ice: { glyph: "📘", fg: "#4da6ff", glow: "#4da6ff" },

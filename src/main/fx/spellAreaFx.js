@@ -54,6 +54,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
   /** @type {Array<{x:number, y:number, radius:number, ttl:number, max:number}>} */
   const _frostImpactFx = [];
 
+  // --- Phase Strike state ---
+  /** @type {Array<{from:{x:number,y:number}, to:{x:number,y:number}, hits:Array<{x:number,y:number}>, ttl:number, max:number, phase:number}>} */
+  const _phaseStrikeFx = [];
+
   // --- Tick ---
   /** @param {number} dt */
   function tick(dt) {
@@ -76,6 +80,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     for (let i = _frostImpactFx.length - 1; i >= 0; i--) {
       _frostImpactFx[i].ttl -= dt;
       if (_frostImpactFx[i].ttl <= 0) _frostImpactFx.splice(i, 1);
+    }
+    for (let i = _phaseStrikeFx.length - 1; i >= 0; i--) {
+      _phaseStrikeFx[i].ttl -= dt;
+      if (_phaseStrikeFx[i].ttl <= 0) _phaseStrikeFx.splice(i, 1);
     }
   }
 
@@ -283,6 +291,96 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     ctx.restore();
   }
 
+  // --- Draw: Phase Strike ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawPhaseStrike(ctx) {
+    if (!_phaseStrikeFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+
+    for (const eff of _phaseStrikeFx) {
+      const alpha = Math.max(0, Math.min(1, eff.ttl / eff.max));
+      const t = 1 - alpha;
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 18.0 + eff.phase);
+
+      const dx = eff.to.x - eff.from.x;
+      const dy = eff.to.y - eff.from.y;
+      const dist = Math.hypot(dx, dy);
+      const segments = Math.max(7, Math.min(18, Math.round(dist * 2.0)));
+      const amp = (0.06 + pulse * 0.12) * alpha;
+      const arc = jitterLine(eff.from, eff.to, segments, amp);
+
+      // Outer violet glow trail
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = `rgba(180,100,255,${(0.28 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.22;
+      pathPolyline(ctx, arc);
+      ctx.stroke();
+
+      // Inner bright violet-white core
+      ctx.strokeStyle = `rgba(230,180,255,${(0.85 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.05;
+      pathPolyline(ctx, jitterLine(eff.from, eff.to, segments + 2, amp * 0.5));
+      ctx.stroke();
+
+      // Sparks along the arc
+      const sparkEvery = Math.max(1, Math.floor(arc.length / 6));
+      for (let i = 1; i < arc.length - 1; i += sparkEvery) {
+        const p = arc[i];
+        if (!p) continue;
+        const size = 0.035 + pulse * 0.035;
+        ctx.fillStyle = `rgba(220,170,255,${(0.6 * alpha).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, size, 0, TAU);
+        ctx.fill();
+      }
+
+      // Portal rings at origin and destination (purple)
+      const fromR = 0.20 + t * 0.85 + pulse * 0.05;
+      const toR = 0.24 + t * 1.05 + pulse * 0.06;
+
+      ctx.strokeStyle = `rgba(160,80,255,${(0.65 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.08;
+      ctx.beginPath();
+      ctx.arc(eff.from.x, eff.from.y, fromR, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(eff.to.x, eff.to.y, toR, 0, TAU);
+      ctx.stroke();
+
+      // Inner portal disc fill
+      ctx.fillStyle = `rgba(200,140,255,${(0.20 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(eff.from.x, eff.from.y, Math.max(0.05, fromR * 0.42), 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(eff.to.x, eff.to.y, Math.max(0.05, toR * 0.40), 0, TAU);
+      ctx.fill();
+
+      // Impact flashes at each hit enemy position
+      for (const h of eff.hits) {
+        const flashR = 0.15 + t * 0.55 + pulse * 0.08;
+        const flashA = 0.7 * alpha;
+        // Bright violet-white flash
+        ctx.fillStyle = `rgba(240,200,255,${(flashA * 0.5).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, flashR * 0.5, 0, TAU);
+        ctx.fill();
+        // Expanding impact ring
+        ctx.strokeStyle = `rgba(200,100,255,${(flashA * 0.6).toFixed(3)})`;
+        ctx.lineWidth = 0.06;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, flashR, 0, TAU);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
   // --- Listeners ---
   function installListeners() {
     world.on('spell:blink', ({ from, to, randomized }) => {
@@ -437,7 +535,104 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         });
       }
     });
+
+    world.on('spell:phase_strike', ({ from, to, hits, randomized }) => {
+      if (!from || !to) return;
+      if (!Number.isFinite(from.x) || !Number.isFinite(from.y)) return;
+      if (!Number.isFinite(to.x) || !Number.isFinite(to.y)) return;
+
+      const src = { x: from.x, y: from.y };
+      const dst = { x: to.x, y: to.y };
+      const hitPositions = Array.isArray(hits) ? hits.map(h => ({ x: h.x, y: h.y })) : [];
+
+      _phaseStrikeFx.push({
+        from: src,
+        to: dst,
+        hits: hitPositions,
+        ttl: 0.32,
+        max: 0.32,
+        phase: Math.random() * Math.PI * 2,
+      });
+
+      // Purple particle burst at source and destination
+      const scale = PERF.quality === 'low' ? 0.7 : (PERF.quality === 'high' ? 1.2 : 1.0);
+      const burstCount = Math.max(4, Math.round(12 * scale));
+      for (const pos of [src, dst]) {
+        for (let i = 0; i < burstCount; i++) {
+          const angle = (Math.PI * 2 * i / burstCount) + (Math.random() - 0.5) * 0.4;
+          const speed = 0.5 + Math.random() * 1.4;
+          fx.pool.spawn({
+            x: pos.x + (Math.random() - 0.5) * 0.12,
+            y: pos.y + (Math.random() - 0.5) * 0.12,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 0.05,
+            ax: 0, ay: 0.12,
+            life: 0.18 + Math.random() * 0.26,
+            size0: 0.10 + Math.random() * 0.09,
+            size1: 0.02,
+            r: 180 + ((Math.random() * 50) | 0),
+            g: 80 + ((Math.random() * 60) | 0),
+            b: 255,
+            a0: 0.92, a1: 0.0,
+            rot: 0, rotVel: (Math.random() - 0.5) * 2.2,
+          });
+        }
+      }
+
+      // Violet sparkle trail along the path
+      const pdx = dst.x - src.x;
+      const pdy = dst.y - src.y;
+      const dist = Math.hypot(pdx, pdy);
+      const sparkleCount = Math.max(6, Math.min(22, Math.round(dist * 1.8)));
+      const sparkScale = PERF.quality === 'low' ? 0.6 : 1.0;
+      const sparkleCountScaled = Math.max(4, Math.round(sparkleCount * sparkScale));
+      for (let i = 0; i < sparkleCountScaled; i++) {
+        const t = (i + Math.random()) / Math.max(1, sparkleCountScaled);
+        fx.pool.spawn({
+          x: src.x + pdx * t + (Math.random() - 0.5) * 0.18,
+          y: src.y + pdy * t + (Math.random() - 0.5) * 0.18,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          ax: 0, ay: 0.04,
+          life: 0.12 + Math.random() * 0.22,
+          size0: 0.05 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 210 + ((Math.random() * 30) | 0),
+          g: 160 + ((Math.random() * 40) | 0),
+          b: 255,
+          a0: 0.75, a1: 0.0,
+          rot: 0, rotVel: 0,
+        });
+      }
+
+      // Violet impact bursts at each hit enemy
+      for (const h of hitPositions) {
+        const impactCount = Math.max(3, Math.round(8 * scale));
+        for (let i = 0; i < impactCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 0.8 + Math.random() * 1.6;
+          fx.pool.spawn({
+            x: h.x + (Math.random() - 0.5) * 0.15,
+            y: h.y + (Math.random() - 0.5) * 0.15,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            ax: 0, ay: 0.2,
+            life: 0.14 + Math.random() * 0.20,
+            size0: 0.12 + Math.random() * 0.08,
+            size1: 0.02,
+            r: 220 + ((Math.random() * 35) | 0),
+            g: 120 + ((Math.random() * 60) | 0),
+            b: 255,
+            a0: 0.95, a1: 0.0,
+            rot: Math.random() * Math.PI * 2,
+            rotVel: (Math.random() - 0.5) * 3,
+          });
+        }
+      }
+
+      startShake(cam, 5, 0.18);
+    });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, drawPhaseStrike, installListeners };
 }

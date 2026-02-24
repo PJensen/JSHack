@@ -19,6 +19,7 @@ import { Vitality } from '../components/Vitality.js';
 import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
+import { Faction } from '../components/Faction.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
 
@@ -184,6 +185,12 @@ function spendWrathDebt(world, playerId, deityId, amount) {
   else store.delete(slot);
 }
 
+const _PROFANE = /\b(damn|hell|ass|shit|fuck|crap|piss|bastard|bloody|bollocks|bugger|wanker)\b/i;
+/** @param {unknown} text */
+function _isProfane(text) {
+  return _PROFANE.test(String(text || ''));
+}
+
 /**
  * Install world-event hooks that feed the deity.
  * Called once per world instance.
@@ -236,6 +243,16 @@ function wireWorldEvents(world) {
       return;
     }
 
+    // Killing non-hostile NPCs is betrayal — shopkeepers most of all.
+    const victimFaction = world.get(victim, Faction)?.key || '';
+    if (victimFaction === 'shopkeeper') {
+      const victimName = String(world.get(victim, NamedIdentity)?.name || 'merchant');
+      deity.action('betray', { magnitude: 0.8, target: victimName });
+    } else if (victimFaction === 'neutral') {
+      const victimName = String(world.get(victim, NamedIdentity)?.name || 'innocent');
+      deity.action('betray', { magnitude: 0.5, target: victimName });
+    }
+
     const def = getDeity(deityId);
     deity.action('kill', { magnitude: 0.5, target: String(victim) });
     // War gods treat kills as implicit blood offerings (resets neglect clock)
@@ -245,7 +262,9 @@ function wireWorldEvents(world) {
   });
 
   // Heal events → deity.action('heal')
-  world.on('healed', ({ id }) => {
+  // Skip divine-source heals so miracles don't feed back into the mood ledger.
+  world.on('healed', ({ id, source }) => {
+    if (source === 'divine') return;
     const resolved = resolvePlayerDeity(world, id);
     if (!resolved) return;
     const { deity } = resolved;
@@ -307,6 +326,80 @@ function wireWorldEvents(world) {
     deity.offer('item', { value: value || 0.3, alignment: 'neutral', itemName });
     world.emit?.('altar:offered', { actor, deityName: deity.name, itemName, value });
   });
+
+  // ── Steal ─────────────────────────────────────────────────────────────────
+  // Attempted shoplifting — tried to leave with unpaid goods.
+  world.on('shop:exit-blocked', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const { deity } = resolved;
+    deity.action('steal', { magnitude: 0.6, target: 'shopkeeper' });
+    // Shoplifting is also a minor breach of the merchant's trust.
+    deity.action('betray', { magnitude: 0.3, target: 'shopkeeper' });
+  });
+
+  // ── Destroy ───────────────────────────────────────────────────────────────
+  // Chopping through terrain (trees, vegetation).
+  world.on('tile:chopped', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('destroy', { magnitude: 0.4, target: 'terrain' });
+  });
+
+  // Digging through walls and ground.
+  world.on('tile:dug', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('destroy', { magnitude: 0.4, target: 'terrain' });
+  });
+
+  // Clearing webs.
+  world.on('web:cleared', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('destroy', { magnitude: 0.15, target: 'web' });
+  });
+
+  // ── Create ────────────────────────────────────────────────────────────────
+  // Alchemy — crafting potions and reagents.
+  world.on('alchemy:crafted', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('create', { magnitude: 0.6, target: 'potion' });
+  });
+
+  // Cooking — transforming corpses into sustenance.
+  world.on('cooking:cooked', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('create', { magnitude: 0.4, target: 'food' });
+  });
+
+  // Engraving — leaving a mark on the world.
+  // Profane graffiti is vandalism: fires destroy alongside create.
+  world.on('engrave', ({ actor, text }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('create', { magnitude: 0.15, target: 'engraving' });
+    if (_isProfane(text)) {
+      resolved.deity.action('destroy', { magnitude: 0.3, target: 'graffiti' });
+    }
+  });
+
+  // Harvesting — gathering from nature.
+  world.on('harvest:picked', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('create', { magnitude: 0.2, target: 'harvest' });
+  });
+
+  // ── Protect ───────────────────────────────────────────────────────────────
+  // Disarming traps — making the dungeon safer.
+  world.on('trap:disarmed', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('protect', { magnitude: 0.5, target: 'self' });
+  });
 }
 
 /**
@@ -317,7 +410,7 @@ function wireWorldEvents(world) {
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 function wireDeityMiracles(deity, deityId, world) {
-  const cooldowns = { wrath: 0, demand: 0, utterance: 0 };
+  const cooldowns = { wrath: 0, demand: 0, utterance: 0, omen: 0 };
   const DEITY_COOLDOWN = 30;
 
   // Wrath inflicts damage and optional curses on the worshipper.
@@ -412,6 +505,12 @@ function wireDeityMiracles(deity, deityId, world) {
     if ((tick - cooldowns.demand) < DEITY_COOLDOWN) return;
     cooldowns.demand = tick;
     world.emit('deity:demand', { deityId, deityName: deity.name, tick });
+  });
+
+  deity.on('omen', ({ tick = 0 }) => {
+    if ((tick - cooldowns.omen) < DEITY_COOLDOWN) return;
+    cooldowns.omen = tick;
+    world.emit('deity:omen', { deityId, deityName: deity.name, tick });
   });
 
   deity.on('moodShift', ({ to }) => {

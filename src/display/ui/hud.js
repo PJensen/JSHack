@@ -701,9 +701,10 @@ function createQuickSlot() {
     zIndex: 901,
   });
 
-  /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number}>} */
+  /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number, addedAt:number}>} */
   const stack = [];
-  const MAX_VISIBLE = 4;
+  const MAX_CHIPS = 2;
+  const AUTO_DISMISS_MS = 12000;
 
   function actionable(it) {
     const t = String(it.type||'');
@@ -711,6 +712,16 @@ function createQuickSlot() {
     if (t === 'gem' || t === 'tool') return true;
     if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
     return false;
+  }
+
+  let dismissTimer = 0;
+  function resetDismissTimer() {
+    if (dismissTimer) clearTimeout(dismissTimer);
+    if (stack.length === 0) return;
+    dismissTimer = setTimeout(() => {
+      stack.length = 0;
+      renderStack();
+    }, AUTO_DISMISS_MS);
   }
 
   function renderStack() {
@@ -724,14 +735,19 @@ function createQuickSlot() {
       });
       el.appendChild(chip);
       shown++;
-      if (shown >= MAX_VISIBLE) break;
+      if (shown >= MAX_CHIPS) break;
     }
   }
 
   function dispatchAction(it) {
     const t = String(it.type||'');
-    if (t === 'equip' || t === 'ammo' || t === 'wand') window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-    else window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    if (t === 'equip' || t === 'ammo' || t === 'wand') {
+      window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+    } else if (t === 'potion') {
+      window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
+    }
   }
 
   function dismissTop(id) {
@@ -747,8 +763,10 @@ function createQuickSlot() {
     if (!item) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
-    stack.unshift({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1) });
+    stack.unshift({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1), addedAt: Date.now() });
+    while (stack.length > MAX_CHIPS) stack.pop();
     renderStack();
+    resetDismissTimer();
   });
 
   window.addEventListener('ui:itemEquipped', (ev) => {
@@ -757,7 +775,7 @@ function createQuickSlot() {
     const id = Number(e?.detail?.itemId || 0);
     if (!id) return;
     const idx = stack.findIndex((x) => x && x.id === id);
-    if (idx >= 0) { stack.splice(idx, 1); renderStack(); }
+    if (idx >= 0) { stack.splice(idx, 1); renderStack(); resetDismissTimer(); }
   });
 
   window.addEventListener('ui:itemUsed', (ev) => {
@@ -769,6 +787,7 @@ function createQuickSlot() {
     if (idx >= 0) {
       stack.splice(idx, 1);
       renderStack();
+      resetDismissTimer();
     }
   });
 
@@ -798,7 +817,8 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  btn.textContent = (it.type === 'equip' || it.type === 'ammo' || it.type === 'wand') ? 'Equip' : (it.type === 'food' ? 'Eat' : (it.type === 'learn' ? 'Learn' : (it.type === 'gem' ? 'Appraise' : 'Use')));
+  const ACTION_LABELS = { equip: 'Equip', ammo: 'Equip', wand: 'Equip', potion: 'Drink', food: 'Eat', scroll: 'Read', learn: 'Learn', book: 'Read', gem: 'Appraise', tool: 'Use' };
+  btn.textContent = ACTION_LABELS[it.type] || 'Use';
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   const x = document.createElement('button');

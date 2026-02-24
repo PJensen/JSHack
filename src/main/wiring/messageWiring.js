@@ -211,6 +211,38 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log('Blink fizzles.', 'system');
   });
 
+  world.on('spell:phase_strike', ({ actor, hits, randomized, randomReason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (randomized) {
+      const why = randomReason === 'confused' ? 'confused' : 'hallucinating';
+      log(`Your ${why} mind yanks the phase strike off-course.`, 'system');
+      return;
+    }
+    const hitCount = Array.isArray(hits) ? hits.length : 0;
+    if (hitCount > 0) {
+      log(`You phase through your enemies, striking ${hitCount === 1 ? 'one foe' : hitCount + ' foes'}.`, 'system');
+    } else {
+      log('You phase strike to your mark.', 'system');
+    }
+  });
+
+  world.on('spell:phase_strike:failed', ({ actor, reason, range }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'no_target') {
+      log('Phase Strike needs a destination tile.', 'system');
+      return;
+    }
+    if (reason === 'out_of_range') {
+      log(`Phase Strike destination is out of range (${Number(range || 10) | 0} tiles).`, 'system');
+      return;
+    }
+    if (reason === 'no_safe_landing') {
+      log('Phase Strike fizzles: no safe landing tile.', 'system');
+      return;
+    }
+    log('Phase Strike fizzles.', 'system');
+  });
+
   world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {

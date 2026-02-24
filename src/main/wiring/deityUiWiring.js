@@ -46,6 +46,10 @@ export function installDeityUiWiring(world, { log }) {
     logDeity(`${deityName} hungers for an offering!`);
   });
 
+  world.on("deity:omen", ({ deityName }) => {
+    logDeity(`The air around ${deityName}'s altar shimmers with foreboding.`);
+  });
+
   world.on("deity:moodShift", ({ deityName, to }) => {
     const labels = {
       wrath: "wrathful",
