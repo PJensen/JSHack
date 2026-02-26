@@ -721,12 +721,33 @@ function ensureItemTooltip(root) {
 }
 
 /**
+ * Mobile-first tooltip pinning target.
+ * Coarse pointer + smaller viewport keeps desktop behavior unchanged.
+ */
+function isMobileTooltipViewport() {
+  const coarse = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false;
+  return coarse && window.innerWidth <= 900;
+}
+
+/** @param {HTMLElement} tip */
+function resetTooltipPlacement(tip) {
+  tip.style.left = '';
+  tip.style.right = '';
+  tip.style.top = '';
+  tip.style.bottom = '';
+  tip.style.transform = '';
+}
+
+/**
  * Position the tooltip near the anchor element.
  * @param {HTMLElement} tip
  * @param {HTMLElement} anchorEl
  */
 function positionTooltip(tip, anchorEl) {
   if (!anchorEl) return;
+  resetTooltipPlacement(tip);
   const GAP = 8;
   const MARGIN = 8;
   const ar = anchorEl.getBoundingClientRect();
@@ -779,12 +800,21 @@ function positionTooltip(tip, anchorEl) {
   tip.style.top = y + 'px';
 }
 
+/** @param {HTMLElement} tip */
+function positionTooltipBottomCenter(tip) {
+  resetTooltipPlacement(tip);
+  tip.style.left = '50%';
+  tip.style.bottom = 'calc(var(--jshack-actionbar-height, 48px) + 16px + env(safe-area-inset-bottom, 0px))';
+  tip.style.transform = 'translateX(-50%)';
+}
+
 /**
  * Show the floating item tooltip near the given anchor element.
  * @param {any} item
  * @param {HTMLElement} anchorEl
+ * @param {{ pinBottomOnMobile?: boolean }} [opts]
  */
-function showItemTooltip(item, anchorEl) {
+function showItemTooltip(item, anchorEl, opts) {
   const tip = _itemTooltip;
   if (!tip) return;
   if (!item) { hideItemTooltip(); return; }
@@ -793,7 +823,13 @@ function showItemTooltip(item, anchorEl) {
   if (anchorEl && !anchorEl.offsetParent) { hideItemTooltip(); return; }
   renderItemDetails(tip, item);
   tip.style.display = 'block';
-  positionTooltip(tip, anchorEl);
+  const pinBottom = !!opts?.pinBottomOnMobile && isMobileTooltipViewport();
+  tip.style.maxWidth = pinBottom ? 'min(92vw, 460px)' : '280px';
+  if (pinBottom) {
+    positionTooltipBottomCenter(tip);
+  } else {
+    positionTooltip(tip, anchorEl);
+  }
 }
 
 function hideItemTooltip() {
@@ -1595,7 +1631,7 @@ function renderInventory(panel, items, ground) {
       ? (hasApplyTargets ? ' · A=Apply' : ' · A=Apply (no targets)')
       : '';
     hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
-    showItemTooltip(it, rows[sel]);
+    showItemTooltip(it, rows[sel], { pinBottomOnMobile: true });
     renderInventoryActions();
   }
 
