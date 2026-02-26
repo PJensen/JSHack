@@ -136,6 +136,36 @@ function hasValidFloorOverride() {
 
 const _hasFloorOverride = hasValidFloorOverride();
 const _pendingSavegame = _hasFloorOverride ? null : readSavegamePayload();
+const FIRST_RUN_DEV_NOTICE_KEY = "jshack:firstRunDevNoticeSeen:v1";
+const _shouldShowFirstRunDevNotice = consumeFirstRunDevNoticeFlag();
+let _didShowFirstRunDevNotice = false;
+
+function consumeFirstRunDevNoticeFlag() {
+  if (typeof localStorage === "undefined") return false;
+  try {
+    if (localStorage.getItem(FIRST_RUN_DEV_NOTICE_KEY) === "1") return false;
+    localStorage.setItem(FIRST_RUN_DEV_NOTICE_KEY, "1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function maybeShowFirstRunDevNotice() {
+  if (!_shouldShowFirstRunDevNotice || _didShowFirstRunDevNotice) return;
+  _didShowFirstRunDevNotice = true;
+  window.setTimeout(() => {
+    try {
+      window.dispatchEvent(new CustomEvent("ui:showDevNoticeTooltip", {
+        detail: {
+          title: "Active Development Notice",
+          body: "JSHack is under very active development. Please report bugs and share ideas for new features.",
+          closeText: "Got it",
+        },
+      }));
+    } catch (e) { console.debug('[main] dispatch ui:showDevNoticeTooltip:', e); }
+  }, 250);
+}
 
 /**
  * @param {string} label
@@ -165,6 +195,7 @@ function finishBoot() {
     const fn = /** @type {any} */ (window).__JSHACK_BOOT_DONE;
     if (typeof fn === 'function') fn();
   } catch (e) { console.debug('[main] boot done callback failed:', e); }
+  maybeShowFirstRunDevNotice();
 }
 
 updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
