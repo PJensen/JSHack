@@ -2,6 +2,7 @@ import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
+import { Vitality } from "../../components/Vitality.js";
 import { Brain } from "../../components/Brain.js";
 import { runSpellScript } from "../../scripts/spells.js";
 import { runScript } from "../../scripting.js";
@@ -171,6 +172,25 @@ export function createFacets(init) {
     },
     hasEffect(entityId, effectKey) {
       return status.hasEffect(entityId | 0, effectKey);
+    },
+    livingAt(x, y, opts = {}) {
+      const tx = Number(x) | 0;
+      const ty = Number(y) | 0;
+      const exclude = new Set(
+        Array.isArray(opts.exclude)
+          ? opts.exclude.map((id) => Number(id || 0) | 0)
+          : [],
+      );
+      const ids = [];
+      for (const [id, pos, vit] of world.query(Position, Vitality)) {
+        const eid = Number(id || 0) | 0;
+        if (exclude.has(eid)) continue;
+        if (!pos || (pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+        if (!vit || (vit.hp | 0) <= 0) continue;
+        ids.push(eid);
+      }
+      ids.sort((a, b) => a - b);
+      return ids;
     },
   });
 
