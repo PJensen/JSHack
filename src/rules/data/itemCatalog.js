@@ -8,7 +8,6 @@ import { Beatitude } from "../components/Beatitude.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
 import { Equipment } from "../components/Equipment.js";
-import { Material } from "../components/Material.js";
 
 /**
  * @param {string} identity
@@ -352,31 +351,6 @@ function createWaterPotionHooks() {
       const targetId = Number(state?.targetId || ctx.target || 0) | 0;
       const beatitude = normalizeBeatitude(ctx.query.get(toolId, Beatitude)?.state);
       const waterType = waterTypeFromBeatitude(beatitude);
-      const targetIsPotion = String(state?.targetInfo?.type || "") === "potion";
-      const targetMaterial = String(ctx.query.get(targetId, Material)?.kind || "");
-      const targetType = String(state?.targetInfo?.type || "");
-
-      let changedBeatitude = null;
-      if (targetIsPotion && waterType === "holy") changedBeatitude = "blessed";
-      if (targetIsPotion && waterType === "unholy") changedBeatitude = "cursed";
-      if (targetIsPotion && waterType === "plain") changedBeatitude = "uncursed";
-      if (changedBeatitude) {
-        ctx.helpers.setBeatitude(targetId, changedBeatitude);
-      }
-
-      const paperLike = (
-        targetMaterial === "paper"
-        || targetType === "scroll"
-        || targetType === "learn"
-      );
-      if (paperLike) {
-        ctx.io.emit("item:waterlogged", {
-          actor: actorId,
-          itemId: targetId,
-          by: toolId,
-          waterType,
-        });
-      }
 
       ctx.io.emit("item:applied", {
         actor: actorId,
@@ -385,8 +359,6 @@ function createWaterPotionHooks() {
         result: {
           type: "water_dip",
           waterType,
-          changedBeatitude,
-          waterlogged: paperLike,
         },
       });
       ctx.io.emit("water:dipped", {
@@ -394,7 +366,6 @@ function createWaterPotionHooks() {
         toolId,
         targetId,
         waterType,
-        changedBeatitude,
       });
 
       return { applied: true, consumedTool: true, resultType: "water_dip", waterType };

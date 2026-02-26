@@ -10,6 +10,7 @@ import { Inventory } from "../src/rules/components/Inventory.js";
 import { Position } from "../src/rules/components/Position.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { drinkSystem } from "../src/rules/systems/drinkSystem.js";
+import { installMaterialReactionListeners, materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 
@@ -47,6 +48,7 @@ Deno.test("water potion drink clears burn and emits semantic event", () => {
 
 Deno.test("holy water dip blesses target potion beatitude", () => {
   const world = new World({ seed: 9002 });
+  installMaterialReactionListeners(world);
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
 
@@ -66,15 +68,38 @@ Deno.test("holy water dip blesses target potion beatitude", () => {
 
   world.add(actor, ApplyIntent, { itemId: holyWater, targetItemId: targetPotion });
   applySystem(world);
+  materialReactionSystem(world);
 
   assertEquals(dipped.length, 1);
   assertEquals(String(dipped[0]?.waterType || ""), "holy");
-  assertEquals(String(dipped[0]?.changedBeatitude || ""), "blessed");
   assertEquals(applied.length, 1);
   assertEquals(String(applied[0]?.result?.type || ""), "water_dip");
-  assertEquals(String(applied[0]?.result?.changedBeatitude || ""), "blessed");
   assert(!world.isAlive(holyWater), "dip should consume the water potion");
   assertEquals(String(world.get(targetPotion, Beatitude)?.state || ""), "blessed");
+});
+
+Deno.test("water dip waterlogs paper targets via material reaction rules", () => {
+  const world = new World({ seed: 9004 });
+  installMaterialReactionListeners(world);
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+
+  const water = createItemById(world, "potion_water");
+  const scroll = createItemById(world, "scroll_mapping");
+  assert(water != null && scroll != null, "required items should be creatable");
+  const inv = world.get(actor, Inventory);
+  inv.items.push(water, scroll);
+
+  const waterlogged = [];
+  world.on("item:waterlogged", (ev) => waterlogged.push(ev));
+
+  world.add(actor, ApplyIntent, { itemId: water, targetItemId: scroll });
+  applySystem(world);
+  materialReactionSystem(world);
+
+  assert(!world.isAlive(water), "water dip should consume the potion");
+  assertEquals(waterlogged.length, 1);
+  assertEquals(Number(waterlogged[0]?.itemId || 0), scroll);
 });
 
 Deno.test("thrown water potion spawns wet splash hazard", () => {
