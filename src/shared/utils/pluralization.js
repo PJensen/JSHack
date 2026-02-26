@@ -129,6 +129,11 @@ export const PluralizationUtil = (() => {
     return UNCHANGEABLE_WORDS.has(String(word).toLowerCase());
   }
 
+  /**
+   * Converts a plural word to its singular form.
+   * @param {*} plural 
+   * @returns 
+   */
   function singularize(plural) {
     const w = String(plural);
     if (isUnchangeable(w)) return w;
@@ -139,6 +144,12 @@ export const PluralizationUtil = (() => {
     return w;
   }
 
+  /**
+   * Pluralizes a word based on the count. If count is 1, returns the singular form; otherwise, returns the plural form.
+   * @param {*} count 
+   * @param {*} singular 
+   * @returns 
+   */
   function pluralize(count, singular) {
     const w = String(singular);
     if (count === 1 || isUnchangeable(w)) return w;
@@ -157,6 +168,10 @@ export const PluralizationUtil = (() => {
 
 // Optional: C#-style extension methods on String (non-enumerable).
 export function installPluralizationExtensions() {
+  /**
+   * @param {string} name
+   * @param {Function} fn
+   */
   const define = (name, fn) => {
     if (Object.prototype.hasOwnProperty.call(String.prototype, name)) return;
     Object.defineProperty(String.prototype, name, {

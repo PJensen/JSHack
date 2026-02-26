@@ -1,6 +1,7 @@
 {
   "test": {
-    "include": ["tests/"]
+    "include": ["tests/"],
+    "preload": ["./tests/testHarness.mjs"]
   },
   "tasks": {
     "test": "deno test --no-check --allow-read tests/"

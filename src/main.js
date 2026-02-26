@@ -108,6 +108,7 @@ import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
 import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
+import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -166,6 +167,7 @@ function finishBoot() {
 }
 
 updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
+installPluralizationExtensions();
 
 // ---- App wires rules/ (no display logic here) ------------------------------
 const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xC0FFEE;
