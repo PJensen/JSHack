@@ -2173,6 +2173,41 @@ function drawGlowingTagAura(ctx, e, fxTime) {
 }
 
 /**
+ * Draw a venom-themed aura for entities tagged with `venom_glowing`.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawVenomTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.3 + e.id * 0.41);
+  const rOuter = 0.52 + 0.05 * pulse;
+  const rInner = 0.23 + 0.02 * pulse;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  outer.addColorStop(0,   `rgba(120,230,130,${(0.10 + 0.06 * pulse).toFixed(3)})`);
+  outer.addColorStop(0.58,`rgba(70,170,95,${(0.06 + 0.04 * pulse).toFixed(3)})`);
+  outer.addColorStop(1,   'rgba(30,80,40,0)');
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  inner.addColorStop(0, `rgba(210,255,190,${(0.12 + 0.10 * pulse).toFixed(3)})`);
+  inner.addColorStop(1, 'rgba(125,210,135,0)');
+  ctx.fillStyle = inner;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * @param {number} n
  */
 function clamp01(n) {
@@ -2374,6 +2409,9 @@ function render(worldView) {
     // Glyph-FX: passive glow aura for entities tagged "glowing"
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
       drawGlowingTagAura(bctx, e, _fxTime);
+    }
+    if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
+      drawVenomTagAura(bctx, e, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -2719,6 +2757,9 @@ function render(worldView) {
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
       drawGlowingTagAura(bctx, e, _fxTime);
+    }
+    if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
+      drawVenomTagAura(bctx, e, _fxTime);
     }
   }
 
