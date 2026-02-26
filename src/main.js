@@ -259,6 +259,43 @@ function getTargetedSpellConfig(spellId) {
 function computeThrowRange(weight) { return throwFx.computeThrowRange(weight); }
 function isSimUiBlocked() { return throwFx.isBlocking(); }
 
+/**
+ * Convert world-space coordinate to nearest tile center index.
+ * World uses integer-centered tile coordinates.
+ * @param {number} value
+ */
+function worldToTile(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n);
+}
+
+/**
+ * Clamp a tile target to Chebyshev range from an origin.
+ * @param {number} fromX
+ * @param {number} fromY
+ * @param {number} toX
+ * @param {number} toY
+ * @param {number} maxRange
+ */
+function clampTargetToRange(fromX, fromY, toX, toY, maxRange) {
+  const ox = Number(fromX) | 0;
+  const oy = Number(fromY) | 0;
+  const tx = Number(toX) | 0;
+  const ty = Number(toY) | 0;
+  const range = Math.max(0, Number(maxRange) | 0);
+
+  const dx = tx - ox;
+  const dy = ty - oy;
+  const dist = Math.max(Math.abs(dx), Math.abs(dy));
+  if (dist <= range || range <= 0) return { x: tx, y: ty };
+
+  const scale = range / Math.max(1, dist);
+  const cx = ox + Math.round(dx * scale);
+  const cy = oy + Math.round(dy * scale);
+  return { x: cx, y: cy };
+}
+
 const spellCtrl = createActiveSpellController(world);
 
 // Initialize HUD feed updaters with stamina support
@@ -793,10 +830,16 @@ addEventListener('keydown', (ev) => {
   };
   const dir = KEY_DIR[ev.key];
   if (dir && _targetCursor) {
+    const pe = playerEntity(world);
+    if (!pe) return;
     ev.preventDefault();
     ev.stopPropagation();
-    _targetCursor.x += dir[0];
-    _targetCursor.y += dir[1];
+    const nx = _targetCursor.x + dir[0];
+    const ny = _targetCursor.y + dir[1];
+    const activeRange = _pendingSpellTargeting?.range ?? _pendingThrowTargeting?.range ?? 0;
+    const clamped = clampTargetToRange(pe.pos.x, pe.pos.y, nx, ny, activeRange);
+    _targetCursor.x = clamped.x | 0;
+    _targetCursor.y = clamped.y | 0;
     return;
   }
 
@@ -813,15 +856,18 @@ addEventListener('keydown', (ev) => {
 
     if (_pendingSpellTargeting?.spellId) {
       const pending = _pendingSpellTargeting;
-      const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
-      if (!(dist > 0) || dist > pending.range) {
-        try { messageLog.log({ text: `${pending.spellName} target must be within ${pending.range} tiles.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+      const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
+      const finalTx = clamped.x | 0;
+      const finalTy = clamped.y | 0;
+      const dist = Math.max(Math.abs(finalTx - px), Math.abs(finalTy - py));
+      if (!(dist > 0)) {
+        try { messageLog.log({ text: `${pending.spellName} needs another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
         return;
       }
       if (pending.requiresLOS) {
         const blocked = buildBlocksVisionMap(world);
         const isBlocked = blockedCallback(blocked);
-        if (!hasLOS(px, py, tx, ty, isBlocked)) {
+        if (!hasLOS(px, py, finalTx, finalTy, isBlocked)) {
           try { messageLog.log({ text: `${pending.spellName} target must be in line of sight.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
           return;
         }
@@ -829,14 +875,17 @@ addEventListener('keydown', (ev) => {
       _pendingSpellTargeting = null;
       _targetCursor = null;
       const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-      rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: tx, y: ty } });
+      rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: finalTx, y: finalTy } });
       return;
     }
 
     if (_pendingThrowTargeting?.itemId) {
       const pending = _pendingThrowTargeting;
       if ((pending.actorId | 0) !== (pe.id | 0)) { _pendingThrowTargeting = null; _targetCursor = null; return; }
-      const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+      const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
+      const finalTx = clamped.x | 0;
+      const finalTy = clamped.y | 0;
+      const dist = Math.max(Math.abs(finalTx - px), Math.abs(finalTy - py));
       if (!(dist > 0)) {
         try { messageLog.log({ text: `${bracketizeName(pending.itemName)} must target another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
         return;
@@ -844,7 +893,7 @@ addEventListener('keydown', (ev) => {
       _pendingThrowTargeting = null;
       _targetCursor = null;
       const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-      rulesHandler({ type: 'rules.throwItem', payload: { itemId: pending.itemId, x: tx, y: ty } });
+      rulesHandler({ type: 'rules.throwItem', payload: { itemId: pending.itemId, x: finalTx, y: finalTy } });
       return;
     }
   }
@@ -1752,21 +1801,31 @@ addEventListener('ui:requestThrow', (ev) => {
   const y = Number(e?.detail?.y);
   const hasTileTarget = Number.isFinite(x) && Number.isFinite(y);
 
+  const pe = playerEntity(world);
+  if (!pe) return;
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   if (hasTileTarget || (Number.isInteger(targetId) && targetId > 0)) {
     _pendingThrowTargeting = null;
     const payload = { itemId };
     if (Number.isInteger(targetId) && targetId > 0) payload.targetId = targetId;
     if (hasTileTarget) {
-      payload.x = Math.floor(x);
-      payload.y = Math.floor(y);
+      const info = world.get(itemId, ItemInfo);
+      const range = computeThrowRange(Number(info?.weight));
+      const tileX = worldToTile(x);
+      const tileY = worldToTile(y);
+      const clamped = clampTargetToRange(pe.pos.x, pe.pos.y, tileX, tileY, range);
+      const dist = Math.max(Math.abs((clamped.x | 0) - (pe.pos.x | 0)), Math.abs((clamped.y | 0) - (pe.pos.y | 0)));
+      if (!(dist > 0)) {
+        try { messageLog.log({ text: `${bracketizeName(resolveItemDisplayName(world, itemId) || 'item')} must target another tile.`, type: 'system' }); } catch (err) { console.debug('[main] messageLog failed:', err); }
+        return;
+      }
+      payload.x = clamped.x | 0;
+      payload.y = clamped.y | 0;
     }
     rulesHandler({ type: 'rules.throwItem', payload });
     return;
   }
 
-  const pe = playerEntity(world);
-  if (!pe) return;
   const inv = world.get(pe.id, Inventory);
   if (!inv || !Array.isArray(inv.items) || !inv.items.includes(itemId)) {
     try { messageLog.log({ text: 'You are not carrying that item.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
@@ -1824,8 +1883,8 @@ canvas.addEventListener('pointerdown', (ev) => {
   }
 
   const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
-  const tx = Math.floor(wx);
-  const ty = Math.floor(wy);
+  const rawTx = worldToTile(wx);
+  const rawTy = worldToTile(wy);
 
   ev.preventDefault();
   ev.stopPropagation();
@@ -1834,11 +1893,14 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (pendingSpell?.spellId) {
     const px = pe.pos.x | 0;
     const py = pe.pos.y | 0;
+    const clamped = clampTargetToRange(px, py, rawTx, rawTy, pendingSpell.range);
+    const tx = clamped.x | 0;
+    const ty = clamped.y | 0;
     const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
-    if (!(dist > 0) || dist > pendingSpell.range) {
+    if (!(dist > 0)) {
       try {
         messageLog.log({
-          text: `${pendingSpell.spellName} target must be within ${pendingSpell.range} tiles.`,
+          text: `${pendingSpell.spellName} needs another tile.`,
           type: 'system',
         });
       } catch (e) { console.debug('[main] messageLog failed:', e); }
@@ -1883,6 +1945,9 @@ canvas.addEventListener('pointerdown', (ev) => {
 
   const px = pe.pos.x | 0;
   const py = pe.pos.y | 0;
+  const clamped = clampTargetToRange(px, py, rawTx, rawTy, pendingThrow.range);
+  const tx = clamped.x | 0;
+  const ty = clamped.y | 0;
   const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
   if (!(dist > 0)) {
     try {
@@ -2511,8 +2576,8 @@ function render(worldView) {
   // Keyboard targeting cursor reticle (world-space)
   if (bctx && _targetCursor && (_pendingSpellTargeting || _pendingThrowTargeting)) {
     bctx.save();
-    const cx = _targetCursor.x + 0.5;
-    const cy = _targetCursor.y + 0.5;
+    const cx = _targetCursor.x;
+    const cy = _targetCursor.y;
     const pulse = 0.6 + 0.4 * Math.sin(_fxTime * 6.0);
     // Outer pulsing ring
     bctx.strokeStyle = `rgba(255,220,80,${(0.7 * pulse).toFixed(3)})`;
