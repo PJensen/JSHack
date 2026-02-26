@@ -78,6 +78,13 @@ Deno.test("holy water dip blesses target potion beatitude", () => {
   assertEquals(String(world.get(targetPotion, Beatitude)?.state || ""), "blessed");
 });
 
+Deno.test("holy water vial item starts blessed by default", () => {
+  const world = new World({ seed: 9005 });
+  const holyWater = createItemById(world, "potion_holy_water");
+  assert(holyWater != null, "holy water vial should be creatable");
+  assertEquals(String(world.get(holyWater, Beatitude)?.state || ""), "blessed");
+});
+
 Deno.test("water dip waterlogs paper targets via material reaction rules", () => {
   const world = new World({ seed: 9004 });
   installMaterialReactionListeners(world);

@@ -105,6 +105,7 @@ export const CLASS_DEFS = {
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 2 },
+      { itemId: 'potion_holy_water', count: 1 },
     ],
     startingSpell: null,
   },

@@ -115,6 +115,7 @@ const runtimeConfig = readRuntimeConfig();
 const PERF = runtimeConfig.perf;
 const chosenDeityId = runtimeConfig.chosenDeityId;
 const TILE_PX = 28;
+const CAMERA_START_SCALE = TILE_PX * 1.2;
 
 const _canvasSetup = createCanvasSetup({ canvasId: 'stage', TILE_PX, dprCap: PERF.dprCap });
 const { canvas, ctx, back, bctx } = _canvasSetup;
@@ -554,7 +555,7 @@ function _finalizeNewGame(classData) {
     finishBoot();
   });
 
-  installSceneControls({ world, cam, TILE_PX, messageLog, runtimeConfig });
+  installSceneControls({ world, cam, TILE_PX, defaultZoomScale: CAMERA_START_SCALE, messageLog, runtimeConfig });
 }
 
 function findNearestTraversalTarget(world, x, y) {
@@ -1774,8 +1775,8 @@ addEventListener('ui:requestDrop', (ev) => {
 
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
-cam.scale = TILE_PX;
-cam.targetScale = TILE_PX;
+cam.scale = CAMERA_START_SCALE;
+cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
 
 // Tile-targeted spell casts and throws capture the next tap on the stage.
