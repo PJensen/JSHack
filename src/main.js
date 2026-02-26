@@ -2085,6 +2085,16 @@ const _stackMeta = new Map();
 const _origins = [];
 /** @type {number[]} flat buffer [tile, x, y, ...] for explored-not-visible tiles */
 const _exploredTileBuffer = [];
+/** @type {Map<number, { hp:number, ratio:number, showUntil:number }>} */
+const _healthBarState = new Map();
+/** @type {Set<number>} */
+const _healthBarSeen = new Set();
+/** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
+const _healthBarsToDraw = [];
+const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
+const HP_BAR_SHOW_SECONDS = 2.25;
+const PET_HP_BAR_SHOW_SECONDS = 3.5;
+const PET_CRITICAL_RATIO = 0.35;
 
 /**
  * Draw a small additive aura for entities explicitly tagged with `glowing`.
@@ -2119,6 +2129,91 @@ function drawGlowingTagAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.restore();
+}
+
+/**
+ * @param {number} n
+ */
+function clamp01(n) {
+  if (!Number.isFinite(n)) return 0;
+  if (n <= 0) return 0;
+  if (n >= 1) return 1;
+  return n;
+}
+
+/**
+ * Bars are hidden by default and appear when HP changes enough to be informative.
+ * Pet bars also stay visible while critically low.
+ * @param {{ id:number, hp?:number, maxHp?:number, showHealthBar?:boolean, isPet?:boolean }} e
+ * @param {number} now
+ */
+function shouldShowHealthBar(e, now) {
+  if (!e || !e.showHealthBar) return false;
+  const maxHp = Math.max(1, Number(e.maxHp) | 0);
+  const hp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
+  if (hp <= 0) {
+    _healthBarState.delete(e.id);
+    return false;
+  }
+
+  const ratio = clamp01(hp / maxHp);
+  let state = _healthBarState.get(e.id);
+  if (!state) {
+    const seededShow = ratio < 1 ? (now + 0.9) : -Infinity;
+    state = { hp, ratio, showUntil: seededShow };
+    _healthBarState.set(e.id, state);
+  } else {
+    const hpDelta = Math.abs(hp - state.hp);
+    const ratioDelta = Math.abs(ratio - state.ratio);
+    const meaningfulHpDelta = Math.max(1, Math.ceil(maxHp * 0.06));
+    if (ratioDelta >= HP_BAR_MEANINGFUL_RATIO_DELTA || hpDelta >= meaningfulHpDelta) {
+      state.showUntil = now + (e.isPet ? PET_HP_BAR_SHOW_SECONDS : HP_BAR_SHOW_SECONDS);
+    }
+    state.hp = hp;
+    state.ratio = ratio;
+  }
+
+  _healthBarSeen.add(e.id);
+  if (e.isPet && ratio <= PET_CRITICAL_RATIO) return true;
+  return now <= state.showUntil;
+}
+
+function pruneHealthBarState() {
+  for (const id of _healthBarState.keys()) {
+    if (!_healthBarSeen.has(id)) _healthBarState.delete(id);
+  }
+  _healthBarSeen.clear();
+}
+
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }} e
+ */
+function drawEntityHealthBar(ctx, e) {
+  const maxHp = Math.max(1, Number(e.maxHp) | 0);
+  const hp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
+  const ratio = clamp01(hp / maxHp);
+  const width = 0.68;
+  const height = 0.06;
+  const y = e.pos.y + 0.43;
+  const x = e.pos.x - (width * 0.5);
+  const pad = 0.01;
+  const innerW = Math.max(0, width - (pad * 2));
+  const innerH = Math.max(0.01, height - (pad * 2));
+  const fillW = innerW * ratio;
+  const hue = Math.round(120 * ratio);
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,12,18,0.8)';
+  ctx.fillRect(x, y, width, height);
+  if (fillW > 0.002) {
+    ctx.fillStyle = `hsl(${hue} 85% 48%)`;
+    ctx.fillRect(x + pad, y + pad, fillW, innerH);
+  }
+  ctx.strokeStyle = e.isPet ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.85)';
+  ctx.lineWidth = 0.014;
+  ctx.strokeRect(x, y, width, height);
   ctx.restore();
 }
 
@@ -2202,6 +2297,7 @@ function render(worldView) {
   // Pass 2: entities (doors, stairs, monsters, items, player)
   // Keep only the top-most ground item glyph per tile.
   _stackMeta.clear(); // "x,y" -> topItemId
+  _healthBarsToDraw.length = 0;
   const stackMeta = _stackMeta;
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
@@ -2231,6 +2327,9 @@ function render(worldView) {
     }
 
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    if (shouldShowHealthBar(e, _fxTime)) {
+      _healthBarsToDraw.push(e);
+    }
 
     // Glyph-FX: passive glow aura for entities tagged "glowing"
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
@@ -2582,6 +2681,11 @@ function render(worldView) {
       drawGlowingTagAura(bctx, e, _fxTime);
     }
   }
+
+  for (let i = 0; i < _healthBarsToDraw.length; i++) {
+    drawEntityHealthBar(bctx, _healthBarsToDraw[i]);
+  }
+  pruneHealthBarState();
 
   if (bctx) throwFx.draw(bctx, worldView, glyphAtlas);
 
