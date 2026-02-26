@@ -349,6 +349,8 @@ export const AFFIX_DEFS = {
   soulDrain1: { name: "Soul Drain", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_SOUL_DRAIN, weight: 7 },
   berserk1: { name: "Berserking", slots: ["weapon", "ring"], triggers: ["onHit"], script: AFFIX_BERSERK, weight: 8 },
   shieldWall1: { name: "Stoneskin Proc", slots: ["armor", "shield"], triggers: ["onDamaged"], script: AFFIX_SHIELD_WALL, weight: 10 },
+  helmGuard1: { name: "Helm Guard", slots: ["head"], passive: AFFIX_GUARD, triggers: [], weight: 16 },
+  helmAttuned1: { name: "Helm of Attunement", slots: ["head"], passive: AFFIX_ATTUNED, triggers: [], weight: 14 },
   manaSurge1: { name: "Mana Surge", slots: ["ring", "weapon"], triggers: ["onHit"], script: AFFIX_MANA_SURGE, weight: 10 },
   executioner1: { name: "Executioner", slots: ["weapon"], triggers: ["onBeforeHit"], script: AFFIX_EXECUTIONER, weight: 6 },
   frostbite1: { name: "Frostbite", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_FROSTBITE, weight: 10 },

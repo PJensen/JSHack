@@ -35,3 +35,24 @@ Deno.test("equipment system derives stats from equipped items", () => {
   assert(eq.defenseDerived === 2, 'defense derived from armor + head');
   assert(eq.maxHpDerived >= 5, 'life1 passive applied');
 });
+
+Deno.test("equipment system applies head-specific affix passives", () => {
+  const world = new World({ seed: 8 });
+  const actor = world.create();
+  world.add(actor, Equipment, {});
+  const eq = world.get(actor, Equipment);
+
+  const helm = makeEquip(world, {
+    name: 'Attuned Helm',
+    id: 'helm_iron',
+    slot: 'head',
+    bonuses: { defense: 1 },
+    affixes: ['helmGuard1', 'helmAttuned1'],
+  });
+
+  eq.head = helm;
+  equipmentSystem(world);
+
+  assert(eq.defenseDerived === 2, 'head bonus + helmGuard1 should add defense');
+  assert(eq.manaRegenDerived >= 0.25, 'helmAttuned1 should add mana regen');
+});
