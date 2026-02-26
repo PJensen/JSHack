@@ -20,7 +20,7 @@ import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Faction } from '../components/Faction.js';
-import { Equipment, NON_PROJECTILE_GEAR_SLOTS } from '../components/Equipment.js';
+import { Equipment, NON_AMMO_GEAR_SLOTS } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
@@ -540,7 +540,7 @@ function wireDeityMiracles(deity, deityId, world) {
         let grantedAffix = false;
         const eq = world.get(playerId, Equipment);
         if (eq) {
-          for (const slot of NON_PROJECTILE_GEAR_SLOTS) {
+          for (const slot of NON_AMMO_GEAR_SLOTS) {
             const itemId = eq[slot];
             if (!Number.isInteger(itemId)) continue;
             const info = world.get(itemId, ItemInfo);

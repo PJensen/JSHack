@@ -2,7 +2,7 @@
 // Processes AttackIntent: computes damage using derived stats, emits events for affix triggers, applies Vitality changes.
 
 import { AttackIntent } from '../components/Intents/AttackIntent.js';
-import { Equipment, NON_PROJECTILE_GEAR_SLOTS } from '../components/Equipment.js';
+import { Equipment, NON_AMMO_GEAR_SLOTS } from '../components/Equipment.js';
 import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
@@ -29,7 +29,7 @@ const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 function forEachAffix(world, entityId, fn) {
     const eq = world.get(entityId, Equipment);
     if (!eq) return;
-    for (const slot of NON_PROJECTILE_GEAR_SLOTS) {
+    for (const slot of NON_AMMO_GEAR_SLOTS) {
         const slotId = eq[slot];
         if (!Number.isInteger(slotId)) continue;
         const info = world.get(slotId, ItemInfo);

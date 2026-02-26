@@ -1,7 +1,7 @@
 // src/rules/systems/affixTriggerSystem.js
 // Installs event listeners that dispatch affix scripts on equipment for both attacker and defender contexts.
 
-import { Equipment, NON_PROJECTILE_GEAR_SLOTS } from '../components/Equipment.js';
+import { Equipment, NON_AMMO_GEAR_SLOTS } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { getMonster } from '../data/monsters.js';
@@ -18,7 +18,7 @@ const AFFIX_TRIGGERS_KEY = Symbol.for('jshack.affixTriggers');
 function eachAffix(world, entityId, cb) {
   const eq = world.get(entityId, Equipment);
   if (!eq) return;
-  for (const slot of NON_PROJECTILE_GEAR_SLOTS) {
+  for (const slot of NON_AMMO_GEAR_SLOTS) {
     const slotId = eq[slot];
     if (!Number.isInteger(slotId)) continue;
     const info = world.get(slotId, ItemInfo);
