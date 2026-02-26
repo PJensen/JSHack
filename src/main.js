@@ -1996,6 +1996,43 @@ const _stackMeta = new Map();
 const _origins = [];
 /** @type {number[]} flat buffer [tile, x, y, ...] for explored-not-visible tiles */
 const _exploredTileBuffer = [];
+
+/**
+ * Draw a small additive aura for entities explicitly tagged with `glowing`.
+ * Kept tag-gated so palette `glow` color does not imply runtime glyph FX.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number}, tags?:string[] }} e
+ * @param {number} fxTime
+ */
+function drawGlowingTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 4.2 + e.id * 0.37);
+  const rOuter = 0.58 + 0.06 * pulse;
+  const rInner = 0.27 + 0.03 * pulse;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  outer.addColorStop(0,   `rgba(255,180,80,${(0.24 + 0.14 * pulse).toFixed(3)})`);
+  outer.addColorStop(0.55,`rgba(255,110,20,${(0.12 + 0.10 * pulse).toFixed(3)})`);
+  outer.addColorStop(1,   'rgba(170,60,10,0)');
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  inner.addColorStop(0, `rgba(255,230,170,${(0.28 + 0.22 * pulse).toFixed(3)})`);
+  inner.addColorStop(1, 'rgba(255,170,80,0)');
+  ctx.fillStyle = inner;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function render(worldView) {
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
@@ -2105,6 +2142,11 @@ function render(worldView) {
     }
 
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+
+    // Glyph-FX: passive glow aura for entities tagged "glowing"
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
+      drawGlowingTagAura(bctx, e, _fxTime);
+    }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
     if (PERF.quality !== 'low' && k === 'grid_bug') {
@@ -2447,6 +2489,9 @@ function render(worldView) {
     const e = deferredItems[i];
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
     drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
+      drawGlowingTagAura(bctx, e, _fxTime);
+    }
   }
 
   if (bctx) throwFx.draw(bctx, worldView, glyphAtlas);

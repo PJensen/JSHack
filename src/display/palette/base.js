@@ -134,6 +134,7 @@ export const basePalette = {
   // Traps (revealed after triggering)
   trap_spike: { glyph: "^", fg: "#a84000", glow: "#d65d1f" },
   trap_snake: { glyph: "^", fg: "#55aa44", glow: "#338822" },
+  trap_shock: { glyph: "^", fg: "#66ddff", glow: "#2299cc" },
   // Tier 0 (snake — spawned by snake traps)
   snake:    { glyph: "S", fg: "#55aa44", glow: "#338822" },
 
