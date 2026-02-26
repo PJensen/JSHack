@@ -22,6 +22,7 @@ import { Resistances } from "../components/Resistences.js";
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
+import { Beatitude } from "../components/Beatitude.js";
 import { Speed } from "../components/Speed.js";
 import { buildCatalogItem } from "../data/itemCatalogLoader.js";
 import { getMonster } from "../data/monsters.js";
@@ -154,6 +155,29 @@ export function applyMutation(world, op) {
         }
         info[key] = value;
       }
+      break;
+    }
+    case "setBeatitude": {
+      const state = String(op.state || "").toLowerCase();
+      if (state !== "blessed" && state !== "uncursed" && state !== "cursed") break;
+      let beatitude = /** @type any */ (world.get(op.entityId, Beatitude));
+      if (!beatitude) {
+        try { world.add(op.entityId, Beatitude, { state }); } catch {} // ECS: may already exist
+        beatitude = /** @type any */ (world.get(op.entityId, Beatitude));
+      }
+      if (beatitude) beatitude.state = state;
+      break;
+    }
+    case "removeTimedEffectsByKey": {
+      const ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
+      if (!ae || !Array.isArray(ae.effects)) break;
+      const keys = new Set(
+        Array.isArray(op.keys)
+          ? op.keys.map((k) => String(k || "").toLowerCase()).filter(Boolean)
+          : [],
+      );
+      if (keys.size <= 0) break;
+      ae.effects = ae.effects.filter((effect) => !keys.has(String(effect?.key || "").toLowerCase()));
       break;
     }
     case "setMaterial": {
@@ -426,6 +450,8 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
  * @typedef {{ type: 'appendDamageChannels', entityId: number, channels: Array<Record<string, unknown>> }} AppendDamageChannelsOp
  * @typedef {{ type: 'patchItemInfo', entityId: number, patch: Record<string, unknown> }} PatchItemInfoOp
+ * @typedef {{ type: 'setBeatitude', entityId: number, state: 'blessed'|'uncursed'|'cursed' }} SetBeatitudeOp
+ * @typedef {{ type: 'removeTimedEffectsByKey', entityId: number, keys: string[] }} RemoveTimedEffectsByKeyOp
  * @typedef {{ type: 'setMaterial', entityId: number, kind: string }} SetMaterialOp
  * @typedef {{ type: 'spawnItem', itemId: string, x?: number, y?: number, count?: number, affixes?: string[], ownerId?: number, material?: string, patchItemInfo?: Record<string, unknown>, emitEvent?: boolean }} SpawnItemOp
  * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, attackDerived?: number, defenseDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean }} SpawnMonsterOp
@@ -437,7 +463,7 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp} MutationOp
  */
 
 export class ActionTransaction {

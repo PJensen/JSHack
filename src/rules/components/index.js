@@ -1,5 +1,6 @@
 export { Position } from './Position.js';
 export { ActiveEffects } from './ActiveEffects.js';
+export { Beatitude } from './Beatitude.js';
 export { Consumable } from './Consumable.js';
 export { ItemInfo } from './ItemInfo.js';
 export { Equipment } from './Equipment.js';
