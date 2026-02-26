@@ -46,6 +46,7 @@ import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
+import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -99,6 +100,8 @@ export function configureWorld(world) {
   installTileStepEffectListener(world);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
   installMaterialReactionListeners(world);
+  // Polymorph requests (e.g. mimic reveal on touch).
+  installPolymorphListener(world);
 
   // Phase: ai (intent producers — runs with immediate mutations so
   // MoveIntents are visible to movementSystem in the same tick)

@@ -32,6 +32,7 @@ export const basePalette = {
   demon:    { glyph: "&", fg: "#ff4444", glow: "#cc0000" },
   dragon:   { glyph: "D", fg: "#ffcc33", glow: "#dd9900" },
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
+  mimic:    { glyph: "M", fg: "#b07a3f", glow: "#7a4d1f" },
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224" },
   grass_a:  { glyph: "'", fg: "#cce07a", glow: "#8ab850" },  // sparse/bare
@@ -175,6 +176,7 @@ export const basePalette = {
   corpse_demon:        { glyph: "%", fg: "#ff4444", glow: "#cc0000" },
   corpse_dragon:       { glyph: "%", fg: "#ffcc33", glow: "#dd9900" },
   corpse_lich:         { glyph: "%", fg: "#cc88ff", glow: "#9955cc" },
+  corpse_mimic:        { glyph: "%", fg: "#b07a3f", glow: "#7a4d1f" },
   corpse_kitty:        { glyph: "%", fg: "#ffcc88", glow: "#cc9955" },
   corpse_pet:          { glyph: "%", fg: "#ffcc88", glow: "#cc9955" },
 

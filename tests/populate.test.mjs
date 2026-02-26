@@ -344,3 +344,48 @@ Deno.test("origin chunk spawn room is never selected as a shop room", () => {
     'shopkeeper must not be placed in origin chunk spawn room',
   );
 });
+
+Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a mimic", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  // Room 0 (origin spawn room; must be excluded from shop selection).
+  for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
+  // Room 1 (eligible shop room).
+  for (let y = 20; y < 28; y++) for (let x = 20; x < 28; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[24 * CHUNK_SIZE + 19] = TILE_FLOOR;
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    tiles,
+    rooms: [
+      { x: 1, y: 1, w: 6, h: 6 },
+      { x: 20, y: 20, w: 8, h: 8 },
+    ],
+    doors: [],
+  };
+  const floorPlan = { depth: 3, difficultyMult: 1.2 };
+  const rng = {
+    next: () => 0, // force all chance-gates for deterministic coverage
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const shopkeeper = spawns.find((s) => s.kind === "shopkeeper");
+  assert(shopkeeper, "expected a shopkeeper in deterministic shop test");
+  const shopRoom = shopkeeper.params?.room;
+  assert(shopRoom, "shopkeeper should include room metadata");
+
+  const inShopRoom = (s) =>
+    s.x >= shopRoom.x && s.x < shopRoom.x + shopRoom.w
+    && s.y >= shopRoom.y && s.y < shopRoom.y + shopRoom.h;
+
+  const normalHostiles = spawns.filter((s) => inShopRoom(s) && (s.kind === "monster" || s.kind === "spawner"));
+  assert(normalHostiles.length === 0, "shop room must not contain normal monster/spawner spawns");
+
+  const mimics = spawns.filter((s) => inShopRoom(s) && s.kind === "mimic");
+  assert(mimics.length === 1, "shop room should allow a rare mimic spawn");
+});

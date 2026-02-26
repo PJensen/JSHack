@@ -100,6 +100,18 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  touchMimic: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      world.emit?.("polymorph:request", {
+        entityId: targetId,
+        actorId: actor,
+        trigger: "touch",
+        reason: "mimic_touched",
+      });
+    },
+  },
+
   // ── Signs & text ───────────────────────────────────────────────────────────
 
   readText: {
