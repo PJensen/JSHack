@@ -115,7 +115,7 @@ const runtimeConfig = readRuntimeConfig();
 const PERF = runtimeConfig.perf;
 const chosenDeityId = runtimeConfig.chosenDeityId;
 const TILE_PX = 28;
-const CAMERA_START_SCALE = TILE_PX * 1.2;
+const CAMERA_START_SCALE = TILE_PX * (1.2 ** 5);
 
 const _canvasSetup = createCanvasSetup({ canvasId: 'stage', TILE_PX, dprCap: PERF.dprCap });
 const { canvas, ctx, back, bctx } = _canvasSetup;
