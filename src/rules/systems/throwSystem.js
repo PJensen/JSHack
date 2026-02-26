@@ -19,6 +19,45 @@ function computeBaseThrowRange(weight) {
 }
 
 /**
+ * Project a point toward a target along an integer grid line by up to `maxSteps`.
+ * Uses Bresenham stepping so off-axis throws preserve the selected slope.
+ * @param {number} fromX
+ * @param {number} fromY
+ * @param {number} toX
+ * @param {number} toY
+ * @param {number} maxSteps
+ */
+function projectTowardTarget(fromX, fromY, toX, toY, maxSteps) {
+  let x = fromX | 0;
+  let y = fromY | 0;
+  const tx = toX | 0;
+  const ty = toY | 0;
+  const limit = Math.max(0, maxSteps | 0);
+
+  let dx = Math.abs(tx - x);
+  let sx = x < tx ? 1 : -1;
+  let dy = -Math.abs(ty - y);
+  let sy = y < ty ? 1 : -1;
+  let err = dx + dy;
+  let moved = 0;
+
+  while (moved < limit && (x !== tx || y !== ty)) {
+    const e2 = err * 2;
+    if (e2 >= dy) {
+      err += dy;
+      x += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y += sy;
+    }
+    moved++;
+  }
+
+  return { x, y };
+}
+
+/**
  * @param {any} intent
  */
 function readIntentPoint(intent) {
@@ -73,22 +112,32 @@ function resolveThrowSpec(world, actor, itemId, intent) {
   let dx = 1;
   let dy = 0;
   let range = maxRange;
+  let to = {
+    x: (from.x | 0) + (dx * range),
+    y: (from.y | 0) + (dy * range),
+  };
 
   if (targetPoint) {
     const rawDx = (targetPoint.x | 0) - (from.x | 0);
     const rawDy = (targetPoint.y | 0) - (from.y | 0);
     const dist = Math.max(Math.abs(rawDx), Math.abs(rawDy));
     if (dist > 0) {
-      dx = Math.sign(rawDx);
-      dy = Math.sign(rawDy);
-      range = Math.min(maxRange, dist);
+      const cappedRange = Math.min(maxRange, dist);
+      const projected = projectTowardTarget(
+        from.x | 0,
+        from.y | 0,
+        targetPoint.x | 0,
+        targetPoint.y | 0,
+        cappedRange,
+      );
+      const stepX = (projected.x | 0) - (from.x | 0);
+      const stepY = (projected.y | 0) - (from.y | 0);
+      dx = Math.sign(stepX);
+      dy = Math.sign(stepY);
+      range = Math.max(1, Math.max(Math.abs(stepX), Math.abs(stepY)));
+      to = { x: projected.x | 0, y: projected.y | 0 };
     }
   }
-
-  const to = {
-    x: (from.x | 0) + (dx * range),
-    y: (from.y | 0) + (dy * range),
-  };
 
   return {
     from: { x: from.x | 0, y: from.y | 0 },
