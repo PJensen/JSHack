@@ -83,6 +83,9 @@ export function equipItemSystem(world) {
     } else if (slot === 'armor') {
       if (Number.isInteger(eq.armor) && eq.armor > 0) pushToInventory(eq.armor);
       eq.armor = itemId; appliedSlot = 'armor';
+    } else if (slot === 'head') {
+      if (Number.isInteger(eq.head) && eq.head > 0) pushToInventory(eq.head);
+      eq.head = itemId; appliedSlot = 'head';
     } else if (slot === 'ring') {
       if (!Number.isInteger(eq.ring1) || eq.ring1 <= 0) {
         eq.ring1 = itemId; appliedSlot = 'ring1';

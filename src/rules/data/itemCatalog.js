@@ -4,6 +4,7 @@ import { getSpell } from "./spells.js";
 import { getGem } from "./gems.js";
 import { identify } from "./identification.js";
 import { createEatOnUseHook, createMappingOnUseHook } from "../content/items/useNativeHooks.js";
+import { Beatitude } from "../components/Beatitude.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
 import { Equipment } from "../components/Equipment.js";
@@ -171,6 +172,7 @@ function canPoisonDipTarget(state) {
 const STONECOAT_ALLOWED_SLOTS = Object.freeze(new Set([
   "weapon",
   "armor",
+  "head",
   "shield",
   "ring",
   "ranged",
@@ -218,6 +220,157 @@ function interpolateFields(template, fields) {
     const value = Object.prototype.hasOwnProperty.call(table, key) ? table[key] : "";
     return String(value ?? "");
   });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {"blessed"|"uncursed"|"cursed"}
+ */
+function normalizeBeatitude(value) {
+  const beat = String(value || "").toLowerCase();
+  if (beat === "blessed") return "blessed";
+  if (beat === "cursed") return "cursed";
+  return "uncursed";
+}
+
+/**
+ * @param {"blessed"|"uncursed"|"cursed"} beatitude
+ */
+function waterTypeFromBeatitude(beatitude) {
+  if (beatitude === "blessed") return "holy";
+  if (beatitude === "cursed") return "unholy";
+  return "plain";
+}
+
+function createWaterPotionHooks() {
+  return {
+    can_dip_target: (state) => {
+      const targetType = String(state?.targetInfo?.type || "");
+      return !!targetType && targetType !== "currency";
+    },
+    on_drink: (ctx, state) => {
+      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+      const targetId = ctx.rules.resolveTarget(actorId);
+      const beatitude = normalizeBeatitude(ctx.query.get(itemId, Beatitude)?.state);
+      const waterType = waterTypeFromBeatitude(beatitude);
+      const hadBurn = ctx.helpers.hasStatus(targetId, "burning") || ctx.helpers.hasStatus(targetId, "burn");
+
+      ctx.helpers.clearEffects(targetId, ["burn", "burning"]);
+
+      if (waterType === "holy") {
+        ctx.helpers.addEffect(targetId, {
+          key: "blessed",
+          potency: 1,
+          turnsLeft: 30,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: itemId,
+          meta: { source: "potion_water", waterType: "holy" },
+        });
+      } else if (waterType === "unholy") {
+        ctx.helpers.addEffect(targetId, {
+          key: "cursed",
+          potency: 1,
+          turnsLeft: 30,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: itemId,
+          meta: { source: "potion_water", waterType: "unholy" },
+        });
+      }
+
+      ctx.io.emit("water:drank", {
+        actor: actorId,
+        itemId,
+        targetId,
+        waterType,
+        removedBurn: hadBurn ? 1 : 0,
+      });
+      return { waterType, removedBurn: hadBurn ? 1 : 0 };
+    },
+    on_throw: (ctx, state) => {
+      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+      const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+      const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+      const fallback = ctx.helpers.adjacentPoint(actorId);
+      const to = {
+        x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0),
+        y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0),
+      };
+      const from = (
+        Number.isFinite(Number(throwSpec?.from?.x)) && Number.isFinite(Number(throwSpec?.from?.y))
+          ? { x: Number(throwSpec.from.x) | 0, y: Number(throwSpec.from.y) | 0 }
+          : null
+      );
+
+      const beatitude = normalizeBeatitude(ctx.query.get(itemId, Beatitude)?.state);
+      const waterType = waterTypeFromBeatitude(beatitude);
+
+      ctx.helpers.hazardSpawn({
+        kind: "wet_splash",
+        medium: "floor",
+        turnsLeft: 1,
+        radius: 1,
+        tickDamage: 0,
+        damageType: "generic",
+        cause: "thrown_water",
+        sourceId: actorId,
+        sourceKind: "potion_water",
+        meta: { waterType },
+      }, to);
+
+      ctx.io.emit("item:thrown", {
+        actor: actorId,
+        itemId,
+        targetId,
+        from,
+        to: { ...to },
+        range: Number.isFinite(Number(throwSpec?.range)) ? (Number(throwSpec.range) | 0) : null,
+        maxRange: Number.isFinite(Number(throwSpec?.maxRange)) ? (Number(throwSpec.maxRange) | 0) : null,
+        weight: Number.isFinite(Number(throwSpec?.weight)) ? Number(throwSpec.weight) : null,
+        path: "itemHooks",
+        result: { type: "water_splash", waterType },
+      });
+      ctx.io.emit("water:splashed", {
+        actor: actorId,
+        itemId,
+        at: { ...to },
+        waterType,
+      });
+      return { consumed: true, resultType: "water_splash", waterType };
+    },
+    on_dip: (ctx, state) => {
+      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+      const toolId = Number(state?.toolId || ctx.primary || 0) | 0;
+      const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+      const beatitude = normalizeBeatitude(ctx.query.get(toolId, Beatitude)?.state);
+      const waterType = waterTypeFromBeatitude(beatitude);
+
+      ctx.io.emit("item:applied", {
+        actor: actorId,
+        toolId,
+        targetId,
+        result: {
+          type: "water_dip",
+          waterType,
+        },
+      });
+      ctx.io.emit("water:dipped", {
+        actor: actorId,
+        toolId,
+        targetId,
+        waterType,
+      });
+
+      return { applied: true, consumedTool: true, resultType: "water_dip", waterType };
+    },
+  };
 }
 
 /**
@@ -455,6 +608,17 @@ export const ITEM_CATALOG = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2 },
+  },
+  helm_iron: {
+    id: "helm_iron",
+    catalogKind: "equipment",
+    name: "Iron Helm",
+    type: "equip",
+    slot: "head",
+    material: "iron",
+    rarity: 1,
+    rarityName: "common",
+    bonuses: { defense: 1 },
   },
   ring_health: {
     id: "ring_health",
@@ -1087,6 +1251,48 @@ export const ITEM_CATALOG = {
         medium: "floor",
       }),
     },
+  },
+  potion_water: {
+    id: "potion_water",
+    catalogKind: "magic",
+    name: "Potion of Water",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 12,
+    description: "Clear water in a fragile vial. Useful for quenching, blessing, and splashing.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      beatitude: "uncursed",
+    },
+    hooks: createWaterPotionHooks(),
+  },
+  potion_holy_water: {
+    id: "potion_holy_water",
+    catalogKind: "magic",
+    name: "Vial of Holy Water",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 30,
+    description: "Consecrated water that purges flame and carries a blessing.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      beatitude: "blessed",
+    },
+    hooks: createWaterPotionHooks(),
   },
   potion_stoneskin: {
     id: "potion_stoneskin",

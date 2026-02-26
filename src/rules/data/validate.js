@@ -141,6 +141,8 @@ export function validateAffixes(AFFIX_DEFS) {
 export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}) {
   if (!Array.isArray(MATERIAL_REACTION_RULES)) throw new Error('MATERIAL_REACTION_RULES must be an array');
   const outcomeIds = new Set(Array.isArray(opts.outcomeIds) ? opts.outcomeIds : []);
+  const allowedWaterTypes = new Set(["holy", "unholy", "plain"]);
+  const allowedBeatitudes = new Set(["blessed", "uncursed", "cursed"]);
   const ruleIds = new Set();
 
   for (let i = 0; i < MATERIAL_REACTION_RULES.length; i++) {
@@ -150,12 +152,23 @@ export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}
     if (ruleIds.has(id)) throw new Error(`material reaction rule ${id}: duplicate id`);
     ruleIds.add(id);
 
-    if (!Array.isArray(rule.sourceStatuses) || rule.sourceStatuses.length === 0) {
-      throw new Error(`material reaction rule ${id}: sourceStatuses required`);
+    const hasStatuses = Array.isArray(rule.sourceStatuses) && rule.sourceStatuses.length > 0;
+    const hasEvents = Array.isArray(rule.sourceEvents) && rule.sourceEvents.length > 0;
+    if (!hasStatuses && !hasEvents) {
+      throw new Error(`material reaction rule ${id}: sourceStatuses or sourceEvents required`);
     }
-    for (const status of rule.sourceStatuses) {
-      if (typeof status !== 'string' || !status.trim()) {
-        throw new Error(`material reaction rule ${id}: sourceStatuses must contain non-empty strings`);
+    if (hasStatuses) {
+      for (const status of rule.sourceStatuses) {
+        if (typeof status !== 'string' || !status.trim()) {
+          throw new Error(`material reaction rule ${id}: sourceStatuses must contain non-empty strings`);
+        }
+      }
+    }
+    if (hasEvents) {
+      for (const eventName of rule.sourceEvents) {
+        if (typeof eventName !== 'string' || !eventName.trim()) {
+          throw new Error(`material reaction rule ${id}: sourceEvents must contain non-empty strings`);
+        }
       }
     }
 
@@ -163,8 +176,8 @@ export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}
       throw new Error(`material reaction rule ${id}: itemScopes required`);
     }
     for (const scope of rule.itemScopes) {
-      if (scope !== 'ground' && scope !== 'inventory') {
-        throw new Error(`material reaction rule ${id}: itemScopes must be 'ground' or 'inventory'`);
+      if (scope !== 'ground' && scope !== 'inventory' && scope !== 'target') {
+        throw new Error(`material reaction rule ${id}: itemScopes must be 'ground', 'inventory', or 'target'`);
       }
     }
 
@@ -210,6 +223,23 @@ export function validateMaterialReactionRules(MATERIAL_REACTION_RULES, opts = {}
       }
       if (outcomeIds.size > 0 && !outcomeIds.has(reaction.outcome)) {
         throw new Error(`material reaction rule ${id}.${reactionId}: unknown outcome ${reaction.outcome}`);
+      }
+
+      if (reaction.outcome === "set_beatitude") {
+        const state = String(reaction.state || "").toLowerCase();
+        if (!allowedBeatitudes.has(state)) {
+          throw new Error(`material reaction rule ${id}.${reactionId}: state must be blessed|uncursed|cursed`);
+        }
+      }
+      if (reaction.waterTypes != null) {
+        if (!Array.isArray(reaction.waterTypes) || reaction.waterTypes.length === 0) {
+          throw new Error(`material reaction rule ${id}.${reactionId}: waterTypes must be a non-empty array when provided`);
+        }
+        for (const waterType of reaction.waterTypes) {
+          if (!allowedWaterTypes.has(String(waterType || "").toLowerCase())) {
+            throw new Error(`material reaction rule ${id}.${reactionId}: unknown waterType ${waterType}`);
+          }
+        }
       }
     }
   }
