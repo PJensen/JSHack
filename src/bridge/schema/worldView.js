@@ -66,6 +66,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'starving',
 	'wasting',
 ]);
+const VENOM_GLOW_ITEM_KINDS = new Set(['nightfang_dagger', 'venomfang_dagger', 'nightfang', 'venomfang']);
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
@@ -102,6 +103,24 @@ function projectDisplayTags(world, id, rec) {
 		const t = normalizeDisplayStatusType(s?.type);
 		if (!t || !DISPLAY_STATUS_TAGS.has(t)) continue;
 		if (!rec.tags.includes(t)) rec.tags.push(t);
+	}
+}
+
+/**
+ * @param {string} kind
+ * @param {any} itemInfo
+ * @param {EntityView} rec
+ */
+function projectItemAffixDisplayTags(kind, itemInfo, rec) {
+	if (!itemInfo || !Array.isArray(itemInfo.affixes)) return;
+	const affixes = itemInfo.affixes;
+	const hasAffix = (key) => affixes.includes(key) || affixes.includes(`affix:${key}`);
+
+	if (hasAffix('flaming') && !rec.tags.includes('glowing')) {
+		rec.tags.push('glowing');
+	}
+	if (hasAffix('venomous1') || VENOM_GLOW_ITEM_KINDS.has(String(kind || ''))) {
+		if (!rec.tags.includes('venom_glowing')) rec.tags.push('venom_glowing');
 	}
 }
 
@@ -234,9 +253,7 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
-			if (itemInfo && Array.isArray(itemInfo.affixes) && itemInfo.affixes.includes('flaming')) {
-				if (!rec.tags.includes('glowing')) rec.tags.push('glowing');
-			}
+			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
 
 			_allEntities.push(rec);
@@ -292,9 +309,7 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
-			if (itemInfo && Array.isArray(itemInfo.affixes) && itemInfo.affixes.includes('flaming')) {
-				if (!rec.tags.includes('glowing')) rec.tags.push('glowing');
-			}
+			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');
 
 			_allEntities.push(rec);
