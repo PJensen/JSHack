@@ -2,7 +2,7 @@
 // Processes AttackIntent: computes damage using derived stats, emits events for affix triggers, applies Vitality changes.
 
 import { AttackIntent } from '../components/Intents/AttackIntent.js';
-import { Equipment } from '../components/Equipment.js';
+import { Equipment, GEAR_SLOTS } from '../components/Equipment.js';
 import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
@@ -24,12 +24,14 @@ import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
+const COMBAT_AFFIX_SLOTS = Object.freeze(GEAR_SLOTS.filter((slot) => slot !== 'ammo' && slot !== 'ranged'));
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {number} entityId @param {(a:any, slotId:number)=>void} fn */
 function forEachAffix(world, entityId, fn) {
     const eq = world.get(entityId, Equipment);
     if (!eq) return;
-    for (const slotId of [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.feet]) {
+    for (const slot of COMBAT_AFFIX_SLOTS) {
+        const slotId = eq[slot];
         if (!Number.isInteger(slotId)) continue;
         const info = world.get(slotId, ItemInfo);
         if (!info || !Array.isArray(info.affixes)) continue;

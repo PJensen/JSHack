@@ -1,5 +1,25 @@
 import { defineComponent } from "../../lib/ecs-js/index.js";
 
+export const GEAR_SLOTS = Object.freeze([
+  "weapon", "armor", "shield", "ring1", "ring2", "ammo", "ranged", "feet",
+]);
+
+export const GEAR_SLOT_SET = Object.freeze(new Set(GEAR_SLOTS));
+
+/**
+ * Resolve the equipped slot name for a specific item id.
+ * @param {any} equipment
+ * @param {number} itemId
+ * @returns {string|null}
+ */
+export function getEquippedSlot(equipment, itemId) {
+  if (!equipment || !Number.isInteger(itemId) || itemId <= 0) return null;
+  for (const slot of GEAR_SLOTS) {
+    if (equipment[slot] === itemId) return slot;
+  }
+  return null;
+}
+
 export const Equipment = defineComponent('Equipment', {
   weapon: null,
   armor: null,

@@ -2,10 +2,11 @@
 // Recompute derived stats from equipped items and passive affixes.
 // Keeps results on Equipment component; other systems may consume them.
 
-import { Equipment } from '../components/Equipment.js';
+import { Equipment, GEAR_SLOTS } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { AFFIX_DEFS } from '../data/affixes.js';
 import { runScript, ScriptVerb } from '../scripting.js';
+const DERIVED_STAT_SLOTS = Object.freeze(GEAR_SLOTS.filter((slot) => slot !== 'ammo'));
 
 function emptyDerived() {
   return {
@@ -67,8 +68,8 @@ export function equipmentSystem(world) {
     const d = emptyDerived();
 
     // equip slots contain entity ids of items
-    const slots = [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.ranged, eq.feet];
-    for (const itemId of slots) {
+    for (const slot of DERIVED_STAT_SLOTS) {
+      const itemId = eq[slot];
       if (!Number.isInteger(itemId)) continue;
       const info = world.get(itemId, ItemInfo);
       if (!info) continue;
