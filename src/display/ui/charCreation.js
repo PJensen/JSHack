@@ -1,6 +1,7 @@
 // display/ui/charCreation.js
-// Character creation screen. Pure presentation — no rules/ imports.
+// Character creation screen. Pure presentation — no rules/ imports (shared/ is OK).
 // Data is passed in by main.js via showCharCreation(opts).
+import { versionLoaded } from '../../shared/version.js';
 
 /**
  * @param {{
@@ -35,14 +36,61 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     padding: '24px 20px', boxShadow: '0 0 60px rgba(40,80,160,0.25)',
   });
 
-  // ---- title ----
+  // ---- title row (title + help icon) ----
+  const titleRow = document.createElement('div');
+  Object.assign(titleRow.style, {
+    position: 'relative',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    marginBottom: '4px',
+  });
+
   const title = document.createElement('div');
   title.textContent = 'Enter the Dungeon';
   Object.assign(title.style, {
     fontSize: '22px', fontWeight: 'bold', color: '#7ab8ff',
-    textShadow: '0 0 12px rgba(80,140,255,0.3)', marginBottom: '20px',
+    textShadow: '0 0 12px rgba(80,140,255,0.3)',
   });
-  box.appendChild(title);
+
+  const helpLink = document.createElement('a');
+  helpLink.textContent = '\u2139';
+  helpLink.href = './tools/help/';
+  helpLink.target = '_blank';
+  helpLink.rel = 'noopener';
+  helpLink.title = 'Help & Reference';
+  Object.assign(helpLink.style, {
+    position: 'absolute', right: '0',
+    width: '28px', height: '28px',
+    display: 'grid', placeItems: 'center',
+    borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#7ab8ff',
+    fontSize: '16px', textDecoration: 'none',
+    lineHeight: '1',
+  });
+
+  titleRow.appendChild(title);
+  titleRow.appendChild(helpLink);
+  box.appendChild(titleRow);
+
+  // ---- version ----
+  const versionEl = document.createElement('div');
+  Object.assign(versionEl.style, {
+    fontSize: '12px', color: '#4a6080',
+    marginBottom: '10px',
+  });
+  box.appendChild(versionEl);
+  versionLoaded.then(() => {
+    const ver = /** @type {any} */ (window).VERSION;
+    if (ver) versionEl.textContent = `v${ver}`;
+  }).catch(() => {});
+
+  // ---- music nudge ----
+  const musicNudge = document.createElement('div');
+  musicNudge.textContent = '\u266B Best played with your own music';
+  Object.assign(musicNudge.style, {
+    fontSize: '11px', color: '#4a6080', fontStyle: 'italic',
+    marginBottom: '20px',
+  });
+  box.appendChild(musicNudge);
 
   // ---- name input ----
   const nameLabel = document.createElement('label');
