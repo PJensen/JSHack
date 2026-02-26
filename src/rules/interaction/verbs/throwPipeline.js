@@ -1,7 +1,10 @@
 import { Position } from "../../components/Position.js";
+import { Faction } from "../../components/Faction.js";
+import { Vitality } from "../../components/Vitality.js";
 import { ScriptRef } from "../../components/ScriptRef.js";
 import { findThrowPayload } from "../../content/items/throwPayloads.js";
 import { ScriptVerb } from "../../scripting.js";
+import { areFactionsHostile } from "../../utils/factionHostility.js";
 
 /**
  * @param {any} value
@@ -104,6 +107,51 @@ function normalizeThrowSpec(input, actorPos, weight) {
 }
 
 /**
+ * @param {any} info
+ */
+function isThrowableWeapon(info) {
+  return String(info?.type || "") === "equip" && String(info?.slot || "") === "weapon";
+}
+
+/**
+ * @param {any} ctx
+ * @param {number} actor
+ * @param {number} targetId
+ * @param {{ x:number, y:number }} landing
+ */
+function resolveThrowImpactTarget(ctx, actor, targetId, landing) {
+  const preferred = Number(targetId || 0) | 0;
+  if (preferred > 0 && preferred !== actor && ctx.query.alive(preferred)) {
+    const p = ctx.query.get(preferred, Position);
+    const v = ctx.query.get(preferred, Vitality);
+    if (
+      p && v
+      && (v.hp | 0) > 0
+      && (p.x | 0) === (landing.x | 0)
+      && (p.y | 0) === (landing.y | 0)
+    ) {
+      return preferred;
+    }
+  }
+
+  const ids = ctx.query.livingAt(landing.x, landing.y, { exclude: [actor] });
+  return Array.isArray(ids) && ids.length > 0 ? (Number(ids[0]) | 0) : 0;
+}
+
+/**
+ * @param {any} ctx
+ * @param {{ damageDice?: string }} info
+ * @param {number} actor
+ */
+function rollThrowImpactDamage(ctx, info, actor) {
+  const dice = String(info?.damageDice || "1d2");
+  const base = Math.max(1, Number(ctx.fx.roll(dice) || 0) | 0);
+  const snapshot = ctx.query.combatSnapshot(actor, "ranged");
+  const flat = Math.max(0, Number(snapshot?.damageFlatBonus || 0) | 0);
+  return Math.max(1, base + flat);
+}
+
+/**
  * Canonical throw interaction pipeline.
  *
  * Behavior:
@@ -125,6 +173,8 @@ export function throwPipeline(ctx) {
   const metrics = {
     consumed: false,
     dropped: false,
+    impacted: false,
+    impactDamage: 0,
     payloadMatched: false,
     path: "none",
     range: 0,
@@ -238,6 +288,36 @@ export function throwPipeline(ctx) {
     metrics.consumed = true;
   } else if (!hookResult.skipBaseThrow) {
     const landing = normalizePoint(hookResult.at, throwSpec.to);
+    let impact = null;
+
+    if (isThrowableWeapon(info)) {
+      const defender = resolveThrowImpactTarget(ctx, actor, targetId, landing);
+      if (defender > 0) {
+        const af = ctx.query.get(actor, Faction)?.key || "";
+        const df = ctx.query.get(defender, Faction)?.key || "";
+        if (areFactionsHostile(af, df)) {
+          const damage = rollThrowImpactDamage(ctx, info || {}, actor);
+          ctx.mutate.queue({
+            type: "damage",
+            entityId: defender,
+            amount: damage,
+            source: actor,
+            damageType: "physical",
+          });
+          metrics.impacted = true;
+          metrics.impactDamage = damage;
+          impact = { targetId: defender, damage };
+          ctx.io.emit("item:throw-impact", {
+            actor,
+            itemId,
+            targetId: defender,
+            at: { ...landing },
+            damage,
+          });
+        }
+      }
+    }
+
     ctx.mutate.queue({
       type: "dropFromInventory",
       entityId: itemId,
@@ -257,6 +337,7 @@ export function throwPipeline(ctx) {
       maxRange: throwSpec.maxRange,
       weight: throwSpec.weight,
       path: metrics.path,
+      impact,
     });
   }
 

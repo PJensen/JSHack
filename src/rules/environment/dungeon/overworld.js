@@ -342,8 +342,8 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, homeX + 3, homeY + 1, "cooking_fire");
   addSpawn(chunks, homeX - 3, doorY + 2, "home_sign");
   // Outside crafting & fire
-  setWorldTile(chunks, homeX + 10, homeY + 5, TILE_GRASS);
-  addSpawn(chunks, homeX + 10, homeY + 5, "anvil");
+  // setWorldTile(chunks, homeX + 10, homeY + 5, TILE_GRASS);
+  // addSpawn(chunks, homeX + 10, homeY + 5, "anvil");
   setWorldTile(chunks, homeX - 6, homeY + 7, TILE_GRASS);
   addSpawn(chunks, homeX - 6, homeY + 7, "furnace");
 

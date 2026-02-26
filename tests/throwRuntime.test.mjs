@@ -2,10 +2,12 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
+import { Faction } from "../src/rules/components/Faction.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ScriptRef } from "../src/rules/components/ScriptRef.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
 import { ThrowIntent } from "../src/rules/components/Intents/ThrowIntent.js";
 import { ScriptVerb, registerScript } from "../src/rules/scripting.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
@@ -73,6 +75,45 @@ Deno.test("throw runtime range decreases with heavier item weight", () => {
   const heavyThrow = results[1].payload?.throw;
   assert(lightThrow && heavyThrow, "both throw actions should expose throw metadata");
   assert(lightThrow.maxRange > heavyThrow.maxRange, "lighter items should throw farther than heavier items");
+});
+
+Deno.test("throw runtime weapon impacts hostile entity on landing tile", () => {
+  const world = new World({ seed: 7104 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 999 });
+  world.add(actor, Position, { x: 10, y: 10 });
+  world.add(actor, Faction, { key: "player" });
+
+  const target = world.create();
+  world.add(target, Position, { x: 12, y: 10 });
+  world.add(target, Vitality, { hp: 12, maxHp: 12 });
+  world.add(target, Faction, { key: "enemy" });
+
+  const dagger = buildCatalogItem(world, "dagger_quick");
+  world.get(actor, Inventory).items.push(dagger);
+
+  const impacts = [];
+  const results = [];
+  world.on("item:throw-impact", (ev) => impacts.push(ev));
+  world.on("interaction:result", (ev) => results.push(ev));
+
+  world.add(actor, ThrowIntent, { itemId: dagger, x: 12, y: 10 });
+  throwSystem(world);
+
+  assertEquals(results.length, 1);
+  assertEquals(results[0].verb, "throw");
+  assertEquals(results[0].ok, true);
+  assertEquals(results[0].metrics.impacted, true);
+  assert(results[0].metrics.impactDamage > 0, "impact damage should be recorded");
+
+  assertEquals(impacts.length, 1);
+  assertEquals(impacts[0].actor, actor);
+  assertEquals(impacts[0].itemId, dagger);
+  assertEquals(impacts[0].targetId, target);
+  assert(impacts[0].damage > 0, "impact event should include positive damage");
+
+  const vit = world.get(target, Vitality);
+  assert(vit.hp < 12, "thrown weapon should reduce target hp");
 });
 
 Deno.test("throw runtime invokes ScriptVerb.ItemThrow with throw context", () => {
