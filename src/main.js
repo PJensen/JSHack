@@ -85,7 +85,7 @@ import { Faction } from "./rules/components/Faction.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import TombstoneComponent from "./rules/components/Tombstone.js";
-import { installDeathShareListener } from "./rules/systems/shareDeathSystem.js";
+import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
 import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
@@ -190,7 +190,7 @@ if (_pendingSavegame) {
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
 installTombstoneDeathListener(world, tombstoneRepo);
-installDeathShareListener(world);
+installDeathShareWiring({ world });
 bootAdvance("Installed run listeners");
 
 // Warm data registries with per-dataset progress callbacks.

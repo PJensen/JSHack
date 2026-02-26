@@ -85,6 +85,14 @@ Deno.test("equip item system: weapon, armor, rings, shield, ranged, swap, and ed
   eq = world.get(actor, Equipment);
   assert(eq.shield === shield, `shield should be buckler, got ${eq.shield}`);
 
+  // Equip feet slot
+  const boots = makeItem(world, { id: 'boots_leather', name: 'Leather Boots', slot: 'feet' });
+  inv.items.push(boots);
+  world.add(actor, EquipIntent, { itemId: boots });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.feet === boots, `feet should be leather boots, got ${eq.feet}`);
+
   // Equip ranged bow
   const bow = makeItem(world, { id: 'bow_short', name: 'Short Bow', slot: 'ranged', type: 'equip' });
   inv.items.push(bow);
