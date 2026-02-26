@@ -19,9 +19,13 @@ import { Engraving } from '../../rules/components/Engraving.js';
 import { PlasmaCloud } from "../../rules/components/PlasmaCloud.js";
 import { HazardArea } from "../../rules/components/HazardArea.js";
 import { Trap } from "../../rules/components/Trap.js";
+import { Vitality } from '../../rules/components/Vitality.js';
+import { Faction } from '../../rules/components/Faction.js';
+import { Pet } from '../../rules/components/Pet.js';
+import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
@@ -102,6 +106,38 @@ function projectDisplayTags(world, id, rec) {
 }
 
 /**
+ * Project display-only combat HUD data onto the entity record.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {EntityView} rec
+ * @param {string} playerFactionKey
+ */
+function projectCombatUi(world, id, rec, playerFactionKey) {
+	rec.hp = 0;
+	rec.maxHp = 0;
+	rec.isPet = false;
+	rec.showHealthBar = false;
+
+	/** @type {any} */ const vit = /** @type any */ (world.get(id, Vitality));
+	if (!vit) return;
+
+	const maxHp = Math.max(1, vit.maxHp | 0);
+	const hp = Math.max(0, Math.min(maxHp, vit.hp | 0));
+	rec.hp = hp;
+	rec.maxHp = maxHp;
+
+	const factionKey = String(world.get(id, Faction)?.key || '').trim().toLowerCase();
+	const isPet = world.has(id, Pet) || factionKey === 'pet';
+	rec.isPet = isPet;
+	if (isPet) {
+		rec.showHealthBar = true;
+		return;
+	}
+	if (!playerFactionKey || !factionKey) return;
+	rec.showHealthBar = areFactionsHostile(playerFactionKey, factionKey);
+}
+
+/**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @returns {WorldView}
  */
@@ -144,6 +180,7 @@ export function buildWorldView(world) {
 
 	_view.isVisible = isVisible;
 	_view.isExplored = isExplored;
+	const playerFactionKey = _view.player ? String(world.get(_view.player.id, Faction)?.key || 'player').trim().toLowerCase() : '';
 
 	// Collect entity records near the player (or all if no player).
 	if (_view.player) {
@@ -186,7 +223,7 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -200,6 +237,7 @@ export function buildWorldView(world) {
 			if (itemInfo && Array.isArray(itemInfo.affixes) && itemInfo.affixes.includes('flaming')) {
 				if (!rec.tags.includes('glowing')) rec.tags.push('glowing');
 			}
+			projectCombatUi(world, id, rec, playerFactionKey);
 
 			_allEntities.push(rec);
 
@@ -243,7 +281,7 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -257,6 +295,7 @@ export function buildWorldView(world) {
 			if (itemInfo && Array.isArray(itemInfo.affixes) && itemInfo.affixes.includes('flaming')) {
 				if (!rec.tags.includes('glowing')) rec.tags.push('glowing');
 			}
+			projectCombatUi(world, id, rec, '');
 
 			_allEntities.push(rec);
 			if (isPlayer) {
