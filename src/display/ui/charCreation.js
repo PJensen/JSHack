@@ -2,6 +2,7 @@
 // Character creation screen. Pure presentation — no rules/ imports (shared/ is OK).
 // Data is passed in by main.js via showCharCreation(opts).
 import { versionLoaded, getVersionState } from '../../shared/version.js';
+import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
 
 /**
  * @param {{
@@ -13,6 +14,7 @@ import { versionLoaded, getVersionState } from '../../shared/version.js';
  */
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
   let selectedClassId = null;
+  const fallbackName = pickRandomCharacterName();
 
   // ---- backdrop (full-viewport, blocks all input) ----
   const panel = document.createElement('div');
@@ -140,7 +142,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
-  nameInput.value = 'Hero';
+  nameInput.value = fallbackName;
   nameInput.maxLength = 24;
   nameInput.setAttribute('autocomplete', 'off');
   nameInput.setAttribute('autocapitalize', 'words');
@@ -288,7 +290,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   confirmBtn.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     if (confirmBtn.disabled) return;
-    const name = (nameInput.value || '').trim() || 'Hero';
+    const name = (nameInput.value || '').trim() || fallbackName;
     const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
     onConfirm({ name, classId: selectedClassId, seed });
     dispose();
@@ -305,7 +307,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   panel.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !confirmBtn.disabled) {
       e.preventDefault();
-      const name = (nameInput.value || '').trim() || 'Hero';
+      const name = (nameInput.value || '').trim() || fallbackName;
       const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
       onConfirm({ name, classId: selectedClassId, seed });
       dispose();
