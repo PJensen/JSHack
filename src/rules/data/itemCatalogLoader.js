@@ -1,4 +1,5 @@
 import { getCatalogItem } from "./itemCatalog.js";
+import { Beatitude } from "../components/Beatitude.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -48,6 +49,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
 
   if (String(def.type || "").toLowerCase() === "potion") {
     const potionDef = (def.potion && typeof def.potion === "object") ? def.potion : {};
+    const beatitude = String(potionDef.beatitude || def.beatitude || "").toLowerCase();
     world.add(id, Potion, {
       name: String(def.name || potionDef.name || "Potion"),
       route: String(potionDef.route || "oral"),
@@ -56,6 +58,9 @@ export function buildCatalogItem(world, itemId, opts = {}) {
       effects: Array.isArray(potionDef.effects) ? potionDef.effects.map((e) => ({ ...e })) : [],
       toxicity: (potionDef.toxicity && typeof potionDef.toxicity === "object") ? { ...potionDef.toxicity } : null,
     });
+    if (beatitude === "blessed" || beatitude === "uncursed" || beatitude === "cursed") {
+      world.add(id, Beatitude, { state: beatitude });
+    }
   }
 
   if (typeof def.material === "string" && def.material) {
