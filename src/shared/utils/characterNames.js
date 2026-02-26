@@ -6,7 +6,6 @@ export const STARTER_CHARACTER_NAMES = Object.freeze([
   'Rook',
   'Nyx',
   'Vale',
-  'Kestrel',
   'Bram',
   'Mara',
   'Orin',
