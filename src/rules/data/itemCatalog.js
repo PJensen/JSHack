@@ -171,6 +171,7 @@ function canPoisonDipTarget(state) {
 const STONECOAT_ALLOWED_SLOTS = Object.freeze(new Set([
   "weapon",
   "armor",
+  "head",
   "shield",
   "ring",
   "ranged",
@@ -455,6 +456,17 @@ export const ITEM_CATALOG = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2 },
+  },
+  helm_iron: {
+    id: "helm_iron",
+    catalogKind: "equipment",
+    name: "Iron Helm",
+    type: "equip",
+    slot: "head",
+    material: "iron",
+    rarity: 1,
+    rarityName: "common",
+    bonuses: { defense: 1 },
   },
   ring_health: {
     id: "ring_health",

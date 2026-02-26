@@ -14,7 +14,7 @@ function makeItem(world, { id, name, slot, type = 'equip', count = 1 }) {
   return eid;
 }
 
-Deno.test("equip item system: weapon, armor, rings, shield, ranged, swap, and edge cases", () => {
+Deno.test("equip item system: weapon, armor, head, rings, shield, ranged, swap, and edge cases", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
@@ -53,6 +53,14 @@ Deno.test("equip item system: weapon, armor, rings, shield, ranged, swap, and ed
 
   eq = world.get(actor, Equipment);
   assert(eq.armor === plate, `armor should be plate, got ${eq.armor}`);
+
+  // Equip head slot
+  const helm = makeItem(world, { id: 'helm_iron', name: 'Iron Helm', slot: 'head' });
+  inv.items.push(helm);
+  world.add(actor, EquipIntent, { itemId: helm });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.head === helm, `head should be iron helm, got ${eq.head}`);
 
   // Equip rings: first fills ring1, second fills ring2, third swaps ring1
   const ring1 = makeItem(world, { id: 'ring_a', name: 'Ruby Ring', slot: 'ring' });

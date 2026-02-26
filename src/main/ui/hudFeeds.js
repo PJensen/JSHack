@@ -1,7 +1,7 @@
 import { playerEntity } from "../../rules/utils/queries.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { Stamina } from "../../rules/components/Stamina.js";
-import { Equipment } from "../../rules/components/Equipment.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
@@ -118,12 +118,7 @@ export function createHudFeeds(world, deps) {
       for (const a of arr) affixIds.push(String(a));
     };
     if (eq) {
-      pushAffixes(Number(eq.weapon || 0));
-      pushAffixes(Number(eq.armor || 0));
-      pushAffixes(Number(eq.ring1 || 0));
-      pushAffixes(Number(eq.ring2 || 0));
-      pushAffixes(Number(eq.ranged || 0));
-      pushAffixes(Number(eq.feet || 0));
+      for (const slot of NON_AMMO_GEAR_SLOTS) pushAffixes(Number(eq[slot] || 0));
     }
     const affixNames = affixIds
       .filter((id) => !/^thorns/i.test(String(id)))
