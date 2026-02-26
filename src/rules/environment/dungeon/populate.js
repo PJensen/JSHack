@@ -5,6 +5,9 @@ import { createRng } from '../../../lib/ecs-js/rng.js';
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Position } from '../../components/Position.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
+import { Interactable } from '../../components/Interactable.js';
+import { Collider } from '../../components/Collider.js';
+import { Polymorph } from '../../components/Polymorph.js';
 import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
@@ -63,6 +66,7 @@ const ROOM_FEATURES = [
   { kind: 'torch',       weight: 2 }, // very rare standalone
 ];
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
+const SHOP_MIMIC_CHANCE = 0.08;
 
 function pickRoomFeature(rng) {
   let roll = rng.next() * ROOM_FEATURE_TOTAL_WEIGHT;
@@ -77,7 +81,7 @@ function pickRoomFeature(rng) {
  * @typedef {Object} SpawnPoint
  * @property {number} x - world X
  * @property {number} y - world Y
- * @property {string} kind - 'monster', 'gold', 'potion', 'equipment'
+ * @property {string} kind - 'monster', 'mimic', 'gold', 'potion', 'equipment'
  * @property {Object} params
  */
 
@@ -253,6 +257,15 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   if (eligibleShopRooms.length > 0 && rng.next() < 0.30) {
     const room = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
 
+    // Shop rooms must not start with regular dungeon enemies/spawners.
+    for (let i = spawns.length - 1; i >= 0; i--) {
+      const sp = spawns[i];
+      if (!isPointInRoom(sp.x, sp.y, room)) continue;
+      if (sp.kind === 'monster' || sp.kind === 'spawner') {
+        spawns.splice(i, 1);
+      }
+    }
+
     // Place shopkeeper near the room entrance (prefer near doors)
     const sx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
     const sy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
@@ -266,6 +279,24 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         room: { x: room.x, y: room.y, w: room.w, h: room.h }
       }
     });
+
+    // Rare trap-chest in shops: looks like a chest until touched.
+    if (rng.next() < SHOP_MIMIC_CHANCE) {
+      let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      let attempts = 0;
+      while (mx === sx && my === sy && attempts < 8) {
+        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+        attempts++;
+      }
+      spawns.push({
+        x: mx,
+        y: my,
+        kind: 'mimic',
+        params: { depth: floorPlan.depth },
+      });
+    }
 
     // Scatter shop items on the floor throughout the room (5-12 items)
     const itemCount = rng.int(5, 12);
@@ -385,6 +416,10 @@ function countRoomEntrances(room, chunk) {
   return entrances;
 }
 
+function isPointInRoom(x, y, room) {
+  return x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+}
+
 /**
  * Equip a monster entity with items defined in its equipment spec.
  * @param {import('../../../lib/ecs-js/index.js').World} world
@@ -484,6 +519,20 @@ export function materializeSpawn(world, spawn) {
           }
         }
       }
+      return id;
+    }
+    case 'mimic': {
+      const id = createFrom(world, Chest, { x: spawn.x, y: spawn.y });
+      world.add(id, Collider, { solid: true, blocksSight: false });
+      world.add(id, Interactable, { action: 'touchMimic', params: null });
+      world.add(id, Polymorph, {
+        targetIdentity: 'mimic',
+        trigger: 'touch',
+        once: true,
+        revealed: false,
+        hookKey: 'mimic_touch',
+        depth: Math.max(1, spawn.params?.depth | 0),
+      });
       return id;
     }
     case 'trap': {
