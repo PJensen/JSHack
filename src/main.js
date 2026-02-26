@@ -1595,6 +1595,10 @@ world.on('item:unequipped', ({ itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
+function hideTrapTooltip() {
+  try { window.dispatchEvent(new CustomEvent('ui:hideTrapTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTrapTooltip:', e); }
+}
+
 // When player moves, show a mobile-friendly ground item tooltip for non-currency items on the tile
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
@@ -1646,7 +1650,7 @@ world.on('moved', ({ id, to }) => {
       }));
     } catch (e) { console.debug('[main] dispatch ui:showTrapTooltip:', e); }
   } else {
-    try { window.dispatchEvent(new CustomEvent('ui:hideTrapTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTrapTooltip:', e); }
+    hideTrapTooltip();
   }
 
   // Check for adjacent shopkeeper
@@ -1688,6 +1692,26 @@ world.on('moved', ({ id, to }) => {
   } else {
     try { window.dispatchEvent(new CustomEvent('ui:hideTombstoneTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTombstoneTooltip:', e); }
   }
+});
+
+// Trap tooltip can be shown during movement, before trap resolution in the same tick.
+// Hide it immediately when the trap resolves against the player.
+world.on('trap:triggered', ({ victimId }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== (Number(victimId) | 0)) return;
+  hideTrapTooltip();
+});
+
+world.on('trap:disarmed', ({ actor }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== (Number(actor) | 0)) return;
+  hideTrapTooltip();
+});
+
+world.on('trap:disarm:failed', ({ actor }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== (Number(actor) | 0)) return;
+  hideTrapTooltip();
 });
 
 // When player moves onto a tile with an engraving, show it in the log
