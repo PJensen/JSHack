@@ -51,6 +51,59 @@ Deno.test("throw runtime default path drops item to landing tile with weighted r
   assertEquals(thrownEvents[0].range, throwMeta.range);
 });
 
+Deno.test("throw runtime preserves selected off-axis tile when target is in range", () => {
+  const world = new World({ seed: 7105 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 999 });
+  world.add(actor, Position, { x: 10, y: 10 });
+
+  const item = buildCatalogItem(world, "scroll_mapping");
+  world.get(actor, Inventory).items.push(item);
+
+  const thrownEvents = [];
+  world.on("item:thrown", (ev) => thrownEvents.push(ev));
+
+  world.add(actor, ThrowIntent, { itemId: item, x: 13, y: 11 });
+  throwSystem(world);
+
+  assertEquals(thrownEvents.length, 1);
+  assertEquals(thrownEvents[0].to.x, 13);
+  assertEquals(thrownEvents[0].to.y, 11);
+});
+
+Deno.test("throw runtime preserves aim slope when clamping out-of-range targets", () => {
+  const world = new World({ seed: 7106 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 999 });
+  world.add(actor, Position, { x: 10, y: 10 });
+
+  const item = world.create();
+  world.add(item, NamedIdentity, { name: "Test Stone", identity: "test_stone" });
+  world.add(item, ItemInfo, {
+    type: "tool",
+    slot: "bag",
+    weight: 2,
+    value: 0,
+    description: "Test throw vector item.",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  world.get(actor, Inventory).items.push(item);
+
+  const thrownEvents = [];
+  world.on("item:thrown", (ev) => thrownEvents.push(ev));
+
+  world.add(actor, ThrowIntent, { itemId: item, x: 20, y: 12 });
+  throwSystem(world);
+
+  assertEquals(thrownEvents.length, 1);
+  assertEquals(thrownEvents[0].to.x, 14);
+  assertEquals(thrownEvents[0].to.y, 11);
+});
+
 Deno.test("throw runtime range decreases with heavier item weight", () => {
   const world = new World({ seed: 7102 });
   const actor = world.create();
