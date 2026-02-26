@@ -183,7 +183,16 @@ export function initHUD() {
     cursor: 'pointer'
   });
   bugBtn.addEventListener('click', () => {
-    window.open('https://github.com/pjensen/JSHack', '_blank', 'noopener');
+    const version = window.VERSION || 'unknown';
+    const ua = navigator.userAgent;
+    const body = encodeURIComponent(
+      `**Version:** ${version}\n**Browser:** ${ua}\n\n**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**`
+    );
+    const title = encodeURIComponent('[Bug] ');
+    window.open(
+      `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
+      '_blank', 'noopener'
+    );
   });
 
   // Pet control button (touch/press interface)

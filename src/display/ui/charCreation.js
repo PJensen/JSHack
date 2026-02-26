@@ -1,7 +1,7 @@
 // display/ui/charCreation.js
 // Character creation screen. Pure presentation — no rules/ imports (shared/ is OK).
 // Data is passed in by main.js via showCharCreation(opts).
-import { versionLoaded } from '../../shared/version.js';
+import { versionLoaded, getVersionState } from '../../shared/version.js';
 
 /**
  * @param {{
@@ -76,11 +76,48 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   Object.assign(versionEl.style, {
     fontSize: '12px', color: '#4a6080',
     marginBottom: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
   });
   box.appendChild(versionEl);
   versionLoaded.then(() => {
     const ver = /** @type {any} */ (window).VERSION;
-    if (ver) versionEl.textContent = `v${ver}`;
+    if (!ver) return;
+
+    versionEl.textContent = `v${ver}`;
+    const state = getVersionState();
+    if (!state.isNew) return;
+
+    const badge = document.createElement('span');
+    badge.textContent = 'NEW';
+    Object.assign(badge.style, {
+      fontSize: '10px',
+      fontWeight: 'bold',
+      letterSpacing: '0.08em',
+      color: '#b9ffd2',
+      background: 'rgba(44,94,58,0.42)',
+      border: '1px solid #4e9a61',
+      borderRadius: '999px',
+      padding: '1px 6px',
+      lineHeight: '1.4',
+    });
+    versionEl.appendChild(badge);
+    try {
+      badge.animate(
+        [
+          { transform: 'translateY(0px)', opacity: 0.75, filter: 'brightness(1)' },
+          { transform: 'translateY(-1px)', opacity: 1, filter: 'brightness(1.25)' },
+        ],
+        {
+          duration: 700,
+          easing: 'ease-in-out',
+          direction: 'alternate',
+          iterations: Infinity,
+        },
+      );
+    } catch {}
   }).catch(() => {});
 
   // ---- music nudge ----
