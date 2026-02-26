@@ -1,177 +1,231 @@
-# Item Complexity Architecture Plan
+# Thing Complexity Architecture Plan
 
 ## Purpose
 
-Define a practical path to reach high-complexity, event-driven item behavior (like Water/Holy/Unholy Water) while preserving JSHack constraints:
+Define a practical path to reach high-agency, high-complexity simulation objects across JSHack (items, weapons, monsters, social NPCs) while preserving core constraints:
 
 - `rules -> bridge -> display` separation
-- ECS scheduler ownership of execution order
+- ECS scheduler controls ordering
 - no system-to-system calls
-- deterministic behavior and Deno-first testing
+- deterministic, replayable behavior
+- Deno-first testing
+
+This plan treats each complex object as a **thing contract**, not a one-off content script.
 
 ---
 
-## Architectural Goal
+## North Star
 
-Move from ad-hoc item handling to a consistent model where:
+Each thing should be:
 
-1. Item definitions declare rich verb hooks and metadata.
-2. Item hooks emit deterministic domain events.
-3. Resolver systems in scheduler phases consume those events and apply world changes.
-4. Complex behavior remains composable, testable, and replayable.
+1. Self-describing: identity, appearance, policy, affordances, invariants.
+2. Event-native: hooks emit events, resolver systems apply outcomes.
+3. Deterministic: all randomness routed through world/query services.
+4. Composable: cross-domain behavior without direct subsystem coupling.
+5. Auditable: failure modes and assumptions are explicit.
 
 ---
 
-## Core Design Decisions
+## Canonical Thing Definition Spec
 
-### 1) Canonical item action contract in `rules`
+Standardize one schema shape for all high-complexity things.
 
-Introduce one action context contract used by all item verbs (`quaff`, `dip`, `throw`, `pour`, `apply`, `offer`, etc.).  
-Hooks must be deterministic and must communicate effects via emitted events.
+## Required sections
 
-### 2) Event-driven item outcomes
+1. `identity`: `id`, `kind`, `name`, `tags`, visual identity.
+2. `state defaults`: stable per-instance defaults (brain, ledger, properties).
+3. `affordances(ctx)`: current available actions for UI/planning, mobile-first prompts.
+4. `verbs`: registry of callable hooks.
+5. `hooks`: `on_*` behavior entry points that emit events and return deterministic results.
+6. `policy`: generation, wishability, ownership, legality, alignment, economy constraints.
+7. `debug`: invariants + common failure modes.
 
-Item hooks never call systems directly.  
-Effects are resolved by dedicated systems handling event families (`wetness`, `BUC`, `mixing`, `tile wash`, `status reactions`, etc.).
+## Optional sections
 
-### 3) One-file complex thing policy
+1. `appearance` / unknown-vs-identified presentation.
+2. `economy` appraise/shop pricing contracts.
+3. `serialization` helpers for derived properties.
+4. `telemetry` hints for audit logging.
 
-When a gameplay object reaches a high interaction surface area, it may be modeled as a **single domain file** that contains:
+Schema rule:
+- do not invent ad-hoc top-level shapes per file
+- extend via optional sections, not custom mini-frameworks
 
-- identity/appearance metadata
+---
+
+## Complexity Layering Model
+
+Use the same layered structure for every complex thing.
+
+## Structural layers (always)
+
+1. Layer A: static identity (`id`, tags, visuals, material, slots, uniqueness).
+2. Layer B: action surface (verbs, affordances, gating checks).
+3. Layer C: effect contract (event emissions only).
+4. Layer D: policy envelope (economy, legality, generation, ownership, alignment).
+5. Layer E: observability (invariants, failure modes, audit trace points).
+
+## Behavior rollout layers (implementation sequence)
+
+1. Layer 1: core verbs + minimal resolver effects.
+2. Layer 2: cross-system interactions (combat/status/material/altar/economy).
+3. Layer 3: edge behavior (environment, director logic, pricing, anti-exploit, audit).
+
+---
+
+## Event Taxonomy Standard
+
+Complexity only scales with one shared event language.
+
+## Event namespaces
+
+- `item.*`
+- `combat.*`
+- `damage.*`
+- `status.*`
+- `tile.*`
+- `field.*`
+- `buc.*`
+- `altar.*`
+- `boss.*`
+- `shop.*`
+- `alignment.*`
+- `economy.*`
+
+## Contract rules
+
+1. Stable payload shape per event name.
+2. Deterministic payload values only.
+3. No hidden side effects in hooks.
+4. Hook output is event emission + `ok/fail`.
+5. Resolver systems own mutation and conflict resolution.
+
+---
+
+## Verb Intent vs Effect Resolution
+
+Enforce this split universally:
+
+1. Thing hook: validates context, emits intent/effect events, returns.
+2. Resolver systems: process events in scheduler phase order.
+3. Cleanup systems: clear transient intents/events.
+
+This is the key safeguard against cross-system coupling and order bugs.
+
+---
+
+## One-File Complex Thing Policy
+
+A complex thing may be modeled in one file when behavior is tightly coupled and domain-coherent.
+
+File can include:
+
+- metadata
+- affordances
 - verb hooks
-- internal helper functions
-- invariants and failure mode notes
+- helper routines
+- policy + debug sections
 
-Scope rule:
-- this is acceptable for one coherent domain object (for example: water)
-- shared cross-item logic must still be extracted into reusable helpers/systems
-- resolver effects remain outside the item file in systems
+Boundary rules:
 
-Rationale:
-- keeps the full behavior model discoverable in one place
-- reduces accidental fragmentation for highly coupled item semantics
-- still respects ECS and scheduler boundaries
+1. Shared mechanics stay in resolver systems/helpers.
+2. No direct calls into other systems.
+3. No display-layer imports in rules thing files.
+4. Per-thing file is allowed; per-thing framework is not.
 
 ---
 
 ## Phase Plan
 
-## Phase 1: Vertical Slice (Water only)
+## Phase 0: Standardization Foundation
 
-Implement one full slice for water before generalizing.
-
-1. Add minimum required components:
-- `ItemDefRef`
-- `Beatitude`
-- `LiquidProps`
-- `PendingItemAction` (or equivalent intent/action component)
-
-2. Add action dispatch:
-- `itemActionSystem` resolves verb intents and calls item hook by definition
-
-3. Implement water with limited verb set first:
-- `on_quaff`
-- `on_dip`
-- `on_throw` + `on_projectile_impact`
-
-4. Add resolver systems for immediate needs:
-- burning extinguish
-- wetness status
-- rust/material reaction
-- holy/unholy trait reaction
-
-5. Add deterministic tests:
-- unit tests per hook (expected emitted events)
-- integration test per action chain
+1. Publish `Thing Definition Spec` doc in-repo.
+2. Define event taxonomy and payload contracts.
+3. Add one dispatcher pattern for thing verbs.
+4. Add contract validation helpers for dev/test.
+5. Add test harness helpers for hook-level deterministic assertions.
 
 Exit criteria:
-- one water action per tick resolves consistently with fixed seed
-- no direct system-to-system calls
-- all new behavior covered by tests
 
-## Phase 2: Event Taxonomy and Safety Rails
+- one schema shape is documented and used
+- one event taxonomy is documented and enforced in tests
 
-1. Define event namespace/constants and payload docs.
-2. Add dev-time payload validation where useful.
-3. Add explicit regression tests for known failure modes:
-- double consumption on throw and impact
-- protection bypass (wetness applied despite waterproof state)
-- beatitude and derived water type desync
-4. Add lightweight replay/audit logging hooks for item action traces.
+## Phase 1: Water Vertical Slice (systemic hub)
+
+1. Implement water as a full thing contract.
+2. Start with `quaff`, `dip`, `throw/impact`.
+3. Build minimal resolver set: wetness, burning removal, rust, holy/unholy reactions.
+4. Add regression tests for double-consume and protection checks.
 
 Exit criteria:
-- event contract is stable and documented
-- regression tests lock common failure paths
 
-## Phase 3: Generalize to Item Families
+- full deterministic action chain works
+- event contracts are stable
 
-1. Extract reusable helpers from water slice:
-- beatitude derivation
-- wetness emission helpers
-- BUC attempt emitters
-- projectile break/impact flow helper
+## Phase 2: Artifact Weapon Vertical Slice (combat-policy hybrid)
 
-2. Migrate potion family to same action contract.
-3. Extend model to other families (scrolls, wands, food) using the same dispatcher + resolver pattern.
+1. Implement one artifact weapon contract (Grayswandir class).
+2. Cover wield/unwield/attack/throw/invoke flows.
+3. Normalize channel-based damage payloads and policy hooks (wish/enchant/shop).
+4. Add tests for alignment gating, channel composition, throw/return lifecycle.
 
 Exit criteria:
-- multiple item families use same contract
-- new item complexity is additive (mostly data + hook entries)
+
+- weapon complexity composes with existing combat/economy systems through events only
+
+## Phase 3: Complex Actor Slices (director and social law engines)
+
+1. Implement one boss contract (Wizard class) with phase-driven AI.
+2. Implement one shopkeeper contract (ledger + theft + pursuit policy).
+3. Add resolver systems for boss director events and shop law/economy events.
+4. Add determinism tests around cooldown persistence, pursuit transitions, billing integrity.
+
+Exit criteria:
+
+- high-agency AI and social/economy behavior are expressed as thing contracts plus resolvers
+
+## Phase 4: Catalog Scale-Out
+
+1. Migrate other items/monsters/NPCs onto the same contract gradually.
+2. Prefer reaction tables and shared helpers over bespoke logic duplication.
+3. Enforce acceptance rubric before merge.
+
+Exit criteria:
+
+- complexity is cheap to replicate
+- new things follow one lifecycle pattern
 
 ---
 
-## System Wiring Strategy
+## Acceptance Rubric (per new thing)
 
-In `configureWorld()`:
+A new complex thing is done only if all are true:
 
-1. Install item-domain listeners once using Symbol guards:
-- `Symbol.for('jshack:itemActions:installed')`
-- `Symbol.for('jshack:wetnessResolvers:installed')`
-- `Symbol.for('jshack:bucResolvers:installed')`
-
-2. Register resolver systems in phases:
-- intents: action intent capture/normalization
-- effects: event resolution and state mutation
-- cleanup: transient event cleanup
-
----
-
-## Testing Strategy
-
-Tests are mandatory for each new system/hook.
-
-1. Unit tests:
-- each item hook emits expected events for fixed inputs
-- each resolver transforms state correctly for fixed event payloads
-
-2. Integration tests:
-- `intent -> action dispatch -> emitted events -> resolver effects`
-
-3. Determinism tests:
-- same seed + same input sequence => same output state/events
+1. Uses canonical schema sections.
+2. Exposes affordances for UI/planning.
+3. Uses verbs/hooks with event-only side effects.
+4. Declares policy envelope (generation/economy/alignment/ownership as applicable).
+5. Includes `debug.invariants` and `debug.commonFailureModes`.
+6. Has unit tests for hook emissions.
+7. Has integration tests for resolver outcomes.
+8. Passes deterministic replay for fixed seed + input sequence.
 
 ---
 
-## Commit and Scope Discipline
+## Biggest Risk and Controls
 
-Follow "one subsystem per session":
+Primary risk: **inconsistent over-modeling** (each thing becomes complex in a different dialect).
 
-1. components
-2. dispatcher system
-3. water definition/hook set
-4. resolver system(s)
-5. tests
+Controls:
 
-Keep commits focused and message clearly (no catch-all mega commits).
+1. one contract
+2. one event taxonomy
+3. one dispatcher lifecycle
+4. schema validation in tests
+5. rubric gate on pull requests
 
 ---
 
-## Immediate Next Implementation Step
+## Immediate Next Planning Step
 
-Build Phase 1 as the first vertical slice:
-
-1. create item action contract + dispatcher
-2. implement water hooks for `quaff`, `dip`, `throw/impact`
-3. add minimal resolver systems
-4. add deterministic tests before broadening scope
+Write a compact `THING_CONTRACT_CHECKLIST.md` that mirrors the rubric and is used as the merge gate for every new high-complexity thing definition.
