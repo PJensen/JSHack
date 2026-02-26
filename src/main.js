@@ -2812,6 +2812,7 @@ function frame(now) {
   hudFeeds.updateVitalsHUD();
   hudFeeds.updateCombatHUD();
   hudFeeds.updateDepthHUD();
+  hudFeeds.updateTurnHUD();
   hudFeeds.updatePetHUD();
   hudFeeds.updateActiveSpellHUD();
 
