@@ -163,3 +163,45 @@ Deno.test("wrath damage scales from severity and can remove mercy floor", () => 
   assert(Number(wrathEvents[1]?.severityScale || 1) > 1, "scaled wrath event should report multiplier");
   assert(Number(wrathEvents[1]?.wrathDebt || 0) > 0, "scaled wrath event should report wrath debt");
 });
+
+Deno.test("shrine touch records deity communion on the deity ledger", () => {
+  const world = new World({ seed: 0xC0DE });
+  const playerId = createPlayer(world, { name: "Hero" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+  else world.add(playerId, Devotion, { deityId: "seraphine" });
+
+  const deity = initDeity("seraphine", world);
+  assert(deity, "deity should initialize");
+  deitySystem(world); // install listeners + baseline tick
+
+  const communionEvents = [];
+  world.on("shrine:communion", (e) => communionEvents.push(e));
+
+  world.emit("shrine:touch", { actor: playerId, targetId: 321 });
+  assertEquals(communionEvents.length, 1);
+  assertEquals(communionEvents[0].effect, "blessing");
+  assertEquals(communionEvents[0].deityId, "seraphine");
+  assertEquals(deity.ledger.ticksSinceLast("pray"), 0, "shrine should register an immediate prayer");
+  assertEquals(deity.ledger.ticksSinceLast("offer"), 0, "shrine should register an immediate offering");
+});
+
+Deno.test("shrine touch is cooldown-gated to prevent spam", () => {
+  const world = new World({ seed: 0x5A11 });
+  const playerId = createPlayer(world, { name: "Hero" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+  else world.add(playerId, Devotion, { deityId: "seraphine" });
+
+  initDeity("seraphine", world);
+  deitySystem(world); // install listeners
+
+  const communionEvents = [];
+  world.on("shrine:communion", (e) => communionEvents.push(e));
+
+  world.emit("shrine:touch", { actor: playerId, targetId: 900 });
+  world.emit("shrine:touch", { actor: playerId, targetId: 900 });
+
+  assertEquals(communionEvents.length, 2, "both shrine touches should emit outcome events");
+  assertEquals(communionEvents[0].effect, "blessing");
+  assertEquals(communionEvents[1].effect, "cooldown");
+  assert(Number(communionEvents[1].cooldownRemaining || 0) > 0, "cooldown event should report remaining turns");
+});
