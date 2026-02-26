@@ -4,7 +4,7 @@
 
 import { playerEntity, itemsAt } from "../../rules/utils/queries.js";
 import { Inventory } from "../../rules/components/Inventory.js";
-import { Equipment } from "../../rules/components/Equipment.js";
+import { Equipment, GEAR_SLOTS, getEquippedSlot } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
@@ -54,15 +54,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     };
   }
 
-  const _slotMap = {
-    weapon: ['weapon'],
-    armor: ['armor'],
-    shield: ['shield'],
+  const _slotMap = Object.freeze({
+    ...Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, [slot]])),
     ring: ['ring1', 'ring2'],
-    ammo: ['ammo'],
-    ranged: ['ranged'],
-    feet: ['feet'],
-  };
+  });
 
   function buildEquippedComparison(eq, slot, currentItemId) {
     const fields = _slotMap[slot];
@@ -148,16 +143,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         for (const id of inv.items) {
           const info = world.get(id, ItemInfo);
           if (info) {
-            const equippedSlot = (eq && (
-              (eq.weapon === id && 'weapon') ||
-              (eq.armor === id && 'armor') ||
-              (eq.shield === id && 'shield') ||
-              (eq.ring1 === id && 'ring1') ||
-              (eq.ring2 === id && 'ring2') ||
-              (eq.ammo === id && 'ammo') ||
-              (eq.ranged === id && 'ranged') ||
-              (eq.feet === id && 'feet')
-            )) || null;
+            const equippedSlot = eq ? getEquippedSlot(eq, id) : null;
             const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
             const applyTargetCount = applyTargetIds.length;
             const canApply = isApplyTool(world, p.id, id);

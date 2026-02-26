@@ -20,7 +20,7 @@ import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Faction } from '../components/Faction.js';
-import { Equipment } from '../components/Equipment.js';
+import { Equipment, GEAR_SLOTS } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
@@ -47,6 +47,7 @@ const OFFENSE_SEVERITY_WEIGHTS = Object.freeze({
   grave: 0.45,
   horrifying: 0.9,
 });
+const DEITY_BLESSABLE_GEAR_SLOTS = Object.freeze(GEAR_SLOTS.filter((slot) => slot !== 'ammo' && slot !== 'ranged'));
 
 /** Get (or lazily create) a Deity instance for a given deityId. */
 function ensureDeity(deityId, world = null) {
@@ -540,8 +541,8 @@ function wireDeityMiracles(deity, deityId, world) {
         let grantedAffix = false;
         const eq = world.get(playerId, Equipment);
         if (eq) {
-          const slots = [eq.weapon, eq.armor, eq.shield, eq.ring1, eq.ring2, eq.feet];
-          for (const itemId of slots) {
+          for (const slot of DEITY_BLESSABLE_GEAR_SLOTS) {
+            const itemId = eq[slot];
             if (!Number.isInteger(itemId)) continue;
             const info = world.get(itemId, ItemInfo);
             if (!info || !Array.isArray(info.affixes)) continue;

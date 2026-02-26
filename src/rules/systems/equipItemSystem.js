@@ -1,6 +1,6 @@
 import { EquipIntent } from "../components/Intents/EquipIntent.js";
 import { Inventory } from "../components/Inventory.js";
-import { Equipment } from "../components/Equipment.js";
+import { Equipment, GEAR_SLOT_SET, getEquippedSlot } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 
@@ -37,17 +37,7 @@ export function equipItemSystem(world) {
     if (!eq) { world.remove(actor, EquipIntent); continue; }
 
     // Toggle path: selecting an item that's already equipped unequips it.
-    const equippedSlot = (
-      (eq.weapon === itemId && 'weapon') ||
-      (eq.armor === itemId && 'armor') ||
-      (eq.shield === itemId && 'shield') ||
-      (eq.ring1 === itemId && 'ring1') ||
-      (eq.ring2 === itemId && 'ring2') ||
-      (eq.ammo === itemId && 'ammo') ||
-      (eq.ranged === itemId && 'ranged') ||
-      (eq.feet === itemId && 'feet') ||
-      null
-    );
+    const equippedSlot = getEquippedSlot(eq, itemId);
     if (equippedSlot) {
       eq[equippedSlot] = null;
       try {
@@ -65,6 +55,11 @@ export function equipItemSystem(world) {
     // Determine target slot
     const slot = (info.slot || '').toLowerCase();
     let appliedSlot = null;
+    const isSupportedSlot = slot === 'ring' || GEAR_SLOT_SET.has(slot) || info.type === 'ammo';
+    if (!isSupportedSlot) {
+      world.remove(actor, EquipIntent);
+      continue;
+    }
 
     // Helper to push item back to inventory (ensuring it isn't already present)
     const pushToInventory = (id) => {
