@@ -12,8 +12,7 @@ import {
   findInventoryStackTargetByIdentity,
 } from "../../rules/utils/inventoryStacking.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
-import { isIdentified } from "../../rules/data/identification.js";
-import { getUnidentifiedGemValue } from "../../rules/data/gemPricing.js";
+import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
 const API_KEY = Symbol.for("jshack:main:shopWiring:api");
@@ -78,26 +77,18 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     addItemEntityToInventory(world, inv, gid);
   }
 
-  /** Resolve sell value: unidentified gems use appearance-based pricing. */
-  function resolveItemSellValue(id) {
-    const info = world.get(id, ItemInfo);
-    if (!info) return 0;
-    if (info.type === 'gem') {
-      const ni = world.get(id, NamedIdentity);
-      const identity = ni?.identity || '';
-      if (!identity || !isIdentified(identity)) {
-        return getUnidentifiedGemValue(info.description) || info.value || 0;
-      }
-    }
-    return info.value || 0;
+  function resolveItemAppraisal(id) {
+    return appraiseItemValue(world, id, {
+      unidentifiedGemValue: getUnidentifiedGemAppraisal(world, id),
+    });
   }
 
   function buildShopItemDetail(id, markup) {
     const base = buildItemDisplayData(world, id);
     if (!base) return null;
-    const info = world.get(id, ItemInfo);
-    base.value = info?.value || 0;
-    base.buyPrice = Math.ceil((info?.value || 0) * markup);
+    const appraisedValue = resolveItemAppraisal(id);
+    base.value = appraisedValue;
+    base.buyPrice = Math.ceil(appraisedValue * markup);
     return base;
   }
 
@@ -134,14 +125,14 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
           if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
             // This is an unpaid item from this shop
             const detail = buildItemDisplayData(world, id) || { id, name: resolveItemDisplayName(world, id) };
-            detail.value = info.value || 0;
+            detail.value = resolveItemAppraisal(id);
             detail.price = unpaid.price;
             detail.unpaid = true;
             unpaidItems.push(detail);
             totalBill += unpaid.price;
           } else if (info.type !== "currency") {
             // Regular item for selling
-            const sellValue = resolveItemSellValue(id);
+            const sellValue = resolveItemAppraisal(id);
             const detail = buildItemDisplayData(world, id) || { id, name: resolveItemDisplayName(world, id) };
             detail.value = sellValue;
             detail.sellPrice = Math.floor(sellValue * sellDiscount);
@@ -292,7 +283,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!info) return;
 
     const sellDiscount = shop.sellDiscount ?? 0.5;
-    const sellValue = resolveItemSellValue(itemId);
+    const sellValue = resolveItemAppraisal(itemId);
     const price = Math.floor(sellValue * sellDiscount);
 
     const inv = world.get(pe.id, Inventory);
@@ -308,7 +299,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       }
     }
 
-    const resalePrice = Math.ceil((info.value || 0) * (shop.buyMarkup ?? 1.0));
+    const resalePrice = Math.ceil(sellValue * (shop.buyMarkup ?? 1.0));
     if (!placeItemOnShopFloor(itemId, shopkeeperId)) {
       log("The shop floor is inaccessible.");
       return;

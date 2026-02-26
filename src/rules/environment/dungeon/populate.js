@@ -45,9 +45,7 @@ import {
   TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
 } from './constants.js';
 import { setTile, getTile } from './tileMap.js';
-import { NamedIdentity } from '../../components/NamedIdentity.js';
-import { isIdentified } from '../../data/identification.js';
-import { getUnidentifiedGemValue } from '../../data/gemPricing.js';
+import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shopAppraisal.js';
 import {
   Fountain, Altar, Shrine, Statue,
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch,
@@ -597,15 +595,9 @@ export function materializeSpawn(world, spawn) {
       // Calculate price (will be added as Unpaid in post-processing)
       const info = world.get(itemId, ItemInfo);
       if (info) {
-        // Unidentified gems use appearance-based pricing
-        let baseValue = info.value || 0;
-        if (info.type === 'gem') {
-          const ni = world.get(itemId, NamedIdentity);
-          const identity = ni?.identity || '';
-          if (!identity || !isIdentified(identity)) {
-            baseValue = getUnidentifiedGemValue(info.description) || baseValue;
-          }
-        }
+        const baseValue = appraiseItemValue(world, itemId, {
+          unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
+        });
         const price = Math.ceil(baseValue * 1.3); // 30% markup
         // Store price temporarily in spawn params for post-processing
         spawn._calculatedPrice = price;
