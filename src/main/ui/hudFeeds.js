@@ -13,6 +13,7 @@ import { Hunger } from "../../rules/components/Hunger.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
+import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -23,8 +24,22 @@ export function createHudFeeds(world, deps) {
   const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel } = deps;
 
   let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
-  let lastCombatHud = { weaponId: -1, rangedId: -1, rangedCount: -1, atk: -999, def: -999, statusSig: "", affixSig: "", ammo: -1 };
+  let lastCombatHud = {
+    weaponId: -1,
+    rangedId: -1,
+    rangedCount: -1,
+    atk: -999,
+    def: -999,
+    luck: -999,
+    ac: -999,
+    critPct: -999,
+    statusSig: "",
+    affixSig: "",
+    ammo: -1,
+    coatingSig: "",
+  };
   let lastDepth = -1;
+  let lastTurn = -1;
   let lastPetExists = false;
   let lastPetState = "";
   let lastSpellMana = -1;
@@ -61,8 +76,12 @@ export function createHudFeeds(world, deps) {
     const semanticStatus = /** @type any */ (world.get(pe.id, Status));
     const wid = Number(eq?.weapon || 0);
     const rangedId = Number(eq?.ranged || 0);
-    const atk = Number(eq?.attackDerived || 0);
-    const def = Number(eq?.defenseDerived || 0);
+    const combat = resolveCombatSnapshot(world, pe.id, { mode: "melee" });
+    const atk = Number(eq?.attackDerived ?? combat?.attackDerived ?? 0);
+    const def = Number(eq?.defenseDerived ?? combat?.defenseDerived ?? 0);
+    const luck = Number(combat?.luck ?? eq?.luckDerived ?? 0);
+    const armorClass = Number(combat?.armorClass ?? (10 + def));
+    const critPct = (Number(combat?.critChance ?? eq?.critChanceDerived ?? 0) * 100) + luck;
     const wInfo = wid ? world.get(wid, ItemInfo) : null;
     const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
     const rangedCount = Number(rangedInfo?.count || 0);
@@ -135,14 +154,20 @@ export function createHudFeeds(world, deps) {
       }
     }
 
-    if (lastCombatHud.weaponId !== wid || lastCombatHud.rangedId !== rangedId || lastCombatHud.rangedCount !== rangedCount || lastCombatHud.atk !== atk || lastCombatHud.def !== def ||
+    if (lastCombatHud.weaponId !== wid || lastCombatHud.rangedId !== rangedId || lastCombatHud.rangedCount !== rangedCount ||
+      lastCombatHud.atk !== atk || lastCombatHud.def !== def || lastCombatHud.luck !== luck ||
+      lastCombatHud.ac !== armorClass || lastCombatHud.critPct !== critPct ||
       lastCombatHud.statusSig !== statusSig || lastCombatHud.affixSig !== affixSig || lastCombatHud.ammo !== ammo || lastCombatHud.coatingSig !== coatingSig) {
-      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, statusSig, affixSig, ammo, coatingSig };
+      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, luck, ac: armorClass, critPct, statusSig, affixSig, ammo, coatingSig };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateCombatHUD", { detail: {
+          attack: atk,
           weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk, coating: wCoating } : null,
           ranged: rangedId ? { id: rangedId, name: rangedName || null, isWand: rangedType === 'wand', count: rangedCount } : null,
           defense: def,
+          luck,
+          armorClass,
+          critChancePercent: critPct,
           statuses,
           affixes: affixNames,
           ammo,
@@ -161,6 +186,16 @@ export function createHudFeeds(world, deps) {
         } catch (e) { console.debug('[hudFeeds] dispatch ui:updateDepth:', e); }
       }
       break;
+    }
+  }
+
+  function updateTurnHUD() {
+    const turn = Math.max(0, Number(world.step || 0) | 0);
+    if (turn !== lastTurn) {
+      lastTurn = turn;
+      try {
+        window.dispatchEvent(new CustomEvent("ui:updateTurn", { detail: { turn } }));
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:updateTurn:', e); }
     }
   }
 
@@ -210,6 +245,7 @@ export function createHudFeeds(world, deps) {
     updateVitalsHUD,
     updateCombatHUD,
     updateDepthHUD,
+    updateTurnHUD,
     updatePetHUD,
     updateActiveSpellHUD,
   };
