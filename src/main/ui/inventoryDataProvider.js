@@ -61,6 +61,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     ring: ['ring1', 'ring2'],
     ammo: ['ammo'],
     ranged: ['ranged'],
+    feet: ['feet'],
   };
 
   function buildEquippedComparison(eq, slot, currentItemId) {
