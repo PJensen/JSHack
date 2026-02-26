@@ -197,6 +197,9 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
+			if (itemInfo && Array.isArray(itemInfo.affixes) && itemInfo.affixes.includes('flaming')) {
+				if (!rec.tags.includes('glowing')) rec.tags.push('glowing');
+			}
 
 			_allEntities.push(rec);
 
@@ -251,6 +254,9 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
+			if (itemInfo && Array.isArray(itemInfo.affixes) && itemInfo.affixes.includes('flaming')) {
+				if (!rec.tags.includes('glowing')) rec.tags.push('glowing');
+			}
 
 			_allEntities.push(rec);
 			if (isPlayer) {

@@ -57,6 +57,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 20, pool: ["smoldering_club"], affixChance: 0 },
       { type: "equip", weight: 20, pool: ["chipped_fang"], affixChance: 0 },
       { type: "equip", weight: 18, pool: ["leech_blade"], affixChance: 0 },
+      { type: "equip", weight: 16, pool: ["ember_knife"], affixChance: 0 },
       { type: "equip", weight: 15, pool: ["rusted_buckler"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["brawler_band"], affixChance: 0 },
     ],
@@ -70,6 +71,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 18, pool: ["stormtouched_mace"], affixChance: 0 },
       { type: "equip", weight: 15, pool: ["grounded_buckler"], affixChance: 0 },
       { type: "equip", weight: 15, pool: ["warhammer_of_fury"], affixChance: 0 },
+      { type: "equip", weight: 14, pool: ["flametongue"], affixChance: 0 },
     ],
   },
 
@@ -77,6 +79,7 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "equip", weight: 18, pool: ["pyreheart_mace"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["ashen_reaver"], affixChance: 0 },
       { type: "equip", weight: 18, pool: ["glacial_edge"], affixChance: 0 },
       { type: "equip", weight: 15, pool: ["ring_of_fury"], affixChance: 0 },
       { type: "equip", weight: 15, pool: ["witchfire_sword"], affixChance: 0 },

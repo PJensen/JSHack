@@ -9,4 +9,7 @@ export const weapons = {
   venomfang_dagger:   { glyph:")",  fg:"#80c060", glow:"#40a030" },
   caustic_stiletto:   { glyph:"/",  fg:"#a0cc40", glow:"#70a020" },
   stormtouched_mace:  { glyph:")",  fg:"#8090e0", glow:"#4060cc" },
+  ember_knife:        { glyph:")",  fg:"#ff8830", glow:"#ff5500" },
+  flametongue:        { glyph:"/",  fg:"#ff6020", glow:"#ff3300" },
+  ashen_reaver:       { glyph:"/",  fg:"#cc3000", glow:"#ff4400" },
 };
