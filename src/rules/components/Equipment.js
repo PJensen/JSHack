@@ -5,8 +5,8 @@ export const GEAR_SLOTS = Object.freeze([
 ]);
 
 export const GEAR_SLOT_SET = Object.freeze(new Set(GEAR_SLOTS));
-export const NON_PROJECTILE_GEAR_SLOTS = Object.freeze(
-  GEAR_SLOTS.filter((slot) => slot !== "ammo" && slot !== "ranged"),
+export const NON_AMMO_GEAR_SLOTS = Object.freeze(
+  GEAR_SLOTS.filter((slot) => slot !== "ammo"),
 );
 
 /**
