@@ -64,6 +64,7 @@ export function initOverlays() {
   const stairTip = ensureStairTooltip(root);
   const trapTip = ensureTrapTooltip(root);
   const tombstoneTip = ensureTombstoneTooltip(root);
+  const devNoticeTip = ensureDevNoticeTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
   const memoryGraph = ensureMemoryGraph(root);
@@ -451,6 +452,18 @@ export function initOverlays() {
   });
   window.addEventListener('ui:hideTombstoneTooltip', () => {
     tombstoneTip.style.display = 'none';
+  });
+
+  // Project development notice tooltip lifecycle
+  window.addEventListener('ui:showDevNoticeTooltip', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderDevNoticeTooltip(devNoticeTip, d);
+    devNoticeTip.style.display = 'block';
+  });
+  window.addEventListener('ui:hideDevNoticeTooltip', () => {
+    devNoticeTip.style.display = 'none';
   });
 
   // Passive updates to the always-on ticker
@@ -928,6 +941,78 @@ function renderTombstoneTooltip(tip, detail) {
     fontSize: '13px', lineHeight: '1.5', color: '#c8b898'
   });
   tip.appendChild(text);
+}
+
+// --- Dev notice tooltip (first-run project notice) -------------------------
+/** @param {HTMLElement} root */
+function ensureDevNoticeTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'dev-notice-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed',
+    left: '50%',
+    top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+    transform: 'translateX(-50%)',
+    width: 'min(92vw, 420px)',
+    pointerEvents: 'auto',
+    display: 'none',
+    background: 'rgba(12,18,28,0.97)',
+    color: '#dbeaff',
+    borderRadius: '12px',
+    border: '1px solid #426084',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    fontFamily: 'monospace',
+    padding: '12px 14px',
+    zIndex: 920,
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+/** @param {HTMLDivElement} tip @param {{title?:string, body?:string, closeText?:string}} detail */
+function renderDevNoticeTooltip(tip, detail) {
+  tip.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = detail?.title || 'Active Development Notice';
+  Object.assign(title.style, {
+    fontWeight: 'bold',
+    fontSize: '13px',
+    color: '#9ed2ff',
+    marginBottom: '8px',
+    letterSpacing: '0.03em',
+  });
+  tip.appendChild(title);
+
+  const body = document.createElement('div');
+  body.textContent = detail?.body
+    || 'JSHack is under very active development. Please report bugs and share ideas for new features.';
+  Object.assign(body.style, {
+    fontSize: '12px',
+    lineHeight: '1.45',
+    color: '#dbeaff',
+    marginBottom: '10px',
+  });
+  tip.appendChild(body);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = detail?.closeText || 'Got it';
+  Object.assign(closeBtn.style, {
+    minHeight: '44px',
+    minWidth: '88px',
+    borderRadius: '10px',
+    border: '1px solid #6aa7da',
+    background: '#234463',
+    color: '#e9f7ff',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0 14px',
+  });
+  closeBtn.onclick = () => { tip.style.display = 'none'; };
+  tip.appendChild(closeBtn);
 }
 
 function ensureSpellGestureHint(root) {
