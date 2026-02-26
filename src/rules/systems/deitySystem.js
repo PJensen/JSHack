@@ -32,6 +32,7 @@ const _deities = new Map();
 const _wired = new WeakSet();
 const WORLD_EVENTS_INSTALLED = Symbol.for('jshack:deity:worldEvents:installed');
 const WRATH_DEBT_KEY = Symbol.for('jshack:deity:wrathDebt');
+const SHRINE_TOUCH_COOLDOWN_KEY = Symbol.for('jshack:deity:shrineTouchCooldown');
 
 /** @type {WeakMap<import('../../lib/deity-js/deity.js').Deity, WeakSet<import('../../lib/ecs-js/index.js').World>>} */
 const _miraclesWired = new WeakMap();
@@ -42,6 +43,9 @@ const WRATH_DEBT_DAMAGE_FACTOR = 0.55;
 const WRATH_DEBT_MERCY_REDUCTION = 0.02;
 const WRATH_DEBT_NO_MERCY_THRESHOLD = 1.25;
 const WRATH_DEBT_CONSUME_PER_WRATH = 0.6;
+const SHRINE_TOUCH_COOLDOWN_TURNS = 30;
+const SHRINE_TOUCH_PROTECT_MAGNITUDE = 0.35;
+const SHRINE_TOUCH_PLEA_VALUE = 0.25;
 const OFFENSE_SEVERITY_WEIGHTS = Object.freeze({
   minor: 0.15,
   grave: 0.45,
@@ -187,6 +191,27 @@ function spendWrathDebt(world, playerId, deityId, amount) {
   else store.delete(slot);
 }
 
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {Map<string, number>}
+ */
+function ensureShrineTouchCooldownStore(world) {
+  const current = world[SHRINE_TOUCH_COOLDOWN_KEY];
+  if (current instanceof Map) return current;
+  const created = new Map();
+  world[SHRINE_TOUCH_COOLDOWN_KEY] = created;
+  return created;
+}
+
+/**
+ * @param {number} playerId
+ * @param {string} deityId
+ * @returns {string}
+ */
+function shrineTouchCooldownSlot(playerId, deityId) {
+  return `${deityId}:${playerId}`;
+}
+
 const _PROFANE = /\b(damn|hell|ass|shit|fuck|crap|piss|bastard|bloody|bollocks|bugger|wanker)\b/i;
 /** @param {unknown} text */
 function _isProfane(text) {
@@ -327,6 +352,53 @@ function wireWorldEvents(world) {
     const { deity } = resolved;
     deity.offer('item', { value: value || 0.3, alignment: 'neutral', itemName });
     world.emit?.('altar:offered', { actor, deityName: deity.name, itemName, value });
+  });
+
+  // Shrine touch → prayer + protect action, with anti-spam cooldown.
+  world.on('shrine:touch', ({ actor, targetId }) => {
+    const actorId = Number(actor || 0) | 0;
+    const shrineId = Number(targetId || 0) | 0;
+    const resolved = resolvePlayerDeity(world, actorId);
+    if (!resolved) {
+      world.emit?.('shrine:communion', {
+        actor: actorId,
+        targetId: shrineId,
+        effect: 'silent',
+      });
+      return;
+    }
+
+    const { deityId, deity } = resolved;
+    const cooldowns = ensureShrineTouchCooldownStore(world);
+    const slot = shrineTouchCooldownSlot(actorId, deityId);
+    const now = Number(world.step || 0) | 0;
+    const last = Number(cooldowns.get(slot) ?? -1e9);
+    const elapsed = now - last;
+    if (elapsed < SHRINE_TOUCH_COOLDOWN_TURNS) {
+      const remaining = Math.max(1, SHRINE_TOUCH_COOLDOWN_TURNS - Math.max(0, elapsed));
+      world.emit?.('shrine:communion', {
+        actor: actorId,
+        targetId: shrineId,
+        deityId,
+        deityName: deity.name,
+        effect: 'cooldown',
+        cooldownRemaining: remaining,
+      });
+      return;
+    }
+
+    cooldowns.set(slot, now);
+    deity.pray();
+    deity.action('protect', { magnitude: SHRINE_TOUCH_PROTECT_MAGNITUDE, target: 'shrine' });
+    deity.offer('plea', { value: SHRINE_TOUCH_PLEA_VALUE, alignment: 'neutral' });
+    world.emit?.('shrine:communion', {
+      actor: actorId,
+      targetId: shrineId,
+      deityId,
+      deityName: deity.name,
+      effect: 'blessing',
+      cooldownRemaining: 0,
+    });
   });
 
   // ── Steal ─────────────────────────────────────────────────────────────────

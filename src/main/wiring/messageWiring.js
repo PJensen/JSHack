@@ -5,6 +5,7 @@ import { Owner } from "../../rules/components/Owner.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { Player } from "../../rules/components/Player.js";
 import { Position } from "../../rules/components/Position.js";
+import { Devotion } from "../../rules/components/Devotion.js";
 import { resolveItemDisplayName } from "./itemName.js";
 
 const INSTALLED = Symbol.for("jshack:main:messageWiring:installed");
@@ -491,7 +492,23 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('shrine:touch', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
+    const devotion = world.get(Number(actor || 0), Devotion);
+    if (devotion?.deityId) return;
     log('You touch the shrine. A faint warmth pulses through you.', 'system');
+  });
+
+  world.on('shrine:communion', ({ actor, deityName, effect, cooldownRemaining }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (effect === 'blessing') {
+      log(`${deityName || 'Your deity'} acknowledges your devotion at the shrine.`, 'deity');
+      return;
+    }
+    if (effect === 'cooldown') {
+      const turns = Math.max(1, Number(cooldownRemaining || 1) | 0);
+      log(`${deityName || 'Your deity'} remains silent. Commune again in ${turns} turns.`, 'deity');
+      return;
+    }
+    log('The shrine is silent.', 'system');
   });
 
   world.on('mushroom:hallucinate', ({ actor }) => {
