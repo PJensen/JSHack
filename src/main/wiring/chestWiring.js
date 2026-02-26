@@ -1,4 +1,4 @@
-import { Equipment } from "../../rules/components/Equipment.js";
+import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
@@ -135,7 +135,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
 
     const eq = world.get(pe.id, Equipment);
     if (eq) {
-      for (const slot of ["weapon", "armor", "shield", "ring1", "ring2", "ammo", "ranged"]) {
+      for (const slot of GEAR_SLOTS) {
         if (eq[slot] === itemId) {
           eq[slot] = null;
           ownedByPlayer = true;

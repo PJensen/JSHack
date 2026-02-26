@@ -41,7 +41,7 @@ import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
-import { materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
+import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
@@ -97,6 +97,8 @@ export function configureWorld(world) {
   installMoveAutoPickupListener(world);
   // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)
   installTileStepEffectListener(world);
+  // Material reactions consume semantic reaction events (water splash/dip, etc.).
+  installMaterialReactionListeners(world);
 
   // Phase: ai (intent producers — runs with immediate mutations so
   // MoveIntents are visible to movementSystem in the same tick)

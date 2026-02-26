@@ -212,6 +212,20 @@ export function createFacets(init) {
         patch: (patch && typeof patch === "object") ? { ...patch } : {},
       });
     },
+    setBeatitude(entityId, state) {
+      return tx.queueMutation({
+        type: "setBeatitude",
+        entityId: entityId | 0,
+        state: String(state || "").toLowerCase(),
+      });
+    },
+    removeTimedEffectsByKey(entityId, keys) {
+      return tx.queueMutation({
+        type: "removeTimedEffectsByKey",
+        entityId: entityId | 0,
+        keys: Array.isArray(keys) ? keys.map((k) => String(k || "")) : [],
+      });
+    },
     setMaterial(entityId, kind) {
       return tx.queueMutation({
         type: "setMaterial",
@@ -416,8 +430,14 @@ export function createFacets(init) {
     patchItemInfo(entityId, patch) {
       return mutate.patchItemInfo(entityId, patch);
     },
+    setBeatitude(entityId, state) {
+      return mutate.setBeatitude(entityId, state);
+    },
     setMaterial(entityId, kind) {
       return mutate.setMaterial(entityId, kind);
+    },
+    clearEffects(entityId = actor, keys = []) {
+      return mutate.removeTimedEffectsByKey(entityId | 0, keys);
     },
     consume(itemId = primary, ownerId = actor) {
       return mutate.consume(itemId, ownerId);

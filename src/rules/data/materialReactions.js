@@ -7,6 +7,8 @@
  */
 export const MATERIAL_REACTION_OUTCOME_IDS = Object.freeze([
   "transmute_to_ash",
+  "set_beatitude",
+  "emit_waterlogged",
 ]);
 
 /**
@@ -22,6 +24,8 @@ export const MATERIAL_REACTION_OUTCOME_IDS = Object.freeze([
  *   id: string,
  *   match: MaterialReactionMatch,
  *   outcome: string,
+ *   state?: "blessed" | "uncursed" | "cursed",
+ *   waterTypes?: Array<"holy" | "unholy" | "plain">,
  *   result?: string,
  * }} MaterialReactionDef
  */
@@ -29,8 +33,9 @@ export const MATERIAL_REACTION_OUTCOME_IDS = Object.freeze([
 /**
  * @typedef {{
  *   id: string,
- *   sourceStatuses: string[],
- *   itemScopes: Array<"ground"|"inventory">,
+ *   sourceStatuses?: string[],
+ *   sourceEvents?: string[],
+ *   itemScopes: Array<"ground"|"inventory"|"target">,
  *   eventKind: string,
  *   reactions: MaterialReactionDef[],
  * }} MaterialReactionRule
@@ -55,5 +60,56 @@ export const MATERIAL_REACTION_RULES = [
       },
     ],
   },
+  {
+    id: "water_dip_sets_potion_beatitude",
+    sourceEvents: ["water:dipped"],
+    itemScopes: ["target"],
+    eventKind: "water:dipped",
+    reactions: [
+      {
+        id: "holy_water_blesses_potion",
+        match: { itemTypes: ["potion"] },
+        waterTypes: ["holy"],
+        outcome: "set_beatitude",
+        state: "blessed",
+        result: "blessed",
+      },
+      {
+        id: "unholy_water_curses_potion",
+        match: { itemTypes: ["potion"] },
+        waterTypes: ["unholy"],
+        outcome: "set_beatitude",
+        state: "cursed",
+        result: "cursed",
+      },
+      {
+        id: "plain_water_uncurses_potion",
+        match: { itemTypes: ["potion"] },
+        waterTypes: ["plain"],
+        outcome: "set_beatitude",
+        state: "uncursed",
+        result: "uncursed",
+      },
+    ],
+  },
+  {
+    id: "water_dip_waterlogs_paper",
+    sourceEvents: ["water:dipped"],
+    itemScopes: ["target"],
+    eventKind: "water:dipped",
+    reactions: [
+      {
+        id: "dipped_scroll_waterlogged",
+        match: { itemTypes: ["scroll", "learn"] },
+        outcome: "emit_waterlogged",
+        result: "waterlogged",
+      },
+      {
+        id: "dipped_paper_item_waterlogged",
+        match: { materials: ["paper"] },
+        outcome: "emit_waterlogged",
+        result: "waterlogged",
+      },
+    ],
+  },
 ];
-

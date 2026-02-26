@@ -44,6 +44,13 @@ Deno.test("cleric maps to seraphine", () => {
   assertEquals(getClass('cleric').deityId, 'seraphine');
 });
 
+Deno.test("cleric starts with one vial of holy water", () => {
+  const cleric = getClass('cleric');
+  const holyWater = cleric.inventoryItems.find((entry) => entry.itemId === 'potion_holy_water');
+  assert(holyWater, 'cleric should include potion_holy_water in starter inventory');
+  assertEquals(holyWater.count, 1);
+});
+
 Deno.test("warden has highest maxHp", () => {
   const hps = Object.values(CLASS_DEFS).map(c => c.stats.maxHp);
   const warden = getClass('warden').stats.maxHp;

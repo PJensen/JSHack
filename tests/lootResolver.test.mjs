@@ -58,3 +58,29 @@ Deno.test("known-spell filter does not affect non-book item entries", () => {
   }
   assert(totalPotions > 0, "non-book item entries should still drop");
 });
+
+Deno.test("sub:equip_common can naturally drop helm_iron", () => {
+  let seen = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const rng = createRng(seed);
+    const drops = resolveLootTable("sub:equip_common", rng, 2);
+    for (const drop of drops) {
+      if (drop.kind === "equip" && drop.params?.equipId === "helm_iron") {
+        seen++;
+      }
+    }
+  }
+  assert(seen > 0, "expected to see helm_iron in common equipment drops");
+});
+
+Deno.test("sub:potions can naturally drop potion_water", () => {
+  let seen = 0;
+  for (let seed = 1; seed <= 500; seed++) {
+    const rng = createRng(seed);
+    const drops = resolveLootTable("sub:potions", rng, 5);
+    for (const drop of drops) {
+      if (drop.kind === "item" && drop.params?.itemId === "potion_water") seen++;
+    }
+  }
+  assert(seen > 0, "expected to see potion_water in potion drops");
+});

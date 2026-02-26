@@ -57,6 +57,8 @@ export const basePalette = {
   potion_second_wind: { glyph: "!", fg: "#44ddee", glow: "#22aacc" },
   potion_adrenaline:  { glyph: "!", fg: "#ff8822", glow: "#cc5500" },
   potion_poison:      { glyph: "!", fg: "#84d26d", glow: "#4a8f3f" },
+  potion_water:       { glyph: "!", fg: "#8fd7ff", glow: "#4f97be" },
+  potion_holy_water:  { glyph: "!", fg: "#fff2b0", glow: "#d7b457" },
   potion_stoneskin:   { glyph: "!", fg: "#b0b3be", glow: "#6f7485" },
   // Spellbooks
   spellbook_fire: { glyph: "📕", fg: "#ff704d", glow: "#ff704d" },

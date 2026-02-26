@@ -10,6 +10,7 @@ Deno.test("equipment data is available and buildEquipmentItem works", () => {
   const all = listCatalogItems().filter((x) => x.catalogKind === 'equipment');
   assert(Array.isArray(all) && all.length > 0, 'equipment defs available');
   assert(all.some((x) => x.id === 'sword_plain'), 'sword_plain exists');
+  assert(all.some((x) => x.id === 'helm_iron' && x.slot === 'head'), 'helm_iron head slot exists');
 
   const world = new World({ seed: 1 });
   const id = buildCatalogItem(world, 'sword_plain', {});
