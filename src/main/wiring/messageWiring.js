@@ -480,6 +480,15 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`You place ${itemName} on the altar as an offering to ${deityName}.`, 'system');
   });
 
+  world.on('altar:offerFailed', ({ actor, reason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (String(reason || '') === 'not_owned') {
+      log('You are no longer carrying that offering.', 'system');
+      return;
+    }
+    log('Your offering fails.', 'system');
+  });
+
   world.on('shrine:touch', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     log('You touch the shrine. A faint warmth pulses through you.', 'system');

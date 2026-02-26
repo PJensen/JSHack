@@ -92,7 +92,7 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
   world.on('altar:offerPrompt', ({ actor, targetId, items }) => {
     const pe = playerEntity(world);
     if (!pe || pe.id !== actor) return;
-    if (!Array.isArray(items) || items.length === 0) return;
+    if (!Array.isArray(items)) return;
     const offerableItems = [];
     for (const iid of items) {
       const info = world.get(iid, ItemInfo);
@@ -106,13 +106,11 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
         value: info.value || 0,
       });
     }
-    if (offerableItems.length > 0) {
-      try {
-        window.dispatchEvent(new CustomEvent('ui:altarOfferPrompt', {
-          detail: { altarId: targetId, items: offerableItems },
-        }));
-      } catch (e) { console.debug('[eventUiWiring] dispatch ui:altarOfferPrompt:', e); }
-    }
+    try {
+      window.dispatchEvent(new CustomEvent('ui:altarOfferPrompt', {
+        detail: { altarId: targetId, items: offerableItems },
+      }));
+    } catch (e) { console.debug('[eventUiWiring] dispatch ui:altarOfferPrompt:', e); }
   });
 
   // Harvest updates: refresh inventory UI after gather actions.

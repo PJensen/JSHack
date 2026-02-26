@@ -58,6 +58,7 @@ export function initOverlays() {
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
+  const altar = ensurePanel('altar');
   const groundTip = ensureGroundTooltip(root);
   _itemTooltip = ensureItemTooltip(root);
   const stairTip = ensureStairTooltip(root);
@@ -154,6 +155,7 @@ export function initOverlays() {
       hide(shop);
       hide(chest);
       hide(rack);
+      hide(altar);
       hide(applyPanel);
       hide(deathLog);
       hide(bookReader);
@@ -208,6 +210,16 @@ export function initOverlays() {
     const items = (e?.detail?.items) || [];
     renderPickupChooser(pick, items);
     show(pick);
+  });
+
+  // Altar offering chooser
+  window.addEventListener('ui:altarOfferPrompt', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const items = (e?.detail?.items) || [];
+    const altarId = Number(e?.detail?.altarId || 0) | 0;
+    renderAltarOfferChooser(altar, items, altarId);
+    show(altar);
   });
 
   // Use-item chooser (filtered inventory for usable items)
@@ -1867,6 +1879,146 @@ function bracketize(s) {
   // Avoid double-bracketing if already bracketed
   if (str.startsWith('[') && str.endsWith(']')) return str;
   return `[${str}]`;
+}
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {Array<any>} items
+ * @param {number} altarId
+ */
+function renderAltarOfferChooser(panel, items, altarId) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = 'Offer which item?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(you have nothing to offer)';
+    empty.style.marginBottom = '10px';
+    el.appendChild(empty);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    decorateButton(closeBtn);
+    closeBtn.addEventListener('click', () => hide(panel));
+    el.appendChild(closeBtn);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  let sel = 0;
+  const rows = items.map((it, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      width: '100%', padding: '6px 8px',
+      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer'
+    });
+
+    const name = document.createElement('span');
+    const rn = String(it.rarityName || 'common').toLowerCase();
+    const rs = rarityStyle(rn);
+    name.textContent = bracketize(sanitize(it.name || it.description || it.type || 'item'));
+    Object.assign(name.style, rs);
+
+    const qty = document.createElement('span');
+    qty.style.opacity = '0.8';
+    qty.textContent = `x${Math.max(1, Number(it.count || 1))}`;
+
+    const value = document.createElement('span');
+    value.style.marginLeft = 'auto';
+    value.style.opacity = '0.75';
+    value.style.fontSize = '12px';
+    value.textContent = `value ${Math.max(0, Number(it.value || 0))}`;
+
+    row.appendChild(name);
+    row.appendChild(qty);
+    row.appendChild(value);
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => offerSelected());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.style.fontSize = '12px';
+  hint.textContent = '↑/↓ select · Enter=Offer · Esc=Close';
+  el.appendChild(hint);
+
+  const actions = document.createElement('div');
+  actions.style.display = 'flex';
+  actions.style.gap = '8px';
+  actions.style.marginTop = '10px';
+
+  const offerBtn = document.createElement('button');
+  offerBtn.textContent = 'Offer';
+  decorateButton(offerBtn);
+  offerBtn.addEventListener('click', () => offerSelected());
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  decorateButton(cancelBtn);
+  cancelBtn.addEventListener('click', () => hide(panel));
+
+  actions.appendChild(offerBtn);
+  actions.appendChild(cancelBtn);
+  el.appendChild(actions);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(items.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+    showItemTooltip(items[sel], rows[sel]);
+  }
+
+  function offerSelected() {
+    const it = items[sel];
+    if (!it) return;
+    window.dispatchEvent(new CustomEvent('ui:requestAltarOffer', {
+      detail: { altarId, itemId: it.id }
+    }));
+    hide(panel);
+  }
+
+  setSel(0);
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(0); e.preventDefault(); }
+    else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
+    else if (k === 'Enter') { offerSelected(); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
+  }
+
+  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+  window.addEventListener('keydown', keyHandler);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', keyHandler);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */

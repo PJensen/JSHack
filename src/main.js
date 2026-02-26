@@ -1709,6 +1709,36 @@ addEventListener('ui:requestUse', (ev) => {
   rulesHandler(action);
 });
 
+// When user offers an item at an altar from the altar-offering overlay
+addEventListener('ui:requestAltarOffer', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const altarId = Number(e?.detail?.altarId || 0);
+  const itemId = Number(e?.detail?.itemId || 0);
+  if (!Number.isInteger(altarId) || altarId <= 0) return;
+  if (!Number.isInteger(itemId) || itemId <= 0) return;
+
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const pPos = world.get(pe.id, Position);
+  const aPos = world.get(altarId, Position);
+  if (!pPos || !aPos) return;
+  const dist = Math.max(Math.abs((pPos.x | 0) - (aPos.x | 0)), Math.abs((pPos.y | 0) - (aPos.y | 0)));
+  if (dist > 1) {
+    try { messageLog.log({ text: 'You are too far from the altar.', type: 'system' }); } catch (err) { console.debug('[main] messageLog failed:', err); }
+    return;
+  }
+
+  const inter = world.get(altarId, Interactable);
+  if (!inter || inter.action !== 'prayAltar') return;
+
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.altarOffer', payload: { altarId, itemId } });
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (err) { console.debug('[main] dispatch ui:requestInventoryData:', err); }
+});
+
 // When user throws an inventory item
 addEventListener('ui:requestThrow', (ev) => {
   if (isSimUiBlocked()) return;
