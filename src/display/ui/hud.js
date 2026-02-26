@@ -173,6 +173,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch (e) { console.debug('[hud] dispatch ui:pray:', e); }
   });
 
+  // Submit bug report button
+  const bugBtn = document.createElement('button');
+  bugBtn.id = 'btn-bug-report';
+  bugBtn.textContent = 'Submit Bug Report';
+  Object.assign(bugBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  bugBtn.addEventListener('click', () => {
+    window.open('https://github.com/pjensen/JSHack', '_blank', 'noopener');
+  });
+
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
@@ -192,6 +205,7 @@ export function initHUD() {
     throw: '\u2934',          // ⤴
     engrave: '\u270E',        // ✎
     pray: '\u{1F64F}',        // 🙏
+    bug: '\u{1F47E}',         // 👾
     petDefault: '\u{1F43E}',  // 🐾
   });
 
@@ -292,7 +306,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn];
+  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn, bugBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -357,6 +371,7 @@ export function initHUD() {
   setDesktopLabel(throwBtn, 'Throw'); setMobileLabel(throwBtn, 'Throw');
   setDesktopLabel(engraveBtn, 'Engrave'); setMobileLabel(engraveBtn, 'Engrave');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
+  setDesktopLabel(bugBtn, 'Submit Bug Report'); setMobileLabel(bugBtn, 'Submit Bug Report');
   setDesktopIcon(invBtn, ACTION_ICONS.inventory); setMobileIcon(invBtn, ACTION_ICONS.inventory);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
@@ -364,6 +379,7 @@ export function initHUD() {
   setDesktopIcon(throwBtn, ACTION_ICONS.throw); setMobileIcon(throwBtn, ACTION_ICONS.throw);
   setDesktopIcon(engraveBtn, ACTION_ICONS.engrave); setMobileIcon(engraveBtn, ACTION_ICONS.engrave);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
+  setDesktopIcon(bugBtn, ACTION_ICONS.bug); setMobileIcon(bugBtn, ACTION_ICONS.bug);
   setBarLabel(invBtn, 'Bag');
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
@@ -371,6 +387,7 @@ export function initHUD() {
   setBarLabel(throwBtn, 'Throw');
   setBarLabel(engraveBtn, 'Engrave');
   setBarLabel(prayBtn, 'Pray');
+  setBarLabel(bugBtn, 'Bug');
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
@@ -575,6 +592,7 @@ export function initHUD() {
   bar.appendChild(throwBtn);
   bar.appendChild(engraveBtn);
   bar.appendChild(prayBtn);
+  bar.appendChild(bugBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
 
@@ -598,7 +616,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn };
+  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn, bugBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
