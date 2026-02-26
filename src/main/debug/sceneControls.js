@@ -12,9 +12,9 @@ const _installed = Symbol.for('sceneControls');
 
 /**
  * Install keyboard-driven scene debug controls (zoom, camera, shake, save-delete).
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, TILE_PX: number, messageLog: { log(msg: object): void }, runtimeConfig: { debug?: boolean } }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, TILE_PX: number, defaultZoomScale?: number, messageLog: { log(msg: object): void }, runtimeConfig: { debug?: boolean } }} deps
  */
-export function installSceneControls({ world, cam, TILE_PX, messageLog, runtimeConfig }) {
+export function installSceneControls({ world, cam, TILE_PX, defaultZoomScale = TILE_PX, messageLog, runtimeConfig }) {
   if (/** @type {any} */ (world)[_installed]) return;
   /** @type {any} */ (world)[_installed] = true;
 
@@ -39,7 +39,7 @@ export function installSceneControls({ world, cam, TILE_PX, messageLog, runtimeC
 
     if (zoomIn)  { zoomTo(cam, Math.min(TILE_PX * 4.0, cam.targetScale * 1.2)); e.preventDefault(); return; }
     if (zoomOut) { zoomTo(cam, Math.max(TILE_PX * 0.5, cam.targetScale / 1.2)); e.preventDefault(); return; }
-    if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, TILE_PX); e.preventDefault(); return; }
+    if (key === "0") { jumpTo(cam, { x: 0, y: 0 }); zoomTo(cam, defaultZoomScale); e.preventDefault(); return; }
     if (key === "9") {
       // Debug: toggle camera between nearest down-stair and player
       if (cam._detached) {

@@ -72,3 +72,15 @@ Deno.test("sub:equip_common can naturally drop helm_iron", () => {
   }
   assert(seen > 0, "expected to see helm_iron in common equipment drops");
 });
+
+Deno.test("sub:potions can naturally drop potion_water", () => {
+  let seen = 0;
+  for (let seed = 1; seed <= 500; seed++) {
+    const rng = createRng(seed);
+    const drops = resolveLootTable("sub:potions", rng, 5);
+    for (const drop of drops) {
+      if (drop.kind === "item" && drop.params?.itemId === "potion_water") seen++;
+    }
+  }
+  assert(seen > 0, "expected to see potion_water in potion drops");
+});
