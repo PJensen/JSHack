@@ -220,6 +220,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     marginBottom: '20px',
   });
 
+  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨' };
+
   const cards = [];
   for (const cls of classes) {
     const card = document.createElement('div');
@@ -233,7 +235,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     });
 
     const cName = document.createElement('div');
-    cName.textContent = cls.name;
+    const icon = /** @type {any} */ (CLASS_ICONS)[cls.id];
+    cName.textContent = icon ? `${icon} ${cls.name}` : cls.name;
     Object.assign(cName.style, {
       fontSize: '16px', fontWeight: 'bold', color: '#cfe8ff',
       marginBottom: '4px',
