@@ -4,6 +4,7 @@ import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { Status } from '../src/rules/components/Status.js';
+import { Collider } from '../src/rules/components/Collider.js';
 import { runSpellScript } from '../src/rules/scripts/spells.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 import { clearAll as clearTileMap, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
@@ -113,6 +114,25 @@ Deno.test("meteor: explicit target blocked by LOS fails", () => {
   world.on('spell:meteor:failed', (e) => failures.push(e));
   const caster = makeEntity(world, 2, 0, 20, 'player');
   const target = makeEntity(world, 8, 0, 50, 'enemy');
+
+  runSpellScript(world, caster, SPELL, { x: 8, y: 0 });
+
+  const vit = world.get(target, Vitality);
+  assertEquals(vit.hp, 50);
+  assertEquals(failures.length, 1);
+  assertEquals(failures[0].reason, 'blocked_los');
+});
+
+Deno.test("meteor: explicit target blocked by blocksSight collider fails", () => {
+  loadFlatFloor();
+  const world = new World({ seed: 31 });
+  const failures = [];
+  world.on('spell:meteor:failed', (e) => failures.push(e));
+  const caster = makeEntity(world, 2, 0, 20, 'player');
+  const target = makeEntity(world, 8, 0, 50, 'enemy');
+  const blocker = world.create();
+  world.add(blocker, Position, { x: 5, y: 0 });
+  world.add(blocker, Collider, { solid: true, blocksSight: true });
 
   runSpellScript(world, caster, SPELL, { x: 8, y: 0 });
 
