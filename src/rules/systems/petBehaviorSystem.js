@@ -19,7 +19,7 @@ import { Faction } from '../components/Faction.js';
 import { findNearestValidTileAround } from '../utils/queries.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { getItemsAt } from '../utils/tileQueryCache.js';
-import { getCorpseEatHooks, getDecayStage } from '../data/food.js';
+import { getDecayStage } from '../data/food.js';
 import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
 
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
@@ -118,7 +118,7 @@ function tryMunchCorpseUnderfoot(world, petId, petPos, vit, consumedCorpseIds) {
     const itemId = itemIds[i] | 0;
     if (!(itemId > 0)) continue;
     if (consumedCorpseIds.has(itemId)) continue;
-    if (!isBasicFloorCorpse(world, itemId)) continue;
+    if (!isCorpseItemOnFloor(world, itemId)) continue;
 
     consumedCorpseIds.add(itemId);
     consumeCorpseForPet(world, petId, itemId, vit);
@@ -128,7 +128,7 @@ function tryMunchCorpseUnderfoot(world, petId, petPos, vit, consumedCorpseIds) {
   return false;
 }
 
-function isBasicFloorCorpse(world, itemId) {
+function isCorpseItemOnFloor(world, itemId) {
   if (!(itemId > 0) || !world.isAlive(itemId)) return false;
   if (!world.has(itemId, Position)) return false;
 
@@ -137,10 +137,7 @@ function isBasicFloorCorpse(world, itemId) {
 
   const ident = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
   if (!ident.startsWith('corpse_')) return false;
-  if (world.has(itemId, Pet)) return false;
-
-  const hooks = getCorpseEatHooks(ident);
-  return hooks.length === 0;
+  return true;
 }
 
 function consumeCorpseForPet(world, petId, corpseId, vit) {

@@ -250,6 +250,52 @@ Deno.test("movementSystem: spider web listener spawns web on departure", () => {
   } finally { clearAll(); }
 });
 
+Deno.test("movementSystem: spider can traverse web tiles", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+
+    const web = world.create();
+    world.add(web, Position, { x: 6, y: 5 });
+    world.add(web, NamedIdentity, { name: "Web", identity: "web" });
+    world.add(web, Collider, { solid: true, blocksSight: false });
+
+    const spider = world.create();
+    world.add(spider, Position, { x: 5, y: 5 });
+    world.add(spider, NamedIdentity, { name: "Spider", identity: "spider" });
+    world.add(spider, MoveIntent, { dx: 1, dy: 0 });
+
+    movementSystem(world);
+
+    const pos = world.get(spider, Position);
+    assertEquals(pos.x, 6, "spider should move onto web tile");
+    assertEquals(pos.y, 5, "spider should move onto web tile");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: non-spider is blocked by web tiles", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+
+    const web = world.create();
+    world.add(web, Position, { x: 6, y: 5 });
+    world.add(web, NamedIdentity, { name: "Web", identity: "web" });
+    world.add(web, Collider, { solid: true, blocksSight: false });
+
+    const goblin = world.create();
+    world.add(goblin, Position, { x: 5, y: 5 });
+    world.add(goblin, NamedIdentity, { name: "Goblin", identity: "goblin" });
+    world.add(goblin, MoveIntent, { dx: 1, dy: 0 });
+
+    movementSystem(world);
+
+    const pos = world.get(goblin, Position);
+    assertEquals(pos.x, 5, "non-spider should remain blocked by web");
+    assertEquals(pos.y, 5, "non-spider should remain blocked by web");
+  } finally { clearAll(); }
+});
+
 Deno.test("movementSystem: non-spider does not spawn web", () => {
   loadFloorChunk();
   try {
