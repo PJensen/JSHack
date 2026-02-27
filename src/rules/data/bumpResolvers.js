@@ -58,6 +58,13 @@ function emitSafe(world, event, payload) {
   }
 }
 
+function targetIsAtBumpTile(world, targetId, nx, ny) {
+  if (!(targetId > 0)) return false;
+  const pos = world.get(targetId, Position);
+  if (!pos) return false;
+  return (pos.x | 0) === (nx | 0) && (pos.y | 0) === (ny | 0);
+}
+
 // ── resolvers (priority order) ──────────────────────────────────────
 
 /** Bump-attack: melee into a hostile living entity on an adjacent tile. */
@@ -66,6 +73,9 @@ const hostileMelee = {
   test(world, actor, ctx) {
     if (!isManhattan1(ctx.mdx, ctx.mdy)) return false;
     if (!(ctx.target > 0) || ctx.target === actor) return false;
+    // Precision gate: never melee through stale occupancy or non-walkable terrain.
+    if (!targetIsAtBumpTile(world, ctx.target, ctx.nx, ctx.ny)) return false;
+    if (!isWalkable(ctx.nx, ctx.ny)) return false;
     const actorFac = world.get(actor, Faction);
     const targetFac = world.get(ctx.target, Faction);
     // Shopkeepers / neutrals with Interactable are handled by npc-interact
