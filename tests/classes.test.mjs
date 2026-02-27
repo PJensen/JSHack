@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { CLASS_DEFS, getClass, listClassIds } from '../src/rules/data/classes.js';
 import { DEITY_DEFS } from '../src/rules/data/deities.js';
+import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
 
 Deno.test("CLASS_DEFS has exactly 4 classes", () => {
   const ids = listClassIds();
@@ -77,4 +78,15 @@ Deno.test("equipment and inventory items have valid string ids", () => {
 Deno.test("each class has a unique deity", () => {
   const deities = Object.values(CLASS_DEFS).map(c => c.deityId);
   assertEquals(new Set(deities).size, deities.length, 'duplicate deity assignments');
+});
+
+Deno.test("druid starts with at least +1 defense from equipped gear", () => {
+  const druid = getClass('druid');
+  const equippedIds = Object.values(druid.equipment).filter((id) => typeof id === 'string');
+  const defenseTotal = equippedIds.reduce((sum, itemId) => {
+    const def = getCatalogItem(itemId);
+    const bonus = Number(def?.bonuses?.defense || 0);
+    return sum + bonus;
+  }, 0);
+  assert(defenseTotal >= 1, `druid defense from starter gear should be >= 1, got ${defenseTotal}`);
 });
