@@ -3,6 +3,7 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
+import { Pet } from "../src/rules/components/Pet.js";
 import { installMessageWiring } from "../src/main/wiring/messageWiring.js";
 
 function createMessageLog() {
@@ -115,4 +116,38 @@ Deno.test("messageWiring logs apply coat outcomes and cryptic fallback", () => {
   assert(messageLog.entries[0].text.includes("12"), "poison coat message should include charges");
   assert(messageLog.entries[1].text.includes("AC +1"), "stonecoat message should include AC bonus");
   assert(messageLog.entries[2].text.includes("cryptic sheen"), "unknown apply result should use cryptic fallback");
+});
+
+Deno.test("messageWiring logs pet corpse munch flavor text", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const petId = world.create();
+  world.add(petId, Pet);
+  world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+
+  const messageLog = createMessageLog();
+  installMessageWiring({
+    world,
+    messageLog,
+    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
+    bracketizeName: (s) => `[${s}]`,
+    getSpell: () => null,
+  });
+
+  world.emit("pet:corpse-munch", {
+    petId,
+    corpseName: "Half-eaten Orc Corpse",
+    heal: 2,
+    partial: true,
+    resistedToxin: true,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  assertEquals(messageLog.entries[0].type, "system");
+  assert(messageLog.entries[0].text.includes("bite"), "message should mention taking a bite");
+  assert(messageLog.entries[0].text.includes("Crunch"), "message should include flavor text");
+  assert(messageLog.entries[0].text.includes("+2 HP"), "message should include healing");
+  assert(messageLog.entries[0].text.includes("Iron stomach"), "message should mention toxin resistance flavor");
 });
