@@ -12,6 +12,7 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Consumable } from "../src/rules/components/Consumable.js";
 import { FoodDecay } from "../src/rules/components/FoodDecay.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Faction } from "../src/rules/components/Faction.js";
 
 function addCorpse(world, { x, y, name, identity, nutrition = 300, turnsHeld = 0, shelfLife = 150 }) {
   const corpseId = world.create();
@@ -193,4 +194,70 @@ Deno.test("feline has strong toxic resistance when munching decayed corpses", ()
 
   assert(kittyDiseased === false, "kitty should resist most decay toxin procs");
   assert(wolfDiseased === true, "non-feline pet should still suffer decay toxin");
+});
+
+Deno.test("pet flees at 50% threshold and seeks safe corpse to heal", () => {
+  const world = new World({ seed: 42 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 0, y: 8 });
+
+  const kittyId = world.create();
+  world.add(kittyId, Pet);
+  world.add(kittyId, Position, { x: 0, y: 0 });
+  world.add(kittyId, Vitality, { hp: 4, maxHp: 10 }); // below 0.5 flee threshold
+  world.add(kittyId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+  world.add(kittyId, Faction, { key: "pet" });
+
+  addCorpse(world, {
+    x: 2,
+    y: 0,
+    name: "Orc Corpse",
+    identity: "corpse_orc",
+    nutrition: 300,
+  });
+
+  petBehaviorSystem(world);
+
+  const state = world.get(kittyId, PetState);
+  assert(state?.state === "fleeing", "pet should enter fleeing below 50% hp");
+  const move = world.get(kittyId, MoveIntent);
+  assert(move?.dx === 1 && move?.dy === 0, "fleeing pet should step toward safe corpse");
+});
+
+Deno.test("fleeing pet ignores unsafe corpse and retreats toward player", () => {
+  const world = new World({ seed: 42 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 0, y: 8 });
+  world.add(playerId, Faction, { key: "player" });
+
+  const kittyId = world.create();
+  world.add(kittyId, Pet);
+  world.add(kittyId, Position, { x: 0, y: 0 });
+  world.add(kittyId, Vitality, { hp: 4, maxHp: 10 }); // below 0.5 flee threshold
+  world.add(kittyId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+  world.add(kittyId, Faction, { key: "pet" });
+
+  addCorpse(world, {
+    x: 2,
+    y: 0,
+    name: "Orc Corpse",
+    identity: "corpse_orc",
+    nutrition: 300,
+  });
+
+  const enemyId = world.create();
+  world.add(enemyId, Position, { x: 2, y: 1 });
+  world.add(enemyId, Vitality, { hp: 8, maxHp: 8 });
+  world.add(enemyId, Faction, { key: "enemy" });
+
+  petBehaviorSystem(world);
+
+  const state = world.get(kittyId, PetState);
+  assert(state?.state === "fleeing", "pet should still be in fleeing state");
+  const move = world.get(kittyId, MoveIntent);
+  assert(move?.dx === 0 && move?.dy === 1, "unsafe corpse should be ignored; pet should retreat toward player");
 });
