@@ -16,6 +16,8 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Settings } from "../components/Settings.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Collider } from "../components/Collider.js";
+import { Vitality } from "../components/Vitality.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { getTileQuerySnapshot, forEachItemAt } from "../utils/tileQueryCache.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
@@ -31,6 +33,30 @@ import { DoorState } from "../components/DoorState.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
+
+/** @param {any} world @param {number} id */
+function hasIdentity(world, id, identity) {
+  const ni = world.get(id, NamedIdentity);
+  return String(ni?.identity || "").toLowerCase() === identity;
+}
+
+/** @param {any} world @param {import('../utils/tileQueryCache.js').TileQueryState} tiles @param {number} x @param {number} y */
+function isBlockedOnlyByWebs(world, tiles, x, y) {
+  const ids = tiles.byCell.get(key(x, y));
+  if (!ids || ids.length === 0) return false;
+
+  let foundBlocking = false;
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const col = world.get(id, Collider);
+    const vit = world.get(id, Vitality);
+    const isBlocking = !!(col?.solid) || Number(vit?.hp || 0) > 0;
+    if (!isBlocking) continue;
+    foundBlocking = true;
+    if (!hasIdentity(world, id, "web")) return false;
+  }
+  return foundBlocking;
+}
 
 const MISSTEP_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -163,7 +189,14 @@ export function movementSystem(world) {
         world.set(actor, Facing, { dx: mdx, dy: mdy });
       }
 
-      if (!isWalkable(nx, ny) || blocking.has(k)) {
+      const spiderCanTraverseWeb =
+        hasIdentity(world, actor, "spider")
+        && isWalkable(nx, ny)
+        && blocking.has(k)
+        && tiles.blockedByCell.has(k)
+        && isBlockedOnlyByWebs(world, tiles, nx, ny);
+
+      if (!isWalkable(nx, ny) || (blocking.has(k) && !spiderCanTraverseWeb)) {
         // Blocked — delegate to bump resolver dispatch table
         const target = tiles.livingByCell.get(k) || 0;
         resolveBump(world, actor, { nx, ny, mdx, mdy, target, tiles });

@@ -90,7 +90,7 @@ Deno.test("kitty munches basic corpse underfoot, heals, and leaves a half-eaten 
   assert(munchEvents[0].heal > 0, "event should include healing amount");
 });
 
-Deno.test("pet ignores non-basic toxic corpses", () => {
+Deno.test("kitty can munch special-effect corpses", () => {
   const world = new World({ seed: 42 });
 
   const playerId = world.create();
@@ -113,9 +113,9 @@ Deno.test("pet ignores non-basic toxic corpses", () => {
 
   petBehaviorSystem(world);
 
-  assert(world.isAlive(corpseId), "toxic corpse should not be munched");
-  assert(world.get(kittyId, Vitality).hp === 5, "kitty should not heal from toxic corpse");
-  assert(world.get(corpseId, Consumable).effectParams.nutrition === 150, "toxic corpse nutrition should remain unchanged");
+  assert(world.isAlive(corpseId), "corpse should remain after first munch");
+  assert(world.get(kittyId, Vitality).hp > 5, "kitty should heal from special corpse munch");
+  assert(world.get(corpseId, Consumable).effectParams.nutrition === 75, "nutrition should be reduced after munch");
 });
 
 Deno.test("pet only munches corpses below 75% HP", () => {
