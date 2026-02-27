@@ -223,6 +223,35 @@ Deno.test("movementSystem: player with dig weapon digs wall via bump", () => {
   } finally { clearAll(); }
 });
 
+Deno.test("movementSystem: wall bump does not trigger hostile melee from stale target", () => {
+  loadFloorChunk();
+  try {
+    setTile(4, 3, TILE_WALL);
+    const world = new World({ seed: 42 });
+    const player = world.create();
+    world.add(player, Position, { x: 3, y: 3 });
+    world.add(player, Vitality, { maxHp: 20, hp: 20 });
+    world.add(player, Faction, { key: "player" });
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+
+    const spider = world.create();
+    world.add(spider, Position, { x: 4, y: 3 });
+    world.add(spider, Vitality, { maxHp: 6, hp: 6 });
+    world.add(spider, Faction, { key: "enemy" });
+
+    let bumpAttacks = 0;
+    world.on("bump:attack", () => { bumpAttacks += 1; });
+
+    movementSystem(world);
+
+    assertEquals(bumpAttacks, 0, "wall bumps should not resolve hostile melee");
+    assertEquals(world.get(spider, Vitality).hp, 6, "target should not take melee damage");
+    const pos = world.get(player, Position);
+    assertEquals(pos.x, 3, "player remains in place on wall bump");
+    assertEquals(pos.y, 3, "player remains in place on wall bump");
+  } finally { clearAll(); }
+});
+
 // ── spider web listener ─────────────────────────────────────────────
 
 Deno.test("movementSystem: spider web listener spawns web on departure", () => {
