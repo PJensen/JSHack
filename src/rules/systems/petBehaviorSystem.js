@@ -25,6 +25,8 @@ import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
 const CORPSE_HEAL_NUTRITION_DIVISOR = 120;
 const FELINE_TOXIC_IMMUNITY = 0.85;
+const FLEE_CORPSE_SEARCH_RADIUS = 8;
+const FLEE_CORPSE_THREAT_RADIUS = 2;
 
 /**
  * petBehaviorSystem - state-aware pet AI
@@ -325,6 +327,44 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
   }
 }
 
+function findSafeCorpseForFleeing(world, petId, petPos, playerPos) {
+  const petFaction = String(world.get(petId, Faction)?.key || 'pet');
+  let best = null;
+  let bestScore = Infinity;
+
+  for (const [itemId, itemPos, info] of world.query(Position, ItemInfo)) {
+    if (!info || String(info.type || '').toLowerCase() !== 'food') continue;
+    if (!isCorpseItemOnFloor(world, itemId)) continue;
+
+    const distFromPet = Math.abs((itemPos.x | 0) - (petPos.x | 0)) + Math.abs((itemPos.y | 0) - (petPos.y | 0));
+    if (distFromPet > FLEE_CORPSE_SEARCH_RADIUS) continue;
+
+    if (countHostilesNearTile(world, itemPos.x | 0, itemPos.y | 0, petFaction) > 0) continue;
+
+    const distFromPlayer = Math.abs((itemPos.x | 0) - (playerPos.x | 0)) + Math.abs((itemPos.y | 0) - (playerPos.y | 0));
+    const score = distFromPet + distFromPlayer;
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x: itemPos.x | 0, y: itemPos.y | 0 };
+    }
+  }
+
+  return best;
+}
+
+function countHostilesNearTile(world, x, y, petFaction) {
+  let threats = 0;
+  for (const [, fac, pos, vit] of world.query(Faction, Position, Vitality)) {
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    if (!areFactionsHostile(petFaction, fac?.key)) continue;
+
+    const dist = Math.max(Math.abs((pos.x | 0) - x), Math.abs((pos.y | 0) - y));
+    if (dist <= FLEE_CORPSE_THREAT_RADIUS) threats += 1;
+    if (threats > 0) return threats;
+  }
+  return threats;
+}
+
 /**
  * Following behavior: standard pet follow logic
  */
@@ -476,9 +516,16 @@ function behaviorStaying(world, petId, petState, petPos, playerPos) {
 }
 
 /**
- * Fleeing behavior: move away from danger (toward player)
+ * Fleeing behavior: attempt to recover by reaching a safe nearby corpse.
+ * If no safe corpse exists, retreat toward player.
  */
 function behaviorFleeing(world, petId, petPos, playerPos) {
+  const corpseTarget = findSafeCorpseForFleeing(world, petId, petPos, playerPos);
+  if (corpseTarget) {
+    moveToward(world, petId, corpseTarget.x, corpseTarget.y);
+    return;
+  }
+
   const dx = playerPos.x - petPos.x;
   const dy = playerPos.y - petPos.y;
   const dist = Math.abs(dx) + Math.abs(dy);
