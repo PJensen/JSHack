@@ -18,7 +18,7 @@ export const CLASS_DEFS = {
     },
     equipment: {
       weapon: 'staff_oak',
-      armor: null,
+      armor: 'leather_armor',
       shield: null,
       feet: 'sandals_hemp',
     },
