@@ -17,7 +17,8 @@ import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Physiology } from "../components/Physiology.js";
-import { isWalkable, isOpaque } from "../environment/dungeon/tileMap.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { bresenhamLine } from "../../shared/math/bresenham.js";
 import { dealDamage } from "../utils/dealDamage.js";
@@ -40,6 +41,17 @@ function chebyshev(a, b) {
   return Math.max(Math.abs((a.x | 0) - (b.x | 0)), Math.abs((a.y | 0) - (b.y | 0)));
 }
 
+/**
+ * Build a LOS blocker callback that accounts for terrain opacity and entities
+ * with Collider.blocksSight (e.g. closed doors).
+ *
+ * @param {World} world
+ * @returns {(x:number, y:number) => boolean}
+ */
+function createLOSBlocker(world) {
+  return blockedCallback(buildBlocksVisionMap(world));
+}
+
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
 /** @param {World} world @param {number} actor @param {{id:string,name:string,manaCost:number,[k:string]:any}} spell @param {{[k:string]:any}} intent */
 REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
@@ -47,6 +59,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   /** @type {{x:number,y:number}|null} */
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const isBlocked = createLOSBlocker(world);
 
   const MAX_R = 12; // tiles
   const CHAIN_MAX = 3;
@@ -74,7 +87,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   candidates.sort((a,b)=> d2(apos.x,apos.y,a.x,a.y) - d2(apos.x,apos.y,b.x,b.y));
   let first = null;
   for (const c of candidates) {
-    if (hasLOS(apos.x|0, apos.y|0, c.x|0, c.y|0, isOpaque)) { first = c; break; }
+    if (hasLOS(apos.x|0, apos.y|0, c.x|0, c.y|0, isBlocked)) { first = c; break; }
   }
   if (!first) {
     // Nothing visible to hit; emit a short self-burst semantic
@@ -95,7 +108,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
       if (used.has(c.id)) continue;
       const dist2 = d2(last.x, last.y, c.x, c.y);
       if (dist2 <= CHAIN_RADIUS*CHAIN_RADIUS && dist2 < bestD2
-          && hasLOS(last.x|0, last.y|0, c.x|0, c.y|0, isOpaque)) { best = c; bestD2 = dist2; }
+          && hasLOS(last.x|0, last.y|0, c.x|0, c.y|0, isBlocked)) { best = c; bestD2 = dist2; }
     }
     if (!best) break;
     used.add(best.id);
@@ -398,6 +411,7 @@ REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) 
 REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const isBlocked = createLOSBlocker(world);
 
   const RADIUS = 2;
   const BASE_DMG = 10;
@@ -426,7 +440,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
         const ty = (apos.y | 0) + dy;
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
         if (dist > MAX_R) continue;
-        if (!hasLOS(apos.x | 0, apos.y | 0, tx, ty, isOpaque)) continue;
+        if (!hasLOS(apos.x | 0, apos.y | 0, tx, ty, isBlocked)) continue;
         candidates.push({ x: tx, y: ty });
       }
     }
@@ -447,7 +461,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
-    if (!hasLOS(apos.x | 0, apos.y | 0, ox | 0, oy | 0, isOpaque)) {
+    if (!hasLOS(apos.x | 0, apos.y | 0, ox | 0, oy | 0, isBlocked)) {
       try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
@@ -464,7 +478,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       const dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
       if (d2 > (MAX_R * MAX_R)) continue;
-      if (d2 < bestD2 && hasLOS(apos.x | 0, apos.y | 0, pos.x | 0, pos.y | 0, isOpaque)) { bestId = id; bestD2 = d2; }
+      if (d2 < bestD2 && hasLOS(apos.x | 0, apos.y | 0, pos.x | 0, pos.y | 0, isBlocked)) { bestId = id; bestD2 = d2; }
     }
     if (!bestId) {
       try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
@@ -518,6 +532,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
 REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const isBlocked = createLOSBlocker(world);
 
   const MAX_R = 10;
   const BASE_DMG = 4;
@@ -543,7 +558,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   candidates.sort((a, b) => a.dist2 - b.dist2);
   let target = null;
   for (const c of candidates) {
-    if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isOpaque)) { target = c; break; }
+    if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isBlocked)) { target = c; break; }
   }
   if (!target) {
     // No valid target; emit a fizzle pulse at caster
