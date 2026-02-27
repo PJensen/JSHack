@@ -2058,6 +2058,7 @@ const _frozenEmitters  = new Set();
 const _cursedEmitters  = new Set();
 const _blessedEmitters = new Set();
 const _fountainEmitters = new Set();
+const _dryFountains = new Set();
 const _furnaceEmitters  = new Set();
 const _cookFireEmitters = new Set();
 const _torchEmitters    = new Set();
@@ -2084,6 +2085,18 @@ const _KIND_EMITTER_CFG = {
 };
 // Reusable set for tracking which emitter keys are active in the current frame
 const _seenEmitterKeys = new Set();
+
+world.on('fountain:dry', ({ targetId }) => {
+  const id = Number(targetId || 0);
+  if (!(id > 0)) return;
+  _dryFountains.add(id);
+  _fountainEmitters.delete(id);
+  fx.removeEmitter(`fountain:${id}`);
+});
+world.on('spawned', ({ id, kind }) => {
+  if (String(kind || '') !== 'fountain') return;
+  _dryFountains.delete(Number(id || 0));
+});
 
 // FX controllers (depend on cam + fx)
 const boltFx = createBoltFxController({ world, cam, fx });
@@ -2928,6 +2941,7 @@ function frame(now) {
       }
       const kc = _KIND_EMITTER_CFG[e.kind];
       if (kc) {
+        if (e.kind === 'fountain' && _dryFountains.has(e.id)) continue;
         const key = `${kc.prefix}:${e.id}`;
         _seenEmitterKeys.add(key);
         if (!kc.tracker.has(e.id)) {
