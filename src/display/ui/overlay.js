@@ -800,11 +800,56 @@ function positionTooltip(tip, anchorEl) {
   tip.style.top = y + 'px';
 }
 
-/** @param {HTMLElement} tip */
-function positionTooltipBottomCenter(tip) {
+/**
+ * @param {HTMLElement | null | undefined} anchorEl
+ * @returns {HTMLElement | null}
+ */
+function resolveTooltipPanelInner(anchorEl) {
+  if (!anchorEl || typeof anchorEl.closest !== 'function') return null;
+  const panel = anchorEl.closest('.ui-panel');
+  if (!(panel instanceof HTMLElement)) return null;
+  if (panel.style.display === 'none') return null;
+
+  const inner = /** @type {any} */ (panel)._inner;
+  if (inner instanceof HTMLElement) return inner;
+
+  const first = panel.firstElementChild;
+  return first instanceof HTMLElement ? first : null;
+}
+
+/**
+ * Position a pinned mobile tooltip under the open panel window.
+ * @param {HTMLElement} tip
+ * @param {HTMLElement} anchorEl
+ * @returns {boolean}
+ */
+function positionTooltipBelowPanel(tip, anchorEl) {
+  const inner = resolveTooltipPanelInner(anchorEl);
+  if (!inner) return false;
+
+  resetTooltipPlacement(tip);
+  const MARGIN = 8;
+  const GAP = 8;
+  const rect = inner.getBoundingClientRect();
+  const tw = tip.offsetWidth;
+  const vw = window.innerWidth;
+  let x = rect.left + (rect.width * 0.5) - (tw * 0.5);
+  x = Math.max(MARGIN, Math.min(vw - tw - MARGIN, x));
+
+  tip.style.left = `${x}px`;
+  tip.style.top = `${Math.max(MARGIN, rect.bottom + GAP)}px`;
+  return true;
+}
+
+/**
+ * @param {HTMLElement} tip
+ * @param {HTMLElement} anchorEl
+ */
+function positionTooltipBottomCenter(tip, anchorEl) {
+  if (positionTooltipBelowPanel(tip, anchorEl)) return;
   resetTooltipPlacement(tip);
   tip.style.left = '50%';
-  tip.style.bottom = 'calc(var(--jshack-actionbar-height, 48px) + 16px + env(safe-area-inset-bottom, 0px))';
+  tip.style.bottom = 'max(12px, env(safe-area-inset-bottom, 0px))';
   tip.style.transform = 'translateX(-50%)';
 }
 
@@ -825,8 +870,9 @@ function showItemTooltip(item, anchorEl, opts) {
   tip.style.display = 'block';
   const pinBottom = !!opts?.pinBottomOnMobile && isMobileTooltipViewport();
   tip.style.maxWidth = pinBottom ? 'min(92vw, 460px)' : '280px';
+  tip.style.maxHeight = '';
   if (pinBottom) {
-    positionTooltipBottomCenter(tip);
+    positionTooltipBottomCenter(tip, anchorEl);
   } else {
     positionTooltip(tip, anchorEl);
   }
