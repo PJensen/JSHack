@@ -396,6 +396,19 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`${petName} teleports to your side.`, 'system');
   });
 
+  world.on('pet:corpse-munch', ({ petId, corpseName, heal, partial, resistedToxin }) => {
+    const petName = nameOfEntity(petId);
+    const label = bracketizeName(String(corpseName || 'corpse'));
+    const hp = Math.max(0, Number(heal || 0) | 0);
+    const keptSome = partial === true;
+    let msg = keptSome
+      ? `${petName} takes a bite out of ${label} right off the floor. Crunch.`
+      : `${petName} demolishes ${label} right off the floor. Crunch-crunch.`;
+    if (hp > 0) msg += ` (+${hp} HP)`;
+    if (resistedToxin === true) msg += ' Iron stomach.';
+    log(msg, 'system');
+  });
+
   world.on('corpse:desecrated', ({ actor, ownerId, corpseName }) => {
     const pe = playerEntity(world);
     const playerId = Number(pe?.id || 0) | 0;

@@ -8,6 +8,9 @@ import { Player } from '../components/Player.js';
 import { Inventory } from '../components/Inventory.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
+import { Consumable } from '../components/Consumable.js';
+import { FoodDecay } from '../components/FoodDecay.js';
+import { ActiveEffects } from '../components/ActiveEffects.js';
 import { MoveIntent } from '../components/Intents/MoveIntent.js';
 import { PickupIntent } from '../components/Intents/PickupIntent.js';
 import { MeleeAttackIntent } from '../components/Intents/MeleeAttackIntent.js';
@@ -15,7 +18,13 @@ import { Vitality } from '../components/Vitality.js';
 import { Faction } from '../components/Faction.js';
 import { findNearestValidTileAround } from '../utils/queries.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
+import { getItemsAt } from '../utils/tileQueryCache.js';
+import { getCorpseEatHooks, getDecayStage } from '../data/food.js';
 import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
+
+const PET_CORPSE_HEAL_THRESHOLD = 0.75;
+const CORPSE_HEAL_NUTRITION_DIVISOR = 120;
+const FELINE_TOXIC_IMMUNITY = 0.85;
 
 /**
  * petBehaviorSystem - state-aware pet AI
@@ -32,8 +41,15 @@ export function petBehaviorSystem(world) {
   }
   if (!playerPos) return;
 
+  const consumedCorpseIds = new Set();
+
   for (const [id, _pet, pos, vit] of world.query(Pet, Position, Vitality)) {
     if (!vit || vit.hp <= 0) continue;
+
+    if (tryMunchCorpseUnderfoot(world, id, pos, vit, consumedCorpseIds)) {
+      continue;
+    }
+
     // Get or create PetState
     let petState = world.get(id, PetState);
     if (!petState) {
@@ -89,6 +105,150 @@ export function petBehaviorSystem(world) {
         break;
     }
   }
+}
+
+function tryMunchCorpseUnderfoot(world, petId, petPos, vit, consumedCorpseIds) {
+  if (!vit || (vit.maxHp | 0) <= 0) return false;
+  if ((vit.hp / vit.maxHp) >= PET_CORPSE_HEAL_THRESHOLD) return false;
+
+  const itemIds = getItemsAt(world, petPos.x, petPos.y);
+  if (!itemIds || itemIds.length <= 0) return false;
+
+  for (let i = 0; i < itemIds.length; i++) {
+    const itemId = itemIds[i] | 0;
+    if (!(itemId > 0)) continue;
+    if (consumedCorpseIds.has(itemId)) continue;
+    if (!isBasicFloorCorpse(world, itemId)) continue;
+
+    consumedCorpseIds.add(itemId);
+    consumeCorpseForPet(world, petId, itemId, vit);
+    return true;
+  }
+
+  return false;
+}
+
+function isBasicFloorCorpse(world, itemId) {
+  if (!(itemId > 0) || !world.isAlive(itemId)) return false;
+  if (!world.has(itemId, Position)) return false;
+
+  const info = world.get(itemId, ItemInfo);
+  if (!info || String(info.type || '').toLowerCase() !== 'food') return false;
+
+  const ident = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
+  if (!ident.startsWith('corpse_')) return false;
+  if (world.has(itemId, Pet)) return false;
+
+  const hooks = getCorpseEatHooks(ident);
+  return hooks.length === 0;
+}
+
+function consumeCorpseForPet(world, petId, corpseId, vit) {
+  const cons = world.get(corpseId, Consumable);
+  const baseNutrition = Math.max(0, Number(cons?.effectParams?.nutrition || 0));
+  const biteNutrition = Math.max(1, Math.ceil(baseNutrition / 2));
+  const decay = world.get(corpseId, FoodDecay);
+  const decayInfo = decay ? getDecayStage(decay.turnsHeld, decay.shelfLife) : null;
+  const nutrition = decayInfo ? Math.floor(biteNutrition * decayInfo.nutritionMult) : biteNutrition;
+
+  const missing = Math.max(0, (vit.maxHp | 0) - (vit.hp | 0));
+  const healBase = Math.max(1, Math.floor(Math.max(0, nutrition) / CORPSE_HEAL_NUTRITION_DIVISOR));
+  const healAmount = Math.min(missing, healBase);
+
+  if (healAmount > 0) {
+    vit.hp = Math.min(vit.maxHp, vit.hp + healAmount);
+    try { world.emit?.('healed', { id: petId, amount: healAmount }); } catch {}
+  }
+
+  const feline = isFelinePet(world, petId);
+  const toxinApplied = maybeApplyDecayToxin(world, petId, corpseId, decayInfo, feline);
+  const toxinResisted = !toxinApplied && feline && Number(decayInfo?.sicknessChance || 0) > 0;
+
+  const corpseIdent = world.get(corpseId, NamedIdentity);
+  const corpseIdentity = String(corpseIdent?.identity || '');
+  const corpseNameBefore = String(corpseIdent?.name || 'corpse');
+  const remainingNutrition = Math.max(0, baseNutrition - biteNutrition);
+  const partial = remainingNutrition > 0;
+  if (cons && cons.effectParams && typeof cons.effectParams === 'object') {
+    cons.effectParams.nutrition = remainingNutrition;
+  }
+  if (partial && corpseIdent && !/^half-eaten\s+/i.test(corpseNameBefore)) {
+    corpseIdent.name = `Half-eaten ${corpseNameBefore}`;
+  }
+  const corpseNameAfter = String(world.get(corpseId, NamedIdentity)?.name || corpseNameBefore);
+  if (!partial) {
+    try { world.destroy(corpseId); } catch {}
+  }
+  try {
+    world.emit?.('pet:corpse-munch', {
+      petId,
+      corpseId,
+      corpseName: corpseNameAfter,
+      corpseIdentity,
+      heal: healAmount,
+      nutrition: Number.isFinite(nutrition) ? nutrition : 0,
+      remainingNutrition,
+      partial,
+      decayStage: String(decayInfo?.stage || 'fresh'),
+      resistedToxin: toxinResisted,
+    });
+  } catch (e) { console.debug('[petBehaviorSystem] emit pet:corpse-munch failed:', e); }
+}
+
+function maybeApplyDecayToxin(world, petId, corpseId, decayInfo, feline) {
+  const baseChance = Number(decayInfo?.sicknessChance || 0);
+  if (!(baseChance > 0)) return false;
+
+  const finalChance = feline ? (baseChance * (1 - FELINE_TOXIC_IMMUNITY)) : baseChance;
+  if (!(finalChance > 0)) return false;
+
+  const roll = nextRoll(world);
+  if (!(roll < finalChance)) return false;
+
+  addActiveEffect(world, petId, {
+    key: 'disease',
+    turnsLeft: 15,
+    potency: 1,
+    stacks: 1,
+    sourceId: corpseId,
+  });
+  try { world.emit?.('hunger:sickened', { actor: petId, type: 'decay' }); } catch {}
+  return true;
+}
+
+function addActiveEffect(world, entityId, effect) {
+  if (!(entityId > 0) || !effect || typeof effect !== 'object') return;
+  let ae = world.get(entityId, ActiveEffects);
+  if (!ae) {
+    try {
+      world.add(entityId, ActiveEffects, { effects: [{ ...effect }] });
+      return;
+    } catch {}
+    ae = world.get(entityId, ActiveEffects);
+    if (!ae) return;
+  }
+  if (!Array.isArray(ae.effects)) ae.effects = [];
+  ae.effects.push({ stacks: 1, ...effect });
+}
+
+function isFelinePet(world, petId) {
+  const ni = world.get(petId, NamedIdentity);
+  const identity = String(ni?.identity || '').toLowerCase();
+  const name = String(ni?.name || '').toLowerCase();
+  return (
+    identity.includes('cat')
+    || identity.includes('kitty')
+    || identity.includes('feline')
+    || name.includes('cat')
+    || name.includes('kitty')
+    || name.includes('feline')
+  );
+}
+
+function nextRoll(world) {
+  const fromRand = Number(typeof world?.rand === 'function' ? world.rand() : NaN);
+  if (Number.isFinite(fromRand)) return Math.max(0, Math.min(1, fromRand));
+  return 1;
 }
 
 /**
