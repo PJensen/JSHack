@@ -53,6 +53,58 @@ const CATALOG_ARCHETYPES = {
 };
 
 const HARVEST_SEED_SALT = 0x48415256;
+const FOUNTAIN_MIN_CHARGES = 2;
+const FOUNTAIN_MAX_CHARGES = 4;
+
+function ensureFountainState(world, targetId) {
+  const inter = world.get(targetId, Interactable);
+  if (!inter) return null;
+
+  const params = (inter.params && typeof inter.params === "object")
+    ? { ...inter.params }
+    : {};
+
+  let charges = Number(params.chargesRemaining);
+  let primaryEffect = String(params.primaryEffect || "");
+  let changed = false;
+
+  if (primaryEffect !== "heal" && primaryEffect !== "mana") {
+    const modeSeed = ((world.seed >>> 0) ^ (((targetId | 0) * 0x85ebca6b) >>> 0) ^ 0xF0AD) >>> 0;
+    primaryEffect = mulberry32(modeSeed)() < 0.5 ? "heal" : "mana";
+    changed = true;
+  }
+
+  if (!Number.isFinite(charges) || charges < 0) {
+    const seed = ((world.seed >>> 0) ^ (((targetId | 0) * 0x9e3779b9) >>> 0) ^ 0xF017) >>> 0;
+    const r = mulberry32(seed);
+    const span = FOUNTAIN_MAX_CHARGES - FOUNTAIN_MIN_CHARGES + 1;
+    charges = FOUNTAIN_MIN_CHARGES + Math.floor(r() * span);
+    changed = true;
+  }
+
+  charges = Math.max(0, charges | 0);
+  if (charges !== Number(params.chargesRemaining)) {
+    changed = true;
+  }
+
+  if (changed) {
+    params.chargesRemaining = charges;
+    params.primaryEffect = primaryEffect;
+    world.set(targetId, Interactable, { action: inter.action, params });
+  }
+
+  return { inter, params, charges, primaryEffect };
+}
+
+function setFountainCharges(world, targetId, nextCharges) {
+  const inter = world.get(targetId, Interactable);
+  if (!inter) return;
+  const params = (inter.params && typeof inter.params === "object")
+    ? { ...inter.params }
+    : {};
+  params.chargesRemaining = Math.max(0, nextCharges | 0);
+  world.set(targetId, Interactable, { action: inter.action, params });
+}
 
 // ─── Payload definitions ──────────────────────────────────────────────────────
 
@@ -263,41 +315,49 @@ export const INTERACT_PAYLOADS = {
 
   drinkFountain: {
     beforeInteract(ctx) {
-      const { world, actor } = ctx;
+      const { world, actor, targetId } = ctx;
       if (!world.get(actor, Vitality)) {
         ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
+      }
+      const state = ensureFountainState(world, targetId);
+      const charges = Number(state?.charges || 0);
+      if (charges <= 0) {
+        world.emit?.("fountain:dry", { actor, targetId, chargesRemaining: 0 });
+        ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
       }
     },
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
+      const state = ensureFountainState(world, targetId);
+      const charges = Number(state?.charges || 0);
+      const primaryEffect = String(state?.primaryEffect || "heal");
+      if (charges <= 0) return;
+
       const vit = world.get(actor, Vitality);
       const fSeed = combatSeed(world.seed, world.step, actor | 0, targetId | 0, 0xF0C5);
       const r = mulberry32(fSeed);
       const roll = r();
 
-      if (roll < 0.50) {
-        const healAmt = Math.max(1, Math.floor(vit.maxHp * (0.2 + r() * 0.2)));
-        const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
-        world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
-        world.emit?.("fountain:drink", { actor, targetId, effect: "heal", amount: healAmt });
-
-      } else if (roll < 0.75) {
-        const mana = world.get(actor, Mana);
-        if (mana && mana.maxMana > 0) {
-          const amt = Math.max(1, Math.floor(mana.maxMana * 0.3));
-          world.set(actor, Mana, { ...mana, mana: Math.min(mana.maxMana, mana.mana + amt) });
-          world.emit?.("fountain:drink", { actor, targetId, effect: "mana", amount: amt });
-        } else {
-          const healAmt = Math.max(1, Math.floor(vit.maxHp * 0.15));
+      if (roll < 0.75) {
+        if (primaryEffect === "heal") {
+          const healAmt = Math.max(1, Math.floor(vit.maxHp * (0.2 + r() * 0.2)));
           const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
           world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
           world.emit?.("fountain:drink", { actor, targetId, effect: "heal", amount: healAmt });
+        } else {
+          const mana = world.get(actor, Mana);
+          if (mana && mana.maxMana > 0) {
+            const amt = Math.max(1, Math.floor(mana.maxMana * 0.3));
+            world.set(actor, Mana, { ...mana, mana: Math.min(mana.maxMana, mana.mana + amt) });
+            world.emit?.("fountain:drink", { actor, targetId, effect: "mana", amount: amt });
+          } else {
+            world.emit?.("fountain:drink", { actor, targetId, effect: "nothing", amount: 0 });
+          }
         }
-
       } else if (roll < 0.90) {
         world.emit?.("fountain:drink", { actor, targetId, effect: "nothing", amount: 0 });
-
       } else {
+        const mana = world.get(actor, Mana);
         const dmgAmt = Math.max(1, Math.floor(vit.maxHp * (0.05 + r() * 0.05)));
         dealDamage(world, {
           target: actor,
@@ -307,6 +367,12 @@ export const INTERACT_PAYLOADS = {
           cause: "fountain",
         });
         world.emit?.("fountain:drink", { actor, targetId, effect: "poison", amount: dmgAmt });
+      }
+
+      const nextCharges = Math.max(0, charges - 1);
+      setFountainCharges(world, targetId, nextCharges);
+      if (nextCharges <= 0) {
+        world.emit?.("fountain:dry", { actor, targetId, chargesRemaining: 0 });
       }
     },
   },

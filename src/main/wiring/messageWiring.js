@@ -483,6 +483,10 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     else if (effect === 'poison') log(`You drink from the fountain. It was contaminated! (-${amount} HP)`, 'combat');
     else log('You drink from the fountain. The water is stale.', 'system');
   });
+  world.on('fountain:dry', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The fountain is dry.', 'system');
+  });
 
   world.on('altar:pray', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;

@@ -625,3 +625,58 @@ Deno.test("cooking fire: cooking item not in inventory emits cooking:failed", ()
   assert(failures.length === 1, 'should emit cooking:failed');
   assert(failures[0].reason === 'not_owned', 'reason should be not_owned');
 });
+
+Deno.test("fountain has finite uses and becomes dry", () => {
+  const world = new World({ seed: 88 });
+  const actor = world.create();
+  world.add(actor, Vitality, { maxHp: 20, hp: 8 });
+
+  const fountain = world.create();
+  world.add(fountain, Interactable, {
+    action: 'drinkFountain',
+    params: { chargesRemaining: 2, primaryEffect: 'heal' },
+  });
+
+  const drinks = [];
+  const dry = [];
+  world.on('fountain:drink', (e) => drinks.push(e));
+  world.on('fountain:dry', (e) => dry.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fountain });
+  interactionSystem(world);
+  world.add(actor, InteractIntent, { targetId: fountain });
+  interactionSystem(world);
+  world.add(actor, InteractIntent, { targetId: fountain });
+  interactionSystem(world);
+
+  const inter = world.get(fountain, Interactable);
+  assert((inter?.params?.chargesRemaining | 0) === 0, 'fountain should have no charges left');
+  assert(drinks.length === 2, `expected 2 successful drinks, got ${drinks.length}`);
+  assert(dry.length >= 1, 'dry event should be emitted once depleted');
+});
+
+Deno.test("fountain beneficial effect is stable per fountain", () => {
+  const world = new World({ seed: 89 });
+  const actor = world.create();
+  world.add(actor, Vitality, { maxHp: 20, hp: 20 });
+  world.add(actor, Mana, { maxMana: 12, mana: 1, manaRegen: 0.1 });
+
+  const fountain = world.create();
+  world.add(fountain, Interactable, {
+    action: 'drinkFountain',
+    params: { chargesRemaining: 20, primaryEffect: 'mana' },
+  });
+
+  const drinks = [];
+  world.on('fountain:drink', (e) => drinks.push(e));
+
+  for (let i = 0; i < 12; i++) {
+    world.step = i;
+    world.add(actor, InteractIntent, { targetId: fountain });
+    interactionSystem(world);
+  }
+
+  const beneficial = drinks.filter((e) => e.effect === 'heal' || e.effect === 'mana');
+  assert(beneficial.length > 0, 'expected at least one beneficial fountain roll');
+  assert(beneficial.every((e) => e.effect === 'mana'), 'mana fountain should never emit heal effect');
+});
