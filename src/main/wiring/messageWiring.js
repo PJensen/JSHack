@@ -487,6 +487,10 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (nameOfEntity(actor) !== 'You') return;
     log('The fountain is dry.', 'system');
   });
+  world.on('fountain:refilled', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The fountain bubbles back to life.', 'system');
+  });
 
   world.on('altar:pray', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;

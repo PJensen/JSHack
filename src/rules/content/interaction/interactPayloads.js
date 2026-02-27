@@ -55,6 +55,22 @@ const CATALOG_ARCHETYPES = {
 const HARVEST_SEED_SALT = 0x48415256;
 const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
+const FOUNTAIN_COOLDOWN_MIN = 201;
+const FOUNTAIN_COOLDOWN_MAX = 259;
+
+function deriveFountainCooldownTurns(world, targetId, params) {
+  const explicit = Number(params?.cooldownTurns);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit | 0;
+
+  const seed = ((world.seed >>> 0) ^ (((targetId | 0) * 0xc2b2ae35) >>> 0) ^ 0xF0CD) >>> 0;
+  const r = mulberry32(seed);
+  const span = FOUNTAIN_COOLDOWN_MAX - FOUNTAIN_COOLDOWN_MIN + 1;
+  let turns = FOUNTAIN_COOLDOWN_MIN + Math.floor(r() * span);
+  // "200 some odd": enforce odd cooldown length.
+  if ((turns & 1) === 0) turns += 1;
+  if (turns > FOUNTAIN_COOLDOWN_MAX) turns -= 2;
+  return turns;
+}
 
 function ensureFountainState(world, targetId) {
   const inter = world.get(targetId, Interactable);
@@ -65,7 +81,10 @@ function ensureFountainState(world, targetId) {
     : {};
 
   let charges = Number(params.chargesRemaining);
+  let maxCharges = Number(params.maxCharges);
   let primaryEffect = String(params.primaryEffect || "");
+  let cooldownTurns = Number(params.cooldownTurns);
+  let dryUntilStep = Number(params.dryUntilStep);
   let changed = false;
 
   if (primaryEffect !== "heal" && primaryEffect !== "mana") {
@@ -82,6 +101,24 @@ function ensureFountainState(world, targetId) {
     changed = true;
   }
 
+  if (!Number.isFinite(maxCharges) || maxCharges <= 0) {
+    maxCharges = Math.max(1, charges | 0);
+    changed = true;
+  }
+  if (!Number.isFinite(charges) || charges > maxCharges) {
+    charges = maxCharges;
+    changed = true;
+  }
+
+  if (!Number.isFinite(cooldownTurns) || cooldownTurns <= 0) {
+    cooldownTurns = deriveFountainCooldownTurns(world, targetId, params);
+    changed = true;
+  }
+  if (!Number.isFinite(dryUntilStep)) {
+    dryUntilStep = -1;
+    changed = true;
+  }
+
   charges = Math.max(0, charges | 0);
   if (charges !== Number(params.chargesRemaining)) {
     changed = true;
@@ -89,20 +126,29 @@ function ensureFountainState(world, targetId) {
 
   if (changed) {
     params.chargesRemaining = charges;
+    params.maxCharges = maxCharges;
     params.primaryEffect = primaryEffect;
+    params.cooldownTurns = cooldownTurns;
+    params.dryUntilStep = dryUntilStep;
     world.set(targetId, Interactable, { action: inter.action, params });
   }
 
-  return { inter, params, charges, primaryEffect };
+  return { inter, params, charges, maxCharges, primaryEffect, cooldownTurns, dryUntilStep };
 }
 
-function setFountainCharges(world, targetId, nextCharges) {
+function setFountainState(world, targetId, updates) {
   const inter = world.get(targetId, Interactable);
   if (!inter) return;
   const params = (inter.params && typeof inter.params === "object")
     ? { ...inter.params }
     : {};
-  params.chargesRemaining = Math.max(0, nextCharges | 0);
+  if (updates && typeof updates === "object") {
+    for (const [k, v] of Object.entries(updates)) params[k] = v;
+  }
+  params.chargesRemaining = Math.max(0, Number(params.chargesRemaining || 0) | 0);
+  if (!Number.isFinite(Number(params.maxCharges)) || Number(params.maxCharges) <= 0) {
+    params.maxCharges = Math.max(1, params.chargesRemaining | 0);
+  }
   world.set(targetId, Interactable, { action: inter.action, params });
 }
 
@@ -321,8 +367,33 @@ export const INTERACT_PAYLOADS = {
       }
       const state = ensureFountainState(world, targetId);
       const charges = Number(state?.charges || 0);
-      if (charges <= 0) {
-        world.emit?.("fountain:dry", { actor, targetId, chargesRemaining: 0 });
+      const maxCharges = Math.max(1, Number(state?.maxCharges || 1) | 0);
+      const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
+      const dryUntilStep = Number(state?.dryUntilStep ?? -1);
+      const nowStep = Number(world.step || 0) | 0;
+      if (charges <= 0 && dryUntilStep >= 0 && nowStep >= dryUntilStep) {
+        setFountainState(world, targetId, {
+          chargesRemaining: maxCharges,
+          dryUntilStep: -1,
+          cooldownTurns,
+        });
+        world.emit?.("fountain:refilled", {
+          actor,
+          targetId,
+          chargesRemaining: maxCharges,
+          cooldownTurns,
+        });
+      }
+      const readyState = ensureFountainState(world, targetId);
+      const readyCharges = Number(readyState?.charges || 0);
+      if (readyCharges <= 0) {
+        world.emit?.("fountain:dry", {
+          actor,
+          targetId,
+          chargesRemaining: 0,
+          cooldownTurns,
+          dryUntilStep: dryUntilStep >= 0 ? dryUntilStep : (nowStep + cooldownTurns),
+        });
         ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
       }
     },
@@ -370,9 +441,25 @@ export const INTERACT_PAYLOADS = {
       }
 
       const nextCharges = Math.max(0, charges - 1);
-      setFountainCharges(world, targetId, nextCharges);
       if (nextCharges <= 0) {
-        world.emit?.("fountain:dry", { actor, targetId, chargesRemaining: 0 });
+        const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
+        const dryUntilStep = (Number(world.step || 0) | 0) + cooldownTurns;
+        setFountainState(world, targetId, {
+          chargesRemaining: 0,
+          maxCharges: Math.max(1, Number(state?.maxCharges || 1) | 0),
+          primaryEffect,
+          cooldownTurns,
+          dryUntilStep,
+        });
+        world.emit?.("fountain:dry", {
+          actor,
+          targetId,
+          chargesRemaining: 0,
+          cooldownTurns,
+          dryUntilStep,
+        });
+      } else {
+        setFountainState(world, targetId, { chargesRemaining: nextCharges });
       }
     },
   },

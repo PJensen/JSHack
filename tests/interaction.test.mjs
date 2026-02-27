@@ -680,3 +680,43 @@ Deno.test("fountain beneficial effect is stable per fountain", () => {
   assert(beneficial.length > 0, 'expected at least one beneficial fountain roll');
   assert(beneficial.every((e) => e.effect === 'mana'), 'mana fountain should never emit heal effect');
 });
+
+Deno.test("dry fountain refills after cooldown and can be used again", () => {
+  const world = new World({ seed: 90 });
+  const actor = world.create();
+  world.add(actor, Vitality, { maxHp: 20, hp: 10 });
+
+  const fountain = world.create();
+  world.add(fountain, Interactable, {
+    action: 'drinkFountain',
+    params: {
+      chargesRemaining: 0,
+      maxCharges: 2,
+      primaryEffect: 'heal',
+      cooldownTurns: 201,
+      dryUntilStep: 205,
+    },
+  });
+
+  const drinks = [];
+  const dry = [];
+  const refilled = [];
+  world.on('fountain:drink', (e) => drinks.push(e));
+  world.on('fountain:dry', (e) => dry.push(e));
+  world.on('fountain:refilled', (e) => refilled.push(e));
+
+  world.step = 204;
+  world.add(actor, InteractIntent, { targetId: fountain });
+  interactionSystem(world);
+  assert(drinks.length === 0, 'dry fountain should not be usable before cooldown');
+  assert(dry.length >= 1, 'should emit dry while still cooling down');
+
+  world.step = 205;
+  world.add(actor, InteractIntent, { targetId: fountain });
+  interactionSystem(world);
+
+  assert(refilled.length === 1, 'fountain should emit refilled event at cooldown completion');
+  assert(drinks.length === 1, 'fountain should be drinkable again after refill');
+  const inter = world.get(fountain, Interactable);
+  assert((inter?.params?.chargesRemaining | 0) === 1, 'one charge should remain after the first post-refill drink');
+});

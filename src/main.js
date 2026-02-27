@@ -2097,6 +2097,11 @@ world.on('spawned', ({ id, kind }) => {
   if (String(kind || '') !== 'fountain') return;
   _dryFountains.delete(Number(id || 0));
 });
+world.on('fountain:refilled', ({ targetId }) => {
+  const id = Number(targetId || 0);
+  if (!(id > 0)) return;
+  _dryFountains.delete(id);
+});
 
 // FX controllers (depend on cam + fx)
 const boltFx = createBoltFxController({ world, cam, fx });
