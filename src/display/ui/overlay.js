@@ -87,6 +87,18 @@ function appendCharacterMenuTabs(host, activeKey) {
 }
 
 /**
+ * Mark an element as intentionally scrollable under global input lockdown.
+ * @param {HTMLElement} el
+ */
+function markScrollable(el) {
+  if (!(el instanceof HTMLElement)) return;
+  el.dataset.allowScroll = 'true';
+  el.style.touchAction = 'pan-y';
+  el.style.overscrollBehavior = 'contain';
+  el.style.webkitOverflowScrolling = 'touch';
+}
+
+/**
  * @param {any} it
  */
 function isInventoryItemEquippable(it) {
@@ -1640,6 +1652,7 @@ function ensurePanel(kind) {
     border: '1px solid #2d3b52', borderRadius: '8px', padding: '12px',
     background: '#0b0e16', boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
   });
+  markScrollable(inner);
   // Close button
   const close = document.createElement('button');
   close.textContent = '×';
@@ -1701,6 +1714,7 @@ function renderInventory(panel, items, ground, slotFilter = '') {
   list.style.maxHeight = '42vh';
   list.style.overflowY = 'auto';
   list.style.overflowX = 'hidden';
+  markScrollable(list);
   el.appendChild(list);
 
   const savedSelectionKey = String((/** @type {any} */ (panel))._inventorySelectionKey || '');
@@ -1814,6 +1828,7 @@ function renderInventory(panel, items, ground, slotFilter = '') {
     overflowY: 'auto',
     overflowX: 'hidden',
   });
+  markScrollable(detail);
   el.appendChild(detail);
 
   const actions = document.createElement('div');
@@ -2320,6 +2335,7 @@ function renderEquipment(panel, equippedBySlot, playerName) {
   list.style.maxHeight = '40vh';
   list.style.overflowY = 'auto';
   list.style.overflowX = 'hidden';
+  markScrollable(list);
   el.appendChild(list);
 
   const detail = document.createElement('div');
