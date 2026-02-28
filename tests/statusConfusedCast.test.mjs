@@ -116,7 +116,7 @@ Deno.test("castSpellSystem: flash_heal remains reliable while confused", () => {
   assertEquals(castEvents[0].spellId, "flash_heal");
 
   const afterVit = world.get(caster, Vitality);
-  assertEquals(afterVit.hp, 13, "flash_heal should restore 25% max HP while confused");
+  assertEquals(afterVit.hp, 12, "flash_heal should restore 22% max HP while confused");
 
   const mana = world.get(caster, Mana);
   assertEquals(mana.mana, 16, "flash_heal should consume its own mana cost");

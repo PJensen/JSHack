@@ -26,12 +26,25 @@ import { findNearestValidTileAround } from "../utils/queries.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
+import { areFactionsHostile } from "../utils/factionHostility.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
   [-1, 0],            [1, 0],
   [-1, 1],  [0, 1],   [1, 1],
 ]);
+
+const FLASH_HEAL_TUNING = Object.freeze({
+  healFraction: 0.22,
+  minimumHeal: 1,
+  splash: Object.freeze({
+    // Reserved for future spell-rank gating; currently always active.
+    unlockLevel: 1,
+    radius: 1,
+    damage: 2,
+    type: 'physical',
+  }),
+});
 
 /**
  * @param {{x:number,y:number}} a
@@ -40,6 +53,19 @@ const BLINK_DIRS = Object.freeze([
  */
 function chebyshev(a, b) {
   return Math.max(Math.abs((a.x | 0) - (b.x | 0)), Math.abs((a.y | 0) - (b.y | 0)));
+}
+
+/**
+ * Placeholder for upcoming spell-rank progression.
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ [k:string]: any }} spell
+ * @param {{ [k:string]: any }} intent
+ * @returns {number}
+ */
+function getFlashHealSpellLevel(world, actor, spell, intent) {
+  void world; void actor; void spell; void intent;
+  return 1;
 }
 
 /**
@@ -660,14 +686,51 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
   }
 
   const maxHp = vit.maxHp | 0;
-  const amount = Math.max(1, Math.floor(maxHp * 0.25));
+  const spellLevel = getFlashHealSpellLevel(world, actor, spell, intent);
+  const amount = Math.max(FLASH_HEAL_TUNING.minimumHeal, Math.floor(maxHp * FLASH_HEAL_TUNING.healFraction));
 
   const oldHp = vit.hp | 0;
   vit.hp = Math.min(maxHp, oldHp + amount);
   const actualHeal = vit.hp - oldHp;
 
+  /** @type {Array<{id:number, amount:number, at:{x:number,y:number}}>} */
+  const splashHits = [];
+  const splash = FLASH_HEAL_TUNING.splash;
+  if (spellLevel >= splash.unlockLevel && splash.radius > 0 && splash.damage > 0) {
+    const actorFaction = /** @type any */ (world.get(actor, Faction))?.key || '';
+    for (const [id, pos] of world.query(Position)) {
+      if (id === actor) continue;
+      const targetVit = /** @type any */ (world.get(id, Vitality));
+      if (!targetVit || (targetVit.hp | 0) <= 0) continue;
+      const dist = Math.max(Math.abs((pos.x | 0) - (apos.x | 0)), Math.abs((pos.y | 0) - (apos.y | 0)));
+      if (dist < 1 || dist > (splash.radius | 0)) continue;
+      const targetFaction = /** @type any */ (world.get(id, Faction))?.key || '';
+      if (!areFactionsHostile(actorFaction, targetFaction)) continue;
+      const result = dealDamage(world, {
+        target: id,
+        amount: splash.damage | 0,
+        source: actor,
+        type: splash.type,
+        cause: 'spell:flash_heal',
+        at: { x: pos.x | 0, y: pos.y | 0 },
+      });
+      if (result.applied && result.amount > 0) {
+        splashHits.push({ id, amount: result.amount, at: { x: pos.x | 0, y: pos.y | 0 } });
+      }
+    }
+  }
+
   try { world.emit && world.emit('healed', { id: actor, amount: actualHeal }); } catch (e) { console.debug('[spells] emit healed failed:', e); }
-  try { world.emit && world.emit('spell:flash_heal', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, amount: actualHeal }); } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
+  try {
+    world.emit && world.emit('spell:flash_heal', {
+      actor,
+      targetId: actor,
+      at: { x: apos.x, y: apos.y },
+      amount: actualHeal,
+      spellLevel,
+      splashHits,
+    });
+  } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
 };
 
 /**

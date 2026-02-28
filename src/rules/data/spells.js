@@ -146,7 +146,8 @@ export const SPELL_DEFS = {
     effects: [
       { kind: 'utility', note: 'Self-cast only' },
       { kind: 'utility', note: 'Consumes roughly a quarter of a cleric\'s starting mana' },
-      { kind: 'utility', note: 'Restores 25% of max HP (minimum 1)' },
+      { kind: 'utility', note: 'Restores 22% of max HP (minimum 1)' },
+      { kind: 'damage', element: 'holy', amount: '2 to adjacent hostile creatures' },
     ],
   },
   phase_strike: {
