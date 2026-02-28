@@ -14,6 +14,7 @@ import { getHungerLevel } from "../../rules/data/food.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
+import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -108,7 +109,7 @@ export function createHudFeeds(world, deps) {
     const statusMap = new Map();
     if (Array.isArray(st?.effects)) {
       for (const e of st.effects) {
-        const key = String(e?.key || e?.type || "").toLowerCase();
+        const key = canonicalStatusKey(String(e?.key || e?.type || ""));
         if (!key) continue;
         const turns = Math.max(0, Number(e?.turnsLeft || e?.duration || 0));
         const stacks = Math.max(1, Number(e?.stacks || 1));
@@ -119,7 +120,7 @@ export function createHudFeeds(world, deps) {
     }
     if (Array.isArray(semanticStatus?.statuses)) {
       for (const s of semanticStatus.statuses) {
-        const key = String(s?.type || s?.key || "").toLowerCase();
+        const key = canonicalStatusKey(String(s?.type || s?.key || ""));
         if (!key) continue;
         const turns = Math.max(0, Number(s?.duration || s?.turns || 0));
         const stacks = Math.max(1, Number(s?.stacks || 1));

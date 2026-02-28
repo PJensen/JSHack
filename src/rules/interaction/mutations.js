@@ -29,6 +29,7 @@ import { getMonster } from "../data/monsters.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 
 /**
@@ -64,7 +65,7 @@ export function applyMutation(world, op) {
         ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       }
       if (ae && Array.isArray(ae.effects)) {
-        ae.effects.push({ stacks: 1, ...op.effect });
+        upsertTimedEffect(ae.effects, { stacks: 1, ...(op.effect || {}) });
       }
       break;
     }
@@ -96,6 +97,12 @@ export function applyMutation(world, op) {
       const stack = String(input.stack || "add");
       const maxStacks = Math.max(1, Number(input.maxStacks ?? 1) | 0);
       const existing = ae.effects.filter((x) => String(x?.key || "") === key);
+
+      // DOT semantics are refresh-only across all entry points.
+      if (isDotEffectKey(key)) {
+        upsertTimedEffect(ae.effects, normalized);
+        break;
+      }
 
       if (stack === "refresh" && existing.length > 0) {
         for (let i = 0; i < existing.length; i++) {

@@ -11,6 +11,7 @@ import { registerScript, ScriptVerb } from "../scripting.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { upsertTimedEffect } from "../utils/effectSemantics.js";
 
 const AFFIX_THORNS = "affix:thorns1";
 const AFFIX_VAMP = "affix:vamp1";
@@ -47,14 +48,7 @@ const AFFIX_FLAMING = "affix:flaming";
 function upsertEffect(world, entityId, effect) {
   const ae = world.get(entityId, ActiveEffects);
   if (ae && Array.isArray(ae.effects)) {
-    const existing = ae.effects.find((e) => e.key === effect.key);
-    if (existing) {
-      existing.stacks = (existing.stacks || 1) + 1;
-      existing.turnsLeft = Math.max(existing.turnsLeft || 0, effect.turnsLeft);
-      existing.potency = Math.max(existing.potency || 0, effect.potency);
-      return;
-    }
-    ae.effects.push({ stacks: 1, ...effect });
+    upsertTimedEffect(ae.effects, { stacks: 1, ...effect });
     return;
   }
   try { world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {} // ECS: may already exist

@@ -6,6 +6,7 @@ import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { rngInt, rollDice } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
+import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 
 // ── ProjectileImpactCallbackContext ────────────────────────────────
 
@@ -137,13 +138,7 @@ export class ProjectileImpactCallbackContext {
   pushEffect(entityId, effect) {
     const ae = this.world.get(entityId, ActiveEffects);
     if (ae && Array.isArray(ae.effects)) {
-      const existing = ae.effects.find((e) => e.key === effect.key);
-      if (existing) {
-        existing.stacks = (existing.stacks || 1) + 1;
-        existing.turnsLeft = Math.max(existing.turnsLeft, effect.turnsLeft);
-        return;
-      }
-      ae.effects.push({ stacks: 1, ...effect });
+      upsertTimedEffect(ae.effects, { stacks: 1, ...effect });
       return;
     }
     try { this.world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {} // ECS: may already exist

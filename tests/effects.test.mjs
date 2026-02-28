@@ -51,6 +51,30 @@ Deno.test("poison effect deals damage over time and expires", () => {
   assert(!st.statuses.some(s => s.type === 'poisoned'), 'poisoned status cleared after expiry');
 });
 
+Deno.test("DOT aliases refresh duration and do not stack damage", () => {
+  const world = new World({ seed: 11 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: "Hero", maxHp: 20, hp: 20 });
+  const ae = world.get(player, ActiveEffects);
+  ae.effects.push({ key: "poison", turnsLeft: 1, potency: 2, stacks: 3 });
+  ae.effects.push({ key: "poisoned", turnsLeft: 3, potency: 2, stacks: 1 });
+
+  world.tick(1);
+
+  const vit = world.get(player, Vitality);
+  assertEquals(vit.hp, 18, "poison should tick once per turn even with duplicate alias entries");
+
+  const after = world.get(player, ActiveEffects);
+  const poisonRows = (after?.effects || []).filter((e) => {
+    const k = String(e?.key || "").toLowerCase();
+    return k === "poison" || k === "poisoned";
+  });
+  assertEquals(poisonRows.length, 1, "poison aliases should compact into a single active effect row");
+  assertEquals(Number(poisonRows[0]?.stacks || 0), 1, "dot stacks should remain singular");
+  assertEquals(Number(poisonRows[0]?.turnsLeft || 0), 2, "reapplied poison should refresh to max duration then tick down");
+});
+
 Deno.test("simultaneous regen and burn effects net correctly", () => {
   const world = new World({ seed: 7 });
   world.setScheduler((w) => scheduler(w));

@@ -8,6 +8,7 @@ import { Mana } from '../components/Mana.js';
 import { Equipment } from '../components/Equipment.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { compactDotEffects } from '../utils/effectSemantics.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -109,6 +110,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
 export function effectSystem(world) {
     for (const [id, ae] of world.query(ActiveEffects)) {
         if (!ae || !Array.isArray(ae.effects)) continue;
+        compactDotEffects(ae.effects);
         if (ae.effects.length === 0) {
             // If no active effects, clear Status if present
             if (world.has(id, Status)) {
