@@ -213,7 +213,7 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 2 }, chemical: { toxMult: 0 } },
     speed: 3,
     hooks: {
-      onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3 })],
+      onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
       onHit: [statusEffectOnHit(15, 0xdead0002, { key: "poison", turnsLeft: 3, potency: 1 }, "proc:poisoned")],
     },
     description: 'A dog-sized arachnid with venomous fangs.',
