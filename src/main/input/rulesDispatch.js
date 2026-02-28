@@ -16,6 +16,15 @@ import { itemsAt } from "../../rules/utils/queries.js";
  * @returns {(action:{type:string,payload?:object})=>void}
  */
 export function makeRulesDispatcher(world, getActorId) {
+  const uiTarget = /** @type {any} */ ((typeof window !== "undefined") ? window : globalThis);
+  const dispatchUiEvent = (name, detail = undefined) => {
+    try {
+      if (uiTarget && typeof uiTarget.dispatchEvent === "function") {
+        uiTarget.dispatchEvent(new CustomEvent(name, { detail }));
+      }
+    } catch (e) { console.debug(`[rulesDispatch] dispatch ${name}:`, e); }
+  };
+
   return function dispatch(action) {
     // Display-side lock: used for brief blocking FX windows (e.g. thrown-item flight).
     if (typeof window !== "undefined") {
@@ -55,7 +64,7 @@ export function makeRulesDispatcher(world, getActorId) {
         if (!spellId) {
           // No spell specified (keyboard shortcut); delegate to app-side
           // active spell resolution via the same path as the Cast button.
-          try { window.dispatchEvent(new CustomEvent('ui:castActiveSpell')); } catch (e) { console.debug('[rulesDispatch] dispatch ui:castActiveSpell:', e); }
+          dispatchUiEvent('ui:castActiveSpell');
           break;
         }
         const cast = { spellId, targetId };
@@ -100,7 +109,7 @@ export function makeRulesDispatcher(world, getActorId) {
       }
       case "rules.shootRanged": {
         // No explicit target; delegate to app-side auto-targeting
-        try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch (e) { console.debug('[rulesDispatch] dispatch ui:shootRanged:', e); }
+        dispatchUiEvent('ui:shootRanged');
         break;
       }
       case "rules.rangedAttack": {

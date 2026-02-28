@@ -14,9 +14,14 @@ export const ELECTRIC_DAMAGE_TUNING = Object.freeze({
     armor: 0.55,
     shield: 0.25,
     weapon: 0.20,
+    legs: 0.15,
+    gloves: 0.10,
+    belt: 0.08,
+    feet: 0.10,
+    head: 0.08,
+    neck: 0.04,
     ring1: 0.08,
     ring2: 0.08,
     ammo: 0.04,
   }),
 });
-

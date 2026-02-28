@@ -37,13 +37,14 @@ import { deitySystem } from "../rules/systems/deitySystem.js";
 import { engraveSystem, installEngraveListeners } from "../rules/systems/engraveSystem.js";
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
-import { ambientSoundSystem } from "../rules/systems/ambientSoundSystem.js";
+import { shopAmbientSoundSystem } from "../rules/systems/shopAmbientSoundSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
+import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
@@ -126,6 +127,8 @@ export function configureWorld(world) {
   registerSystem(shopkeeperSystem, 'intents');
   // Taunt steering can override enemy movement intents before movement resolves.
   registerSystem(tauntSteeringSystem, 'intents');
+  // Refill dry fountains at cooldown before interaction tries to drink.
+  registerSystem(fountainRegrowthSystem, 'intents');
   registerSystem(movementSystem, 'intents');
   // interactionSystem must run AFTER movementSystem: bump-to-interact adds
   // InteractIntent during movement; processing it in the same tick prevents
@@ -157,8 +160,8 @@ export function configureWorld(world) {
   registerSystem(monsterSpawnerSystem, 'effects');
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
-  // Ambient sounds check proximity in the effects phase
-  registerSystem(ambientSoundSystem, 'effects');
+  // Shop ambient sound cues resolve in effects.
+  registerSystem(shopAmbientSoundSystem, 'effects');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');

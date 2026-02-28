@@ -9,6 +9,35 @@ import { statusStrength } from "../utils/statusFacade.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
+ * Accept both raw ids ("flash_heal") and item-style ids ("spell:flash_heal").
+ * @param {any} value
+ * @returns {string}
+ */
+function normalizeSpellId(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw.startsWith("spell:") ? raw.slice(6) : raw;
+}
+
+/**
+ * @param {any} brain
+ * @returns {string[]}
+ */
+function normalizedLearnedSpellIds(brain) {
+  const raw = Array.isArray(brain?.learnedSpellIds) ? brain.learnedSpellIds : [];
+  /** @type {string[]} */
+  const out = [];
+  const seen = new Set();
+  for (let i = 0; i < raw.length; i++) {
+    const id = normalizeSpellId(raw[i]);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/**
  * @param {string} value
  * @returns {number}
  */
@@ -32,13 +61,14 @@ function resolveConfusedCast(world, actor, intendedSpell, learnedSpellIds) {
   const confusePower = statusStrength(world, actor, "confused");
   if (confusePower <= 0) return { kind: "normal", spell: intendedSpell };
   // Blink handles confusion/hallucination inside its own targeting rules.
-  if (String(intendedSpell?.id || "") === "blink" || String(intendedSpell?.id || "") === "phase_strike") {
+  const intendedId = String(intendedSpell?.id || "");
+  if (intendedId === "blink" || intendedId === "phase_strike" || intendedId === "flash_heal") {
     return { kind: "normal", spell: intendedSpell };
   }
 
   const alternatives = [];
   for (let i = 0; i < learnedSpellIds.length; i++) {
-    const id = String(learnedSpellIds[i] || "");
+    const id = normalizeSpellId(learnedSpellIds[i]);
     if (!id || id === intendedSpell.id) continue;
     const def = getSpell(id);
     if (def) alternatives.push(def);
@@ -66,10 +96,11 @@ export function castSpellSystem(world) {
   for (const [actor, intent] of world.query(CastSpellIntent)) {
     /** @type {{ learnedSpellIds?: string[] }|null} */
     const brain0 = /** @type any */ (world.get(actor, Brain));
-    let spellId = intent.spellId;
+    let spellId = normalizeSpellId(intent?.spellId);
+    const learned0 = normalizedLearnedSpellIds(brain0);
     // If no spell specified, default to first learned
-    if (!spellId || spellId === 0) {
-      const first = (brain0 && Array.isArray(brain0.learnedSpellIds) && brain0.learnedSpellIds[0]) || null;
+    if (!spellId) {
+      const first = learned0[0] || null;
       if (first) spellId = first;
     }
     const spell = getSpell(spellId);
@@ -81,16 +112,23 @@ export function castSpellSystem(world) {
 
     /** @type {{ learnedSpellIds?: string[] }|null} */
     const brain = /** @type any */ (world.get(actor, Brain));
-    if (!brain || !Array.isArray(brain.learnedSpellIds) || !brain.learnedSpellIds.includes(spell.id)) {
+    const learned = normalizedLearnedSpellIds(brain);
+    if (!brain || !learned.includes(spell.id)) {
       try { world.emit && world.emit('spell:not-known', { actor, spellId: spell.id }); } catch (e) { console.debug('[castSpellSystem] emit spell:not-known failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
+    }
+    if (Array.isArray(brain.learnedSpellIds)) {
+      // One-time migration of legacy "spell:*" ids to canonical ids.
+      if (brain.learnedSpellIds.length !== learned.length || brain.learnedSpellIds.some((id, i) => String(id ?? "") !== learned[i])) {
+        brain.learnedSpellIds = learned.slice();
+      }
     }
 
     /** @type {{ mana?: number, maxMana?:number }|null} */
     const mana = /** @type any */ (world.get(actor, Mana));
 
-    const confusion = resolveConfusedCast(world, actor, spell, brain.learnedSpellIds);
+    const confusion = resolveConfusedCast(world, actor, spell, learned);
     const resolvedSpell = confusion.spell;
 
     const have = Number(mana?.mana ?? 0);

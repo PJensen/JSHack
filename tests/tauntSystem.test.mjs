@@ -23,7 +23,7 @@ function loadFloorChunk() {
   loadChunk(0, 0, tiles);
 }
 
-Deno.test("taunt:apply-area applies to target faction only and emits one-shot vfx", () => {
+Deno.test("taunt:apply-area applies to target faction only and emits semantic taunt status", () => {
   const world = new World({ seed: 7101 });
   installTauntListener(world);
 
@@ -50,7 +50,6 @@ Deno.test("taunt:apply-area applies to target faction only and emits one-shot vf
     turnsLeft: 3,
     potency: 1,
     targetFaction: "enemy",
-    vfxText: "!",
   });
 
   const enemyEffects = world.get(enemy, ActiveEffects);
@@ -63,8 +62,8 @@ Deno.test("taunt:apply-area applies to target faction only and emits one-shot vf
   const neutralEffects = world.get(neutral, ActiveEffects);
   assertEquals(Array.isArray(neutralEffects?.effects), false);
 
-  const enemyVfx = statusEvents.filter((ev) => ev.id === enemy && String(ev.text) === "!");
-  const neutralVfx = statusEvents.filter((ev) => ev.id === neutral && String(ev.text) === "!");
+  const enemyVfx = statusEvents.filter((ev) => ev.id === enemy && ev.kind === "taunt" && ev.effect === "taunt");
+  const neutralVfx = statusEvents.filter((ev) => ev.id === neutral && ev.kind === "taunt");
   assertEquals(enemyVfx.length, 1);
   assertEquals(neutralVfx.length, 0);
 });

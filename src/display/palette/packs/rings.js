@@ -1,5 +1,21 @@
 export const rings = {
   ring_health:    { glyph:"◌", fg:"#ffb347", glow:"#ffb347" },
   ring_precision: { glyph:"◌", fg:"#b3e6ff", glow:"#b3e6ff" },
-  ring_arcana:    { glyph:"◌", fg:"#a480ff", glow:"#a480ff" }
+  ring_arcana:    { glyph:"◌", fg:"#a480ff", glow:"#a480ff" },
+  ring_fire_resist:   { glyph:"◌", fg:"#ff9a5c", glow:"#ff6f2e" },
+  ring_poison_resist: { glyph:"◌", fg:"#9bdc7a", glow:"#6ca84f" },
+  ring_endurance:     { glyph:"◌", fg:"#f0cf7c", glow:"#c8a658" },
+  ring_sorcery:       { glyph:"◌", fg:"#9f8dff", glow:"#7360cf" },
+  ring_channeling:    { glyph:"◌", fg:"#7fd3ff", glow:"#4b9bc7" },
+  ring_of_fury:       { glyph:"◌", fg:"#ff7c6e", glow:"#cf4a3f" },
+  serpent_ring:       { glyph:"◌", fg:"#7cc46b", glow:"#4d8f41" },
+  brawler_band:       { glyph:"◌", fg:"#d0a272", glow:"#9b7246" },
+  amulet_guarded:      { glyph:"\"", fg:"#d5d9de", glow:"#9ba4af" },
+  amulet_vigor:        { glyph:"\"", fg:"#f1c36c", glow:"#ba8f3f" },
+  amulet_warding:      { glyph:"\"", fg:"#c7d4e3", glow:"#8fa0b2" },
+  amulet_focus:        { glyph:"\"", fg:"#9fc7ff", glow:"#6c91c9" },
+  pendant_soulkeeper:  { glyph:"\"", fg:"#f2a96f", glow:"#c57844" },
+  pendant_stormward:   { glyph:"\"", fg:"#8fd0f2", glow:"#5d97b7" },
+  amulet_lifeblood:    { glyph:"\"", fg:"#ff8a83", glow:"#c95a54" },
+  amulet_arcanum:      { glyph:"\"", fg:"#b08fff", glow:"#7d62c9" }
 };

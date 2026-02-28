@@ -5,6 +5,6 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
 export const Stamina = defineComponent('Stamina', {
   maxStamina: 100,
   stamina: 100,
-  staminaRegen: 2.0,
+  staminaRegen: 3.0,
   regenCooldown: 0,
 });

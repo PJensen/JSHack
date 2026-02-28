@@ -106,7 +106,7 @@ Deno.test("stoneskin potion on_throw (via throw pipeline) spawns taunting statue
   assertEquals(taunt.sourceId, spawnedTaunter);
   assert(taunt.turnsLeft >= 3, "taunt duration should match spawn pulse config");
 
-  const tauntVfx = statusEvents.find((ev) => ev.id === enemy && String(ev.text) === "!");
+  const tauntVfx = statusEvents.find((ev) => ev.id === enemy && ev.kind === "taunt" && ev.effect === "taunt");
   assert(tauntVfx, "taunt should emit one-shot status VFX");
   assert(messageEvents.length > 0, "throw hook should emit at least one message event");
 });

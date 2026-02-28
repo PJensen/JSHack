@@ -8,16 +8,32 @@ import { Speed } from "../components/Speed.js";
 import { Player } from "../components/Player.js";
 import { Equipment } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { RangedAttackIntent } from "../components/Intents/RangedAttackIntent.js";
+import { getMonster } from "../data/monsters.js";
+import { SeenCallbackContext } from "../data/callbacks/ai.js";
+import { runCallbackList } from "../interaction/dispatch.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
+const ON_SEEN_STATE_KEY = Symbol.for("jshack:aiChase:onSeen:visible");
+
+/** @param {any} world */
+function ensureOnSeenState(world) {
+  const rec = world[ON_SEEN_STATE_KEY];
+  if (rec && rec.ids instanceof Set) return rec;
+  const created = { ids: new Set() };
+  world[ON_SEEN_STATE_KEY] = created;
+  return created;
+}
 
 export function aiChaseSystem(world) {
+  const seenState = ensureOnSeenState(world);
+
   // Identify the player position and entity ID (first found)
   let playerId = 0;
   let playerPos = null;
@@ -26,10 +42,19 @@ export function aiChaseSystem(world) {
     playerPos = { x: pos.x, y: pos.y };
     break;
   }
-  if (!playerPos) return;
+  if (!playerPos) {
+    seenState.ids.clear();
+    return;
+  }
 
   // Lazily built blocking map for LOS checks (only when a ranged enemy needs it)
   let _isBlocked = null;
+  const ensureBlockedMap = () => {
+    if (!_isBlocked) _isBlocked = blockedCallback(buildBlocksVisionMap(world));
+    return _isBlocked;
+  };
+  const previouslySeen = seenState.ids;
+  const nowSeen = new Set();
 
   // For each enemy-faction entity, add a MoveIntent toward player if none queued
   forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
@@ -55,6 +80,28 @@ export function aiChaseSystem(world) {
     const dxp = playerPos.x - pos.x;
     const dyp = playerPos.y - pos.y;
 
+    // onSeen hooks: run once when visibility transitions from false -> true.
+    let hookHandled = false;
+    const ni = world.get(id, NamedIdentity);
+    const def = ni ? getMonster(String(ni.identity || "")) : null;
+    const onSeenHooks = def?.hooks?.onSeen;
+    if (Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {
+      const canSeePlayer = hasLOS(pos.x | 0, pos.y | 0, playerPos.x | 0, playerPos.y | 0, ensureBlockedMap());
+      const seenKey = `${id}:${playerId}`;
+      if (canSeePlayer) nowSeen.add(seenKey);
+      if (canSeePlayer && !previouslySeen.has(seenKey)) {
+        const seenCtx = new SeenCallbackContext(world, {
+          actor: id,
+          target: playerId,
+          actorPos: { x: pos.x | 0, y: pos.y | 0 },
+          targetPos: { x: playerPos.x | 0, y: playerPos.y | 0 },
+        });
+        runCallbackList(onSeenHooks, seenCtx);
+        hookHandled = !!seenCtx.handled || !!seenCtx.cancelled;
+      }
+    }
+    if (hookHandled) return;
+
     // Ranged attack: if equipped with a bow and ammo, prefer shooting over chasing
     const eq = world.get(id, Equipment);
     if (eq && eq.ranged && eq.ammo && world.isAlive(eq.ammo)) {
@@ -62,8 +109,7 @@ export function aiChaseSystem(world) {
       const maxRange = weaponInfo?.range || 8;
       const dist = Math.max(Math.abs(dxp), Math.abs(dyp));
       if (dist > 1 && dist <= maxRange) {
-        if (!_isBlocked) _isBlocked = blockedCallback(buildBlocksVisionMap(world));
-        if (hasLOS(pos.x | 0, pos.y | 0, playerPos.x | 0, playerPos.y | 0, _isBlocked)) {
+        if (hasLOS(pos.x | 0, pos.y | 0, playerPos.x | 0, playerPos.y | 0, ensureBlockedMap())) {
           try { world.add(id, RangedAttackIntent, { targetId: playerId }); } catch {}
           return;
         }
@@ -84,4 +130,6 @@ export function aiChaseSystem(world) {
 
     try { world.add(id, MoveIntent, { dx, dy }); } catch {} // ECS: may already exist
   });
+
+  seenState.ids = nowSeen;
 }

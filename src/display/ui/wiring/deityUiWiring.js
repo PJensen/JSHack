@@ -1,4 +1,4 @@
-const DEITY_UI_WIRING_INSTALLED = Symbol.for("jshack:main:deityUiWiring:installed");
+const DEITY_UI_WIRING_INSTALLED = Symbol.for("jshack:display:deityUiWiring:installed");
 
 export function installDeityUiWiring(world, { log }) {
   if (!world || typeof log !== "function" || world[DEITY_UI_WIRING_INSTALLED]) return;

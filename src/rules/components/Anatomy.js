@@ -1,5 +1,46 @@
 import { defineComponent } from "../../lib/ecs-js/index.js";
 
+export const HEARING_TIERS = Object.freeze({
+  deaf: "deaf",
+  near: "near",
+  mid: "mid",
+  far: "far",
+  super: "super",
+});
+
+// Hearing-loss thresholds in dB HL; lower threshold means better hearing.
+export const HEARING_HL_RANGES = Object.freeze({
+  super: Object.freeze({ min: 0, max: 20 }),
+  far: Object.freeze({ min: 25, max: 40 }),
+  mid: Object.freeze({ min: 45, max: 60 }),
+  near: Object.freeze({ min: 65, max: 85 }),
+  deaf: Object.freeze({ min: 90, max: Infinity }),
+});
+
+// Representative dB HL threshold by hearing tier (used for quick calculations).
+export const HEARING_HL_THRESHOLD = Object.freeze({
+  super: 20,
+  far: 30,
+  mid: 50,
+  near: 70,
+  deaf: 95,
+});
+
+export const HEARING_SOURCE_DB = Object.freeze({
+  footsteps: 30,
+  conversation: 60,
+  shout: 80,
+  explosion: 110,
+});
+
+function isValidHearingTier(value) {
+  return value === HEARING_TIERS.deaf
+    || value === HEARING_TIERS.near
+    || value === HEARING_TIERS.mid
+    || value === HEARING_TIERS.far
+    || value === HEARING_TIERS.super;
+}
+
 /**
  * Anatomy — minimal, fast, snapshot-friendly.
  * parts[]. Required fields:
@@ -15,11 +56,13 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  */
 export const Anatomy = defineComponent(
   "Anatomy",
-  { parts: [] },
+  { parts: [], hearing: HEARING_TIERS.super },
   {
     validate(rec) {
       if (!Array.isArray(rec.parts))
         throw new Error("Anatomy.parts must be an array");
+      if (!isValidHearingTier(rec.hearing))
+        throw new Error(`Anatomy.hearing must be one of: ${Object.keys(HEARING_TIERS).join(", ")}`);
       return true;
     },
   }

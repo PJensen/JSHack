@@ -101,6 +101,30 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:toggleInventory')); } catch (e) { console.debug('[hud] dispatch ui:toggleInventory:', e); }
   });
 
+  const charBtn = document.createElement('button');
+  charBtn.id = 'btn-character-sheet';
+  charBtn.textContent = 'Character';
+  Object.assign(charBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  charBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:toggleCharacter')); } catch (e) { console.debug('[hud] dispatch ui:toggleCharacter:', e); }
+  });
+
+  const equipBtn = document.createElement('button');
+  equipBtn.id = 'btn-equipment';
+  equipBtn.textContent = 'Equipment';
+  Object.assign(equipBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  equipBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:toggleEquipment')); } catch (e) { console.debug('[hud] dispatch ui:toggleEquipment:', e); }
+  });
+
   const castBtn = document.createElement('button');
   castBtn.id = 'active-spell';
   castBtn.textContent = 'Cast';
@@ -208,6 +232,8 @@ export function initHUD() {
 
   const ACTION_ICONS = Object.freeze({
     inventory: '\u{1F392}',   // 🎒
+    character: '@',
+    equipment: '\u{1F6E1}\uFE0F', // 🛡️
     cast: '\u2726',           // ✦
     shoot: '\u{1F3F9}',       // 🏹
     zap: '\u26A1',            // ⚡
@@ -315,7 +341,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [invBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn, bugBtn];
+  const commandButtons = [invBtn, charBtn, equipBtn, petBtn, castBtn, shootBtn, throwBtn, engraveBtn, prayBtn, bugBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -374,6 +400,8 @@ export function initHUD() {
   };
 
   setDesktopLabel(invBtn, 'Inventory'); setMobileLabel(invBtn, 'Inventory');
+  setDesktopLabel(charBtn, 'Character'); setMobileLabel(charBtn, 'Character');
+  setDesktopLabel(equipBtn, 'Equipment'); setMobileLabel(equipBtn, 'Equipment');
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
@@ -382,6 +410,8 @@ export function initHUD() {
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopLabel(bugBtn, 'Submit Bug Report'); setMobileLabel(bugBtn, 'Submit Bug Report');
   setDesktopIcon(invBtn, ACTION_ICONS.inventory); setMobileIcon(invBtn, ACTION_ICONS.inventory);
+  setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
+  setDesktopIcon(equipBtn, ACTION_ICONS.equipment); setMobileIcon(equipBtn, ACTION_ICONS.equipment);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
@@ -390,6 +420,8 @@ export function initHUD() {
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
   setDesktopIcon(bugBtn, ACTION_ICONS.bug); setMobileIcon(bugBtn, ACTION_ICONS.bug);
   setBarLabel(invBtn, 'Bag');
+  setBarLabel(charBtn, 'Char');
+  setBarLabel(equipBtn, 'Gear');
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
   setBarLabel(shootBtn, 'Shoot');
@@ -521,7 +553,7 @@ export function initHUD() {
     const hpf = Math.max(0, Math.min(1, hpVal / hpMax));
     const mpf = Math.max(0, Math.min(1, mpVal / mpMax));
     const stf = Math.max(0, Math.min(1, stVal / stMax));
-    vitalsGauge.animateTo({
+    vitalsGauge.set({
       health: hpf,
       mana: mpf,
       stamina: stf,
@@ -531,7 +563,7 @@ export function initHUD() {
       manaMax: mpMax,
       staminaValue: stVal,
       staminaMax: stMax,
-    }, 250);
+    });
   });
 
   // Update combat HUD details
@@ -595,6 +627,8 @@ export function initHUD() {
   // Right-aligned bar: compact core actions only.
   const quick = createQuickSlot();
   bar.appendChild(invBtn);
+  bar.appendChild(charBtn);
+  bar.appendChild(equipBtn);
   bar.appendChild(petBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
@@ -625,7 +659,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, invBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn, bugBtn };
+  return { castBtn, invBtn, charBtn, equipBtn, shootBtn, throwBtn, engraveBtn, prayBtn, petBtn, bugBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------

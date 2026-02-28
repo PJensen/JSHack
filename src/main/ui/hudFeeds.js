@@ -40,9 +40,22 @@ export function createHudFeeds(world, deps) {
   };
   let lastDepth = -1;
   let lastTurn = -1;
+  let lastGold = -1;
   let lastPetExists = false;
   let lastPetState = "";
   let lastSpellMana = -1;
+
+  function sumPlayerGold(playerId) {
+    const inv = /** @type any */ (world.get(playerId, Inventory));
+    if (!inv || !Array.isArray(inv.items)) return 0;
+    let total = 0;
+    for (const iid of inv.items) {
+      const info = world.get(iid, ItemInfo);
+      if (!info || info.type !== "currency") continue;
+      total += Math.max(0, Number(info.count || 0) | 0);
+    }
+    return Math.max(0, total | 0);
+  }
 
   function updateVitalsHUD() {
     const pe = playerEntity(world);
@@ -199,6 +212,17 @@ export function createHudFeeds(world, deps) {
     }
   }
 
+  function updateGoldHUD() {
+    const pe = playerEntity(world);
+    const gold = pe ? sumPlayerGold(pe.id) : 0;
+    if (gold !== lastGold) {
+      lastGold = gold;
+      try {
+        window.dispatchEvent(new CustomEvent("ui:updateGold", { detail: { gold } }));
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:updateGold:', e); }
+    }
+  }
+
   function updatePetHUD() {
     // Check if pet exists
     let petExists = false;
@@ -246,6 +270,7 @@ export function createHudFeeds(world, deps) {
     updateCombatHUD,
     updateDepthHUD,
     updateTurnHUD,
+    updateGoldHUD,
     updatePetHUD,
     updateActiveSpellHUD,
   };

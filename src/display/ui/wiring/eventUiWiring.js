@@ -1,24 +1,32 @@
-// src/main/wiring/eventUiWiring.js
+// src/display/ui/wiring/eventUiWiring.js
 // Event-driven UI wiring: engrave, item:used, spell:learned,
 // interaction (chest), harvest:picked.
 
-import { ItemInfo } from "../../rules/components/ItemInfo.js";
-import { playerEntity } from "../../rules/utils/queries.js";
-import { resolveItemDisplayName } from "./itemName.js";
-import { makeRulesDispatcher } from "../input/rulesDispatch.js";
-
-const _installed = Symbol.for('jshack:main:eventUiWiring:installed');
+const _installed = Symbol.for('jshack:display:eventUiWiring:installed');
 
 /**
  * Install event-driven UI wiring listeners.
  * @param {{
- *   world: import('../../lib/ecs-js/index.js').World,
+ *   world: import('../../../lib/ecs-js/index.js').World,
  *   ftext: { addStatus: Function },
  *   getActiveSpellId: () => string|null,
  *   setActiveSpell: (id: string) => void,
+ *   getPlayerEntity: () => ({ id:number, pos:{x:number,y:number} } | null),
+ *   getItemInfo: (id:number) => any,
+ *   resolveItemDisplayName: (id:number) => string,
+ *   dispatchRulesAction: (action:any) => void,
  * }} deps
  */
-export function installEventUiWiring({ world, ftext, getActiveSpellId, setActiveSpell }) {
+export function installEventUiWiring({
+  world,
+  ftext,
+  getActiveSpellId,
+  setActiveSpell,
+  getPlayerEntity,
+  getItemInfo,
+  resolveItemDisplayName,
+  dispatchRulesAction,
+}) {
   if (/** @type {any} */ (world)[_installed]) return;
   /** @type {any} */ (world)[_installed] = true;
 
@@ -39,7 +47,7 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
       setActiveSpell(String(spellId));
     }
     const learnedId = String(spellId || '');
-    if (learnedId === 'lightning' || learnedId === 'meteor' || learnedId === 'blastwave') {
+    if (learnedId === 'lightning') {
       try {
         window.dispatchEvent(new CustomEvent('ui:showSpellGestureHint', {
           detail: { id: learnedId, mode: 'learn', quality: 1 },
@@ -55,16 +63,15 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
       const nonCurrency = [];
       if (Array.isArray(droppedIds)) {
         for (const eid of droppedIds) {
-          const info = world.get(eid, ItemInfo);
+          const info = getItemInfo(Number(eid || 0));
           if (!info) continue;
           if (info.type === 'currency') {
-            const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-            rulesHandler({ type: 'rules.pickupItem', payload: { itemId: eid } });
+            dispatchRulesAction({ type: 'rules.pickupItem', payload: { itemId: eid } });
           } else {
             nonCurrency.push({
               id: eid,
               type: info.type || 'item',
-              name: resolveItemDisplayName(world, eid),
+              name: resolveItemDisplayName(eid),
               count: info.count || 1,
               rarityName: info.rarityName || 'common',
               bonuses: info.bonuses || {},
@@ -90,17 +97,17 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
 
   // Altar offering: present the player's inventory so they can choose an item to offer.
   world.on('altar:offerPrompt', ({ actor, targetId, items }) => {
-    const pe = playerEntity(world);
+    const pe = getPlayerEntity();
     if (!pe || pe.id !== actor) return;
     if (!Array.isArray(items)) return;
     const offerableItems = [];
     for (const iid of items) {
-      const info = world.get(iid, ItemInfo);
+      const info = getItemInfo(Number(iid || 0));
       if (!info) continue;
       offerableItems.push({
         id: iid,
         type: info.type || 'item',
-        name: resolveItemDisplayName(world, iid),
+        name: resolveItemDisplayName(Number(iid || 0)),
         count: info.count || 1,
         rarityName: info.rarityName || 'common',
         value: info.value || 0,
@@ -120,7 +127,7 @@ export function installEventUiWiring({ world, ftext, getActiveSpellId, setActive
       try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[eventUiWiring] dispatch ui:requestInventoryData:', e); }
       try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch (e) { console.debug('[eventUiWiring] dispatch ui:requestUsableItemsData:', e); }
     }, 0);
-    const pe = playerEntity(world);
+    const pe = getPlayerEntity();
     if (!pe || pe.id !== actor) return;
     const qty = Math.max(1, Number(count || 1) | 0);
     const k = String(kind || '').toLowerCase();

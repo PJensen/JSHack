@@ -26,6 +26,7 @@ export function initStatusLine() {
 
   let depth = 1;
   let turn = 0;
+  let gold = 0;
   let atk = 0;
   let def = 0;
   let luck = 0;
@@ -67,6 +68,7 @@ export function initStatusLine() {
     const parts = [];
     pushSegment(parts, 'DLvl', String(depth));
     pushSegment(parts, 'Turn', String(turn));
+    pushSegment(parts, 'Gold', String(gold), '#ffde5a');
     pushSegment(parts, 'Atk', fmtSigned(atk), colorForDelta(atk));
     pushSegment(parts, 'Def', fmtSigned(def), colorForDelta(def));
     pushSegment(parts, 'Lk', fmtSigned(luck), colorForDelta(luck));
@@ -100,6 +102,13 @@ export function initStatusLine() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     turn = Math.max(0, Number(e?.detail?.turn ?? turn) | 0);
+    render();
+  });
+
+  window.addEventListener('ui:updateGold', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    gold = Math.max(0, Number(e?.detail?.gold ?? gold) | 0);
     render();
   });
 

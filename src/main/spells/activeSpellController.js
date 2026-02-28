@@ -10,6 +10,19 @@ import { getSpell } from "../../rules/data/spells.js";
 export function createActiveSpellController(world) {
   /** @type {string|null} */
   let activeSpellId = null;
+  const uiTarget = /** @type {any} */ ((typeof window !== "undefined") ? window : globalThis);
+
+  function knownSpellIds() {
+    const spells = learnedSpells();
+    const ids = [];
+    for (let i = 0; i < spells.length; i++) {
+      const id = String(spells[i]?.id || "");
+      if (!id) continue;
+      if (!getSpell(id)) continue;
+      ids.push(id);
+    }
+    return ids;
+  }
 
   function learnedSpells() {
     const pe = playerEntity(world);
@@ -36,22 +49,33 @@ export function createActiveSpellController(world) {
     const { mana } = getPlayerMana();
     const canCast = mana >= cost && !!activeSpellId;
     try {
-      window.dispatchEvent(new CustomEvent("ui:updateActiveSpellLabel", {
-        detail: { id: activeSpellId, name, symbol, cost, canCast }
-      }));
+      if (uiTarget && typeof uiTarget.dispatchEvent === "function") {
+        uiTarget.dispatchEvent(new CustomEvent("ui:updateActiveSpellLabel", {
+          detail: { id: activeSpellId, name, symbol, cost, canCast }
+        }));
+      }
     } catch (e) { console.debug('[activeSpellController] dispatch ui:updateActiveSpellLabel:', e); }
   }
 
   function ensureActiveSpell() {
-    if (activeSpellId) return activeSpellId;
-    const list = learnedSpells();
-    activeSpellId = (list[0]?.id) || null;
-    updateActiveSpellLabel();
+    const ids = knownSpellIds();
+    if (!activeSpellId || !ids.includes(activeSpellId)) {
+      activeSpellId = ids[0] || null;
+      updateActiveSpellLabel();
+    }
     return activeSpellId;
   }
 
   function setActiveSpell(id) {
-    activeSpellId = (typeof id === "string" && id.length) ? id : null;
+    const requested = (typeof id === "string" && id.length) ? id : null;
+    const ids = knownSpellIds();
+    if (!requested) {
+      activeSpellId = ids[0] || null;
+    } else if (ids.includes(requested)) {
+      activeSpellId = requested;
+    } else {
+      activeSpellId = ids[0] || null;
+    }
     updateActiveSpellLabel();
   }
 

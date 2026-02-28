@@ -356,7 +356,7 @@ export function validateEffectDefs(EFFECT_DEFS, opts = {}) {
 }
 
 const VALID_HOOK_KEYS = new Set([
-  'onHit', 'onBeforeHit', 'onDamaged', 'onDeath',
+  'onHit', 'onBeforeHit', 'onDamaged', 'onDeath', 'onSeen',
 ]);
 
 export function validateHookCallbacks(defs, opts = {}) {

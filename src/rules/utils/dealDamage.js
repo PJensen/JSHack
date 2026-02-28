@@ -8,6 +8,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { isEntityInvulnerable } from "./effectGuards.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
 import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
+import { createStatusEvent } from "../../shared/events/statusEvent.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -225,7 +226,7 @@ export function dealDamage(world, spec) {
   // Step 2: Invulnerability gate
   if (!spec.bypassInvuln && isEntityInvulnerable(world, target)) {
     try {
-      world.emit?.('status', { id: target, kind: 'immune', text: 'IMMUNE', source });
+      world.emit?.('status', createStatusEvent({ id: target, kind: 'immune', source }));
     } catch { /* */ }
     return { ...ZERO_RESULT, rawAmount, reason: 'invulnerable' };
   }
@@ -237,7 +238,7 @@ export function dealDamage(world, spec) {
 
   if (finalAmount <= 0) {
     try {
-      world.emit?.('status', { id: target, kind: 'resist', text: 'RESIST', source });
+      world.emit?.('status', createStatusEvent({ id: target, kind: 'resist', source }));
     } catch { /* */ }
     return { ...ZERO_RESULT, rawAmount, reason: 'resisted' };
   }

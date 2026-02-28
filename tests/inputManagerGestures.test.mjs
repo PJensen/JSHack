@@ -91,7 +91,7 @@ Deno.test("InputManager: touch tap emits tap-move action", () => {
   }
 });
 
-Deno.test("InputManager: Z gesture emits lightning cast action", () => {
+Deno.test("InputManager: Z gesture emits active-spell cast action", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
   const mgr = new InputManager(target, { canvas, touchFeedback: false });
@@ -115,7 +115,7 @@ Deno.test("InputManager: Z gesture emits lightning cast action", () => {
 
     assertEquals(actions.length, 1);
     assertEquals(actions[0]?.type, Actions.CastActiveSpell);
-    assertEquals(actions[0]?.payload, { spellId: "lightning" });
+    assertEquals(actions[0]?.payload, {});
     assertEquals(hints.length, 1);
     assertEquals(hints[0]?.id, "lightning");
   } finally {
@@ -124,7 +124,7 @@ Deno.test("InputManager: Z gesture emits lightning cast action", () => {
   }
 });
 
-Deno.test("InputManager: Z gesture is lightning regardless of active spell", () => {
+Deno.test("InputManager: Z gesture stays generic cast regardless of active spell label", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
   const mgr = new InputManager(target, { canvas, touchFeedback: false });
@@ -150,14 +150,14 @@ Deno.test("InputManager: Z gesture is lightning regardless of active spell", () 
 
     assertEquals(actions.length, 1);
     assertEquals(actions[0]?.type, Actions.CastActiveSpell);
-    assertEquals(actions[0]?.payload, { spellId: "lightning" });
+    assertEquals(actions[0]?.payload, {});
   } finally {
     off();
     mgr.dispose();
   }
 });
 
-Deno.test("InputManager: diagonal slash emits meteor cast action", () => {
+Deno.test("InputManager: diagonal slash is unwired and falls back to movement", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
   const mgr = new InputManager(target, { canvas, touchFeedback: false });
@@ -176,15 +176,14 @@ Deno.test("InputManager: diagonal slash emits meteor cast action", () => {
     ]);
 
     assertEquals(actions.length, 1);
-    assertEquals(actions[0]?.type, Actions.CastActiveSpell);
-    assertEquals(actions[0]?.payload, { spellId: "meteor" });
+    assertEquals(actions[0]?.type, Actions.Move);
   } finally {
     off();
     mgr.dispose();
   }
 });
 
-Deno.test("InputManager: circle gesture emits blastwave cast action", () => {
+Deno.test("InputManager: circle gesture is unwired and falls back to movement", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
   const mgr = new InputManager(target, { canvas, touchFeedback: false });
@@ -208,10 +207,8 @@ Deno.test("InputManager: circle gesture emits blastwave cast action", () => {
     ]);
 
     assertEquals(actions.length, 1);
-    assertEquals(actions[0]?.type, Actions.CastActiveSpell);
-    assertEquals(actions[0]?.payload, { spellId: "blastwave" });
-    assertEquals(hints.length, 1);
-    assertEquals(hints[0]?.id, "blastwave");
+    assertEquals(actions[0]?.type, Actions.Move);
+    assertEquals(hints.length, 0);
   } finally {
     off();
     mgr.dispose();
@@ -233,6 +230,70 @@ Deno.test("InputManager: keyboard r and z both emit ranged action", () => {
     assertEquals(actions.length, 2);
     assertEquals(actions[0]?.type, Actions.ShootRanged);
     assertEquals(actions[1]?.type, Actions.ShootRanged);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager: keyboard c emits open character action", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    const evC = target.emit("keydown", { key: "c", code: "KeyC" });
+
+    assertEquals(evC.defaultPrevented, true);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.OpenCharacter);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager: keyboard f emits cast even when a ui-panel is open", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+
+  const originalDocument = globalThis.document;
+  const openPanel = { style: { display: "block" } };
+  globalThis.document = {
+    querySelectorAll(selector) {
+      return selector === ".ui-panel" ? [openPanel] : [];
+    },
+  };
+
+  try {
+    const evF = target.emit("keydown", { key: "f", code: "KeyF", target: { tagName: "DIV" } });
+
+    assertEquals(evF.defaultPrevented, true);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.CastActiveSpell);
+  } finally {
+    off();
+    mgr.dispose();
+    globalThis.document = originalDocument;
+  }
+});
+
+Deno.test("InputManager: keyboard e emits open equipment action", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    const evE = target.emit("keydown", { key: "e", code: "KeyE" });
+
+    assertEquals(evE.defaultPrevented, true);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.OpenEquipment);
   } finally {
     off();
     mgr.dispose();

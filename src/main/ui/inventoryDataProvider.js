@@ -4,20 +4,29 @@
 
 import { playerEntity, itemsAt } from "../../rules/utils/queries.js";
 import { Inventory } from "../../rules/components/Inventory.js";
-import { Equipment, GEAR_SLOTS, getEquippedSlot } from "../../rules/components/Equipment.js";
+import { Equipment, GEAR_SLOTS, GEAR_SLOT_SET, getEquippedSlot } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { Unpaid } from "../../rules/components/Unpaid.js";
-import { Brain } from "../../rules/components/Brain.js";
 import { Settings } from "../../rules/components/Settings.js";
-import { getSpell } from "../../rules/data/spells.js";
+import { Vitality } from "../../rules/components/Vitality.js";
+import { Mana } from "../../rules/components/Mana.js";
+import { Stamina } from "../../rules/components/Stamina.js";
+import { Hunger } from "../../rules/components/Hunger.js";
+import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
+import { Status } from "../../rules/components/Status.js";
+import { DungeonState } from "../../rules/components/DungeonState.js";
+import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "../../rules/data/spells.js";
+import { getHungerLevel } from "../../rules/data/food.js";
 import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js";
+import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
 import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
+const _uiEventTarget = globalThis.window || globalThis;
 
 /**
  * Install event listeners that supply inventory/use/throw/apply/message/death
@@ -79,6 +88,92 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     return null;
   }
 
+  function buildEquippedBySlot(eq) {
+    const out = Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, { item: null, blocked: false }]));
+    if (!eq) return out;
+
+    for (const slot of GEAR_SLOTS) {
+      const eqId = Number(eq[slot] || 0) | 0;
+      if (!(eqId > 0)) continue;
+      const info = world.get(eqId, ItemInfo);
+      if (!info) continue;
+      out[slot] = {
+        item: buildItemDisplayData(info, eqId),
+        blocked: false,
+      };
+    }
+
+    const weaponId = Number(eq.weapon || 0) | 0;
+    const weaponInfo = weaponId > 0 ? world.get(weaponId, ItemInfo) : null;
+    if (weaponInfo?.twoHanded) {
+      out.shield = {
+        ...out.shield,
+        blocked: true,
+        blockedBy: "weapon",
+        reason: "Two-hand",
+      };
+    }
+
+    return out;
+  }
+
+  function buildActiveSpellItem() {
+    const activeSpellId = String(getActiveSpellId() || "").trim();
+    const spell = activeSpellId ? getSpell(activeSpellId) : null;
+    if (!spell) return null;
+    return {
+      id: `spell:${spell.id}`,
+      type: "spell",
+      name: spell.symbol ? `${spell.symbol} ${spell.name}` : spell.name,
+      description: String(spell.description || "").trim(),
+      detailLines: describeSpellDetailLines(spell),
+      targetEffects: describeSpellTargetEffects(spell),
+    };
+  }
+
+  function buildStatusRows(playerId) {
+    /** @type {Map<string, { key: string, turns: number, stacks: number }>} */
+    const byKey = new Map();
+    const effectComp = world.get(playerId, ActiveEffects);
+    const statusComp = world.get(playerId, Status);
+    if (Array.isArray(effectComp?.effects)) {
+      for (const entry of effectComp.effects) {
+        const key = String(entry?.key || "").trim().toLowerCase();
+        if (!key) continue;
+        const turns = Math.max(0, Number(entry?.turnsLeft || 0) | 0);
+        const stacks = Math.max(1, Number(entry?.stacks || 1) | 0);
+        const prev = byKey.get(key);
+        if (!prev) byKey.set(key, { key, turns, stacks });
+        else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+      }
+    }
+    if (Array.isArray(statusComp?.statuses)) {
+      for (const entry of statusComp.statuses) {
+        const key = String(entry?.type || entry?.key || "").trim().toLowerCase();
+        if (!key) continue;
+        const turns = Math.max(0, Number(entry?.duration || entry?.turns || 0) | 0);
+        const stacks = Math.max(1, Number(entry?.stacks || 1) | 0);
+        const prev = byKey.get(key);
+        if (!prev) byKey.set(key, { key, turns, stacks });
+        else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+      }
+    }
+    return Array.from(byKey.values());
+  }
+
+  function sumPlayerGold(playerId) {
+    if (!(playerId > 0)) return 0;
+    const inv = world.get(playerId, Inventory);
+    if (!inv || !Array.isArray(inv.items)) return 0;
+    let total = 0;
+    for (const id of inv.items) {
+      const info = world.get(id, ItemInfo);
+      if (!info || info.type !== 'currency') continue;
+      total += Math.max(0, Number(info.count || 0) | 0);
+    }
+    return Math.max(0, total | 0);
+  }
+
   function buildGroundPickupDetailAt(actorId, x, y) {
     const tx = Number.isFinite(x) ? (x | 0) : 0;
     const ty = Number.isFinite(y) ? (y | 0) : 0;
@@ -130,57 +225,66 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     };
   }
 
+  const SLOT_FILTER_MAP = Object.freeze({
+    ring1: 'ring',
+    ring2: 'ring',
+  });
+  /**
+   * @param {any} raw
+   * @returns {string|null}
+   */
+  function normalizeSlotFilter(raw) {
+    const slot = String(raw || '').trim().toLowerCase();
+    if (!slot) return null;
+    return SLOT_FILTER_MAP[slot] || slot;
+  }
+  /**
+   * @param {any} it
+   * @param {string|null} slotFilter
+   * @returns {boolean}
+   */
+  function matchesSlotFilter(it, slotFilter) {
+    if (!slotFilter) return true;
+    if (!it || !Number.isInteger(it.id) || it.id <= 0) return false;
+    const itemSlot = String(it.slot || '').toLowerCase();
+    const itemType = String(it.type || '').toLowerCase();
+    if (slotFilter === 'ammo') return itemType === 'ammo' || itemSlot === 'ammo';
+    if (slotFilter === 'ranged') return itemSlot === 'ranged' || itemType === 'wand';
+    return itemSlot === slotFilter;
+  }
+
   // Provide inventory data to overlay when requested
-  addEventListener('ui:requestInventoryData', () => {
+  addEventListener('ui:requestInventoryData', (ev) => {
+    const slotFilter = normalizeSlotFilter(ev?.detail?.slotFilter);
     const p = playerEntity(world);
     const items = [];
     let ground = null;
+    let equippedBySlot = Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, { item: null, blocked: false }]));
     if (p) {
       const inv = world.get(p.id, Inventory);
       const eq = world.get(p.id, Equipment);
+      equippedBySlot = buildEquippedBySlot(eq);
       if (inv && Array.isArray(inv.items)) {
         coalesceInventoryStacks(world, inv);
         for (const id of inv.items) {
           const info = world.get(id, ItemInfo);
-          if (info) {
-            const equippedSlot = eq ? getEquippedSlot(eq, id) : null;
-            const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
-            const applyTargetCount = applyTargetIds.length;
-            const canApply = isApplyTool(world, p.id, id);
-            items.push({
-              ...buildItemDisplayData(info, id),
-              equipped: Boolean(equippedSlot),
-              equippedSlot,
-              equippedComparison: null,
-              unpaid: world.has(id, Unpaid),
-              unpaidPrice: world.get(id, Unpaid)?.price || 0,
-              unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
-              canApply,
-              applyTargetCount,
-            });
-          }
+          if (!info || info.type === 'currency') continue;
+          const equippedSlot = eq ? getEquippedSlot(eq, id) : null;
+          const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
+          const applyTargetCount = applyTargetIds.length;
+          const canApply = isApplyTool(world, p.id, id);
+          items.push({
+            ...buildItemDisplayData(info, id),
+            equipped: Boolean(equippedSlot),
+            equippedSlot,
+            equippedComparison: null,
+            unpaid: world.has(id, Unpaid),
+            unpaidPrice: world.get(id, Unpaid)?.price || 0,
+            unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
+            canApply,
+            applyTargetCount,
+          });
         }
-      }
-      // Append learned spells as virtual brain-slot items
-      const brain = world.get(p.id, Brain);
-      const activeSpellId = getActiveSpellId();
-      const spellIds = Array.isArray(brain?.learnedSpellIds) ? brain.learnedSpellIds : [];
-      for (const sid of spellIds) {
-        const s = getSpell(sid);
-        if (!s) continue;
-        items.push({
-          id: `spell:${sid}`,
-          type: 'spell',
-          description: `Mana ${s.manaCost}`,
-          count: 1,
-          slot: 'brain',
-          name: s.symbol ? `${s.symbol} ${s.name}` : s.name,
-          rarityName: 'rare',
-          bonuses: {},
-          affixes: [],
-          equipped: activeSpellId === sid,
-          equippedSlot: activeSpellId === sid ? 'brain' : null,
-        });
       }
       // Attach comparison data for unequipped equippable items
       if (eq) {
@@ -191,7 +295,104 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       }
       ground = buildGroundPickupDetailAt(p.id, p.pos.x, p.pos.y);
     }
-    window.dispatchEvent(new CustomEvent('ui:inventoryData', { detail: { items, ground } }));
+    const bagItems = items.filter((it) => !GEAR_SLOT_SET.has(String(it?.equippedSlot || "")));
+    const filteredItems = slotFilter ? bagItems.filter((it) => matchesSlotFilter(it, slotFilter)) : bagItems;
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:inventoryData', {
+      detail: {
+        items: filteredItems,
+        bagItems: filteredItems,
+        equippedBySlot,
+        ground,
+        slotFilter,
+      },
+    }));
+  });
+
+  addEventListener('ui:requestCharacterData', () => {
+    const p = playerEntity(world);
+    let equippedBySlot = Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, { item: null, blocked: false }]));
+    let playerName = 'Hero';
+    const stats = {
+      hp: 0,
+      maxHp: 0,
+      mana: 0,
+      maxMana: 0,
+      stamina: 0,
+      maxStamina: 0,
+      attack: 0,
+      defense: 0,
+      armorClass: 10,
+      luck: 0,
+      critChancePercent: 0,
+      hunger: 0,
+      hungerLevel: "normal",
+      gold: 0,
+      turn: Math.max(0, Number(world.step || 0) | 0),
+      depth: 0,
+    };
+    let activeEffects = [];
+    equippedBySlot.brain = { item: null, blocked: false };
+    if (p) {
+      const eq = world.get(p.id, Equipment);
+      const vit = world.get(p.id, Vitality);
+      const mana = world.get(p.id, Mana);
+      const stamina = world.get(p.id, Stamina);
+      const hunger = world.get(p.id, Hunger);
+      const combat = resolveCombatSnapshot(world, p.id, { mode: "melee" });
+      equippedBySlot = buildEquippedBySlot(eq);
+      equippedBySlot.brain = { item: null, blocked: false };
+      playerName = String(world.get(p.id, NamedIdentity)?.name || 'Hero');
+      const spellItem = buildActiveSpellItem();
+      if (spellItem) {
+        equippedBySlot.brain = { item: spellItem, blocked: false };
+      }
+      const maxManaBonus = Number(eq?.maxManaDerived ?? 0);
+      const maxStaminaBonus = Number(eq?.maxStaminaDerived ?? 0);
+      const rawHunger = Math.max(0, Number(hunger?.hunger || 0) | 0);
+      const hungerLevel = (hunger?.satiation > 0) ? "satiated" : getHungerLevel(rawHunger);
+      stats.hp = Math.max(0, Number(vit?.hp || 0) | 0);
+      stats.maxHp = Math.max(0, Number(vit?.maxHp || 0) | 0);
+      stats.mana = Math.max(0, Number(mana?.mana || 0) | 0);
+      stats.maxMana = Math.max(0, (Number(mana?.maxMana || 0) | 0) + maxManaBonus);
+      stats.stamina = Math.max(0, Number(stamina?.stamina || 0) | 0);
+      stats.maxStamina = Math.max(0, (Number(stamina?.maxStamina || 0) | 0) + maxStaminaBonus);
+      stats.attack = Math.max(0, Number(combat?.attackBonus ?? eq?.attackDerived ?? 0));
+      stats.defense = Math.max(0, Number(combat?.defenseDerived ?? eq?.defenseDerived ?? 0));
+      stats.armorClass = Math.max(0, Number(combat?.armorClass ?? (10 + stats.defense)));
+      stats.luck = Number(combat?.luck ?? eq?.luckDerived ?? 0);
+      stats.critChancePercent = (Number(combat?.critChance ?? eq?.critChanceDerived ?? 0) * 100) + stats.luck;
+      stats.hunger = rawHunger;
+      stats.hungerLevel = String(hungerLevel || "normal");
+      stats.gold = sumPlayerGold(p.id);
+      activeEffects = buildStatusRows(p.id);
+      for (const [, ds] of world.query(DungeonState)) {
+        stats.depth = Math.max(0, Number(ds?.currentDepth || 0) | 0);
+        break;
+      }
+    }
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:characterData', {
+      detail: { equippedBySlot, playerName, stats, activeEffects },
+    }));
+  });
+
+  addEventListener('ui:requestEquipmentData', () => {
+    const p = playerEntity(world);
+    let equippedBySlot = Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, { item: null, blocked: false }]));
+    let playerName = 'Hero';
+    equippedBySlot.brain = { item: null, blocked: false };
+    if (p) {
+      const eq = world.get(p.id, Equipment);
+      equippedBySlot = buildEquippedBySlot(eq);
+      equippedBySlot.brain = { item: null, blocked: false };
+      playerName = String(world.get(p.id, NamedIdentity)?.name || 'Hero');
+      const spellItem = buildActiveSpellItem();
+      if (spellItem) {
+        equippedBySlot.brain = { item: spellItem, blocked: false };
+      }
+    }
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:equipmentData', {
+      detail: { equippedBySlot, playerName },
+    }));
   });
 
   // Provide usable items to the use-chooser overlay when requested
@@ -209,7 +410,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         }
       }
     }
-    window.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
   });
 
   // Provide all inventory items to the throw-chooser overlay when requested
@@ -226,7 +427,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         }
       }
     }
-    window.dispatchEvent(new CustomEvent('ui:throwableItemsData', { detail: { items } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:throwableItemsData', { detail: { items } }));
   });
 
   // Provide applicable tools to the apply-tool chooser
@@ -242,7 +443,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         }
       }
     }
-    window.dispatchEvent(new CustomEvent('ui:applyToolsData', { detail: { items } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:applyToolsData', { detail: { items } }));
   });
 
   // Provide filtered targets for an apply tool
@@ -258,7 +459,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         items.push({ id, name: resolveItemDisplayName(world, id), description: info?.description || '' });
       }
     }
-    window.dispatchEvent(new CustomEvent('ui:applyTargetsData', { detail: { items } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:applyTargetsData', { detail: { items } }));
   });
 
   // When user confirms an apply action from the UI
@@ -274,13 +475,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   // Provide message log entries
   addEventListener('ui:requestMessageLogData', () => {
     const entries = getMessageLog().getEntries();
-    window.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:messageLogData', { detail: { entries } }));
   });
 
   // Provide death log records from tombstone repository
   addEventListener('ui:requestDeathLogData', () => {
     const records = tombstoneRepo.getAll();
-    window.dispatchEvent(new CustomEvent('ui:deathLogData', { detail: { records } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:deathLogData', { detail: { records } }));
   });
 
   return { buildGroundPickupDetailAt };
