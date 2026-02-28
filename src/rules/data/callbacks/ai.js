@@ -4,6 +4,7 @@
 
 import { Position } from "../../components/Position.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
+import { worldChance } from "../../utils/rng.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 
@@ -150,7 +151,7 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
 
   return (ctx) => {
     if (!ctx || ctx.cancelled) return;
-    if (chance < 1 && ctx.world.rand() >= chance) return;
+    if (!worldChance(ctx.world, chance)) return;
     const from = ctx.actorPos;
     const target = ctx.targetPos;
     if (!from || !target) return;

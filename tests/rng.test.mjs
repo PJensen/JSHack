@@ -6,6 +6,7 @@ import {
 } from '../src/lib/ecs-js/rng.js';
 import {
   combatSeed,
+  worldChance, worldRand,
   rn2, rnd, d, rollDice,
   oneIn, pct, rnl, rne,
 } from '../src/rules/utils/rng.js';
@@ -32,6 +33,34 @@ Deno.test("different seeds produce different sequences", () => {
 
 Deno.test("rngSelfTest passes", () => {
   assert(rngSelfTest());
+});
+
+Deno.test("worldRand reads from world.rand deterministically", () => {
+  const world = { rand: mulberry32(12345) };
+  const a = worldRand(world);
+  const b = worldRand(world);
+  assert(a >= 0 && a < 1);
+  assert(b >= 0 && b < 1);
+
+  const worldAgain = { rand: mulberry32(12345) };
+  assertEquals(worldRand(worldAgain), a);
+  assertEquals(worldRand(worldAgain), b);
+});
+
+Deno.test("worldRand rejects missing world.rand", () => {
+  let threw = false;
+  try { worldRand({}); } catch { threw = true; }
+  assert(threw, "worldRand should require world.rand");
+});
+
+Deno.test("worldChance handles edge probabilities", () => {
+  const world = { rand: () => 0.5 };
+  assertEquals(worldChance(world, 0), false);
+  assertEquals(worldChance(world, -1), false);
+  assertEquals(worldChance(world, 1), true);
+  assertEquals(worldChance(world, 2), true);
+  assertEquals(worldChance(world, 0.49), false);
+  assertEquals(worldChance(world, 0.51), true);
 });
 
 // ---------------------------------------------------------------------------
