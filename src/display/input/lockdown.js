@@ -14,6 +14,28 @@
  */
 export function enableInputLockdown({ canvas = null } = {}) {
   try {
+    /**
+     * Allow native scroll behavior for designated UI containers.
+     * @param {EventTarget | null} target
+     */
+    const shouldAllowNativeScroll = (target) => {
+      let el = target instanceof Element ? target : null;
+      while (el) {
+        const attr = el.getAttribute?.("data-allow-scroll");
+        if (attr === "true" || attr === "1") return true;
+        const style = window.getComputedStyle(el);
+        const oy = String(style.overflowY || style.overflow || "");
+        const ox = String(style.overflowX || style.overflow || "");
+        const canY = (oy === "auto" || oy === "scroll" || oy === "overlay")
+          && (el.scrollHeight > (el.clientHeight + 1));
+        const canX = (ox === "auto" || ox === "scroll" || ox === "overlay")
+          && (el.scrollWidth > (el.clientWidth + 1));
+        if (canY || canX) return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
     // CSS fallbacks in case index.html styles are altered later
     const root = document.documentElement;
     const body = document.body;
@@ -39,6 +61,7 @@ export function enableInputLockdown({ canvas = null } = {}) {
 
     // 1) Wheel scrolling and ctrl+wheel zoom
     on(window, "wheel", (e) => {
+      if (shouldAllowNativeScroll(e.target)) return;
       // Block any default scrolling/zooming behavior
       e.preventDefault();
     }, { passive: false, capture: true });
@@ -48,7 +71,10 @@ export function enableInputLockdown({ canvas = null } = {}) {
     for (const t of ["gesturestart", "gesturechange", "gestureend"]) {
       on(window, t, (e) => { e.preventDefault(); }, { passive: false, capture: true });
     }
-    on(window, "touchmove", (e) => { e.preventDefault(); }, { passive: false, capture: true });
+    on(window, "touchmove", (e) => {
+      if (shouldAllowNativeScroll(e.target)) return;
+      e.preventDefault();
+    }, { passive: false, capture: true });
 
     // 3) Keyboard-based scrolling and browser zoom shortcuts
     const scrollKeys = new Set([
