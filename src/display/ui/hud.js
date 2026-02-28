@@ -133,19 +133,6 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch (e) { console.debug('[hud] dispatch ui:shootRanged:', e); }
   });
 
-  // Throw item button
-  const throwBtn = document.createElement('button');
-  throwBtn.id = 'btn-throw';
-  throwBtn.textContent = 'Throw';
-  Object.assign(throwBtn.style, {
-    padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer'
-  });
-  throwBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:openThrowChooser')); } catch (e) { console.debug('[hud] dispatch ui:openThrowChooser:', e); }
-  });
-
   // Pray button
   const prayBtn = document.createElement('button');
   prayBtn.id = 'btn-pray';
@@ -197,7 +184,6 @@ export function initHUD() {
     cast: '\u2726',           // ✦
     shoot: '\u{1F3F9}',       // 🏹
     zap: '\u26A1',            // ⚡
-    throw: '\u2934',          // ⤴
     pray: '\u{1F64F}',        // 🙏
     bug: '\u{1F47E}',         // 👾
     petDefault: '\u{1F43E}',  // 🐾
@@ -300,7 +286,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, throwBtn, prayBtn, bugBtn];
+  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, prayBtn, bugBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -362,21 +348,18 @@ export function initHUD() {
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
-  setDesktopLabel(throwBtn, 'Throw'); setMobileLabel(throwBtn, 'Throw');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopLabel(bugBtn, 'Submit Bug Report'); setMobileLabel(bugBtn, 'Submit Bug Report');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
-  setDesktopIcon(throwBtn, ACTION_ICONS.throw); setMobileIcon(throwBtn, ACTION_ICONS.throw);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
   setDesktopIcon(bugBtn, ACTION_ICONS.bug); setMobileIcon(bugBtn, ACTION_ICONS.bug);
   setBarLabel(charBtn, 'Char');
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
   setBarLabel(shootBtn, 'Shoot');
-  setBarLabel(throwBtn, 'Throw');
   setBarLabel(prayBtn, 'Pray');
   setBarLabel(bugBtn, 'Bug');
 
@@ -580,7 +563,6 @@ export function initHUD() {
   bar.appendChild(petBtn);
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
-  bar.appendChild(throwBtn);
   bar.appendChild(prayBtn);
   bar.appendChild(bugBtn);
   root.appendChild(bar);
@@ -606,7 +588,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, charBtn, shootBtn, throwBtn, prayBtn, petBtn, bugBtn };
+  return { castBtn, charBtn, shootBtn, prayBtn, petBtn, bugBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
