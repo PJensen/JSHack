@@ -2,6 +2,7 @@ import { assert } from "jsr:@std/assert";
 import { SPELL_DEFS, getSpell, listSpells } from '../src/rules/data/spells.js';
 import { ITEM_CATALOG, getCatalogItem, listCatalogItems } from '../src/rules/data/itemCatalog.js';
 import { AFFIX_DEFS, getAffix, listAffixes } from '../src/rules/data/affixes.js';
+import { MONSTERS } from '../src/rules/data/monsters.js';
 import { registerScript, runScript, listRegisteredScripts, ScriptVerb } from '../src/rules/scripting.js';
 
 Deno.test("spell definitions are valid", () => {
@@ -32,6 +33,30 @@ Deno.test("item catalog definitions are valid", () => {
   assert(getCatalogItem('book_lightning') !== null, 'getCatalogItem should find book_lightning');
   assert(getCatalogItem('nonexistent') === null, 'getCatalogItem should return null for missing');
   assert(listCatalogItems().length === Object.keys(ITEM_CATALOG).length, 'listCatalogItems length should match');
+});
+
+Deno.test("blunt weapon and skeleton vulnerability data are wired", () => {
+  const bluntIds = [
+    'iron_mace',
+    'warhammer',
+    'stormtouched_mace',
+    'warhammer_of_fury',
+    'smoldering_club',
+    'pyreheart_mace',
+    'howling_maul',
+  ];
+
+  for (const id of bluntIds) {
+    const item = ITEM_CATALOG[id];
+    assert(item && item.damageType === 'blunt', `${id} should declare damageType='blunt'`);
+  }
+
+  const skeletalIds = ['skeleton_archer', 'bone_bowman', 'skeleton', 'skeletal_marksman', 'skeleton_sharpshooter'];
+  for (const id of skeletalIds) {
+    const def = MONSTERS.find((m) => m.id === id);
+    const bluntMult = Number(def?.resistances?.kinetic?.bluntMult ?? 1);
+    assert(bluntMult > 1, `${id} should be vulnerable to blunt damage`);
+  }
 });
 
 Deno.test("affix definitions are valid", () => {

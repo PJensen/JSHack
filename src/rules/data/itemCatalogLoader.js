@@ -41,6 +41,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
       ...(Array.isArray(opts.affixes) ? opts.affixes : []),
     ])],
     damageDice: def.damageDice || null,
+    damageType: def.damageType || null,
     staminaCost: def.staminaCost ?? null,
     subtype: def.subtype || null,
     range: def.range || null,

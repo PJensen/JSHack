@@ -128,7 +128,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 25,
     resistances: {
-      kinetic: { DR: 2, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 2, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
@@ -150,7 +150,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 25,
     resistances: {
-      kinetic: { DR: 4, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 4, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
@@ -190,14 +190,14 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 25,
     resistances: {
-      kinetic: { DR: 4, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 4, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
     hooks: {
       onDamaged: [healOnDamaged(20, 0xdead0008, 2, "proc:reassemble")],
     },
-    description: 'Bones held together by spite. Resistant to piercing.',
+    description: 'Bones held together by spite. Resistant to piercing but brittle against blunt force.',
   },
   {
     id: 'spider',
@@ -232,7 +232,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 28,
     resistances: {
-      kinetic: { DR: 6, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 6, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
@@ -254,7 +254,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 25,
     resistances: {
-      kinetic: { DR: 6, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 6, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
