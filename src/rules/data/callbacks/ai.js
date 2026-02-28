@@ -146,9 +146,11 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
   const searchRadius = Math.max(1, Number.isFinite(opts.searchRadius) ? (Number(opts.searchRadius) | 0) : 1);
   const fallbackSearchRadius = Math.max(searchRadius, Number.isFinite(opts.fallbackSearchRadius) ? (Number(opts.fallbackSearchRadius) | 0) : 2);
   const cooldownTurns = Math.max(0, Number.isFinite(opts.cooldownTurns) ? (Number(opts.cooldownTurns) | 0) : 0);
+  const chance = Number.isFinite(opts.chance) ? Math.max(0, Math.min(1, opts.chance)) : 1;
 
   return (ctx) => {
     if (!ctx || ctx.cancelled) return;
+    if (chance < 1 && Math.random() >= chance) return;
     const from = ctx.actorPos;
     const target = ctx.targetPos;
     if (!from || !target) return;
