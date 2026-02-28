@@ -28,10 +28,22 @@ function makeActor(world, name, eq, hp = 10, resistances = null) {
   return id;
 }
 
-function makeEquip(world, { id, name, slot, bonuses, affixes = [] }) {
+function makeEquip(world, { id, name, slot, bonuses, affixes = [], damageType = null }) {
   const eid = world.create();
   world.add(eid, NamedIdentity, { name, identity: id });
-  world.add(eid, ItemInfo, { type: 'equip', slot, weight: 1, value: 0, description: '', count: 1, bonuses: bonuses || {}, rarity: 1, rarityName: 'common', affixes });
+  world.add(eid, ItemInfo, {
+    type: 'equip',
+    slot,
+    weight: 1,
+    value: 0,
+    description: '',
+    count: 1,
+    bonuses: bonuses || {},
+    rarity: 1,
+    rarityName: 'common',
+    affixes,
+    damageType,
+  });
   return eid;
 }
 
@@ -58,6 +70,42 @@ Deno.test("d20 combat with affix triggers: fierce, vamp, thorns", () => {
 
   assert(fVit.hp === 5, `foe should be at 5 hp, got ${fVit.hp}`);
   assert(hVit.hp === 8, `hero HP after vamp + thorns should be 8, got ${hVit.hp}`);
+});
+
+Deno.test("blunt melee deals extra damage to skeleton-style resistance profile", () => {
+  const baseResist = { kinetic: { DR: 4, bluntMult: 1.0, slashMult: 0.7, pierceMult: 0.5 } };
+  const skeletalResist = { kinetic: { DR: 4, bluntMult: 1.5, slashMult: 0.7, pierceMult: 0.5 } };
+
+  function runOne(seed, resistances) {
+    const world = new World({ seed });
+    installAffixTriggers(world);
+    const mace = makeEquip(world, {
+      id: 'test_blunt_mace',
+      name: 'Test Mace',
+      slot: 'weapon',
+      bonuses: { attack: 12 },
+      damageType: 'blunt',
+    });
+    const hero = makeActor(world, 'Hero', { weapon: mace }, 30);
+    const foe = makeActor(world, 'Target', {}, 30, resistances);
+    world.add(hero, Position, { x: 1, y: 1 });
+    world.add(foe, Position, { x: 1, y: 2 });
+    equipmentSystem(world);
+    world.add(hero, AttackIntent, { targetId: foe });
+    combatSystem(world);
+    return 30 - world.get(foe, Vitality).hp;
+  }
+
+  let compared = false;
+  for (let seed = 1; seed <= 64; seed++) {
+    const dmgBase = runOne(seed, baseResist);
+    const dmgSkeletal = runOne(seed, skeletalResist);
+    if (dmgBase === 0 && dmgSkeletal === 0) continue; // same nat1 miss path
+    assert(dmgSkeletal > dmgBase, `expected skeletal profile to take more blunt damage (base=${dmgBase}, skeletal=${dmgSkeletal}, seed=${seed})`);
+    compared = true;
+    break;
+  }
+  assert(compared, 'expected at least one deterministic seed with a landed hit');
 });
 
 Deno.test("caustic affix adds acid chip that is blocked by acid immunity", () => {

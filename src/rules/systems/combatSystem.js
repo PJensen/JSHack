@@ -184,11 +184,17 @@ export function resolveMeleeAttack(world, attacker, defender) {
     }
 
     // Base damage from weapon dice (or fallback)
+    // Typed melee is opt-in per weapon via ItemInfo.damageType.
+    let damageType = 'physical';
     weaponId = atkEq?.weapon || 0;
     let baseDice = null;
     if (weaponId) {
         const info = world.get(weaponId, ItemInfo);
         baseDice = (info && info.damageDice) ? String(info.damageDice) : null;
+        const rawType = String(info?.damageType || 'physical').toLowerCase();
+        if (rawType === 'blunt' || rawType === 'slash' || rawType === 'pierce') {
+            damageType = rawType;
+        }
     }
     if (!baseDice) {
         // Fallbacks: use natural damage dice (claws/bite) if defined, else defaults
@@ -253,14 +259,15 @@ export function resolveMeleeAttack(world, attacker, defender) {
 
     // Route through canonical damage pipeline (handles invuln, events, death)
     if (finalDmg > 0) {
+        const bypassResist = damageType === 'physical';
         const result = dealDamage(world, {
             target,
             amount: finalDmg,
             source,
-            type: 'physical',
+            type: damageType,
             cause: 'melee',
             critical: isCrit,
-            bypassResist: true,
+            bypassResist,
         });
         // dealDamage returns applied:false for invulnerable targets
         if (!result.applied && result.reason !== 'invulnerable') {
