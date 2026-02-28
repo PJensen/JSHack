@@ -139,14 +139,13 @@ Deno.test("spider onSeen self-throws near player, not on player, and not into wa
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
   loadChunk(0, 0, tiles);
-  const origRandom = Math.random;
-  Math.random = () => 0.0; // guarantee jump triggers (chance = 0.25)
   try {
     // Force a deterministic landing near the player: north blocked so west is picked first.
     setTile(5, 4, TILE_WALL);
     setTile(5, 6, TILE_WALL);
 
     const world = new World({ seed: 1 });
+    world.rand = () => 0.0; // guarantee jump triggers (chance = 0.25)
     const thrown = [];
     const bumps = [];
     world.on("item:thrown", (ev) => thrown.push(ev));
@@ -183,7 +182,6 @@ Deno.test("spider onSeen self-throws near player, not on player, and not into wa
     aiChaseSystem(world);
     assertEquals(thrown.length, 1, "onSeen should only trigger once while target remains seen");
   } finally {
-    Math.random = origRandom;
     clearAll();
   }
 });
@@ -192,10 +190,9 @@ Deno.test("spider onSeen self-throw is cooldown-gated for 3 turns", () => {
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
   loadChunk(0, 0, tiles);
-  const origRandom = Math.random;
-  Math.random = () => 0.0; // guarantee jump triggers (chance = 0.25)
   try {
     const world = new World({ seed: 1 });
+    world.rand = () => 0.0; // guarantee jump triggers (chance = 0.25)
     const thrown = [];
     world.on("item:thrown", (ev) => thrown.push(ev));
 
@@ -246,7 +243,6 @@ Deno.test("spider onSeen self-throw is cooldown-gated for 3 turns", () => {
     aiChaseSystem(world);
     assertEquals(thrown.length, 2, "spider should jump again after cooldown window");
   } finally {
-    Math.random = origRandom;
     clearAll();
   }
 });
