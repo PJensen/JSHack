@@ -38,6 +38,7 @@ const AFFIX_FROSTBITE = "affix:frostbite1";
 const AFFIX_HEMORRHAGE = "affix:hemorrhage1";
 const AFFIX_SECOND_WIND = "affix:secondWind1";
 const AFFIX_FLAMING = "affix:flaming";
+const AFFIX_STUNNING = "affix:stunning1";
 
 /**
  * Push or stack an active effect directly on an entity.
@@ -319,6 +320,14 @@ registerScript(AFFIX_FLAMING, {
   },
 });
 
+registerScript(AFFIX_STUNNING, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1a, 25)) return;
+    upsertEffect(world, ctx.defender, { key: "stun", turnsLeft: 1, potency: 1, stacks: 1 });
+    try { world.emit && world.emit("proc:stunned", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:stunned failed:", e); }
+  },
+});
+
 registerScript(AFFIX_SECOND_WIND, {
   [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee18, 10)) return;
@@ -360,6 +369,7 @@ export const AFFIX_DEFS = {
   hemorrhage1: { name: "Hemorrhage", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_HEMORRHAGE, weight: 12 },
   secondWind1: { name: "Second Wind", slots: ["armor", "shield"], triggers: ["onDamaged"], script: AFFIX_SECOND_WIND, weight: 8 },
   flaming: { name: "Flaming", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_FLAMING, weight: 8 },
+  stunning1: { name: "Stunning", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_STUNNING, weight: 0 },
 };
 
 export function listAffixes() { return Object.entries(AFFIX_DEFS).map(([id, rec]) => ({ id, ...rec })); }

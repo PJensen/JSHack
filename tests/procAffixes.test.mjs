@@ -115,6 +115,30 @@ Deno.test("hemorrhage1 affix applies bleed to defender", () => {
   assert(false, 'hemorrhage never procced in 200 seeds');
 });
 
+// ── Stunning: applies stun to defender ─────────────────────────────
+
+Deno.test("stunning1 affix applies stun to defender", () => {
+  for (let s = 1; s <= 200; s++) {
+    const world = new World({ seed: s });
+    installAffixTriggers(world);
+
+    const weapon = makeEquip(world, { slot: 'weapon', bonuses: { attack: 10 }, affixes: ['stunning1'], damageDice: '1d8' });
+    const hero = makeActor(world, { x: 1, y: 1, hp: 50, faction: 'player' });
+    const foe = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
+    world.get(hero, Equipment).weapon = weapon;
+    equipmentSystem(world);
+    resolveMeleeAttack(world, hero, foe);
+
+    const ae = world.get(foe, ActiveEffects);
+    const hasStun = ae && ae.effects.some(e => e.key === 'stun');
+    if (hasStun) {
+      assert(true, 'stunning applied stun');
+      return;
+    }
+  }
+  assert(false, 'stunning never procced in 200 seeds');
+});
+
 // ── Berserk: applies berserk to attacker ───────────────────────────
 
 Deno.test("berserk1 affix applies berserk to attacker", () => {
@@ -314,6 +338,24 @@ Deno.test("buildCatalogItem merges inherent affixes with provided ones", () => {
   const info3 = world.get(id3, ItemInfo);
   assert(info3.affixes.includes("chainLightning1"), "stormcaller should have chainLightning1");
   assert(info3.affixes.includes("capacitive1"), "stormcaller should have capacitive1");
+});
+
+Deno.test("mace-family catalog items include inherent stunning1 affix", () => {
+  const world = new World({ seed: 1 });
+  const maceIds = [
+    "iron_mace",
+    "warhammer",
+    "stormtouched_mace",
+    "warhammer_of_fury",
+    "pyreheart_mace",
+    "howling_maul",
+  ];
+
+  for (const equipId of maceIds) {
+    const id = buildCatalogItem(world, equipId);
+    const info = world.get(id, ItemInfo);
+    assert(info.affixes.includes("stunning1"), `${equipId} should include stunning1`);
+  }
 });
 
 // ── Shield slot fix ────────────────────────────────────────────────
