@@ -1,7 +1,7 @@
-// src/main/fx/throwFxController.js
+// src/display/fx/throwFxController.js
 // Thrown-item arc animation, hiding, and input lock.
 
-import { drawKind } from "../../display/passes/glyphs/atlas.js";
+import { drawKind } from "../passes/glyphs/atlas.js";
 
 const THROW_FX_SPEED_TILES_PER_SEC = 26;
 const THROW_FX_MIN_DURATION = 0.09;

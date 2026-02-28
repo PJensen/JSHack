@@ -24,11 +24,13 @@ Deno.test("archetypes create valid entities with correct components", () => {
   assert(world.isAlive(c), 'creature alive');
   const ca = world.get(c, Anatomy);
   assert(Array.isArray(ca.parts) && ca.parts.length > 0, 'humanoid anatomy built');
+  assert(typeof ca.hearing === 'string' && ca.hearing.length > 0, 'humanoid anatomy includes hearing tier');
 
   const h = createFrom(world, Human, { x: -2, y: 2 });
   assert(world.isAlive(h), 'human alive');
   const ha = world.get(h, Anatomy);
   assert(Array.isArray(ha.parts) && ha.parts.length > 0, 'human anatomy built');
+  assert(typeof ha.hearing === 'string' && ha.hearing.length > 0, 'human anatomy includes hearing tier');
 
   const m = createFrom(world, Monster, { x: 3, y: -1, name: 'Goblin' });
   assert(world.isAlive(m), 'monster alive');

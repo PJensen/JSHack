@@ -6,6 +6,32 @@ import { getMonster } from "../src/rules/data/monsters.js";
 import { CombatCallbackContext } from "../src/rules/data/callbacks/combat.js";
 import { runCallbackList } from "../src/rules/interaction/dispatch.js";
 
+Deno.test("spider poison proc is short and low-potency when it triggers", () => {
+  const hooks = getMonster("spider")?.hooks?.onHit;
+  assert(Array.isArray(hooks) && hooks.length > 0, "spider onHit hooks should exist");
+
+  let found = false;
+  for (let seed = 0; seed < 4096; seed++) {
+    const world = new World({ seed });
+    const attacker = world.create();
+    const defender = world.create();
+
+    const ctx = new CombatCallbackContext(world, { attacker, defender, damage: 4 });
+    runCallbackList(hooks, ctx);
+
+    const ae = world.get(defender, ActiveEffects);
+    const poison = ae?.effects?.find((e) => e.key === "poison");
+    if (!poison) continue;
+
+    assertEquals(Number(poison.turnsLeft), 3, "spider poison should last 3 turns");
+    assertEquals(Number(poison.potency), 1, "spider poison potency should remain 1");
+    found = true;
+    break;
+  }
+
+  assert(found, "expected at least one deterministic seed to trigger spider poison");
+});
+
 Deno.test("troll smash on-hit applies regen to attacker", () => {
   const world = new World({ seed: 123 });
   const attacker = world.create();

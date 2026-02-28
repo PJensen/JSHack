@@ -6,6 +6,8 @@ import { createPlayer } from '../src/rules/archetypes/Player.js';
 import { Monster } from '../src/rules/archetypes/Creatures.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { WaitIntent } from '../src/rules/components/Intents/WaitIntent.js';
+import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 
 /**
  * Scenario: player surrounded on 3 cardinal sides by fast monsters.
@@ -20,6 +22,10 @@ import { WaitIntent } from '../src/rules/components/Intents/WaitIntent.js';
  */
 
 function setup() {
+  // Ensure bump targets are walkable (hostile melee gate checks tile walkability).
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+
   const world = new World({ seed: 42 });
   configureWorld(world);
 
@@ -40,68 +46,77 @@ function setup() {
 }
 
 Deno.test("surrounded: 3 adjacent speed-3 monsters should all attack every tick", () => {
-  const { world, pid } = setup();
+  try {
+    const { world, pid } = setup();
 
-  let totalAttacks = 0;
-  const attacksPerTick = [];
+    let totalAttacks = 0;
+    const attacksPerTick = [];
 
-  world.on('bump:attack', () => { totalAttacks++; });
+    world.on('bump:attack', () => { totalAttacks++; });
 
-  const TICKS = 10;
-  for (let t = 0; t < TICKS; t++) {
-    const before = totalAttacks;
-    // Player waits (added outside tick = immediate, like real game input)
-    world.add(pid, WaitIntent);
-    world.tick(1);
-    attacksPerTick.push(totalAttacks - before);
+    const TICKS = 10;
+    for (let t = 0; t < TICKS; t++) {
+      const before = totalAttacks;
+      // Player waits (added outside tick = immediate, like real game input)
+      world.add(pid, WaitIntent);
+      world.tick(1);
+      attacksPerTick.push(totalAttacks - before);
+    }
+
+    // 3 adjacent monsters × actEvery 1 × 10 ticks = 30 expected attack attempts
+    assertEquals(
+      totalAttacks, TICKS * 3,
+      `Expected ${TICKS * 3} attack attempts over ${TICKS} ticks from 3 adjacent ` +
+      `actEvery=1 monsters, got ${totalAttacks}. Per-tick: [${attacksPerTick.join(', ')}]`
+    );
+  } finally {
+    clearAll();
   }
-
-  // 3 adjacent monsters × actEvery 1 × 10 ticks = 30 expected attack attempts
-  assertEquals(
-    totalAttacks, TICKS * 3,
-    `Expected ${TICKS * 3} attack attempts over ${TICKS} ticks from 3 adjacent ` +
-    `actEvery=1 monsters, got ${totalAttacks}. Per-tick: [${attacksPerTick.join(', ')}]`
-  );
 });
 
 Deno.test("surrounded: no tick should have 0 attacks when 3 monsters are adjacent", () => {
-  const { world, pid } = setup();
+  try {
+    const { world, pid } = setup();
 
-  const attacksPerTick = [];
+    const attacksPerTick = [];
 
-  let tickAttacks = 0;
-  world.on('bump:attack', () => { tickAttacks++; });
+    let tickAttacks = 0;
+    world.on('bump:attack', () => { tickAttacks++; });
 
-  const TICKS = 10;
-  for (let t = 0; t < TICKS; t++) {
-    tickAttacks = 0;
-    world.add(pid, WaitIntent);
-    world.tick(1);
-    attacksPerTick.push(tickAttacks);
+    const TICKS = 10;
+    for (let t = 0; t < TICKS; t++) {
+      tickAttacks = 0;
+      world.add(pid, WaitIntent);
+      world.tick(1);
+      attacksPerTick.push(tickAttacks);
+    }
+
+    const zeroTicks = attacksPerTick.filter(n => n === 0).length;
+    assertEquals(
+      zeroTicks, 0,
+      `${zeroTicks} out of ${TICKS} ticks had ZERO attacks while surrounded ` +
+      `by 3 adjacent monsters. Per-tick: [${attacksPerTick.join(', ')}]`
+    );
+  } finally {
+    clearAll();
   }
-
-  const zeroTicks = attacksPerTick.filter(n => n === 0).length;
-  assertEquals(
-    zeroTicks, 0,
-    `${zeroTicks} out of ${TICKS} ticks had ZERO attacks while surrounded ` +
-    `by 3 adjacent monsters. Per-tick: [${attacksPerTick.join(', ')}]`
-  );
 });
 
 Deno.test("surrounded: cumulative damage confirms multiple attackers per turn", () => {
-  const { world, pid } = setup();
+  try {
+    const { world, pid } = setup();
 
-  const startHp = world.get(pid, Vitality).hp;
+    const startHp = world.get(pid, Vitality).hp;
 
-  // Run enough ticks for statistically clear results
-  const TICKS = 20;
-  for (let t = 0; t < TICKS; t++) {
-    world.add(pid, WaitIntent);
-    world.tick(1);
-  }
+    // Run enough ticks for statistically clear results
+    const TICKS = 20;
+    for (let t = 0; t < TICKS; t++) {
+      world.add(pid, WaitIntent);
+      world.tick(1);
+    }
 
-  const endHp = world.get(pid, Vitality).hp;
-  const totalDmg = startHp - endHp;
+    const endHp = world.get(pid, Vitality).hp;
+    const totalDmg = startHp - endHp;
 
   // With 3 monsters attacking, even accounting for misses (d20 vs low AC),
   // total damage over 20 ticks should be substantial. A single attacker doing
@@ -110,9 +125,12 @@ Deno.test("surrounded: cumulative damage confirms multiple attackers per turn", 
   // damage will be clustered around the single-attacker range.
   //
   // This is a sanity check — the per-tick event counts above are the real proof.
-  assert(
-    totalDmg > 0,
-    `Player took 0 damage over ${TICKS} ticks while surrounded by 3 monsters ` +
-    `(started ${startHp} hp, ended ${endHp} hp)`
-  );
+    assert(
+      totalDmg > 0,
+      `Player took 0 damage over ${TICKS} ticks while surrounded by 3 monsters ` +
+      `(started ${startHp} hp, ended ${endHp} hp)`
+    );
+  } finally {
+    clearAll();
+  }
 });

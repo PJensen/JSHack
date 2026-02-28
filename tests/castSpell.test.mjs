@@ -38,3 +38,27 @@ Deno.test("casting a spell costs mana and emits events", () => {
   world.tick(1);
   assert(events.some(e => e[0] === 'oom'), 'oom event raised');
 });
+
+Deno.test("castSpellSystem accepts legacy prefixed spell ids", () => {
+  const world = new World({ seed: 2 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: "Cleric" });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ["spell:flash_heal"];
+
+  const mana = world.get(player, Mana);
+  mana.mana = 30;
+  mana.maxMana = 30;
+
+  const castEvents = [];
+  world.on("castSpell", (e) => castEvents.push(e));
+
+  world.add(player, CastSpellIntent, { spellId: "spell:flash_heal" });
+  world.tick(1);
+
+  const manaAfter = world.get(player, Mana);
+  assert(manaAfter.mana === 16, "flash_heal mana cost should be applied from prefixed id");
+  assert(castEvents.some((e) => e.spellId === "flash_heal"), "prefixed id should resolve to canonical spell id");
+  assert(brain.learnedSpellIds[0] === "flash_heal", "learned spell ids should migrate to canonical ids");
+});

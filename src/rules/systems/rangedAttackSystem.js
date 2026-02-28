@@ -18,6 +18,7 @@ import { getAmmoHooks } from '../data/ammo.js';
 import { ProjectileImpactCallbackContext } from '../data/callbacks/projectile.js';
 import { runCallbackList } from '../interaction/dispatch.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
+import { createStatusEvent } from '../../shared/events/statusEvent.js';
 
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
@@ -147,7 +148,7 @@ export function rangedAttackSystem(world) {
         critical: isCrit,
         rng: r,
       });
-      world.emit?.('status', { id: defender, kind: 'miss', text: 'MISS', source: attacker });
+      world.emit?.('status', createStatusEvent({ id: defender, kind: 'miss', source: attacker }));
       // Consume ammo even on miss
       consumeAmmo(world, attacker, ammoId, ammoInfo);
       world.emit?.('ranged:shot', { attacker, target: defender, hit: false, style: ammoStyle });

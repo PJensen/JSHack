@@ -9,6 +9,11 @@ import { FoodDecay } from "../../rules/components/FoodDecay.js";
 import { isIdentified } from "../../rules/data/identification.js";
 import { getDecayStage } from "../../rules/data/food.js";
 import { getAffix } from "../../rules/data/affixes.js";
+import {
+  getSpell,
+  describeSpellDetailLines,
+  describeSpellTargetEffects,
+} from "../../rules/data/spells.js";
 
 /**
  * Resolve the display name for an item entity.
@@ -61,6 +66,19 @@ export function resolveAffixes(rawAffixes) {
 }
 
 /**
+ * @param {string} identity
+ * @returns {string}
+ */
+function spellIdFromIdentity(identity) {
+  const raw = String(identity || "").trim();
+  if (!raw) return "";
+  for (const prefix of ["book_", "scroll_", "wand_", "spell:"]) {
+    if (raw.startsWith(prefix)) return raw.slice(prefix.length);
+  }
+  return "";
+}
+
+/**
  * Build a standardised display-data object for an item entity.
  * Used by inventory, chest, ground-pickup and any other UI that shows item info.
  *
@@ -71,6 +89,15 @@ export function resolveAffixes(rawAffixes) {
 export function buildItemDisplayData(world, itemId) {
   const info = world.get(itemId, ItemInfo);
   if (!info) return null;
+  const ni = world.get(itemId, NamedIdentity);
+  const spellId = spellIdFromIdentity(ni?.identity || "");
+  const linkedSpell = spellId ? getSpell(spellId) : null;
+  const detailLines = linkedSpell ? describeSpellDetailLines(linkedSpell) : [];
+  const targetEffects = linkedSpell ? describeSpellTargetEffects(linkedSpell) : [];
+  const description = linkedSpell
+    ? String(linkedSpell.description || info.description || "").trim()
+    : (info.description || "");
+
   return {
     id: itemId,
     type: info.type || 'item',
@@ -78,12 +105,15 @@ export function buildItemDisplayData(world, itemId) {
     slot: info.slot || '',
     count: info.count || 1,
     rarityName: info.rarityName || 'common',
-    description: info.description || '',
+    description,
     bonuses: info.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {},
     affixes: resolveAffixes(info.affixes),
     damageDice: info.damageDice || null,
     staminaCost: info.staminaCost ?? null,
     twoHanded: !!info.twoHanded,
     coating: info.coating && typeof info.coating === 'object' ? { ...info.coating } : null,
+    spellId: linkedSpell?.id || null,
+    detailLines,
+    targetEffects,
   };
 }

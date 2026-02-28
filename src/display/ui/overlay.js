@@ -8,6 +8,22 @@ import { renderCookingFire } from './cookingFireOverlay.js';
 
 const PANEL_Z_BASE = 1200;
 let _panelZCounter = PANEL_Z_BASE;
+const CHARACTER_SLOT_ORDER = Object.freeze([
+  'brain',
+  'weapon',
+  'armor',
+  'head',
+  'neck',
+  'belt',
+  'gloves',
+  'shield',
+  'ring1',
+  'ring2',
+  'legs',
+  'feet',
+  'ammo',
+  'ranged',
+]);
 
 /**
  * @param {any} it
@@ -48,6 +64,8 @@ export function getInventoryDefaultAction(it) {
 export function initOverlays() {
   const root = ensureRoot();
   const inv = ensurePanel('inventory');
+  const char = ensurePanel('character');
+  const equip = ensurePanel('equipment');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const usePanel = ensurePanel('use');
@@ -99,18 +117,59 @@ export function initOverlays() {
   const ticker = ensureMessageTicker(root);
   let spellGestureTimer = 0;
 
-  window.addEventListener('ui:openInventory', () => {
+  window.addEventListener('ui:openInventory', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
+    (/** @type {any} */ (inv))._inventorySlotFilter = slotFilter || '';
+    hide(char);
+    hide(equip);
     show(inv);
     // Request data from app; app will respond with ui:inventoryData
-    window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
+    window.dispatchEvent(new CustomEvent('ui:requestInventoryData', { detail: { slotFilter } }));
+  });
+  window.addEventListener('ui:openCharacter', () => {
+    hide(inv);
+    hide(equip);
+    show(char);
+    window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
+  });
+  window.addEventListener('ui:openEquipment', () => {
+    hide(inv);
+    hide(char);
+    show(equip);
+    window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
   });
   // Toggle inventory panel open/close
   window.addEventListener('ui:toggleInventory', () => {
     if (inv.style.display === 'block') {
       hide(inv);
     } else {
+      hide(char);
+      hide(equip);
       show(inv);
+      (/** @type {any} */ (inv))._inventorySlotFilter = '';
       window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
+    }
+  });
+  window.addEventListener('ui:toggleCharacter', () => {
+    if (char.style.display === 'block') {
+      hide(char);
+    } else {
+      hide(inv);
+      hide(equip);
+      show(char);
+      window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
+    }
+  });
+  window.addEventListener('ui:toggleEquipment', () => {
+    if (equip.style.display === 'block') {
+      hide(equip);
+    } else {
+      hide(inv);
+      hide(char);
+      show(equip);
+      window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
     }
   });
   // Toggle memory graph
@@ -146,6 +205,8 @@ export function initOverlays() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       hide(inv);
+      hide(char);
+      hide(equip);
       hide(log);
       hide(pick);
       hide(usePanel);
@@ -180,9 +241,31 @@ export function initOverlays() {
   window.addEventListener('ui:inventoryData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    const items = (e?.detail?.items) || [];
+    const items = (e?.detail?.bagItems) || (e?.detail?.items) || [];
+    const equippedBySlot = e?.detail?.equippedBySlot || null;
     const ground = e?.detail?.ground || null;
-    renderInventory(inv, items, ground);
+    const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
+    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter);
+    if (equip.style.display === 'block') {
+      const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
+      renderEquipment(equip, equippedBySlot, cachedPlayerName);
+    }
+  });
+  window.addEventListener('ui:characterData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const playerName = String(e?.detail?.playerName || 'Hero');
+    const stats = e?.detail?.stats || {};
+    const activeEffects = Array.isArray(e?.detail?.activeEffects) ? e.detail.activeEffects : [];
+    if (char.style.display === 'block') renderCharacterSheet(char, { playerName, stats, activeEffects });
+  });
+  window.addEventListener('ui:equipmentData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const equippedBySlot = e?.detail?.equippedBySlot || null;
+    const playerName = String(e?.detail?.playerName || 'Hero');
+    (/** @type {any} */ (equip))._equipmentPlayerName = playerName;
+    if (equip.style.display === 'block') renderEquipment(equip, equippedBySlot, playerName);
   });
   window.addEventListener('ui:messageLogData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -254,6 +337,8 @@ export function initOverlays() {
     _applyToolId = 0;
     // Keep modal overlays exclusive; prevents touch click-through into inventory rows.
     hide(inv);
+    hide(char);
+    hide(equip);
     show(applyPanel);
     window.dispatchEvent(new CustomEvent('ui:requestApplyToolsData'));
   });
@@ -265,6 +350,7 @@ export function initOverlays() {
     _applyToolId = toolId;
     // Opening apply from inventory should not leave inventory interactive behind it.
     hide(inv);
+    hide(equip);
     show(applyPanel);
     window.dispatchEvent(new CustomEvent('ui:requestApplyTargetsData', { detail: { toolId } }));
   });
@@ -488,37 +574,18 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const id = String(e?.detail?.id || '');
-    if (id !== 'lightning' && id !== 'meteor' && id !== 'blastwave') return;
+    if (id !== 'lightning') return;
     const mode = String(e?.detail?.mode || 'cast');
     const quality = Number(e?.detail?.quality);
     const clamped = Number.isFinite(quality) ? Math.max(0.35, Math.min(1, quality)) : 1;
-    let duration = mode === 'learn' ? 2600 : 900;
-    if (id === 'meteor' && mode === 'cast') duration = 1800;
-    if (id === 'lightning') {
-      spellGestureHint.glyph.textContent = 'Z';
-      spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
-      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
-      spellGestureHint.caption.textContent = mode === 'learn'
-        ? 'Draw a Z to unleash Lightning!'
-        : '';
-      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
-    } else if (id === 'blastwave') {
-      spellGestureHint.glyph.textContent = '◯';
-      spellGestureHint.glyph.style.textShadow = '0 0 16px rgba(255,170,80,0.55), 0 0 30px rgba(255,140,50,0.35)';
-      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,170,80,0.45))';
-      spellGestureHint.caption.textContent = mode === 'learn'
-        ? 'Draw a circle to unleash Blast Wave!'
-        : '';
-      spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
-    } else {
-      spellGestureHint.glyph.textContent = '/';
-      spellGestureHint.glyph.style.textShadow = buildFlameShadow(clamped);
-      spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(255,160,80,0.45))';
-      spellGestureHint.caption.textContent = (mode === 'learn')
-        ? 'Draw a diagonal to call Meteor!'
-        : 'Tap a target';
-      spellGestureHint.caption.style.display = 'block';
-    }
+    const duration = mode === 'learn' ? 2600 : 900;
+    spellGestureHint.glyph.textContent = 'Z';
+    spellGestureHint.glyph.style.textShadow = buildLightningShadow(clamped);
+    spellGestureHint.wrap.style.filter = 'drop-shadow(0 0 22px rgba(120,200,255,0.45))';
+    spellGestureHint.caption.textContent = mode === 'learn'
+      ? 'Draw a Z to cast your active spell!'
+      : '';
+    spellGestureHint.caption.style.display = mode === 'learn' ? 'block' : 'none';
     spellGestureHint.glyph.style.opacity = mode === 'cast' ? '0.92' : '1';
     spellGestureHint.wrap.style.display = 'flex';
     spellGestureHint.wrap.style.animation = 'none';
@@ -1295,6 +1362,44 @@ function renderItemDetails(container, it) {
     container.appendChild(effectLine);
   }
 
+  // --- Spell details (cost/range/requirements + target effects) ---
+  const detailLines = Array.isArray(it.detailLines)
+    ? it.detailLines.map((line) => String(line || '').trim()).filter(Boolean)
+    : [];
+  const targetEffects = Array.isArray(it.targetEffects)
+    ? it.targetEffects.map((line) => String(line || '').trim()).filter(Boolean)
+    : [];
+  const hasSpellDetails = it.type === 'spell' || detailLines.length > 0 || targetEffects.length > 0 || !!it.spellId;
+  if (hasSpellDetails) {
+    if (detailLines.length) {
+      const detailRow = document.createElement('div');
+      detailRow.textContent = detailLines.join(' · ');
+      detailRow.style.color = '#c8e0ff';
+      detailRow.style.fontSize = '13px';
+      detailRow.style.marginBottom = '2px';
+      container.appendChild(detailRow);
+    }
+
+    if (targetEffects.length) {
+      const effectsTitle = document.createElement('div');
+      effectsTitle.textContent = 'Target Effects';
+      effectsTitle.style.color = '#9fd6ff';
+      effectsTitle.style.fontSize = '11px';
+      effectsTitle.style.textTransform = 'uppercase';
+      effectsTitle.style.letterSpacing = '0.06em';
+      effectsTitle.style.opacity = '0.85';
+      effectsTitle.style.marginTop = '2px';
+      container.appendChild(effectsTitle);
+    }
+    for (const effect of targetEffects) {
+      const line = document.createElement('div');
+      line.textContent = `\u2022 ${effect}`;
+      line.style.color = '#9fd6ff';
+      line.style.fontSize = '12px';
+      container.appendChild(line);
+    }
+  }
+
   // --- Weapon stats (damage dice, stamina cost, two-handed) ---
   const isWeapon = it.slot === 'weapon' || it.slot === 'ranged';
   if (isWeapon && (it.damageDice || it.staminaCost != null)) {
@@ -1499,8 +1604,8 @@ function show(panel) {
 /** @param {HTMLDivElement} panel */
 function hide(panel) { panel.style.display = 'none'; hideItemTooltip(); }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] */
-function renderInventory(panel, items, ground) {
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] @param {string} [slotFilter] */
+function renderInventory(panel, items, ground, slotFilter = '') {
   const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] inventory detach failed:', e); }
@@ -1510,7 +1615,8 @@ function renderInventory(panel, items, ground) {
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
   const title = document.createElement('div');
-  title.textContent = 'Inventory';
+  const filterText = humanize(slotFilter || '');
+  title.textContent = filterText ? `Inventory · ${filterText}` : 'Inventory';
   title.style.fontWeight = 'bold';
   title.style.marginBottom = '8px';
   el.appendChild(title);
@@ -1634,6 +1740,20 @@ function renderInventory(panel, items, ground) {
   hint.style.wordBreak = 'break-word';
   el.appendChild(hint);
 
+  const detail = document.createElement('div');
+  Object.assign(detail.style, {
+    marginTop: '8px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    minHeight: '56px',
+    maxHeight: '26vh',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+  });
+  el.appendChild(detail);
+
   const actions = document.createElement('div');
   Object.assign(actions.style, {
     marginTop: '8px',
@@ -1677,7 +1797,12 @@ function renderInventory(panel, items, ground) {
       ? (hasApplyTargets ? ' · A=Apply' : ' · A=Apply (no targets)')
       : '';
     hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
-    showItemTooltip(it, rows[sel], { pinBottomOnMobile: true });
+    detail.innerHTML = '';
+    if (it) {
+      renderItemDetails(detail, it);
+    }
+    // Inventory uses inline detail panel; avoid duplicate floating tooltip.
+    hideItemTooltip();
     renderInventoryActions();
   }
 
@@ -1946,7 +2071,423 @@ function renderInventory(panel, items, ground) {
   (/** @type {any} */ (panel))._inventoryDetach = detach;
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,symbol?:string,cost?:number}>} spells @param {string|null} activeId */
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{ playerName?: string, stats?: Record<string, any>, activeEffects?: Array<any> }} data
+ */
+function renderCharacterSheet(panel, data) {
+  const existingDetach = /** @type {any} */ (panel)._characterSheetDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch (e) { console.debug('[overlay] character sheet detach failed:', e); }
+  }
+
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+  el.style.overflowX = 'hidden';
+
+  const playerName = String(data?.playerName || 'Hero').trim() || 'Hero';
+  const stats = data?.stats && typeof data.stats === 'object' ? data.stats : {};
+  const activeEffects = Array.isArray(data?.activeEffects) ? data.activeEffects : [];
+
+  const title = document.createElement('div');
+  title.textContent = `${playerName} · Character Sheet`;
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  const statCard = document.createElement('div');
+  Object.assign(statCard.style, {
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '6px 12px',
+    fontSize: '13px',
+  });
+  el.appendChild(statCard);
+
+  const statRows = [
+    ['HP', `${Number(stats.hp || 0)}/${Number(stats.maxHp || 0)}`],
+    ['Mana', `${Number(stats.mana || 0)}/${Number(stats.maxMana || 0)}`],
+    ['Stamina', `${Number(stats.stamina || 0)}/${Number(stats.maxStamina || 0)}`],
+    ['Attack', `${Number(stats.attack || 0)}`],
+    ['Defense', `${Number(stats.defense || 0)}`],
+    ['Armor Class', `${Number(stats.armorClass || 0)}`],
+    ['Luck', `${Number(stats.luck || 0)}`],
+    ['Crit %', `${Number(stats.critChancePercent || 0).toFixed(1)}`],
+    ['Gold', `${Number(stats.gold || 0)}`],
+    ['Hunger', `${humanize(String(stats.hungerLevel || 'normal'))} (${Number(stats.hunger || 0)})`],
+    ['Depth', `${Number(stats.depth || 0)}`],
+    ['Turn', `${Number(stats.turn || 0)}`],
+  ];
+  for (const [label, value] of statRows) {
+    const row = document.createElement('div');
+    row.textContent = `${label}: ${value}`;
+    statCard.appendChild(row);
+  }
+
+  const effectsTitle = document.createElement('div');
+  effectsTitle.textContent = 'Active Effects';
+  effectsTitle.style.marginTop = '10px';
+  effectsTitle.style.fontWeight = 'bold';
+  el.appendChild(effectsTitle);
+
+  const effects = document.createElement('div');
+  Object.assign(effects.style, {
+    marginTop: '6px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    maxHeight: '24vh',
+    overflowY: 'auto',
+    fontSize: '13px',
+  });
+  if (!activeEffects.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(none)';
+    empty.style.opacity = '0.75';
+    effects.appendChild(empty);
+  } else {
+    for (const status of activeEffects) {
+      const row = document.createElement('div');
+      const key = humanize(String(status?.key || '').trim());
+      const turns = Math.max(0, Number(status?.turns || 0) | 0);
+      const stacks = Math.max(1, Number(status?.stacks || 1) | 0);
+      row.textContent = `${key} · ${turns}t${stacks > 1 ? ` · x${stacks}` : ''}`;
+      row.style.marginBottom = '4px';
+      effects.appendChild(row);
+    }
+  }
+  el.appendChild(effects);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.textContent = 'I=Inventory · E=Equipment · Esc=Close';
+  el.appendChild(hint);
+
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'i' || k === 'I') {
+      window.dispatchEvent(new CustomEvent('ui:openInventory'));
+      e.preventDefault();
+    }
+    else if (k === 'e' || k === 'E') {
+      window.dispatchEvent(new CustomEvent('ui:openEquipment'));
+      e.preventDefault();
+    }
+  }
+
+  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      detach();
+    }
+  });
+
+  const detach = () => {
+    window.removeEventListener('keydown', keyHandler);
+    obs.disconnect();
+    if ((/** @type {any} */ (panel))._characterSheetDetach === detach) {
+      (/** @type {any} */ (panel))._characterSheetDetach = null;
+    }
+  };
+
+  window.addEventListener('keydown', keyHandler);
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  (/** @type {any} */ (panel))._characterSheetDetach = detach;
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName */
+function renderEquipment(panel, equippedBySlot, playerName) {
+  const existingDetach = /** @type {any} */ (panel)._equipmentDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch (e) { console.debug('[overlay] equipment detach failed:', e); }
+  }
+
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+  el.style.overflowX = 'hidden';
+
+  const title = document.createElement('div');
+  const pn = String(playerName || 'Hero').trim() || 'Hero';
+  title.textContent = `${pn} · Equipment`;
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  const rowsData = CHARACTER_SLOT_ORDER.map((slot) => {
+    const state = (equippedBySlot && typeof equippedBySlot === 'object') ? (equippedBySlot[slot] || {}) : {};
+    const item = state?.item && typeof state.item === 'object' ? state.item : null;
+    return {
+      slot,
+      item,
+      blocked: !!state?.blocked,
+      reason: String(state?.reason || ''),
+    };
+  });
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  list.style.maxHeight = '40vh';
+  list.style.overflowY = 'auto';
+  list.style.overflowX = 'hidden';
+  el.appendChild(list);
+
+  const detail = document.createElement('div');
+  Object.assign(detail.style, {
+    marginTop: '8px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    minHeight: '52px',
+  });
+  el.appendChild(detail);
+
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    marginTop: '8px',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    minHeight: '44px',
+    alignItems: 'center',
+  });
+  el.appendChild(actions);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.textContent = '↑/↓ select slot · Enter=Equip/Unequip · I=Open Inventory · C=Character Sheet · Esc=Close';
+  el.appendChild(hint);
+
+  function openInventoryForSlot(slotName) {
+    const slotFilter = String(slotName || '').trim().toLowerCase();
+    window.dispatchEvent(new CustomEvent('ui:openInventory', { detail: { slotFilter } }));
+  }
+
+  function openSpellPicker() {
+    window.dispatchEvent(new CustomEvent('ui:openSpellPicker'));
+  }
+
+  function rarityStyle(rarityName) {
+    const rn = String(rarityName || 'common').toLowerCase();
+    if (rn === 'rare' || rn === 'magic') return { color: '#55aaff', weight: 'bold' };
+    if (rn === 'epic') return { color: '#c47bff', weight: 'bold' };
+    if (rn === 'legendary') return { color: '#ff9f3b', weight: 'bold' };
+    return { color: '#ffffff', weight: 'bold' };
+  }
+
+  const rows = rowsData.map((rowData, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      width: '100%',
+      padding: '6px 8px',
+      boxSizing: 'border-box',
+      background: '#0f1421',
+      color: '#cfe8ff',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      cursor: 'pointer',
+    });
+
+    const slot = document.createElement('span');
+    slot.style.opacity = '0.75';
+    slot.style.minWidth = '84px';
+    const slotText = humanize(rowData.slot);
+    slot.textContent = slotText ? `${slotText.charAt(0).toUpperCase()}${slotText.slice(1)}:` : `${rowData.slot}:`;
+
+    const name = document.createElement('span');
+    name.style.flex = '1 1 auto';
+    name.style.minWidth = '0';
+    name.style.overflow = 'hidden';
+    name.style.textOverflow = 'ellipsis';
+    name.style.whiteSpace = 'nowrap';
+    if (rowData.item) {
+      const rs = rarityStyle(rowData.item.rarityName);
+      name.textContent = bracketize(sanitize(rowData.item.name || rowData.item.description || rowData.item.type || 'item'));
+      name.style.color = rs.color;
+      name.style.fontWeight = rs.weight;
+    } else {
+      name.textContent = '(empty)';
+      name.style.opacity = '0.65';
+    }
+
+    row.appendChild(slot);
+    row.appendChild(name);
+    if (rowData.blocked) {
+      const blocked = document.createElement('span');
+      blocked.textContent = rowData.reason ? `Blocked: ${rowData.reason}` : 'Blocked';
+      blocked.style.fontSize = '11px';
+      blocked.style.color = '#ffbf5a';
+      row.appendChild(blocked);
+    }
+
+    row.addEventListener('click', () => setSel(idx));
+    list.appendChild(row);
+    return row;
+  });
+
+  let sel = 0;
+  const savedSlot = String((/** @type {any} */ (panel))._equipmentSelectionSlot || '');
+  const savedIdx = rowsData.findIndex((row) => row.slot === savedSlot);
+  if (savedIdx >= 0) sel = savedIdx;
+
+  function createActionButton(label, onClick, disabled = false) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    decorateButton(btn);
+    btn.style.minHeight = '44px';
+    btn.style.padding = '8px 12px';
+    if (disabled) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function updateDetail() {
+    const row = rowsData[sel];
+    detail.innerHTML = '';
+    actions.innerHTML = '';
+    if (!row) return;
+
+    (/** @type {any} */ (panel))._equipmentSelectionSlot = row.slot;
+
+    const slotTitle = document.createElement('div');
+    slotTitle.style.fontWeight = 'bold';
+    slotTitle.style.marginBottom = '4px';
+    const slotText = humanize(row.slot);
+    slotTitle.textContent = slotText ? `${slotText.charAt(0).toUpperCase()}${slotText.slice(1)}` : row.slot;
+    detail.appendChild(slotTitle);
+
+    if (row.blocked) {
+      const blockedLine = document.createElement('div');
+      blockedLine.style.color = '#ffbf5a';
+      blockedLine.style.marginBottom = '4px';
+      blockedLine.textContent = row.reason ? `Blocked: ${row.reason}` : 'Blocked';
+      detail.appendChild(blockedLine);
+    }
+
+    if (row.item) {
+      if (row.slot === 'brain') {
+        const itemBody = document.createElement('div');
+        detail.appendChild(itemBody);
+        renderItemDetails(itemBody, row.item);
+        actions.appendChild(createActionButton('Change Spell', () => {
+          openSpellPicker();
+        }));
+      } else {
+        const itemBody = document.createElement('div');
+        detail.appendChild(itemBody);
+        renderItemDetails(itemBody, row.item);
+      }
+      if (row.slot !== 'brain' && Number.isInteger(row.item.id) && row.item.id > 0) {
+        actions.appendChild(createActionButton('Unequip', () => {
+          window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
+        }));
+      }
+      hideItemTooltip();
+    } else {
+      const empty = document.createElement('div');
+      empty.textContent = '(nothing equipped)';
+      empty.style.opacity = '0.75';
+      detail.appendChild(empty);
+      const canEquip = !row.blocked;
+      if (row.slot === 'brain') {
+        actions.appendChild(createActionButton('Choose Spell', () => {
+          openSpellPicker();
+        }));
+      } else {
+        actions.appendChild(createActionButton('Equip', () => {
+          openInventoryForSlot(row.slot);
+        }, !canEquip));
+      }
+      hideItemTooltip();
+    }
+
+    actions.appendChild(createActionButton('Open Inventory', () => {
+      window.dispatchEvent(new CustomEvent('ui:openInventory'));
+    }));
+    actions.appendChild(createActionButton('Open Character Sheet', () => {
+      window.dispatchEvent(new CustomEvent('ui:openCharacter'));
+    }));
+  }
+
+  function setSel(next) {
+    sel = Math.max(0, Math.min(rowsData.length - 1, next | 0));
+    rows.forEach((row, i) => {
+      row.style.outline = (i === sel) ? '2px solid #55aaff' : 'none';
+      row.style.background = (i === sel) ? '#0b1323' : '#0f1421';
+    });
+    rows[sel]?.scrollIntoView({ block: 'nearest' });
+    updateDetail();
+  }
+
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(0); e.preventDefault(); }
+    else if (k === 'End') { setSel(rowsData.length - 1); e.preventDefault(); }
+    else if (k === 'Enter' || k === 'e' || k === 'E') {
+      const row = rowsData[sel];
+      if (row?.slot === 'brain') {
+        openSpellPicker();
+        e.preventDefault();
+      } else if (Number.isInteger(row?.item?.id) && row.item.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
+        e.preventDefault();
+      } else if (row && !row.blocked) {
+        openInventoryForSlot(row.slot);
+        e.preventDefault();
+      }
+    }
+    else if (k === 'i' || k === 'I') {
+      window.dispatchEvent(new CustomEvent('ui:openInventory'));
+      e.preventDefault();
+    }
+    else if (k === 'c' || k === 'C') {
+      window.dispatchEvent(new CustomEvent('ui:openCharacter'));
+      e.preventDefault();
+    }
+  }
+
+  setSel(sel);
+  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      detach();
+    }
+  });
+
+  const detach = () => {
+    window.removeEventListener('keydown', keyHandler);
+    obs.disconnect();
+    if ((/** @type {any} */ (panel))._equipmentDetach === detach) {
+      (/** @type {any} */ (panel))._equipmentDetach = null;
+    }
+  };
+
+  window.addEventListener('keydown', keyHandler);
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  (/** @type {any} */ (panel))._equipmentDetach = detach;
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,symbol?:string,cost?:number,description?:string,targetEffects?:string[]}>} spells @param {string|null} activeId */
 function renderSpellPicker(panel, spells, activeId) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
@@ -1970,21 +2511,54 @@ function renderSpellPicker(panel, spells, activeId) {
   for (const sp of spells) {
     const row = document.createElement('div');
     Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
+      display: 'flex', alignItems: 'flex-start', gap: '8px',
+      flexDirection: 'column',
       padding: '6px 8px', border: '1px solid #2d3b52', borderRadius: '6px',
       background: sp.id === activeId ? '#0b1323' : '#0f1421', cursor: 'pointer'
+    });
+    const head = document.createElement('div');
+    Object.assign(head.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      width: '100%',
     });
     if (sp.symbol) {
       const sym = document.createElement('span');
       sym.textContent = sp.symbol;
       sym.style.fontSize = '18px';
-      row.appendChild(sym);
+      head.appendChild(sym);
     }
     const name = document.createElement('span');
     name.textContent = sp.name ? `[${sp.name}]` : `[${sp.id}]`;
     const cost = document.createElement('span');
     cost.style.marginLeft = 'auto'; cost.style.opacity = '0.8'; cost.textContent = sp.cost ? `Mana ${sp.cost}` : '';
-    row.appendChild(name); row.appendChild(cost);
+    head.appendChild(name);
+    head.appendChild(cost);
+    row.appendChild(head);
+
+    const desc = String(sp.description || '').trim();
+    if (desc) {
+      const descLine = document.createElement('div');
+      descLine.textContent = desc;
+      descLine.style.opacity = '0.85';
+      descLine.style.fontSize = '12px';
+      descLine.style.fontStyle = 'italic';
+      row.appendChild(descLine);
+    }
+
+    const targetEffects = Array.isArray(sp.targetEffects)
+      ? sp.targetEffects.map((line) => String(line || '').trim()).filter(Boolean)
+      : [];
+    for (const effect of targetEffects.slice(0, 2)) {
+      const effectLine = document.createElement('div');
+      effectLine.textContent = `\u2022 ${effect}`;
+      effectLine.style.opacity = '0.85';
+      effectLine.style.fontSize = '11px';
+      effectLine.style.color = '#9fd6ff';
+      row.appendChild(effectLine);
+    }
+
     row.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId: sp.id } }));
       hide(panel);

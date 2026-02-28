@@ -1,15 +1,14 @@
-// src/main/fx/projectileFx.js
+// src/display/fx/projectileFx.js
 // Arrow / ranged-shot tracer VFX (world-space; display-only).
 
-import { startShake } from "../../display/camera/shake.js";
-import { Position } from "../../rules/components/Position.js";
-import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { startShake } from "../camera/shake.js";
+import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { ArrowFx, ArrowSparkFx } from "./fxEntries.js";
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } } }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
  */
-export function createProjectileFxController({ world, cam, fx }) {
+export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {ArrowFx[]} */
   const _arrowFx = [];
   /** @type {ArrowSparkFx[]} */
@@ -105,8 +104,8 @@ export function createProjectileFxController({ world, cam, fx }) {
 
   function installListeners() {
     world.on('ranged:shot', ({ attacker, target, hit, style }) => {
-      const apos = world.get(Number(attacker||0), Position);
-      const dpos = world.get(Number(target||0), Position);
+      const apos = getPosition(Number(attacker || 0));
+      const dpos = getPosition(Number(target || 0));
       if (!apos || !dpos) return;
       const dx = dpos.x - apos.x, dy = dpos.y - apos.y;
       const len = Math.hypot(dx, dy) || 1;

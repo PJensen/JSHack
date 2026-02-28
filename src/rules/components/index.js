@@ -9,7 +9,14 @@ export { DamageSpec } from './DamageSpec.js';
 export { Player } from './Player.js';
 export { Inventory } from './Inventory.js';
 export { NamedIdentity } from './NamedIdentity.js';
-export { Anatomy, buildHumanoidAnatomy } from './Anatomy.js';
+export {
+  Anatomy,
+  buildHumanoidAnatomy,
+  HEARING_TIERS,
+  HEARING_HL_RANGES,
+  HEARING_HL_THRESHOLD,
+  HEARING_SOURCE_DB,
+} from './Anatomy.js';
 export { Physiology } from './Physiology.js';
 export { Resistances } from './Resistences.js';
 export { Wounds } from './Wounds.js';

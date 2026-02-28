@@ -1,4 +1,4 @@
-// src/main/fx/fxGeom.js
+// src/display/fx/fxGeom.js
 // Shared geometry/color utilities for FX modules.
 
 /** @param {number} v @returns {number} */

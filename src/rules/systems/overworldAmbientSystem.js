@@ -8,12 +8,33 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 const _stateByWorld = new WeakMap();
 
 const HOME_IDENTITIES = new Set(["bed_home", "house_sign", "berry_bush", "herb_patch", "alchemy_bench"]);
+const HOME_SOURCE_DB_AT_1_TILE = 42;
 const HOME_LINES = Object.freeze([
-  "A clean breeze carries the scent of pine and damp soil.",
-  "Somewhere nearby, a kettle softly rattles over embers.",
-  "Birdsong drifts over the yard. You feel your shoulders loosen.",
-  "The quiet around your home feels familiar and safe.",
-  "A calm hush settles in, broken only by rustling leaves.",
+  Object.freeze({
+    far: "you catch a faint, homely hush",
+    mid: "you hear a clean breeze carry pine and damp soil",
+    near: "you hear a calm homestead breeze all around you",
+  }),
+  Object.freeze({
+    far: "you hear a faint metallic rattle in the distance",
+    mid: "you hear a kettle softly rattling over embers",
+    near: "you hear a kettle rattling clearly by the fire",
+  }),
+  Object.freeze({
+    far: "you hear faint birdsong on the wind",
+    mid: "you hear birdsong drifting over the yard",
+    near: "you hear bright birdsong nearby",
+  }),
+  Object.freeze({
+    far: "you catch a distant rustle of leaves",
+    mid: "you hear familiar rustling around your home",
+    near: "you hear the leaves rustling around the homestead",
+  }),
+  Object.freeze({
+    far: "you hear a faint, calming hush",
+    mid: "you hear a calm hush settling over home",
+    near: "you hear a deeply familiar stillness close by",
+  }),
 ]);
 
 /**
@@ -32,6 +53,7 @@ export function overworldAmbientSystem(world) {
   if (!ppos) return;
 
   let nearest = null;
+  let nearestPos = null;
   let nearestDist = Infinity;
   for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
     if (!HOME_IDENTITIES.has(String(ni.identity || ""))) continue;
@@ -39,6 +61,7 @@ export function overworldAmbientSystem(world) {
     if (dist < nearestDist) {
       nearestDist = dist;
       nearest = id;
+      nearestPos = pos;
     }
   }
   if (!nearest || nearestDist > 4) return;
@@ -53,7 +76,14 @@ export function overworldAmbientSystem(world) {
 
   const r = mulberry32(combatSeed(world.seed, step, nearest | 0, nearestDist | 0, 0x484F4D45));
   const idx = (r() * HOME_LINES.length) | 0;
-  const text = HOME_LINES[idx] || HOME_LINES[0];
-  world.emit?.("ambient:sound", { text, source: "home" });
+  const clarity = HOME_LINES[idx] || HOME_LINES[0];
+  world.emit?.("ambient:sound", {
+    source: "home",
+    at: { x: Number(nearestPos?.x || 0) | 0, y: Number(nearestPos?.y || 0) | 0 },
+    depth,
+    sourceDbAt1Tile: HOME_SOURCE_DB_AT_1_TILE,
+    clarity,
+    targetId: nearest,
+  });
   st.nextTick = step + 28 + ((r() * 22) | 0);
 }

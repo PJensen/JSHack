@@ -22,6 +22,7 @@ import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
+import { createStatusEvent } from '../../shared/events/statusEvent.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -178,7 +179,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
 
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
         // Miss (include attacker for better UX logging)
-        world.emit?.('status', { id: target, kind: 'miss', text: 'MISS', source });
+        world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
         return;
     }
 
@@ -263,11 +264,11 @@ export function resolveMeleeAttack(world, attacker, defender) {
         });
         // dealDamage returns applied:false for invulnerable targets
         if (!result.applied && result.reason !== 'invulnerable') {
-            world.emit?.('status', { id: target, kind: 'miss', text: 'MISS', source });
+            world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
         }
     } else {
         // Zero damage after modifiers → treat as miss/blocked
-        world.emit?.('status', { id: target, kind: 'miss', text: 'MISS', source });
+        world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
     }
 }
 

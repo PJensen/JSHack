@@ -2,6 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { CLASS_DEFS, getClass, listClassIds } from '../src/rules/data/classes.js';
 import { DEITY_DEFS } from '../src/rules/data/deities.js';
 import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
+import { getSpell } from "../src/rules/data/spells.js";
 
 Deno.test("CLASS_DEFS has exactly 4 classes", () => {
   const ids = listClassIds();
@@ -50,6 +51,12 @@ Deno.test("cleric starts with one vial of holy water", () => {
   const holyWater = cleric.inventoryItems.find((entry) => entry.itemId === 'potion_holy_water');
   assert(holyWater, 'cleric should include potion_holy_water in starter inventory');
   assertEquals(holyWater.count, 1);
+});
+
+Deno.test("cleric starts with flash_heal as their class spell", () => {
+  const cleric = getClass("cleric");
+  assertEquals(cleric.startingSpell, "flash_heal");
+  assert(getSpell("flash_heal"), "flash_heal spell definition should exist");
 });
 
 Deno.test("warden has highest maxHp", () => {

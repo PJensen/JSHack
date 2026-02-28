@@ -19,6 +19,7 @@ import { FoodDecay } from '../src/rules/components/FoodDecay.js';
 import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { WildBerries, WildHerbs, ThornPods, VenomFronds } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
+import { fountainRegrowthSystem } from '../src/rules/systems/fountainRegrowthSystem.js';
 
 Deno.test("toggle door: closed → open → closed", () => {
   const world = new World({ seed: 1 });
@@ -697,6 +698,7 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
       dryUntilStep: 205,
     },
   });
+  world.add(fountain, Position, { x: 8, y: 8 });
 
   const drinks = [];
   const dry = [];
@@ -712,6 +714,7 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
   assert(dry.length >= 1, 'should emit dry while still cooling down');
 
   world.step = 205;
+  fountainRegrowthSystem(world);
   world.add(actor, InteractIntent, { targetId: fountain });
   interactionSystem(world);
 

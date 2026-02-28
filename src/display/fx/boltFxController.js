@@ -1,10 +1,9 @@
-// src/main/fx/boltFxController.js
+// src/display/fx/boltFxController.js
 // Spell bolt and deity wrath lightning FX.
 
-import { Position } from "../../rules/components/Position.js";
-import { startShake } from "../../display/camera/shake.js";
+import { startShake } from "../camera/shake.js";
 import { clamp01, rgba, pathPolyline, jitterLine } from "./fxGeom.js";
-import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
 
 const DEITY_WRATH_VFX = Object.freeze({
@@ -61,9 +60,9 @@ function getWrathVfxProfile(deityId) {
 }
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool?: { spawn(p:object):void } } }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool?: { spawn(p:object):void } }, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
  */
-export function createBoltFxController({ world, cam, fx }) {
+export function createBoltFxController({ world, cam, fx, getPosition }) {
   /** @type {LineFx[]} */
   const _boltFx = [];
   /** @type {PulseFx[]} */
@@ -80,7 +79,7 @@ export function createBoltFxController({ world, cam, fx }) {
   function _spawnDeityWrath(payload) {
     const playerId = Number(payload?.playerId || 0) | 0;
     if (!(playerId > 0)) return;
-    const pos = world.get(playerId, Position);
+    const pos = getPosition(playerId);
     if (!pos) return;
 
     const x = Number(pos.x);

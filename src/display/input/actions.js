@@ -20,6 +20,8 @@ export const Actions = Object.freeze({
 
   // Display-directed UI
   OpenInventory: "display.openInventory", // payload: {}
+  OpenCharacter: "display.openCharacter", // payload: {}
+  OpenEquipment: "display.openEquipment", // payload: {}
   OpenMessageLog: "display.openMessageLog", // payload: {}
   Zoom: "display.zoom", // payload: { factor:number } (pinch scale delta)
   // Open a chooser for items underfoot; display will query and let user pick
@@ -49,6 +51,8 @@ export const defaultActionSinks = Object.freeze({
 
   // Display-directed UI actions
   [Actions.OpenInventory]: Sinks.display,
+  [Actions.OpenCharacter]: Sinks.display,
+  [Actions.OpenEquipment]: Sinks.display,
   [Actions.OpenMessageLog]: Sinks.display,
   [Actions.Zoom]: Sinks.display,
   [Actions.OpenPickupChooser]: Sinks.display,

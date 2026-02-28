@@ -14,7 +14,7 @@ function makeItem(world, { id, name, slot, type = 'equip', count = 1 }) {
   return eid;
 }
 
-Deno.test("equip item system: weapon, armor, head, rings, shield, ranged, swap, and edge cases", () => {
+Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rings, shield, ranged, swap, and edge cases", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
@@ -61,6 +61,38 @@ Deno.test("equip item system: weapon, armor, head, rings, shield, ranged, swap, 
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
   assert(eq.head === helm, `head should be iron helm, got ${eq.head}`);
+
+  // Equip neck slot
+  const amulet = makeItem(world, { id: 'amulet_guarded', name: 'Guarded Amulet', slot: 'neck' });
+  inv.items.push(amulet);
+  world.add(actor, EquipIntent, { itemId: amulet });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.neck === amulet, `neck should be guarded amulet, got ${eq.neck}`);
+
+  // Equip belt slot
+  const belt = makeItem(world, { id: 'belt_leather', name: 'Leather Belt', slot: 'belt' });
+  inv.items.push(belt);
+  world.add(actor, EquipIntent, { itemId: belt });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.belt === belt, `belt should be leather belt, got ${eq.belt}`);
+
+  // Equip gloves slot
+  const gloves = makeItem(world, { id: 'gloves_leather', name: 'Leather Gloves', slot: 'gloves' });
+  inv.items.push(gloves);
+  world.add(actor, EquipIntent, { itemId: gloves });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.gloves === gloves, `gloves should be leather gloves, got ${eq.gloves}`);
+
+  // Equip legs slot
+  const leggings = makeItem(world, { id: 'leggings_leather', name: 'Leather Leggings', slot: 'legs' });
+  inv.items.push(leggings);
+  world.add(actor, EquipIntent, { itemId: leggings });
+  equipItemSystem(world);
+  eq = world.get(actor, Equipment);
+  assert(eq.legs === leggings, `legs should be leather leggings, got ${eq.legs}`);
 
   // Equip rings: first fills ring1, second fills ring2, third swaps ring1
   const ring1 = makeItem(world, { id: 'ring_a', name: 'Ruby Ring', slot: 'ring' });

@@ -3,9 +3,7 @@
 // This module is display-only and must not import rules.
 
 import {
-  recognizeBlastwaveGesture,
   recognizeLightningGesture,
-  recognizeMeteorGesture,
 } from "./gestureRecognizers.js";
 import { Actions, makeAction } from "./actions.js";
 
@@ -98,19 +96,45 @@ export class InputManager {
 
   _handleKeyDown(e) {
     const { key, code } = e;
+    const lowerKey = key?.toLowerCase?.();
+
+    // Cast active spell: 'f' should be reliable even if a stale UI panel is left open.
+    // Keep text-entry fields safe so typing never triggers a cast.
+    if (lowerKey === "f") {
+      const target = /** @type {any} */ (e.target);
+      const tag = String(target?.tagName || "").toLowerCase();
+      const isTextEntry = !!target?.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
+      if (isTextEntry) return;
+      e.preventDefault();
+      this._emit(makeAction(Actions.CastActiveSpell));
+      return;
+    }
+
     // If any UI panel is open, ignore movement/consumable bindings to let UI handle keys
-    try {
-      const openPanels = Array.from(document.querySelectorAll('.ui-panel')).filter(p => p && p.style.display === 'block');
+    if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+      const openPanels = Array.from(document.querySelectorAll('.ui-panel')).filter((p) => p && p.style.display === 'block');
       if (openPanels.length) {
         // Allow UI overlays to consume keys like arrows/enter without moving the player
         return;
       }
-    } catch (e) { console.debug('[InputManager] panel query failed:', e); }
+    }
 
     // Open Inventory: 'i'
     if (key?.toLowerCase() === 'i') {
       e.preventDefault();
       this._emit(makeAction(Actions.OpenInventory));
+      return;
+    }
+    // Open Character: 'c'
+    if (key?.toLowerCase() === 'c') {
+      e.preventDefault();
+      this._emit(makeAction(Actions.OpenCharacter));
+      return;
+    }
+    // Open Equipment: 'e'
+    if (key?.toLowerCase() === 'e') {
+      e.preventDefault();
+      this._emit(makeAction(Actions.OpenEquipment));
       return;
     }
     // Wait intent: '.' (period)
@@ -148,28 +172,21 @@ export class InputManager {
       return;
     }
     // Drink potion (common roguelike: 'q' for quaff)
-    if (key?.toLowerCase() === "q") {
+    if (lowerKey === "q") {
       e.preventDefault();
       this._emit(makeAction(Actions.DrinkPotion));
       return;
     }
 
-    // Cast active spell: 'f'
-    if (key?.toLowerCase() === "f") {
-      e.preventDefault();
-      this._emit(makeAction(Actions.CastActiveSpell));
-      return;
-    }
-
     // Ranged attack / zap: 'r' or 'z'
-    if (key?.toLowerCase() === "r" || key?.toLowerCase() === "z") {
+    if (lowerKey === "r" || lowerKey === "z") {
       e.preventDefault();
       this._emit(makeAction(Actions.ShootRanged));
       return;
     }
 
     // Pet state rotation: 'p'
-    if (key?.toLowerCase() === "p") {
+    if (lowerKey === "p") {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('ui:rotatePetState'));
       return;
@@ -270,7 +287,9 @@ export class InputManager {
     }
 
     if (recognized?.spellId) {
-      this._emit(makeAction(Actions.CastActiveSpell, { spellId: recognized.spellId }));
+      // Route through normal active-spell cast flow (no hardcoded spell id).
+      // This keeps gesture casting aligned with keyboard/HUD casting behavior.
+      this._emit(makeAction(Actions.CastActiveSpell));
       this._emitUi("ui:showSpellGestureHint", {
         id: recognized.spellId,
         mode: "cast",
@@ -356,34 +375,16 @@ export class InputManager {
 
   _recognizeSpellGesture(localPoints, minQuality) {
     if (!Array.isArray(localPoints) || localPoints.length < MIN_GESTURE_POINTS) return null;
+
+    // Intentionally scoped to one reliable gesture for now.
+    // Other gesture recognizers remain available but are unhooked from input wiring.
     const z = recognizeLightningGesture(localPoints);
-    const slash = recognizeMeteorGesture(localPoints);
-    const circle = recognizeBlastwaveGesture(localPoints);
-    const candidates = [];
-    if (z && Number(z.quality) >= minQuality) {
-      candidates.push({
-        spellId: "lightning",
-        quality: Number(z.quality),
-        bounds: this._boundsToViewport(z.bounds),
-      });
-    }
-    if (slash && Number(slash.quality) >= minQuality) {
-      candidates.push({
-        spellId: "meteor",
-        quality: Number(slash.quality),
-        bounds: this._boundsToViewport(slash.bounds),
-      });
-    }
-    if (circle && Number(circle.quality) >= minQuality) {
-      candidates.push({
-        spellId: "blastwave",
-        quality: Number(circle.quality),
-        bounds: this._boundsToViewport(circle.bounds),
-      });
-    }
-    if (!candidates.length) return null;
-    candidates.sort((a, b) => b.quality - a.quality);
-    return candidates[0];
+    if (!z || Number(z.quality) < minQuality) return null;
+    return {
+      spellId: "lightning",
+      quality: Number(z.quality),
+      bounds: this._boundsToViewport(z.bounds),
+    };
   }
 
   _boundsToViewport(bounds) {

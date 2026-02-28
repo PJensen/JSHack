@@ -14,10 +14,11 @@ Deno.test("monster hooks are first-class callbacks on monster defs", () => {
   }
 });
 
-Deno.test("monster hooks remain combat-only", () => {
+Deno.test("monster hooks remain on explicit hook surfaces", () => {
   for (let i = 0; i < MONSTERS.length; i++) {
     const hooks = MONSTERS[i].hooks;
     if (!hooks) continue;
     assert(!("eat" in hooks), `${MONSTERS[i].id} should not define hooks.eat`);
+    assert(!("use" in hooks), `${MONSTERS[i].id} should not define hooks.use`);
   }
 });

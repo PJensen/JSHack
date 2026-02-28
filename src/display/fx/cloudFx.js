@@ -1,15 +1,14 @@
-// src/main/fx/cloudFx.js
+// src/display/fx/cloudFx.js
 // Plasma cloud, poison cloud, and bubble pop VFX (world-space; display-only).
 
-import { startShake } from "../../display/camera/shake.js";
-import { Position } from "../../rules/components/Position.js";
-import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { startShake } from "../camera/shake.js";
+import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { BubblePopFx } from "./fxEntries.js";
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getFxTime: () => number }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getFxTime: () => number, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
  */
-export function createCloudFxController({ world, cam, fx, getFxTime }) {
+export function createCloudFxController({ world, cam, fx, getFxTime, getPosition }) {
   /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number }>} */
   const _plasmaCloudFx = new Map();
   /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, pulseFlash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, medium:string, bubbleClock:number }>} */
@@ -462,7 +461,7 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
 
       if (Array.isArray(affectedIds)) {
         for (let i = 0; i < affectedIds.length; i++) {
-          const tpos = world.get(Number(affectedIds[i] || 0), Position);
+          const tpos = getPosition(Number(affectedIds[i] || 0));
           if (!tpos) continue;
           spawnPlasmaCloudSparks(tpos.x, tpos.y, 5);
         }
@@ -556,7 +555,7 @@ export function createCloudFxController({ world, cam, fx, getFxTime }) {
 
       if (Array.isArray(affectedIds)) {
         for (let i = 0; i < affectedIds.length; i++) {
-          const tpos = world.get(Number(affectedIds[i] || 0), Position);
+          const tpos = getPosition(Number(affectedIds[i] || 0));
           if (!tpos) continue;
           spawnPoisonCloudMotes(tpos.x, tpos.y, 4);
           if (Math.random() < 0.72) {

@@ -1,9 +1,9 @@
-// src/main/fx/spellAreaFx.js
+// src/display/fx/spellAreaFx.js
 // Blink, meteor, blastwave, and frost spell VFX (world-space; display-only).
 
-import { startShake } from "../../display/camera/shake.js";
+import { startShake } from "../camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
-import { Particle } from "../../display/passes/vfx/particles/particlePool.js";
+import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, LineFx, BlinkFx, PhaseStrikeFx } from "./fxEntries.js";
 
 /**
@@ -53,6 +53,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
   /** @type {RadialFx[]} */
   const _frostImpactFx = [];
 
+  // --- Flash Heal state ---
+  /** @type {RadialFx[]} */
+  const _flashHealFx = [];
+
   // --- Phase Strike state ---
   /** @type {PhaseStrikeFx[]} */
   const _phaseStrikeFx = [];
@@ -79,6 +83,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     for (let i = _frostImpactFx.length - 1; i >= 0; i--) {
       _frostImpactFx[i].tick(dt);
       if (_frostImpactFx[i].expired) _frostImpactFx.splice(i, 1);
+    }
+    for (let i = _flashHealFx.length - 1; i >= 0; i--) {
+      _flashHealFx[i].tick(dt);
+      if (_flashHealFx[i].expired) _flashHealFx.splice(i, 1);
     }
     for (let i = _phaseStrikeFx.length - 1; i >= 0; i--) {
       _phaseStrikeFx[i].tick(dt);
@@ -287,6 +295,66 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       }
     }
 
+    ctx.restore();
+  }
+
+  // --- Draw: Flash Heal ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawFlashHeal(ctx) {
+    if (!_flashHealFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+    for (const eff of _flashHealFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+      const pulse = 0.55 + 0.45 * Math.sin(_fxTime * 13.0 + eff.x * 0.7 + eff.y * 0.4);
+      const maxR = Number.isFinite(eff.radius) ? Math.max(0.9, eff.radius) : 1.4;
+
+      if (t < 0.22) {
+        const ft = t / 0.22;
+        const flashR = 0.20 + ft * (maxR * 0.75);
+        const flashA = 0.85 * (1 - ft) * alpha;
+        ctx.fillStyle = `rgba(255,255,235,${flashA.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(eff.x, eff.y, flashR, 0, TAU);
+        ctx.fill();
+      }
+
+      const ringR = 0.20 + t * maxR;
+      ctx.strokeStyle = `rgba(255,245,190,${(0.85 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.12 * (1 - t * 0.55);
+      ctx.beginPath();
+      ctx.arc(eff.x, eff.y, ringR, 0, TAU);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(255,255,230,${(0.62 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.065;
+      ctx.beginPath();
+      ctx.arc(eff.x, eff.y, ringR * (1.35 + pulse * 0.12), 0, TAU);
+      ctx.stroke();
+
+      const glowR = 0.20 + t * (maxR * 0.55) + pulse * 0.06;
+      ctx.fillStyle = `rgba(255,240,170,${(0.32 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(eff.x, eff.y, glowR, 0, TAU);
+      ctx.fill();
+
+      const spokeA = 0.42 * (1 - t) * alpha;
+      if (spokeA > 0.02) {
+        ctx.strokeStyle = `rgba(255,250,210,${spokeA.toFixed(3)})`;
+        ctx.lineWidth = 0.04;
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU + pulse * 0.08;
+          const len = ringR * (0.55 + 0.25 * pulse);
+          ctx.beginPath();
+          ctx.moveTo(eff.x, eff.y);
+          ctx.lineTo(eff.x + Math.cos(a) * len, eff.y + Math.sin(a) * len);
+          ctx.stroke();
+        }
+      }
+    }
     ctx.restore();
   }
 
@@ -526,6 +594,52 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       }
     });
 
+    world.on('spell:flash_heal', ({ at, amount }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _flashHealFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.5, ttl: 0.44 }));
+      const scale = PERF.quality === 'low' ? 0.7 : (PERF.quality === 'high' ? 1.25 : 1.0);
+      const sparkleCount = Math.max(14, Math.round(30 * scale));
+      for (let i = 0; i < sparkleCount; i++) {
+        const angle = (Math.PI * 2 * i / sparkleCount) + (Math.random() - 0.5) * 0.55;
+        const speed = 0.45 + Math.random() * 1.25;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.16,
+          y: at.y + (Math.random() - 0.5) * 0.16,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.16,
+          ay: 0.18,
+          life: 0.28 + Math.random() * 0.40,
+          size0: 0.11 + Math.random() * 0.09,
+          size1: 0.02,
+          r: 250 + ((Math.random() * 5) | 0),
+          g: 230 + ((Math.random() * 20) | 0),
+          b: 170 + ((Math.random() * 35) | 0),
+          a0: 0.92,
+          rot: Math.random() * Math.PI * 2,
+          rotVel: (Math.random() - 0.5) * 2.4,
+        }));
+      }
+      const shimmerCount = Math.max(5, Math.round(10 * scale));
+      for (let i = 0; i < shimmerCount; i++) {
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 1.0,
+          y: at.y + (Math.random() - 0.5) * 0.7,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: 0.10 + Math.random() * 0.24,
+          ay: 0.03,
+          life: 0.60 + Math.random() * 0.45,
+          size0: 0.06 + Math.random() * 0.05,
+          size1: 0.01,
+          r: 255,
+          g: 245,
+          b: 205,
+          a0: 0.55,
+          rotVel: (Math.random() - 0.5) * 1.8,
+        }));
+      }
+      startShake(cam, Number(amount || 0) > 0 ? 3 : 2, 0.12);
+    });
+
     world.on('spell:phase_strike', ({ from, to, hits, randomized }) => {
       if (!from || !to) return;
       if (!Number.isFinite(from.x) || !Number.isFinite(from.y)) return;
@@ -622,5 +736,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, drawPhaseStrike, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, drawFlashHeal, drawPhaseStrike, installListeners };
 }

@@ -653,6 +653,28 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
   try { world.emit && world.emit('spell:heal', { actor, targetId, at: targetPos, amount: actualHeal }); } catch (e) { console.debug('[spells] emit spell:heal failed:', e); }
 };
 
+// Flash Heal — high-cost, self-only instant heal.
+REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const vit = /** @type any */ (world.get(actor, Vitality));
+  if (!vit || (vit.hp | 0) >= (vit.maxHp | 0)) {
+    try { world.emit && world.emit('spell:flash_heal', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, amount: 0, reason: 'full_health' }); } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
+    return;
+  }
+
+  const maxHp = vit.maxHp | 0;
+  const amount = Math.max(1, Math.floor(maxHp * 0.25));
+
+  const oldHp = vit.hp | 0;
+  vit.hp = Math.min(maxHp, oldHp + amount);
+  const actualHeal = vit.hp - oldHp;
+
+  try { world.emit && world.emit('healed', { id: actor, amount: actualHeal }); } catch (e) { console.debug('[spells] emit healed failed:', e); }
+  try { world.emit && world.emit('spell:flash_heal', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, amount: actualHeal }); } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world

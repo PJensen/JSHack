@@ -22,8 +22,7 @@ export function equipItemSystem(world) {
     if (!inv || !Array.isArray(inv.items)) { world.remove(actor, EquipIntent); continue; }
 
     // Ensure the item is in inventory
-    const idx = inv.items.indexOf(itemId);
-    if (idx === -1) { world.remove(actor, EquipIntent); continue; }
+    if (!inv.items.includes(itemId)) { world.remove(actor, EquipIntent); continue; }
 
     const info = world.get(itemId, ItemInfo);
     if (!info || (info.type !== 'equip' && info.type !== 'ammo' && info.type !== 'wand')) { world.remove(actor, EquipIntent); continue; }
@@ -67,25 +66,25 @@ export function equipItemSystem(world) {
       if (!inv.items.includes(id)) inv.items.push(id);
     };
 
-    // previously, we removed items from inventory after equipping;
-    // since we don't have an equipment screen yet, we should leave it
-    // in the inventory for now to allow re-equipping
+    const equipSingleSlot = (slotName) => {
+      if (!GEAR_SLOT_SET.has(slotName)) return false;
+      if (Number.isInteger(eq[slotName]) && eq[slotName] > 0) pushToInventory(eq[slotName]);
+      eq[slotName] = itemId;
+      appliedSlot = slotName;
+      return true;
+    };
+
+    // Equipped items intentionally remain in Inventory.items.
+    // UI renders bag and character views separately and filters equipped rows.
     // inv.items.splice(idx, 1);
 
     if (slot === 'weapon') {
-      if (Number.isInteger(eq.weapon) && eq.weapon > 0) pushToInventory(eq.weapon);
-      eq.weapon = itemId; appliedSlot = 'weapon';
+      equipSingleSlot('weapon');
       // two-handers occupy both hands — kick out any equipped shield
       if (info.twoHanded && Number.isInteger(eq.shield) && eq.shield > 0) {
         pushToInventory(eq.shield);
         eq.shield = null;
       }
-    } else if (slot === 'armor') {
-      if (Number.isInteger(eq.armor) && eq.armor > 0) pushToInventory(eq.armor);
-      eq.armor = itemId; appliedSlot = 'armor';
-    } else if (slot === 'head') {
-      if (Number.isInteger(eq.head) && eq.head > 0) pushToInventory(eq.head);
-      eq.head = itemId; appliedSlot = 'head';
     } else if (slot === 'ring') {
       if (!Number.isInteger(eq.ring1) || eq.ring1 <= 0) {
         eq.ring1 = itemId; appliedSlot = 'ring1';
@@ -105,18 +104,10 @@ export function equipItemSystem(world) {
           eq.weapon = null;
         }
       }
-      if (Number.isInteger(eq.shield) && eq.shield > 0) pushToInventory(eq.shield);
-      eq.shield = itemId; appliedSlot = 'shield';
+      equipSingleSlot('shield');
     } else if (slot === 'ammo' || info.type === 'ammo') {
-      if (Number.isInteger(eq.ammo) && eq.ammo > 0) pushToInventory(eq.ammo);
-      eq.ammo = itemId; appliedSlot = 'ammo';
-    } else if (slot === 'ranged') {
-      if (Number.isInteger(eq.ranged) && eq.ranged > 0) pushToInventory(eq.ranged);
-      eq.ranged = itemId; appliedSlot = 'ranged';
-    } else if (slot === 'feet') {
-      if (Number.isInteger(eq.feet) && eq.feet > 0) pushToInventory(eq.feet);
-      eq.feet = itemId; appliedSlot = 'feet';
-    } else {
+      equipSingleSlot('ammo');
+    } else if (!equipSingleSlot(slot)) {
       // Unknown or unsupported slot: item is already in inventory, ignore.
       world.remove(actor, EquipIntent);
       continue;

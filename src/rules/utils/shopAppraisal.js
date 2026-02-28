@@ -24,7 +24,11 @@ const SLOT_BONUS = Object.freeze({
   armor: 24,
   shield: 18,
   head: 12,
+  neck: 12,
+  belt: 10,
+  gloves: 10,
   ring: 28,
+  legs: 16,
   ranged: 20,
   feet: 10,
   ammo: 0,
@@ -189,4 +193,3 @@ export function appraiseItemValue(world, itemId, opts = {}) {
 
   return estimateItemValueFromInfo(info);
 }
-

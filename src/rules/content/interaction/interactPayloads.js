@@ -367,32 +367,15 @@ export const INTERACT_PAYLOADS = {
       }
       const state = ensureFountainState(world, targetId);
       const charges = Number(state?.charges || 0);
-      const maxCharges = Math.max(1, Number(state?.maxCharges || 1) | 0);
       const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
       const dryUntilStep = Number(state?.dryUntilStep ?? -1);
-      const nowStep = Number(world.step || 0) | 0;
-      if (charges <= 0 && dryUntilStep >= 0 && nowStep >= dryUntilStep) {
-        setFountainState(world, targetId, {
-          chargesRemaining: maxCharges,
-          dryUntilStep: -1,
-          cooldownTurns,
-        });
-        world.emit?.("fountain:refilled", {
-          actor,
-          targetId,
-          chargesRemaining: maxCharges,
-          cooldownTurns,
-        });
-      }
-      const readyState = ensureFountainState(world, targetId);
-      const readyCharges = Number(readyState?.charges || 0);
-      if (readyCharges <= 0) {
+      if (charges <= 0) {
         world.emit?.("fountain:dry", {
           actor,
           targetId,
           chargesRemaining: 0,
           cooldownTurns,
-          dryUntilStep: dryUntilStep >= 0 ? dryUntilStep : (nowStep + cooldownTurns),
+          dryUntilStep: dryUntilStep >= 0 ? dryUntilStep : ((Number(world.step || 0) | 0) + cooldownTurns),
         });
         ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
       }

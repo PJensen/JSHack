@@ -1,7 +1,7 @@
 import { defineComponent } from "../../lib/ecs-js/index.js";
 
 export const GEAR_SLOTS = Object.freeze([
-  "weapon", "armor", "head", "shield", "ring1", "ring2", "ammo", "ranged", "feet",
+  "weapon", "armor", "head", "neck", "belt", "gloves", "shield", "ring1", "ring2", "legs", "feet", "ammo", "ranged",
 ]);
 
 export const GEAR_SLOT_SET = Object.freeze(new Set(GEAR_SLOTS));
@@ -27,9 +27,13 @@ export const Equipment = defineComponent('Equipment', {
   weapon: null,
   armor: null,
   head: null,
+  neck: null,
+  belt: null,
+  gloves: null,
   shield: null,
   ring1: null,
   ring2: null,
+  legs: null,
   ammo: null,
   ranged: null,
   feet: null,

@@ -4,7 +4,44 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Pet } from "../src/rules/components/Pet.js";
-import { installMessageWiring } from "../src/main/wiring/messageWiring.js";
+import { Anatomy } from "../src/rules/components/Anatomy.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { Owner } from "../src/rules/components/Owner.js";
+import { Position } from "../src/rules/components/Position.js";
+import { Devotion } from "../src/rules/components/Devotion.js";
+import { HEARING_TIERS } from "../src/rules/components/Anatomy.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
+import { evaluateSound, thresholdForTier } from "../src/rules/utils/sound.js";
+import { resolveItemDisplayName } from "../src/main/wiring/itemName.js";
+import { installMessageWiring } from "../src/display/ui/wiring/messageWiring.js";
+
+function installWithDeps(world, messageLog, playerId) {
+  installMessageWiring({
+    world,
+    messageLog,
+    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
+    bracketizeName: (s) => `[${s}]`,
+    getSpell: () => null,
+    resolveItemDisplayName,
+    components: {
+      Equipment,
+      ItemInfo,
+      NamedIdentity,
+      Owner,
+      Pet,
+      Player,
+      Position,
+      Devotion,
+      Anatomy,
+      DungeonState,
+    },
+    soundApi: {
+      evaluateSound,
+      thresholdForTier,
+      HEARING_TIERS,
+    },
+  });
+}
 
 function createMessageLog() {
   const entries = [];
@@ -23,13 +60,7 @@ Deno.test("messageWiring logs homecoming flavor text for player", () => {
   world.add(playerId, Player, {});
 
   const messageLog = createMessageLog();
-  installMessageWiring({
-    world,
-    messageLog,
-    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
-    bracketizeName: (s) => `[${s}]`,
-    getSpell: () => null,
-  });
+  installWithDeps(world, messageLog, playerId);
 
   world.emit("dungeon:teleport-depth", {
     actor: playerId,
@@ -48,13 +79,7 @@ Deno.test("messageWiring ignores non-homecoming depth teleports", () => {
   world.add(playerId, Player, {});
 
   const messageLog = createMessageLog();
-  installMessageWiring({
-    world,
-    messageLog,
-    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
-    bracketizeName: (s) => `[${s}]`,
-    getSpell: () => null,
-  });
+  installWithDeps(world, messageLog, playerId);
 
   world.emit("dungeon:teleport-depth", {
     actor: playerId,
@@ -86,13 +111,7 @@ Deno.test("messageWiring logs apply coat outcomes and cryptic fallback", () => {
   });
 
   const messageLog = createMessageLog();
-  installMessageWiring({
-    world,
-    messageLog,
-    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
-    bracketizeName: (s) => `[${s}]`,
-    getSpell: () => null,
-  });
+  installWithDeps(world, messageLog, playerId);
 
   world.emit("item:applied", {
     targetId,
@@ -128,13 +147,7 @@ Deno.test("messageWiring logs pet corpse munch flavor text", () => {
   world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
 
   const messageLog = createMessageLog();
-  installMessageWiring({
-    world,
-    messageLog,
-    playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
-    bracketizeName: (s) => `[${s}]`,
-    getSpell: () => null,
-  });
+  installWithDeps(world, messageLog, playerId);
 
   world.emit("pet:corpse-munch", {
     petId,
@@ -150,4 +163,70 @@ Deno.test("messageWiring logs pet corpse munch flavor text", () => {
   assert(messageLog.entries[0].text.includes("Crunch"), "message should include flavor text");
   assert(messageLog.entries[0].text.includes("+2 HP"), "message should include healing");
   assert(messageLog.entries[0].text.includes("Iron stomach"), "message should mention toxin resistance flavor");
+});
+
+Deno.test("messageWiring resolves ambient sound audibility by depth, hearing tier, and dB clarity", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Anatomy, { parts: [], hearing: "mid" });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { worldSeed: 42, currentDepth: 2, floorEntityIds: [] });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("ambient:sound", {
+    source: "fountain",
+    depth: 3,
+    at: { x: 1, y: 1 },
+    sourceDbAt1Tile: 80,
+    clarity: {
+      far: "you hear faint gurgling",
+      mid: "you hear running water",
+      near: "you hear water gushing to life",
+    },
+  });
+  assertEquals(messageLog.entries.length, 0);
+
+  world.emit("ambient:sound", {
+    source: "fountain",
+    depth: 2,
+    at: { x: 1, y: 1 },
+    sourceDbAt1Tile: 80,
+    clarity: {
+      far: "you hear faint gurgling",
+      mid: "you hear running water",
+      near: "you hear water gushing to life",
+    },
+  });
+  assertEquals(messageLog.entries.length, 1);
+  assertEquals(messageLog.entries[0].text, "you hear running water");
+
+  world.emit("ambient:sound", {
+    source: "fountain",
+    depth: 2,
+    at: { x: 32, y: 0 },
+    sourceDbAt1Tile: 60,
+    clarity: {
+      far: "you hear faint trade chatter",
+      mid: "you hear trade chatter nearby",
+      near: "you hear loud trade chatter close by",
+    },
+  });
+  assertEquals(messageLog.entries.length, 1);
+
+  world.emit("ambient:sound", {
+    source: "shop",
+    depth: 2,
+    at: { x: 1, y: 0 },
+    sourceDbAt1Tile: 80,
+    clarity: {
+      far: "you hear faint market noise",
+      mid: "you hear market chatter nearby",
+      near: "you hear loud market clamor",
+    },
+  });
+  assertEquals(messageLog.entries.length, 2);
+  assertEquals(messageLog.entries[1].text, "YOU HEAR MARKET CHATTER NEARBY");
 });

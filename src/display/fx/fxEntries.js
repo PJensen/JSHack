@@ -1,4 +1,4 @@
-// src/main/fx/fxEntries.js
+// src/display/fx/fxEntries.js
 // Typed FX effect cache entries with shared lifecycle helpers.
 
 // ---------------------------------------------------------------------------

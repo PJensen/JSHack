@@ -4,6 +4,7 @@ import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
+import { createStatusEvent } from "../../shared/events/statusEvent.js";
 
 const TAUNT_INSTALLED_KEY = Symbol.for("jshack:taunt:installed");
 const TAUNT_EFFECT_KEYS = Object.freeze(new Set(["taunt", "taunted"]));
@@ -138,22 +139,20 @@ function applyTauntArea(world, payload) {
   const turnsLeft = Math.max(1, Number(payload?.turnsLeft || 0) | 0);
   const potency = Math.max(1, Number(payload?.potency || 0));
   const targetFaction = String(payload?.targetFaction || "enemy");
-  const vfxText = String(payload?.vfxText || "");
 
   forEachInRadius(world, center.x, center.y, radius, (id, pos) => {
     if ((id | 0) === sourceId) return;
     const faction = world.get(id, Faction);
     if (targetFaction && String(faction?.key || "") !== targetFaction) return;
     if (!upsertTauntEffect(world, id, { sourceId, turnsLeft, potency })) return;
-    if (!vfxText) return;
     try {
-      world.emit?.("status", {
+      world.emit?.("status", createStatusEvent({
         id,
-        kind: "debuff",
-        text: vfxText,
+        kind: "taunt",
+        effect: "taunt",
         source: sourceId,
         at: { x: pos.x | 0, y: pos.y | 0 },
-      });
+      }));
     } catch (e) { console.debug('[tauntSystem] emit status failed:', e); }
   });
 }
@@ -163,9 +162,8 @@ function applyTauntArea(world, payload) {
  * @param {import("../../lib/ecs-js/index.js").World} world
  * @param {number} sourceId
  * @param {{ x: number, y: number }} center
- * @param {{ vfxText?: string }} [options]
  */
-function applyStoneTauntPulse(world, sourceId, center, options = {}) {
+function applyStoneTauntPulse(world, sourceId, center) {
   applyTauntArea(world, {
     sourceId,
     x: center.x | 0,
@@ -174,7 +172,6 @@ function applyStoneTauntPulse(world, sourceId, center, options = {}) {
     turnsLeft: STONE_TAUNT_TURNS,
     potency: STONE_TAUNT_POTENCY,
     targetFaction: STONE_TAUNT_TARGET_FACTION,
-    vfxText: String(options?.vfxText || ""),
   });
 }
 
@@ -207,7 +204,7 @@ export function installTauntListener(world) {
 
     const pos = world.get(spawnedId, Position) || { x: 0, y: 0 };
     const center = readPoint(at, pos);
-    applyStoneTauntPulse(world, spawnedId, center, { vfxText: "!" });
+    applyStoneTauntPulse(world, spawnedId, center);
   });
 
   world.on("taunt:apply-area", (payload) => {

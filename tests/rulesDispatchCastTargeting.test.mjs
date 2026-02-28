@@ -22,3 +22,29 @@ Deno.test("rulesDispatch: castActiveSpell forwards target tile coordinates", () 
   assertEquals(addCalls[0]?.[2], { spellId: "blink", targetId: 99, x: 12, y: 7 });
   assertEquals(tickCalls, [[1]]);
 });
+
+Deno.test("rulesDispatch: castActiveSpell without spellId delegates to ui event", () => {
+  const addCalls = [];
+  const tickCalls = [];
+  const world = {
+    add: (...args) => addCalls.push(args),
+    tick: (...args) => tickCalls.push(args),
+  };
+  const dispatch = makeRulesDispatcher(world, () => 42);
+
+  let emitted = 0;
+  const onCast = () => { emitted += 1; };
+  globalThis.addEventListener("ui:castActiveSpell", onCast);
+  try {
+    dispatch({
+      type: "rules.castActiveSpell",
+      payload: {},
+    });
+  } finally {
+    globalThis.removeEventListener("ui:castActiveSpell", onCast);
+  }
+
+  assertEquals(emitted, 1);
+  assertEquals(addCalls.length, 0);
+  assertEquals(tickCalls.length, 0);
+});

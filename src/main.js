@@ -11,6 +11,15 @@ import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.
 import { createCamera, updateCamera, applyCamera, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
 import { updateShake } from "./display/camera/shake.js";
 import { zoomTo } from "./display/camera/utils.js";
+import {
+  setupDisplayRuntime,
+  tickDisplayEffects,
+  drawWorldEffects,
+  drawScreenEffects,
+  drawTargetingReticle,
+  drawRulesProfilerOverlay,
+  applyHallucinationSway,
+} from "./display/composition/index.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
 import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
@@ -29,23 +38,17 @@ import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
-import { createThrowFxController } from "./main/fx/throwFxController.js";
-import { createBoltFxController } from "./main/fx/boltFxController.js";
-import { createProjectileFxController } from "./main/fx/projectileFx.js";
-import { createSpellAreaFxController } from "./main/fx/spellAreaFx.js";
-import { createCloudFxController } from "./main/fx/cloudFx.js";
+import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
-import { installDeityUiWiring } from "./main/wiring/deityUiWiring.js";
-import { installMessageWiring } from "./main/wiring/messageWiring.js";
+import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
+import { installMessageWiring } from "./display/ui/wiring/messageWiring.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installRackWiring } from "./main/wiring/rackWiring.js";
 import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
 import { installCookingWiring } from "./main/wiring/cookingWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
-import { installFloatTextWiring } from "./main/wiring/floatTextWiring.js";
-import { installEventUiWiring } from "./main/wiring/eventUiWiring.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
   hasSavegame,
@@ -69,15 +72,16 @@ import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
-import { getSpell } from "./rules/data/spells.js";
+import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
 import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
-import { FloatText } from "./display/passes/vfx/text/floatText.js";
+import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
 import { Devotion } from "./rules/components/Devotion.js";
+import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { initDeity, getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { Interactable } from "./rules/components/Interactable.js";
@@ -102,6 +106,8 @@ import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
+import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
+import { updateFOV, isVisible as isTileVisible } from "./rules/environment/dungeon/exploredMap.js";
 import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
@@ -341,7 +347,7 @@ const spellCtrl = createActiveSpellController(world);
 // Initialize HUD feed updaters with stamina support
 const hudFeeds = createHudFeeds(world, {
   getPlayerMana: spellCtrl.getPlayerMana,
-  ensureActiveSpell: () => spellCtrl.ensureActiveSpell(),
+  ensureActiveSpell: () => ensureActiveSpell(),
   updateActiveSpellLabel: () => spellCtrl.updateActiveSpellLabel(),
 });
 
@@ -502,7 +508,7 @@ function _finalizeNewGame(classData) {
         identity: classDef ? `player_${classDef.id}` : "player",
         maxHp: stats.maxHp ?? 20,
         maxStamina: stats.maxStamina ?? 100,
-        staminaRegen: stats.staminaRegen ?? 2.0,
+        staminaRegen: stats.staminaRegen ?? 3.0,
       });
     }
 
@@ -556,11 +562,13 @@ function _finalizeNewGame(classData) {
       }
 
       // Starting spell from class
-      if (brain && classDef?.startingSpell) {
+      const forcedClassSpell = classDef?.id === "cleric" ? "flash_heal" : null;
+      const startingSpellId = String(forcedClassSpell || classDef?.startingSpell || "");
+      if (brain && startingSpellId) {
         if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-        const filtered = brain.learnedSpellIds.filter((id) => id !== classDef.startingSpell);
-        brain.learnedSpellIds = [classDef.startingSpell, ...filtered];
-        setActiveSpell(classDef.startingSpell);
+        const filtered = brain.learnedSpellIds.filter((id) => id !== startingSpellId);
+        brain.learnedSpellIds = [startingSpellId, ...filtered];
+        setActiveSpell(startingSpellId);
       }
     }
 
@@ -665,6 +673,12 @@ const inputDisposers = [];
     switch (action.type) {
       case "display.openInventory":
         window.dispatchEvent(new CustomEvent("ui:openInventory"));
+        break;
+      case "display.openCharacter":
+        window.dispatchEvent(new CustomEvent("ui:openCharacter"));
+        break;
+      case "display.openEquipment":
+        window.dispatchEvent(new CustomEvent("ui:openEquipment"));
         break;
       case "display.openMessageLog":
         window.dispatchEvent(new CustomEvent("ui:openMessageLog"));
@@ -1080,7 +1094,11 @@ addEventListener('ui:pray', () => {
 
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
-  const spells = spellCtrl.learnedSpells();
+  const spells = spellCtrl.learnedSpells().map((spell) => ({
+    ...spell,
+    detailLines: describeSpellDetailLines(spell),
+    targetEffects: describeSpellTargetEffects(spell),
+  }));
   const activeSpellId = ensureActiveSpell();
   try { window.dispatchEvent(new CustomEvent('ui:spellData', { detail: { spells, activeSpellId } })); } catch (e) { console.debug('[main] dispatch ui:spellData:', e); }
 });
@@ -1110,7 +1128,25 @@ installMessageWiring({
   messageLog,
   playerEntity,
   bracketizeName,
-  getSpell
+  getSpell,
+  resolveItemDisplayName,
+  components: {
+    Equipment,
+    ItemInfo,
+    NamedIdentity,
+    Owner,
+    Pet,
+    Player,
+    Position,
+    Devotion,
+    Anatomy,
+    DungeonState,
+  },
+  soundApi: {
+    evaluateSound,
+    thresholdForTier,
+    HEARING_TIERS,
+  },
 });
 
 // Dismiss the quick-slot chip when item is used
@@ -2047,86 +2083,55 @@ const fx = new ParticleFX({ capacity: PERF.particleCapacity, seedBase: (world.se
 fx.ctx = bctx;
 // Avoid expensive per-particle transforms: draw in world units under camera transform
 fx.worldToScreen = (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ size, /** @type {{x:number,y:number,size:number}} */ out) => { out.x = x; out.y = y; out.size = size; };
-
-// Per-entity particle emitter tracking sets (display-only, reconciled each frame)
-const _burningEmitters = new Set();
-const _bleedEmitters   = new Set();
-const _poisonEmitters  = new Set();
-const _regenEmitters   = new Set();
-const _shockEmitters   = new Set();
-const _frozenEmitters  = new Set();
-const _cursedEmitters  = new Set();
-const _blessedEmitters = new Set();
-const _fountainEmitters = new Set();
-const _dryFountains = new Set();
-const _furnaceEmitters  = new Set();
-const _cookFireEmitters = new Set();
-const _torchEmitters    = new Set();
-
-// Static emitter config tables — built once at module init, used every frame.
-// Replaces repeated reconcileStatusEmitter() calls with a single entity pass.
-/** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
-const _STATUS_EMITTER_CFG = {
-  burning:  { tracker: _burningEmitters, prefix: 'burn',    cfg: { rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5,  speed: 0.8,  speedJitter: 0.4,  ax: 0, ay: -0.5,  life: 0.7,  lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06, color: '#ff8c00', alpha0: 0.9,  alpha1: 0.0, offsetX: 0, offsetY: -0.15 } },
-  bleeding: { tracker: _bleedEmitters,   prefix: 'bleed',   cfg: { rate: 14, angle:  Math.PI / 2, spread: Math.PI / 8,  speed: 0.55, speedJitter: 0.3,  ax: 0, ay:  1.2,  life: 0.9,  lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05, color: '#bb1111', alpha0: 0.9,  alpha1: 0.0 } },
-  poisoned: { tracker: _poisonEmitters,  prefix: 'poison',  cfg: { rate:  4, angle:  0,            spread: Math.PI * 2,  speed: 0.15, speedJitter: 0.10, ax: 0, ay: -0.04, life: 1.6,  lifeJitter: 0.5, size: 0.08, sizeEnd: 0.03, color: '#33ff55', alpha0: 0.35, alpha1: 0.0 } },
-  regen:    { tracker: _regenEmitters,   prefix: 'regen',   cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 4,  speed: 0.4,  speedJitter: 0.15, ax: 0, ay: -0.1,  life: 1.0,  lifeJitter: 0.4, size: 0.10, sizeEnd: 0.02, color: '#44ff88', alpha0: 0.7,  alpha1: 0.0 } },
-  shocked:  { tracker: _shockEmitters,   prefix: 'shock',   cfg: { rate: 30, angle:  0,            spread: Math.PI * 2,  speed: 1.2,  speedJitter: 0.8,  ax: 0, ay:  0,    life: 0.2,  lifeJitter: 0.1, size: 0.10, sizeEnd: 0.02, color: '#00ccff', alpha0: 1.0,  alpha1: 0.0 } },
-  frozen:   { tracker: _frozenEmitters,  prefix: 'frozen',  cfg: { rate: 15, angle:  0,            spread: Math.PI * 2,  speed: 0.22, speedJitter: 0.14, ax: 0, ay:  0.04, life: 1.8,  lifeJitter: 0.5, size: 0.12, sizeEnd: 0.04, color: '#aaeeff', alpha0: 0.6,  alpha1: 0.0 } },
-  cursed:   { tracker: _cursedEmitters,  prefix: 'cursed',  cfg: { rate: 12, angle: -Math.PI / 2, spread: Math.PI,      speed: 0.5,  speedJitter: 0.3,  ax: 0, ay: -0.25, life: 1.2,  lifeJitter: 0.4, size: 0.14, sizeEnd: 0.02, color: '#8822cc', alpha0: 0.7,  alpha1: 0.0 } },
-  blessed:  { tracker: _blessedEmitters, prefix: 'blessed', cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 3,  speed: 0.6,  speedJitter: 0.2,  ax: 0, ay: -0.35, life: 1.0,  lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02, color: '#ffcc00', alpha0: 0.8,  alpha1: 0.0 } },
+const getPosition = (id) => world.get(Number(id || 0), Position) || null;
+const isPetEntity = (id) => world.has(Number(id || 0), Pet);
+const isPlayerEntity = (id) => world.has(Number(id || 0), Player);
+const getPlayerEntity = () => playerEntity(world);
+const getItemInfo = (id) => world.get(Number(id || 0), ItemInfo) || null;
+const uiRulesDispatcher = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+const dispatchRulesAction = (action) => uiRulesDispatcher(action);
+const resolveDisplayName = (id) => resolveItemDisplayName(world, Number(id || 0));
+let _floatTextFovStep = -1;
+const isVisibleAt = (x, y) => {
+  const step = world.step | 0;
+  if (step !== _floatTextFovStep) {
+    _floatTextFovStep = step;
+    const pe = playerEntity(world);
+    if (pe?.id && pe.pos) {
+      const brain = world.get(pe.id, Brain);
+      const radius = brain?.visionRange ?? 10;
+      const pad = 2;
+      const bounds = {
+        x0: pe.pos.x - radius - pad,
+        y0: pe.pos.y - radius - pad,
+        x1: pe.pos.x + radius + pad,
+        y1: pe.pos.y + radius + pad,
+      };
+      const blockedMap = buildBlocksVisionMap(world, bounds);
+      const isBlocked = blockedCallback(blockedMap);
+      updateFOV(step, pe.pos.x, pe.pos.y, radius, isBlocked);
+    }
+  }
+  return !!isTileVisible(Number(x) | 0, Number(y) | 0);
 };
-/** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
-const _KIND_EMITTER_CFG = {
-  fountain:     { tracker: _fountainEmitters, prefix: 'fountain', cfg: { continuous: true, rate: 16, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 1.4,  speedJitter: 0.5, ax: 0, ay:  2.5,  life: 1.2,  lifeJitter: 0.3, size: 0.35, sizeEnd: 0.08, color: '#66ccff', alpha0: 0.7,  alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
-  furnace:      { tracker: _furnaceEmitters,  prefix: 'furnace',  cfg: { continuous: true, rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.9,  speedJitter: 0.3, ax: 0, ay: -0.1,  life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04, color: '#ff6600', alpha0: 0.88, alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
-  cooking_fire: { tracker: _cookFireEmitters, prefix: 'cfire',    cfg: { continuous: true, rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05, life: 0.9,  lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04, color: '#ff8800', alpha0: 0.75, alpha1: 0.0, offsetX: 0, offsetY:  0   } },
-  torch:        { tracker: _torchEmitters,    prefix: 'torch',    cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5,  speedJitter: 0.4, ax: 0, ay: -0.3,  life: 0.6,  lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: '#ffaa33', alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.1 } },
-};
-// Reusable set for tracking which emitter keys are active in the current frame
-const _seenEmitterKeys = new Set();
 
-world.on('fountain:dry', ({ targetId }) => {
-  const id = Number(targetId || 0);
-  if (!(id > 0)) return;
-  _dryFountains.add(id);
-  _fountainEmitters.delete(id);
-  fx.removeEmitter(`fountain:${id}`);
+const { statusEmitterFx, boltFx, projectileFx, spellAreaFx, cloudFx, ftext } = setupDisplayRuntime({
+  world,
+  cam,
+  fx,
+  PERF,
+  getFxTime: () => _fxTime,
+  getActiveSpellId: () => _activeSpellId,
+  setActiveSpell,
+  getPosition,
+  isVisibleAt,
+  isPet: isPetEntity,
+  isPlayer: isPlayerEntity,
+  getPlayerEntity,
+  getItemInfo,
+  resolveItemDisplayName: resolveDisplayName,
+  dispatchRulesAction,
 });
-world.on('spawned', ({ id, kind }) => {
-  if (String(kind || '') !== 'fountain') return;
-  _dryFountains.delete(Number(id || 0));
-});
-world.on('fountain:refilled', ({ targetId }) => {
-  const id = Number(targetId || 0);
-  if (!(id > 0)) return;
-  _dryFountains.delete(id);
-});
-
-// FX controllers (depend on cam + fx)
-const boltFx = createBoltFxController({ world, cam, fx });
-boltFx.installListeners();
-const projectileFx = createProjectileFxController({ world, cam, fx });
-projectileFx.installListeners();
-const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime: () => _fxTime });
-spellAreaFx.installListeners();
-const cloudFx = createCloudFxController({ world, cam, fx, getFxTime: () => _fxTime });
-cloudFx.installListeners();
-
-// Floating combat text (display-only, world-space)
-const ftext = new FloatText();
-// Debug/testing helper: expose a global to spawn text at world coords
-try {
-  /** @type any */ (window).float_text = /**
-   * @param {number} x
-   * @param {number} y
-   * @param {string|number} text
-   * @param {any} [opts]
-   */
-  (x,y,text,opts)=> ftext.add(x,y,text,opts||{});
-} catch (e) { console.debug('[main] float_text global setup failed:', e); }
-installFloatTextWiring({ world, ftext, fx });
-installEventUiWiring({ world, ftext, getActiveSpellId: () => _activeSpellId, setActiveSpell });
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
@@ -2139,8 +2144,6 @@ let _fxTime = 0; // display-side time accumulator for simple glyph FX
 
 // Reusable render buffers — hoisted out of hot functions to avoid per-frame GC
 const _stackMeta = new Map();
-/** @type {{ key: string, x: number, y: number }[]} */
-const _origins = [];
 /** @type {number[]} flat buffer [tile, x, y, ...] for explored-not-visible tiles */
 const _exploredTileBuffer = [];
 /** @type {Map<number, { hp:number, ratio:number, showUntil:number }>} */
@@ -2454,81 +2457,20 @@ function render(worldView) {
       bctx.restore();
     }
 
-    // Glyph-FX: invulnerability aegis ward — rotating hex ward, gold aura, sweeping spark
+    // Glyph-FX: invulnerability aegis ward
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
-      const cx = e.pos.x, cy = e.pos.y + 0.09;
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.2);
-      const spin  = _fxTime * 1.4;
-      const rCore = 0.50 + 0.046 * pulse;
-      const rRing = rCore * 1.22;
-
-      bctx.save();
-      bctx.globalCompositeOperation = 'lighter';
-
-      // soft inner aura — warm gold radial gradient
-      const _invAura = bctx.createRadialGradient(cx, cy, 0, cx, cy, rCore * 1.1);
-      _invAura.addColorStop(0, `rgba(255,255,200,${(0.12 + 0.10 * pulse).toFixed(3)})`);
-      _invAura.addColorStop(1, `rgba(240,200,100,${(0.08 + 0.10 * pulse).toFixed(3)})`);
-      bctx.fillStyle = _invAura;
-      bctx.beginPath();
-      bctx.arc(cx, cy, rCore * 1.1, 0, Math.PI * 2);
-      bctx.fill();
-
-      // outer ring — warm gold stroke
-      bctx.lineWidth = 0.032;
-      bctx.strokeStyle = `rgba(255,240,160,${(0.40 + 0.25 * pulse).toFixed(3)})`;
-      bctx.beginPath();
-      bctx.arc(cx, cy, rRing, 0, Math.PI * 2);
-      bctx.stroke();
-
-      // chroma fringe — faint blue outer ring for refractive look
-      bctx.strokeStyle = `rgba(120,220,255,${(0.18 + 0.12 * pulse).toFixed(3)})`;
-      bctx.beginPath();
-      bctx.arc(cx, cy, rRing * 1.04, 0, Math.PI * 2);
-      bctx.stroke();
-
-      // rotating hex ward
-      bctx.save();
-      bctx.translate(cx, cy);
-      bctx.rotate(spin);
-      const _invSides = 6;
-      const _invHexR  = rCore * 0.80;
-      bctx.globalAlpha = 0.45 + 0.25 * pulse;
-      bctx.lineWidth = 0.018;
-      bctx.strokeStyle = 'rgba(255,230,160,0.9)';
-      bctx.beginPath();
-      for (let i = 0; i < _invSides; i++) {
-        const ang = (i / _invSides) * Math.PI * 2;
-        const px = Math.cos(ang) * _invHexR, py = Math.sin(ang) * _invHexR;
-        if (i === 0) bctx.moveTo(px, py); else bctx.lineTo(px, py);
-      }
-      bctx.closePath();
-      bctx.stroke();
-
-      // rune dots at hex vertices
-      bctx.globalAlpha = 0.70;
-      bctx.fillStyle = 'rgba(255,255,210,0.9)';
-      for (let i = 0; i < _invSides; i++) {
-        const ang = (i / _invSides) * Math.PI * 2;
-        const px = Math.cos(ang) * _invHexR, py = Math.sin(ang) * _invHexR;
-        const s = 1 + 0.4 * Math.sin(_fxTime * 6 + i * 1.047);
-        bctx.beginPath();
-        bctx.arc(px, py, 0.015 * s, 0, Math.PI * 2);
-        bctx.fill();
-      }
-      bctx.restore();
-
-      // sweeping specular spark along the outer ring
-      const _invSweepA = (_fxTime * 2.6) % (Math.PI * 2);
-      const _invSx = cx + Math.cos(_invSweepA) * rRing;
-      const _invSy = cy + Math.sin(_invSweepA) * rRing;
-      bctx.globalAlpha = 0.40 + 0.35 * pulse;
-      bctx.fillStyle = 'rgba(255,255,255,0.95)';
-      bctx.beginPath();
-      bctx.ellipse(_invSx, _invSy, 0.05, 0.014, _invSweepA, 0, Math.PI * 2);
-      bctx.fill();
-
-      bctx.restore();
+      drawAegisWardGlyphFx(
+        bctx,
+        '@',
+        e.pos.x,
+        e.pos.y,
+        1.0,
+        _fxTime,
+        0,
+        (e.id | 0) ^ 0xA381,
+        e.pos.y,
+        { gain: 1 }
+      );
     }
 
     // Glyph-FX: frozen — pulsing icy blue radial glow (outer halo + bright inner core)
@@ -2786,51 +2728,27 @@ function render(worldView) {
   }
   pruneHealthBarState();
 
-  if (bctx) throwFx.draw(bctx, worldView, glyphAtlas);
+  drawWorldEffects({
+    bctx,
+    worldView,
+    glyphAtlas,
+    boltFx,
+    spellAreaFx,
+    projectileFx,
+    throwFx,
+    cloudFx,
+    fx,
+    PERF,
+    ftext,
+  });
 
-  // Spell bolt VFX (world-space additive glow)
-  if (bctx) boltFx.drawBolts(bctx);
-  if (bctx) boltFx.drawDeityWrath(bctx);
-  if (bctx) spellAreaFx.drawBlink(bctx);
-  if (bctx) spellAreaFx.drawMeteor(bctx);
-  if (bctx) spellAreaFx.drawBlastwave(bctx);
-  if (bctx) spellAreaFx.drawFrost(bctx);
-  if (bctx) spellAreaFx.drawPhaseStrike(bctx);
-  if (bctx) projectileFx.draw(bctx);
-  if (bctx) cloudFx.drawPoison(bctx);
-  if (bctx) cloudFx.drawPlasma(bctx);
-
-  // Keyboard targeting cursor reticle (world-space)
-  if (bctx && _targetCursor && (_pendingSpellTargeting || _pendingThrowTargeting)) {
-    bctx.save();
-    const cx = _targetCursor.x;
-    const cy = _targetCursor.y;
-    const pulse = 0.6 + 0.4 * Math.sin(_fxTime * 6.0);
-    // Outer pulsing ring
-    bctx.strokeStyle = `rgba(255,220,80,${(0.7 * pulse).toFixed(3)})`;
-    bctx.lineWidth = 0.08;
-    bctx.beginPath();
-    bctx.arc(cx, cy, 0.42, 0, Math.PI * 2);
-    bctx.stroke();
-    // Corner brackets (crosshair feel)
-    const s = 0.46;
-    const l = 0.14;
-    bctx.strokeStyle = `rgba(255,255,200,${(0.85 * pulse).toFixed(3)})`;
-    bctx.lineWidth = 0.06;
-    bctx.beginPath();
-    bctx.moveTo(cx - s, cy - s + l); bctx.lineTo(cx - s, cy - s); bctx.lineTo(cx - s + l, cy - s);
-    bctx.moveTo(cx + s, cy - s + l); bctx.lineTo(cx + s, cy - s); bctx.lineTo(cx + s - l, cy - s);
-    bctx.moveTo(cx - s, cy + s - l); bctx.lineTo(cx - s, cy + s); bctx.lineTo(cx - s + l, cy + s);
-    bctx.moveTo(cx + s, cy + s - l); bctx.lineTo(cx + s, cy + s); bctx.lineTo(cx + s - l, cy + s);
-    bctx.stroke();
-    bctx.restore();
-  }
-
-  // Particles (already in world space)
-  fx.render({ mode: (PERF.quality === 'low' ? 'source-over' : 'lighter'), alphaScale: 0.9, shape: (PERF.quality === 'low' ? 'rect' : 'circle') });
-
-  // Floating text, rendered in world space on top of particles
-  if (bctx) ftext.render(bctx);
+  drawTargetingReticle({
+    bctx,
+    targetCursor: _targetCursor,
+    hasPendingSpellTargeting: !!_pendingSpellTargeting,
+    hasPendingThrowTargeting: !!_pendingThrowTargeting,
+    fxTime: _fxTime,
+  });
 
   bctx.restore();
 
@@ -2841,41 +2759,9 @@ function render(worldView) {
   ctx.restore();
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
-  if (boltFx.hasScreenEffects()) {
-    boltFx.drawScreenFlash(ctx, W, H);
-    boltFx.drawScreenBolts(ctx, W, H);
-  }
+  drawScreenEffects({ ctx, W, H, boltFx });
 
-  // HUD
-  if (PERF.quality !== 'low') {
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "#9cf";
-    ctx.font = "12px monospace";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    // Optional rules profiler overlay (top 3 systems by last tick duration)
-    const prof = /** @type any */ (window).__JSHACK_RULES_PROF;
-    if (prof && prof.lastTick) {
-      const t = prof.lastTick;
-      ctx.fillText(`rules dt: ${t.totalMs.toFixed(2)}ms`, 8, 40);
-      // flatten systems with phase labels
-      const all = [];
-      for (const ph of Object.keys(t.phases)) {
-        const p = t.phases[ph];
-        for (let i = 0; i < p.systems.length; i++) {
-          const srec = p.systems[i];
-          all.push({ ph, name: srec.name, ms: srec.ms });
-        }
-      }
-      all.sort((a,b)=>b.ms - a.ms);
-      for (let i = 0; i < Math.min(3, all.length); i++) {
-        const r = all[i];
-        ctx.fillText(`${r.ph}: ${r.name} ${r.ms.toFixed(2)}ms`, 8, 56 + i*14);
-      }
-    }
-    ctx.restore();
-  }
+  drawRulesProfilerOverlay({ ctx, quality: PERF.quality, prof: /** @type any */ (window).__JSHACK_RULES_PROF });
 }
 
 // ---- Frame loop (FXClock) --------------------------------------------------
@@ -2899,19 +2785,14 @@ function frame(now) {
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
-  // Display-only VFX lifetimes
-  boltFx.tick(dtSec);
-  spellAreaFx.tick(dtSec);
-  projectileFx.tick(dtSec);
-  throwFx.tick(dtSec);
-  cloudFx.tick(dtSec);
-  ftext.step(dtSec);
+  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
 
   // Update vitals HUD if changed (lightweight per-frame check)
   hudFeeds.updateVitalsHUD();
   hudFeeds.updateCombatHUD();
   hudFeeds.updateDepthHUD();
   hudFeeds.updateTurnHUD();
+  hudFeeds.updateGoldHUD();
   hudFeeds.updatePetHUD();
   hudFeeds.updateActiveSpellHUD();
 
@@ -2925,70 +2806,10 @@ function frame(now) {
 
   // Status particle emitter reconciliation + advance particles
   if (PERF.particleCapacity > 0) {
-    _origins.length = 0;
-    const origins = _origins;
-    // Single entity pass for all status + kind emitters (replaces 11 separate scans)
-    _seenEmitterKeys.clear();
-    for (let i = 0; i < view.entities.length; i++) {
-      const e = view.entities[i];
-      if (Array.isArray(e.tags)) {
-        for (let t = 0; t < e.tags.length; t++) {
-          const sc = _STATUS_EMITTER_CFG[e.tags[t]];
-          if (!sc) continue;
-          const key = `${sc.prefix}:${e.id}`;
-          _seenEmitterKeys.add(key);
-          if (!sc.tracker.has(e.id)) {
-            fx.ensureEmitter(key, { continuous: true, ...sc.cfg });
-            sc.tracker.add(e.id);
-          }
-          origins.push({ key, x: e.pos.x, y: e.pos.y });
-        }
-      }
-      const kc = _KIND_EMITTER_CFG[e.kind];
-      if (kc) {
-        if (e.kind === 'fountain' && _dryFountains.has(e.id)) continue;
-        const key = `${kc.prefix}:${e.id}`;
-        _seenEmitterKeys.add(key);
-        if (!kc.tracker.has(e.id)) {
-          fx.ensureEmitter(key, kc.cfg);
-          kc.tracker.add(e.id);
-        }
-        origins.push({ key, x: e.pos.x, y: e.pos.y });
-      }
-    }
-    // Remove emitters for entities that left the view
-    for (const tag in _STATUS_EMITTER_CFG) {
-      const sc = _STATUS_EMITTER_CFG[tag];
-      if (!sc) continue;
-      for (const id of sc.tracker) {
-        if (!_seenEmitterKeys.has(`${sc.prefix}:${id}`)) {
-          fx.removeEmitter(`${sc.prefix}:${id}`);
-          sc.tracker.delete(id);
-        }
-      }
-    }
-    for (const kind in _KIND_EMITTER_CFG) {
-      const kc = _KIND_EMITTER_CFG[kind];
-      if (!kc) continue;
-      for (const id of kc.tracker) {
-        if (!_seenEmitterKeys.has(`${kc.prefix}:${id}`)) {
-          fx.removeEmitter(`${kc.prefix}:${id}`);
-          kc.tracker.delete(id);
-        }
-      }
-    }
-    fx.step(dtSec, origins);
+    statusEmitterFx.step(dtSec, view, _fxTime);
   }
 
-  // Hallucination: Lissajous world-sway applied as a world-unit cam offset after follow.
-  // cam.x/y are in world units; 0.15 ≈ 4px at default zoom — visually clear, not nauseating.
-  if (view.player) {
-    const pe = view.entities.find(e => e.id === view.player.id);
-    if (pe && Array.isArray(pe.tags) && (pe.tags.includes('hallucinating') || pe.tags.includes('intoxicated'))) {
-      cam.x += Math.sin(_fxTime * 0.27 * Math.PI * 2) * 0.15;
-      cam.y += Math.sin(_fxTime * 0.41 * Math.PI * 2 + 1.3) * 0.15;
-    }
-  }
+  applyHallucinationSway({ cam, view, fxTime: _fxTime });
 
   render(view);
 

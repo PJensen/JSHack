@@ -1,29 +1,62 @@
-import { Equipment } from "../../rules/components/Equipment.js";
-import { ItemInfo } from "../../rules/components/ItemInfo.js";
-import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { Owner } from "../../rules/components/Owner.js";
-import { Pet } from "../../rules/components/Pet.js";
-import { Player } from "../../rules/components/Player.js";
-import { Position } from "../../rules/components/Position.js";
-import { Devotion } from "../../rules/components/Devotion.js";
-import { resolveItemDisplayName } from "./itemName.js";
+import { normalizeStatusEvent } from "../../../shared/events/statusEvent.js";
 
-const INSTALLED = Symbol.for("jshack:main:messageWiring:installed");
+const INSTALLED = Symbol.for("jshack:display:messageWiring:installed");
+const ALL_CAPS_DB_BY_SOURCE = Object.freeze({
+  fountain: 84,
+  shop: 78,
+  home: 74,
+});
 
 /**
  * Centralized message event handling
  * @param {{
- *   world: import("../../lib/ecs-js/index.js").World,
+ *   world: import("../../../lib/ecs-js/index.js").World,
  *   messageLog: { log: (msg: string | {text: string, type: string}) => void },
- *   playerEntity: (world: import("../../lib/ecs-js/index.js").World) => ({id:number,pos:{x:number,y:number}}|null),
+ *   playerEntity: (world: import("../../../lib/ecs-js/index.js").World) => ({id:number,pos:{x:number,y:number}}|null),
  *   bracketizeName: (s: string) => string,
  *   getSpell: (id: string) => any,
+ *   resolveItemDisplayName: (world: any, id: number) => string,
+ *   components: {
+ *     Equipment?: any, ItemInfo?: any, NamedIdentity?: any, Owner?: any, Pet?: any,
+ *     Player?: any, Position?: any, Devotion?: any, Anatomy?: any, DungeonState?: any,
+ *   },
+ *   soundApi: {
+ *     evaluateSound: Function,
+ *     thresholdForTier: Function,
+ *     HEARING_TIERS: Record<string, string>,
+ *   },
  * }} opts
  */
-export function installMessageWiring({ world, messageLog, playerEntity, bracketizeName, getSpell }) {
+export function installMessageWiring({
+  world,
+  messageLog,
+  playerEntity,
+  bracketizeName,
+  getSpell,
+  resolveItemDisplayName,
+  components = {},
+  soundApi = {},
+}) {
   if (!world || !messageLog || typeof playerEntity !== "function") return;
   if (world[INSTALLED]) return;
   world[INSTALLED] = true;
+  const {
+    Equipment,
+    ItemInfo,
+    NamedIdentity,
+    Owner,
+    Pet,
+    Player,
+    Position,
+    Devotion,
+    Anatomy,
+    DungeonState,
+  } = components || {};
+  const evaluateSound = typeof soundApi.evaluateSound === "function" ? soundApi.evaluateSound : () => ({ audible: false, clarity: "barely", perceivedDb: -Infinity });
+  const thresholdForTier = typeof soundApi.thresholdForTier === "function" ? soundApi.thresholdForTier : () => Number.POSITIVE_INFINITY;
+  const HEARING_TIERS = (soundApi.HEARING_TIERS && typeof soundApi.HEARING_TIERS === "object")
+    ? soundApi.HEARING_TIERS
+    : { super: "super" };
 
   /** Helper to log a message with type */
   function log(text, type = 'default') {
@@ -34,20 +67,25 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     }
   }
 
+  const compGet = (id, comp) => (comp ? world.get(Number(id || 0), comp) : null);
+  const compHas = (id, comp) => (comp ? world.has(Number(id || 0), comp) : false);
+
   /** Format helpers for message log */
   function nameOfEntity(id) {
     const pe = playerEntity(world);
     const playerId = pe?.id || 0;
     const n = Number(id || 0);
     if (playerId && n === playerId) return 'You';
-    const ni = world.get(n, NamedIdentity);
+    const ni = compGet(n, NamedIdentity);
     const label = ni?.name;
     return label ? bracketizeName(label) : `Entity ${n}`;
   }
 
   function nameOfItem(id) {
     const n = Number(id || 0);
-    const label = resolveItemDisplayName(world, n);
+    const label = typeof resolveItemDisplayName === "function"
+      ? resolveItemDisplayName(world, n)
+      : "";
     return label ? bracketizeName(label) : `item ${n}`;
   }
 
@@ -98,8 +136,81 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     return k === "iron_ore" || k === "coal_ore" || k === "stone";
   }
 
+  function currentDepth() {
+    if (!DungeonState) return 0;
+    for (const [, ds] of world.query(DungeonState)) {
+      const depth = Number(ds?.currentDepth);
+      return Number.isFinite(depth) ? (depth | 0) : 0;
+    }
+    return 0;
+  }
+
+  function currentHearingThreshold() {
+    const pe = playerEntity(world);
+    if (!pe?.id) return thresholdForTier(HEARING_TIERS.super);
+    const anatomy = compGet(pe.id, Anatomy);
+    const tier = String(anatomy?.hearing || HEARING_TIERS.super).toLowerCase();
+    try {
+      return thresholdForTier(tier);
+    } catch (_err) {
+      return thresholdForTier(HEARING_TIERS.super);
+    }
+  }
+
+  function pickFirstString(rec, keys) {
+    if (!rec || typeof rec !== "object") return "";
+    for (const key of keys) {
+      const value = rec[key];
+      if (typeof value === "string" && value.trim().length > 0) return value;
+    }
+    return "";
+  }
+
+  function textForClarity(rec, clarity) {
+    if (clarity === "crystal") return pickFirstString(rec, ["near", "crystal", "mid", "clear", "far", "faint", "barely"]);
+    if (clarity === "clear") return pickFirstString(rec, ["mid", "clear", "near", "crystal", "far", "faint", "barely"]);
+    if (clarity === "faint") return pickFirstString(rec, ["far", "faint", "mid", "clear", "near", "crystal", "barely"]);
+    if (clarity === "barely") return pickFirstString(rec, ["far", "barely", "faint", "mid", "clear", "near", "crystal"]);
+    return "";
+  }
+
+  function resolveAmbientSoundText(ev) {
+    const pe = playerEntity(world);
+    if (!pe?.pos) return null;
+
+    const soundDepth = Number(ev?.depth);
+    if (!Number.isFinite(soundDepth) || (soundDepth | 0) !== currentDepth()) return null;
+
+    const at = ev?.at;
+    if (!at || !Number.isFinite(Number(at.x)) || !Number.isFinite(Number(at.y))) return null;
+
+    const sourceDbAt1Tile = Number(ev?.sourceDbAt1Tile);
+    if (!Number.isFinite(sourceDbAt1Tile)) return null;
+
+    const hearingThresholdDbHL = currentHearingThreshold();
+    const evalResult = evaluateSound({
+      origin: { x: pe.pos.x, y: pe.pos.y },
+      source: { x: Number(at.x) | 0, y: Number(at.y) | 0 },
+      sourceDbAt1Tile,
+      hearingThresholdDbHL,
+    });
+    if (!evalResult.audible) return null;
+
+    const text = textForClarity(ev?.clarity, evalResult.clarity);
+    if (!text) return null;
+
+    const source = String(ev?.source || "").toLowerCase();
+    const allCapsAtDb = Number(ALL_CAPS_DB_BY_SOURCE[source]);
+    if (Number.isFinite(allCapsAtDb) && evalResult.perceivedDb >= allCapsAtDb) {
+      return text.toUpperCase();
+    }
+    return text;
+  }
+
   // === Ambient sound events ===
-  world.on('ambient:sound', ({ text }) => {
+  world.on('ambient:sound', (ev) => {
+    const text = resolveAmbientSoundText(ev);
+    if (!text) return;
     log(text, 'ambient');
   });
 
@@ -162,6 +273,53 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('spell:oom', ({ actor, spellId, need, have }) => {
     log(`Not enough mana to cast [${String(spellId || 'spell')}] (need ${need}, have ${have}).`, 'system');
+  });
+
+  world.on('spell:fizzle', ({ actor, spellId, confused }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const s = getSpell ? getSpell(String(spellId || '')) : null;
+    const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
+    if (confused) {
+      log(`You lose focus and ${label} fizzles.`, 'system');
+      return;
+    }
+    log(`${label} fizzles.`, 'system');
+  });
+
+  world.on('spell:miscast', ({ actor, fromSpellId, toSpellId, confused }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const from = getSpell ? getSpell(String(fromSpellId || '')) : null;
+    const to = getSpell ? getSpell(String(toSpellId || '')) : null;
+    const fromLabel = from?.name ? `[${from.name}]` : `[${String(fromSpellId || 'spell')}]`;
+    const toLabel = to?.name ? `[${to.name}]` : `[${String(toSpellId || 'spell')}]`;
+    if (confused) {
+      log(`Your confusion twists ${fromLabel} into ${toLabel}.`, 'system');
+      return;
+    }
+    log(`${fromLabel} miscasts into ${toLabel}.`, 'system');
+  });
+
+  world.on('intent:blocked', ({ actor, reason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'stunned') {
+      log('You are stunned and lose your turn.', 'system');
+      return;
+    }
+    log('You cannot act right now.', 'system');
+  });
+
+  world.on('spell:flash_heal', ({ actor, reason, amount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'full_health' || Number(amount || 0) <= 0) {
+      log('Flash Heal has no effect; you are already at full health.', 'system');
+    }
+  });
+
+  world.on('spell:heal', ({ actor, reason, amount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'full_health' || Number(amount || 0) <= 0) {
+      log('Heal has no effect; target is already at full health.', 'system');
+    }
   });
 
   world.on('spell:learned', ({ actor, spellId }) => {
@@ -271,9 +429,9 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   // === Combat events ===
   world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
-    const weaponInfo = world.get(weaponId, ItemInfo);
+    const weaponInfo = compGet(weaponId, ItemInfo);
     const weaponName = weaponInfo ?
-      (world.get(weaponId, NamedIdentity)?.name || weaponInfo.description || weaponInfo.type)
+      (compGet(weaponId, NamedIdentity)?.name || weaponInfo.description || weaponInfo.type)
       : 'fists';
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
@@ -284,12 +442,12 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
       let weaponLabel = '';
-      const eq = world.get(Number(source || 0), Equipment);
+      const eq = compGet(Number(source || 0), Equipment);
       const wid = Number(eq?.weapon || 0);
       if (wid) {
-        const wname = world.get(wid, NamedIdentity)?.name;
+        const wname = compGet(wid, NamedIdentity)?.name;
         if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
-      } else if (world.has(Number(source || 0), Player)) {
+      } else if (compHas(Number(source || 0), Player)) {
         weaponLabel = ' with bare fists';
       }
       log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`, 'combat');
@@ -310,8 +468,8 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     const deadId = Number(id || 0) | 0;
     const killerId = Number(killer || 0) | 0;
 
-    if (world.has(deadId, Pet)) {
-      const owner = world.get(deadId, Owner);
+    if (compHas(deadId, Pet)) {
+      const owner = compGet(deadId, Owner);
       const ownerId = Number(owner?.ownerId || 0) | 0;
       if (playerId > 0 && ownerId === playerId && killerId === playerId) {
         log(`You kill ${who}. The act is unforgivable.`, 'deity');
@@ -322,7 +480,8 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     log(`${who} dies.`, 'combat');
   });
 
-  world.on('status', ({ id, kind, text, source }) => {
+  world.on('status', (payload) => {
+    const { id, kind, source } = normalizeStatusEvent(payload);
     const style = (String(kind || '')).toLowerCase();
     const tgt = nameOfEntity(id);
     const src = Number(source || 0) ? nameOfEntity(source) : null;
@@ -433,7 +592,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   world.on('engrave:scrambled', ({ actor, text, x, y }) => {
     const pe = playerEntity(world);
     if (!pe) return;
-    const ppos = world.get(pe.id, Position);
+    const ppos = compGet(pe.id, Position);
     // Only log if the player can see the tile
     if (ppos && Math.max(Math.abs(ppos.x - x), Math.abs(ppos.y - y)) <= 10) {
       const who = nameOfEntity(actor);
@@ -458,7 +617,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
       }
     }
     if (action === 'readText') {
-      const inter = world.get(Number(targetId || 0), NamedIdentity);
+      const inter = compGet(Number(targetId || 0), NamedIdentity);
       if (inter?.identity === 'house_sign') {
         log('Home sweet home. Rest, gather, and prepare for another descent.', 'system');
       } else {
@@ -487,10 +646,6 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
     if (nameOfEntity(actor) !== 'You') return;
     log('The fountain is dry.', 'system');
   });
-  world.on('fountain:refilled', ({ actor }) => {
-    if (nameOfEntity(actor) !== 'You') return;
-    log('The fountain bubbles back to life.', 'system');
-  });
 
   world.on('altar:pray', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
@@ -513,7 +668,7 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
 
   world.on('shrine:touch', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const devotion = world.get(Number(actor || 0), Devotion);
+    const devotion = compGet(Number(actor || 0), Devotion);
     if (devotion?.deityId) return;
     log('You touch the shrine. A faint warmth pulses through you.', 'system');
   });
@@ -558,8 +713,8 @@ export function installMessageWiring({ world, messageLog, playerEntity, bracketi
   world.on('harvest:regrown', ({ id, kind }) => {
     const pe = playerEntity(world);
     if (!pe) return;
-    const ppos = world.get(pe.id, Position);
-    const pos = world.get(Number(id || 0), Position);
+    const ppos = compGet(pe.id, Position);
+    const pos = compGet(Number(id || 0), Position);
     if (!ppos || !pos) return;
     const dist = Math.max(Math.abs(ppos.x - pos.x), Math.abs(ppos.y - pos.y));
     if (dist > 6) return;
