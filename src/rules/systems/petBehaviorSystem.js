@@ -19,6 +19,7 @@ import { Faction } from '../components/Faction.js';
 import { findNearestValidTileAround } from '../utils/queries.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { getItemsAt } from '../utils/tileQueryCache.js';
+import { worldRand } from '../utils/rng.js';
 import { getDecayStage } from '../data/food.js';
 import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
 
@@ -201,7 +202,7 @@ function maybeApplyDecayToxin(world, petId, corpseId, decayInfo, feline) {
   const finalChance = feline ? (baseChance * (1 - FELINE_TOXIC_IMMUNITY)) : baseChance;
   if (!(finalChance > 0)) return false;
 
-  const roll = nextRoll(world);
+  const roll = worldRand(world);
   if (!(roll < finalChance)) return false;
 
   addActiveEffect(world, petId, {
@@ -242,12 +243,6 @@ function isFelinePet(world, petId) {
     || name.includes('kitty')
     || name.includes('feline')
   );
-}
-
-function nextRoll(world) {
-  const fromRand = Number(typeof world?.rand === 'function' ? world.rand() : NaN);
-  if (Number.isFinite(fromRand)) return Math.max(0, Math.min(1, fromRand));
-  return 1;
 }
 
 /**

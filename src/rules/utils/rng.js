@@ -43,6 +43,41 @@ export function combatSeed(worldSeed, step, entityA, entityB, salt = 0) {
     ^ (salt >>> 0)) >>> 0;
 }
 
+/**
+ * Pull one random unit float from world-scoped RNG.
+ * Rules code should use this instead of any global random source.
+ *
+ * @param {{ rand?: (() => number) | unknown }} world
+ * @returns {number} in [0, 1)
+ */
+export function worldRand(world) {
+  const next = world?.rand;
+  if (typeof next !== "function") {
+    throw new Error("worldRand: world.rand() is required in rules-layer code");
+  }
+  const raw = Number(next.call(world));
+  if (!Number.isFinite(raw)) {
+    throw new Error(`worldRand: world.rand() returned non-finite value (${raw})`);
+  }
+  if (raw <= 0) return 0;
+  if (raw >= 1) return (1 - Number.EPSILON);
+  return raw;
+}
+
+/**
+ * Deterministic chance roll backed by world.rand().
+ *
+ * @param {{ rand?: (() => number) | unknown }} world
+ * @param {number} chance
+ * @returns {boolean}
+ */
+export function worldChance(world, chance) {
+  const p = Number(chance);
+  if (!(p > 0)) return false;
+  if (p >= 1) return true;
+  return worldRand(world) < p;
+}
+
 // --- Nethack-style helpers ---
 
 /**
