@@ -592,6 +592,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d8",
     staminaCost: 11,
     description: "A heavy iron head on a wooden haft. Favored by the faithful.",
+    affixes: ["stunning1"],
   },
   leather_armor: {
     id: "leather_armor",
@@ -1162,6 +1163,7 @@ export const ITEM_CATALOG = {
     bonuses: { attack: 2, critMult: 0.5 },
     damageDice: "1d8",
     staminaCost: 10,
+    affixes: ["stunning1"],
   },
   venomfang_dagger: {
     id: "venomfang_dagger",
@@ -1261,7 +1263,7 @@ export const ITEM_CATALOG = {
     bonuses: { attack: 2 },
     damageDice: "1d6",
     staminaCost: 8,
-    affixes: ["capacitive1"],
+    affixes: ["capacitive1", "stunning1"],
   },
   grounded_buckler: {
     id: "grounded_buckler",
@@ -1287,7 +1289,7 @@ export const ITEM_CATALOG = {
     bonuses: { attack: 1 },
     damageDice: "1d8",
     staminaCost: 7,
-    affixes: ["fierce"],
+    affixes: ["fierce", "stunning1"],
   },
   ring_sorcery: {
     id: "ring_sorcery",
@@ -1527,7 +1529,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d8",
     staminaCost: 10,
     description: "The head glows cherry-red, leaving scorch marks on everything it strikes.",
-    affixes: ["firestorm1"],
+    affixes: ["firestorm1", "stunning1"],
   },
   glacial_edge: {
     id: "glacial_edge",
@@ -1586,7 +1588,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d10",
     staminaCost: 12,
     description: "The wind screams through holes bored in the hammerhead.",
-    affixes: ["hemorrhage1", "berserk1"],
+    affixes: ["hemorrhage1", "berserk1", "stunning1"],
   },
   wardkeeper_shield: {
     id: "wardkeeper_shield",
