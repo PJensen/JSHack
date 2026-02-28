@@ -150,7 +150,7 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
 
   return (ctx) => {
     if (!ctx || ctx.cancelled) return;
-    if (chance < 1 && Math.random() >= chance) return;
+    if (chance < 1 && ctx.world.rand() >= chance) return;
     const from = ctx.actorPos;
     const target = ctx.targetPos;
     if (!from || !target) return;
