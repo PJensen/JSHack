@@ -20,7 +20,7 @@ function makeActor(world, x, y, hp = 10, maxHp = 10, faction = "ally") {
   return id;
 }
 
-Deno.test("flash_heal: restores 25% max HP and emits spell:flash_heal event", () => {
+Deno.test("flash_heal: restores 22% max HP and emits spell:flash_heal event", () => {
   const world = new World({ seed: 0xC0FFEE });
   const actor = makeActor(world, 8, 9, 7, 30);
   world.add(actor, Brain, { intelligence: 99 });
@@ -30,12 +30,36 @@ Deno.test("flash_heal: restores 25% max HP and emits spell:flash_heal event", ()
   runSpellScript(world, actor, FLASH_HEAL, { x: 100, y: 100 });
 
   const vit = world.get(actor, Vitality);
-  assertEquals(vit.hp, 14, "flash_heal should restore floor(maxHp * 0.25)");
+  assertEquals(vit.hp, 13, "flash_heal should restore floor(maxHp * 0.22)");
   assertEquals(events.length, 1);
   assertEquals(events[0].actor, actor);
   assertEquals(events[0].targetId, actor);
   assertEquals(events[0].at, { x: 8, y: 9 });
-  assertEquals(events[0].amount, 7, "event amount should match actual healed HP");
+  assertEquals(events[0].amount, 6, "event amount should match actual healed HP");
+  assertEquals(events[0].spellLevel, 1, "flash_heal should report baseline spell level");
+  assertEquals(events[0].splashHits, []);
+});
+
+Deno.test("flash_heal: deals small AoE damage to adjacent hostiles only", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  const actor = makeActor(world, 5, 5, 10, 30, "player");
+  const enemy = makeActor(world, 6, 5, 8, 8, "enemy");
+  const ally = makeActor(world, 4, 5, 8, 8, "player");
+  const neutral = makeActor(world, 5, 6, 8, 8, "neutral");
+  const farEnemy = makeActor(world, 8, 5, 8, 8, "enemy");
+  const events = [];
+  world.on("spell:flash_heal", (e) => events.push(e));
+
+  runSpellScript(world, actor, FLASH_HEAL, {});
+
+  assertEquals(world.get(enemy, Vitality).hp, 6, "adjacent hostile should take 2 splash damage");
+  assertEquals(world.get(ally, Vitality).hp, 8, "adjacent ally should not take splash damage");
+  assertEquals(world.get(neutral, Vitality).hp, 8, "adjacent neutral should not take splash damage");
+  assertEquals(world.get(farEnemy, Vitality).hp, 8, "hostiles outside radius should not take splash damage");
+  assertEquals(events.length, 1);
+  assertEquals(events[0].splashHits.length, 1);
+  assertEquals(events[0].splashHits[0].id, enemy);
+  assertEquals(events[0].splashHits[0].amount, 2);
 });
 
 Deno.test("flash_heal: healing is clamped by max HP", () => {
