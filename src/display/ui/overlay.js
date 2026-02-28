@@ -24,6 +24,67 @@ const CHARACTER_SLOT_ORDER = Object.freeze([
   'ammo',
   'ranged',
 ]);
+const CHARACTER_MENU_TABS = Object.freeze([
+  { key: 'character', icon: '@', label: 'Character', eventName: 'ui:openCharacter' },
+  { key: 'inventory', icon: '\u{1F392}', label: 'Inventory', eventName: 'ui:openInventory' },
+  { key: 'equipment', icon: '\u{1F6E1}\uFE0F', label: 'Equipment', eventName: 'ui:openEquipment' },
+]);
+
+/**
+ * @param {HTMLDivElement} host
+ * @param {'character'|'inventory'|'equipment'} activeKey
+ */
+function appendCharacterMenuTabs(host, activeKey) {
+  const tabs = document.createElement('div');
+  Object.assign(tabs.style, {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: '6px',
+    marginBottom: '10px',
+  });
+
+  for (const tab of CHARACTER_MENU_TABS) {
+    const btn = document.createElement('button');
+    decorateButton(btn);
+    Object.assign(btn.style, {
+      minHeight: '46px',
+      padding: '6px 4px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '3px',
+      borderRadius: '8px',
+    });
+    const isActive = tab.key === activeKey;
+    if (isActive) {
+      btn.style.background = '#173458';
+      btn.style.borderColor = '#5fb3ff';
+      btn.style.color = '#e9f5ff';
+      btn.style.boxShadow = '0 0 0 1px rgba(95,179,255,0.2)';
+    }
+
+    const icon = document.createElement('span');
+    icon.textContent = tab.icon;
+    icon.style.lineHeight = '1';
+    icon.style.fontSize = '16px';
+    const label = document.createElement('span');
+    label.textContent = tab.label;
+    label.style.fontSize = '11px';
+    label.style.lineHeight = '1';
+    btn.title = tab.label;
+    btn.setAttribute('aria-label', tab.label);
+    if (isActive) btn.setAttribute('aria-current', 'page');
+    btn.appendChild(icon);
+    btn.appendChild(label);
+    btn.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent(tab.eventName));
+    });
+    tabs.appendChild(btn);
+  }
+
+  host.appendChild(tabs);
+}
 
 /**
  * @param {any} it
@@ -1614,6 +1675,7 @@ function renderInventory(panel, items, ground, slotFilter = '') {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  appendCharacterMenuTabs(el, 'inventory');
   const title = document.createElement('div');
   const filterText = humanize(slotFilter || '');
   title.textContent = filterText ? `Inventory · ${filterText}` : 'Inventory';
@@ -2084,6 +2146,7 @@ function renderCharacterSheet(panel, data) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  appendCharacterMenuTabs(el, 'character');
 
   const playerName = String(data?.playerName || 'Hero').trim() || 'Hero';
   const stats = data?.stats && typeof data.stats === 'object' ? data.stats : {};
@@ -2163,6 +2226,24 @@ function renderCharacterSheet(panel, data) {
   }
   el.appendChild(effects);
 
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    marginTop: '10px',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  });
+  const engraveBtn = document.createElement('button');
+  engraveBtn.textContent = '\u270E Engrave';
+  decorateButton(engraveBtn);
+  engraveBtn.style.minHeight = '44px';
+  engraveBtn.style.padding = '8px 12px';
+  engraveBtn.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('ui:engrave'));
+  });
+  actions.appendChild(engraveBtn);
+  el.appendChild(actions);
+
   const hint = document.createElement('div');
   hint.style.marginTop = '8px';
   hint.style.opacity = '0.85';
@@ -2212,6 +2293,7 @@ function renderEquipment(panel, equippedBySlot, playerName) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  appendCharacterMenuTabs(el, 'equipment');
 
   const title = document.createElement('div');
   const pn = String(playerName || 'Hero').trim() || 'Hero';
@@ -2418,12 +2500,6 @@ function renderEquipment(panel, equippedBySlot, playerName) {
       hideItemTooltip();
     }
 
-    actions.appendChild(createActionButton('Open Inventory', () => {
-      window.dispatchEvent(new CustomEvent('ui:openInventory'));
-    }));
-    actions.appendChild(createActionButton('Open Character Sheet', () => {
-      window.dispatchEvent(new CustomEvent('ui:openCharacter'));
-    }));
   }
 
   function setSel(next) {
