@@ -25,6 +25,7 @@ import { dealDamage } from "../utils/dealDamage.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { upsertTimedEffect } from "../utils/effectSemantics.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -502,13 +503,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       const ae = /** @type any */ (world.get(id, ActiveEffects));
       const effect = { key: 'burn', turnsLeft: 4, potency: 3, stacks: 1 };
       if (ae && Array.isArray(ae.effects)) {
-        const existing = ae.effects.find(e => e.key === 'burn');
-        if (existing) {
-          existing.stacks = (existing.stacks || 1) + 1;
-          existing.turnsLeft = Math.max(existing.turnsLeft, 4);
-        } else {
-          ae.effects.push(effect);
-        }
+        upsertTimedEffect(ae.effects, effect);
       } else {
         try { world.add(id, ActiveEffects, { effects: [effect] }); } catch {} // ECS: may already exist
       }

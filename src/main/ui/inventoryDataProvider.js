@@ -22,6 +22,7 @@ import { getHungerLevel } from "../../rules/data/food.js";
 import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
+import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 
@@ -138,7 +139,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const statusComp = world.get(playerId, Status);
     if (Array.isArray(effectComp?.effects)) {
       for (const entry of effectComp.effects) {
-        const key = String(entry?.key || "").trim().toLowerCase();
+        const key = canonicalStatusKey(String(entry?.key || ""));
         if (!key) continue;
         const turns = Math.max(0, Number(entry?.turnsLeft || 0) | 0);
         const stacks = Math.max(1, Number(entry?.stacks || 1) | 0);
@@ -149,7 +150,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     }
     if (Array.isArray(statusComp?.statuses)) {
       for (const entry of statusComp.statuses) {
-        const key = String(entry?.type || entry?.key || "").trim().toLowerCase();
+        const key = canonicalStatusKey(String(entry?.type || entry?.key || ""));
         if (!key) continue;
         const turns = Math.max(0, Number(entry?.duration || entry?.turns || 0) | 0);
         const stacks = Math.max(1, Number(entry?.stacks || 1) | 0);

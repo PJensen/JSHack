@@ -8,6 +8,8 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Brain } from "../src/rules/components/Brain.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Status } from "../src/rules/components/Status.js";
 
 function makeEquipItem(world, identity, name, slot) {
   const id = world.create();
@@ -104,4 +106,37 @@ Deno.test("inventory data provider does not emit learned spells as bag items", (
   assert(inventoryPayload, "expected ui:inventoryData payload");
   const bagItems = Array.isArray(inventoryPayload.bagItems) ? inventoryPayload.bagItems : [];
   assert(!bagItems.some((it) => String(it?.id || "").startsWith("spell:")), "learned spells should not appear in bagItems");
+});
+
+Deno.test("character data dedupes effect/status aliases into one active effect row", () => {
+  const world = new World({ seed: 99 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+  world.add(player, ActiveEffects, { effects: [{ key: "poison", turnsLeft: 3, potency: 1, stacks: 1 }] });
+  world.add(player, Status, { statuses: [{ type: "poisoned", duration: 3, potency: 1, stacks: 1 }] });
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any} */
+  let payload = null;
+  const onCharacterData = (ev) => {
+    payload = ev?.detail || null;
+  };
+  addEventListener("ui:characterData", onCharacterData);
+  dispatchEvent(new CustomEvent("ui:requestCharacterData"));
+  removeEventListener("ui:characterData", onCharacterData);
+
+  assert(payload, "expected ui:characterData payload");
+  const activeEffects = Array.isArray(payload?.activeEffects) ? payload.activeEffects : [];
+  const poisonedRows = activeEffects.filter((entry) => String(entry?.key || "") === "poisoned");
+  assertEquals(poisonedRows.length, 1, "poison alias rows should collapse to one canonical poisoned entry");
 });

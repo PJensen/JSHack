@@ -14,6 +14,7 @@ import { findTileStepEffect } from "../data/tileStepEffects.js";
 import { TILE_ICE } from "../environment/dungeon/constants.js";
 import { getTile, isWalkable } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 
 const INSTALLED = Symbol.for("jshack:tileStepEffect:installed");
@@ -108,13 +109,7 @@ function _scorch(world, id, effect) {
     const ae = /** @type {any} */ (world.get(id, ActiveEffects));
     const status = { ...effect.status };
     if (ae && Array.isArray(ae.effects)) {
-      const existing = ae.effects.find(e => e.key === "burn");
-      if (existing) {
-        existing.stacks = (existing.stacks || 1) + 1;
-        existing.turnsLeft = Math.max(existing.turnsLeft, status.turnsLeft);
-      } else {
-        ae.effects.push(status);
-      }
+      upsertTimedEffect(ae.effects, { stacks: 1, ...status });
     } else {
       try { world.add(id, ActiveEffects, { effects: [status] }); } catch {}
     }

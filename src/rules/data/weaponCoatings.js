@@ -1,6 +1,7 @@
 import { ItemInfo } from '../components/ItemInfo.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { combatSeed, mulberry32, rngInt } from '../utils/rng.js';
+import { upsertTimedEffect } from '../utils/effectSemantics.js';
 
 export const WEAPON_COATING_DEFS = Object.freeze({
   poison: Object.freeze({
@@ -15,14 +16,7 @@ export const WEAPON_COATING_DEFS = Object.freeze({
 function upsertEffect(world, entityId, effect) {
   const ae = world.get(entityId, ActiveEffects);
   if (ae && Array.isArray(ae.effects)) {
-    const existing = ae.effects.find((entry) => entry.key === effect.key);
-    if (existing) {
-      existing.stacks = (existing.stacks || 1) + 1;
-      existing.turnsLeft = Math.max(existing.turnsLeft || 0, effect.turnsLeft);
-      existing.potency = Math.max(existing.potency || 0, effect.potency);
-      return;
-    }
-    ae.effects.push({ stacks: 1, ...effect });
+    upsertTimedEffect(ae.effects, { stacks: 1, ...effect });
     return;
   }
   try { world.add(entityId, ActiveEffects, { effects: [{ stacks: 1, ...effect }] }); } catch {}
