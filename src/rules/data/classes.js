@@ -8,7 +8,7 @@ export const CLASS_DEFS = {
     description: 'A guardian of nature. Communes with the wild, heals the wounded.',
     deityId: 'gaia',
     stats: {
-      maxHp: 18,
+      maxHp: 23,
       maxMana: 70,
       manaRegen: 0.15,
       maxStamina: 80,
@@ -34,7 +34,7 @@ export const CLASS_DEFS = {
     description: 'A brute devoted to slaughter. Every kill is an offering.',
     deityId: 'molkhar',
     stats: {
-      maxHp: 26,
+      maxHp: 33,
       maxMana: 20,
       manaRegen: 0.05,
       maxStamina: 130,
@@ -60,7 +60,7 @@ export const CLASS_DEFS = {
     description: 'Quick, slippery, unreliable. Loki loves a good con.',
     deityId: 'loki',
     stats: {
-      maxHp: 16,
+      maxHp: 20,
       maxMana: 35,
       manaRegen: 0.12,
       maxStamina: 110,
@@ -89,7 +89,7 @@ export const CLASS_DEFS = {
     description: 'Devoted to Seraphine. Shields the faithful, smites the wicked.',
     deityId: 'seraphine',
     stats: {
-      maxHp: 20,
+      maxHp: 25,
       maxMana: 55,
       manaRegen: 0.13,
       maxStamina: 90,
