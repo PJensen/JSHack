@@ -348,10 +348,11 @@ export function initOverlays() {
     const equippedBySlot = e?.detail?.equippedBySlot || null;
     const ground = e?.detail?.ground || null;
     const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
-    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter);
+    const scrollOfIdentifyId = Number(e?.detail?.scrollOfIdentifyId || 0) | 0;
+    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId);
     if (equip.style.display === 'block') {
       const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
-      renderEquipment(equip, equippedBySlot, cachedPlayerName);
+      renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId);
     }
   });
   window.addEventListener('ui:characterData', (ev) => {
@@ -367,8 +368,9 @@ export function initOverlays() {
     const e = ev;
     const equippedBySlot = e?.detail?.equippedBySlot || null;
     const playerName = String(e?.detail?.playerName || 'Hero');
+    const scrollOfIdentifyId = Number(e?.detail?.scrollOfIdentifyId || 0) | 0;
     (/** @type {any} */ (equip))._equipmentPlayerName = playerName;
-    if (equip.style.display === 'block') renderEquipment(equip, equippedBySlot, playerName);
+    if (equip.style.display === 'block') renderEquipment(equip, equippedBySlot, playerName, scrollOfIdentifyId);
   });
   window.addEventListener('ui:messageLogData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -1710,7 +1712,7 @@ function show(panel) {
 function hide(panel) { panel.style.display = 'none'; hideItemTooltip(); }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] @param {string} [slotFilter] */
-function renderInventory(panel, items, ground, slotFilter = '') {
+function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentifyId = 0) {
   const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] inventory detach failed:', e); }
@@ -1967,6 +1969,15 @@ function renderInventory(panel, items, ground, slotFilter = '') {
         available.push({ key: 'set-spell', label: it.equipped ? 'Active Spell' : 'Set Spell', enabled: true });
       }
     }
+    if (it.identified === false && hasItemId) {
+      const hasScroll = scrollOfIdentifyId > 0;
+      available.push({
+        key: 'identify',
+        label: 'Identify',
+        enabled: hasScroll,
+        disabledReason: hasScroll ? '' : 'No Scroll of Identify',
+      });
+    }
     if (hasItemId) {
       available.push({ key: 'throw', label: 'Throw', enabled: true });
     }
@@ -1979,9 +1990,10 @@ function renderInventory(panel, items, ground, slotFilter = '') {
       equip: 1,
       use: 2,
       apply: 3,
-      'set-spell': 4,
-      throw: 5,
-      drop: 6,
+      identify: 4,
+      'set-spell': 5,
+      throw: 6,
+      drop: 7,
     };
     available.sort((a, b) => {
       const ar = a.key === defaultKey ? 0 : (order[a.key] || 90);
@@ -2009,10 +2021,18 @@ function renderInventory(panel, items, ground, slotFilter = '') {
 
   /**
    * @param {any} it
-   * @param {"apply"|"equip"|"use"|"set-spell"|"throw"|"drop"} actionKey
+   * @param {"apply"|"identify"|"equip"|"use"|"set-spell"|"throw"|"drop"} actionKey
    */
   function dispatchInventoryAction(it, actionKey) {
     if (!it) return;
+    if (actionKey === 'identify') {
+      if (scrollOfIdentifyId > 0 && Number.isInteger(it.id) && it.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestApply', {
+          detail: { toolId: scrollOfIdentifyId, targetItemId: it.id },
+        }));
+      }
+      return;
+    }
     if (actionKey === 'apply') {
       if (it?.canApply && Number(it?.applyTargetCount || 0) > 0) {
         triggerApplyForTool(it);
@@ -2582,8 +2602,8 @@ function renderCharacterSheet(panel, data) {
   (/** @type {any} */ (panel))._characterSheetDetach = detach;
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName */
-function renderEquipment(panel, equippedBySlot, playerName) {
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName @param {number} [scrollOfIdentifyId] */
+function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId = 0) {
   const existingDetach = /** @type {any} */ (panel)._equipmentDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] equipment detach failed:', e); }
@@ -2780,6 +2800,16 @@ function renderEquipment(panel, equippedBySlot, playerName) {
         actions.appendChild(createActionButton('Unequip', () => {
           window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
         }));
+        if (row.item.identified === false) {
+          const hasScroll = scrollOfIdentifyId > 0;
+          actions.appendChild(createActionButton('Identify', () => {
+            if (hasScroll) {
+              window.dispatchEvent(new CustomEvent('ui:requestApply', {
+                detail: { toolId: scrollOfIdentifyId, targetItemId: row.item.id },
+              }));
+            }
+          }, !hasScroll));
+        }
       }
       hideItemTooltip();
     } else {
