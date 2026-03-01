@@ -83,6 +83,33 @@ export const CLASS_DEFS = {
     startingSpell: 'phase_strike',
   },
 
+  archeologist: {
+    id: 'archeologist',
+    name: 'Archeologist',
+    description: 'A scholar of ruins. Digs deep, identifies relics, and trusts in luck.',
+    deityId: 'gaia',
+    stats: {
+      maxHp: 22,
+      maxMana: 30,
+      manaRegen: 0.08,
+      maxStamina: 100,
+      staminaRegen: 3.0,
+      intelligence: 11,
+      visionRange: 11,
+    },
+    equipment: {
+      weapon: 'iron_pickaxe',
+      armor: null,
+      shield: null,
+      neck: 'pendant_lucky',
+      feet: 'boots_leather',
+    },
+    inventoryItems: [
+      { itemId: 'stone_touchstone', count: 1 },
+    ],
+    startingSpell: null,
+  },
+
   cleric: {
     id: 'cleric',
     name: 'Cleric',
