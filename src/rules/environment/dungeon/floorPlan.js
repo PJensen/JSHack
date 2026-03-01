@@ -53,15 +53,27 @@ export function generateFloorPlan(worldSeed, depth) {
   const seed = floorSeed(worldSeed, depth);
   const rng = createRng(seed);
 
-  // Down stairs: placed in the starting chunk (0,0)
+  const scale = dungeonConfig.dungeonScale;
+
+  // Progressive dungeon size: place down-stairs further from origin on
+  // deeper floors.  dungeonScale modulates the growth rate —
+  // 0.3 (compact/mobile) grows slowly, 1.0 grows every ~3 floors.
+  const stairOffset = Math.min(3, Math.floor(depth * scale / 3));
+
+  // Down stairs: offset from origin on deeper floors
+  let downCX = 0, downCY = 0;
+  if (stairOffset > 0) {
+    downCX = rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+    downCY = rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+  }
   const downStairs = [{
-    chunkX: 0,
-    chunkY: 0,
+    chunkX: downCX,
+    chunkY: downCY,
     localX: rng.int(4, CHUNK_SIZE - 5),
     localY: rng.int(4, CHUNK_SIZE - 5),
   }];
 
-  // Up stairs: 1 near origin, except on floor 1
+  // Up stairs: always near origin (player enters here)
   const upStairs = [];
   if (depth >= 1) {
     upStairs.push({
@@ -73,12 +85,13 @@ export function generateFloorPlan(worldSeed, depth) {
   }
 
   // Derive chunk extent from stair positions + 1 chunk padding
+  const padding = Math.max(1, Math.round(scale));
   const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
   const extent = {
-    minCX: Math.min(...allChunkPositions.map(s => s.chunkX)) - 1,
-    maxCX: Math.max(...allChunkPositions.map(s => s.chunkX)) + 1,
-    minCY: Math.min(...allChunkPositions.map(s => s.chunkY)) - 1,
-    maxCY: Math.max(...allChunkPositions.map(s => s.chunkY)) + 1,
+    minCX: Math.min(...allChunkPositions.map(s => s.chunkX)) - padding,
+    maxCX: Math.max(...allChunkPositions.map(s => s.chunkX)) + padding,
+    minCY: Math.min(...allChunkPositions.map(s => s.chunkY)) - padding,
+    maxCY: Math.max(...allChunkPositions.map(s => s.chunkY)) + padding,
   };
 
   return {
