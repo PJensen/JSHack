@@ -24,6 +24,7 @@ export const MONSTERS = [
   {
     id: 'rat',
     name: 'Rat',
+    tags: ['beast', 'vermin'],
     tier: 0,
     baseHp: 5,
     hpPerLevel: 1,
@@ -42,6 +43,7 @@ export const MONSTERS = [
   {
     id: 'goblin',
     name: 'Goblin',
+    tags: ['humanoid'],
     tier: 0,
     baseHp: 8,
     hpPerLevel: 1.5,
@@ -61,6 +63,7 @@ export const MONSTERS = [
   {
     id: 'bat',
     name: 'Bat',
+    tags: ['beast', 'vermin'],
     tier: 0,
     baseHp: 3,
     hpPerLevel: 0.5,
@@ -80,6 +83,7 @@ export const MONSTERS = [
   {
     id: 'grid_bug',
     name: 'Grid Bug',
+    tags: ['beast', 'vermin', 'electric'],
     tier: 0,
     baseHp: 3,
     hpPerLevel: 0.5,
@@ -100,6 +104,7 @@ export const MONSTERS = [
   {
     id: 'snake',
     name: 'Snake',
+    tags: ['beast', 'venomous'],
     tier: 0,
     baseHp: 7,
     hpPerLevel: 1.2,
@@ -119,6 +124,7 @@ export const MONSTERS = [
   {
     id: 'skeleton_archer',
     name: 'Skeleton Archer',
+    tags: ['undead', 'skeletal'],
     tier: 0,
     baseHp: 6,
     hpPerLevel: 1,
@@ -141,6 +147,7 @@ export const MONSTERS = [
   {
     id: 'bone_bowman',
     name: 'Bone Bowman',
+    tags: ['undead', 'skeletal'],
     tier: 1,
     baseHp: 10,
     hpPerLevel: 1.5,
@@ -163,6 +170,7 @@ export const MONSTERS = [
   {
     id: 'orc',
     name: 'Orc',
+    tags: ['humanoid'],
     tier: 1,
     baseHp: 15,
     hpPerLevel: 2,
@@ -181,6 +189,7 @@ export const MONSTERS = [
   {
     id: 'skeleton',
     name: 'Skeleton',
+    tags: ['undead', 'skeletal'],
     tier: 1,
     baseHp: 12,
     hpPerLevel: 1.8,
@@ -202,6 +211,7 @@ export const MONSTERS = [
   {
     id: 'spider',
     name: 'Spider',
+    tags: ['beast', 'venomous'],
     tier: 1,
     baseHp: 10,
     hpPerLevel: 1.5,
@@ -223,6 +233,7 @@ export const MONSTERS = [
   {
     id: 'skeletal_marksman',
     name: 'Skeletal Marksman',
+    tags: ['undead', 'skeletal'],
     tier: 2,
     baseHp: 16,
     hpPerLevel: 2,
@@ -245,6 +256,7 @@ export const MONSTERS = [
   {
     id: 'skeleton_sharpshooter',
     name: 'Skeleton Sharpshooter',
+    tags: ['undead', 'skeletal'],
     tier: 2,
     baseHp: 14,
     hpPerLevel: 2,
@@ -267,6 +279,7 @@ export const MONSTERS = [
   {
     id: 'troll',
     name: 'Troll',
+    tags: ['giant', 'regenerator'],
     tier: 2,
     baseHp: 25,
     hpPerLevel: 3,
@@ -286,6 +299,7 @@ export const MONSTERS = [
   {
     id: 'wraith',
     name: 'Wraith',
+    tags: ['undead', 'spectral'],
     tier: 2,
     baseHp: 18,
     hpPerLevel: 2.5,
@@ -307,6 +321,7 @@ export const MONSTERS = [
   {
     id: 'ogre',
     name: 'Ogre',
+    tags: ['giant', 'humanoid'],
     tier: 2,
     baseHp: 30,
     hpPerLevel: 2,
@@ -326,6 +341,7 @@ export const MONSTERS = [
   {
     id: 'floating_eye',
     name: 'Floating Eye',
+    tags: ['aberration', 'psychic'],
     tier: 2,
     baseHp: 38,
     hpPerLevel: 3.5,
@@ -348,6 +364,7 @@ export const MONSTERS = [
   {
     id: 'carrion_shade',
     name: 'Carrion Shade',
+    tags: ['undead', 'spectral'],
     tier: 2,
     baseHp: 20,
     hpPerLevel: 2.5,
@@ -377,6 +394,7 @@ export const MONSTERS = [
   {
     id: 'death_archer',
     name: 'Death Archer',
+    tags: ['undead', 'skeletal'],
     tier: 3,
     baseHp: 28,
     hpPerLevel: 3,
@@ -400,6 +418,7 @@ export const MONSTERS = [
   {
     id: 'demon',
     name: 'Demon',
+    tags: ['demon', 'planar'],
     tier: 3,
     baseHp: 40,
     hpPerLevel: 4,
@@ -422,6 +441,7 @@ export const MONSTERS = [
   {
     id: 'dragon',
     name: 'Dragon',
+    tags: ['beast', 'draconic'],
     tier: 3,
     baseHp: 50,
     hpPerLevel: 5,
@@ -444,6 +464,7 @@ export const MONSTERS = [
   {
     id: 'lich',
     name: 'Lich',
+    tags: ['undead', 'caster'],
     tier: 3,
     baseHp: 35,
     hpPerLevel: 3.5,
@@ -468,6 +489,7 @@ export const MONSTERS = [
   {
     id: 'mimic',
     name: 'Mimic',
+    tags: ['aberration', 'mimic'],
     tier: 99,
     baseHp: 16,
     hpPerLevel: 1.5,
@@ -485,6 +507,7 @@ export const MONSTERS = [
   {
     id: 'stone_taunter',
     name: 'Taunting Statue',
+    tags: ['construct'],
     tier: 99,
     baseHp: 45,
     hpPerLevel: 0,
@@ -527,4 +550,26 @@ export function getMonsterLootTable(def) {
   return def.lootTable || `drop:tier${def.tier}`;
 }
 
-/** @typedef {{ id:string, name:string, tier:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */
+/**
+ * Check whether a monster (by id) carries a given tag.
+ * @param {string} monsterId
+ * @param {string} tag
+ * @returns {boolean}
+ */
+export function monsterHasTag(monsterId, tag) {
+  const def = _byId.get(monsterId);
+  if (!def || !Array.isArray(def.tags)) return false;
+  return def.tags.includes(tag);
+}
+
+/**
+ * Return all tags for a monster id, or empty array.
+ * @param {string} monsterId
+ * @returns {string[]}
+ */
+export function getMonsterTags(monsterId) {
+  const def = _byId.get(monsterId);
+  return Array.isArray(def?.tags) ? def.tags : [];
+}
+
+/** @typedef {{ id:string, name:string, tags?:string[], tier:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */

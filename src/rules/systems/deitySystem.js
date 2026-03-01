@@ -11,6 +11,7 @@
 import { Devotion } from '../components/Devotion.js';
 import { Deity } from '../../lib/deity-js/deity.js';
 import { getDeity } from '../data/deities.js';
+import { monsterHasTag } from '../data/monsters.js';
 import { Player } from '../components/Player.js';
 import { Pet } from '../components/Pet.js';
 import { Owner } from '../components/Owner.js';
@@ -22,6 +23,7 @@ import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Faction } from '../components/Faction.js';
 import { Equipment, NON_AMMO_GEAR_SLOTS } from '../components/Equipment.js';
 import { ItemInfo } from '../components/ItemInfo.js';
+import { Beatitude } from '../components/Beatitude.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
 
@@ -211,6 +213,15 @@ function ensureShrineTouchCooldownStore(world) {
 function shrineTouchCooldownSlot(playerId, deityId) {
   return `${deityId}:${playerId}`;
 }
+
+// ── Niche deity interaction constants ─────────────────────────────────
+const DESTRUCTION_SPELL_IDS = new Set([
+  'lightning', 'meteor', 'blastwave', 'frost', 'phase_strike',
+]);
+const HEALING_SPELL_IDS = new Set(['heal', 'flash_heal']);
+const TRICKERY_SPELL_IDS = new Set(['blink', 'phase_strike']);
+const KILL_STREAK_KEY = Symbol.for('jshack:deity:killStreak');
+const KILL_STREAK_WINDOW = 8;
 
 const _PROFANE = /\b(damn|hell|ass|shit|fuck|crap|piss|bastard|bloody|bollocks|bugger|wanker)\b/i;
 /** @param {unknown} text */
@@ -473,6 +484,203 @@ function wireWorldEvents(world) {
     const resolved = resolvePlayerDeity(world, actor);
     if (!resolved) return;
     resolved.deity.action('protect', { magnitude: 0.5, target: 'self' });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NICHE DEITY INTERACTIONS — clever systemic cross-references
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── 1. Undead Purge ─────────────────────────────────────────────────────
+  // Seraphine views slaying undead as holy purification — the kill penalty
+  // (-0.3 from favorMap) is offset by a protect action (+0.7), netting a
+  // meaningful reward. Gaia considers undead an aberration against nature.
+  // Mol'Khar is indifferent — a kill is a kill.
+  world.on('died', ({ id, killer }) => {
+    if (!killer) return;
+    const resolved = resolvePlayerDeity(world, killer);
+    if (!resolved) return;
+    const { deityId, deity } = resolved;
+    const victimIdentity = world.get(Number(id || 0) | 0, NamedIdentity)?.identity || '';
+
+    if (monsterHasTag(victimIdentity, 'undead')) {
+      if (deityId === 'seraphine') {
+        deity.action('protect', { magnitude: 0.5, target: 'undead_purge' });
+      } else if (deityId === 'gaia') {
+        deity.action('protect', { magnitude: 0.3, target: 'unnatural_purge' });
+      }
+    }
+
+    // Mol'Khar especially loves destroying rival planar entities.
+    if (deityId === 'molkhar' && monsterHasTag(victimIdentity, 'demon')) {
+      deity.offer('rival_blood', { value: 0.4, alignment: 'chaotic' });
+    }
+  });
+
+  // ── 2. Loki's Schadenfreude ─────────────────────────────────────────────
+  // When traps trigger on enemies (not the player), Loki finds it hilarious.
+  // Intentionally leaving traps armed becomes a devotional act for tricksters.
+  world.on('trap:triggered', ({ victimId }) => {
+    const victim = Number(victimId || 0) | 0;
+    if (!(victim > 0)) return;
+    // Find a player who worships Loki — the trap amuses the trickster god
+    // whether or not the player set it, as long as an enemy triggered it.
+    if (world.has(victim, Player)) return; // player ate the trap — not funny
+    for (const [playerId] of world.query(Player, Devotion)) {
+      const dev = world.get(playerId, Devotion);
+      if (dev?.deityId !== 'loki') continue;
+      const deity = ensureDeity('loki', world);
+      if (!deity) continue;
+      deity.action('steal', { magnitude: 0.25, target: 'trap_prank' });
+      break;
+    }
+  });
+
+  // When the player DOES trigger a trap, Loki still chuckles (your pain
+  // amuses the trickster) but only if they worship Loki specifically.
+  world.on('trap:triggered', ({ victimId }) => {
+    const victim = Number(victimId || 0) | 0;
+    if (!(victim > 0) || !world.has(victim, Player)) return;
+    const resolved = resolvePlayerDeity(world, victim);
+    if (!resolved || resolved.deityId !== 'loki') return;
+    // Self-harm amuses Loki — "you walked right into that one"
+    resolved.deity.action('betray', { magnitude: 0.15, target: 'self_prank' });
+  });
+
+  // ── 3. Mol'Khar Kill Streaks ────────────────────────────────────────────
+  // Consecutive kills within a short window feed Mol'Khar's bloodlust.
+  // The magnitude of each kill action escalates with streak length.
+  world.on('died', ({ killer }) => {
+    if (!killer) return;
+    const killerId = Number(killer || 0) | 0;
+    const resolved = resolvePlayerDeity(world, killerId);
+    if (!resolved || resolved.deityId !== 'molkhar') return;
+
+    const store = world[KILL_STREAK_KEY] || (world[KILL_STREAK_KEY] = new Map());
+    const now = Number(world.step || 0) | 0;
+    const prev = store.get(killerId);
+    const lastTurn = Number(prev?.turn || 0);
+    const streak = (now - lastTurn <= KILL_STREAK_WINDOW) ? (Number(prev?.count || 0) + 1) : 1;
+    store.set(killerId, { turn: now, count: streak });
+
+    if (streak >= 2) {
+      // Escalating blood frenzy — each streak kill pleases more
+      const bonus = Math.min(0.5, streak * 0.1);
+      resolved.deity.action('kill', { magnitude: bonus, target: 'streak_' + streak });
+      resolved.deity.offer('frenzy', { value: bonus * 0.5, alignment: 'chaotic' });
+    }
+  });
+
+  // ── 4. Gaia's Cycle of Life ─────────────────────────────────────────────
+  // Eating a monster corpse closes the cycle: predator becomes sustenance.
+  // Gaia views this as sacred recycling. Cooking the corpse first is even
+  // more pleasing (transformation rather than raw consumption).
+  // Killing nature creatures (spider, snake, bat, rat) angers Gaia extra.
+  world.on('died', ({ id, killer }) => {
+    if (!killer) return;
+    const resolved = resolvePlayerDeity(world, killer);
+    if (!resolved || resolved.deityId !== 'gaia') return;
+    const victimIdentity = world.get(Number(id || 0) | 0, NamedIdentity)?.identity || '';
+    if (monsterHasTag(victimIdentity, 'beast')) {
+      // Killing nature's children stings Gaia beyond the normal kill penalty
+      resolved.deity.action('destroy', { magnitude: 0.3, target: 'natures_child' });
+    }
+  });
+
+  // Cooking corpses is a sacred transformation for Gaia — already tracked
+  // as create (0.4), but also explicitly counts as protecting the cycle.
+  world.on('cooking:cooked', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved || resolved.deityId !== 'gaia') return;
+    resolved.deity.action('protect', { magnitude: 0.2, target: 'cycle_of_life' });
+  });
+
+  // ── 5. Spell School Deity Synergies ─────────────────────────────────────
+  // Deities have opinions about the magic their followers wield.
+  // Healing spells please Seraphine. Destruction spells please Mol'Khar.
+  // Trickery spells (blink, phase strike) amuse Loki. Gaia dislikes
+  // violent magic but appreciates healing.
+  world.on('castSpell', ({ actor, spellId }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const { deityId, deity } = resolved;
+    const spell = String(spellId || '');
+
+    if (HEALING_SPELL_IDS.has(spell)) {
+      deity.action('heal', { magnitude: 0.2, target: 'spell_heal' });
+    }
+
+    if (DESTRUCTION_SPELL_IDS.has(spell)) {
+      deity.action('destroy', { magnitude: 0.2, target: 'spell_destruction' });
+      // Mol'Khar treats destructive magic as a form of combat offering
+      if (deityId === 'molkhar') {
+        deity.offer('arcane_violence', { value: 0.15, alignment: 'chaotic' });
+      }
+    }
+
+    if (TRICKERY_SPELL_IDS.has(spell)) {
+      // Loki adores spatial trickery — phase strike is both trickery AND
+      // violence, a special combination the trickster finds delightful
+      if (deityId === 'loki') {
+        deity.action('steal', { magnitude: 0.3, target: 'spell_trickery' });
+        if (spell === 'phase_strike') {
+          deity.action('betray', { magnitude: 0.15, target: 'spell_violence_trick' });
+        }
+      }
+      // Seraphine disapproves of underhanded combat magic
+      if (deityId === 'seraphine' && spell === 'phase_strike') {
+        deity.action('betray', { magnitude: 0.1, target: 'violent_trickery' });
+      }
+    }
+  });
+
+  // ── 6. Blessed/Cursed Offering Resonance ────────────────────────────────
+  // The beatitude of items offered at altars modulates their value.
+  // Blessed items resonate with divine energy — doubled value.
+  // Cursed items carry corruption — negative value (angers deity).
+  // Exception: Loki finds cursed offerings amusing rather than offensive.
+  world.on('altar:offer', ({ actor, itemId }) => {
+    const offeredItemId = Number(itemId || 0) | 0;
+    if (!(offeredItemId > 0)) return;
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const { deityId, deity } = resolved;
+
+    const beat = world.get(offeredItemId, Beatitude);
+    const state = String(beat?.state || '').toLowerCase();
+
+    if (state === 'blessed') {
+      // Blessed items carry accumulated holiness — bonus offering
+      deity.offer('blessed_gift', { value: 0.4, alignment: 'lawful' });
+      world.emit?.('deity:nicheEvent', {
+        playerId: Number(actor || 0) | 0,
+        deityId,
+        deityName: deity.name,
+        event: 'blessed_offering',
+        message: `${deity.name} is pleased by the sanctified offering!`,
+      });
+    } else if (state === 'cursed') {
+      if (deityId === 'loki') {
+        // Loki loves the audacity of offering corrupted items
+        deity.action('steal', { magnitude: 0.35, target: 'cursed_offering' });
+        world.emit?.('deity:nicheEvent', {
+          playerId: Number(actor || 0) | 0,
+          deityId,
+          deityName: deity.name,
+          event: 'cursed_offering_amused',
+          message: `${deity.name} cackles at your brazen offering!`,
+        });
+      } else {
+        // Other deities are offended by corrupted offerings
+        deity.action('betray', { magnitude: 0.25, target: 'cursed_offering' });
+        world.emit?.('deity:nicheEvent', {
+          playerId: Number(actor || 0) | 0,
+          deityId,
+          deityName: deity.name,
+          event: 'cursed_offering_angered',
+          message: `${deity.name} recoils from the tainted offering!`,
+        });
+      }
+    }
   });
 }
 
