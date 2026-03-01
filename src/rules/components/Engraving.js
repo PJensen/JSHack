@@ -13,4 +13,5 @@ export const Engraving = defineComponent("Engraving", {
   text: "",
   author: 0,
   turn: 0,
+  profane: false,
 });

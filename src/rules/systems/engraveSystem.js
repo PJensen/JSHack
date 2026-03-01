@@ -4,6 +4,7 @@ import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Physiology } from "../components/Physiology.js";
 import { mulberry32, combatSeed } from "../utils/rng.js";
+import { isProfane } from "../utils/profanity.js";
 
 /**
  * engraveSystem — consumes EngraveIntent, creates an Engraving entity
@@ -35,7 +36,7 @@ export function engraveSystem(world) {
     // Spawn a new engraving entity
     const id = world.create();
     world.add(id, Position, { x: pos.x, y: pos.y });
-    world.add(id, Engraving, { text: capped, author: actor, turn: world.step | 0 });
+    world.add(id, Engraving, { text: capped, author: actor, turn: world.step | 0, profane: isProfane(capped) });
     world.add(id, NamedIdentity, { name: capped, identity: "engraving" });
 
     try {
@@ -43,6 +44,7 @@ export function engraveSystem(world) {
         actor,
         engravingId: id,
         text: capped,
+        profane: isProfane(capped),
         x: pos.x,
         y: pos.y,
       });
