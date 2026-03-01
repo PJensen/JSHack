@@ -7,7 +7,7 @@ export const Brain = defineComponent(
         itemKnowledgeIdentities: [],
         seenTiles: new Uint8Array(),
         intelligence: 10,
-        visionRange: 10,
+        visionRange: 8,
     },
     {
         validate(rec) {
