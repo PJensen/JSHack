@@ -28,6 +28,7 @@ function emptyDerived() {
     slashResistDerived: 0,
     pierceResistDerived: 0,
     luckDerived: 0,
+    visionRangeDerived: 0,
   };
 }
 
@@ -52,6 +53,7 @@ function applyBonuses(acc, bonuses) {
   if (Number.isFinite(bonuses.slashResist)) acc.slashResistDerived += bonuses.slashResist;
   if (Number.isFinite(bonuses.pierceResist)) acc.pierceResistDerived += bonuses.pierceResist;
   if (Number.isFinite(bonuses.luck)) acc.luckDerived += bonuses.luck;
+  if (Number.isFinite(bonuses.visionRange)) acc.visionRangeDerived += bonuses.visionRange;
 }
 
 function runAffixPassives(world, ctx, affixIds) {
@@ -97,6 +99,7 @@ export function equipmentSystem(world) {
           else if (k === 'slashResist') d.slashResistDerived += v;
           else if (k === 'pierceResist') d.pierceResistDerived += v;
           else if (k === 'luck') d.luckDerived += v;
+          else if (k === 'visionRange') d.visionRangeDerived += v;
         },
         entityId: id,
         itemId,
@@ -125,5 +128,6 @@ export function equipmentSystem(world) {
     eq.slashResistDerived = d.slashResistDerived;
     eq.pierceResistDerived = d.pierceResistDerived;
     eq.luckDerived = d.luckDerived;
+    eq.visionRangeDerived = d.visionRangeDerived;
   }
 }

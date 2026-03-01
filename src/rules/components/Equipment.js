@@ -56,6 +56,7 @@ export const Equipment = defineComponent('Equipment', {
   slashResistDerived: 0,
   pierceResistDerived: 0,
   luckDerived: 0,
+  visionRangeDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });

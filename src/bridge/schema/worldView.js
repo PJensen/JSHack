@@ -183,7 +183,8 @@ export function buildWorldView(world) {
 		if (_view.turn !== _lastFovStep) {
 			_lastFovStep = _view.turn;
 			const brain = world.get(_view.player.id, Brain);
-			const radius = brain?.visionRange ?? 10;
+			const eq = world.get(_view.player.id, Equipment);
+			const radius = (brain?.visionRange ?? 10) + (eq?.visionRangeDerived ?? 0);
 			const pad = 2;
 			const bounds = {
 				x0: _view.player.pos.x - radius - pad,
@@ -205,7 +206,8 @@ export function buildWorldView(world) {
 	if (_view.player) {
 		ensureSpatialIndex(world);
 		const brain = world.get(_view.player.id, Brain);
-		const radius = brain?.visionRange ?? 10;
+		const eq2 = world.get(_view.player.id, Equipment);
+		const radius = (brain?.visionRange ?? 10) + (eq2?.visionRangeDerived ?? 0);
 		const viewR = (radius | 0) + 4;
 		const x0 = _view.player.pos.x - viewR;
 		const y0 = _view.player.pos.y - viewR;
