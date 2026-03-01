@@ -22,6 +22,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   spellAreaFx.drawMeteor(bctx);
   spellAreaFx.drawBlastwave(bctx);
   spellAreaFx.drawFrost(bctx);
+  if (typeof spellAreaFx.drawShadowBolt === "function") {
+    spellAreaFx.drawShadowBolt(bctx);
+  }
   if (typeof spellAreaFx.drawFlashHeal === "function") {
     spellAreaFx.drawFlashHeal(bctx);
   }
