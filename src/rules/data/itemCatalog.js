@@ -9,6 +9,7 @@ import { isIdentified } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
+import { Mana } from "../components/Mana.js";
 import { Equipment } from "../components/Equipment.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 
@@ -1967,6 +1968,38 @@ export const ITEM_CATALOG = {
         const before = stam.stamina;
         stam.stamina = cap;
         return { restored: stam.stamina - before };
+      },
+    },
+  },
+  potion_mana: {
+    id: "potion_mana",
+    catalogKind: "magic",
+    name: "Mana Potion",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 50,
+    description: "A shimmering azure elixir that instantly restores all mana.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        const mana = ctx.query.get(targetId, Mana);
+        if (!mana) return { restored: 0 };
+        const eq = ctx.query.get(targetId, Equipment);
+        const maxBonus = Number(eq?.maxManaDerived ?? 0);
+        const cap = mana.maxMana + maxBonus;
+        const before = mana.mana;
+        mana.mana = cap;
+        return { restored: mana.mana - before };
       },
     },
   },
