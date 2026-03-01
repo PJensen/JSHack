@@ -2186,24 +2186,90 @@ function renderCharacterSheet(panel, data) {
   });
   el.appendChild(statCard);
 
+  function deltaColor(value, baseline = 0) {
+    const n = Number(value || 0);
+    if (n > baseline) return '#64c87a';
+    if (n < baseline) return '#e06a6a';
+    return null;
+  }
+
+  // [label, value, color|null]  — null = default text color
   const statRows = [
     ['HP', `${Number(stats.hp || 0)}/${Number(stats.maxHp || 0)}`],
     ['Mana', `${Number(stats.mana || 0)}/${Number(stats.maxMana || 0)}`],
     ['Stamina', `${Number(stats.stamina || 0)}/${Number(stats.maxStamina || 0)}`],
-    ['Attack', `${Number(stats.attack || 0)}`],
-    ['Defense', `${Number(stats.defense || 0)}`],
-    ['Armor Class', `${Number(stats.armorClass || 0)}`],
-    ['Luck', `${Number(stats.luck || 0)}`],
-    ['Crit %', `${Number(stats.critChancePercent || 0).toFixed(1)}`],
+    ['Attack', `${Number(stats.attack || 0)}`, deltaColor(stats.attack)],
+    ['Defense', `${Number(stats.defense || 0)}`, deltaColor(stats.defense)],
+    ['Armor Class', `${Number(stats.armorClass || 0)}`, deltaColor(stats.armorClass, 10)],
+    ['Luck', `${Number(stats.luck || 0)}`, deltaColor(stats.luck)],
+    ['Crit %', `${Number(stats.critChancePercent || 0).toFixed(1)}`, deltaColor(stats.critChancePercent)],
+    ['Crit Mult', `\u00d7${Number(stats.critMult || 0).toFixed(1)}`, deltaColor(stats.critMult)],
+    ['Dmg Bonus', `${Number(stats.damageFlatBonus || 0)}`, deltaColor(stats.damageFlatBonus)],
+    ['Mana Regen', `${Number(stats.manaRegen || 0).toFixed(2)}/t`, deltaColor(stats.manaRegenDerived)],
+    ['Stam Regen', `${Number(stats.staminaRegen || 0).toFixed(1)}/t`, deltaColor(stats.staminaRegenDerived)],
+    ['Max HP Bonus', `${Number(stats.maxHpDerived || 0)}`, deltaColor(stats.maxHpDerived)],
+    ['Speed', `${Number(stats.speed || 1)}`, deltaColor(stats.speed, 1) === '#64c87a' ? '#e06a6a' : deltaColor(stats.speed, 1) === '#e06a6a' ? '#64c87a' : null],
     ['Gold', `${Number(stats.gold || 0)}`],
     ['Hunger', `${humanize(String(stats.hungerLevel || 'normal'))} (${Number(stats.hunger || 0)})`],
     ['Depth', `${Number(stats.depth || 0)}`],
     ['Turn', `${Number(stats.turn || 0)}`],
   ];
-  for (const [label, value] of statRows) {
+  for (const [label, value, color] of statRows) {
     const row = document.createElement('div');
-    row.textContent = `${label}: ${value}`;
+    const lbl = document.createElement('span');
+    lbl.textContent = `${label}: `;
+    const val = document.createElement('span');
+    val.textContent = value;
+    if (color) val.style.color = color;
+    row.appendChild(lbl);
+    row.appendChild(val);
     statCard.appendChild(row);
+  }
+
+  // Resistances — only show non-zero entries
+  const resistRows = [
+    ['Kinetic DR', Number(stats.kineticDR || 0)],
+    ['Fire Resist', Number(stats.fireResist || 0)],
+    ['Poison Resist', Number(stats.poisonResist || 0)],
+    ['Acid Resist', Number(stats.acidResist || 0)],
+    ['Rad Resist', Number(stats.radiationResist || 0)],
+    ['Elec Resist', Number(stats.electricResist || 0)],
+    ['Blunt Resist', Number(stats.bluntResist || 0)],
+    ['Slash Resist', Number(stats.slashResist || 0)],
+    ['Pierce Resist', Number(stats.pierceResist || 0)],
+  ].filter(([, v]) => v !== 0);
+
+  if (resistRows.length) {
+    const resistHeader = document.createElement('div');
+    resistHeader.textContent = 'Resistances';
+    resistHeader.style.marginTop = '10px';
+    resistHeader.style.fontWeight = 'bold';
+    el.appendChild(resistHeader);
+
+    const resistCard = document.createElement('div');
+    Object.assign(resistCard.style, {
+      marginTop: '6px',
+      padding: '8px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: '#0a111f',
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gap: '6px 12px',
+      fontSize: '13px',
+    });
+    for (const [label, v] of resistRows) {
+      const row = document.createElement('div');
+      const lbl = document.createElement('span');
+      lbl.textContent = `${label}: `;
+      const val = document.createElement('span');
+      val.textContent = `${v}`;
+      val.style.color = deltaColor(v) || '#cfe8ff';
+      row.appendChild(lbl);
+      row.appendChild(val);
+      resistCard.appendChild(row);
+    }
+    el.appendChild(resistCard);
   }
 
   const effectsTitle = document.createElement('div');
