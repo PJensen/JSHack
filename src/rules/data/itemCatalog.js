@@ -1160,7 +1160,7 @@ export const ITEM_CATALOG = {
     rarity: 1,
     rarityName: "common",
     bonuses: { dig: 1 },
-    damageDice: "1d4",
+    damageDice: "1d6",
     staminaCost: 25,
   },
   bow_short: {
