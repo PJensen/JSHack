@@ -236,7 +236,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     display: 'grid',
     gridTemplateColumns: classes.length % 3 === 0 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
     gap: '10px',
-    marginBottom: '20px',
+    marginBottom: '10px',
   });
 
   const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨', archeologist: '⛏️' };
@@ -246,10 +246,10 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     const card = document.createElement('div');
     card.dataset.classId = cls.id;
     Object.assign(card.style, {
-      minHeight: '88px', padding: '12px 10px',
+      padding: '10px 10px',
       background: '#111827', border: '2px solid #1e2a3e',
       borderRadius: '8px', cursor: 'pointer',
-      textAlign: 'left',
+      textAlign: 'center',
       transition: 'border-color 120ms, background 120ms',
     });
 
@@ -257,25 +257,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     const icon = /** @type {any} */ (CLASS_ICONS)[cls.id];
     cName.textContent = icon ? `${icon} ${cls.name}` : cls.name;
     Object.assign(cName.style, {
-      fontSize: '16px', fontWeight: 'bold', color: '#cfe8ff',
-      marginBottom: '4px',
+      fontSize: '14px', fontWeight: 'bold', color: '#cfe8ff',
     });
     card.appendChild(cName);
-
-    const cDesc = document.createElement('div');
-    cDesc.textContent = cls.description;
-    Object.assign(cDesc.style, {
-      fontSize: '11px', color: '#8a9ab0', lineHeight: '1.4',
-      marginBottom: '6px',
-    });
-    card.appendChild(cDesc);
-
-    const cDeity = document.createElement('div');
-    cDeity.textContent = `${cls.deityName} (${cls.deityAlignment})`;
-    Object.assign(cDeity.style, {
-      fontSize: '11px', color: '#5a7a9a', fontStyle: 'italic',
-    });
-    card.appendChild(cDeity);
 
     card.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -286,6 +270,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       }
       card.style.borderColor = '#4a8aff';
       card.style.background = '#141e30';
+      detailDesc.textContent = cls.description;
+      detailDeity.textContent = `${cls.deityName} (${cls.deityAlignment})`;
+      detailPanel.style.opacity = '1';
       confirmBtn.disabled = false;
       confirmBtn.style.opacity = '1';
       confirmBtn.style.cursor = 'pointer';
@@ -295,6 +282,31 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     cards.push(card);
   }
   box.appendChild(grid);
+
+  // ---- class detail panel (shown on selection) ----
+  const detailPanel = document.createElement('div');
+  Object.assign(detailPanel.style, {
+    minHeight: '44px', padding: '10px 12px',
+    background: '#111827', border: '1px solid #1e2a3e',
+    borderRadius: '8px', marginBottom: '20px',
+    textAlign: 'left', opacity: '0',
+    transition: 'opacity 150ms',
+  });
+
+  const detailDesc = document.createElement('div');
+  Object.assign(detailDesc.style, {
+    fontSize: '12px', color: '#8a9ab0', lineHeight: '1.4',
+    marginBottom: '4px',
+  });
+  detailPanel.appendChild(detailDesc);
+
+  const detailDeity = document.createElement('div');
+  Object.assign(detailDeity.style, {
+    fontSize: '11px', color: '#5a7a9a', fontStyle: 'italic',
+  });
+  detailPanel.appendChild(detailDeity);
+
+  box.appendChild(detailPanel);
 
   // ---- confirm button ----
   const confirmBtn = document.createElement('button');
