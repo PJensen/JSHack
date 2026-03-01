@@ -32,7 +32,7 @@ export const TILE_LAVA           = 18; // molten rock  — scorches on step
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 7;   // smallest BSP leaf dimension
 export const MIN_ROOM_SIZE   = 4;   // smallest room interior (excl. walls)
-export const ROOM_MARGIN     = 1;   // gap between room edge and leaf edge
-export const SPLIT_RATIO_MIN = 0.35;
-export const SPLIT_RATIO_MAX = 0.65;
+export const ROOM_MARGIN     = 0;   // gap between room edge and leaf edge
+export const SPLIT_RATIO_MIN = 0.40;
+export const SPLIT_RATIO_MAX = 0.60;
 export const BSP_MAX_DEPTH   = 5;
