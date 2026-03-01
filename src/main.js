@@ -2101,7 +2101,7 @@ const isVisibleAt = (x, y) => {
     if (pe?.id && pe.pos) {
       const brain = world.get(pe.id, Brain);
       const eq = world.get(pe.id, Equipment);
-      const radius = (brain?.visionRange ?? 10) + (eq?.visionRangeDerived ?? 0);
+      const radius = (brain?.visionRange ?? 8) + (eq?.visionRangeDerived ?? 0);
       const pad = 2;
       const bounds = {
         x0: pe.pos.x - radius - pad,

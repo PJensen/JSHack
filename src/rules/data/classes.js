@@ -40,7 +40,7 @@ export const CLASS_DEFS = {
       maxStamina: 80,
       staminaRegen: 2.25,
       intelligence: 12,
-      visionRange: 12,
+      visionRange: 8,
     },
     equipment: {
       weapon: 'staff_oak',
@@ -66,7 +66,7 @@ export const CLASS_DEFS = {
       maxStamina: 110,
       staminaRegen: 3.3,
       intelligence: 10,
-      visionRange: 10,
+      visionRange: 8,
     },
     equipment: {
       weapon: 'dagger_quick',
@@ -95,7 +95,7 @@ export const CLASS_DEFS = {
       maxStamina: 100,
       staminaRegen: 3.0,
       intelligence: 11,
-      visionRange: 11,
+      visionRange: 8,
     },
     equipment: {
       weapon: 'iron_pickaxe',
@@ -123,7 +123,7 @@ export const CLASS_DEFS = {
       maxStamina: 90,
       staminaRegen: 2.7,
       intelligence: 10,
-      visionRange: 10,
+      visionRange: 8,
     },
     equipment: {
       weapon: 'iron_mace',
