@@ -249,13 +249,25 @@ export function resolveMeleeAttack(world, attacker, defender) {
 
     // Innate monster on-hit behavior from monster definition hooks
     runMonsterHooks(world, source, 'onHit', hitCtx);
-    // Defender on-hit reactions (e.g., Thorns)
+    // Defender on-hit reactions (e.g., Thorns) — skip weapon-slot affixes so
+    // the defender's own weapon procs (like stunning) don't fire against themselves.
     const defCtx = attachHelpers(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-    forEachAffix(world, target, /** @param {any} a */ (a) => {
-        if (a.triggers?.includes('onHit') && a.script) {
-            runScript(a.script, ScriptVerb.AffixOnHit, world, defCtx);
+    const defEq = world.get(target, Equipment);
+    if (defEq) {
+        for (const slot of NON_AMMO_GEAR_SLOTS) {
+            if (slot === 'weapon') continue;
+            const slotId = defEq[slot];
+            if (!Number.isInteger(slotId)) continue;
+            const info = world.get(slotId, ItemInfo);
+            if (!info || !Array.isArray(info.affixes)) continue;
+            for (const aId of info.affixes) {
+                const a = /** @type any */ (AFFIX_DEFS)[aId];
+                if (a?.triggers?.includes('onHit') && a.script) {
+                    runScript(a.script, ScriptVerb.AffixOnHit, world, defCtx);
+                }
+            }
         }
-    });
+    }
 
     // Route through canonical damage pipeline (handles invuln, events, death)
     if (finalDmg > 0) {
