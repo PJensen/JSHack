@@ -72,6 +72,11 @@ export function installChannelingController(world, getActorId) {
       if (world.has(actorId, Channeling)) {
         scheduleNextTick();
       } else {
+        // Channeling completed — the CastSpellIntent was deferred during
+        // the tick (intents phase buffers structural mutations).  Run one
+        // more tick so castSpellSystem can pick it up and fire the spell.
+        try { world.add(actorId, WaitIntent, {}); } catch {}
+        try { world.tick(1); } catch {}
         stopLoop();
       }
     }, TICK_INTERVAL_MS);

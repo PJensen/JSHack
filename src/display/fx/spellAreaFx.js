@@ -57,12 +57,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
   /** @type {RadialFx[]} */
   const _flashHealFx = [];
 
-  // --- Shadow Bolt state ---
-  /** @type {LineFx[]} */
-  const _shadowBoltBeamFx = [];
-  /** @type {RadialFx[]} */
-  const _shadowBoltImpactFx = [];
-
   // --- Phase Strike state ---
   /** @type {PhaseStrikeFx[]} */
   const _phaseStrikeFx = [];
@@ -93,14 +87,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     for (let i = _flashHealFx.length - 1; i >= 0; i--) {
       _flashHealFx[i].tick(dt);
       if (_flashHealFx[i].expired) _flashHealFx.splice(i, 1);
-    }
-    for (let i = _shadowBoltBeamFx.length - 1; i >= 0; i--) {
-      _shadowBoltBeamFx[i].tick(dt);
-      if (_shadowBoltBeamFx[i].expired) _shadowBoltBeamFx.splice(i, 1);
-    }
-    for (let i = _shadowBoltImpactFx.length - 1; i >= 0; i--) {
-      _shadowBoltImpactFx[i].tick(dt);
-      if (_shadowBoltImpactFx[i].expired) _shadowBoltImpactFx.splice(i, 1);
     }
     for (let i = _phaseStrikeFx.length - 1; i >= 0; i--) {
       _phaseStrikeFx[i].tick(dt);
