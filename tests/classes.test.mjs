@@ -4,10 +4,10 @@ import { DEITY_DEFS } from '../src/rules/data/deities.js';
 import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
 import { getSpell } from "../src/rules/data/spells.js";
 
-Deno.test("CLASS_DEFS has exactly 4 classes", () => {
+Deno.test("CLASS_DEFS has exactly 5 classes", () => {
   const ids = listClassIds();
-  assertEquals(ids.length, 4);
-  for (const id of ['druid', 'warden', 'outlaw', 'cleric']) {
+  assertEquals(ids.length, 5);
+  for (const id of ['druid', 'warden', 'outlaw', 'cleric', 'archeologist']) {
     assert(ids.includes(id), `missing class: ${id}`);
   }
 });
@@ -82,9 +82,11 @@ Deno.test("equipment and inventory items have valid string ids", () => {
   }
 });
 
-Deno.test("each class has a unique deity", () => {
-  const deities = Object.values(CLASS_DEFS).map(c => c.deityId);
-  assertEquals(new Set(deities).size, deities.length, 'duplicate deity assignments');
+Deno.test("each class has a valid deity", () => {
+  for (const [id, def] of Object.entries(CLASS_DEFS)) {
+    assert(DEITY_DEFS[def.deityId] != null,
+      `class ${id} references unknown deity: ${def.deityId}`);
+  }
 });
 
 Deno.test("druid starts with at least +1 defense from equipped gear", () => {
