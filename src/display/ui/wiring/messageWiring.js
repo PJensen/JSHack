@@ -299,6 +299,29 @@ export function installMessageWiring({
     log(`${fromLabel} miscasts into ${toLabel}.`, 'system');
   });
 
+  // === Channeling events ===
+  world.on('channeling:start', ({ actor, spellId }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const s = getSpell ? getSpell(String(spellId || '')) : null;
+    const label = s?.name ? bracketizeName(s.name) : '[Spell]';
+    log(`You begin channeling ${label}...`, 'system');
+  });
+
+  world.on('channeling:tick', ({ actor, spellId, turnsRemaining, turnsTotal }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const elapsed = Math.max(0, (turnsTotal || 0) - (turnsRemaining || 0));
+    log(`Channeling... (${elapsed}/${turnsTotal || '?'})`, 'system');
+  });
+
+  world.on('channeling:cancelled', ({ actor, spellId, reason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'dead') {
+      log('Channeling interrupted by death.', 'combat');
+    } else {
+      log('Channeling interrupted.', 'system');
+    }
+  });
+
   world.on('intent:blocked', ({ actor, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (reason === 'stunned') {

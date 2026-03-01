@@ -282,6 +282,11 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
 
   if (!bestId) return false;
 
+  // Capture target position before damage (target may die)
+  const targetPos = world.get(bestId, Position);
+  const toX = targetPos?.x ?? 0;
+  const toY = targetPos?.y ?? 0;
+
   // Fire the bolt
   dealDamage(world, {
     target: bestId,
@@ -292,16 +297,13 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
   });
   petState.rangedCooldown = FAMILIAR_FIRE_COOLDOWN;
 
-  // Emit ranged:shot with fireball style so the display renders fireball visuals
+  // Emit dedicated fireball VFX event with pre-resolved positions (not ranged:shot)
   try {
-    world.emit?.('ranged:shot', {
-      attacker: petId,
-      target: bestId,
-      hit: true,
-      damage: FAMILIAR_FIRE_DMG,
-      style: 'fireball',
+    world.emit?.('familiar:fireball', {
+      from: { x: petPos.x, y: petPos.y },
+      to: { x: toX, y: toY },
     });
-  } catch (e) { console.debug('[petBehaviorSystem] emit ranged:shot failed:', e); }
+  } catch (e) { console.debug('[petBehaviorSystem] emit familiar:fireball failed:', e); }
 
   // Tell display to suppress familiar ambient particles during cooldown
   try {
