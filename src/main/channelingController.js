@@ -8,6 +8,7 @@
 
 import { WaitIntent } from "../rules/components/Intents/WaitIntent.js";
 import { Channeling } from "../rules/components/Channeling.js";
+import { getSpell } from "../rules/data/spells.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:channelingController:installed');
 const TICK_INTERVAL_MS = 500;
@@ -23,6 +24,12 @@ export function installChannelingController(world, getActorId) {
 
   let _timerId = null;
   let _escHandler = null;
+  let _cancelUiHandler = null;
+
+  /** Dispatch a window CustomEvent for the HUD overlay. */
+  function uiEvent(name, detail) {
+    try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch {}
+  }
 
   function stopLoop() {
     if (_timerId !== null) {
@@ -33,7 +40,12 @@ export function installChannelingController(world, getActorId) {
       try { window.removeEventListener('keydown', _escHandler); } catch {}
       _escHandler = null;
     }
+    if (_cancelUiHandler) {
+      try { window.removeEventListener('ui:cancelChanneling', _cancelUiHandler); } catch {}
+      _cancelUiHandler = null;
+    }
     try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = false; } catch {}
+    uiEvent('ui:channeling:end', {});
   }
 
   function cancelChanneling() {
@@ -82,8 +94,14 @@ export function installChannelingController(world, getActorId) {
     }, TICK_INTERVAL_MS);
   }
 
-  function startLoop() {
+  function startLoop(spellId) {
     try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = true; } catch {}
+
+    // Dispatch UI start event so the HUD can show the channeling overlay
+    const spell = getSpell(spellId || '');
+    const spellName = spell?.name || spellId || 'Spell';
+    const castTime = spell?.castTime || 0;
+    uiEvent('ui:channeling:start', { spellId, spellName, castTime });
 
     // Install ESC handler for cancellation
     _escHandler = (ev) => {
@@ -95,14 +113,24 @@ export function installChannelingController(world, getActorId) {
     };
     try { window.addEventListener('keydown', _escHandler, true); } catch {}
 
+    // Install cancel handler for mobile cancel button
+    _cancelUiHandler = () => cancelChanneling();
+    try { window.addEventListener('ui:cancelChanneling', _cancelUiHandler); } catch {}
+
     scheduleNextTick();
   }
 
   // Listen for channeling events on the player
-  world.on('channeling:start', ({ actor }) => {
+  world.on('channeling:start', ({ actor, spellId }) => {
     const actorId = getActorId();
     if (actor !== actorId) return; // Only auto-tick for the player
-    startLoop();
+    startLoop(spellId);
+  });
+
+  world.on('channeling:tick', ({ actor, spellId, turnsRemaining, turnsTotal }) => {
+    const actorId = getActorId();
+    if (actor !== actorId) return;
+    uiEvent('ui:channeling:tick', { spellId, turnsRemaining, turnsTotal });
   });
 
   world.on('channeling:complete', ({ actor }) => {

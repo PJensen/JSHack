@@ -139,7 +139,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_identify', count: 1 },
     ],
-    startingSpells: ['summon_skeleton', 'shadow_bolt'],
+    startingSpells: ['shadow_bolt','summon_skeleton'],
   },
 
   cleric: {

@@ -18,6 +18,7 @@ export function createStatusEmitterController({ world, fx }) {
   const cookFireEmitters = new Set();
   const torchEmitters = new Set();
   const familiarEmitters = new Set();
+  const familiarCooldowns = new Set();
   const dryFountains = new Set();
   const seenEmitterKeys = new Set();
   const origins = [];
@@ -62,6 +63,18 @@ export function createStatusEmitterController({ world, fx }) {
       if (!(id > 0)) return;
       dryFountains.delete(id);
     });
+    world.on("familiar:fired", ({ id }) => {
+      const fid = Number(id || 0);
+      if (!(fid > 0)) return;
+      familiarCooldowns.add(fid);
+      familiarEmitters.delete(fid);
+      fx.removeEmitter(`fam:${fid}`);
+    });
+    world.on("familiar:ready", ({ id }) => {
+      const fid = Number(id || 0);
+      if (!(fid > 0)) return;
+      familiarCooldowns.delete(fid);
+    });
   }
 
   function step(dtSec, view, fxTime) {
@@ -96,6 +109,7 @@ export function createStatusEmitterController({ world, fx }) {
       const kc = KIND_EMITTER_CFG[e.kind];
       if (kc) {
         if (e.kind === "fountain" && dryFountains.has(e.id)) continue;
+        if (e.kind === "familiar" && familiarCooldowns.has(e.id)) continue;
         const key = `${kc.prefix}:${e.id}`;
         seenEmitterKeys.add(key);
         if (!kc.tracker.has(e.id)) {
