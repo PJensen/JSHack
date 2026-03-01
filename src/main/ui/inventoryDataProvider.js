@@ -51,6 +51,16 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   if (/** @type {any} */ (world)[_installed]) return { buildGroundPickupDetailAt };
   /** @type {any} */ (world)[_installed] = true;
 
+  function findScrollOfIdentify(playerId) {
+    const inv = world.get(playerId, Inventory);
+    if (!inv || !Array.isArray(inv.items)) return 0;
+    for (const id of inv.items) {
+      const ni = world.get(id, NamedIdentity);
+      if (ni && ni.identity === 'scroll_identify') return id;
+    }
+    return 0;
+  }
+
   function buildItemDisplayData(info, itemId) {
     return _buildItemDisplayData(world, itemId) || {
       id: itemId,
@@ -303,6 +313,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     }
     const bagItems = items.filter((it) => !GEAR_SLOT_SET.has(String(it?.equippedSlot || "")));
     const filteredItems = slotFilter ? bagItems.filter((it) => matchesSlotFilter(it, slotFilter)) : bagItems;
+    const scrollOfIdentifyId = p ? findScrollOfIdentify(p.id) : 0;
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:inventoryData', {
       detail: {
         items: filteredItems,
@@ -310,6 +321,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         equippedBySlot,
         ground,
         slotFilter,
+        scrollOfIdentifyId,
       },
     }));
   });
@@ -431,8 +443,9 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         equippedBySlot.brain = { item: spellItem, blocked: false };
       }
     }
+    const scrollOfIdentifyId = p ? findScrollOfIdentify(p.id) : 0;
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:equipmentData', {
-      detail: { equippedBySlot, playerName },
+      detail: { equippedBySlot, playerName, scrollOfIdentifyId },
     }));
   });
 

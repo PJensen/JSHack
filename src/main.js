@@ -653,7 +653,7 @@ function findNearestTraversalTarget(world, x, y) {
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
     if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal') continue;
     const dist = Math.max(Math.abs(pos.x - x), Math.abs(pos.y - y));
-    if (dist > 1) continue;
+    if (dist > 0) continue;
     const prefer = dist < nearestDist
       || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal');
     if (prefer) {
@@ -1691,13 +1691,13 @@ world.on('moved', ({ id, to }) => {
   try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
 });
 
-// When player moves, show stair tooltip if near stairs
+// When player moves, show stair tooltip if standing on stairs
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== id) return;
   shopWiring.handlePlayerMoved();
 
-  // Find traversable targets (stairs or return portal) within Chebyshev distance 1
+  // Find traversable targets (stairs or return portal) at exact player position
   const nearestTarget = findNearestTraversalTarget(world, to.x, to.y);
 
   if (nearestTarget) {
