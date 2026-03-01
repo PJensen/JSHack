@@ -296,7 +296,7 @@
 			// from its own scriptURL, so we only need the hash on the entry module.
 			if ('serviceWorker' in navigator) {
 			try {
-				navigator.serviceWorker.register('./sw.js').then((reg) => {
+				navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
 					const sw = reg.active || reg.installing || reg.waiting;
 					if (sw) sw.postMessage({ type: 'set-version', v: hash });
 					reg.addEventListener('updatefound', () => {

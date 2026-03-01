@@ -38,7 +38,10 @@ self.addEventListener('fetch', (event) => {
 
     if (sameOrigin && isJs && inScope) {
         // Always bypass cache for local JS modules
-        const alt = new Request(req, { cache: 'no-store' });
+        if (!hasVersion) {
+            url.searchParams.set('v', getVersionParam());
+        }
+        const alt = new Request(url.href, { cache: 'no-store', mode: req.mode, credentials: req.credentials });
         event.respondWith(fetch(alt).catch(() => fetch(req)));
     }
 });
