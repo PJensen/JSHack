@@ -1,6 +1,6 @@
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { GoldStack } from "../../rules/archetypes/Items.js";
-import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
+import { Equipment, GEAR_SLOTS, getEquippedSlot } from "../../rules/components/Equipment.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
@@ -282,6 +282,12 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const info = world.get(itemId, ItemInfo);
     if (!info) return;
 
+    const eq = world.get(pe.id, Equipment);
+    if (getEquippedSlot(eq, itemId)) {
+      log("You must unequip that item before selling it.");
+      return;
+    }
+
     const sellDiscount = shop.sellDiscount ?? 0.5;
     const sellValue = resolveItemAppraisal(itemId);
     const price = Math.floor(sellValue * sellDiscount);
@@ -291,13 +297,6 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!inv.items.includes(itemId)) return;
     const idx = inv.items.indexOf(itemId);
     if (idx !== -1) inv.items.splice(idx, 1);
-
-    const eq = world.get(pe.id, Equipment);
-    if (eq) {
-      for (const slot of GEAR_SLOTS) {
-        if (eq[slot] === itemId) { eq[slot] = null; break; }
-      }
-    }
 
     const resalePrice = Math.ceil(sellValue * (shop.buyMarkup ?? 1.0));
     if (!placeItemOnShopFloor(itemId, shopkeeperId)) {

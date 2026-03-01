@@ -732,6 +732,18 @@ export const ITEM_CATALOG = {
     rarityName: "common",
     bonuses: { defense: 1 },
   },
+  pendant_lucky: {
+    id: "pendant_lucky",
+    catalogKind: "equipment",
+    name: "Lucky Pendant",
+    type: "equip",
+    slot: "neck",
+    material: "gold",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { luck: 1 },
+    description: "A battered charm that has outlived every owner who wore it.",
+  },
   amulet_vigor: {
     id: "amulet_vigor",
     catalogKind: "equipment",

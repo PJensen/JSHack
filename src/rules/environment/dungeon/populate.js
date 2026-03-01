@@ -255,11 +255,11 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   if (eligibleShopRooms.length > 0 && rng.next() < 0.30) {
     const room = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
 
-    // Shop rooms must not start with regular dungeon enemies/spawners.
+    // Shop rooms must not start with regular dungeon enemies, spawners, or traps.
     for (let i = spawns.length - 1; i >= 0; i--) {
       const sp = spawns[i];
       if (!isPointInRoom(sp.x, sp.y, room)) continue;
-      if (sp.kind === 'monster' || sp.kind === 'spawner') {
+      if (sp.kind === 'monster' || sp.kind === 'spawner' || sp.kind === 'trap') {
         spawns.splice(i, 1);
       }
     }

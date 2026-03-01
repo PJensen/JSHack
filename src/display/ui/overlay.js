@@ -448,7 +448,7 @@ export function initOverlays() {
   });
 
   // Shop overlay
-  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse' };
+  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse', activeTab: 'buy' };
   window.addEventListener('ui:openShop', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -462,6 +462,7 @@ export function initOverlays() {
   window.addEventListener('ui:closeShop', () => {
     _shopState.shopkeeperId = 0;
     _shopState.mode = 'browse';
+    _shopState.activeTab = 'buy';
     hide(shop);
   });
   window.addEventListener('ui:shopData', (ev) => {
@@ -3438,7 +3439,7 @@ function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
   obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number, mode:string}} state */
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number, mode:string, activeTab?:string}} state */
 function renderShop(panel, data, state) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
@@ -3588,7 +3589,7 @@ function renderShop(panel, data, state) {
   }
 
   // Tabs
-  let activeTab = 'buy';
+  let activeTab = state.activeTab || 'buy';
   const tabBar = document.createElement('div');
   Object.assign(tabBar.style, { display: 'flex', gap: '4px', marginBottom: '10px' });
 
@@ -3707,6 +3708,7 @@ function renderShop(panel, data, state) {
       else if (k === 'Tab') {
         e.preventDefault();
         activeTab = activeTab === 'buy' ? 'sell' : 'buy';
+        state.activeTab = activeTab;
         updateTabStyle();
         renderList();
       }
@@ -3722,8 +3724,8 @@ function renderShop(panel, data, state) {
     obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
   }
 
-  buyTab.addEventListener('click', () => { activeTab = 'buy'; updateTabStyle(); renderList(); });
-  sellTab.addEventListener('click', () => { activeTab = 'sell'; updateTabStyle(); renderList(); });
+  buyTab.addEventListener('click', () => { activeTab = 'buy'; state.activeTab = activeTab; updateTabStyle(); renderList(); });
+  sellTab.addEventListener('click', () => { activeTab = 'sell'; state.activeTab = activeTab; updateTabStyle(); renderList(); });
 
   updateTabStyle();
   renderList();
