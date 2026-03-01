@@ -19,7 +19,8 @@
  * @property {number} manaCost
  * @property {number} [minIntelligence]
  * @property {number} [range]   // max casting range in tiles
-  * @property {string} [script]  // optional key for scripted behavior
+ * @property {number} [castTime] // turns to channel before casting (0 or omitted = instant)
+ * @property {string} [script]  // optional key for scripted behavior
  * @property {string} [description] // flavor-forward tooltip text
  * @property {'self'|'target'|'auto'|'path'|'area'} [targeting]
  * @property {number} [radius]
@@ -156,12 +157,28 @@ export const SPELL_DEFS = {
     symbol: '\u{1F480}',   // 💀
     manaCost: 10,
     minIntelligence: 8,
+    castTime: 5,
     script: 'summon_skeleton',
     targeting: 'self',
     description: 'Rip a skeleton from the earth to fight at your side.',
     effects: [
       { kind: 'utility', note: 'Summons a friendly skeleton nearby' },
       { kind: 'utility', note: 'Skeleton is always aggressive toward enemies' },
+    ],
+  },
+  shadow_bolt: {
+    id: 'shadow_bolt',
+    name: 'Shadow Bolt',
+    symbol: '\u{1F31A}',   // 🌚
+    manaCost: 8,
+    minIntelligence: 8,
+    range: 10,
+    castTime: 2,
+    script: 'shadow_bolt',
+    targeting: 'auto',
+    description: 'A bolt of pure shadow that strikes with devastating force.',
+    effects: [
+      { kind: 'damage', element: 'shadow', amount: '8' },
     ],
   },
   phase_strike: {
@@ -205,6 +222,9 @@ export function describeSpellDetailLines(spell) {
     Number.isFinite(spell.range) ? `Range ${Number(spell.range) | 0}` : "",
     Number.isFinite(spell.minIntelligence) && Number(spell.minIntelligence) > 0
       ? `Int ${Number(spell.minIntelligence) | 0}+`
+      : "",
+    Number.isFinite(spell.castTime) && Number(spell.castTime) > 0
+      ? `Cast ${Number(spell.castTime) | 0} turns`
       : "",
   ].filter(Boolean);
 }

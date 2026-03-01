@@ -779,6 +779,50 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
   } catch (e) { console.debug('[spells] emit spell:summon_skeleton failed:', e); }
 };
 
+// Shadow Bolt — high-damage shadow projectile, no status effect.
+REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const isBlocked = createLOSBlocker(world);
+
+  const MAX_R = Number(spell.range || 10);
+  const BASE_DMG = 8;
+
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Collect living hostile candidates in range
+  /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+  const candidates = [];
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile('player', fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist2 = d2(apos.x, apos.y, p.x, p.y);
+    if (dist2 <= MAX_R * MAX_R) {
+      candidates.push({ id, x: p.x, y: p.y, dist2 });
+    }
+  }
+
+  // Pick nearest with LOS
+  candidates.sort((a, b) => a.dist2 - b.dist2);
+  let target = null;
+  for (const c of candidates) {
+    if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isBlocked)) { target = c; break; }
+  }
+  if (!target) {
+    try { world.emit && world.emit('spell:shadow_bolt', { actor, targetId: actor, from: { x: apos.x, y: apos.y }, to: { x: apos.x, y: apos.y }, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:shadow_bolt fizzle failed:', e); }
+    return;
+  }
+
+  // Apply shadow damage — no status effect
+  dealDamage(world, { target: target.id, amount: BASE_DMG, source: actor, type: 'shadow', cause: 'spell:shadow_bolt', at: { x: target.x, y: target.y } });
+
+  // Emit VFX event
+  try { world.emit && world.emit('spell:shadow_bolt', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, to: { x: target.x, y: target.y } }); } catch (e) { console.debug('[spells] emit spell:shadow_bolt failed:', e); }
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world

@@ -1,6 +1,7 @@
 import { CastSpellIntent } from "../components/Intents/CastSpellIntent.js";
 import { Brain } from "../components/Brain.js";
 import { Mana } from "../components/Mana.js";
+import { Channeling } from "../components/Channeling.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
@@ -131,18 +132,23 @@ export function castSpellSystem(world) {
     const confusion = resolveConfusedCast(world, actor, spell, learned);
     const resolvedSpell = confusion.spell;
 
-    const have = Number(mana?.mana ?? 0);
-    const cost = Number(resolvedSpell.manaCost || 0);
-    if (have < cost) {
-      try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: cost, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
-      world.remove(actor, CastSpellIntent);
-      continue;
-    }
+    // Channeled casts already paid mana when channeling started — skip deduction.
+    const fromChanneling = !!intent._fromChanneling;
 
-    // Deduct mana and suppress regen this turn
-    if (mana) {
-      mana.mana = have - cost;
-      mana.regenCooldown = MANA_REGEN_COOLDOWN;
+    if (!fromChanneling) {
+      const have = Number(mana?.mana ?? 0);
+      const cost = Number(resolvedSpell.manaCost || 0);
+      if (have < cost) {
+        try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: cost, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
+        world.remove(actor, CastSpellIntent);
+        continue;
+      }
+
+      // Deduct mana and suppress regen this turn
+      if (mana) {
+        mana.mana = have - cost;
+        mana.regenCooldown = MANA_REGEN_COOLDOWN;
+      }
     }
 
     if (confusion.kind === "fizzle") {
@@ -160,6 +166,26 @@ export function castSpellSystem(world) {
           confused: true,
         });
       } catch (e) { console.debug('[castSpellSystem] emit spell:miscast failed:', e); }
+    }
+
+    // Cast time: begin channeling instead of immediate cast
+    const castTime = Number(resolvedSpell.castTime || 0) | 0;
+    if (castTime > 0 && !fromChanneling) {
+      try {
+        world.add(actor, Channeling, {
+          turnsRemaining: castTime,
+          turnsTotal: castTime,
+          spellId: resolvedSpell.id,
+          targetId: intent.targetId || actor,
+          x: intent.x ?? null,
+          y: intent.y ?? null,
+        });
+      } catch {}
+      try {
+        world.emit?.('channeling:start', { actor, spellId: resolvedSpell.id, castTime });
+      } catch {}
+      world.remove(actor, CastSpellIntent);
+      continue;
     }
 
     // Run scripted behavior (pure rules)
