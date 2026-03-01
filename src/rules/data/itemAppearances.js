@@ -10,18 +10,9 @@ import { isIdentificationEnabled } from './identification.js';
  * @type {Record<string, string>}
  */
 const UNIDENTIFIED_LABELS = Object.freeze({
-  // equipment slots
-  weapon: "Weapon",
-  armor: "Armor",
-  head: "Helm",
+  // jewelry
   neck: "Amulet",
-  belt: "Belt",
-  gloves: "Gloves",
-  shield: "Shield",
   ring: "Ring",
-  legs: "Leggings",
-  feet: "Boots",
-  ranged: "Ranged Weapon",
   // magic item types
   scroll: "Scroll",
   potion: "Potion",
