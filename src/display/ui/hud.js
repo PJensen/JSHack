@@ -856,58 +856,60 @@ function createChannelingOverlay() {
   const el = document.createElement('div');
   Object.assign(el.style, {
     position: 'fixed',
-    left: '50%', top: '38%',
-    transform: 'translate(-50%, -50%)',
+    left: '50%',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))',
+    transform: 'translateX(-50%)',
     display: 'none',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: '10px',
-    padding: '16px 28px',
-    borderRadius: '10px',
+    padding: '6px 16px',
+    borderRadius: '8px',
     background: 'rgba(10,14,22,0.88)',
     border: '1px solid #3b2d52',
-    boxShadow: '0 0 24px rgba(120,60,200,0.25)',
+    boxShadow: '0 0 16px rgba(120,60,200,0.2)',
     color: '#cfe8ff',
     zIndex: 950,
     pointerEvents: 'auto',
-    minWidth: '220px',
+    minWidth: '280px',
     textAlign: 'center',
   });
 
   const label = document.createElement('div');
-  Object.assign(label.style, { fontSize: '15px', fontWeight: '600', letterSpacing: '0.5px' });
+  Object.assign(label.style, { fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', whiteSpace: 'nowrap' });
   label.textContent = 'Channeling...';
 
   const barOuter = document.createElement('div');
   Object.assign(barOuter.style, {
-    width: '100%', height: '10px', borderRadius: '5px',
+    flex: '1', minWidth: '80px', height: '8px', borderRadius: '4px',
     background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
   });
   const barInner = document.createElement('div');
   Object.assign(barInner.style, {
-    width: '0%', height: '100%', borderRadius: '5px',
+    width: '0%', height: '100%', borderRadius: '4px',
     background: 'linear-gradient(90deg, #7b3fbe, #b070ff)',
     transition: 'width 0.35s ease',
   });
   barOuter.appendChild(barInner);
 
   const progressText = document.createElement('div');
-  Object.assign(progressText.style, { fontSize: '12px', opacity: '0.7' });
+  Object.assign(progressText.style, { fontSize: '11px', opacity: '0.7', whiteSpace: 'nowrap' });
   progressText.textContent = '';
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel (ESC)';
+  cancelBtn.textContent = '\u00D7';
+  cancelBtn.title = 'Cancel (ESC)';
   Object.assign(cancelBtn.style, {
-    marginTop: '4px',
-    padding: '8px 18px',
-    minHeight: '44px', minWidth: '120px',
-    borderRadius: '6px',
+    padding: '2px 8px',
+    minHeight: '28px', minWidth: '28px',
+    borderRadius: '4px',
     border: '1px solid #5a3a7a',
     background: '#2a1a3a',
     color: '#e6d6ff',
     fontSize: '14px',
     cursor: 'pointer',
     touchAction: 'manipulation',
+    lineHeight: '1',
   });
   cancelBtn.addEventListener('click', () => {
     try { window.dispatchEvent(new CustomEvent('ui:cancelChanneling')); } catch {}
