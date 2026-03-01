@@ -48,6 +48,7 @@ import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
+import { installCurseHooks } from "../rules/systems/curseHooks.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -103,6 +104,7 @@ export function configureWorld(world) {
   installMaterialReactionListeners(world);
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
+  installCurseHooks(world);
 
   // Phase: ai (intent producers — runs with immediate mutations so
   // MoveIntents are visible to movementSystem in the same tick)

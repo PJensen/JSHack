@@ -23,6 +23,7 @@ import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
+import { Beatitude, BUC_CURSED } from '../components/Beatitude.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -162,6 +163,24 @@ export function resolveMeleeAttack(world, attacker, defender) {
         }
         // Deduct stamina and suppress regen this turn
         world.set(source, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
+    }
+
+    // Cursed weapon fumble: 20% chance to waste the attack (stamina already spent)
+    if (weaponId) {
+        const weaponBeat = world.get(weaponId, Beatitude);
+        if (weaponBeat && weaponBeat.state === BUC_CURSED) {
+            const fumbleSeed = combatSeed(world.seed, world.step, source, target, 0xF0B1E);
+            const fumbleRng = mulberry32(fumbleSeed);
+            if (pct(fumbleRng, 20)) {
+                world.emit?.('combat:fumble', {
+                    attacker: source,
+                    defender: target,
+                    weaponId,
+                    name: world.get(weaponId, NamedIdentity)?.name || 'weapon',
+                });
+                return;
+            }
+        }
     }
 
     const atkSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });

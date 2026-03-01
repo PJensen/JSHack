@@ -154,6 +154,7 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 12, itemId: "scroll_amnesia" },
       { type: "item",      weight: 10, itemId: "scroll_fire" },
       { type: "item",      weight: 10, itemId: "scroll_aggravation" },
+      { type: "item",      weight: 8,  itemId: "scroll_remove_curse" },
     ],
   },
 

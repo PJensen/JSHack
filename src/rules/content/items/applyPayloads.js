@@ -2,6 +2,7 @@ import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { getItemHooksByIdentity } from "./itemHooks.js";
+import { Beatitude } from "../../components/Beatitude.js";
 
 /**
  * @typedef {{
@@ -52,6 +53,7 @@ export function buildApplyPayloadState(reader, spec) {
     targetIdentity: String(reader?.identity?.(targetId) || "").toLowerCase(),
     toolInfo: reader?.itemInfo?.(toolId),
     targetInfo: reader?.itemInfo?.(targetId),
+    targetBeatitude: String(reader?.beatitude?.(targetId) || ""),
   };
 }
 
@@ -112,6 +114,9 @@ function createWorldApplyPayloadReader(world) {
     },
     itemInfo(entityId) {
       return /** @type any */ (world.get(entityId | 0, ItemInfo));
+    },
+    beatitude(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Beatitude))?.state || '';
     },
   };
 }

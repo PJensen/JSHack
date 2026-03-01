@@ -3,6 +3,7 @@ import { Inventory } from "../components/Inventory.js";
 import { Equipment, GEAR_SLOT_SET, getEquippedSlot } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Beatitude } from "../components/Beatitude.js";
 
 /**
  * equipItemSystem — resolves EquipIntent:
@@ -38,6 +39,20 @@ export function equipItemSystem(world) {
     // Toggle path: selecting an item that's already equipped unequips it.
     const equippedSlot = getEquippedSlot(eq, itemId);
     if (equippedSlot) {
+      // Cursed items cannot be unequipped — they are welded to the player.
+      const beat = world.get(itemId, Beatitude);
+      if (beat && beat.state === 'cursed') {
+        try {
+          world.emit && world.emit('item:welded', {
+            actor,
+            itemId,
+            slot: equippedSlot,
+            name: world.get(itemId, NamedIdentity)?.name,
+          });
+        } catch (e) { console.debug('[equipItemSystem] emit item:welded failed:', e); }
+        world.remove(actor, EquipIntent);
+        continue;
+      }
       eq[equippedSlot] = null;
       try {
         world.emit && world.emit('item:unequipped', {

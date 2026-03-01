@@ -3,6 +3,9 @@ import { Devotion } from "../components/Devotion.js";
 import { Player } from "../components/Player.js";
 import { Vitality } from "../components/Vitality.js";
 import { Hunger } from "../components/Hunger.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
+import { Beatitude } from "../components/Beatitude.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getDeityInstance } from "./deitySystem.js";
 import { hasStatus } from "../utils/statusFacade.js";
 
@@ -39,6 +42,35 @@ export function praySystem(world) {
               value: distress.severity * 0.5,
               alignment: 'neutral'
             });
+          }
+
+          // Prayer-based curse removal: a healthy player can focus spiritual energy
+          if (!distress.desperate && !distress.troubled) {
+            const vit = world.get(id, Vitality);
+            const hpPct = vit ? (vit.hp / vit.maxHp) : 0;
+            if (hpPct > 0.8) {
+              const eq = world.get(id, Equipment);
+              if (eq) {
+                for (const slot of NON_AMMO_GEAR_SLOTS) {
+                  const itemId = eq[slot];
+                  if (!Number.isInteger(itemId) || itemId <= 0) continue;
+                  const beat = world.get(itemId, Beatitude);
+                  if (beat && beat.state === 'cursed') {
+                    beat.state = 'uncursed';
+                    const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+                    try {
+                      world.emit && world.emit('prayer:curse-removed', {
+                        actor: id,
+                        itemId,
+                        name: itemName,
+                        deityId: devotion.deityId,
+                      });
+                    } catch (e) { console.debug('[praySystem] emit prayer:curse-removed failed:', e); }
+                    break; // one item per prayer
+                  }
+                }
+              }
+            }
           }
 
           // Emit event for logging/UI feedback
