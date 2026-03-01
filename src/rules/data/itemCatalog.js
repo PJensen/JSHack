@@ -2475,6 +2475,24 @@ export const ITEM_CATALOG = {
       }),
     },
   },
+  scroll_summon_skeleton: {
+    id: "scroll_summon_skeleton",
+    catalogKind: "magic",
+    name: "Scroll of Summon Skeleton",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "rare",
+    description: "Rip a skeleton from the earth to fight at your side.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "scroll_",
+        targetMode: "self",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
   scroll_mapping: {
     id: "scroll_mapping",
     catalogKind: "magic",
