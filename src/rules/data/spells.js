@@ -170,7 +170,7 @@ export const SPELL_DEFS = {
     id: 'shadow_bolt',
     name: 'Shadow Bolt',
     symbol: '\u{1F31A}',   // 🌚
-    manaCost: 8,
+    manaCost: 15,
     minIntelligence: 8,
     range: 10,
     castTime: 2,
@@ -178,7 +178,7 @@ export const SPELL_DEFS = {
     targeting: 'auto',
     description: 'A bolt of pure shadow that strikes with devastating force.',
     effects: [
-      { kind: 'damage', element: 'shadow', amount: '8' },
+      { kind: 'damage', element: 'shadow', amount: '12' },
     ],
   },
   phase_strike: {
