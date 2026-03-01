@@ -17,6 +17,7 @@ import { Hunger } from "../../rules/components/Hunger.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { Speed } from "../../rules/components/Speed.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "../../rules/data/spells.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js";
@@ -325,6 +326,23 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       armorClass: 10,
       luck: 0,
       critChancePercent: 0,
+      critMult: 0,
+      damageFlatBonus: 0,
+      manaRegen: 0,
+      manaRegenDerived: 0,
+      staminaRegen: 0,
+      staminaRegenDerived: 0,
+      maxHpDerived: 0,
+      speed: 1,
+      kineticDR: 0,
+      fireResist: 0,
+      poisonResist: 0,
+      acidResist: 0,
+      radiationResist: 0,
+      electricResist: 0,
+      bluntResist: 0,
+      slashResist: 0,
+      pierceResist: 0,
       hunger: 0,
       hungerLevel: "normal",
       gold: 0,
@@ -362,6 +380,24 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       stats.armorClass = Math.max(0, Number(combat?.armorClass ?? (10 + stats.defense)));
       stats.luck = Number(combat?.luck ?? eq?.luckDerived ?? 0);
       stats.critChancePercent = (Number(combat?.critChance ?? eq?.critChanceDerived ?? 0) * 100) + stats.luck;
+      stats.critMult = Number(combat?.critMult ?? eq?.critMultDerived ?? 0);
+      stats.damageFlatBonus = Number(combat?.damageFlatBonus ?? 0);
+      stats.manaRegen = Number(mana?.manaRegen ?? 0) + Number(eq?.manaRegenDerived ?? 0);
+      stats.manaRegenDerived = Number(eq?.manaRegenDerived ?? 0);
+      stats.staminaRegen = Number(stamina?.staminaRegen ?? 0) + Number(eq?.staminaRegenDerived ?? 0);
+      stats.staminaRegenDerived = Number(eq?.staminaRegenDerived ?? 0);
+      stats.maxHpDerived = Number(eq?.maxHpDerived ?? 0);
+      const spd = world.get(p.id, Speed);
+      stats.speed = Number(spd?.actEvery ?? 1);
+      stats.kineticDR = Number(eq?.kineticDRDerived ?? 0);
+      stats.fireResist = Number(eq?.fireResistDerived ?? 0);
+      stats.poisonResist = Number(eq?.poisonResistDerived ?? 0);
+      stats.acidResist = Number(eq?.acidResistDerived ?? 0);
+      stats.radiationResist = Number(eq?.radiationResistDerived ?? 0);
+      stats.electricResist = Number(eq?.electricOhmsDerived ?? 0);
+      stats.bluntResist = Number(eq?.bluntResistDerived ?? 0);
+      stats.slashResist = Number(eq?.slashResistDerived ?? 0);
+      stats.pierceResist = Number(eq?.pierceResistDerived ?? 0);
       stats.hunger = rawHunger;
       stats.hungerLevel = String(hungerLevel || "normal");
       stats.gold = sumPlayerGold(p.id);
