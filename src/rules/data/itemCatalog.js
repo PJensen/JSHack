@@ -2074,6 +2074,37 @@ export const ITEM_CATALOG = {
       },
     },
   },
+  potion_anti_venom: {
+    id: "potion_anti_venom",
+    catalogKind: "magic",
+    name: "Anti-Venom",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 40,
+    description: "A milky white serum that instantly neutralises all poisons in the body.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        const hadPoison = ctx.helpers.hasStatus(targetId, "poisoned") || ctx.helpers.hasStatus(targetId, "poison");
+        ctx.helpers.clearEffects(targetId, ["poison", "poisoned"]);
+        if (hadPoison) {
+          ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "cure", effect: "poison", source: actorId }));
+        }
+        return { cured: hadPoison ? "poison" : "none" };
+      },
+    },
+  },
   potion_resist_electric: {
     id: "potion_resist_electric",
     catalogKind: "magic",

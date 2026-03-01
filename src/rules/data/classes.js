@@ -106,6 +106,7 @@ export const CLASS_DEFS = {
     },
     inventoryItems: [
       { itemId: 'stone_touchstone', count: 1 },
+      { itemId: 'potion_anti_venom', count: 2 },
     ],
     startingSpell: null,
   },
