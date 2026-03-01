@@ -535,9 +535,23 @@ for (const m of MONSTERS) {
   (_byTier[m.tier] ??= []).push(m);
 }
 
+/** Genocide registry — tracks monster IDs permanently removed from the game. */
+const _genocided = new Set();
+
+/** @param {string} id */
+export function addGenocide(id) { _genocided.add(id); }
+
+/** @param {string} id @returns {boolean} */
+export function isGenocided(id) { return _genocided.has(id); }
+
+/** @returns {string[]} */
+export function getAllGenocided() { return [..._genocided]; }
+
 /** @param {number} tier @returns {MonsterDef[]} */
 export function getMonstersByTier(tier) {
-  return _byTier[Math.min(tier, _byTier.length - 1)] || _byTier[_byTier.length - 1];
+  const pool = _byTier[Math.min(tier, _byTier.length - 1)] || _byTier[_byTier.length - 1];
+  if (_genocided.size === 0) return pool;
+  return pool.filter(m => !_genocided.has(m.id));
 }
 
 /** @param {string} id @returns {MonsterDef|null} */

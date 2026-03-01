@@ -6,12 +6,14 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
 import { equipMonster } from "../environment/dungeon/populate.js";
+import { isGenocided } from "../data/monsters.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
   for (const [id, sp] of world.query(MonsterSpawner)) {
     try {
       if (!sp?.isActive) continue;
+      if (isGenocided(sp.spawnParams?.identity)) continue;
       const pos = world.get(id, Position);
       if (!pos) continue;
       const vit = world.get(id, Vitality);

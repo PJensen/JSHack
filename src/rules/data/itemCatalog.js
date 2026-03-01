@@ -2929,6 +2929,28 @@ export const ITEM_CATALOG = {
     },
   },
 
+  // ── Genocide ────────────────────────────────────────────────────
+  scroll_genocide: {
+    id: "scroll_genocide",
+    catalogKind: "magic",
+    name: "Scroll of Genocide",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    weight: 0.1,
+    value: 200,
+    description: "The parchment hums with finality. Name a creature, and it shall cease to exist.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:genocide", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
   // ── Bad Potions ───────────────────────────────────────────────────
   potion_sickness: {
     id: "potion_sickness",

@@ -1,7 +1,7 @@
 // rules/environment/dungeon/tables.js
 // Loot tables and monster pools for depth-scaled entity placement.
 
-import { getMonster, getMonstersByTier } from '../../data/monsters.js';
+import { getMonster, getMonstersByTier, isGenocided } from '../../data/monsters.js';
 import { resolveLootTable } from '../../data/lootResolver.js';
 
 /**
@@ -113,6 +113,7 @@ export function pickSpawner(rng, depth) {
   let monsterParams = null;
   if (depth <= 5) {
     const earlyPool = ['rat', 'spider']
+      .filter((id) => !isGenocided(id))
       .map((id) => getMonster(id))
       .filter(Boolean);
     if (earlyPool.length > 0) {
