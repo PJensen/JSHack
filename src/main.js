@@ -2826,7 +2826,14 @@ if (_savegameLoaded) {
   // Fade out the boot loader so the char creation panel is visible
   finishBoot();
 
-  const classDisplayData = listClassIds().map(id => {
+  const displayOrder = listClassIds();
+  const idxDruid = displayOrder.indexOf('druid');
+  const idxWarden = displayOrder.indexOf('warden');
+  if (idxDruid !== -1 && idxWarden !== -1) {
+    [displayOrder[idxDruid], displayOrder[idxWarden]] = [displayOrder[idxWarden], displayOrder[idxDruid]];
+  }
+
+  const classDisplayData = displayOrder.map(id => {
     const cls = getClass(id);
     const deity = getDeity(cls.deityId);
     return {

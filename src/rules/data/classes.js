@@ -2,32 +2,6 @@
 // Player class definitions. Pure data — no behavior, no display.
 
 export const CLASS_DEFS = {
-  druid: {
-    id: 'druid',
-    name: 'Druid',
-    description: 'A guardian of nature. Communes with the wild, heals the wounded.',
-    deityId: 'gaia',
-    stats: {
-      maxHp: 23,
-      maxMana: 70,
-      manaRegen: 0.15,
-      maxStamina: 80,
-      staminaRegen: 2.25,
-      intelligence: 12,
-      visionRange: 12,
-    },
-    equipment: {
-      weapon: 'staff_oak',
-      armor: 'leather_armor',
-      shield: null,
-      feet: 'sandals_hemp',
-    },
-    inventoryItems: [
-      { itemId: 'potion_health', count: 2 },
-    ],
-    startingSpell: 'frost',
-  },
-
   warden: {
     id: 'warden',
     name: 'Warden',
@@ -52,6 +26,32 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 1 },
     ],
     startingSpell: null,
+  },
+
+  druid: {
+    id: 'druid',
+    name: 'Druid',
+    description: 'A guardian of nature. Communes with the wild, heals the wounded.',
+    deityId: 'gaia',
+    stats: {
+      maxHp: 23,
+      maxMana: 70,
+      manaRegen: 0.15,
+      maxStamina: 80,
+      staminaRegen: 2.25,
+      intelligence: 12,
+      visionRange: 12,
+    },
+    equipment: {
+      weapon: 'staff_oak',
+      armor: 'leather_armor',
+      shield: null,
+      feet: 'sandals_hemp',
+    },
+    inventoryItems: [
+      { itemId: 'potion_health', count: 2 },
+    ],
+    startingSpell: 'frost',
   },
 
   outlaw: {
