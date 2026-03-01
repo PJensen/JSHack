@@ -3,10 +3,13 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { buildItemDisplayData } from "../src/main/wiring/itemName.js";
+import { identify, resetIdentification } from "../src/rules/data/identification.js";
 
 Deno.test("buildItemDisplayData enriches spell-linked items with target effects", () => {
+  resetIdentification();
   const world = new World({ seed: 1 });
   const wand = world.create();
+  identify("wand_frost"); // Item must be identified to reveal spell details
   world.add(wand, NamedIdentity, { identity: "wand_frost", name: "Wand of Frost" });
   world.add(wand, ItemInfo, {
     type: "wand",

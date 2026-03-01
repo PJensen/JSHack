@@ -546,6 +546,8 @@ function _finalizeNewGame(classData) {
         if (!(createdId > 0)) return 0;
         const moved = addItemEntityToInventory(world, inv, createdId);
         if (!moved.ok) return 0;
+        // Starting gear is always identified
+        identify(itemId);
         return moved.mode === "stacked" ? moved.stackedIntoId : createdId;
       };
 

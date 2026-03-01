@@ -4,6 +4,8 @@ import { getSpell } from "./spells.js";
 import { getGem } from "./gems.js";
 import { identify } from "./identification.js";
 import { createEatOnUseHook, createMappingOnUseHook } from "../content/items/useNativeHooks.js";
+import { requiresIdentification } from "./itemAppearances.js";
+import { isIdentified } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
@@ -2698,6 +2700,210 @@ export const ITEM_CATALOG = {
     value: 7,
     description: "Slick venom fronds that reek of bitter alkaloids.",
   },
+  // ── Scroll of Identify ─────────────────────────────────────────────
+  scroll_identify: {
+    id: "scroll_identify",
+    catalogKind: "magic",
+    name: "Scroll of Identify",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 30,
+    description: "Reveals the true nature of an item.",
+    hooks: {
+      can_dip_target: (state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return false;
+        const identity = String(state?.targetIdentity || "");
+        if (!identity) return false;
+        if (isIdentified(identity)) return false;
+        return requiresIdentification(targetInfo);
+      },
+      on_dip: (ctx, state) => {
+        const identity = String(state?.targetIdentity || "");
+        if (!identity) return { applied: false, consumedTool: false };
+
+        const wasNew = identify(identity);
+        const targetName = String(ctx?.query?.name?.(state.targetId) || identity.replace(/_/g, " "));
+        ctx.io.emit("item:identified", {
+          actor: state.actor,
+          identity,
+          name: targetName,
+          category: String(state?.targetInfo?.type || state?.targetInfo?.slot || "item"),
+          newlyIdentified: wasNew,
+        });
+        return { applied: true, consumedTool: true, resultType: "identify" };
+      },
+    },
+  },
+
+  // ── Cursed / Negative Rings ───────────────────────────────────────
+  ring_hunger: {
+    id: "ring_hunger",
+    catalogKind: "equipment",
+    name: "Ring of Hunger",
+    type: "equip",
+    slot: "ring",
+    material: "iron",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { hungerRate: 2 },
+    description: "A dull iron band that gnaws at your stomach. You feel ravenous.",
+  },
+  ring_fumbling: {
+    id: "ring_fumbling",
+    catalogKind: "equipment",
+    name: "Ring of Fumbling",
+    type: "equip",
+    slot: "ring",
+    material: "copper",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { attack: -3 },
+    description: "A tarnished copper ring. Your hands feel clumsy.",
+  },
+  ring_weakness: {
+    id: "ring_weakness",
+    catalogKind: "equipment",
+    name: "Ring of Weakness",
+    type: "equip",
+    slot: "ring",
+    material: "lead",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { maxHp: -5 },
+    description: "A heavy leaden ring. It saps your vitality.",
+  },
+  ring_blindness: {
+    id: "ring_blindness",
+    catalogKind: "equipment",
+    name: "Ring of Blindness",
+    type: "equip",
+    slot: "ring",
+    material: "obsidian",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { visionRange: -4 },
+    description: "A ring of polished obsidian. Shadows creep at the edge of your vision.",
+  },
+  ring_teleportation: {
+    id: "ring_teleportation",
+    catalogKind: "equipment",
+    name: "Ring of Teleportation",
+    type: "equip",
+    slot: "ring",
+    material: "silver",
+    rarity: 3,
+    rarityName: "rare",
+    bonuses: { luck: -5, visionRange: -2 },
+    description: "A shimmering silver ring. Reality warps and shifts around you.",
+  },
+
+  // ── Bad Scrolls ───────────────────────────────────────────────────
+  scroll_amnesia: {
+    id: "scroll_amnesia",
+    catalogKind: "magic",
+    name: "Scroll of Amnesia",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "The words swim before your eyes. You forget things.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const brain = ctx.query.brain(actor);
+        const learned = Array.isArray(brain?.learnedSpellIds) ? brain.learnedSpellIds : [];
+        if (learned.length === 0) {
+          ctx.io.emit("scroll:amnesia", { actor, forgotten: null });
+          return { consumed: true };
+        }
+        const idx = ctx.rng.int(0, learned.length - 1);
+        const forgotten = learned[idx];
+        learned.splice(idx, 1);
+        ctx.io.emit("scroll:amnesia", { actor, forgotten });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_fire: {
+    id: "scroll_fire",
+    catalogKind: "magic",
+    name: "Scroll of Fire",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "The scroll erupts in flames as you read it!",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const damage = ctx.helpers.roll("2d6");
+        ctx.helpers.damage(actor, damage, "scroll_fire");
+        ctx.io.emit("scroll:fire", { actor, damage });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_aggravation: {
+    id: "scroll_aggravation",
+    catalogKind: "magic",
+    name: "Scroll of Aggravation",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "A terrible shriek fills the dungeon!",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:aggravation", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Bad Potions ───────────────────────────────────────────────────
+  potion_sickness: {
+    id: "potion_sickness",
+    catalogKind: "magic",
+    name: "Potion of Sickness",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A foul brew that turns your stomach.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [{ type: "damage", amount: 4 }],
+      effects: [
+        { key: "poison", potency: 2, onset: 0, peak: 0, duration: 15, stack: "add", meta: { source: "potion_sickness" } },
+      ],
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:sickness", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
   food_mushrooms: {
     id: "food_mushrooms",
     catalogKind: "food",
