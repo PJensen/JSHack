@@ -83,6 +83,9 @@ export function petBehaviorSystem(world) {
     // Tick down ranged cooldown and attempt familiar fire bolt
     if (petState.rangedCooldown > 0) {
       petState.rangedCooldown -= 1;
+      if (petState.rangedCooldown <= 0 && isFamiliar(world, id)) {
+        try { world.emit?.('familiar:ready', { id }); } catch { /* */ }
+      }
     }
     if (petState.rangedCooldown <= 0 && isFamiliar(world, id)) {
       if (tryFamiliarFireBolt(world, id, pos, petState)) {
@@ -289,16 +292,21 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
   });
   petState.rangedCooldown = FAMILIAR_FIRE_COOLDOWN;
 
-  // Emit ranged:shot with fire style so the display renders fire arrow visuals
+  // Emit ranged:shot with fireball style so the display renders fireball visuals
   try {
     world.emit?.('ranged:shot', {
       attacker: petId,
       target: bestId,
       hit: true,
       damage: FAMILIAR_FIRE_DMG,
-      style: 'fire',
+      style: 'fireball',
     });
   } catch (e) { console.debug('[petBehaviorSystem] emit ranged:shot failed:', e); }
+
+  // Tell display to suppress familiar ambient particles during cooldown
+  try {
+    world.emit?.('familiar:fired', { id: petId });
+  } catch { /* */ }
 
   return true;
 }
