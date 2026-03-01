@@ -64,6 +64,14 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     }
   }
 
+  // General beatitude for non-potion items (e.g. cursed rings, blessed armor)
+  if (String(def.type || "").toLowerCase() !== "potion") {
+    const beatitude = String(def.beatitude || "").toLowerCase();
+    if (beatitude === "blessed" || beatitude === "uncursed" || beatitude === "cursed") {
+      world.add(id, Beatitude, { state: beatitude });
+    }
+  }
+
   if (typeof def.material === "string" && def.material) {
     world.add(id, Material, { kind: def.material });
   }

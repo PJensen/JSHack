@@ -896,6 +896,28 @@ function wireDeityMiracles(deity, deityId, world) {
             message: `${deity.name} purges your afflictions!`
           });
         }
+
+        // Also uncurse equipped items when the primary need is blessing
+        if (primaryNeed === 'blessing') {
+          const eqMiracle = world.get(playerId, Equipment);
+          if (eqMiracle) {
+            for (const slot of NON_AMMO_GEAR_SLOTS) {
+              const itemId = eqMiracle[slot];
+              if (!Number.isInteger(itemId) || itemId <= 0) continue;
+              const beat = world.get(itemId, Beatitude);
+              if (beat && beat.state === 'cursed') {
+                beat.state = 'uncursed';
+                const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
+                world.emit('deity:miracle', {
+                  playerId,
+                  deityId,
+                  effect: 'uncurse_equipment',
+                  message: `${deity.name} lifts the curse from your ${itemName}!`
+                });
+              }
+            }
+          }
+        }
       }
     }
   });
@@ -931,6 +953,20 @@ function assessPlayerNeeds(world, playerId) {
   if (hasStatus(world, playerId, 'cursed')) {
     needsBlessing = true;
     maxUrgency = Math.max(maxUrgency, 0.8);
+  }
+  // Detect cursed equipped items
+  const eqNeeds = world.get(playerId, Equipment);
+  if (eqNeeds) {
+    for (const slot of NON_AMMO_GEAR_SLOTS) {
+      const eid = eqNeeds[slot];
+      if (!Number.isInteger(eid) || eid <= 0) continue;
+      const b = world.get(eid, Beatitude);
+      if (b && b.state === 'cursed') {
+        needsBlessing = true;
+        maxUrgency = Math.max(maxUrgency, 0.75);
+        break;
+      }
+    }
   }
   if (hasStatus(world, playerId, 'disease') || hasStatus(world, playerId, 'poisoned')) {
     maxUrgency = Math.max(maxUrgency, 0.7);

@@ -10,6 +10,7 @@ import { isIdentified } from "../../rules/data/identification.js";
 import { getUnidentifiedName, requiresIdentification } from "../../rules/data/itemAppearances.js";
 import { getDecayStage } from "../../rules/data/food.js";
 import { getAffix } from "../../rules/data/affixes.js";
+import { Beatitude } from "../../rules/components/Beatitude.js";
 import {
   getSpell,
   describeSpellDetailLines,
@@ -58,6 +59,17 @@ export function resolveItemDisplayName(world, entityId) {
     if (stage !== 'fresh') {
       const prefix = stage.charAt(0).toUpperCase() + stage.slice(1);
       name = `${prefix} ${name}`;
+    }
+  }
+
+  // Prepend BUC status when identified and beatitude is not the default uncursed
+  const beat = world.get(entityId, Beatitude);
+  if (beat && beat.state !== 'uncursed') {
+    const identity = ni?.identity || '';
+    const needsId = info ? requiresIdentification(info) : false;
+    const isKnown = !needsId || (identity && isIdentified(identity));
+    if (isKnown) {
+      name = `${beat.state.charAt(0).toUpperCase() + beat.state.slice(1)} ${name}`;
     }
   }
 
@@ -137,5 +149,6 @@ export function buildItemDisplayData(world, itemId) {
     detailLines,
     targetEffects,
     identified,
+    beatitude: identified ? (world.get(itemId, Beatitude)?.state || null) : null,
   };
 }

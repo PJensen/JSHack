@@ -2740,6 +2740,37 @@ export const ITEM_CATALOG = {
     },
   },
 
+  scroll_remove_curse: {
+    id: "scroll_remove_curse",
+    catalogKind: "magic",
+    name: "Scroll of Remove Curse",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 50,
+    description: "Holy words purge corruption from an item.",
+    hooks: {
+      can_dip_target: (state) => {
+        return state?.targetBeatitude === 'cursed';
+      },
+      on_dip: (ctx, state) => {
+        const targetId = state?.targetId;
+        if (!targetId) return { applied: false, consumedTool: false };
+        const targetName = String(ctx?.query?.name?.(targetId) || "item");
+        ctx.io.emit("curse:removed", {
+          actor: state.actor,
+          itemId: targetId,
+          name: targetName,
+          source: 'scroll',
+        });
+        return { applied: true, consumedTool: true, resultType: "remove_curse" };
+      },
+    },
+  },
+
   // ── Cursed / Negative Rings ───────────────────────────────────────
   ring_hunger: {
     id: "ring_hunger",
@@ -2751,6 +2782,7 @@ export const ITEM_CATALOG = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { hungerRate: 2 },
+    beatitude: "cursed",
     description: "A dull iron band that gnaws at your stomach. You feel ravenous.",
   },
   ring_fumbling: {
@@ -2763,6 +2795,7 @@ export const ITEM_CATALOG = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { attack: -3 },
+    beatitude: "cursed",
     description: "A tarnished copper ring. Your hands feel clumsy.",
   },
   ring_weakness: {
@@ -2775,6 +2808,7 @@ export const ITEM_CATALOG = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxHp: -5 },
+    beatitude: "cursed",
     description: "A heavy leaden ring. It saps your vitality.",
   },
   ring_blindness: {
@@ -2787,6 +2821,7 @@ export const ITEM_CATALOG = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { visionRange: -4 },
+    beatitude: "cursed",
     description: "A ring of polished obsidian. Shadows creep at the edge of your vision.",
   },
   ring_teleportation: {
@@ -2799,6 +2834,7 @@ export const ITEM_CATALOG = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { luck: -5, visionRange: -2 },
+    beatitude: "cursed",
     description: "A shimmering silver ring. Reality warps and shifts around you.",
   },
 

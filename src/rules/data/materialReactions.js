@@ -93,6 +93,30 @@ export const MATERIAL_REACTION_RULES = [
     ],
   },
   {
+    id: "water_dip_sets_equipment_beatitude",
+    sourceEvents: ["water:dipped"],
+    itemScopes: ["target"],
+    eventKind: "water:dipped",
+    reactions: [
+      {
+        id: "holy_water_uncurses_equipment",
+        match: { itemTypes: ["equip"] },
+        waterTypes: ["holy"],
+        outcome: "set_beatitude",
+        state: "uncursed",
+        result: "uncursed",
+      },
+      {
+        id: "unholy_water_curses_equipment",
+        match: { itemTypes: ["equip"] },
+        waterTypes: ["unholy"],
+        outcome: "set_beatitude",
+        state: "cursed",
+        result: "cursed",
+      },
+    ],
+  },
+  {
     id: "water_dip_waterlogs_paper",
     sourceEvents: ["water:dipped"],
     itemScopes: ["target"],
