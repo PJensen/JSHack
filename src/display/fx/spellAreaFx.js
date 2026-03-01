@@ -57,6 +57,12 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
   /** @type {RadialFx[]} */
   const _flashHealFx = [];
 
+  // --- Shadow Bolt state ---
+  /** @type {LineFx[]} */
+  const _shadowBoltBeamFx = [];
+  /** @type {RadialFx[]} */
+  const _shadowBoltImpactFx = [];
+
   // --- Phase Strike state ---
   /** @type {PhaseStrikeFx[]} */
   const _phaseStrikeFx = [];
@@ -87,6 +93,14 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     for (let i = _flashHealFx.length - 1; i >= 0; i--) {
       _flashHealFx[i].tick(dt);
       if (_flashHealFx[i].expired) _flashHealFx.splice(i, 1);
+    }
+    for (let i = _shadowBoltBeamFx.length - 1; i >= 0; i--) {
+      _shadowBoltBeamFx[i].tick(dt);
+      if (_shadowBoltBeamFx[i].expired) _shadowBoltBeamFx.splice(i, 1);
+    }
+    for (let i = _shadowBoltImpactFx.length - 1; i >= 0; i--) {
+      _shadowBoltImpactFx[i].tick(dt);
+      if (_shadowBoltImpactFx[i].expired) _shadowBoltImpactFx.splice(i, 1);
     }
     for (let i = _phaseStrikeFx.length - 1; i >= 0; i--) {
       _phaseStrikeFx[i].tick(dt);
@@ -292,6 +306,67 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
           ctx.lineTo(imp.x + Math.cos(angle) * spokeLen, imp.y + Math.sin(angle) * spokeLen);
           ctx.stroke();
         }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // --- Draw: Shadow Bolt ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawShadowBolt(ctx) {
+    if (!_shadowBoltBeamFx.length && !_shadowBoltImpactFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Shadow beam: purple ray from caster to target
+    for (const eff of _shadowBoltBeamFx) {
+      const alpha = eff.alpha;
+      const pts = jitterLine(eff.from, eff.to, 14, 0.09 * alpha);
+
+      // Outer shadow glow (wide, dark purple)
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = `rgba(100,40,180,${(0.20 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.28;
+      pathPolyline(ctx, pts); ctx.stroke();
+
+      // Mid purple shimmer
+      ctx.strokeStyle = `rgba(160,80,255,${(0.40 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.12;
+      pathPolyline(ctx, pts); ctx.stroke();
+
+      // Core (hot bright purple-white)
+      const core = jitterLine(eff.from, eff.to, 16, 0.04 * alpha);
+      ctx.strokeStyle = `rgba(220,180,255,${(0.90 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.05;
+      pathPolyline(ctx, core); ctx.stroke();
+    }
+
+    // Impact: expanding purple burst
+    for (const imp of _shadowBoltImpactFx) {
+      const t = imp.progress;
+
+      // Bright flash on impact
+      if (t < 0.15) {
+        const flashT = t / 0.15;
+        const flashR = 0.2 + flashT * 0.5;
+        const flashA = 0.85 * (1 - flashT);
+        ctx.fillStyle = `rgba(200,140,255,${flashA.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, flashR, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // Expanding shadow ring
+      const ringR = t * (imp.radius + 0.4);
+      const ringA = 0.5 * (1 - t);
+      ctx.strokeStyle = `rgba(140,60,255,${ringA.toFixed(3)})`;
+      ctx.lineWidth = 0.09 * (1 - t * 0.5);
+      ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
+
+      // Inner dark disc
+      if (t < 0.4) {
+        const discA = 0.22 * (1 - t / 0.4);
+        ctx.fillStyle = `rgba(80,20,140,${discA.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR * 0.5, 0, Math.PI * 2); ctx.fill();
       }
     }
 
@@ -594,6 +669,54 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       }
     });
 
+    world.on('spell:shadow_bolt', ({ actor, targetId, from, to, fizzle }) => {
+      if (fizzle) return;
+      if (!from || !to) return;
+      // Purple beam from caster to target
+      _shadowBoltBeamFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.24 }));
+      // Impact burst at target
+      _shadowBoltImpactFx.push(new RadialFx({ x: to.x, y: to.y, radius: 0.9, ttl: 0.50 }));
+      // Camera shake (shadow impact)
+      startShake(cam, 4, 0.16);
+      // Purple particle burst at impact
+      const N = 24;
+      for (let i = 0; i < N; i++) {
+        const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        const spd = 0.8 + Math.random() * 2.0;
+        const life = 0.30 + Math.random() * 0.35;
+        fx.pool.spawn(new Particle({
+          x: to.x + (Math.random() - 0.5) * 0.3,
+          y: to.y + (Math.random() - 0.5) * 0.3,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd - 0.3,
+          ay: 0.25,
+          life,
+          size0: 0.14 + Math.random() * 0.10,
+          size1: 0.02,
+          r: 130 + (Math.random() * 70 | 0), g: 40 + (Math.random() * 40 | 0), b: 220 + (Math.random() * 35 | 0),
+          a0: 0.9,
+          rot: Math.random() * Math.PI * 2,
+          rotVel: (Math.random() - 0.5) * 4,
+        }));
+      }
+      // Lingering dark motes (shadow dissipation)
+      const M = 10;
+      for (let i = 0; i < M; i++) {
+        fx.pool.spawn(new Particle({
+          x: to.x + (Math.random() - 0.5) * 1.0,
+          y: to.y + (Math.random() - 0.5) * 0.6,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: -0.1 + Math.random() * -0.3,
+          life: 0.6 + Math.random() * 0.5,
+          size0: 0.07 + Math.random() * 0.05,
+          size1: 0.01,
+          r: 80, g: 20, b: 140,
+          a0: 0.55,
+          rotVel: (Math.random() - 0.5) * 2,
+        }));
+      }
+    });
+
     world.on('spell:flash_heal', ({ at, amount }) => {
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       _flashHealFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.5, ttl: 0.44 }));
@@ -736,5 +859,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, drawFlashHeal, drawPhaseStrike, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, drawShadowBolt, drawFlashHeal, drawPhaseStrike, installListeners };
 }

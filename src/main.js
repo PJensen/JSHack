@@ -220,6 +220,8 @@ installPluralizationExtensions();
 const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xC0FFEE;
 const world = new World({ seed: _bootSeed });
 configureWorld(world);
+import { installChannelingController } from "./main/channelingController.js";
+installChannelingController(world, () => (playerEntity(world)?.id || 0));
 bootAdvance("Configured ECS systems");
 
 // Initialize identification & gem pricing for this game run
@@ -565,14 +567,23 @@ function _finalizeNewGame(classData) {
         }
       }
 
-      // Starting spell from class
+      // Starting spell(s) from class — supports both startingSpell (string) and startingSpells (array)
       const forcedClassSpell = classDef?.id === "cleric" ? "flash_heal" : null;
-      const startingSpellId = String(forcedClassSpell || classDef?.startingSpell || "");
-      if (brain && startingSpellId) {
+      /** @type {string[]} */
+      const classSpells = [];
+      if (forcedClassSpell) {
+        classSpells.push(forcedClassSpell);
+      } else if (Array.isArray(classDef?.startingSpells)) {
+        for (const s of classDef.startingSpells) { if (s) classSpells.push(String(s)); }
+      } else if (classDef?.startingSpell) {
+        classSpells.push(String(classDef.startingSpell));
+      }
+      if (brain && classSpells.length > 0) {
         if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-        const filtered = brain.learnedSpellIds.filter((id) => id !== startingSpellId);
-        brain.learnedSpellIds = [startingSpellId, ...filtered];
-        setActiveSpell(startingSpellId);
+        // Prepend class spells in order, deduplicating
+        const existing = brain.learnedSpellIds.filter((id) => !classSpells.includes(id));
+        brain.learnedSpellIds = [...classSpells, ...existing];
+        setActiveSpell(classSpells[0]);
       }
     }
 
