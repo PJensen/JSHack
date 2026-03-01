@@ -2,6 +2,8 @@
 // Maps item slots/types to their unidentified display labels.
 // Items that are not yet identified show as "Unidentified <Label>" in the UI.
 
+import { isIdentificationEnabled } from './identification.js';
+
 /**
  * Categories of items that require identification.
  * Maps item type or slot to the unidentified display label.
@@ -64,10 +66,12 @@ export function getUnidentifiedName(itemInfo) {
 
 /**
  * Returns true if this item type/slot is subject to the identification system.
+ * Always returns false when the identification system is globally disabled.
  *
  * @param {{ type?: string, slot?: string }} itemInfo
  * @returns {boolean}
  */
 export function requiresIdentification(itemInfo) {
+  if (!isIdentificationEnabled()) return false;
   return getUnidentifiedName(itemInfo) !== null;
 }

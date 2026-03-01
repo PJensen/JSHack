@@ -65,5 +65,6 @@ export function readRuntimeConfig() {
     giveParam:    params.get("give")    || "",
     effectsParam: params.get("effects") || "",
     debug:        params.has("debug"),
+    identifyItems: params.get("identify") !== "off",
   };
 }
