@@ -15,9 +15,11 @@ import { Pet } from "../components/Pet.js";
 import { Owner } from "../components/Owner.js";
 import { Player } from "../components/Player.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
-import { getMonster, getMonsterLootTable } from "../data/monsters.js";
+import { getMonster, getMonsterLootTable, getMonsterTags } from "../data/monsters.js";
 import { dropLoot } from "../data/lootResolver.js";
 import { createCorpse } from "../archetypes/Food.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { Bone } from "../archetypes/Items.js";
 
 /**
  * Collect all entities with Vitality and remove those whose hp <= 0.
@@ -101,17 +103,27 @@ export function cleanupSystem(world) {
           }
 
           if (shouldCreateCorpse) {
-            const corpseId = createCorpse(world, effectiveMonsterDef, { x: pos.x, y: pos.y });
+            // Skeletal monsters drop bones instead of corpses
+            const tags = getMonsterTags(effectiveMonsterDef.id);
+            const isSkeletal = tags.includes('skeletal');
+
+            let droppedId;
+            if (isSkeletal && !wasPet) {
+              droppedId = createFrom(world, Bone, {});
+              world.add(droppedId, Position, { x: pos.x, y: pos.y });
+            } else {
+              droppedId = createCorpse(world, effectiveMonsterDef, { x: pos.x, y: pos.y });
+            }
 
             // If this was a pet, mark the corpse with Pet tag and Owner
             if (wasPet && petOwnerId) {
               try {
-                world.add(corpseId, Pet);
-                world.add(corpseId, Owner, { ownerId: petOwnerId });
+                world.add(droppedId, Pet);
+                world.add(droppedId, Owner, { ownerId: petOwnerId });
               } catch { /* */ }
             }
 
-            try { world.emit && world.emit('item:dropped', { itemId: corpseId, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }
+            try { world.emit && world.emit('item:dropped', { itemId: droppedId, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }
           }
         }
       }
