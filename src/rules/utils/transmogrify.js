@@ -9,6 +9,7 @@ import { Potion } from "../components/Potion.js";
 import { Consumable } from "../components/Consumable.js";
 import { DamageSpec } from "../components/DamageSpec.js";
 import { createItemById, isValidItemId } from "./itemFactory.js";
+import { identify } from "../data/identification.js";
 
 /** Components that are type-specific and should be stripped when transmogrifying
  *  unless the target item explicitly re-adds them. */
@@ -63,6 +64,9 @@ export function transmogrify(world, entityId, targetItemId, opts = {}) {
 
   const toNi = world.get(entityId, NamedIdentity);
   const toIdentity = toNi?.identity ?? targetItemId;
+
+  // Transmogrified items are always identified
+  if (toIdentity) identify(toIdentity);
 
   // Clean up the disposable template entity.
   world.destroy(templateId);

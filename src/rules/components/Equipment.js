@@ -57,6 +57,7 @@ export const Equipment = defineComponent('Equipment', {
   pierceResistDerived: 0,
   luckDerived: 0,
   visionRangeDerived: 0,
+  hungerRateDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });
