@@ -115,6 +115,8 @@ import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
+import { MONSTERS, addGenocide } from "./rules/data/monsters.js";
+import { MonsterSpawner } from "./rules/components/MonsterSpawner.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -1102,6 +1104,81 @@ addEventListener('ui:engrave', () => {
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({ type: 'rules.engrave', payload: { text: text.trim() } });
 });
+
+// Scroll of Genocide → prompt for monster name, kill all matching, prevent future spawns
+world.on('scroll:genocide', ({ actor }) => {
+  const input = prompt('Which monster do you want to genocide?');
+  if (!input || !input.trim()) {
+    world.emit?.('message', { text: 'The scroll crumbles to dust, unused.', type: 'system' });
+    return;
+  }
+  const query = input.trim().toLowerCase();
+
+  // Match against all monster definitions: exact name > startsWith > includes > edit distance
+  let best = null;
+  let bestScore = Infinity;
+  for (const m of MONSTERS) {
+    const name = m.name.toLowerCase();
+    if (name === query) { best = m; break; }
+    const score = name.startsWith(query) ? 1
+      : name.includes(query) ? 2
+      : query.startsWith(name) ? 3
+      : editDistance(query, name);
+    if (score < bestScore) { bestScore = score; best = m; }
+  }
+
+  if (!best || bestScore > 4) {
+    world.emit?.('message', { text: 'The scroll burns, but nothing happens.', type: 'system' });
+    return;
+  }
+
+  addGenocide(best.id);
+
+  // Kill all living monsters of this type on the current floor
+  let killed = 0;
+  for (const [id] of world.query(NamedIdentity)) {
+    const ni = world.get(id, NamedIdentity);
+    if (!ni || ni.identity !== best.id) continue;
+    const fac = world.get(id, Faction);
+    if (!fac || fac.key !== 'enemy') continue;
+    const vit = world.get(id, Vitality);
+    if (!vit || vit.hp <= 0) continue;
+    world.mutate(id, Vitality, (v) => { v.hp = 0; });
+    killed++;
+  }
+
+  // Deactivate spawners for this monster type
+  for (const [id, sp] of world.query(MonsterSpawner)) {
+    if (sp?.spawnParams?.identity === best.id) {
+      world.mutate(id, MonsterSpawner, (r) => { r.isActive = false; });
+    }
+  }
+
+  world.emit?.('message', {
+    text: `You have genocided all ${best.name}s! ${killed > 0 ? `${killed} perish${killed === 1 ? 'es' : ''} instantly.` : ''}`,
+    type: 'system',
+  });
+});
+
+/** Simple Levenshtein edit distance for genocide string matching. */
+function editDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return matrix[b.length][a.length];
+}
 
 // Pray button → dispatch pray action
 addEventListener('ui:pray', () => {
