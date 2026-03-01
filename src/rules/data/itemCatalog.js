@@ -2868,20 +2868,25 @@ export const ITEM_CATALOG = {
     rarityName: "common",
     weight: 0.1,
     value: 5,
-    description: "The words swim before your eyes. You forget things.",
+    description: "The words burn away everything you know. Total oblivion.",
     hooks: {
       on_use: (ctx, state) => {
         const actor = Number(state?.actor || ctx.actor || 0) | 0;
         const brain = ctx.query.brain(actor);
-        const learned = Array.isArray(brain?.learnedSpellIds) ? brain.learnedSpellIds : [];
-        if (learned.length === 0) {
-          ctx.io.emit("scroll:amnesia", { actor, forgotten: null });
-          return { consumed: true };
+        const forgottenSpells = [];
+        if (brain) {
+          if (Array.isArray(brain.learnedSpellIds)) {
+            forgottenSpells.push(...brain.learnedSpellIds);
+            brain.learnedSpellIds.length = 0;
+          }
+          if (Array.isArray(brain.itemKnowledgeIdentities)) {
+            brain.itemKnowledgeIdentities.length = 0;
+          }
+          if (brain.seenTiles) {
+            brain.seenTiles.fill(0);
+          }
         }
-        const idx = ctx.rng.int(0, learned.length - 1);
-        const forgotten = learned[idx];
-        learned.splice(idx, 1);
-        ctx.io.emit("scroll:amnesia", { actor, forgotten });
+        ctx.io.emit("scroll:amnesia", { actor, forgottenSpells, total: true });
         return { consumed: true };
       },
     },
