@@ -28,17 +28,18 @@ const CHARACTER_MENU_TABS = Object.freeze([
   { key: 'character', icon: '@', label: 'Character', eventName: 'ui:openCharacter' },
   { key: 'inventory', icon: '\u{1F392}', label: 'Inventory', eventName: 'ui:openInventory' },
   { key: 'equipment', icon: '\u{1F6E1}\uFE0F', label: 'Equipment', eventName: 'ui:openEquipment' },
+  { key: 'settings', icon: '\u2699\uFE0F', label: 'Settings', eventName: 'ui:openSettings' },
 ]);
 
 /**
  * @param {HTMLDivElement} host
- * @param {'character'|'inventory'|'equipment'} activeKey
+ * @param {'character'|'inventory'|'equipment'|'settings'} activeKey
  */
 function appendCharacterMenuTabs(host, activeKey) {
   const tabs = document.createElement('div');
   Object.assign(tabs.style, {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
     gap: '6px',
     marginBottom: '10px',
   });
@@ -139,6 +140,7 @@ export function initOverlays() {
   const inv = ensurePanel('inventory');
   const char = ensurePanel('character');
   const equip = ensurePanel('equipment');
+  const settingsPanel = ensurePanel('settings');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const usePanel = ensurePanel('use');
@@ -197,6 +199,7 @@ export function initOverlays() {
     (/** @type {any} */ (inv))._inventorySlotFilter = slotFilter || '';
     hide(char);
     hide(equip);
+    hide(settingsPanel);
     show(inv);
     // Request data from app; app will respond with ui:inventoryData
     window.dispatchEvent(new CustomEvent('ui:requestInventoryData', { detail: { slotFilter } }));
@@ -204,14 +207,23 @@ export function initOverlays() {
   window.addEventListener('ui:openCharacter', () => {
     hide(inv);
     hide(equip);
+    hide(settingsPanel);
     show(char);
     window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
   });
   window.addEventListener('ui:openEquipment', () => {
     hide(inv);
     hide(char);
+    hide(settingsPanel);
     show(equip);
     window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
+  });
+  window.addEventListener('ui:openSettings', () => {
+    hide(inv);
+    hide(char);
+    hide(equip);
+    show(settingsPanel);
+    window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
   });
   // Toggle inventory panel open/close
   window.addEventListener('ui:toggleInventory', () => {
@@ -220,6 +232,7 @@ export function initOverlays() {
     } else {
       hide(char);
       hide(equip);
+      hide(settingsPanel);
       show(inv);
       (/** @type {any} */ (inv))._inventorySlotFilter = '';
       window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
@@ -231,6 +244,7 @@ export function initOverlays() {
     } else {
       hide(inv);
       hide(equip);
+      hide(settingsPanel);
       show(char);
       window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
     }
@@ -241,9 +255,25 @@ export function initOverlays() {
     } else {
       hide(inv);
       hide(char);
+      hide(settingsPanel);
       show(equip);
       window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
     }
+  });
+  window.addEventListener('ui:toggleSettings', () => {
+    if (settingsPanel.style.display === 'block') {
+      hide(settingsPanel);
+    } else {
+      hide(inv);
+      hide(char);
+      hide(equip);
+      show(settingsPanel);
+      window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
+    }
+  });
+  window.addEventListener('ui:settingsData', (ev) => {
+    const data = /** @type {CustomEvent} */ (ev).detail || {};
+    renderSettings(settingsPanel, data, memoryGraph, deityGraph);
   });
   // Toggle memory graph
   window.addEventListener('ui:toggleMemoryGraph', () => {
@@ -2147,6 +2177,193 @@ function renderInventory(panel, items, ground, slotFilter = '') {
   window.addEventListener('keydown', keyHandler);
   obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
   (/** @type {any} */ (panel))._inventoryDetach = detach;
+}
+
+// ---------------------------------------------------------------------------
+// Settings panel
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{ identificationEnabled?: boolean, allItemIds?: string[], hasPet?: boolean, petAlive?: boolean }} data
+ * @param {{ canvas: HTMLCanvasElement }} memGraph
+ * @param {{ canvas: HTMLCanvasElement }} dtyGraph
+ */
+function renderSettings(panel, data, memGraph, dtyGraph) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+
+  // Close button (re-create since innerHTML cleared it)
+  const close = document.createElement('button');
+  close.textContent = '\u00D7';
+  Object.assign(close.style, {
+    position: 'absolute', right: '6px', top: '6px', width: '28px', height: '28px',
+    border: '1px solid #2d3b52', borderRadius: '6px', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer',
+  });
+  close.addEventListener('click', () => hide(panel));
+  el.appendChild(close);
+
+  appendCharacterMenuTabs(el, 'settings');
+
+  const content = document.createElement('div');
+  Object.assign(content.style, {
+    display: 'flex', flexDirection: 'column', gap: '14px',
+    maxHeight: '55vh', overflowY: 'auto', overflowX: 'hidden',
+  });
+  markScrollable(content);
+
+  // --- Gameplay section ---
+  const gpHead = document.createElement('div');
+  gpHead.textContent = 'Gameplay';
+  Object.assign(gpHead.style, {
+    fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
+    borderBottom: '1px solid #2d3b52', paddingBottom: '4px',
+  });
+  content.appendChild(gpHead);
+
+  content.appendChild(makeCheckbox('Identification', !!data.identificationEnabled, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setIdentification', { detail: { enabled: on } }));
+  }));
+
+  // --- Debugging section ---
+  const dbHead = document.createElement('div');
+  dbHead.textContent = 'Debugging';
+  Object.assign(dbHead.style, {
+    fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
+    borderBottom: '1px solid #2d3b52', paddingBottom: '4px', marginTop: '4px',
+  });
+  content.appendChild(dbHead);
+
+  content.appendChild(makeCheckbox('Deity debugging', dtyGraph.canvas.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleDeityMoodGraph'));
+  }));
+
+  content.appendChild(makeCheckbox('Memory visualizer', memGraph.canvas.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
+  }));
+
+  // --- Give item row ---
+  const giveRow = document.createElement('div');
+  Object.assign(giveRow.style, {
+    display: 'flex', gap: '6px', alignItems: 'flex-start', position: 'relative',
+  });
+
+  const inputWrap = document.createElement('div');
+  Object.assign(inputWrap.style, { position: 'relative', flex: '1' });
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'item id\u2026';
+  Object.assign(input.style, {
+    width: '100%', boxSizing: 'border-box',
+    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px',
+    fontFamily: 'monospace', fontSize: '13px', outline: 'none',
+  });
+
+  const dropdown = document.createElement('div');
+  Object.assign(dropdown.style, {
+    position: 'absolute', left: '0', right: '0', top: '100%',
+    maxHeight: '150px', overflowY: 'auto', overflowX: 'hidden',
+    background: '#0b0e16', border: '1px solid #2d3b52', borderRadius: '0 0 6px 6px',
+    zIndex: '10', display: 'none',
+  });
+  markScrollable(dropdown);
+
+  const allIds = Array.isArray(data.allItemIds) ? data.allItemIds : [];
+
+  function updateDropdown() {
+    const q = input.value.trim().toLowerCase();
+    dropdown.innerHTML = '';
+    if (!q) { dropdown.style.display = 'none'; return; }
+    const matches = allIds.filter(id => id.includes(q)).slice(0, 30);
+    if (!matches.length) { dropdown.style.display = 'none'; return; }
+    for (const id of matches) {
+      const opt = document.createElement('div');
+      opt.textContent = id;
+      Object.assign(opt.style, {
+        padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
+        color: '#cfe8ff', fontFamily: 'monospace',
+      });
+      opt.addEventListener('pointerenter', () => { opt.style.background = '#173458'; });
+      opt.addEventListener('pointerleave', () => { opt.style.background = ''; });
+      opt.addEventListener('click', () => {
+        input.value = id;
+        dropdown.style.display = 'none';
+      });
+      dropdown.appendChild(opt);
+    }
+    dropdown.style.display = 'block';
+  }
+  input.addEventListener('input', updateDropdown);
+  input.addEventListener('focus', updateDropdown);
+  input.addEventListener('blur', () => {
+    // Delay hide so click on dropdown option can fire first
+    setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+  });
+
+  inputWrap.appendChild(input);
+  inputWrap.appendChild(dropdown);
+  giveRow.appendChild(inputWrap);
+
+  const giveBtn = document.createElement('button');
+  giveBtn.textContent = 'Give';
+  decorateButton(giveBtn);
+  giveBtn.style.minHeight = '34px';
+  giveBtn.addEventListener('click', () => {
+    const itemId = input.value.trim();
+    if (!itemId) return;
+    window.dispatchEvent(new CustomEvent('ui:debugGiveItem', { detail: { itemId } }));
+    input.value = '';
+    dropdown.style.display = 'none';
+  });
+  giveRow.appendChild(giveBtn);
+  content.appendChild(giveRow);
+
+  // --- Resurrect pet button ---
+  const petBtn = document.createElement('button');
+  petBtn.textContent = 'Resurrect Pet';
+  decorateButton(petBtn);
+  petBtn.style.minHeight = '44px';
+  if (!data.hasPet || data.petAlive) {
+    petBtn.disabled = true;
+    petBtn.style.opacity = '0.4';
+    petBtn.style.cursor = 'default';
+  }
+  petBtn.addEventListener('click', () => {
+    if (petBtn.disabled) return;
+    window.dispatchEvent(new CustomEvent('ui:debugResurrectPet'));
+    // Re-request settings to update button state
+    window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
+  });
+  content.appendChild(petBtn);
+
+  el.appendChild(content);
+}
+
+/**
+ * @param {string} label
+ * @param {boolean} checked
+ * @param {(on: boolean) => void} onChange
+ * @returns {HTMLLabelElement}
+ */
+function makeCheckbox(label, checked, onChange) {
+  const row = document.createElement('label');
+  Object.assign(row.style, {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    cursor: 'pointer', fontSize: '13px', minHeight: '32px',
+  });
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = checked;
+  Object.assign(cb.style, { width: '16px', height: '16px', accentColor: '#5fb3ff', cursor: 'pointer' });
+  cb.addEventListener('change', () => onChange(cb.checked));
+  const txt = document.createElement('span');
+  txt.textContent = label;
+  row.appendChild(cb);
+  row.appendChild(txt);
+  return row;
 }
 
 /**
