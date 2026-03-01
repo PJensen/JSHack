@@ -8,7 +8,7 @@ import { getGem } from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
-import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
 import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 
 /**
@@ -25,6 +25,7 @@ const SIMPLE_ITEM_ARCHETYPES = {
   'food_wild_berries': WildBerries,
   'food_wild_herbs': WildHerbs,
   'scroll_mapping': ScrollOfMapping,
+  'bone': Bone,
 };
 
 /**

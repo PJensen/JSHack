@@ -168,6 +168,7 @@ export const basePalette = {
   corpse_death_archer:    { glyph: "%", fg: "#a0a8b0", glow: "#6070a0" },
   corpse_orc:          { glyph: "%", fg: "#cc6644", glow: "#993320" },
   corpse_skeleton:     { glyph: "%", fg: "#ddd8c8", glow: "#aaa590" },
+  bone:                { glyph: "(", fg: "#e8e4d4", glow: "#b0a890" },
   corpse_spider:       { glyph: "%", fg: "#55bb55", glow: "#338833" },
   corpse_troll:        { glyph: "%", fg: "#66aa66", glow: "#448844" },
   corpse_wraith:       { glyph: "%", fg: "#aabbff", glow: "#7799dd" },

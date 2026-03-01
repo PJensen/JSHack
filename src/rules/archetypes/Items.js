@@ -108,6 +108,20 @@ export const GemItem = defineArchetype(
     })],
 );
 
+// Bone — dropped by skeletal monsters on death
+export const Bone = defineArchetype(
+    "Bone",
+    [ItemInfo, {
+        type: "misc",
+        description: "A bleached bone from an undead skeleton.",
+        weight: 1,
+        value: 3,
+        count: 1,
+    }],
+    [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Bone", identity: "bone" })],
+    [Material, { kind: "bone" }],
+);
+
 // Debug/utility: reveals entire dungeon map when used
 export const ScrollOfMapping = defineArchetype(
     "ScrollOfMapping",
