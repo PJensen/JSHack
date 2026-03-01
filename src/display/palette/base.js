@@ -8,6 +8,7 @@ export const basePalette = {
   player_warden:  { glyph: "@", fg: "#e85050", glow: "#a03030" },
   player_outlaw:  { glyph: "@", fg: "#d4a0ff", glow: "#9060cc" },
   player_cleric:  { glyph: "@", fg: "#ffe066", glow: "#cca830" },
+  player_archeologist: { glyph: "@", fg: "#d2a064", glow: "#8a6030" },
   monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },  // fallback
   // Tier 0
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" }, // 🐀

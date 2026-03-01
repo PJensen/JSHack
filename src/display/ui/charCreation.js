@@ -215,12 +215,12 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   const grid = document.createElement('div');
   Object.assign(grid.style, {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
+    gridTemplateColumns: classes.length % 3 === 0 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
     gap: '10px',
     marginBottom: '20px',
   });
 
-  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨' };
+  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨', archeologist: '⛏️' };
 
   const cards = [];
   for (const cls of classes) {
