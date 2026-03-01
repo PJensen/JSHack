@@ -779,7 +779,7 @@ initPetMenu();
 initStatusLine();
 bootAdvance("Initialized HUD and overlays");
 
-// Register deity mood sampler for the debug graph (key 9).
+// Register deity mood sampler for the debug graph (key 7).
 // The sampler closure bridges rules-layer deity data to the display-layer graph.
 window.dispatchEvent(new CustomEvent('debug:registerDeityMoodSampler', {
   detail: {
