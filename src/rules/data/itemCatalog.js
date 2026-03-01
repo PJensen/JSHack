@@ -1136,6 +1136,18 @@ export const ITEM_CATALOG = {
     rarityName: "magic",
     bonuses: { defense: 2 },
   },
+  lantern: {
+    id: "lantern",
+    catalogKind: "equipment",
+    name: "Lantern",
+    type: "equip",
+    slot: "shield",
+    material: "iron",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { visionRange: 3 },
+    description: "A sturdy hooded lantern that casts a warm glow, illuminating the darkness ahead.",
+  },
   iron_pickaxe: {
     id: "iron_pickaxe",
     catalogKind: "equipment",
