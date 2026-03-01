@@ -89,6 +89,35 @@ Deno.test("each class has a valid deity", () => {
   }
 });
 
+Deno.test("warlock maps to molkhar", () => {
+  assertEquals(getClass('warlock').deityId, 'molkhar');
+});
+
+Deno.test("warlock starts with summon_skeleton and shadow_bolt", () => {
+  const warlock = getClass('warlock');
+  assert(Array.isArray(warlock.startingSpells), 'warlock should have startingSpells array');
+  assert(warlock.startingSpells.includes('summon_skeleton'), 'warlock should start with summon_skeleton');
+  assert(warlock.startingSpells.includes('shadow_bolt'), 'warlock should start with shadow_bolt');
+  assert(getSpell("summon_skeleton"), "summon_skeleton spell definition should exist");
+  assert(getSpell("shadow_bolt"), "shadow_bolt spell definition should exist");
+});
+
+Deno.test("shadow_bolt has 2-turn cast time and 8 damage", () => {
+  const spell = getSpell("shadow_bolt");
+  assert(spell, "shadow_bolt should exist");
+  assertEquals(spell.castTime, 2);
+  assertEquals(spell.manaCost, 8);
+  const dmgEffect = spell.effects.find(e => e.kind === 'damage');
+  assert(dmgEffect, "shadow_bolt should have a damage effect");
+  assertEquals(dmgEffect.amount, '8');
+});
+
+Deno.test("summon_skeleton has 5-turn cast time", () => {
+  const spell = getSpell("summon_skeleton");
+  assert(spell, "summon_skeleton should exist");
+  assertEquals(spell.castTime, 5);
+});
+
 Deno.test("druid starts with at least +1 defense from equipped gear", () => {
   const druid = getClass('druid');
   const equippedIds = Object.values(druid.equipment).filter((id) => typeof id === 'string');
