@@ -26,6 +26,10 @@ import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
+import { isIdentificationEnabled, setIdentificationEnabled } from "../../rules/data/identification.js";
+import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js";
+import { addItemEntityToInventory } from "../../rules/utils/inventoryStacking.js";
+import { Pet } from "../../rules/components/Pet.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -519,6 +523,66 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   addEventListener('ui:requestDeathLogData', () => {
     const records = tombstoneRepo.getAll();
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:deathLogData', { detail: { records } }));
+  });
+
+  // --- Settings panel data & actions ---
+
+  addEventListener('ui:requestSettingsData', () => {
+    let hasPet = false;
+    let petAlive = false;
+    for (const [petId] of world.query(Pet)) {
+      hasPet = true;
+      petAlive = world.has(petId, Position);
+      break;
+    }
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:settingsData', {
+      detail: {
+        identificationEnabled: isIdentificationEnabled(),
+        allItemIds: listAllItemIds(),
+        hasPet,
+        petAlive,
+      },
+    }));
+  });
+
+  addEventListener('ui:setIdentification', (ev) => {
+    const enabled = !!ev?.detail?.enabled;
+    setIdentificationEnabled(enabled);
+  });
+
+  addEventListener('ui:debugGiveItem', (ev) => {
+    const itemId = String(ev?.detail?.itemId || '').trim();
+    if (!itemId) return;
+    const p = playerEntity(world);
+    if (!p) return;
+    const inv = world.get(p.id, Inventory);
+    if (!inv || !Array.isArray(inv.items)) return;
+    const created = createItemById(world, itemId);
+    if (created === null) {
+      console.warn(`[settings] Unknown item: "${itemId}"`);
+      return;
+    }
+    addItemEntityToInventory(world, inv, created);
+    console.debug(`[settings] Gave 1x ${itemId}`);
+  });
+
+  addEventListener('ui:debugResurrectPet', () => {
+    const p = playerEntity(world);
+    if (!p) return;
+    const pPos = world.get(p.id, Position);
+    if (!pPos) return;
+    for (const [petId] of world.query(Pet)) {
+      if (world.has(petId, Position)) continue; // already alive
+      const vit = world.get(petId, Vitality);
+      if (vit) {
+        vit.hp = vit.maxHp;
+      }
+      if (!world.has(petId, Position)) {
+        world.add(petId, Position, { x: pPos.x, y: pPos.y });
+      }
+      console.debug(`[settings] Resurrected pet ${petId}`);
+      break;
+    }
   });
 
   return { buildGroundPickupDetailAt };
