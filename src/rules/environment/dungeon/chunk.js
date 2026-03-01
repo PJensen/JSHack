@@ -91,7 +91,8 @@ export function edgeGate(worldSeed, depth, cxA, cyA, cxB, cyB) {
  * @returns {Array<{x:number, y:number}>} chunk-local positions
  */
 export function findDoorPositions(tiles, stride, rng, doorChance) {
-  const doors = [];
+  // Collect all valid candidates first
+  const candidates = [];
   for (let y = 1; y < stride - 1; y++) {
     for (let x = 1; x < stride - 1; x++) {
       if (tiles[y * stride + x] !== TILE_FLOOR) continue;
@@ -108,10 +109,24 @@ export function findDoorPositions(tiles, stride, rng, doorChance) {
       // XOR: exactly one pair of opposing neighbors is wall
       if ((nsWalls && !ewWalls) || (!nsWalls && ewWalls)) {
         if (rng.next() < doorChance) {
-          doors.push({ x, y });
+          candidates.push({ x, y });
         }
       }
     }
+  }
+
+  // Filter out consecutive doors: enforce minimum spacing of 3 tiles
+  const MIN_DOOR_SPACING = 3;
+  const doors = [];
+  for (const c of candidates) {
+    let tooClose = false;
+    for (const d of doors) {
+      if (Math.abs(c.x - d.x) + Math.abs(c.y - d.y) < MIN_DOOR_SPACING) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) doors.push(c);
   }
   return doors;
 }
