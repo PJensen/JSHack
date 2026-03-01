@@ -4,10 +4,10 @@ import { DEITY_DEFS } from '../src/rules/data/deities.js';
 import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
 import { getSpell } from "../src/rules/data/spells.js";
 
-Deno.test("CLASS_DEFS has exactly 5 classes", () => {
+Deno.test("CLASS_DEFS has exactly 6 classes", () => {
   const ids = listClassIds();
-  assertEquals(ids.length, 5);
-  for (const id of ['druid', 'warden', 'outlaw', 'cleric', 'archeologist']) {
+  assertEquals(ids.length, 6);
+  for (const id of ['druid', 'warden', 'outlaw', 'cleric', 'archeologist', 'warlock']) {
     assert(ids.includes(id), `missing class: ${id}`);
   }
 });
