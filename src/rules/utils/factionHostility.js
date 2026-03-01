@@ -9,7 +9,7 @@ function normalizeFactionKey(key) {
 
 /**
  * Explicit faction hostility table.
- * - player + pet + stone_taunter are allies
+ * - player + pet + summoned + stone_taunter are allies
  * - enemy is hostile to that ally group
  * - neutral/shopkeeper are non-hostile by default
  * Unknown factions fall back to legacy behavior (different faction => hostile).
@@ -18,8 +18,9 @@ function normalizeFactionKey(key) {
 const HOSTILITY = Object.freeze({
   player: Object.freeze(new Set(["enemy"])),
   pet: Object.freeze(new Set(["enemy"])),
+  summoned: Object.freeze(new Set(["enemy"])),
   stone_taunter: Object.freeze(new Set(["enemy"])),
-  enemy: Object.freeze(new Set(["player", "pet", "stone_taunter"])),
+  enemy: Object.freeze(new Set(["player", "pet", "summoned", "stone_taunter"])),
   neutral: Object.freeze(new Set()),
   shopkeeper: Object.freeze(new Set()),
 });

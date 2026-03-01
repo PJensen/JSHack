@@ -239,7 +239,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     marginBottom: '10px',
   });
 
-  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨', archeologist: '⛏️' };
+  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨', archeologist: '⛏️', warlock: '🔮' };
 
   const cards = [];
   for (const cls of classes) {

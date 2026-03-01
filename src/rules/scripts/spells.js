@@ -27,6 +27,8 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { Monster } from "../archetypes/Creatures.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -731,6 +733,50 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
       splashHits,
     });
   } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
+};
+
+// Summon Skeleton — spawn a friendly skeleton near the caster.
+REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  // Find a walkable tile near the caster
+  const spawnTile = findNearestValidTileAround(world, apos, {
+    maxDistance: 2,
+    exclude: [{ x: apos.x, y: apos.y }],
+  });
+  if (!spawnTile) {
+    try { world.emit && world.emit('spell:summon_skeleton:failed', { actor, spellId: spell.id, reason: 'no_space' }); } catch (e) { console.debug('[spells] emit spell:summon_skeleton:failed failed:', e); }
+    return;
+  }
+
+  // Create a friendly skeleton entity
+  const skeletonId = createFrom(world, Monster, {
+    x: spawnTile.x,
+    y: spawnTile.y,
+    name: 'Summoned Skeleton',
+    identity: 'skeleton',
+    faction: 'summoned',
+    maxHp: 12,
+    attackDerived: 2,
+    defenseDerived: 2,
+    naturalDamageDice: '1d6',
+    sizeClass: 'M',
+    massKg: 25,
+    speed: 2,
+    resistances: {
+      kinetic: { DR: 4, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+    },
+  });
+
+  try {
+    world.emit && world.emit('spell:summon_skeleton', {
+      actor,
+      skeletonId,
+      at: { x: spawnTile.x, y: spawnTile.y },
+    });
+  } catch (e) { console.debug('[spells] emit spell:summon_skeleton failed:', e); }
 };
 
 /**
