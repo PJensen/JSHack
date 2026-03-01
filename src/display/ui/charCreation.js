@@ -230,11 +230,11 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   box.appendChild(classLabel);
 
-  // ---- class grid (2x2) ----
+  // ---- class grid (2x3) ----
   const grid = document.createElement('div');
   Object.assign(grid.style, {
     display: 'grid',
-    gridTemplateColumns: classes.length % 3 === 0 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '10px',
     marginBottom: '10px',
   });
