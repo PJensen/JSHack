@@ -54,3 +54,4 @@ export { HazardArea } from './HazardArea.js';
 export { ObjectState } from './ObjectState.js';
 export { DisarmIntent } from './Intents/DisarmIntent.js';
 export { Polymorph } from './Polymorph.js';
+export { Channeling } from './Channeling.js';

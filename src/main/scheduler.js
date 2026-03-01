@@ -50,6 +50,7 @@ import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
+import { channelingSystem } from "../rules/systems/channelingSystem.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -125,6 +126,7 @@ export function configureWorld(world) {
   registerSystem(equipItemSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
   registerSystem(rangedAttackSystem, 'intents');
+  registerSystem(channelingSystem, 'intents');   // countdown before castSpellSystem fires
   registerSystem(castSpellSystem, 'intents');
   registerSystem(engraveSystem, 'intents');
   // Shopkeeper system must run BEFORE movementSystem to block exits

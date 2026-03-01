@@ -23,6 +23,7 @@ import { EngraveIntent } from "../components/Intents/EngraveIntent.js";
 import { PrayIntent } from "../components/Intents/PrayIntent.js";
 import { DisarmIntent } from "../components/Intents/DisarmIntent.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
+import { Channeling } from "../components/Channeling.js";
 import { statusStrength } from "../utils/statusFacade.js";
 
 /** All intent components that should be stripped when an actor cannot act. */
@@ -32,6 +33,9 @@ const ALL_INTENTS = [
   CastSpellIntent, RangedAttackIntent, EngraveIntent, PrayIntent,
   DisarmIntent, InteractIntent,
 ];
+
+/** Intents stripped during channeling (everything except WaitIntent). */
+const CHANNELING_BLOCKED = ALL_INTENTS.filter(c => c !== WaitIntent);
 
 /**
  * Remove all intent components from an entity.
@@ -68,6 +72,16 @@ export function intentValidationSystem(world) {
         world.emit?.("intent:blocked", { actor: id, reason: "stunned" });
       } catch (e) {
         console.debug("[intentValidationSystem] emit intent:blocked failed:", e);
+      }
+      continue;
+    }
+
+    // Channeling actors can only wait — strip everything else
+    if (world.has(id, Channeling)) {
+      for (let i = 0; i < CHANNELING_BLOCKED.length; i++) {
+        if (world.has(id, CHANNELING_BLOCKED[i])) {
+          try { world.remove(id, CHANNELING_BLOCKED[i]); } catch {}
+        }
       }
     }
   }
