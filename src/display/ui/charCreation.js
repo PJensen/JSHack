@@ -73,17 +73,36 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   titleRow.appendChild(helpLink);
   box.appendChild(titleRow);
 
-  // ---- version ----
+  // ---- version + subscribe row ----
+  const versionRow = document.createElement('div');
+  Object.assign(versionRow.style, {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '10px', marginBottom: '10px',
+  });
+
   const versionEl = document.createElement('div');
   Object.assign(versionEl.style, {
     fontSize: '12px', color: '#4a6080',
-    marginBottom: '10px',
     display: 'inline-flex',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: '6px',
   });
-  box.appendChild(versionEl);
+  versionRow.appendChild(versionEl);
+
+  const subscribeLink = document.createElement('a');
+  subscribeLink.href = 'https://pjensen.substack.com/s/js-hack';
+  subscribeLink.target = '_blank';
+  subscribeLink.rel = 'noopener';
+  subscribeLink.textContent = 'Subscribe to Updates';
+  Object.assign(subscribeLink.style, {
+    fontSize: '12px', color: '#7aacdf',
+    textDecoration: 'none', opacity: '0.8',
+  });
+  subscribeLink.addEventListener('mouseenter', () => { subscribeLink.style.opacity = '1'; });
+  subscribeLink.addEventListener('mouseleave', () => { subscribeLink.style.opacity = '0.8'; });
+  versionRow.appendChild(subscribeLink);
+
+  box.appendChild(versionRow);
   versionLoaded.then(() => {
     const ver = /** @type {any} */ (window).VERSION;
     if (!ver) return;
