@@ -576,7 +576,7 @@ function _finalizeNewGame(classData) {
       }
     }
 
-    // Spawn pet (kitty) next to the player
+    // Spawn pet next to the player (familiar for warlock, kitty otherwise)
     {
       const pe = playerEntity(world);
       if (pe) {
@@ -585,10 +585,14 @@ function _finalizeNewGame(classData) {
           maxDistance: 1,
           exclude: [{ x: ppos.x, y: ppos.y }],
         });
+        const isWarlock = classDef?.id === 'warlock';
         const petId = world.create();
         world.add(petId, Pet);
         world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
-        world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+        world.add(petId, NamedIdentity, {
+          name: isWarlock ? "Familiar" : "Kitty",
+          identity: isWarlock ? "familiar" : "kitty",
+        });
         world.add(petId, Faction, { key: "pet" });
         world.add(petId, Owner, { ownerId: pe.id });
         world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
@@ -607,6 +611,7 @@ function _finalizeNewGame(classData) {
           lastPlayerX: ppos.x,
           lastPlayerY: ppos.y,
           commandCooldown: 0,
+          rangedCooldown: 0,
         });
         try {
           window.dispatchEvent(new CustomEvent('ui:petExists', {

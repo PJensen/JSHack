@@ -150,6 +150,20 @@ export const SPELL_DEFS = {
       { kind: 'damage', element: 'holy', amount: '2 to adjacent hostile creatures' },
     ],
   },
+  summon_skeleton: {
+    id: 'summon_skeleton',
+    name: 'Summon Skeleton',
+    symbol: '\u{1F480}',   // 💀
+    manaCost: 10,
+    minIntelligence: 8,
+    script: 'summon_skeleton',
+    targeting: 'self',
+    description: 'Rip a skeleton from the earth to fight at your side.',
+    effects: [
+      { kind: 'utility', note: 'Summons a friendly skeleton nearby' },
+      { kind: 'utility', note: 'Skeleton is always aggressive toward enemies' },
+    ],
+  },
   phase_strike: {
     id: 'phase_strike',
     name: 'Phase Strike',

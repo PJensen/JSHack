@@ -21,6 +21,7 @@ import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../rules/systems/tauntSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
+import { summonedBehaviorSystem } from "../rules/systems/summonedBehaviorSystem.js";
 import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
 import { movementSystem, installSpiderWebListener, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
@@ -110,6 +111,7 @@ export function configureWorld(world) {
   // MoveIntents are visible to movementSystem in the same tick)
   registerSystem(intentValidationSystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');
+  registerSystem(summonedBehaviorSystem, 'ai');
   registerSystem(petCommandSystem, 'ai');
   registerSystem(petBehaviorSystem, 'ai');
 

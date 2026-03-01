@@ -21,9 +21,15 @@ import { areFactionsHostile } from '../utils/factionHostility.js';
 import { getItemsAt } from '../utils/tileQueryCache.js';
 import { worldRand } from '../utils/rng.js';
 import { getDecayStage } from '../data/food.js';
+import { hasLOS } from "../../shared/math/gridLOS.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
+import { dealDamage } from "../utils/dealDamage.js";
 import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
 
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
+const FAMILIAR_FIRE_RANGE = 8;
+const FAMILIAR_FIRE_COOLDOWN = 10;
+const FAMILIAR_FIRE_DMG = 4;
 const CORPSE_HEAL_NUTRITION_DIVISOR = 120;
 const FELINE_TOXIC_IMMUNITY = 0.85;
 const FLEE_CORPSE_SEARCH_RADIUS = 8;
@@ -72,6 +78,16 @@ export function petBehaviorSystem(world) {
     // Tick down command cooldown
     if (petState.commandCooldown > 0) {
       petState.commandCooldown -= 1;
+    }
+
+    // Tick down ranged cooldown and attempt familiar fire bolt
+    if (petState.rangedCooldown > 0) {
+      petState.rangedCooldown -= 1;
+    }
+    if (petState.rangedCooldown <= 0 && isFamiliar(world, id)) {
+      if (tryFamiliarFireBolt(world, id, pos, petState)) {
+        continue; // used turn on ranged attack
+      }
     }
 
     // Check for automatic state transitions
@@ -229,6 +245,62 @@ function addActiveEffect(world, entityId, effect) {
   }
   if (!Array.isArray(ae.effects)) ae.effects = [];
   ae.effects.push({ stacks: 1, ...effect });
+}
+
+function isFamiliar(world, petId) {
+  const ni = world.get(petId, NamedIdentity);
+  return String(ni?.identity || '').toLowerCase() === 'familiar';
+}
+
+/**
+ * Familiar fire bolt: find nearest enemy in LOS within range and shoot a fire bolt.
+ * Returns true if a bolt was fired (consuming the pet's turn).
+ */
+function tryFamiliarFireBolt(world, petId, petPos, petState) {
+  const petFaction = String(world.get(petId, Faction)?.key || 'pet');
+
+  // Lazily build LOS blocker
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+
+  let bestId = 0;
+  let bestDist = Infinity;
+  for (const [eid, fac, epos, evit] of world.query(Faction, Position, Vitality)) {
+    if (!evit || (evit.hp | 0) <= 0) continue;
+    if (!areFactionsHostile(petFaction, fac?.key)) continue;
+    const dx = (epos.x | 0) - (petPos.x | 0);
+    const dy = (epos.y | 0) - (petPos.y | 0);
+    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+    if (dist < 1 || dist > FAMILIAR_FIRE_RANGE) continue;
+    if (dist < bestDist && hasLOS(petPos.x | 0, petPos.y | 0, epos.x | 0, epos.y | 0, isBlocked)) {
+      bestId = eid;
+      bestDist = dist;
+    }
+  }
+
+  if (!bestId) return false;
+
+  // Fire the bolt
+  dealDamage(world, {
+    target: bestId,
+    amount: FAMILIAR_FIRE_DMG,
+    source: petId,
+    type: 'fire',
+    cause: 'familiar:fire_bolt',
+  });
+  petState.rangedCooldown = FAMILIAR_FIRE_COOLDOWN;
+
+  // Emit ranged:shot with fire style so the display renders fire arrow visuals
+  try {
+    world.emit?.('ranged:shot', {
+      attacker: petId,
+      target: bestId,
+      hit: true,
+      damage: FAMILIAR_FIRE_DMG,
+      style: 'fire',
+    });
+  } catch (e) { console.debug('[petBehaviorSystem] emit ranged:shot failed:', e); }
+
+  return true;
 }
 
 function isFelinePet(world, petId) {

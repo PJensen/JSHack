@@ -115,6 +115,33 @@ export const CLASS_DEFS = {
     startingSpell: null,
   },
 
+  warlock: {
+    id: 'warlock',
+    name: 'Warlock',
+    description: 'A dark conjurer bound to forces beyond the veil. Commands the dead and channels hellfire through a familiar.',
+    deityId: 'molkhar',
+    stats: {
+      maxHp: 22,
+      maxMana: 65,
+      manaRegen: 0.14,
+      maxStamina: 75,
+      staminaRegen: 2.0,
+      intelligence: 13,
+      visionRange: 8,
+    },
+    equipment: {
+      weapon: 'staff_oak',
+      armor: null,
+      shield: null,
+      feet: 'shoes_cloth',
+    },
+    inventoryItems: [
+      { itemId: 'potion_health', count: 1 },
+      { itemId: 'scroll_identify', count: 1 },
+    ],
+    startingSpell: 'summon_skeleton',
+  },
+
   cleric: {
     id: 'cleric',
     name: 'Cleric',

@@ -19,6 +19,7 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * - stateEnteredTurn: world.step when this state was entered
  * - lastPlayerX, lastPlayerY: last known player position (for stay/guard)
  * - commandCooldown: turns before accepting new command (prevents command spam)
+ * - rangedCooldown: turns before familiar can fire again (0 = ready)
  */
 export const PetState = defineComponent(
   'PetState',
@@ -31,6 +32,7 @@ export const PetState = defineComponent(
     lastPlayerX: null,
     lastPlayerY: null,
     commandCooldown: 0,
+    rangedCooldown: 0,
   },
   {
     validate(rec) {
@@ -58,6 +60,9 @@ export const PetState = defineComponent(
       }
       if (!Number.isInteger(rec.commandCooldown) || rec.commandCooldown < 0) {
         throw new Error('PetState: commandCooldown must be non-negative integer');
+      }
+      if (!Number.isInteger(rec.rangedCooldown) || rec.rangedCooldown < 0) {
+        throw new Error('PetState: rangedCooldown must be non-negative integer');
       }
       return true;
     }

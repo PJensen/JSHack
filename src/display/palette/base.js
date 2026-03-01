@@ -9,6 +9,7 @@ export const basePalette = {
   player_outlaw:  { glyph: "@", fg: "#d4a0ff", glow: "#9060cc" },
   player_cleric:  { glyph: "@", fg: "#ffe066", glow: "#cca830" },
   player_archeologist: { glyph: "@", fg: "#d2a064", glow: "#8a6030" },
+  player_warlock:  { glyph: "@", fg: "#b366ff", glow: "#8833cc" },
   monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },  // fallback
   // Tier 0
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" }, // 🐀
@@ -86,6 +87,7 @@ export const basePalette = {
 
   // Pets
   kitty: { glyph: "f", fg: "#ffcc88", glow: "#cc9955" },
+  familiar: { glyph: "f", fg: "#b366ff", glow: "#8833cc" },
 
   // NPCs
   shopkeeper: { glyph: "@", fg: "#c47bff", glow: "#9955cc" },
