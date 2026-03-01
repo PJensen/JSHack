@@ -108,7 +108,7 @@ import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible } from "./rules/environment/dungeon/exploredMap.js";
-import { resetIdentification, identify, restoreIdentification } from "./rules/data/identification.js";
+import { resetIdentification, identify, restoreIdentification, setIdentificationEnabled } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
 import { getClass, listClassIds } from "./rules/data/classes.js";
@@ -224,6 +224,7 @@ bootAdvance("Configured ECS systems");
 
 // Initialize identification & gem pricing for this game run
 resetIdentification();
+setIdentificationEnabled(runtimeConfig.identifyItems);
 if (_pendingSavegame) {
   restoreIdentification(_pendingSavegame.identified);
   if (!Array.isArray(_pendingSavegame.identified)) identify('stone_touchstone');

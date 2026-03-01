@@ -2,9 +2,25 @@
 // Type-level identification knowledge for the current game run.
 // Tracks which item types (by identity string) the player has identified.
 // Extensible: works for any identity string (gems now, scrolls/potions later).
+//
+// The system can be globally enabled/disabled. When disabled, isIdentified()
+// always returns true (all items appear identified).
+
+/** @type {boolean} */
+let _enabled = true;
 
 /** @type {Set<string>} */
 const _identified = new Set();
+
+/** Enable or disable the identification system globally. */
+export function setIdentificationEnabled(on) {
+  _enabled = !!on;
+}
+
+/** Returns true if the identification system is currently enabled. */
+export function isIdentificationEnabled() {
+  return _enabled;
+}
 
 /** Mark an identity as known. Returns true if this was newly identified. */
 export function identify(identity) {
@@ -13,8 +29,9 @@ export function identify(identity) {
   return true;
 }
 
-/** Check if an identity is known. */
+/** Check if an identity is known. When the system is disabled, always true. */
 export function isIdentified(identity) {
+  if (!_enabled) return true;
   return _identified.has(identity);
 }
 

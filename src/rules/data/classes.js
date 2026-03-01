@@ -24,6 +24,7 @@ export const CLASS_DEFS = {
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 1 },
+      { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpell: null,
   },
@@ -50,6 +51,7 @@ export const CLASS_DEFS = {
     },
     inventoryItems: [
       { itemId: 'potion_health', count: 2 },
+      { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpell: 'frost',
   },
@@ -79,6 +81,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_blastwave', count: 1 },
       { itemId: 'potion_poison', count: 2 },
+      { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpell: 'phase_strike',
   },
@@ -107,6 +110,7 @@ export const CLASS_DEFS = {
     inventoryItems: [
       { itemId: 'stone_touchstone', count: 1 },
       { itemId: 'potion_anti_venom', count: 2 },
+      { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpell: null,
   },
@@ -134,6 +138,7 @@ export const CLASS_DEFS = {
     inventoryItems: [
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_holy_water', count: 1 },
+      { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpell: 'flash_heal',
   },
