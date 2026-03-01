@@ -223,11 +223,7 @@ const TRICKERY_SPELL_IDS = new Set(['blink', 'phase_strike']);
 const KILL_STREAK_KEY = Symbol.for('jshack:deity:killStreak');
 const KILL_STREAK_WINDOW = 8;
 
-const _PROFANE = /\b(damn|hell|ass|shit|fuck|crap|piss|bastard|bloody|bollocks|bugger|wanker)\b/i;
-/** @param {unknown} text */
-function _isProfane(text) {
-  return _PROFANE.test(String(text || ''));
-}
+import { isProfane as _isProfane } from '../utils/profanity.js';
 
 /**
  * Install world-event hooks that feed the deity.

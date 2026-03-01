@@ -2381,10 +2381,21 @@ function render(worldView) {
     for (let i = 0; i < worldView.engravings.length; i++) {
       const eng = worldView.engravings[i];
       if (eng.pos.x < vx0 || eng.pos.x > vx1 || eng.pos.y < vy0 || eng.pos.y > vy1) continue;
-      bctx.globalAlpha = (isVis && isVis(eng.pos.x, eng.pos.y)) ? 0.6 : 0.2;
-      bctx.fillStyle = '#8899aa';
+      const visible = isVis && isVis(eng.pos.x, eng.pos.y);
+      bctx.globalAlpha = visible ? 0.6 : 0.2;
       const label = eng.text.length > 8 ? eng.text.slice(0, 7) + '\u2026' : eng.text;
-      bctx.fillText(label, eng.pos.x, eng.pos.y + 0.28);
+      if (eng.profane && visible) {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.004 + eng.pos.x * 3.7);
+        bctx.shadowColor = 'rgba(255,60,60,0.9)';
+        bctx.shadowBlur = 4 + 6 * pulse;
+        bctx.fillStyle = '#ff6655';
+        bctx.fillText(label, eng.pos.x, eng.pos.y + 0.28);
+        bctx.shadowBlur = 0;
+        bctx.shadowColor = 'transparent';
+      } else {
+        bctx.fillStyle = '#8899aa';
+        bctx.fillText(label, eng.pos.x, eng.pos.y + 0.28);
+      }
     }
     bctx.globalAlpha = 1.0;
     bctx.restore();

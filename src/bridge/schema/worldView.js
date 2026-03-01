@@ -29,7 +29,7 @@ import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
-/** @typedef {{ id:number, text:string, pos:{x:number,y:number} }} EngravingView */
+/** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
 const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null };
@@ -349,7 +349,7 @@ export function buildWorldView(world) {
 	// Collect engravings (visible or explored tiles)
 	for (const [id, eng, pos] of world.query(Engraving, Position)) {
 		if (isVisible(pos.x, pos.y) || isExplored(pos.x, pos.y)) {
-			_view.engravings.push({ id, text: eng.text, pos: { x: pos.x, y: pos.y } });
+			_view.engravings.push({ id, text: eng.text, profane: !!eng.profane, pos: { x: pos.x, y: pos.y } });
 		}
 	}
 

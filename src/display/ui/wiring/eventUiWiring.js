@@ -31,8 +31,9 @@ export function installEventUiWiring({
   /** @type {any} */ (world)[_installed] = true;
 
   // Engrave floating text (messages handled in messageWiring)
-  world.on('engrave', ({ text, x, y }) => {
-    try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color: '#8899aa', life: 1.2 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
+  world.on('engrave', ({ text, x, y, profane }) => {
+    const color = profane ? '#ff6655' : '#8899aa';
+    try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color, life: 1.2 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
   });
 
   // Refresh inventory UI when any item is used (consumed/learned/etc.)
