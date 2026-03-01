@@ -553,6 +553,7 @@ function _finalizeNewGame(classData) {
         if (classDef.equipment.weapon) eq.weapon = addStarterItem(classDef.equipment.weapon) || null;
         if (classDef.equipment.armor) eq.armor = addStarterItem(classDef.equipment.armor) || null;
         if (classDef.equipment.shield) eq.shield = addStarterItem(classDef.equipment.shield) || null;
+        if (classDef.equipment.neck) eq.neck = addStarterItem(classDef.equipment.neck) || null;
         if (classDef.equipment.feet) eq.feet = addStarterItem(classDef.equipment.feet) || null;
       }
       if (classDef) {
