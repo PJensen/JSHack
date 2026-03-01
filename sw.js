@@ -36,22 +36,9 @@ self.addEventListener('fetch', (event) => {
     const inScope = url.pathname.startsWith('/src/') || url.pathname.startsWith('/app/');
     const hasVersion = url.searchParams.has('v');
 
-    if (sameOrigin && isJs && inScope && !hasVersion) {
-        const v = getVersionParam();
-        url.searchParams.set('v', v);
-        const alt = new Request(url.toString(), {
-            method: req.method,
-            headers: req.headers,
-            // scripts use GET; avoid cloning body to keep it simple
-            mode: req.mode,
-            credentials: req.credentials,
-            cache: 'no-store',
-            redirect: req.redirect,
-            referrer: req.referrer,
-            referrerPolicy: req.referrerPolicy,
-            integrity: req.integrity,
-        });
-        // Fall back to original request on network error so the page can still load
+    if (sameOrigin && isJs && inScope) {
+        // Always bypass cache for local JS modules
+        const alt = new Request(req, { cache: 'no-store' });
         event.respondWith(fetch(alt).catch(() => fetch(req)));
     }
 });
