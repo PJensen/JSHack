@@ -4,6 +4,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { populateChunk, materializeSpawn } from '../src/rules/environment/dungeon/populate.js';
 import { pickMonster, pickItem, pickSpawner } from '../src/rules/environment/dungeon/tables.js';
+import { getMonstersByTier } from '../src/rules/data/monsters.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
@@ -37,24 +38,13 @@ Deno.test("pickMonster scales HP with depth", () => {
   assert(m20.maxHp > m1.maxHp, `deeper monsters have more HP: ${m1.maxHp} vs ${m20.maxHp}`);
 });
 
-Deno.test("pickSpawner uses rat/cave_snake/cave_spider pool on shallow depth", () => {
-  const rngFirst = {
-    next: () => 0,
-    int: (min) => min,
-    choice: (arr) => arr[0],
-    float: (min) => min,
-  };
-  const first = pickSpawner(rngFirst, 1);
-  assert(first.monsterType.identity === 'rat', `expected rat, got ${first.monsterType.identity}`);
-
-  const rngSecond = {
-    next: () => 0,
-    int: (min, max) => (typeof max === 'number' ? max : min),
-    choice: (arr) => arr[arr.length - 1],
-    float: (min, max) => (typeof max === 'number' ? max : min),
-  };
-  const second = pickSpawner(rngSecond, 1);
-  assert(second.monsterType.identity === 'cave_spider', `expected cave_spider, got ${second.monsterType.identity}`);
+Deno.test("pickSpawner uses tier pool on shallow depth", () => {
+  const rng = createRng(42);
+  const sp = pickSpawner(rng, 1);
+  // Spawners at depth 1 use the tier 0 pool — same as pickMonster
+  const tier0 = getMonstersByTier(0);
+  const tier0Ids = new Set(tier0.map(m => m.id));
+  assert(tier0Ids.has(sp.monsterType.identity), `expected tier 0 monster, got ${sp.monsterType.identity}`);
 });
 
 Deno.test("pickItem returns valid kinds", () => {
@@ -125,8 +115,10 @@ Deno.test("populateChunk can generate a shallow spawner", () => {
   assert(spawners[0].params?.monsterType?.identity === 'rat', 'expected shallow spawner monster to be rat');
 });
 
-Deno.test("populateChunk shallow spawners can be rat, cave_snake, and cave_spider", () => {
+Deno.test("populateChunk shallow spawners draw from tier pool", () => {
   const seen = new Set();
+  const tier0 = getMonstersByTier(0);
+  const tier0Ids = new Set(tier0.map(m => m.id));
   for (let seed = 1; seed <= 200; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
     const rng = createRng(seed * 1337);
@@ -134,14 +126,11 @@ Deno.test("populateChunk shallow spawners can be rat, cave_snake, and cave_spide
     for (const sp of spawns) {
       if (sp.kind !== 'spawner') continue;
       const identity = sp.params?.monsterType?.identity;
-      if (identity === 'rat' || identity === 'cave_snake' || identity === 'cave_spider') seen.add(identity);
+      assert(tier0Ids.has(identity), `spawner monster should be tier 0, got ${identity}`);
+      seen.add(identity);
     }
-    if (seen.size === 3) break;
   }
-
-  assert(seen.has('rat'), 'expected to observe a rat spawner');
-  assert(seen.has('cave_snake'), 'expected to observe a cave_snake spawner');
-  assert(seen.has('cave_spider'), 'expected to observe a cave_spider spawner');
+  assert(seen.size > 1, 'expected spawners to vary across seeds');
 });
 
 Deno.test("spawner wiring: kind -> identity -> worldView -> palette", () => {
