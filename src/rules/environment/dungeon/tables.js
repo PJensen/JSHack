@@ -108,8 +108,34 @@ const PACK_SIZE_BY_CLASS = {
 };
 
 /**
+ * Create spawn params for a specific monster by ID.
+ * @param {string} monsterId
+ * @param {number} depth
+ * @returns {Object|null}
+ */
+export function pickSpecificMonster(monsterId, depth) {
+  const def = getMonster(monsterId);
+  if (!def || isGenocided(monsterId)) return null;
+  return toMonsterSpawnParams(def, depth);
+}
+
+/**
+ * Create a spawner for a specific monster type.
+ * @param {Object} rng
+ * @param {string} monsterId
+ * @param {number} depth
+ * @returns {Object|null}
+ */
+export function pickSpecificSpawner(rng, monsterId, depth) {
+  const params = pickSpecificMonster(monsterId, depth);
+  if (!params) return null;
+  const packRange = PACK_SIZE_BY_CLASS[params.sizeClass] || PACK_SIZE_BY_CLASS['M'];
+  const packSize = rng.int(packRange.min, packRange.max);
+  return { monsterType: params, packSize, depth };
+}
+
+/**
  * Pick spawner parameters based on depth.
- * Returns spawner config with monster type and pack size.
  * @param {Object} rng - createRng() instance
  * @param {number} depth
  * @returns {{monsterType:Object, packSize:number, depth:number}}
