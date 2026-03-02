@@ -108,19 +108,8 @@ const PACK_SIZE_BY_CLASS = {
  * @returns {{monsterType:Object, packSize:number, depth:number}}
  */
 export function pickSpawner(rng, depth) {
-  // Early-game nests are small vermin packs: rats or spiders.
-  // This keeps early spawners readable and dangerous without front-loading heavy monsters.
-  let monsterParams = null;
-  if (depth <= 5) {
-    const earlyPool = ['rat', 'cave_snake', 'cave_spider']
-      .filter((id) => !isGenocided(id))
-      .map((id) => getMonster(id))
-      .filter(Boolean);
-    if (earlyPool.length > 0) {
-      monsterParams = toMonsterSpawnParams(rng.choice(earlyPool), depth);
-    }
-  }
-  if (!monsterParams) monsterParams = pickMonster(rng, depth);
+  // Spawners use the same tier-based pool as individual monsters.
+  const monsterParams = pickMonster(rng, depth);
 
   // Look up pack size based on monster's size class
   const packRange = PACK_SIZE_BY_CLASS[monsterParams.sizeClass] || PACK_SIZE_BY_CLASS['M'];
