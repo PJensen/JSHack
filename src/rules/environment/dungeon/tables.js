@@ -112,7 +112,7 @@ export function pickSpawner(rng, depth) {
   // This keeps early spawners readable and dangerous without front-loading heavy monsters.
   let monsterParams = null;
   if (depth <= 5) {
-    const earlyPool = ['rat', 'spider']
+    const earlyPool = ['rat', 'cave_snake', 'cave_spider']
       .filter((id) => !isGenocided(id))
       .map((id) => getMonster(id))
       .filter(Boolean);
