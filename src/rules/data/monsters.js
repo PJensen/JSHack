@@ -159,6 +159,28 @@ export const MONSTERS = [
   },
 
   {
+    id: 'pit_viper',
+    name: 'Pit Viper',
+    tags: ['beast', 'venomous', 'venom_glowing', 'rare'],
+    tier: 0,
+    rare: true,
+    baseHp: 10,
+    hpPerLevel: 1.5,
+    attack: 2,
+    defense: 0,
+    damageDice: '1d4',
+    sizeClass: 'XS',
+    massKg: 4,
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
+    speed: 3,
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0010, { key: "poison", turnsLeft: 4, potency: 1 }, "proc:poisoned")],
+    },
+    description: 'A thick-bodied serpent with iridescent scales. Its bite delivers a potent venom.',
+    lootTable: 'drop:pit_viper',
+  },
+
+  {
     id: 'skeleton_archer',
     name: 'Skeleton Archer',
     tags: ['undead', 'skeletal'],
@@ -569,7 +591,7 @@ export const MONSTERS = [
 const _byId = new Map(MONSTERS.map(m => [m.id, m]));
 const _byTier = [];
 for (const m of MONSTERS) {
-  (_byTier[m.tier] ??= []).push(m);
+  if (!m.rare) (_byTier[m.tier] ??= []).push(m);
 }
 
 /** Genocide registry — tracks monster IDs permanently removed from the game. */

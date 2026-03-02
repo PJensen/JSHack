@@ -261,6 +261,17 @@ export const LOOT_TABLES = {
 
   // ── Monster-specific overrides ────────────────────────────────────
 
+  "drop:pit_viper": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "table",     weight: 40, tableId: "sub:equip_early_proc" },
+      { type: "table",     weight: 25, tableId: "sub:equip_common" },
+      { type: "table",     weight: 15, tableId: "sub:potions" },
+      { type: "gold",      weight: 15, count: { base: 10, perDepth: 3 } },
+      { type: "table",     weight: 5,  tableId: "sub:scrolls" },
+    ],
+  },
+
   "drop:goblin": {
     rolls: { min: 1, max: 1 },
     entries: [

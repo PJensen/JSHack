@@ -18,6 +18,7 @@ export const basePalette = {
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
   cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
   cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
+  pit_viper: { glyph: "S", fg: "#44dd44", glow: "#22aa22" },
   skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },

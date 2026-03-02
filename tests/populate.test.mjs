@@ -4,7 +4,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { populateChunk, materializeSpawn } from '../src/rules/environment/dungeon/populate.js';
 import { pickMonster, pickItem, pickSpawner } from '../src/rules/environment/dungeon/tables.js';
-import { getMonstersByTier } from '../src/rules/data/monsters.js';
+import { getMonstersByTier, getMonster } from '../src/rules/data/monsters.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
@@ -119,6 +119,8 @@ Deno.test("populateChunk shallow spawners draw from tier pool", () => {
   const seen = new Set();
   const tier0 = getMonstersByTier(0);
   const tier0Ids = new Set(tier0.map(m => m.id));
+  // pit_viper is a rare upgrade from cave_snake/cave_spider, valid at T0
+  if (getMonster('pit_viper')) tier0Ids.add('pit_viper');
   for (let seed = 1; seed <= 200; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
     const rng = createRng(seed * 1337);

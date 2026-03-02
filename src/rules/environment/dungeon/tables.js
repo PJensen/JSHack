@@ -34,7 +34,14 @@ function toMonsterSpawnParams(def, depth) {
 export function pickMonster(rng, depth) {
   const tier = Math.min(Math.floor((depth - 1) / 5), 3);
   const pool = getMonstersByTier(tier);
-  const def = rng.choice(pool);
+  let def = rng.choice(pool);
+
+  // Rare upgrade: cave_snake or cave_spider has a 5% chance to become a pit viper
+  if ((def.id === 'cave_snake' || def.id === 'cave_spider') && rng.next() < 0.05) {
+    const rare = getMonster('pit_viper');
+    if (rare && !isGenocided('pit_viper')) def = rare;
+  }
+
   return toMonsterSpawnParams(def, depth);
 }
 
