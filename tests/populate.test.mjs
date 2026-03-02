@@ -344,8 +344,8 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
   for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
   tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
   // Room 1 (eligible shop room).
-  for (let y = 20; y < 28; y++) for (let x = 20; x < 28; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
-  tiles[24 * CHUNK_SIZE + 19] = TILE_FLOOR;
+  for (let y = 14; y < 21; y++) for (let x = 14; x < 21; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[17 * CHUNK_SIZE + 13] = TILE_FLOOR;
 
   const chunk = {
     chunkX: 0,
@@ -353,7 +353,7 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
     tiles,
     rooms: [
       { x: 1, y: 1, w: 6, h: 6 },
-      { x: 20, y: 20, w: 8, h: 8 },
+      { x: 14, y: 14, w: 7, h: 7 },
     ],
     doors: [],
   };
