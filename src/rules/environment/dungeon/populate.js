@@ -14,7 +14,7 @@ import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopItem } from '../../data/shopStock.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
-import { pickMonster, pickItem, pickTrap, pickSpawner } from './tables.js';
+import { pickMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner } from './tables.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap, ShockTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
@@ -233,6 +233,53 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         }
         if (painted.length > 0) {
           spawns.push({ x: 0, y: 0, kind: 'tile_paint', params: { tiles: painted } });
+        }
+      }
+    }
+  }
+
+  // Depth 1 guaranteed content: skeleton archers, a rare monster, rat/spider spawners.
+  // Only inject into the origin chunk so they appear once per floor.
+  if (floorPlan.depth === 1 && chunk.chunkX === 0 && chunk.chunkY === 0) {
+    const nonEntryRooms = chunk.rooms.filter(r => r !== entryRoom);
+    if (nonEntryRooms.length >= 1) {
+      let roomIdx = 0;
+      const nextRoom = () => nonEntryRooms[roomIdx++ % nonEntryRooms.length];
+
+      // Guaranteed skeleton archer
+      const archerRoom = nextRoom();
+      const ax = archerRoom.x + 1 + rng.int(0, Math.max(0, archerRoom.w - 3));
+      const ay = archerRoom.y + 1 + rng.int(0, Math.max(0, archerRoom.h - 3));
+      const archerParams = pickSpecificMonster('skeleton_archer', 1);
+      if (archerParams) spawns.push({ x: ax, y: ay, kind: 'monster', params: archerParams });
+
+      // Guaranteed rare monster (pit viper)
+      const rareRoom = nextRoom();
+      const rx = rareRoom.x + 1 + rng.int(0, Math.max(0, rareRoom.w - 3));
+      const ry = rareRoom.y + 1 + rng.int(0, Math.max(0, rareRoom.h - 3));
+      const rareParams = pickSpecificMonster('pit_viper', 1);
+      if (rareParams) spawns.push({ x: rx, y: ry, kind: 'monster', params: rareParams });
+
+      // Guaranteed rat/spider spawners (2 nests, picking rat or cave_spider)
+      const verminIds = ['rat', 'cave_spider'];
+      for (let i = 0; i < 2; i++) {
+        const vRoom = nextRoom();
+        const vx = vRoom.x + 1 + rng.int(0, Math.max(0, vRoom.w - 3));
+        const vy = vRoom.y + 1 + rng.int(0, Math.max(0, vRoom.h - 3));
+        const verminId = rng.choice(verminIds);
+        const sp = pickSpecificSpawner(rng, verminId, 1);
+        if (sp) {
+          spawns.push({ x: vx, y: vy, kind: 'spawner', params: sp });
+          // Scatter webs if this is a spider spawner
+          if (verminId === 'cave_spider') {
+            for (let wy = vRoom.y + 1; wy < vRoom.y + vRoom.h - 1; wy++) {
+              for (let wx = vRoom.x + 1; wx < vRoom.x + vRoom.w - 1; wx++) {
+                if (rng.next() < 0.30) {
+                  spawns.push({ x: wx, y: wy, kind: 'web', params: {} });
+                }
+              }
+            }
+          }
         }
       }
     }
