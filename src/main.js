@@ -2327,6 +2327,44 @@ function drawVenomTagAura(ctx, e, fxTime) {
 }
 
 /**
+ * Draw orbiting sparkle motes for entities tagged with `rare`.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawRareSparkle(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const seed = e.id * 0.73;
+  const MOTES = 6;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let i = 0; i < MOTES; i++) {
+    const phase = seed + i * (Math.PI * 2 / MOTES);
+    const speed = 1.4 + (i % 3) * 0.3;
+    const orbit = 0.34 + 0.06 * Math.sin(fxTime * 0.8 + i);
+    const angle = fxTime * speed + phase;
+    const mx = cx + Math.cos(angle) * orbit;
+    const my = cy + Math.sin(angle) * orbit;
+
+    const flicker = 0.5 + 0.5 * Math.sin(fxTime * 5.0 + i * 1.9);
+    const a = 0.35 + 0.45 * flicker;
+    const r = 0.035 + 0.01 * flicker;
+
+    const grad = ctx.createRadialGradient(mx, my, 0, mx, my, r);
+    grad.addColorStop(0, `rgba(200,255,140,${a.toFixed(3)})`);
+    grad.addColorStop(1, 'rgba(100,220,80,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
  * @param {number} n
  */
 function clamp01(n) {
@@ -2542,6 +2580,9 @@ function render(worldView) {
     }
     if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
       drawVenomTagAura(bctx, e, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
+      drawRareSparkle(bctx, e, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -2829,6 +2870,9 @@ function render(worldView) {
     }
     if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
       drawVenomTagAura(bctx, e, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
+      drawRareSparkle(bctx, e, _fxTime);
     }
   }
 
