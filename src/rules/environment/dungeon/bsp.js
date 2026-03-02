@@ -4,7 +4,7 @@
 
 import {
   TILE_VOID, TILE_FLOOR, TILE_WALL,
-  MIN_LEAF_SIZE, MIN_ROOM_SIZE, ROOM_MARGIN,
+  MIN_LEAF_SIZE, MIN_ROOM_SIZE, MAX_ROOM_SIZE, ROOM_MARGIN,
   SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, BSP_MAX_DEPTH,
 } from './constants.js';
 
@@ -91,8 +91,8 @@ export function placeRooms(node, rng) {
 
   if (maxW < MIN_ROOM_SIZE || maxH < MIN_ROOM_SIZE) return; // too small
 
-  const rw = rng.int(MIN_ROOM_SIZE, maxW);
-  const rh = rng.int(MIN_ROOM_SIZE, maxH);
+  const rw = rng.int(MIN_ROOM_SIZE, Math.min(maxW, MAX_ROOM_SIZE));
+  const rh = rng.int(MIN_ROOM_SIZE, Math.min(maxH, MAX_ROOM_SIZE));
 
   // Random position within the leaf
   const rx = node.x + ROOM_MARGIN + (maxW > rw ? rng.int(0, maxW - rw) : 0);
