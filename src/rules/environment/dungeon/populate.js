@@ -96,6 +96,22 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const diff = floorPlan.difficultyMult;
   const SPAWNER_CHANCE_PER_MONSTER = 0.35; // Convert room monster budget into a per-room nest chance.
 
+  // Track occupied positions for solid/immovable features (decorations, chests, tombstones,
+  // spawners) so nothing gets placed on top of something else solid.
+  const solidPositions = new Set(); // "x,y" string keys
+  const isSolid = (x, y) => solidPositions.has(`${x},${y}`);
+  const markSolid = (x, y) => solidPositions.add(`${x},${y}`);
+
+  // Pre-mark stair tiles so monsters, traps, and other spawns never land on them.
+  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      const t = chunk.tiles[ly * CHUNK_SIZE + lx];
+      if (t === TILE_STAIR_DOWN || t === TILE_STAIR_UP) {
+        markSolid(chunk.chunkX * CHUNK_SIZE + lx, chunk.chunkY * CHUNK_SIZE + ly);
+      }
+    }
+  }
+
   // Identify the player's entry room so we don't clutter it with a feature
   const entryRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
     ? chunk.rooms[0]
@@ -107,31 +123,37 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Place a room feature (~50% of non-entry rooms get one)
     const isEntryRoom = room === entryRoom;
     let roomHasWeaponRack = false;
-    let decorationPos = null;
     if (!isEntryRoom && rng.next() < 0.50) {
       const featureKind = pickRoomFeature(rng);
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
-      spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
-      if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
-      decorationPos = { x: cx, y: cy };
+      // Don't place a feature on a stair (or any other already-solid tile).
+      if (!isSolid(cx, cy)) {
+        spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
+        if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
+        markSolid(cx, cy);
 
-      // Sacred rooms (altar or shrine) get a torch in each corner when the room
-      // is large enough to have four obvious, distinct inner corner tiles.
-      // Sacred rooms (altar or shrine) get a torch in each floor corner when the
-      // room is large enough to have four obvious, distinct corner tiles.
-      // room.x/y is the first floor tile; walls are carved outside at x-1, y-1.
-      const isSacred = featureKind === 'altar' || featureKind === 'shrine';
-      if (isSacred && room.w >= 4 && room.h >= 4) {
-        spawns.push({ x: room.x,             y: room.y,             kind: 'torch', params: {} });
-        spawns.push({ x: room.x + room.w - 1, y: room.y,             kind: 'torch', params: {} });
-        spawns.push({ x: room.x,             y: room.y + room.h - 1, kind: 'torch', params: {} });
-        spawns.push({ x: room.x + room.w - 1, y: room.y + room.h - 1, kind: 'torch', params: {} });
+        // Sacred rooms (altar or shrine) get a torch in each floor corner when the
+        // room is large enough to have four obvious, distinct corner tiles.
+        // room.x/y is the first floor tile; walls are carved outside at x-1, y-1.
+        const isSacred = featureKind === 'altar' || featureKind === 'shrine';
+        if (isSacred && room.w >= 4 && room.h >= 4) {
+          const corners = [
+            { x: room.x,             y: room.y             },
+            { x: room.x + room.w - 1, y: room.y             },
+            { x: room.x,             y: room.y + room.h - 1 },
+            { x: room.x + room.w - 1, y: room.y + room.h - 1 },
+          ];
+          for (const c of corners) {
+            spawns.push({ x: c.x, y: c.y, kind: 'torch', params: {} });
+            markSolid(c.x, c.y);
+          }
+        }
       }
     }
 
-    // Monster density: ~1 per 20-30 floor tiles, scaled by depth
-    const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(20, 30) * diff));
+    // Monster density: ~1 per 12-18 floor tiles, scaled by depth
+    const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
     const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
     const spawnerBudget = totalMonsterBudget > 0 && rng.next() < spawnerChance ? 1 : 0;
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
@@ -146,18 +168,26 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
         my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
         attempts++;
-      } while (decorationPos && mx === decorationPos.x && my === decorationPos.y && attempts < 10);
+      } while (isSolid(mx, my) && attempts < 10);
       const sp = pickSpawner(rng, floorPlan.depth);
       const isSpiderSpawner = sp.monsterType?.identity === 'spider' || sp.monsterType?.identity === 'cave_spider';
-      spawns.push({ x: mx, y: my, kind: 'spawner', params: sp });
-      if (isSpiderSpawner) roomHasSpider = true;
-      roomSpawners.push({ x: mx, y: my, isSpider: isSpiderSpawner });
+      if (!isSolid(mx, my)) {
+        markSolid(mx, my);
+        spawns.push({ x: mx, y: my, kind: 'spawner', params: sp });
+        if (isSpiderSpawner) roomHasSpider = true;
+        roomSpawners.push({ x: mx, y: my, isSpider: isSpiderSpawner });
+      }
     }
 
-    // Place individual monsters
+    // Place individual monsters — avoid solid features (decorations, chests, spawners)
     for (let i = 0; i < monsterBudget; i++) {
-      const mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      let mx, my, attempts = 0;
+      do {
+        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+        attempts++;
+      } while (isSolid(mx, my) && attempts < 10);
+      if (isSolid(mx, my)) continue;
       const mp = pickMonster(rng, floorPlan.depth);
       spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
       if (mp.identity === 'spider' || mp.identity === 'cave_spider') roomHasSpider = true;
@@ -191,22 +221,37 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       });
     }
 
-    // Trap density: ~1 per 30-50 floor tiles
-    const trapBudget = Math.max(1, Math.floor(area / rng.int(30, 50)));
-    for (let i = 0; i < trapBudget; i++) {
-      const tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      const ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-      const trap = pickTrap(rng, floorPlan.depth);
-      spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
+    // Trap density: ~33% of rooms get a trap (infrequent enough to lull players)
+    if (rng.next() < 0.33) {
+      const trapBudget = area >= 64 ? rng.int(1, 2) : 1;
+      for (let i = 0; i < trapBudget; i++) {
+        let tx, ty, attempts = 0;
+        do {
+          tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+          ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+          attempts++;
+        } while (isSolid(tx, ty) && attempts < 10);
+        if (isSolid(tx, ty)) continue;
+        const trap = pickTrap(rng, floorPlan.depth);
+        spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
+      }
     }
 
     // Chest: ~13% chance per room (rare find). Weapon racks count as equivalent — skip if the room already has one.
+    // Never place on top of a decoration, sarcophagus, tombstone, spawner, or any other solid feature.
     if (!roomHasWeaponRack && rng.next() < 0.13) {
-      const chx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      const chy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-      const d = floorPlan.depth;
-      const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
-      spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
+      let chx, chy, chAttempts = 0;
+      do {
+        chx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+        chy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+        chAttempts++;
+      } while (isSolid(chx, chy) && chAttempts < 10);
+      if (!isSolid(chx, chy)) {
+        markSolid(chx, chy);
+        const d = floorPlan.depth;
+        const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
+        spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
+      }
     }
 
     // Hazard tile patches — paint ice / shallow water / lava near room center
@@ -264,11 +309,16 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const verminIds = ['rat', 'cave_spider'];
       for (let i = 0; i < 2; i++) {
         const vRoom = nextRoom();
-        const vx = vRoom.x + 1 + rng.int(0, Math.max(0, vRoom.w - 3));
-        const vy = vRoom.y + 1 + rng.int(0, Math.max(0, vRoom.h - 3));
+        let vx, vy, vAttempts = 0;
+        do {
+          vx = vRoom.x + 1 + rng.int(0, Math.max(0, vRoom.w - 3));
+          vy = vRoom.y + 1 + rng.int(0, Math.max(0, vRoom.h - 3));
+          vAttempts++;
+        } while (isSolid(vx, vy) && vAttempts < 10);
         const verminId = rng.choice(verminIds);
         const sp = pickSpecificSpawner(rng, verminId, 1);
-        if (sp) {
+        if (sp && !isSolid(vx, vy)) {
+          markSolid(vx, vy);
           spawns.push({ x: vx, y: vy, kind: 'spawner', params: sp });
           // Scatter webs if this is a spider spawner
           if (verminId === 'cave_spider') {
@@ -367,19 +417,22 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       rng
     );
 
-    // Place tombstones in random rooms
+    // Place tombstones in random rooms, avoiding solid features.
     for (const tombstoneData of tombstones) {
       const roomIdx = Math.floor(rng.next() * chunk.rooms.length);
       const room = chunk.rooms[roomIdx];
-      const tx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      const ty = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-
-      spawns.push({
-        x: tx,
-        y: ty,
-        kind: 'tombstone',
-        params: tombstoneData
-      });
+      if (!room) continue;
+      const rngAny = /** @type {any} */ (rng);
+      let tx, ty, tAttempts = 0;
+      do {
+        tx = room.x + 1 + rngAny.int(0, Math.max(0, room.w - 3));
+        ty = room.y + 1 + rngAny.int(0, Math.max(0, room.h - 3));
+        tAttempts++;
+      } while (isSolid(tx, ty) && tAttempts < 10);
+      if (!isSolid(tx, ty)) {
+        markSolid(tx, ty);
+        spawns.push({ x: tx, y: ty, kind: 'tombstone', params: tombstoneData });
+      }
     }
   }
 
@@ -639,8 +692,13 @@ export function materializeSpawn(world, spawn) {
       // Place it on the floor
       world.add(itemId, Position, { x: spawn.x, y: spawn.y });
 
-      // Calculate price (will be added as Unpaid in post-processing)
+      // Shop items are pre-identified on the entity — no identify mask.
       const info = world.get(itemId, ItemInfo);
+      if (info) {
+        world.mutate(itemId, ItemInfo, r => { r.identified = true; });
+      }
+
+      // Calculate price (will be added as Unpaid in post-processing)
       if (info) {
         const baseValue = appraiseItemValue(world, itemId, {
           unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),

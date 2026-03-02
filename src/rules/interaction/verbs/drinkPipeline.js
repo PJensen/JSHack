@@ -1,5 +1,6 @@
 import { Potion } from "../../components/Potion.js";
 import { Vitality } from "../../components/Vitality.js";
+import { isIdentified } from "../../data/identification.js";
 
 /**
  * @param {any} hookOwner
@@ -42,7 +43,7 @@ function runPayloadHooks(ctx, hooks, state) {
  * @param {any} effect
  * @param {any} ctx
  * @param {number} target
- * @param {{ route?: string, name?: string }} potionMeta
+ * @param {{ route?: string, name?: string, masked?: boolean }} potionMeta
  * @returns {any}
  */
 function normalizePotionEffect(effect, ctx, target, potionMeta) {
@@ -61,6 +62,7 @@ function normalizePotionEffect(effect, ctx, target, potionMeta) {
       route: String(potionMeta?.route || "oral"),
       name: String(potionMeta?.name || "Potion"),
       ...(input.meta && typeof input.meta === "object" ? input.meta : {}),
+      masked: !!potionMeta?.masked,
     },
   };
 
@@ -139,11 +141,14 @@ export function drinkPipeline(ctx) {
   const paramsPayload = ctx.params?.payload && typeof ctx.params.payload === "object"
     ? ctx.params.payload
     : null;
+  const identity = String(ctx.query.identity(itemId) || "").toLowerCase();
+  const identified = isIdentified(identity);
   const state = {
     actor,
     itemId,
     target,
-    identity: String(ctx.query.identity(itemId) || "").toLowerCase(),
+    identity,
+    identified,
     potion,
   };
   const hooks = {
@@ -164,7 +169,7 @@ export function drinkPipeline(ctx) {
 
   const effects = Array.isArray(potion.effects) ? potion.effects : [];
   for (let i = 0; i < effects.length; i++) {
-    const normalized = normalizePotionEffect(effects[i], ctx, target, { route, name: potion.name });
+    const normalized = normalizePotionEffect(effects[i], ctx, target, { route, name: potion.name, masked: !identified });
     if (!normalized.key || normalized.turnsLeft <= 0) continue;
     ctx.mutate.upsertTimedEffect(target, normalized);
     metrics.queuedEffects += 1;
@@ -196,7 +201,7 @@ export function drinkPipeline(ctx) {
   if (ctx.cancelled) return { metrics, payload };
 
   ctx.io.emit("effectsChanged", { entity: target });
-  ctx.io.emit("drank", { actor, itemId, target });
+  ctx.io.emit("drank", { actor, itemId, target, feel: potion.feel || null, identified });
   ctx.io.emit("item:used", { actor, itemId });
 
   ctx.audit.breadcrumb("drink:queued", metrics);

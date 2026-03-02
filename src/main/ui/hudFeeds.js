@@ -113,9 +113,10 @@ export function createHudFeeds(world, deps) {
         if (!key) continue;
         const turns = Math.max(0, Number(e?.turnsLeft || e?.duration || 0));
         const stacks = Math.max(1, Number(e?.stacks || 1));
+        const masked = e?.meta?.masked === true;
         const prev = statusMap.get(key);
-        if (!prev) statusMap.set(key, { key, turns, stacks });
-        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+        if (!prev) statusMap.set(key, { key, turns, stacks, masked });
+        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks), masked: prev.masked && masked });
       }
     }
     if (Array.isArray(semanticStatus?.statuses)) {
@@ -125,8 +126,8 @@ export function createHudFeeds(world, deps) {
         const turns = Math.max(0, Number(s?.duration || s?.turns || 0));
         const stacks = Math.max(1, Number(s?.stacks || 1));
         const prev = statusMap.get(key);
-        if (!prev) statusMap.set(key, { key, turns, stacks });
-        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+        if (!prev) statusMap.set(key, { key, turns, stacks, masked: false });
+        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks), masked: prev.masked });
       }
     }
     const hc = /** @type any */ (world.get(pe.id, Hunger));
@@ -137,12 +138,12 @@ export function createHudFeeds(world, deps) {
         const turns = hc.satiation > 0 ? Math.max(0, Number(hc.satiation || 0)) : 9999;
         const stacks = 1;
         const prev = statusMap.get(key);
-        if (!prev) statusMap.set(key, { key, turns, stacks });
-        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+        if (!prev) statusMap.set(key, { key, turns, stacks, masked: false });
+        else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks), masked: false });
       }
     }
     const statuses = Array.from(statusMap.values());
-    const statusSig = statuses.map((s) => `${s.key}:${s.turns}:${s.stacks}`).join("|");
+    const statusSig = statuses.map((s) => `${s.key}:${s.turns}:${s.stacks}:${s.masked ? 1 : 0}`).join("|");
 
     const affixIds = [];
     const pushAffixes = (id) => {

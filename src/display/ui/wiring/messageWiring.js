@@ -215,10 +215,18 @@ export function installMessageWiring({
   });
 
   // === Item events ===
-  world.on('drank', ({ actor, itemId, target }) => {
+  world.on('drank', ({ actor, itemId, target, feel, identified }) => {
     const who = nameOfEntity(actor);
-    const it = nameOfItem(itemId);
     const tgt = nameOfEntity(target || actor);
+    if (identified === false && feel) {
+      if (who === 'You') {
+        log(`You drink an unknown vial. ${feel}`, 'system');
+      } else {
+        log(`${who} drinks an unknown vial.`, 'system');
+      }
+      return;
+    }
+    const it = nameOfItem(itemId);
     if (tgt === 'You' && who === 'You') {
       log(`You drink ${it}.`, 'system');
     } else if (who === tgt) {
@@ -842,13 +850,21 @@ export function installMessageWiring({
   });
 
   world.on('dungeon:teleport-depth', ({ actor, targetDepth, source }) => {
-    if (String(source || '') !== 'scroll_homecoming') return;
     if (Number(targetDepth) !== 0) return;
+    const src = String(source || '');
     const who = nameOfEntity(actor);
-    if (who === 'You') {
-      log('The scroll turns to warm ash. A familiar pull carries you home.', 'system');
-    } else {
-      log(`${who} vanishes in a swirl of warm ash.`, 'system');
+    if (src === 'scroll_homecoming') {
+      if (who === 'You') {
+        log('The scroll turns to warm ash. A familiar pull carries you home.', 'system');
+      } else {
+        log(`${who} vanishes in a swirl of warm ash.`, 'system');
+      }
+    } else if (src === 'hearthstone') {
+      if (who === 'You') {
+        log('The hearthstone pulses with warmth. You are pulled home.', 'system');
+      } else {
+        log(`${who} vanishes in a pulse of hearthlight.`, 'system');
+      }
     }
   });
 

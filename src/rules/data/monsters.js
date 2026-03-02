@@ -26,6 +26,8 @@ export const MONSTERS = [
     name: 'Rat',
     tags: ['beast', 'vermin'],
     tier: 0,
+    intelligence: 2,   // basic animal instinct
+    packSense: true, packRadius: 6,
     baseHp: 5,
     hpPerLevel: 1,
     attack: 0,
@@ -45,6 +47,8 @@ export const MONSTERS = [
     name: 'Goblin',
     tags: ['humanoid'],
     tier: 0,
+    intelligence: 4,   // pack animal — cunning enough to call for help
+    packSense: true, packRadius: 8,
     baseHp: 8,
     hpPerLevel: 1.5,
     attack: 1,
@@ -65,6 +69,8 @@ export const MONSTERS = [
     name: 'Bat',
     tags: ['beast', 'vermin'],
     tier: 0,
+    intelligence: 2,   // basic animal instinct
+    aggro: 'passive',  // doesn't attack on sight — only when struck
     baseHp: 3,
     hpPerLevel: 0.5,
     attack: 0,
@@ -85,6 +91,7 @@ export const MONSTERS = [
     name: 'Grid Bug',
     tags: ['beast', 'vermin', 'electric'],
     tier: 0,
+    intelligence: 1,   // mindless; instinct only
     baseHp: 3,
     hpPerLevel: 0.5,
     attack: 0,
@@ -106,6 +113,8 @@ export const MONSTERS = [
     name: 'Cave Snake',
     tags: ['beast'],
     tier: 0,
+    intelligence: 2,   // basic animal instinct
+    aggro: 'passive',  // harmless unless provoked
     baseHp: 5,
     hpPerLevel: 1,
     attack: 0,
@@ -123,6 +132,8 @@ export const MONSTERS = [
     name: 'Cave Spider',
     tags: ['beast'],
     tier: 0,
+    intelligence: 3,   // cunning predator
+    packSense: true, packRadius: 5,
     baseHp: 6,
     hpPerLevel: 1,
     attack: 0,
@@ -143,6 +154,8 @@ export const MONSTERS = [
     name: 'Snake',
     tags: ['beast', 'venomous'],
     tier: 1,
+    intelligence: 2,   // basic animal instinct
+    aggro: 'passive',  // defensive — strikes only when approached
     baseHp: 7,
     hpPerLevel: 1.2,
     attack: 1,
@@ -164,7 +177,8 @@ export const MONSTERS = [
     tags: ['beast', 'venomous', 'venom_glowing', 'rare'],
     tier: 0,
     rare: true,
-    baseHp: 10,
+    intelligence: 2,   // basic animal instinct
+    baseHp: 20,
     hpPerLevel: 1.5,
     attack: 2,
     defense: 0,
@@ -181,10 +195,34 @@ export const MONSTERS = [
   },
 
   {
+    id: 'cave_bear',
+    name: 'Cave Bear',
+    tags: ['beast', 'rare'],
+    tier: 0,
+    rare: true,
+    intelligence: 3,   // predatory instinct
+    baseHp: 28,
+    hpPerLevel: 2,
+    attack: 4,
+    defense: 2,
+    damageDice: '2d6',
+    sizeClass: 'L',
+    massKg: 350,
+    resistances: { kinetic: { DR: 8 } },
+    speed: 1,
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0200, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
+    },
+    description: 'A massive bear with matted fur and scarred hide. Its claws can split stone.',
+  },
+
+  {
     id: 'skeleton_archer',
     name: 'Skeleton Archer',
     tags: ['undead', 'skeletal'],
     tier: 0,
+    intelligence: 5,   // humanoid dim — follows orders
+    packSense: true, packRadius: 8,
     baseHp: 6,
     hpPerLevel: 1,
     attack: 2,
@@ -208,6 +246,8 @@ export const MONSTERS = [
     name: 'Bone Bowman',
     tags: ['undead', 'skeletal'],
     tier: 1,
+    intelligence: 5,   // humanoid dim
+    packSense: true, packRadius: 8,
     baseHp: 10,
     hpPerLevel: 1.5,
     attack: 3,
@@ -231,6 +271,8 @@ export const MONSTERS = [
     name: 'Orc',
     tags: ['humanoid'],
     tier: 1,
+    intelligence: 5,   // humanoid dim — brute
+    packSense: true, packRadius: 8,
     baseHp: 15,
     hpPerLevel: 2,
     attack: 2,
@@ -250,6 +292,8 @@ export const MONSTERS = [
     name: 'Skeleton',
     tags: ['undead', 'skeletal'],
     tier: 1,
+    intelligence: 4,   // pack animal — horde behavior
+    packSense: true, packRadius: 8,
     baseHp: 12,
     hpPerLevel: 1.8,
     attack: 1,
@@ -272,6 +316,8 @@ export const MONSTERS = [
     name: 'Spider',
     tags: ['beast', 'venomous'],
     tier: 1,
+    intelligence: 3,   // cunning predator
+    packSense: true, packRadius: 6,
     baseHp: 10,
     hpPerLevel: 1.5,
     attack: 2,
@@ -294,6 +340,8 @@ export const MONSTERS = [
     name: 'Skeletal Marksman',
     tags: ['undead', 'skeletal'],
     tier: 2,
+    intelligence: 5,   // humanoid dim
+    packSense: true, packRadius: 8,
     baseHp: 16,
     hpPerLevel: 2,
     attack: 4,
@@ -317,6 +365,8 @@ export const MONSTERS = [
     name: 'Skeleton Sharpshooter',
     tags: ['undead', 'skeletal'],
     tier: 2,
+    intelligence: 5,   // humanoid dim
+    packSense: true, packRadius: 8,
     baseHp: 14,
     hpPerLevel: 2,
     attack: 5,
@@ -340,6 +390,7 @@ export const MONSTERS = [
     name: 'Troll',
     tags: ['giant', 'regenerator'],
     tier: 2,
+    intelligence: 5,   // dim but relentless
     baseHp: 25,
     hpPerLevel: 3,
     attack: 3,
@@ -360,6 +411,8 @@ export const MONSTERS = [
     name: 'Wraith',
     tags: ['undead', 'spectral'],
     tier: 2,
+    intelligence: 7,   // tactical mind — fights and flees
+    retreatHpPct: 0.25,
     baseHp: 18,
     hpPerLevel: 2.5,
     attack: 3,
@@ -382,6 +435,7 @@ export const MONSTERS = [
     name: 'Ogre',
     tags: ['giant', 'humanoid'],
     tier: 2,
+    intelligence: 5,   // humanoid dim — sluggish aggression
     baseHp: 30,
     hpPerLevel: 2,
     attack: 4,
@@ -402,6 +456,8 @@ export const MONSTERS = [
     name: 'Floating Eye',
     tags: ['aberration', 'psychic'],
     tier: 2,
+    intelligence: 9,   // highly intelligent — patient and deadly
+    ambush: true,      // waits for prey to come to it
     baseHp: 38,
     hpPerLevel: 3.5,
     attack: 5,
@@ -425,6 +481,9 @@ export const MONSTERS = [
     name: 'Carrion Shade',
     tags: ['undead', 'spectral'],
     tier: 2,
+    intelligence: 7,   // tactical — lurks then retreats when cornered
+    ambush: true,      // lurks until player is within 2 tiles
+    retreatHpPct: 0.30,
     baseHp: 20,
     hpPerLevel: 2.5,
     attack: 3,
@@ -445,7 +504,7 @@ export const MONSTERS = [
       ],
       onDamaged: [phaseOutOnDamaged(25, 0xdead0102)],
     },
-    description: 'A shadow that coalesces around old blood. It strikes harder against the wounded and fades when cornered.',
+    description: 'A shadow that coalesces around old blood. It lurks in darkness and strikes harder against the wounded.',
     lootTable: 'drop:tier2',
   },
 
@@ -455,6 +514,8 @@ export const MONSTERS = [
     name: 'Death Archer',
     tags: ['undead', 'skeletal'],
     tier: 3,
+    intelligence: 6,   // cunning hunter
+    packSense: true, packRadius: 10,
     baseHp: 28,
     hpPerLevel: 3,
     attack: 5,
@@ -479,6 +540,8 @@ export const MONSTERS = [
     name: 'Demon',
     tags: ['demon', 'planar'],
     tier: 3,
+    intelligence: 8,   // smart predator — proud but not suicidal
+    retreatHpPct: 0.20,
     baseHp: 40,
     hpPerLevel: 4,
     attack: 5,
@@ -502,6 +565,8 @@ export const MONSTERS = [
     name: 'Dragon',
     tags: ['beast', 'draconic'],
     tier: 3,
+    intelligence: 8,   // apex predator — territorial and cunning
+    retreatHpPct: 0.15,
     baseHp: 50,
     hpPerLevel: 5,
     attack: 6,
@@ -523,8 +588,10 @@ export const MONSTERS = [
   {
     id: 'lich',
     name: 'Lich',
-    tags: ['undead', 'caster'],
+    tags: ['undead', 'caster', 'humanoid'],
     tier: 3,
+    intelligence: 10,  // sapient sorcerer — picks up better weapons
+    retreatHpPct: 0.25,
     baseHp: 35,
     hpPerLevel: 3.5,
     attack: 4,
@@ -550,6 +617,8 @@ export const MONSTERS = [
     name: 'Mimic',
     tags: ['aberration', 'mimic'],
     tier: 99,
+    intelligence: 6,   // cunning ambusher — waits for victims
+    ambush: true,
     baseHp: 16,
     hpPerLevel: 1.5,
     attack: 3,
@@ -568,6 +637,8 @@ export const MONSTERS = [
     name: 'Taunting Statue',
     tags: ['construct'],
     tier: 99,
+    intelligence: 2,   // construct with scripted taunting behavior
+    ambush: true,      // doesn't move; waits for targets to come close
     baseHp: 45,
     hpPerLevel: 0,
     attack: 2,

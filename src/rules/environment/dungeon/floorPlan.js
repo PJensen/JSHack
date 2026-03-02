@@ -30,9 +30,13 @@ import { OVERWORLD_EXTENT } from './overworld.js';
  * Called once when entering a new floor.
  * @param {number} worldSeed
  * @param {number} depth
+ * @param {{x:number,y:number}[]|null} [priorDownStairPositions]
+ *   Actual world positions of down-stairs on the floor above.
+ *   When provided, up-stairs are placed at those exact positions (positional-identity
+ *   contract) rather than being independently computed.
  * @returns {FloorPlan}
  */
-export function generateFloorPlan(worldSeed, depth) {
+export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = null) {
   if (depth === 0) {
     return {
       depth,
@@ -60,28 +64,49 @@ export function generateFloorPlan(worldSeed, depth) {
   // 0.3 (compact/mobile) grows slowly, 1.0 grows every ~3 floors.
   const stairOffset = Math.min(3, Math.floor(depth * scale / 3));
 
-  // Down stairs: offset from origin on deeper floors
-  let downCX = 0, downCY = 0;
-  if (stairOffset > 0) {
-    downCX = rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
-    downCY = rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
-  }
-  const downStairs = [{
-    chunkX: downCX,
-    chunkY: downCY,
-    localX: rng.int(4, CHUNK_SIZE - 5),
-    localY: rng.int(4, CHUNK_SIZE - 5),
-  }];
-
-  // Up stairs: always near origin (player enters here)
-  const upStairs = [];
-  if (depth >= 1) {
-    upStairs.push({
-      chunkX: 0,
-      chunkY: 0,
+  // Down stairs: generate minDownStairs–maxDownStairs per floor, each with an independent
+  // chunk offset so they spread across the floor on deeper levels.
+  // At shallow depths (stairOffset = 0) they share chunk (0,0) and land in different rooms.
+  const count = rng.int(dungeonConfig.minDownStairs, dungeonConfig.maxDownStairs);
+  const downStairs = [];
+  for (let i = 0; i < count; i++) {
+    let cX = 0, cY = 0;
+    if (stairOffset > 0) {
+      cX = rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+      cY = rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+    }
+    downStairs.push({
+      chunkX: cX,
+      chunkY: cY,
       localX: rng.int(4, CHUNK_SIZE - 5),
       localY: rng.int(4, CHUNK_SIZE - 5),
     });
+  }
+
+  // Up stairs: inherit the prior floor's down-stair positions (positional-identity
+  // contract) when available, otherwise place independently near origin.
+  const upStairs = [];
+  if (depth >= 1) {
+    if (Array.isArray(priorDownStairPositions) && priorDownStairPositions.length > 0) {
+      for (const { x, y } of priorDownStairPositions) {
+        const chunkX = Math.floor(x / CHUNK_SIZE);
+        const chunkY = Math.floor(y / CHUNK_SIZE);
+        upStairs.push({
+          chunkX,
+          chunkY,
+          localX: x - chunkX * CHUNK_SIZE,
+          localY: y - chunkY * CHUNK_SIZE,
+          forced: true,
+        });
+      }
+    } else {
+      upStairs.push({
+        chunkX: 0,
+        chunkY: 0,
+        localX: rng.int(4, CHUNK_SIZE - 5),
+        localY: rng.int(4, CHUNK_SIZE - 5),
+      });
+    }
   }
 
   // Derive chunk extent from stair positions + 1 chunk padding
@@ -100,7 +125,7 @@ export function generateFloorPlan(worldSeed, depth) {
     downStairs,
     upStairs,
     extent,
-    difficultyMult: 1.0 + (depth - 1) * 0.15,
+    difficultyMult: 1.0 + (depth - 1) * 0.017,
     theme: _pickTheme(rng, depth),
   };
 }

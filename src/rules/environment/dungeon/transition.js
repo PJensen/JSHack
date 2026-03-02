@@ -20,6 +20,44 @@ const _exploredCache = new Map();
 /** @type {Map<number, { snapshot: any, order: number[] }>} floor entity snapshots keyed by depth */
 const _floorEntityCache = new Map();
 
+/** Max floor entity snapshots held in the JS heap; older entries are evicted to localStorage. */
+const MAX_MEMORY_FLOORS = 5;
+
+/** @param {number} worldSeed @param {number} depth @returns {string} */
+function _floorStorageKey(worldSeed, depth) {
+  return `jshack:floor:${(worldSeed >>> 0).toString(16)}:${depth}`;
+}
+
+/** @param {number} worldSeed @param {number} depth @param {object} entry */
+function _persistFloor(worldSeed, depth, entry) {
+  if (typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(_floorStorageKey(worldSeed, depth), JSON.stringify(entry)); } catch { /* quota exceeded — skip */ }
+}
+
+/** @param {number} worldSeed @param {number} depth @returns {{ snapshot: any, order: number[] }|null} */
+function _loadPersistedFloor(worldSeed, depth) {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(_floorStorageKey(worldSeed, depth));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/** Evict in-memory entries farthest from `currentDepth` until within MAX_MEMORY_FLOORS.
+ *  Evicted entries are already persisted to localStorage; just drop the heap reference.
+ * @param {number} currentDepth */
+function _evictMemoryFloors(currentDepth) {
+  while (_floorEntityCache.size > MAX_MEMORY_FLOORS) {
+    let furthestDepth = null, maxDist = -1;
+    for (const d of _floorEntityCache.keys()) {
+      const dist = Math.abs(d - currentDepth);
+      if (dist > maxDist) { maxDist = dist; furthestDepth = d; }
+    }
+    if (furthestDepth === null) break;
+    _floorEntityCache.delete(furthestDepth);
+  }
+}
+
 /**
  * Build a runtime component registry from currently known stores.
  * @param {import('../../../lib/ecs-js/index.js').World} world
@@ -48,7 +86,7 @@ function _buildSnapshotRegistry(world) {
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
- * @param {{direction?: 'up'|'down', tombstoneRepo?: Object, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
+ * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
  */
 export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
@@ -60,16 +98,22 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     break;
   }
 
+  // Compute worldSeed early — needed for floor cache persistence keys.
+  const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
+
   // Save explored map for the current floor before clearing
   const currentDepth = ds ? ds.currentDepth : 0;
   if (ds && Array.isArray(ds.floorEntityIds)) {
     if (currentDepth > 0) _exploredCache.set(currentDepth, saveExplored());
     const floorIds = ds.floorEntityIds
-      .filter((id) => Number.isInteger(id) && id > 0 && world.isAlive(id));
-    _floorEntityCache.set(currentDepth, {
+      .filter((/** @type {number} */ id) => Number.isInteger(id) && id > 0 && world.isAlive(id));
+    const entry = {
       snapshot: serializeEntities(world, floorIds, { note: `floor_depth_${currentDepth}` }),
       order: floorIds.slice(),
-    });
+    };
+    _persistFloor(worldSeed, currentDepth, entry);
+    _floorEntityCache.set(currentDepth, entry);
+    _evictMemoryFloors(newDepth);
   }
 
   // Destroy all entities from the current floor (destroySubtree cascades to
@@ -95,14 +139,18 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   clearSpatialIndex(world);
   invalidateTileQueryCache(world);
 
-  // Generate the new floor
-  const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
+  // Generate the new floor, inheriting down-stair positions from the current floor
+  // when descending so up-stairs land at the same world coordinates.
   const tombstoneRepo = opts.tombstoneRepo || null;
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
-  const { spawnX, spawnY, entityIds: generatedEntityIds } = generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress);
+  const isDescending = newDepth > currentDepth;
+  const priorDownStairPositions = (isDescending && Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0)
+    ? ds.downStairPositions : null;
+  const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions } =
+    generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions);
   let entityIds = generatedEntityIds;
 
-  const cachedFloor = _floorEntityCache.get(newDepth);
+  const cachedFloor = _floorEntityCache.get(newDepth) ?? _loadPersistedFloor(worldSeed, newDepth);
   if (cachedFloor?.snapshot?.v === 1 && cachedFloor.snapshot.comps) {
     /** @type {number[]} */
     const createdIds = [];
@@ -161,9 +209,15 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     restoreExplored(savedExplored);
   }
 
-  // If direction provided, arrive at the matching stair on the new floor
-  // (descending → land on up-stair; ascending → land on down-stair)
-  if (opts.direction) {
+  // Determine arrival position on the new floor.
+  if (opts.stairPos) {
+    // Positional-identity contract: the matching stair is at the exact same world
+    // coordinates as the one the player stepped on (guaranteed by generateFloorPlan
+    // when priorDownStairPositions is passed, or by snapshot restoration).
+    destinationPos = opts.stairPos;
+  } else if (opts.direction) {
+    // Fallback for single-stair floors or callers that don't supply stairPos:
+    // find the first stair of the matching type on the new floor.
     const arrivalIdentity = opts.direction === 'down' ? 'stair_up' : 'stair_down';
     let found = false;
     for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
@@ -183,6 +237,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     world.mutate(dungeonId, DungeonState, r => {
       r.currentDepth = newDepth;
       r.floorEntityIds = entityIds;
+      r.downStairPositions = newDownStairPositions || [];
     });
   }
 

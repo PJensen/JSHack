@@ -4,6 +4,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Vitality } from "../components/Vitality.js";
 import { Collider } from "../components/Collider.js";
 import { MonsterSpawner } from "../components/MonsterSpawner.js";
+import { EffectImmunities } from "../components/EffectImmunities.js";
 
 export const Spawner = defineArchetype(
   "Spawner",
@@ -21,5 +22,6 @@ export const Spawner = defineArchetype(
     spawnParams: p.spawnParams ?? {},
     spawnRadius: p.spawnRadius ?? 1,
     isActive: p.isActive ?? true,
-  })]
+  })],
+  [EffectImmunities, () => ({ immuneTo: ["stun"] })]
 );

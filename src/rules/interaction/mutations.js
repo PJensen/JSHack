@@ -8,7 +8,9 @@
 // - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Collider } from "../components/Collider.js";
+import { EffectImmunities } from "../components/EffectImmunities.js";
 import { Equipment } from "../components/Equipment.js";
 import { Faction } from "../components/Faction.js";
 import { Hunger } from "../components/Hunger.js";
@@ -31,6 +33,18 @@ import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
+
+/**
+ * @param {any} world
+ * @param {number} entityId
+ * @param {string | undefined} effectKey
+ * @returns {boolean}
+ */
+function isEffectImmune(world, entityId, effectKey) {
+  if (!effectKey) return false;
+  const imm = /** @type any */ (world.get(entityId, EffectImmunities));
+  return Array.isArray(imm?.immuneTo) && imm.immuneTo.includes(effectKey);
+}
 
 /**
  * Apply a single mutation op to the world.
@@ -59,6 +73,7 @@ export function applyMutation(world, op) {
       break;
     }
     case "pushEffect": {
+      if (isEffectImmune(world, op.entityId, op.effect?.key)) break;
       let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       if (!ae || !Array.isArray(ae.effects)) {
         try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
@@ -70,6 +85,7 @@ export function applyMutation(world, op) {
       break;
     }
     case "upsertTimedEffect": {
+      if (isEffectImmune(world, op.entityId, op.effect?.key)) break;
       let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
       if (!ae || !Array.isArray(ae.effects)) {
         try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
@@ -298,7 +314,7 @@ export function applyMutation(world, op) {
       try { world.add(spawned, NamedIdentity, { name: String(op.name || def.name || monsterId), identity: monsterId }); } catch {} // ECS: may already exist
       try { world.add(spawned, Faction, { key: faction }); } catch {} // ECS: may already exist
       try { world.add(spawned, Collider, { solid: true, blocksSight: false }); } catch {} // ECS: may already exist
-      try { world.add(spawned, Inventory, { items: [], capacity: 0, weightLimit: null }); } catch {} // ECS: may already exist
+      try { world.add(spawned, Inventory, { items: [], capacity: 0 }); } catch {} // ECS: may already exist
       try {
         world.add(spawned, Equipment, {
           weapon: null,
@@ -443,6 +459,20 @@ export function applyMutation(world, op) {
       spawnHazard(world, /** @type any */ (spec));
       break;
     }
+    case "setItemCooldown": {
+      const turns = Math.max(0, Number(op.turns || 0) | 0);
+      if (!(turns > 0)) break;
+      let cd = /** @type any */ (world.get(op.entityId, ItemCooldown));
+      if (!cd) {
+        try { world.add(op.entityId, ItemCooldown, { turnsRemaining: turns, turnsMax: turns }); } catch {} // ECS: may already exist
+        cd = /** @type any */ (world.get(op.entityId, ItemCooldown));
+      }
+      if (cd) {
+        cd.turnsRemaining = turns;
+        cd.turnsMax = turns;
+      }
+      break;
+    }
     case "destroy": {
       try { world.destroy(op.entityId); } catch {} // ECS: entity may already be destroyed
       break;
@@ -470,7 +500,8 @@ export function applyMutation(world, op) {
  * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp} MutationOp
+ * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {

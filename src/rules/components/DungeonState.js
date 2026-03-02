@@ -7,5 +7,6 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
 export const DungeonState = defineComponent('DungeonState', {
   worldSeed: 0,
   currentDepth: 1,
-  floorEntityIds: [], // all entity IDs created for this floor
+  floorEntityIds: [],    // all entity IDs created for this floor
+  downStairPositions: [], // world {x,y} of each down-stair on the current floor
 });

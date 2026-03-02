@@ -23,6 +23,7 @@ import { Vitality } from '../../rules/components/Vitality.js';
 import { Faction } from '../../rules/components/Faction.js';
 import { Pet } from '../../rules/components/Pet.js';
 import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
+import { getMonsterTags } from '../../rules/data/monsters.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -102,6 +103,19 @@ function projectDisplayTags(world, id, rec) {
 		const s = stat.statuses[i];
 		const t = normalizeDisplayStatusType(s?.type);
 		if (!t || !DISPLAY_STATUS_TAGS.has(t)) continue;
+		if (!rec.tags.includes(t)) rec.tags.push(t);
+	}
+}
+
+/**
+ * Project display-relevant tags from the monster definition onto the entity record.
+ * @param {string} kind - entity identity (matches monster id)
+ * @param {EntityView} rec
+ */
+function projectMonsterDefTags(kind, rec) {
+	const defTags = getMonsterTags(kind);
+	for (let i = 0; i < defTags.length; i++) {
+		const t = defTags[i];
 		if (!rec.tags.includes(t)) rec.tags.push(t);
 	}
 }
@@ -255,6 +269,7 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
+			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
 
@@ -311,6 +326,7 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
+			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');
 

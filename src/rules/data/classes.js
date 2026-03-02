@@ -23,6 +23,7 @@ export const CLASS_DEFS = {
       feet: 'boots_leather',
     },
     inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_identify', count: 1 },
     ],
@@ -50,7 +51,9 @@ export const CLASS_DEFS = {
       feet: 'sandals_hemp',
     },
     inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
+      { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpell: 'frost',
@@ -78,6 +81,7 @@ export const CLASS_DEFS = {
 
     },
     inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_blastwave', count: 1 },
       { itemId: 'potion_poison', count: 2 },
@@ -108,6 +112,7 @@ export const CLASS_DEFS = {
       feet: 'boots_leather',
     },
     inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
       { itemId: 'stone_touchstone', count: 1 },
       { itemId: 'potion_anti_venom', count: 2 },
       { itemId: 'scroll_identify', count: 1 },
@@ -136,7 +141,9 @@ export const CLASS_DEFS = {
       feet: 'shoes_cloth',
     },
     inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 1 },
+      { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 1 },
     ],
     startingSpells: ['shadow_bolt','summon_skeleton'],
@@ -163,6 +170,7 @@ export const CLASS_DEFS = {
       feet: 'shoes_cloth',
     },
     inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_holy_water', count: 1 },
       { itemId: 'scroll_identify', count: 1 },

@@ -64,5 +64,7 @@ export function getUnidentifiedName(itemInfo) {
  */
 export function requiresIdentification(itemInfo) {
   if (!isIdentificationEnabled()) return false;
+  // Per-item override: items flagged as pre-identified skip the mask entirely.
+  if (itemInfo && itemInfo.identified) return false;
   return getUnidentifiedName(itemInfo) !== null;
 }

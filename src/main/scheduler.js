@@ -17,7 +17,13 @@ import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
-import { aiChaseSystem } from "../rules/systems/aiChaseSystem.js";
+import { aiChaseSystem, installAggroFromDamageListener } from "../rules/systems/aiChaseSystem.js";
+import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
+import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
+import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
+import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
+import { soundPropagationSystem } from "../rules/systems/soundPropagationSystem.js";
+import { encumbranceSystem } from "../rules/systems/encumbranceSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../rules/systems/tauntSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
@@ -44,6 +50,7 @@ import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSyste
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
+import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
 import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
@@ -107,16 +114,25 @@ export function configureWorld(world) {
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
   installCurseHooks(world);
+  // Elevate enemy AggroState when they take damage (even off-screen).
+  installAggroFromDamageListener(world);
 
   // Phase: ai (intent producers — runs with immediate mutations so
   // MoveIntents are visible to movementSystem in the same tick)
   registerSystem(intentValidationSystem, 'ai');
+  // Scurry before chase: dumb idle creatures set a random MoveIntent which
+  // aiChaseSystem's existing intent-skip guard then honours.
+  registerSystem(aiScurrySystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');
+  // Weapon pickup after chase so the monster's hunt state is settled first.
+  registerSystem(aiWeaponPickupSystem, 'ai');
   registerSystem(summonedBehaviorSystem, 'ai');
   registerSystem(petCommandSystem, 'ai');
   registerSystem(petBehaviorSystem, 'ai');
 
   // Phase: intents (intent consumers + steering)
+  // Knockback resolves before standard movement so positions are committed first.
+  registerSystem(knockbackSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
@@ -150,11 +166,16 @@ export function configureWorld(world) {
 
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
+  // Encumbrance recomputed after equipment is settled; movement reads it next tick.
+  registerSystem(encumbranceSystem, 'effects');
+  // Sound propagation checks SoundEmitter vs Anatomy.hearing; updates AggroState.
+  registerSystem(soundPropagationSystem, 'effects');
   registerSystem(effectSystem, 'effects');
   registerSystem(materialReactionSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
   // Food decay ticks after hunger (rot inventory food each turn)
   registerSystem(foodDecaySystem, 'effects');
+  registerSystem(itemCooldownSystem, 'effects');
   registerSystem(hazardSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');
@@ -171,6 +192,8 @@ export function configureWorld(world) {
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');
+  // Lifespan countdown and entity removal (before spatial index sync).
+  registerSystem(lifespanSystem, 'cleanup');
   // Keep spatial index in sync after structural changes
   registerSystem(spatialIndexSystem, 'cleanup');
 

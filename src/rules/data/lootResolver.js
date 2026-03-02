@@ -14,6 +14,7 @@ import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Brain } from '../components/Brain.js';
 import { Player } from '../components/Player.js';
+import { Inventory } from '../components/Inventory.js';
 
 const MAX_NESTING = 5;
 
@@ -112,22 +113,38 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
 }
 
 /**
- * Return effective weight for an entry, accounting for known-spell suppression.
- * Spellbook entries (itemId starting with "book_") whose spell the player already
- * knows are weighted at 0 so the RNG picks something else.
+ * Return effective weight for an entry, accounting for:
+ * - known-spell suppression (spellbook entries)
+ * - on_loot_roll catalog hooks (e.g. scroll_homecoming suppressed when player has hearthstone)
  * @param {Object} entry
- * @param {Object} [opts]
+ * @param {any} [opts]
  * @returns {number}
  */
 function effectiveWeight(entry, opts) {
   const w = entry.weight || 0;
   if (w <= 0) return 0;
-  if (!opts?.knownSpells) return w;
   if (entry.type !== "item") return w;
   const id = entry.itemId || "";
-  if (!id.startsWith("book_")) return w;
-  const spellId = id.slice(5); // strip "book_" prefix
-  return opts.knownSpells.has(spellId) ? 0 : w;
+
+  // Spellbook suppression: books for already-known spells weight → 0
+  if (opts?.knownSpells && id.startsWith("book_")) {
+    const spellId = id.slice(5); // strip "book_" prefix
+    if (opts.knownSpells.has(spellId)) return 0;
+  }
+
+  // on_loot_roll hook: catalog item may veto its own appearance
+  if (opts?.playerItemIds) {
+    const def = getCatalogItem(id);
+    const hook = def?.hooks?.on_loot_roll;
+    if (typeof hook === "function") {
+      try {
+        const result = hook({ playerItemIds: opts.playerItemIds }, { itemId: id });
+        if (result?.cancel) return 0;
+      } catch { /* ignore hook errors */ }
+    }
+  }
+
+  return w;
 }
 
 /**
@@ -253,6 +270,26 @@ export function materializeDrop(world, drop, pos) {
 }
 
 /**
+ * Build a Set of item identities the player currently carries.
+ * Used to suppress loot rolls via on_loot_roll hooks.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {Set<string>|null}
+ */
+function getPlayerItemIdentities(world) {
+  for (const [id] of world.query(Player)) {
+    const inv = /** @type {any} */ (world.get(id, Inventory));
+    if (!inv || !Array.isArray(inv.items)) return null;
+    const ids = new Set();
+    for (const itemEid of inv.items) {
+      const info = /** @type {any} */ (world.get(itemEid, ItemInfo));
+      if (info?.identity) ids.add(String(info.identity));
+    }
+    return ids;
+  }
+  return null;
+}
+
+/**
  * Build a Set of spell IDs the player currently knows.
  * Returns null if no player or no Brain component is found.
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -281,7 +318,11 @@ function getPlayerKnownSpells(world) {
  */
 export function dropLoot(world, tableId, rng, depth, pos) {
   const knownSpells = getPlayerKnownSpells(world);
-  const opts = knownSpells ? { knownSpells } : undefined;
+  const playerItemIds = getPlayerItemIdentities(world);
+  const opts = (knownSpells || playerItemIds) ? {
+    knownSpells: knownSpells ?? undefined,
+    playerItemIds: playerItemIds ?? undefined,
+  } : undefined;
   const drops = resolveLootTable(tableId, rng, depth, 0, opts);
   const ids = [];
   for (const drop of drops) {

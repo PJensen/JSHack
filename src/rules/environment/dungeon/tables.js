@@ -3,6 +3,7 @@
 
 import { getMonster, getMonstersByTier, isGenocided } from '../../data/monsters.js';
 import { resolveLootTable } from '../../data/lootResolver.js';
+import { creatureTypeFromTags } from '../../components/CreatureType.js';
 
 /**
  * Convert a monster definition into spawn-time params.
@@ -23,6 +24,7 @@ function toMonsterSpawnParams(def, depth) {
     resistances: def.resistances,
     speed: def.speed,
     equipment: def.equipment || null,
+    creatureType: creatureTypeFromTags(def.tags || []),
   };
 }
 
@@ -40,6 +42,12 @@ export function pickMonster(rng, depth) {
   if ((def.id === 'cave_snake' || def.id === 'cave_spider') && rng.next() < 0.05) {
     const rare = getMonster('pit_viper');
     if (rare && !isGenocided('pit_viper')) def = rare;
+  }
+
+  // Rare upgrade: rat has a 3% chance to become a cave bear
+  if (def.id === 'rat' && rng.next() < 0.03) {
+    const rare = getMonster('cave_bear');
+    if (rare && !isGenocided('cave_bear')) def = rare;
   }
 
   return toMonsterSpawnParams(def, depth);

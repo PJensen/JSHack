@@ -58,6 +58,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
       channels: Array.isArray(potionDef.channels) ? potionDef.channels.slice() : [],
       effects: Array.isArray(potionDef.effects) ? potionDef.effects.map((e) => ({ ...e })) : [],
       toxicity: (potionDef.toxicity && typeof potionDef.toxicity === "object") ? { ...potionDef.toxicity } : null,
+      feel: String(potionDef.feel || ""),
     });
     if (beatitude === "blessed" || beatitude === "uncursed" || beatitude === "cursed") {
       world.add(id, Beatitude, { state: beatitude });

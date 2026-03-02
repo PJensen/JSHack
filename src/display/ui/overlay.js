@@ -118,7 +118,8 @@ function isInventoryItemUsable(it) {
     || it.type === 'book'
     || it.type === 'scroll'
     || it.type === 'wand'
-    || it.type === 'food';
+    || it.type === 'food'
+    || it.type === 'tool';
 }
 
 /**
@@ -1830,6 +1831,17 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     }
     row.appendChild(slot);
     if (it.unpaid) row.appendChild(unpaidTag);
+    const cdRemaining = Number(it.cooldownTurnsRemaining ?? 0);
+    const cdMax = Number(it.cooldownTurnsMax ?? 0);
+    if (cdRemaining > 0 && cdMax > 0) {
+      const elapsed = 1 - (cdRemaining / cdMax);
+      const cdSym = elapsed >= 0.75 ? '\u25d5' : elapsed >= 0.5 ? '\u25d1' : elapsed >= 0.25 ? '\u25d4' : '\u25cb';
+      const cdSpan = document.createElement('span');
+      cdSpan.textContent = cdSym;
+      cdSpan.title = `Cooldown: ${cdRemaining} turns remaining`;
+      cdSpan.style.color = '#ff9f3b';
+      row.appendChild(cdSpan);
+    }
     row.appendChild(qty);
 
     row.addEventListener('click', () => { setSel(idx); });
@@ -2050,6 +2062,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
       if (it.type === 'potion') {
         window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
       } else {
+        window.dispatchEvent(new CustomEvent('ui:toggleInventory'));
         window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
       }
       return;
@@ -2151,6 +2164,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
         if (it.type === 'potion') {
           window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
         } else {
+          window.dispatchEvent(new CustomEvent('ui:toggleInventory'));
           window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
         }
         e.preventDefault();

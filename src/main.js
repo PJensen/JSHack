@@ -608,7 +608,7 @@ function _finalizeNewGame(classData) {
         });
         world.add(petId, Faction, { key: "pet" });
         world.add(petId, Owner, { ownerId: pe.id });
-        world.add(petId, Inventory, { items: [], capacity: 1, weightLimit: null });
+        world.add(petId, Inventory, { items: [], capacity: 1 });
         world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
         world.add(petId, Vitality, { maxHp: 30, hp: 30 });
         world.add(petId, Equipment, {
@@ -1477,17 +1477,19 @@ const RETURN_PORTAL_IDENTITY = 'return_portal';
  *   direction?: 'up' | 'down',
  *   targetDepth?: number,
  *   targetPos?: { x: number, y: number },
+ *   stairPos?: { x: number, y: number } | null,
  *   fragActorsAtTarget?: boolean,
  *   returnTicket?: { depth: number, x: number, y: number } | null,
  * } | null} */
 let _pendingStairTransition = null;
 
-function queueStairTransition(direction) {
+function queueStairTransition(direction, stairX = null, stairY = null) {
   const dir = direction === 'up' ? 'up' : (direction === 'down' ? 'down' : null);
   if (!dir) return;
   // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
   if (_pendingStairTransition) return;
-  _pendingStairTransition = { direction: dir };
+  const stairPos = (stairX != null && stairY != null) ? { x: stairX, y: stairY } : null;
+  _pendingStairTransition = { direction: dir, stairPos };
 }
 
 function queueDepthTransition(targetDepth, opts = {}) {
@@ -1653,7 +1655,7 @@ function flushPendingStairTransition() {
     }
   } else {
     const direction = newDepth > currentDepth ? 'down' : 'up';
-    transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, tombstoneRepo });
+    transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
   }
 
   if (newDepth === 0 && pending.returnTicket && pending.returnTicket.depth > 0) {
@@ -1665,13 +1667,18 @@ function flushPendingStairTransition() {
   _cachedStep = -1;
 }
 
-world.on('stair:traverse', ({ direction }) => {
-  queueStairTransition(direction);
+world.on('stair:traverse', ({ direction, targetId }) => {
+  let stairX = null, stairY = null;
+  if (targetId > 0) {
+    const pos = world.get(targetId, Position);
+    if (pos) { stairX = pos.x | 0; stairY = pos.y | 0; }
+  }
+  queueStairTransition(direction, stairX, stairY);
 });
 
 world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
   queueDepthTransition(targetDepth, {
-    returnTicket: String(source || '') === 'scroll_homecoming' ? returnTicket : null,
+    returnTicket: (String(source || '') === 'scroll_homecoming' || String(source || '') === 'hearthstone') ? returnTicket : null,
   });
 });
 
@@ -2292,33 +2299,38 @@ function drawGlowingTagAura(ctx, e, fxTime) {
 }
 
 /**
- * Draw a venom-themed aura for entities tagged with `venom_glowing`.
+ * Draw a poison-green glow for entities tagged with `venom_glowing`.
+ * Matches the poisoned-item glow style to convey venomous nature.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
 function drawVenomTagAura(ctx, e, fxTime) {
   const cx = e.pos.x, cy = e.pos.y;
-  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.3 + e.id * 0.41);
-  const rOuter = 0.52 + 0.05 * pulse;
-  const rInner = 0.23 + 0.02 * pulse;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.5 + e.id * 1.3);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
-  outer.addColorStop(0,   `rgba(120,230,130,${(0.10 + 0.06 * pulse).toFixed(3)})`);
-  outer.addColorStop(0.58,`rgba(70,170,95,${(0.06 + 0.04 * pulse).toFixed(3)})`);
-  outer.addColorStop(1,   'rgba(30,80,40,0)');
-  ctx.fillStyle = outer;
+  // Outer soft glow — same palette as poisoned-weapon ground glow
+  const rOuter = 0.62 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.30 + 0.15 * pulse;
+  outerGrad.addColorStop(0,   `rgba(50,220,70,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(40,190,55,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(20,140,35,0)');
+  ctx.fillStyle = outerGrad;
   ctx.beginPath();
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
-  inner.addColorStop(0, `rgba(210,255,190,${(0.12 + 0.10 * pulse).toFixed(3)})`);
-  inner.addColorStop(1, 'rgba(125,210,135,0)');
-  ctx.fillStyle = inner;
+  // Inner bright core
+  const rInner = 0.30 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.35 + 0.20 * pulse;
+  innerGrad.addColorStop(0, `rgba(100,255,120,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(60,230,80,0)');
+  ctx.fillStyle = innerGrad;
   ctx.beginPath();
   ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
   ctx.fill();
@@ -2327,39 +2339,41 @@ function drawVenomTagAura(ctx, e, fxTime) {
 }
 
 /**
- * Draw orbiting sparkle motes for entities tagged with `rare`.
+ * Draw a small static star directly above the head of entities tagged with `rare`.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawRareSparkle(ctx, e, fxTime) {
-  const cx = e.pos.x, cy = e.pos.y;
-  const seed = e.id * 0.73;
-  const MOTES = 6;
+function drawRareStar(ctx, e, fxTime) {
+  const cx = e.pos.x;
+  const cy = e.pos.y - 0.65; // directly above the glyph (glyph spans y-0.5 to y+0.5)
+  const R = 0.09;  // outer point radius
+  const r = 0.035; // inner point radius
+  const POINTS = 4;
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  for (let i = 0; i < MOTES; i++) {
-    const phase = seed + i * (Math.PI * 2 / MOTES);
-    const speed = 1.4 + (i % 3) * 0.3;
-    const orbit = 0.34 + 0.06 * Math.sin(fxTime * 0.8 + i);
-    const angle = fxTime * speed + phase;
-    const mx = cx + Math.cos(angle) * orbit;
-    const my = cy + Math.sin(angle) * orbit;
+  // Soft glow halo behind the star
+  const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2.0);
+  halo.addColorStop(0, 'rgba(255,255,200,0.20)');
+  halo.addColorStop(1, 'rgba(255,240,120,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 2.0, 0, Math.PI * 2);
+  ctx.fill();
 
-    const flicker = 0.5 + 0.5 * Math.sin(fxTime * 5.0 + i * 1.9);
-    const a = 0.35 + 0.45 * flicker;
-    const r = 0.035 + 0.01 * flicker;
-
-    const grad = ctx.createRadialGradient(mx, my, 0, mx, my, r);
-    grad.addColorStop(0, `rgba(200,255,140,${a.toFixed(3)})`);
-    grad.addColorStop(1, 'rgba(100,220,80,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(mx, my, r, 0, Math.PI * 2);
-    ctx.fill();
+  // 4-pointed star shape
+  ctx.fillStyle = 'rgba(255,252,200,0.90)';
+  ctx.beginPath();
+  for (let i = 0; i < POINTS * 2; i++) {
+    const angle = (i * Math.PI) / POINTS - Math.PI / 2;
+    const rad = i % 2 === 0 ? R : r;
+    if (i === 0) ctx.moveTo(cx + Math.cos(angle) * rad, cy + Math.sin(angle) * rad);
+    else ctx.lineTo(cx + Math.cos(angle) * rad, cy + Math.sin(angle) * rad);
   }
+  ctx.closePath();
+  ctx.fill();
 
   ctx.restore();
 }
@@ -2582,7 +2596,7 @@ function render(worldView) {
       drawVenomTagAura(bctx, e, _fxTime);
     }
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
-      drawRareSparkle(bctx, e, _fxTime);
+      drawRareStar(bctx, e, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -2872,7 +2886,7 @@ function render(worldView) {
       drawVenomTagAura(bctx, e, _fxTime);
     }
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
-      drawRareSparkle(bctx, e, _fxTime);
+      drawRareStar(bctx, e, _fxTime);
     }
   }
 

@@ -1,5 +1,6 @@
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
+import { creatureTypeFromTags } from "../components/CreatureType.js";
 import { Inventory } from "../components/Inventory.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Polymorph } from "../components/Polymorph.js";
@@ -55,6 +56,7 @@ function toMonsterSpawnParams(def, depth) {
     massKg: def.massKg,
     resistances: def.resistances,
     speed: def.speed,
+    creatureType: creatureTypeFromTags(def.tags || []),
   };
 }
 

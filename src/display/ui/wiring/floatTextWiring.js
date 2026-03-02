@@ -23,6 +23,7 @@ const STATUS_LABEL_BY_KIND = Object.freeze({
   immune: 'IMMUNE',
   resist: 'RESIST',
   taunt: '!',
+  alert: '!',
 });
 
 const STATUS_LABEL_BY_EFFECT = Object.freeze({

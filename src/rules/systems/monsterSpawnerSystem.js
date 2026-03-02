@@ -7,6 +7,7 @@ import { Monster } from "../archetypes/Creatures.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
 import { equipMonster } from "../environment/dungeon/populate.js";
 import { isGenocided } from "../data/monsters.js";
+import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
@@ -35,13 +36,21 @@ export function monsterSpawnerSystem(world) {
       const last = Number.isFinite(sp.lastSpawnStep) ? sp.lastSpawnStep : -Infinity;
       if ((now - last) < sp.cooldownTicks) continue;
 
-      // Pick a random integer offset within spawnRadius tiles
+      // Pick a random integer offset within spawnRadius tiles,
+      // avoiding tiles occupied by solid or interactable entities (chests, doors, decorations).
       const rand = world.rand;
       const radius = Math.max(0, sp.spawnRadius | 0);
-      const ox = radius > 0 ? Math.round((rand() * 2 - 1) * radius) : 0;
-      const oy = radius > 0 ? Math.round((rand() * 2 - 1) * radius) : 0;
-      const sx = (pos.x + ox) | 0;
-      const sy = (pos.y + oy) | 0;
+      const tiles = getTileQuerySnapshot(world);
+      let sx, sy, spawnAttempts = 0;
+      do {
+        const ox = radius > 0 ? Math.round((rand() * 2 - 1) * radius) : 0;
+        const oy = radius > 0 ? Math.round((rand() * 2 - 1) * radius) : 0;
+        sx = (pos.x + ox) | 0;
+        sy = (pos.y + oy) | 0;
+        spawnAttempts++;
+      } while (spawnAttempts < 8 &&
+        (tiles.blockedByCell.has(`${sx},${sy}`) || tiles.interactableByCell.has(`${sx},${sy}`)));
+      if (tiles.blockedByCell.has(`${sx},${sy}`) || tiles.interactableByCell.has(`${sx},${sy}`)) continue;
 
       const params = Object.assign({ x: sx, y: sy }, sp.spawnParams || {});
       const child = createFrom(world, Monster, params);

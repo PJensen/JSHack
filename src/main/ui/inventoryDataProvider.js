@@ -30,6 +30,7 @@ import { isIdentificationEnabled, setIdentificationEnabled } from "../../rules/d
 import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js";
 import { addItemEntityToInventory } from "../../rules/utils/inventoryStacking.js";
 import { Pet } from "../../rules/components/Pet.js";
+import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -299,6 +300,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
             unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
             canApply,
             applyTargetCount,
+            cooldownTurnsRemaining: world.get(id, ItemCooldown)?.turnsRemaining ?? 0,
+            cooldownTurnsMax: world.get(id, ItemCooldown)?.turnsMax ?? 0,
           });
         }
       }
@@ -450,7 +453,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   });
 
   // Provide usable items to the use-chooser overlay when requested
-  const USABLE_TYPES = new Set(['wand', 'scroll', 'book', 'learn', 'food', 'potion']);
+  const USABLE_TYPES = new Set(['wand', 'scroll', 'book', 'learn', 'food', 'potion', 'tool']);
   addEventListener('ui:requestUsableItemsData', () => {
     const p = playerEntity(world);
     const items = [];

@@ -11,15 +11,6 @@ import {
     findInventoryStackTargetForItem,
 } from "../utils/inventoryStacking.js";
 
-// Helper: sum inventory weight
-function inventoryWeight(world, inv) {
-    let total = 0;
-    for (const id of inv.items) {
-        const ii = world.get(id, ItemInfo);
-        if (ii) total += (ii.weight || 0) * (ii.count || 1);
-    }
-    return total;
-}
 
 export function itemPickupSystem(world) {
     // Explicit pickups via intent
@@ -51,17 +42,6 @@ export function itemPickupSystem(world) {
             try { world.emit && world.emit('item:pickup-denied', { actor, itemId, reason: 'capacity' }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup-denied failed:', e); }
             world.remove(actor, PickupIntent);
             continue;
-        }
-
-        // weight gate
-        const addWeight = (info.weight || 0) * (takeCount || 1);
-        if (inv.weightLimit != null) {
-            const cur = inventoryWeight(world, inv);
-            if (cur + addWeight > inv.weightLimit) {
-                try { world.emit && world.emit('item:pickup-denied', { actor, itemId, reason: 'weight' }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup-denied failed:', e); }
-                world.remove(actor, PickupIntent);
-                continue;
-            }
         }
 
         // perform pickup
