@@ -30,6 +30,7 @@ import { resolveBump } from "../data/bumpResolvers.js";
 import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { DoorState } from "../components/DoorState.js";
+import { Encumbrance } from "../components/Encumbrance.js";
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -177,6 +178,14 @@ export function movementSystem(world) {
               to: { dx: mdx, dy: mdy },
             });
           } catch (e) { console.debug("[movementSystem] emit status:confused-misstep failed:", e); }
+        }
+      }
+
+      // Overloaded actors cannot move diagonally; force to dominant axis.
+      if (mdx !== 0 && mdy !== 0) {
+        const enc = /** @type {any} */ (world.get(actor, Encumbrance));
+        if (enc?.overloaded) {
+          if (Math.abs(intendedDx) >= Math.abs(intendedDy)) { mdy = 0; } else { mdx = 0; }
         }
       }
 

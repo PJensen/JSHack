@@ -4,6 +4,34 @@
 import { basePalette } from './base.js';
 import { equipmentPalette } from './equipment.js';
 
+// Non-creature entries in basePalette that should not get auto-generated corpse entries.
+const _CORPSE_SKIP_PREFIXES = [
+  'player', 'corpse_',
+  'floor', 'grass', 'water', 'mountain', 'tree', 'wall', 'door', 'stair',
+  'potion_', 'spellbook_', 'book_', 'scroll_', 'return_', 'ammo_',
+  'food_', 'reagent_', 'ore_', 'gem_', 'trap_',
+];
+const _CORPSE_SKIP_KEYS = new Set([
+  'gold', 'monster', 'bone', 'engraving', 'spawner', 'tombstone',
+  'chest', 'bed_home', 'house_sign', 'alchemy_bench',
+  'berry_bush', 'herb_patch', 'thorn_bramble', 'venom_fern', 'venom_spores',
+  'anvil', 'furnace', 'furnace_unlit', 'cooking_fire',
+  'fountain', 'altar', 'shrine', 'statue', 'sarcophagus',
+  'pillar', 'weapon_rack', 'mushrooms', 'web', 'torch',
+]);
+
 export function buildPalette() {
-  return { ...basePalette, ...equipmentPalette };
+  const merged = { ...basePalette, ...equipmentPalette };
+
+  // Auto-generate corpse entries: any creature in basePalette gets a '%' entry
+  // that inherits its fg/glow. New monsters are handled automatically.
+  for (const [k, v] of Object.entries(basePalette)) {
+    if (_CORPSE_SKIP_KEYS.has(k)) continue;
+    if (_CORPSE_SKIP_PREFIXES.some(p => k.startsWith(p))) continue;
+    if (!merged[`corpse_${k}`]) {
+      merged[`corpse_${k}`] = { glyph: '%', fg: v.fg, glow: v.glow };
+    }
+  }
+
+  return merged;
 }

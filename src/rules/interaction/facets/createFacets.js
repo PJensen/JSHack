@@ -5,6 +5,7 @@ import { Position } from "../../components/Position.js";
 import { Vitality } from "../../components/Vitality.js";
 import { Brain } from "../../components/Brain.js";
 import { runSpellScript } from "../../scripts/spells.js";
+import { Channeling } from "../../components/Channeling.js";
 import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
@@ -362,6 +363,22 @@ export function createFacets(init) {
       );
     },
     runSpell(actorId, spell, intent = {}) {
+      const castTime = Number(spell?.castTime || 0) | 0;
+      if (castTime > 0) {
+        const safeIntent = (intent && typeof intent === "object") ? intent : {};
+        try {
+          world.add(actorId | 0, Channeling, {
+            turnsRemaining: castTime,
+            turnsTotal: castTime,
+            spellId: String(spell.id || ""),
+            targetId: safeIntent.targetId ? (Number(safeIntent.targetId) | 0) : (actorId | 0),
+            x: safeIntent.x != null ? (Number(safeIntent.x) | 0) : null,
+            y: safeIntent.y != null ? (Number(safeIntent.y) | 0) : null,
+          });
+        } catch {}
+        try { world.emit?.('channeling:start', { actor: actorId | 0, spellId: spell.id, castTime }); } catch {}
+        return true;
+      }
       runSpellScript(
         world,
         actorId | 0,

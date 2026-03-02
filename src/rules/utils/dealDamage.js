@@ -2,6 +2,7 @@
 // Canonical damage pipeline. ALL damage in the game flows through here.
 import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
+import { KnockbackPending } from "../components/KnockbackPending.js";
 import { Equipment } from "../components/Equipment.js";
 import { Material } from "../components/Material.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
@@ -183,6 +184,7 @@ export function resolveResistance(world, targetId, rawAmount, type) {
  * @property {boolean} [bypassInvuln=false]- Skip invulnerability check
  * @property {boolean} [bypassResist=false]- Skip resistance resolution
  * @property {boolean} [noTrigger=false]   - Suppress affix/hook triggers (prevents retaliate loops)
+ * @property {{dx:number,dy:number,force:number}} [knockback] - Push target after damage is applied.
  */
 
 /**
@@ -245,6 +247,18 @@ export function dealDamage(world, spec) {
 
   // Step 4: Apply damage
   vit.hp = Math.max(0, (vit.hp | 0) - finalAmount);
+
+  // Step 4b: Queue knockback (resolved by knockbackSystem this tick).
+  const kb = spec.knockback;
+  if (kb && (kb.dx || kb.dy)) {
+    try {
+      world.add(target, KnockbackPending, {
+        dx:    Math.sign(Number(kb.dx)    || 0),
+        dy:    Math.sign(Number(kb.dy)    || 0),
+        force: Math.max(1, Math.min(5, (Number(kb.force) || 1) | 0)),
+      });
+    } catch { /* entity may already have a pending knockback; keep the first */ }
+  }
 
   // Step 5: Emit 'damaged'
   try {

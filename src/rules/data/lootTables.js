@@ -265,9 +265,10 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "table",     weight: 40, tableId: "sub:equip_early_proc" },
+      { type: "equip",     weight: 12, pool: ["venomfang_dagger"], affixChance: 0 },
       { type: "table",     weight: 25, tableId: "sub:equip_common" },
       { type: "table",     weight: 15, tableId: "sub:potions" },
-      { type: "gold",      weight: 15, count: { base: 10, perDepth: 3 } },
+      { type: "gold",      weight: 15, count: { base: 33, perDepth: 3 } },
       { type: "table",     weight: 5,  tableId: "sub:scrolls" },
     ],
   },

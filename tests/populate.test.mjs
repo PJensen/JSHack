@@ -112,15 +112,17 @@ Deno.test("populateChunk can generate a shallow spawner", () => {
   const spawns = populateChunk(chunk, floorPlan, rng);
   const spawners = spawns.filter((s) => s.kind === 'spawner');
   assert(spawners.length > 0, 'expected at least one spawner');
-  assert(spawners[0].params?.monsterType?.identity === 'rat', 'expected shallow spawner monster to be rat');
+  // Mock rng always passes chance gates (next: () => 0), so rat → cave_bear rare upgrade fires.
+  assert(spawners[0].params?.monsterType?.identity === 'cave_bear', 'expected shallow spawner monster to be cave_bear (rare rat upgrade)');
 });
 
 Deno.test("populateChunk shallow spawners draw from tier pool", () => {
   const seen = new Set();
   const tier0 = getMonstersByTier(0);
   const tier0Ids = new Set(tier0.map(m => m.id));
-  // pit_viper is a rare upgrade from cave_snake/cave_spider, valid at T0
+  // Rare upgrades are valid at T0
   if (getMonster('pit_viper')) tier0Ids.add('pit_viper');
+  if (getMonster('cave_bear')) tier0Ids.add('cave_bear');
   for (let seed = 1; seed <= 200; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
     const rng = createRng(seed * 1337);

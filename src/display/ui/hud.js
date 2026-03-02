@@ -693,6 +693,8 @@ function ensureEffectsStack(container) {
     rec.ticksEl.textContent = r >= 9999 ? '\u221E' : String(r);
   }
 
+  const MASKED_SPEC = { name: '?', glyph: '\u2753', hue: 200 };
+
   function update(statuses) {
     const seen = new Set();
     for (const s of (Array.isArray(statuses) ? statuses : [])) {
@@ -700,7 +702,8 @@ function ensureEffectsStack(container) {
       if (!key) continue;
       const turns = Math.max(0, Number(s.turns || 0));
       const stacks = Math.max(1, Number(s.stacks || 1));
-      const spec = VIS[key] || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 };
+      const masked = !!s.masked;
+      const spec = masked ? MASKED_SPEC : (VIS[key] || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
       let rec = byKey.get(key);
       if (!rec) {
         const { el, overlay, ticksEl, stacksEl } = createBadge(spec, turns || 1);

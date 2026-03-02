@@ -106,6 +106,21 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Stores return ticket to prior depth and tile' },
     ],
   },
+  hearthstone: {
+    id: 'hearthstone',
+    name: 'Hearthstone',
+    symbol: '\u{1FAA8}',   // 🪨
+    manaCost: 0,
+    minIntelligence: 0,
+    castTime: 10,
+    script: 'hearthstone',
+    targeting: 'self',
+    description: 'Focus your will on hearth and home. After a long channel, you are pulled back to safety.',
+    effects: [
+      { kind: 'movement', mode: 'depth-teleport', note: 'Returns caster to depth 0 after 10-turn channel' },
+      { kind: 'utility', note: 'Stores return ticket to prior depth and tile' },
+    ],
+  },
   frost: {
     id: 'frost',
     name: 'Frost',

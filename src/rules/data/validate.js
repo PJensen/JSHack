@@ -18,6 +18,7 @@ const ITEM_HOOK_KEY_ALIASES = Object.freeze({
   before_apply: 'beforeApply',
   on_apply: 'onApply',
   after_apply: 'afterApply',
+  on_loot_roll: 'onLootRoll',
 });
 
 const ITEM_HOOK_KEYS = new Set([
@@ -27,6 +28,7 @@ const ITEM_HOOK_KEYS = new Set([
   'beforeDip', 'onDip', 'afterDip',
   'beforeUse', 'onUse', 'afterUse',
   'beforeApply', 'onApply', 'afterApply',
+  'onLootRoll',
   ...Object.keys(ITEM_HOOK_KEY_ALIASES),
 ]);
 

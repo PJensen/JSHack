@@ -1,0 +1,132 @@
+// tests/nav.test.mjs
+// Navigation / connectivity tests for full dungeon floors.
+//
+// These tests verify:
+//   1. All stair tiles are reachable from the player spawn position.
+//   2. No stair tile is a dead-end (the player can always step off).
+//   3. All walkable tiles belong to a single connected component (no isolated blobs).
+//
+// Tests run across several world seeds at depths 1 and 4 to catch edge cases.
+
+import { assert } from "jsr:@std/assert";
+import { World } from '../src/lib/ecs-js/index.js';
+import {
+  clearAll, isWalkable, forEachLoadedTile,
+} from '../src/rules/environment/dungeon/tileMap.js';
+import { generateFloor } from '../src/rules/environment/dungeon/index.js';
+import { TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const CARDINALS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/**
+ * Flood-fill across the multi-chunk tile map using world coordinates.
+ * Uses isWalkable() so it respects all tile types (floor, door, stairs, etc.).
+ * Returns a Set of "x,y" string keys reachable from (sx, sy).
+ */
+function floodFillWorld(sx, sy) {
+  const visited = new Set();
+  const queue = [[sx, sy]];
+  visited.add(`${sx},${sy}`);
+  while (queue.length > 0) {
+    const [cx, cy] = queue.shift();
+    for (const [dx, dy] of CARDINALS) {
+      const nx = cx + dx, ny = cy + dy;
+      const nk = `${nx},${ny}`;
+      if (visited.has(nk)) continue;
+      if (isWalkable(nx, ny)) {
+        visited.add(nk);
+        queue.push([nx, ny]);
+      }
+    }
+  }
+  return visited;
+}
+
+/** Collect all stair tiles across all loaded chunks. */
+function collectStairs() {
+  const stairs = [];
+  forEachLoadedTile((x, y, tile) => {
+    if (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP) {
+      stairs.push({ x, y, kind: tile === TILE_STAIR_DOWN ? 'down' : 'up' });
+    }
+  });
+  return stairs;
+}
+
+/** Collect all walkable tile positions across all loaded chunks. */
+function collectWalkable() {
+  const out = new Set();
+  forEachLoadedTile((x, y) => {
+    if (isWalkable(x, y)) out.add(`${x},${y}`);
+  });
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+const SEEDS = [42, 123, 777, 9999, 31337];
+const DEPTHS = [1, 4];
+
+Deno.test("all stair tiles are reachable from spawn", () => {
+  for (const depth of DEPTHS) {
+    for (const seed of SEEDS) {
+      clearAll();
+      const world = new World({ seed });
+      const { spawnX, spawnY } = generateFloor(world, seed, depth);
+
+      assert(isWalkable(spawnX, spawnY),
+        `depth ${depth} seed ${seed}: spawn (${spawnX},${spawnY}) must be walkable`);
+
+      const reachable = floodFillWorld(spawnX, spawnY);
+      const stairs = collectStairs();
+
+      assert(stairs.length > 0,
+        `depth ${depth} seed ${seed}: floor must contain at least one stair`);
+
+      for (const { x, y, kind } of stairs) {
+        assert(reachable.has(`${x},${y}`),
+          `depth ${depth} seed ${seed}: ${kind}-stair at (${x},${y}) unreachable from spawn (${spawnX},${spawnY})`);
+      }
+    }
+  }
+});
+
+Deno.test("every stair tile has at least one walkable neighbour (player can step off)", () => {
+  for (const depth of DEPTHS) {
+    for (const seed of SEEDS) {
+      clearAll();
+      const world = new World({ seed });
+      generateFloor(world, seed, depth);
+
+      for (const { x, y, kind } of collectStairs()) {
+        const walkableNeighbours = CARDINALS.filter(([dx, dy]) => isWalkable(x + dx, y + dy));
+        assert(walkableNeighbours.length > 0,
+          `depth ${depth} seed ${seed}: ${kind}-stair at (${x},${y}) is isolated — no walkable neighbour`);
+      }
+    }
+  }
+});
+
+Deno.test("all walkable tiles form one connected component", () => {
+  for (const depth of DEPTHS) {
+    for (const seed of SEEDS) {
+      clearAll();
+      const world = new World({ seed });
+      const { spawnX, spawnY } = generateFloor(world, seed, depth);
+
+      const reachable = floodFillWorld(spawnX, spawnY);
+      const allWalkable = collectWalkable();
+
+      for (const k of allWalkable) {
+        assert(reachable.has(k),
+          `depth ${depth} seed ${seed}: walkable tile ${k} not reachable from spawn (${spawnX},${spawnY})`);
+      }
+    }
+  }
+});

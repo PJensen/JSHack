@@ -16,12 +16,15 @@ import { Collider } from "../components/Collider.js";
 import { Facing } from "../components/Facing.js";
 import { Score } from "../components/Score.js";
 import { Faction } from "../components/Faction.js";
+import { SoundEmitter } from "../components/SoundEmitter.js";
+import { Encumbrance } from "../components/Encumbrance.js";
+import { HEARING_SOURCE_DB } from "../components/Anatomy.js";
 
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
   [Player],
   [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
-  [Inventory, (p) => ({ capacity: p.capacity ?? 20, weightLimit: p.weightLimit ?? 50, items: [] })],
+  [Inventory, (p) => ({ capacity: p.capacity ?? 20, items: [] })],
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [Resistances, (p) => ({
@@ -42,7 +45,9 @@ export const PlayerArchetype = defineArchetype(
   [Brain, {}],
   [Facing, { dx: 0, dy: 0 }],
   [Score, {}],
-  [Faction, { key: "player" }]
+  [Faction, { key: "player" }],
+  [SoundEmitter, { ambient: HEARING_SOURCE_DB.footsteps, lastActionNoise: 0 }],
+  [Encumbrance, { current: 0, overloaded: false, heavilyLoaded: false }],
 );
 
 export function createPlayer(world, params = {}) {
@@ -50,7 +55,7 @@ export function createPlayer(world, params = {}) {
     const id = world.create();
     world.add(id, Player);
     world.add(id, Position, { x: params.x ?? 0, y: params.y ?? 0 });
-    world.add(id, Inventory, { capacity: params.capacity ?? 20, weightLimit: params.weightLimit ?? 50, items: [] });
+    world.add(id, Inventory, { capacity: params.capacity ?? 20, items: [] });
     world.add(id, NamedIdentity, { name: params.name ?? "Player", identity: params.identity ?? "player" });
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
     world.add(id, Resistances, {
@@ -68,6 +73,8 @@ export function createPlayer(world, params = {}) {
     world.add(id, Stamina, { maxStamina: params.maxStamina ?? 100, stamina: params.stamina ?? (params.maxStamina ?? 100), staminaRegen: params.staminaRegen ?? 3.0 });
     world.add(id, Score, {});
     world.add(id, Faction, { key: "player" });
+    world.add(id, SoundEmitter, { ambient: HEARING_SOURCE_DB.footsteps, lastActionNoise: 0 });
+    world.add(id, Encumbrance, { current: 0, overloaded: false, heavilyLoaded: false });
     return id;
   })();
 }

@@ -37,6 +37,7 @@ import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
+import { Encumbrance } from "../../components/Encumbrance.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 
@@ -554,16 +555,8 @@ export const INTERACT_PAYLOADS = {
         const inv = world.get(actor, Inventory);
         const actorPos = world.get(actor, Position);
 
-        let overweight = false;
-        if (inv?.weightLimit != null) {
-          const addWeight = (def?.weight || 0) * count;
-          let curWeight = 0;
-          for (const iid of inv.items) {
-            const ii = world.get(iid, ItemInfo);
-            if (ii) curWeight += (ii.weight || 0) * (ii.count || 1);
-          }
-          overweight = curWeight + addWeight > inv.weightLimit;
-        }
+        const enc = world.get(actor, Encumbrance);
+        const overweight = enc ? enc.overloaded : false;
         const overCapacity = inv != null && inv.capacity != null && inv.items.length >= inv.capacity;
 
         const itemId = createFrom(world, arch, {});

@@ -16,6 +16,11 @@ import { Vitality } from "../components/Vitality.js";
 import { Speed } from "../components/Speed.js";
 import { Interactable } from "../components/Interactable.js";
 import { ShopInventory } from "../components/ShopInventory.js";
+import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
+import { SoundEmitter } from "../components/SoundEmitter.js";
+import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
+import { Encumbrance } from "../components/Encumbrance.js";
+import { HEARING_SOURCE_DB } from "../components/Anatomy.js";
 
 /**
  * Consolidated creature archetypes
@@ -71,7 +76,7 @@ export const Creature = defineArchetype(
   })],
   // Gameplay utility
   [Collider, (p) => ({ solid: p.solid ?? true, blocksSight: p.blocksSight ?? false })],
-  [Inventory, (p) => ({ items: [], capacity: p.capacity ?? 0, weightLimit: p.weightLimit ?? null })],
+  [Inventory, (p) => ({ items: [], capacity: p.capacity ?? 0 })],
   [Equipment, (p) => ({
     weapon: p.weapon ?? null,
     armor: p.armor ?? null,
@@ -86,6 +91,14 @@ export const Creature = defineArchetype(
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
   [Speed, (p) => ({ actEvery: Math.max(1, 4 - (p.speed ?? 1)) })],
+  // Awareness: starts unaware; managed by aiChaseSystem + soundPropagationSystem.
+  [AggroState, { alertLevel: AGGRO_LEVELS.unaware, lastKnownX: 0, lastKnownY: 0, searchTurnsLeft: 0 }],
+  // Sound emission: footstep-level ambient by default; override via ambientNoise param.
+  [SoundEmitter, (p) => ({ ambient: p.ambientNoise ?? HEARING_SOURCE_DB.footsteps, lastActionNoise: 0 })],
+  // Creature taxonomy for targeting by spells, affixes, and deity mechanics.
+  [CreatureType, (p) => ({ type: p.creatureType ?? CREATURE_TYPES.humanoid })],
+  // Carrying load; recomputed each effects phase by encumbranceSystem.
+  [Encumbrance, { current: 0, overloaded: false, heavilyLoaded: false }],
 );
 
 // Human (humanoid defaults, neutral faction)

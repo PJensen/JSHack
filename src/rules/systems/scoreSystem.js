@@ -1,3 +1,4 @@
+import { DungeonState } from '../components/DungeonState.js';
 import { Player } from '../components/Player.js';
 import { Score } from '../components/Score.js';
 import { Vitality } from '../components/Vitality.js';
@@ -5,7 +6,8 @@ import { Vitality } from '../components/Vitality.js';
 const INSTALLED_KEY = Symbol.for('jshack:score:kill:installed');
 
 /**
- * Listen for 'died' events and award the dead entity's maxHp to the player's score.
+ * Listen for 'died' events and award the dead entity's maxHp to the player's score,
+ * multiplied by the current floor depth.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function installScoreListener(world) {
@@ -24,6 +26,9 @@ export function installScoreListener(world) {
     const score = world.get(killer, Score);
     if (!score) return;
 
-    score.current += vit.maxHp;
+    let depth = 1;
+    for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
+
+    score.current += vit.maxHp * depth;
   });
 }

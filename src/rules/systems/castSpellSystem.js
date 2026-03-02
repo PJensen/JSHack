@@ -114,7 +114,8 @@ export function castSpellSystem(world) {
     /** @type {{ learnedSpellIds?: string[] }|null} */
     const brain = /** @type any */ (world.get(actor, Brain));
     const learned = normalizedLearnedSpellIds(brain);
-    if (!brain || !learned.includes(spell.id)) {
+    const fromChanneling = !!intent._fromChanneling;
+    if (!fromChanneling && (!brain || !learned.includes(spell.id))) {
       try { world.emit && world.emit('spell:not-known', { actor, spellId: spell.id }); } catch (e) { console.debug('[castSpellSystem] emit spell:not-known failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
@@ -133,8 +134,6 @@ export function castSpellSystem(world) {
     const resolvedSpell = confusion.spell;
 
     // Channeled casts already paid mana when channeling started — skip deduction.
-    const fromChanneling = !!intent._fromChanneling;
-
     if (!fromChanneling) {
       const have = Number(mana?.mana ?? 0);
       const cost = Number(resolvedSpell.manaCost || 0);

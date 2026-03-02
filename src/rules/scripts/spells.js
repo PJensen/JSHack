@@ -436,6 +436,31 @@ REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) 
   } catch (e) { console.debug('[spells] emit dungeon:teleport-depth failed:', e); }
 };
 
+// Hearthstone — 10-turn channeled version of homecoming.
+REGISTRY['hearthstone'] = function hearthstoneScript(world, actor, _spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  let fromDepth = 0;
+  for (const [, ds] of world.query(DungeonState)) {
+    fromDepth = Number(ds?.currentDepth || 0) | 0;
+    break;
+  }
+
+  try {
+    world.emit && world.emit('dungeon:teleport-depth', {
+      actor,
+      source: 'hearthstone',
+      targetDepth: 0,
+      returnTicket: {
+        depth: fromDepth,
+        x: apos.x | 0,
+        y: apos.y | 0,
+      },
+    });
+  } catch (e) { console.debug('[spells] emit dungeon:teleport-depth failed:', e); }
+};
+
 // Meteor — AoE damage at target position. Full damage at radius 1, half at radius 2.
 REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));

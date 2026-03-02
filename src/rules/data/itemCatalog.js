@@ -7,6 +7,7 @@ import { createEatOnUseHook, createMappingOnUseHook } from "../content/items/use
 import { requiresIdentification } from "./itemAppearances.js";
 import { isIdentified } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
+import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
 import { Mana } from "../components/Mana.js";
@@ -20,7 +21,7 @@ import { createStatusEvent } from "../../shared/events/statusEvent.js";
 function spellIdFromIdentity(identity, prefix) {
   const id = String(identity || "").toLowerCase();
   const p = String(prefix || "").toLowerCase();
-  if (!p || !id.startsWith(p)) return "";
+  if (p && !id.startsWith(p)) return "";
   return id.slice(p.length);
 }
 
@@ -277,7 +278,7 @@ function createWaterPotionHooks() {
           stack: "refresh",
           maxStacks: 1,
           sourceId: itemId,
-          meta: { source: "potion_water", waterType: "holy" },
+          meta: { source: "potion_water", waterType: "holy", masked: !state.identified },
         });
       } else if (waterType === "unholy") {
         ctx.helpers.addEffect(targetId, {
@@ -289,7 +290,7 @@ function createWaterPotionHooks() {
           stack: "refresh",
           maxStacks: 1,
           sourceId: itemId,
-          meta: { source: "potion_water", waterType: "unholy" },
+          meta: { source: "potion_water", waterType: "unholy", masked: !state.identified },
         });
       }
 
@@ -1733,6 +1734,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "It tastes acrid and vile.",
     },
     hooks: {
       can_dip_target: canPoisonDipTarget,
@@ -1767,6 +1769,7 @@ export const ITEM_CATALOG = {
       effects: [],
       toxicity: null,
       beatitude: "uncursed",
+      feel: "It tastes like plain water.",
     },
     hooks: createWaterPotionHooks(),
   },
@@ -1788,6 +1791,7 @@ export const ITEM_CATALOG = {
       effects: [],
       toxicity: null,
       beatitude: "blessed",
+      feel: "It tastes pure and faintly warm.",
     },
     hooks: createWaterPotionHooks(),
   },
@@ -1808,6 +1812,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "Your skin prickles and feels curiously heavy.",
     },
     hooks: {
       can_dip_target: canStonecoatDipTarget,
@@ -1825,7 +1830,7 @@ export const ITEM_CATALOG = {
           stack: "refresh",
           maxStacks: 1,
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
-          meta: { source: "potion_stoneskin", kind: "armor_buff" },
+          meta: { source: "potion_stoneskin", kind: "armor_buff", masked: !state.identified },
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "stoneskin", source: actorId }));
         return { turns, potency };
@@ -1927,6 +1932,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "Your wounds knit closed with a rush of heat.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -1956,6 +1962,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "Your heart pounds with sudden, explosive energy.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -1988,6 +1995,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "Your mind buzzes with arcane static.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -2023,6 +2031,7 @@ export const ITEM_CATALOG = {
           stack: "refresh", maxStacks: 1 },
       ],
       toxicity: null,
+      feel: "Your muscles surge with newfound vigour.",
     },
   },
   potion_second_wind: {
@@ -2045,6 +2054,7 @@ export const ITEM_CATALOG = {
           stack: "refresh", maxStacks: 1 },
       ],
       toxicity: null,
+      feel: "Your lungs open; your breathing quickens and steadies.",
     },
   },
   potion_resist_fire: {
@@ -2064,6 +2074,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "A cool wave washes over your body.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -2077,7 +2088,7 @@ export const ITEM_CATALOG = {
           stack: "refresh",
           maxStacks: 1,
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
-          meta: { source: "potion_resist_fire", kind: "resist_buff" },
+          meta: { source: "potion_resist_fire", kind: "resist_buff", masked: !state.identified },
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_fire", source: Number(state?.actor || ctx.actor || 0) | 0 }));
         return { resist: "fire", duration: 40 };
@@ -2101,6 +2112,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "It burns your throat with a sharp intensity.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -2114,7 +2126,7 @@ export const ITEM_CATALOG = {
           stack: "refresh",
           maxStacks: 1,
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
-          meta: { source: "potion_resist_poison", kind: "resist_buff" },
+          meta: { source: "potion_resist_poison", kind: "resist_buff", masked: !state.identified },
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_poison", source: Number(state?.actor || ctx.actor || 0) | 0 }));
         return { resist: "poison", duration: 40 };
@@ -2138,6 +2150,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "It tastes medicinal and faintly chalky.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -2169,6 +2182,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "A faint tingle runs over your skin.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -2182,7 +2196,7 @@ export const ITEM_CATALOG = {
           stack: "refresh",
           maxStacks: 1,
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
-          meta: { source: "potion_resist_electric", kind: "resist_buff" },
+          meta: { source: "potion_resist_electric", kind: "resist_buff", masked: !state.identified },
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_electric", source: Number(state?.actor || ctx.actor || 0) | 0 }));
         return { resist: "electric", duration: 40 };
@@ -2206,6 +2220,7 @@ export const ITEM_CATALOG = {
       channels: [],
       effects: [],
       toxicity: null,
+      feel: "It coats your throat with a thick, amber warmth.",
     },
     hooks: {
       on_drink: (ctx, state) => {
@@ -2219,7 +2234,7 @@ export const ITEM_CATALOG = {
           stack: "refresh",
           maxStacks: 1,
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
-          meta: { source: "potion_resist_acid", kind: "resist_buff" },
+          meta: { source: "potion_resist_acid", kind: "resist_buff", masked: !state.identified },
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_acid", source: Number(state?.actor || ctx.actor || 0) | 0 }));
         return { resist: "acid", duration: 40 };
@@ -2472,6 +2487,39 @@ export const ITEM_CATALOG = {
       }),
     },
   },
+  hearthstone: {
+    id: "hearthstone",
+    catalogKind: "magic",
+    name: "Hearthstone",
+    type: "tool",
+    slot: "bag",
+    value: 88,
+    material: "mineral",
+    rarity: 3,
+    rarityName: "unique",
+    description: "A warm stone that remembers the way home. Channel your will to return to the surface.",
+    hooks: (() => {
+      const _castHook = createCastSpellFromIdentityHook({
+        identityPrefix: "",
+        targetMode: "self",
+        consumeOnSuccess: false,
+      });
+      return {
+        on_use: (ctx, state) => {
+          const cd = ctx.query.get(state.itemId, ItemCooldown);
+          if (cd && cd.turnsRemaining > 0) {
+            ctx.io.message(`The hearthstone is still cooling down (${cd.turnsRemaining} turns).`, 'warning');
+            return { consumed: false, cancelled: true, consumesTurn: false, code: 'ITEM_ON_COOLDOWN', message: 'Hearthstone is on cooldown.' };
+          }
+          return _castHook(ctx, state);
+        },
+        after_use: (ctx, state) => {
+          ctx.mutate.queue({ type: 'setItemCooldown', entityId: state.itemId | 0, turns: 500 });
+          return {};
+        },
+      };
+    })(),
+  },
   scroll_homecoming: {
     id: "scroll_homecoming",
     catalogKind: "magic",
@@ -2488,6 +2536,10 @@ export const ITEM_CATALOG = {
         targetMode: "self",
         consumeOnSuccess: true,
       }),
+      on_loot_roll: (ctx, _state) => {
+        if (ctx?.playerItemIds?.has('hearthstone')) return { cancel: true };
+        return {};
+      }
     },
   },
   scroll_heal: {
@@ -3008,6 +3060,7 @@ export const ITEM_CATALOG = {
       effects: [
         { key: "poison", potency: 2, onset: 0, peak: 0, duration: 15, stack: "add", meta: { source: "potion_sickness" } },
       ],
+      feel: "Your stomach lurches violently.",
     },
     hooks: {
       on_drink: (ctx, state) => {
