@@ -148,7 +148,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         attempts++;
       } while (decorationPos && mx === decorationPos.x && my === decorationPos.y && attempts < 10);
       const sp = pickSpawner(rng, floorPlan.depth);
-      const isSpiderSpawner = sp.monsterType?.identity === 'spider';
+      const isSpiderSpawner = sp.monsterType?.identity === 'spider' || sp.monsterType?.identity === 'cave_spider';
       spawns.push({ x: mx, y: my, kind: 'spawner', params: sp });
       if (isSpiderSpawner) roomHasSpider = true;
       roomSpawners.push({ x: mx, y: my, isSpider: isSpiderSpawner });
@@ -160,7 +160,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
       const mp = pickMonster(rng, floorPlan.depth);
       spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
-      if (mp.identity === 'spider') roomHasSpider = true;
+      if (mp.identity === 'spider' || mp.identity === 'cave_spider') roomHasSpider = true;
     }
 
     // Scatter webs across ~30% of floor tiles in spider rooms.

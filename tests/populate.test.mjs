@@ -37,7 +37,7 @@ Deno.test("pickMonster scales HP with depth", () => {
   assert(m20.maxHp > m1.maxHp, `deeper monsters have more HP: ${m1.maxHp} vs ${m20.maxHp}`);
 });
 
-Deno.test("pickSpawner uses rat/spider pool on shallow depth", () => {
+Deno.test("pickSpawner uses rat/cave_snake/cave_spider pool on shallow depth", () => {
   const rngFirst = {
     next: () => 0,
     int: (min) => min,
@@ -54,7 +54,7 @@ Deno.test("pickSpawner uses rat/spider pool on shallow depth", () => {
     float: (min, max) => (typeof max === 'number' ? max : min),
   };
   const second = pickSpawner(rngSecond, 1);
-  assert(second.monsterType.identity === 'spider', `expected spider, got ${second.monsterType.identity}`);
+  assert(second.monsterType.identity === 'cave_spider', `expected cave_spider, got ${second.monsterType.identity}`);
 });
 
 Deno.test("pickItem returns valid kinds", () => {
@@ -125,7 +125,7 @@ Deno.test("populateChunk can generate a shallow spawner", () => {
   assert(spawners[0].params?.monsterType?.identity === 'rat', 'expected shallow spawner monster to be rat');
 });
 
-Deno.test("populateChunk shallow spawners can be both rat and spider", () => {
+Deno.test("populateChunk shallow spawners can be rat, cave_snake, and cave_spider", () => {
   const seen = new Set();
   for (let seed = 1; seed <= 200; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
@@ -134,13 +134,14 @@ Deno.test("populateChunk shallow spawners can be both rat and spider", () => {
     for (const sp of spawns) {
       if (sp.kind !== 'spawner') continue;
       const identity = sp.params?.monsterType?.identity;
-      if (identity === 'rat' || identity === 'spider') seen.add(identity);
+      if (identity === 'rat' || identity === 'cave_snake' || identity === 'cave_spider') seen.add(identity);
     }
-    if (seen.size === 2) break;
+    if (seen.size === 3) break;
   }
 
   assert(seen.has('rat'), 'expected to observe a rat spawner');
-  assert(seen.has('spider'), 'expected to observe a spider spawner');
+  assert(seen.has('cave_snake'), 'expected to observe a cave_snake spawner');
+  assert(seen.has('cave_spider'), 'expected to observe a cave_spider spawner');
 });
 
 Deno.test("spawner wiring: kind -> identity -> worldView -> palette", () => {

@@ -16,6 +16,8 @@ export const basePalette = {
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
   bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" }, // 🦇
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
+  cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
+  cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
   skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },
@@ -163,6 +165,8 @@ export const basePalette = {
   corpse_goblin:       { glyph: "%", fg: "#7ecc5a", glow: "#4a9030" },
   corpse_bat:          { glyph: "%", fg: "#9080b0", glow: "#605080" },
   corpse_grid_bug:     { glyph: "%", fg: "#bb66ff", glow: "#44ccff" },
+  corpse_cave_snake:   { glyph: "%", fg: "#88aa66", glow: "#667744" },
+  corpse_cave_spider:  { glyph: "%", fg: "#88bb88", glow: "#558855" },
   corpse_snake:        { glyph: "%", fg: "#55aa44", glow: "#338822" },
   corpse_skeleton_archer: { glyph: "%", fg: "#c8c4b0", glow: "#908870" },
   corpse_bone_bowman:     { glyph: "%", fg: "#d8d4c0", glow: "#a8a490" },
