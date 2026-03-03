@@ -300,6 +300,8 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
 let _pendingSpellTargeting = null;
 /** @type {{ actorId: number, itemId: number, itemName: string, range: number }|null} */
 let _pendingThrowTargeting = null;
+/** @type {{ spellId: string, spellName: string, range: number, enemies: Array<{id:number,x:number,y:number}>, index: number }|null} */
+let _pendingEnemyTargeting = null;
 /** @type {{ x: number, y: number }|null} Keyboard targeting cursor (tile coords) */
 let _targetCursor = null;
 const throwFx = createThrowFxController({ world });
@@ -867,6 +869,68 @@ addEventListener('ui:castActiveSpell', () => {
     return;
   }
 
+  // Enemy-targeted spells: build visible enemy list, Tab to cycle
+  const enemySpellDef = getSpell(id);
+  if (enemySpellDef?.targeting === 'enemy') {
+    const _pe = playerEntity(world);
+    if (!_pe) return;
+    const px = _pe.pos.x | 0;
+    const py = _pe.pos.y | 0;
+    const range = Math.max(1, Number(enemySpellDef.range || 8));
+    const blocked = buildBlocksVisionMap(world);
+    const isBlocked = blockedCallback(blocked);
+
+    /** @type {Array<{id:number,x:number,y:number}>} */
+    const enemies = [];
+    forEachInRadius(world, px, py, range, (eid, pos) => {
+      if (eid === _pe.id) return;
+      const fac = world.get(eid, Faction);
+      if (!fac || fac.key !== 'enemy') return;
+      const vit = /** @type any */ (world.get(eid, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) return;
+      if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
+      enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
+    });
+
+    if (enemies.length === 0) {
+      try { messageLog.log({ text: 'No visible enemies in range.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+      return;
+    }
+
+    // Sort by Chebyshev distance (nearest first)
+    enemies.sort((a, b) => {
+      const da = Math.max(Math.abs(a.x - px), Math.abs(a.y - py));
+      const db = Math.max(Math.abs(b.x - px), Math.abs(b.y - py));
+      return da - db;
+    });
+
+    // Toggle off if already targeting same spell
+    if (_pendingEnemyTargeting?.spellId === id) {
+      _pendingEnemyTargeting = null;
+      _targetCursor = null;
+      try { messageLog.log({ text: `${enemySpellDef.name} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+      return;
+    }
+
+    _pendingEnemyTargeting = {
+      spellId: id,
+      spellName: enemySpellDef.name,
+      range,
+      enemies,
+      index: 0,
+    };
+    _targetCursor = { x: enemies[0].x, y: enemies[0].y };
+    _pendingSpellTargeting = null;
+    _pendingThrowTargeting = null;
+    try {
+      messageLog.log({
+        text: `Choose target for ${enemySpellDef.name}. Tab to cycle enemies, Enter to confirm, Esc to cancel.`,
+        type: 'system',
+      });
+    } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
+
   _pendingSpellTargeting = null;
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: id } });
@@ -874,6 +938,14 @@ addEventListener('ui:castActiveSpell', () => {
 
 addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
+  if (_pendingEnemyTargeting) {
+    const spellName = _pendingEnemyTargeting.spellName;
+    _pendingEnemyTargeting = null;
+    _targetCursor = null;
+    ev.preventDefault();
+    try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
   if (_pendingSpellTargeting) {
     const spellName = _pendingSpellTargeting.spellName;
     _pendingSpellTargeting = null;
@@ -890,6 +962,47 @@ addEventListener('keydown', (ev) => {
     try { messageLog.log({ text: `${bracketizeName(itemName)} throw cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
   }
 });
+
+// Enemy targeting: Tab cycles enemies, Enter confirms
+addEventListener('keydown', (ev) => {
+  if (!_pendingEnemyTargeting) return;
+
+  if (ev.key === 'Tab') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const targeting = _pendingEnemyTargeting;
+    if (ev.shiftKey) {
+      targeting.index = (targeting.index - 1 + targeting.enemies.length) % targeting.enemies.length;
+    } else {
+      targeting.index = (targeting.index + 1) % targeting.enemies.length;
+    }
+    const enemy = targeting.enemies[targeting.index];
+    _targetCursor = { x: enemy.x, y: enemy.y };
+    return;
+  }
+
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const pe = playerEntity(world);
+    if (!pe) { _pendingEnemyTargeting = null; _targetCursor = null; return; }
+    const targeting = _pendingEnemyTargeting;
+    const enemy = targeting.enemies[targeting.index];
+    _pendingEnemyTargeting = null;
+    _targetCursor = null;
+    const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+    rulesHandler({
+      type: 'rules.castActiveSpell',
+      payload: {
+        spellId: targeting.spellId,
+        targetId: enemy.id,
+        x: enemy.x,
+        y: enemy.y,
+      },
+    });
+    return;
+  }
+}, { capture: true });
 
 // Keyboard targeting: arrow/vim/numpad keys move cursor, Enter confirms target
 addEventListener('keydown', (ev) => {
@@ -2072,6 +2185,49 @@ cam.scale = CAMERA_START_SCALE;
 cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
 
+// Enemy-targeted spell casts: tap on a visible enemy to select.
+canvas.addEventListener('pointerdown', (ev) => {
+  if (!_pendingEnemyTargeting) return;
+  const pe = playerEntity(world);
+  if (!pe) { _pendingEnemyTargeting = null; _targetCursor = null; return; }
+
+  const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
+  const tapX = worldToTile(wx);
+  const tapY = worldToTile(wy);
+
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+
+  const targeting = _pendingEnemyTargeting;
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < targeting.enemies.length; i++) {
+    const e = targeting.enemies[i];
+    const d = Math.max(Math.abs(e.x - tapX), Math.abs(e.y - tapY));
+    if (d <= 1 && d < bestDist) { bestIdx = i; bestDist = d; }
+  }
+
+  if (bestIdx < 0) {
+    try { messageLog.log({ text: 'No valid enemy at that position.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
+
+  const enemy = targeting.enemies[bestIdx];
+  _pendingEnemyTargeting = null;
+  _targetCursor = null;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({
+    type: 'rules.castActiveSpell',
+    payload: {
+      spellId: targeting.spellId,
+      targetId: enemy.id,
+      x: enemy.x,
+      y: enemy.y,
+    },
+  });
+}, { capture: true });
+
 // Tile-targeted spell casts and throws capture the next tap on the stage.
 canvas.addEventListener('pointerdown', (ev) => {
   const pendingSpell = _pendingSpellTargeting;
@@ -2914,6 +3070,7 @@ function render(worldView) {
     targetCursor: _targetCursor,
     hasPendingSpellTargeting: !!_pendingSpellTargeting,
     hasPendingThrowTargeting: !!_pendingThrowTargeting,
+    hasPendingEnemyTargeting: !!_pendingEnemyTargeting,
     fxTime: _fxTime,
   });
 

@@ -194,4 +194,10 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["lucky"],
   },
+  {
+    id: "agony",
+    keys: ["agony"],
+    operation: "damage",
+    statuses: ["agony"],
+  },
 ];
