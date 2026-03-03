@@ -62,7 +62,7 @@ Deno.test("agony applies DOT effect to target", () => {
   const agony = ae.effects.find(e => e.key === 'agony');
   assert(agony, 'should have agony effect');
   assert(agony.turnsLeft > 0, 'agony should have remaining turns');
-  assert(agony.potency >= 2, 'agony potency should be at least 2');
+  assert(agony.potency >= 1, 'agony potency should be at least 1');
   assertEquals(agony.stacks, 1, 'DOT stacks should be 1');
 });
 

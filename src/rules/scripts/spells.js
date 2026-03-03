@@ -910,7 +910,7 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   // Intelligence scaling
   const brain = /** @type any */ (world.get(actor, Brain));
   const intBonus = brain?.intelligence ? Math.floor((brain.intelligence - 10) / 2) : 0;
-  const basePotency = 2 + Math.max(0, Math.floor(intBonus / 2));
+  const basePotency = 1 + Math.max(0, Math.floor(intBonus / 2));
   const baseDuration = Math.min(10, 6 + Math.max(0, Math.floor(intBonus / 2)));
 
   // Apply agony DOT via ActiveEffects
