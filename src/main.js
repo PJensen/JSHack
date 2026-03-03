@@ -2185,7 +2185,7 @@ cam.scale = CAMERA_START_SCALE;
 cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
 
-// Enemy-targeted spell casts: tap on a visible enemy to select.
+// Enemy-targeted spell casts: tap selects nearest enemy, tap selected enemy confirms.
 canvas.addEventListener('pointerdown', (ev) => {
   if (!_pendingEnemyTargeting) return;
   const pe = playerEntity(world);
@@ -2200,32 +2200,39 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
 
   const targeting = _pendingEnemyTargeting;
+
+  // Find enemy nearest to the tap point (Manhattan distance)
   let bestIdx = -1;
   let bestDist = Infinity;
   for (let i = 0; i < targeting.enemies.length; i++) {
     const e = targeting.enemies[i];
-    const d = Math.max(Math.abs(e.x - tapX), Math.abs(e.y - tapY));
-    if (d <= 1 && d < bestDist) { bestIdx = i; bestDist = d; }
+    const d = Math.abs(e.x - tapX) + Math.abs(e.y - tapY);
+    if (d < bestDist) { bestIdx = i; bestDist = d; }
   }
+  if (bestIdx < 0) return;
 
-  if (bestIdx < 0) {
-    try { messageLog.log({ text: 'No valid enemy at that position.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+  const selected = targeting.enemies[bestIdx];
+
+  // If tapping the already-selected enemy → confirm and cast
+  if (targeting.index === bestIdx) {
+    _pendingEnemyTargeting = null;
+    _targetCursor = null;
+    const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+    rulesHandler({
+      type: 'rules.castActiveSpell',
+      payload: {
+        spellId: targeting.spellId,
+        targetId: selected.id,
+        x: selected.x,
+        y: selected.y,
+      },
+    });
     return;
   }
 
-  const enemy = targeting.enemies[bestIdx];
-  _pendingEnemyTargeting = null;
-  _targetCursor = null;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({
-    type: 'rules.castActiveSpell',
-    payload: {
-      spellId: targeting.spellId,
-      targetId: enemy.id,
-      x: enemy.x,
-      y: enemy.y,
-    },
-  });
+  // Otherwise → select this enemy (snap reticle)
+  targeting.index = bestIdx;
+  _targetCursor = { x: selected.x, y: selected.y };
 }, { capture: true });
 
 // Tile-targeted spell casts and throws capture the next tap on the stage.
