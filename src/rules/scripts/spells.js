@@ -914,19 +914,12 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   const baseDuration = Math.min(10, 6 + Math.max(0, Math.floor(intBonus / 2)));
 
   // Apply agony DOT via ActiveEffects
-  let ae = /** @type any */ (world.get(targetId, ActiveEffects));
-  if (!ae) {
-    try { world.add(targetId, ActiveEffects, { effects: [] }); } catch {}
-    ae = /** @type any */ (world.get(targetId, ActiveEffects));
-  }
+  const agonyEffect = { key: 'agony', turnsLeft: baseDuration, potency: basePotency, stacks: 1, sourceId: actor };
+  const ae = /** @type any */ (world.get(targetId, ActiveEffects));
   if (ae && Array.isArray(ae.effects)) {
-    upsertTimedEffect(ae.effects, {
-      key: 'agony',
-      turnsLeft: baseDuration,
-      potency: basePotency,
-      stacks: 1,
-      sourceId: actor,
-    });
+    upsertTimedEffect(ae.effects, agonyEffect);
+  } else {
+    try { world.add(targetId, ActiveEffects, { effects: [agonyEffect] }); } catch {}
   }
 
   // Emit VFX event
