@@ -3041,6 +3041,48 @@ export const ITEM_CATALOG = {
     },
   },
 
+  // ── Teleportation & Polymorph ────────────────────────────────────
+  scroll_teleportation: {
+    id: "scroll_teleportation",
+    catalogKind: "magic",
+    name: "Scroll of Teleportation",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 15,
+    description: "Reality lurches. You blink and find yourself somewhere else entirely.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:teleportation", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_polymorph: {
+    id: "scroll_polymorph",
+    catalogKind: "magic",
+    name: "Scroll of Polymorph",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 80,
+    description: "The words twist reality itself. Name a creature and watch the nearest foe reshape.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:polymorph", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
   // ── Bad Potions ───────────────────────────────────────────────────
   potion_sickness: {
     id: "potion_sickness",
