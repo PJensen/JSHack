@@ -22,7 +22,7 @@
  * @property {number} [castTime] // turns to channel before casting (0 or omitted = instant)
  * @property {string} [script]  // optional key for scripted behavior
  * @property {string} [description] // flavor-forward tooltip text
- * @property {'self'|'target'|'auto'|'path'|'area'} [targeting]
+ * @property {'self'|'target'|'auto'|'path'|'area'|'enemy'} [targeting]
  * @property {number} [radius]
  * @property {number} [maxTargets]
  * @property {SpellEffectDef[]} [effects]
@@ -196,6 +196,21 @@ export const SPELL_DEFS = {
       { kind: 'damage', element: 'shadow', amount: '12' },
     ],
   },
+  agony: {
+    id: 'agony',
+    name: 'Agony',
+    symbol: '\u2620',       // ☠
+    manaCost: 8,
+    minIntelligence: 8,
+    range: 8,
+    script: 'agony',
+    targeting: 'enemy',
+    description: 'Weave shadow into a curse that gnaws at the target\'s life force, dealing damage each turn.',
+    effects: [
+      { kind: 'damage', element: 'shadow', amount: 'DOT; intelligence-scaled potency per turn' },
+      { kind: 'status', status: 'agony', duration: '6-8 turns (intelligence-scaled)' },
+    ],
+  },
   phase_strike: {
     id: 'phase_strike',
     name: 'Phase Strike',
@@ -257,6 +272,7 @@ export function describeSpellTargetEffects(spell) {
   else if (spell.targeting === 'auto') lines.push('Targeting: Auto-selects valid target');
   else if (spell.targeting === 'path') lines.push('Targeting: Along movement path');
   else if (spell.targeting === 'area') lines.push('Targeting: Area');
+  else if (spell.targeting === 'enemy') lines.push('Targeting: Choose a visible enemy');
   if (Number.isFinite(spell.radius) && Number(spell.radius) > 0) {
     lines.push(`Area radius ${Number(spell.radius) | 0}`);
   }

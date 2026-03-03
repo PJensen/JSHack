@@ -40,6 +40,7 @@ function effectKeyToType(key) {
         case 'poison': case 'poisoned': return 'poison';
         case 'bleed': case 'bleeding': return 'generic';
         case 'shock': case 'shocked': return 'lightning';
+        case 'agony': return 'shadow';
         default: return 'generic';
     }
 }

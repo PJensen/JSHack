@@ -848,6 +848,100 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   try { world.emit && world.emit('spell:shadow_bolt', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, to: { x: target.x, y: target.y } }); } catch (e) { console.debug('[spells] emit spell:shadow_bolt failed:', e); }
 };
 
+// Agony — shadow DOT curse, intelligence-scaled potency and duration.
+REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const MAX_R = Math.max(1, Number(spell.range || 8));
+  const isBlocked = createLOSBlocker(world);
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Resolve target: prefer intent.targetId, fallback to auto-target nearest hostile
+  let targetId = intent?.targetId || 0;
+  let tpos = targetId ? /** @type any */ (world.get(targetId, Position)) : null;
+
+  if (!targetId || !tpos) {
+    // Auto-target fallback (confused casts, AI casters)
+    /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+    const candidates = [];
+    for (const [id, p] of world.query(Position)) {
+      if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || !areFactionsHostile('player', fac.key)) continue;
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      const dist2v = d2(apos.x, apos.y, p.x, p.y);
+      if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
+    }
+    candidates.sort((a, b) => a.dist2 - b.dist2);
+    let found = null;
+    for (const c of candidates) {
+      if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isBlocked)) { found = c; break; }
+    }
+    if (!found) {
+      try { world.emit && world.emit('spell:agony', { actor, targetId: actor, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
+      return;
+    }
+    targetId = found.id;
+    tpos = { x: found.x, y: found.y };
+  }
+
+  // Validate target alive
+  const vit = /** @type any */ (world.get(targetId, Vitality));
+  if (!vit || (vit.hp | 0) <= 0) {
+    try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
+    return;
+  }
+
+  // LOS check
+  if (!hasLOS(apos.x | 0, apos.y | 0, tpos.x | 0, tpos.y | 0, isBlocked)) {
+    try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true, reason: 'no_los' }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
+    return;
+  }
+
+  // Range check
+  const dist = chebyshev(apos, tpos);
+  if (dist > MAX_R) {
+    try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true, reason: 'out_of_range' }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
+    return;
+  }
+
+  // Intelligence scaling
+  const brain = /** @type any */ (world.get(actor, Brain));
+  const intBonus = brain?.intelligence ? Math.floor((brain.intelligence - 10) / 2) : 0;
+  const basePotency = 2 + Math.max(0, Math.floor(intBonus / 2));
+  const baseDuration = Math.min(10, 6 + Math.max(0, Math.floor(intBonus / 2)));
+
+  // Apply agony DOT via ActiveEffects
+  let ae = /** @type any */ (world.get(targetId, ActiveEffects));
+  if (!ae) {
+    try { world.add(targetId, ActiveEffects, { effects: [] }); } catch {}
+    ae = /** @type any */ (world.get(targetId, ActiveEffects));
+  }
+  if (ae && Array.isArray(ae.effects)) {
+    upsertTimedEffect(ae.effects, {
+      key: 'agony',
+      turnsLeft: baseDuration,
+      potency: basePotency,
+      stacks: 1,
+      sourceId: actor,
+    });
+  }
+
+  // Emit VFX event
+  try {
+    world.emit && world.emit('spell:agony', {
+      actor,
+      targetId,
+      from: { x: apos.x, y: apos.y },
+      at: { x: tpos.x, y: tpos.y },
+      potency: basePotency,
+      duration: baseDuration,
+    });
+  } catch (e) { console.debug('[spells] emit spell:agony failed:', e); }
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world
