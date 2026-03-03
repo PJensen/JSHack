@@ -155,10 +155,11 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
             const centerTile = chunkData.tiles[ly * CHUNK_SIZE + lx];
             // Always make the stair tile itself walkable.
             chunkData.tiles[ly * CHUNK_SIZE + lx] = TILE_FLOOR;
-            if (centerTile === TILE_VOID && chunkData.rooms.length > 0) {
-              // Stair landed in uncarved space — connect it to the nearest room with an
-              // L-shaped corridor so the player can always navigate off it.  We only add
-              // walls beside void segments (never punch through existing room walls).
+            if ((centerTile === TILE_VOID || centerTile === TILE_WALL) && chunkData.rooms.length > 0) {
+              // Stair landed in uncarved space or inside a wall — connect it to the
+              // nearest room with an L-shaped corridor so the player can always
+              // navigate off it.  We only add walls beside void segments (never punch
+              // through existing room walls).
               let nearRoom = chunkData.rooms[0];
               let nearDist = Infinity;
               for (const r of chunkData.rooms) {
@@ -187,8 +188,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
                   chunkData.tiles[y * CHUNK_SIZE + rcx + 1] = TILE_WALL;
               }
             }
-            // TILE_WALL center: room interior is immediately adjacent — stair becomes a doorway.
-            // TILE_FLOOR center: stair sits cleanly inside an existing room or corridor.
+            // TILE_FLOOR / TILE_DOOR center: stair sits cleanly inside an existing room or corridor.
           } else if (chunkData.rooms.length > 0) {
             const room = chunkData.rooms[0];
             lx = (room.x - cx * CHUNK_SIZE) + Math.floor(room.w / 2);

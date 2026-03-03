@@ -130,3 +130,37 @@ Deno.test("all walkable tiles form one connected component", () => {
     }
   }
 });
+
+Deno.test("forced up-stairs stay connected after descent (positional-identity)", () => {
+  // Simulate the actual game path: overworld → depth 1.
+  // The overworld's down-stair position becomes a forced up-stair on depth 1.
+  // This up-stair may land on TILE_WALL or TILE_VOID, so a corridor must be carved.
+  for (const seed of [...SEEDS, 0xC0FFEE]) {
+    // Generate overworld to collect down-stair positions
+    clearAll();
+    const w0 = new World({ seed });
+    const ow = generateFloor(w0, seed, 0);
+
+    // Generate depth 1 via descent (with priorDownStairPositions)
+    clearAll();
+    const w1 = new World({ seed });
+    const d1 = generateFloor(w1, seed, 1, null, null, ow.downStairPositions);
+
+    // Every forced up-stair must be walkable and have walkable neighbors
+    for (const sp of ow.downStairPositions) {
+      assert(isWalkable(sp.x, sp.y),
+        `seed ${seed}: forced up-stair at (${sp.x},${sp.y}) must be walkable`);
+      const wn = CARDINALS.filter(([dx, dy]) => isWalkable(sp.x + dx, sp.y + dy));
+      assert(wn.length > 0,
+        `seed ${seed}: forced up-stair at (${sp.x},${sp.y}) must have walkable neighbors`);
+    }
+
+    // Full connectivity: all walkable tiles reachable from spawn
+    const reachable = floodFillWorld(d1.spawnX, d1.spawnY);
+    const allWalkable = collectWalkable();
+    for (const k of allWalkable) {
+      assert(reachable.has(k),
+        `seed ${seed}: walkable tile ${k} unreachable from spawn after descent`);
+    }
+  }
+});
