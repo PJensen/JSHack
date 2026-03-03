@@ -3036,6 +3036,36 @@ function render(worldView) {
       bctx.fill();
       bctx.restore();
     }
+
+    // Glyph-FX: agony — pulsing dark purple shadow aura
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('agony')) {
+      bctx.save();
+      bctx.globalCompositeOperation = 'lighter';
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 4.0 + e.id * 0.7);
+      const cx = e.pos.x, cy = e.pos.y;
+      // Outer shadow haze
+      const rOuter = 0.58 + 0.10 * pulse;
+      const outerGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+      const outerA = 0.20 + 0.12 * pulse;
+      outerGrad.addColorStop(0, `rgba(120,40,180,${outerA.toFixed(3)})`);
+      outerGrad.addColorStop(0.55, `rgba(80,20,140,${(outerA * 0.45).toFixed(3)})`);
+      outerGrad.addColorStop(1, 'rgba(40,10,80,0)');
+      bctx.fillStyle = outerGrad;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+      bctx.fill();
+      // Inner dark core
+      const rInner = 0.26 + 0.04 * pulse;
+      const innerGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+      const innerA = 0.30 + 0.18 * pulse;
+      innerGrad.addColorStop(0, `rgba(160,60,220,${innerA.toFixed(3)})`);
+      innerGrad.addColorStop(1, 'rgba(100,30,160,0)');
+      bctx.fillStyle = innerGrad;
+      bctx.beginPath();
+      bctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+      bctx.fill();
+      bctx.restore();
+    }
   }
 
   for (let i = 0; i < deferredItems.length; i++) {
