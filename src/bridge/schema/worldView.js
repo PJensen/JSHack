@@ -66,6 +66,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'famished',
 	'starving',
 	'wasting',
+	'agony',
 ]);
 const VENOM_GLOW_ITEM_KINDS = new Set(['nightfang_dagger', 'venomfang_dagger', 'nightfang', 'venomfang']);
 
