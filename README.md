@@ -1,4 +1,6 @@
-# JSHack 🎮⚡
+# JSHack ⚡
+
+[🎮 Play JSHack](https://pjensen.github.io/JSHack/)
 
 **A mobile-first roguelike built to be hacked.**
 
