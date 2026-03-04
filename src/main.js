@@ -373,7 +373,7 @@ function setActiveSpell(id) {
 
 // ---- Dungeon initialization -------------------------------------------------
 import { initDungeon, generateFloorPlan } from "./rules/environment/dungeon/index.js";
-import { transitionToDepth } from "./rules/environment/dungeon/transition.js";
+import { transitionToDepth, clearFloorCache } from "./rules/environment/dungeon/transition.js";
 import {
   TILE_FLOOR,
   TILE_WALL,
@@ -505,6 +505,7 @@ function _finalizeNewGame(classData) {
   }
 
   if (!_savegameLoaded) {
+    clearFloorCache();
     const stats = classDef?.stats ?? {};
 
     // Create player at the spawn position with class stats
