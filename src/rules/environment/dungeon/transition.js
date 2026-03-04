@@ -43,6 +43,19 @@ function _loadPersistedFloor(worldSeed, depth) {
   } catch { return null; }
 }
 
+/** Clear all in-memory and localStorage floor caches (call on new game). */
+export function clearFloorCache() {
+  _floorEntityCache.clear();
+  _exploredCache.clear();
+  if (typeof localStorage === 'undefined') return;
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('jshack:floor:')) keys.push(k);
+  }
+  for (const k of keys) localStorage.removeItem(k);
+}
+
 /** Evict in-memory entries farthest from `currentDepth` until within MAX_MEMORY_FLOORS.
  *  Evicted entries are already persisted to localStorage; just drop the heap reference.
  * @param {number} currentDepth */
