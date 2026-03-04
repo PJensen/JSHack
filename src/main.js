@@ -84,6 +84,8 @@ import { Devotion } from "./rules/components/Devotion.js";
 import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { initDeity, getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
+import { CastSpellIntent } from "./rules/components/Intents/CastSpellIntent.js";
+import { Channeling } from "./rules/components/Channeling.js";
 import { Interactable } from "./rules/components/Interactable.js";
 import { Faction } from "./rules/components/Faction.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
@@ -654,6 +656,17 @@ function _finalizeNewGame(classData) {
   }
 
   bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
+
+  // Strip in-flight spell intents and channeling state from all entities before
+  // the first tick. These are transient and must not auto-fire on load — the
+  // initial tick would otherwise immediately complete a restored channel or cast
+  // a lingering CastSpellIntent from the savegame.
+  for (const [eid] of world.query(CastSpellIntent)) {
+    try { world.remove(eid, CastSpellIntent); } catch {}
+  }
+  for (const [eid] of world.query(Channeling)) {
+    try { world.remove(eid, Channeling); } catch {}
+  }
 
   // Initial world tick — runs all systems once so status effects, equipment stats,
   // and other derived state are fully resolved before the first frame renders.
