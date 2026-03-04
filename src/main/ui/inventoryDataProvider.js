@@ -543,6 +543,66 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
 
   // --- Settings panel data & actions ---
 
+  addEventListener('ui:requestBugReportData', () => {
+    const p = playerEntity(world);
+    let playerName = 'Hero';
+    let playerClass = 'unknown';
+    const stats = {};
+    const gear = [];
+    const inv = [];
+    const effects = [];
+    if (p) {
+      const ni = world.get(p.id, NamedIdentity);
+      playerName = String(ni?.name || 'Hero');
+      playerClass = String(ni?.identity || '').replace(/^player_/, '') || 'unknown';
+      const eq = world.get(p.id, Equipment);
+      const vit = world.get(p.id, Vitality);
+      const mana = world.get(p.id, Mana);
+      const stamina = world.get(p.id, Stamina);
+      const hunger = world.get(p.id, Hunger);
+      const combat = resolveCombatSnapshot(world, p.id, { mode: "melee" });
+      const rawHunger = Math.max(0, Number(hunger?.hunger || 0) | 0);
+      stats.hp = `${Math.max(0, Number(vit?.hp || 0) | 0)}/${Math.max(0, Number(vit?.maxHp || 0) | 0)}`;
+      stats.mana = `${Math.max(0, Number(mana?.mana || 0) | 0)}/${Math.max(0, Number(mana?.maxMana || 0) | 0)}`;
+      stats.stamina = `${Math.max(0, Number(stamina?.stamina || 0) | 0)}/${Math.max(0, Number(stamina?.maxStamina || 0) | 0)}`;
+      stats.attack = Math.max(0, Number(combat?.attackBonus ?? eq?.attackDerived ?? 0));
+      stats.defense = Math.max(0, Number(combat?.defenseDerived ?? eq?.defenseDerived ?? 0));
+      stats.armorClass = Math.max(0, Number(combat?.armorClass ?? (10 + stats.defense)));
+      stats.luck = Number(combat?.luck ?? eq?.luckDerived ?? 0);
+      stats.gold = sumPlayerGold(p.id);
+      stats.hungerLevel = (hunger?.satiation > 0) ? "satiated" : getHungerLevel(rawHunger);
+      stats.turn = Math.max(0, Number(world.step || 0) | 0);
+      for (const [, ds] of world.query(DungeonState)) {
+        stats.depth = Math.max(0, Number(ds?.currentDepth || 0) | 0);
+        break;
+      }
+      if (eq) {
+        for (const slot of GEAR_SLOTS) {
+          const eqId = Number(eq[slot] || 0) | 0;
+          if (!(eqId > 0)) continue;
+          gear.push({ slot, name: resolveItemDisplayName(world, eqId) });
+        }
+      }
+      const invComp = world.get(p.id, Inventory);
+      if (invComp && Array.isArray(invComp.items)) {
+        coalesceInventoryStacks(world, invComp);
+        for (const id of invComp.items) {
+          const info = world.get(id, ItemInfo);
+          if (!info || info.type === 'currency') continue;
+          const name = resolveItemDisplayName(world, id);
+          const count = Number(info.count || 1);
+          inv.push(count > 1 ? `${name} ×${count}` : name);
+        }
+      }
+      for (const { key, turns, stacks } of buildStatusRows(p.id)) {
+        effects.push(stacks > 1 ? `${key}×${stacks}(${turns}t)` : `${key}(${turns}t)`);
+      }
+    }
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:bugReportData', {
+      detail: { playerName, playerClass, stats, gear, inv, effects },
+    }));
+  });
+
   addEventListener('ui:requestSettingsData', () => {
     let hasPet = false;
     let petAlive = false;

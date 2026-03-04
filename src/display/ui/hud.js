@@ -158,14 +158,41 @@ export function initHUD() {
   bugBtn.addEventListener('click', () => {
     const version = window.VERSION || 'unknown';
     const ua = navigator.userAgent;
-    const body = encodeURIComponent(
-      `**Version:** ${version}\n**Browser:** ${ua}\n\n**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**`
-    );
-    const title = encodeURIComponent('[Bug] ');
-    window.open(
-      `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
-      '_blank', 'noopener'
-    );
+    function openWithData(d) {
+      const gearLines = (d?.gear || []).map(g => `  - ${g.slot}: ${g.name}`).join('\n') || '  (none)';
+      const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
+      const effectsLine = (d?.effects || []).join(', ') || 'none';
+      const s = d?.stats || {};
+      const charSection = d
+        ? [
+          `**Character:** ${d.playerName} (${d.playerClass})`,
+          `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
+          `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
+          `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,
+          `**Gold:** ${s.gold}  |  **Hunger:** ${s.hungerLevel}`,
+          `**Active effects:** ${effectsLine}`,
+          `**Gear:**\n${gearLines}`,
+          `**Inventory:**\n${invLines}`,
+        ].join('\n')
+        : '(no game state available)';
+      const body = encodeURIComponent(
+        `**Version:** ${version}\n**Browser:** ${ua}\n\n${charSection}\n\n**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**`
+      );
+      const title = encodeURIComponent('[Bug] ');
+      window.open(
+        `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
+        '_blank', 'noopener'
+      );
+    }
+    const onData = (ev) => {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(ev?.detail);
+    };
+    window.addEventListener('ui:bugReportData', onData);
+    try { window.dispatchEvent(new CustomEvent('ui:requestBugReportData')); } catch (e) {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(null);
+    }
   });
 
   // Pet control button (touch/press interface)
