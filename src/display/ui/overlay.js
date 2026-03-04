@@ -5,6 +5,7 @@ import { ensureMemoryGraph } from './memoryGraph.js';
 import { createDebugGraph } from './debugGraph.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
+import { versionLoaded } from '../../shared/version.js';
 
 const PANEL_Z_BASE = 1200;
 let _panelZCounter = PANEL_Z_BASE;
@@ -2372,6 +2373,36 @@ function renderSettings(panel, data, memGraph, dtyGraph) {
     window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
   });
   content.appendChild(petBtn);
+
+  // --- Version + Subscribe row ---
+  const versionRow = document.createElement('div');
+  Object.assign(versionRow.style, {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '10px', marginTop: '8px',
+  });
+
+  const versionEl = document.createElement('div');
+  Object.assign(versionEl.style, { fontSize: '12px', color: '#4a6080' });
+  versionRow.appendChild(versionEl);
+
+  const subscribeLink = document.createElement('a');
+  subscribeLink.href = 'https://pjensen.substack.com/s/js-hack';
+  subscribeLink.target = '_blank';
+  subscribeLink.rel = 'noopener';
+  subscribeLink.textContent = 'Subscribe to Updates';
+  Object.assign(subscribeLink.style, {
+    fontSize: '12px', color: '#7aacdf', textDecoration: 'none', opacity: '0.8',
+  });
+  subscribeLink.addEventListener('mouseenter', () => { subscribeLink.style.opacity = '1'; });
+  subscribeLink.addEventListener('mouseleave', () => { subscribeLink.style.opacity = '0.8'; });
+  versionRow.appendChild(subscribeLink);
+
+  content.appendChild(versionRow);
+
+  versionLoaded.then(() => {
+    const ver = /** @type {any} */ (window).VERSION;
+    if (ver) versionEl.textContent = `v${ver}`;
+  });
 
   el.appendChild(content);
 }
