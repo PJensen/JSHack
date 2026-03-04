@@ -21,8 +21,8 @@ import { areFactionsHostile } from '../utils/factionHostility.js';
 import { getItemsAt } from '../utils/tileQueryCache.js';
 import { worldRand } from '../utils/rng.js';
 import { getDecayStage } from '../data/food.js';
-import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
+import { computeFOV } from "../../shared/math/fov.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
 
@@ -262,8 +262,9 @@ function isFamiliar(world, petId) {
 function tryFamiliarFireBolt(world, petId, petPos, petState) {
   const petFaction = String(world.get(petId, Faction)?.key || 'pet');
 
-  // Lazily build LOS blocker
+  // Build visible set using shadowcasting — same algorithm as player FOV
   const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+  const visible = computeFOV(petPos.x | 0, petPos.y | 0, FAMILIAR_FIRE_RANGE, isBlocked);
 
   let bestId = 0;
   let bestDist = Infinity;
@@ -274,7 +275,7 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
     const dy = (epos.y | 0) - (petPos.y | 0);
     const dist = Math.max(Math.abs(dx), Math.abs(dy));
     if (dist < 1 || dist > FAMILIAR_FIRE_RANGE) continue;
-    if (dist < bestDist && hasLOS(petPos.x | 0, petPos.y | 0, epos.x | 0, epos.y | 0, isBlocked)) {
+    if (dist < bestDist && visible.has(`${epos.x | 0},${epos.y | 0}`)) {
       bestId = eid;
       bestDist = dist;
     }
