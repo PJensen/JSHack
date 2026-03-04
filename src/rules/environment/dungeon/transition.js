@@ -6,6 +6,8 @@ import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { Pet } from '../../components/Pet.js';
 import { PetState } from '../../components/PetState.js';
+import { Inventory } from '../../components/Inventory.js';
+import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
@@ -118,8 +120,15 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   const currentDepth = ds ? ds.currentDepth : 0;
   if (ds && Array.isArray(ds.floorEntityIds)) {
     if (currentDepth > 0) _exploredCache.set(currentDepth, saveExplored());
-    const floorIds = ds.floorEntityIds
-      .filter((/** @type {number} */ id) => Number.isInteger(id) && id > 0 && world.isAlive(id));
+    // Capture ALL non-permanent alive entities so that chest inventory items
+    // (no Position, not in floorEntityIds) and runtime-spawned monsters are
+    // included in the snapshot.
+    const _permanentIds = new Set();
+    for (const [id] of world.query(Player)) _permanentIds.add(id);
+    for (const [id] of world.query(Pet)) _permanentIds.add(id);
+    for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
+    const floorIds = Array.from(world.alive)
+      .filter(id => Number.isInteger(id) && id > 0 && !_permanentIds.has(id));
     const entry = {
       snapshot: serializeEntities(world, floorIds, { note: `floor_depth_${currentDepth}` }),
       order: floorIds.slice(),
@@ -183,6 +192,28 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
           return id;
         },
       });
+
+      // Remap entity ID cross-references embedded in component payloads.
+      // applySnapshot(append) assigns new IDs but does not walk payload values,
+      // so arrays like Inventory.items and MonsterSpawner.activeChildren still
+      // contain the old IDs from the snapshot.
+      const _restoredSet = new Set(oldToNew.values());
+      for (const [eid] of world.query(Inventory)) {
+        if (!_restoredSet.has(eid)) continue;
+        const inv = world.get(eid, Inventory);
+        if (!inv?.items?.length) continue;
+        world.mutate(eid, Inventory, r => {
+          r.items = r.items.map(id => oldToNew.get(id) ?? id).filter(id => world.isAlive(id));
+        });
+      }
+      for (const [eid] of world.query(MonsterSpawner)) {
+        if (!_restoredSet.has(eid)) continue;
+        world.mutate(eid, MonsterSpawner, r => {
+          r.activeChildren = (r.activeChildren || [])
+            .map(id => oldToNew.get(id) ?? id)
+            .filter(id => world.isAlive(id));
+        });
+      }
 
       world.time = prevTime;
       world.frame = prevFrame;
