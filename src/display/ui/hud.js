@@ -163,7 +163,7 @@ export function initHUD() {
       const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
       const effectsLine = (d?.effects || []).join(', ') || 'none';
       const s = d?.stats || {};
-      const charSection = d
+      const snapshot = d
         ? [
           `**Character:** ${d.playerName} (${d.playerClass})`,
           `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
@@ -176,7 +176,7 @@ export function initHUD() {
         ].join('\n')
         : '(no game state available)';
       const body = encodeURIComponent(
-        `**Version:** ${version}\n**Browser:** ${ua}\n\n${charSection}\n\n**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**`
+        `**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**\n\n---\n\n<details>\n<summary>Game state snapshot</summary>\n\n**Version:** ${version}\n**Browser:** ${ua}\n\n${snapshot}\n</details>`
       );
       const title = encodeURIComponent('[Bug] ');
       window.open(
