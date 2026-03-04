@@ -178,7 +178,7 @@ function maybeShowFirstRunDevNotice() {
       window.dispatchEvent(new CustomEvent("ui:showDevNoticeTooltip", {
         detail: {
           title: "Active Development Notice",
-          body: "JSHack is under very active development. Please report bugs and share ideas for new features.",
+          body: "JSHack is under very active development. Use the Bug button in the action bar to request features or report bugs!",
           closeText: "Got it",
         },
       }));
