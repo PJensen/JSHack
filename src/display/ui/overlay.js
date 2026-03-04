@@ -1243,7 +1243,7 @@ function renderDevNoticeTooltip(tip, detail) {
 
   const body = document.createElement('div');
   body.textContent = detail?.body
-    || 'JSHack is under very active development. Please report bugs and share ideas for new features.';
+    || 'JSHack is under very active development. Use the Bug button in the action bar to request features or report bugs!';
   Object.assign(body.style, {
     fontSize: '12px',
     lineHeight: '1.45',
