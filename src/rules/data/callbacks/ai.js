@@ -136,6 +136,18 @@ export class SeenCallbackContext {
   }
 }
 
+// ── Gaze exposure tracking ────────────────────────────────────────
+
+const GAZE_EXPOSURE_KEY = Symbol.for('jshack:ai:gazeExposure');
+
+/** @param {any} world @returns {Map<string, {count:number, lastTurn:number}>} */
+function ensureGazeExposureState(world) {
+  if (world[GAZE_EXPOSURE_KEY] instanceof Map) return world[GAZE_EXPOSURE_KEY];
+  const m = new Map();
+  world[GAZE_EXPOSURE_KEY] = m;
+  return m;
+}
+
 // ── Factory functions ─────────────────────────────────────────────
 
 /**
@@ -201,21 +213,62 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
 }
 
 /**
- * Gaze aura: while the monster has LOS to its target, progressively stack mindwipe.
- * Each turn in LOS adds one mindwipe stack (up to stackLimit) and refreshes duration.
- * @param {number} [stackLimit=4]
+ * Gaze aura: the monster must maintain LOS for `exposureTurns` consecutive turns
+ * before mindwipe begins to stack. Breaking LOS resets the exposure counter.
+ * Each turn in LOS emits an escalating `proc:gaze:message` event for UI wiring.
+ *
+ * @param {number} [stackLimit=4]   - max mindwipe stacks after exposure is complete
+ * @param {number} [exposureTurns=5] - consecutive LOS turns before mindwipe applies
  */
-export function gazeOnLOS(stackLimit = 4) {
-  const limit = Math.max(1, Math.trunc(stackLimit));
+export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
+  const limit    = Math.max(1, Math.trunc(stackLimit));
+  const threshold = Math.max(1, Math.trunc(exposureTurns));
+
+  /** Escalating messages: indices 0…threshold-2 are pre-effect warnings; index threshold-1 triggers mindwipe. */
+  const MESSAGES = [
+    "The Floating Eye's unblinking gaze washes over you.",
+    "Your thoughts feel sluggish under its stare...",
+    "The eye's gaze presses deeper into your mind.",
+    "Your concentration is slipping away...",
+    "The Floating Eye's gaze sears into your mind!",
+  ];
+
   return (ctx) => {
     if (!ctx || ctx.cancelled) return;
+
+    const now   = (Number(ctx.world.step) || 0) | 0;
+    const store = ensureGazeExposureState(ctx.world);
+    const slot  = `${ctx.actor | 0}:${ctx.target | 0}`;
+    const rec   = store.get(slot) || { count: 0, lastTurn: -1e9 };
+
+    // Reset counter if LOS was broken (gap of more than 1 turn)
+    if (now - rec.lastTurn > 1) {
+      rec.count = 0;
+    }
+
+    rec.count++;
+    rec.lastTurn = now;
+    store.set(slot, rec);
+
+    // Emit escalating message (turn 1 through threshold, capped at last message)
+    const msgIdx = Math.min(rec.count - 1, MESSAGES.length - 1);
+    ctx.emit('proc:gaze:message', {
+      actor:   ctx.actor,
+      target:  ctx.target,
+      step:    rec.count,
+      message: MESSAGES[msgIdx],
+    });
+
+    // No effect until fully exposed
+    if (rec.count < threshold) return;
+
     const ae = ctx.world.get(ctx.target, ActiveEffects);
     if (!ae) return;
     const existing = ae.effects.find(e => e.key === 'mindwipe');
     if (existing) {
       const currentStacks = existing.stacks || 1;
       if (currentStacks < limit) {
-        existing.stacks = currentStacks + 1;
+        existing.stacks  = currentStacks + 1;
         existing.potency = existing.stacks;
       }
       existing.turnsLeft = Math.max(existing.turnsLeft, 3);
@@ -223,6 +276,10 @@ export function gazeOnLOS(stackLimit = 4) {
       ae.effects.push({ key: 'mindwipe', turnsLeft: 3, potency: 1, stacks: 1 });
     }
     ctx.world.set(ctx.target, ActiveEffects, ae);
-    ctx.emit('proc:gaze:mindwipe', { actor: ctx.actor, target: ctx.target });
+    ctx.emit('proc:gaze:mindwipe', {
+      actor:  ctx.actor,
+      target: ctx.target,
+      stacks: ae.effects.find(e => e.key === 'mindwipe')?.stacks ?? 1,
+    });
   };
 }
