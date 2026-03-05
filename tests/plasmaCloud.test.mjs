@@ -143,6 +143,9 @@ Deno.test("monster onDeath hooks install once and spawn one cloud per bug per st
   world.emit("died", { id: bugId }); // duplicate in same step
 
   assertEquals(spawned.length, 1);
+  // Cloud must spawn exactly on the tile where the bug died, not nearby.
+  assertEquals(spawned[0].at.x, 4, "cloud x must match bug tile x");
+  assertEquals(spawned[0].at.y, 7, "cloud y must match bug tile y");
 
   let cloudCount = 0;
   for (const _ of world.query(Position, PlasmaCloud)) cloudCount++;

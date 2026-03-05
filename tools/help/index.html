@@ -436,215 +436,7 @@
     <p>Monsters by tier. Tier 0 spawns on floors 1–5, Tier 1 on 6–10, Tier 2 on 11–15, Tier 3 on floor 16+. Tier 99 = scripted/special spawn only.</p>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th></th>
-          <th>Name</th>
-          <th>Tier</th>
-          <th>Base HP</th>
-          <th>+HP/lvl</th>
-          <th>ATK</th>
-          <th>DEF</th>
-          <th>Damage</th>
-          <th>Size</th>
-          <th>Mass</th>
-          <th>SPD</th>
-          <th>Special / Resistances</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-
-        <!-- Tier 0 -->
-        <tr>
-          <td><span class="glyph" style="color:#b89070">r</span></td>
-          <td>Rat</td>
-          <td><span class="t0">0</span></td>
-          <td>5</td><td>1.0</td><td>0</td><td>0</td><td>1d3</td><td>S</td><td>2 kg</td><td>1</td>
-          <td><span class="tag tag-s">Disease 25%</span></td>
-          <td>A mangy rodent with beady eyes.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#7ecc5a">g</span></td>
-          <td>Goblin</td>
-          <td><span class="t0">0</span></td>
-          <td>8</td><td>1.5</td><td>1</td><td>0</td><td>1d4</td><td>S</td><td>30 kg</td><td>2</td>
-          <td><span class="tag tag-s">Bleed 20%</span></td>
-          <td>A sneering green-skinned runt armed with a rusty shiv.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#9080b0">b</span></td>
-          <td>Bat</td>
-          <td><span class="t0">0</span></td>
-          <td>3</td><td>0.5</td><td>0</td><td>2</td><td>1d2</td><td>XS</td><td>1 kg</td><td>1</td>
-          <td><span class="tag tag-s">Stun 15%</span></td>
-          <td>A leathery-winged vermin that darts erratically.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#bb66ff">x</span></td>
-          <td>Grid Bug</td>
-          <td><span class="t0">0</span></td>
-          <td>3</td><td>0.5</td><td>0</td><td>0</td><td>1d2</td><td>XS</td><td>1 kg</td><td>1</td>
-          <td><span class="tag tag-s">Shock 30%</span> <span class="tag tag-r">Immune: electric</span></td>
-          <td>A tiny crackling insect that moves only along the grid axes.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#55aa44">S</span></td>
-          <td>Snake</td>
-          <td><span class="t0">0</span></td>
-          <td>4</td><td>0.8</td><td>1</td><td>0</td><td>1d3</td><td>XS</td><td>3 kg</td><td>1</td>
-          <td><span class="tag tag-s">Poison 25%</span> <span class="tag tag-r">Immune: poison</span></td>
-          <td>A hissing serpent with venomous fangs.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#dd55ff">e</span></td>
-          <td>Floating Eye</td>
-          <td><span class="t0">0</span></td>
-          <td>14</td><td>1.5</td><td>1</td><td>2</td><td>1d4</td><td>M</td><td>40 kg</td><td>3</td>
-          <td>
-            <span class="tag tag-s">Gaze: stacking mindwipe</span>
-            <span class="tag tag-s">Mind Blast 10%</span>
-            <span class="tag tag-r">Immune: poison</span>
-          </td>
-          <td>A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.</td>
-        </tr>
-
-        <!-- Tier 1 -->
-        <tr>
-          <td><span class="glyph" style="color:#cc6644">o</span></td>
-          <td>Orc</td>
-          <td><span class="t1">1</span></td>
-          <td>15</td><td>2.0</td><td>2</td><td>1</td><td>1d8</td><td>M</td><td>95 kg</td><td>2</td>
-          <td><span class="tag tag-s">Rage +2 dmg (25%)</span></td>
-          <td>A thick-skulled brute with a chipped cleaver.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#ddd8c8">s</span></td>
-          <td>Skeleton</td>
-          <td><span class="t1">1</span></td>
-          <td>12</td><td>1.8</td><td>1</td><td>2</td><td>1d6</td><td>M</td><td>25 kg</td><td>2</td>
-          <td>
-            <span class="tag tag-s">Self-heal 2 HP (20%)</span>
-            <span class="tag tag-r">Immune: poison</span>
-            <span class="tag tag-r">½ pierce/slash dmg</span>
-          </td>
-          <td>Bones held together by spite. Resistant to piercing and slashing.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#55bb55">x</span></td>
-          <td>Spider</td>
-          <td><span class="t1">1</span></td>
-          <td>10</td><td>1.5</td><td>2</td><td>1</td><td>1d4</td><td>S</td><td>15 kg</td><td>1</td>
-          <td><span class="tag tag-s">Poison 30%</span> <span class="tag tag-r">Immune: poison</span></td>
-          <td>A dog-sized arachnid with venomous fangs.</td>
-        </tr>
-
-        <!-- Tier 2 -->
-        <tr>
-          <td><span class="glyph" style="color:#66aa66">T</span></td>
-          <td>Troll</td>
-          <td><span class="t2">2</span></td>
-          <td>25</td><td>3.0</td><td>3</td><td>1</td><td>2d6</td><td>L</td><td>200 kg</td><td>3</td>
-          <td>
-            <span class="tag tag-s">Regen buff on hit</span>
-            <span class="tag tag-s">Self-heal 1 HP (30%)</span>
-            <span class="tag tag-w">1.5× fire dmg</span>
-          </td>
-          <td>A hulking regenerator. Weak to fire.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#aabbff">W</span></td>
-          <td>Wraith</td>
-          <td><span class="t2">2</span></td>
-          <td>18</td><td>2.5</td><td>3</td><td>4</td><td>1d8</td><td>M</td><td>5 kg</td><td>1</td>
-          <td><span class="tag tag-s">Drain 3 HP (20%)</span> <span class="tag tag-r">0.3× physical dmg</span></td>
-          <td>A spectral horror. Physical attacks pass through it.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#cc9966">O</span></td>
-          <td>Ogre</td>
-          <td><span class="t2">2</span></td>
-          <td>30</td><td>2.0</td><td>4</td><td>1</td><td>2d8</td><td>L</td><td>250 kg</td><td>3</td>
-          <td><span class="tag tag-s">Stun 25%</span></td>
-          <td>A lumbering slab of muscle and bad intentions.</td>
-        </tr>
-
-        <tr>
-          <td><span class="glyph" style="color:#556677">c</span></td>
-          <td>Carrion Shade</td>
-          <td><span class="t2">2</span></td>
-          <td>20</td><td>2.5</td><td>3</td><td>3</td><td>1d8</td><td>M</td><td>8 kg</td><td>2</td>
-          <td>
-            <span class="tag tag-s">+dmg vs afflicted</span>
-            <span class="tag tag-s">Weaken 30%</span>
-            <span class="tag tag-s">Bleed 20%</span>
-            <span class="tag tag-s">Phase out 25%</span>
-            <span class="tag tag-r">Immune: poison</span>
-            <span class="tag tag-r">½ physical dmg</span>
-          </td>
-          <td>A shadow that coalesces around old blood. Strikes harder against the wounded and fades when cornered.</td>
-        </tr>
-
-        <!-- Tier 3 -->
-        <tr>
-          <td><span class="glyph" style="color:#ff4444">&amp;</span></td>
-          <td>Demon</td>
-          <td><span class="t3">3</span></td>
-          <td>40</td><td>4.0</td><td>5</td><td>4</td><td>2d8</td><td>L</td><td>180 kg</td><td>2</td>
-          <td>
-            <span class="tag tag-s">Burn 30%</span>
-            <span class="tag tag-s">Hellfire retaliation</span>
-            <span class="tag tag-r">Immune: fire</span>
-          </td>
-          <td>Sulphur and malice given form. Immune to fire.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#ffcc33">D</span></td>
-          <td>Dragon</td>
-          <td><span class="t3">3</span></td>
-          <td>50</td><td>5.0</td><td>6</td><td>6</td><td>3d8</td><td>XL</td><td>800 kg</td><td>2</td>
-          <td>
-            <span class="tag tag-s">Burn 20%</span>
-            <span class="tag tag-r">Immune: fire</span>
-            <span class="tag tag-r">0.7× pierce dmg</span>
-          </td>
-          <td>Scales like hammered bronze. The apex predator of the deep.</td>
-        </tr>
-        <tr>
-          <td><span class="glyph" style="color:#cc88ff">L</span></td>
-          <td>Lich</td>
-          <td><span class="t3">3</span></td>
-          <td>35</td><td>3.5</td><td>4</td><td>5</td><td>2d6</td><td>M</td><td>40 kg</td><td>3</td>
-          <td>
-            <span class="tag tag-s">Drain 2 HP (25%)</span>
-            <span class="tag tag-s">Phylactery regen (20%)</span>
-            <span class="tag tag-r">Immune: poison</span>
-            <span class="tag tag-r">High elec resist</span>
-            <span class="tag tag-r">½ physical dmg</span>
-          </td>
-          <td>An undead sorcerer sustained by a hidden phylactery.</td>
-        </tr>
-
-        <!-- Tier 99 -->
-        <tr>
-          <td><span class="glyph" style="color:#b8b8b8">S</span></td>
-          <td>Taunting Statue</td>
-          <td><span class="t99">99</span></td>
-          <td>18</td><td>0</td><td>2</td><td>4</td><td>1d6</td><td>M</td><td>240 kg</td><td>2</td>
-          <td>
-            <span class="tag tag-r">DR 14 physical</span>
-            <span class="tag tag-r">½ pierce/slash</span>
-            <span class="tag tag-r">0.6× fire</span>
-            <span class="tag tag-r">High elec resist</span>
-          </td>
-          <td>An animated stone idol that heckles anything that breathes. Spawned by throwing Potion of Stoneskin.</td>
-        </tr>
-
-      </tbody>
-    </table>
-  </div>
+  <div id="bestiary-live"></div>
 
 </section>
 
@@ -1071,6 +863,114 @@
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+</script>
+
+<script type="module">
+  // ── Bestiary table — sourced from monsters.js + palette/base.js ───────────
+  import { MONSTERS } from '../../src/rules/data/monsters.js';
+  import { basePalette } from '../../src/display/palette/base.js';
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function resistanceTags(res) {
+    const tags = [];
+    for (const [type, v] of Object.entries(res || {})) {
+      if (type === 'kinetic') {
+        if ((v.DR || 0) > 0) tags.push(['tag-r', `DR ${v.DR} physical`]);
+        const b = v.bluntMult, p = v.pierceMult, s = v.slashMult;
+        if (b != null && p != null && s != null && b === p && p === s) {
+          if (b < 1) tags.push(['tag-r', `${b}× physical dmg`]);
+          else if (b > 1) tags.push(['tag-w', `${b}× physical dmg`]);
+        } else {
+          if (b != null && b > 1) tags.push(['tag-w', `${b}× blunt`]);
+          if (b != null && b < 1) tags.push(['tag-r', `${b}× blunt`]);
+          if (p != null && p < 1) tags.push(['tag-r', `${p}× pierce`]);
+          if (s != null && s < 1) tags.push(['tag-r', `${s}× slash`]);
+        }
+      }
+      if (type === 'thermal') {
+        if (v.burnMult === 0) tags.push(['tag-r', 'Immune: fire']);
+        else if (v.burnMult != null && v.burnMult < 1) tags.push(['tag-r', `${v.burnMult}× fire dmg`]);
+        else if (v.burnMult != null && v.burnMult > 1) tags.push(['tag-w', `${v.burnMult}× fire dmg`]);
+      }
+      if (type === 'chemical') {
+        if (v.toxMult === 0) tags.push(['tag-r', 'Immune: poison']);
+        else if (v.toxMult != null && v.toxMult < 1) tags.push(['tag-r', `${v.toxMult}× poison dmg`]);
+      }
+      if (type === 'electric') {
+        if (v.ohms === Infinity) tags.push(['tag-r', 'Immune: electric']);
+        else if (v.ohms != null && v.ohms >= 500) tags.push(['tag-r', 'High elec resist']);
+      }
+    }
+    return tags;
+  }
+
+  const tierClass = { 0: 't0', 1: 't1', 2: 't2', 3: 't3', 99: 't99' };
+
+  const rows = MONSTERS.map(def => {
+    const pal = basePalette[def.id] || basePalette.monster;
+    const glyphHtml = `<span class="glyph" style="color:${esc(pal.fg)}">${esc(pal.glyph)}</span>`;
+    const tc = tierClass[def.tier] ?? 't99';
+    const tierHtml = `<span class="${tc}">${def.tier}</span>`;
+
+    const specialTagsHtml = (def.specials || [])
+      .map(s => `<span class="tag tag-s">${esc(s)}</span>`).join(' ');
+    const rangedTagHtml = def.equipment?.ranged
+      ? `<span class="tag tag-s">Ranged</span>` : '';
+    const rareTagHtml = def.rare
+      ? `<span class="tag tag-r">Rare spawn</span>` : '';
+    const resTagsHtml = resistanceTags(def.resistances)
+      .map(([cls, text]) => `<span class="tag ${cls}">${esc(text)}</span>`).join(' ');
+    const allTagsHtml = [specialTagsHtml, rangedTagHtml, resTagsHtml, rareTagHtml].filter(Boolean).join(' ');
+
+    return `
+      <tr>
+        <td>${glyphHtml}</td>
+        <td>${esc(def.name)}</td>
+        <td>${tierHtml}</td>
+        <td>${def.baseHp}</td>
+        <td>${def.hpPerLevel}</td>
+        <td>${def.attack}</td>
+        <td>${def.defense}</td>
+        <td>${esc(def.damageDice)}</td>
+        <td>${esc(def.sizeClass)}</td>
+        <td>${def.massKg} kg</td>
+        <td>${def.speed}</td>
+        <td>${allTagsHtml}</td>
+        <td>${esc(def.description)}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('bestiary-live').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Name</th>
+            <th>Tier</th>
+            <th>Base HP</th>
+            <th>+HP/lvl</th>
+            <th>ATK</th>
+            <th>DEF</th>
+            <th>Damage</th>
+            <th>Size</th>
+            <th>Mass</th>
+            <th>SPD</th>
+            <th>Special / Resistances</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
 </script>
 
 </body>
