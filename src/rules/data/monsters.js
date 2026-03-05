@@ -240,6 +240,31 @@ export const MONSTERS = [
     equipment: { ranged: 'bow_short', ammo: 'arrows' },
   },
 
+  {
+    id: 'floating_eye',
+    name: 'Floating Eye',
+    tags: ['aberration', 'psychic'],
+    tier: 0,
+    intelligence: 5,   // strange but patient — waits for prey
+    ambush: true,      // waits for prey to come to it
+    baseHp: 8,
+    hpPerLevel: 1.0,
+    attack: 1,
+    defense: 1,
+    damageDice: '1d4',
+    sizeClass: 'S',
+    massKg: 8,
+    resistances: {
+      chemical: { toxMult: 0 },
+      electric: { ohms: 30 },
+    },
+    speed: 2,
+    hooks: {
+      onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
+    },
+    description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
+  },
+
   // ── Tier 1 (floors 6-10) ───────────────────────────────────────────
   {
     id: 'bone_bowman',
@@ -451,31 +476,6 @@ export const MONSTERS = [
     description: 'A lumbering slab of muscle and bad intentions.',
   },
 
-  {
-    id: 'floating_eye',
-    name: 'Floating Eye',
-    tags: ['aberration', 'psychic'],
-    tier: 2,
-    intelligence: 9,   // highly intelligent — patient and deadly
-    ambush: true,      // waits for prey to come to it
-    baseHp: 38,
-    hpPerLevel: 3.5,
-    attack: 5,
-    defense: 5,
-    damageDice: '2d6',
-    sizeClass: 'M',
-    massKg: 75,
-    resistances: {
-      kinetic: { DR: 6, bluntMult: 0.7, slashMult: 0.7, pierceMult: 0.7 },
-      chemical: { toxMult: 0 },
-      electric: { ohms: 100 },
-    },
-    speed: 2,
-    hooks: {
-      onHit: [mindflayerBlastOnHit(20, 0xdead000e)],
-    },
-    description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
-  },
   {
     id: 'carrion_shade',
     name: 'Carrion Shade',
