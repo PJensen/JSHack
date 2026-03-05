@@ -40,6 +40,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead0001, { key: "disease", turnsLeft: 20, potency: 1 }, "proc:diseased")],
     },
+    specials: ["Disease 25%"],
     description: 'A mangy rodent with beady eyes.',
   },
   {
@@ -61,6 +62,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(20, 0xdead0005, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
     },
+    specials: ["Bleed 20%"],
     description: 'A sneering green-skinned runt armed with a rusty shiv.',
     lootTable: 'drop:goblin',
   },
@@ -83,6 +85,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(15, 0xdead0006, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
     },
+    specials: ["Stun 15%"],
     description: 'A leathery-winged vermin that darts erratically.',
   },
 
@@ -105,6 +108,7 @@ export const MONSTERS = [
       onHit: [statusEffectOnHit(30, 0xdead0010, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
       onDeath: [spawnPlasmaCloudOnDeath({ turnsLeft: 3, radius: 1, damage: 2 })],
     },
+    specials: ["Shock 30%"],
     description: 'A tiny crackling insect that moves only along the grid axes.',
   },
 
@@ -125,6 +129,7 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 0 } },
     speed: 3,
     hooks: null,
+    specials: [],
     description: 'A small, harmless serpent that slithers through the dark.',
   },
   {
@@ -146,6 +151,7 @@ export const MONSTERS = [
     hooks: {
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
     },
+    specials: ["Throws web (25%)"],
     description: 'A skittish arachnid. It spins webs but lacks venom.',
   },
 
@@ -168,6 +174,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead000f, { key: "poison", turnsLeft: 5, potency: 1 }, "proc:poisoned")],
     },
+    specials: ["Poison 25%"],
     description: 'A hissing serpent with venomous fangs.',
   },
 
@@ -190,6 +197,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0010, { key: "poison", turnsLeft: 4, potency: 1 }, "proc:poisoned")],
     },
+    specials: ["Poison 30%"],
     description: 'A thick-bodied serpent with iridescent scales. Its bite delivers a potent venom.',
     lootTable: 'drop:pit_viper',
   },
@@ -213,6 +221,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0200, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
     },
+    specials: ["Stun 30%"],
     description: 'A massive bear with matted fur and scarred hide. Its claws can split stone.',
   },
 
@@ -236,6 +245,7 @@ export const MONSTERS = [
     },
     speed: 2,
     hooks: null,
+    specials: [],
     description: 'A rattling skeleton clutching a short bow.',
     equipment: { ranged: 'bow_short', ammo: 'arrows' },
   },
@@ -263,6 +273,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(20, 0xdead0020, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
     },
+    specials: ["Bleed 20%"],
     description: 'A skeletal bowman with practiced aim. Its arrows leave jagged wounds.',
     equipment: { ranged: 'bow_short', ammo: 'arrows' },
   },
@@ -285,6 +296,7 @@ export const MONSTERS = [
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(25, 0xdead0007, 2, "proc:rage")],
     },
+    specials: ["Rage +2 dmg (25%)"],
     description: 'A thick-skulled brute with a chipped cleaver.',
   },
   {
@@ -309,6 +321,7 @@ export const MONSTERS = [
     hooks: {
       onDamaged: [healOnDamaged(20, 0xdead0008, 2, "proc:reassemble")],
     },
+    specials: ["Self-heal 2 HP (20%)"],
     description: 'Bones held together by spite. Resistant to piercing but brittle against blunt force.',
   },
   {
@@ -331,6 +344,7 @@ export const MONSTERS = [
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
       onHit: [statusEffectOnHit(15, 0xdead0002, { key: "poison", turnsLeft: 3, potency: 1 }, "proc:poisoned")],
     },
+    specials: ["Throws web (25%)", "Poison 15%"],
     description: 'A dog-sized arachnid with venomous fangs.',
   },
 
@@ -357,6 +371,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(20, 0xdead0021, { key: "burn", turnsLeft: 3, potency: 2 }, "proc:burning")],
     },
+    specials: ["Burn 20%"],
     description: 'A grim skeleton nocking arrows tipped with alchemical fire.',
     equipment: { ranged: 'bow_short', ammo: 'fire_arrows' },
   },
@@ -382,6 +397,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(15, 0xdead0022, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
     },
+    specials: ["Stun 15%"],
     description: 'A headless torso that somehow never misses.',
     equipment: { ranged: 'bow_short', ammo: 'arrows' },
   },
@@ -404,6 +420,7 @@ export const MONSTERS = [
       onHit: [selfBuffOnHit({ key: "regen", turnsLeft: 3, potency: 2 })],
       onDamaged: [healOnDamaged(30, 0xdead0009, 1, "proc:regenerate")],
     },
+    specials: ["Regen buff on hit", "Self-heal 1 HP (30%)"],
     description: 'A hulking regenerator. Weak to fire.',
   },
   {
@@ -428,6 +445,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [drainOnHit(20, 0xdead0003, 3)],
     },
+    specials: ["Drain 3 HP (20%)"],
     description: 'A spectral horror. Physical attacks pass through it.',
   },
   {
@@ -448,6 +466,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead000a, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
     },
+    specials: ["Stun 25%"],
     description: 'A lumbering slab of muscle and bad intentions.',
   },
 
@@ -474,6 +493,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [mindflayerBlastOnHit(20, 0xdead000e)],
     },
+    specials: ["Mind Blast 20%"],
     description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
   },
   {
@@ -504,6 +524,7 @@ export const MONSTERS = [
       ],
       onDamaged: [phaseOutOnDamaged(25, 0xdead0102)],
     },
+    specials: ["+dmg vs afflicted", "Weaken 30%", "Bleed 20%", "Phase out 25%"],
     description: 'A shadow that coalesces around old blood. It lurks in darkness and strikes harder against the wounded.',
     lootTable: 'drop:tier2',
   },
@@ -532,6 +553,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [drainOnHit(20, 0xdead0023, 3)],
     },
+    specials: ["Drain 3 HP (20%)"],
     description: 'An ancient undead marksman wreathed in cold flame. Its arrows sap the life from their targets.',
     equipment: { ranged: 'bow_short', ammo: 'fire_arrows' },
   },
@@ -558,6 +580,7 @@ export const MONSTERS = [
       onHit: [statusEffectOnHit(30, 0xdead000b, { key: "burn", turnsLeft: 4, potency: 3 }, "proc:burning")],
       onDamaged: [retaliateOnDamaged(2, "proc:hellfire")],
     },
+    specials: ["Burn 30%", "Hellfire retaliation"],
     description: 'Sulphur and malice given form. Immune to fire.',
   },
   {
@@ -582,6 +605,7 @@ export const MONSTERS = [
     hooks: {
       onHit: [statusEffectOnHit(20, 0xdead0004, { key: "burn", turnsLeft: 5, potency: 4 }, "proc:burning")],
     },
+    specials: ["Burn 20%"],
     description: 'Scales like hammered bronze. The apex predator of the deep.',
     lootTable: 'drop:dragon',
   },
@@ -609,6 +633,7 @@ export const MONSTERS = [
       onHit: [drainOnHit(25, 0xdead000c, 2)],
       onDamaged: [statusEffectOnDamaged(20, 0xdead000d, { key: "regen", turnsLeft: 3, potency: 2 }, "proc:phylactery", true)],
     },
+    specials: ["Drain 2 HP (25%)", "Phylactery regen (20%)"],
     description: 'An undead sorcerer sustained by a hidden phylactery.',
     lootTable: 'drop:lich',
   },
@@ -629,6 +654,7 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
     hooks: null,
+    specials: [],
     description: 'A predatory chest-creature that waits for curious hands.',
     lootTable: 'drop:tier1',
   },
@@ -654,6 +680,7 @@ export const MONSTERS = [
     },
     speed: 2,
     hooks: null,
+    specials: [],
     description: 'An animated stone idol that heckles anything that breathes.',
   },
 ];
@@ -716,4 +743,4 @@ export function getMonsterTags(monsterId) {
   return Array.isArray(def?.tags) ? def.tags : [];
 }
 
-/** @typedef {{ id:string, name:string, tags?:string[], tier:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */
+/** @typedef {{ id:string, name:string, tags?:string[], tier:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */
