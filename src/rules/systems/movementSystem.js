@@ -157,6 +157,16 @@ export function movementSystem(world) {
       const pos = world.get(actor, Position);
       if (!pos) { world.remove(actor, MoveIntent); continue; }
 
+      // Dead entities must not move — prevents a spurious "moved" event firing
+      // after the entity dies mid-tick (e.g. grid bug killed while it still has
+      // an AI-queued MoveIntent).  The event would be harmless for most listeners
+      // but the deferred position update produced by world.set would be applied
+      // at end-of-tick, briefly placing the entity at the wrong tile before it
+      // is destroyed by cleanupSystem — enough to confuse any system that reads
+      // the entity's position between the flush and the cleanup.
+      const vit = world.get(actor, Vitality);
+      if (vit && (vit.hp | 0) <= 0) { world.remove(actor, MoveIntent); continue; }
+
       const intendedDx = intent.dx | 0;
       const intendedDy = intent.dy | 0;
       let mdx = intendedDx;
