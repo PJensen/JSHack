@@ -257,7 +257,7 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
       electric: { ohms: 30 },
     },
-    speed: 3,
+    speed: 1,
     hooks: {
       whileLOS: [gazeOnLOS(4)],
       onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
