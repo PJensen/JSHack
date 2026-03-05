@@ -4130,7 +4130,7 @@ function renderChest(panel, data, state) {
         r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
         r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
       });
-      showItemTooltip(currentItems[sel], rows[sel]);
+      showItemTooltip(currentItems[sel], rows[sel], { pinBottomOnMobile: true });
     }
 
     setSel(0);
