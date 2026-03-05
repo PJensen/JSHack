@@ -16,7 +16,7 @@ import {
   phaseOutOnDamaged,
   mindflayerBlastOnHit,
 } from "./callbacks/combat.js";
-import { selfThrowNearTargetOnSeen } from "./callbacks/ai.js";
+import { selfThrowNearTargetOnSeen, gazeOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath } from "./callbacks/death.js";
 
 export const MONSTERS = [
@@ -245,24 +245,24 @@ export const MONSTERS = [
     name: 'Floating Eye',
     tags: ['aberration', 'psychic'],
     tier: 0,
-    intelligence: 5,   // strange but patient — waits for prey
-    ambush: true,      // waits for prey to come to it
-    baseHp: 8,
-    hpPerLevel: 1.0,
+    intelligence: 2,   // dumb (≤3 triggers scurry: wanders randomly when unaware)
+    baseHp: 14,
+    hpPerLevel: 1.5,
     attack: 1,
-    defense: 1,
+    defense: 2,
     damageDice: '1d4',
-    sizeClass: 'S',
-    massKg: 8,
+    sizeClass: 'M',
+    massKg: 40,
     resistances: {
       chemical: { toxMult: 0 },
       electric: { ohms: 30 },
     },
-    speed: 2,
+    speed: 3,
     hooks: {
+      whileLOS: [gazeOnLOS(4)],
       onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
     },
-    description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
+    description: 'A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.',
   },
 
   // ── Tier 1 (floors 6-10) ───────────────────────────────────────────

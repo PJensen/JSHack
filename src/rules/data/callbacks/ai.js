@@ -3,6 +3,7 @@
 // Callbacks are plain (ctx) => void functions invoked via runCallbackList.
 
 import { Position } from "../../components/Position.js";
+import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
 
@@ -196,5 +197,32 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
     }
     markSelfThrowUsed(ctx.world, ctx.actor, ctx.target);
     ctx.setHandled(true);
+  };
+}
+
+/**
+ * Gaze aura: while the monster has LOS to its target, progressively stack mindwipe.
+ * Each turn in LOS adds one mindwipe stack (up to stackLimit) and refreshes duration.
+ * @param {number} [stackLimit=4]
+ */
+export function gazeOnLOS(stackLimit = 4) {
+  const limit = Math.max(1, Math.trunc(stackLimit));
+  return (ctx) => {
+    if (!ctx || ctx.cancelled) return;
+    const ae = ctx.world.get(ctx.target, ActiveEffects);
+    if (!ae) return;
+    const existing = ae.effects.find(e => e.key === 'mindwipe');
+    if (existing) {
+      const currentStacks = existing.stacks || 1;
+      if (currentStacks < limit) {
+        existing.stacks = currentStacks + 1;
+        existing.potency = existing.stacks;
+      }
+      existing.turnsLeft = Math.max(existing.turnsLeft, 3);
+    } else {
+      ae.effects.push({ key: 'mindwipe', turnsLeft: 3, potency: 1, stacks: 1 });
+    }
+    ctx.world.set(ctx.target, ActiveEffects, ae);
+    ctx.emit('proc:gaze:mindwipe', { actor: ctx.actor, target: ctx.target });
   };
 }
