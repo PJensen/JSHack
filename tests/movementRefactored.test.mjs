@@ -364,3 +364,27 @@ Deno.test("movementSystem: intent consumed even on no-position entity", () => {
     assertEquals(world.has(id, MoveIntent), false, "intent should be consumed");
   } finally { clearAll(); }
 });
+
+// ── dead entity guard ───────────────────────────────────────────────
+
+Deno.test("movementSystem: dead entity (hp<=0) MoveIntent is consumed without moving", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    const id = world.create();
+    world.add(id, Position, { x: 5, y: 5 });
+    world.add(id, Vitality, { hp: 0, maxHp: 10 });
+    world.add(id, MoveIntent, { dx: 1, dy: 0 });
+
+    const moved = [];
+    world.on("moved", (e) => moved.push(e));
+
+    movementSystem(world);
+
+    const pos = world.get(id, Position);
+    assertEquals(pos.x, 5, "dead entity must not change x");
+    assertEquals(pos.y, 5, "dead entity must not change y");
+    assertEquals(world.has(id, MoveIntent), false, "intent must be consumed");
+    assertEquals(moved.length, 0, "no spurious moved event for dead entity");
+  } finally { clearAll(); }
+});
