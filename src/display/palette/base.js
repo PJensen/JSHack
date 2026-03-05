@@ -18,6 +18,7 @@ export const basePalette = {
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
   cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
   cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
+  floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
   pit_viper: { glyph: "S", fg: "#44dd44", glow: "#22aa22" },
   skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   // Tier 1
@@ -31,7 +32,6 @@ export const basePalette = {
   troll:    { glyph: "T", fg: "#66aa66", glow: "#448844" },
   wraith:   { glyph: "W", fg: "#aabbff", glow: "#7799dd" },
   ogre:     { glyph: "O", fg: "#cc9966", glow: "#996633" },
-  floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
   // Tier 3
   death_archer: { glyph: "s", fg: "#a0a8b0", glow: "#6070a0" },
   demon:    { glyph: "&", fg: "#ff4444", glow: "#cc0000" },
