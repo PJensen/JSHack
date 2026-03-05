@@ -196,6 +196,18 @@ export function aiChaseSystem(world) {
           }
         }
       }
+
+      // ── whileLOS hooks: fire every turn the monster has LOS ──────────
+      const whileLOSHooks = def?.hooks?.whileLOS;
+      if (Array.isArray(whileLOSHooks) && whileLOSHooks.length > 0) {
+        const losCtx = new SeenCallbackContext(world, {
+          actor:     id,
+          target:    playerId,
+          actorPos:  { x: pos.x | 0, y: pos.y | 0 },
+          targetPos: { x: playerPos.x | 0, y: playerPos.y | 0 },
+        });
+        runCallbackList(whileLOSHooks, losCtx);
+      }
     } else {
       // No LOS — tick down the search budget.
       switch (aggro.alertLevel) {
