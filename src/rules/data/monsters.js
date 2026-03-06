@@ -496,32 +496,6 @@ export const MONSTERS = [
   },
 
   {
-    id: 'floating_eye',
-    name: 'Floating Eye',
-    tags: ['aberration', 'psychic'],
-    tier: 2,
-    intelligence: 9,   // highly intelligent — patient and deadly
-    ambush: true,      // waits for prey to come to it
-    baseHp: 38,
-    hpPerLevel: 3.5,
-    attack: 5,
-    defense: 5,
-    damageDice: '2d6',
-    sizeClass: 'M',
-    massKg: 75,
-    resistances: {
-      kinetic: { DR: 6, bluntMult: 0.7, slashMult: 0.7, pierceMult: 0.7 },
-      chemical: { toxMult: 0 },
-      electric: { ohms: 100 },
-    },
-    speed: 2,
-    hooks: {
-      onHit: [mindflayerBlastOnHit(20, 0xdead000e)],
-    },
-    specials: ["Mind Blast 20%"],
-    description: 'A pulsing violet eye that hovers in silence. Its gaze erases all memory.',
-  },
-  {
     id: 'carrion_shade',
     name: 'Carrion Shade',
     tags: ['undead', 'spectral'],
