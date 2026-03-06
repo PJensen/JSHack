@@ -12,6 +12,7 @@ import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
+import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 function scheduler(world) {
   useItemSystem(world);
@@ -22,8 +23,7 @@ Deno.test("wand use resolves from data defs, emits cast, and decrements charges"
   world.setScheduler((w) => scheduler(w));
 
   const player = createPlayer(world, { x: 10, y: 10, name: "Caster" });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const target = world.create();
   world.add(target, Position, { x: 11, y: 10 });
@@ -32,7 +32,7 @@ Deno.test("wand use resolves from data defs, emits cast, and decrements charges"
 
   const wand = buildCatalogItem(world, "wand_lightning");
   assert(wand != null, "wand should be creatable");
-  inv.items.push(wand);
+  addToInventory(world, player, wand);
 
   const castEvents = [];
   const usedEvents = [];
@@ -45,7 +45,7 @@ Deno.test("wand use resolves from data defs, emits cast, and decrements charges"
   const info = world.get(wand, ItemInfo);
   assert(info, "wand should still exist after one use");
   assertEquals(info.count, 2);
-  assert(inv.items.includes(wand), "wand should remain in inventory with remaining charges");
+  assert(inventoryContains(world, player, wand), "wand should remain in inventory with remaining charges");
   assertEquals(usedEvents.length, 1);
 
   const cast = castEvents.find((e) => e.spellId === "lightning");
@@ -59,8 +59,7 @@ Deno.test("wand meteor still works without explicit x/y targeting payload", () =
   world.setScheduler((w) => scheduler(w));
 
   const player = createPlayer(world, { x: 5, y: 5, name: "Caster" });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const target = world.create();
   world.add(target, Position, { x: 7, y: 5 });
@@ -69,7 +68,7 @@ Deno.test("wand meteor still works without explicit x/y targeting payload", () =
 
   const wand = buildCatalogItem(world, "wand_meteor");
   assert(wand != null, "wand should be creatable");
-  inv.items.push(wand);
+  addToInventory(world, player, wand);
 
   const castEvents = [];
   world.on("castSpell", (e) => castEvents.push(e));
@@ -90,12 +89,11 @@ Deno.test("scroll use resolves from data defs, emits cast, and consumes item", (
   world.setScheduler((w) => scheduler(w));
 
   const player = createPlayer(world, { x: 5, y: 5, name: "Reader" });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const scroll = createItemById(world, "scroll_blastwave");
   assert(scroll != null, "scroll should be creatable");
-  inv.items.push(scroll);
+  addToInventory(world, player, scroll);
 
   const castEvents = [];
   const usedEvents = [];
@@ -106,7 +104,7 @@ Deno.test("scroll use resolves from data defs, emits cast, and consumes item", (
   world.tick(1);
 
   assert(!world.isAlive(scroll), "scroll should be consumed on use");
-  assert(!inv.items.includes(scroll), "consumed scroll should be removed from inventory");
+  assert(!inventoryContains(world, player, scroll), "consumed scroll should be removed from inventory");
   assertEquals(usedEvents.length, 1);
 
   const cast = castEvents.find((e) => e.spellId === "blastwave");
@@ -126,12 +124,11 @@ Deno.test("scroll of homecoming emits depth-0 teleport request and is consumed",
     currentDepth: 5,
     floorEntityIds: [],
   });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const scroll = createItemById(world, "scroll_homecoming");
   assert(scroll != null, "homecoming scroll should be creatable");
-  inv.items.push(scroll);
+  addToInventory(world, player, scroll);
 
   const castEvents = [];
   const teleportEvents = [];
@@ -142,7 +139,7 @@ Deno.test("scroll of homecoming emits depth-0 teleport request and is consumed",
   world.tick(1);
 
   assert(!world.isAlive(scroll), "homecoming scroll should be consumed on use");
-  assert(!inv.items.includes(scroll), "consumed homecoming scroll should be removed from inventory");
+  assert(!inventoryContains(world, player, scroll), "consumed homecoming scroll should be removed from inventory");
   assertEquals(teleportEvents.length, 1);
   assertEquals(teleportEvents[0].actor, player);
   assertEquals(teleportEvents[0].targetDepth, 0);

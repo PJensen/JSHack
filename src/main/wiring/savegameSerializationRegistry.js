@@ -29,6 +29,9 @@ import { Terrain } from "../../rules/components/Terrain.js";
 import Tombstone from "../../rules/components/Tombstone.js";
 import { Trap } from "../../rules/components/Trap.js";
 import { Trigger } from "../../rules/components/Trigger.js";
+import { Parent, Sibling } from "../../lib/ecs-js/hierarchy.js";
+import { InventoryRoot } from "../../rules/components/InventoryRoot.js";
+import { Weight } from "../../rules/components/Weight.js";
 
 // Chest-relevant components are intentionally prioritized at the front.
 const CHEST_FIRST_COMPONENTS = Object.freeze([
@@ -67,6 +70,10 @@ const KNOWN_COMPONENTS = Object.freeze([
   Tombstone,
   Trap,
   Trigger,
+  Parent,
+  Sibling,
+  InventoryRoot,
+  Weight,
 ]);
 
 /**

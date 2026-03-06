@@ -173,9 +173,12 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const { id, kind, effect, at } = normalizeStatusEvent(payload);
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(Number(id || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
-    const style = (String(kind || '')).toLowerCase() === 'miss' ? 'miss' : ((String(kind || '')).toLowerCase() === 'immune' ? 'immune' : 'status');
+    const kindLower = (String(kind || '')).toLowerCase();
+    const style = kindLower === 'miss' ? 'miss' : (kindLower === 'immune' ? 'immune' : 'status');
     const label = resolveStatusLabel(kind, effect);
-    try { ftext.addStatus(pos.x, pos.y, label, { style }); } catch (e) { console.debug('[floatTextWiring] ftext failed:', e); }
+    const opts = { style };
+    if (kindLower === 'taunt' || kindLower === 'alert') opts.color = '#ffdd00';
+    try { ftext.addStatus(pos.x, pos.y, label, opts); } catch (e) { console.debug('[floatTextWiring] ftext failed:', e); }
   });
 
   // Ranged combat floating text (messages handled in messageWiring)
@@ -193,21 +196,40 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
-  // Gaze charge countdown: pips showing how many WAIT turns until paralysis.
-  // e.g. waitCount=2 of total=5 → "◈◈○○○"
-  world.on('proc:gaze:charged', ({ target, waitCount, total }) => {
-    const pos = getPosition(Number(target || 0));
-    if (!pos || !canShowAt(pos.x, pos.y)) return;
-    const filled = Math.max(0, Math.min(Number(waitCount) | 0, Number(total) | 0));
-    const empty  = Math.max(0, (Number(total) | 0) - filled);
-    const pips   = '◈'.repeat(filled) + '○'.repeat(empty);
-    try { ftext.addStatus(pos.x, pos.y - 0.5, pips, { color: '#cc66ff', life: 0.9 }); } catch (e) { console.debug('[floatTextWiring] gaze charged ftext failed:', e); }
-  });
-
-  // Gaze stun: "PARALYZED!" float text on the player.
+  // Gaze stun: strong psychic lock burst on the player.
   world.on('proc:gaze:stun', ({ target }) => {
     const pos = getPosition(Number(target || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
-    try { ftext.addStatus(pos.x, pos.y - 0.4, 'PARALYZED!', { color: '#cc66ff', life: 1.2 }); } catch (e) { console.debug('[floatTextWiring] gaze stun ftext failed:', e); }
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'MIND LOCK!', {
+        color: '#ff5fd2',
+        life: 1.35,
+        scaleStart: 1.5,
+        scaleEnd: 1.0,
+      });
+    } catch (e) {
+      console.debug('[floatTextWiring] gaze stun ftext failed:', e);
+    }
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.4 + Math.random() * 0.6;
+      try {
+        fx.pool.spawn(new Particle({
+          x: pos.x,
+          y: pos.y - 0.1,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.15,
+          life: 0.25 + Math.random() * 0.2,
+          size0: 0.12,
+          size1: 0.03,
+          r: 255,
+          g: 95,
+          b: 210,
+          a0: 0.9,
+        }));
+      } catch (e) {
+        console.debug('[floatTextWiring] gaze stun fx failed:', e);
+      }
+    }
   });
 }

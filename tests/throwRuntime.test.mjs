@@ -11,6 +11,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { ThrowIntent } from "../src/rules/components/Intents/ThrowIntent.js";
 import { ScriptVerb, registerScript } from "../src/rules/scripting.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
+import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("throw runtime default path drops item to landing tile with weighted range", () => {
   const world = new World({ seed: 7101 });
@@ -19,7 +20,7 @@ Deno.test("throw runtime default path drops item to landing tile with weighted r
   world.add(actor, Position, { x: 10, y: 10 });
 
   const scroll = buildCatalogItem(world, "scroll_mapping");
-  world.get(actor, Inventory).items.push(scroll);
+  addToInventory(world, actor, scroll);
 
   const thrownEvents = [];
   const results = [];
@@ -41,8 +42,7 @@ Deno.test("throw runtime default path drops item to landing tile with weighted r
   assert(throwMeta && Number.isFinite(throwMeta.range), "throw payload should include resolved throw metadata");
   assert(throwMeta.range >= 1, "throw range should be at least one tile");
 
-  const inv = world.get(actor, Inventory);
-  assert(!inv.items.includes(scroll), "base throw should remove item from inventory");
+  assert(!inventoryContains(world, actor, scroll), "base throw should remove item from inventory");
   const groundPos = world.get(scroll, Position);
   assert(groundPos, "base throw should place the item on the ground");
 
@@ -58,7 +58,7 @@ Deno.test("throw runtime preserves selected off-axis tile when target is in rang
   world.add(actor, Position, { x: 10, y: 10 });
 
   const item = buildCatalogItem(world, "scroll_mapping");
-  world.get(actor, Inventory).items.push(item);
+  addToInventory(world, actor, item);
 
   const thrownEvents = [];
   world.on("item:thrown", (ev) => thrownEvents.push(ev));
@@ -91,7 +91,7 @@ Deno.test("throw runtime preserves aim slope when clamping out-of-range targets"
     rarityName: "common",
     affixes: [],
   });
-  world.get(actor, Inventory).items.push(item);
+  addToInventory(world, actor, item);
 
   const thrownEvents = [];
   world.on("item:thrown", (ev) => thrownEvents.push(ev));
@@ -112,8 +112,8 @@ Deno.test("throw runtime range decreases with heavier item weight", () => {
 
   const light = buildCatalogItem(world, "scroll_mapping"); // explicit weight 0.1
   const heavy = buildCatalogItem(world, "stone_touchstone"); // explicit weight 10
-  const inv = world.get(actor, Inventory);
-  inv.items.push(light, heavy);
+  addToInventory(world, actor, light);
+  addToInventory(world, actor, heavy);
 
   const results = [];
   world.on("interaction:result", (ev) => results.push(ev));
@@ -143,7 +143,7 @@ Deno.test("throw runtime weapon impacts hostile entity on landing tile", () => {
   world.add(target, Faction, { key: "enemy" });
 
   const dagger = buildCatalogItem(world, "dagger_quick");
-  world.get(actor, Inventory).items.push(dagger);
+  addToInventory(world, actor, dagger);
 
   const impacts = [];
   const results = [];
@@ -190,7 +190,7 @@ Deno.test("throw runtime invokes ScriptVerb.ItemThrow with throw context", () =>
     affixes: [],
   });
   world.add(item, ScriptRef, { ref: "test:throw_runtime_script", params: { flag: "ok" } });
-  world.get(actor, Inventory).items.push(item);
+  addToInventory(world, actor, item);
 
   let seen = null;
   registerScript("test:throw_runtime_script", {
@@ -216,7 +216,6 @@ Deno.test("throw runtime invokes ScriptVerb.ItemThrow with throw context", () =>
   assertEquals(seen.targetX, 8, "targetX should carry resolved landing tile");
   assertEquals(seen.targetY, 4, "targetY should carry resolved landing tile");
 
-  const inv = world.get(actor, Inventory);
-  assert(inv.items.includes(item), "skipBaseThrow should leave the item in inventory");
+  assert(inventoryContains(world, actor, item), "skipBaseThrow should leave the item in inventory");
   assert(!world.has(item, Position), "skipBaseThrow should avoid ground placement");
 });

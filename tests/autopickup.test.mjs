@@ -7,6 +7,7 @@ import { Position } from '../src/rules/components/Position.js';
 import { Inventory, ItemInfo } from '../src/rules/components/index.js';
 import { GoldStack } from '../src/rules/archetypes/Items.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
+import { inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 
@@ -23,8 +24,7 @@ Deno.test("player auto-picks up gold when moving onto its tile", () => {
   const gid = createFrom(world, GoldStack, {});
   world.add(gid, Position, { x: 1, y: 0 });
 
-  const inv0 = world.get(pid, Inventory);
-  assert(inv0 && Array.isArray(inv0.items) && inv0.items.length === 0, 'expected empty inventory at start');
+  assert(world.has(pid, Inventory) && inventoryItems(world, pid).length === 0, 'expected empty inventory at start');
 
   world.add(pid, MoveIntent, { dx: 1, dy: 0 });
   world.tick(1);
@@ -32,9 +32,9 @@ Deno.test("player auto-picks up gold when moving onto its tile", () => {
   const pos = world.get(pid, Position);
   assert(pos.x === 1 && pos.y === 0, 'player did not move to (1,0)');
 
-  const inv = world.get(pid, Inventory);
-  assert(inv.items.length === 1, 'gold was not picked up automatically');
-  const picked = inv.items[0];
+  const pickedItems = inventoryItems(world, pid);
+  assert(pickedItems.length === 1, 'gold was not picked up automatically');
+  const picked = pickedItems[0];
   const info = world.get(picked, ItemInfo);
   assert(info && info.type === 'currency', 'picked item is not currency');
 });

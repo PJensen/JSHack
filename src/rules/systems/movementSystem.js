@@ -22,10 +22,7 @@ import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { getTileQuerySnapshot, forEachItemAt } from "../utils/tileQueryCache.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
-import {
-  addItemEntityToInventory,
-  findInventoryStackTargetForItem,
-} from "../utils/inventoryStacking.js";
+import { addToInventory, hasCapacityForItem } from "../utils/inventoryFacade.js";
 import { resolveBump } from "../data/bumpResolvers.js";
 import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
@@ -127,14 +124,9 @@ export function installMoveAutoPickupListener(world) {
         const info = world.get(itemId, ItemInfo);
         if (!info || !info.type || !kinds.includes(info.type)) return;
         const count = info.count || 1;
-        const stackTarget = findInventoryStackTargetForItem(world, inv, itemId);
-        if (stackTarget) {
-          addItemEntityToInventory(world, inv, itemId);
-        } else {
-          const ignoreCapacity = info.type === "currency";
-          if (ignoreCapacity || inv.capacity == null || inv.items.length < inv.capacity) {
-            addItemEntityToInventory(world, inv, itemId);
-          }
+        const ignoreCapacity = info.type === "currency";
+        if (ignoreCapacity || hasCapacityForItem(world, actor, itemId)) {
+          addToInventory(world, actor, itemId);
         }
         try { world.emit?.("item:pickup", { actor, itemId, count }); } catch {}
       });

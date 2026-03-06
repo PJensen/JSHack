@@ -5,7 +5,8 @@ import { playerEntity } from "../../rules/utils/queries.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
-import { addItemEntityToInventory } from "../../rules/utils/inventoryStacking.js";
+import { addToInventory } from "../../rules/utils/inventoryFacade.js";
+import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 
 /**
  * Apply URL-param debug commands (?give, ?effects) to the player.
@@ -21,7 +22,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
       const pe = playerEntity(world);
       if (pe) {
         const inv = world.get(pe.id, Inventory);
-        if (inv && Array.isArray(inv.items)) {
+        if (inv) {
           // Parse comma-separated item specs
           const specs = giveParam.split(',').map(s => s.trim()).filter(Boolean);
 
@@ -46,7 +47,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
               const createdItemId = createItemById(world, itemId, { count });
 
               if (createdItemId !== null) {
-                addItemEntityToInventory(world, inv, createdItemId);
+                addToInventory(world, pe.id, createdItemId);
                 console.debug(`[?give] Created ${count}x ${itemId}`);
               } else {
                 console.warn(`[?give] Unknown item: "${itemId}"`);

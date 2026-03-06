@@ -290,26 +290,102 @@
 			if (hasSavegame() && !hasValidFloorOverride()) bootLabel.textContent = 'Loading from Save';
 			renderBoot();
 
-			const hash = new Date().getTime().toString(16);
-			// Register the dev service worker once (stable URL prevents reinstall races).
-			// The SW itself busts module caches internally via the ?v= param it reads
-			// from its own scriptURL, so we only need the hash on the entry module.
-			if ('serviceWorker' in navigator) {
-			try {
-				navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
-					const sw = reg.active || reg.installing || reg.waiting;
-					if (sw) sw.postMessage({ type: 'set-version', v: hash });
-					reg.addEventListener('updatefound', () => {
-						if (reg.installing) reg.installing.postMessage({ type: 'set-version', v: hash });
-					});
+			async function loadAppVersion() {
+				try {
+					const res = await fetch('./VERSION', { cache: 'no-store' });
+					if (!res.ok) throw new Error('VERSION fetch failed');
+					const text = (await res.text()).trim();
+					if (text) return text;
+				} catch {}
+				return new Date().getTime().toString(16);
+			}
+
+			function withTimeout(promise, timeoutMs) {
+				return Promise.race([
+					promise,
+					new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+				]);
+			}
+
+			function waitForServiceWorkerController(timeoutMs = 600) {
+				if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+				if (navigator.serviceWorker.controller) return Promise.resolve(navigator.serviceWorker.controller);
+				return new Promise((resolve) => {
+					let settled = false;
+					const finish = (controller) => {
+						if (settled) return;
+						settled = true;
+						clearTimeout(timer);
+						navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+						resolve(controller || null);
+					};
+					const onControllerChange = () => finish(navigator.serviceWorker.controller);
+					const timer = setTimeout(() => finish(navigator.serviceWorker.controller), timeoutMs);
+					navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 				});
-			} catch {}
-		}
-		const script = document.createElement('script');
-		script.type = 'module';
-		script.src = `./src/main.js?v=${hash}`;
-		document.body.appendChild(script);
-	</script>
-</body>
+			}
+
+			function postVersionToWorker(worker, version, timeoutMs = 250) {
+				if (!worker || typeof worker.postMessage !== 'function') return Promise.resolve(false);
+				return new Promise((resolve) => {
+					let settled = false;
+					const channel = new MessageChannel();
+					const finish = (ok) => {
+						if (settled) return;
+						settled = true;
+						clearTimeout(timer);
+						channel.port1.onmessage = null;
+						try { channel.port1.close(); } catch {}
+						try { channel.port2.close(); } catch {}
+						resolve(ok);
+					};
+					const timer = setTimeout(() => finish(false), timeoutMs);
+					channel.port1.onmessage = (event) => {
+						if (event.data?.type === 'set-version:ack' && String(event.data.v) === String(version)) {
+							finish(true);
+						}
+					};
+					try {
+						worker.postMessage({ type: 'set-version', v: String(version) }, [channel.port2]);
+					} catch {
+						finish(false);
+					}
+				});
+			}
+
+			async function prepareServiceWorker(version) {
+				if (!('serviceWorker' in navigator)) return;
+				try {
+					const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+					const readyReg = await withTimeout(navigator.serviceWorker.ready, 600);
+					const firstWorker = navigator.serviceWorker.controller
+						|| (readyReg && readyReg.active)
+						|| reg.active
+						|| reg.waiting
+						|| reg.installing
+						|| null;
+
+					if (firstWorker) await postVersionToWorker(firstWorker, version);
+
+					const controller = navigator.serviceWorker.controller || await waitForServiceWorkerController(600);
+					if (controller && controller !== firstWorker) {
+						await postVersionToWorker(controller, version);
+					}
+				} catch {}
+			}
+
+			async function bootApp() {
+				const version = await loadAppVersion();
+				window.VERSION = version;
+				await prepareServiceWorker(version);
+				const script = document.createElement('script');
+				script.type = 'module';
+				script.src = `./src/main.js?v=${encodeURIComponent(version)}`;
+				document.body.appendChild(script);
+			}
+
+			bootApp();
+		</script>
+	</body>
 
 </html>

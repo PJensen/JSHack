@@ -8,11 +8,12 @@ import { Position } from "../../rules/components/Position.js";
 import { ShopInventory } from "../../rules/components/ShopInventory.js";
 import { Unpaid } from "../../rules/components/Unpaid.js";
 import {
-  addItemEntityToInventory,
-  findInventoryStackTargetByIdentity,
-} from "../../rules/utils/inventoryStacking.js";
+  inventoryItems, inventoryContains, addToInventory,
+  removeFromInventory, hasCapacityForItem,
+} from "../../rules/utils/inventoryFacade.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
+import { groupDisplayItems } from "../ui/itemGrouping.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
 const API_KEY = Symbol.for("jshack:main:shopWiring:api");
@@ -37,20 +38,18 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   function playerGoldCount() {
     const pe = playerEntity(world);
     if (!pe) return 0;
-    const inv = world.get(pe.id, Inventory);
-    if (!inv) return 0;
     let total = 0;
-    for (const id of inv.items) {
+    for (const id of inventoryItems(world, pe.id)) {
       const info = world.get(id, ItemInfo);
       if (info && info.type === "currency") total += info.count || 0;
     }
     return total;
   }
 
-  function spendGold(inv, amount) {
+  function spendGold(ownerId, amount) {
     let remaining = Math.max(0, Number(amount || 0));
     if (remaining <= 0) return true;
-    for (const gid of [...inv.items]) {
+    for (const gid of inventoryItems(world, ownerId)) {
       const gi = world.get(gid, ItemInfo);
       if (!gi || gi.type !== "currency") continue;
       const have = Math.max(0, Number(gi.count || 0));
@@ -60,8 +59,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       remaining -= spend;
       const next = world.get(gid, ItemInfo)?.count || 0;
       if (next <= 0) {
-        const idx = inv.items.indexOf(gid);
-        if (idx !== -1) inv.items.splice(idx, 1);
+        removeFromInventory(world, ownerId, gid);
         try { world.destroy(gid); } catch {} // ECS: entity may already be destroyed
       }
       if (remaining <= 0) break;
@@ -69,12 +67,12 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     return remaining <= 0;
   }
 
-  function grantGold(inv, amount) {
+  function grantGold(ownerId, amount) {
     const n = Math.max(0, Number(amount || 0));
     if (n <= 0) return;
     const gid = createFrom(world, GoldStack, {});
     world.mutate(gid, ItemInfo, (r) => { r.count = n; });
-    addItemEntityToInventory(world, inv, gid);
+    addToInventory(world, ownerId, gid);
   }
 
   function resolveItemAppraisal(id) {
@@ -115,9 +113,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const pe = playerEntity(world);
     const playerItems = [];
     if (pe) {
-      const inv = world.get(pe.id, Inventory);
-      if (inv) {
-        for (const id of inv.items) {
+        for (const id of inventoryItems(world, pe.id)) {
           const info = world.get(id, ItemInfo);
           if (!info) continue;
 
@@ -139,15 +135,18 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
             playerItems.push(detail);
           }
         }
-      }
     }
+
+    const groupedShopItems = groupDisplayItems(shopItems);
+    const groupedPlayerItems = groupDisplayItems(playerItems);
+    const groupedUnpaidItems = groupDisplayItems(unpaidItems);
 
     try {
       window.dispatchEvent(new CustomEvent("ui:shopData", { detail: {
         shopkeeperId,
-        shopItems,
-        playerItems,
-        unpaidItems,
+        shopItems: groupedShopItems,
+        playerItems: groupedPlayerItems,
+        unpaidItems: groupedUnpaidItems,
         totalBill,
         gold: playerGoldCount(),
         buyMarkup,
@@ -233,31 +232,20 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       return;
     }
 
-    const inv = world.get(pe.id, Inventory);
-    if (!inv) return;
-
-    // Check inventory capacity
-    const identity = world.get(itemId, NamedIdentity)?.identity || "";
-    const stackIntoId = identity
-      ? findInventoryStackTargetByIdentity(world, inv, identity)
-      : 0;
-    const hasCapacity = stackIntoId || inv.capacity == null || inv.items.length < inv.capacity;
-    if (!hasCapacity) {
+    if (!hasCapacityForItem(world, pe.id, itemId)) {
       log("Your pack is full.");
       return;
     }
 
     // Deduct gold across all currency stacks
-    if (!spendGold(inv, price)) {
+    if (!spendGold(pe.id, price)) {
       log("You cannot afford that.");
       return;
     }
 
-    // Remove from floor and add to inventory
-    try { world.remove(itemId, Position); } catch {} // ECS: may not exist
     // Remove unpaid status (item is now paid for)
     try { world.remove(itemId, Unpaid); } catch {} // ECS: may not exist
-    addItemEntityToInventory(world, inv, itemId);
+    addToInventory(world, pe.id, itemId);
 
     log(`You buy ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
 
@@ -292,11 +280,8 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const sellValue = resolveItemAppraisal(itemId);
     const price = Math.floor(sellValue * sellDiscount);
 
-    const inv = world.get(pe.id, Inventory);
-    if (!inv) return;
-    if (!inv.items.includes(itemId)) return;
-    const idx = inv.items.indexOf(itemId);
-    if (idx !== -1) inv.items.splice(idx, 1);
+    if (!inventoryContains(world, pe.id, itemId)) return;
+    removeFromInventory(world, pe.id, itemId);
 
     const resalePrice = Math.ceil(sellValue * (shop.buyMarkup ?? 1.0));
     if (!placeItemOnShopFloor(itemId, shopkeeperId)) {
@@ -309,7 +294,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       world.add(itemId, Unpaid, { shopkeeperId, price: resalePrice });
     }
 
-    grantGold(inv, price);
+    grantGold(pe.id, price);
 
     log(`You sell ${bracketizeName(resolveItemDisplayName(world, itemId))} for ${price} gold.`);
 
@@ -367,15 +352,12 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       return;
     }
 
-    const inv = world.get(pe.id, Inventory);
-    if (!inv) return;
-    if (!inv.items.includes(itemId)) return;
+    if (!inventoryContains(world, pe.id, itemId)) return;
 
     const unpaid = world.get(itemId, Unpaid);
     if (!unpaid || unpaid.shopkeeperId !== shopkeeperId) return;
 
-    const idx = inv.items.indexOf(itemId);
-    if (idx !== -1) inv.items.splice(idx, 1);
+    removeFromInventory(world, pe.id, itemId);
 
     const eq = world.get(pe.id, Equipment);
     if (eq) {
@@ -408,13 +390,10 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!shop) return;
 
     // Calculate total bill
-    const inv = world.get(pe.id, Inventory);
-    if (!inv) return;
-
     let totalBill = 0;
     const unpaidItemIds = [];
 
-    for (const itemId of inv.items) {
+    for (const itemId of inventoryItems(world, pe.id)) {
       const unpaid = world.get(itemId, Unpaid);
       if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
         totalBill += unpaid.price;
@@ -435,7 +414,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
 
     // Deduct gold across all currency stacks
-    if (!spendGold(inv, totalBill)) {
+    if (!spendGold(pe.id, totalBill)) {
       log(`You cannot afford that. You need ${totalBill} gold but only have ${gold}.`);
       return;
     }

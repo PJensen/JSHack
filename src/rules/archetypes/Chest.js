@@ -9,5 +9,5 @@ export const Chest = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Chest", identity: "chest" }],
   [Material, { kind: "iron" }],
-  [Inventory, { items: [], capacity: 20 }]
+  [Inventory, { capacity: 20 }]
 );

@@ -10,6 +10,7 @@ import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { RangedAttackIntent } from '../src/rules/components/Intents/RangedAttackIntent.js';
 import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
+import { inventoryContains, addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 
@@ -79,7 +80,9 @@ function setup(opts = {}) {
   world.add(archer, Position, { x: opts.ax ?? 0, y: opts.ay ?? 0 });
   world.add(archer, Vitality, { maxHp: 20, hp: 20 });
   world.add(archer, Equipment, { ranged: bowId, attackDerived: 1 });
-  world.add(archer, Inventory, { items: [bowId, ammoId], capacity: 20 });
+  world.add(archer, Inventory, { capacity: 20 });
+  addToInventory(world, archer, bowId);
+  addToInventory(world, archer, ammoId);
   world.add(archer, Faction, { key: opts.archerFaction || 'player' });
 
   const target = world.create();
@@ -128,7 +131,12 @@ Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
 Deno.test("ranged: no ammo → ranged:no-ammo emitted", () => {
   const events = [];
   const { world, archer, target } = setup();
-  world.set(archer, Inventory, { items: [world.get(archer, Equipment).ranged], capacity: 20 });
+  // Remove ammo from inventory — keep only bow
+  const ammoItems = inventoryItems(world, archer).filter(id => {
+    const info = world.get(id, ItemInfo);
+    return info && info.type === 'ammo';
+  });
+  for (const id of ammoItems) world.destroy(id);
   trackEvents(world, events);
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
@@ -178,8 +186,7 @@ Deno.test("ranged: last ammo → entity destroyed", () => {
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
   assert(!world.isAlive(ammoId), 'ammo entity destroyed');
-  const inv = world.get(archer, Inventory);
-  assert(!inv.items.includes(ammoId), 'ammo removed from inventory');
+  assert(!inventoryContains(world, archer, ammoId), 'ammo removed from inventory');
 });
 
 Deno.test("ranged: kill target → died emitted", () => {

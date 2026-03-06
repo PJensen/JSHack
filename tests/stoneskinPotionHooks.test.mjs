@@ -17,6 +17,7 @@ import { installTauntListener } from "../src/rules/systems/tauntSystem.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("stoneskin potion on_drink grants temporary stoneskin effect", () => {
   const world = new World({ seed: 6101 });
@@ -26,7 +27,7 @@ Deno.test("stoneskin potion on_drink grants temporary stoneskin effect", () => {
 
   const potion = createItemById(world, "potion_stoneskin");
   assert(potion != null, "stoneskin potion should be creatable");
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const results = [];
   world.on("interaction:result", (ev) => results.push(ev));
@@ -61,7 +62,7 @@ Deno.test("stoneskin potion on_throw (via throw pipeline) spawns taunting statue
 
   const potion = createItemById(world, "potion_stoneskin");
   assert(potion != null, "stoneskin potion should be creatable");
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const messageEvents = [];
   const statusEvents = [];
@@ -119,7 +120,7 @@ Deno.test("stoneskin potion use does not route through on_throw", () => {
 
   const potion = createItemById(world, "potion_stoneskin");
   assert(potion != null, "stoneskin potion should be creatable");
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const results = [];
   world.on("interaction:result", (ev) => results.push(ev));
@@ -147,12 +148,11 @@ Deno.test("stoneskin potion on_dip (via apply pipeline) petrifies target item", 
   const world = new World({ seed: 6103 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
-  const inv = world.get(actor, Inventory);
-
   const potion = createItemById(world, "potion_stoneskin");
   const weapon = createItemById(world, "dagger_quick");
   assert(potion != null && weapon != null, "required test items should be creatable");
-  inv.items.push(potion, weapon);
+  addToInventory(world, actor, potion);
+  addToInventory(world, actor, weapon);
 
   const weaponInfoBefore = world.get(weapon, ItemInfo);
   const beforeDefense = Number(weaponInfoBefore?.bonuses?.defense || 0);

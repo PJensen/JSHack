@@ -8,6 +8,7 @@ import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { RoomMetadata } from "../src/rules/components/RoomMetadata.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("shopkeeperSystem blocks exiting shop with unpaid items and emits invoice bill", () => {
   const world = new World({ seed: 42 });
@@ -16,11 +17,12 @@ Deno.test("shopkeeperSystem blocks exiting shop with unpaid items and emits invo
 
   world.add(playerId, Player, {});
   world.add(playerId, Position, { x: 2, y: 2 });
-  world.add(playerId, Inventory, { items: [itemId], capacity: 20, weightLimit: null });
+  world.add(playerId, Inventory, { capacity: 20 });
   world.add(playerId, MoveIntent, { dx: -1, dy: 0 }); // move to x=1, outside room
 
   world.add(itemId, ItemInfo, { type: "equip", count: 1, value: 50 });
   world.add(itemId, Unpaid, { shopkeeperId: 9001, price: 75 });
+  addToInventory(world, playerId, itemId);
 
   const roomId = world.create();
   world.add(roomId, RoomMetadata, {
@@ -49,7 +51,7 @@ Deno.test("shopkeeperSystem allows exiting shop when player has no unpaid items"
 
   world.add(playerId, Player, {});
   world.add(playerId, Position, { x: 2, y: 2 });
-  world.add(playerId, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(playerId, Inventory, { capacity: 20 });
   world.add(playerId, MoveIntent, { dx: -1, dy: 0 }); // move to x=1, outside room
 
   const roomId = world.create();

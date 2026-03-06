@@ -8,6 +8,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 function makeActor(world, x, y, hp) {
   const id = world.create();
@@ -25,7 +26,7 @@ Deno.test("throwing potion_poison spawns poison hazard, consumes item, and does 
   const target = makeActor(world, 12, 10, 10);
   const potion = createItemById(world, "potion_poison");
   assert(potion != null, "potion_poison should be creatable");
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const hazardSpawned = [];
   const plasmaSpawned = [];

@@ -23,7 +23,7 @@ export const HomeChest = defineArchetype(
   [NamedIdentity, { name: "Stash Chest", identity: "chest" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
-  [Inventory, { items: [], capacity: 60 }],
+  [Inventory, { capacity: 60 }],
   [Interactable, { action: "openChest", params: null }],
 );
 

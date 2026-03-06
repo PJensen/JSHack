@@ -8,6 +8,7 @@ import { Player } from '../components/Player.js';
 import { Inventory } from '../components/Inventory.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
+import { inventoryContains, inventoryItems, removeFromInventory } from '../utils/inventoryFacade.js';
 import { Consumable } from '../components/Consumable.js';
 import { FoodDecay } from '../components/FoodDecay.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
@@ -380,8 +381,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
 
   // Auto-transition from fetching to returning when item is picked up
   if (petState.state === 'fetching') {
-    const inv = world.get(petId, Inventory);
-    if (inv && inv.items.length > 0 && inv.items.includes(petState.targetItemId)) {
+    if (petState.targetItemId > 0 && inventoryContains(world, petId, petState.targetItemId)) {
       petState.state = 'returning';
       petState.stateEnteredTurn = world.step;
       petState.targetX = null;
@@ -641,12 +641,13 @@ function moveToward(world, petId, targetX, targetY) {
  * Helper: deliver items from pet inventory to player position
  */
 function deliverItemsToPlayer(world, petId, playerId, playerPos) {
-  const petInv = world.get(petId, Inventory);
-  if (!petInv || petInv.items.length === 0) return;
+  const items = inventoryItems(world, petId);
+  if (items.length === 0) return;
 
-  for (const itemId of petInv.items) {
+  for (const itemId of items) {
     const itemName = world.get(itemId, NamedIdentity)?.name ||
                      world.get(itemId, ItemInfo)?.description || 'item';
+    removeFromInventory(world, petId, itemId);
     try {
       world.add(itemId, Position, { x: playerPos.x, y: playerPos.y });
     } catch {} // ECS: may already exist
@@ -659,5 +660,4 @@ function deliverItemsToPlayer(world, petId, playerId, playerPos) {
       });
     } catch (e) { console.debug('[petBehaviorSystem] emit pet:deliver failed:', e); }
   }
-  petInv.items.length = 0;
 }

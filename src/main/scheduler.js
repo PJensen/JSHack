@@ -24,6 +24,7 @@ import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
 import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
 import { soundPropagationSystem } from "../rules/systems/soundPropagationSystem.js";
 import { encumbranceSystem } from "../rules/systems/encumbranceSystem.js";
+import { weightDerivationSystem } from "../rules/systems/weightDerivationSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../rules/systems/tauntSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
@@ -58,36 +59,18 @@ import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSy
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
 import { channelingSystem } from "../rules/systems/channelingSystem.js";
+import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
-
-/**
- * Run all systems in a phase with _inTick temporarily set to false so
- * structural mutations (add/remove) execute immediately rather than
- * being deferred to end-of-tick.  Necessary for AI intent producers
- * whose world.add(MoveIntent) must be visible to movementSystem in the
- * same tick.  Mirrors the pattern World.tick() uses during its own
- * post-scheduler command-queue flush (core.js _inTick toggle).
- * @param {World} world
- * @param {number} dt
- * @param {string} phase
- */
-function runPhaseImmediate(world, dt, phase) {
-  const prev = world._inTick;
-  world._inTick = false;
-  try {
-    for (const fn of getOrderedSystems(phase)) fn(world, dt);
-  } finally {
-    world._inTick = prev;
-  }
-}
 
 /**
  * @param {World} world
  */
 export function configureWorld(world) {
   clearSystems();
+  installVirtuals(world);
+  defineInventoryVirtuals(world);
 
   // Install affix event listeners once per world
   installAffixTriggers(world);
@@ -117,8 +100,8 @@ export function configureWorld(world) {
   // Elevate enemy AggroState when they take damage (even off-screen).
   installAggroFromDamageListener(world);
 
-  // Phase: ai (intent producers — runs with immediate mutations so
-  // MoveIntents are visible to movementSystem in the same tick)
+  // Phase: ai (intent producers — added intents are visible to later phases
+  // in the same tick because ecs-js add() is intratick-immediate)
   registerSystem(intentValidationSystem, 'ai');
   // Scurry before chase: dumb idle creatures set a random MoveIntent which
   // aiChaseSystem's existing intent-skip guard then honours.
@@ -166,7 +149,9 @@ export function configureWorld(world) {
 
   // Phase: effects (derived first, then per-turn effects)
   registerSystem(equipmentSystem, 'effects');
-  // Encumbrance recomputed after equipment is settled; movement reads it next tick.
+  // Weight derivation: bottom-up recomputation of Weight.total for bags/actors.
+  registerSystem(weightDerivationSystem, 'effects');
+  // Encumbrance recomputed after equipment + weight are settled; movement reads it next tick.
   registerSystem(encumbranceSystem, 'effects');
   // Sound propagation checks SoundEmitter vs Anatomy.hearing; updates AggroState.
   registerSystem(soundPropagationSystem, 'effects');
@@ -197,11 +182,7 @@ export function configureWorld(world) {
   // Keep spatial index in sync after structural changes
   registerSystem(spatialIndexSystem, 'cleanup');
 
-  // Compose scheduler: ai phase runs with immediate mutations, rest deferred
-  const baseScheduler = composeScheduler(
-    (w, dt) => runPhaseImmediate(w, dt, 'ai'),
-    'intents', 'effects', 'cleanup'
-  );
+  const baseScheduler = composeScheduler('ai', 'intents', 'effects', 'cleanup');
   const profEnabled = shouldProfileRules();
   if (!profEnabled) {
     world.setScheduler(baseScheduler);
@@ -226,20 +207,13 @@ export function configureWorld(world) {
       const list = phaseSystems[ph] || [];
       let phStart = performance.now();
       const sysTimes = [];
-      // AI phase runs with immediate mutations (not deferred)
-      const immediate = (ph === 'ai');
-      if (immediate) w._inTick = false;
-      try {
-        for (let i = 0; i < list.length; i++) {
-          /** @type {Function} */
-          const fn = /** @type any */ (list[i] || (()=>{}));
-          const s0 = performance.now();
-          fn(w, dt);
-          const s1 = performance.now();
-          sysTimes.push({ name: fn.name || `sys${i}`, ms: s1 - s0 });
-        }
-      } finally {
-        if (immediate) w._inTick = true;
+      for (let i = 0; i < list.length; i++) {
+        /** @type {Function} */
+        const fn = /** @type any */ (list[i] || (()=>{}));
+        const s0 = performance.now();
+        fn(w, dt);
+        const s1 = performance.now();
+        sysTimes.push({ name: fn.name || `sys${i}`, ms: s1 - s0 });
       }
       const phEnd = performance.now();
       tick.phases[ph] = { totalMs: phEnd - phStart, systems: sysTimes };

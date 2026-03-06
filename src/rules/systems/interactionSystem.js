@@ -49,7 +49,8 @@ const BUMP_INTERACT_INSTALLED = Symbol.for("jshack.bumpInteract");
 
 /**
  * Install a one-time bump:interact listener for movement-triggered interactions
- * (e.g. walking into a door). Avoids the deferred-add tick delay of InteractIntent.
+ * (e.g. walking into a door). This bypasses the intent queue so bump actions
+ * resolve immediately during movement.
  *
  * @param {any} world
  */

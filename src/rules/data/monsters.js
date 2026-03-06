@@ -256,6 +256,8 @@ export const MONSTERS = [
     tags: ['aberration', 'psychic'],
     tier: 0,
     intelligence: 2,   // dumb (≤3 triggers scurry: wanders randomly when unaware)
+    visionRange: 6,
+    ambush: true,
     baseHp: 14,
     hpPerLevel: 1.5,
     attack: 1,
@@ -269,7 +271,7 @@ export const MONSTERS = [
     },
     speed: 1,
     hooks: {
-      whileLOS: [gazeOnLOS(4)],
+      whileLOS: [gazeOnLOS(4, 8, 3)],
       onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
     },
     description: 'A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.',
@@ -742,4 +744,4 @@ export function getMonsterTags(monsterId) {
   return Array.isArray(def?.tags) ? def.tags : [];
 }
 
-/** @typedef {{ id:string, name:string, tags?:string[], tier:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */
+/** @typedef {{ id:string, name:string, tags?:string[], tier:number, intelligence?:number, visionRange?:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */

@@ -3,11 +3,11 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
 /**
  * Encumbrance — derived carrying-load state, recomputed each effects phase.
  *
- * Managed by encumbranceSystem from Inventory item weights + equipped gear weights.
+ * Managed by encumbranceSystem from the authoritative inventory-root weight.
  * Limit = Stamina.maxStamina (1:1 kg). No Stamina component = unlimited carry.
  * Consumed by movementSystem: overloaded entities cannot move diagonally.
  *
- * current:       Total weight (kg) of held items + equipped gear.
+ * current:       Total carried weight (kg) of the inventory root subtree.
  * overloaded:    true when current > Stamina.maxStamina.
  * heavilyLoaded: true when current > maxStamina * 0.75 (approaching the limit).
  */

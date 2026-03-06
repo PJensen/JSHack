@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Visual Test Runner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #ddd; font-family: monospace; font-size: 13px;
+         display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── Toolbar ─────────────────────────────────────────────────── */
+  #toolbar { display: flex; align-items: center; background: #161616; border-bottom: 1px solid #2a2a2a;
+             padding: 0 12px; height: 38px; flex-shrink: 0; gap: 8px; }
+  #toolbar select { background: #0f0f0f; border: 1px solid #2e2e2e; color: #ddd;
+                    padding: 4px 8px; font-family: monospace; font-size: 12px; cursor: pointer; }
+  .tb-btn { padding: 5px 14px; border: none; border-radius: 3px; cursor: pointer;
+            font-family: monospace; font-size: 12px; }
+  .tb-btn:disabled { opacity: 0.3; cursor: default; }
+  .btn-blue  { background: #1d3f58; color: #9de; }
+  .btn-blue:hover:not(:disabled) { background: #264d66; }
+  .btn-green { background: #1a3020; color: #8fb; }
+  .btn-green:hover:not(:disabled) { background: #234030; }
+  .btn-amber { background: #3a2a10; color: #fca; }
+  .btn-amber:hover:not(:disabled) { background: #4a3818; }
+  #step-counter { color: #777; font-size: 12px; margin-left: auto; }
+
+  /* ── Main layout ─────────────────────────────────────────────── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center;
+                 background: #0a0a0a; padding: 16px; }
+  canvas { display: block; image-rendering: pixelated; }
+
+  /* ── Sidebar ─────────────────────────────────────────────────── */
+  #sidebar { background: #1a1a1a; border-left: 1px solid #333; width: 300px; min-width: 300px;
+             display: flex; flex-direction: column; overflow: hidden; }
+  .section { padding: 10px 12px; border-bottom: 1px solid #242424; }
+  .section-label { color: #777; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+                   margin-bottom: 6px; }
+
+  #step-desc { color: #bbb; font-size: 12px; line-height: 1.5; min-height: 40px; }
+  #scenario-desc { color: #888; font-size: 11px; font-style: italic; }
+
+  /* Assertion result */
+  .assert-pass { color: #8fb; }
+  .assert-fail { color: #f88; }
+  #assertion-result { font-size: 12px; min-height: 24px; }
+
+  /* Entity inspector */
+  #entity-inspector { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  .entity-row { margin-bottom: 8px; }
+  .entity-header { color: #9de; font-size: 12px; font-weight: bold; }
+  .entity-detail { color: #888; font-size: 11px; padding-left: 12px; }
+
+  /* ── Log panel ───────────────────────────────────────────────── */
+  #log-panel { background: #0d1117; border-top: 1px solid #1e1e1e; height: 156px; min-height: 100px;
+               overflow-y: auto; padding: 8px 12px; flex-shrink: 0; }
+  .log-entry { font-size: 11px; line-height: 1.6; }
+  .log-pass { color: #8fb; }
+  .log-fail { color: #f88; }
+  .log-info { color: #777; }
+
+  /* ── Aggro legend ────────────────────────────────────────────── */
+  #legend { display: flex; gap: 12px; padding: 6px 12px; border-bottom: 1px solid #242424;
+            flex-shrink: 0; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #888; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <select id="scenario-select"><option value="">-- select scenario --</option></select>
+  <button id="btn-step" class="tb-btn btn-blue" disabled>Step</button>
+  <button id="btn-auto" class="tb-btn btn-green" disabled>Auto-play</button>
+  <button id="btn-loop" class="tb-btn btn-green" disabled>Continuous</button>
+  <button id="btn-reset" class="tb-btn btn-amber" disabled>Reset</button>
+  <span id="step-counter">--</span>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="c" width="720" height="520"></canvas>
+  </div>
+  <div id="sidebar">
+    <div class="section">
+      <div class="section-label">Scenario</div>
+      <div id="scenario-desc">Select a scenario to begin.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">Current Step</div>
+      <div id="step-desc">--</div>
+    </div>
+    <div class="section">
+      <div class="section-label">Assertion</div>
+      <div id="assertion-result">--</div>
+    </div>
+    <div id="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:#666"></span> unaware</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#dd0"></span> curious</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f80"></span> alerted</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f22"></span> hunting</div>
+    </div>
+    <div class="section">
+      <div class="section-label">Entity Inspector</div>
+    </div>
+    <div id="entity-inspector"></div>
+  </div>
+</div>
+
+<div id="log-panel"></div>
+
+<script type="module">
+import { basePalette } from '../src/display/palette/base.js';
+import { createGlyphAtlas } from '../src/display/passes/glyphs/atlas.js';
+import { SCENARIOS } from '../tests/visual/_registry.js';
+import { Position } from '../src/rules/components/Position.js';
+import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
+import { AggroState } from '../src/rules/components/AggroState.js';
+import { Vitality } from '../src/rules/components/Vitality.js';
+import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { Player } from '../src/rules/components/Player.js';
+import { getTile } from '../src/rules/environment/dungeon/tileMap.js';
+import {
+	TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
+	TILE_GRASS, TILE_WATER, TILE_ICE
+} from '../src/rules/environment/dungeon/constants.js';
+import { FloatText } from '../src/display/passes/vfx/text/floatText.js';
+import { installFloatTextWiring } from '../src/display/ui/wiring/floatTextWiring.js';
+import { Status } from '../src/rules/components/Status.js';
+
+// ── Atlas ────────────────────────────────────────────────────────
+const atlas = createGlyphAtlas(basePalette, { sizePx: 64, fontPx: 56, glowLayers: 0 });
+
+// ── DOM refs ─────────────────────────────────────────────────────
+const selectEl     = document.getElementById('scenario-select');
+const btnStep      = document.getElementById('btn-step');
+const btnAuto      = document.getElementById('btn-auto');
+const btnLoop      = document.getElementById('btn-loop');
+const btnReset     = document.getElementById('btn-reset');
+const stepCounter  = document.getElementById('step-counter');
+const scenarioDesc = document.getElementById('scenario-desc');
+const stepDesc     = document.getElementById('step-desc');
+const assertResult = document.getElementById('assertion-result');
+const inspectorEl  = document.getElementById('entity-inspector');
+const logPanel     = document.getElementById('log-panel');
+const canvas       = document.getElementById('c');
+const ctx          = canvas.getContext('2d');
+
+// ── FloatText VFX ────────────────────────────────────────────────
+let ftext = null;         // FloatText instance, wired per-scenario
+
+function wireFloatText(w) {
+	ftext = new FloatText();
+	const noopPool = { spawn() {} };
+	installFloatTextWiring({
+		world: w,
+		ftext,
+		fx: { pool: noopPool },
+		getPosition: (id) => w.get(id, Position),
+		isVisibleAt: () => true,
+		isPet: () => false,
+		isPlayer: (id) => w.has(id, Player),
+	});
+}
+
+// ── State ────────────────────────────────────────────────────────
+let scenario   = null;   // loaded scenario default export
+let world      = null;
+let entityMap  = null;   // Map<id, { label, track }>
+let stepIndex  = -1;     // -1 = setup shown, 0+ = step executed
+let autoTimer  = null;
+let loopTimer  = null;
+let lastCheck  = null;   // { pass, message } from last check()
+let _fxTime    = 0;      // running time for glyph VFX animation
+
+// ── Populate dropdown ────────────────────────────────────────────
+for (const s of SCENARIOS) {
+	const opt = document.createElement('option');
+	opt.value = s.path;
+	opt.textContent = s.name;
+	selectEl.appendChild(opt);
+}
+
+// ── Event handlers ───────────────────────────────────────────────
+selectEl.addEventListener('change', async () => {
+	stopAuto();
+	const path = selectEl.value;
+	if (!path) { scenario = null; setButtonsEnabled(false); return; }
+	try {
+		const mod = await import(`../tests/visual/${path.replace('./', '')}`);
+		scenario = mod.default;
+		resetScenario();
+	} catch (err) {
+		logEntry(`Failed to load scenario: ${err.message}`, 'fail');
+		console.error(err);
+	}
+});
+
+btnStep.addEventListener('click', doStep);
+btnReset.addEventListener('click', () => { stopAuto(); resetScenario(); });
+btnAuto.addEventListener('click', () => {
+	if (autoTimer) { stopAuto(); return; }
+	stopLoop();
+	btnAuto.textContent = 'Pause';
+	autoTimer = setInterval(() => {
+		if (!canStep()) { stopAuto(); return; }
+		doStep();
+	}, 500);
+});
+btnLoop.addEventListener('click', () => {
+	if (loopTimer) { stopLoop(); return; }
+	stopAuto();
+	btnLoop.textContent = 'Stop';
+	function loopTick() {
+		if (!canStep()) {
+			resetScenario();
+		}
+		doStep();
+	}
+	loopTimer = setInterval(loopTick, 500);
+});
+
+// ── Core logic ───────────────────────────────────────────────────
+function resetScenario() {
+	if (!scenario) return;
+	const result = scenario.setup();
+	world = result.world;
+	entityMap = result.entities;
+	wireFloatText(world);
+	stepIndex = -1;
+	lastCheck = null;
+	scenarioDesc.textContent = scenario.description || scenario.name;
+	stepDesc.textContent = 'Initial state (click Step to advance)';
+	assertResult.textContent = '--';
+	assertResult.className = '';
+	stepCounter.textContent = `Step 0 / ${scenario.steps.length}`;
+	logPanel.innerHTML = '';
+	logEntry(`Loaded: ${scenario.name}`, 'info');
+	setButtonsEnabled(true);
+	render();
+	updateInspector();
+}
+
+function canStep() {
+	return scenario && stepIndex < scenario.steps.length - 1;
+}
+
+function doStep() {
+	if (!canStep()) return;
+	stepIndex++;
+	const step = scenario.steps[stepIndex];
+
+	stepDesc.textContent = step.description || `Step ${stepIndex + 1}`;
+	stepCounter.textContent = `Step ${stepIndex + 1} / ${scenario.steps.length}`;
+
+	// Execute
+	step.run(world);
+
+	// Check assertion
+	lastCheck = null;
+	if (step.check) {
+		lastCheck = step.check(world, entityMap);
+		const cls = lastCheck.pass ? 'assert-pass' : 'assert-fail';
+		const icon = lastCheck.pass ? 'PASS' : 'FAIL';
+		assertResult.textContent = `${icon}: ${lastCheck.message}`;
+		assertResult.className = cls;
+		logEntry(`[${stepIndex + 1}] ${lastCheck.message}`, lastCheck.pass ? 'pass' : 'fail');
+	} else {
+		assertResult.textContent = '(no assertion)';
+		assertResult.className = '';
+		logEntry(`[${stepIndex + 1}] ${step.description || 'step'}`, 'info');
+	}
+
+	if (!canStep() && !loopTimer) {
+		stopAuto();
+		btnStep.disabled = true;
+		btnAuto.disabled = true;
+	}
+
+	render();
+	updateInspector();
+}
+
+function stopAuto() {
+	if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+	btnAuto.textContent = 'Auto-play';
+}
+
+function stopLoop() {
+	if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+	btnLoop.textContent = 'Continuous';
+}
+
+function setButtonsEnabled(on) {
+	btnStep.disabled = !on;
+	btnAuto.disabled = !on;
+	btnLoop.disabled = !on;
+	btnReset.disabled = !on;
+}
+
+// ── Render ────────────────────────────────────────────────────────
+
+function tileColor(tile) {
+	switch (tile) {
+		case TILE_FLOOR:      return '#1a1a2a';
+		case TILE_WALL:       return '#444455';
+		case TILE_DOOR:       return '#2a2a1a';
+		case TILE_STAIR_DOWN:
+		case TILE_STAIR_UP:   return '#2a3a2a';
+		case TILE_GRASS:      return '#1a2a1a';
+		case TILE_WATER:      return '#1a2a3a';
+		case TILE_ICE:        return '#2a3a4a';
+		default:              return '#0a0a0a';
+	}
+}
+
+function render() {
+	if (!world || !scenario) {
+		ctx.fillStyle = '#0a0a0a';
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.fillStyle = '#555';
+		ctx.font = '16px monospace';
+		ctx.textAlign = 'center';
+		ctx.fillText('Select a scenario to begin', canvas.width / 2, canvas.height / 2);
+		return;
+	}
+
+	const { x0, y0, x1, y1 } = scenario.bounds;
+	const gridW = x1 - x0 + 1;
+	const gridH = y1 - y0 + 1;
+	const cellSize = Math.floor(Math.min(canvas.width / gridW, canvas.height / gridH));
+	const offsetX = Math.floor((canvas.width  - gridW * cellSize) / 2);
+	const offsetY = Math.floor((canvas.height - gridH * cellSize) / 2);
+
+	function w2s(wx, wy) {
+		return { x: offsetX + (wx - x0) * cellSize, y: offsetY + (wy - y0) * cellSize };
+	}
+
+	// 1. Background
+	ctx.fillStyle = '#0a0a0a';
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+	// 2. Tile grid
+	for (let wy = y0; wy <= y1; wy++) {
+		for (let wx = x0; wx <= x1; wx++) {
+			const tile = getTile(wx, wy);
+			const { x, y } = w2s(wx, wy);
+			ctx.fillStyle = tileColor(tile);
+			ctx.fillRect(x, y, cellSize, cellSize);
+			ctx.strokeStyle = '#1e1e2e';
+			ctx.lineWidth = 0.5;
+			ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
+		}
+	}
+
+	// 3. Entity glyphs
+	for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
+		if (pos.x < x0 || pos.x > x1 || pos.y < y0 || pos.y > y1) continue;
+		const { x, y } = w2s(pos.x, pos.y);
+		const identity = ni.identity || 'default';
+		const entry = atlas.get(identity) || atlas.get('default');
+		if (entry && entry.canvas) {
+			const pad = Math.max(2, cellSize * 0.08);
+			ctx.drawImage(entry.canvas, x + pad, y + pad, cellSize - pad * 2, cellSize - pad * 2);
+		}
+	}
+
+	// 4. Annotations
+	for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
+		if (pos.x < x0 || pos.x > x1 || pos.y < y0 || pos.y > y1) continue;
+		const { x, y } = w2s(pos.x, pos.y);
+
+		// MoveIntent arrow
+		const mi = world.get(id, MoveIntent);
+		if (mi && (mi.dx || mi.dy)) {
+			drawArrow(ctx, x + cellSize / 2, y + cellSize / 2, mi.dx, mi.dy, cellSize * 0.35);
+		}
+
+		// AggroState dot
+		const aggro = world.get(id, AggroState);
+		if (aggro) {
+			const colors = { unaware: '#666', curious: '#dd0', alerted: '#f80', hunting: '#f22' };
+			ctx.fillStyle = colors[aggro.alertLevel] || '#666';
+			ctx.beginPath();
+			ctx.arc(x + cellSize - 6, y + 6, 4, 0, Math.PI * 2);
+			ctx.fill();
+			if (aggro.retreating) {
+				ctx.fillStyle = '#fff';
+				ctx.font = '9px monospace';
+				ctx.textAlign = 'left';
+				ctx.fillText('R', x + cellSize - 14, y + 16);
+			}
+		}
+
+		// Entity label below cell (tracked entities only)
+		const meta = entityMap?.get(id);
+		if (meta && meta.track) {
+			ctx.fillStyle = '#888';
+			ctx.font = '10px monospace';
+			ctx.textAlign = 'center';
+			ctx.fillText(meta.label, x + cellSize / 2, y + cellSize + 12);
+		}
+	}
+
+	// 5. Glyph VFX overlays (drawn in world space)
+	ctx.save();
+	ctx.translate(offsetX - x0 * cellSize + cellSize * 0.5, offsetY - y0 * cellSize + cellSize * 0.5);
+	ctx.scale(cellSize, cellSize);
+	for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
+		if (pos.x < x0 || pos.x > x1 || pos.y < y0 || pos.y > y1) continue;
+		const tags = getEntityTags(id);
+		if (!tags.length) continue;
+		const wx = pos.x, wy = pos.y;
+		if (tags.includes('stunned') || tags.includes('confused')) drawStunnedStars(ctx, wx, wy, id);
+		if (tags.includes('frozen'))   drawFrozenHalo(ctx, wx, wy);
+		if (tags.includes('poisoned')) drawPoisonGlow(ctx, wx, wy, id);
+		if (tags.includes('bleeding')) drawBleedPulse(ctx, wx, wy, id);
+		if (tags.includes('shocked'))  drawShockArcs(ctx, wx, wy, id);
+	}
+	ctx.restore();
+
+	// 6. Coordinate labels (subtle, along edges)
+	ctx.fillStyle = '#333';
+	ctx.font = '9px monospace';
+	ctx.textAlign = 'center';
+	for (let wx = x0; wx <= x1; wx++) {
+		const { x } = w2s(wx, y0);
+		ctx.fillText(String(wx), x + cellSize / 2, offsetY - 4);
+	}
+	ctx.textAlign = 'right';
+	for (let wy = y0; wy <= y1; wy++) {
+		const { y } = w2s(x0, wy);
+		ctx.fillText(String(wy), offsetX - 4, y + cellSize / 2 + 3);
+	}
+
+	// 7. Float text VFX (rendered in world space via transform)
+	if (ftext && ftext.fct.length > 0) {
+		ctx.save();
+		// Set transform so 1 world unit = cellSize pixels, origin at grid (0,0)
+		ctx.translate(offsetX - x0 * cellSize + cellSize * 0.5, offsetY - y0 * cellSize + cellSize * 0.5);
+		ctx.scale(cellSize, cellSize);
+		ftext.render(ctx);
+		ctx.restore();
+	}
+}
+
+function drawArrow(ctx, cx, cy, dx, dy, len) {
+	const ex = cx + dx * len;
+	const ey = cy + dy * len;
+	ctx.strokeStyle = '#66ccff';
+	ctx.lineWidth = 2;
+	ctx.beginPath();
+	ctx.moveTo(cx, cy);
+	ctx.lineTo(ex, ey);
+	ctx.stroke();
+	// Arrowhead
+	const angle = Math.atan2(dy, dx);
+	ctx.beginPath();
+	ctx.moveTo(ex, ey);
+	ctx.lineTo(ex - 8 * Math.cos(angle - 0.5), ey - 8 * Math.sin(angle - 0.5));
+	ctx.lineTo(ex - 8 * Math.cos(angle + 0.5), ey - 8 * Math.sin(angle + 0.5));
+	ctx.closePath();
+	ctx.fillStyle = '#66ccff';
+	ctx.fill();
+}
+
+// ── Glyph VFX (status-driven entity overlays) ────────────────────
+// Resolve status tags from Status component + ActiveEffects
+function getEntityTags(id) {
+	const tags = [];
+	const stat = world.get(id, Status);
+	if (stat && Array.isArray(stat.statuses)) {
+		for (const s of stat.statuses) {
+			const t = String(s?.type || '').toLowerCase();
+			if (t === 'poison') tags.push('poisoned');
+			else if (t === 'burn') tags.push('burning');
+			else if (t === 'bleed') tags.push('bleeding');
+			else if (t === 'shock') tags.push('shocked');
+			else if (t === 'frost') tags.push('frozen');
+			else if (t === 'confuse') tags.push('confused');
+			else if (t) tags.push(t);
+		}
+	}
+	const ae = world.get(id, ActiveEffects);
+	if (ae && Array.isArray(ae.effects)) {
+		for (const e of ae.effects) {
+			if (e.key === 'stun' && e.turnsLeft > 0 && !tags.includes('stunned')) tags.push('stunned');
+			if (e.key === 'frozen' && e.turnsLeft > 0 && !tags.includes('frozen')) tags.push('frozen');
+		}
+	}
+	return tags;
+}
+
+// Spinning 4-point stars above stunned/confused entities (world space)
+function drawStunnedStars(g, x, y, eid) {
+	g.save();
+	g.globalCompositeOperation = 'lighter';
+	g.lineWidth = 0.035;
+	g.globalAlpha = 0.9;
+	for (let j = 0; j < 3; j++) {
+		const ang = _fxTime * 2.2 + (j / 3) * Math.PI * 2;
+		const sx = x + Math.cos(ang) * 0.32;
+		const sy = y + Math.sin(ang) * 0.12 - 0.52;
+		const r = 0.10;
+		g.strokeStyle = j === 1 ? '#ffffff' : '#ffe033';
+		g.beginPath();
+		g.moveTo(sx - r, sy); g.lineTo(sx + r, sy);
+		g.moveTo(sx, sy - r); g.lineTo(sx, sy + r);
+		g.moveTo(sx - r*0.7, sy - r*0.7); g.lineTo(sx + r*0.7, sy + r*0.7);
+		g.moveTo(sx + r*0.7, sy - r*0.7); g.lineTo(sx - r*0.7, sy + r*0.7);
+		g.stroke();
+	}
+	g.restore();
+}
+
+// Pulsing icy blue halo for frozen entities (world space)
+function drawFrozenHalo(g, x, y) {
+	g.save();
+	g.globalCompositeOperation = 'lighter';
+	const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 1.4);
+	const rOuter = 0.70 + 0.08 * pulse;
+	const outer = g.createRadialGradient(x, y, 0, x, y, rOuter);
+	outer.addColorStop(0,   `rgba(160,230,255,${(0.45 + 0.20 * pulse).toFixed(3)})`);
+	outer.addColorStop(0.5, `rgba(80,180,255,${(0.20 + 0.10 * pulse).toFixed(3)})`);
+	outer.addColorStop(1,   'rgba(40,120,255,0)');
+	g.fillStyle = outer;
+	g.beginPath(); g.arc(x, y, rOuter, 0, Math.PI * 2); g.fill();
+	const rInner = 0.28 + 0.04 * pulse;
+	const inner = g.createRadialGradient(x, y, 0, x, y, rInner);
+	inner.addColorStop(0, `rgba(220,245,255,${(0.55 + 0.25 * pulse).toFixed(3)})`);
+	inner.addColorStop(1, 'rgba(100,200,255,0)');
+	g.fillStyle = inner;
+	g.beginPath(); g.arc(x, y, rInner, 0, Math.PI * 2); g.fill();
+	g.restore();
+}
+
+// Pulsing green glow for poisoned entities (world space)
+function drawPoisonGlow(g, x, y, eid) {
+	g.save();
+	g.globalCompositeOperation = 'lighter';
+	const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.5 + eid * 1.3);
+	const rOuter = 0.62 + 0.08 * pulse;
+	const outerGrad = g.createRadialGradient(x, y, 0, x, y, rOuter);
+	const outerA = 0.30 + 0.15 * pulse;
+	outerGrad.addColorStop(0, `rgba(50,220,70,${outerA.toFixed(3)})`);
+	outerGrad.addColorStop(0.5, `rgba(40,190,55,${(outerA * 0.5).toFixed(3)})`);
+	outerGrad.addColorStop(1, 'rgba(20,140,35,0)');
+	g.fillStyle = outerGrad;
+	g.beginPath(); g.arc(x, y, rOuter, 0, Math.PI * 2); g.fill();
+	g.restore();
+}
+
+// Pulsing red aura for bleeding entities (world space)
+function drawBleedPulse(g, x, y, eid) {
+	g.save();
+	const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 7.0 + eid * 0.3);
+	g.globalCompositeOperation = 'source-over';
+	g.fillStyle = `rgba(160,0,0,${(0.08 + 0.07 * pulse).toFixed(3)})`;
+	g.beginPath(); g.arc(x, y, 0.44 + 0.04 * pulse, 0, Math.PI * 2); g.fill();
+	g.restore();
+}
+
+// Chaotic electric arcs for shocked entities (world space)
+function drawShockArcs(g, x, y, eid) {
+	g.save();
+	g.globalCompositeOperation = 'lighter';
+	g.lineCap = 'round'; g.lineJoin = 'round';
+	const sh = (n) => ((Math.imul(n * 73 + 1, 2654435761) ^ Math.imul(eid | 1, 1664525)) >>> 0) / 4294967296;
+	const shF = (i, fi, s) => ((Math.imul((i * 97 + fi * 31 + s + 1) * 73 + 1, 2654435761) ^ Math.imul(eid | 1, 1664525)) >>> 0) / 4294967296;
+	for (let _i = 0; _i < 8; _i++) {
+		const baseAng = sh(_i * 5 + 1) * Math.PI * 2;
+		const freq = 3.0 + sh(_i * 5 + 2) * 10.0;
+		const phase = sh(_i * 5 + 3) * Math.PI * 2;
+		const bright = Math.max(0, Math.sin(_fxTime * freq + phase));
+		if (bright < 0.05) continue;
+		const fi = Math.floor(_fxTime * freq + phase) | 0;
+		const ang = baseAng + (shF(_i, fi, 0) - 0.5) * 0.9;
+		const len = 0.35 + shF(_i, fi, 1) * 0.40;
+		const perp = ang + Math.PI / 2;
+		const j1 = (shF(_i, fi, 2) - 0.5) * len * 0.70;
+		const k1x = x + Math.cos(ang) * len * 0.4 + Math.cos(perp) * j1;
+		const k1y = y + Math.sin(ang) * len * 0.4 + Math.sin(perp) * j1;
+		const ex = x + Math.cos(ang) * len;
+		const ey = y + Math.sin(ang) * len;
+		g.globalAlpha = 0.55 + 0.45 * bright;
+		g.lineWidth = 0.06; g.strokeStyle = 'rgba(60,200,255,0.90)';
+		g.beginPath(); g.moveTo(x, y); g.lineTo(k1x, k1y); g.lineTo(ex, ey); g.stroke();
+		g.lineWidth = 0.025; g.strokeStyle = '#ffffff';
+		g.beginPath(); g.moveTo(x, y); g.lineTo(k1x, k1y); g.lineTo(ex, ey); g.stroke();
+	}
+	g.restore();
+}
+
+// ── Entity Inspector ──────────────────────────────────────────────
+function updateInspector() {
+	if (!world || !entityMap) { inspectorEl.innerHTML = ''; return; }
+
+	let html = '';
+	for (const [id, meta] of entityMap) {
+		if (!meta.track) continue;
+		const pos = world.get(id, Position);
+		const ni  = world.get(id, NamedIdentity);
+		if (!pos) continue;
+
+		const look = basePalette[ni?.identity] || basePalette.default;
+		html += `<div class="entity-row">`;
+		html += `<div class="entity-header" style="color:${look.fg}">${look.glyph} ${meta.label} (${pos.x}, ${pos.y})</div>`;
+
+		// AggroState
+		const aggro = world.get(id, AggroState);
+		if (aggro) {
+			html += `<div class="entity-detail">aggro: ${aggro.alertLevel}${aggro.retreating ? ' (retreating)' : ''}</div>`;
+			html += `<div class="entity-detail">lastKnown: (${aggro.lastKnownX}, ${aggro.lastKnownY})</div>`;
+			html += `<div class="entity-detail">searchTurns: ${aggro.searchTurnsLeft}</div>`;
+		}
+
+		// MoveIntent
+		const mi = world.get(id, MoveIntent);
+		if (mi) {
+			html += `<div class="entity-detail" style="color:#9de">MoveIntent: dx=${mi.dx} dy=${mi.dy}</div>`;
+		}
+
+		// Vitality
+		const vit = world.get(id, Vitality);
+		if (vit) {
+			html += `<div class="entity-detail">HP: ${vit.hp}/${vit.maxHp}</div>`;
+		}
+
+		// ActiveEffects
+		const ae = world.get(id, ActiveEffects);
+		if (ae && ae.effects && ae.effects.length > 0) {
+			for (const eff of ae.effects) {
+				html += `<div class="entity-detail" style="color:#fca">${eff.key}: ${eff.turnsLeft} turns</div>`;
+			}
+		}
+
+		html += `</div>`;
+	}
+	inspectorEl.innerHTML = html;
+}
+
+// ── Log ──────────────────────────────────────────────────────────
+function logEntry(text, type) {
+	const div = document.createElement('div');
+	div.className = `log-entry log-${type}`;
+	div.textContent = text;
+	logPanel.prepend(div);
+}
+
+// ── Animation loop (drives float text animation) ────────────────
+let _lastFrame = 0;
+function frame(now) {
+	const dt = Math.min(0.1, (now - _lastFrame) / 1000);
+	_lastFrame = now;
+	_fxTime += dt;
+	if (ftext) ftext.step(dt);
+	render();
+	requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

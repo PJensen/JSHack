@@ -12,6 +12,7 @@ import { applyPipeline } from "../src/rules/interaction/verbs/applyPipeline.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { resetIdentification } from "../src/rules/data/identification.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 /**
  * @param {World} world
@@ -35,12 +36,13 @@ Deno.test("apply target listing and payload resolver agree for touchstone", () =
   resetIdentification();
   const world = new World({ seed: 7301 });
   const actor = createActorWithInventory(world);
-  const inv = world.get(actor, Inventory);
 
   const toolId = createItemById(world, "stone_touchstone");
   const gemId = createItemById(world, "gem_ruby");
   const daggerId = buildCatalogItem(world, "dagger_quick");
-  inv.items.push(toolId, gemId, daggerId);
+  addToInventory(world, actor, toolId);
+  addToInventory(world, actor, gemId);
+  addToInventory(world, actor, daggerId);
 
   const listedTargets = listApplyTargetsForTool(world, actor, toolId);
   const targetSet = toIdSet(listedTargets);
@@ -70,13 +72,15 @@ Deno.test("apply target listing and payload resolver agree for touchstone", () =
 Deno.test("apply target listing and payload resolver agree for hook-native on_dip tools", () => {
   const world = new World({ seed: 7302 });
   const actor = createActorWithInventory(world);
-  const inv = world.get(actor, Inventory);
 
   const toolId = createItemById(world, "potion_stoneskin");
   const daggerId = buildCatalogItem(world, "dagger_quick");
   const armorId = buildCatalogItem(world, "leather_armor");
   const bagItemId = createItemById(world, "potion_health");
-  inv.items.push(toolId, daggerId, armorId, bagItemId);
+  addToInventory(world, actor, toolId);
+  addToInventory(world, actor, daggerId);
+  addToInventory(world, actor, armorId);
+  addToInventory(world, actor, bagItemId);
 
   const listedTargets = listApplyTargetsForTool(world, actor, toolId);
   const targetSet = toIdSet(listedTargets);
@@ -108,11 +112,11 @@ Deno.test("apply target listing accepts legacy touchstone identity aliases", () 
   resetIdentification();
   const world = new World({ seed: 7303 });
   const actor = createActorWithInventory(world);
-  const inv = world.get(actor, Inventory);
 
   const toolId = createItemById(world, "stone_touchstone");
   const gemId = createItemById(world, "gem_ruby");
-  inv.items.push(toolId, gemId);
+  addToInventory(world, actor, toolId);
+  addToInventory(world, actor, gemId);
 
   // Simulate old savegame identity before item catalog key migration.
   world.add(toolId, NamedIdentity, { name: "Touchstone", identity: "touchstone" });
@@ -137,10 +141,9 @@ Deno.test("apply target listing accepts legacy touchstone identity aliases", () 
 Deno.test("apply tool detection keeps touchstone selectable with zero targets", () => {
   const world = new World({ seed: 7304 });
   const actor = createActorWithInventory(world);
-  const inv = world.get(actor, Inventory);
 
   const toolId = createItemById(world, "stone_touchstone");
-  inv.items.push(toolId);
+  addToInventory(world, actor, toolId);
 
   const listedTargets = listApplyTargetsForTool(world, actor, toolId);
   assertEquals(listedTargets.length, 0);

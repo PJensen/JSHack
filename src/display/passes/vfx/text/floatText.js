@@ -145,7 +145,7 @@ export class FloatText {
       else color = '#c47bff'; // generic status
     }
     const base = /** @type {FTOptions} */({ flavor:'status', color, scaleStart: 1.02, scaleEnd: 0.98, life: 0.8 });
-    return this.add(x,y,String(text||''), /** @type {FTOptions} */({ ...opts, ...base }));
+    return this.add(x,y,String(text||''), /** @type {FTOptions} */({ ...base, ...opts, flavor: 'status', color: (opts && opts.color) || color }));
   }
 
   /** @param {number} dt */

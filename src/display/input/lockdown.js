@@ -83,6 +83,11 @@ export function enableInputLockdown({ canvas = null } = {}) {
     ]);
 
     on(window, "keydown", (e) => {
+      // Never block keys when the user is typing in a text field (e.g. debug console)
+      const tag = String(/** @type {any} */ (e.target)?.tagName || "").toLowerCase();
+      const isText = tag === "input" || tag === "textarea" || !!/** @type {any} */ (e.target)?.isContentEditable;
+      if (isText) return;
+
       // Block zoom combos
       const k = e.key;
       if ((e.ctrlKey || e.metaKey) && (k === "+" || k === "=" || k === "-" || k === "_" || k === "0")) {
@@ -103,8 +108,16 @@ export function enableInputLockdown({ canvas = null } = {}) {
 
     // 4) Context menu, selection, and drag
     for (const t of ["contextmenu", "dragstart", "selectstart"]) {
-      on(window, t, (e) => { e.preventDefault(); }, { capture: true });
-      on(document, t, (e) => { e.preventDefault(); }, { capture: true });
+      const handler = (e) => {
+        // Allow text selection inside text fields (e.g. debug console input)
+        if (t === "selectstart") {
+          const tag = String(/** @type {any} */ (e.target)?.tagName || "").toLowerCase();
+          if (tag === "input" || tag === "textarea" || !!/** @type {any} */ (e.target)?.isContentEditable) return;
+        }
+        e.preventDefault();
+      };
+      on(window, t, handler, { capture: true });
+      on(document, t, handler, { capture: true });
     }
 
     // 5) Pointer capture on the canvas keeps interactions owned by app

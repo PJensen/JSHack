@@ -4,7 +4,6 @@
 
 import { Position } from "../../components/Position.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
-import { WaitIntent } from "../../components/Intents/WaitIntent.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
 
@@ -141,12 +140,26 @@ export class SeenCallbackContext {
 
 const GAZE_EXPOSURE_KEY = Symbol.for('jshack:ai:gazeExposure');
 
-/** @param {any} world @returns {Map<string, {count:number, lastTurn:number, waitCount:number}>} */
+/** @param {any} world @returns {Map<string, {count:number, lastTurn:number}>} */
 function ensureGazeExposureState(world) {
   if (world[GAZE_EXPOSURE_KEY] instanceof Map) return world[GAZE_EXPOSURE_KEY];
   const m = new Map();
   world[GAZE_EXPOSURE_KEY] = m;
   return m;
+}
+
+/**
+ * @param {any} world
+ * @param {number} entityId
+ * @returns {{ effects: any[] } | null}
+ */
+function ensureActiveEffects(world, entityId) {
+  let ae = world.get(entityId, ActiveEffects);
+  if (ae && Array.isArray(ae.effects)) return ae;
+
+  try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
+  ae = world.get(entityId, ActiveEffects);
+  return (ae && Array.isArray(ae.effects)) ? ae : null;
 }
 
 // ── Factory functions ─────────────────────────────────────────────
@@ -214,18 +227,22 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
 }
 
 /**
- * Gaze aura: the monster must maintain LOS for `exposureTurns` consecutive turns
- * before mindwipe begins to stack. Breaking LOS resets the exposure counter.
+ * Gaze aura: the monster must maintain LOS for `exposureTurns` consecutive turns.
+ * On the threshold turn, the target is stunned and gains one stack of mindwipe.
+ * Breaking LOS resets the exposure counter, and repeated exposure can retrigger.
  * Each turn in LOS emits an escalating `proc:gaze:message` event for UI wiring.
  *
  * @param {number} [stackLimit=4]   - max mindwipe stacks after exposure is complete
  * @param {number} [exposureTurns=5] - consecutive LOS turns before mindwipe applies
+ * @param {number} [stunTurns=5] - blocked turns granted by the gaze proc
  */
-export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
-  const limit    = Math.max(1, Math.trunc(stackLimit));
+export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
+  const limit = Math.max(1, Math.trunc(stackLimit));
   const threshold = Math.max(1, Math.trunc(exposureTurns));
+  const stunDuration = Math.max(1, Math.trunc(stunTurns));
+  const stunTurnsLeft = stunDuration + 1;
 
-  /** Escalating messages: indices 0…threshold-2 are pre-effect warnings; index threshold-1 triggers mindwipe. */
+  /** Escalating messages: indices 0…threshold-2 are warnings; index threshold-1 triggers the proc. */
   const MESSAGES = [
     "The Floating Eye's unblinking gaze washes over you.",
     "Your thoughts feel sluggish under its stare...",
@@ -237,30 +254,19 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
   return (ctx) => {
     if (!ctx || ctx.cancelled) return;
 
-    const now   = (Number(ctx.world.step) || 0) | 0;
+    const now = (Number(ctx.world.step) || 0) | 0;
     const store = ensureGazeExposureState(ctx.world);
-    const slot  = `${ctx.actor | 0}:${ctx.target | 0}`;
-    const rec   = store.get(slot) || { count: 0, lastTurn: -1e9, waitCount: 0 };
+    const slot = `${ctx.actor | 0}:${ctx.target | 0}`;
+    const rec = store.get(slot) || { count: 0, lastTurn: -1e9 };
 
-    // Reset counter if LOS was broken (gap of more than 1 turn)
+    // whileLOS hooks now fire every world turn the eye has sight, so any gap
+    // longer than one turn means line of sight was broken and charge resets.
     if (now - rec.lastTurn > 1) {
       rec.count = 0;
-      rec.waitCount = 0;
     }
 
     rec.count++;
     rec.lastTurn = now;
-
-    // Wait-stun track: only advances when player uses WAIT action this turn.
-    // WaitIntent is still on the entity at this point (ai phase runs before intents phase).
-    // Use world.has (not world.get) — definitive presence check for marker components.
-    const isWaiting = ctx.world.has(ctx.target, WaitIntent);
-    if (isWaiting) {
-      rec.waitCount = (rec.waitCount || 0) + 1;
-    } else {
-      rec.waitCount = 0;
-    }
-
     store.set(slot, rec);
 
     // Emit escalating message (turn 1 through threshold, capped at last message)
@@ -272,40 +278,36 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
       message: MESSAGES[msgIdx],
     });
 
-    // Wait-stun: after threshold consecutive WAIT turns in gaze, player is paralyzed.
-    if (isWaiting && rec.waitCount >= threshold) {
-      rec.waitCount = 0;
-      store.set(slot, rec);
-      const aeStun = ctx.world.get(ctx.target, ActiveEffects);
-      if (aeStun) {
-        // turnsLeft: 6 so effectSystem's same-tick decrement leaves 5 full blocked turns.
-        aeStun.effects.push({ key: 'stun', turnsLeft: 6, potency: 1, stacks: 1 });
-        ctx.world.set(ctx.target, ActiveEffects, aeStun);
-      }
-      ctx.emit('proc:gaze:stun', { actor: ctx.actor, target: ctx.target });
+    if (rec.count < threshold) {
+      ctx.emit('proc:gaze:charged', {
+        actor: ctx.actor,
+        target: ctx.target,
+        chargeCount: rec.count,
+        total: threshold,
+      });
       return;
     }
 
-    // Emit visual countdown when player is actively waiting in gaze (not yet stunned).
-    if (isWaiting && rec.waitCount > 0) {
-      ctx.emit('proc:gaze:charged', {
-        actor:     ctx.actor,
-        target:    ctx.target,
-        waitCount: rec.waitCount,
-        total:     threshold,
-      });
+    rec.count = 0;
+    store.set(slot, rec);
+
+    const ae = ensureActiveEffects(ctx.world, ctx.target);
+    if (!ae) return;
+
+    const existingStun = ae.effects.find(e => e.key === 'stun');
+    if (existingStun) {
+      existingStun.turnsLeft = Math.max(Number(existingStun.turnsLeft) || 0, stunTurnsLeft);
+      existingStun.potency = Math.max(Number(existingStun.potency) || 1, 1);
+      existingStun.stacks = Math.max(Number(existingStun.stacks) || 1, 1);
+    } else {
+      ae.effects.push({ key: 'stun', turnsLeft: stunTurnsLeft, potency: 1, stacks: 1 });
     }
 
-    // No mindwipe effect until fully exposed (any-LOS counter)
-    if (rec.count < threshold) return;
-
-    const ae = ctx.world.get(ctx.target, ActiveEffects);
-    if (!ae) return;
     const existing = ae.effects.find(e => e.key === 'mindwipe');
     if (existing) {
-      const currentStacks = existing.stacks || 1;
+      const currentStacks = Math.max(1, Number(existing.stacks) || 1);
       if (currentStacks < limit) {
-        existing.stacks  = currentStacks + 1;
+        existing.stacks = currentStacks + 1;
         existing.potency = existing.stacks;
       }
       existing.turnsLeft = Math.max(existing.turnsLeft, 3);
@@ -313,8 +315,9 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
       ae.effects.push({ key: 'mindwipe', turnsLeft: 3, potency: 1, stacks: 1 });
     }
     ctx.world.set(ctx.target, ActiveEffects, ae);
+    ctx.emit('proc:gaze:stun', { actor: ctx.actor, target: ctx.target, duration: stunDuration });
     ctx.emit('proc:gaze:mindwipe', {
-      actor:  ctx.actor,
+      actor: ctx.actor,
       target: ctx.target,
       stacks: ae.effects.find(e => e.key === 'mindwipe')?.stacks ?? 1,
     });

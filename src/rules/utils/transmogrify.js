@@ -52,7 +52,7 @@ export function transmogrify(world, entityId, targetItemId, opts = {}) {
     if (world.has(templateId, Comp)) {
       _copyOrAdd(world, templateId, entityId, Comp);
     } else if (world.has(entityId, Comp)) {
-      world.remove(entityId, Comp);
+      world.removeImmediate(entityId, Comp);
     }
   }
 
@@ -69,7 +69,7 @@ export function transmogrify(world, entityId, targetItemId, opts = {}) {
   if (toIdentity) identify(toIdentity);
 
   // Clean up the disposable template entity.
-  world.destroy(templateId);
+  world.destroyImmediate(templateId);
 
   return { ok: true, from: fromIdentity, to: toIdentity };
 }

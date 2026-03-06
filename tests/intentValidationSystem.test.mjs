@@ -40,7 +40,7 @@ Deno.test("intentValidation: does NOT strip intents from living actors", () => {
 
 // ── stunned actors ──────────────────────────────────────────────────
 
-Deno.test("intentValidation: strips intents from stunned actors", () => {
+Deno.test("intentValidation: stunned actors keep WaitIntent but lose other intents", () => {
   const world = new World({ seed: 42 });
   const id = world.create();
   world.add(id, Position, { x: 1, y: 1 });
@@ -54,7 +54,7 @@ Deno.test("intentValidation: strips intents from stunned actors", () => {
   intentValidationSystem(world);
 
   assertEquals(world.has(id, MoveIntent), false, "stunned actor should not have MoveIntent");
-  assertEquals(world.has(id, WaitIntent), false, "stunned actor should not have WaitIntent");
+  assertEquals(world.has(id, WaitIntent), true, "stunned actor should keep WaitIntent");
 });
 
 Deno.test("intentValidation: emits intent:blocked for stunned actors", () => {

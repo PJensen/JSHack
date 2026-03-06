@@ -6,6 +6,7 @@ import { Equipment } from '../src/rules/components/Equipment.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { equipItemSystem } from '../src/rules/systems/equipItemSystem.js';
+import { addToInventory, inventoryContains } from '../src/rules/utils/inventoryFacade.js';
 
 function makeItem(world, { id, name, slot, type = 'equip', count = 1 }) {
   const eid = world.create();
@@ -18,13 +19,12 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   const world = new World({ seed: 1 });
 
   const actor = world.create();
-  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+  world.add(actor, Inventory, { capacity: 100 });
   world.add(actor, Equipment, {});
 
   // Equip weapon
   const sword = makeItem(world, { id: 'sword', name: 'Sword', slot: 'weapon' });
-  const inv = world.get(actor, Inventory);
-  inv.items.push(sword);
+  addToInventory(world, actor, sword);
 
   world.add(actor, EquipIntent, { itemId: sword });
   equipItemSystem(world);
@@ -35,18 +35,18 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Swap weapon
   const axe = makeItem(world, { id: 'axe', name: 'Axe', slot: 'weapon' });
-  inv.items.push(axe);
+  addToInventory(world, actor, axe);
 
   world.add(actor, EquipIntent, { itemId: axe });
   equipItemSystem(world);
 
   eq = world.get(actor, Equipment);
   assert(eq.weapon === axe, `weapon should be axe, got ${eq.weapon}`);
-  assert(inv.items.includes(sword), 'old sword should be back in inventory');
+  assert(inventoryContains(world, actor, sword), 'old sword should be back in inventory');
 
   // Equip armor
   const plate = makeItem(world, { id: 'plate', name: 'Plate', slot: 'armor' });
-  inv.items.push(plate);
+  addToInventory(world, actor, plate);
 
   world.add(actor, EquipIntent, { itemId: plate });
   equipItemSystem(world);
@@ -56,7 +56,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip head slot
   const helm = makeItem(world, { id: 'helm_iron', name: 'Iron Helm', slot: 'head' });
-  inv.items.push(helm);
+  addToInventory(world, actor, helm);
   world.add(actor, EquipIntent, { itemId: helm });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -64,7 +64,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip neck slot
   const amulet = makeItem(world, { id: 'amulet_guarded', name: 'Guarded Amulet', slot: 'neck' });
-  inv.items.push(amulet);
+  addToInventory(world, actor, amulet);
   world.add(actor, EquipIntent, { itemId: amulet });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -72,7 +72,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip belt slot
   const belt = makeItem(world, { id: 'belt_leather', name: 'Leather Belt', slot: 'belt' });
-  inv.items.push(belt);
+  addToInventory(world, actor, belt);
   world.add(actor, EquipIntent, { itemId: belt });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -80,7 +80,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip gloves slot
   const gloves = makeItem(world, { id: 'gloves_leather', name: 'Leather Gloves', slot: 'gloves' });
-  inv.items.push(gloves);
+  addToInventory(world, actor, gloves);
   world.add(actor, EquipIntent, { itemId: gloves });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -88,7 +88,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip legs slot
   const leggings = makeItem(world, { id: 'leggings_leather', name: 'Leather Leggings', slot: 'legs' });
-  inv.items.push(leggings);
+  addToInventory(world, actor, leggings);
   world.add(actor, EquipIntent, { itemId: leggings });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -98,7 +98,9 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   const ring1 = makeItem(world, { id: 'ring_a', name: 'Ruby Ring', slot: 'ring' });
   const ring2 = makeItem(world, { id: 'ring_b', name: 'Gold Ring', slot: 'ring' });
   const ring3 = makeItem(world, { id: 'ring_c', name: 'Iron Ring', slot: 'ring' });
-  inv.items.push(ring1, ring2, ring3);
+  addToInventory(world, actor, ring1);
+  addToInventory(world, actor, ring2);
+  addToInventory(world, actor, ring3);
 
   world.add(actor, EquipIntent, { itemId: ring1 });
   equipItemSystem(world);
@@ -114,11 +116,11 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
   assert(eq.ring1 === ring3, `ring1 should be swapped to iron ring, got ${eq.ring1}`);
-  assert(inv.items.includes(ring1), 'displaced ruby ring should be in inventory');
+  assert(inventoryContains(world, actor, ring1), 'displaced ruby ring should be in inventory');
 
   // Equip shield
   const shield = makeItem(world, { id: 'buckler', name: 'Buckler', slot: 'shield' });
-  inv.items.push(shield);
+  addToInventory(world, actor, shield);
 
   world.add(actor, EquipIntent, { itemId: shield });
   equipItemSystem(world);
@@ -127,7 +129,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip feet slot
   const boots = makeItem(world, { id: 'boots_leather', name: 'Leather Boots', slot: 'feet' });
-  inv.items.push(boots);
+  addToInventory(world, actor, boots);
   world.add(actor, EquipIntent, { itemId: boots });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -135,7 +137,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip ranged bow
   const bow = makeItem(world, { id: 'bow_short', name: 'Short Bow', slot: 'ranged', type: 'equip' });
-  inv.items.push(bow);
+  addToInventory(world, actor, bow);
   world.add(actor, EquipIntent, { itemId: bow });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
@@ -143,13 +145,13 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   // Equip ranged wand; previous ranged item should be displaced.
   const wand = makeItem(world, { id: 'wand_frost', name: 'Wand of Frost', slot: 'ranged', type: 'wand', count: 3 });
-  inv.items.push(wand);
+  addToInventory(world, actor, wand);
   world.add(actor, EquipIntent, { itemId: wand });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
   const wandInfo = world.get(wand, ItemInfo);
   assert(eq.ranged === wand, `ranged should be wand, got ${eq.ranged}`);
-  assert(inv.items.includes(bow), 'displaced bow should be back in inventory');
+  assert(inventoryContains(world, actor, bow), 'displaced bow should be back in inventory');
   assert((wandInfo?.count || 0) === 3, `wand charges should be preserved, got ${(wandInfo?.count || 0)}`);
 
   // Invalid: item not in inventory
@@ -163,7 +165,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   const potion = world.create();
   world.add(potion, NamedIdentity, { name: 'Potion', identity: 'potion' });
   world.add(potion, ItemInfo, { type: 'potion', slot: '', weight: 1, value: 5, description: '', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [] });
-  inv.items.push(potion);
+  addToInventory(world, actor, potion);
 
   world.add(actor, EquipIntent, { itemId: potion });
   equipItemSystem(world);
@@ -174,12 +176,11 @@ Deno.test("equip item system: selecting an already equipped starter item unequip
   const world = new World({ seed: 2 });
 
   const actor = world.create();
-  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+  world.add(actor, Inventory, { capacity: 100 });
   world.add(actor, Equipment, {});
 
   const starterSword = makeItem(world, { id: 'starter_sword', name: 'Starter Sword', slot: 'weapon' });
-  const inv = world.get(actor, Inventory);
-  inv.items.push(starterSword);
+  addToInventory(world, actor, starterSword);
 
   const eq = world.get(actor, Equipment);
   eq.weapon = starterSword; // Simulate "starts equipped"
@@ -188,6 +189,6 @@ Deno.test("equip item system: selecting an already equipped starter item unequip
   equipItemSystem(world);
 
   assert(eq.weapon == null, 'starter weapon should unequip when selected again');
-  assert(inv.items.includes(starterSword), 'unequipped item remains in inventory');
+  assert(inventoryContains(world, actor, starterSword), 'unequipped item remains in inventory');
   assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
 });

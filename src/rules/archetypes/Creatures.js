@@ -10,6 +10,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Collider } from "../components/Collider.js";
 import { Inventory } from "../components/Inventory.js";
 import { Equipment } from "../components/Equipment.js";
+import { Brain } from "../components/Brain.js";
 import { Wounds } from "../components/Wounds.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
@@ -21,6 +22,7 @@ import { SoundEmitter } from "../components/SoundEmitter.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { HEARING_SOURCE_DB } from "../components/Anatomy.js";
+import { getMonster } from "../data/monsters.js";
 
 /**
  * Consolidated creature archetypes
@@ -50,6 +52,19 @@ function resolveAnatomyParts(p) {
   }
 }
 
+function resolveBrainDefaults(p) {
+  const input = (p && typeof p === "object") ? p : {};
+  const identity = typeof input.identity === "string" ? input.identity : "";
+  const def = identity ? getMonster(identity) : null;
+  return {
+    learnedSpellIds: Array.isArray(input.learnedSpellIds) ? [...input.learnedSpellIds] : [],
+    itemKnowledgeIdentities: Array.isArray(input.itemKnowledgeIdentities) ? [...input.itemKnowledgeIdentities] : [],
+    seenTiles: input.seenTiles instanceof Uint8Array ? input.seenTiles.slice() : new Uint8Array(),
+    intelligence: Number.isFinite(input.intelligence) ? Number(input.intelligence) : Number(def?.intelligence ?? 10),
+    visionRange: Number.isFinite(input.visionRange) ? Number(input.visionRange) : Number(def?.visionRange ?? 8),
+  };
+}
+
 export const Creature = defineArchetype(
   "Creature",
   // Spatial (optional via params; defaults to 0,0)
@@ -76,7 +91,7 @@ export const Creature = defineArchetype(
   })],
   // Gameplay utility
   [Collider, (p) => ({ solid: p.solid ?? true, blocksSight: p.blocksSight ?? false })],
-  [Inventory, (p) => ({ items: [], capacity: p.capacity ?? 0 })],
+  [Inventory, (p) => ({ capacity: p.capacity ?? 0 })],
   [Equipment, (p) => ({
     weapon: p.weapon ?? null,
     armor: p.armor ?? null,
@@ -87,6 +102,7 @@ export const Creature = defineArchetype(
     naturalScript: p.naturalScript ?? null,
     maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,
   })],
+  [Brain, (p) => resolveBrainDefaults(p)],
   [Wounds, { list: [] }],
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
@@ -155,7 +171,7 @@ export const Shopkeeper = defineArchetype("Shopkeeper",
     })],
   ]) },
   [Interactable, { action: "openShop" }],
-  [ShopInventory, { items: [], buyMarkup: 1.0, sellDiscount: 0.5 }],
+  [ShopInventory, { buyMarkup: 1.0, sellDiscount: 0.5 }],
 );
 
 // Back-compat shims (optional): export a HumanoidBase if callers expect it

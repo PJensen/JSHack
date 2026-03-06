@@ -2,12 +2,12 @@ import { MonsterSpawner } from "../components/MonsterSpawner.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Owner } from "../components/Owner.js";
-import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { Monster } from "../archetypes/Creatures.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
 import { equipMonster } from "../environment/dungeon/populate.js";
 import { isGenocided } from "../data/monsters.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
+import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
@@ -49,11 +49,11 @@ export function monsterSpawnerSystem(world) {
         sy = (pos.y + oy) | 0;
         spawnAttempts++;
       } while (spawnAttempts < 8 &&
-        (tiles.blockedByCell.has(`${sx},${sy}`) || tiles.interactableByCell.has(`${sx},${sy}`)));
-      if (tiles.blockedByCell.has(`${sx},${sy}`) || tiles.interactableByCell.has(`${sx},${sy}`)) continue;
+        (!isWalkable(sx, sy) || tiles.blockedByCell.has(`${sx},${sy}`) || tiles.interactableByCell.has(`${sx},${sy}`)));
+      if (!isWalkable(sx, sy) || tiles.blockedByCell.has(`${sx},${sy}`) || tiles.interactableByCell.has(`${sx},${sy}`)) continue;
 
       const params = Object.assign({ x: sx, y: sy }, sp.spawnParams || {});
-      const child = createFrom(world, Monster, params);
+      const child = spawnMonsterEntity(world, params);
       if (params.equipment) equipMonster(world, child, params.equipment);
       try { world.add(child, Owner, { ownerId: id }); } catch {} // ECS: may already exist
 

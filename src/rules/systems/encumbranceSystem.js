@@ -1,16 +1,14 @@
 import { Inventory } from "../components/Inventory.js";
 import { Encumbrance } from "../components/Encumbrance.js";
-import { ItemInfo } from "../components/ItemInfo.js";
-import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { Stamina } from "../components/Stamina.js";
+import { getCarriedWeight } from "../utils/inventoryFacade.js";
 
 const HEAVY_LOAD_RATIO = 0.75;
 
 /**
- * Recomputes Encumbrance from Inventory + equipped gear each effects phase.
+ * Recomputes Encumbrance from the authoritative inventory-root weight.
  *
- * current       = sum of (ItemInfo.weight * count) for held items
- *               + sum of (ItemInfo.weight) for each occupied gear slot.
+ * current       = total carried weight of the inventory root subtree.
  * limit         = Stamina.maxStamina when the entity has Stamina (1:1 rule),
  *                 No Stamina component = unlimited carry.
  * overloaded    = current > limit (blocks diagonal movement).
@@ -21,31 +19,8 @@ const HEAVY_LOAD_RATIO = 0.75;
  * Phase: effects (runs after equipmentSystem so gear changes are committed).
  */
 export function encumbranceSystem(world) {
-  for (const [id, inv, enc] of world.query(Inventory, Encumbrance)) {
-    let current = 0;
-
-    // ── Held items (stacked) ─────────────────────────────────────────
-    const items = inv.items;
-    for (let i = 0; i < items.length; i++) {
-      const itemId = items[i];
-      if (!itemId || !world.isAlive(itemId)) continue;
-      const info = world.get(itemId, ItemInfo);
-      if (!info) continue;
-      current += (Number(info.weight) || 0) * Math.max(1, (info.count | 0));
-    }
-
-    // ── Equipped gear (singular — no count multiplier) ───────────────
-    const eq = world.get(id, Equipment);
-    if (eq) {
-      for (let i = 0; i < GEAR_SLOTS.length; i++) {
-        const slotId = eq[GEAR_SLOTS[i]];
-        if (!slotId || !world.isAlive(slotId)) continue;
-        const info = world.get(slotId, ItemInfo);
-        if (!info) continue;
-        current += Number(info.weight) || 0;
-      }
-    }
-
+  for (const [id, , enc] of world.query(Inventory, Encumbrance)) {
+    const current = getCarriedWeight(world, id);
     enc.current = current;
 
     // ── Determine limit ──────────────────────────────────────────────

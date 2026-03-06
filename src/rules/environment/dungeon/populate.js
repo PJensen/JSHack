@@ -8,7 +8,7 @@ import { ItemInfo } from '../../components/ItemInfo.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Collider } from '../../components/Collider.js';
 import { Polymorph } from '../../components/Polymorph.js';
-import { Monster, Shopkeeper } from '../../archetypes/Creatures.js';
+import { Shopkeeper } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopItem } from '../../data/shopStock.js';
@@ -39,16 +39,17 @@ import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
-import { addItemEntityToInventory } from '../../utils/inventoryStacking.js';
+import { addToInventory } from '../../utils/inventoryFacade.js';
 import {
   CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
   TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
 } from './constants.js';
 import { setTile, getTile } from './tileMap.js';
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shopAppraisal.js';
+import { spawnMonsterEntity } from '../../utils/spawnMonsterEntity.js';
 import {
   Fountain, Altar, Shrine, Statue,
-  Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch,
+  Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
 } from '../../archetypes/RoomFeatures.js';
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -62,6 +63,7 @@ const ROOM_FEATURES = [
   { kind: 'weapon_rack', weight: 6 },
   { kind: 'mushrooms',   weight: 8 },
   { kind: 'torch',       weight: 2 }, // very rare standalone
+  { kind: 'urn',         weight: 7 },
 ];
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
 const SHOP_MIMIC_CHANCE = 0.08;
@@ -547,7 +549,7 @@ export function materializeSpawn(world, spawn) {
   switch (spawn.kind) {
     case 'monster': {
       const p = spawn.params;
-      const id = createFrom(world, Monster, {
+      const id = spawnMonsterEntity(world, {
         x: spawn.x, y: spawn.y,
         name: p.name,
         identity: p.identity,
@@ -561,6 +563,7 @@ export function materializeSpawn(world, spawn) {
         massKg: p.massKg,
         resistances: p.resistances,
         speed: p.speed,
+        creatureType: p.creatureType,
       });
       if (p.equipment) equipMonster(world, id, p.equipment);
       return id;
@@ -613,7 +616,7 @@ export function materializeSpawn(world, spawn) {
           const eid = materializeDrop(world, drop, dummyPos);
           if (eid != null) {
             try { world.remove(eid, Position); } catch {} // ECS: may not exist
-            addItemEntityToInventory(world, inv, eid, { removePosition: false });
+            addToInventory(world, id, eid);
           }
         }
       }
@@ -674,10 +677,6 @@ export function materializeSpawn(world, spawn) {
           shopkeeperId: id,
         });
       }
-
-      // Keep ShopInventory component for pricing info, but start with empty items
-      const shop = world.get(id, ShopInventory);
-      if (shop) shop.items = [];
 
       return id;
     }
@@ -791,7 +790,7 @@ export function materializeSpawn(world, spawn) {
           const eid = materializeDrop(world, drop, { x: spawn.x, y: spawn.y });
           if (eid != null) {
             try { world.remove(eid, Position); } catch {}
-            addItemEntityToInventory(world, inv, eid, { removePosition: false });
+            addToInventory(world, id, eid);
           }
         }
       }
@@ -803,6 +802,8 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, Web, { x: spawn.x, y: spawn.y });
     case 'torch':
       return createFrom(world, Torch, { x: spawn.x, y: spawn.y });
+    case 'urn':
+      return createFrom(world, Urn, { x: spawn.x, y: spawn.y });
     case 'tile_paint': {
       const tiles = /** @type {any} */ (spawn.params)?.tiles;
       if (Array.isArray(tiles)) {

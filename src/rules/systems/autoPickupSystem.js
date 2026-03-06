@@ -6,7 +6,7 @@ import { Position } from "../components/Position.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Player } from "../components/Player.js";
-import { addItemEntityToInventory } from "../utils/inventoryStacking.js";
+import { addToInventory } from "../utils/inventoryFacade.js";
 
 export function autoPickupSystem(world) {
   // Build a lookup from tile -> item ids for currency only
@@ -29,7 +29,7 @@ export function autoPickupSystem(world) {
       const info = world.get(itemId, ItemInfo);
       if (!info || info.type !== "currency") continue;
       const takeCount = info.count || 1;
-      addItemEntityToInventory(world, inv, itemId);
+      addToInventory(world, actor, itemId);
 
       try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount }); } catch (e) { console.debug('[autoPickupSystem] emit item:pickup failed:', e); }
     }

@@ -7,19 +7,20 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { isIdentified, resetIdentification } from "../src/rules/data/identification.js";
+import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("touchstone apply hook identifies gem targets", () => {
   resetIdentification();
   const world = new World({ seed: 1001 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
-  const inv = world.get(actor, Inventory);
 
   const touchstone = createItemById(world, "stone_touchstone");
   const gem = createItemById(world, "gem_ruby");
   assert(touchstone != null, "touchstone should be creatable");
   assert(gem != null, "gem should be creatable");
-  inv.items.push(touchstone, gem);
+  addToInventory(world, actor, touchstone);
+  addToInventory(world, actor, gem);
 
   world.add(actor, ApplyIntent, { itemId: touchstone, targetItemId: gem });
   applySystem(world);
@@ -32,7 +33,6 @@ Deno.test("poison potion apply hook coats weapon and consumes the potion", () =>
   const world = new World({ seed: 1002 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
-  const inv = world.get(actor, Inventory);
   const appliedEvents = [];
   world.on("item:applied", (ev) => appliedEvents.push(ev));
 
@@ -43,7 +43,8 @@ Deno.test("poison potion apply hook coats weapon and consumes the potion", () =>
   const daggerInfoBefore = world.get(dagger, ItemInfo);
   daggerInfoBefore.coating = { kind: "poison", charges: 5 };
   world.set(dagger, ItemInfo, daggerInfoBefore);
-  inv.items.push(potion, dagger);
+  addToInventory(world, actor, potion);
+  addToInventory(world, actor, dagger);
 
   world.add(actor, ApplyIntent, { itemId: potion, targetItemId: dagger });
   applySystem(world);
@@ -65,5 +66,5 @@ Deno.test("poison potion apply hook coats weapon and consumes the potion", () =>
     "poison apply message should interpolate computed total charges",
   );
   assert(!world.isAlive(potion), "poison potion should be consumed");
-  assert(!inv.items.includes(potion), "consumed potion should be removed from inventory");
+  assert(!inventoryContains(world, actor, potion), "consumed potion should be removed from inventory");
 });

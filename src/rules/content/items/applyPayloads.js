@@ -1,6 +1,7 @@
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
+import { inventoryItems, inventoryContains } from "../../utils/inventoryFacade.js";
 import { getItemHooksByIdentity } from "./itemHooks.js";
 import { Beatitude } from "../../components/Beatitude.js";
 
@@ -142,14 +143,13 @@ export function listApplyTargetsForTool(world, actor, toolId) {
   if (!world || !(actorId > 0) || !(toolEntityId > 0)) return [];
   if (!world.isAlive(actorId) || !world.isAlive(toolEntityId)) return [];
 
-  const inv = /** @type any */ (world.get(actorId, Inventory));
-  if (!inv || !Array.isArray(inv.items)) return [];
-  if (!inv.items.includes(toolEntityId)) return [];
+  if (!inventoryContains(world, actorId, toolEntityId)) return [];
 
+  const items = inventoryItems(world, actorId);
   const out = [];
   const reader = createWorldApplyPayloadReader(world);
-  for (let i = 0; i < inv.items.length; i++) {
-    const targetId = inv.items[i] | 0;
+  for (let i = 0; i < items.length; i++) {
+    const targetId = items[i] | 0;
     if (!(targetId > 0) || targetId === toolEntityId) continue;
     if (!world.isAlive(targetId)) continue;
 
@@ -186,9 +186,7 @@ export function isApplyTool(world, actor, toolId) {
   if (!world || !(actorId > 0) || !(toolEntityId > 0)) return false;
   if (!world.isAlive(actorId) || !world.isAlive(toolEntityId)) return false;
 
-  const inv = /** @type any */ (world.get(actorId, Inventory));
-  if (!inv || !Array.isArray(inv.items)) return false;
-  if (!inv.items.includes(toolEntityId)) return false;
+  if (!inventoryContains(world, actorId, toolEntityId)) return false;
 
   const reader = createWorldApplyPayloadReader(world);
   const state = buildApplyPayloadState(reader, {

@@ -8,6 +8,7 @@ export { Material } from './Material.js';
 export { DamageSpec } from './DamageSpec.js';
 export { Player } from './Player.js';
 export { Inventory } from './Inventory.js';
+export { InventoryRoot } from './InventoryRoot.js';
 export { NamedIdentity } from './NamedIdentity.js';
 export {
   Anatomy,

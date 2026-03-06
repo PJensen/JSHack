@@ -5,9 +5,10 @@ import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { Monster } from '../src/rules/archetypes/Creatures.js';
 import { Position } from '../src/rules/components/Position.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
-import { Inventory, ItemInfo, NamedIdentity } from '../src/rules/components/index.js';
+import { ItemInfo } from '../src/rules/components/index.js';
 import { GoldStack } from '../src/rules/archetypes/Items.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
+import { inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 
@@ -29,9 +30,9 @@ Deno.test("monster picks up gold and drops it on death", () => {
 
   let mpos = world.get(mid, Position);
   assert(mpos.x === 1 && mpos.y === 0, 'monster did not move to (1,0)');
-  const minv = world.get(mid, Inventory);
-  assert(Array.isArray(minv.items) && minv.items.length === 1, 'monster did not pick up gold');
-  const goldId = minv.items[0];
+  const monsterItems = inventoryItems(world, mid);
+  assert(monsterItems.length === 1, 'monster did not pick up gold');
+  const goldId = monsterItems[0];
   const goldInfo = world.get(goldId, ItemInfo);
   assert(goldInfo && goldInfo.type === 'currency', 'picked item is not currency');
 

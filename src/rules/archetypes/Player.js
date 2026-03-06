@@ -24,7 +24,7 @@ export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
   [Player],
   [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
-  [Inventory, (p) => ({ capacity: p.capacity ?? 20, items: [] })],
+  [Inventory, (p) => ({ capacity: p.capacity ?? 20 })],
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [Resistances, (p) => ({
@@ -55,7 +55,7 @@ export function createPlayer(world, params = {}) {
     const id = world.create();
     world.add(id, Player);
     world.add(id, Position, { x: params.x ?? 0, y: params.y ?? 0 });
-    world.add(id, Inventory, { capacity: params.capacity ?? 20, items: [] });
+    world.add(id, Inventory, { capacity: params.capacity ?? 20 });
     world.add(id, NamedIdentity, { name: params.name ?? "Player", identity: params.identity ?? "player" });
     world.add(id, Physiology, { sizeClass: params.sizeClass ?? "M", massKg: params.massKg ?? 80 });
     world.add(id, Resistances, {

@@ -13,6 +13,7 @@ import { drinkSystem } from "../src/rules/systems/drinkSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("water potion drink clears burn and emits semantic event", () => {
   const world = new World({ seed: 9001 });
@@ -27,7 +28,7 @@ Deno.test("water potion drink clears burn and emits semantic event", () => {
 
   const potion = createItemById(world, "potion_water");
   assert(potion != null, "water potion should be creatable");
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const drank = [];
   world.on("water:drank", (ev) => drank.push(ev));
@@ -58,8 +59,8 @@ Deno.test("holy water dip blesses target potion beatitude", () => {
 
   world.add(holyWater, Beatitude, { state: "blessed" });
 
-  const inv = world.get(actor, Inventory);
-  inv.items.push(holyWater, targetPotion);
+  addToInventory(world, actor, holyWater);
+  addToInventory(world, actor, targetPotion);
 
   const dipped = [];
   const applied = [];
@@ -94,8 +95,8 @@ Deno.test("water dip waterlogs paper targets via material reaction rules", () =>
   const water = createItemById(world, "potion_water");
   const scroll = createItemById(world, "scroll_mapping");
   assert(water != null && scroll != null, "required items should be creatable");
-  const inv = world.get(actor, Inventory);
-  inv.items.push(water, scroll);
+  addToInventory(world, actor, water);
+  addToInventory(world, actor, scroll);
 
   const waterlogged = [];
   world.on("item:waterlogged", (ev) => waterlogged.push(ev));
@@ -117,7 +118,7 @@ Deno.test("thrown water potion spawns wet splash hazard", () => {
 
   const potion = createItemById(world, "potion_water");
   assert(potion != null, "water potion should be creatable");
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const thrown = [];
   const splashed = [];
