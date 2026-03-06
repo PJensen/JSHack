@@ -4,6 +4,7 @@
 
 import { Position } from "../../components/Position.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { WaitIntent } from "../../components/Intents/WaitIntent.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
 
@@ -140,7 +141,7 @@ export class SeenCallbackContext {
 
 const GAZE_EXPOSURE_KEY = Symbol.for('jshack:ai:gazeExposure');
 
-/** @param {any} world @returns {Map<string, {count:number, lastTurn:number}>} */
+/** @param {any} world @returns {Map<string, {count:number, lastTurn:number, waitCount:number}>} */
 function ensureGazeExposureState(world) {
   if (world[GAZE_EXPOSURE_KEY] instanceof Map) return world[GAZE_EXPOSURE_KEY];
   const m = new Map();
@@ -239,15 +240,26 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
     const now   = (Number(ctx.world.step) || 0) | 0;
     const store = ensureGazeExposureState(ctx.world);
     const slot  = `${ctx.actor | 0}:${ctx.target | 0}`;
-    const rec   = store.get(slot) || { count: 0, lastTurn: -1e9 };
+    const rec   = store.get(slot) || { count: 0, lastTurn: -1e9, waitCount: 0 };
 
     // Reset counter if LOS was broken (gap of more than 1 turn)
     if (now - rec.lastTurn > 1) {
       rec.count = 0;
+      rec.waitCount = 0;
     }
 
     rec.count++;
     rec.lastTurn = now;
+
+    // Wait-stun track: only advances when player uses WAIT action this turn.
+    // WaitIntent is still on the entity at this point (ai phase runs before intents phase).
+    const isWaiting = !!ctx.world.get(ctx.target, WaitIntent);
+    if (isWaiting) {
+      rec.waitCount = (rec.waitCount || 0) + 1;
+    } else {
+      rec.waitCount = 0;
+    }
+
     store.set(slot, rec);
 
     // Emit escalating message (turn 1 through threshold, capped at last message)
@@ -259,7 +271,30 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
       message: MESSAGES[msgIdx],
     });
 
-    // No effect until fully exposed
+    // Wait-stun: after threshold consecutive WAIT turns in gaze, player is paralyzed.
+    if (isWaiting && rec.waitCount >= threshold) {
+      rec.waitCount = 0;
+      store.set(slot, rec);
+      const aeStun = ctx.world.get(ctx.target, ActiveEffects);
+      if (aeStun) {
+        aeStun.effects.push({ key: 'stun', turnsLeft: 5, potency: 1, stacks: 1 });
+        ctx.world.set(ctx.target, ActiveEffects, aeStun);
+      }
+      ctx.emit('proc:gaze:stun', { actor: ctx.actor, target: ctx.target });
+      return;
+    }
+
+    // Emit visual countdown when player is actively waiting in gaze (not yet stunned).
+    if (isWaiting && rec.waitCount > 0) {
+      ctx.emit('proc:gaze:charged', {
+        actor:     ctx.actor,
+        target:    ctx.target,
+        waitCount: rec.waitCount,
+        total:     threshold,
+      });
+    }
+
+    // No mindwipe effect until fully exposed (any-LOS counter)
     if (rec.count < threshold) return;
 
     const ae = ctx.world.get(ctx.target, ActiveEffects);

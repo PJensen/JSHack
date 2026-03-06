@@ -932,4 +932,7 @@ export function installMessageWiring({
   world.on('proc:gaze:message', ({ message }) => {
     if (typeof message === 'string') log(message, 'system');
   });
+  world.on('proc:gaze:stun', () => {
+    log('The Floating Eye\'s gaze sears through you — you are paralyzed!', 'danger');
+  });
 }
