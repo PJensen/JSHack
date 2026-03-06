@@ -58,11 +58,9 @@ function emitSafe(world, event, payload) {
   }
 }
 
-function targetIsAtBumpTile(world, targetId, nx, ny) {
+function targetIsAtBumpTile(targetId, nx, ny, tiles) {
   if (!(targetId > 0)) return false;
-  const pos = world.get(targetId, Position);
-  if (!pos) return false;
-  return (pos.x | 0) === (nx | 0) && (pos.y | 0) === (ny | 0);
+  return tiles.livingByCell.get(`${nx},${ny}`) === targetId;
 }
 
 // ── resolvers (priority order) ──────────────────────────────────────
@@ -74,7 +72,7 @@ const hostileMelee = {
     if (!isManhattan1(ctx.mdx, ctx.mdy)) return false;
     if (!(ctx.target > 0) || ctx.target === actor) return false;
     // Precision gate: never melee through stale occupancy or non-walkable terrain.
-    if (!targetIsAtBumpTile(world, ctx.target, ctx.nx, ctx.ny)) return false;
+    if (!targetIsAtBumpTile(ctx.target, ctx.nx, ctx.ny, ctx.tiles)) return false;
     if (!isWalkable(ctx.nx, ctx.ny)) return false;
     const actorFac = world.get(actor, Faction);
     const targetFac = world.get(ctx.target, Faction);
