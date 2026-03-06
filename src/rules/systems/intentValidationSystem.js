@@ -4,7 +4,7 @@
 //
 // Currently strips intents for:
 //   - Dead actors (hp <= 0)
-//   - Stunned actors (have "stunned" status)
+//   - Stunned actors (have "stunned" status), except WaitIntent
 
 import { Vitality } from "../components/Vitality.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
@@ -34,8 +34,29 @@ const ALL_INTENTS = [
   DisarmIntent, InteractIntent,
 ];
 
+/** Intents stripped while stunned (WaitIntent is allowed to burn the turn). */
+const STUNNED_BLOCKED = ALL_INTENTS.filter(c => c !== WaitIntent);
+
 /** Intents stripped during channeling (everything except WaitIntent). */
 const CHANNELING_BLOCKED = ALL_INTENTS.filter(c => c !== WaitIntent);
+
+/**
+ * Remove a list of intent components from an entity.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {readonly any[]} intents
+ * @returns {boolean}
+ */
+function stripIntents(world, id, intents) {
+  let removed = false;
+  for (let i = 0; i < intents.length; i++) {
+    if (world.has(id, intents[i])) {
+      try { world.remove(id, intents[i]); } catch {}
+      removed = true;
+    }
+  }
+  return removed;
+}
 
 /**
  * Remove all intent components from an entity.
@@ -43,17 +64,14 @@ const CHANNELING_BLOCKED = ALL_INTENTS.filter(c => c !== WaitIntent);
  * @param {number} id
  */
 function stripAllIntents(world, id) {
-  for (let i = 0; i < ALL_INTENTS.length; i++) {
-    if (world.has(id, ALL_INTENTS[i])) {
-      try { world.remove(id, ALL_INTENTS[i]); } catch {}
-    }
-  }
+  stripIntents(world, id, ALL_INTENTS);
 }
 
 /**
  * Intent validation system — runs first in the intents phase.
- * Strips all intents from actors who are dead or stunned so downstream
- * systems never process actions for incapacitated entities.
+ * Strips invalid intents from actors who are dead or stunned so downstream
+ * systems never process actions for incapacitated entities. Stunned actors
+ * may only keep WaitIntent, which lets the player explicitly burn the turn.
  *
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
@@ -65,13 +83,15 @@ export function intentValidationSystem(world) {
       continue;
     }
 
-    // Stunned actors lose their turn
+    // Stunned actors may only wait
     if (statusStrength(world, id, "stunned") > 0) {
-      stripAllIntents(world, id);
-      try {
-        world.emit?.("intent:blocked", { actor: id, reason: "stunned" });
-      } catch (e) {
-        console.debug("[intentValidationSystem] emit intent:blocked failed:", e);
+      const blocked = stripIntents(world, id, STUNNED_BLOCKED);
+      if (blocked) {
+        try {
+          world.emit?.("intent:blocked", { actor: id, reason: "stunned" });
+        } catch (e) {
+          console.debug("[intentValidationSystem] emit intent:blocked failed:", e);
+        }
       }
       continue;
     }

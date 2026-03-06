@@ -15,6 +15,7 @@
 import { DoorState } from "../../components/DoorState.js";
 import { Collider } from "../../components/Collider.js";
 import { Inventory } from "../../components/Inventory.js";
+import { inventoryItems, inventoryContains, addToInventory, removeFromInventory, hasCapacity } from "../../utils/inventoryFacade.js";
 import { Vitality } from "../../components/Vitality.js";
 import { Mana } from "../../components/Mana.js";
 import { Stamina } from "../../components/Stamina.js";
@@ -37,6 +38,7 @@ import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
+import { Ashes } from "../../archetypes/Items.js";
 import { Encumbrance } from "../../components/Encumbrance.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
@@ -188,12 +190,11 @@ export const INTERACT_PAYLOADS = {
   openChest: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
-      const inv = world.get(targetId, Inventory);
-      if (inv) {
+      if (world.has(targetId, Inventory)) {
         world.emit?.("chest:open", {
           actor,
           targetId,
-          chestItems: [...(inv.items || [])],
+          chestItems: inventoryItems(world, targetId),
         });
       }
     },
@@ -249,7 +250,8 @@ export const INTERACT_PAYLOADS = {
       const rackPos = world.get(targetId, Position);
       if (!rackInv || !rackPos) return;
 
-      if (!rackInv.items || rackInv.items.length === 0) {
+      const rackItems = inventoryItems(world, targetId);
+      if (rackItems.length === 0) {
         world.emit?.("rack:empty", { actor, targetId });
         return;
       }
@@ -258,7 +260,8 @@ export const INTERACT_PAYLOADS = {
       const dropPos = actorPos ?? rackPos;
 
       // Pull one weapon off the rack and fling it at the player.
-      const itemId = rackInv.items.shift();
+      const itemId = rackItems[0];
+      removeFromInventory(world, targetId, itemId);
       world.add(itemId, Position, { x: dropPos.x, y: dropPos.y });
       world.emit?.("item:thrown", {
         itemId,
@@ -342,7 +345,6 @@ export const INTERACT_PAYLOADS = {
       if (shop) {
         world.emit?.("shop:open", {
           actor, targetId,
-          shopItems: [...(shop.items || [])],
           buyMarkup: shop.buyMarkup ?? 1.0,
           sellDiscount: shop.sellDiscount ?? 0.5,
         });
@@ -465,14 +467,11 @@ export const INTERACT_PAYLOADS = {
       }
 
       // Phase 1 — collect offerable items and prompt the UI.
-      const inv = world.get(actor, Inventory);
       const offerableItems = [];
-      if (inv && Array.isArray(inv.items)) {
-        for (const iid of inv.items) {
-          if (!world.isAlive(iid)) continue;
-          if (!world.get(iid, ItemInfo)) continue;
-          offerableItems.push(iid);
-        }
+      for (const iid of inventoryItems(world, actor)) {
+        if (!world.isAlive(iid)) continue;
+        if (!world.get(iid, ItemInfo)) continue;
+        offerableItems.push(iid);
       }
       world.emit?.("altar:offerPrompt", { actor, targetId, items: offerableItems });
       world.emit?.("prayer", { actor, distress: null, altarBonus: true });
@@ -557,22 +556,20 @@ export const INTERACT_PAYLOADS = {
 
         const enc = world.get(actor, Encumbrance);
         const overweight = enc ? enc.overloaded : false;
-        const overCapacity = inv != null && inv.capacity != null && inv.items.length >= inv.capacity;
+        const overCapacity = !hasCapacity(world, actor);
 
         const itemId = createFrom(world, arch, {});
         world.mutate(itemId, ItemInfo, (rec) => { rec.count = count; });
         resultItemId = itemId;
 
-        if (inv && !overweight && !overCapacity) {
-          if (!inv.items.includes(itemId)) inv.items.push(itemId);
+        if (!overweight && !overCapacity) {
+          addToInventory(world, actor, itemId);
         } else {
           if (actorPos) world.add(itemId, Position, { x: actorPos.x, y: actorPos.y });
-          if (inv) {
-            world.emit?.("harvest:overweight", {
-              actor, targetId, kind: node.kind, count,
-              reason: overweight ? "weight" : "capacity",
-            });
-          }
+          world.emit?.("harvest:overweight", {
+            actor, targetId, kind: node.kind, count,
+            reason: overweight ? "weight" : "capacity",
+          });
         }
       }
 
@@ -640,6 +637,21 @@ export const INTERACT_PAYLOADS = {
         itemId: ctx.data.resultItemId,
         regrowTurns: node.regrowTurns,
       });
+    },
+  },
+
+  // ── Urns ───────────────────────────────────────────────────────────────────
+
+  breakUrn: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const pos = world.get(targetId, Position);
+      if (pos) {
+        const ashId = createFrom(world, Ashes, {});
+        world.add(ashId, Position, { x: pos.x, y: pos.y });
+      }
+      world.emit?.("urn:broken", { actor, targetId });
+      try { world.destroy(targetId); } catch {}
     },
   },
 
@@ -716,8 +728,7 @@ export const INTERACT_PAYLOADS = {
 // ─── Altar offer helper ───────────────────────────────────────────────────────
 
 function _altarExecuteOffer(world, actor, targetId, itemId) {
-  const inv = world.get(actor, Inventory);
-  if (!inv || !Array.isArray(inv.items) || !inv.items.includes(itemId)) {
+  if (!inventoryContains(world, actor, itemId)) {
     world.emit?.("altar:offerFailed", { actor, targetId, itemId, reason: "not_owned" });
     return;
   }
@@ -725,7 +736,7 @@ function _altarExecuteOffer(world, actor, targetId, itemId) {
   const rawValue = (info?.value || 0) * Math.max(1, info?.count || 1);
   const value = Math.min(1, Math.max(0.05, rawValue > 0 ? rawValue / 200 : 0.1));
   const itemName = info?.name || info?.description || "item";
-  inv.items = inv.items.filter((id) => id !== itemId);
+  removeFromInventory(world, actor, itemId);
   try { world.destroy(itemId); } catch {}
   // Emit altar:offer so the deity system records the offering and emits altar:offered.
   world.emit?.("altar:offer", { actor, targetId, itemName, value });

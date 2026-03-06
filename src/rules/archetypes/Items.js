@@ -123,6 +123,20 @@ export const Bone = defineArchetype(
     [Material, { kind: "bone" }],
 );
 
+// Ashes — dropped when an urn is broken
+export const Ashes = defineArchetype(
+    "Ashes",
+    [ItemInfo, {
+        type: "misc",
+        description: "A pile of dusty ashes.",
+        weight: 0.5,
+        value: 1,
+        count: 1,
+    }],
+    [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Ashes", identity: "ashes" })],
+    [Material, { kind: "organic" }],
+);
+
 // Debug/utility: reveals entire dungeon map when used
 export const ScrollOfMapping = defineArchetype(
     "ScrollOfMapping",

@@ -8,6 +8,7 @@ import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
 import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js";
 import { itemsAt } from "../../rules/utils/queries.js";
+import { statusStrength } from "../../rules/utils/statusFacade.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.
@@ -35,6 +36,17 @@ export function makeRulesDispatcher(world, getActorId) {
 
     const actorId = (typeof getActorId === "function") ? getActorId() : 0;
     if (!actorId) return;
+
+    // Forced-wait state: any gameplay input while stunned spends the turn waiting.
+    if (
+      typeof action?.type === "string"
+      && action.type.startsWith("rules.")
+      && statusStrength(world, actorId, "stunned") > 0
+    ) {
+      try { world?.add?.(actorId, WaitIntent, {}); } catch {}
+      world?.tick?.(1);
+      return;
+    }
 
     switch (action.type) {
       case "rules.move": {

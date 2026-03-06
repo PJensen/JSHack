@@ -15,6 +15,7 @@ import { ItemInfo } from '../components/ItemInfo.js';
 import { Brain } from '../components/Brain.js';
 import { Player } from '../components/Player.js';
 import { Inventory } from '../components/Inventory.js';
+import { inventoryItems } from '../utils/inventoryFacade.js';
 
 const MAX_NESTING = 5;
 
@@ -277,10 +278,8 @@ export function materializeDrop(world, drop, pos) {
  */
 function getPlayerItemIdentities(world) {
   for (const [id] of world.query(Player)) {
-    const inv = /** @type {any} */ (world.get(id, Inventory));
-    if (!inv || !Array.isArray(inv.items)) return null;
     const ids = new Set();
-    for (const itemEid of inv.items) {
+    for (const itemEid of inventoryItems(world, id)) {
       const info = /** @type {any} */ (world.get(itemEid, ItemInfo));
       if (info?.identity) ids.add(String(info.identity));
     }

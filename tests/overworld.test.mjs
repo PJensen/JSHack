@@ -13,6 +13,7 @@ import { isWalkable, clearAll } from "../src/rules/environment/dungeon/tileMap.j
 import { createFrom } from "../src/lib/ecs-js/archetype.js";
 import { WildBerries } from "../src/rules/archetypes/Food.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import { addToInventory, inventoryContains, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 
 function makePlayerAt(world, x, y) {
   const id = world.create();
@@ -107,7 +108,7 @@ Deno.test("overworld stash chest and harvest states persist across transitions",
   const world = new World({ seed: 4242 });
   const spawn = initDungeon(world, { startDepth: 0 });
   const actor = makePlayerAt(world, spawn.x, spawn.y);
-  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Inventory, { capacity: 20 });
 
   let chestId = 0;
   let harvestId = 0;
@@ -120,9 +121,8 @@ Deno.test("overworld stash chest and harvest states persist across transitions",
   const harvestPos = world.get(harvestId, Position);
   const harvestKind = world.get(harvestId, HarvestNode)?.kind || "";
 
-  const chestInv = world.get(chestId, Inventory);
   const stashItem = createFrom(world, WildBerries, {});
-  chestInv.items.push(stashItem);
+  addToInventory(world, chestId, stashItem);
 
   world.add(actor, InteractIntent, { targetId: harvestId });
   interactionSystem(world);
@@ -146,9 +146,14 @@ Deno.test("overworld stash chest and harvest states persist across transitions",
   assert(chest2 > 0, "stash chest should respawn");
   assert(harvest2 > 0, "harvest node should respawn");
 
-  const chestInv2 = world.get(chest2, Inventory);
-  assert(chestInv2.items.length >= 1, "stash chest should retain stored items");
-  assert(chestInv2.items.includes(stashItem), "stored item id should persist in stash");
+  const chestItems2 = inventoryItems(world, chest2);
+  assert(chestItems2.length >= 1, "stash chest should retain stored items");
+  // Entity IDs are remapped during transition, so check by identity, not by old ID.
+  const hasBerries = chestItems2.some(id => {
+    const ni = world.get(id, NamedIdentity);
+    return ni && ni.identity === "food_wild_berries";
+  });
+  assert(hasBerries, "stash chest should contain the stored berries");
 
   const harvestState2 = world.get(harvest2, HarvestNode);
   assert(harvestState2.ready === false, "harvest cooldown state should persist");

@@ -6,8 +6,18 @@ import { Vitality } from '../src/rules/components/Vitality.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { Owner } from '../src/rules/components/Owner.js';
 import { monsterSpawnerSystem } from '../src/rules/systems/monsterSpawnerSystem.js';
+import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
+import { TILE_FLOOR, CHUNK_SIZE } from '../src/rules/environment/dungeon/constants.js';
+
+/** Load a single all-floor chunk covering world coords (0,0)–(CHUNK_SIZE-1,CHUNK_SIZE-1). */
+function setupFloorTiles() {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+}
 
 Deno.test("spawner: spawn, cooldown, max concurrent, and replacement", () => {
+  setupFloorTiles();
   const world = new World({ seed: 42 });
 
   const spawner = world.create();
@@ -15,7 +25,7 @@ Deno.test("spawner: spawn, cooldown, max concurrent, and replacement", () => {
   world.add(spawner, MonsterSpawner, {
     maxConcurrent: 2, cooldownTicks: 3, totalToSpawn: 4,
     spawnedSoFar: 0, lastSpawnStep: -Infinity, activeChildren: [],
-    spawnParams: { name: 'Spawn', maxHp: 5, hp: 5 }, spawnRadius: 0, isActive: true
+    spawnParams: { name: 'Spawn', maxHp: 5, hp: 5 }, spawnRadius: 1, isActive: true
   });
 
   // Step 0: first spawn
@@ -58,6 +68,7 @@ Deno.test("spawner: spawn, cooldown, max concurrent, and replacement", () => {
 });
 
 Deno.test("inactive spawner does nothing", () => {
+  setupFloorTiles();
   const world = new World({ seed: 2 });
   const s2 = world.create();
   world.add(s2, Position, { x: 0, y: 0 });

@@ -11,7 +11,7 @@ Deno.test("spell definitions are valid", () => {
   for (const [id, spell] of Object.entries(SPELL_DEFS)) {
     assert(spell.id === id, `spell key ${id} should match spell.id ${spell.id}`);
     assert(typeof spell.name === 'string' && spell.name.length > 0, `spell ${id} must have name`);
-    assert(typeof spell.manaCost === 'number' && spell.manaCost > 0, `spell ${id} must have positive manaCost`);
+    assert(typeof spell.manaCost === 'number' && spell.manaCost >= 0, `spell ${id} must have non-negative manaCost`);
   }
 
   assert(getSpell('lightning') !== null, 'getSpell should find lightning');

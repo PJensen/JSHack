@@ -4,7 +4,7 @@ import { configureWorld } from "../src/main/scheduler.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
 import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
-import { addItemEntityToInventory } from "../src/rules/utils/inventoryStacking.js";
+import { addToInventory, findInventoryRoot, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { serializeWorld } from "../src/lib/ecs-js/serialization.js";
 import { getSavegameRegistryNames } from "../src/main/wiring/savegameSerializationRegistry.js";
 import { Player } from "../src/rules/components/Player.js";
@@ -130,11 +130,11 @@ Deno.test("overworld dropped ground items persist through save/restore", () => {
   const pe = playerEntity(source);
   assert(pe, "player should exist");
   const inv = source.get(pe.id, Inventory);
-  assert(inv && Array.isArray(inv.items), "player inventory should exist");
+  assert(inv && typeof inv.capacity === "number", "player inventory should exist");
 
   const itemId = createItemById(source, "gold", { count: 10 });
   assert(Number.isInteger(itemId) && itemId > 0, "gold item should be created");
-  addItemEntityToInventory(source, inv, itemId);
+  addToInventory(source, pe.id, itemId);
   source.add(pe.id, DropIntent, { itemId, count: 3 });
   source.tick(1);
 
@@ -165,4 +165,38 @@ Deno.test("overworld dropped ground items persist through save/restore", () => {
   assert(pos && pos.x === spawn.x && pos.y === spawn.y, "dropped stack position should match saved world");
   assert(ni?.identity === "gold", "dropped stack identity should persist");
   assert((info?.count | 0) === 3, "dropped stack count should persist");
+});
+
+Deno.test("restoreSnapshotFromSavegame normalizes legacy inventory payloads", () => {
+  const source = new World({ seed: 0x4242 });
+  configureWorld(source);
+  const playerId = createPlayer(source, { x: 4, y: 5, name: "Hero" });
+  const itemId = createItemById(source, "gold", { count: 7 });
+  addToInventory(source, playerId, itemId);
+
+  const payload = {
+    v: 1,
+    world: serializeWorld(source, { include: getSavegameRegistryNames(source) }),
+  };
+
+  payload.world.comps.InventoryBag = payload.world.comps.InventoryRoot;
+  delete payload.world.comps.InventoryRoot;
+  for (const row of payload.world.comps.Inventory || []) {
+    if ((Number(row?.[0] || 0) | 0) !== playerId) continue;
+    row[1].items = [itemId];
+    row[1].maxWeight = 99;
+    row[1].weightLimit = 99;
+  }
+
+  const restored = new World({ seed: 0x4242 });
+  configureWorld(restored);
+  restoreSnapshotFromSavegame(restored, payload);
+
+  const restoredInv = restored.get(playerId, Inventory);
+  assert(restoredInv, "inventory should restore");
+  assert(!Object.prototype.hasOwnProperty.call(restoredInv, "items"), "legacy Inventory.items should be stripped");
+  assert(!Object.prototype.hasOwnProperty.call(restoredInv, "maxWeight"), "legacy maxWeight should be stripped");
+  assert(!Object.prototype.hasOwnProperty.call(restoredInv, "weightLimit"), "legacy weightLimit should be stripped");
+  assert(findInventoryRoot(restored, playerId) > 0, "legacy InventoryBag should normalize to InventoryRoot");
+  assertEquals(inventoryItems(restored, playerId), [itemId]);
 });

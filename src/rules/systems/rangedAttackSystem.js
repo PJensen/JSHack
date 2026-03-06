@@ -13,6 +13,7 @@ import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { inventoryItems, removeFromInventory } from '../utils/inventoryFacade.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { getAmmoHooks } from '../data/ammo.js';
 import { ProjectileImpactCallbackContext } from '../data/callbacks/projectile.js';
@@ -60,8 +61,8 @@ export function rangedAttackSystem(world) {
       const info = world.get(equippedAmmo, ItemInfo);
       if (info && info.type === 'ammo') { ammoId = equippedAmmo; ammoInfo = info; }
     }
-    if (!ammoId && inv && Array.isArray(inv.items)) {
-      for (const itemId of inv.items) {
+    if (!ammoId) {
+      for (const itemId of inventoryItems(world, attacker)) {
         const info = world.get(itemId, ItemInfo);
         if (info && info.type === 'ammo') { ammoId = itemId; ammoInfo = info; break; }
       }
@@ -235,11 +236,7 @@ function consumeAmmo(world, owner, ammoId, ammoInfo) {
     ammoInfo.count -= 1;
   } else {
     // Last arrow: remove from inventory, clear equip slot, destroy entity
-    const inv = world.get(owner, Inventory);
-    if (inv && Array.isArray(inv.items)) {
-      const idx = inv.items.indexOf(ammoId);
-      if (idx !== -1) inv.items.splice(idx, 1);
-    }
+    removeFromInventory(world, owner, ammoId);
     const eq = world.get(owner, Equipment);
     if (eq && eq.ammo === ammoId) eq.ammo = null;
     world.destroy(ammoId);

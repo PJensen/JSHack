@@ -6,7 +6,6 @@ import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
 import { Pet } from '../../components/Pet.js';
 import { PetState } from '../../components/PetState.js';
-import { Inventory } from '../../components/Inventory.js';
 import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { clearAll as clearTileMap } from './tileMap.js';
@@ -14,8 +13,9 @@ import { clearExplored, saveExplored, restoreExplored, degradeExplored } from '.
 import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
+import { normalizeInventorySnapshot } from '../../utils/inventorySnapshotMigration.js';
 import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
-import { destroySubtree } from '../../../lib/ecs-js/hierarchy.js';
+import { destroySubtree, Parent, Sibling } from '../../../lib/ecs-js/hierarchy.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
@@ -173,7 +173,8 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   let entityIds = generatedEntityIds;
 
   const cachedFloor = _floorEntityCache.get(newDepth) ?? _loadPersistedFloor(worldSeed, newDepth);
-  if (cachedFloor?.snapshot?.v === 1 && cachedFloor.snapshot.comps) {
+  const normalizedSnapshot = normalizeInventorySnapshot(cachedFloor?.snapshot);
+  if (normalizedSnapshot?.v === 1 && normalizedSnapshot.comps) {
     /** @type {number[]} */
     const createdIds = [];
     try {
@@ -182,7 +183,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
       const prevTime = +world.time || 0;
       const prevFrame = world.frame | 0;
 
-      applySnapshot(world, cachedFloor.snapshot, _buildSnapshotRegistry(world), {
+      applySnapshot(world, normalizedSnapshot, _buildSnapshotRegistry(world), {
         mode: 'append',
         skipUnknown: true,
         remapId(oldId) {
@@ -195,17 +196,8 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
       // Remap entity ID cross-references embedded in component payloads.
       // applySnapshot(append) assigns new IDs but does not walk payload values,
-      // so arrays like Inventory.items and MonsterSpawner.activeChildren still
-      // contain the old IDs from the snapshot.
+      // so payloads like MonsterSpawner.activeChildren still contain the old IDs.
       const _restoredSet = new Set(oldToNew.values());
-      for (const [eid] of world.query(Inventory)) {
-        if (!_restoredSet.has(eid)) continue;
-        const inv = world.get(eid, Inventory);
-        if (!inv?.items?.length) continue;
-        world.mutate(eid, Inventory, r => {
-          r.items = r.items.map(id => oldToNew.get(id) ?? id).filter(id => world.isAlive(id));
-        });
-      }
       for (const [eid] of world.query(MonsterSpawner)) {
         if (!_restoredSet.has(eid)) continue;
         world.mutate(eid, MonsterSpawner, r => {
@@ -213,6 +205,22 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
             .map(id => oldToNew.get(id) ?? id)
             .filter(id => world.isAlive(id));
         });
+      }
+      // Remap hierarchy (Parent/Sibling) entity-ID cross-references.
+      for (const eid of createdIds) {
+        if (world.has(eid, Parent)) {
+          world.mutate(eid, Parent, r => {
+            if (r.first) r.first = oldToNew.get(r.first) ?? r.first;
+            if (r.last) r.last = oldToNew.get(r.last) ?? r.last;
+          });
+        }
+        if (world.has(eid, Sibling)) {
+          world.mutate(eid, Sibling, r => {
+            if (r.parent) r.parent = oldToNew.get(r.parent) ?? r.parent;
+            if (r.prev) r.prev = oldToNew.get(r.prev) ?? r.prev;
+            if (r.next) r.next = oldToNew.get(r.next) ?? r.next;
+          });
+        }
       }
 
       world.time = prevTime;

@@ -8,6 +8,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { Status } from "../src/rules/components/Status.js";
 import { materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("burning status combusts scrolls on tile into ash", () => {
   const world = new World({ seed: 21 });
@@ -83,7 +84,7 @@ Deno.test("burning status combusts carried scrolls in inventory", () => {
 
   const carriedScroll = createItemById(world, "scroll_blastwave");
   assert(carriedScroll != null, "carried scroll should exist");
-  world.get(carrier, Inventory).items.push(carriedScroll);
+  addToInventory(world, carrier, carriedScroll);
 
   materialReactionSystem(world);
 

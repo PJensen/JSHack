@@ -10,6 +10,7 @@ import { Inventory } from "../components/Inventory.js";
 import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { destroyInventoryRoot, inventoryItems, removeFromInventory } from "../utils/inventoryFacade.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { Pet } from "../components/Pet.js";
 import { Owner } from "../components/Owner.js";
@@ -31,22 +32,15 @@ export function cleanupSystem(world) {
     if (!vit) continue;
     if ((vit.hp | 0) <= 0 && world.isAlive(id)) {
       // Drop all inventory items at the entity's current position before destroying
-      const inv = world.get(id, Inventory);
       const pos = world.get(id, Position);
-      if (inv && pos && Array.isArray(inv.items) && inv.items.length) {
-        // copy list in case we mutate during loop
-        const items = inv.items.slice();
+      if (pos) {
+        const items = inventoryItems(world, id);
         for (const itemId of items) {
-          // Ensure item has identity and info retained; then place on ground
           const info = world.get(itemId, ItemInfo);
-          const ident = world.get(itemId, NamedIdentity);
-          // If the item was an inventory-only copy, it may lack Position; add it at corpse location
+          removeFromInventory(world, id, itemId);
           try { world.add(itemId, Position, { x: pos.x, y: pos.y }); } catch { /* already had pos or deferred */ }
-          // Emit event for display/bridges
           try { world.emit && world.emit('item:dropped', { actor: id, itemId, count: info?.count || 1, at: { x: pos.x, y: pos.y } }); } catch (e) { console.debug('[cleanupSystem] emit item:dropped failed:', e); }
         }
-        // Clear inventory to reflect that items are no longer held
-        inv.items.length = 0;
       }
       // Check if this was a pet before cleanup
       const wasPet = world.has(id, Pet);
@@ -140,6 +134,7 @@ export function cleanupSystem(world) {
         } catch { /* */ }
       }
 
+      destroyInventoryRoot(world, id);
       world.destroy(id);
     }
   }

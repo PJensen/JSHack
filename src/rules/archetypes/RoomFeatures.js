@@ -74,7 +74,7 @@ export const WeaponRack = defineArchetype(
   [NamedIdentity, { name: "Weapon Rack", identity: "weapon_rack" }],
   [Material, { kind: "iron" }],
   [Collider, { solid: true, blocksSight: false }],
-  [Inventory, { items: [], capacity: 6 }],
+  [Inventory, { capacity: 6 }],
   [Interactable, { action: "browseRack", params: null }],
 );
 
@@ -105,4 +105,13 @@ export const Torch = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Torch", identity: "torch" }],
   [Material, { kind: "wood" }],
+);
+
+export const Urn = defineArchetype(
+  "Urn",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Urn", identity: "urn" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "breakUrn", params: null }],
 );

@@ -333,7 +333,7 @@ export function installMessageWiring({
   world.on('intent:blocked', ({ actor, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (reason === 'stunned') {
-      log('You are stunned and lose your turn.', 'system');
+      log('You are stunned and can only wait.', 'system');
       return;
     }
     log('You cannot act right now.', 'system');
@@ -928,11 +928,16 @@ export function installMessageWiring({
     log(`You unequip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
   });
 
+  // === Urn events ===
+  world.on('urn:broken', () => {
+    log('The urn shatters, scattering ashes on the floor.', 'system');
+  });
+
   // === Gaze events (Floating Eye) ===
   world.on('proc:gaze:message', ({ message }) => {
     if (typeof message === 'string') log(message, 'system');
   });
   world.on('proc:gaze:stun', () => {
-    log('The Floating Eye\'s gaze sears through you — you are paralyzed!', 'danger');
+    log('The Floating Eye\'s gaze locks your mind — you are stunned!', 'danger');
   });
 }

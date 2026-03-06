@@ -7,6 +7,7 @@ import { Potion } from "../src/rules/components/Potion.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { executeInteraction } from "../src/rules/interaction/runtime/actionRuntime.js";
 import { drinkPipeline } from "../src/rules/interaction/verbs/drinkPipeline.js";
+import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 function makePotion(world, init = {}) {
   const itemId = world.create();
@@ -46,7 +47,7 @@ Deno.test("drink runtime returns canonical result and commits queued mechanics",
   const potion = makePotion(world, {
     effects: [{ key: "regen", potency: 2, onset: 0, peak: 0, duration: 4, stack: "add" }],
   });
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const result = executeInteraction(world, {
     verb: "drink",
@@ -84,8 +85,7 @@ Deno.test("drink payload can cancel before mechanics and roll back transaction",
   const potion = makePotion(world, {
     effects: [{ key: "regen", potency: 1, onset: 0, peak: 0, duration: 2, stack: "add" }],
   });
-  const inv = world.get(actor, Inventory);
-  inv.items.push(potion);
+  addToInventory(world, actor, potion);
 
   const result = executeInteraction(world, {
     verb: "drink",
@@ -108,7 +108,7 @@ Deno.test("drink payload can cancel before mechanics and roll back transaction",
   assertEquals(result.reason, "TEST_BLOCK");
   assertEquals(drankEvents.length, 0, "cancelled drink should emit no drank event");
   assert(world.isAlive(potion), "cancelled action should not consume potion");
-  assert(inv.items.includes(potion), "item should remain in inventory after cancellation");
+  assert(inventoryContains(world, actor, potion), "item should remain in inventory after cancellation");
   assert(!world.get(actor, ActiveEffects), "no effects should commit on cancellation");
 });
 
@@ -119,7 +119,7 @@ Deno.test("drink payload onDrink can queue mutations via ctx.mutate", () => {
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
 
   const potion = makePotion(world);
-  world.get(actor, Inventory).items.push(potion);
+  addToInventory(world, actor, potion);
 
   const result = executeInteraction(world, {
     verb: "drink",

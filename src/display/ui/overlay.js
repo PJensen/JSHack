@@ -100,42 +100,8 @@ function markScrollable(el) {
   el.style.webkitOverflowScrolling = 'touch';
 }
 
-/**
- * @param {any} it
- */
-function isInventoryItemEquippable(it) {
-  const type = String(it?.type || '');
-  const slot = String(it?.slot || '').toLowerCase();
-  return type === 'equip' || type === 'ammo' || type === 'wand' || slot === 'ranged';
-}
-
-/**
- * @param {any} it
- */
-function isInventoryItemUsable(it) {
-  if (!it) return false;
-  return it.type === 'potion'
-    || it.type === 'learn'
-    || it.type === 'book'
-    || it.type === 'scroll'
-    || it.type === 'wand'
-    || it.type === 'food'
-    || it.type === 'tool';
-}
-
-/**
- * Resolve default inventory enter-action for the selected row.
- * @param {any} it
- * @returns {"none"|"apply"|"equip"|"use"|"set-spell"}
- */
-export function getInventoryDefaultAction(it) {
-  if (!it) return 'none';
-  if (isInventoryItemEquippable(it)) return 'equip';
-  if (isInventoryItemUsable(it)) return 'use';
-  if (it.canApply && Number(it.applyTargetCount || 0) > 0) return 'apply';
-  if (it.type === 'spell') return 'set-spell';
-  return 'none';
-}
+import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
+export { getInventoryDefaultAction };
 
 export function initOverlays() {
   const root = ensureRoot();
@@ -318,24 +284,11 @@ export function initOverlays() {
       }
     }
     if (e.key === 'Escape') {
-      hide(inv);
-      hide(char);
-      hide(equip);
-      hide(log);
-      hide(pick);
-      hide(usePanel);
-      hide(throwPanel);
-      hide(spells);
-      hide(alchemy);
-      hide(cooking);
-      hide(shop);
-      hide(chest);
-      hide(rack);
-      hide(altar);
-      hide(applyPanel);
-      hide(deathLog);
-      hide(bookReader);
-      hide(settingsPanel);
+      // Close every ui-panel that is currently visible
+      for (const p of document.querySelectorAll('.ui-panel')) {
+        if (p.style.display === 'block') p.style.display = 'none';
+      }
+      hideItemTooltip();
       // Close debug graphs
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
@@ -1379,6 +1332,12 @@ function renderGroundTooltip(tip, detail) {
         nameSpan.textContent = bracketize(sanitize(it.name || it.type || 'item'));
         Object.assign(nameSpan.style, rarityStyle(rarity));
         line.appendChild(nameSpan);
+        if (Number(it.count || 1) > 1) {
+          const qty = document.createElement('span');
+          qty.textContent = ` x${Number(it.count || 1) | 0}`;
+          qty.style.opacity = '0.7';
+          line.appendChild(qty);
+        }
         const aff = Array.isArray(it.affixes) ? it.affixes : [];
         if (aff.length) {
           const affSpan = document.createElement('span');
@@ -1425,9 +1384,9 @@ function renderGroundTooltip(tip, detail) {
 
   // Click behavior: attempt pickup via shared flow
   tip.onclick = () => {
-    const id = Number(it.id || 0);
-    if (id > 0) {
-      window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: [id] } }));
+    const ids = getUiItemEntityIds(it);
+    if (ids.length > 0) {
+      window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
     }
     tip.style.display = 'none';
   };
@@ -1437,6 +1396,17 @@ function renderGroundTooltip(tip, detail) {
 function humanize(k) {
   const s = String(k || '').replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase().trim();
   return s;
+}
+
+/** @param {any} it */
+function getUiItemEntityIds(it) {
+  const raw = Array.isArray(it?.entityIds) ? it.entityIds : [it?.id];
+  const ids = [];
+  for (const id of raw) {
+    const n = Number(id || 0) | 0;
+    if (n > 0 && !ids.includes(n)) ids.push(n);
+  }
+  return ids;
 }
 
 /**
@@ -3249,7 +3219,11 @@ function renderPickupChooser(panel, items) {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.addEventListener('change', () => {
-      if (cb.checked) selections.add(it.id); else selections.delete(it.id);
+      const ids = getUiItemEntityIds(it);
+      for (const id of ids) {
+        if (cb.checked) selections.add(id);
+        else selections.delete(id);
+      }
     });
     checkboxes.push(cb);
   const name = document.createElement('span');
@@ -3289,7 +3263,7 @@ function renderPickupChooser(panel, items) {
   }
 
   function takeAll() {
-    const ids = items.map((i) => i.id);
+    const ids = items.flatMap((i) => getUiItemEntityIds(i));
     if (!ids.length) return;
     window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
     hide(panel);
@@ -3850,9 +3824,11 @@ function renderShop(panel, data, state) {
     function returnSelected() {
       const it = unpaidItems[sel];
       if (!it) return;
-      window.dispatchEvent(new CustomEvent('ui:removeFromInvoice', {
-        detail: { shopkeeperId: state.shopkeeperId, itemId: it.id }
-      }));
+      for (const itemId of getUiItemEntityIds(it)) {
+        window.dispatchEvent(new CustomEvent('ui:removeFromInvoice', {
+          detail: { shopkeeperId: state.shopkeeperId, itemId }
+        }));
+      }
     }
 
     payBtn.addEventListener('click', payBill);
@@ -3978,14 +3954,20 @@ function renderShop(panel, data, state) {
 
     function doTransaction() {
       const it = currentItems[sel]; if (!it) return;
+      const ids = getUiItemEntityIds(it);
+      if (!ids.length) return;
       if (activeTab === 'buy') {
-        window.dispatchEvent(new CustomEvent('ui:requestBuy', {
-          detail: { shopkeeperId: state.shopkeeperId, itemId: it.id }
-        }));
+        for (const itemId of ids) {
+          window.dispatchEvent(new CustomEvent('ui:requestBuy', {
+            detail: { shopkeeperId: state.shopkeeperId, itemId }
+          }));
+        }
       } else {
-        window.dispatchEvent(new CustomEvent('ui:requestSell', {
-          detail: { shopkeeperId: state.shopkeeperId, itemId: it.id }
-        }));
+        for (const itemId of ids) {
+          window.dispatchEvent(new CustomEvent('ui:requestSell', {
+            detail: { shopkeeperId: state.shopkeeperId, itemId }
+          }));
+        }
       }
     }
 

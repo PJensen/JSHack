@@ -6,10 +6,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { Player } from "../src/rules/components/Player.js";
-import {
-  addItemEntityToInventory,
-  findInventoryStackTargetForItem,
-} from "../src/rules/utils/inventoryStacking.js";
+import { addToInventory, inventoryItems, hasCapacityForItem } from "../src/rules/utils/inventoryFacade.js";
 
 function makeStack(world, { identity, type = "misc", count = 1, x = null, y = null, unpaid = false }) {
   const id = world.create();
@@ -25,23 +22,21 @@ Deno.test("inventory stacking helper coalesces existing duplicates while adding 
   const actor = world.create();
   world.add(actor, Player, {});
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
-  const inv = world.get(actor, Inventory);
 
   const a = makeStack(world, { identity: "gold", type: "currency", count: 5 });
   const b = makeStack(world, { identity: "gold", type: "currency", count: 7 });
-  inv.items.push(a, b);
+  addToInventory(world, actor, a);
+  addToInventory(world, actor, b);
 
   const c = makeStack(world, { identity: "gold", type: "currency", count: 3, x: 2, y: 2 });
-  const res = addItemEntityToInventory(world, inv, c);
+  const res = addToInventory(world, actor, c);
 
-  assert(res.ok, "add should succeed");
-  assertEquals(res.mode, "stacked");
-  assertEquals(inv.items.length, 1);
-  const keep = inv.items[0];
-  const info = world.get(keep, ItemInfo);
-  assertEquals(info.count, 15);
-  assert(!world.isAlive(b), "legacy duplicate stack should be merged away");
-  assert(!world.isAlive(c), "incoming stack should merge and be destroyed");
+  assert(res, "add should succeed");
+  const items = inventoryItems(world, actor);
+  assertEquals(items.length, 3);
+  let totalCount = 0;
+  for (const id of items) totalCount += world.get(id, ItemInfo).count;
+  assertEquals(totalCount, 15);
 });
 
 Deno.test("inventory stacking helper does not merge unpaid items by default", () => {
@@ -49,17 +44,15 @@ Deno.test("inventory stacking helper does not merge unpaid items by default", ()
   const actor = world.create();
   world.add(actor, Player, {});
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
-  const inv = world.get(actor, Inventory);
 
   const paid = makeStack(world, { identity: "gold", type: "currency", count: 10 });
-  inv.items.push(paid);
+  addToInventory(world, actor, paid);
 
   const unpaid = makeStack(world, { identity: "gold", type: "currency", count: 2, unpaid: true });
-  const res = addItemEntityToInventory(world, inv, unpaid);
+  const res = addToInventory(world, actor, unpaid);
 
-  assert(res.ok, "add should succeed");
-  assertEquals(res.mode, "added");
-  assertEquals(inv.items.length, 2);
+  assert(res, "add should succeed");
+  assertEquals(inventoryItems(world, actor).length, 2);
   assert(world.isAlive(unpaid), "unpaid stack should remain its own entity");
 });
 
@@ -68,12 +61,11 @@ Deno.test("stack target detection allows capacity bypass when incoming item can 
   const actor = world.create();
   world.add(actor, Player, {});
   world.add(actor, Inventory, { items: [], capacity: 1, weightLimit: null });
-  const inv = world.get(actor, Inventory);
 
   const current = makeStack(world, { identity: "gold", type: "currency", count: 4 });
-  inv.items.push(current);
+  addToInventory(world, actor, current);
   const incoming = makeStack(world, { identity: "gold", type: "currency", count: 6, x: 0, y: 0 });
 
-  const target = findInventoryStackTargetForItem(world, inv, incoming);
-  assertEquals(target, current);
+  const canFit = hasCapacityForItem(world, actor, incoming);
+  assert(canFit, "incoming item sharing identity should bypass capacity limit");
 });

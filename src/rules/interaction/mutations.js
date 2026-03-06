@@ -9,15 +9,12 @@
 
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
-import { Collider } from "../components/Collider.js";
 import { EffectImmunities } from "../components/EffectImmunities.js";
 import { Equipment } from "../components/Equipment.js";
-import { Faction } from "../components/Faction.js";
 import { Hunger } from "../components/Hunger.js";
-import { Inventory } from "../components/Inventory.js";
+import { addToInventory, inventoryContains, removeFromInventory } from "../utils/inventoryFacade.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { Potion } from "../components/Potion.js";
 import { Resistances } from "../components/Resistences.js";
@@ -25,7 +22,7 @@ import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { Beatitude } from "../components/Beatitude.js";
-import { Speed } from "../components/Speed.js";
+import { creatureTypeFromTags } from "../components/CreatureType.js";
 import { buildCatalogItem } from "../data/itemCatalogLoader.js";
 import { getMonster } from "../data/monsters.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
@@ -33,6 +30,7 @@ import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
+import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 
 /**
  * @param {any} world
@@ -272,11 +270,7 @@ export function applyMutation(world, op) {
 
       const ownerId = op.ownerId | 0;
       if (ownerId > 0) {
-        const inv = /** @type any */ (world.get(ownerId, Inventory));
-        if (inv && Array.isArray(inv.items)) {
-          if (!inv.items.includes(created)) inv.items.push(created);
-          try { world.remove(created, Position); } catch {} // ECS: may not exist
-        }
+        addToInventory(world, ownerId, created);
       }
 
       if (op.emitEvent !== false) {
@@ -299,7 +293,6 @@ export function applyMutation(world, op) {
 
       const spawnX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
       const spawnY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
-      const spawned = world.create();
       const maxHp = Number.isFinite(op.maxHp) ? (Number(op.maxHp) | 0) : Math.max(1, Number(def.baseHp || 1) | 0);
       const faction = String(op.faction || "enemy");
       const attackDerived = Number.isFinite(op.attackDerived) ? Number(op.attackDerived) : Number(def.attack || 0);
@@ -309,31 +302,22 @@ export function applyMutation(world, op) {
       const resistances = (op.resistances && typeof op.resistances === "object")
         ? { ...op.resistances }
         : ((def.resistances && typeof def.resistances === "object") ? { ...def.resistances } : {});
-
-      try { world.add(spawned, Position, { x: spawnX, y: spawnY }); } catch {} // ECS: may already exist
-      try { world.add(spawned, NamedIdentity, { name: String(op.name || def.name || monsterId), identity: monsterId }); } catch {} // ECS: may already exist
-      try { world.add(spawned, Faction, { key: faction }); } catch {} // ECS: may already exist
-      try { world.add(spawned, Collider, { solid: true, blocksSight: false }); } catch {} // ECS: may already exist
-      try { world.add(spawned, Inventory, { items: [], capacity: 0 }); } catch {} // ECS: may already exist
-      try {
-        world.add(spawned, Equipment, {
-          weapon: null,
-          armor: null,
-          ring1: null,
-          ring2: null,
-          attackDerived,
-          defenseDerived,
-          naturalDamageDice,
-          naturalScript: null,
-          maxHpDerived: 0,
-          critChanceDerived: 0,
-          critMultDerived: 0,
-        });
-      } catch {} // ECS: may already exist
-      try { world.add(spawned, Vitality, { maxHp, hp: maxHp }); } catch {} // ECS: may already exist
-      try { world.add(spawned, Speed, { actEvery: Math.max(1, Number(speed) | 0) }); } catch {} // ECS: may already exist
-      try { world.add(spawned, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
-      try { world.add(spawned, Resistances, resistances); } catch {} // ECS: may already exist
+      const spawned = spawnMonsterEntity(world, {
+        x: spawnX,
+        y: spawnY,
+        name: String(op.name || def.name || monsterId),
+        identity: monsterId,
+        maxHp,
+        faction,
+        attackDerived,
+        defenseDerived,
+        naturalDamageDice,
+        sizeClass: op.sizeClass || def.sizeClass,
+        massKg: Number.isFinite(op.massKg) ? Number(op.massKg) : Number(def.massKg || 0),
+        resistances,
+        speed,
+        creatureType: creatureTypeFromTags(def.tags || []),
+      });
 
       if (op.emitEvent !== false) {
         try {
@@ -365,10 +349,7 @@ export function applyMutation(world, op) {
       break;
     }
     case "consume": {
-      const inv = /** @type any */ (world.get(op.inventoryOwnerId, Inventory));
-      if (!inv || !Array.isArray(inv.items)) return;
-      const idx = inv.items.indexOf(op.entityId);
-      if (idx === -1) return;
+      if (!inventoryContains(world, op.inventoryOwnerId, op.entityId)) return;
 
       const potion = /** @type any */ (world.get(op.entityId, Potion));
       if (potion && Number.isFinite(potion.doses) && (potion.doses | 0) > 1) {
@@ -383,17 +364,14 @@ export function applyMutation(world, op) {
         return;
       }
 
-      inv.items.splice(idx, 1);
+      removeFromInventory(world, op.inventoryOwnerId, op.entityId);
       try { world.destroy(op.entityId); } catch {} // ECS: entity may already be destroyed
       break;
     }
     case "dropFromInventory": {
-      const inv = /** @type any */ (world.get(op.inventoryOwnerId, Inventory));
-      if (!inv || !Array.isArray(inv.items)) return;
-      const idx = inv.items.indexOf(op.entityId);
-      if (idx === -1) return;
+      if (!inventoryContains(world, op.inventoryOwnerId, op.entityId)) return;
 
-      inv.items.splice(idx, 1);
+      removeFromInventory(world, op.inventoryOwnerId, op.entityId);
 
       const x = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
       const y = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;

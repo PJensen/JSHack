@@ -6,6 +6,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { MATERIAL_REACTION_RULES } from "../data/materialReactions.js";
 import { hasAnyStatus } from "../utils/statusFacade.js";
+import { inventoryItems } from "../utils/inventoryFacade.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
 const INSTALLED_KEY = Symbol.for("jshack:materialReactions:listeners:installed");
@@ -433,10 +434,7 @@ function runRuleAgainstSource(world, seen, rule, sourceId, sourcePos, sourcePayl
 
     if (scope === "inventory") {
       if (!(sourceId > 0)) continue;
-      const inv = world.get(sourceId, Inventory);
-      if (!inv || !Array.isArray(inv.items)) continue;
-      for (let i = 0; i < inv.items.length; i++) {
-        const itemId = Number(inv.items[i] || 0) | 0;
+      for (const itemId of inventoryItems(world, sourceId)) {
         if (!(itemId > 0) || !world.isAlive(itemId)) continue;
         const info = world.get(itemId, ItemInfo);
         if (!info) continue;

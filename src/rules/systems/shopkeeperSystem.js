@@ -8,6 +8,7 @@ import { Unpaid } from "../components/Unpaid.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { inventoryItems } from "../utils/inventoryFacade.js";
 
 /**
  * Check if a position is inside a room
@@ -20,11 +21,8 @@ function isInRoom(x, y, room) {
  * Get total unpaid bill for a player from a specific shopkeeper
  */
 function calculateBill(world, playerId, shopkeeperId) {
-  const inv = world.get(playerId, Inventory);
-  if (!inv) return 0;
-
   let total = 0;
-  for (const itemId of inv.items) {
+  for (const itemId of inventoryItems(world, playerId)) {
     const unpaid = world.get(itemId, Unpaid);
     if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
       total += unpaid.price;

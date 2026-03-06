@@ -36,6 +36,8 @@ import { createHudFeeds } from "./main/ui/hudFeeds.js";
 import { createActiveSpellController } from "./main/spells/activeSpellController.js";
 import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
+import { initDebugConsole } from "./display/ui/debugConsole.js";
+import { registerBuiltinCommands } from "./main/debug/consoleCommands.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
@@ -97,9 +99,9 @@ import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
-  addItemEntityToInventory,
-  findInventoryStackTargetForItem,
-} from "./rules/utils/inventoryStacking.js";
+  inventoryItems, inventoryContains, addToInventory,
+  hasCapacityForItem, transferItem,
+} from "./rules/utils/inventoryFacade.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
 import { PetState } from "./rules/components/PetState.js";
@@ -554,11 +556,10 @@ function _finalizeNewGame(classData) {
         if (!inv) return 0;
         const createdId = createItemById(world, itemId, opts);
         if (!(createdId > 0)) return 0;
-        const moved = addItemEntityToInventory(world, inv, createdId);
-        if (!moved.ok) return 0;
+        if (!addToInventory(world, pe.id, createdId)) return 0;
         // Starting gear is always identified
         identify(itemId);
-        return moved.mode === "stacked" ? moved.stackedIntoId : createdId;
+        return createdId;
       };
 
       if (eq && classDef) {
@@ -679,6 +680,9 @@ function _finalizeNewGame(classData) {
   });
 
   installSceneControls({ world, cam, TILE_PX, defaultZoomScale: CAMERA_START_SCALE, messageLog, runtimeConfig });
+
+  const debugConsole = initDebugConsole({ world, messageLog });
+  registerBuiltinCommands(debugConsole, { world, messageLog });
 }
 
 function findNearestTraversalTarget(world, x, y) {
@@ -751,7 +755,7 @@ const inputDisposers = [];
             world.emit?.('chest:open', {
               actor: p.id,
               targetId: chestId,
-              chestItems: [...(chestInv?.items || [])],
+              chestItems: inventoryItems(world, chestId),
             });
           } catch (e) { console.debug('[main] emit chest:open failed:', e); }
           break;
@@ -1114,7 +1118,7 @@ addEventListener('ui:tapOpenChest', (e) => {
     world.emit?.('chest:open', {
       actor: pe.id,
       targetId: chestId,
-      chestItems: [...(chestInv?.items || [])],
+      chestItems: inventoryItems(world, chestId),
     });
   } catch (err) { console.debug('[main] emit chest:open failed:', err); }
 });
@@ -1131,20 +1135,12 @@ addEventListener('ui:requestPickup', (e) => {
     if (!Number.isInteger(id) || id <= 0) continue;
     // Check if the item is inside a chest inventory (no Position)
     if (!world.get(id, Position)) {
-      const playerInv = world.get(pe.id, Inventory);
-      if (!playerInv) continue;
-      const stackIntoId = findInventoryStackTargetForItem(world, playerInv, id);
-      const hasCapacity = stackIntoId || playerInv.capacity == null || playerInv.items.length < playerInv.capacity;
-      if (!hasCapacity && !playerInv.items.includes(id)) continue;
+      if (!hasCapacityForItem(world, pe.id, id)) continue;
       // Find and remove from the chest that holds it
       for (const [cid, , ni] of world.query(Position, NamedIdentity)) {
         if (ni.identity !== 'chest') continue;
-        const cInv = world.get(cid, Inventory);
-        if (!cInv) continue;
-        const idx = cInv.items.indexOf(id);
-        if (idx === -1) continue;
-        cInv.items.splice(idx, 1);
-        addItemEntityToInventory(world, playerInv, id);
+        if (!inventoryContains(world, cid, id)) continue;
+        transferItem(world, id, cid, pe.id);
         const count = world.get(id, ItemInfo)?.count || 1;
         try { world.emit?.('item:pickup', { actor: pe.id, itemId: id, count }); } catch (e) { console.debug('[main] emit item:pickup failed:', e); }
         break;
@@ -2157,8 +2153,7 @@ addEventListener('ui:requestThrow', (ev) => {
     return;
   }
 
-  const inv = world.get(pe.id, Inventory);
-  if (!inv || !Array.isArray(inv.items) || !inv.items.includes(itemId)) {
+  if (!inventoryContains(world, pe.id, itemId)) {
     try { messageLog.log({ text: 'You are not carrying that item.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
   }

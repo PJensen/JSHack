@@ -4,6 +4,7 @@
 
 import { playerEntity, itemsAt } from "../../rules/utils/queries.js";
 import { Inventory } from "../../rules/components/Inventory.js";
+import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { Equipment, GEAR_SLOTS, GEAR_SLOT_SET, getEquippedSlot } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
@@ -20,7 +21,6 @@ import { DungeonState } from "../../rules/components/DungeonState.js";
 import { Speed } from "../../rules/components/Speed.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "../../rules/data/spells.js";
 import { getHungerLevel } from "../../rules/data/food.js";
-import { coalesceInventoryStacks } from "../../rules/utils/inventoryStacking.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
@@ -28,9 +28,10 @@ import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildI
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 import { isIdentificationEnabled, setIdentificationEnabled } from "../../rules/data/identification.js";
 import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js";
-import { addItemEntityToInventory } from "../../rules/utils/inventoryStacking.js";
+import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
+import { groupDisplayItems } from "./itemGrouping.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -53,9 +54,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   /** @type {any} */ (world)[_installed] = true;
 
   function findScrollOfIdentify(playerId) {
-    const inv = world.get(playerId, Inventory);
-    if (!inv || !Array.isArray(inv.items)) return 0;
-    for (const id of inv.items) {
+    for (const id of inventoryItems(world, playerId)) {
       const ni = world.get(id, NamedIdentity);
       if (ni && ni.identity === 'scroll_identify') return id;
     }
@@ -180,10 +179,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
 
   function sumPlayerGold(playerId) {
     if (!(playerId > 0)) return 0;
-    const inv = world.get(playerId, Inventory);
-    if (!inv || !Array.isArray(inv.items)) return 0;
     let total = 0;
-    for (const id of inv.items) {
+    for (const id of inventoryItems(world, playerId)) {
       const info = world.get(id, ItemInfo);
       if (!info || info.type !== 'currency') continue;
       total += Math.max(0, Number(info.count || 0) | 0);
@@ -200,9 +197,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
       if (ni.identity !== 'chest' || pos.x !== tx || pos.y !== ty) continue;
       chestId = eid;
-      const inv = world.get(eid, Inventory);
-      if (!inv || !Array.isArray(inv.items)) continue;
-      for (const itemId of inv.items) ids.push(itemId);
+      for (const itemId of inventoryItems(world, eid)) ids.push(itemId);
     }
 
     const nonCurrencyItems = [];
@@ -212,27 +207,30 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       nonCurrencyItems.push(buildItemDisplayData(info, itemId));
     }
 
-    if (!nonCurrencyItems.length && !chestId) return null;
+    const groupedItems = groupDisplayItems(nonCurrencyItems);
+    const totalCount = groupedItems.reduce((sum, item) => sum + Math.max(1, Number(item?.count || 0) | 0), 0);
+
+    if (!groupedItems.length && !chestId) return null;
 
     if (chestId) {
       return {
         mode: 'multi',
-        count: nonCurrencyItems.length,
-        items: nonCurrencyItems,
+        count: totalCount,
+        items: groupedItems,
         fromChest: true,
         chestId,
       };
     }
-    if (nonCurrencyItems.length > 1) {
+    if (groupedItems.length > 1) {
       return {
         mode: 'multi',
-        count: nonCurrencyItems.length,
-        items: nonCurrencyItems,
+        count: totalCount,
+        items: groupedItems,
         fromChest: false,
       };
     }
 
-    const single = nonCurrencyItems[0];
+    const single = groupedItems[0];
     const set = world.get(actorId, Settings);
     const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
     return {
@@ -281,29 +279,26 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       const inv = world.get(p.id, Inventory);
       const eq = world.get(p.id, Equipment);
       equippedBySlot = buildEquippedBySlot(eq);
-      if (inv && Array.isArray(inv.items)) {
-        coalesceInventoryStacks(world, inv);
-        for (const id of inv.items) {
-          const info = world.get(id, ItemInfo);
-          if (!info || info.type === 'currency') continue;
-          const equippedSlot = eq ? getEquippedSlot(eq, id) : null;
-          const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
-          const applyTargetCount = applyTargetIds.length;
-          const canApply = isApplyTool(world, p.id, id);
-          items.push({
-            ...buildItemDisplayData(info, id),
-            equipped: Boolean(equippedSlot),
-            equippedSlot,
-            equippedComparison: null,
-            unpaid: world.has(id, Unpaid),
-            unpaidPrice: world.get(id, Unpaid)?.price || 0,
-            unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
-            canApply,
-            applyTargetCount,
-            cooldownTurnsRemaining: world.get(id, ItemCooldown)?.turnsRemaining ?? 0,
-            cooldownTurnsMax: world.get(id, ItemCooldown)?.turnsMax ?? 0,
-          });
-        }
+      for (const id of inventoryItems(world, p.id)) {
+        const info = world.get(id, ItemInfo);
+        if (!info || info.type === 'currency') continue;
+        const equippedSlot = eq ? getEquippedSlot(eq, id) : null;
+        const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
+        const applyTargetCount = applyTargetIds.length;
+        const canApply = isApplyTool(world, p.id, id);
+        items.push({
+          ...buildItemDisplayData(info, id),
+          equipped: Boolean(equippedSlot),
+          equippedSlot,
+          equippedComparison: null,
+          unpaid: world.has(id, Unpaid),
+          unpaidPrice: world.get(id, Unpaid)?.price || 0,
+          unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
+          canApply,
+          applyTargetCount,
+          cooldownTurnsRemaining: world.get(id, ItemCooldown)?.turnsRemaining ?? 0,
+          cooldownTurnsMax: world.get(id, ItemCooldown)?.turnsMax ?? 0,
+        });
       }
       // Attach comparison data for unequipped equippable items
       if (eq) {
@@ -314,8 +309,9 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       }
       ground = buildGroundPickupDetailAt(p.id, p.pos.x, p.pos.y);
     }
-    const bagItems = items.filter((it) => !GEAR_SLOT_SET.has(String(it?.equippedSlot || "")));
-    const filteredItems = slotFilter ? bagItems.filter((it) => matchesSlotFilter(it, slotFilter)) : bagItems;
+      const bagItems = items.filter((it) => !GEAR_SLOT_SET.has(String(it?.equippedSlot || "")));
+      const groupedBagItems = groupDisplayItems(bagItems);
+      const filteredItems = slotFilter ? groupedBagItems.filter((it) => matchesSlotFilter(it, slotFilter)) : groupedBagItems;
     const scrollOfIdentifyId = p ? findScrollOfIdentify(p.id) : 0;
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:inventoryData', {
       detail: {
@@ -458,13 +454,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     const items = [];
     if (p) {
-      const inv = world.get(p.id, Inventory);
-      if (inv && Array.isArray(inv.items)) {
-        for (const id of inv.items) {
-          const info = world.get(id, ItemInfo);
-          if (!info || !USABLE_TYPES.has(info.type)) continue;
-          items.push(buildItemDisplayData(info, id));
-        }
+      for (const id of inventoryItems(world, p.id)) {
+        const info = world.get(id, ItemInfo);
+        if (!info || !USABLE_TYPES.has(info.type)) continue;
+        items.push(buildItemDisplayData(info, id));
       }
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
@@ -475,13 +468,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     const items = [];
     if (p) {
-      const inv = world.get(p.id, Inventory);
-      if (inv && Array.isArray(inv.items)) {
-        for (const id of inv.items) {
-          const info = world.get(id, ItemInfo);
-          if (!info) continue;
-          items.push(buildItemDisplayData(info, id));
-        }
+      for (const id of inventoryItems(world, p.id)) {
+        const info = world.get(id, ItemInfo);
+        if (!info) continue;
+        items.push(buildItemDisplayData(info, id));
       }
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:throwableItemsData', { detail: { items } }));
@@ -492,12 +482,9 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     const items = [];
     if (p) {
-      const inv = world.get(p.id, Inventory);
-      if (inv && Array.isArray(inv.items)) {
-        for (const id of inv.items) {
-          if (!isApplyTool(world, p.id, id)) continue;
-          items.push({ id, name: resolveItemDisplayName(world, id) });
-        }
+      for (const id of inventoryItems(world, p.id)) {
+        if (!isApplyTool(world, p.id, id)) continue;
+        items.push({ id, name: resolveItemDisplayName(world, id) });
       }
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:applyToolsData', { detail: { items } }));
@@ -583,16 +570,12 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
           gear.push({ slot, name: resolveItemDisplayName(world, eqId) });
         }
       }
-      const invComp = world.get(p.id, Inventory);
-      if (invComp && Array.isArray(invComp.items)) {
-        coalesceInventoryStacks(world, invComp);
-        for (const id of invComp.items) {
-          const info = world.get(id, ItemInfo);
-          if (!info || info.type === 'currency') continue;
-          const name = resolveItemDisplayName(world, id);
-          const count = Number(info.count || 1);
-          inv.push(count > 1 ? `${name} ×${count}` : name);
-        }
+      for (const id of inventoryItems(world, p.id)) {
+        const info = world.get(id, ItemInfo);
+        if (!info || info.type === 'currency') continue;
+        const name = resolveItemDisplayName(world, id);
+        const count = Number(info.count || 1);
+        inv.push(count > 1 ? `${name} ×${count}` : name);
       }
       for (const { key, turns, stacks } of buildStatusRows(p.id)) {
         effects.push(stacks > 1 ? `${key}×${stacks}(${turns}t)` : `${key}(${turns}t)`);
@@ -632,13 +615,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     if (!p) return;
     const inv = world.get(p.id, Inventory);
-    if (!inv || !Array.isArray(inv.items)) return;
+    if (!inv) return;
     const created = createItemById(world, itemId);
     if (created === null) {
       console.warn(`[settings] Unknown item: "${itemId}"`);
       return;
     }
-    addItemEntityToInventory(world, inv, created);
+    addToInventory(world, p.id, created);
     console.debug(`[settings] Gave 1x ${itemId}`);
   });
 

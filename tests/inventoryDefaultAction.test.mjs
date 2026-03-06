@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert";
-import { getInventoryDefaultAction } from "../src/display/ui/overlay.js";
+import { getInventoryDefaultAction } from "../src/display/ui/inventoryUtils.js";
 
 Deno.test("inventory default action: equippable items prioritize equip", () => {
   const sword = {

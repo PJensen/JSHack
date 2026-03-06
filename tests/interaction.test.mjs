@@ -20,6 +20,7 @@ import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { WildBerries, WildHerbs, ThornPods, VenomFronds } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
 import { fountainRegrowthSystem } from '../src/rules/systems/fountainRegrowthSystem.js';
+import { addToInventory, inventoryContains, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("toggle door: closed → open → closed", () => {
   const world = new World({ seed: 1 });
@@ -78,7 +79,11 @@ Deno.test("open chest emits chest:open event", () => {
   const actor = world.create();
   const chest = world.create();
   world.add(chest, Interactable, { action: 'openChest', params: {} });
-  world.add(chest, Inventory, { items: [100, 101], capacity: 20, weightLimit: null });
+  world.add(chest, Inventory, { capacity: 20 });
+  const ci1 = world.create(); world.add(ci1, ItemInfo, { type: 'equip', count: 1 });
+  const ci2 = world.create(); world.add(ci2, ItemInfo, { type: 'equip', count: 1 });
+  addToInventory(world, chest, ci1);
+  addToInventory(world, chest, ci2);
 
   world.add(actor, InteractIntent, { targetId: chest });
   const chestEvents = [];
@@ -96,7 +101,7 @@ Deno.test("chest remains interactable after opening", () => {
   const actor = world.create();
   const chest = world.create();
   world.add(chest, Interactable, { action: 'openChest', params: {} });
-  world.add(chest, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(chest, Inventory, { capacity: 20 });
 
   // Open chest twice
   world.add(actor, InteractIntent, { targetId: chest });
@@ -113,7 +118,13 @@ Deno.test("chest:open event includes copy of items", () => {
   const actor = world.create();
   const chest = world.create();
   world.add(chest, Interactable, { action: 'openChest', params: {} });
-  world.add(chest, Inventory, { items: [42, 43, 44], capacity: 20, weightLimit: null });
+  world.add(chest, Inventory, { capacity: 20 });
+  const ci1 = world.create(); world.add(ci1, ItemInfo, { type: 'equip', count: 1 });
+  const ci2 = world.create(); world.add(ci2, ItemInfo, { type: 'equip', count: 1 });
+  const ci3 = world.create(); world.add(ci3, ItemInfo, { type: 'equip', count: 1 });
+  addToInventory(world, chest, ci1);
+  addToInventory(world, chest, ci2);
+  addToInventory(world, chest, ci3);
 
   const events = [];
   world.on('chest:open', e => events.push(e));
@@ -126,8 +137,7 @@ Deno.test("chest:open event includes copy of items", () => {
   assert(events[0].chestItems.length === 3);
   // Ensure it's a copy, not a reference
   events[0].chestItems.push(999);
-  const inv = world.get(chest, Inventory);
-  assert(inv.items.length === 3, 'original inventory should be unchanged');
+  assert(inventoryItems(world, chest).length === 3, 'original inventory should be unchanged');
 });
 
 Deno.test("read text emits event with textId", () => {
@@ -190,9 +200,9 @@ Deno.test("harvest node creates food and enters regrow cooldown", () => {
   assert(hn.ready === false, 'node should become unready');
   assert(hn.regrowCountdown === 9, 'node should start regrow countdown');
 
-  const inv = world.get(actor, Inventory);
-  assert(inv.items.length >= 1, 'actor should receive harvested item');
-  const first = inv.items[0];
+  const actorItems = inventoryItems(world, actor);
+  assert(actorItems.length >= 1, 'actor should receive harvested item');
+  const first = actorItems[0];
   const ni = world.get(first, NamedIdentity);
   const info = world.get(first, ItemInfo);
   assert(ni.identity === 'food_wild_berries', `expected berries, got ${ni.identity}`);
@@ -267,9 +277,9 @@ Deno.test("thorn bramble harvest hurts actor and yields thorn pods", () => {
   const vit = world.get(actor, Vitality);
   assert(vit.hp < vit.maxHp, 'thorn harvest should damage actor');
 
-  const inv = world.get(actor, Inventory);
-  assert(inv.items.length >= 1, 'actor should receive harvested item');
-  const first = inv.items[0];
+  const actorItems = inventoryItems(world, actor);
+  assert(actorItems.length >= 1, 'actor should receive harvested item');
+  const first = actorItems[0];
   const ni = world.get(first, NamedIdentity);
   assert(ni.identity === 'reagent_thorn_pod', `expected thorn pods, got ${ni.identity}`);
 });
@@ -310,9 +320,9 @@ Deno.test("venom fern harvest spawns poison hazard and hurts actor", () => {
   }
   assert(foundHazard, 'venom fern harvest should create poison hazard');
 
-  const inv = world.get(actor, Inventory);
-  assert(inv.items.length >= 1, 'venom fern should yield a harvested item');
-  const first = inv.items[0];
+  const actorItems = inventoryItems(world, actor);
+  assert(actorItems.length >= 1, 'venom fern should yield a harvested item');
+  const first = actorItems[0];
   const ni = world.get(first, NamedIdentity);
   assert(ni.identity === 'reagent_venom_frond', `expected venom fronds, got ${ni.identity}`);
 });
@@ -331,8 +341,10 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
   world.mutate(thornPods, ItemInfo, (r) => { r.count = 1; });
   const venomFronds = createFrom(world, VenomFronds, {});
   world.mutate(venomFronds, ItemInfo, (r) => { r.count = 2; });
-  const inv = world.get(actor, Inventory);
-  inv.items.push(berries, herbs, thornPods, venomFronds);
+  addToInventory(world, actor, berries);
+  addToInventory(world, actor, herbs);
+  addToInventory(world, actor, thornPods);
+  addToInventory(world, actor, venomFronds);
 
   const bench = world.create();
   world.add(bench, Interactable, { action: 'brewAlchemy', params: null });
@@ -352,7 +364,7 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
 
   function countIdentity(identity) {
     let total = 0;
-    for (const id of inv.items) {
+    for (const id of inventoryItems(world, actor)) {
       const ni = world.get(id, NamedIdentity);
       if (ni?.identity !== identity) continue;
       const info = world.get(id, ItemInfo);
@@ -368,9 +380,8 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
   assert(crafted.length === 1, 'brew mode should craft a potion');
   assert(crafted[0].outputIdentity === 'potion_poison', 'should craft poison potion');
 
-  const invAfter = world.get(actor, Inventory);
   let poisonId = 0;
-  for (const id of invAfter.items) {
+  for (const id of inventoryItems(world, actor)) {
     const ni = world.get(id, NamedIdentity);
     if (ni?.identity === 'potion_poison') {
       poisonId = id;
@@ -451,7 +462,7 @@ Deno.test("altar: phase 1 emits offer prompt with inventory items", () => {
     type: 'potion', slot: 'bag', weight: 1, value: 50,
     description: 'test', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
   });
-  world.get(actor, Inventory).items.push(itemId);
+  addToInventory(world, actor, itemId);
 
   const prompts = [];
   world.on('altar:offerPrompt', (e) => prompts.push(e));
@@ -476,7 +487,7 @@ Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
     type: 'potion', slot: 'bag', weight: 1, value: 50,
     description: 'test', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
   });
-  world.get(actor, Inventory).items.push(itemId);
+  addToInventory(world, actor, itemId);
 
   const offers = [];
   world.on('altar:offer', (e) => offers.push(e));
@@ -488,8 +499,7 @@ Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
   assert(offers.length === 1, 'should emit altar:offer');
   assert(offers[0].value === 0.25, 'should report normalized value (50/200)');
   assert(offers[0].itemName === 'test', 'should report item name');
-  const inv = world.get(actor, Inventory);
-  assert(!inv.items.includes(itemId), 'offered item should be removed from inventory');
+  assert(!inventoryContains(world, actor, itemId), 'offered item should be removed from inventory');
 });
 
 Deno.test("altar: offer fails gracefully when item is not in inventory", () => {
@@ -525,13 +535,12 @@ Deno.test("cooking fire: phase 1 emits cooking:open with corpses and herbs", () 
   world.add(corpse, ItemInfo, { type: "food", weight: 2, value: 5, count: 1 });
   world.add(corpse, Consumable, { effectParams: { nutrition: 150, corpseIdentity: "corpse_rat" }, remainingUses: 1, potency: 0 });
   world.add(corpse, FoodDecay, { turnsHeld: 20, shelfLife: 150 });
-  const inv = world.get(actor, Inventory);
-  inv.items.push(corpse);
+  addToInventory(world, actor, corpse);
 
   // Add herbs to inventory.
   const herbs = createFrom(world, WildHerbs, {});
   world.mutate(herbs, ItemInfo, (r) => { r.count = 3; });
-  inv.items.push(herbs);
+  addToInventory(world, actor, herbs);
 
   const fire = world.create();
   world.add(fire, Interactable, { action: 'cookFood', params: null });
@@ -563,8 +572,7 @@ Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   world.add(corpse, ItemInfo, { type: "food", weight: 4, value: 10, count: 1 });
   world.add(corpse, Consumable, { effectParams: { nutrition: 300, corpseIdentity: "corpse_orc" }, remainingUses: 1, potency: 0 });
   world.add(corpse, FoodDecay, { turnsHeld: 50, shelfLife: 150 });
-  const inv = world.get(actor, Inventory);
-  inv.items.push(corpse);
+  addToInventory(world, actor, corpse);
 
   const fire = world.create();
   world.add(fire, Interactable, { action: 'cookFood', params: null });
@@ -583,7 +591,7 @@ Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   // The corpse entity should now be a ration (same entity id, new identity).
   const ni = world.get(corpse, NamedIdentity);
   assert(ni.identity === 'food_ration', `expected food_ration, got ${ni.identity}`);
-  assert(inv.items.includes(corpse), 'ration should still be in inventory');
+  assert(inventoryContains(world, actor, corpse), 'ration should still be in inventory');
 
   // FoodDecay should be reset to fresh with ration shelf life.
   const fd = world.get(corpse, FoodDecay);

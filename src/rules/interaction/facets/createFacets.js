@@ -10,6 +10,7 @@ import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
+import { inventoryContains } from "../../utils/inventoryFacade.js";
 
 /**
  * @param {string} text
@@ -346,8 +347,7 @@ export function createFacets(init) {
 
   const rules = Object.freeze({
     hasItemInInventory(ownerId, itemId) {
-      const inv = /** @type any */ (world.get(ownerId | 0, Inventory));
-      return !!(inv && Array.isArray(inv.items) && inv.items.includes(itemId | 0));
+      return inventoryContains(world, ownerId | 0, itemId | 0);
     },
     resolveTarget(defaultId) {
       const preferred = target | 0;

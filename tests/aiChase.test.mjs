@@ -6,6 +6,7 @@ import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../src/rules/components/AggroState.js';
+import { Brain } from '../src/rules/components/Brain.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { aiChaseSystem } from '../src/rules/systems/aiChaseSystem.js';
 import { clearAll, isWalkable, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
@@ -435,6 +436,35 @@ Deno.test("ambusher (floating_eye) holds position when player is > 1 tile away",
   aiChaseSystem(world);
 
   assert(!world.has(eye, MoveIntent), 'floating eye should not move while player is far away');
+});
+
+Deno.test("floating_eye uses brain sight range before aggroing", () => {
+  const world = new World({ seed: 7 });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 5, y: 5 });
+  world.add(player, NamedIdentity, { name: 'Hero', identity: 'player' });
+
+  const eye = world.create();
+  world.add(eye, Position, { x: 12, y: 5 }); // 7 tiles away, beyond floating eye visionRange=6
+  world.add(eye, NamedIdentity, { name: 'Floating Eye', identity: 'floating_eye' });
+  world.add(eye, Faction, { key: 'enemy' });
+  world.add(eye, Brain, { intelligence: 2, visionRange: 6 });
+  world.add(eye, AggroState, {
+    alertLevel: AGGRO_LEVELS.unaware,
+    lastKnownX: 0,
+    lastKnownY: 0,
+    searchTurnsLeft: 0,
+    retreating: false,
+  });
+
+  aiChaseSystem(world);
+
+  const aggro = world.get(eye, AggroState);
+  assertEquals(aggro.alertLevel, AGGRO_LEVELS.unaware,
+    'floating eye should stay unaware outside its sight range');
+  assertEquals(world.has(eye, MoveIntent), false);
 });
 
 // Spider onSeen tests (pre-existing; updated to include AggroState) ──────────

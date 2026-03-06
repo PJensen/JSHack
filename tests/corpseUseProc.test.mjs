@@ -14,12 +14,12 @@ import { Devotion } from "../src/rules/components/Devotion.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { deitySystem, getDeityInstance, initDeity } from "../src/rules/systems/deitySystem.js";
+import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("eating eel corpse grants electric resistance", () => {
   const world = new World({ seed: 0xC0FFEE });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const eelCorpse = createCorpse(world, {
     id: "eel",
@@ -30,7 +30,7 @@ Deno.test("eating eel corpse grants electric resistance", () => {
   }, { x: 0, y: 0 });
   const eelConsumable = world.get(eelCorpse, Consumable);
   assertEquals(eelConsumable?.effectParams?.corpseIdentity, "corpse_eel", "corpse identity should follow corpse_<monsterId> convention");
-  inv.items.push(eelCorpse);
+  addToInventory(world, player, eelCorpse);
 
   const beforeOhms = Number(world.get(player, Resistances)?.electric?.ohms || 0);
   world.add(player, UseIntent, { itemId: eelCorpse, targetId: player });
@@ -45,8 +45,7 @@ Deno.test("eating eel corpse grants electric resistance", () => {
 Deno.test("eating bat corpse can apply disease effect", () => {
   const world = new World({ seed: 0xA77A77 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const batCorpse = createCorpse(world, {
     id: "bat",
@@ -55,7 +54,7 @@ Deno.test("eating bat corpse can apply disease effect", () => {
     massKg: 1,
     tier: 0,
   }, { x: 0, y: 0 });
-  inv.items.push(batCorpse);
+  addToInventory(world, player, batCorpse);
 
   world.add(player, UseIntent, { itemId: batCorpse, targetId: player });
   useItemSystem(world);
@@ -69,8 +68,7 @@ Deno.test("eat cancellation prevents nutrition/effects and does not consume item
   const world = new World({ seed: 0xC0DE });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
   world.add(player, Hunger, { hunger: 120, satiation: 0 });
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const cursedMeal = createCorpse(world, {
     id: "test_cancel",
@@ -81,7 +79,7 @@ Deno.test("eat cancellation prevents nutrition/effects and does not consume item
   }, { x: 0, y: 0 });
   const cursedConsumable = world.get(cursedMeal, Consumable);
   assertEquals(cursedConsumable?.effectParams?.corpseIdentity, "corpse_test_cancel");
-  inv.items.push(cursedMeal);
+  addToInventory(world, player, cursedMeal);
 
   const cancelled = [];
   const used = [];
@@ -96,7 +94,7 @@ Deno.test("eat cancellation prevents nutrition/effects and does not consume item
   useItemSystem(world);
 
   assert(world.isAlive(cursedMeal), "cancelled eat should not destroy item");
-  assert(inv.items.includes(cursedMeal), "cancelled eat should keep item in inventory");
+  assert(inventoryContains(world, player, cursedMeal), "cancelled eat should keep item in inventory");
   assertEquals(world.get(player, Hunger).hunger, beforeHunger);
   assertEquals(world.get(player, Hunger).satiation, beforeSatiation);
   assertEquals(world.get(player, ActiveEffects).effects.length, beforeEffects);
@@ -121,8 +119,7 @@ Deno.test("eating your own pet corpse is horrifying and spikes wrath without ins
   assert(deity, "deity should be initialized");
   const wrathBefore = deity._queryPrecise().wrath;
 
-  const inv = world.get(player, Inventory);
-  assert(inv && Array.isArray(inv.items), "player should have inventory");
+  assert(world.has(player, Inventory), "player should have inventory");
 
   const kittyCorpse = createCorpse(world, {
     id: "kitty",
@@ -133,7 +130,7 @@ Deno.test("eating your own pet corpse is horrifying and spikes wrath without ins
   }, { x: 0, y: 0 });
   world.add(kittyCorpse, Pet);
   world.add(kittyCorpse, Owner, { ownerId: player });
-  inv.items.push(kittyCorpse);
+  addToInventory(world, player, kittyCorpse);
 
   const died = [];
   const offenses = [];

@@ -7,6 +7,7 @@ import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { DrinkIntent } from '../src/rules/components/Intents/DrinkIntent.js';
 import { drinkSystem } from '../src/rules/systems/drinkSystem.js';
+import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("drinking a single-dose potion applies effect and destroys it", () => {
   const world = new World({ seed: 1 });
@@ -23,8 +24,7 @@ Deno.test("drinking a single-dose potion applies effect and destroys it", () => 
   });
   world.add(potion, ItemInfo, { type: 'potion', slot: '', weight: 1, value: 10, description: '', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [] });
 
-  const inv = world.get(actor, Inventory);
-  inv.items.push(potion);
+  addToInventory(world, actor, potion);
 
   world.add(actor, DrinkIntent, { itemId: potion, targetId: 0 });
   drinkSystem(world);
@@ -38,7 +38,7 @@ Deno.test("drinking a single-dose potion applies effect and destroys it", () => 
   assert(ae.effects[0].turnsLeft === 3, `duration should be 3, got ${ae.effects[0].turnsLeft}`);
 
   assert(!world.isAlive(potion), 'empty potion should be destroyed');
-  assert(!inv.items.includes(potion), 'potion should be removed from inventory');
+  assert(!inventoryContains(world, actor, potion), 'potion should be removed from inventory');
 });
 
 Deno.test("drinking from a stacked potion decrements count", () => {
@@ -56,8 +56,7 @@ Deno.test("drinking from a stacked potion decrements count", () => {
   });
   world.add(stack, ItemInfo, { type: 'potion', slot: '', weight: 1, value: 5, description: '', count: 3, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [] });
 
-  const inv = world.get(actor, Inventory);
-  inv.items.push(stack);
+  addToInventory(world, actor, stack);
 
   world.add(actor, DrinkIntent, { itemId: stack, targetId: 0 });
   drinkSystem(world);
@@ -92,8 +91,7 @@ Deno.test("toxic potion schedules hangover effect", () => {
   });
   world.add(toxicBrew, ItemInfo, { type: 'potion', slot: '', weight: 1, value: 5, description: '', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [] });
 
-  const inv = world.get(actor, Inventory);
-  inv.items.push(toxicBrew);
+  addToInventory(world, actor, toxicBrew);
 
   world.add(actor, DrinkIntent, { itemId: toxicBrew, targetId: 0 });
   drinkSystem(world);

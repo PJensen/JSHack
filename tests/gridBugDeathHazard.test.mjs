@@ -32,7 +32,9 @@ Deno.test("grid_bug: onDeath cloud spawns via dealDamage (no tick)", () => {
   assertEquals(spawned[0].at.y, 5);
 
   let cloudCount = 0;
-  for (const _ of world.query(Position, HazardArea)) cloudCount++;
+  for (const _ of world.query(Position, HazardArea)) {
+    cloudCount++;
+  }
   assertEquals(cloudCount, 1, "one HazardArea entity should exist");
 });
 

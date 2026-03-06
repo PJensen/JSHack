@@ -1,5 +1,7 @@
 import { Lifespan } from "../components/Lifespan.js";
 import { Position } from "../components/Position.js";
+import { Inventory } from "../components/Inventory.js";
+import { destroyInventoryRoot } from "../utils/inventoryFacade.js";
 
 /**
  * Ticks down Lifespan.turnsLeft and destroys the entity when it expires.
@@ -26,6 +28,7 @@ export function lifespanSystem(world) {
       } catch { /* */ }
     }
 
+    if (world.has(id, Inventory)) destroyInventoryRoot(world, id);
     world.destroy(id);
   }
 }

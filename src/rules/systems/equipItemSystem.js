@@ -4,6 +4,10 @@ import { Equipment, GEAR_SLOT_SET, getEquippedSlot } from "../components/Equipme
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Beatitude } from "../components/Beatitude.js";
+import {
+  inventoryContains,
+  addToInventory,
+} from "../utils/inventoryFacade.js";
 
 /**
  * equipItemSystem — resolves EquipIntent:
@@ -19,11 +23,8 @@ export function equipItemSystem(world) {
     const itemId = intent.itemId | 0;
     if (!(itemId > 0)) { world.remove(actor, EquipIntent); continue; }
 
-    const inv = world.get(actor, Inventory);
-    if (!inv || !Array.isArray(inv.items)) { world.remove(actor, EquipIntent); continue; }
-
-    // Ensure the item is in inventory
-    if (!inv.items.includes(itemId)) { world.remove(actor, EquipIntent); continue; }
+    // Ensure the item is in inventory (hierarchy check)
+    if (!inventoryContains(world, actor, itemId)) { world.remove(actor, EquipIntent); continue; }
 
     const info = world.get(itemId, ItemInfo);
     if (!info || (info.type !== 'equip' && info.type !== 'ammo' && info.type !== 'wand')) { world.remove(actor, EquipIntent); continue; }
@@ -75,10 +76,13 @@ export function equipItemSystem(world) {
       continue;
     }
 
-    // Helper to push item back to inventory (ensuring it isn't already present)
+    // Helper to push swapped-out item back to inventory via facade
     const pushToInventory = (id) => {
       if (!Number.isInteger(id) || id <= 0) return;
-      if (!inv.items.includes(id)) inv.items.push(id);
+      // Item may already be in inventory (hierarchy child). If not, add it.
+      if (!inventoryContains(world, actor, id)) {
+        addToInventory(world, actor, id);
+      }
     };
 
     const equipSingleSlot = (slotName) => {
@@ -88,10 +92,6 @@ export function equipItemSystem(world) {
       appliedSlot = slotName;
       return true;
     };
-
-    // Equipped items intentionally remain in Inventory.items.
-    // UI renders bag and character views separately and filters equipped rows.
-    // inv.items.splice(idx, 1);
 
     if (slot === 'weapon') {
       equipSingleSlot('weapon');
@@ -123,7 +123,7 @@ export function equipItemSystem(world) {
     } else if (slot === 'ammo' || info.type === 'ammo') {
       equipSingleSlot('ammo');
     } else if (!equipSingleSlot(slot)) {
-      // Unknown or unsupported slot: item is already in inventory, ignore.
+      // Unknown or unsupported slot: ignore.
       world.remove(actor, EquipIntent);
       continue;
     }

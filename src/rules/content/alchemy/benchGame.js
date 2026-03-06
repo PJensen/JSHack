@@ -4,6 +4,7 @@ import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { buildCatalogItem } from "../../data/itemCatalogLoader.js";
+import { inventoryItems, addToInventory, consumeFromStack } from "../../utils/inventoryFacade.js";
 
 export const ALCHEMY_INGREDIENTS = Object.freeze({
   berries: Object.freeze({ identity: "food_wild_berries", label: "berries" }),
@@ -66,18 +67,17 @@ function findRecipe(recipeKey) {
 
 /**
  * @param {import("../../../lib/ecs-js/index.js").World} world
- * @param {{items:number[]}|null} inv
+ * @param {number} actor
  */
-function countIngredients(world, inv) {
+function countIngredients(world, actor) {
   const out = {
     berries: 0,
     herbs: 0,
     thornPods: 0,
     venomFronds: 0,
   };
-  if (!inv || !Array.isArray(inv.items)) return out;
 
-  for (const itemId of inv.items) {
+  for (const itemId of inventoryItems(world, actor)) {
     if (!(itemId > 0) || !world.isAlive(itemId)) continue;
     const ni = world.get(itemId, NamedIdentity);
     if (!ni) continue;
@@ -103,40 +103,25 @@ function hasEnoughIngredients(counts, requirements) {
   return true;
 }
 
-function consumeByIdentity(world, inv, identity, amount) {
+function consumeByIdentity(world, actor, identity, amount) {
   let remaining = Math.max(0, Number(amount || 0) | 0);
   if (remaining <= 0) return true;
-  if (!inv || !Array.isArray(inv.items)) return false;
 
-  for (let i = 0; i < inv.items.length && remaining > 0; i++) {
-    const itemId = Number(inv.items[i] || 0) | 0;
-    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
-    const ni = world.get(itemId, NamedIdentity);
-    if (!ni || ni.identity !== identity) continue;
-    const info = world.get(itemId, ItemInfo);
-    const stackCount = Math.max(1, Number(info?.count || 1) | 0);
-    if (stackCount <= remaining) {
-      remaining -= stackCount;
-      inv.items.splice(i, 1);
-      i -= 1;
-      try { world.destroy(itemId); } catch {} // ECS: entity may already be destroyed
-      continue;
-    }
-    const nextCount = Math.max(0, stackCount - remaining);
-    remaining = 0;
-    world.mutate(itemId, ItemInfo, (rec) => { rec.count = nextCount; });
+  const result = consumeFromStack(world, actor, identity, remaining);
+  for (const eid of result.entities) {
+    try { world.destroy(eid); } catch {} // ECS: entity may already be destroyed
   }
-  return remaining <= 0;
+  return result.consumed >= remaining;
 }
 
-function consumeIngredients(world, inv, requirements) {
+function consumeIngredients(world, actor, requirements) {
   const req = (requirements && typeof requirements === "object") ? requirements : {};
   for (const key of Object.keys(req)) {
     const ing = ALCHEMY_INGREDIENTS[key];
     if (!ing) continue;
     const need = Math.max(0, Number(req[key] || 0) | 0);
     if (need <= 0) continue;
-    if (!consumeByIdentity(world, inv, ing.identity, need)) return false;
+    if (!consumeByIdentity(world, actor, ing.identity, need)) return false;
   }
   return true;
 }
@@ -159,8 +144,7 @@ function buildAlchemyProduct(world, outputIdentity) {
  * @param {number} targetId
  */
 export function emitAlchemyBenchOpen(world, actor, targetId) {
-  const inv = getInventory(world, actor);
-  const ingredients = countIngredients(world, inv);
+  const ingredients = countIngredients(world, actor);
   const recipes = ALCHEMY_RECIPES.map((recipe) => ({
     key: recipe.key,
     label: recipe.label,
@@ -182,8 +166,7 @@ export function emitAlchemyBenchOpen(world, actor, targetId) {
  * @param {string} recipeKey
  */
 export function brewAtAlchemyBench(world, actor, targetId, recipeKey) {
-  const inv = getInventory(world, actor);
-  if (!inv) {
+  if (!world.has(actor, Inventory)) {
     world.emit?.("alchemy:result", {
       actor,
       targetId,
@@ -205,7 +188,7 @@ export function brewAtAlchemyBench(world, actor, targetId, recipeKey) {
     return;
   }
 
-  const ingredients = countIngredients(world, inv);
+  const ingredients = countIngredients(world, actor);
   if (!hasEnoughIngredients(ingredients, recipe.requirements || {})) {
     const missing = {};
     const need = {};
@@ -227,7 +210,7 @@ export function brewAtAlchemyBench(world, actor, targetId, recipeKey) {
     return;
   }
 
-  if (!consumeIngredients(world, inv, recipe.requirements || {})) {
+  if (!consumeIngredients(world, actor, recipe.requirements || {})) {
     world.emit?.("alchemy:result", {
       actor,
       targetId,
@@ -243,7 +226,7 @@ export function brewAtAlchemyBench(world, actor, targetId, recipeKey) {
     const itemId = buildAlchemyProduct(world, recipe.outputIdentity);
     if (!(itemId > 0)) continue;
     itemIds.push(itemId);
-    if (!inv.items.includes(itemId)) inv.items.push(itemId);
+    addToInventory(world, actor, itemId);
   }
   if (!itemIds.length) {
     world.emit?.("alchemy:result", {

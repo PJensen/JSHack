@@ -20,6 +20,7 @@ import { Player }       from "../components/Player.js";
 import { Equipment }    from "../components/Equipment.js";
 import { ItemInfo }     from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Brain } from "../components/Brain.js";
 import { Vitality }     from "../components/Vitality.js";
 import { MoveIntent }   from "../components/Intents/MoveIntent.js";
 import { RangedAttackIntent } from "../components/Intents/RangedAttackIntent.js";
@@ -39,6 +40,10 @@ import { hasLOS }            from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
+
+function chebyshevDistance(ax, ay, bx, by) {
+  return Math.max(Math.abs((ax | 0) - (bx | 0)), Math.abs((ay | 0) - (by | 0)));
+}
 
 // ── Damage-triggered aggro listener ──────────────────────────────────
 
@@ -102,6 +107,14 @@ export function aiChaseSystem(world) {
     const fac = world.get(id, Faction);
     if (!fac || fac.key !== "enemy") return;
 
+    const aggro = world.get(id, AggroState);
+    if (!aggro) return; // no AggroState = no AI behaviour
+
+    // ── Look up monster def and brain-backed awareness ──────────────
+    const ni = world.get(id, NamedIdentity);
+    const def = ni ? getMonster(String(ni.identity || "")) : null;
+    const brain = world.get(id, Brain);
+
     // Speed gate: only act on ticks that match this entity's cadence.
     const spd = world.get(id, Speed);
     let actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
@@ -109,21 +122,13 @@ export function aiChaseSystem(world) {
     // Frost slow stacks double the cadence per stack.
     const frostStacks = Math.min(3, statusStrength(world, id, "frozen"));
     if (frostStacks > 0) actEvery = actEvery * (1 + frostStacks);
+    const canActThisTurn = !(actEvery > 1 && ((world.step + id) % actEvery) !== 0);
+    const hasQueuedMove = world.has(id, MoveIntent);
 
-    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
-
-    // Skip if an intent is already queued (e.g. from scurry, taunt, or external system).
-    if (world.has(id, MoveIntent)) return;
-
-    const aggro = world.get(id, AggroState);
-    if (!aggro) return; // no AggroState = no AI behaviour
-
-    // ── Look up monster def for intelligence-gated behaviour ────────
-    const ni  = world.get(id, NamedIdentity);
-    const def = ni ? getMonster(String(ni.identity || "")) : null;
-
-    // ── LOS check ──────────────────────────────────────────────────
-    const canSee = hasLOS(
+    // Perception is driven by Brain data rather than action cadence.
+    const sightRange = Math.max(0, Math.trunc(Number(brain?.visionRange ?? def?.visionRange ?? 8)));
+    const withinSightRange = chebyshevDistance(pos.x, pos.y, playerPos.x, playerPos.y) <= sightRange;
+    const canSee = withinSightRange && hasLOS(
       pos.x | 0, pos.y | 0,
       playerPos.x | 0, playerPos.y | 0,
       ensureBlockedMap(),
@@ -164,7 +169,7 @@ export function aiChaseSystem(world) {
         world.emit('status', { id, kind: 'alert', at: { x: pos.x | 0, y: pos.y | 0 } });
         // onSeen hooks (e.g. spider leap)
         const onSeenHooks = def?.hooks?.onSeen;
-        if (Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {
+        if (!hasQueuedMove && canActThisTurn && Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {
           const seenCtx = new SeenCallbackContext(world, {
             actor:     id,
             target:    playerId,
@@ -237,6 +242,9 @@ export function aiChaseSystem(world) {
     }
 
     if (aggro.alertLevel === AGGRO_LEVELS.unaware) return;
+
+    // Awareness keeps updating every turn; cadence only gates intent production.
+    if (!canActThisTurn || hasQueuedMove) return;
 
     // ── Retreat: update flag based on current HP ────────────────────
     const retreatThreshold = def?.retreatHpPct ?? 0;

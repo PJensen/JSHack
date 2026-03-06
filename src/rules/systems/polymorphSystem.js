@@ -8,6 +8,7 @@ import { Position } from "../components/Position.js";
 import { getMonster } from "../data/monsters.js";
 import { equipMonster } from "../environment/dungeon/populate.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
+import { addToInventory, destroyInventoryRoot, inventoryItems } from "../utils/inventoryFacade.js";
 
 const POLYMORPH_LISTENER_INSTALLED = Symbol.for("jshack:polymorph:listener:installed");
 
@@ -112,14 +113,11 @@ export function resolvePolymorph(world, req = {}) {
   });
   if (def.equipment) equipMonster(world, spawnedId, def.equipment);
 
-  const oldInv = world.get(entityId, Inventory);
-  const newInv = world.get(spawnedId, Inventory);
-  if (oldInv && newInv && Array.isArray(oldInv.items) && oldInv.items.length > 0) {
-    for (const itemId of oldInv.items) {
-      if (world.isAlive(itemId) && !newInv.items.includes(itemId)) newInv.items.push(itemId);
-    }
+  for (const itemId of inventoryItems(world, entityId)) {
+    if (world.isAlive(itemId)) addToInventory(world, spawnedId, itemId);
   }
 
+  destroyInventoryRoot(world, entityId);
   try { world.destroy(entityId); } catch {}
   invalidateTileQueryCache(world);
 
@@ -155,4 +153,3 @@ export function installPolymorphListener(world) {
 
 // Reserved for future queued/intents-based polymorphs.
 export function polymorphSystem() {}
-

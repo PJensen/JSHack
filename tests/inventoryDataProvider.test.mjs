@@ -10,6 +10,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Status } from "../src/rules/components/Status.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 function makeEquipItem(world, identity, name, slot) {
   const id = world.create();
@@ -40,8 +41,8 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
   const sword = makeEquipItem(world, "sword_plain", "Plain Sword", "weapon");
   const boots = makeEquipItem(world, "boots_leather", "Leather Boots", "feet");
 
-  const inv = world.get(player, Inventory);
-  inv.items.push(sword, boots);
+  addToInventory(world, player, sword);
+  addToInventory(world, player, boots);
   const eq = world.get(player, Equipment);
   eq.weapon = sword;
 

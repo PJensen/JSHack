@@ -3,17 +3,16 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { createCorpse } from "../src/rules/archetypes/Food.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
-import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("use runtime resolves wand payload object and consumes one charge", () => {
   const world = new World({ seed: 3301 });
   const actor = createPlayer(world, { x: 0, y: 0, name: "Caster" });
-  const inv = world.get(actor, Inventory);
   const wand = buildCatalogItem(world, "wand_lightning");
-  inv.items.push(wand);
+  addToInventory(world, actor, wand);
 
   const results = [];
   world.on("interaction:result", (ev) => results.push(ev));
@@ -34,7 +33,6 @@ Deno.test("use runtime resolves wand payload object and consumes one charge", ()
 Deno.test("use runtime resolves corpse consumable payload object and can cancel", () => {
   const world = new World({ seed: 3302 });
   const actor = createPlayer(world, { x: 0, y: 0, name: "Hero" });
-  const inv = world.get(actor, Inventory);
 
   const corpse = createCorpse(world, {
     id: "test_cancel",
@@ -43,7 +41,7 @@ Deno.test("use runtime resolves corpse consumable payload object and can cancel"
     massKg: 5,
     tier: 0,
   }, { x: 0, y: 0 });
-  inv.items.push(corpse);
+  addToInventory(world, actor, corpse);
 
   const results = [];
   world.on("interaction:result", (ev) => results.push(ev));

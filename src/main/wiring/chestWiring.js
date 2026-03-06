@@ -3,9 +3,9 @@ import { Inventory } from "../../rules/components/Inventory.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import {
-  addItemEntityToInventory,
-  findInventoryStackTargetForItem,
-} from "../../rules/utils/inventoryStacking.js";
+  inventoryItems, inventoryContains, addToInventory,
+  removeFromInventory, hasCapacityForItem, transferItem,
+} from "../../rules/utils/inventoryFacade.js";
 import { buildItemDisplayData } from "./itemName.js";
 
 const INSTALLED = Symbol.for("jshack:main:chestWiring:installed");
@@ -28,24 +28,19 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
   }
 
   function dispatchChestData(chestId) {
-    const inv = world.get(chestId, Inventory);
-    if (!inv) return;
     const chestItems = [];
-    for (const id of (inv.items || [])) {
+    for (const id of inventoryItems(world, chestId)) {
       const detail = buildChestItemDetail(id);
       if (detail) chestItems.push(detail);
     }
     const pe = playerEntity(world);
     const playerItems = [];
     if (pe) {
-      const playerInv = world.get(pe.id, Inventory);
-      if (playerInv) {
-        for (const id of playerInv.items) {
-          const info = world.get(id, ItemInfo);
-          if (!info || info.type === "currency") continue;
-          const detail = buildItemDisplayData(world, id);
-          if (detail) playerItems.push(detail);
-        }
+      for (const id of inventoryItems(world, pe.id)) {
+        const info = world.get(id, ItemInfo);
+        if (!info || info.type === "currency") continue;
+        const detail = buildItemDisplayData(world, id);
+        if (detail) playerItems.push(detail);
       }
     }
     try {
@@ -76,26 +71,16 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     const pe = playerEntity(world);
     if (!pe) return;
 
-    const chestInv = world.get(chestId, Inventory);
-    if (!chestInv) return;
+    if (!inventoryContains(world, chestId, itemId)) return;
 
-    const idx = chestInv.items.indexOf(itemId);
-    if (idx === -1) return;
-
-    const playerInv = world.get(pe.id, Inventory);
-    const stackIntoId = playerInv ? findInventoryStackTargetForItem(world, playerInv, itemId) : 0;
-    const needsSlot = playerInv ? (!stackIntoId && !playerInv.items.includes(itemId)) : false;
-    if (playerInv && playerInv.capacity != null && playerInv.items.length >= playerInv.capacity && needsSlot) {
+    if (!hasCapacityForItem(world, pe.id, itemId)) {
       log("Your inventory is full.");
       return;
     }
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
 
-    chestInv.items.splice(idx, 1);
-    if (playerInv) {
-      addItemEntityToInventory(world, playerInv, itemId);
-    }
+    transferItem(world, itemId, chestId, pe.id);
 
     log(`You take ${bracketizeName(itemName)} from the chest.`);
 
@@ -111,26 +96,17 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     const pe = playerEntity(world);
     if (!pe) return;
 
-    const chestInv = world.get(chestId, Inventory);
-    if (!chestInv) return;
     const info = world.get(itemId, ItemInfo);
     if (!info || !world.isAlive(itemId)) return;
 
-    const stackIntoId = findInventoryStackTargetForItem(world, chestInv, itemId, { allowUnpaidStack: true });
-    const needsSlot = !stackIntoId && !chestInv.items.includes(itemId);
-    if (chestInv.capacity != null && chestInv.items.length >= chestInv.capacity && needsSlot) {
+    if (!hasCapacityForItem(world, chestId, itemId)) {
       log("The chest is full.");
       return;
     }
 
-    const playerInv = world.get(pe.id, Inventory);
-    let ownedByPlayer = false;
-    if (playerInv) {
-      const idx = playerInv.items.indexOf(itemId);
-      if (idx !== -1) {
-        playerInv.items.splice(idx, 1);
-        ownedByPlayer = true;
-      }
+    if (!inventoryContains(world, pe.id, itemId)) {
+      log("You don't seem to be carrying that.");
+      return;
     }
 
     const eq = world.get(pe.id, Equipment);
@@ -138,18 +114,13 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
       for (const slot of GEAR_SLOTS) {
         if (eq[slot] === itemId) {
           eq[slot] = null;
-          ownedByPlayer = true;
           break;
         }
       }
     }
-    if (!ownedByPlayer) {
-      log("You don't seem to be carrying that.");
-      return;
-    }
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
-    addItemEntityToInventory(world, chestInv, itemId, { allowUnpaidStack: true });
+    transferItem(world, itemId, pe.id, chestId);
     log(`You put ${bracketizeName(itemName)} in the chest.`);
 
     dispatchChestData(chestId);

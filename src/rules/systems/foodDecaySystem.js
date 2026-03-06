@@ -9,17 +9,15 @@ import { ItemInfo } from '../components/ItemInfo.js';
 import { FoodDecay } from '../components/FoodDecay.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { getDecayStage } from '../data/food.js';
+import { inventoryItems } from '../utils/inventoryFacade.js';
 
 /**
  * foodDecaySystem — advances food rot for items held in inventories.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function foodDecaySystem(world) {
-  for (const [ownerId, inv] of world.query(Inventory)) {
-    if (!inv || !Array.isArray(inv.items)) continue;
-
-    for (let i = 0; i < inv.items.length; i++) {
-      const itemId = inv.items[i];
+  for (const [ownerId] of world.query(Inventory)) {
+    for (const itemId of inventoryItems(world, ownerId)) {
       const decay = world.get(itemId, FoodDecay);
       if (!decay) continue;
 

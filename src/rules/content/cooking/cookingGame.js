@@ -5,6 +5,7 @@
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
+import { inventoryItems, inventoryContains } from "../../utils/inventoryFacade.js";
 import { FoodDecay } from "../../components/FoodDecay.js";
 import { transmogrify } from "../../utils/transmogrify.js";
 import { SHELF_LIFE_RATION } from "../../data/food.js";
@@ -16,13 +17,10 @@ import { SHELF_LIFE_RATION } from "../../data/food.js";
  * @returns {{ corpses: number[], herbs: { count: number, items: number[] } }}
  */
 function gatherCookables(world, actor) {
-  const inv = world.get(actor, Inventory);
   const corpses = [];
   const herbs = { count: 0, items: [] };
 
-  if (!inv || !Array.isArray(inv.items)) return { corpses, herbs };
-
-  for (const itemId of inv.items) {
+  for (const itemId of inventoryItems(world, actor)) {
     if (!(itemId > 0) || !world.isAlive(itemId)) continue;
     const ni = world.get(itemId, NamedIdentity);
     if (!ni) continue;
@@ -58,8 +56,7 @@ export function emitCookingFireOpen(world, actor, targetId) {
  * @param {number} corpseItemId
  */
 export function cookAtFire(world, actor, targetId, corpseItemId) {
-  const inv = world.get(actor, Inventory);
-  if (!inv || !Array.isArray(inv.items) || !inv.items.includes(corpseItemId)) {
+  if (!inventoryContains(world, actor, corpseItemId)) {
     world.emit?.("cooking:failed", { actor, targetId, itemId: corpseItemId, reason: "not_owned" });
     return;
   }
@@ -72,31 +69,20 @@ export function cookAtFire(world, actor, targetId, corpseItemId) {
 
   const fromName = ni.name || "corpse";
 
-  // Exit tick context so transmogrify's template entity creation and the
-  // FoodDecay reset are immediate rather than deferred. Without this,
-  // world.add() during a tick queues ops that haven't been applied yet,
-  // so transmogrify's world.get() on the template returns null and the
-  // corpse-to-ration conversion silently does nothing.
-  const wasTicking = world._inTick;
-  world._inTick = false;
-  try {
-    const result = transmogrify(world, corpseItemId, "food_ration");
-    if (!result.ok) {
-      world.emit?.("cooking:failed", { actor, targetId, itemId: corpseItemId, reason: "transmogrify_failed" });
-      return;
-    }
+  const result = transmogrify(world, corpseItemId, "food_ration");
+  if (!result.ok) {
+    world.emit?.("cooking:failed", { actor, targetId, itemId: corpseItemId, reason: "transmogrify_failed" });
+    return;
+  }
 
-    // Reset decay — freshly cooked food with ration shelf life.
-    if (world.has(corpseItemId, FoodDecay)) {
-      world.mutate(corpseItemId, FoodDecay, (fd) => {
-        fd.turnsHeld = 0;
-        fd.shelfLife = SHELF_LIFE_RATION;
-      });
-    } else {
-      world.add(corpseItemId, FoodDecay, { turnsHeld: 0, shelfLife: SHELF_LIFE_RATION });
-    }
-  } finally {
-    world._inTick = wasTicking;
+  // Reset decay — freshly cooked food with ration shelf life.
+  if (world.has(corpseItemId, FoodDecay)) {
+    world.mutate(corpseItemId, FoodDecay, (fd) => {
+      fd.turnsHeld = 0;
+      fd.shelfLife = SHELF_LIFE_RATION;
+    });
+  } else {
+    world.add(corpseItemId, FoodDecay, { turnsHeld: 0, shelfLife: SHELF_LIFE_RATION });
   }
 
   world.emit?.("cooking:cooked", {

@@ -7,6 +7,7 @@ import { getSpell } from "../data/spells.js";
 import { createEntityProxy } from "../interaction/entityProxy.js";
 import { ActionTransaction } from "../interaction/mutations.js";
 import { runSpellScript } from "../scripts/spells.js";
+import { inventoryContains } from "./inventoryFacade.js";
 
 /**
  * Base helpers shared by first-class action contexts.
@@ -288,9 +289,8 @@ export class ItemApplyActionContext extends RuleActionContext {
    * @returns {boolean}
    */
   hasBothItemsInInventory() {
-    const inv = this.getInventory();
-    if (!inv || !Array.isArray(inv.items)) return false;
-    return inv.items.includes(this.toolId) && inv.items.includes(this._targetId);
+    return inventoryContains(this.world, this._actorId, this.toolId)
+      && inventoryContains(this.world, this._actorId, this._targetId);
   }
 
   /**
@@ -329,9 +329,7 @@ export class ItemApplyActionContext extends RuleActionContext {
    * @returns {boolean}
    */
   consumeTool() {
-    const inv = this.getInventory();
-    if (!inv || !Array.isArray(inv.items)) return false;
-    if (!inv.items.includes(this.toolId)) return false;
+    if (!inventoryContains(this.world, this._actorId, this.toolId)) return false;
     this._queue.enqueue({ type: "consume", entityId: this.toolId, inventoryOwnerId: this._actorId });
     return true;
   }

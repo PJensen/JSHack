@@ -6,7 +6,7 @@ import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { Inventory } from "../../rules/components/Inventory.js";
+import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { AFFIX_DEFS } from "../../rules/data/affixes.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { Hunger } from "../../rules/components/Hunger.js";
@@ -47,10 +47,10 @@ export function createHudFeeds(world, deps) {
   let lastSpellMana = -1;
 
   function sumPlayerGold(playerId) {
-    const inv = /** @type any */ (world.get(playerId, Inventory));
-    if (!inv || !Array.isArray(inv.items)) return 0;
+    const items = inventoryItems(world, playerId);
+    if (!items.length) return 0;
     let total = 0;
-    for (const iid of inv.items) {
+    for (const iid of items) {
       const info = world.get(iid, ItemInfo);
       if (!info || info.type !== "currency") continue;
       total += Math.max(0, Number(info.count || 0) | 0);
@@ -161,12 +161,9 @@ export function createHudFeeds(world, deps) {
 
     // Count ammo in player inventory
     let ammo = 0;
-    const inv = /** @type any */ (world.get(pe.id, Inventory));
-    if (inv && Array.isArray(inv.items)) {
-      for (const iid of inv.items) {
-        const info = world.get(iid, ItemInfo);
-        if (info && info.type === 'ammo') ammo += Number(info.count || 1);
-      }
+    for (const iid of inventoryItems(world, pe.id)) {
+      const info = world.get(iid, ItemInfo);
+      if (info && info.type === 'ammo') ammo += Number(info.count || 1);
     }
 
     if (lastCombatHud.weaponId !== wid || lastCombatHud.rangedId !== rangedId || lastCombatHud.rangedCount !== rangedCount ||

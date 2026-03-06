@@ -18,6 +18,7 @@ const _CORPSE_SKIP_KEYS = new Set([
   'anvil', 'furnace', 'furnace_unlit', 'cooking_fire',
   'fountain', 'altar', 'shrine', 'statue', 'sarcophagus',
   'pillar', 'weapon_rack', 'mushrooms', 'web', 'torch',
+  'urn', 'ashes',
 ]);
 
 export function buildPalette() {

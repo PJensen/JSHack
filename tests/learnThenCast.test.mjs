@@ -2,8 +2,8 @@
 import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { createPlayer } from '../src/rules/archetypes/Player.js';
-import { Inventory } from '../src/rules/components/Inventory.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Brain } from '../src/rules/components/Brain.js';
 import { Mana } from '../src/rules/components/Mana.js';
@@ -22,7 +22,6 @@ Deno.test("learn spell then cast spell in separate ticks", () => {
   world.setScheduler((w) => scheduler(w));
 
   const player = createPlayer(world, { name: 'Mage' });
-  const inv = world.get(player, Inventory);
   const brain = world.get(player, Brain);
   const mana = world.get(player, Mana);
   mana.mana = 50; mana.maxMana = 50;
@@ -31,7 +30,7 @@ Deno.test("learn spell then cast spell in separate ticks", () => {
   const book = world.create();
   world.add(book, NamedIdentity, { name: 'Spellbook of Lightning', identity: 'book_lightning' });
   world.add(book, ItemInfo, { type: 'learn', slot: 'brain', weight: 1, value: 0, description: 'Teaches lightning', count: 1 });
-  inv.items.push(book);
+  addToInventory(world, player, book);
 
   console.log('Before learning - brain.learnedSpellIds:', JSON.stringify(brain.learnedSpellIds));
 
