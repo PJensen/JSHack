@@ -192,4 +192,22 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       try { ftext.addStatus(pos.x, pos.y - 0.3, line, { color: '#ff8c00', life: 1.0 }); } catch (e) { console.debug('[floatTextWiring] ftext failed:', e); }
     }
   });
+
+  // Gaze charge countdown: pips showing how many WAIT turns until paralysis.
+  // e.g. waitCount=2 of total=5 → "◈◈○○○"
+  world.on('proc:gaze:charged', ({ target, waitCount, total }) => {
+    const pos = getPosition(Number(target || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const filled = Math.max(0, Math.min(Number(waitCount) | 0, Number(total) | 0));
+    const empty  = Math.max(0, (Number(total) | 0) - filled);
+    const pips   = '◈'.repeat(filled) + '○'.repeat(empty);
+    try { ftext.addStatus(pos.x, pos.y - 0.5, pips, { color: '#cc66ff', life: 0.9 }); } catch (e) { console.debug('[floatTextWiring] gaze charged ftext failed:', e); }
+  });
+
+  // Gaze stun: "PARALYZED!" float text on the player.
+  world.on('proc:gaze:stun', ({ target }) => {
+    const pos = getPosition(Number(target || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    try { ftext.addStatus(pos.x, pos.y - 0.4, 'PARALYZED!', { color: '#cc66ff', life: 1.2 }); } catch (e) { console.debug('[floatTextWiring] gaze stun ftext failed:', e); }
+  });
 }
