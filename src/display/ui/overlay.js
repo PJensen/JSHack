@@ -326,6 +326,7 @@ export function initOverlays() {
       hide(applyPanel);
       hide(deathLog);
       hide(bookReader);
+      hide(settingsPanel);
       // Close debug graphs
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
@@ -2228,17 +2229,6 @@ function renderSettings(panel, data, memGraph, dtyGraph) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
-  // Close button (re-create since innerHTML cleared it)
-  const close = document.createElement('button');
-  close.textContent = '\u00D7';
-  Object.assign(close.style, {
-    position: 'absolute', right: '6px', top: '6px', width: '28px', height: '28px',
-    border: '1px solid #2d3b52', borderRadius: '6px', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer',
-  });
-  close.addEventListener('click', () => hide(panel));
-  el.appendChild(close);
-
   appendCharacterMenuTabs(el, 'settings');
 
   const content = document.createElement('div');
@@ -2611,13 +2601,20 @@ function renderCharacterSheet(panel, data) {
   const hint = document.createElement('div');
   hint.style.marginTop = '8px';
   hint.style.opacity = '0.85';
-  hint.textContent = 'I=Inventory · E=Equipment · Esc=Close';
+  hint.textContent = 'Tab=Next tab · I=Inventory · E=Equipment · Esc=Close';
   el.appendChild(hint);
 
   function onKey(e) {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'i' || k === 'I') {
+    if (k === 'Tab') {
+      const tabs = CHARACTER_MENU_TABS;
+      const curIdx = tabs.findIndex(t => t.key === 'character');
+      const next = tabs[(curIdx + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length];
+      window.dispatchEvent(new CustomEvent(next.eventName));
+      e.preventDefault();
+    }
+    else if (k === 'i' || k === 'I') {
       window.dispatchEvent(new CustomEvent('ui:openInventory'));
       e.preventDefault();
     }
