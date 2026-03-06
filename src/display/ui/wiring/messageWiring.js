@@ -927,4 +927,9 @@ export function installMessageWiring({
     const label = name ? bracketizeName(name) : `item ${itemId}`;
     log(`You unequip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
   });
+
+  // === Gaze events (Floating Eye) ===
+  world.on('proc:gaze:message', ({ message }) => {
+    if (typeof message === 'string') log(message, 'system');
+  });
 }
