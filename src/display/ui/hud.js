@@ -366,6 +366,21 @@ export function initHUD() {
         });
         btn.appendChild(labelSpan);
       }
+      if (!isMobile && btn.dataset.keyHint) {
+        const keySpan = document.createElement('span');
+        keySpan.textContent = btn.dataset.keyHint;
+        Object.assign(keySpan.style, {
+          position: 'absolute',
+          top: '2px',
+          right: '4px',
+          fontSize: '9px',
+          lineHeight: '1',
+          opacity: '0.8',
+          pointerEvents: 'none',
+          fontFamily: 'monospace',
+        });
+        btn.appendChild(keySpan);
+      }
       btn.title = desktopText || visibleText || '';
       btn.setAttribute('aria-label', desktopText || visibleText || 'Action');
     }
@@ -389,6 +404,11 @@ export function initHUD() {
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
   setBarLabel(bugBtn, 'Bug');
+  charBtn.dataset.keyHint = 'c';
+  petBtn.dataset.keyHint = 'p';
+  castBtn.dataset.keyHint = 'f';
+  shootBtn.dataset.keyHint = 'r';
+  prayBtn.dataset.keyHint = 'P';
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
