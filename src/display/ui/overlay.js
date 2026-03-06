@@ -308,6 +308,15 @@ export function initOverlays() {
     window.dispatchEvent(new CustomEvent('ui:requestMessageLogData'));
   });
   window.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      const tabPanels = [char, inv, equip, settingsPanel];
+      const curIdx = tabPanels.findIndex(p => p.style.display === 'block');
+      if (curIdx !== -1) {
+        e.preventDefault();
+        const next = CHARACTER_MENU_TABS[(curIdx + (e.shiftKey ? CHARACTER_MENU_TABS.length - 1 : 1)) % CHARACTER_MENU_TABS.length];
+        window.dispatchEvent(new CustomEvent(next.eventName));
+      }
+    }
     if (e.key === 'Escape') {
       hide(inv);
       hide(char);
@@ -2607,14 +2616,7 @@ function renderCharacterSheet(panel, data) {
   function onKey(e) {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'Tab') {
-      const tabs = CHARACTER_MENU_TABS;
-      const curIdx = tabs.findIndex(t => t.key === 'character');
-      const next = tabs[(curIdx + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length];
-      window.dispatchEvent(new CustomEvent(next.eventName));
-      e.preventDefault();
-    }
-    else if (k === 'i' || k === 'I') {
+    if (k === 'i' || k === 'I') {
       window.dispatchEvent(new CustomEvent('ui:openInventory'));
       e.preventDefault();
     }
