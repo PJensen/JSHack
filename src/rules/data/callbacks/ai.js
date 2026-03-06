@@ -253,7 +253,8 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
 
     // Wait-stun track: only advances when player uses WAIT action this turn.
     // WaitIntent is still on the entity at this point (ai phase runs before intents phase).
-    const isWaiting = !!ctx.world.get(ctx.target, WaitIntent);
+    // Use world.has (not world.get) — definitive presence check for marker components.
+    const isWaiting = ctx.world.has(ctx.target, WaitIntent);
     if (isWaiting) {
       rec.waitCount = (rec.waitCount || 0) + 1;
     } else {
@@ -277,7 +278,8 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5) {
       store.set(slot, rec);
       const aeStun = ctx.world.get(ctx.target, ActiveEffects);
       if (aeStun) {
-        aeStun.effects.push({ key: 'stun', turnsLeft: 5, potency: 1, stacks: 1 });
+        // turnsLeft: 6 so effectSystem's same-tick decrement leaves 5 full blocked turns.
+        aeStun.effects.push({ key: 'stun', turnsLeft: 6, potency: 1, stacks: 1 });
         ctx.world.set(ctx.target, ActiveEffects, aeStun);
       }
       ctx.emit('proc:gaze:stun', { actor: ctx.actor, target: ctx.target });
