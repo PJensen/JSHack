@@ -2511,6 +2511,59 @@ function drawVenomTagAura(ctx, e, fxTime) {
 }
 
 /**
+ * Draw a potion-shaped glow keyed off the "!" silhouette.
+ * The disabled-kind set lives in worldView so enabling/disabling stays trivial.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, kind:string, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawPotionGlyphAura(ctx, e, fxTime) {
+  const cx = e.pos.x;
+  const cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.1 + e.id * 0.83);
+  const look = palette[e.kind] || palette.potion || palette.default;
+  const glowHex = look?.glow || "#6bc7ff";
+  const fgHex = look?.fg || "#8fd7ff";
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '900 0.92px monospace';
+
+  ctx.shadowColor = glowHex;
+  ctx.shadowBlur = 10 + 6 * pulse;
+  ctx.fillStyle = `${glowHex}22`;
+  ctx.fillText('!', cx, cy);
+
+  ctx.shadowBlur = 4 + 2 * pulse;
+  ctx.fillStyle = `${fgHex}88`;
+  ctx.fillText('!', cx, cy);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = `${fgHex}55`;
+  ctx.beginPath();
+  ctx.arc(cx, cy + 0.23, 0.11 + 0.02 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Fallback unknown potion identities to the generic potion glyph instead of the
+ * default bullet. This keeps all potions rendering as "!" even when a new ID
+ * has not received a dedicated palette row yet.
+ * @param {Map<string, { canvas: HTMLCanvasElement }>} glyphAtlas
+ * @param {{ kind:string, tags:string[] }} e
+ * @returns {string}
+ */
+function resolveRenderableKind(glyphAtlas, e) {
+  const kind = (typeof e.kind === 'string') ? e.kind : 'default';
+  if (glyphAtlas.has(kind)) return kind;
+  if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) return 'potion';
+  return kind;
+}
+
+/**
  * Draw a small static star directly above the head of entities tagged with `rare`.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
@@ -2755,7 +2808,7 @@ function render(worldView) {
       continue;
     }
 
-    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
     if (shouldShowHealthBar(e, _fxTime)) {
       _healthBarsToDraw.push(e);
     }
@@ -2766,6 +2819,9 @@ function render(worldView) {
     }
     if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
       drawVenomTagAura(bctx, e, _fxTime);
+    }
+    if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
+      drawPotionGlyphAura(bctx, e, _fxTime);
     }
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
       drawRareStar(bctx, e, _fxTime);
@@ -3080,12 +3136,15 @@ function render(worldView) {
   for (let i = 0; i < deferredItems.length; i++) {
     const e = deferredItems[i];
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    drawKind(glyphAtlas, bctx, k, e.pos.x, e.pos.y);
+    drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
       drawGlowingTagAura(bctx, e, _fxTime);
     }
     if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
       drawVenomTagAura(bctx, e, _fxTime);
+    }
+    if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
+      drawPotionGlyphAura(bctx, e, _fxTime);
     }
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
       drawRareStar(bctx, e, _fxTime);
