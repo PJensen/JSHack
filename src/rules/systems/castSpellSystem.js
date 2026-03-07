@@ -61,9 +61,10 @@ function hashString32(value) {
 function resolveConfusedCast(world, actor, intendedSpell, learnedSpellIds) {
   const confusePower = statusStrength(world, actor, "confused");
   if (confusePower <= 0) return { kind: "normal", spell: intendedSpell };
-  // Blink handles confusion/hallucination inside its own targeting rules.
-  const intendedId = String(intendedSpell?.id || "");
-  if (intendedId === "blink" || intendedId === "phase_strike" || intendedId === "flash_heal") {
+  // Spells marked clearMindedCasting resolve normally even when confused
+  // (e.g. blink handles confusion inside its own targeting, flash_heal is
+  // a desperate reflex, phase_strike muscle memory).
+  if (intendedSpell?.clearMindedCasting) {
     return { kind: "normal", spell: intendedSpell };
   }
 

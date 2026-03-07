@@ -26,6 +26,8 @@
  * @property {number} [radius]
  * @property {number} [maxTargets]
  * @property {SpellEffectDef[]} [effects]
+ * @property {string[]} [schools]           // spell schools, e.g. ['destruction'], ['destruction','trickery']
+ * @property {boolean}  [clearMindedCasting] // true = resolves normally even when caster is confused
  */
 
 /** @type {Record<string, SpellDef>} */
@@ -34,6 +36,7 @@ export const SPELL_DEFS = {
     id: 'lightning',
     name: 'Lightning',
     symbol: '\u26A1',       // ⚡
+    schools: ['destruction'],
     manaCost: 7,
     minIntelligence: 8,
     range: 12,
@@ -50,6 +53,7 @@ export const SPELL_DEFS = {
     id: 'meteor',
     name: 'Meteor',
     symbol: '\u2604',       // ☄
+    schools: ['destruction'],
     manaCost: 12,
     minIntelligence: 0,
     range: 12,
@@ -66,6 +70,7 @@ export const SPELL_DEFS = {
     id: 'blastwave',
     name: 'Blast Wave',
     symbol: '\u25CE',       // ◎
+    schools: ['destruction'],
     manaCost: 7,
     minIntelligence: 0,
     script: 'blastwave',
@@ -81,6 +86,8 @@ export const SPELL_DEFS = {
     id: 'blink',
     name: 'Blink',
     symbol: '\u{1F3C3}',   // 🏃
+    schools: ['trickery'],
+    clearMindedCasting: true,
     manaCost: 6,
     minIntelligence: 0,
     range: 10,
@@ -125,6 +132,7 @@ export const SPELL_DEFS = {
     id: 'frost',
     name: 'Frost',
     symbol: '\u2744',       // ❄
+    schools: ['destruction'],
     manaCost: 5,
     minIntelligence: 0,
     script: 'frost',
@@ -139,6 +147,7 @@ export const SPELL_DEFS = {
     id: 'heal',
     name: 'Heal',
     symbol: '\u2764',       // ❤
+    schools: ['healing'],
     manaCost: 8,
     minIntelligence: 0,
     range: 6,
@@ -154,6 +163,8 @@ export const SPELL_DEFS = {
     id: 'flash_heal',
     name: 'Flash Heal',
     symbol: '\u2728',       // ✨
+    schools: ['healing'],
+    clearMindedCasting: true,
     manaCost: 14,
     minIntelligence: 0,
     script: 'flash_heal',
@@ -215,6 +226,8 @@ export const SPELL_DEFS = {
     id: 'phase_strike',
     name: 'Phase Strike',
     symbol: '\u2381',       // ⌁
+    schools: ['destruction', 'trickery'],
+    clearMindedCasting: true,
     manaCost: 10,
     minIntelligence: 0,
     range: 4,
