@@ -77,6 +77,20 @@ function pickRoomFeature(rng) {
   return ROOM_FEATURES[ROOM_FEATURES.length - 1].kind;
 }
 
+/** Pick a feature kind, optionally restricted to a string[] pool. */
+function _pickFeature(rng, pool) {
+  if (!pool) return pickRoomFeature(rng);
+  const candidates = ROOM_FEATURES.filter(f => pool.includes(f.kind));
+  if (candidates.length === 0) return pickRoomFeature(rng);
+  const total = candidates.reduce((s, f) => s + f.weight, 0);
+  let roll = rng.next() * total;
+  for (const f of candidates) {
+    roll -= f.weight;
+    if (roll <= 0) return f.kind;
+  }
+  return candidates[candidates.length - 1].kind;
+}
+
 /**
  * @typedef {Object} SpawnPoint
  * @property {number} x - world X
@@ -125,8 +139,9 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Place a room feature (~50% of non-entry rooms get one)
     const isEntryRoom = room === entryRoom;
     let roomHasWeaponRack = false;
-    if (!isEntryRoom && rng.next() < 0.50) {
-      const featureKind = pickRoomFeature(rng);
+    const featureRate = floorPlan.profile?.doorFeatureRate ?? 0.50;
+    if (!isEntryRoom && rng.next() < featureRate) {
+      const featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
       // Don't place a feature on a stair (or any other already-solid tile).
@@ -259,11 +274,21 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Hazard tile patches — paint ice / shallow water / lava near room center
     if (!isEntryRoom && room.w >= 4 && room.h >= 4) {
       const depth = floorPlan.depth;
-      const patchTile =
-        depth >= 12 && rng.next() < 0.05 ? TILE_LAVA :
-        depth >= 8  && rng.next() < 0.08 ? TILE_SHALLOW_WATER :
-        depth >= 3  && rng.next() < 0.08 ? TILE_ICE :
-        0;
+      const bias = floorPlan.profile?.hazardBias ?? null;
+      let patchTile = 0;
+      if (bias === 'water') {
+        if (rng.next() < 0.20) patchTile = TILE_SHALLOW_WATER;
+      } else if (bias === 'lava') {
+        if (rng.next() < 0.15) patchTile = TILE_LAVA;
+      } else if (bias === 'ice') {
+        if (rng.next() < 0.15) patchTile = TILE_ICE;
+      } else {
+        patchTile =
+          depth >= 12 && rng.next() < 0.05 ? TILE_LAVA :
+          depth >= 8  && rng.next() < 0.08 ? TILE_SHALLOW_WATER :
+          depth >= 3  && rng.next() < 0.08 ? TILE_ICE :
+          0;
+      }
       if (patchTile) {
         const pcx = room.x + Math.floor(room.w / 2);
         const pcy = room.y + Math.floor(room.h / 2);
@@ -351,7 +376,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       room.h === spawnRoom.h;
     return isDeadEnd && !isSpawnRoom;
   });
-  if (eligibleShopRooms.length > 0 && rng.next() < 0.30) {
+  const shopChance = floorPlan.profile?.shopChance ?? 0.30;
+  if (eligibleShopRooms.length > 0 && rng.next() < shopChance) {
     const room = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
 
     // Shop rooms must not start with regular dungeon enemies, spawners, or traps.
