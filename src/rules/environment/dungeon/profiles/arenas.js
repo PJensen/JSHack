@@ -19,4 +19,5 @@ export const ARENA_PROFILE = {
   doorChance:    0.0,     // no doors — open combat flow
   hazardBias:    'lava',
   featurePool:   ['statue', 'altar', 'chest'],
+  monsterFilter: def => (def.tags ?? []).some(t => ['humanoid', 'giant', 'demon', 'draconic'].includes(t)),
 };

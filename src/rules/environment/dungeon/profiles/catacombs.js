@@ -17,4 +17,5 @@ export const CATACOMB_PROFILE = {
   splitRatioMax: 0.55,
   corridorWidth: 1,
   doorChance:    0.9,     // near-every doorway gets a door
+  monsterFilter: def => (def.tags ?? []).some(t => ['undead', 'skeletal', 'spectral', 'humanoid'].includes(t)),
 };
