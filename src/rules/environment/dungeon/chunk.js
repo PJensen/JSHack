@@ -41,6 +41,10 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null) 
   carveRooms(tree, tiles, CHUNK_SIZE);
   connectRooms(tree, tiles, CHUNK_SIZE, rng, profile);
 
+  // Post-process: mutate tiles before edge gates are carved.
+  // Edge gates always run after, so they are never blocked by post-processing.
+  if (profile?.postProcess) profile.postProcess(tiles, rng, CHUNK_SIZE);
+
   // Collect rooms in world coordinates
   const localRooms = collectLeafRooms(tree);
   const ox = chunkX * CHUNK_SIZE;

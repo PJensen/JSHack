@@ -10,6 +10,7 @@ import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
+import { isIdentified } from "../../data/identification.js";
 import { inventoryContains } from "../../utils/inventoryFacade.js";
 
 /**
@@ -137,6 +138,9 @@ export function createFacets(init) {
     identity(entityId) {
       const ni = /** @type any */ (world.get(entityId | 0, NamedIdentity));
       return String(ni?.identity || "");
+    },
+    isIdentified(identity) {
+      return isIdentified(String(identity || "").toLowerCase());
     },
     name(entityId) {
       const ni = /** @type any */ (world.get(entityId | 0, NamedIdentity));

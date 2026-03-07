@@ -23,8 +23,6 @@ import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { creatureTypeFromTags } from "../components/CreatureType.js";
-import { buildCatalogItem } from "../data/itemCatalogLoader.js";
-import { getMonster } from "../data/monsters.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
@@ -50,7 +48,7 @@ function isEffectImmune(world, entityId, effectKey) {
  * @param {any} world
  * @param {MutationOp} op
  */
-export function applyMutation(world, op) {
+export function applyMutation(world, op, resolvers = {}) {
   switch (op.type) {
     case "damage": {
       dealDamage(world, {
@@ -216,6 +214,8 @@ export function applyMutation(world, op) {
       const itemId = String(op.itemId || "");
       if (!itemId) break;
 
+      const buildCatalogItem = resolvers.buildCatalogItem;
+      if (typeof buildCatalogItem !== "function") break;
       let created = 0;
       try {
         created = buildCatalogItem(world, itemId, {
@@ -288,6 +288,8 @@ export function applyMutation(world, op) {
       const monsterId = String(op.monsterId || "");
       if (!monsterId) break;
 
+      const getMonster = resolvers.getMonster;
+      if (typeof getMonster !== "function") break;
       const def = getMonster(monsterId);
       if (!def) break;
 
@@ -483,7 +485,9 @@ export function applyMutation(world, op) {
  */
 
 export class ActionTransaction {
-  constructor() {
+  /** @param {Record<string, Function>} [resolvers] */
+  constructor(resolvers = {}) {
+    this._resolvers = resolvers;
     /** @type {MutationOp[]} */
     this._ops = [];
     this._cancelled = false;
@@ -520,7 +524,7 @@ export class ActionTransaction {
     if (this._cancelled) return [];
     const applied = [];
     for (let i = 0; i < this._ops.length; i++) {
-      applyMutation(world, this._ops[i]);
+      applyMutation(world, this._ops[i], this._resolvers);
       applied.push(this._ops[i]);
     }
     this._ops.length = 0;
