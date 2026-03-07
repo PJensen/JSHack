@@ -1,7 +1,7 @@
 // rules/environment/dungeon/overworld.js
 // Deterministic depth-0 overworld generation (Perlin/fBM terrain + home clearing).
 
-import { createRng } from "../../../lib/ecs-js/rng.js";
+import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -29,86 +29,6 @@ export const OVERWORLD_EXTENT = Object.freeze({
 });
 
 function chunkKey(cx, cy) { return `${cx},${cy}`; }
-
-function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-function lerp(a, b, t) { return a + t * (b - a); }
-
-function grad(hash, x, y) {
-  const h = hash & 7;
-  switch (h) {
-    case 0: return x + y;
-    case 1: return -x + y;
-    case 2: return x - y;
-    case 3: return -x - y;
-    case 4: return x;
-    case 5: return -x;
-    case 6: return y;
-    default: return -y;
-  }
-}
-
-/**
- * @param {number} x
- * @param {number} y
- * @param {Uint8Array} perm
- */
-function perlin2(x, y, perm) {
-  const xi0 = Math.floor(x) & 255;
-  const yi0 = Math.floor(y) & 255;
-  const xi1 = (xi0 + 1) & 255;
-  const yi1 = (yi0 + 1) & 255;
-  const xf = x - Math.floor(x);
-  const yf = y - Math.floor(y);
-  const u = fade(xf);
-  const v = fade(yf);
-  const aa = perm[perm[xi0] + yi0];
-  const ab = perm[perm[xi0] + yi1];
-  const ba = perm[perm[xi1] + yi0];
-  const bb = perm[perm[xi1] + yi1];
-  const x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u);
-  const x2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u);
-  const out = lerp(x1, x2, v);
-  return Math.max(-1, Math.min(1, out));
-}
-
-/**
- * @param {number} seed
- */
-function buildPermutation(seed) {
-  const rng = createRng((seed ^ 0x9e3779b1) >>> 0);
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  for (let i = 255; i > 0; i--) {
-    const j = (rng.next() * (i + 1)) | 0;
-    const tmp = p[i];
-    p[i] = p[j];
-    p[j] = tmp;
-  }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
-
-/**
- * @param {number} x
- * @param {number} y
- * @param {Uint8Array} perm
- * @param {{scale:number,oct:number,persist:number,lacun:number}} cfg
- */
-function fbm01(x, y, perm, cfg) {
-  let amp = 1;
-  let freq = cfg.scale;
-  let sum = 0;
-  let ampSum = 0;
-  for (let i = 0; i < cfg.oct; i++) {
-    sum += amp * perlin2(x * freq, y * freq, perm);
-    ampSum += amp;
-    amp *= cfg.persist;
-    freq *= cfg.lacun;
-  }
-  const norm = sum / (ampSum || 1);
-  return 0.5 * (norm + 1);
-}
 
 /**
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks

@@ -6,11 +6,13 @@ import { DEFAULT_PROFILE } from './default.js';
 import { CATACOMB_PROFILE } from './catacombs.js';
 import { ARENA_PROFILE } from './arenas.js';
 import { CAVE_PROFILE } from './caves.js';
+import { GROTTO_PROFILE } from './grottos.js';
 
 export { DEFAULT_PROFILE } from './default.js';
 export { CATACOMB_PROFILE } from './catacombs.js';
 export { ARENA_PROFILE } from './arenas.js';
 export { CAVE_PROFILE } from './caves.js';
+export { GROTTO_PROFILE } from './grottos.js';
 
 /**
  * Pick a dungeon profile for the given depth.
@@ -24,6 +26,7 @@ export function pickProfile(rng, depth) {
   if (type === 'catacombs') return CATACOMB_PROFILE;
   if (type === 'arenas')    return ARENA_PROFILE;
   if (type === 'caves')     return CAVE_PROFILE;
+  if (type === 'grottos')   return GROTTO_PROFILE;
   // default: resolve theme by depth
   return { ...DEFAULT_PROFILE, theme: _pickTheme(rng, depth) };
 }
@@ -36,12 +39,19 @@ function _pickType(rng, depth) {
     if (r < 0.60) return 'catacombs';
     return 'default';
   }
-  // depth 9+: grottos added in slice 4
+  if (depth <= 15) {
+    // caves 35 %, grottos 30 %, arenas 20 %, default 15 %
+    const r = rng.next();
+    if (r < 0.35) return 'caves';
+    if (r < 0.65) return 'grottos';
+    if (r < 0.85) return 'arenas';
+    return 'default';
+  }
+  // depth 16+: grottos 35 %, arenas 35 %, caves 30 %
   const r = rng.next();
-  if (r < 0.35) return 'caves';
-  if (r < 0.55) return 'arenas';
-  if (r < 0.70) return 'catacombs';
-  return 'default';
+  if (r < 0.35) return 'grottos';
+  if (r < 0.70) return 'arenas';
+  return 'caves';
 }
 
 function _pickTheme(rng, depth) {
