@@ -174,13 +174,15 @@ export function connectRooms(node, tiles, stride, rng, profile = null) {
   const cx2 = roomR.x + Math.floor(roomR.w / 2);
   const cy2 = roomR.y + Math.floor(roomR.h / 2);
 
+  const corridorWidth = profile?.corridorWidth ?? 1;
+
   // Randomly choose horizontal-first or vertical-first
   if (rng.next() < 0.5) {
-    _carveCorridorH(tiles, stride, cx1, cy1, cx2, cy1); // horizontal
-    _carveCorridorV(tiles, stride, cx2, cy1, cx2, cy2); // vertical
+    _carveCorridorH(tiles, stride, cx1, cy1, cx2, corridorWidth);
+    _carveCorridorV(tiles, stride, cx2, cy1, cy2, corridorWidth);
   } else {
-    _carveCorridorV(tiles, stride, cx1, cy1, cx1, cy2); // vertical
-    _carveCorridorH(tiles, stride, cx1, cy2, cx2, cy2); // horizontal
+    _carveCorridorV(tiles, stride, cx1, cy1, cy2, corridorWidth);
+    _carveCorridorH(tiles, stride, cx1, cy2, cx2, corridorWidth);
   }
 }
 
@@ -219,31 +221,39 @@ function _collectRooms(node, out) {
 
 /**
  * Carve a horizontal corridor from (x1,y) to (x2,y).
- * Sets floor tiles and adds wall borders above and below.
+ * width=1: single tile row. width=2: two tile rows (y and y+1).
  */
-function _carveCorridorH(tiles, stride, x1, y, x2, _y) {
+function _carveCorridorH(tiles, stride, x1, y, x2, width = 1) {
   const lo = Math.min(x1, x2);
   const hi = Math.max(x1, x2);
   for (let x = lo; x <= hi; x++) {
     _setFloor(tiles, stride, x, y);
-    // Walls above and below
     _setWallIfVoid(tiles, stride, x, y - 1);
-    _setWallIfVoid(tiles, stride, x, y + 1);
+    if (width >= 2) {
+      _setFloor(tiles, stride, x, y + 1);
+      _setWallIfVoid(tiles, stride, x, y + 2);
+    } else {
+      _setWallIfVoid(tiles, stride, x, y + 1);
+    }
   }
 }
 
 /**
  * Carve a vertical corridor from (x,y1) to (x,y2).
- * Sets floor tiles and adds wall borders left and right.
+ * width=1: single tile column. width=2: two tile columns (x and x+1).
  */
-function _carveCorridorV(tiles, stride, x, y1, _x, y2) {
+function _carveCorridorV(tiles, stride, x, y1, y2, width = 1) {
   const lo = Math.min(y1, y2);
   const hi = Math.max(y1, y2);
   for (let y = lo; y <= hi; y++) {
     _setFloor(tiles, stride, x, y);
-    // Walls left and right
     _setWallIfVoid(tiles, stride, x - 1, y);
-    _setWallIfVoid(tiles, stride, x + 1, y);
+    if (width >= 2) {
+      _setFloor(tiles, stride, x + 1, y);
+      _setWallIfVoid(tiles, stride, x + 2, y);
+    } else {
+      _setWallIfVoid(tiles, stride, x + 1, y);
+    }
   }
 }
 
