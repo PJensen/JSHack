@@ -72,7 +72,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       sway: (Math.random() - 0.5) * 0.4,
       phase: Math.random() * Math.PI * 2,
       radius: 28 + Math.random() * 65,
-      alpha: 0.05 + Math.random() * 0.09,
+      alpha: 0.14 + Math.random() * 0.14,
       r: nc[0], g: nc[1], b: nc[2],
     });
   }
@@ -91,7 +91,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         const nc = BG_PART_COLORS[Math.floor(Math.random() * BG_PART_COLORS.length)];
         p.r = nc[0]; p.g = nc[1]; p.b = nc[2];
         p.radius = 28 + Math.random() * 65;
-        p.alpha = 0.05 + Math.random() * 0.09;
+        p.alpha = 0.14 + Math.random() * 0.14;
       }
       const grad = bgCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
       grad.addColorStop(0, `rgba(${p.r},${p.g},${p.b},${p.alpha})`);
