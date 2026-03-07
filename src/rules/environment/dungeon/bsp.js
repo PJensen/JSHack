@@ -2,11 +2,17 @@
 // BSP (Binary Space Partition) tree for dungeon room generation.
 // Operates on a Uint8Array tile grid — no ECS dependency.
 
-import {
-  TILE_VOID, TILE_FLOOR, TILE_WALL,
-  MIN_LEAF_SIZE, MIN_ROOM_SIZE, MAX_ROOM_SIZE, ROOM_MARGIN,
-  SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, BSP_MAX_DEPTH,
-} from './constants.js';
+import { TILE_VOID, TILE_FLOOR, TILE_WALL } from './constants.js';
+
+// Fallback BSP parameters used when no profile is provided.
+// These mirror the values previously imported from constants.js.
+const _DEF_BSP_MAX_DEPTH   = 5;
+const _DEF_MIN_LEAF_SIZE   = 5;
+const _DEF_MIN_ROOM_SIZE   = 3;
+const _DEF_MAX_ROOM_SIZE   = 7;
+const _DEF_ROOM_MARGIN     = 1;
+const _DEF_SPLIT_RATIO_MIN = 0.40;
+const _DEF_SPLIT_RATIO_MAX = 0.60;
 
 /**
  * @typedef {Object} BSPNode
@@ -27,17 +33,23 @@ import {
  * @param {number} w - width
  * @param {number} h - height
  * @param {Object} rng - createRng() instance (needs .next(), .float(), .int())
- * @param {number} [depth=0] - current recursion depth
+ * @param {import('./profiles/default.js').DungeonProfile|null} [profile]
+ * @param {number} [_recursionDepth=0] - internal recursion counter; do not pass externally
  * @returns {BSPNode}
  */
-export function buildBSP(x, y, w, h, rng, depth = 0) {
+export function buildBSP(x, y, w, h, rng, profile = null, _recursionDepth = 0) {
+  const minLeafSize   = profile?.minLeafSize   ?? _DEF_MIN_LEAF_SIZE;
+  const bspMaxDepth   = profile?.bspMaxDepth   ?? _DEF_BSP_MAX_DEPTH;
+  const splitRatioMin = profile?.splitRatioMin ?? _DEF_SPLIT_RATIO_MIN;
+  const splitRatioMax = profile?.splitRatioMax ?? _DEF_SPLIT_RATIO_MAX;
+
   const node = { x, y, w, h, left: null, right: null, room: null, splitH: false };
 
   // Stop splitting if too small or max depth reached
-  const canSplitH = h >= 2 * MIN_LEAF_SIZE;
-  const canSplitV = w >= 2 * MIN_LEAF_SIZE;
+  const canSplitH = h >= 2 * minLeafSize;
+  const canSplitV = w >= 2 * minLeafSize;
 
-  if (depth >= BSP_MAX_DEPTH || (!canSplitH && !canSplitV)) {
+  if (_recursionDepth >= bspMaxDepth || (!canSplitH && !canSplitV)) {
     return node; // leaf
   }
 
@@ -55,17 +67,17 @@ export function buildBSP(x, y, w, h, rng, depth = 0) {
 
   // Pick split position
   const dim = splitH ? h : w;
-  const ratio = rng.float(SPLIT_RATIO_MIN, SPLIT_RATIO_MAX);
+  const ratio = rng.float(splitRatioMin, splitRatioMax);
   const split = Math.floor(dim * ratio);
-  // Clamp: each half must have at least MIN_LEAF_SIZE
-  const clamped = Math.max(MIN_LEAF_SIZE, Math.min(dim - MIN_LEAF_SIZE, split));
+  // Clamp: each half must have at least minLeafSize
+  const clamped = Math.max(minLeafSize, Math.min(dim - minLeafSize, split));
 
   if (splitH) {
-    node.left  = buildBSP(x, y, w, clamped, rng, depth + 1);
-    node.right = buildBSP(x, y + clamped, w, h - clamped, rng, depth + 1);
+    node.left  = buildBSP(x, y, w, clamped, rng, profile, _recursionDepth + 1);
+    node.right = buildBSP(x, y + clamped, w, h - clamped, rng, profile, _recursionDepth + 1);
   } else {
-    node.left  = buildBSP(x, y, clamped, h, rng, depth + 1);
-    node.right = buildBSP(x + clamped, y, w - clamped, h, rng, depth + 1);
+    node.left  = buildBSP(x, y, clamped, h, rng, profile, _recursionDepth + 1);
+    node.right = buildBSP(x + clamped, y, w - clamped, h, rng, profile, _recursionDepth + 1);
   }
 
   return node;
@@ -73,30 +85,35 @@ export function buildBSP(x, y, w, h, rng, depth = 0) {
 
 /**
  * Place a room inside each leaf node. Room is randomly sized and positioned
- * within the leaf bounds, respecting ROOM_MARGIN.
+ * within the leaf bounds, respecting roomMargin from the profile.
  * @param {BSPNode} node
  * @param {Object} rng
+ * @param {import('./profiles/default.js').DungeonProfile|null} [profile]
  */
-export function placeRooms(node, rng) {
+export function placeRooms(node, rng, profile = null) {
+  const minRoomSize = profile?.minRoomSize ?? _DEF_MIN_ROOM_SIZE;
+  const maxRoomSize = profile?.maxRoomSize ?? _DEF_MAX_ROOM_SIZE;
+  const roomMargin  = profile?.roomMargin  ?? _DEF_ROOM_MARGIN;
+
   if (node.left || node.right) {
     // Internal node: recurse
-    if (node.left)  placeRooms(node.left, rng);
-    if (node.right) placeRooms(node.right, rng);
+    if (node.left)  placeRooms(node.left, rng, profile);
+    if (node.right) placeRooms(node.right, rng, profile);
     return;
   }
 
   // Leaf: place a room
-  const maxW = node.w - 2 * ROOM_MARGIN;
-  const maxH = node.h - 2 * ROOM_MARGIN;
+  const maxW = node.w - 2 * roomMargin;
+  const maxH = node.h - 2 * roomMargin;
 
-  if (maxW < MIN_ROOM_SIZE || maxH < MIN_ROOM_SIZE) return; // too small
+  if (maxW < minRoomSize || maxH < minRoomSize) return; // too small
 
-  const rw = rng.int(MIN_ROOM_SIZE, Math.min(maxW, MAX_ROOM_SIZE));
-  const rh = rng.int(MIN_ROOM_SIZE, Math.min(maxH, MAX_ROOM_SIZE));
+  const rw = rng.int(minRoomSize, Math.min(maxW, maxRoomSize));
+  const rh = rng.int(minRoomSize, Math.min(maxH, maxRoomSize));
 
   // Random position within the leaf
-  const rx = node.x + ROOM_MARGIN + (maxW > rw ? rng.int(0, maxW - rw) : 0);
-  const ry = node.y + ROOM_MARGIN + (maxH > rh ? rng.int(0, maxH - rh) : 0);
+  const rx = node.x + roomMargin + (maxW > rw ? rng.int(0, maxW - rw) : 0);
+  const ry = node.y + roomMargin + (maxH > rh ? rng.int(0, maxH - rh) : 0);
 
   node.room = { x: rx, y: ry, w: rw, h: rh };
 }
@@ -137,13 +154,14 @@ export function carveRooms(node, tiles, stride) {
  * @param {Uint8Array} tiles
  * @param {number} stride
  * @param {Object} rng
+ * @param {import('./profiles/default.js').DungeonProfile|null} [profile]
  */
-export function connectRooms(node, tiles, stride, rng) {
+export function connectRooms(node, tiles, stride, rng, profile = null) {
   if (!node.left || !node.right) return;
 
   // Recurse first (bottom-up)
-  connectRooms(node.left, tiles, stride, rng);
-  connectRooms(node.right, tiles, stride, rng);
+  connectRooms(node.left, tiles, stride, rng, profile);
+  connectRooms(node.right, tiles, stride, rng, profile);
 
   // Find a room in each subtree
   const roomL = _findRoom(node.left);

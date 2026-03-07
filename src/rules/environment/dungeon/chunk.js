@@ -27,18 +27,19 @@ import {
  * @param {number} depth
  * @param {number} chunkX
  * @param {number} chunkY
+ * @param {import('./profiles/default.js').DungeonProfile|null} [profile]
  * @returns {ChunkData}
  */
-export function generateChunk(worldSeed, depth, chunkX, chunkY) {
+export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null) {
   const seed = chunkSeed(worldSeed, depth, chunkX, chunkY);
   const rng = createRng(seed);
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
 
   // BSP: build tree, place rooms, carve, connect
-  const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, rng);
-  placeRooms(tree, rng);
+  const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, rng, profile);
+  placeRooms(tree, rng, profile);
   carveRooms(tree, tiles, CHUNK_SIZE);
-  connectRooms(tree, tiles, CHUNK_SIZE, rng);
+  connectRooms(tree, tiles, CHUNK_SIZE, rng, profile);
 
   // Collect rooms in world coordinates
   const localRooms = collectLeafRooms(tree);
@@ -52,7 +53,8 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY) {
   _carveEdgeGates(tiles, worldSeed, depth, chunkX, chunkY, localRooms, rng);
 
   // Detect door positions
-  const doors = findDoorPositions(tiles, CHUNK_SIZE, rng, 0.6).map(d => ({
+  const doorChance = profile?.doorChance ?? 0.6;
+  const doors = findDoorPositions(tiles, CHUNK_SIZE, rng, doorChance).map(d => ({
     x: d.x + ox, y: d.y + oy,
   }));
 
