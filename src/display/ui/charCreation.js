@@ -38,6 +38,72 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     padding: '24px 20px', boxShadow: '0 0 60px rgba(40,80,160,0.25)',
   });
 
+  // ---- background particle canvas (behind the box) ----
+  box.style.position = 'relative';
+  box.style.zIndex = '1';
+
+  const bgCanvas = document.createElement('canvas');
+  Object.assign(bgCanvas.style, {
+    position: 'absolute', left: '0', top: '0',
+    width: '100%', height: '100%',
+    pointerEvents: 'none', zIndex: '0',
+  });
+  const bgCtx = bgCanvas.getContext('2d');
+  let bgRafId = null;
+
+  function resizeBgCanvas() {
+    bgCanvas.width = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+  }
+  resizeBgCanvas();
+  window.addEventListener('resize', resizeBgCanvas);
+
+  const BG_PART_COLORS = [
+    [50, 90, 200], [70, 50, 170], [30, 150, 190], [90, 70, 210], [50, 130, 245],
+  ];
+
+  const bgParts = [];
+  for (let i = 0; i < 18; i++) {
+    const nc = BG_PART_COLORS[Math.floor(Math.random() * BG_PART_COLORS.length)];
+    bgParts.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      vy: -(0.12 + Math.random() * 0.22),
+      sway: (Math.random() - 0.5) * 0.4,
+      phase: Math.random() * Math.PI * 2,
+      radius: 28 + Math.random() * 65,
+      alpha: 0.05 + Math.random() * 0.09,
+      r: nc[0], g: nc[1], b: nc[2],
+    });
+  }
+
+  function bgLoop() {
+    bgRafId = requestAnimationFrame(bgLoop);
+    const w = bgCanvas.width, h = bgCanvas.height;
+    bgCtx.clearRect(0, 0, w, h);
+    for (const p of bgParts) {
+      p.phase += 0.012;
+      p.x += p.sway + Math.sin(p.phase) * 0.3;
+      p.y += p.vy;
+      if (p.y + p.radius < 0) {
+        p.y = h + p.radius;
+        p.x = Math.random() * w;
+        const nc = BG_PART_COLORS[Math.floor(Math.random() * BG_PART_COLORS.length)];
+        p.r = nc[0]; p.g = nc[1]; p.b = nc[2];
+        p.radius = 28 + Math.random() * 65;
+        p.alpha = 0.05 + Math.random() * 0.09;
+      }
+      const grad = bgCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
+      grad.addColorStop(0, `rgba(${p.r},${p.g},${p.b},${p.alpha})`);
+      grad.addColorStop(1, `rgba(${p.r},${p.g},${p.b},0)`);
+      bgCtx.fillStyle = grad;
+      bgCtx.beginPath();
+      bgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      bgCtx.fill();
+    }
+  }
+  bgLoop();
+
   // ---- title row (title + help icon) ----
   const titleRow = document.createElement('div');
   Object.assign(titleRow.style, {
@@ -331,6 +397,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   box.appendChild(confirmBtn);
 
+  panel.appendChild(bgCanvas);
   panel.appendChild(box);
   document.body.appendChild(panel);
 
@@ -349,6 +416,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
 
   function dispose() {
+    if (bgRafId !== null) cancelAnimationFrame(bgRafId);
+    window.removeEventListener('resize', resizeBgCanvas);
     if (panel.parentNode) panel.parentNode.removeChild(panel);
   }
 
