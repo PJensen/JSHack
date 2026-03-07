@@ -8,6 +8,7 @@ Deno.test("rulesDispatch: castActiveSpell forwards target tile coordinates", () 
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 99);
@@ -29,6 +30,7 @@ Deno.test("rulesDispatch: castActiveSpell without spellId delegates to ui event"
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
   const dispatch = makeRulesDispatcher(world, () => 42);
 

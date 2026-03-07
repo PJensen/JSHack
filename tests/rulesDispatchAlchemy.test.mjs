@@ -8,6 +8,7 @@ Deno.test("rulesDispatch: brewAlchemy queues InteractIntent in brew mode", () =>
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 77);
@@ -26,6 +27,7 @@ Deno.test("rulesDispatch: brewAlchemy ignores invalid payloads", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 9);

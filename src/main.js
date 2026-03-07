@@ -308,7 +308,17 @@ let _pendingThrowTargeting = null;
 let _pendingEnemyTargeting = null;
 /** @type {{ x: number, y: number }|null} Keyboard targeting cursor (tile coords) */
 let _targetCursor = null;
-const throwFx = createThrowFxController({ world });
+const throwFx = createThrowFxController({
+  world,
+  resolveItemMeta: (itemId) => {
+    const ident = world.get(itemId, NamedIdentity);
+    const info = world.get(itemId, ItemInfo);
+    return {
+      identity: String(ident?.identity || ""),
+      isPotion: String(info?.type || "").toLowerCase() === "potion",
+    };
+  },
+});
 
 function getTargetedSpellConfig(spellId) {
   return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;

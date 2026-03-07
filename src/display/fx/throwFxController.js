@@ -2,8 +2,6 @@
 // Thrown-item arc animation, hiding, and input lock.
 
 import { drawKind } from "../passes/glyphs/atlas.js";
-import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { ItemInfo } from "../../rules/components/ItemInfo.js";
 
 const THROW_FX_SPEED_TILES_PER_SEC = 26;
 const THROW_FX_MIN_DURATION = 0.09;
@@ -11,9 +9,9 @@ const THROW_FX_MAX_DURATION = 0.32;
 const THROW_FX_ARC_HEIGHT = 0.38;
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, resolveItemMeta: (itemId:number) => {identity:string, isPotion:boolean} }} deps
  */
-export function createThrowFxController({ world }) {
+export function createThrowFxController({ world, resolveItemMeta }) {
   /** @type {Array<{ itemId:number, from:{x:number,y:number}, to:{x:number,y:number}, t:number, duration:number, kind:string, isPotion:boolean }>} */
   const _fx = [];
   const _hidden = new Set();
@@ -46,16 +44,15 @@ export function createThrowFxController({ world }) {
   }
 
   function resolveThrownKind(itemId, fallback = "") {
-    const ident = world.get(itemId, NamedIdentity);
-    const item = world.get(itemId, ItemInfo);
-    const identity = String(ident?.identity || "");
+    const meta = resolveItemMeta ? resolveItemMeta(itemId) : null;
+    const identity = String(meta?.identity || "");
     if (identity) return identity;
-    if (String(item?.type || "").toLowerCase() === "potion") return "potion";
+    if (meta?.isPotion) return "potion";
     return fallback || "default";
   }
 
   function isThrownPotion(itemId) {
-    return String(world.get(itemId, ItemInfo)?.type || "").toLowerCase() === "potion";
+    return !!(resolveItemMeta ? resolveItemMeta(itemId)?.isPotion : false);
   }
 
   function drawPotionThrowGlow(ctx, kind, x, y, pulse) {
