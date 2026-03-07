@@ -33,20 +33,32 @@ import {
 export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null) {
   const seed = chunkSeed(worldSeed, depth, chunkX, chunkY);
   const rng = createRng(seed);
-  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
 
-  // BSP: build tree, place rooms, carve, connect
-  const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, rng, profile);
-  placeRooms(tree, rng, profile);
-  carveRooms(tree, tiles, CHUNK_SIZE);
-  connectRooms(tree, tiles, CHUNK_SIZE, rng, profile);
+  let tiles;
+  let localRooms; // chunk-local coords; offset to world coords below
+
+  if (profile?.generator) {
+    // Custom generator bypasses BSP entirely.
+    // Returns { tiles, rooms } where rooms is chunk-local and synthesised for
+    // stair / edge-gate placement (the noise field is the real floor area).
+    const result = profile.generator(seed, chunkX, chunkY, CHUNK_SIZE);
+    tiles      = result.tiles;
+    localRooms = result.rooms;
+  } else {
+    // Standard BSP pipeline
+    tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+    const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, rng, profile);
+    placeRooms(tree, rng, profile);
+    carveRooms(tree, tiles, CHUNK_SIZE);
+    connectRooms(tree, tiles, CHUNK_SIZE, rng, profile);
+    localRooms = collectLeafRooms(tree);
+  }
 
   // Post-process: mutate tiles before edge gates are carved.
   // Edge gates always run after, so they are never blocked by post-processing.
   if (profile?.postProcess) profile.postProcess(tiles, rng, CHUNK_SIZE);
 
   // Collect rooms in world coordinates
-  const localRooms = collectLeafRooms(tree);
   const ox = chunkX * CHUNK_SIZE;
   const oy = chunkY * CHUNK_SIZE;
   const rooms = localRooms.map(r => ({
