@@ -127,7 +127,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
 
   for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
     for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
-      const chunkData = generateChunk(worldSeed, depth, cx, cy);
+      const chunkData = generateChunk(worldSeed, depth, cx, cy, floorPlan.profile);
 
       // Place stairs inside actual rooms (not at random positions that may be void).
       // Multiple down-stairs in the same chunk snap to successive rooms from the end

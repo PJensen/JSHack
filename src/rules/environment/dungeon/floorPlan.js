@@ -6,6 +6,7 @@ import { floorSeed } from './seed.js';
 import { CHUNK_SIZE } from './constants.js';
 import { dungeonConfig } from './dungeonConfig.js';
 import { OVERWORLD_EXTENT } from './overworld.js';
+import { pickProfile } from './profiles/index.js';
 
 /**
  * @typedef {Object} StairPlacement
@@ -23,6 +24,7 @@ import { OVERWORLD_EXTENT } from './overworld.js';
  * @property {StairPlacement[]} upStairs
  * @property {number} difficultyMult
  * @property {string} theme
+ * @property {import('./profiles/default.js').DungeonProfile} profile
  */
 
 /**
@@ -119,6 +121,8 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     maxCY: Math.max(...allChunkPositions.map(s => s.chunkY)) + padding,
   };
 
+  const profile = pickProfile(rng, depth);
+
   return {
     depth,
     seed,
@@ -126,7 +130,8 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     upStairs,
     extent,
     difficultyMult: 1.0 + (depth - 1) * 0.017,
-    theme: _pickTheme(rng, depth),
+    theme: profile.theme,
+    profile,
   };
 }
 
@@ -140,11 +145,4 @@ export function stairWorldPos(stair) {
     x: stair.chunkX * CHUNK_SIZE + stair.localX,
     y: stair.chunkY * CHUNK_SIZE + stair.localY,
   };
-}
-
-function _pickTheme(rng, depth) {
-  if (depth <= 3) return 'crypt';
-  if (depth <= 8) return rng.choice(['crypt', 'cave', 'sewer']);
-  if (depth <= 15) return rng.choice(['cave', 'mine', 'temple']);
-  return rng.choice(['abyss', 'temple', 'mine', 'hell']);
 }
