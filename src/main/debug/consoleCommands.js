@@ -131,7 +131,7 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
       type: 'spawnMonster', monsterId,
       x: spawnX, y: spawnY,
       emitEvent: true,
-    });
+    }, { getMonster });
     return `Spawned ${def.name} at (${spawnX}, ${spawnY})`;
   });
 

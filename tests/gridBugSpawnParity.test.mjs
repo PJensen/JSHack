@@ -24,6 +24,7 @@ import { pickSpecificMonster } from "../src/rules/environment/dungeon/tables.js"
 import { TILE_FLOOR, CHUNK_SIZE } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { applyMutation } from "../src/rules/interaction/mutations.js";
+import { getMonster } from "../src/rules/data/monsters.js";
 import { monsterSpawnerSystem } from "../src/rules/systems/monsterSpawnerSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 
@@ -88,7 +89,7 @@ Deno.test("grid_bug parity: debug spawn, dungeon spawn, and spawner child share 
     x: 2,
     y: 2,
     emitEvent: false,
-  });
+  }, { getMonster });
   const debugId = findEntityAt(world, 2, 2, "grid_bug");
   assert(debugId > 0, "debug-style spawn should create a grid bug");
 

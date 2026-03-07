@@ -3,6 +3,8 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Potion } from "../components/Potion.js";
+import { buildCatalogItem } from "../data/itemCatalogLoader.js";
+import { getMonster } from "../data/monsters.js";
 import { getSpell } from "../data/spells.js";
 import { createEntityProxy } from "../interaction/entityProxy.js";
 import { ActionTransaction } from "../interaction/mutations.js";
@@ -21,7 +23,7 @@ export class RuleActionContext {
    */
   constructor(world) {
     this.world = world;
-    this._queue = new ActionTransaction();
+    this._queue = new ActionTransaction({ buildCatalogItem, getMonster });
     /** @type {Set<string>} */
     this._prevented = new Set();
   }

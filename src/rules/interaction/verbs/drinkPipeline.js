@@ -1,6 +1,5 @@
 import { Potion } from "../../components/Potion.js";
 import { Vitality } from "../../components/Vitality.js";
-import { isIdentified } from "../../data/identification.js";
 
 /**
  * @param {any} hookOwner
@@ -142,7 +141,7 @@ export function drinkPipeline(ctx) {
     ? ctx.params.payload
     : null;
   const identity = String(ctx.query.identity(itemId) || "").toLowerCase();
-  const identified = isIdentified(identity);
+  const identified = ctx.query.isIdentified(identity);
   const state = {
     actor,
     itemId,
