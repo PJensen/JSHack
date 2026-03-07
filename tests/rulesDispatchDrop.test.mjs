@@ -8,6 +8,7 @@ Deno.test("rulesDispatch: dropItem adds DropIntent and ticks once", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 42);
@@ -26,6 +27,7 @@ Deno.test("rulesDispatch: dropItem forwards count when provided", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 7);
@@ -42,6 +44,7 @@ Deno.test("rulesDispatch: dropItem ignores invalid item ids", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 7);

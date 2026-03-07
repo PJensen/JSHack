@@ -44,7 +44,17 @@ Deno.test("throwFx uses potion glyph fallback for thrown potion items not presen
     affixes: [],
   });
 
-  const controller = createThrowFxController({ world });
+  const controller = createThrowFxController({
+    world,
+    resolveItemMeta: (itemId) => {
+      const ident = world.get(itemId, NamedIdentity);
+      const info = world.get(itemId, ItemInfo);
+      return {
+        identity: String(ident?.identity || ""),
+        isPotion: String(info?.type || "").toLowerCase() === "potion",
+      };
+    },
+  });
   controller.installListeners();
   world.emit("item:thrown", {
     itemId: potionId,

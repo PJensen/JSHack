@@ -8,6 +8,7 @@ Deno.test("rulesDispatch: altarOffer queues InteractIntent offer mode", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
     emit: () => { throw new Error("altarOffer should not emit directly"); },
     destroy: () => { throw new Error("altarOffer should not destroy directly"); },
   };
@@ -28,6 +29,7 @@ Deno.test("rulesDispatch: altarOffer ignores invalid payloads", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 7);

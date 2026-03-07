@@ -8,6 +8,7 @@ Deno.test("rulesDispatch: throwItem forwards target tile coordinates", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 77);
@@ -29,6 +30,7 @@ Deno.test("rulesDispatch: throwItem ignores invalid item ids", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const dispatch = makeRulesDispatcher(world, () => 7);
@@ -46,6 +48,7 @@ Deno.test("rulesDispatch: input lock blocks throw intents", () => {
   const world = {
     add: (...args) => addCalls.push(args),
     tick: (...args) => tickCalls.push(args),
+    get: () => null,
   };
 
   const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, "window");
