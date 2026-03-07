@@ -33,9 +33,13 @@ function toMonsterSpawnParams(def, depth) {
  * @param {Object} rng - createRng() instance
  * @param {number} depth
  */
-export function pickMonster(rng, depth) {
+export function pickMonster(rng, depth, monsterFilter = null) {
   const tier = Math.min(Math.floor((depth - 1) / 5), 3);
-  const pool = getMonstersByTier(tier);
+  let pool = getMonstersByTier(tier);
+  if (monsterFilter) {
+    const filtered = pool.filter(monsterFilter);
+    if (filtered.length > 0) pool = filtered;
+  }
   let def = rng.choice(pool);
 
   // Rare upgrade: cave_snake or cave_spider has a 5% chance to become a pit viper
@@ -148,9 +152,9 @@ export function pickSpecificSpawner(rng, monsterId, depth) {
  * @param {number} depth
  * @returns {{monsterType:Object, packSize:number, depth:number}}
  */
-export function pickSpawner(rng, depth) {
+export function pickSpawner(rng, depth, monsterFilter = null) {
   // Spawners use the same tier-based pool as individual monsters.
-  const monsterParams = pickMonster(rng, depth);
+  const monsterParams = pickMonster(rng, depth, monsterFilter);
 
   // Look up pack size based on monster's size class
   const packRange = PACK_SIZE_BY_CLASS[monsterParams.sizeClass] || PACK_SIZE_BY_CLASS['M'];

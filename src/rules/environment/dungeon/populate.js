@@ -186,7 +186,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
         attempts++;
       } while (isSolid(mx, my) && attempts < 10);
-      const sp = pickSpawner(rng, floorPlan.depth);
+      const sp = pickSpawner(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
       const isSpiderSpawner = sp.monsterType?.identity === 'spider' || sp.monsterType?.identity === 'cave_spider';
       if (!isSolid(mx, my)) {
         markSolid(mx, my);
@@ -205,7 +205,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         attempts++;
       } while (isSolid(mx, my) && attempts < 10);
       if (isSolid(mx, my)) continue;
-      const mp = pickMonster(rng, floorPlan.depth);
+      const mp = pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
       spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
       if (mp.identity === 'spider' || mp.identity === 'cave_spider') roomHasSpider = true;
     }
