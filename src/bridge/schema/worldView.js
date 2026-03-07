@@ -69,6 +69,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'agony',
 ]);
 const VENOM_GLOW_ITEM_KINDS = new Set(['nightfang_dagger', 'venomfang_dagger', 'nightfang', 'venomfang']);
+const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
@@ -127,6 +128,9 @@ function projectMonsterDefTags(kind, rec) {
  * @param {EntityView} rec
  */
 function projectItemAffixDisplayTags(kind, itemInfo, rec) {
+	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'potion' && !POTION_GLOW_DISABLED_KINDS.has(String(kind || ''))) {
+		if (!rec.tags.includes('potion_glow')) rec.tags.push('potion_glow');
+	}
 	if (!itemInfo || !Array.isArray(itemInfo.affixes)) return;
 	const affixes = itemInfo.affixes;
 	const hasAffix = (key) => affixes.includes(key) || affixes.includes(`affix:${key}`);
