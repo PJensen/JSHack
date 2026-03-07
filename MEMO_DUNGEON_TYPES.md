@@ -78,8 +78,8 @@ src/rules/environment/dungeon/
     caves.js            ← NEW: CA generator profile
     grottos.js          ← NEW: blob generator profile
   generators/
-    cellular.js         ← NEW: cellular automata tile generator
-    blob.js             ← NEW: drunk-walk blob generator
+    noise.js            ← NEW: extract perlin2 / buildPermutation / fbm01 from overworld.js
+    cellular.js         ← NEW: CA corner-erosion post-process (caves)
 ```
 
 ---
@@ -163,26 +163,33 @@ For every TILE_WALL tile, if ≥ 3 of its 4 orthogonal neighbours are TILE_FLOOR
 ---
 
 ### Grottos
-*Vast underground spaces, wet and open. Dedicated blob generator.*
+*Vast underground spaces, wet and open. Noise-based generator.*
+
+> **Note:** `overworld.js` already contains a full seeded Perlin implementation (`perlin2`, `buildPermutation`, `fbm01`). Grottos reuse this by extracting it to `generators/noise.js`. `overworld.js` is updated to import from there.
 
 | Field | Value | Reason |
 |---|---|---|
-| generator | `blobGenerator` | BSP rooms discarded; blob shapes instead |
+| generator | `noiseGenerator` | fBM noise field thresholded to floor/wall |
 | bspMaxDepth | — | N/A |
-| postProcess | `cellularAutomata` | Full CA smoothing after blob fill |
-| corridorWidth | — | N/A (generator handles corridors) |
+| postProcess | null | Noise field is naturally smooth; no CA needed |
+| corridorWidth | — | N/A (generator handles all tiles) |
 | doorChance | 0.0 | |
 | theme | 'cave' or 'sewer' | |
 | hazardBias | 'water' | Heavy water features |
 
-**`blobGenerator(rng, CHUNK_SIZE)`:**
-1. Fill array with TILE_WALL.
-2. Pick 3–5 random seed points in the interior.
-3. Drunk-walk from each seed for `CHUNK_SIZE * CHUNK_SIZE * 0.35` steps, carving TILE_FLOOR.
-4. Return tiles (edge gates and CA post-process applied after).
+**`noiseGenerator(seed, chunkX, chunkY, CHUNK_SIZE)`:**
+```
+perm = buildPermutation(seed)
+cfg  = { scale: 0.10, oct: 3, persist: 0.55, lacun: 2.0 }
+threshold = 0.48   ← tune for ~50% floor density
 
-**`cellularAutomata(tiles, rng, CHUNK_SIZE)`:**
-Standard B3/S12345 automaton (born if 3 floor neighbours, survives if 1–5). Run 4 iterations. Then: flood-fill from the largest connected region; any TILE_FLOOR not in the main region → TILE_WALL (connectivity repair). No isolated blobs escape.
+for each tile at chunk-local (lx, ly):
+  wx = chunkX * CHUNK_SIZE + lx
+  wy = chunkY * CHUNK_SIZE + ly
+  n = fbm01(wx, wy, perm, cfg)
+  tile = n < threshold ? TILE_FLOOR : TILE_WALL
+```
+Samples **world coordinates** → adjacent chunks tile seamlessly. Connectivity is implicit in the noise field at this scale; no repair pass needed. Edge gates are carved after generation as usual.
 
 ---
 
@@ -273,14 +280,15 @@ Each slice is independently testable. Complete and validate each before starting
 - [ ] Update `pickProfile` to include caves
 - **Validation:** Caves visibly organic. No isolated floor regions. Nav tests pass.
 
-### Slice 4 — Grotto generator (blob + full CA)
-*Goal: Grottos use drunk-walk blob generator + CA smoothing.*
+### Slice 4 — Grotto generator (noise-based)
+*Goal: Grottos use fBM noise generator extracted from overworld.js.*
 
-- [ ] Implement `blobGenerator` in `generators/blob.js`
-- [ ] Implement `cellularAutomata` (with connectivity repair) in `generators/cellular.js`
+- [ ] Extract `perlin2`, `buildPermutation`, `fbm01` from `overworld.js` into `generators/noise.js`
+- [ ] Update `overworld.js` to import from `generators/noise.js`
+- [ ] Implement `noiseGenerator` in `generators/noise.js`
 - [ ] Create `profiles/grottos.js`
 - [ ] Update `pickProfile` to include grottos
-- **Validation:** Grottos are open, cave-like. Connectivity repair verified. Nav tests pass.
+- **Validation:** Grottos seamlessly tile across chunk boundaries. Large open spaces visible. Nav tests pass.
 
 ### Slice 5 — Population integration
 *Goal: Profile drives hazard tiles, feature pool, door feature rate.*
