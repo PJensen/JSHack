@@ -16,6 +16,12 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   /** @type {BubblePopFx[]} */
   const _poisonBubblePops = [];
 
+  function clearTransientCloudState() {
+    _plasmaCloudFx.clear();
+    _poisonCloudFx.clear();
+    _poisonBubblePops.length = 0;
+  }
+
   // --- Particle helpers ---
   function spawnPlasmaCloudSparks(x, y, count = 8) {
     if (!fx?.pool) return;
@@ -411,6 +417,10 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
 
   // --- Listeners ---
   function installListeners() {
+    world.on('dungeon:transitioned', () => {
+      clearTransientCloudState();
+    });
+
     world.on('plasmaCloud:spawned', ({ cloudId, at, radius, turnsLeft }) => {
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       const id = Number(cloudId || 0) | 0;
