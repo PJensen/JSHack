@@ -1,7 +1,56 @@
 // rules/data/deities.js
 // Deity definitions. Pure data — no behavior, no display.
 
-/** @type {Record<string, import('../../lib/deity-js/deity.js').DeityOpts>} */
+/**
+ * @typedef {Object} TagKillReaction
+ * Fired on 'died' when the victim's identity has the given monster tag.
+ * @property {string}  tag           monster tag matched via monsterHasTag()
+ * @property {'action'|'offer'} type
+ * @property {string}  verb          deity.action verb (type='action') OR offer type (type='offer')
+ * @property {number}  [magnitude]   magnitude for action
+ * @property {string}  [target]      target label for action
+ * @property {number}  [value]       value for offer
+ * @property {string}  [alignment]   alignment for offer
+ */
+
+/**
+ * @typedef {Object} SpellSchoolReaction
+ * Fired on 'castSpell' when the cast spell belongs to the given school.
+ * @property {string}  school        must appear in spell.schools[]
+ * @property {string}  [spellId]     optional — narrows to one specific spell
+ * @property {'action'|'offer'} type
+ * @property {string}  verb
+ * @property {number}  [magnitude]
+ * @property {string}  [target]
+ * @property {number}  [value]
+ * @property {string}  [alignment]
+ */
+
+/**
+ * @typedef {Object} KillStreakConfig
+ * Consecutive kills within `window` turns escalate the deity reaction.
+ * @property {number} window         turns within which kills chain
+ * @property {number} minStreak      minimum streak before bonus fires
+ * @property {number} bonusPerKill   magnitude added per streak kill
+ * @property {number} maxBonus       magnitude cap
+ * @property {string} killAction     deity.action verb for the streak bonus
+ * @property {string} offerType      deity.offer type for the frenzy offering
+ * @property {number} offerFactor    offer value = bonus * offerFactor
+ * @property {string} offerAlignment
+ */
+
+/**
+ * @typedef {Object} DeityDef
+ * Full deity definition including deity-js opts and niche interaction specs.
+ * @property {TagKillReaction[]}    [tagKillReactions]
+ * @property {SpellSchoolReaction[]} [spellSchoolReactions]
+ * @property {Record<string,{type:'action'|'offer',verb:string,magnitude?:number,target?:string,value?:number,alignment?:string,message?:string}>} [specialHooks]
+ *   Keys: 'trap:triggered:enemy', 'trap:triggered:self', 'altar:offer:cursed', 'cooking:cooked:bonus'
+ *   Use '{deity}' in message as a placeholder for deity.name.
+ * @property {KillStreakConfig}     [killStreakConfig]
+ */
+
+/** @type {Record<string, import('../../lib/deity-js/deity.js').DeityOpts & DeityDef>} */
 export const DEITY_DEFS = {
   molkhar: {
     name: "Mol'Khar",
@@ -28,6 +77,18 @@ export const DEITY_DEFS = {
     thresholds: { wrath: 0.38, miracle: 0.55, demand: 0.32, omen: 0.28 },
     neglectThreshold: 50,
     killsAreOfferings: true, // blood of enemies feeds the war god
+    tagKillReactions: [
+      // Rival planar entities: their blood is a special offering
+      { tag: 'demon', type: 'offer', verb: 'rival_blood', value: 0.4, alignment: 'chaotic', target: 'rival_blood' },
+    ],
+    spellSchoolReactions: [
+      // Destructive magic is a form of combat offering
+      { school: 'destruction', type: 'offer', verb: 'arcane_violence', value: 0.15, alignment: 'chaotic', target: 'arcane_violence' },
+    ],
+    killStreakConfig: {
+      window: 8, minStreak: 2, bonusPerKill: 0.1, maxBonus: 0.5,
+      killAction: 'kill', offerType: 'frenzy', offerFactor: 0.5, offerAlignment: 'chaotic',
+    },
   },
 
   seraphine: {
@@ -54,6 +115,14 @@ export const DEITY_DEFS = {
     ledgerOpts: { decayHalfLife: 120 },  // remembers longer
     thresholds: { wrath: 0.45, miracle: 0.4, demand: 0.38, omen: 0.35 },
     neglectThreshold: 100,  // patient with neglect
+    tagKillReactions: [
+      // Undead purge offsets the kill penalty — slaying the unnatural is holy purification
+      { tag: 'undead', type: 'action', verb: 'protect', magnitude: 0.5, target: 'undead_purge' },
+    ],
+    spellSchoolReactions: [
+      // Phase strike is violent trickery — Seraphine disapproves
+      { school: 'trickery', spellId: 'phase_strike', type: 'action', verb: 'betray', magnitude: 0.1, target: 'violent_trickery' },
+    ],
   },
 
   loki: {
@@ -80,6 +149,21 @@ export const DEITY_DEFS = {
     ledgerOpts: { decayHalfLife: 60 },  // short memory
     thresholds: { wrath: 0.5, miracle: 0.6, demand: 0.25, omen: 0.2 },
     neglectThreshold: 30,  // gets bored quickly
+    spellSchoolReactions: [
+      // Spatial trickery pleases the trickster
+      { school: 'trickery', type: 'action', verb: 'steal', magnitude: 0.3, target: 'spell_trickery' },
+      // Phase strike is trickery AND violence — doubly delightful
+      { school: 'trickery', spellId: 'phase_strike', type: 'action', verb: 'betray', magnitude: 0.15, target: 'spell_violence_trick' },
+    ],
+    specialHooks: {
+      // Enemies triggering traps amuses the trickster (intentional or not)
+      'trap:triggered:enemy': { type: 'action', verb: 'steal', magnitude: 0.25, target: 'trap_prank' },
+      // Self-harm also amuses Loki — "you walked right into that one"
+      'trap:triggered:self':  { type: 'action', verb: 'betray', magnitude: 0.15, target: 'self_prank' },
+      // Loki loves the audacity of offering corrupted items
+      'altar:offer:cursed':   { type: 'action', verb: 'steal', magnitude: 0.35, target: 'cursed_offering',
+                                message: '{deity} cackles at your brazen offering!' },
+    },
   },
 
   gaia: {
@@ -106,6 +190,16 @@ export const DEITY_DEFS = {
     ledgerOpts: { decayHalfLife: 150 },  // ancient memory
     thresholds: { wrath: 0.4, miracle: 0.45, demand: 0.35, omen: 0.3 },
     neglectThreshold: 80,
+    tagKillReactions: [
+      // Aberrations against nature: undead are unnatural, slaying them is righteous
+      { tag: 'undead', type: 'action', verb: 'protect', magnitude: 0.3, target: 'unnatural_purge' },
+      // Killing nature's own children stings beyond the normal kill penalty
+      { tag: 'beast',  type: 'action', verb: 'destroy', magnitude: 0.3, target: 'natures_child' },
+    ],
+    specialHooks: {
+      // Cooking corpses closes the cycle — transformation rather than raw consumption
+      'cooking:cooked:bonus': { type: 'action', verb: 'protect', magnitude: 0.2, target: 'cycle_of_life' },
+    },
   },
 };
 
