@@ -9,6 +9,7 @@ import { Equipment } from '../components/Equipment.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
+import { buildSpellDamageSpec } from '../utils/spellDamage.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -102,6 +103,28 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
 }
 
 /**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {any} effect
+ * @returns {boolean}
+ */
+function applySpellEffectDamage(world, id, effect) {
+    const sourceId = Number(effect?.sourceId || 0) | 0;
+    if (!(sourceId > 0) || !world.isAlive(sourceId)) return false;
+    const key = String(effect?.key || '').toLowerCase();
+    const amount = Math.max(0, (Number(effect?.potency) || 0) * Math.max(1, Number(effect?.stacks) || 1));
+    if (!(amount > 0)) return true;
+    dealDamage(world, buildSpellDamageSpec(world, sourceId, id, {
+        spell: { id: String(effect?.spellId || key || 'spell') },
+        baseAmount: amount,
+        type: effectKeyToType(key),
+        cause: `spell:${String(effect?.spellId || key || 'effect')}`,
+        salt: world.step ^ (Number(effect?.startedAtTurn || 0) << 8),
+    }));
+    return true;
+}
+
+/**
  * effectSystem — per-tick effect resolver.
  * - Iterates entities with ActiveEffects
  * - Applies on-tick impacts (e.g., poison damage, regeneration)
@@ -150,7 +173,10 @@ export function effectSystem(world) {
             const def = EFFECTS_BY_KEY[key];
 
             if (def) {
-                applyEffectOperation(world, id, vit, def.operation, potency, stacks, key);
+                const handledBySpellDamage = (key === 'agony') && applySpellEffectDamage(world, id, e);
+                if (!handledBySpellDamage) {
+                    applyEffectOperation(world, id, vit, def.operation, potency, stacks, key);
+                }
                 for (let i = 0; i < def.statuses.length; i++) {
                     const statusType = String(def.statuses[i] || '');
                     if (!statusType) continue;
