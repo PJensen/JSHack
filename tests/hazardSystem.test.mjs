@@ -1,14 +1,25 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { Burned } from "../src/rules/components/Burned.js";
+import { Material } from "../src/rules/components/Material.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { PlasmaCloud } from "../src/rules/components/PlasmaCloud.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
-import { CHUNK_SIZE, TILE_FLOOR, TILE_GRASS, TILE_TREE } from "../src/rules/environment/dungeon/constants.js";
+import {
+  CHUNK_SIZE,
+  TILE_DOOR,
+  TILE_FENCE,
+  TILE_FLOOR,
+  TILE_GRASS,
+  TILE_TREE,
+  TILE_WALL,
+} from "../src/rules/environment/dungeon/constants.js";
 import { clearAll, getTile, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
+import { getDestroyedTileRecord, ROOF_BURN_TURNS } from "../src/rules/utils/destroyedTiles.js";
 import { spawnHazard } from "../src/rules/utils/hazardSpawn.js";
 import { spawnPlasmaCloud } from "../src/rules/utils/spawnPlasmaCloud.js";
 
@@ -18,6 +29,17 @@ function makeActor(world, x, y, hp, name = "Target", identity = "target") {
   world.add(id, Vitality, { hp, maxHp: Math.max(1, hp) });
   world.add(id, NamedIdentity, { name, identity });
   return id;
+}
+
+function addOverworldState(world) {
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, {
+    worldSeed: 0xC0FFEE,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+  });
+  return dungeonId;
 }
 
 Deno.test("spawnHazard tracks hazards in DungeonState.floorEntityIds", () => {
@@ -181,6 +203,7 @@ Deno.test("fire floor hazards burn tree tiles into grass", () => {
     assertEquals(burned[0].y, 5);
     assertEquals(burned[0].sourceKind, "dragon_whelp");
     assertEquals(burned[0].cause, "monster:firebreath");
+    assertEquals(burned[0].tileBefore, TILE_TREE);
   } finally {
     clearAll();
   }
@@ -231,6 +254,105 @@ Deno.test("fire floor hazards can spread to adjacent trees", () => {
       burned.some((event) => event.x === 6 && event.y === 5),
       "spread fire should emit tile:burned when the neighbor burns down",
     );
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("overworld fire hazards burn wooden structure tiles into ruin tiles", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_GRASS);
+  tiles[5 * CHUNK_SIZE + 5] = TILE_WALL;
+  tiles[5 * CHUNK_SIZE + 6] = TILE_DOOR;
+  tiles[5 * CHUNK_SIZE + 7] = TILE_FENCE;
+  loadChunk(0, 0, tiles);
+
+  try {
+    const world = new World({ seed: 9205 });
+    addOverworldState(world);
+    const burned = [];
+    world.on("tile:burned", (event) => burned.push(event));
+
+    spawnHazard(world, {
+      x: 5,
+      y: 5,
+      kind: "fire",
+      medium: "floor",
+      turnsLeft: 3,
+      radius: 0,
+      tickDamage: 0,
+      damageType: "fire",
+      cause: "wildfire",
+      meta: { fireSpreadChance: 1, fireSpreadTurns: 2 },
+    });
+
+    hazardSystem(world);
+    assertEquals(getTile(5, 5), TILE_FLOOR, "wooden wall should collapse to floor");
+    const wallScar = getDestroyedTileRecord(world, 5, 5);
+    assert(wallScar, "wall burn should persist its original tile");
+    assertEquals(wallScar.originalTile, TILE_WALL);
+    assertEquals(wallScar.roofTurnsLeft, ROOF_BURN_TURNS);
+
+    hazardSystem(world);
+    assertEquals(getTile(6, 5), TILE_FLOOR, "wooden door should burn open to floor");
+    const doorScar = getDestroyedTileRecord(world, 6, 5);
+    assert(doorScar, "door burn should persist its original tile");
+    assertEquals(doorScar.originalTile, TILE_DOOR);
+    assertEquals(doorScar.roofTurnsLeft, ROOF_BURN_TURNS);
+
+    hazardSystem(world);
+    assertEquals(getTile(7, 5), TILE_GRASS, "fence should burn away to grass");
+    assert(burned.some((event) => event.x === 5 && event.y === 5), "wall burn should emit tile:burned");
+    assert(burned.some((event) => event.x === 6 && event.y === 5), "door burn should emit tile:burned");
+    assert(burned.some((event) => event.x === 7 && event.y === 5), "fence burn should emit tile:burned");
+    const fenceScar = getDestroyedTileRecord(world, 7, 5);
+    assert(fenceScar, "fence burn should persist its original tile");
+    assertEquals(fenceScar.originalTile, TILE_FENCE);
+    assertEquals(fenceScar.roofTurnsLeft, 0);
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("fire floor hazards burn away flammable overworld props on their tile", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_GRASS);
+  loadChunk(0, 0, tiles);
+
+  try {
+    const world = new World({ seed: 9206 });
+    addOverworldState(world);
+    const burned = [];
+    world.on("entity:burned", (event) => burned.push(event));
+
+    const sign = world.create();
+    world.add(sign, Position, { x: 8, y: 8 });
+    world.add(sign, NamedIdentity, { name: "Tavern Sign", identity: "tavern_sign" });
+    world.add(sign, Material, { kind: "wood" });
+
+    spawnHazard(world, {
+      x: 8,
+      y: 8,
+      kind: "fire",
+      medium: "floor",
+      turnsLeft: 1,
+      radius: 0,
+      tickDamage: 0,
+      damageType: "fire",
+      cause: "wildfire",
+    });
+
+    hazardSystem(world);
+
+    assert(world.isAlive(sign), "burned prop should remain in-world so it can be rebuilt later");
+    assert(world.has(sign, Burned), "burned prop should be marked with Burned");
+    assertEquals(burned.length, 1);
+    assertEquals(burned[0].identity, "tavern_sign");
+    const ashes = [];
+    for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
+      if (ident.identity === "ashes") ashes.push(`${pos.x},${pos.y}`);
+    }
+    assertEquals(ashes, ["8,8"]);
   } finally {
     clearAll();
   }

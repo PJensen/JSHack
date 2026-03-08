@@ -2633,6 +2633,8 @@ const _exploredTileBuffer = [];
 const _healthBarState = new Map();
 /** @type {Set<number>} */
 const _healthBarSeen = new Set();
+/** @type {Set<string>} */
+const _roofCoverKeys = new Set();
 /** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
 const _healthBarsToDraw = [];
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
@@ -2788,6 +2790,42 @@ function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
   ctx.translate(x, y);
   ctx.scale(s, s);
   drawKind(atlas, ctx, kind, 0, 0);
+  ctx.restore();
+}
+
+function roofCellKey(x, y) {
+  return `${x | 0},${y | 0}`;
+}
+
+function drawRoofSmoke(ctx, roof, fxTime) {
+  if (!roof?.burning) return;
+  const phase = ((Math.imul((roof.x | 0) + 11, 1103515245) ^ Math.imul((roof.y | 0) + 17, 12345)) >>> 0) / 0xffffffff;
+  const bob = 0.5 + 0.5 * Math.sin(fxTime * 1.7 + phase * Math.PI * 2);
+  const cx = roof.x + (phase - 0.5) * 0.22;
+  const cy = roof.y - 0.18 - bob * 0.16;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(26,24,22,${(0.24 + bob * 0.16).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 0.22, 0.13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 0.08, cy - 0.14, 0.18, 0.11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx - 0.10, cy - 0.22, 0.15, 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = `rgba(255,122,34,${(0.14 + bob * 0.08).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(roof.x - 0.04, roof.y - 0.05, 0.05, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,210,120,${(0.08 + bob * 0.05).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(roof.x + 0.05, roof.y - 0.08, 0.03, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -3449,14 +3487,47 @@ function render(worldView) {
     ftext,
   });
 
+  _roofCoverKeys.clear();
   if (Array.isArray(worldView?.roofs) && worldView.roofs.length) {
     for (let i = 0; i < worldView.roofs.length; i++) {
       const roof = worldView.roofs[i];
       if (roof.x < vx0 || roof.x > vx1 || roof.y < vy0 || roof.y > vy1) continue;
+      _roofCoverKeys.add(roofCellKey(roof.x, roof.y));
       bctx.globalAlpha = Number.isFinite(roof.alpha) ? roof.alpha : 1.0;
       drawKind(glyphAtlas, bctx, roof.kind, roof.x, roof.y);
+      drawRoofSmoke(bctx, roof, _fxTime);
     }
     bctx.globalAlpha = 1.0;
+  }
+  if (typeof cloudFx.drawBurnPlumes === 'function') {
+    cloudFx.drawBurnPlumes(bctx);
+  }
+
+  if (_roofCoverKeys.size > 0) {
+    for (let i = 0; i < worldView.entities.length; i++) {
+      const e = worldView.entities[i];
+      if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
+      if (!Array.isArray(e.tags) || !e.tags.includes('flying')) continue;
+      if (!_roofCoverKeys.has(roofCellKey(e.pos.x, e.pos.y))) continue;
+
+      const flyingPresentation = flyingFx.getPresentation(e, _fxTime, cam.scale);
+      const renderEntity = flyingPresentation.progress > 0.001
+        ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+        : e;
+
+      drawFlyingShadow(bctx, flyingPresentation);
+      drawKindScaled(
+        glyphAtlas,
+        bctx,
+        resolveRenderableKind(glyphAtlas, renderEntity),
+        renderEntity.pos.x,
+        renderEntity.pos.y,
+        flyingPresentation.glyphScale
+      );
+      if (shouldShowHealthBar(renderEntity, _fxTime)) {
+        drawEntityHealthBar(bctx, renderEntity);
+      }
+    }
   }
 
   drawTargetingReticle({

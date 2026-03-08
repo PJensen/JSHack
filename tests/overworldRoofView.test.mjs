@@ -2,11 +2,14 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
-import { clearAll } from "../src/rules/environment/dungeon/tileMap.js";
+import { TILE_GRASS, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
+import { clearAll, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Position } from "../src/rules/components/Position.js";
+import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
+import { spawnHazard } from "../src/rules/utils/hazardSpawn.js";
 
 function posOfIdentity(world, identity) {
   for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
@@ -97,6 +100,53 @@ Deno.test("overworld roof shading bands run straight across each building instea
   assertEquals(roofAt(view, tavernInterior.x + 5, tavernInterior.y - 1)?.kind, "roof_thatch_shadow");
   assertEquals(roofAt(view, tavernInterior.x, tavernInterior.y + 4)?.kind, "roof_thatch_lit");
   assertEquals(roofAt(view, tavernInterior.x + 5, tavernInterior.y + 4)?.kind, "roof_thatch_lit");
+
+  clearAll();
+  clearExplored();
+});
+
+Deno.test("overworld roofs char and smoke as fire moves through a breached building", () => {
+  clearAll();
+  clearExplored();
+
+  const world = new World({ seed: 0xC0FFEE });
+  const spawn = initDungeon(world, { startDepth: 0 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Position, { x: spawn.x, y: spawn.y });
+
+  const tavernInterior = posOfIdentity(world, "tavern_keg");
+  let view = buildWorldView(world);
+  assert(roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should show before the shell is breached");
+  assert(roofHas(view, tavernInterior.x + 5, tavernInterior.y + 3), "rear tavern roof should initially be visible");
+
+  assert(setTile(tavernInterior.x, tavernInterior.y - 1, TILE_GRASS), "expected to open the tavern north wall to grass");
+  markDestroyedTile(world, {
+    x: tavernInterior.x,
+    y: tavernInterior.y - 1,
+    originalTile: TILE_WALL,
+    currentTile: TILE_GRASS,
+    destroyedAtTurn: world.step | 0,
+    burnedKind: "wall",
+    cause: "wildfire",
+  });
+  spawnHazard(world, {
+    x: tavernInterior.x,
+    y: tavernInterior.y - 1,
+    kind: "fire",
+    medium: "floor",
+    turnsLeft: 3,
+    radius: 0,
+    tickDamage: 0,
+    damageType: "fire",
+    cause: "wildfire",
+  });
+  view = buildWorldView(world);
+  assert(!roofHas(view, tavernInterior.x, tavernInterior.y), "roof should already be gone where the breach opened");
+  assert(String(roofAt(view, tavernInterior.x + 1, tavernInterior.y)?.kind || "").includes("charred"), "roof beside the breach should read as charred");
+  assertEquals(roofAt(view, tavernInterior.x + 1, tavernInterior.y)?.burning, true);
+  assert(roofHas(view, tavernInterior.x + 5, tavernInterior.y + 3), "roof should remain over still-enclosed tavern space");
 
   clearAll();
   clearExplored();

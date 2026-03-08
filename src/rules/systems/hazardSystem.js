@@ -3,9 +3,26 @@ import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Flying } from "../components/Flying.js";
-import { TILE_GRASS, TILE_TREE } from "../environment/dungeon/constants.js";
+import { Burned } from "../components/Burned.js";
+import { Collider } from "../components/Collider.js";
+import { Interactable } from "../components/Interactable.js";
+import { Material } from "../components/Material.js";
+import { DungeonState } from "../components/DungeonState.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import {
+  TILE_DOOR,
+  TILE_FENCE,
+  TILE_FLOOR,
+  TILE_GRASS,
+  TILE_TREE,
+  TILE_WALL,
+} from "../environment/dungeon/constants.js";
 import { getTile, setTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { MATERIAL_CATALOG } from "../data/materials.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { Ashes } from "../archetypes/Items.js";
+import { markDestroyedTile, ROOF_BURN_TURNS, tickDestroyedTileLedger } from "../utils/destroyedTiles.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -17,6 +34,86 @@ const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, 0],           [1, 0],
   [-1, 1],  [0, 1],  [1, 1],
 ]);
+const FLAMMABILITY_BY_MATERIAL = new Map(MATERIAL_CATALOG.map((entry) => [
+  String(entry?.id || entry?.Material?.kind || ""),
+  Number(entry?.Material?.flammability || 0),
+]));
+
+function isOverworld(world) {
+  for (const [, ds] of world.query(DungeonState)) {
+    return ds.currentDepth === 0 || ds.profileType === "overworld";
+  }
+  return false;
+}
+
+function getBurnedTileReplacement(tile, overworld) {
+  if (tile === TILE_TREE) return TILE_GRASS;
+  if (!overworld) return null;
+  if (tile === TILE_FENCE) return TILE_GRASS;
+  if (tile === TILE_DOOR) return TILE_FLOOR;
+  if (tile === TILE_WALL) return TILE_FLOOR;
+  return null;
+}
+
+function burnedTileKind(tile) {
+  if (tile === TILE_TREE) return "tree";
+  if (tile === TILE_FENCE) return "fence";
+  if (tile === TILE_DOOR) return "door";
+  if (tile === TILE_WALL) return "wall";
+  return "terrain";
+}
+
+function isRoofBearingBurn(tile) {
+  return tile === TILE_WALL || tile === TILE_DOOR;
+}
+
+function isFlammableFireSpreadTile(tile, overworld) {
+  if (tile === TILE_TREE) return true;
+  if (!overworld) return false;
+  return tile === TILE_FENCE || tile === TILE_DOOR || tile === TILE_WALL;
+}
+
+function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId, sourceKind) {
+  for (const [id, pos, mat] of world.query(Position, Material)) {
+    if (!pos || !mat) continue;
+    if ((pos.x | 0) !== (x | 0) || (pos.y | 0) !== (y | 0)) continue;
+    if (world.has(id, Vitality)) continue;
+    if (world.has(id, Burned)) continue;
+    const flammability = Number(FLAMMABILITY_BY_MATERIAL.get(String(mat.kind || "")) || 0);
+    if (!(flammability > 0)) continue;
+    const ident = world.get(id, NamedIdentity);
+    try {
+      world.emit?.("entity:burned", {
+        actor: source,
+        hazardId,
+        entityId: id,
+        x: x | 0,
+        y: y | 0,
+        cause,
+        sourceId,
+        sourceKind,
+        identity: String(ident?.identity || ""),
+        name: String(ident?.name || ""),
+        material: String(mat.kind || ""),
+      });
+    } catch { /* */ }
+    try {
+      const ashId = createFrom(world, Ashes, {});
+      world.add(ashId, Position, { x: x | 0, y: y | 0 });
+    } catch { /* */ }
+    try {
+      world.add(id, Burned, {
+        atTurn: world.step | 0,
+        cause,
+        sourceId,
+        sourceKind,
+        smokeTurnsLeft: 6,
+      });
+    } catch { /* */ }
+    try { if (world.has(id, Collider)) world.remove(id, Collider); } catch { /* */ }
+    try { if (world.has(id, Interactable)) world.remove(id, Interactable); } catch { /* */ }
+  }
+}
 
 function clampInt(value, fallback, min = 0) {
   const n = Number.isFinite(value) ? (value | 0) : fallback;
@@ -43,6 +140,8 @@ function getFireSpreadTurns(hazard, turnsBefore) {
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function hazardSystem(world) {
+  const overworld = isOverworld(world);
+  tickDestroyedTileLedger(world);
   const fireHazardCells = new Set();
   for (const [, pos, hazard] of world.query(Position, HazardArea)) {
     if (!pos || !hazard) continue;
@@ -71,8 +170,24 @@ export function hazardSystem(world) {
     /** @type {number[]} */
     const affectedIds = [];
 
-    if (kind === "fire" && medium === "floor" && getTile(pos.x, pos.y) === TILE_TREE) {
-      if (setTile(pos.x, pos.y, TILE_GRASS)) {
+    if (kind === "fire" && medium === "floor") {
+      burnFlammableEntitiesAt(world, pos.x, pos.y, source, hazardId, cause, sourceId, sourceKind);
+      const tileBefore = getTile(pos.x, pos.y);
+      const replacementTile = getBurnedTileReplacement(tileBefore, overworld);
+      if (replacementTile !== null && setTile(pos.x, pos.y, replacementTile)) {
+        const burnedKind = burnedTileKind(tileBefore);
+        markDestroyedTile(world, {
+          x: pos.x | 0,
+          y: pos.y | 0,
+          originalTile: tileBefore,
+          currentTile: replacementTile,
+          destroyedAtTurn: world.step | 0,
+          burnedKind,
+          cause,
+          sourceId,
+          sourceKind,
+          roofTurnsLeft: isRoofBearingBurn(tileBefore) ? ROOF_BURN_TURNS : 0,
+        });
         try {
           world.emit?.("tile:burned", {
             actor: source,
@@ -82,6 +197,9 @@ export function hazardSystem(world) {
             cause,
             sourceId,
             sourceKind,
+            burnedKind,
+            tileBefore,
+            tileAfter: replacementTile,
           });
         } catch { /* */ }
       }
@@ -96,7 +214,7 @@ export function hazardSystem(world) {
           const ny = (pos.y | 0) + dy;
           const key = `${nx},${ny}`;
           if (fireHazardCells.has(key)) continue;
-          if (getTile(nx, ny) !== TILE_TREE) continue;
+          if (!isFlammableFireSpreadTile(getTile(nx, ny), overworld)) continue;
           if ((world.rng?.() ?? Math.random()) >= spreadChance) continue;
 
           pendingFireSpreads.push({

@@ -28,11 +28,13 @@ import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { Burned } from "../../rules/components/Burned.js";
+import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ x:number, y:number, kind:string, alpha:number }} RoofTileView */
+/** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean }} RoofTileView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
@@ -90,6 +92,22 @@ function keyToXY(key) {
 }
 
 /**
+ * @param {string} key
+ * @param {Set<string>} candidates
+ * @param {number} radius
+ */
+function keyWithinRadius(key, candidates, radius = 1) {
+	if (!candidates?.size) return false;
+	const { x, y } = keyToXY(key);
+	for (let dy = -radius; dy <= radius; dy++) {
+		for (let dx = -radius; dx <= radius; dx++) {
+			if (candidates.has(xyKey(x + dx, y + dy))) return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Flood-fill one indoor floor region, then wrap it with any touching doors/walls for roof rendering.
  * @param {number} seedX
  * @param {number} seedY
@@ -99,6 +117,7 @@ function collectRoofedBuilding(seedX, seedY) {
 	const floorKeys = new Set();
 	const doorKeys = new Set();
 	const wallKeys = new Set();
+	const exposedFloorKeys = new Set();
 	const queue = [[seedX, seedY]];
 	const seen = new Set([xyKey(seedX, seedY)]);
 	const cardinal = [
@@ -123,6 +142,8 @@ function collectRoofedBuilding(seedX, seedY) {
 				queue.push([nx, ny]);
 			} else if (tile === TILE_DOOR) {
 				doorKeys.add(nextKey);
+			} else if (tile !== TILE_FLOOR && tile !== TILE_WALL) {
+				exposedFloorKeys.add(key);
 			}
 		}
 	}
@@ -143,7 +164,7 @@ function collectRoofedBuilding(seedX, seedY) {
 	}
 
 	if (!floorKeys.size) return null;
-	return { floorKeys, doorKeys, wallKeys };
+	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
 }
 
 /**
@@ -151,9 +172,26 @@ function collectRoofedBuilding(seedX, seedY) {
  * @param {Set<string>} doorKeys
  * @param {Set<string>} wallKeys
  * @param {number} alpha
+ * @param {boolean} burnActive
  */
-function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, alpha) {
-	const allKeys = [...wallKeys, ...doorKeys, ...floorKeys];
+function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, exposedFloorKeys, alpha, burnActive = false) {
+	const coveredFloorKeys = [...floorKeys].filter((key) => !exposedFloorKeys.has(key));
+	if (!coveredFloorKeys.length) return [];
+	const coveredShellKeys = new Set();
+	const shellCandidates = [...wallKeys, ...doorKeys];
+	for (let i = 0; i < shellCandidates.length; i++) {
+		const shellKey = shellCandidates[i];
+		const { x, y } = keyToXY(shellKey);
+		for (let dy = -1; dy <= 1; dy++) {
+			for (let dx = -1; dx <= 1; dx++) {
+				if (dx === 0 && dy === 0) continue;
+				if (floorKeys.has(xyKey(x + dx, y + dy)) && !exposedFloorKeys.has(xyKey(x + dx, y + dy))) {
+					coveredShellKeys.add(shellKey);
+				}
+			}
+		}
+	}
+	const allKeys = [...coveredShellKeys, ...coveredFloorKeys];
 	const doorKeySet = new Set(doorKeys);
 	let minY = Infinity;
 	let maxY = -Infinity;
@@ -165,8 +203,11 @@ function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, alpha) {
 	const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
 	return allKeys.map((key) => {
 		const { x, y } = keyToXY(key);
-		const tileAlpha = doorKeySet.has(key) ? alpha * 0.4 : alpha;
-		return { x, y, kind: y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit", alpha: tileAlpha };
+		const singed = burnActive || keyWithinRadius(key, exposedFloorKeys, 1);
+		const tileAlpha = (doorKeySet.has(key) ? alpha * 0.4 : alpha) * (burnActive ? 0.94 : (singed ? 0.92 : 1.0));
+		let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
+		if (singed) kind += "_charred";
+		return { x, y, kind, alpha: tileAlpha, burning: burnActive };
 	});
 }
 
@@ -182,6 +223,14 @@ function collectOverworldRoofs(world, playerPos) {
 	}
 	if (!isOverworld) return [];
 
+	const destroyedTiles = getDestroyedTileLedger(world);
+	const activeFireKeys = new Set();
+	for (const [, pos, hazard] of world.query(Position, HazardArea)) {
+		if (!pos || !hazard) continue;
+		if (String(hazard.kind || "").toLowerCase() !== "fire") continue;
+		if (String(hazard.medium || "air").toLowerCase() !== "floor") continue;
+		activeFireKeys.add(xyKey(pos.x, pos.y));
+	}
 	const playerKey = playerPos ? xyKey(playerPos.x, playerPos.y) : "";
 	const roofs = [];
 	const visited = new Set();
@@ -195,7 +244,35 @@ function collectOverworldRoofs(world, playerPos) {
 		if (floorKeys.some((key) => visited.has(key))) continue;
 		for (let i = 0; i < floorKeys.length; i++) visited.add(floorKeys[i]);
 		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) continue;
-		roofs.push(...roofTilesFromBuilding(building.floorKeys, building.doorKeys, building.wallKeys, 1.0));
+		const singedKeys = new Set(building.exposedFloorKeys);
+		for (const [key] of Object.entries(destroyedTiles || {})) {
+			if (
+				building.floorKeys.has(key)
+				|| building.doorKeys.has(key)
+				|| building.wallKeys.has(key)
+				|| keyWithinRadius(key, building.floorKeys, 1)
+			) singedKeys.add(key);
+		}
+		const roofTiles = roofTilesFromBuilding(
+			building.floorKeys,
+			building.doorKeys,
+			building.wallKeys,
+			building.exposedFloorKeys,
+			1.0,
+			false
+		);
+		for (let i = 0; i < roofTiles.length; i++) {
+			const key = xyKey(roofTiles[i].x, roofTiles[i].y);
+			if (keyWithinRadius(key, singedKeys, 1)) {
+				roofTiles[i].kind = roofTiles[i].kind.includes("_charred")
+					? roofTiles[i].kind
+					: `${roofTiles[i].kind}_charred`;
+			}
+			if (keyWithinRadius(key, activeFireKeys, 1)) {
+				roofTiles[i].burning = true;
+			}
+			roofs.push(roofTiles[i]);
+		}
 	}
 
 	return roofs;
@@ -361,6 +438,7 @@ export function buildWorldView(world) {
 		const y1 = _view.player.pos.y + viewR;
 		forEachInRect(world, x0, y0, x1, y1, (id, pos) => {
 			if (world.has(id, PlasmaCloud) || world.has(id, HazardArea)) return;
+			if (world.has(id, Burned)) return;
 			// Hide unrevealed traps — completely invisible until triggered
 			/** @type {any} */ const trap = /** @type any */ (world.get(id, Trap));
 			if (trap && !trap.revealed) return;
@@ -419,6 +497,7 @@ export function buildWorldView(world) {
 	} else {
 		for (const [id, pos] of world.query(Position)) {
 			if (world.has(id, PlasmaCloud) || world.has(id, HazardArea)) continue;
+			if (world.has(id, Burned)) continue;
 			// Hide unrevealed traps — completely invisible until triggered
 			/** @type {any} */ const trap2 = /** @type any */ (world.get(id, Trap));
 			if (trap2 && !trap2.revealed) continue;
