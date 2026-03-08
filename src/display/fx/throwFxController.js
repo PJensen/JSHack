@@ -2,6 +2,7 @@
 // Thrown-item arc animation, hiding, and input lock.
 
 import { drawKind } from "../passes/glyphs/atlas.js";
+import { setInputLock } from "../input/inputLock.js";
 
 const THROW_FX_SPEED_TILES_PER_SEC = 26;
 const THROW_FX_MIN_DURATION = 0.09;
@@ -21,7 +22,7 @@ export function createThrowFxController({ world, resolveItemMeta }) {
   function isItemHidden(id) { return _hidden.has(id); }
 
   function syncInputLock() {
-    try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = isBlocking(); } catch (e) { console.debug('[throwFx] input lock sync failed:', e); }
+    try { setInputLock('throwFx', isBlocking()); } catch (e) { console.debug('[throwFx] input lock sync failed:', e); }
   }
 
   function computeThrowRange(weight) {

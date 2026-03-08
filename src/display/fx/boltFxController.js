@@ -2,10 +2,16 @@
 // Spell bolt and deity wrath lightning FX.
 
 import { startShake } from "../camera/shake.js";
+import { setInputLock } from "../input/inputLock.js";
 import { clamp01, rgba, pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { dragonBreath as drawDragonBreathGlyphFx } from "../passes/vfx/glyph/effects/dragonBreath.js";
-import { LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
+import { ArrowFx, LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
+
+const FIRE_BREATH_SPEED_TILES_PER_SEC = 5.25;
+const FIRE_BREATH_MIN_TRAVEL_SEC = 0.36;
+const FIRE_BREATH_MAX_TRAVEL_SEC = 1.05;
+const FIRE_BREATH_LINGER_SEC = 0.18;
 
 const DEITY_WRATH_VFX = Object.freeze({
   default: Object.freeze({
@@ -68,7 +74,18 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
   const _boltFx = [];
   /** @type {PulseFx[]} */
   const _lightPulses = [];
-  /** @type {Array<{ from:{x:number,y:number}, to:{x:number,y:number}, tiles:Array<{x:number,y:number}>, ttl:number, max:number, age:number, seed:number }>} */
+  /** @type {Array<{
+   *   from:{x:number,y:number},
+   *   to:{x:number,y:number},
+   *   tiles:Array<{x:number,y:number}>,
+   *   beam: ArrowFx,
+   *   linger:number,
+   *   lingerMax:number,
+   *   age:number,
+   *   seed:number,
+   *   impactPositions:Array<{x:number,y:number}>,
+   *   impactSpawned:boolean
+   * }>} */
   const _fireBreathFx = [];
   /** @type {DeityBoltFx[]} */
   const _deityBolts = [];
@@ -78,6 +95,14 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
   const _screenFlash = [];
   /** @type {ScreenBoltFx[]} */
   const _screenBolts = [];
+
+  function isBlocking() {
+    return _fireBreathFx.length > 0;
+  }
+
+  function syncInputLock() {
+    try { setInputLock('boltFx:fireBreath', isBlocking()); } catch (e) { console.debug('[boltFx] input lock sync failed:', e); }
+  }
 
   function _spawnDeityWrath(payload) {
     const playerId = Number(payload?.playerId || 0) | 0;
@@ -166,13 +191,15 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     _screenFlash.push(new ScreenFlashFx({ ttl: flashDuration, color: profile.pulse }));
   }
 
-  function _spawnFireBreathParticles(entry, count = 8, impact = false) {
+  function _spawnFireBreathParticles(entry, count = 8, opts = {}) {
     if (!fx?.pool || !entry) return;
-    const span = Math.max(1, entry.tiles.length || 1);
+    const impact = opts?.impact === true;
+    const uMin = impact ? 1 : Math.max(0, Math.min(1, Number(opts?.uMin ?? 0)));
+    const uMax = impact ? 1 : Math.max(uMin, Math.min(1, Number(opts?.uMax ?? 1)));
     for (let i = 0; i < count; i++) {
       const u = impact
         ? 1
-        : Math.min(1, Math.max(0, (Math.random() * 0.92) + 0.04));
+        : uMin + (Math.random() * Math.max(0, uMax - uMin));
       const px = entry.from.x + (entry.to.x - entry.from.x) * u;
       const py = entry.from.y + (entry.to.y - entry.from.y) * u;
       const trailBias = impact ? 0.2 : 0.85;
@@ -211,6 +238,16 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     }
   }
 
+  function _spawnFireBreathImpactParticles(entry) {
+    const impacts = Array.isArray(entry.impactPositions) && entry.impactPositions.length
+      ? entry.impactPositions
+      : [entry.to];
+    for (let i = 0; i < impacts.length; i++) {
+      const pos = impacts[i];
+      _spawnFireBreathParticles({ ...entry, to: pos }, 8, { impact: true });
+    }
+  }
+
   function installListeners() {
     world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex = 0 }) => {
       if (from && to) {
@@ -235,28 +272,49 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
           .filter((tile) => tile && Number.isFinite(tile.x) && Number.isFinite(tile.y))
           .map((tile) => ({ x: Number(tile.x), y: Number(tile.y) }))
         : [];
-      const ttl = 0.24 + Math.min(0.18, lineTiles.length * 0.02);
+      const dx = Number(to.x) - Number(from.x);
+      const dy = Number(to.y) - Number(from.y);
+      const len = Math.hypot(dx, dy) || 1;
+      const travelDuration = Math.max(
+        FIRE_BREATH_MIN_TRAVEL_SEC,
+        Math.min(FIRE_BREATH_MAX_TRAVEL_SEC, len / FIRE_BREATH_SPEED_TILES_PER_SEC),
+      );
+      const impactPositions = [];
+      if (Array.isArray(hitIds)) {
+        for (let i = 0; i < hitIds.length; i++) {
+          const pos = getPosition(Number(hitIds[i] || 0));
+          if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+            impactPositions.push({ x: Number(pos.x), y: Number(pos.y) });
+          }
+        }
+      }
+      if (!impactPositions.length) {
+        impactPositions.push({ x: Number(to.x), y: Number(to.y) });
+      }
       const entry = {
         from: { x: Number(from.x), y: Number(from.y) },
         to: { x: Number(to.x), y: Number(to.y) },
         tiles: lineTiles,
-        ttl,
-        max: ttl,
+        beam: new ArrowFx({
+          from: { x: Number(from.x), y: Number(from.y) },
+          to: { x: Number(to.x), y: Number(to.y) },
+          duration: travelDuration,
+          dx: dx / len,
+          dy: dy / len,
+          len,
+          style: 'dragon_breath',
+        }),
+        linger: FIRE_BREATH_LINGER_SEC,
+        lingerMax: FIRE_BREATH_LINGER_SEC,
         age: 0,
         seed: Math.random() * 4096,
+        impactPositions,
+        impactSpawned: false,
       };
       _fireBreathFx.push(entry);
-      _spawnFireBreathParticles(entry, Math.max(8, 4 + lineTiles.length * 2));
-      if (Array.isArray(hitIds)) {
-        for (let i = 0; i < hitIds.length; i++) {
-          const pos = getPosition(Number(hitIds[i] || 0));
-          if (!pos) continue;
-          _spawnFireBreathParticles({ ...entry, to: pos }, 8, true);
-        }
-      } else {
-        _spawnFireBreathParticles(entry, 10, true);
-      }
-      startShake(cam, 5, 0.14);
+      _spawnFireBreathParticles(entry, Math.max(5, 2 + lineTiles.length), { uMin: 0, uMax: 0.12 });
+      startShake(cam, 2, 0.12);
+      syncInputLock();
     });
   }
 
@@ -275,17 +333,39 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
       }
     }
     if (_fireBreathFx.length) {
+      let changed = false;
       for (let i = _fireBreathFx.length - 1; i >= 0; i--) {
         const fxEntry = _fireBreathFx[i];
+        const prevTravelTime = fxEntry.beam.t;
+        const prevArrived = fxEntry.beam.arrived;
+        const prevProgress = fxEntry.beam.progress;
         fxEntry.age += dt;
-        fxEntry.ttl -= dt;
+        fxEntry.beam.tick(dt);
+        const nextProgress = fxEntry.beam.progress;
         _spawnFireBreathParticles(
           fxEntry,
-          Math.max(1, Math.ceil(dt * Math.max(10, fxEntry.tiles.length * 3))),
-          false,
+          Math.max(2, Math.ceil(dt * Math.max(16, 10 + fxEntry.tiles.length * 4))),
+          {
+            uMin: Math.max(0, Math.min(prevProgress, nextProgress) - 0.18),
+            uMax: Math.max(prevProgress, nextProgress),
+          },
         );
-        if (fxEntry.ttl <= 0) _fireBreathFx.splice(i, 1);
+        if (fxEntry.beam.arrived && !fxEntry.impactSpawned) {
+          fxEntry.impactSpawned = true;
+          _spawnFireBreathImpactParticles(fxEntry);
+          startShake(cam, 5, 0.16);
+        }
+        if (fxEntry.beam.arrived) {
+          const travelRemaining = Math.max(0, fxEntry.beam.duration - prevTravelTime);
+          const lingerDt = prevArrived ? dt : Math.max(0, dt - travelRemaining);
+          fxEntry.linger -= lingerDt;
+        }
+        if (fxEntry.beam.arrived && fxEntry.linger <= 0) {
+          _fireBreathFx.splice(i, 1);
+          changed = true;
+        }
       }
+      if (changed) syncInputLock();
     }
     // Deity wrath
     if (_deityBolts.length) {
@@ -342,23 +422,35 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     }
     for (let i = 0; i < _fireBreathFx.length; i++) {
       const eff = _fireBreathFx[i];
-      const alpha = Math.max(0, Math.min(1, eff.ttl / Math.max(0.001, eff.max)));
-      const len = Math.max(1, Math.hypot(eff.to.x - eff.from.x, eff.to.y - eff.from.y));
-      const pts = jitterLine(eff.from, eff.to, Math.max(8, Math.min(18, Math.floor(len * 3))), 0.08 + 0.04 * alpha);
-      ctx.strokeStyle = `rgba(255,70,18,${(0.24 * alpha).toFixed(3)})`;
+      const travelProgress = eff.beam.progress;
+      const lineAlpha = eff.beam.arrived
+        ? Math.max(0, Math.min(1, eff.linger / Math.max(0.001, eff.lingerMax)))
+        : Math.max(0.26, Math.min(1, 0.32 + (travelProgress * 1.18)));
+      const beamTo = eff.beam.arrived
+        ? eff.to
+        : {
+          x: eff.from.x + (eff.to.x - eff.from.x) * travelProgress,
+          y: eff.from.y + (eff.to.y - eff.from.y) * travelProgress,
+        };
+      const len = Math.max(1, Math.hypot(beamTo.x - eff.from.x, beamTo.y - eff.from.y));
+      const pts = jitterLine(eff.from, beamTo, Math.max(8, Math.min(18, Math.floor(len * 3))), 0.08 + 0.04 * lineAlpha);
+      ctx.strokeStyle = `rgba(255,70,18,${(0.24 * lineAlpha).toFixed(3)})`;
       ctx.lineWidth = 0.34;
       pathPolyline(ctx, pts); ctx.stroke();
-      ctx.strokeStyle = `rgba(255,138,40,${(0.46 * alpha).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(255,138,40,${(0.46 * lineAlpha).toFixed(3)})`;
       ctx.lineWidth = 0.16;
       pathPolyline(ctx, pts); ctx.stroke();
-      ctx.strokeStyle = `rgba(255,246,208,${(0.92 * alpha).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(255,246,208,${(0.92 * lineAlpha).toFixed(3)})`;
       ctx.lineWidth = 0.055;
-      pathPolyline(ctx, jitterLine(eff.from, eff.to, Math.max(10, Math.floor(len * 4)), 0.03 + 0.02 * alpha)); ctx.stroke();
+      pathPolyline(ctx, jitterLine(eff.from, beamTo, Math.max(10, Math.floor(len * 4)), 0.03 + 0.02 * lineAlpha)); ctx.stroke();
 
-      for (let j = 0; j < eff.tiles.length; j++) {
+      const visibleTiles = eff.beam.arrived
+        ? eff.tiles.length
+        : Math.max(1, Math.min(eff.tiles.length, Math.ceil(eff.tiles.length * travelProgress)));
+      for (let j = 0; j < visibleTiles; j++) {
         const tile = eff.tiles[j];
         const pulse = 0.5 + 0.5 * Math.sin((eff.age * 16) + eff.seed + j * 0.7);
-        ctx.fillStyle = `rgba(255,120,24,${(0.10 + 0.08 * pulse * alpha).toFixed(3)})`;
+        ctx.fillStyle = `rgba(255,120,24,${(0.10 + 0.08 * pulse * lineAlpha).toFixed(3)})`;
         ctx.beginPath();
         ctx.arc(tile.x, tile.y, 0.34 + 0.05 * pulse, 0, Math.PI * 2);
         ctx.fill();
@@ -369,12 +461,12 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         'D',
         eff.from.x,
         eff.from.y,
-        1.0 + alpha * 0.08,
+        1.0 + lineAlpha * 0.08,
         eff.age,
         0,
         eff.seed,
         eff.from.y,
-        { gain: alpha },
+        { gain: lineAlpha },
       );
     }
     ctx.restore();
@@ -477,6 +569,7 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
   }
 
   return {
+    isBlocking,
     tick,
     drawBolts,
     drawDeityWrath,
