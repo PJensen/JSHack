@@ -10,6 +10,7 @@ import { Player } from "../src/rules/components/Player.js";
 import { Position } from "../src/rules/components/Position.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 import { spawnHazard } from "../src/rules/utils/hazardSpawn.js";
+import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 
 function posOfIdentity(world, identity) {
   for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
@@ -147,6 +148,11 @@ Deno.test("overworld roofs char and smoke as fire moves through a breached build
   assert(String(roofAt(view, tavernInterior.x + 1, tavernInterior.y)?.kind || "").includes("charred"), "roof beside the breach should read as charred");
   assertEquals(roofAt(view, tavernInterior.x + 1, tavernInterior.y)?.burning, true);
   assert(roofHas(view, tavernInterior.x + 5, tavernInterior.y + 3), "roof should remain over still-enclosed tavern space");
+
+  for (let i = 0; i < 4; i++) hazardSystem(world);
+  view = buildWorldView(world);
+  assert(!roofHas(view, tavernInterior.x + 1, tavernInterior.y), "roof tile should stop rendering once that section has fully burned through");
+  assert(roofHas(view, tavernInterior.x + 5, tavernInterior.y + 3), "distant roof should remain until fire reaches it");
 
   clearAll();
   clearExplored();
