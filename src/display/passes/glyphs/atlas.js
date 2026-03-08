@@ -71,3 +71,18 @@ export function drawKind(atlas, ctx, kind, x, y) {
   // Draw as 1x1 world unit centered at (x,y); camera transform scales to pixels
   ctx.drawImage(entry.canvas, x - 0.5, y - 0.5, 1, 1);
 }
+
+export function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
+  const entry = atlas.get(kind) || atlas.get('default');
+  if (!entry || !entry.canvas) return;
+  const s = Number(scale || 1);
+  if (Math.abs(s - 1) <= 0.001) {
+    ctx.drawImage(entry.canvas, x - 0.5, y - 0.5, 1, 1);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.drawImage(entry.canvas, -0.5, -0.5, 1, 1);
+  ctx.restore();
+}
