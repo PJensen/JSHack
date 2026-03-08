@@ -755,6 +755,11 @@ export function getMonster(id) {
   return _byId.get(id) || null;
 }
 
+/** @returns {string[]} */
+export function listAllMonsterIds() {
+  return MONSTERS.map((monster) => monster.id).slice().sort();
+}
+
 /** @param {MonsterDef} def @returns {string} loot table ID */
 export function getMonsterLootTable(def) {
   return def.lootTable || `drop:tier${def.tier}`;

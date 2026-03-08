@@ -2200,7 +2200,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
 
 /**
  * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
- * @param {{ identificationEnabled?: boolean, allItemIds?: string[], hasPet?: boolean, petAlive?: boolean }} data
+ * @param {{ identificationEnabled?: boolean, allItemIds?: string[], allMonsterIds?: string[], hasPet?: boolean, petAlive?: boolean }} data
  * @param {{ canvas: HTMLCanvasElement }} memGraph
  * @param {{ canvas: HTMLCanvasElement }} dtyGraph
  */
@@ -2247,83 +2247,109 @@ function renderSettings(panel, data, memGraph, dtyGraph) {
     window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
   }));
 
-  // --- Give item row ---
-  const giveRow = document.createElement('div');
-  Object.assign(giveRow.style, {
-    display: 'flex', gap: '6px', alignItems: 'flex-start', position: 'relative',
-  });
+  function makeAutocompleteActionRow({ ids, placeholder, buttonText, eventName, detailKey }) {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', gap: '6px', alignItems: 'flex-start', position: 'relative',
+    });
 
-  const inputWrap = document.createElement('div');
-  Object.assign(inputWrap.style, { position: 'relative', flex: '1' });
+    const inputWrap = document.createElement('div');
+    Object.assign(inputWrap.style, { position: 'relative', flex: '1' });
 
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'item id\u2026';
-  Object.assign(input.style, {
-    width: '100%', boxSizing: 'border-box',
-    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
-    border: '1px solid #2d3b52', borderRadius: '6px',
-    fontFamily: 'monospace', fontSize: '13px', outline: 'none',
-  });
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder;
+    Object.assign(input.style, {
+      width: '100%', boxSizing: 'border-box',
+      padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52', borderRadius: '6px',
+      fontFamily: 'monospace', fontSize: '13px', outline: 'none',
+    });
 
-  const dropdown = document.createElement('div');
-  Object.assign(dropdown.style, {
-    position: 'absolute', left: '0', right: '0', top: '100%',
-    maxHeight: '150px', overflowY: 'auto', overflowX: 'hidden',
-    background: '#0b0e16', border: '1px solid #2d3b52', borderRadius: '0 0 6px 6px',
-    zIndex: '10', display: 'none',
-  });
-  markScrollable(dropdown);
+    const dropdown = document.createElement('div');
+    Object.assign(dropdown.style, {
+      position: 'absolute', left: '0', right: '0', top: '100%',
+      maxHeight: '150px', overflowY: 'auto', overflowX: 'hidden',
+      background: '#0b0e16', border: '1px solid #2d3b52', borderRadius: '0 0 6px 6px',
+      zIndex: '10', display: 'none',
+    });
+    markScrollable(dropdown);
 
-  const allIds = Array.isArray(data.allItemIds) ? data.allItemIds : [];
+    const allIds = Array.isArray(ids) ? ids : [];
 
-  function updateDropdown() {
-    const q = input.value.trim().toLowerCase();
-    dropdown.innerHTML = '';
-    if (!q) { dropdown.style.display = 'none'; return; }
-    const matches = allIds.filter(id => id.includes(q)).slice(0, 30);
-    if (!matches.length) { dropdown.style.display = 'none'; return; }
-    for (const id of matches) {
-      const opt = document.createElement('div');
-      opt.textContent = id;
-      Object.assign(opt.style, {
-        padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
-        color: '#cfe8ff', fontFamily: 'monospace',
-      });
-      opt.addEventListener('pointerenter', () => { opt.style.background = '#173458'; });
-      opt.addEventListener('pointerleave', () => { opt.style.background = ''; });
-      opt.addEventListener('click', () => {
-        input.value = id;
-        dropdown.style.display = 'none';
-      });
-      dropdown.appendChild(opt);
+    function updateDropdown() {
+      const q = input.value.trim().toLowerCase();
+      dropdown.innerHTML = '';
+      if (!q) { dropdown.style.display = 'none'; return; }
+      const matches = allIds.filter((id) => id.includes(q)).slice(0, 30);
+      if (!matches.length) { dropdown.style.display = 'none'; return; }
+      for (const id of matches) {
+        const opt = document.createElement('div');
+        opt.textContent = id;
+        Object.assign(opt.style, {
+          padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
+          color: '#cfe8ff', fontFamily: 'monospace',
+        });
+        opt.addEventListener('pointerenter', () => { opt.style.background = '#173458'; });
+        opt.addEventListener('pointerleave', () => { opt.style.background = ''; });
+        opt.addEventListener('click', () => {
+          input.value = id;
+          dropdown.style.display = 'none';
+        });
+        dropdown.appendChild(opt);
+      }
+      dropdown.style.display = 'block';
     }
-    dropdown.style.display = 'block';
+
+    function submit() {
+      const value = input.value.trim();
+      if (!value) return;
+      window.dispatchEvent(new CustomEvent(eventName, { detail: { [detailKey]: value } }));
+      input.value = '';
+      dropdown.style.display = 'none';
+    }
+
+    input.addEventListener('input', updateDropdown);
+    input.addEventListener('focus', updateDropdown);
+    input.addEventListener('blur', () => {
+      // Delay hide so click on dropdown option can fire first
+      setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+    });
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      submit();
+    });
+
+    inputWrap.appendChild(input);
+    inputWrap.appendChild(dropdown);
+    row.appendChild(inputWrap);
+
+    const button = document.createElement('button');
+    button.textContent = buttonText;
+    decorateButton(button);
+    button.style.minHeight = '34px';
+    button.addEventListener('click', submit);
+    row.appendChild(button);
+
+    return row;
   }
-  input.addEventListener('input', updateDropdown);
-  input.addEventListener('focus', updateDropdown);
-  input.addEventListener('blur', () => {
-    // Delay hide so click on dropdown option can fire first
-    setTimeout(() => { dropdown.style.display = 'none'; }, 200);
-  });
 
-  inputWrap.appendChild(input);
-  inputWrap.appendChild(dropdown);
-  giveRow.appendChild(inputWrap);
+  content.appendChild(makeAutocompleteActionRow({
+    ids: data.allItemIds,
+    placeholder: 'item id\u2026',
+    buttonText: 'Give',
+    eventName: 'ui:debugGiveItem',
+    detailKey: 'itemId',
+  }));
 
-  const giveBtn = document.createElement('button');
-  giveBtn.textContent = 'Give';
-  decorateButton(giveBtn);
-  giveBtn.style.minHeight = '34px';
-  giveBtn.addEventListener('click', () => {
-    const itemId = input.value.trim();
-    if (!itemId) return;
-    window.dispatchEvent(new CustomEvent('ui:debugGiveItem', { detail: { itemId } }));
-    input.value = '';
-    dropdown.style.display = 'none';
-  });
-  giveRow.appendChild(giveBtn);
-  content.appendChild(giveRow);
+  content.appendChild(makeAutocompleteActionRow({
+    ids: data.allMonsterIds,
+    placeholder: 'monster id\u2026',
+    buttonText: 'Spawn',
+    eventName: 'ui:debugSpawnMonster',
+    detailKey: 'monsterId',
+  }));
 
   // --- Resurrect pet button ---
   const petBtn = document.createElement('button');

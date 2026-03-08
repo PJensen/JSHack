@@ -29,9 +29,11 @@ import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 import { isIdentificationEnabled, setIdentificationEnabled } from "../../rules/data/identification.js";
 import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js";
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
+import { listAllMonsterIds } from "../../rules/data/monsters.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
 import { groupDisplayItems } from "./itemGrouping.js";
+import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -598,6 +600,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       detail: {
         identificationEnabled: isIdentificationEnabled(),
         allItemIds: listAllItemIds(),
+        allMonsterIds: listAllMonsterIds(),
         hasPet,
         petAlive,
       },
@@ -623,6 +626,17 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     }
     addToInventory(world, p.id, created);
     console.debug(`[settings] Gave 1x ${itemId}`);
+  });
+
+  addEventListener('ui:debugSpawnMonster', (ev) => {
+    const monsterId = String(ev?.detail?.monsterId || '').trim();
+    if (!monsterId) return;
+    const result = spawnDebugMonsterNearPlayer(world, monsterId);
+    if (!result.ok) {
+      console.warn(`[settings] ${result.error}`);
+      return;
+    }
+    console.debug(`[settings] Spawned ${result.monsterId} at (${result.x}, ${result.y})`);
   });
 
   addEventListener('ui:debugResurrectPet', () => {

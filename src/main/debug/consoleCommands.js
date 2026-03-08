@@ -9,11 +9,9 @@ import { Vitality } from "../../rules/components/Vitality.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
-import { applyMutation } from "../../rules/interaction/mutations.js";
-import { getMonster, MONSTERS } from "../../rules/data/monsters.js";
+import { MONSTERS } from "../../rules/data/monsters.js";
 import { markExplored } from "../../rules/environment/dungeon/exploredMap.js";
-import { CHUNK_SIZE, TILE_FLOOR } from "../../rules/environment/dungeon/constants.js";
-import { getTile } from "../../rules/environment/dungeon/tileMap.js";
+import { spawnDebugMonsterNearPlayer } from "./spawnDebugMonster.js";
 
 /**
  * Register all built-in debug commands.
@@ -109,30 +107,9 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
       const ids = MONSTERS.map(m => m.id).join(', ');
       return `Usage: spawn <monster_id>\nAvailable: ${ids}`;
     }
-    const def = getMonster(monsterId);
-    if (!def) return `Unknown monster: "${monsterId}"`;
-
-    const pe = playerEntity(world);
-    if (!pe) return 'No player entity found.';
-    const pos = world.get(pe.id, Position);
-    if (!pos) return 'Player has no Position.';
-
-    // Find a free adjacent tile
-    const offsets = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-    let spawnX = pos.x + 1, spawnY = pos.y;
-    for (const [dx, dy] of offsets) {
-      const tx = pos.x + dx;
-      const ty = pos.y + dy;
-      const tile = getTile(tx, ty);
-      if (tile === TILE_FLOOR) { spawnX = tx; spawnY = ty; break; }
-    }
-
-    applyMutation(world, {
-      type: 'spawnMonster', monsterId,
-      x: spawnX, y: spawnY,
-      emitEvent: true,
-    }, { getMonster });
-    return `Spawned ${def.name} at (${spawnX}, ${spawnY})`;
+    const result = spawnDebugMonsterNearPlayer(world, monsterId);
+    if (!result.ok) return result.error;
+    return `Spawned ${result.name} at (${result.x}, ${result.y})`;
   });
 
   // ---- depth <n> ----
