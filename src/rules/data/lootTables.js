@@ -286,6 +286,19 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "drop:dragon_whelp": {
+    rolls: { min: 1, max: 2 },
+    entries: [
+      { type: "nothing",   weight: 35 },
+      { type: "gold",      weight: 28, count: { base: 20, perDepth: 4 } },
+      { type: "equip",     weight: 18, pool: ["ember_knife", "smoldering_club", "ring_fire_resist"], affixChance: 0 },
+      { type: "equip",     weight: 12, pool: ["shield_fireward"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "table",     weight: 18, tableId: "sub:potions" },
+      { type: "item",      weight: 10, itemId: "potion_resist_fire" },
+      { type: "table",     weight: 10, tableId: "sub:scrolls" },
+    ],
+  },
+
   "drop:dragon": {
     rolls: { min: 1, max: 3 },
     entries: [

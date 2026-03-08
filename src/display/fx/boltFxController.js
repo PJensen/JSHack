@@ -4,6 +4,7 @@
 import { startShake } from "../camera/shake.js";
 import { clamp01, rgba, pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
+import { dragonBreath as drawDragonBreathGlyphFx } from "../passes/vfx/glyph/effects/dragonBreath.js";
 import { LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
 
 const DEITY_WRATH_VFX = Object.freeze({
@@ -67,6 +68,8 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
   const _boltFx = [];
   /** @type {PulseFx[]} */
   const _lightPulses = [];
+  /** @type {Array<{ from:{x:number,y:number}, to:{x:number,y:number}, tiles:Array<{x:number,y:number}>, ttl:number, max:number, age:number, seed:number }>} */
+  const _fireBreathFx = [];
   /** @type {DeityBoltFx[]} */
   const _deityBolts = [];
   /** @type {PulseFx[]} */
@@ -163,6 +166,51 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     _screenFlash.push(new ScreenFlashFx({ ttl: flashDuration, color: profile.pulse }));
   }
 
+  function _spawnFireBreathParticles(entry, count = 8, impact = false) {
+    if (!fx?.pool || !entry) return;
+    const span = Math.max(1, entry.tiles.length || 1);
+    for (let i = 0; i < count; i++) {
+      const u = impact
+        ? 1
+        : Math.min(1, Math.max(0, (Math.random() * 0.92) + 0.04));
+      const px = entry.from.x + (entry.to.x - entry.from.x) * u;
+      const py = entry.from.y + (entry.to.y - entry.from.y) * u;
+      const trailBias = impact ? 0.2 : 0.85;
+      fx.pool.spawn(new Particle({
+        x: px + (Math.random() - 0.5) * 0.20,
+        y: py + (Math.random() - 0.5) * 0.16,
+        vx: ((Math.random() - 0.5) * 0.35) + (entry.to.x - entry.from.x) * 0.08 * trailBias,
+        vy: -0.22 - Math.random() * 0.55 + (entry.to.y - entry.from.y) * 0.03 * trailBias,
+        ay: -0.10,
+        life: (impact ? 0.18 : 0.14) + Math.random() * (impact ? 0.24 : 0.20),
+        size0: 0.08 + Math.random() * (impact ? 0.12 : 0.08),
+        size1: 0.01,
+        r: 255,
+        g: 120 + ((Math.random() * 110) | 0),
+        b: 10 + ((Math.random() * 28) | 0),
+        a0: impact ? 0.92 : 0.78,
+        rotVel: (Math.random() - 0.5) * 2.8,
+      }));
+    }
+    if (!impact) return;
+    for (let i = 0; i < Math.max(2, Math.floor(count / 3)); i++) {
+      fx.pool.spawn(new Particle({
+        x: entry.to.x + (Math.random() - 0.5) * 0.42,
+        y: entry.to.y + (Math.random() - 0.5) * 0.24,
+        vx: (Math.random() - 0.5) * 0.22,
+        vy: -0.10 - Math.random() * 0.22,
+        life: 0.28 + Math.random() * 0.28,
+        size0: 0.06 + Math.random() * 0.05,
+        size1: 0.01,
+        r: 120 + ((Math.random() * 40) | 0),
+        g: 50 + ((Math.random() * 26) | 0),
+        b: 16 + ((Math.random() * 12) | 0),
+        a0: 0.38,
+        rotVel: (Math.random() - 0.5) * 1.6,
+      }));
+    }
+  }
+
   function installListeners() {
     world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex = 0 }) => {
       if (from && to) {
@@ -180,6 +228,36 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         wrathDebt: Number(wrathDebt || 0),
       });
     });
+    world.on('monster:firebreath', ({ from, to, tiles, hitIds }) => {
+      if (!from || !to) return;
+      const lineTiles = Array.isArray(tiles)
+        ? tiles
+          .filter((tile) => tile && Number.isFinite(tile.x) && Number.isFinite(tile.y))
+          .map((tile) => ({ x: Number(tile.x), y: Number(tile.y) }))
+        : [];
+      const ttl = 0.24 + Math.min(0.18, lineTiles.length * 0.02);
+      const entry = {
+        from: { x: Number(from.x), y: Number(from.y) },
+        to: { x: Number(to.x), y: Number(to.y) },
+        tiles: lineTiles,
+        ttl,
+        max: ttl,
+        age: 0,
+        seed: Math.random() * 4096,
+      };
+      _fireBreathFx.push(entry);
+      _spawnFireBreathParticles(entry, Math.max(8, 4 + lineTiles.length * 2));
+      if (Array.isArray(hitIds)) {
+        for (let i = 0; i < hitIds.length; i++) {
+          const pos = getPosition(Number(hitIds[i] || 0));
+          if (!pos) continue;
+          _spawnFireBreathParticles({ ...entry, to: pos }, 8, true);
+        }
+      } else {
+        _spawnFireBreathParticles(entry, 10, true);
+      }
+      startShake(cam, 5, 0.14);
+    });
   }
 
   function tick(dt) {
@@ -194,6 +272,19 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
       for (const f of _lightPulses) f.tick(dt);
       for (let i = _lightPulses.length - 1; i >= 0; i--) {
         if (_lightPulses[i].expired) _lightPulses.splice(i, 1);
+      }
+    }
+    if (_fireBreathFx.length) {
+      for (let i = _fireBreathFx.length - 1; i >= 0; i--) {
+        const fxEntry = _fireBreathFx[i];
+        fxEntry.age += dt;
+        fxEntry.ttl -= dt;
+        _spawnFireBreathParticles(
+          fxEntry,
+          Math.max(1, Math.ceil(dt * Math.max(10, fxEntry.tiles.length * 3))),
+          false,
+        );
+        if (fxEntry.ttl <= 0) _fireBreathFx.splice(i, 1);
       }
     }
     // Deity wrath
@@ -224,7 +315,7 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
   }
 
   function drawBolts(ctx) {
-    if (!_boltFx.length && !_lightPulses.length) return;
+    if (!_boltFx.length && !_lightPulses.length && !_fireBreathFx.length) return;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const p of _lightPulses) {
@@ -248,6 +339,43 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
       ctx.strokeStyle = `rgba(230,255,255,${0.9 * alpha})`;
       ctx.lineWidth = 0.045;
       pathPolyline(ctx, core); ctx.stroke();
+    }
+    for (let i = 0; i < _fireBreathFx.length; i++) {
+      const eff = _fireBreathFx[i];
+      const alpha = Math.max(0, Math.min(1, eff.ttl / Math.max(0.001, eff.max)));
+      const len = Math.max(1, Math.hypot(eff.to.x - eff.from.x, eff.to.y - eff.from.y));
+      const pts = jitterLine(eff.from, eff.to, Math.max(8, Math.min(18, Math.floor(len * 3))), 0.08 + 0.04 * alpha);
+      ctx.strokeStyle = `rgba(255,70,18,${(0.24 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.34;
+      pathPolyline(ctx, pts); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,138,40,${(0.46 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.16;
+      pathPolyline(ctx, pts); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,246,208,${(0.92 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.055;
+      pathPolyline(ctx, jitterLine(eff.from, eff.to, Math.max(10, Math.floor(len * 4)), 0.03 + 0.02 * alpha)); ctx.stroke();
+
+      for (let j = 0; j < eff.tiles.length; j++) {
+        const tile = eff.tiles[j];
+        const pulse = 0.5 + 0.5 * Math.sin((eff.age * 16) + eff.seed + j * 0.7);
+        ctx.fillStyle = `rgba(255,120,24,${(0.10 + 0.08 * pulse * alpha).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(tile.x, tile.y, 0.34 + 0.05 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      drawDragonBreathGlyphFx(
+        ctx,
+        'D',
+        eff.from.x,
+        eff.from.y,
+        1.0 + alpha * 0.08,
+        eff.age,
+        0,
+        eff.seed,
+        eff.from.y,
+        { gain: alpha },
+      );
     }
     ctx.restore();
   }

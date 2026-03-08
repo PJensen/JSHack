@@ -1,4 +1,4 @@
-import { assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 import { createRng } from '../src/lib/ecs-js/rng.js';
 import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
@@ -123,6 +123,7 @@ Deno.test("populateChunk shallow spawners draw from tier pool", () => {
   // Rare upgrades are valid at T0
   if (getMonster('pit_viper')) tier0Ids.add('pit_viper');
   if (getMonster('cave_bear')) tier0Ids.add('cave_bear');
+  if (getMonster('dragon_whelp')) tier0Ids.add('dragon_whelp');
   for (let seed = 1; seed <= 200; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
     const rng = createRng(seed * 1337);
@@ -135,6 +136,20 @@ Deno.test("populateChunk shallow spawners draw from tier pool", () => {
     }
   }
   assert(seen.size > 1, 'expected spawners to vary across seeds');
+});
+
+Deno.test("pickMonster can rare-upgrade a bat into a dragon whelp", () => {
+  const rng = {
+    choice(arr) {
+      return arr.find((def) => def.id === "bat") || arr[0];
+    },
+    next() {
+      return 0;
+    },
+  };
+
+  const picked = pickMonster(rng, 1);
+  assertEquals(picked.identity, "dragon_whelp");
 });
 
 Deno.test("spawner wiring: kind -> identity -> worldView -> palette", () => {

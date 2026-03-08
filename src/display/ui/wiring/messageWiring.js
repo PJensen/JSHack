@@ -458,6 +458,11 @@ export function installMessageWiring({
     log('Meteor fizzles.', 'system');
   });
 
+  world.on('monster:firebreath', ({ actor, target }) => {
+    if (nameOfEntity(target) !== 'You') return;
+    log(`${nameOfEntity(actor)} exhales a line of fire!`, 'combat');
+  });
+
   // === Combat events ===
   world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
     const weaponInfo = compGet(weaponId, ItemInfo);

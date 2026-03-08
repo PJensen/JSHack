@@ -16,7 +16,7 @@ import {
   phaseOutOnDamaged,
   mindflayerBlastOnHit,
 } from "./callbacks/combat.js";
-import { selfThrowNearTargetOnSeen, gazeOnLOS } from "./callbacks/ai.js";
+import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath } from "./callbacks/death.js";
 
 export const MONSTERS = [
@@ -223,6 +223,44 @@ export const MONSTERS = [
     },
     specials: ["Stun 30%"],
     description: 'A massive bear with matted fur and scarred hide. Its claws can split stone.',
+  },
+  {
+    id: 'dragon_whelp',
+    name: 'Dragon Whelp',
+    tags: ['beast', 'draconic', 'rare', 'glowing'],
+    tier: 0,
+    rare: true,
+    intelligence: 6,   // cunning enough to hold lanes and punish open sight lines
+    visionRange: 9,
+    retreatHpPct: 0.20,
+    baseHp: 24,
+    hpPerLevel: 2.5,
+    attack: 4,
+    defense: 3,
+    damageDice: '1d8',
+    sizeClass: 'L',
+    massKg: 240,
+    resistances: {
+      kinetic: { DR: 10, pierceMult: 0.85 },
+      thermal: { igniteC: Infinity, burnMult: 0 },
+    },
+    speed: 2,
+    hooks: {
+      whileLOS: [fireBreathLineOnLOS({
+        minRange: 2,
+        maxRange: 6,
+        cooldownTurns: 6,
+        damage: 4,
+        hazardDamage: 1,
+        hazardTurns: 2,
+        burnTurns: 3,
+        burnPotency: 2,
+      })],
+      onHit: [statusEffectOnHit(20, 0xdead0201, { key: "burn", turnsLeft: 3, potency: 2 }, "proc:burning")],
+    },
+    specials: ["Fire breath", "Burn 20%"],
+    description: 'A juvenile dragon whose breath already runs hotter than a forge. Even its scales throw heat into the dark.',
+    lootTable: 'drop:dragon_whelp',
   },
 
   {

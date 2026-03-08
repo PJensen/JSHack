@@ -2,15 +2,30 @@
 // AI callback context and shared factory functions for monster AI hooks.
 // Callbacks are plain (ctx) => void functions invoked via runCallbackList.
 
+import { HazardArea } from "../../components/HazardArea.js";
+import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { Vitality } from "../../components/Vitality.js";
+import { bresenhamLine } from "../../../shared/math/bresenham.js";
+import { dealDamage } from "../../utils/dealDamage.js";
+import { upsertTimedEffect } from "../../utils/effectSemantics.js";
+import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
+const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
 
 function manhattan(a, b) {
   return Math.abs((a.x | 0) - (b.x | 0)) + Math.abs((a.y | 0) - (b.y | 0));
+}
+
+function chebyshev(a, b) {
+  return Math.max(
+    Math.abs((a.x | 0) - (b.x | 0)),
+    Math.abs((a.y | 0) - (b.y | 0)),
+  );
 }
 
 /**
@@ -70,6 +85,51 @@ function markSelfThrowUsed(world, actor, target) {
   store.set(selfThrowCooldownSlot(actor, target), Number(world.step || 0) | 0);
 }
 
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @returns {Map<number, number>}
+ */
+function ensureFireBreathCooldownState(world) {
+  const rec = world[FIRE_BREATH_COOLDOWN_KEY];
+  if (rec instanceof Map) return rec;
+  const created = new Map();
+  world[FIRE_BREATH_COOLDOWN_KEY] = created;
+  return created;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @returns {number}
+ */
+function getFireBreathLastTurn(world, actor) {
+  const store = ensureFireBreathCooldownState(world);
+  const last = Number(store.get(actor | 0));
+  return Number.isFinite(last) ? (last | 0) : -1e9;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {number} cooldownTurns
+ * @returns {boolean}
+ */
+function fireBreathOnCooldown(world, actor, cooldownTurns) {
+  if (!(cooldownTurns > 0)) return false;
+  const now = Number(world.step || 0) | 0;
+  const last = getFireBreathLastTurn(world, actor);
+  return (now - last) < cooldownTurns;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ */
+function markFireBreathUsed(world, actor) {
+  const store = ensureFireBreathCooldownState(world);
+  store.set(actor | 0, Number(world.step || 0) | 0);
+}
+
 // ── SeenCallbackContext ───────────────────────────────────────────
 
 /**
@@ -114,6 +174,8 @@ export class SeenCallbackContext {
   get cancelled() { return this._cancelled; }
   get cancelReason() { return this._cancelReason; }
   get handled() { return this._handled; }
+  get canActThisTurn() { return this._frame.canActThisTurn !== false; }
+  get hasQueuedMove() { return !!this._frame.hasQueuedMove; }
 
   /**
    * @param {unknown} reason
@@ -224,6 +286,181 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
     markSelfThrowUsed(ctx.world, ctx.actor, ctx.target);
     ctx.setHandled(true);
   };
+}
+
+/**
+ * Fire breath: deal immediate fire damage along a line to the target tile and
+ * leave short-lived floor fire hazards behind.
+ *
+ * @param {{
+ *   minRange?: number,
+ *   maxRange?: number,
+ *   cooldownTurns?: number,
+ *   chance?: number,
+ *   damage?: number,
+ *   hazardDamage?: number,
+ *   hazardTurns?: number,
+ *   burnTurns?: number,
+ *   burnPotency?: number,
+ * }} [opts]
+ */
+export function fireBreathLineOnLOS(opts = {}) {
+  const minRange = Math.max(1, Number.isFinite(opts.minRange) ? (Number(opts.minRange) | 0) : 2);
+  const maxRange = Math.max(minRange, Number.isFinite(opts.maxRange) ? (Number(opts.maxRange) | 0) : 6);
+  const cooldownTurns = Math.max(0, Number.isFinite(opts.cooldownTurns) ? (Number(opts.cooldownTurns) | 0) : 6);
+  const chance = Number.isFinite(opts.chance) ? Math.max(0, Math.min(1, opts.chance)) : 1;
+  const damage = Math.max(0, Number.isFinite(opts.damage) ? (Number(opts.damage) | 0) : 4);
+  const hazardDamage = Math.max(0, Number.isFinite(opts.hazardDamage) ? (Number(opts.hazardDamage) | 0) : 1);
+  const hazardTurns = Math.max(1, Number.isFinite(opts.hazardTurns) ? (Number(opts.hazardTurns) | 0) : 2);
+  const burnTurns = Math.max(1, Number.isFinite(opts.burnTurns) ? (Number(opts.burnTurns) | 0) : 3);
+  const burnPotency = Math.max(1, Number.isFinite(opts.burnPotency) ? (Number(opts.burnPotency) | 0) : 2);
+
+  return (ctx) => {
+    if (!ctx || ctx.cancelled) return;
+    if (!ctx.canActThisTurn || ctx.hasQueuedMove) return;
+    if (!worldChance(ctx.world, chance)) return;
+
+    const from = ctx.actorPos;
+    const target = ctx.targetPos;
+    if (!from || !target) return;
+
+    const dist = chebyshev(from, target);
+    if (dist < minRange || dist > maxRange) return;
+    if (fireBreathOnCooldown(ctx.world, ctx.actor, cooldownTurns)) return;
+
+    /** @type {Array<{ x:number, y:number }>} */
+    const tiles = [];
+    for (const [x, y] of bresenhamLine(from.x | 0, from.y | 0, target.x | 0, target.y | 0)) {
+      if (chebyshev(from, { x, y }) > maxRange) break;
+      tiles.push({ x: x | 0, y: y | 0 });
+    }
+    if (tiles.length <= 0) return;
+
+    const tileKeys = new Set(tiles.map((tile) => `${tile.x},${tile.y}`));
+    /** @type {number[]} */
+    const hitIds = [];
+    /** @type {number[]} */
+    const hazardIds = [];
+    const actorIdentity = String(ctx.world.get(ctx.actor, NamedIdentity)?.identity || "dragon");
+
+    for (const [id, pos, vit] of ctx.world.query(Position, Vitality)) {
+      if (id === ctx.actor) continue;
+      if (!pos || !vit || (vit.hp | 0) <= 0) continue;
+      if (!tileKeys.has(`${pos.x | 0},${pos.y | 0}`)) continue;
+
+      const result = dealDamage(ctx.world, {
+        target: id,
+        amount: damage,
+        source: ctx.actor,
+        type: "fire",
+        at: { x: pos.x | 0, y: pos.y | 0 },
+        cause: "monster:firebreath",
+      });
+      if (!result.applied) continue;
+
+      hitIds.push(id);
+      if (!result.killed) {
+        const ae = ensureActiveEffects(ctx.world, id);
+        if (ae) {
+          upsertTimedEffect(ae.effects, {
+            key: "burn",
+            turnsLeft: burnTurns,
+            potency: burnPotency,
+            stacks: 1,
+            startedAtTurn: Number(ctx.world.step || 0) | 0,
+            sourceId: ctx.actor,
+          });
+          try { ctx.world.set(id, ActiveEffects, ae); } catch {}
+        }
+        ctx.emit("proc:burning", { actor: ctx.actor, target: id });
+      }
+    }
+
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      const existing = findFireHazardAt(ctx.world, tile.x, tile.y);
+      if (existing > 0) {
+        const hazard = ctx.world.get(existing, HazardArea);
+        if (hazard) {
+          hazard.turnsLeft = Math.max(hazard.turnsLeft | 0, hazardTurns);
+          hazard.tickDamage = Math.max(hazard.tickDamage | 0, hazardDamage);
+          hazard.damageType = "fire";
+          hazard.cause = "monster:firebreath";
+          hazard.sourceId = ctx.actor | 0;
+          hazard.sourceKind = actorIdentity;
+          try {
+            ctx.world.emit?.("hazard:spawned", {
+              hazardId: existing,
+              kind: "fire",
+              medium: String(hazard.medium || "floor").toLowerCase() === "floor" ? "floor" : "air",
+              at: { x: tile.x | 0, y: tile.y | 0 },
+              turnsLeft: hazard.turnsLeft | 0,
+              radius: hazard.radius | 0,
+              tickDamage: hazard.tickDamage | 0,
+              damageType: hazard.damageType,
+              cause: hazard.cause,
+              sourceId: hazard.sourceId | 0,
+              sourceKind: hazard.sourceKind || "",
+              identity: "dragon_fire",
+              name: "Dragon Fire",
+            });
+          } catch {}
+        }
+        hazardIds.push(existing);
+        continue;
+      }
+
+      const hazardId = spawnHazard(ctx.world, {
+        x: tile.x | 0,
+        y: tile.y | 0,
+        kind: "fire",
+        medium: "floor",
+        turnsLeft: hazardTurns,
+        radius: 0,
+        tickDamage: hazardDamage,
+        damageType: "fire",
+        cause: "monster:firebreath",
+        sourceId: ctx.actor | 0,
+        sourceKind: actorIdentity,
+        identity: "dragon_fire",
+        name: "Dragon Fire",
+        meta: { source: "dragon_firebreath" },
+      });
+      if (hazardId > 0) hazardIds.push(hazardId);
+    }
+
+    markFireBreathUsed(ctx.world, ctx.actor);
+    ctx.emit("monster:firebreath", {
+      actor: ctx.actor,
+      target: ctx.target,
+      from: { x: from.x | 0, y: from.y | 0 },
+      to: { x: tiles[tiles.length - 1].x | 0, y: tiles[tiles.length - 1].y | 0 },
+      tiles: tiles.map((tile) => ({ x: tile.x | 0, y: tile.y | 0 })),
+      hitIds,
+      hazardIds,
+      damage,
+      hazardDamage,
+      hazardTurns,
+    });
+    ctx.setHandled(true);
+  };
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} x
+ * @param {number} y
+ * @returns {number}
+ */
+function findFireHazardAt(world, x, y) {
+  for (const [id, pos, hazard] of world.query(Position, HazardArea)) {
+    if (!pos || !hazard) continue;
+    if ((pos.x | 0) !== (x | 0) || (pos.y | 0) !== (y | 0)) continue;
+    if (String(hazard.kind || "").toLowerCase() !== "fire") continue;
+    if ((hazard.radius | 0) !== 0) continue;
+    return id | 0;
+  }
+  return 0;
 }
 
 /**

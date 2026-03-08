@@ -28,6 +28,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   }
   spellAreaFx.drawPhaseStrike(bctx);
   projectileFx.draw(bctx);
+  if (typeof cloudFx.drawFire === "function") {
+    cloudFx.drawFire(bctx);
+  }
   cloudFx.drawPoison(bctx);
   cloudFx.drawPlasma(bctx);
   fx.render({
