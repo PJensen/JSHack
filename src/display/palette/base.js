@@ -53,6 +53,8 @@ export const basePalette = {
   tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026" },
   farmland:  { glyph: "░", fg: "#8b7355", glow: "#5a4a38" },
   fence:     { glyph: "#", fg: "#a08050", glow: "#6b5530" },
+  roof_thatch_shadow: { glyph: "▓", fg: "#9c7f2c", glow: "#6b5418" },
+  roof_thatch_lit:    { glyph: "▓", fg: "#d8bf5a", glow: "#9d8221" },
   wall: { glyph: "#", fg: "#99a", glow: "#667" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },

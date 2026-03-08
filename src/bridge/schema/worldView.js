@@ -11,6 +11,7 @@ import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { ObjectState } from "../../rules/components/ObjectState.js";
 import { getTile, forEachTileInRect } from '../../rules/environment/dungeon/tileMap.js';
+import { TILE_DOOR, TILE_FLOOR, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
 import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
 import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
@@ -26,16 +27,18 @@ import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
+import { DungeonState } from "../../rules/components/DungeonState.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
+/** @typedef {{ x:number, y:number, kind:string }} RoofTileView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
@@ -76,6 +79,123 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
 let _lastFovStep = -1;
+const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "tavern_keg", "millstone"]);
+
+function xyKey(x, y) {
+	return `${x},${y}`;
+}
+
+function keyToXY(key) {
+	const [x, y] = key.split(",").map(Number);
+	return { x, y };
+}
+
+/**
+ * Flood-fill one indoor floor region, then wrap it with any touching doors/walls for roof rendering.
+ * @param {number} seedX
+ * @param {number} seedY
+ */
+function collectRoofedBuilding(seedX, seedY) {
+	if (getTile(seedX, seedY) !== TILE_FLOOR) return null;
+	const floorKeys = new Set();
+	const doorKeys = new Set();
+	const wallKeys = new Set();
+	const queue = [[seedX, seedY]];
+	const seen = new Set([xyKey(seedX, seedY)]);
+	const cardinal = [
+		[1, 0],
+		[-1, 0],
+		[0, 1],
+		[0, -1],
+	];
+
+	for (let i = 0; i < queue.length; i++) {
+		const [x, y] = queue[i];
+		if (getTile(x, y) !== TILE_FLOOR) continue;
+		const key = xyKey(x, y);
+		floorKeys.add(key);
+		for (let j = 0; j < cardinal.length; j++) {
+			const nx = x + cardinal[j][0];
+			const ny = y + cardinal[j][1];
+			const nextKey = xyKey(nx, ny);
+			const tile = getTile(nx, ny);
+			if (tile === TILE_FLOOR && !seen.has(nextKey)) {
+				seen.add(nextKey);
+				queue.push([nx, ny]);
+			} else if (tile === TILE_DOOR) {
+				doorKeys.add(nextKey);
+			}
+		}
+	}
+
+	const shellKeys = [...floorKeys, ...doorKeys];
+	for (let i = 0; i < shellKeys.length; i++) {
+		const { x, y } = keyToXY(shellKeys[i]);
+		for (let dy = -1; dy <= 1; dy++) {
+			for (let dx = -1; dx <= 1; dx++) {
+				if (dx === 0 && dy === 0) continue;
+				const nx = x + dx;
+				const ny = y + dy;
+				if (getTile(nx, ny) === TILE_WALL) {
+					wallKeys.add(xyKey(nx, ny));
+				}
+			}
+		}
+	}
+
+	if (!floorKeys.size) return null;
+	return { floorKeys, doorKeys, wallKeys };
+}
+
+/**
+ * @param {Set<string>} floorKeys
+ * @param {Set<string>} doorKeys
+ * @param {Set<string>} wallKeys
+ */
+function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys) {
+	const allKeys = [...wallKeys, ...doorKeys, ...floorKeys];
+	allKeys.sort((a, b) => {
+		const pa = keyToXY(a);
+		const pb = keyToXY(b);
+		return ((pa.x + pa.y) - (pb.x + pb.y)) || (pa.y - pb.y) || (pa.x - pb.x);
+	});
+	const split = Math.ceil(allKeys.length / 2);
+	return allKeys.map((key, index) => {
+		const { x, y } = keyToXY(key);
+		return { x, y, kind: index < split ? "roof_thatch_shadow" : "roof_thatch_lit" };
+	});
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{ x:number, y:number } | null} playerPos
+ */
+function collectOverworldRoofs(world, playerPos) {
+	let isOverworld = false;
+	for (const [, ds] of world.query(DungeonState)) {
+		isOverworld = ds.currentDepth === 0 || ds.profileType === "overworld";
+		break;
+	}
+	if (!isOverworld) return [];
+
+	const playerKey = playerPos ? xyKey(playerPos.x, playerPos.y) : "";
+	const roofs = [];
+	const visited = new Set();
+
+	for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
+		const identity = String(ident?.identity || "");
+		if (!OVERWORLD_ROOF_SEED_IDENTITIES.has(identity)) continue;
+		const building = collectRoofedBuilding(pos.x, pos.y);
+		if (!building) continue;
+		const floorKeys = [...building.floorKeys];
+		if (floorKeys.some((key) => visited.has(key))) continue;
+		for (let i = 0; i < floorKeys.length; i++) visited.add(floorKeys[i]);
+		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) continue;
+		roofs.push(...roofTilesFromBuilding(building.floorKeys, building.doorKeys, building.wallKeys));
+	}
+
+	return roofs;
+}
 
 /**
  * @param {string} rawType
@@ -188,6 +308,7 @@ export function buildWorldView(world) {
 	_view.entities.length = 0;
 	_view.solids.length = 0;
 	_view.emissives.length = 0;
+	_view.roofs.length = 0;
 	_view.engravings.length = 0;
 	_allEntities.length = 0;
 
@@ -388,6 +509,11 @@ export function buildWorldView(world) {
 		if (isVisible(pos.x, pos.y) || isExplored(pos.x, pos.y)) {
 			_view.engravings.push({ id, text: eng.text, profane: !!eng.profane, pos: { x: pos.x, y: pos.y } });
 		}
+	}
+
+	const roofTiles = collectOverworldRoofs(world, _view.player?.pos || null);
+	for (let i = 0; i < roofTiles.length; i++) {
+		_view.roofs.push(roofTiles[i]);
 	}
 
 	return _view;

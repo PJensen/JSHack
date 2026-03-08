@@ -92,9 +92,10 @@ const farmY0 = homeY + 6;
 const farmY1 = homeY + 11;
 const tavX0 = homeX + 6;
 const tavY0 = homeY - 10;
-const tavX1 = homeX + 14;
+const tavX1 = homeX + 13;
 const tavY1 = homeY - 4;
-const tavDoorX = tavX0 + 4;
+const tavDoorX = tavX0 + 2;
+const tavDoorY = tavY1;
 const millX0 = homeX - 9;
 const millY0 = homeY - 7;
 const millX1 = homeX - 6;
@@ -152,25 +153,27 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
   const { chunks } = generateOverworldChunks(SEED);
 
   assertEquals(getWorldTile(chunks, tavX0, tavY0), TILE_WALL);
-  assertEquals(getWorldTile(chunks, tavX1, tavY1), TILE_WALL);
+  assertEquals(getWorldTile(chunks, tavX0 + 7, tavY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, tavX0 + 1, tavY0 + 1), TILE_FLOOR);
-  assertEquals(getWorldTile(chunks, tavDoorX, tavY1), TILE_DOOR);
+  assertEquals(getWorldTile(chunks, tavX0 + 6, tavY0 + 3), TILE_FLOOR);
+  assertEquals(getWorldTile(chunks, tavDoorX, tavDoorY), TILE_DOOR);
+  assert(getWorldTile(chunks, tavX0 + 5, tavY0 + 5) !== TILE_WALL, "tavern notch should stay open");
+  assert(getWorldTile(chunks, tavX0 + 5, tavY0 + 5) !== TILE_FLOOR, "tavern notch should form an L shape");
   assertEquals(coordsOfKind(chunks, "tavern_keg"), [`${tavX0 + 1},${tavY0 + 1}`]);
   assertEquals(coordsOfKind(chunks, "tavern_table"), [
-    `${tavX0 + 3},${tavY0 + 2}`,
-    `${tavX0 + 3},${tavY0 + 4}`,
-    `${tavX0 + 5},${tavY0 + 2}`,
-    `${tavX0 + 5},${tavY0 + 4}`,
+    `${tavX0 + 3},${tavY0 + 1}`,
+    `${tavX0 + 4},${tavY0 + 1}`,
+    `${tavX0 + 5},${tavY0 + 1}`,
   ]);
   assertEquals(coordsOfKind(chunks, "tavern_pillar"), [
-    `${tavX0 + 1},${tavY0 + 2}`,
-    `${tavX1 - 1},${tavY0 + 2}`,
+    `${tavX0 + 3},${tavY0 + 2}`,
+    `${tavX0 + 5},${tavY0 + 2}`,
   ]);
   assertEquals(coordsOfKind(chunks, "tavern_bench"), [
-    `${tavX0 + 3},${tavY0 + 3}`,
+    `${tavX0 + 4},${tavY0 + 3}`,
     `${tavX0 + 5},${tavY0 + 3}`,
   ]);
-  assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX + 1},${tavY1 + 1}`]);
+  assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX + 1},${tavDoorY + 1}`]);
 
   assertEquals(getWorldTile(chunks, millX0, millY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, millX1, millY1), TILE_WALL);
@@ -179,13 +182,35 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
   assertEquals(coordsOfKind(chunks, "millstone"), [`${millX0 + 1},${millY0 + 1}`]);
 });
 
+Deno.test("wild harvestables stay on exterior ground rather than structure tiles", () => {
+  const { chunks } = generateOverworldChunks(SEED);
+  const naturalKinds = new Set([
+    "harvest_berries",
+    "harvest_herbs",
+    "harvest_thorn_bramble",
+    "harvest_venom_fern",
+  ]);
+
+  for (const chunk of chunks) {
+    for (const spawn of chunk.spawns) {
+      if (!naturalKinds.has(spawn.kind)) continue;
+      const tile = getWorldTile(chunks, spawn.x, spawn.y);
+      assert(tile !== TILE_WALL, `${spawn.kind} spawned in a wall at ${spawn.x},${spawn.y}`);
+      assert(tile !== TILE_FLOOR, `${spawn.kind} spawned on an indoor floor at ${spawn.x},${spawn.y}`);
+      assert(tile !== TILE_DOOR, `${spawn.kind} spawned in a doorway at ${spawn.x},${spawn.y}`);
+      assert(tile !== TILE_FARMLAND, `${spawn.kind} spawned in the farm plot at ${spawn.x},${spawn.y}`);
+      assert(tile !== TILE_FENCE, `${spawn.kind} spawned on the fence line at ${spawn.x},${spawn.y}`);
+    }
+  }
+});
+
 Deno.test("overworld walkways connect the house to the gate and outbuilding doors", () => {
   clearAll();
   const { chunks } = generateOverworldChunks(SEED);
   for (const chunk of chunks) loadChunk(chunk.chunkX, chunk.chunkY, chunk.tiles);
 
   assert(canReach(spawnX, spawnY, gateX, gateY), "farm gate should be reachable from spawn");
-  assert(canReach(spawnX, spawnY, tavDoorX, tavY1), "tavern door should be reachable from spawn");
+  assert(canReach(spawnX, spawnY, tavDoorX, tavDoorY), "tavern door should be reachable from spawn");
   assert(canReach(spawnX, spawnY, millDoorX, millY1), "windmill door should be reachable from spawn");
 
   clearAll();
