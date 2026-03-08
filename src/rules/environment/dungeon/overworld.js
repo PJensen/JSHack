@@ -19,6 +19,8 @@ import {
   TILE_MOUNTAIN_C,
   TILE_TREE,
   TILE_SHALLOW_WATER,
+  TILE_FARMLAND,
+  TILE_FENCE,
 } from "./constants.js";
 
 export const OVERWORLD_EXTENT = Object.freeze({
@@ -208,12 +210,23 @@ export function generateOverworldChunks(worldSeed) {
 
   fillDisk(chunks, homeX, homeY, 13);
 
-  const halfW = 5;
-  const halfH = 3;
+  const halfW = 4;
+  const halfH = 2;
   const doorX = homeX;
   const doorY = homeY + halfH;
   const spawnX = doorX;
   const spawnY = doorY + 1;
+  const northWalkY = homeY - halfH - 1;
+  const southWalkY = spawnY;
+  const westWalkX = homeX - halfW - 1;
+  const eastWalkX = homeX + halfW + 1;
+  const fenceY = homeY + 5;
+  const gateX = homeX + 1;
+  const gateY = fenceY;
+  const farmX0 = homeX - 2;
+  const farmX1 = homeX + 4;
+  const farmY0 = homeY + 6;
+  const farmY1 = homeY + 11;
 
   // Clear spawn area before building the house so the disk doesn't overwrite walls/door
   fillDisk(chunks, spawnX, spawnY, 2);
@@ -228,9 +241,16 @@ export function generateOverworldChunks(worldSeed) {
 
   setWorldTile(chunks, doorX, doorY, TILE_DOOR);
 
+  // Settlement walkways: a simple ring around the house plus a front path to the farm gate.
+  carvePath(chunks, westWalkX, northWalkY, eastWalkX, northWalkY);
+  carvePath(chunks, westWalkX, southWalkY, eastWalkX, southWalkY);
+  carvePath(chunks, westWalkX, northWalkY, westWalkX, southWalkY);
+  carvePath(chunks, eastWalkX, northWalkY, eastWalkX, southWalkY);
+  carvePath(chunks, doorX, southWalkY, gateX, gateY - 1);
+
   const stairX = homeX + 8;
   const stairY = homeY + 1;
-  carvePath(chunks, doorX, doorY + 1, stairX, stairY);
+  carvePath(chunks, eastWalkX, southWalkY, stairX, stairY);
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
   // Pond — ellipse with Perlin wobble, northwest of the house
@@ -260,7 +280,7 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, homeX + 2, homeY, "home_chest");
   addSpawn(chunks, homeX, homeY - 1, "alchemy_bench");
   addSpawn(chunks, homeX + 3, homeY + 1, "cooking_fire");
-  addSpawn(chunks, homeX - 3, doorY + 2, "home_sign");
+  addSpawn(chunks, westWalkX - 1, southWalkY, "home_sign");
   // Outside crafting & fire
   // setWorldTile(chunks, homeX + 10, homeY + 5, TILE_GRASS);
   // addSpawn(chunks, homeX + 10, homeY + 5, "anvil");
@@ -364,6 +384,83 @@ export function generateOverworldChunks(worldSeed) {
     setWorldTile(chunks, pos.x, pos.y, TILE_GRASS);
     addSpawn(chunks, pos.x, pos.y, "harvest_stone");
   }
+
+  // ── Fence line south of house yard ──────────────────────────────
+  for (let fx = farmX0; fx <= farmX1; fx++) {
+    setWorldTile(chunks, fx, fenceY, TILE_FENCE);
+  }
+  // Gate tile so the opening reads as an actual entrance rather than a missing fence segment.
+  setWorldTile(chunks, gateX, gateY, TILE_DOOR);
+
+  // ── Farm plot — tilled soil south of the fence ────────────────
+  for (let fy = farmY0; fy <= farmY1; fy++) {
+    for (let fx = farmX0; fx <= farmX1; fx++) {
+      setWorldTile(chunks, fx, fy, TILE_FARMLAND);
+    }
+  }
+  // Crop rows: tidy three-by-three planting grid with empty aisles between rows/columns.
+  for (let fx = homeX - 1; fx <= homeX + 3; fx += 2) {
+    addSpawn(chunks, fx, homeY + 7, "crop_wheat");
+  }
+  for (let fx = homeX - 1; fx <= homeX + 3; fx += 2) {
+    addSpawn(chunks, fx, homeY + 9, "crop_turnip");
+  }
+  for (let fx = homeX - 1; fx <= homeX + 3; fx += 2) {
+    addSpawn(chunks, fx, homeY + 11, "crop_pumpkin");
+  }
+  addSpawn(chunks, homeX + 1, homeY + 8, "scarecrow");
+
+  // ── Well — south-west of house ────────────────────────────────
+  addSpawn(chunks, homeX - 3, southWalkY + 1, "well");
+
+  // ── Tavern — walled building NE of house (9×7) ────────────────
+  const tavX0 = homeX + 6;
+  const tavY0 = homeY - 10;
+  const tavX1 = homeX + 14;
+  const tavY1 = homeY - 4;
+  for (let ty = tavY0; ty <= tavY1; ty++) {
+    for (let tx = tavX0; tx <= tavX1; tx++) {
+      const border = tx === tavX0 || tx === tavX1 || ty === tavY0 || ty === tavY1;
+      setWorldTile(chunks, tx, ty, border ? TILE_WALL : TILE_FLOOR);
+    }
+  }
+  const tavDoorX = tavX0 + 4;
+  setWorldTile(chunks, tavDoorX, tavY1, TILE_DOOR);
+  carvePath(chunks, tavDoorX, tavY1 + 1, eastWalkX, northWalkY);
+  // Interior layout (7×5):
+  //   o . . . . . .     keg in NW corner
+  //   □ . ═ . ═ . □     pillars + tables
+  //   . . ▭ . ▭ . .     benches
+  //   . . ═ . ═ . .     more tables
+  //   . . . . . . .     open floor near door
+  addSpawn(chunks, tavX0 + 1, tavY0 + 1, "tavern_keg");
+  addSpawn(chunks, tavX0 + 1, tavY0 + 2, "tavern_pillar");
+  addSpawn(chunks, tavX1 - 1, tavY0 + 2, "tavern_pillar");
+  addSpawn(chunks, tavX0 + 3, tavY0 + 2, "tavern_table");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 2, "tavern_table");
+  addSpawn(chunks, tavX0 + 3, tavY0 + 3, "tavern_bench");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 3, "tavern_bench");
+  addSpawn(chunks, tavX0 + 3, tavY0 + 4, "tavern_table");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 4, "tavern_table");
+  // Sign outside the door
+  addSpawn(chunks, tavDoorX + 1, tavY1 + 1, "tavern_sign");
+
+  // ── Windmill — walled building NW of house ────────────────────
+  const millX0 = homeX - 9;
+  const millY0 = homeY - 7;
+  const millX1 = homeX - 6;
+  const millY1 = homeY - 4;
+  for (let my = millY0; my <= millY1; my++) {
+    for (let mx = millX0; mx <= millX1; mx++) {
+      const border = mx === millX0 || mx === millX1 || my === millY0 || my === millY1;
+      setWorldTile(chunks, mx, my, border ? TILE_WALL : TILE_FLOOR);
+    }
+  }
+  const millDoorX = millX0 + 1;
+  setWorldTile(chunks, millDoorX, millY1, TILE_DOOR);
+  carvePath(chunks, millDoorX, millY1 + 1, westWalkX, northWalkY);
+  // Interior
+  addSpawn(chunks, millX0 + 1, millY0 + 1, "millstone");
 
   const outChunks = [];
   for (const rec of chunks.values()) {

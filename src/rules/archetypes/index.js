@@ -17,6 +17,9 @@ export {
   IronOre,
   CoalOre,
   StoneChip,
+  Wheat,
+  Turnip,
+  Pumpkin,
   createCorpse,
 } from './Food.js';
 export { SpikeTrap, SnakeTrap, ShockTrap } from './Traps.js';
@@ -36,6 +39,17 @@ export {
   Anvil,
   Furnace,
   CookingFire,
+  CropWheat,
+  CropTurnip,
+  CropPumpkin,
+  Well,
+  Scarecrow,
+  TavernKeg,
+  TavernTable,
+  TavernBench,
+  TavernPillar,
+  TavernSign,
+  Millstone,
 } from './Overworld.js';
 export {
   Fountain,

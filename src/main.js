@@ -405,6 +405,8 @@ import {
   TILE_MOUNTAIN_B,
   TILE_MOUNTAIN_C,
   TILE_TREE,
+  TILE_FARMLAND,
+  TILE_FENCE,
 } from "./rules/environment/dungeon/constants.js";
 import { dungeonConfig } from "./rules/environment/dungeon/dungeonConfig.js";
 const _tileKindMap = {
@@ -423,6 +425,8 @@ const _tileKindMap = {
   [TILE_MOUNTAIN_B]: 'mountain_b',
   [TILE_MOUNTAIN_C]: 'mountain_c',
   [TILE_TREE]: 'tree',
+  [TILE_FARMLAND]: 'farmland',
+  [TILE_FENCE]:    'fence',
 };
 
 // Allow URL override: ?dungeonScale=0.3 for compact debugging floors

@@ -31,6 +31,7 @@ import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
   WildBerries, WildHerbs, ThornPods, VenomFronds,
   DungeonMushrooms, IronOre, CoalOre, StoneChip,
+  Wheat, Turnip, Pumpkin,
 } from "../../archetypes/Food.js";
 import { Monster } from "../../archetypes/Creatures.js";
 import { equipMonster } from "../../environment/dungeon/populate.js";
@@ -53,6 +54,9 @@ const CATALOG_ARCHETYPES = {
   "ore_iron":            IronOre,
   "ore_coal":            CoalOre,
   "ore_stone":           StoneChip,
+  "food_wheat":          Wheat,
+  "food_turnip":         Turnip,
+  "food_pumpkin":        Pumpkin,
 };
 
 const HARVEST_SEED_SALT = 0x48415256;

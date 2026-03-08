@@ -168,3 +168,108 @@ export const CookingFire = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "cookFood", params: null }],
 );
+
+// ── Farm crops ────────────────────────────────────────────────────
+export const CropWheat = defineArchetype(
+  "CropWheat",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Wheat", identity: "crop_wheat" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, {
+    kind: "wheat", ready: true, regrowTurns: 200, regrowCountdown: 0,
+    yield: "food_wheat", yieldMin: 1, yieldMax: 3,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
+);
+
+export const CropTurnip = defineArchetype(
+  "CropTurnip",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Turnip", identity: "crop_turnip" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, {
+    kind: "turnip", ready: true, regrowTurns: 160, regrowCountdown: 0,
+    yield: "food_turnip", yieldMin: 1, yieldMax: 2,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
+);
+
+export const CropPumpkin = defineArchetype(
+  "CropPumpkin",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Pumpkin", identity: "crop_pumpkin" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, {
+    kind: "pumpkin", ready: true, regrowTurns: 280, regrowCountdown: 0,
+    yield: "food_pumpkin", yieldMin: 1, yieldMax: 1,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
+);
+
+// ── Decorative overworld entities ─────────────────────────────────
+export const Well = defineArchetype(
+  "Well",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Well", identity: "well" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Scarecrow = defineArchetype(
+  "Scarecrow",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Scarecrow", identity: "scarecrow" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const TavernKeg = defineArchetype(
+  "TavernKeg",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Keg", identity: "tavern_keg" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const TavernTable = defineArchetype(
+  "TavernTable",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Table", identity: "tavern_table" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const TavernBench = defineArchetype(
+  "TavernBench",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Bench", identity: "tavern_bench" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const TavernPillar = defineArchetype(
+  "TavernPillar",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Pillar", identity: "tavern_pillar" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const TavernSign = defineArchetype(
+  "TavernSign",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Tavern Sign", identity: "tavern_sign" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Millstone = defineArchetype(
+  "Millstone",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Millstone", identity: "millstone" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);

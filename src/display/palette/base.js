@@ -51,6 +51,8 @@ export const basePalette = {
   mountain_b: { glyph: "∧", fg: "#bec1c4", glow: "#6e7174" },  // mid-peak
   mountain_c: { glyph: "▲", fg: "#e0e3e6", glow: "#969ea4" },  // high-peak
   tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026" },
+  farmland:  { glyph: "░", fg: "#8b7355", glow: "#5a4a38" },
+  fence:     { glyph: "#", fg: "#a08050", glow: "#6b5530" },
   wall: { glyph: "#", fg: "#99a", glow: "#667" },
   door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
   door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
@@ -123,6 +125,18 @@ export const basePalette = {
   furnace:       { glyph: "🫕", fg: "#ff8533", glow: "#cc4400" },
   furnace_unlit: { glyph: "🫕", fg: "#8a6040", glow: "#553320" },
   cooking_fire: { glyph: "♨", fg: "#ff9944", glow: "#dd5500" },
+  // Overworld structures
+  crop_wheat:    { glyph: "▒", fg: "#d4a830", glow: "#a07820" },
+  crop_turnip:   { glyph: "▒", fg: "#7ecc5a", glow: "#4a9030" },
+  crop_pumpkin:  { glyph: "▒", fg: "#e87820", glow: "#b85a10" },
+  well:          { glyph: "O", fg: "#7799bb", glow: "#445566" },
+  scarecrow:     { glyph: "T", fg: "#b89070", glow: "#7a5a3a" },
+  tavern_keg:    { glyph: "o", fg: "#8b5a2b", glow: "#5a3a1a" },
+  tavern_table:  { glyph: "═", fg: "#a08050", glow: "#6b5530" },
+  tavern_bench:  { glyph: "▭", fg: "#9a7040", glow: "#6a4a28" },
+  tavern_pillar: { glyph: "□", fg: "#8a7a6a", glow: "#5a4a3a" },
+  tavern_sign:   { glyph: "🍺", fg: "#d4a830", glow: "#a07820" },
+  millstone:     { glyph: "◎", fg: "#9a9a9a", glow: "#5a5a5a" },
 
   // Room features
   fountain:    { glyph: "⛲", fg: "#66bbee", glow: "#3388aa" },
@@ -166,6 +180,9 @@ export const basePalette = {
   food_mushrooms:    { glyph: "🍄", fg: "#c8b898", glow: "#8a7a5a" },
   reagent_thorn_pod: { glyph: "✶", fg: "#a08f63", glow: "#6f6242" },
   reagent_venom_frond: { glyph: "☤", fg: "#9ccc69", glow: "#5f8d3c" },
+  food_wheat:    { glyph: "%", fg: "#d4a830", glow: "#a07820" },
+  food_turnip:   { glyph: "%", fg: "#7ecc5a", glow: "#4a9030" },
+  food_pumpkin:  { glyph: "%", fg: "#e87820", glow: "#b85a10" },
   // Ore items (dropped from mining nodes)
   ore_iron:  { glyph: "≡", fg: "#b86840", glow: "#7a3a18" },
   ore_coal:  { glyph: "■", fg: "#404040", glow: "#202020" },

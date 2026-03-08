@@ -34,6 +34,17 @@ import {
   Anvil,
   Furnace,
   CookingFire,
+  CropWheat,
+  CropTurnip,
+  CropPumpkin,
+  Well,
+  Scarecrow,
+  TavernKeg,
+  TavernTable,
+  TavernBench,
+  TavernPillar,
+  TavernSign,
+  Millstone,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
@@ -775,6 +786,28 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, Furnace, { x: spawn.x, y: spawn.y });
     case 'cooking_fire':
       return createFrom(world, CookingFire, { x: spawn.x, y: spawn.y });
+    case 'crop_wheat':
+      return createFrom(world, CropWheat, { x: spawn.x, y: spawn.y });
+    case 'crop_turnip':
+      return createFrom(world, CropTurnip, { x: spawn.x, y: spawn.y });
+    case 'crop_pumpkin':
+      return createFrom(world, CropPumpkin, { x: spawn.x, y: spawn.y });
+    case 'well':
+      return createFrom(world, Well, { x: spawn.x, y: spawn.y });
+    case 'scarecrow':
+      return createFrom(world, Scarecrow, { x: spawn.x, y: spawn.y });
+    case 'tavern_keg':
+      return createFrom(world, TavernKeg, { x: spawn.x, y: spawn.y });
+    case 'tavern_table':
+      return createFrom(world, TavernTable, { x: spawn.x, y: spawn.y });
+    case 'tavern_bench':
+      return createFrom(world, TavernBench, { x: spawn.x, y: spawn.y });
+    case 'tavern_pillar':
+      return createFrom(world, TavernPillar, { x: spawn.x, y: spawn.y });
+    case 'tavern_sign':
+      return createFrom(world, TavernSign, { x: spawn.x, y: spawn.y });
+    case 'millstone':
+      return createFrom(world, Millstone, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);
