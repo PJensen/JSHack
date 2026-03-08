@@ -1,4 +1,4 @@
-import { assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
@@ -56,6 +56,29 @@ Deno.test("overworld roofs appear from outside and hide only the building the pl
   assert(roofHas(view, houseInterior.x, houseInterior.y), "house roof should reappear when the player leaves it");
   assert(!roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should hide when the player steps inside");
   assert(roofHas(view, windmillInterior.x, windmillInterior.y), "windmill roof should remain visible when the player is in the tavern");
+
+  clearAll();
+  clearExplored();
+});
+
+Deno.test("overworld roof shading bands run straight across each building instead of diagonally", () => {
+  clearAll();
+  clearExplored();
+
+  const world = new World({ seed: 0xC0FFEE });
+  const spawn = initDungeon(world, { startDepth: 0 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Position, { x: spawn.x, y: spawn.y });
+
+  const tavernInterior = posOfIdentity(world, "tavern_keg");
+  const view = buildWorldView(world);
+
+  assertEquals(roofAt(view, tavernInterior.x, tavernInterior.y - 1)?.kind, "roof_thatch_shadow");
+  assertEquals(roofAt(view, tavernInterior.x + 5, tavernInterior.y - 1)?.kind, "roof_thatch_shadow");
+  assertEquals(roofAt(view, tavernInterior.x, tavernInterior.y + 4)?.kind, "roof_thatch_lit");
+  assertEquals(roofAt(view, tavernInterior.x + 5, tavernInterior.y + 4)?.kind, "roof_thatch_lit");
 
   clearAll();
   clearExplored();

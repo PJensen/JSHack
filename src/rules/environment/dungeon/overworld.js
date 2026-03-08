@@ -476,42 +476,41 @@ export function generateOverworldChunks(worldSeed) {
   // ── Well — south-west of house ────────────────────────────────
   addSpawn(chunks, homeX - 3, southWalkY + 1, "well");
 
-  // ── Tavern — thatched L-shaped building NE of house ───────────
+  // ── Tavern — broader rectangle so the roof posts, bar, and seating read cleanly ──
   const tavX0 = homeX + 6;
   const tavY0 = homeY - 10;
   const tavFloorCells = [];
-  for (let ty = tavY0 + 1; ty <= tavY0 + 3; ty++) {
-    for (let tx = tavX0 + 1; tx <= tavX0 + 6; tx++) {
-      tavFloorCells.push({ x: tx, y: ty });
-    }
-  }
   for (let ty = tavY0 + 1; ty <= tavY0 + 5; ty++) {
-    for (let tx = tavX0 + 1; tx <= tavX0 + 3; tx++) {
+    for (let tx = tavX0 + 1; tx <= tavX0 + 7; tx++) {
       tavFloorCells.push({ x: tx, y: ty });
     }
   }
-  const tavDoorX = tavX0 + 2;
+  const tavDoorX = tavX0 + 4;
   const tavDoorY = tavY0 + 6;
   paintStructure(chunks, tavFloorCells, { x: tavDoorX, y: tavDoorY });
   carvePath(chunks, tavDoorX, tavDoorY + 1, eastWalkX, northWalkY);
   // Interior layout:
-  //   o ═ ═ ═ . .       keg + bar along the north wall
-  //   . . □ . □ .       central pillars under the roof
-  //   . . . ▭ ▭ .       benches facing the bar
-  //   . . .             south arm remains open to the door
+  //   o ═ ═ ═ ═ . .     keg + long bar along the north wall
+  //   . . . . . . .     standing room behind the benches
+  //   . □ . . . □ .     paired roof posts with a center aisle
+  //   ▭ ▭ . . . ▭ ▭     benches facing the bar
+  //   . . . . . . .     open run to the centered door
   addSpawn(chunks, tavX0 + 1, tavY0 + 1, "tavern_keg");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 1, "tavern_table");
   addSpawn(chunks, tavX0 + 3, tavY0 + 1, "tavern_table");
   addSpawn(chunks, tavX0 + 4, tavY0 + 1, "tavern_table");
-  addSpawn(chunks, tavX0 + 5, tavY0 + 1, "tavern_table");
-  addSpawn(chunks, tavX0 + 3, tavY0 + 2, "tavern_pillar");
-  addSpawn(chunks, tavX0 + 5, tavY0 + 2, "tavern_pillar");
-  addSpawn(chunks, tavX0 + 4, tavY0 + 3, "tavern_bench");
-  addSpawn(chunks, tavX0 + 5, tavY0 + 3, "tavern_bench");
+  addSpawn(chunks, tavX0 + 6, tavY0 + 1, "tavern_table");
+  addSpawn(chunks, tavX0 + 2, tavY0 + 3, "tavern_pillar");
+  addSpawn(chunks, tavX0 + 6, tavY0 + 3, "tavern_pillar");
+  addSpawn(chunks, tavX0 + 1, tavY0 + 4, "tavern_bench");
+  addSpawn(chunks, tavX0 + 2, tavY0 + 4, "tavern_bench");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 4, "tavern_bench");
+  addSpawn(chunks, tavX0 + 6, tavY0 + 4, "tavern_bench");
   addSpawn(chunks, tavDoorX + 1, tavDoorY + 1, "tavern_sign");
 
-  // ── Windmill — walled building NW of house ────────────────────
-  const millX0 = homeX - 9;
-  const millY0 = homeY - 7;
+  // ── Windmill — slightly larger square so the millstone is not jammed into the shell ──
+  const millX0 = homeX - 10;
+  const millY0 = homeY - 8;
   const millX1 = homeX - 6;
   const millY1 = homeY - 4;
   for (let my = millY0; my <= millY1; my++) {
@@ -520,11 +519,11 @@ export function generateOverworldChunks(worldSeed) {
       setWorldTile(chunks, mx, my, border ? TILE_WALL : TILE_FLOOR);
     }
   }
-  const millDoorX = millX0 + 1;
+  const millDoorX = millX0 + 2;
   setWorldTile(chunks, millDoorX, millY1, TILE_DOOR);
   carvePath(chunks, millDoorX, millY1 + 1, westWalkX, northWalkY);
   // Interior
-  addSpawn(chunks, millX0 + 1, millY0 + 1, "millstone");
+  addSpawn(chunks, millX0 + 2, millY0 + 2, "millstone");
 
   // Natural harvestables are placed after all structures so they cannot end up in walls or on paths.
   for (const p of berrySpots) {

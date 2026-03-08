@@ -92,15 +92,15 @@ const farmY0 = homeY + 6;
 const farmY1 = homeY + 11;
 const tavX0 = homeX + 6;
 const tavY0 = homeY - 10;
-const tavX1 = homeX + 13;
+const tavX1 = homeX + 14;
 const tavY1 = homeY - 4;
-const tavDoorX = tavX0 + 2;
+const tavDoorX = tavX0 + 4;
 const tavDoorY = tavY1;
-const millX0 = homeX - 9;
-const millY0 = homeY - 7;
+const millX0 = homeX - 10;
+const millY0 = homeY - 8;
 const millX1 = homeX - 6;
 const millY1 = homeY - 4;
-const millDoorX = millX0 + 1;
+const millDoorX = millX0 + 2;
 
 Deno.test("overworld scales the player house down to a 9x5 footprint with a front walk", () => {
   const { chunks, spawnX: actualSpawnX, spawnY: actualSpawnY } = generateOverworldChunks(SEED);
@@ -153,33 +153,34 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
   const { chunks } = generateOverworldChunks(SEED);
 
   assertEquals(getWorldTile(chunks, tavX0, tavY0), TILE_WALL);
-  assertEquals(getWorldTile(chunks, tavX0 + 7, tavY0), TILE_WALL);
+  assertEquals(getWorldTile(chunks, tavX0 + 8, tavY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, tavX0 + 1, tavY0 + 1), TILE_FLOOR);
-  assertEquals(getWorldTile(chunks, tavX0 + 6, tavY0 + 3), TILE_FLOOR);
+  assertEquals(getWorldTile(chunks, tavX0 + 7, tavY0 + 5), TILE_FLOOR);
   assertEquals(getWorldTile(chunks, tavDoorX, tavDoorY), TILE_DOOR);
-  assert(getWorldTile(chunks, tavX0 + 5, tavY0 + 5) !== TILE_WALL, "tavern notch should stay open");
-  assert(getWorldTile(chunks, tavX0 + 5, tavY0 + 5) !== TILE_FLOOR, "tavern notch should form an L shape");
   assertEquals(coordsOfKind(chunks, "tavern_keg"), [`${tavX0 + 1},${tavY0 + 1}`]);
   assertEquals(coordsOfKind(chunks, "tavern_table"), [
     `${tavX0 + 3},${tavY0 + 1}`,
     `${tavX0 + 4},${tavY0 + 1}`,
     `${tavX0 + 5},${tavY0 + 1}`,
+    `${tavX0 + 6},${tavY0 + 1}`,
   ]);
   assertEquals(coordsOfKind(chunks, "tavern_pillar"), [
-    `${tavX0 + 3},${tavY0 + 2}`,
-    `${tavX0 + 5},${tavY0 + 2}`,
+    `${tavX0 + 2},${tavY0 + 3}`,
+    `${tavX0 + 6},${tavY0 + 3}`,
   ]);
   assertEquals(coordsOfKind(chunks, "tavern_bench"), [
-    `${tavX0 + 4},${tavY0 + 3}`,
-    `${tavX0 + 5},${tavY0 + 3}`,
+    `${tavX0 + 1},${tavY0 + 4}`,
+    `${tavX0 + 2},${tavY0 + 4}`,
+    `${tavX0 + 5},${tavY0 + 4}`,
+    `${tavX0 + 6},${tavY0 + 4}`,
   ]);
   assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX + 1},${tavDoorY + 1}`]);
 
   assertEquals(getWorldTile(chunks, millX0, millY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, millX1, millY1), TILE_WALL);
-  assertEquals(getWorldTile(chunks, millX0 + 1, millY0 + 1), TILE_FLOOR);
+  assertEquals(getWorldTile(chunks, millX0 + 2, millY0 + 2), TILE_FLOOR);
   assertEquals(getWorldTile(chunks, millDoorX, millY1), TILE_DOOR);
-  assertEquals(coordsOfKind(chunks, "millstone"), [`${millX0 + 1},${millY0 + 1}`]);
+  assertEquals(coordsOfKind(chunks, "millstone"), [`${millX0 + 2},${millY0 + 2}`]);
 });
 
 Deno.test("wild harvestables stay on exterior ground rather than structure tiles", () => {
