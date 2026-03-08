@@ -8,6 +8,7 @@ import {
   TILE_GRASS_A, TILE_GRASS_C, TILE_GRASS_D,
   TILE_MOUNTAIN_B, TILE_MOUNTAIN_C,
   TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
+  TILE_FARMLAND, TILE_FENCE,
 } from './constants.js';
 
 // chunk key: "cx,cy" -> Uint8Array (the chunk.tiles reference)
@@ -26,6 +27,7 @@ _walkable[TILE_GRASS_D]       = 1;
 _walkable[TILE_ICE]           = 1;
 _walkable[TILE_SHALLOW_WATER] = 1;
 _walkable[TILE_LAVA]          = 1;
+_walkable[TILE_FARMLAND]      = 1;
 
 // Precomputed flyability per tile type — everything except void and wall.
 // Flying entities can cross water, lava, trees, mountains, etc.
@@ -45,6 +47,8 @@ _flyable[TILE_MOUNTAIN]      = 1;
 _flyable[TILE_MOUNTAIN_B]    = 1;
 _flyable[TILE_MOUNTAIN_C]    = 1;
 _flyable[TILE_TREE]          = 1;
+_flyable[TILE_FARMLAND]      = 1;
+_flyable[TILE_FENCE]         = 1;
 
 // Precomputed opacity per tile type
 const _opaque = new Uint8Array(32);

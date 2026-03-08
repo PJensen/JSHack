@@ -29,6 +29,10 @@ export const TILE_ICE            = 16; // slippery ice — instant chain slide
 export const TILE_SHALLOW_WATER  = 17; // shallow pool — extinguishes burn
 export const TILE_LAVA           = 18; // molten rock  — scorches on step
 
+// Overworld structure tiles
+export const TILE_FARMLAND       = 19; // tilled soil  ░  — walkable, transparent
+export const TILE_FENCE          = 20; // wooden fence #  — NOT walkable, transparent, flyable
+
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 5;   // smallest BSP leaf dimension
 export const MIN_ROOM_SIZE   = 3;   // smallest room interior (excl. walls)

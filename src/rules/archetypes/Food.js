@@ -108,6 +108,63 @@ export const DungeonMushrooms = defineArchetype(
   [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.35) }],
 );
 
+// Harvested from farm wheat crops.
+export const Wheat = defineArchetype(
+  "Wheat",
+  [Consumable, {
+    effectParams: { nutrition: 150, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "A sheaf of golden wheat. Can be cooked into bread.",
+    weight: 0.3,
+    value: 5,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Wheat", identity: "food_wheat" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.8) }],
+);
+
+// Harvested from farm turnip crops.
+export const Turnip = defineArchetype(
+  "Turnip",
+  [Consumable, {
+    effectParams: { nutrition: 130, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "A hearty turnip, fresh from the soil.",
+    weight: 0.4,
+    value: 4,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Turnip", identity: "food_turnip" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.6) }],
+);
+
+// Harvested from farm pumpkin crops.
+export const Pumpkin = defineArchetype(
+  "Pumpkin",
+  [Consumable, {
+    effectParams: { nutrition: 180, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "A large, bright orange pumpkin.",
+    weight: 1.0,
+    value: 8,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Pumpkin", identity: "food_pumpkin" })],
+  [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.7) }],
+);
+
 // Harvested from thorn brambles; used for alchemy recipes.
 export const ThornPods = defineArchetype(
   "ThornPods",
