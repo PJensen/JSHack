@@ -80,7 +80,6 @@ import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
-import { drawFlyingShadow } from "./display/fx/flyingFxController.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
@@ -2405,27 +2404,183 @@ const isVisibleAt = (x, y) => {
   return !!isTileVisible(Number(x) | 0, Number(y) | 0);
 };
 
-const NOOP_FLYING_FX = Object.freeze({
-  tick() {},
-  syncWorldView() {},
-  getPresentation(e) {
-    return {
-      id: e?.id || 0,
-      progress: 0,
-      lift: 0,
-      glyphX: e?.pos?.x || 0,
-      glyphY: e?.pos?.y || 0,
-      glyphScale: 1,
-      shadowX: e?.pos?.x || 0,
-      shadowY: e?.pos?.y || 0,
-      shadowRx: 0,
-      shadowRy: 0,
-      shadowAlpha: 0,
-      wake: 0,
-      wakeKind: '',
-    };
-  },
-});
+const FLYING_FX_INSTALLED = Symbol.for('jshack:display:flyingFx:main:installed');
+const FLYING_TAKEOFF_SECONDS = 0.34;
+const FLYING_LAND_SECONDS = 0.24;
+const FLYING_WAKE_SECONDS = 0.30;
+const FLYING_MAX_LIFT = 0.36;
+const FLYING_HOVER_BOB = 0.028;
+
+function easeOutCubic(n) {
+  const t = clamp01(n);
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function flyingPhaseFromId(id) {
+  const h = (Math.imul((id | 0) ^ 0x9e3779b9, 1664525) + 1013904223) >>> 0;
+  return (h / 0xffffffff) * Math.PI * 2;
+}
+
+function buildFlyingPresentation({ id, x, y, progress, wake, wakeKind, fxTime, camScale, phase }) {
+  const p = clamp01(progress);
+  const lifted = easeOutCubic(p);
+  const hoverBob = lifted > 0.001
+    ? Math.sin(fxTime * (lifted > 0.96 ? 3.2 : 5.8) + phase) * FLYING_HOVER_BOB * lifted
+    : 0;
+  const lift = FLYING_MAX_LIFT * lifted + hoverBob;
+  const scalePulse = lifted > 0.96
+    ? (0.5 + 0.5 * Math.sin(fxTime * 2.7 + phase * 0.7))
+    : lifted;
+  const glyphScale = 1 + lifted * 0.085 + scalePulse * lifted * 0.02;
+  const worldPerPx = 1 / Math.max(1, Number(camScale) || 1);
+  const shadowSlideX = (-2.0 * worldPerPx * lifted) - (lift * 0.12);
+  const shadowSlideY = (-2.0 * worldPerPx * lifted) - (lift * 0.08);
+  return {
+    id,
+    progress: p,
+    lift,
+    glyphX: x,
+    glyphY: y - lift,
+    glyphScale,
+    shadowX: x + shadowSlideX,
+    shadowY: y + 0.24 + shadowSlideY,
+    shadowRx: 0.30 - lifted * 0.04,
+    shadowRy: 0.11 - lifted * 0.015,
+    shadowAlpha: Math.max(0.08, 0.26 - lifted * 0.06),
+    wake: clamp01(wake),
+    wakeKind: wakeKind || '',
+  };
+}
+
+function createFlyingFxController(world) {
+  /** @type {Map<number, { progress:number, targetAirborne:boolean, wake:number, wakeKind:string, phase:number }>} */
+  const states = new Map();
+
+  function ensureState(id, seed = {}) {
+    let rec = states.get(id);
+    if (!rec) {
+      rec = {
+        progress: clamp01(seed.progress ?? 0),
+        targetAirborne: !!seed.targetAirborne,
+        wake: clamp01(seed.wake ?? 0),
+        wakeKind: seed.wakeKind || '',
+        phase: flyingPhaseFromId(id),
+      };
+      states.set(id, rec);
+    }
+    return rec;
+  }
+
+  function installListeners() {
+    if (world[FLYING_FX_INSTALLED]) return;
+    world[FLYING_FX_INSTALLED] = true;
+
+    world.on('proc:fly:takeoff', ({ id }) => {
+      const entityId = Number(id || 0);
+      if (!entityId) return;
+      const rec = ensureState(entityId, { progress: 0, targetAirborne: true });
+      rec.targetAirborne = true;
+      rec.progress = Math.max(rec.progress, 0.12);
+      rec.wake = 1;
+      rec.wakeKind = 'takeoff';
+    });
+
+    world.on('proc:fly:land', ({ id }) => {
+      const entityId = Number(id || 0);
+      if (!entityId) return;
+      const rec = ensureState(entityId, { progress: 1, targetAirborne: false });
+      rec.targetAirborne = false;
+      rec.progress = Math.max(rec.progress, 0.18);
+      rec.wake = 1;
+      rec.wakeKind = 'land';
+    });
+  }
+
+  function syncWorldView(worldView) {
+    const entities = Array.isArray(worldView?.entities) ? worldView.entities : [];
+    for (let i = 0; i < entities.length; i++) {
+      const e = entities[i];
+      const flying = Array.isArray(e.tags) && e.tags.includes('flying');
+      const rec = states.get(e.id);
+      if (!flying) {
+        if (rec) rec.targetAirborne = false;
+        continue;
+      }
+      if (!rec) {
+        states.set(e.id, {
+          progress: 1,
+          targetAirborne: true,
+          wake: 0,
+          wakeKind: '',
+          phase: flyingPhaseFromId(e.id),
+        });
+        continue;
+      }
+      rec.targetAirborne = true;
+      if (rec.progress <= 0.001) rec.progress = 1;
+    }
+  }
+
+  function tick(dt) {
+    for (const [id, rec] of states) {
+      if (rec.targetAirborne) rec.progress = Math.min(1, rec.progress + (dt / FLYING_TAKEOFF_SECONDS));
+      else rec.progress = Math.max(0, rec.progress - (dt / FLYING_LAND_SECONDS));
+
+      rec.wake = Math.max(0, rec.wake - (dt / FLYING_WAKE_SECONDS));
+      if (!rec.targetAirborne && rec.progress <= 0.001) {
+        states.delete(id);
+        continue;
+      }
+      if (rec.targetAirborne && typeof world.isAlive === 'function' && !world.isAlive(id) && rec.progress >= 0.999) {
+        states.delete(id);
+      }
+    }
+  }
+
+  function getPresentation(entity, fxTime, camScale) {
+    const flyingTag = Array.isArray(entity?.tags) && entity.tags.includes('flying');
+    const rec = states.get(entity.id);
+    if (!rec && !flyingTag) {
+      return buildFlyingPresentation({
+        id: entity.id,
+        x: entity.pos.x,
+        y: entity.pos.y,
+        progress: 0,
+        wake: 0,
+        wakeKind: '',
+        fxTime,
+        camScale,
+        phase: flyingPhaseFromId(entity.id),
+      });
+    }
+    if (!rec && flyingTag) {
+      return buildFlyingPresentation({
+        id: entity.id,
+        x: entity.pos.x,
+        y: entity.pos.y,
+        progress: 1,
+        wake: 0,
+        wakeKind: '',
+        fxTime,
+        camScale,
+        phase: flyingPhaseFromId(entity.id),
+      });
+    }
+    return buildFlyingPresentation({
+      id: entity.id,
+      x: entity.pos.x,
+      y: entity.pos.y,
+      progress: rec?.progress ?? 0,
+      wake: rec?.wake ?? 0,
+      wakeKind: rec?.wakeKind || '',
+      fxTime,
+      camScale,
+      phase: rec?.phase ?? flyingPhaseFromId(entity.id),
+    });
+  }
+
+  return { installListeners, syncWorldView, tick, getPresentation };
+}
 
 const displayRuntime = setupDisplayRuntime({
   world,
@@ -2452,7 +2607,8 @@ const {
   cloudFx,
   ftext,
 } = displayRuntime;
-const flyingFx = displayRuntime.flyingFx || NOOP_FLYING_FX;
+const flyingFx = createFlyingFxController(world);
+flyingFx.installListeners();
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
@@ -2626,6 +2782,43 @@ function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
   ctx.translate(x, y);
   ctx.scale(s, s);
   drawKind(atlas, ctx, kind, 0, 0);
+  ctx.restore();
+}
+
+function drawFlyingShadow(ctx, presentation) {
+  if (!presentation || presentation.progress <= 0.001) return;
+
+  const { shadowX, shadowY, shadowRx, shadowRy, shadowAlpha, wake, wakeKind, progress } = presentation;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(0,0,0,${(shadowAlpha * 0.45).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(shadowX, shadowY, shadowRx * 1.55, shadowRy * 1.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(6,8,14,${shadowAlpha.toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(shadowX, shadowY, shadowRx, shadowRy, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(0,0,0,${Math.max(0.08, shadowAlpha * 0.42).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(shadowX, shadowY, shadowRx * 0.72, shadowRy * 0.72, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (wake > 0.001) {
+    const u = 1 - wake;
+    const ringRx = shadowRx + 0.08 + u * 0.24;
+    const ringRy = shadowRy + 0.04 + u * 0.10;
+    const ringAlpha = wake * (wakeKind === 'land' ? 0.24 : 0.20) * progress;
+    ctx.lineWidth = 0.028 + wake * 0.014;
+    ctx.strokeStyle = wakeKind === 'land'
+      ? `rgba(255,188,120,${ringAlpha.toFixed(3)})`
+      : `rgba(120,205,255,${ringAlpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(shadowX, shadowY, ringRx, ringRy, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
