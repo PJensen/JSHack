@@ -2,6 +2,7 @@ import { HazardArea } from "../components/HazardArea.js";
 import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
+import { Flying } from "../components/Flying.js";
 import { TILE_GRASS, TILE_TREE } from "../environment/dungeon/constants.js";
 import { getTile, setTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
@@ -121,6 +122,7 @@ export function hazardSystem(world) {
         if (!tpos || !vit) continue;
         if (id === hazardId) continue;
         if ((vit.hp | 0) <= 0) continue;
+        if (medium === "floor" && world.has(id, Flying)) continue;
 
         const dx = Math.abs((tpos.x | 0) - (pos.x | 0));
         const dy = Math.abs((tpos.y | 0) - (pos.y | 0));

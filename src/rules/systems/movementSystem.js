@@ -195,6 +195,7 @@ export function movementSystem(world) {
       const nx = pos.x + mdx;
       const ny = pos.y + mdy;
       const k = key(nx, ny);
+      const target = tiles.livingByCell.get(k) || 0;
 
       // Record facing direction on every move attempt (successful or not)
       if (world.has(actor, Facing)) {
@@ -211,10 +212,10 @@ export function movementSystem(world) {
         && blocking.has(k)
         && tiles.blockedByCell.has(k)
         && isBlockedOnlyByWebs(world, tiles, nx, ny);
+      const flyingOccupant = target > 0 && target !== actor && world.has(target, Flying);
 
-      if (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb)) {
+      if (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb) || flyingOccupant) {
         // Blocked — delegate to bump resolver dispatch table
-        const target = tiles.livingByCell.get(k) || 0;
         resolveBump(world, actor, { nx, ny, mdx, mdy, target, tiles });
       } else {
         // Successful move

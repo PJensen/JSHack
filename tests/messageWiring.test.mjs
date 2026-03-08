@@ -15,7 +15,7 @@ import { evaluateSound, thresholdForTier } from "../src/rules/utils/sound.js";
 import { resolveItemDisplayName } from "../src/main/wiring/itemName.js";
 import { installMessageWiring } from "../src/display/ui/wiring/messageWiring.js";
 
-function installWithDeps(world, messageLog, playerId) {
+function installWithDeps(world, messageLog, playerId, { isVisibleAt } = {}) {
   installMessageWiring({
     world,
     messageLog,
@@ -23,6 +23,7 @@ function installWithDeps(world, messageLog, playerId) {
     bracketizeName: (s) => `[${s}]`,
     getSpell: () => null,
     resolveItemDisplayName,
+    isVisibleAt,
     components: {
       Equipment,
       ItemInfo,
@@ -229,4 +230,26 @@ Deno.test("messageWiring resolves ambient sound audibility by depth, hearing tie
   });
   assertEquals(messageLog.entries.length, 2);
   assertEquals(messageLog.entries[1].text, "YOU HEAR MARKET CHATTER NEARBY");
+});
+
+Deno.test("messageWiring only logs flying messages for visible creatures", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const hiddenLog = createMessageLog();
+  installWithDeps(world, hiddenLog, playerId, { isVisibleAt: () => false });
+  world.emit("proc:fly:takeoff", { name: "Bat", x: 10, y: 10 });
+  assertEquals(hiddenLog.entries.length, 0);
+
+  const visibleWorld = new World({ seed: 42 });
+  const visiblePlayerId = visibleWorld.create();
+  visibleWorld.add(visiblePlayerId, Player, {});
+  const visibleLog = createMessageLog();
+  installWithDeps(visibleWorld, visibleLog, visiblePlayerId, { isVisibleAt: () => true });
+  visibleWorld.emit("proc:fly:takeoff", { name: "Bat", x: 10, y: 10 });
+  visibleWorld.emit("proc:fly:land", { name: "Bat", x: 10, y: 10 });
+  assertEquals(visibleLog.entries.length, 2);
+  assert(visibleLog.entries[0].text.includes("takes to the air"));
+  assert(visibleLog.entries[1].text.includes("lands"));
 });

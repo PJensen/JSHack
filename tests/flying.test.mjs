@@ -7,6 +7,7 @@ import { Position }       from '../src/rules/components/Position.js';
 import { Player }         from '../src/rules/components/Player.js';
 import { NamedIdentity }  from '../src/rules/components/NamedIdentity.js';
 import { Faction }        from '../src/rules/components/Faction.js';
+import { AttackIntent }   from '../src/rules/components/Intents/AttackIntent.js';
 import { MoveIntent }     from '../src/rules/components/Intents/MoveIntent.js';
 import { Speed }          from '../src/rules/components/Speed.js';
 import { Vitality }       from '../src/rules/components/Vitality.js';
@@ -14,15 +15,19 @@ import { Collider }       from '../src/rules/components/Collider.js';
 import { Flying }         from '../src/rules/components/Flying.js';
 import { DungeonState }   from '../src/rules/components/DungeonState.js';
 import { AggroState, AGGRO_LEVELS } from '../src/rules/components/AggroState.js';
+import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { HazardArea } from '../src/rules/components/HazardArea.js';
 import { aiFlyingSystem } from '../src/rules/systems/aiFlyingSystem.js';
 import { movementSystem } from '../src/rules/systems/movementSystem.js';
+import { installTileStepEffectListener } from '../src/rules/systems/tileStepEffectSystem.js';
+import { hazardSystem } from '../src/rules/systems/hazardSystem.js';
 import { resolveBump, BUMP_RESOLVERS } from '../src/rules/data/bumpResolvers.js';
 import { loadChunk, clearAll, isWalkable, isFlyable } from '../src/rules/environment/dungeon/tileMap.js';
 import { invalidateTileQueryCache, getTileQuerySnapshot } from '../src/rules/utils/tileQueryCache.js';
 import { canFlyOnFloor } from '../src/rules/utils/flyingEligibility.js';
 import {
   CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL,
-  TILE_SHALLOW_WATER, TILE_LAVA, TILE_MOUNTAIN, TILE_TREE,
+  TILE_SHALLOW_WATER, TILE_LAVA, TILE_MOUNTAIN, TILE_TREE, TILE_ICE,
 } from '../src/rules/environment/dungeon/constants.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -195,6 +200,22 @@ Deno.test("aiFlyingSystem: strips Flying when floor becomes ineligible", () => {
   assert(!world.has(bat, Flying), 'Flying should be stripped on ineligible floor');
 });
 
+Deno.test("aiFlyingSystem: respects Speed.actEvery cadence when toggling flight", () => {
+  const world = makeWorld();
+  addDungeonState(world, 0, 'overworld');
+  addPlayer(world, 5, 5);
+  const bat = addFlyingMonster(world, 'bat', 10, 10, AGGRO_LEVELS.hunting);
+  world.set(bat, Speed, { actEvery: 3 });
+
+  world.step = 1;
+  aiFlyingSystem(world);
+  assert(!world.has(bat, Flying), 'bat should not toggle flight off-turn');
+
+  world.step = 3;
+  aiFlyingSystem(world);
+  assert(world.has(bat, Flying), 'bat should toggle flight on its turn');
+});
+
 // ── Terrain bypass (isFlyable) ───────────────────────────────────────
 
 Deno.test("isFlyable: floor tile is flyable", () => {
@@ -293,6 +314,8 @@ Deno.test("hostileMelee: grounded attacker cannot melee flying target", () => {
   const attacker = addPlayer(world, 5, 5);
   const target = addFlyingMonster(world, 'bat', 6, 5, AGGRO_LEVELS.hunting);
   world.add(target, Flying, {});
+  let outOfReach = 0;
+  world.on('combat:target-flying', () => { outOfReach++; });
 
   invalidateTileQueryCache(world);
   const tiles = getTileQuerySnapshot(world);
@@ -303,7 +326,10 @@ Deno.test("hostileMelee: grounded attacker cannot melee flying target", () => {
 
   const ctx = { nx: 6, ny: 5, mdx: 1, mdy: 0, target, tiles };
   const result = resolver.test(world, attacker, ctx);
-  assert(!result, 'grounded attacker should not be able to melee flying target');
+  assert(result, 'grounded attacker should resolve bump against flying target');
+  resolver.resolve(world, attacker, ctx);
+  assertEquals(outOfReach, 1, 'grounded attacker should get out-of-reach feedback');
+  assert(!world.has(attacker, AttackIntent), 'grounded attacker should not queue a melee attack');
 });
 
 Deno.test("hostileMelee: flying attacker CAN melee flying target", () => {
@@ -364,4 +390,89 @@ Deno.test("tileQueryCache: grounded entity DOES block tile", () => {
   const tiles = getTileQuerySnapshot(world);
 
   assert(tiles.blockedByCell.has('5,5'), 'grounded entity should block its tile');
+});
+
+Deno.test("movementSystem: grounded actor cannot step into flying hostile and gets feedback", () => {
+  loadFloorChunk();
+  const world = makeWorld();
+  world.step = 1;
+
+  const attacker = addPlayer(world, 5, 5);
+  const target = addFlyingMonster(world, 'bat', 6, 5, AGGRO_LEVELS.hunting);
+  world.add(target, Flying, {});
+  world.add(attacker, MoveIntent, { dx: 1, dy: 0 });
+
+  let outOfReach = 0;
+  world.on('combat:target-flying', () => { outOfReach++; });
+
+  movementSystem(world);
+
+  const pos = world.get(attacker, Position);
+  assertEquals(pos.x, 5, 'grounded actor should stay in place');
+  assertEquals(pos.y, 5, 'grounded actor should stay in place');
+  assertEquals(outOfReach, 1, 'moving into a flying hostile should emit out-of-reach');
+});
+
+Deno.test("tileStepEffectSystem: flying actor ignores lava and ice step effects", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 5] = TILE_ICE;
+  tiles[6 * CHUNK_SIZE + 5] = TILE_LAVA;
+  loadChunk(0, 0, tiles);
+
+  const world = makeWorld();
+  installTileStepEffectListener(world);
+
+  const actor = world.create();
+  world.add(actor, Position, { x: 5, y: 5 });
+  world.add(actor, Vitality, { maxHp: 10, hp: 10 });
+  world.add(actor, Flying, {});
+
+  world.emit('moved', { id: actor, from: { x: 4, y: 5 }, to: { x: 5, y: 5 } });
+
+  const pos = world.get(actor, Position);
+  const vit = world.get(actor, Vitality);
+  assertEquals(pos.x, 5, 'flying actor should not slide on ice');
+  assertEquals(pos.y, 5, 'flying actor should remain on the destination tile');
+  assertEquals(vit.hp, 10, 'flying actor should not be scorched by floor tiles');
+  assert(!world.has(actor, ActiveEffects), 'flying actor should not gain floor-tile statuses');
+});
+
+Deno.test("hazardSystem: floor hazards ignore flying actors but air hazards still hit them", () => {
+  const world = makeWorld();
+
+  const flyer = world.create();
+  world.add(flyer, Position, { x: 5, y: 5 });
+  world.add(flyer, Vitality, { maxHp: 10, hp: 10 });
+  world.add(flyer, Flying, {});
+
+  const floorHazard = world.create();
+  world.add(floorHazard, Position, { x: 5, y: 5 });
+  world.add(floorHazard, HazardArea, {
+    kind: 'fire',
+    medium: 'floor',
+    turnsLeft: 2,
+    radius: 0,
+    tickDamage: 3,
+    damageType: 'fire',
+    cause: 'floor_fire',
+  });
+
+  const airHazard = world.create();
+  world.add(airHazard, Position, { x: 5, y: 5 });
+  world.add(airHazard, HazardArea, {
+    kind: 'plasma',
+    medium: 'air',
+    turnsLeft: 2,
+    radius: 0,
+    tickDamage: 2,
+    damageType: 'electric',
+    cause: 'air_plasma',
+  });
+
+  hazardSystem(world);
+
+  const vit = world.get(flyer, Vitality);
+  assertEquals(vit.hp, 8, 'only the air hazard should damage a flying actor');
 });

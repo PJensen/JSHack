@@ -75,8 +75,6 @@ const hostileMelee = {
     // Precision gate: never melee through stale occupancy or non-walkable terrain.
     if (!targetIsAtBumpTile(ctx.target, ctx.nx, ctx.ny, ctx.tiles)) return false;
     if (!isWalkable(ctx.nx, ctx.ny)) return false;
-    // Flying target immune to melee from grounded attacker
-    if (world.has(ctx.target, Flying) && !world.has(actor, Flying)) return false;
     const actorFac = world.get(actor, Faction);
     const targetFac = world.get(ctx.target, Faction);
     // Shopkeepers / neutrals with Interactable are handled by npc-interact
