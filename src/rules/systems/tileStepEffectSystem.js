@@ -10,6 +10,7 @@ import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Pushable } from "../components/Pushable.js";
+import { Flying } from "../components/Flying.js";
 import { findTileStepEffect } from "../data/tileStepEffects.js";
 import { TILE_ICE } from "../environment/dungeon/constants.js";
 import { getTile, isWalkable } from "../environment/dungeon/tileMap.js";
@@ -57,6 +58,7 @@ function _handleStep(world, id, from, to) {
   // Only living entities are affected
   const vit = world.get(id, Vitality);
   if (!vit || (vit.hp | 0) <= 0) return;
+  if (world.has(id, Flying)) return;
 
   switch (effect.type) {
     case "extinguish":

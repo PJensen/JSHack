@@ -16,6 +16,7 @@ const ALL_CAPS_DB_BY_SOURCE = Object.freeze({
  *   bracketizeName: (s: string) => string,
  *   getSpell: (id: string) => any,
  *   resolveItemDisplayName: (world: any, id: number) => string,
+ *   isVisibleAt?: (x:number, y:number) => boolean,
  *   components: {
  *     Equipment?: any, ItemInfo?: any, NamedIdentity?: any, Owner?: any, Pet?: any,
  *     Player?: any, Position?: any, Devotion?: any, Anatomy?: any, DungeonState?: any,
@@ -34,6 +35,7 @@ export function installMessageWiring({
   bracketizeName,
   getSpell,
   resolveItemDisplayName,
+  isVisibleAt,
   components = {},
   soundApi = {},
 }) {
@@ -69,6 +71,11 @@ export function installMessageWiring({
 
   const compGet = (id, comp) => (comp ? world.get(Number(id || 0), comp) : null);
   const compHas = (id, comp) => (comp ? world.has(Number(id || 0), comp) : false);
+  const canSeeAt = (x, y) => (
+    Number.isFinite(Number(x))
+    && Number.isFinite(Number(y))
+    && (typeof isVisibleAt !== "function" || !!isVisibleAt(Number(x), Number(y)))
+  );
 
   /** Format helpers for message log */
   function nameOfEntity(id) {
@@ -952,10 +959,12 @@ export function installMessageWiring({
   });
 
   // === Flying events ===
-  world.on('proc:fly:takeoff', ({ name }) => {
+  world.on('proc:fly:takeoff', ({ name, x, y }) => {
+    if (!canSeeAt(x, y)) return;
     log(`The ${name || 'creature'} takes to the air!`, 'system');
   });
-  world.on('proc:fly:land', ({ name }) => {
+  world.on('proc:fly:land', ({ name, x, y }) => {
+    if (!canSeeAt(x, y)) return;
     log(`The ${name || 'creature'} lands.`, 'system');
   });
   world.on('combat:target-flying', () => {

@@ -1361,6 +1361,7 @@ installMessageWiring({
   bracketizeName,
   getSpell,
   resolveItemDisplayName,
+  isVisibleAt: isTileVisible,
   components: {
     Equipment,
     ItemInfo,

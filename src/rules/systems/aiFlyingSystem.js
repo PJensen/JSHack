@@ -8,15 +8,11 @@
 import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
 import { Position }      from "../components/Position.js";
 import { Player }        from "../components/Player.js";
-import { Faction }       from "../components/Faction.js";
 import { Speed }         from "../components/Speed.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Flying }        from "../components/Flying.js";
 import { getMonster }    from "../data/monsters.js";
 import { canFlyOnFloor } from "../utils/flyingEligibility.js";
-import { forEachInRadius } from "../utils/spatialIndex.js";
-
-const ACTIVE_RADIUS = 32;
 
 function chebyshevDistance(ax, ay, bx, by) {
   return Math.max(Math.abs((ax | 0) - (bx | 0)), Math.abs((ay | 0) - (by | 0)));
@@ -41,8 +37,8 @@ export function aiFlyingSystem(world) {
 
     // Speed gate: only act on the entity's turn
     const spd = world.get(id, Speed);
-    const actEvery = Math.max(1, spd ? (4 - spd.actEvery) : 3);
-    if ((world.step % actEvery) !== 0) continue;
+    const actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
+    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) continue;
 
     // Check monster definition for canFly
     const ni = world.get(id, NamedIdentity);
