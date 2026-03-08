@@ -32,6 +32,7 @@ export const TILE_LAVA           = 18; // molten rock  — scorches on step
 // Overworld structure tiles
 export const TILE_FARMLAND       = 19; // tilled soil  ░  — walkable, transparent
 export const TILE_FENCE          = 20; // wooden fence #  — NOT walkable, transparent, flyable
+export const TILE_COBBLESTONE    = 21; // grey stone cobble ·  — walkable, transparent
 
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 5;   // smallest BSP leaf dimension

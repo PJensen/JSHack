@@ -45,6 +45,14 @@ import {
   TavernPillar,
   TavernSign,
   Millstone,
+  ChurchAltar,
+  ChurchPew,
+  ChurchSign,
+  FlowerRose,
+  FlowerSunflower,
+  FlowerTulip,
+  FlowerDaisy,
+  FlowerBluebell,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { Inventory } from '../../components/Inventory.js';
@@ -808,6 +816,22 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, TavernSign, { x: spawn.x, y: spawn.y });
     case 'millstone':
       return createFrom(world, Millstone, { x: spawn.x, y: spawn.y });
+    case 'church_altar':
+      return createFrom(world, ChurchAltar, { x: spawn.x, y: spawn.y });
+    case 'church_pew':
+      return createFrom(world, ChurchPew, { x: spawn.x, y: spawn.y });
+    case 'church_sign':
+      return createFrom(world, ChurchSign, { x: spawn.x, y: spawn.y });
+    case 'flower_rose':
+      return createFrom(world, FlowerRose, { x: spawn.x, y: spawn.y });
+    case 'flower_sunflower':
+      return createFrom(world, FlowerSunflower, { x: spawn.x, y: spawn.y });
+    case 'flower_tulip':
+      return createFrom(world, FlowerTulip, { x: spawn.x, y: spawn.y });
+    case 'flower_daisy':
+      return createFrom(world, FlowerDaisy, { x: spawn.x, y: spawn.y });
+    case 'flower_bluebell':
+      return createFrom(world, FlowerBluebell, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);

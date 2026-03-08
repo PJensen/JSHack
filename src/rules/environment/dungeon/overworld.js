@@ -21,6 +21,7 @@ import {
   TILE_SHALLOW_WATER,
   TILE_FARMLAND,
   TILE_FENCE,
+  TILE_COBBLESTONE,
 } from "./constants.js";
 
 export const OVERWORLD_EXTENT = Object.freeze({
@@ -506,7 +507,7 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, tavX0 + 2, tavY0 + 4, "tavern_bench");
   addSpawn(chunks, tavX0 + 5, tavY0 + 4, "tavern_bench");
   addSpawn(chunks, tavX0 + 6, tavY0 + 4, "tavern_bench");
-  addSpawn(chunks, tavDoorX + 1, tavDoorY + 1, "tavern_sign");
+  addSpawn(chunks, tavDoorX + 1, tavDoorY, "tavern_sign");
 
   // ── Windmill — slightly larger square so the millstone is not jammed into the shell ──
   const millX0 = homeX - 10;
@@ -524,6 +525,64 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, millDoorX, millY1 + 1, westWalkX, northWalkY);
   // Interior
   addSpawn(chunks, millX0 + 2, millY0 + 2, "millstone");
+
+  // ── Church — small chapel north of house ─────────────────────
+  // Clear terrain for the church (sits outside the main clearing disk)
+  fillDisk(chunks, homeX, homeY - 13, 5);
+  const churchX0 = homeX - 3;
+  const churchY0 = homeY - 16;
+  // Interior: 5 wide × 5 tall → building 7 × 7
+  const churchFloorCells = [];
+  for (let cy = churchY0 + 1; cy <= churchY0 + 5; cy++) {
+    for (let cx = churchX0 + 1; cx <= churchX0 + 5; cx++) {
+      churchFloorCells.push({ x: cx, y: cy });
+    }
+  }
+  const churchDoorX = churchX0 + 3;
+  const churchDoorY = churchY0 + 6;
+  paintStructure(chunks, churchFloorCells, { x: churchDoorX, y: churchDoorY });
+  carvePath(chunks, churchDoorX, churchDoorY + 1, churchDoorX, northWalkY);
+  // Interior: altar + candles at north, pew rows in the nave
+  addSpawn(chunks, churchX0 + 3, churchY0 + 1, "church_altar");
+  addSpawn(chunks, churchX0 + 2, churchY0 + 1, "torch");
+  addSpawn(chunks, churchX0 + 4, churchY0 + 1, "torch");
+  addSpawn(chunks, churchX0 + 2, churchY0 + 3, "church_pew");
+  addSpawn(chunks, churchX0 + 4, churchY0 + 3, "church_pew");
+  addSpawn(chunks, churchX0 + 2, churchY0 + 4, "church_pew");
+  addSpawn(chunks, churchX0 + 4, churchY0 + 4, "church_pew");
+  addSpawn(chunks, churchDoorX + 1, churchDoorY + 1, "church_sign");
+
+  // ── Fountain plaza — cobblestone square with fountain ────────
+  // Placed on the church-to-walkway path, north of house
+  const fountainCX = homeX;
+  const fountainCY = homeY - 6;
+  for (let fy = fountainCY - 2; fy <= fountainCY + 2; fy++) {
+    for (let fx = fountainCX - 2; fx <= fountainCX + 2; fx++) {
+      setWorldTile(chunks, fx, fy, TILE_COBBLESTONE);
+    }
+  }
+  addSpawn(chunks, fountainCX, fountainCY, "fountain");
+
+  // ── Garden — colorful flowers east of house ─────────────────
+  const gardenCX = homeX + 9;
+  const gardenCY = homeY + 7;
+  const flowerKinds = [
+    "flower_rose", "flower_sunflower", "flower_tulip",
+    "flower_daisy", "flower_bluebell",
+  ];
+  let flowerIdx = 0;
+  for (let gy = gardenCY - 2; gy <= gardenCY + 1; gy++) {
+    for (let gx = gardenCX - 2; gx <= gardenCX + 2; gx++) {
+      setWorldTile(chunks, gx, gy, TILE_GRASS);
+      // Checkerboard pattern — flowers on even parity, gaps on odd
+      if ((gx + gy) % 2 === 0) {
+        addSpawn(chunks, gx, gy, flowerKinds[flowerIdx % flowerKinds.length]);
+        flowerIdx++;
+      }
+    }
+  }
+  // Short path connecting garden to stair path
+  carvePath(chunks, gardenCX, gardenCY - 3, homeX + 8, homeY + 3);
 
   // Natural harvestables are placed after all structures so they cannot end up in walls or on paths.
   for (const p of berrySpots) {
