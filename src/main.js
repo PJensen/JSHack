@@ -25,6 +25,7 @@ import {
 import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
+import { isInputLocked } from "./display/input/inputLock.js";
 import { enableInputLockdown } from "./display/input/lockdown.js";
 import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
 // simple UI overlays
@@ -324,7 +325,7 @@ function getTargetedSpellConfig(spellId) {
   return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;
 }
 function computeThrowRange(weight) { return throwFx.computeThrowRange(weight); }
-function isSimUiBlocked() { return throwFx.isBlocking(); }
+function isSimUiBlocked() { return isInputLocked(); }
 
 /**
  * Convert world-space coordinate to nearest tile center index.

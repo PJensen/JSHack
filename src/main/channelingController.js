@@ -9,6 +9,7 @@
 import { WaitIntent } from "../rules/components/Intents/WaitIntent.js";
 import { Channeling } from "../rules/components/Channeling.js";
 import { getSpell } from "../rules/data/spells.js";
+import { setInputLock } from "../display/input/inputLock.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:channelingController:installed');
 const TICK_INTERVAL_MS = 500;
@@ -44,7 +45,7 @@ export function installChannelingController(world, getActorId) {
       try { window.removeEventListener('ui:cancelChanneling', _cancelUiHandler); } catch {}
       _cancelUiHandler = null;
     }
-    try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = false; } catch {}
+    try { setInputLock('channeling', false); } catch {}
     uiEvent('ui:channeling:end', {});
   }
 
@@ -95,7 +96,7 @@ export function installChannelingController(world, getActorId) {
   }
 
   function startLoop(spellId) {
-    try { /** @type {any} */ (window).__JSHACK_INPUT_LOCKED = true; } catch {}
+    try { setInputLock('channeling', true); } catch {}
 
     // Dispatch UI start event so the HUD can show the channeling overlay
     const spell = getSpell(spellId || '');
