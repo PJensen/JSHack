@@ -28,6 +28,7 @@ import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { buildSpellDamageSpec, createSpellDamageContext, getSpellIntelligenceBonus, scaleSpellDamage } from "../utils/spellDamage.js";
+import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 
@@ -151,7 +152,14 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   candidates.sort((a,b)=> d2(apos.x,apos.y,a.x,a.y) - d2(apos.x,apos.y,b.x,b.y));
   let first = null;
   for (const c of candidates) {
-    if (hasLOS(apos.x|0, apos.y|0, c.x|0, c.y|0, isBlocked)) { first = c; break; }
+    if (hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: c.id,
+      sourcePos: apos,
+      targetPos: c,
+      range: MAX_R,
+      isBlocked,
+    })) { first = c; break; }
   }
   if (!first) {
     // Nothing visible to hit; emit a short self-burst semantic
@@ -172,7 +180,14 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
       if (used.has(c.id)) continue;
       const dist2 = d2(last.x, last.y, c.x, c.y);
       if (dist2 <= CHAIN_RADIUS*CHAIN_RADIUS && dist2 < bestD2
-          && hasLOS(last.x|0, last.y|0, c.x|0, c.y|0, isBlocked)) { best = c; bestD2 = dist2; }
+          && hasSpellLineOfSight(world, {
+            sourceId: last.id,
+            targetId: c.id,
+            sourcePos: last,
+            targetPos: c,
+            range: CHAIN_RADIUS,
+            isBlocked,
+          })) { best = c; bestD2 = dist2; }
     }
     if (!best) break;
     used.add(best.id);
@@ -569,7 +584,14 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
-    if (!hasLOS(apos.x | 0, apos.y | 0, ox | 0, oy | 0, isBlocked)) {
+    if (!hasSpellLineOfSight(world, {
+      sourceId: actor,
+      sourcePos: apos,
+      targetPos: { x: ox, y: oy },
+      range: MAX_R,
+      isBlocked,
+      allowFlyingOccupantAtTarget: true,
+    })) {
       try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
       return;
     }
@@ -586,7 +608,14 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       const dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
       if (d2 > (MAX_R * MAX_R)) continue;
-      if (d2 < bestD2 && hasLOS(apos.x | 0, apos.y | 0, pos.x | 0, pos.y | 0, isBlocked)) { bestId = id; bestD2 = d2; }
+      if (d2 < bestD2 && hasSpellLineOfSight(world, {
+        sourceId: actor,
+        targetId: id,
+        sourcePos: apos,
+        targetPos: pos,
+        range: MAX_R,
+        isBlocked,
+      })) { bestId = id; bestD2 = d2; }
     }
     if (!bestId) {
       try { world.emit && world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R }); } catch (e) { console.debug('[spells] emit spell:meteor:failed failed:', e); }
@@ -673,7 +702,14 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   candidates.sort((a, b) => a.dist2 - b.dist2);
   let target = null;
   for (const c of candidates) {
-    if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isBlocked)) { target = c; break; }
+    if (hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: c.id,
+      sourcePos: apos,
+      targetPos: c,
+      range: MAX_R,
+      isBlocked,
+    })) { target = c; break; }
   }
   if (!target) {
     // No valid target; emit a fizzle pulse at caster
@@ -907,7 +943,14 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   candidates.sort((a, b) => a.dist2 - b.dist2);
   let target = null;
   for (const c of candidates) {
-    if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isBlocked)) { target = c; break; }
+    if (hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: c.id,
+      sourcePos: apos,
+      targetPos: c,
+      range: MAX_R,
+      isBlocked,
+    })) { target = c; break; }
   }
   if (!target) {
     try { world.emit && world.emit('spell:shadow_bolt', { actor, targetId: actor, from: { x: apos.x, y: apos.y }, to: { x: apos.x, y: apos.y }, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:shadow_bolt fizzle failed:', e); }
@@ -956,7 +999,14 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
     candidates.sort((a, b) => a.dist2 - b.dist2);
     let found = null;
     for (const c of candidates) {
-      if (hasLOS(apos.x | 0, apos.y | 0, c.x | 0, c.y | 0, isBlocked)) { found = c; break; }
+      if (hasSpellLineOfSight(world, {
+        sourceId: actor,
+        targetId: c.id,
+        sourcePos: apos,
+        targetPos: c,
+        range: MAX_R,
+        isBlocked,
+      })) { found = c; break; }
     }
     if (!found) {
       try { world.emit && world.emit('spell:agony', { actor, targetId: actor, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
@@ -974,7 +1024,14 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   }
 
   // LOS check
-  if (!hasLOS(apos.x | 0, apos.y | 0, tpos.x | 0, tpos.y | 0, isBlocked)) {
+  if (!hasSpellLineOfSight(world, {
+    sourceId: actor,
+    targetId,
+    sourcePos: apos,
+    targetPos: tpos,
+    range: MAX_R,
+    isBlocked,
+  })) {
     try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true, reason: 'no_los' }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
     return;
   }
