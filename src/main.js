@@ -79,7 +79,7 @@ import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "
 import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
-import { createGlyphAtlas, drawKind, drawKindScaled } from "./display/passes/glyphs/atlas.js";
+import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
 import { drawFlyingShadow } from "./display/fx/flyingFxController.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
@@ -2405,7 +2405,29 @@ const isVisibleAt = (x, y) => {
   return !!isTileVisible(Number(x) | 0, Number(y) | 0);
 };
 
-const { statusEmitterFx, boltFx, projectileFx, spellAreaFx, cloudFx, flyingFx, ftext } = setupDisplayRuntime({
+const NOOP_FLYING_FX = Object.freeze({
+  tick() {},
+  syncWorldView() {},
+  getPresentation(e) {
+    return {
+      id: e?.id || 0,
+      progress: 0,
+      lift: 0,
+      glyphX: e?.pos?.x || 0,
+      glyphY: e?.pos?.y || 0,
+      glyphScale: 1,
+      shadowX: e?.pos?.x || 0,
+      shadowY: e?.pos?.y || 0,
+      shadowRx: 0,
+      shadowRy: 0,
+      shadowAlpha: 0,
+      wake: 0,
+      wakeKind: '',
+    };
+  },
+});
+
+const displayRuntime = setupDisplayRuntime({
   world,
   cam,
   fx,
@@ -2422,6 +2444,15 @@ const { statusEmitterFx, boltFx, projectileFx, spellAreaFx, cloudFx, flyingFx, f
   resolveItemDisplayName: resolveDisplayName,
   dispatchRulesAction,
 });
+const {
+  statusEmitterFx,
+  boltFx,
+  projectileFx,
+  spellAreaFx,
+  cloudFx,
+  ftext,
+} = displayRuntime;
+const flyingFx = displayRuntime.flyingFx || NOOP_FLYING_FX;
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();
@@ -2574,6 +2605,28 @@ function resolveRenderableKind(glyphAtlas, e) {
   if (glyphAtlas.has(kind)) return kind;
   if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) return 'potion';
   return kind;
+}
+
+/**
+ * Draw a glyph atlas entry with a display-only scale transform.
+ * @param {Map<string, { canvas: HTMLCanvasElement }>} atlas
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {string} kind
+ * @param {number} x
+ * @param {number} y
+ * @param {number} scale
+ */
+function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
+  const s = Number(scale || 1);
+  if (Math.abs(s - 1) <= 0.001) {
+    drawKind(atlas, ctx, kind, x, y);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  drawKind(atlas, ctx, kind, 0, 0);
+  ctx.restore();
 }
 
 /**
