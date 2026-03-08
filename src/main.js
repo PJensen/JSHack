@@ -79,7 +79,8 @@ import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "
 import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
-import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
+import { createGlyphAtlas, drawKind, drawKindScaled } from "./display/passes/glyphs/atlas.js";
+import { drawFlyingShadow } from "./display/fx/flyingFxController.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
@@ -2404,7 +2405,7 @@ const isVisibleAt = (x, y) => {
   return !!isTileVisible(Number(x) | 0, Number(y) | 0);
 };
 
-const { statusEmitterFx, boltFx, projectileFx, spellAreaFx, cloudFx, ftext } = setupDisplayRuntime({
+const { statusEmitterFx, boltFx, projectileFx, spellAreaFx, cloudFx, flyingFx, ftext } = setupDisplayRuntime({
   world,
   cam,
   fx,
@@ -2679,8 +2680,7 @@ function drawEntityHealthBar(ctx, e) {
   const ratio = clamp01(hp / maxHp);
   const width = 0.68;
   const height = 0.06;
-  const flyOff = (Array.isArray(e.tags) && e.tags.includes('flying')) ? -0.35 : 0;
-  const y = e.pos.y + 0.43 + flyOff;
+  const y = e.pos.y + 0.43;
   const x = e.pos.x - (width * 0.5);
   const pad = 0.01;
   const innerW = Math.max(0, width - (pad * 2));
@@ -2793,6 +2793,7 @@ function render(worldView) {
   // Keep only the top-most ground item glyph per tile.
   _stackMeta.clear(); // "x,y" -> topItemId
   _healthBarsToDraw.length = 0;
+  flyingFx.syncWorldView(worldView);
   const stackMeta = _stackMeta;
   for (let i = 0; i < worldView.entities.length; i++) {
     const e = worldView.entities[i];
@@ -2821,34 +2822,36 @@ function render(worldView) {
       continue;
     }
 
-    // Flying VFX: shadow ellipse at ground position, glyph offset upward
-    const _isFlying = Array.isArray(e.tags) && e.tags.includes('flying');
-    if (_isFlying) {
-      bctx.save();
-      bctx.fillStyle = 'rgba(0,0,0,0.22)';
-      bctx.beginPath();
-      bctx.ellipse(e.pos.x, e.pos.y + 0.3, 0.32, 0.12, 0, 0, Math.PI * 2);
-      bctx.fill();
-      bctx.restore();
-    }
-    const _flyOffY = _isFlying ? -0.35 : 0;
-    drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y + _flyOffY);
-    if (shouldShowHealthBar(e, _fxTime)) {
-      _healthBarsToDraw.push(e);
+    const flyingPresentation = flyingFx.getPresentation(e, _fxTime, cam.scale);
+    const renderEntity = flyingPresentation.progress > 0.001
+      ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+      : e;
+
+    drawFlyingShadow(bctx, flyingPresentation);
+    drawKindScaled(
+      glyphAtlas,
+      bctx,
+      resolveRenderableKind(glyphAtlas, renderEntity),
+      renderEntity.pos.x,
+      renderEntity.pos.y,
+      flyingPresentation.glyphScale
+    );
+    if (shouldShowHealthBar(renderEntity, _fxTime)) {
+      _healthBarsToDraw.push(renderEntity);
     }
 
     // Glyph-FX: passive glow aura for entities tagged "glowing"
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
-      drawGlowingTagAura(bctx, e, _fxTime);
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('glowing')) {
+      drawGlowingTagAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
-      drawVenomTagAura(bctx, e, _fxTime);
+    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('venom_glowing')) {
+      drawVenomTagAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
-      drawPotionGlyphAura(bctx, e, _fxTime);
+    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('potion_glow')) {
+      drawPotionGlyphAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
-      drawRareStar(bctx, e, _fxTime);
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rare')) {
+      drawRareStar(bctx, renderEntity, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -2862,39 +2865,39 @@ function render(worldView) {
       bctx.globalCompositeOperation = 'lighter';
       bctx.fillStyle = `rgba(${r},${g},${b},0.25)`;
       bctx.beginPath();
-      bctx.arc(e.pos.x, e.pos.y, 0.35, 0, Math.PI * 2);
+      bctx.arc(renderEntity.pos.x, renderEntity.pos.y, 0.35, 0, Math.PI * 2);
       bctx.fill();
       bctx.strokeStyle = `rgba(${r},${g},${b},0.7)`;
       bctx.lineWidth = 0.06;
       const rad = 0.42 + 0.04 * Math.sin(t * 1.7);
       bctx.beginPath();
-      bctx.arc(e.pos.x, e.pos.y, rad, 0, Math.PI * 2);
+      bctx.arc(renderEntity.pos.x, renderEntity.pos.y, rad, 0, Math.PI * 2);
       bctx.stroke();
       bctx.restore();
     }
 
     // Glyph-FX: invulnerability aegis ward
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('invulnerable')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('invulnerable')) {
       drawAegisWardGlyphFx(
         bctx,
         '@',
-        e.pos.x,
-        e.pos.y,
+        renderEntity.pos.x,
+        renderEntity.pos.y,
         1.0,
         _fxTime,
         0,
-        (e.id | 0) ^ 0xA381,
-        e.pos.y,
+        (renderEntity.id | 0) ^ 0xA381,
+        renderEntity.pos.y,
         { gain: 1 }
       );
     }
 
     // Glyph-FX: frozen — pulsing icy blue radial glow (outer halo + bright inner core)
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('frozen')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('frozen')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 1.4);
-      const cx = e.pos.x, cy = e.pos.y;
+      const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
       // Outer halo — wide, soft
       const rOuter = 0.70 + 0.08 * pulse;
       const outer = bctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
@@ -2919,10 +2922,10 @@ function render(worldView) {
 
     // Glyph-FX: electric shock — soft aura with sparks orbiting outside the glyph
     // Glyph-FX: electric shock — chaotic arcs from center, geometry rerolled every discharge
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('shocked')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('shocked')) {
       bctx.save();
-      const cx = e.pos.x, cy = e.pos.y;
-      const _sid = (e.id || 0) | 0;
+      const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
+      const _sid = (renderEntity.id || 0) | 0;
       // Static hash: stable per-arc properties (base angle, frequency, phase)
       const _sh  = (n) => ((Math.imul(n * 73 + 1, 2654435761) ^ Math.imul(_sid | 1, 1664525)) >>> 0) / 4294967296;
       // Fire-event hash: rerolls geometry on every new discharge
@@ -2994,12 +2997,12 @@ function render(worldView) {
     }
 
     // Glyph-FX: simple green thorn spikes ring when wearing Thorns gear
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('thorns')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('thorns')) {
       /** @type {CanvasRenderingContext2D} */
       const g = /** @type any */ (bctx);
       g.save();
       g.globalCompositeOperation = 'lighter';
-      const cx = e.pos.x, cy = e.pos.y;
+      const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
       // soft inner glow
       g.fillStyle = 'rgba(120,255,120,0.10)';
       g.beginPath(); g.arc(cx, cy, 0.36, 0, Math.PI * 2); g.fill();
@@ -3025,12 +3028,12 @@ function render(worldView) {
     }
 
     // Glyph-FX: flickering fire aura (unused — burning uses particles only)
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('_fire_aura')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('_fire_aura')) {
       /** @type {CanvasRenderingContext2D} */
       const g = /** @type any */ (bctx);
       g.save();
       g.globalCompositeOperation = 'lighter';
-      const cx = e.pos.x, cy = e.pos.y;
+      const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
 
       // Inner warm glow (pulsing)
       const pulse = 0.08 + 0.04 * Math.sin(_fxTime * 8.0);
@@ -3063,15 +3066,15 @@ function render(worldView) {
     }
 
     // Glyph-FX: spinning 4-point stars above confused/stunned entities
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && (e.tags.includes('confused') || e.tags.includes('stunned'))) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && (renderEntity.tags.includes('confused') || renderEntity.tags.includes('stunned'))) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       bctx.lineWidth = 0.035;
       bctx.globalAlpha = 0.9;
       for (let j = 0; j < 3; j++) {
         const ang = _fxTime * 2.2 + (j / 3) * Math.PI * 2;
-        const sx = e.pos.x + Math.cos(ang) * 0.32;
-        const sy = e.pos.y + Math.sin(ang) * 0.12 - 0.52; // flattened orbit above head
+        const sx = renderEntity.pos.x + Math.cos(ang) * 0.32;
+        const sy = renderEntity.pos.y + Math.sin(ang) * 0.12 - 0.52; // flattened orbit above head
         const r = 0.10;
         bctx.strokeStyle = j === 1 ? '#ffffff' : '#ffe033';
         bctx.beginPath();
@@ -3085,23 +3088,23 @@ function render(worldView) {
     }
 
     // Glyph-FX: bleeding wound — pulsing red aura (particles handle the trail)
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('bleeding')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('bleeding')) {
       bctx.save();
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 7.0 + e.id * 0.3);
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 7.0 + renderEntity.id * 0.3);
       bctx.globalCompositeOperation = 'source-over';
       bctx.fillStyle = `rgba(160,0,0,${(0.08 + 0.07 * pulse).toFixed(3)})`;
       bctx.beginPath();
-      bctx.arc(e.pos.x, e.pos.y, 0.44 + 0.04 * pulse, 0, Math.PI * 2);
+      bctx.arc(renderEntity.pos.x, renderEntity.pos.y, 0.44 + 0.04 * pulse, 0, Math.PI * 2);
       bctx.fill();
       bctx.restore();
     }
 
     // Glyph-FX: poisoned — pulsing green glow
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('poisoned')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('poisoned')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.5 + e.id * 1.3);
-      const cx = e.pos.x, cy = e.pos.y;
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.5 + renderEntity.id * 1.3);
+      const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
       // Outer soft glow
       const rOuter = 0.62 + 0.08 * pulse;
       const outerGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
@@ -3127,11 +3130,11 @@ function render(worldView) {
     }
 
     // Glyph-FX: agony — pulsing dark purple shadow aura
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('agony')) {
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('agony')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 4.0 + e.id * 0.7);
-      const cx = e.pos.x, cy = e.pos.y;
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 4.0 + renderEntity.id * 0.7);
+      const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
       // Outer shadow haze
       const rOuter = 0.65 + 0.12 * pulse;
       const outerGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
@@ -3239,6 +3242,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
+  flyingFx.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
   hudFeeds.updateVitalsHUD();
