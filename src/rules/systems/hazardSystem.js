@@ -2,15 +2,37 @@ import { HazardArea } from "../components/HazardArea.js";
 import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
+import { TILE_GRASS, TILE_TREE } from "../environment/dungeon/constants.js";
+import { getTile, setTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
+const DEFAULT_FIRE_SPREAD_CHANCE = 0.25;
+const DEFAULT_FIRE_SPREAD_TURNS = 2;
+const NEIGHBOR_OFFSETS = Object.freeze([
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0],           [1, 0],
+  [-1, 1],  [0, 1],  [1, 1],
+]);
 
 function clampInt(value, fallback, min = 0) {
   const n = Number.isFinite(value) ? (value | 0) : fallback;
   return Math.max(min, n | 0);
+}
+
+function clampChance(value, fallback) {
+  const n = Number.isFinite(value) ? Number(value) : fallback;
+  return Math.max(0, Math.min(1, n));
+}
+
+function getFireSpreadChance(hazard) {
+  return clampChance(hazard?.meta?.fireSpreadChance, DEFAULT_FIRE_SPREAD_CHANCE);
+}
+
+function getFireSpreadTurns(hazard, turnsBefore) {
+  return clampInt(hazard?.meta?.fireSpreadTurns, Math.max(1, turnsBefore - 1), 1);
 }
 
 /**
@@ -20,6 +42,17 @@ function clampInt(value, fallback, min = 0) {
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function hazardSystem(world) {
+  const fireHazardCells = new Set();
+  for (const [, pos, hazard] of world.query(Position, HazardArea)) {
+    if (!pos || !hazard) continue;
+    if (String(hazard.kind || "generic").toLowerCase() !== "fire") continue;
+    if (String(hazard.medium || "air").toLowerCase() !== "floor") continue;
+    fireHazardCells.add(`${pos.x | 0},${pos.y | 0}`);
+  }
+
+  /** @type {Array<{ x:number, y:number, turnsLeft:number, tickDamage:number, damageType:string, cause:string, sourceId:number, sourceKind:string, meta:Record<string, unknown>|null }>} */
+  const pendingFireSpreads = [];
+
   for (const [hazardId, pos, hazard] of world.query(Position, HazardArea)) {
     if (!pos || !hazard) continue;
 
@@ -32,9 +65,56 @@ export function hazardSystem(world) {
     const cause = String(hazard.cause || `${kind}_hazard`);
     const sourceId = clampInt(hazard.sourceId, 0, 0);
     const sourceKind = typeof hazard.sourceKind === "string" ? hazard.sourceKind : "";
+    const source = sourceId > 0 ? sourceId : hazardId;
 
     /** @type {number[]} */
     const affectedIds = [];
+
+    if (kind === "fire" && medium === "floor" && getTile(pos.x, pos.y) === TILE_TREE) {
+      if (setTile(pos.x, pos.y, TILE_GRASS)) {
+        try {
+          world.emit?.("tile:burned", {
+            actor: source,
+            hazardId,
+            x: pos.x | 0,
+            y: pos.y | 0,
+            cause,
+            sourceId,
+            sourceKind,
+          });
+        } catch { /* */ }
+      }
+    }
+
+    if (kind === "fire" && medium === "floor") {
+      const spreadChance = getFireSpreadChance(hazard);
+      if (spreadChance > 0) {
+        const spreadTurns = getFireSpreadTurns(hazard, turnsBefore);
+        for (const [dx, dy] of NEIGHBOR_OFFSETS) {
+          const nx = (pos.x | 0) + dx;
+          const ny = (pos.y | 0) + dy;
+          const key = `${nx},${ny}`;
+          if (fireHazardCells.has(key)) continue;
+          if (getTile(nx, ny) !== TILE_TREE) continue;
+          if ((world.rng?.() ?? Math.random()) >= spreadChance) continue;
+
+          pendingFireSpreads.push({
+            x: nx,
+            y: ny,
+            turnsLeft: spreadTurns,
+            tickDamage,
+            damageType,
+            cause,
+            sourceId,
+            sourceKind,
+            meta: hazard.meta && typeof hazard.meta === "object"
+              ? { ...hazard.meta, source: hazard.meta.source ?? "fire_spread" }
+              : { source: "fire_spread" },
+          });
+          fireHazardCells.add(key);
+        }
+      }
+    }
 
     if (tickDamage > 0) {
       for (const [id, tpos, vit] of world.query(Position, Vitality)) {
@@ -135,4 +215,46 @@ export function hazardSystem(world) {
       world.destroy(hazardId);
     }
   }
+
+  for (const spread of pendingFireSpreads) {
+    spawnFireSpreadHazard(world, spread);
+  }
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{ x:number, y:number, turnsLeft:number, tickDamage:number, damageType:string, cause:string, sourceId:number, sourceKind:string, meta:Record<string, unknown>|null }} spread
+ */
+function spawnFireSpreadHazard(world, spread) {
+  const hazardId = world.create();
+  world.add(hazardId, Position, { x: spread.x, y: spread.y });
+  world.add(hazardId, HazardArea, {
+    kind: "fire",
+    medium: "floor",
+    turnsLeft: spread.turnsLeft,
+    radius: 0,
+    tickDamage: spread.tickDamage,
+    damageType: spread.damageType,
+    cause: spread.cause,
+    sourceId: spread.sourceId,
+    sourceKind: spread.sourceKind,
+    meta: spread.meta,
+  });
+  try {
+    world.emit?.("hazard:spawned", {
+      hazardId,
+      kind: "fire",
+      medium: "floor",
+      at: { x: spread.x, y: spread.y },
+      turnsLeft: spread.turnsLeft,
+      radius: 0,
+      tickDamage: spread.tickDamage,
+      damageType: spread.damageType,
+      cause: spread.cause,
+      sourceId: spread.sourceId,
+      sourceKind: spread.sourceKind,
+      identity: "wildfire",
+      name: "Wildfire",
+    });
+  } catch { /* */ }
 }

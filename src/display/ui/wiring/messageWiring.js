@@ -884,6 +884,11 @@ export function installMessageWiring({
     log(`${who} chop${who === 'You' ? '' : 's'} down the tree.`, 'system');
   });
 
+  world.on('tile:burned', ({ actor, x, y }) => {
+    const who = nameOfEntity(actor);
+    log(`${who} burn${who === 'You' ? '' : 's'} the tree to ash.`, 'system');
+  });
+
   // === Apply events ===
   world.on('item:applied', ({ targetId, result }) => {
     if (!result) return;
