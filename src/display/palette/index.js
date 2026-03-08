@@ -20,6 +20,7 @@ const _CORPSE_SKIP_KEYS = new Set([
   'well', 'scarecrow', 'tavern_keg', 'tavern_table',
   'tavern_bench', 'tavern_pillar', 'tavern_sign', 'millstone',
   'farmland', 'fence', 'roof_thatch_shadow', 'roof_thatch_lit',
+  'roof_thatch_shadow_charred', 'roof_thatch_lit_charred',
   'fountain', 'altar', 'shrine', 'statue', 'sarcophagus',
   'pillar', 'weapon_rack', 'mushrooms', 'web', 'torch',
   'urn', 'ashes',

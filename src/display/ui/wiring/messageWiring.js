@@ -88,6 +88,18 @@ export function installMessageWiring({
     return label ? bracketizeName(label) : `Entity ${n}`;
   }
 
+  function hasNamedEntity(id) {
+    const n = Number(id || 0);
+    if (!(n > 0)) return false;
+    if (compHas(n, Player)) return true;
+    const ni = compGet(n, NamedIdentity);
+    return !!(ni?.name || ni?.identity);
+  }
+
+  function burnVerb(who) {
+    return who === 'You' ? 'burn' : 'burns';
+  }
+
   function nameOfItem(id) {
     const n = Number(id || 0);
     const label = typeof resolveItemDisplayName === "function"
@@ -891,9 +903,33 @@ export function installMessageWiring({
     log(`${who} chop${who === 'You' ? '' : 's'} down the tree.`, 'system');
   });
 
-  world.on('tile:burned', ({ actor, x, y }) => {
+  world.on('tile:burned', ({ actor, x, y, burnedKind }) => {
+    if (!canSeeAt(x, y)) return;
+    const kind = String(burnedKind || 'tree');
+    if (!hasNamedEntity(actor)) {
+      if (kind === 'wall') log('The wall burns open in a shower of sparks.', 'system');
+      else if (kind === 'door') log('The door burns off its hinges.', 'system');
+      else if (kind === 'fence') log('The fence burns away in a quick rush of flame.', 'system');
+      else log('The tree burns down to ash.', 'system');
+      return;
+    }
+
     const who = nameOfEntity(actor);
-    log(`${who} burn${who === 'You' ? '' : 's'} the tree to ash.`, 'system');
+    if (kind === 'wall') log(`${who} ${burnVerb(who)} through the wall.`, 'system');
+    else if (kind === 'door') log(`${who} ${burnVerb(who)} the door off its hinges.`, 'system');
+    else if (kind === 'fence') log(`${who} ${burnVerb(who)} the fence down.`, 'system');
+    else log(`${who} ${burnVerb(who)} the tree to ash.`, 'system');
+  });
+
+  world.on('entity:burned', ({ actor, x, y, name, identity }) => {
+    if (!canSeeAt(x, y)) return;
+    const label = bracketizeName(name || identity || 'thing');
+    if (!hasNamedEntity(actor)) {
+      log(`${label} goes up in sparks.`, 'system');
+      return;
+    }
+    const who = nameOfEntity(actor);
+    log(`${who} ${burnVerb(who)} ${label} to cinders.`, 'system');
   });
 
   // === Apply events ===

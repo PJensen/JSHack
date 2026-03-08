@@ -17,12 +17,15 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   const _poisonCloudFx = new Map();
   /** @type {BubblePopFx[]} */
   const _poisonBubblePops = [];
+  /** @type {Array<{ x:number, y:number, ttl:number, max:number, strength:number, phase:number, embers:boolean }>} */
+  const _burnPlumes = [];
 
   function clearTransientCloudState() {
     _fireCloudFx.clear();
     _plasmaCloudFx.clear();
     _poisonCloudFx.clear();
     _poisonBubblePops.length = 0;
+    _burnPlumes.length = 0;
   }
 
   // --- Particle helpers ---
@@ -90,6 +93,21 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         a0: 0.72,
         rotVel: (Math.random() - 0.5) * 1.9,
       }));
+    }
+  }
+
+  function spawnBurnPlume(x, y, strength = 1, embers = true) {
+    _burnPlumes.push({
+      x,
+      y,
+      ttl: 0.80 + Math.random() * 0.45 + strength * 0.08,
+      max: 0.80 + Math.random() * 0.45 + strength * 0.08,
+      strength: Math.max(0.8, Number(strength) || 1),
+      phase: Math.random() * Math.PI * 2,
+      embers: !!embers,
+    });
+    if (_burnPlumes.length > 48) {
+      _burnPlumes.splice(0, _burnPlumes.length - 48);
     }
   }
 
@@ -227,6 +245,12 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     for (let i = _poisonBubblePops.length - 1; i >= 0; i--) {
       _poisonBubblePops[i].tick(dt);
       if (_poisonBubblePops[i].expired) _poisonBubblePops.splice(i, 1);
+    }
+
+    for (let i = _burnPlumes.length - 1; i >= 0; i--) {
+      const plume = _burnPlumes[i];
+      plume.ttl -= dt;
+      if (plume.ttl <= 0) _burnPlumes.splice(i, 1);
     }
   }
 
@@ -417,6 +441,55 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
           ctx.arc(x, y, Math.max(0.008, (1 - u) * 0.055), 0, TAU);
           ctx.fill();
         }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawBurnPlumes(ctx) {
+    if (!_burnPlumes.length) return;
+    ctx.save();
+    const _fxTime = getFxTime();
+
+    for (let i = 0; i < _burnPlumes.length; i++) {
+      const plume = _burnPlumes[i];
+      const life = plume.max > 0 ? Math.max(0, Math.min(1, plume.ttl / plume.max)) : 0;
+      const age = 1 - life;
+      const lift = age * (0.42 + plume.strength * 0.22);
+      const sway = Math.sin(_fxTime * 2.6 + plume.phase) * 0.08;
+      const cx = plume.x + sway * (0.45 + age * 0.55);
+      const cy = plume.y - 0.14 - lift;
+      const smokeAlpha = Math.max(0, life * 0.28);
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(20,18,16,${smokeAlpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 0.20 + plume.strength * 0.08, 0.12 + plume.strength * 0.04, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(54,42,34,${(smokeAlpha * 0.7).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(cx - 0.08, cy - 0.08, 0.14 + plume.strength * 0.06, 0.10 + plume.strength * 0.04, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(cx + 0.07, cy - 0.12, 0.12 + plume.strength * 0.05, 0.09 + plume.strength * 0.03, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!plume.embers) continue;
+      ctx.globalCompositeOperation = 'lighter';
+      const emberAlpha = Math.max(0, life * 0.42);
+      for (let j = 0; j < 3; j++) {
+        const sparkPhase = plume.phase + j * 2.1;
+        const ex = plume.x + Math.sin(_fxTime * 5.8 + sparkPhase) * (0.06 + j * 0.03);
+        const ey = plume.y - 0.05 - age * (0.20 + j * 0.08) + Math.cos(_fxTime * 4.2 + sparkPhase) * 0.03;
+        ctx.fillStyle = j === 0
+          ? `rgba(255,235,180,${emberAlpha.toFixed(3)})`
+          : `rgba(255,116,32,${(emberAlpha * 0.82).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 0.024 + j * 0.004, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -797,7 +870,19 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         spawnPoisonBubblePop(p.x, p.y, 1);
       }
     });
+
+    world.on('tile:burned', ({ x, y, burnedKind }) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const kind = String(burnedKind || 'tree');
+      const structure = kind === 'wall' || kind === 'door' || kind === 'fence';
+      spawnBurnPlume(Number(x), Number(y), structure ? 1.7 : 1.1, true);
+    });
+
+    world.on('entity:burned', ({ x, y }) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      spawnBurnPlume(Number(x), Number(y), 1.25, true);
+    });
   }
 
-  return { tick, drawFire, drawPoison, drawPlasma, installListeners };
+  return { tick, drawFire, drawPoison, drawPlasma, drawBurnPlumes, installListeners };
 }
