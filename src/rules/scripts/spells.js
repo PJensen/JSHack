@@ -27,6 +27,7 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { buildSpellDamageSpec, getSpellIntelligenceBonus } from "../utils/spellDamage.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 
@@ -152,9 +153,15 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     try { world.emit && world.emit('spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i }); } catch (e) { console.debug('[spells] emit spell:bolt failed:', e); }
 
     // Damage model: base 7 → attenuate per chain
-    const base = 7;
-    const dmg = Math.max(1, Math.round(base * Math.pow(0.7, i)));
-    dealDamage(world, { target: targetId, amount: dmg, source: actor, type: 'electric', cause: 'spell:lightning', at: segTo });
+    const base = Math.max(1, Math.round(7 * Math.pow(0.7, i)));
+    dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
+      spell,
+      baseAmount: base,
+      type: 'electric',
+      cause: 'spell:lightning',
+      at: segTo,
+      salt: i + 1,
+    }));
   }
 };
 
@@ -211,7 +218,13 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
 
     // Damage attenuated by distance
     const dmg = Math.max(1, Math.round(BASE_DMG / t.dist));
-    dealDamage(world, { target: t.id, amount: dmg, source: actor, type: 'physical', cause: 'spell:blastwave' });
+    dealDamage(world, buildSpellDamageSpec(world, actor, t.id, {
+      spell,
+      baseAmount: dmg,
+      type: 'physical',
+      cause: 'spell:blastwave',
+      salt: t.id,
+    }));
   }
 
   try { world.emit && world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS }); } catch (e) { console.debug('[spells] emit spell:blastwave failed:', e); }
@@ -379,7 +392,14 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
 
   // Apply damage and stun to each hit enemy
   for (const h of hits) {
-    dealDamage(world, { target: h.id, amount: STRIKE_DMG, source: actor, type: 'physical', cause: 'spell:phase_strike', at: { x: h.x, y: h.y } });
+    dealDamage(world, buildSpellDamageSpec(world, actor, h.id, {
+      spell,
+      baseAmount: STRIKE_DMG,
+      type: 'physical',
+      cause: 'spell:phase_strike',
+      at: { x: h.x, y: h.y },
+      salt: h.id,
+    }));
     // Apply stun via ActiveEffects
     let ae = /** @type any */ (world.get(h.id, ActiveEffects));
     if (!ae) {
@@ -550,7 +570,13 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     const dist = Math.max(Math.abs((pos.x | 0) - ox), Math.abs((pos.y | 0) - oy));
     if (dist > RADIUS) continue;
     const dmg = dist <= 1 ? BASE_DMG : Math.max(1, Math.floor(BASE_DMG / 2));
-    const result = dealDamage(world, { target: id, amount: dmg, source: actor, type: 'fire', cause: 'spell:meteor' });
+    const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+      spell,
+      baseAmount: dmg,
+      type: 'fire',
+      cause: 'spell:meteor',
+      salt: ((ox & 0xffff) << 16) ^ (oy & 0xffff) ^ dist ^ id,
+    }));
     // Apply burning to survivors
     if (result.applied && !result.killed) {
       const ae = /** @type any */ (world.get(id, ActiveEffects));
@@ -615,7 +641,13 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
 
   // Apply cold damage
-  dealDamage(world, { target: target.id, amount: BASE_DMG, source: actor, type: 'cold', cause: 'spell:frost', at: { x: target.x, y: target.y } });
+  dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+    spell,
+    baseAmount: BASE_DMG,
+    type: 'cold',
+    cause: 'spell:frost',
+    at: { x: target.x, y: target.y },
+  }));
 
   // Compute frost duration from target mass: lighter = longer slow
   // Base 5 turns, -1 per 30kg above 40kg, min 2 turns
@@ -733,14 +765,14 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
       if (dist < 1 || dist > (splash.radius | 0)) continue;
       const targetFaction = /** @type any */ (world.get(id, Faction))?.key || '';
       if (!areFactionsHostile(actorFaction, targetFaction)) continue;
-      const result = dealDamage(world, {
-        target: id,
-        amount: splash.damage | 0,
-        source: actor,
+      const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+        spell,
+        baseAmount: splash.damage | 0,
         type: splash.type,
         cause: 'spell:flash_heal',
         at: { x: pos.x | 0, y: pos.y | 0 },
-      });
+        salt: id,
+      }));
       if (result.applied && result.amount > 0) {
         splashHits.push({ id, amount: result.amount, at: { x: pos.x | 0, y: pos.y | 0 } });
       }
@@ -842,7 +874,13 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   }
 
   // Apply shadow damage — no status effect
-  dealDamage(world, { target: target.id, amount: BASE_DMG, source: actor, type: 'shadow', cause: 'spell:shadow_bolt', at: { x: target.x, y: target.y } });
+  dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+    spell,
+    baseAmount: BASE_DMG,
+    type: 'shadow',
+    cause: 'spell:shadow_bolt',
+    at: { x: target.x, y: target.y },
+  }));
 
   // Emit VFX event
   try { world.emit && world.emit('spell:shadow_bolt', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, to: { x: target.x, y: target.y } }); } catch (e) { console.debug('[spells] emit spell:shadow_bolt failed:', e); }
@@ -908,13 +946,20 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   }
 
   // Intelligence scaling
-  const brain = /** @type any */ (world.get(actor, Brain));
-  const intBonus = brain?.intelligence ? Math.floor((brain.intelligence - 10) / 2) : 0;
-  const basePotency = 1 + Math.max(0, Math.floor(intBonus / 2));
-  const baseDuration = Math.min(10, 6 + Math.max(0, Math.floor(intBonus / 2)));
+  const intBonus = getSpellIntelligenceBonus(world, actor);
+  const basePotency = 1 + Math.floor(intBonus / 8);
+  const baseDuration = Math.min(10, 6 + Math.floor(intBonus / 4));
 
   // Apply agony DOT via ActiveEffects
-  const agonyEffect = { key: 'agony', turnsLeft: baseDuration, potency: basePotency, stacks: 1, sourceId: actor };
+  const agonyEffect = {
+    key: 'agony',
+    turnsLeft: baseDuration,
+    potency: basePotency,
+    stacks: 1,
+    startedAtTurn: world.step,
+    sourceId: actor,
+    spellId: spell.id,
+  };
   const ae = /** @type any */ (world.get(targetId, ActiveEffects));
   if (ae && Array.isArray(ae.effects)) {
     upsertTimedEffect(ae.effects, agonyEffect);
