@@ -172,9 +172,8 @@ function collectRoofedBuilding(seedX, seedY) {
  * @param {Set<string>} doorKeys
  * @param {Set<string>} wallKeys
  * @param {number} alpha
- * @param {boolean} burnActive
  */
-function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, exposedFloorKeys, alpha, burnActive = false) {
+function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, exposedFloorKeys, alpha) {
 	const coveredFloorKeys = [...floorKeys].filter((key) => !exposedFloorKeys.has(key));
 	if (!coveredFloorKeys.length) return [];
 	const coveredShellKeys = new Set();
@@ -203,11 +202,11 @@ function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, exposedFloorKeys, 
 	const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
 	return allKeys.map((key) => {
 		const { x, y } = keyToXY(key);
-		const singed = burnActive || keyWithinRadius(key, exposedFloorKeys, 1);
-		const tileAlpha = (doorKeySet.has(key) ? alpha * 0.4 : alpha) * (burnActive ? 0.94 : (singed ? 0.92 : 1.0));
+		const singed = keyWithinRadius(key, exposedFloorKeys, 1);
+		const tileAlpha = (doorKeySet.has(key) ? alpha * 0.4 : alpha) * (singed ? 0.92 : 1.0);
 		let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
 		if (singed) kind += "_charred";
-		return { x, y, kind, alpha: tileAlpha, burning: burnActive };
+		return { x, y, kind, alpha: tileAlpha, burning: false };
 	});
 }
 
@@ -263,12 +262,15 @@ function collectOverworldRoofs(world, playerPos) {
 		);
 		for (let i = 0; i < roofTiles.length; i++) {
 			const key = xyKey(roofTiles[i].x, roofTiles[i].y);
-			if (keyWithinRadius(key, singedKeys, 1)) {
+			const nearBurned = keyWithinRadius(key, singedKeys, 1);
+			const nearActiveFire = keyWithinRadius(key, activeFireKeys, 1);
+			if (nearBurned && !nearActiveFire) continue;
+			if (nearBurned) {
 				roofTiles[i].kind = roofTiles[i].kind.includes("_charred")
 					? roofTiles[i].kind
 					: `${roofTiles[i].kind}_charred`;
 			}
-			if (keyWithinRadius(key, activeFireKeys, 1)) {
+			if (nearActiveFire) {
 				roofTiles[i].burning = true;
 			}
 			roofs.push(roofTiles[i]);

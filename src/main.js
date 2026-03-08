@@ -2826,6 +2826,21 @@ function drawRoofSmoke(ctx, roof, fxTime) {
   ctx.beginPath();
   ctx.arc(roof.x + 0.05, roof.y - 0.08, 0.03, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 4; i++) {
+    const ashPhase = phase * 11.0 + i * 0.97;
+    const fall = (_fxTime * (0.55 + i * 0.08) + ashPhase) % 1.0;
+    const ax = roof.x - 0.18 + i * 0.11 + Math.sin(_fxTime * 1.3 + ashPhase) * 0.03;
+    const ay = roof.y - 0.10 + fall * 0.42;
+    const alpha = 0.20 + (1 - fall) * 0.18;
+    ctx.strokeStyle = `rgba(170,168,160,${alpha.toFixed(3)})`;
+    ctx.lineWidth = 0.018 + i * 0.002;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay - 0.018);
+    ctx.lineTo(ax - 0.012, ay + 0.022);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
