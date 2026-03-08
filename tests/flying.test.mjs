@@ -8,6 +8,7 @@ import { Player }         from '../src/rules/components/Player.js';
 import { NamedIdentity }  from '../src/rules/components/NamedIdentity.js';
 import { Faction }        from '../src/rules/components/Faction.js';
 import { AttackIntent }   from '../src/rules/components/Intents/AttackIntent.js';
+import { FlyIntent }      from '../src/rules/components/Intents/FlyIntent.js';
 import { MoveIntent }     from '../src/rules/components/Intents/MoveIntent.js';
 import { Speed }          from '../src/rules/components/Speed.js';
 import { Vitality }       from '../src/rules/components/Vitality.js';
@@ -18,6 +19,8 @@ import { AggroState, AGGRO_LEVELS } from '../src/rules/components/AggroState.js'
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { HazardArea } from '../src/rules/components/HazardArea.js';
 import { aiFlyingSystem } from '../src/rules/systems/aiFlyingSystem.js';
+import { aiChaseSystem } from '../src/rules/systems/aiChaseSystem.js';
+import { flyIntentSystem } from '../src/rules/systems/flyIntentSystem.js';
 import { movementSystem } from '../src/rules/systems/movementSystem.js';
 import { installTileStepEffectListener } from '../src/rules/systems/tileStepEffectSystem.js';
 import { hazardSystem } from '../src/rules/systems/hazardSystem.js';
@@ -132,7 +135,7 @@ Deno.test("canFlyOnFloor: returns false for arenas profile", () => {
 
 // ── AI Flying System ─────────────────────────────────────────────────
 
-Deno.test("aiFlyingSystem: bat takes flight when hunting on eligible floor", () => {
+Deno.test("aiFlyingSystem: bat queues takeoff when hunting on eligible floor", () => {
   const world = makeWorld();
   addDungeonState(world, 0, 'overworld');
   addPlayer(world, 5, 5);
@@ -140,7 +143,9 @@ Deno.test("aiFlyingSystem: bat takes flight when hunting on eligible floor", () 
 
   aiFlyingSystem(world);
 
-  assert(world.has(bat, Flying), 'bat should be flying when hunting on eligible floor');
+  assert(world.has(bat, FlyIntent), 'bat should queue takeoff when hunting on eligible floor');
+  assertEquals(world.get(bat, FlyIntent)?.airborne, true);
+  assert(!world.has(bat, Flying), 'takeoff should not resolve until flyIntentSystem runs');
 });
 
 Deno.test("aiFlyingSystem: bat does NOT fly when hunting on ineligible floor", () => {
@@ -152,9 +157,10 @@ Deno.test("aiFlyingSystem: bat does NOT fly when hunting on ineligible floor", (
   aiFlyingSystem(world);
 
   assert(!world.has(bat, Flying), 'bat should not fly on catacombs');
+  assert(!world.has(bat, FlyIntent), 'bat should not queue takeoff on ineligible floor');
 });
 
-Deno.test("aiFlyingSystem: bat lands when adjacent to player", () => {
+Deno.test("aiFlyingSystem: bat queues landing when adjacent to player", () => {
   const world = makeWorld();
   addDungeonState(world, 0, 'overworld');
   addPlayer(world, 5, 5);
@@ -163,7 +169,9 @@ Deno.test("aiFlyingSystem: bat lands when adjacent to player", () => {
 
   aiFlyingSystem(world);
 
-  assert(!world.has(bat, Flying), 'bat should land when adjacent to player');
+  assert(world.has(bat, FlyIntent), 'bat should queue landing when adjacent to player');
+  assertEquals(world.get(bat, FlyIntent)?.airborne, false);
+  assert(world.has(bat, Flying), 'landing should not resolve until flyIntentSystem runs');
 });
 
 Deno.test("aiFlyingSystem: bat does NOT fly when unaware", () => {
@@ -175,6 +183,7 @@ Deno.test("aiFlyingSystem: bat does NOT fly when unaware", () => {
   aiFlyingSystem(world);
 
   assert(!world.has(bat, Flying), 'bat should not fly when unaware');
+  assert(!world.has(bat, FlyIntent), 'bat should not queue takeoff when unaware');
 });
 
 Deno.test("aiFlyingSystem: non-flying monster (goblin) never gets Flying", () => {
@@ -186,9 +195,10 @@ Deno.test("aiFlyingSystem: non-flying monster (goblin) never gets Flying", () =>
   aiFlyingSystem(world);
 
   assert(!world.has(goblin, Flying), 'goblin should never fly');
+  assert(!world.has(goblin, FlyIntent), 'goblin should never queue FlyIntent');
 });
 
-Deno.test("aiFlyingSystem: strips Flying when floor becomes ineligible", () => {
+Deno.test("aiFlyingSystem: queues landing when floor becomes ineligible", () => {
   const world = makeWorld();
   addDungeonState(world, 3, 'catacombs');
   addPlayer(world, 5, 5);
@@ -197,7 +207,8 @@ Deno.test("aiFlyingSystem: strips Flying when floor becomes ineligible", () => {
 
   aiFlyingSystem(world);
 
-  assert(!world.has(bat, Flying), 'Flying should be stripped on ineligible floor');
+  assert(world.has(bat, FlyIntent), 'landing should consume the turn on ineligible floors');
+  assertEquals(world.get(bat, FlyIntent)?.airborne, false);
 });
 
 Deno.test("aiFlyingSystem: respects Speed.actEvery cadence when toggling flight", () => {
@@ -209,11 +220,53 @@ Deno.test("aiFlyingSystem: respects Speed.actEvery cadence when toggling flight"
 
   world.step = 1;
   aiFlyingSystem(world);
-  assert(!world.has(bat, Flying), 'bat should not toggle flight off-turn');
+  assert(!world.has(bat, FlyIntent), 'bat should not queue flight off-turn');
 
   world.step = 3;
   aiFlyingSystem(world);
-  assert(world.has(bat, Flying), 'bat should toggle flight on its turn');
+  assert(world.has(bat, FlyIntent), 'bat should queue flight on its turn');
+});
+
+Deno.test("flyIntentSystem: takeoff resolves and emits event as the actor's full turn", () => {
+  const world = makeWorld();
+  const events = [];
+  addDungeonState(world, 0, 'overworld');
+  addPlayer(world, 5, 5);
+  const bat = addFlyingMonster(world, 'bat', 10, 10, AGGRO_LEVELS.hunting);
+  world.on('proc:fly:takeoff', (e) => events.push(e));
+
+  world.add(bat, FlyIntent, { airborne: true });
+  flyIntentSystem(world);
+
+  assert(world.has(bat, Flying), 'takeoff intent should grant Flying');
+  assert(!world.has(bat, FlyIntent), 'takeoff intent should be consumed');
+  assertEquals(events.length, 1);
+});
+
+Deno.test("flying takeoff claims the AI turn so chase does not also move or attack", () => {
+  const world = makeWorld();
+  addDungeonState(world, 0, 'overworld');
+  addPlayer(world, 5, 5);
+  const bat = addFlyingMonster(world, 'bat', 10, 10, AGGRO_LEVELS.hunting);
+
+  aiFlyingSystem(world);
+  aiChaseSystem(world);
+
+  assert(world.has(bat, FlyIntent), 'takeoff should be queued');
+  assertEquals(world.has(bat, MoveIntent), false, 'takeoff should block chase movement that turn');
+  assertEquals(world.has(bat, AttackIntent), false, 'takeoff should block melee attack intents that turn');
+});
+
+Deno.test("aiFlyingSystem: aware flyer stays airborne through curious search after LOS loss", () => {
+  const world = makeWorld();
+  addDungeonState(world, 0, 'overworld');
+  addPlayer(world, 5, 5);
+  const bat = addFlyingMonster(world, 'bat', 10, 10, AGGRO_LEVELS.curious);
+
+  aiFlyingSystem(world);
+
+  assert(world.has(bat, FlyIntent), 'curious flyer should remain biased toward flight while searching');
+  assertEquals(world.get(bat, FlyIntent)?.airborne, true);
 });
 
 // ── Terrain bypass (isFlyable) ───────────────────────────────────────

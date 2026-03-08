@@ -25,6 +25,7 @@ export { DrinkIntent } from './Intents/DrinkIntent.js';
 export { PickupIntent } from './Intents/PickupIntent.js';
 export { DropIntent } from './Intents/DropIntent.js';
 export { MoveIntent } from './Intents/MoveIntent.js';
+export { FlyIntent } from './Intents/FlyIntent.js';
 export { WaitIntent } from './Intents/WaitIntent.js';
 export { PrayIntent } from './Intents/PrayIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';

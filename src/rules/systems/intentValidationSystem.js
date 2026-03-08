@@ -8,6 +8,7 @@
 
 import { Vitality } from "../components/Vitality.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { FlyIntent } from "../components/Intents/FlyIntent.js";
 import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { WaitIntent } from "../components/Intents/WaitIntent.js";
 import { DrinkIntent } from "../components/Intents/DrinkIntent.js";
@@ -28,7 +29,7 @@ import { statusStrength } from "../utils/statusFacade.js";
 
 /** All intent components that should be stripped when an actor cannot act. */
 const ALL_INTENTS = [
-  MoveIntent, AttackIntent, WaitIntent, DrinkIntent, UseIntent,
+  MoveIntent, FlyIntent, AttackIntent, WaitIntent, DrinkIntent, UseIntent,
   ThrowIntent, ApplyIntent, EquipIntent, DropIntent, PickupIntent,
   CastSpellIntent, RangedAttackIntent, EngraveIntent, PrayIntent,
   DisarmIntent, InteractIntent,
