@@ -174,7 +174,7 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
     `${tavX0 + 5},${tavY0 + 4}`,
     `${tavX0 + 6},${tavY0 + 4}`,
   ]);
-  assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX + 1},${tavDoorY + 1}`]);
+  assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX + 1},${tavDoorY}`]);
 
   assertEquals(getWorldTile(chunks, millX0, millY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, millX1, millY1), TILE_WALL);

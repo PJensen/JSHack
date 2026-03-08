@@ -139,6 +139,17 @@ export const basePalette = {
   tavern_pillar: { glyph: "□", fg: "#8a7a6a", glow: "#5a4a3a" },
   tavern_sign:   { glyph: "🍺", fg: "#d4a830", glow: "#a07820" },
   millstone:     { glyph: "◎", fg: "#9a9a9a", glow: "#5a5a5a" },
+  cobblestone:   { glyph: "·", fg: "#8a8e93", glow: "#555a5e" },
+  // Church
+  church_altar:  { glyph: "⛩", fg: "#cc99ff", glow: "#9966cc" },
+  church_pew:    { glyph: "▭", fg: "#8a6040", glow: "#5a3a28" },
+  church_sign:   { glyph: "†", fg: "#d8c08a", glow: "#8b6f3f" },
+  // Garden flowers (full-color emoji)
+  flower_rose:       { glyph: "🌹", fg: "#ff3344", glow: "#cc1122" },
+  flower_sunflower:  { glyph: "🌻", fg: "#ffdd33", glow: "#ccaa11" },
+  flower_tulip:      { glyph: "🌷", fg: "#ff66aa", glow: "#cc3388" },
+  flower_daisy:      { glyph: "🌼", fg: "#ffeeaa", glow: "#ccbb77" },
+  flower_bluebell:   { glyph: "🌸", fg: "#7799ff", glow: "#4466cc" },
 
   // Room features
   fountain:    { glyph: "⛲", fg: "#66bbee", glow: "#3388aa" },

@@ -273,3 +273,70 @@ export const Millstone = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
 );
+
+// ── Church ───────────────────────────────────────────────────────
+export const ChurchAltar = defineArchetype(
+  "ChurchAltar",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Church Altar", identity: "church_altar" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "prayAltar", params: null }],
+);
+
+export const ChurchPew = defineArchetype(
+  "ChurchPew",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Pew", identity: "church_pew" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const ChurchSign = defineArchetype(
+  "ChurchSign",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Church Sign", identity: "church_sign" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+// ── Garden flowers ───────────────────────────────────────────────
+export const FlowerRose = defineArchetype(
+  "FlowerRose",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Rose", identity: "flower_rose" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const FlowerSunflower = defineArchetype(
+  "FlowerSunflower",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Sunflower", identity: "flower_sunflower" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const FlowerTulip = defineArchetype(
+  "FlowerTulip",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Tulip", identity: "flower_tulip" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const FlowerDaisy = defineArchetype(
+  "FlowerDaisy",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Daisy", identity: "flower_daisy" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const FlowerBluebell = defineArchetype(
+  "FlowerBluebell",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Bluebell", identity: "flower_bluebell" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);

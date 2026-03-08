@@ -78,7 +78,7 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "tavern_keg", "millstone"]);
+const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "tavern_keg", "millstone", "church_altar"]);
 
 function xyKey(x, y) {
 	return `${x},${y}`;
