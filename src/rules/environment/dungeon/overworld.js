@@ -178,6 +178,86 @@ function addSpawn(chunks, x, y, kind, params = {}) {
   chunk.spawns.push({ x, y, kind, params });
 }
 
+function xyKey(x, y) {
+  return `${x},${y}`;
+}
+
+/**
+ * Paint a wall-bounded structure from explicit interior floor cells.
+ * The wall ring is inferred from the interior, so irregular plans stay easy to author.
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {Array<{x:number, y:number}>} floorCells
+ * @param {{ x:number, y:number }} door
+ */
+function paintStructure(chunks, floorCells, door) {
+  const floorKeys = new Set(floorCells.map((cell) => xyKey(cell.x, cell.y)));
+  const wallKeys = new Set();
+
+  for (const cell of floorCells) {
+    setWorldTile(chunks, cell.x, cell.y, TILE_FLOOR);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = cell.x + dx;
+        const y = cell.y + dy;
+        const key = xyKey(x, y);
+        if (floorKeys.has(key)) continue;
+        if (door.x === x && door.y === y) continue;
+        wallKeys.add(key);
+      }
+    }
+  }
+
+  for (const key of wallKeys) {
+    const [x, y] = key.split(",").map(Number);
+    setWorldTile(chunks, x, y, TILE_WALL);
+  }
+  setWorldTile(chunks, door.x, door.y, TILE_DOOR);
+}
+
+function isOutdoorGroundTile(tile) {
+  return tile === TILE_GRASS
+      || tile === TILE_GRASS_A
+      || tile === TILE_GRASS_C
+      || tile === TILE_GRASS_D;
+}
+
+/**
+ * Keep natural gatherables on exterior ground instead of under later-built structures.
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} hintX
+ * @param {number} hintY
+ * @param {number} maxR
+ */
+function findOutdoorSpawnTile(chunks, hintX, hintY, maxR = 10) {
+  for (let r = 0; r <= maxR; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const x = hintX + dx;
+        const y = hintY + dy;
+        if (isOutdoorGroundTile(getWorldTile(chunks, x, y))) {
+          return { x, y };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {{ x:number, y:number }} pos
+ * @param {string} kind
+ */
+function addOutdoorSpawn(chunks, pos, kind) {
+  const target = findOutdoorSpawnTile(chunks, pos.x, pos.y, 10) ?? pos;
+  if (!isOutdoorGroundTile(getWorldTile(chunks, target.x, target.y))) {
+    setWorldTile(chunks, target.x, target.y, TILE_GRASS);
+  }
+  addSpawn(chunks, target.x, target.y, kind);
+}
+
 /**
  * @param {number} worldSeed
  * @returns {{ extent:{minCX:number,maxCX:number,minCY:number,maxCY:number}, chunks:Array<{chunkX:number,chunkY:number,depth:number,seed:number,tiles:Uint8Array,rooms:any[],doors:any[],spawns:any[]}>, spawnX:number, spawnY:number }}
@@ -333,23 +413,6 @@ export function generateOverworldChunks(worldSeed) {
     return null;
   }
 
-  for (const p of berrySpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_berries");
-  }
-  for (const p of herbSpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_herbs");
-  }
-  for (const p of thornSpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_thorn_bramble");
-  }
-  for (const p of venomSpots) {
-    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
-    addSpawn(chunks, p.x, p.y, "harvest_venom_fern");
-  }
-
   // Mining nodes — placed well afield (28–48 tiles from home)
   const ironSpots = [
     { x: homeX + 35, y: homeY - 22 },  // NE
@@ -413,37 +476,38 @@ export function generateOverworldChunks(worldSeed) {
   // ── Well — south-west of house ────────────────────────────────
   addSpawn(chunks, homeX - 3, southWalkY + 1, "well");
 
-  // ── Tavern — walled building NE of house (9×7) ────────────────
+  // ── Tavern — thatched L-shaped building NE of house ───────────
   const tavX0 = homeX + 6;
   const tavY0 = homeY - 10;
-  const tavX1 = homeX + 14;
-  const tavY1 = homeY - 4;
-  for (let ty = tavY0; ty <= tavY1; ty++) {
-    for (let tx = tavX0; tx <= tavX1; tx++) {
-      const border = tx === tavX0 || tx === tavX1 || ty === tavY0 || ty === tavY1;
-      setWorldTile(chunks, tx, ty, border ? TILE_WALL : TILE_FLOOR);
+  const tavFloorCells = [];
+  for (let ty = tavY0 + 1; ty <= tavY0 + 3; ty++) {
+    for (let tx = tavX0 + 1; tx <= tavX0 + 6; tx++) {
+      tavFloorCells.push({ x: tx, y: ty });
     }
   }
-  const tavDoorX = tavX0 + 4;
-  setWorldTile(chunks, tavDoorX, tavY1, TILE_DOOR);
-  carvePath(chunks, tavDoorX, tavY1 + 1, eastWalkX, northWalkY);
-  // Interior layout (7×5):
-  //   o . . . . . .     keg in NW corner
-  //   □ . ═ . ═ . □     pillars + tables
-  //   . . ▭ . ▭ . .     benches
-  //   . . ═ . ═ . .     more tables
-  //   . . . . . . .     open floor near door
+  for (let ty = tavY0 + 1; ty <= tavY0 + 5; ty++) {
+    for (let tx = tavX0 + 1; tx <= tavX0 + 3; tx++) {
+      tavFloorCells.push({ x: tx, y: ty });
+    }
+  }
+  const tavDoorX = tavX0 + 2;
+  const tavDoorY = tavY0 + 6;
+  paintStructure(chunks, tavFloorCells, { x: tavDoorX, y: tavDoorY });
+  carvePath(chunks, tavDoorX, tavDoorY + 1, eastWalkX, northWalkY);
+  // Interior layout:
+  //   o ═ ═ ═ . .       keg + bar along the north wall
+  //   . . □ . □ .       central pillars under the roof
+  //   . . . ▭ ▭ .       benches facing the bar
+  //   . . .             south arm remains open to the door
   addSpawn(chunks, tavX0 + 1, tavY0 + 1, "tavern_keg");
-  addSpawn(chunks, tavX0 + 1, tavY0 + 2, "tavern_pillar");
-  addSpawn(chunks, tavX1 - 1, tavY0 + 2, "tavern_pillar");
-  addSpawn(chunks, tavX0 + 3, tavY0 + 2, "tavern_table");
-  addSpawn(chunks, tavX0 + 5, tavY0 + 2, "tavern_table");
-  addSpawn(chunks, tavX0 + 3, tavY0 + 3, "tavern_bench");
+  addSpawn(chunks, tavX0 + 3, tavY0 + 1, "tavern_table");
+  addSpawn(chunks, tavX0 + 4, tavY0 + 1, "tavern_table");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 1, "tavern_table");
+  addSpawn(chunks, tavX0 + 3, tavY0 + 2, "tavern_pillar");
+  addSpawn(chunks, tavX0 + 5, tavY0 + 2, "tavern_pillar");
+  addSpawn(chunks, tavX0 + 4, tavY0 + 3, "tavern_bench");
   addSpawn(chunks, tavX0 + 5, tavY0 + 3, "tavern_bench");
-  addSpawn(chunks, tavX0 + 3, tavY0 + 4, "tavern_table");
-  addSpawn(chunks, tavX0 + 5, tavY0 + 4, "tavern_table");
-  // Sign outside the door
-  addSpawn(chunks, tavDoorX + 1, tavY1 + 1, "tavern_sign");
+  addSpawn(chunks, tavDoorX + 1, tavDoorY + 1, "tavern_sign");
 
   // ── Windmill — walled building NW of house ────────────────────
   const millX0 = homeX - 9;
@@ -461,6 +525,24 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, millDoorX, millY1 + 1, westWalkX, northWalkY);
   // Interior
   addSpawn(chunks, millX0 + 1, millY0 + 1, "millstone");
+
+  // Natural harvestables are placed after all structures so they cannot end up in walls or on paths.
+  for (const p of berrySpots) {
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addOutdoorSpawn(chunks, p, "harvest_berries");
+  }
+  for (const p of herbSpots) {
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addOutdoorSpawn(chunks, p, "harvest_herbs");
+  }
+  for (const p of thornSpots) {
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addOutdoorSpawn(chunks, p, "harvest_thorn_bramble");
+  }
+  for (const p of venomSpots) {
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addOutdoorSpawn(chunks, p, "harvest_venom_fern");
+  }
 
   const outChunks = [];
   for (const rec of chunks.values()) {

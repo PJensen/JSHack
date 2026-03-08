@@ -3447,6 +3447,21 @@ function render(worldView) {
     ftext,
   });
 
+  if (Array.isArray(worldView?.roofs) && worldView.roofs.length) {
+    const isVisible = worldView.isVisible;
+    const isExplored = worldView.isExplored;
+    for (let i = 0; i < worldView.roofs.length; i++) {
+      const roof = worldView.roofs[i];
+      if (roof.x < vx0 || roof.x > vx1 || roof.y < vy0 || roof.y > vy1) continue;
+      const visible = !!(isVisible && isVisible(roof.x, roof.y));
+      const explored = !!(isExplored && isExplored(roof.x, roof.y));
+      if (!visible && !explored) continue;
+      bctx.globalAlpha = visible ? 1.0 : 0.35;
+      drawKind(glyphAtlas, bctx, roof.kind, roof.x, roof.y);
+    }
+    bctx.globalAlpha = 1.0;
+  }
+
   drawTargetingReticle({
     bctx,
     targetCursor: _targetCursor,
