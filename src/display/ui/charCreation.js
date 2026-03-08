@@ -192,18 +192,29 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     });
     versionEl.appendChild(badge);
     try {
-      badge.animate(
+      const entrance = badge.animate(
         [
-          { transform: 'translateY(0px)', opacity: 0.75, filter: 'brightness(1)' },
-          { transform: 'translateY(-1px)', opacity: 1, filter: 'brightness(1.25)' },
+          { transform: 'scale(0)', opacity: 0, filter: 'brightness(3)' },
+          { transform: 'scale(4)', opacity: 1, filter: 'brightness(2.5)', offset: 0.45 },
+          { transform: 'scale(3.5)', opacity: 1, filter: 'brightness(2)', offset: 0.55 },
+          { transform: 'scale(1)', opacity: 1, filter: 'brightness(1.25)' },
         ],
-        {
-          duration: 700,
-          easing: 'ease-in-out',
-          direction: 'alternate',
-          iterations: Infinity,
-        },
+        { duration: 520, easing: 'cubic-bezier(0.22,1.5,0.36,1)', fill: 'forwards' },
       );
+      entrance.finished.then(() => {
+        badge.animate(
+          [
+            { transform: 'translateY(0px)', opacity: 0.75, filter: 'brightness(1)' },
+            { transform: 'translateY(-1px)', opacity: 1, filter: 'brightness(1.25)' },
+          ],
+          {
+            duration: 700,
+            easing: 'ease-in-out',
+            direction: 'alternate',
+            iterations: Infinity,
+          },
+        );
+      });
     } catch {}
   }).catch(() => {});
 
