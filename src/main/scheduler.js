@@ -15,6 +15,7 @@ import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
 import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
+import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem, installAggroFromDamageListener } from "../rules/systems/aiChaseSystem.js";
@@ -104,8 +105,7 @@ export function configureWorld(world) {
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)
   registerSystem(intentValidationSystem, 'ai');
-  // Flying toggle before scurry/chase: AI decides to take flight or land
-  // so movement and combat systems see the up-to-date flying state.
+  // Flying AI claims the action with FlyIntent before scurry/chase.
   registerSystem(aiFlyingSystem, 'ai');
   // Scurry before chase: dumb idle creatures set a random MoveIntent which
   // aiChaseSystem's existing intent-skip guard then honours.
@@ -120,6 +120,7 @@ export function configureWorld(world) {
   // Phase: intents (intent consumers + steering)
   // Knockback resolves before standard movement so positions are committed first.
   registerSystem(knockbackSystem, 'intents');
+  registerSystem(flyIntentSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');

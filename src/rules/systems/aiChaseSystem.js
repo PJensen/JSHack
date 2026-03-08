@@ -23,6 +23,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Brain } from "../components/Brain.js";
 import { Vitality }     from "../components/Vitality.js";
 import { MoveIntent }   from "../components/Intents/MoveIntent.js";
+import { FlyIntent } from "../components/Intents/FlyIntent.js";
 import { RangedAttackIntent } from "../components/Intents/RangedAttackIntent.js";
 import {
   AggroState,
@@ -124,7 +125,7 @@ export function aiChaseSystem(world) {
     const frostStacks = Math.min(3, statusStrength(world, id, "frozen"));
     if (frostStacks > 0) actEvery = actEvery * (1 + frostStacks);
     const canActThisTurn = !(actEvery > 1 && ((world.step + id) % actEvery) !== 0);
-    const hasQueuedMove = world.has(id, MoveIntent);
+    const hasQueuedAction = world.has(id, MoveIntent) || world.has(id, FlyIntent);
 
     // Perception is driven by Brain data rather than action cadence.
     const sightRange = Math.max(0, Math.trunc(Number(brain?.visionRange ?? def?.visionRange ?? 8)));
@@ -178,14 +179,14 @@ export function aiChaseSystem(world) {
         world.emit('status', { id, kind: 'alert', at: { x: pos.x | 0, y: pos.y | 0 } });
         // onSeen hooks (e.g. spider leap)
         const onSeenHooks = def?.hooks?.onSeen;
-        if (!hasQueuedMove && canActThisTurn && Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {
+        if (!hasQueuedAction && canActThisTurn && Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {
           const seenCtx = new SeenCallbackContext(world, {
             actor:     id,
             target:    playerId,
             actorPos:  { x: pos.x | 0, y: pos.y | 0 },
             targetPos: { x: playerPos.x | 0, y: playerPos.y | 0 },
             canActThisTurn,
-            hasQueuedMove,
+            hasQueuedMove: hasQueuedAction,
           });
           runCallbackList(onSeenHooks, seenCtx);
           if (seenCtx.handled || seenCtx.cancelled) return;
@@ -222,7 +223,7 @@ export function aiChaseSystem(world) {
           actorPos:  { x: pos.x | 0, y: pos.y | 0 },
           targetPos: { x: playerPos.x | 0, y: playerPos.y | 0 },
           canActThisTurn,
-          hasQueuedMove,
+          hasQueuedMove: hasQueuedAction,
         });
         runCallbackList(whileLOSHooks, losCtx);
         if (losCtx.handled || losCtx.cancelled) return;
@@ -258,7 +259,7 @@ export function aiChaseSystem(world) {
     if (aggro.alertLevel === AGGRO_LEVELS.unaware) return;
 
     // Awareness keeps updating every turn; cadence only gates intent production.
-    if (!canActThisTurn || hasQueuedMove) return;
+    if (!canActThisTurn || hasQueuedAction) return;
 
     // ── Retreat: update flag based on current HP ────────────────────
     const retreatThreshold = def?.retreatHpPct ?? 0;
