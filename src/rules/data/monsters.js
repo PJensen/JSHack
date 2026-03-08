@@ -252,7 +252,7 @@ export const MONSTERS = [
         cooldownTurns: 6,
         damage: 4,
         hazardDamage: 1,
-        hazardTurns: 2,
+        hazardTurns: 3,
         burnTurns: 3,
         burnPotency: 2,
       })],

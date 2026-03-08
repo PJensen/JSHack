@@ -65,13 +65,14 @@ Deno.test("dragon whelp breathes fire in a line, leaves fire hazards, and consum
     const fireHazards = [];
     for (const [id, pos, hazard] of world.query(Position, HazardArea)) {
       if (String(hazard.kind || "") !== "fire") continue;
-      fireHazards.push({ id, x: pos.x | 0, y: pos.y | 0 });
+      fireHazards.push({ id, x: pos.x | 0, y: pos.y | 0, turnsLeft: hazard.turnsLeft | 0 });
     }
     assertEquals(
       fireHazards.map(({ x, y }) => ({ x, y })),
       [{ x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }, { x: 5, y: 5 }],
       "breath should leave fire hazards on every traversed tile",
     );
+    assert(fireHazards.every(({ turnsLeft }) => turnsLeft === 3), "dragon fire should linger for three turns");
 
     hazardSystem(world);
     const playerVitAfterHazard = world.get(player, Vitality);

@@ -6,6 +6,8 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { PlasmaCloud } from "../src/rules/components/PlasmaCloud.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
+import { CHUNK_SIZE, TILE_FLOOR, TILE_GRASS, TILE_TREE } from "../src/rules/environment/dungeon/constants.js";
+import { clearAll, getTile, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { spawnHazard } from "../src/rules/utils/hazardSpawn.js";
 import { spawnPlasmaCloud } from "../src/rules/utils/spawnPlasmaCloud.js";
@@ -143,4 +145,93 @@ Deno.test("plasma spawn remains compatible via generic hazard system", () => {
   assert(events.some((e) => e.type === "plasmaCloud:spawned"), "legacy spawned event expected");
   assert(events.some((e) => e.type === "plasmaCloud:pulse"), "legacy pulse event expected");
   assert(events.some((e) => e.type === "plasmaCloud:expired"), "legacy expired event expected");
+});
+
+Deno.test("fire floor hazards burn tree tiles into grass", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 5] = TILE_TREE;
+  loadChunk(0, 0, tiles);
+
+  try {
+    const world = new World({ seed: 9203 });
+    const burned = [];
+    world.on("tile:burned", (event) => burned.push(event));
+
+    const hazardId = spawnHazard(world, {
+      x: 5,
+      y: 5,
+      kind: "fire",
+      medium: "floor",
+      turnsLeft: 2,
+      radius: 0,
+      tickDamage: 1,
+      damageType: "fire",
+      cause: "monster:firebreath",
+      sourceId: 77,
+      sourceKind: "dragon_whelp",
+    });
+    assert(hazardId > 0, "spawnHazard should return a valid hazard id");
+
+    hazardSystem(world);
+
+    assertEquals(getTile(5, 5), TILE_GRASS, "tree tile should become grass after a fire hazard pulse");
+    assertEquals(burned.length, 1, "tile:burned should emit exactly once");
+    assertEquals(burned[0].x, 5);
+    assertEquals(burned[0].y, 5);
+    assertEquals(burned[0].sourceKind, "dragon_whelp");
+    assertEquals(burned[0].cause, "monster:firebreath");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("fire floor hazards can spread to adjacent trees", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 5] = TILE_TREE;
+  tiles[5 * CHUNK_SIZE + 6] = TILE_TREE;
+  loadChunk(0, 0, tiles);
+
+  try {
+    const world = new World({ seed: 9204 });
+    const spawned = [];
+    const burned = [];
+    world.on("hazard:spawned", (event) => spawned.push(event));
+    world.on("tile:burned", (event) => burned.push(event));
+
+    const hazardId = spawnHazard(world, {
+      x: 5,
+      y: 5,
+      kind: "fire",
+      medium: "floor",
+      turnsLeft: 3,
+      radius: 0,
+      tickDamage: 1,
+      damageType: "fire",
+      cause: "monster:firebreath",
+      sourceId: 77,
+      sourceKind: "dragon_whelp",
+      meta: { fireSpreadChance: 1, fireSpreadTurns: 2 },
+    });
+    assert(hazardId > 0, "spawnHazard should return a valid hazard id");
+
+    hazardSystem(world);
+
+    assertEquals(getTile(5, 5), TILE_GRASS, "origin tree should burn on the first pulse");
+    assert(
+      spawned.some((event) => event.kind === "fire" && event.at?.x === 6 && event.at?.y === 5),
+      "first pulse should ignite an adjacent tree tile",
+    );
+
+    hazardSystem(world);
+
+    assertEquals(getTile(6, 5), TILE_GRASS, "spread fire should burn the adjacent tree on its next pulse");
+    assert(
+      burned.some((event) => event.x === 6 && event.y === 5),
+      "spread fire should emit tile:burned when the neighbor burns down",
+    );
+  } finally {
+    clearAll();
+  }
 });

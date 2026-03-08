@@ -443,6 +443,12 @@ function wireWorldEvents(world) {
     resolved.deity.action('destroy', { magnitude: 0.4, target: 'terrain' });
   });
 
+  world.on('tile:burned', ({ actor }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    resolved.deity.action('destroy', { magnitude: 0.4, target: 'terrain' });
+  });
+
   // Clearing webs.
   world.on('web:cleared', ({ actor }) => {
     const resolved = resolvePlayerDeity(world, actor);
