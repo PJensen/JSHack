@@ -22,7 +22,7 @@ import {
 } from "./display/composition/index.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
-import { ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
+import { Particle, ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
 import { isInputLocked } from "./display/input/inputLock.js";
@@ -2635,6 +2635,8 @@ const _healthBarState = new Map();
 const _healthBarSeen = new Set();
 /** @type {Set<string>} */
 const _roofCoverKeys = new Set();
+/** @type {Map<string, number>} */
+const _roofParticleStamp = new Map();
 /** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
 const _healthBarsToDraw = [];
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
@@ -2797,7 +2799,7 @@ function roofCellKey(x, y) {
   return `${x | 0},${y | 0}`;
 }
 
-function drawRoofSmoke(ctx, roof, fxTime) {
+function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
   if (!roof?.burning) return;
   const phase = ((Math.imul((roof.x | 0) + 11, 1103515245) ^ Math.imul((roof.y | 0) + 17, 12345)) >>> 0) / 0xffffffff;
   const bob = 0.5 + 0.5 * Math.sin(fxTime * 1.7 + phase * Math.PI * 2);
@@ -2842,6 +2844,58 @@ function drawRoofSmoke(ctx, roof, fxTime) {
     ctx.stroke();
   }
   ctx.restore();
+
+  if (quality === 'low' || !fx?.pool) return;
+  const particleTick = Math.floor(fxTime * 7 + phase * 13);
+  const particleKey = roofCellKey(roof.x, roof.y);
+  const lastTick = _roofParticleStamp.get(particleKey) ?? -1;
+  if (lastTick === particleTick) return;
+  _roofParticleStamp.set(particleKey, particleTick);
+
+  fx.pool.spawn(new Particle({
+    x: roof.x + (phase - 0.5) * 0.18,
+    y: roof.y - 0.14,
+    vx: (phase - 0.5) * 0.05,
+    vy: -0.10 - bob * 0.05,
+    ay: -0.02,
+    life: 0.65 + bob * 0.18,
+    size0: 0.055,
+    size1: 0.018,
+    r: 72,
+    g: 70,
+    b: 66,
+    a0: 0.40,
+  }));
+  fx.pool.spawn(new Particle({
+    x: roof.x - 0.10 + bob * 0.08,
+    y: roof.y - 0.10,
+    vx: -0.02 + (phase - 0.5) * 0.04,
+    vy: 0.08 + bob * 0.03,
+    ay: 0.08,
+    life: 0.55,
+    size0: 0.032,
+    size1: 0.010,
+    r: 182,
+    g: 178,
+    b: 168,
+    a0: 0.34,
+  }));
+  if (particleTick % 2 === 0) {
+    fx.pool.spawn(new Particle({
+      x: roof.x + 0.03 - phase * 0.10,
+      y: roof.y - 0.06,
+      vx: (phase - 0.5) * 0.08,
+      vy: -0.18 - bob * 0.08,
+      ay: -0.04,
+      life: 0.26,
+      size0: 0.040,
+      size1: 0.010,
+      r: 255,
+      g: 138,
+      b: 48,
+      a0: 0.50,
+    }));
+  }
 }
 
 function drawFlyingShadow(ctx, presentation) {
@@ -3510,7 +3564,7 @@ function render(worldView) {
       _roofCoverKeys.add(roofCellKey(roof.x, roof.y));
       bctx.globalAlpha = Number.isFinite(roof.alpha) ? roof.alpha : 1.0;
       drawKind(glyphAtlas, bctx, roof.kind, roof.x, roof.y);
-      drawRoofSmoke(bctx, roof, _fxTime);
+      drawRoofSmoke(bctx, roof, _fxTime, fx, PERF.quality);
     }
     bctx.globalAlpha = 1.0;
   }

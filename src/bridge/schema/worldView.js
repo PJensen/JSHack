@@ -91,6 +91,14 @@ function keyToXY(key) {
 	return { x, y };
 }
 
+const CARDINAL_STEPS = Object.freeze([
+	[1, 0],
+	[-1, 0],
+	[0, 1],
+	[0, -1],
+]);
+const ROOF_BURN_PROPAGATION_LIMIT = 2;
+
 /**
  * @param {string} key
  * @param {Set<string>} candidates
@@ -211,6 +219,44 @@ function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, exposedFloorKeys, 
 }
 
 /**
+ * @param {Set<string>} floorKeys
+ * @param {Set<string>} sourceKeys
+ * @param {Map<string, number>} seedStrengths
+ * @returns {Map<string, number>}
+ */
+function propagateBurnScores(floorKeys, sourceKeys, seedStrengths) {
+	const scores = new Map();
+	const queue = [];
+	for (const key of sourceKeys) {
+		if (!floorKeys.has(key)) continue;
+		const strength = Math.max(0, Number(seedStrengths.get(key) || 0));
+		if (!(strength > 0)) continue;
+		const prev = Number(scores.get(key) || -Infinity);
+		if (strength <= prev) continue;
+		scores.set(key, strength);
+		queue.push(key);
+	}
+	for (let i = 0; i < queue.length; i++) {
+		const key = queue[i];
+		const score = Number(scores.get(key) || 0);
+		if (!(score > 1)) continue;
+		const { x, y } = keyToXY(key);
+		for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+			const nx = x + CARDINAL_STEPS[j][0];
+			const ny = y + CARDINAL_STEPS[j][1];
+			const nextKey = xyKey(nx, ny);
+			if (!floorKeys.has(nextKey)) continue;
+			const nextScore = score - 1;
+			const prev = Number(scores.get(nextKey) || -Infinity);
+			if (nextScore <= prev) continue;
+			scores.set(nextKey, nextScore);
+			queue.push(nextKey);
+		}
+	}
+	return scores;
+}
+
+/**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {{ x:number, y:number } | null} playerPos
  */
@@ -243,27 +289,65 @@ function collectOverworldRoofs(world, playerPos) {
 		if (floorKeys.some((key) => visited.has(key))) continue;
 		for (let i = 0; i < floorKeys.length; i++) visited.add(floorKeys[i]);
 		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) continue;
-		const singedKeys = new Set(building.exposedFloorKeys);
+		const burnedSeedStrengths = new Map();
+		const burnedSeedKeys = new Set();
+		const activeSeedStrengths = new Map();
+		const activeSeedKeys = new Set();
 		for (const [key] of Object.entries(destroyedTiles || {})) {
+			const rec = destroyedTiles[key];
 			if (
-				building.floorKeys.has(key)
-				|| building.doorKeys.has(key)
-				|| building.wallKeys.has(key)
-				|| keyWithinRadius(key, building.floorKeys, 1)
-			) singedKeys.add(key);
+				!building.floorKeys.has(key)
+				&& !building.doorKeys.has(key)
+				&& !building.wallKeys.has(key)
+				&& !keyWithinRadius(key, building.floorKeys, 1)
+			) continue;
+			const age = Math.max(1, (_view.turn | 0) - (Number(rec?.destroyedAtTurn || 0) | 0) + 1);
+			const strength = Math.min(ROOF_BURN_PROPAGATION_LIMIT, age);
+			const { x, y } = keyToXY(key);
+			for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+				const floorKey = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
+				if (!building.floorKeys.has(floorKey)) continue;
+				burnedSeedKeys.add(floorKey);
+				const prev = Number(burnedSeedStrengths.get(floorKey) || 0);
+				if (strength > prev) burnedSeedStrengths.set(floorKey, strength);
+			}
+		}
+		for (const key of activeFireKeys) {
+			if (
+				!building.floorKeys.has(key)
+				&& !building.doorKeys.has(key)
+				&& !building.wallKeys.has(key)
+				&& !keyWithinRadius(key, building.floorKeys, 1)
+			) continue;
+			const { x, y } = keyToXY(key);
+			for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+				const floorKey = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
+				if (!building.floorKeys.has(floorKey)) continue;
+				activeSeedKeys.add(floorKey);
+				activeSeedStrengths.set(floorKey, ROOF_BURN_PROPAGATION_LIMIT);
+			}
+		}
+		const burnedScores = propagateBurnScores(building.floorKeys, burnedSeedKeys, burnedSeedStrengths);
+		const activeScores = propagateBurnScores(building.floorKeys, activeSeedKeys, activeSeedStrengths);
+		const burnedScoreKeys = new Set(burnedScores.keys());
+		const activeScoreKeys = new Set(activeScores.keys());
+		const exposedFloorKeys = new Set(building.exposedFloorKeys);
+		for (const floorKey of building.floorKeys) {
+			if (Number(burnedScores.get(floorKey) || 0) > 0 && Number(activeScores.get(floorKey) || 0) <= 0) {
+				exposedFloorKeys.add(floorKey);
+			}
 		}
 		const roofTiles = roofTilesFromBuilding(
 			building.floorKeys,
 			building.doorKeys,
 			building.wallKeys,
-			building.exposedFloorKeys,
-			1.0,
-			false
+			exposedFloorKeys,
+			1.0
 		);
 		for (let i = 0; i < roofTiles.length; i++) {
 			const key = xyKey(roofTiles[i].x, roofTiles[i].y);
-			const nearBurned = keyWithinRadius(key, singedKeys, 1);
-			const nearActiveFire = keyWithinRadius(key, activeFireKeys, 1);
+			const nearBurned = keyWithinRadius(key, burnedScoreKeys, 1);
+			const nearActiveFire = keyWithinRadius(key, activeScoreKeys, 1);
 			if (nearBurned && !nearActiveFire) continue;
 			if (nearBurned) {
 				roofTiles[i].kind = roofTiles[i].kind.includes("_charred")
