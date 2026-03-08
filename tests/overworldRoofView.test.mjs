@@ -61,6 +61,24 @@ Deno.test("overworld roofs appear from outside and hide only the building the pl
   clearExplored();
 });
 
+Deno.test("overworld door roof tiles render translucent so entrances read through the roofline", () => {
+  clearAll();
+  clearExplored();
+
+  const world = new World({ seed: 0xC0FFEE });
+  const spawn = initDungeon(world, { startDepth: 0 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Position, { x: spawn.x, y: spawn.y });
+
+  const view = buildWorldView(world);
+  assertEquals(roofAt(view, spawn.x, spawn.y - 1)?.alpha, 0.4);
+
+  clearAll();
+  clearExplored();
+});
+
 Deno.test("overworld roof shading bands run straight across each building instead of diagonally", () => {
   clearAll();
   clearExplored();
