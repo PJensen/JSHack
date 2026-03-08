@@ -232,4 +232,26 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       }
     }
   });
+
+  // Flying: takeoff / land float text
+  world.on('proc:fly:takeoff', ({ x, y }) => {
+    if (!canShowAt(x, y)) return;
+    try {
+      ftext.addStatus(x, y - 0.45, 'TAKES FLIGHT!', {
+        color: '#7bc8ff',
+        life: 1.0,
+        scaleStart: 1.2,
+        scaleEnd: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] fly takeoff ftext failed:', e); }
+  });
+  world.on('proc:fly:land', ({ x, y }) => {
+    if (!canShowAt(x, y)) return;
+    try {
+      ftext.addStatus(x, y - 0.3, 'LANDS', {
+        color: '#b08050',
+        life: 0.7,
+      });
+    } catch (e) { console.debug('[floatTextWiring] fly land ftext failed:', e); }
+  });
 }

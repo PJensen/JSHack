@@ -62,3 +62,4 @@ export { KnockbackPending } from './KnockbackPending.js';
 export { SoundEmitter } from './SoundEmitter.js';
 export { CreatureType, CREATURE_TYPES, creatureTypeFromTags } from './CreatureType.js';
 export { Encumbrance } from './Encumbrance.js';
+export { Flying } from './Flying.js';

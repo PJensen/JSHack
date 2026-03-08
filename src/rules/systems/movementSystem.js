@@ -18,7 +18,8 @@ import { Settings } from "../components/Settings.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Collider } from "../components/Collider.js";
 import { Vitality } from "../components/Vitality.js";
-import { isWalkable } from "../environment/dungeon/tileMap.js";
+import { isWalkable, isFlyable } from "../environment/dungeon/tileMap.js";
+import { Flying } from "../components/Flying.js";
 import { getTileQuerySnapshot, forEachItemAt } from "../utils/tileQueryCache.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
@@ -200,6 +201,10 @@ export function movementSystem(world) {
         world.set(actor, Facing, { dx: mdx, dy: mdy });
       }
 
+      // Flying entities bypass terrain (water, lava, trees, mountains) but not walls/void.
+      const actorFlying = world.has(actor, Flying);
+      const terrainBlocked = actorFlying ? !isFlyable(nx, ny) : !isWalkable(nx, ny);
+
       const spiderCanTraverseWeb =
         hasIdentity(world, actor, "spider")
         && isWalkable(nx, ny)
@@ -207,7 +212,7 @@ export function movementSystem(world) {
         && tiles.blockedByCell.has(k)
         && isBlockedOnlyByWebs(world, tiles, nx, ny);
 
-      if (!isWalkable(nx, ny) || (blocking.has(k) && !spiderCanTraverseWeb)) {
+      if (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb)) {
         // Blocked — delegate to bump resolver dispatch table
         const target = tiles.livingByCell.get(k) || 0;
         resolveBump(world, actor, { nx, ny, mdx, mdy, target, tiles });

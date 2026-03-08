@@ -2678,7 +2678,8 @@ function drawEntityHealthBar(ctx, e) {
   const ratio = clamp01(hp / maxHp);
   const width = 0.68;
   const height = 0.06;
-  const y = e.pos.y + 0.43;
+  const flyOff = (Array.isArray(e.tags) && e.tags.includes('flying')) ? -0.35 : 0;
+  const y = e.pos.y + 0.43 + flyOff;
   const x = e.pos.x - (width * 0.5);
   const pad = 0.01;
   const innerW = Math.max(0, width - (pad * 2));
@@ -2819,7 +2820,18 @@ function render(worldView) {
       continue;
     }
 
-    drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
+    // Flying VFX: shadow ellipse at ground position, glyph offset upward
+    const _isFlying = Array.isArray(e.tags) && e.tags.includes('flying');
+    if (_isFlying) {
+      bctx.save();
+      bctx.fillStyle = 'rgba(0,0,0,0.22)';
+      bctx.beginPath();
+      bctx.ellipse(e.pos.x, e.pos.y + 0.3, 0.32, 0.12, 0, 0, Math.PI * 2);
+      bctx.fill();
+      bctx.restore();
+    }
+    const _flyOffY = _isFlying ? -0.35 : 0;
+    drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y + _flyOffY);
     if (shouldShowHealthBar(e, _fxTime)) {
       _healthBarsToDraw.push(e);
     }

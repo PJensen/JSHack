@@ -21,6 +21,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Stamina } from "../components/Stamina.js";
 import { Position } from "../components/Position.js";
 import { Pushable } from "../components/Pushable.js";
+import { Flying } from "../components/Flying.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { findTileReaction } from "./tileReactions.js";
 import { getTile, setTile, isLoaded, isWalkable } from "../environment/dungeon/tileMap.js";
@@ -74,6 +75,8 @@ const hostileMelee = {
     // Precision gate: never melee through stale occupancy or non-walkable terrain.
     if (!targetIsAtBumpTile(ctx.target, ctx.nx, ctx.ny, ctx.tiles)) return false;
     if (!isWalkable(ctx.nx, ctx.ny)) return false;
+    // Flying target immune to melee from grounded attacker
+    if (world.has(ctx.target, Flying) && !world.has(actor, Flying)) return false;
     const actorFac = world.get(actor, Faction);
     const targetFac = world.get(ctx.target, Faction);
     // Shopkeepers / neutrals with Interactable are handled by npc-interact
@@ -83,6 +86,11 @@ const hostileMelee = {
   },
   resolve(world, actor, ctx) {
     if (world.has(actor, AttackIntent)) return;
+    // Emit out-of-reach when target is flying and attacker is grounded
+    if (world.has(ctx.target, Flying) && !world.has(actor, Flying)) {
+      emitSafe(world, "combat:target-flying", { attacker: actor, target: ctx.target });
+      return;
+    }
     let handled = 0;
     try {
       handled = Number(world.emit?.("bump:attack", { attacker: actor, target: ctx.target }) || 0);

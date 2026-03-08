@@ -23,7 +23,7 @@ export { transitionToDepth } from './transition.js';
 export { populateChunk, materializeSpawn } from './populate.js';
 export { pickMonster, pickItem } from './tables.js';
 export { buildBSP, placeRooms, carveRooms, connectRooms, collectLeafRooms } from './bsp.js';
-export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isOpaque, forEachTileInRect, forEachLoadedTile, loadedChunkCount } from './tileMap.js';
+export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isFlyable, isOpaque, forEachTileInRect, forEachLoadedTile, loadedChunkCount } from './tileMap.js';
 export { markExplored } from './exploredMap.js';
 
 import { DungeonState } from '../../components/DungeonState.js';
@@ -53,7 +53,7 @@ import { generateOverworldChunks } from './overworld.js';
  * @param {{x:number,y:number}[]|null} [priorDownStairPositions]
  *   Actual world positions of down-stairs on the floor above; passed to
  *   generateFloorPlan so up-stairs inherit those exact positions.
- * @returns {{ spawnX: number, spawnY: number, entityIds: number[], downStairPositions: {x:number,y:number}[] }}
+ * @returns {{ spawnX: number, spawnY: number, entityIds: number[], downStairPositions: {x:number,y:number}[], profileType: string }}
  */
 export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null) {
   if (depth === 0) {
@@ -97,7 +97,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
         }
       }
     }
-    return { spawnX: ow.spawnX, spawnY: ow.spawnY, entityIds: allEntityIds, downStairPositions };
+    return { spawnX: ow.spawnX, spawnY: ow.spawnY, entityIds: allEntityIds, downStairPositions, profileType: 'overworld' };
   }
 
   const floorPlan = generateFloorPlan(worldSeed, depth, priorDownStairPositions);
@@ -233,7 +233,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
     }
   }
 
-  return { spawnX, spawnY, entityIds: allEntityIds, downStairPositions };
+  return { spawnX, spawnY, entityIds: allEntityIds, downStairPositions, profileType: floorPlan.profile.id || 'default' };
 }
 
 /**
@@ -258,13 +258,14 @@ export function initDungeon(world, opts = {}) {
   clearExplored();
   clearSpatialIndex(world);
 
-  const { spawnX, spawnY, entityIds, downStairPositions } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress);
+  const { spawnX, spawnY, entityIds, downStairPositions, profileType } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress);
 
   // Create dungeon state singleton
   const dsId = world.create();
   world.add(dsId, DungeonState, {
     worldSeed,
     currentDepth: depth,
+    profileType: profileType || 'default',
     floorEntityIds: entityIds,
     downStairPositions: downStairPositions || [],
   });

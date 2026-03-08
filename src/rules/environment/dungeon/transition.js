@@ -8,6 +8,7 @@ import { Pet } from '../../components/Pet.js';
 import { PetState } from '../../components/PetState.js';
 import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
+import { Flying } from '../../components/Flying.js';
 import { clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
 import { generateFloor } from './index.js';
@@ -168,7 +169,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   const isDescending = newDepth > currentDepth;
   const priorDownStairPositions = (isDescending && Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0)
     ? ds.downStairPositions : null;
-  const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions } =
+  const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions, profileType: newProfileType } =
     generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions);
   let entityIds = generatedEntityIds;
 
@@ -284,10 +285,16 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     }
   }
 
+  // Strip Flying from any surviving entities (player, pets) — AI re-evaluates next tick
+  for (const [eid] of world.query(Flying)) {
+    try { world.remove(eid, Flying); } catch {}
+  }
+
   // Update dungeon state
   if (dungeonId != null) {
     world.mutate(dungeonId, DungeonState, r => {
       r.currentDepth = newDepth;
+      r.profileType = newProfileType || 'default';
       r.floorEntityIds = entityIds;
       r.downStairPositions = newDownStairPositions || [];
     });
