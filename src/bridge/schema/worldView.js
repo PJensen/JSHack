@@ -154,6 +154,7 @@ function collectRoofedBuilding(seedX, seedY) {
  */
 function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, alpha) {
 	const allKeys = [...wallKeys, ...doorKeys, ...floorKeys];
+	const doorKeySet = new Set(doorKeys);
 	let minY = Infinity;
 	let maxY = -Infinity;
 	for (let i = 0; i < allKeys.length; i++) {
@@ -164,7 +165,8 @@ function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, alpha) {
 	const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
 	return allKeys.map((key) => {
 		const { x, y } = keyToXY(key);
-		return { x, y, kind: y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit", alpha };
+		const tileAlpha = doorKeySet.has(key) ? alpha * 0.4 : alpha;
+		return { x, y, kind: y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit", alpha: tileAlpha };
 	});
 }
 
