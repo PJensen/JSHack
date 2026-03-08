@@ -32,7 +32,7 @@ import { DungeonState } from "../../rules/components/DungeonState.js";
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ x:number, y:number, kind:string }} RoofTileView */
+/** @typedef {{ x:number, y:number, kind:string, alpha:number }} RoofTileView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
@@ -78,7 +78,6 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-let _lastFovStep = -1;
 const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "tavern_keg", "millstone"]);
 
 function xyKey(x, y) {
@@ -151,8 +150,9 @@ function collectRoofedBuilding(seedX, seedY) {
  * @param {Set<string>} floorKeys
  * @param {Set<string>} doorKeys
  * @param {Set<string>} wallKeys
+ * @param {number} alpha
  */
-function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys) {
+function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, alpha) {
 	const allKeys = [...wallKeys, ...doorKeys, ...floorKeys];
 	allKeys.sort((a, b) => {
 		const pa = keyToXY(a);
@@ -162,7 +162,7 @@ function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys) {
 	const split = Math.ceil(allKeys.length / 2);
 	return allKeys.map((key, index) => {
 		const { x, y } = keyToXY(key);
-		return { x, y, kind: index < split ? "roof_thatch_shadow" : "roof_thatch_lit" };
+		return { x, y, kind: index < split ? "roof_thatch_shadow" : "roof_thatch_lit", alpha };
 	});
 }
 
@@ -191,7 +191,7 @@ function collectOverworldRoofs(world, playerPos) {
 		if (floorKeys.some((key) => visited.has(key))) continue;
 		for (let i = 0; i < floorKeys.length; i++) visited.add(floorKeys[i]);
 		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) continue;
-		roofs.push(...roofTilesFromBuilding(building.floorKeys, building.doorKeys, building.wallKeys));
+		roofs.push(...roofTilesFromBuilding(building.floorKeys, building.doorKeys, building.wallKeys, 1.0));
 	}
 
 	return roofs;
@@ -323,23 +323,20 @@ export function buildWorldView(world) {
 
 	// Compute FOV (once per turn, idempotent via step check in updateFOV)
 	if (_view.player) {
-		if (_view.turn !== _lastFovStep) {
-			_lastFovStep = _view.turn;
-			const brain = world.get(_view.player.id, Brain);
-			const eq = world.get(_view.player.id, Equipment);
-			const radius = (brain?.visionRange ?? 8) + (eq?.visionRangeDerived ?? 0);
-			playerVisionRadius = radius;
-			const pad = 2;
-			const bounds = {
-				x0: _view.player.pos.x - radius - pad,
-				y0: _view.player.pos.y - radius - pad,
-				x1: _view.player.pos.x + radius + pad,
-				y1: _view.player.pos.y + radius + pad,
-			};
-			const blockedMap = buildBlocksVisionMap(world, bounds);
-			const isBlocked = blockedCallback(blockedMap);
-			updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked);
-		}
+		const brain = world.get(_view.player.id, Brain);
+		const eq = world.get(_view.player.id, Equipment);
+		const radius = (brain?.visionRange ?? 8) + (eq?.visionRangeDerived ?? 0);
+		playerVisionRadius = radius;
+		const pad = 2;
+		const bounds = {
+			x0: _view.player.pos.x - radius - pad,
+			y0: _view.player.pos.y - radius - pad,
+			x1: _view.player.pos.x + radius + pad,
+			y1: _view.player.pos.y + radius + pad,
+		};
+		const blockedMap = buildBlocksVisionMap(world, bounds);
+		const isBlocked = blockedCallback(blockedMap);
+		updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked);
 	}
 
 	_view.isVisible = isVisible;
