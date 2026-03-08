@@ -27,7 +27,7 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
-import { buildSpellDamageSpec, getSpellIntelligenceBonus } from "../utils/spellDamage.js";
+import { buildSpellDamageSpec, createSpellDamageContext, getSpellIntelligenceBonus, scaleSpellDamage } from "../utils/spellDamage.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 
@@ -80,6 +80,40 @@ function getFlashHealSpellLevel(world, actor, spell, intent) {
  */
 function createLOSBlocker(world) {
   return blockedCallback(buildBlocksVisionMap(world));
+}
+
+/**
+ * Snapshot a spell-sourced DOT so future ticks do not depend on live caster stats.
+ * This is shared by distinct effects like Agony and true fire burns from spells
+ * such as Meteor or future Conflagurate-style effects.
+ *
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ id?:string, [k:string]:any }} spell
+ * @param {{
+ *   key:string,
+ *   turnsLeft:number,
+ *   potency:number,
+ *   stacks?:number,
+ *   cause?:string,
+ *   type?:string,
+ * }} options
+ */
+function createSpellDotEffect(world, actor, spell, options) {
+  const ctx = createSpellDamageContext(world, actor, spell, {
+    cause: options?.cause,
+    type: options?.type,
+  });
+  return {
+    key: String(options?.key || "").toLowerCase(),
+    turnsLeft: Math.max(0, Number(options?.turnsLeft || 0) | 0),
+    potency: Math.max(1, Number(options?.potency || 1) | 0),
+    stacks: Math.max(1, Number(options?.stacks || 1) | 0),
+    startedAtTurn: world.step,
+    sourceId: ctx.sourceId,
+    spellId: ctx.spellId,
+    meta: { spellDamage: ctx },
+  };
 }
 
 // Example: Lightning — auto-target nearest enemy and chain to up to 3 foes.
@@ -580,7 +614,14 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     // Apply burning to survivors
     if (result.applied && !result.killed) {
       const ae = /** @type any */ (world.get(id, ActiveEffects));
-      const effect = { key: 'burn', turnsLeft: 4, potency: 3, stacks: 1 };
+      const effect = createSpellDotEffect(world, actor, spell, {
+        key: 'burn',
+        turnsLeft: 4,
+        potency: scaleSpellDamage(world, actor, 3),
+        stacks: 1,
+        cause: 'spell:meteor:burn',
+        type: 'fire',
+      });
       if (ae && Array.isArray(ae.effects)) {
         upsertTimedEffect(ae.effects, effect);
       } else {
@@ -951,15 +992,14 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   const baseDuration = Math.min(10, 6 + Math.floor(intBonus / 4));
 
   // Apply agony DOT via ActiveEffects
-  const agonyEffect = {
+  const agonyEffect = createSpellDotEffect(world, actor, spell, {
     key: 'agony',
     turnsLeft: baseDuration,
     potency: basePotency,
     stacks: 1,
-    startedAtTurn: world.step,
-    sourceId: actor,
-    spellId: spell.id,
-  };
+    cause: 'spell:agony',
+    type: 'shadow',
+  });
   const ae = /** @type any */ (world.get(targetId, ActiveEffects));
   if (ae && Array.isArray(ae.effects)) {
     upsertTimedEffect(ae.effects, agonyEffect);

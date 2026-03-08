@@ -45,7 +45,7 @@ export const SPELL_DEFS = {
     maxTargets: 3,
     description: 'A needle-bright bolt that leaps from foe to foe.',
     effects: [
-      { kind: 'damage', element: 'electric', amount: '7, then reduced per jump' },
+      { kind: 'damage', element: 'electric', amount: '7 base, INT-scaled, can crit; reduced per jump' },
       { kind: 'utility', note: 'Chains to additional nearby enemies' },
     ],
   },
@@ -62,8 +62,8 @@ export const SPELL_DEFS = {
     radius: 2,
     description: 'Drag a star to earth and let the blast wave finish the rest.',
     effects: [
-      { kind: 'damage', element: 'fire', amount: '10 near impact, 5 on outer ring' },
-      { kind: 'status', status: 'burn', duration: '4 turns (stacks)' },
+      { kind: 'damage', element: 'fire', amount: '10 near impact, 5 on outer ring; INT-scaled, can crit' },
+      { kind: 'status', status: 'burn', duration: '4 turns; spell-burn ticks also scale and can crit' },
     ],
   },
   blastwave: {
@@ -78,7 +78,7 @@ export const SPELL_DEFS = {
     radius: 2,
     description: 'Release a concussive ring that batters and scatters nearby bodies.',
     effects: [
-      { kind: 'damage', element: 'physical', amount: 'distance-scaled' },
+      { kind: 'damage', element: 'physical', amount: 'distance-scaled, INT-scaled, can crit' },
       { kind: 'movement', mode: 'knockback', note: 'Pushes targets away from caster' },
     ],
   },
@@ -139,7 +139,7 @@ export const SPELL_DEFS = {
     targeting: 'auto',
     description: 'Winter-sharp shards bite deep and numb whatever survives.',
     effects: [
-      { kind: 'damage', element: 'cold', amount: '4' },
+      { kind: 'damage', element: 'cold', amount: '4 base, INT-scaled, can crit' },
       { kind: 'status', status: 'frost', duration: '2-5 turns (longer on lighter targets)' },
     ],
   },
@@ -174,7 +174,7 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Self-cast only' },
       { kind: 'utility', note: 'Consumes roughly a quarter of a cleric\'s starting mana' },
       { kind: 'utility', note: 'Restores 22% of max HP (minimum 1)' },
-      { kind: 'damage', element: 'holy', amount: '2 to adjacent hostile creatures' },
+      { kind: 'damage', element: 'holy', amount: '2 base to adjacent hostile creatures; INT-scaled, can crit' },
     ],
   },
   summon_skeleton: {
@@ -204,7 +204,7 @@ export const SPELL_DEFS = {
     targeting: 'auto',
     description: 'A bolt of pure shadow that strikes with devastating force.',
     effects: [
-      { kind: 'damage', element: 'shadow', amount: '12' },
+      { kind: 'damage', element: 'shadow', amount: '12 base, INT-scaled, can crit' },
     ],
   },
   agony: {
@@ -218,8 +218,8 @@ export const SPELL_DEFS = {
     targeting: 'enemy',
     description: 'Weave shadow into a curse that gnaws at the target\'s life force, dealing damage each turn.',
     effects: [
-      { kind: 'damage', element: 'shadow', amount: 'DOT; intelligence-scaled potency per turn' },
-      { kind: 'status', status: 'agony', duration: '6-8 turns (intelligence-scaled)' },
+      { kind: 'damage', element: 'shadow', amount: 'Shadow DOT; cast-time damage scales with INT and each tick can crit' },
+      { kind: 'status', status: 'agony', duration: '6-10 turns, snapshotted from cast-time INT' },
     ],
   },
   phase_strike: {
@@ -236,7 +236,7 @@ export const SPELL_DEFS = {
     description: 'Slip between moments and cut everything standing on your line.',
     effects: [
       { kind: 'movement', mode: 'teleport', note: 'Dash up to 4 tiles' },
-      { kind: 'damage', element: 'physical', amount: '6 to enemies crossed' },
+      { kind: 'damage', element: 'physical', amount: '6 base to enemies crossed; INT-scaled, can crit' },
       { kind: 'status', status: 'stun', duration: '3 turns' },
     ],
   },
