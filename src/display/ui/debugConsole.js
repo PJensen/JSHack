@@ -167,6 +167,7 @@ export function initDebugConsole({ world, messageLog }) {
     } catch (err) {
       appendOutput(`Error: ${err.message || err}`, 'err');
     }
+    world.tick(0);
   }
 
   // --- Open / Close ---
