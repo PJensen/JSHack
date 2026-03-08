@@ -1,5 +1,5 @@
 // src/display/fx/cloudFx.js
-// Plasma cloud, poison cloud, and bubble pop VFX (world-space; display-only).
+// Fire, plasma, poison cloud, and bubble pop VFX (world-space; display-only).
 
 import { startShake } from "../camera/shake.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
@@ -9,6 +9,8 @@ import { BubblePopFx } from "./fxEntries.js";
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getFxTime: () => number, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
  */
 export function createCloudFxController({ world, cam, fx, getFxTime, getPosition }) {
+  /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, pulseFlash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, medium:string }>} */
+  const _fireCloudFx = new Map();
   /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, flash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number }>} */
   const _plasmaCloudFx = new Map();
   /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, pulseFlash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, medium:string, bubbleClock:number }>} */
@@ -17,6 +19,7 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   const _poisonBubblePops = [];
 
   function clearTransientCloudState() {
+    _fireCloudFx.clear();
     _plasmaCloudFx.clear();
     _poisonCloudFx.clear();
     _poisonBubblePops.length = 0;
@@ -63,6 +66,29 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         b: 90 + ((Math.random() * 40) | 0),
         a0: 0.52,
         rotVel: (Math.random() - 0.5) * 0.9,
+      }));
+    }
+  }
+
+  function spawnFireCloudEmbers(x, y, count = 8) {
+    if (!fx?.pool) return;
+    for (let i = 0; i < count; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+      const speed = 0.18 + Math.random() * 0.55;
+      fx.pool.spawn(new Particle({
+        x: x + (Math.random() - 0.5) * 0.28,
+        y: y + 0.10 + (Math.random() - 0.5) * 0.12,
+        vx: Math.cos(angle) * speed * 0.45,
+        vy: Math.sin(angle) * speed - 0.10,
+        ay: -0.06,
+        life: 0.18 + Math.random() * 0.24,
+        size0: 0.07 + Math.random() * 0.06,
+        size1: 0.01,
+        r: 255,
+        g: 100 + ((Math.random() * 120) | 0),
+        b: 10 + ((Math.random() * 28) | 0),
+        a0: 0.72,
+        rotVel: (Math.random() - 0.5) * 1.9,
       }));
     }
   }
@@ -127,6 +153,24 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   // --- Tick ---
   /** @param {number} dt */
   function tick(dt) {
+    // Fire hazards
+    for (const [hazardId, cloud] of _fireCloudFx) {
+      cloud.pulseFlash = Math.max(0, cloud.pulseFlash - dt);
+      if (cloud.fading) {
+        cloud.fadeLeft = Math.max(0, cloud.fadeLeft - dt);
+        if (cloud.fadeLeft <= 0) {
+          _fireCloudFx.delete(hazardId);
+        }
+        continue;
+      }
+      if (!world.isAlive(hazardId)) {
+        cloud.fading = true;
+        cloud.fadeMax = 0.35;
+        cloud.fadeLeft = Math.max(cloud.fadeLeft, cloud.fadeMax);
+        cloud.pulseFlash = Math.max(cloud.pulseFlash, 0.10);
+      }
+    }
+
     // Plasma clouds
     for (const [cloudId, cloud] of _plasmaCloudFx) {
       cloud.flash = Math.max(0, cloud.flash - dt);
@@ -184,6 +228,67 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       _poisonBubblePops[i].tick(dt);
       if (_poisonBubblePops[i].expired) _poisonBubblePops.splice(i, 1);
     }
+  }
+
+  // --- Draw: Fire hazards ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawFire(ctx) {
+    if (!_fireCloudFx.size) return;
+    ctx.save();
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+
+    for (const cloud of _fireCloudFx.values()) {
+      const cx = cloud.x;
+      const cy = cloud.y;
+      const r = Math.max(0, cloud.radius | 0);
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 9.5 + cloud.phase);
+      const flicker = 0.5 + 0.5 * Math.sin(_fxTime * 16.0 + cloud.phase * 0.7);
+      const lifeFactor = Math.max(0.30, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+      const fadeFactor = cloud.fading
+        ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+        : 1;
+      const flashBoost = cloud.pulseFlash > 0 ? (cloud.pulseFlash / 0.18) : 0;
+      const alphaScale = lifeFactor * fadeFactor;
+
+      ctx.globalCompositeOperation = 'lighter';
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const dist = Math.max(Math.abs(dx), Math.abs(dy));
+          if (dist > r) continue;
+
+          const tx = cx + dx;
+          const ty = cy + dy;
+          const bedR = 0.42 + 0.06 * pulse;
+          const glow = ctx.createRadialGradient(tx, ty + 0.06, 0.02, tx, ty + 0.06, bedR + 0.20);
+          glow.addColorStop(0, `rgba(255,230,160,${((0.18 + pulse * 0.10 + flashBoost * 0.12) * alphaScale).toFixed(3)})`);
+          glow.addColorStop(0.55, `rgba(255,112,24,${((0.12 + flicker * 0.10 + flashBoost * 0.10) * alphaScale).toFixed(3)})`);
+          glow.addColorStop(1, 'rgba(110,18,0,0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(tx, ty + 0.06, bedR + 0.20, 0, TAU);
+          ctx.fill();
+
+          const tongues = 2 + (Math.random() < 0.35 ? 1 : 0);
+          for (let i = 0; i < tongues; i++) {
+            const ox = (i - (tongues - 1) * 0.5) * 0.10;
+            const sway = Math.sin(_fxTime * (10.0 + i * 1.4) + cloud.phase + dx * 0.6 + dy * 0.45) * 0.04;
+            const height = 0.22 + 0.08 * flicker + (i === 1 ? 0.06 : 0);
+            const width = 0.09 + 0.02 * pulse;
+            ctx.fillStyle = `rgba(255,135,30,${((0.18 + 0.18 * flicker) * alphaScale).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.ellipse(tx + ox + sway, ty + 0.08, width, height, 0, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = `rgba(255,235,180,${((0.11 + 0.10 * pulse) * alphaScale).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.ellipse(tx + ox * 0.75 + sway * 0.6, ty + 0.02, width * 0.55, height * 0.52, 0, 0, TAU);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    ctx.restore();
   }
 
   // --- Draw: Poison clouds ---
@@ -504,6 +609,33 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
 
     world.on('hazard:spawned', ({ hazardId, kind, at, radius, turnsLeft, medium }) => {
+      if (String(kind || '').toLowerCase() === 'fire') {
+        if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+        const id = Number(hazardId || 0) | 0;
+        if (!(id > 0)) return;
+        const r = Math.max(0, Number(radius || 0) | 0);
+        const ttl = Math.max(1, Number(turnsLeft || 1) | 0);
+        _fireCloudFx.set(id, {
+          x: at.x,
+          y: at.y,
+          radius: r,
+          turnsLeft: ttl,
+          maxTurns: ttl,
+          pulseFlash: 0.18,
+          phase: Math.random() * Math.PI * 2,
+          fading: false,
+          fadeLeft: 0,
+          fadeMax: 0,
+          medium: String(medium || 'floor').toLowerCase() === 'floor' ? 'floor' : 'air',
+        });
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+            spawnFireCloudEmbers(at.x + dx, at.y + dy, 3);
+          }
+        }
+        return;
+      }
       if (String(kind || '').toLowerCase() !== 'poison') return;
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       const id = Number(hazardId || 0) | 0;
@@ -539,6 +671,42 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
 
     world.on('hazard:pulse', ({ hazardId, kind, at, radius, turnsLeft, affectedIds, medium }) => {
+      if (String(kind || '').toLowerCase() === 'fire') {
+        const id = Number(hazardId || 0) | 0;
+        if (!(id > 0)) return;
+        const r = Math.max(0, Number(radius || 0) | 0);
+        const ttl = Math.max(0, Number(turnsLeft || 0) | 0);
+        const prev = _fireCloudFx.get(id);
+        const next = {
+          x: (at && Number.isFinite(at.x)) ? at.x : (prev?.x ?? 0),
+          y: (at && Number.isFinite(at.y)) ? at.y : (prev?.y ?? 0),
+          radius: r,
+          turnsLeft: ttl,
+          maxTurns: Math.max(prev?.maxTurns ?? 0, ttl),
+          pulseFlash: 0.20,
+          phase: prev?.phase ?? (Math.random() * Math.PI * 2),
+          fading: false,
+          fadeLeft: 0,
+          fadeMax: 0,
+          medium: String(medium || prev?.medium || 'floor').toLowerCase() === 'floor' ? 'floor' : 'air',
+        };
+        _fireCloudFx.set(id, next);
+        if (Array.isArray(affectedIds) && affectedIds.length > 0) {
+          for (let i = 0; i < affectedIds.length; i++) {
+            const pos = getPosition(Number(affectedIds[i] || 0));
+            if (!pos) continue;
+            spawnFireCloudEmbers(pos.x, pos.y, 5);
+          }
+        } else {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+              if (Math.random() < 0.35) spawnFireCloudEmbers(next.x + dx, next.y + dy, 2);
+            }
+          }
+        }
+        return;
+      }
       if (String(kind || '').toLowerCase() !== 'poison') return;
       const id = Number(hazardId || 0) | 0;
       if (!(id > 0)) return;
@@ -592,6 +760,23 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
 
     world.on('hazard:expired', ({ hazardId, kind, at, radius }) => {
+      if (String(kind || '').toLowerCase() === 'fire') {
+        const id = Number(hazardId || 0) | 0;
+        if (!(id > 0)) return;
+        const cloud = _fireCloudFx.get(id);
+        if (!cloud) return;
+        if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) {
+          cloud.x = at.x;
+          cloud.y = at.y;
+        }
+        if (Number.isFinite(radius)) cloud.radius = Math.max(0, Number(radius) | 0);
+        cloud.fading = true;
+        cloud.fadeMax = 0.30;
+        cloud.fadeLeft = cloud.fadeMax;
+        cloud.pulseFlash = Math.max(cloud.pulseFlash, 0.10);
+        spawnFireCloudEmbers(cloud.x, cloud.y, 4);
+        return;
+      }
       if (String(kind || '').toLowerCase() !== 'poison') return;
       const id = Number(hazardId || 0) | 0;
       if (!(id > 0)) return;
@@ -614,5 +799,5 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
   }
 
-  return { tick, drawPoison, drawPlasma, installListeners };
+  return { tick, drawFire, drawPoison, drawPlasma, installListeners };
 }

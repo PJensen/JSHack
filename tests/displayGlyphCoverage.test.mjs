@@ -8,7 +8,7 @@ import { buildWorldView } from "../src/bridge/schema/worldView.js";
 
 Deno.test("palette includes shock trap and special weapon glyph keys", () => {
   const palette = buildPalette();
-  for (const key of ["trap_shock", "ember_knife", "flametongue", "ashen_reaver", "nightfang_dagger", "venomfang_dagger", "nightfang", "venomfang"]) {
+  for (const key of ["trap_shock", "dragon_whelp", "ember_knife", "flametongue", "ashen_reaver", "nightfang_dagger", "venomfang_dagger", "nightfang", "venomfang"]) {
     assert(palette[key], `missing palette key: ${key}`);
   }
 });

@@ -54,6 +54,12 @@ export function pickMonster(rng, depth, monsterFilter = null) {
     if (rare && !isGenocided('cave_bear')) def = rare;
   }
 
+  // Rare upgrade: bat has a 2% chance to be an early dragon sighting.
+  if (def.id === 'bat' && rng.next() < 0.02) {
+    const rare = getMonster('dragon_whelp');
+    if (rare && !isGenocided('dragon_whelp')) def = rare;
+  }
+
   return toMonsterSpawnParams(def, depth);
 }
 

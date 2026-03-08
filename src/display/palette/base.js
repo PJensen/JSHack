@@ -20,6 +20,7 @@ export const basePalette = {
   cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
   floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
   pit_viper: { glyph: "S", fg: "#44dd44", glow: "#22aa22" },
+  dragon_whelp: { glyph: "D", fg: "#ff8a2b", glow: "#ff5a12" },
   skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },

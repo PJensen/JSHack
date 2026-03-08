@@ -175,6 +175,8 @@ export function aiChaseSystem(world) {
             target:    playerId,
             actorPos:  { x: pos.x | 0, y: pos.y | 0 },
             targetPos: { x: playerPos.x | 0, y: playerPos.y | 0 },
+            canActThisTurn,
+            hasQueuedMove,
           });
           runCallbackList(onSeenHooks, seenCtx);
           if (seenCtx.handled || seenCtx.cancelled) return;
@@ -210,8 +212,11 @@ export function aiChaseSystem(world) {
           target:    playerId,
           actorPos:  { x: pos.x | 0, y: pos.y | 0 },
           targetPos: { x: playerPos.x | 0, y: playerPos.y | 0 },
+          canActThisTurn,
+          hasQueuedMove,
         });
         runCallbackList(whileLOSHooks, losCtx);
+        if (losCtx.handled || losCtx.cancelled) return;
       }
     } else {
       // No LOS — tick down the search budget.
