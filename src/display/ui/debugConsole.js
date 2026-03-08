@@ -12,8 +12,16 @@ export function initDebugConsole({ world, messageLog }) {
   if (/** @type {any} */ (world)[_installed]) return /** @type {any} */ (world)[_installed];
 
   const commands = new Map();
-  const history = [];       // command input history
-  let historyIdx = -1;
+  const HISTORY_KEY = 'jshack:debugConsole:history';
+  const HISTORY_MAX = 100;
+  let history;
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    history = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(history)) history = [];
+    history = history.slice(-HISTORY_MAX);
+  } catch { history = []; }
+  let historyIdx = history.length;
   const outputLines = [];   // { text, type:'cmd'|'ok'|'err' }
   let open = false;
 
@@ -85,6 +93,7 @@ export function initDebugConsole({ world, messageLog }) {
     flex: '1',
     background: 'transparent', border: 'none', outline: 'none',
     color: '#e6f2ff', fontFamily: 'monospace', fontSize: '14px',
+    lineHeight: '1.4', padding: '2px 0',
     caretColor: '#5fb3ff',
     userSelect: 'text', WebkitUserSelect: 'text',
   });
@@ -136,7 +145,9 @@ export function initDebugConsole({ world, messageLog }) {
     const trimmed = raw.trim();
     if (!trimmed) return;
     history.push(trimmed);
+    if (history.length > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX);
     historyIdx = history.length;
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
     appendOutput(trimmed, 'cmd');
 
     const spaceIdx = trimmed.indexOf(' ');
@@ -188,7 +199,7 @@ export function initDebugConsole({ world, messageLog }) {
     if (!open) return;
 
     // Console is open — claim ALL keys so lockdown/InputManager cannot intercept.
-    e.stopPropagation();
+    e.stopImmediatePropagation();
 
     if (e.key === 'Escape') {
       e.preventDefault();
