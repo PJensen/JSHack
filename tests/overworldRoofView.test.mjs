@@ -19,6 +19,10 @@ function roofHas(view, x, y) {
   return Array.isArray(view.roofs) && view.roofs.some((roof) => roof.x === x && roof.y === y);
 }
 
+function roofAt(view, x, y) {
+  return Array.isArray(view.roofs) ? view.roofs.find((roof) => roof.x === x && roof.y === y) ?? null : null;
+}
+
 Deno.test("overworld roofs appear from outside and hide only the building the player is inside", () => {
   clearAll();
   clearExplored();
@@ -38,6 +42,8 @@ Deno.test("overworld roofs appear from outside and hide only the building the pl
   assert(roofHas(view, houseInterior.x, houseInterior.y), "house roof should show while the player is outside");
   assert(roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should show while the player is outside");
   assert(roofHas(view, windmillInterior.x, windmillInterior.y), "windmill roof should show while the player is outside");
+  assert(!view.isVisible?.(houseInterior.x, houseInterior.y), "house interior should still be hidden by walls while the player is outside");
+  assert(roofAt(view, houseInterior.x, houseInterior.y)?.alpha === 1, "house roof should still render at full alpha while the shell is visible");
 
   world.set(player, Position, houseInterior);
   view = buildWorldView(world);
