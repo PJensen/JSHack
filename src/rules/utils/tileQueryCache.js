@@ -6,6 +6,7 @@ import { Vitality } from "../components/Vitality.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
+import { Flying } from "../components/Flying.js";
 
 /** @typedef {{ byCell: Map<string, number[]>, itemsByCell: Map<string, number[]>, livingByCell: Map<string, number>, interactableByCell: Map<string, number>, blockedByCell: Set<string>, lastStep: number }} TileQueryState */
 
@@ -75,7 +76,8 @@ function _rebuild(world) {
 
     const vit = world.get(id, Vitality);
     if (vit && (vit.hp ?? 0) > 0) {
-      st.blockedByCell.add(k);
+      // Flying entities don't block ground-level movement
+      if (!world.has(id, Flying)) st.blockedByCell.add(k);
       if (!st.livingByCell.has(k)) st.livingByCell.set(k, id);
     }
 

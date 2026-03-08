@@ -27,6 +27,25 @@ _walkable[TILE_ICE]           = 1;
 _walkable[TILE_SHALLOW_WATER] = 1;
 _walkable[TILE_LAVA]          = 1;
 
+// Precomputed flyability per tile type — everything except void and wall.
+// Flying entities can cross water, lava, trees, mountains, etc.
+const _flyable = new Uint8Array(32);
+_flyable[TILE_FLOOR]         = 1;
+_flyable[TILE_DOOR]          = 1;
+_flyable[TILE_STAIR_DOWN]    = 1;
+_flyable[TILE_STAIR_UP]      = 1;
+_flyable[TILE_GRASS]         = 1;
+_flyable[TILE_GRASS_A]       = 1;
+_flyable[TILE_GRASS_C]       = 1;
+_flyable[TILE_GRASS_D]       = 1;
+_flyable[TILE_ICE]           = 1;
+_flyable[TILE_SHALLOW_WATER] = 1;
+_flyable[TILE_LAVA]          = 1;
+_flyable[TILE_MOUNTAIN]      = 1;
+_flyable[TILE_MOUNTAIN_B]    = 1;
+_flyable[TILE_MOUNTAIN_C]    = 1;
+_flyable[TILE_TREE]          = 1;
+
 // Precomputed opacity per tile type
 const _opaque = new Uint8Array(32);
 _opaque[TILE_WALL]       = 1;
@@ -119,6 +138,16 @@ export function isLoaded(x, y) {
  */
 export function isWalkable(x, y) {
   return _walkable[getTile(x, y)] === 1;
+}
+
+/**
+ * Flyable check: flying entities can cross all terrain except void and walls.
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function isFlyable(x, y) {
+  return _flyable[getTile(x, y)] === 1;
 }
 
 /**

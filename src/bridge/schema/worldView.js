@@ -24,6 +24,7 @@ import { Faction } from '../../rules/components/Faction.js';
 import { Pet } from '../../rules/components/Pet.js';
 import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 import { getMonsterTags } from '../../rules/data/monsters.js';
+import { Flying } from '../../rules/components/Flying.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -277,6 +278,7 @@ export function buildWorldView(world) {
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
+			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 
 			_allEntities.push(rec);
 
@@ -334,6 +336,7 @@ export function buildWorldView(world) {
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');
+			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 
 			_allEntities.push(rec);
 			if (isPlayer) {

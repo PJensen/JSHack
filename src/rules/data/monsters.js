@@ -71,6 +71,7 @@ export const MONSTERS = [
     name: 'Bat',
     tags: ['beast', 'vermin'],
     tier: 0,
+    canFly: true,
     intelligence: 2,   // basic animal instinct
     aggro: 'passive',  // doesn't attack on sight — only when struck
     baseHp: 3,
@@ -229,6 +230,7 @@ export const MONSTERS = [
     name: 'Dragon Whelp',
     tags: ['beast', 'draconic', 'rare', 'glowing'],
     tier: 0,
+    canFly: true,
     rare: true,
     intelligence: 6,   // cunning enough to hold lanes and punish open sight lines
     visionRange: 9,
@@ -627,6 +629,7 @@ export const MONSTERS = [
     name: 'Dragon',
     tags: ['beast', 'draconic'],
     tier: 3,
+    canFly: true,
     intelligence: 8,   // apex predator — territorial and cunning
     retreatHpPct: 0.15,
     baseHp: 50,

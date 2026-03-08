@@ -950,4 +950,15 @@ export function installMessageWiring({
   world.on('proc:gaze:stun', () => {
     log('The Floating Eye\'s gaze locks your mind — you are stunned!', 'danger');
   });
+
+  // === Flying events ===
+  world.on('proc:fly:takeoff', ({ name }) => {
+    log(`The ${name || 'creature'} takes to the air!`, 'system');
+  });
+  world.on('proc:fly:land', ({ name }) => {
+    log(`The ${name || 'creature'} lands.`, 'system');
+  });
+  world.on('combat:target-flying', () => {
+    log('Out of reach!', 'info');
+  });
 }
