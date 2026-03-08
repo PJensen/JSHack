@@ -11,6 +11,8 @@ import { Brain } from "../src/rules/components/Brain.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Status } from "../src/rules/components/Status.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
+import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
+import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 
 function makeEquipItem(world, identity, name, slot) {
   const id = world.create();
@@ -140,4 +142,70 @@ Deno.test("character data dedupes effect/status aliases into one active effect r
   const activeEffects = Array.isArray(payload?.activeEffects) ? payload.activeEffects : [];
   const poisonedRows = activeEffects.filter((entry) => String(entry?.key || "") === "poisoned");
   assertEquals(poisonedRows.length, 1, "poison alias rows should collapse to one canonical poisoned entry");
+});
+
+Deno.test("settings data exposes monster ids for spawn autocomplete", () => {
+  const world = new World({ seed: 123 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any} */
+  let payload = null;
+  const onSettingsData = (ev) => {
+    payload = ev?.detail || null;
+  };
+  addEventListener("ui:settingsData", onSettingsData);
+  dispatchEvent(new CustomEvent("ui:requestSettingsData"));
+  removeEventListener("ui:settingsData", onSettingsData);
+
+  assert(payload, "expected ui:settingsData payload");
+  const monsterIds = Array.isArray(payload?.allMonsterIds) ? payload.allMonsterIds : [];
+  assert(monsterIds.includes("goblin"), "settings autocomplete should include goblin");
+  assert(monsterIds.includes("rat"), "settings autocomplete should include rat");
+});
+
+Deno.test("settings debug spawn spawns the selected monster near the player", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+
+    const world = new World({ seed: 321 });
+    const player = world.create();
+    world.add(player, Player, {});
+    world.add(player, Position, { x: 10, y: 10 });
+
+    installInventoryDataProvider({
+      world,
+      getActiveSpellId: () => null,
+      isSimUiBlocked: () => false,
+      getMessageLog: () => ({ getEntries: () => [] }),
+      tombstoneRepo: { getAll: () => [] },
+    });
+
+    dispatchEvent(new CustomEvent("ui:debugSpawnMonster", {
+      detail: { monsterId: "goblin" },
+    }));
+
+    let spawned = null;
+    for (const [id, ident, pos] of world.query(NamedIdentity, Position)) {
+      if (id === player) continue;
+      if (String(ident?.identity || "") !== "goblin") continue;
+      spawned = { id, pos };
+      break;
+    }
+
+    assert(spawned, "expected goblin to spawn from settings event");
+    assertEquals(Math.abs(spawned.pos.x - 10) + Math.abs(spawned.pos.y - 10), 1);
+  } finally {
+    clearAll();
+  }
 });
