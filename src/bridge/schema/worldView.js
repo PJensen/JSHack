@@ -25,6 +25,7 @@ import { Pet } from '../../rules/components/Pet.js';
 import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
+import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -192,6 +193,7 @@ export function buildWorldView(world) {
 
 	// Expose tile grid functions for direct grid-based rendering
 	_view.tileGrid = { getTile, forEachTileInRect };
+	let playerVisionRadius = 0;
 
 	for (const [id, _p, pos] of world.query(Player, Position)) {
 		_view.player = { id, pos: { x: pos.x, y: pos.y } };
@@ -205,6 +207,7 @@ export function buildWorldView(world) {
 			const brain = world.get(_view.player.id, Brain);
 			const eq = world.get(_view.player.id, Equipment);
 			const radius = (brain?.visionRange ?? 8) + (eq?.visionRangeDerived ?? 0);
+			playerVisionRadius = radius;
 			const pad = 2;
 			const bounds = {
 				x0: _view.player.pos.x - radius - pad,
@@ -228,6 +231,7 @@ export function buildWorldView(world) {
 		const brain = world.get(_view.player.id, Brain);
 		const eq2 = world.get(_view.player.id, Equipment);
 		const radius = (brain?.visionRange ?? 8) + (eq2?.visionRangeDerived ?? 0);
+		playerVisionRadius = radius;
 		const viewR = (radius | 0) + 4;
 		const x0 = _view.player.pos.x - viewR;
 		const y0 = _view.player.pos.y - viewR;
@@ -361,7 +365,14 @@ export function buildWorldView(world) {
 			_view.entities.push(rec);
 			continue;
 		}
-		if (isVisible(rec.pos.x, rec.pos.y)) {
+		const aerialVisible = !!(_view.player && hasOverworldAerialLOS(world, {
+			sourceId: _view.player.id,
+			targetId: rec.id,
+			sourcePos: _view.player.pos,
+			targetPos: rec.pos,
+			range: playerVisionRadius,
+		}));
+		if (isVisible(rec.pos.x, rec.pos.y) || aerialVisible) {
 			_view.entities.push(rec);
 		}
 	}

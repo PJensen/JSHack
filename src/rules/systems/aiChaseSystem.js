@@ -38,6 +38,7 @@ import { forEachInRadius }   from "../utils/spatialIndex.js";
 import { statusStrength }    from "../utils/statusFacade.js";
 import { hasLOS }            from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
+import { hasOverworldAerialLOS } from "../utils/flyingEligibility.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
@@ -128,10 +129,18 @@ export function aiChaseSystem(world) {
     // Perception is driven by Brain data rather than action cadence.
     const sightRange = Math.max(0, Math.trunc(Number(brain?.visionRange ?? def?.visionRange ?? 8)));
     const withinSightRange = chebyshevDistance(pos.x, pos.y, playerPos.x, playerPos.y) <= sightRange;
-    const canSee = withinSightRange && hasLOS(
-      pos.x | 0, pos.y | 0,
-      playerPos.x | 0, playerPos.y | 0,
-      ensureBlockedMap(),
+    const canSee = withinSightRange && (
+      hasOverworldAerialLOS(world, {
+        sourceId: id,
+        targetId: playerId,
+        sourcePos: pos,
+        targetPos: playerPos,
+        range: sightRange,
+      }) || hasLOS(
+        pos.x | 0, pos.y | 0,
+        playerPos.x | 0, playerPos.y | 0,
+        ensureBlockedMap(),
+      )
     );
 
     // ── Alert level transitions ─────────────────────────────────────

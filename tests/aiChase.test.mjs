@@ -8,6 +8,8 @@ import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../src/rules/components/AggroState.js';
 import { Brain } from '../src/rules/components/Brain.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
+import { Flying } from '../src/rules/components/Flying.js';
+import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { aiChaseSystem } from '../src/rules/systems/aiChaseSystem.js';
 import { clearAll, isWalkable, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
@@ -22,6 +24,18 @@ function addHuntingAggro(world, id, playerX, playerY) {
     searchTurnsLeft: SEARCH_TURNS_HUNTING_GRACE,
     retreating: false,
   });
+}
+
+function addDungeonState(world, depth, profileType = 'default') {
+  const id = world.create();
+  world.add(id, DungeonState, {
+    worldSeed: 1,
+    currentDepth: depth,
+    profileType,
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+  return id;
 }
 
 // Chase direction tests ─────────────────────────────────────────────────────
@@ -172,6 +186,70 @@ Deno.test("no player → AI chase is a no-op", () => {
   addHuntingAggro(world, lonely, 0, 0);
   aiChaseSystem(world);
   assert(!world.has(lonely, MoveIntent), 'no player means no chase');
+});
+
+Deno.test("flying enemy in overworld keeps LOS through terrain blockers", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[0 * CHUNK_SIZE + 2] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 4 });
+  addDungeonState(world, 0, 'overworld');
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, NamedIdentity, { name: 'Hero', identity: 'player' });
+
+  const flyer = world.create();
+  world.add(flyer, Position, { x: 4, y: 0 });
+  world.add(flyer, NamedIdentity, { name: 'Dragon Whelp', identity: 'dragon_whelp' });
+  world.add(flyer, Faction, { key: 'enemy' });
+  world.add(flyer, Flying, {});
+  world.add(flyer, Brain, { visionRange: 8 });
+  world.add(flyer, AggroState, {
+    alertLevel: AGGRO_LEVELS.unaware,
+    lastKnownX: 0, lastKnownY: 0, searchTurnsLeft: 0, retreating: false,
+  });
+
+  aiChaseSystem(world);
+
+  const aggro = world.get(flyer, AggroState);
+  assertEquals(aggro.alertLevel, AGGRO_LEVELS.hunting, 'overworld flyer should acquire player despite wall cover');
+});
+
+Deno.test("flying enemy in caves still respects blocked LOS", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[0 * CHUNK_SIZE + 2] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 5 });
+  addDungeonState(world, 5, 'caves');
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, NamedIdentity, { name: 'Hero', identity: 'player' });
+
+  const flyer = world.create();
+  world.add(flyer, Position, { x: 4, y: 0 });
+  world.add(flyer, NamedIdentity, { name: 'Dragon Whelp', identity: 'dragon_whelp' });
+  world.add(flyer, Faction, { key: 'enemy' });
+  world.add(flyer, Flying, {});
+  world.add(flyer, Brain, { visionRange: 8 });
+  world.add(flyer, AggroState, {
+    alertLevel: AGGRO_LEVELS.unaware,
+    lastKnownX: 0, lastKnownY: 0, searchTurnsLeft: 0, retreating: false,
+  });
+
+  aiChaseSystem(world);
+
+  const aggro = world.get(flyer, AggroState);
+  assertEquals(aggro.alertLevel, AGGRO_LEVELS.unaware, 'cave flyer should not see through bedrock corners');
 });
 
 // Passive aggro ─────────────────────────────────────────────────────────────
