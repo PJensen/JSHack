@@ -285,23 +285,30 @@ export function initOverlays() {
     }
     if (e.key === 'Escape') {
       // Close every ui-panel that is currently visible
+      let closed = false;
       for (const p of document.querySelectorAll('.ui-panel')) {
-        if (p.style.display === 'block') p.style.display = 'none';
+        if (p.style.display === 'block') {
+          hide(/** @type {HTMLDivElement} */ (p));
+          closed = true;
+        }
       }
-      hideItemTooltip();
       // Close debug graphs
       if (memoryGraph.canvas.style.display === 'block') {
         memoryGraph.hide();
         memoryGraph.stopSampling();
+        closed = true;
       }
       if (deityGraph.canvas.style.display === 'block') {
         deityGraph.hide();
         deityGraph.stopSampling();
+        closed = true;
       }
       if ((/** @type {any} */ (ticker))._expanded) {
         (/** @type {any} */ (ticker))._expanded = false;
         renderMessageTicker(ticker, (/** @type {any} */ (ticker))._entries || []);
+        closed = true;
       }
+      if (closed) e.preventDefault();
     }
   });
 
@@ -482,6 +489,18 @@ export function initOverlays() {
     _alchemyState.benchId = Number(d.benchId || 0) | 0;
     show(alchemy);
     renderAlchemyBench(alchemy, _alchemyState);
+    const escKey = (/** @type {KeyboardEvent} */ ke) => {
+      if (alchemy.style.display !== 'block') return;
+      if (ke.key === 'Escape') { hide(alchemy); ke.preventDefault(); }
+    };
+    window.addEventListener('keydown', escKey);
+    const obs = new MutationObserver(() => {
+      if (alchemy.style.display === 'none') {
+        window.removeEventListener('keydown', escKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(alchemy, { attributes: true, attributeFilter: ['style'] });
   });
   window.addEventListener('ui:closeAlchemyBench', () => {
     _alchemyState.benchId = 0;
@@ -514,6 +533,18 @@ export function initOverlays() {
     _cookingState.fireId = Number(d.fireId || 0) | 0;
     show(cooking);
     renderCookingFire(cooking, _cookingState);
+    const escKey = (/** @type {KeyboardEvent} */ ke) => {
+      if (cooking.style.display !== 'block') return;
+      if (ke.key === 'Escape') { hide(cooking); ke.preventDefault(); }
+    };
+    window.addEventListener('keydown', escKey);
+    const obs = new MutationObserver(() => {
+      if (cooking.style.display === 'none') {
+        window.removeEventListener('keydown', escKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(cooking, { attributes: true, attributeFilter: ['style'] });
   });
   window.addEventListener('ui:closeCookingFire', () => {
     _cookingState.fireId = 0;
@@ -2151,6 +2182,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
         e.preventDefault();
       }
     }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 't' || k === 'T') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } })); hide(panel); e.preventDefault(); } }
     else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
     else if (k === 'p' || k === 'P') {
@@ -2616,6 +2648,7 @@ function renderCharacterSheet(panel, data) {
       window.dispatchEvent(new CustomEvent('ui:openInventory'));
       e.preventDefault();
     }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'e' || k === 'E') {
       window.dispatchEvent(new CustomEvent('ui:openEquipment'));
       e.preventDefault();
@@ -2906,6 +2939,7 @@ function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId =
       window.dispatchEvent(new CustomEvent('ui:openInventory'));
       e.preventDefault();
     }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'c' || k === 'C') {
       window.dispatchEvent(new CustomEvent('ui:openCharacter'));
       e.preventDefault();
@@ -3334,6 +3368,7 @@ function renderPickupChooser(panel, items) {
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
     else if (k === ' ') { checkboxes[sel].checked = !checkboxes[sel].checked; checkboxes[sel].dispatchEvent(new Event('change')); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { selections.size ? takeSelected() : takeAll(); e.preventDefault(); }
   }
 
@@ -3440,6 +3475,7 @@ function renderUseChooser(panel, items) {
     const k = e.key;
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { useSelected(); e.preventDefault(); }
     else if (k === 't' || k === 'T') {
       const it = items[sel];
@@ -3548,6 +3584,7 @@ function renderThrowChooser(panel, items) {
     const k = e.key;
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { throwSelected(); e.preventDefault(); }
   }
 
@@ -3629,6 +3666,7 @@ function renderApplyToolChooser(panel, tools, onSelect) {
     const k = e.key;
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { pickTool(); e.preventDefault(); }
   }
   window.addEventListener('keydown', onKey);
@@ -3718,6 +3756,7 @@ function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
     const k = e.key;
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { pickTarget(); e.preventDefault(); }
   }
   window.addEventListener('keydown', onKey);
@@ -3866,6 +3905,7 @@ function renderShop(panel, data, state) {
       const k = e.key;
       if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
       else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { returnSelected(); e.preventDefault(); }
       else if (k === 'p' || k === 'P') { payBill(); e.preventDefault(); }
     }
@@ -4003,6 +4043,7 @@ function renderShop(panel, data, state) {
       const k = e.key;
       if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
       else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
       else if (k === 'Tab') {
         e.preventDefault();
@@ -4167,6 +4208,7 @@ function renderChest(panel, data, state) {
       const k = e.key;
       if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
       else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
       else if (k === 'Tab') {
         e.preventDefault();
@@ -4589,6 +4631,7 @@ function renderDeathLog(panel, records) {
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(records.length - 1); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
   }
 
   setSel(0);
@@ -4846,6 +4889,7 @@ function renderRack(panel, data, state) {
     const k = e.key;
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { doTake(); e.preventDefault(); }
   }
 
