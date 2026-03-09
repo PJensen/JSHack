@@ -9,10 +9,15 @@ import { NamedIdentity }  from "../src/rules/components/NamedIdentity.js";
 import { Faction }        from "../src/rules/components/Faction.js";
 import { Collider }       from "../src/rules/components/Collider.js";
 import { DoorState }      from "../src/rules/components/DoorState.js";
+import { Interactable }   from "../src/rules/components/Interactable.js";
 import { MoveIntent }     from "../src/rules/components/Intents/MoveIntent.js";
 import { DungeonState }   from "../src/rules/components/DungeonState.js";
+import { ObjectState } from "../src/rules/components/ObjectState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../src/rules/components/TownfolkJob.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
+import { Inventory } from "../src/rules/components/Inventory.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { NamedIdentity as ItemNamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/systems/aiTownfolkSystem.js";
 import { aiChaseSystem }    from "../src/rules/systems/aiChaseSystem.js";
 import { clearAll, loadChunk, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
@@ -20,6 +25,9 @@ import {
   CHUNK_SIZE, TILE_FLOOR, TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_WALL, TILE_DOOR,
 } from "../src/rules/environment/dungeon/constants.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
+import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
+import { createItemById } from "../src/rules/utils/itemFactory.js";
+import { Unpaid } from "../src/rules/components/Unpaid.js";
 
 // ── helpers ────────────────────────────────────────────────────────
 
@@ -53,6 +61,8 @@ function addTownfolk(world, x, y, role, opts = {}) {
   world.add(id, Position, { x, y });
   world.add(id, NamedIdentity, { name: role, identity: `townfolk_${role}` });
   world.add(id, Faction, { key: "townfolk" });
+  world.add(id, Inventory, { capacity: 6 });
+  world.add(id, Equipment, {});
   world.add(id, TownfolkJob, {
     role,
     state:        opts.state        ?? TOWNFOLK_STATES.idle,
@@ -75,9 +85,30 @@ function addTownfolk(world, x, y, role, opts = {}) {
     routineKind:  opts.routineKind  ?? "",
     lastPhase:    opts.lastPhase    ?? "",
     carrying:     opts.carrying     ?? "",
+    deliverX:     opts.deliverX     ?? 0,
+    deliverY:     opts.deliverY     ?? 0,
     stuckTurns:   opts.stuckTurns   ?? 0,
   });
+  if (role === "miner") {
+    const pickId = createItemById(world, "iron_pickaxe");
+    addToInventory(world, id, pickId);
+    world.set(id, Equipment, { ...world.get(id, Equipment), weapon: pickId });
+  }
+  if (role === "woodcutter") {
+    const hatchetId = createItemById(world, "tool_hatchet");
+    addToInventory(world, id, hatchetId);
+    world.set(id, Equipment, { ...world.get(id, Equipment), weapon: hatchetId });
+  }
   return id;
+}
+
+function countInventory(world, ownerId, identity) {
+  let total = 0;
+  for (const itemId of inventoryItems(world, ownerId)) {
+    const ni = world.get(itemId, ItemNamedIdentity);
+    if (ni?.identity === identity) total++;
+  }
+  return total;
 }
 
 // ── tests ──────────────────────────────────────────────────────────
@@ -234,6 +265,8 @@ Deno.test("woodcutter chops adjacent tree tile on work completion", () => {
 
   assertEquals(getTile(8, 5), TILE_GRASS, "tree should be replaced with grass");
   assert(chopped, "townfolk:chopped event should fire");
+  assertEquals(countInventory(world, npc, "material_lumber"), 1, "woodcutter should carry lumber");
+  assertEquals(countInventory(world, npc, "fuel_firewood"), 1, "woodcutter should carry firewood");
   const job = world.get(npc, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.returning, "should be returning with wood");
 });
@@ -252,6 +285,12 @@ Deno.test("mason repairs destroyed tile on work completion", () => {
   // Set the tile to match the destroyed record
   setTile(8, 5, TILE_FLOOR);
 
+  const lumberChest = world.create();
+  world.add(lumberChest, Position, { x: 9, y: 5 });
+  world.add(lumberChest, Inventory, { capacity: 30 });
+  world.add(lumberChest, ItemNamedIdentity, { name: "Lumber Chest", identity: "lumber_chest" });
+  addToInventory(world, lumberChest, createItemById(world, "material_lumber"));
+
   const npc = addTownfolk(world, 8, 5, "mason", {
     state: TOWNFOLK_STATES.working,
     workTurns: 0,
@@ -267,6 +306,7 @@ Deno.test("mason repairs destroyed tile on work completion", () => {
 
   assertEquals(getTile(8, 5), TILE_TREE, "tile should be restored to original");
   assert(repaired, "townfolk:repaired event should fire");
+  assertEquals(countInventory(world, lumberChest, "material_lumber"), 0, "repair should consume lumber");
 });
 
 Deno.test("townfolk system does nothing on non-overworld depth", () => {
@@ -383,6 +423,7 @@ Deno.test("miner returns home carrying ore after work", () => {
 
   assert(mined, "townfolk:mined event should fire");
   assert(carrying, "townfolk:carrying event should fire with resource 'ore'");
+  assertEquals(countInventory(world, npc, "ore_iron"), 1, "miner should carry mined ore as an item");
   const job = world.get(npc, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.returning, "miner should be returning home");
   assertEquals(job.targetX, 5, "target should be homeX");
@@ -428,9 +469,45 @@ Deno.test("scheduled farmer alternates between field and mill during work hours"
   aiTownfolkSystem(world);
 
   const job = world.get(farmer, TownfolkJob);
-  assertEquals(job.state, TOWNFOLK_STATES.working);
   assertEquals(job.workSiteKind, "mill");
   assert(milled, "farmer should work the mill during the late work beat");
+  assertEquals(job.state, TOWNFOLK_STATES.returning, "farmer should leave the mill after processing goods");
+});
+
+Deno.test("scheduled farmer can work a solid millstone from an adjacent tile", () => {
+  const world = makeWorld(115);
+  world.step = 34;
+
+  const millstone = world.create();
+  world.add(millstone, Position, { x: 4, y: 4 });
+  world.add(millstone, ItemNamedIdentity, { name: "Millstone", identity: "millstone" });
+  world.add(millstone, Collider, { solid: true, blocksSight: false });
+  world.add(millstone, Interactable, { action: "millGrain", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(millstone, ObjectState, { state: "idle" });
+
+  const millChest = world.create();
+  world.add(millChest, Position, { x: 3, y: 4 });
+  world.add(millChest, Inventory, { capacity: 30 });
+  world.add(millChest, ItemNamedIdentity, { name: "Mill Chest", identity: "chest" });
+  addToInventory(world, millChest, createItemById(world, "food_wheat"));
+
+  const farmer = addTownfolk(world, 4, 5, "farmer", {
+    scheduleEnabled: true,
+    homeX: 8, homeY: 8,
+    bedX: 7, bedY: 8,
+    workX: 12, workY: 12,
+    workAuxX: 4, workAuxY: 4,
+    pubX: 9, pubY: 9,
+  });
+
+  let milled = false;
+  world.on("townfolk:milled", () => { milled = true; });
+
+  for (let i = 0; i < 5; i++) aiTownfolkSystem(world);
+
+  assert(milled, "farmer should mill grain from beside the millstone");
+  assertEquals(countInventory(world, millChest, "food_flour"), 1, "mill chest should receive flour");
+  assertEquals(world.get(millstone, ObjectState)?.state, "working", "millstone should animate as active");
 });
 
 Deno.test("scheduled townfolk heads to the pub after work", () => {
@@ -523,4 +600,140 @@ Deno.test("townfolk pathing aligns to a one-door house exit before heading to an
   const intent = world.get(npc, MoveIntent);
   assertEquals(intent.dx, 0, "townfolk should align with the doorway first");
   assertEquals(intent.dy, -1, "townfolk should head north toward the door");
+});
+
+Deno.test("alchemist brew consumes herbs and reagents from the herb chest", () => {
+  const world = makeWorld(19);
+
+  const chest = world.create();
+  world.add(chest, Position, { x: 8, y: 5 });
+  world.add(chest, Inventory, { capacity: 30 });
+  world.add(chest, ItemNamedIdentity, { name: "Herb Chest", identity: "herb_chest" });
+
+  const herbs = createItemById(world, "food_wild_herbs");
+  const venom = createItemById(world, "reagent_venom_frond");
+  addToInventory(world, chest, herbs);
+  addToInventory(world, chest, venom);
+
+  const npc = addTownfolk(world, 8, 5, "alchemist", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "brew",
+    homeX: 6,
+    homeY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  let brewedAntiVenom = false;
+  for (const [id, unpaid] of world.query(Unpaid)) {
+    if (Number(unpaid.shopkeeperId || 0) !== npc) continue;
+    const ni = world.get(id, ItemNamedIdentity);
+    if (ni?.identity === "potion_anti_venom") brewedAntiVenom = true;
+  }
+
+  assert(brewedAntiVenom, "alchemist should brew an anti-venom potion when venom fronds are available");
+});
+
+Deno.test("villager hauls flour from the mill chest into the tavern chest", () => {
+  const world = makeWorld(20);
+
+  const millChest = world.create();
+  world.add(millChest, Position, { x: 8, y: 5 });
+  world.add(millChest, Inventory, { capacity: 30 });
+  world.add(millChest, ItemNamedIdentity, { name: "Mill Chest", identity: "chest" });
+  addToInventory(world, millChest, createItemById(world, "food_flour"));
+
+  const tavernChest = world.create();
+  world.add(tavernChest, Position, { x: 12, y: 5 });
+  world.add(tavernChest, Inventory, { capacity: 30 });
+  world.add(tavernChest, ItemNamedIdentity, { name: "Tavern Chest", identity: "tavern_chest" });
+
+  const npc = addTownfolk(world, 8, 5, "villager", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "haul_flour",
+    deliverX: 12,
+    deliverY: 5,
+    homeX: 6,
+    homeY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, npc, "food_flour"), 1, "villager should carry flour after collecting it");
+  let job = world.get(npc, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.delivering, "villager should head to delivery after pickup");
+
+  world.set(npc, Position, { x: 12, y: 5 });
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, tavernChest, "food_flour"), 1, "tavern chest should receive hauled flour");
+  assertEquals(countInventory(world, npc, "food_flour"), 0, "villager inventory should be empty after delivery");
+  job = world.get(npc, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.returning, "villager should head home after delivery");
+});
+
+Deno.test("barkeep cooks stew from tavern chest ingredients", () => {
+  const world = makeWorld(21);
+
+  const tavernChest = world.create();
+  world.add(tavernChest, Position, { x: 8, y: 5 });
+  world.add(tavernChest, Inventory, { capacity: 30 });
+  world.add(tavernChest, ItemNamedIdentity, { name: "Tavern Chest", identity: "tavern_chest" });
+  addToInventory(world, tavernChest, createItemById(world, "food_flour"));
+  addToInventory(world, tavernChest, createItemById(world, "water_bucket"));
+  addToInventory(world, tavernChest, createItemById(world, "fuel_firewood"));
+  addToInventory(world, tavernChest, createItemById(world, "tool_kitchen_knife"));
+
+  const barkeep = addTownfolk(world, 8, 5, "barkeep", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "cook",
+    homeX: 6,
+    homeY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, tavernChest, "food_stew"), 1, "barkeep should turn ingredients into stew");
+  assertEquals(countInventory(world, tavernChest, "tool_kitchen_knife"), 1, "kitchen knife should remain as a reusable tool");
+  assertEquals(countInventory(world, tavernChest, "water_bucket"), 1, "water bucket should remain as reusable kitchen gear");
+});
+
+Deno.test("scheduled barkeep can cook beside a solid cooking fire", () => {
+  const world = makeWorld(121);
+  world.step = 26;
+
+  const fire = world.create();
+  world.add(fire, Position, { x: 8, y: 5 });
+  world.add(fire, Collider, { solid: true, blocksSight: false });
+  world.add(fire, Interactable, { action: "cookFood", params: null });
+
+  const tavernChest = world.create();
+  world.add(tavernChest, Position, { x: 9, y: 5 });
+  world.add(tavernChest, Inventory, { capacity: 30 });
+  world.add(tavernChest, ItemNamedIdentity, { name: "Tavern Chest", identity: "tavern_chest" });
+  addToInventory(world, tavernChest, createItemById(world, "food_flour"));
+  addToInventory(world, tavernChest, createItemById(world, "water_bucket"));
+  addToInventory(world, tavernChest, createItemById(world, "fuel_firewood"));
+  addToInventory(world, tavernChest, createItemById(world, "tool_kitchen_knife"));
+
+  const barkeep = addTownfolk(world, 8, 6, "barkeep", {
+    scheduleEnabled: true,
+    homeX: 6, homeY: 5,
+    bedX: 6, bedY: 5,
+    workX: 8, workY: 5,
+    workAuxX: 7, workAuxY: 5,
+    pubX: 10, pubY: 10,
+  });
+
+  let cooked = false;
+  world.on("townfolk:cooked", () => { cooked = true; });
+
+  for (let i = 0; i < 5; i++) aiTownfolkSystem(world);
+
+  assert(cooked, "barkeep should cook without standing on the fire tile");
+  assertEquals(countInventory(world, tavernChest, "food_stew"), 1, "tavern chest should receive stew");
+  assertEquals(countInventory(world, tavernChest, "water_bucket"), 1, "water bucket should still be present after cooking");
 });

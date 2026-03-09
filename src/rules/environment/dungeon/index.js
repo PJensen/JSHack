@@ -40,6 +40,7 @@ import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js
 import { clearExplored } from './exploredMap.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { generateOverworldChunks } from './overworld.js';
+import { WeatherState } from '../../components/WeatherState.js';
 
 /**
  * Generate all chunks for a floor and materialize everything at once.
@@ -269,6 +270,16 @@ export function initDungeon(world, opts = {}) {
     floorEntityIds: entityIds,
     downStairPositions: downStairPositions || [],
   });
+
+  // Create weather singleton for overworld
+  if (depth === 0) {
+    const wsId = world.create();
+    world.add(wsId, WeatherState, {
+      current: "clear",
+      turnsRemaining: 60 + Math.floor((worldSeed & 0xff) * 0.4),
+      transitionCooldown: 0,
+    });
+  }
 
   return { x: spawnX, y: spawnY };
 }

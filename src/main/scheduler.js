@@ -56,12 +56,16 @@ import { installMaterialReactionListeners, materialReactionSystem } from "../rul
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
+import { plantGrowthSystem } from "../rules/systems/plantGrowthSystem.js";
 import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
+import { weatherSystem } from "../rules/systems/weatherSystem.js";
+import { townSimulationSystem } from "../rules/systems/townSimulationSystem.js";
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
 import { channelingSystem } from "../rules/systems/channelingSystem.js";
+import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
@@ -173,7 +177,11 @@ export function configureWorld(world) {
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');
   registerSystem(harvestRegrowthSystem, 'effects');
+  registerSystem(plantGrowthSystem, 'effects');
+  registerSystem(weatherSystem, 'effects');
+  registerSystem(townSimulationSystem, 'effects');
   registerSystem(overworldAmbientSystem, 'effects');
+  registerSystem(workstationStateSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase

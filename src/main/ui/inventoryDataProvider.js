@@ -34,6 +34,7 @@ import { Pet } from "../../rules/components/Pet.js";
 import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
 import { groupDisplayItems } from "./itemGrouping.js";
 import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
+import { isChestIdentity } from "../../shared/chests.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -124,8 +125,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const weaponId = Number(eq.weapon || 0) | 0;
     const weaponInfo = weaponId > 0 ? world.get(weaponId, ItemInfo) : null;
     if (weaponInfo?.twoHanded) {
-      out.shield = {
-        ...out.shield,
+      out.offhand = {
+        ...out.offhand,
         blocked: true,
         blockedBy: "weapon",
         reason: "Two-hand",
@@ -197,7 +198,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     // Include chest contents on the tile.
     let chestId = 0;
     for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-      if (ni.identity !== 'chest' || pos.x !== tx || pos.y !== ty) continue;
+      if (!isChestIdentity(ni.identity) || pos.x !== tx || pos.y !== ty) continue;
       chestId = eid;
       for (const itemId of inventoryItems(world, eid)) ids.push(itemId);
     }

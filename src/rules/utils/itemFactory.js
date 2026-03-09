@@ -9,7 +9,20 @@ import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
 import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
-import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
+import {
+  Ration, IronRation, WildBerries, WildHerbs, Wheat, Turnip, Pumpkin,
+  ThornPods, VenomFronds, IronOre, CoalOre, StoneChip,
+} from '../archetypes/Food.js';
+import {
+  FlourSack,
+  IronIngot,
+  WaterBucket,
+  FirewoodBundle,
+  LumberBundle,
+  WorkHatchet,
+  KitchenKnife,
+  TownStew,
+} from '../archetypes/TownGoods.js';
 
 /**
  * Centralized item creation registry.
@@ -24,6 +37,22 @@ const SIMPLE_ITEM_ARCHETYPES = {
   'food_iron_ration': IronRation,
   'food_wild_berries': WildBerries,
   'food_wild_herbs': WildHerbs,
+  'food_wheat': Wheat,
+  'food_turnip': Turnip,
+  'food_pumpkin': Pumpkin,
+  'food_flour': FlourSack,
+  'food_stew': TownStew,
+  'reagent_thorn_pod': ThornPods,
+  'reagent_venom_frond': VenomFronds,
+  'ore_iron': IronOre,
+  'ore_coal': CoalOre,
+  'ore_stone': StoneChip,
+  'water_bucket': WaterBucket,
+  'fuel_firewood': FirewoodBundle,
+  'material_iron': IronIngot,
+  'material_lumber': LumberBundle,
+  'tool_hatchet': WorkHatchet,
+  'tool_kitchen_knife': KitchenKnife,
   'scroll_mapping': ScrollOfMapping,
   'bone': Bone,
 };

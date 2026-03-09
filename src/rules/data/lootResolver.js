@@ -183,8 +183,9 @@ function rollAffixes(rng, equipId, affixChance, maxCount) {
   const def = getCatalogItem(equipId);
   if (!def || !isCatalogEquipment(def)) return [];
 
-  // Map equipment slot to affix slot: shield -> armor for affix purposes
-  const slot = def.slot === 'shield' ? 'armor' : def.slot;
+  // Map equipment slot to affix slot: offhand/shield -> armor for affix purposes
+  const rawSlot = def.slot === 'shield' ? 'offhand' : def.slot;
+  const slot = rawSlot === 'offhand' ? 'armor' : rawSlot;
 
   const eligible = Object.entries(AFFIX_DEFS)
     .filter(([, affix]) => affix.slots.includes(slot))

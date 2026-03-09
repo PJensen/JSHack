@@ -25,7 +25,7 @@ export function createStatusEmitterController({ world, fx }) {
   const origins = [];
 
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
-  const STATUS_EMITTER_CFG = {
+  const TAG_EMITTER_CFG = {
     burning: { tracker: burningEmitters, prefix: "burn", cfg: { rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.8, speedJitter: 0.4, ax: 0, ay: -0.5, life: 0.7, lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06, color: "#ff8c00", alpha0: 0.9, alpha1: 0.0, offsetX: 0, offsetY: -0.15 } },
     bleeding: { tracker: bleedEmitters, prefix: "bleed", cfg: { rate: 14, angle: Math.PI / 2, spread: Math.PI / 8, speed: 0.55, speedJitter: 0.3, ax: 0, ay: 1.2, life: 0.9, lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05, color: "#bb1111", alpha0: 0.9, alpha1: 0.0 } },
     poisoned: { tracker: poisonEmitters, prefix: "poison", cfg: { rate: 4, angle: 0, spread: Math.PI * 2, speed: 0.15, speedJitter: 0.1, ax: 0, ay: -0.04, life: 1.6, lifeJitter: 0.5, size: 0.08, sizeEnd: 0.03, color: "#33ff55", alpha0: 0.35, alpha1: 0.0 } },
@@ -35,6 +35,7 @@ export function createStatusEmitterController({ world, fx }) {
     cursed: { tracker: cursedEmitters, prefix: "cursed", cfg: { rate: 12, angle: -Math.PI / 2, spread: Math.PI, speed: 0.5, speedJitter: 0.3, ax: 0, ay: -0.25, life: 1.2, lifeJitter: 0.4, size: 0.14, sizeEnd: 0.02, color: "#8822cc", alpha0: 0.7, alpha1: 0.0 } },
     blessed: { tracker: blessedEmitters, prefix: "blessed", cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.6, speedJitter: 0.2, ax: 0, ay: -0.35, life: 1.0, lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02, color: "#ffcc00", alpha0: 0.8, alpha1: 0.0 } },
     agony: { tracker: agonyEmitters, prefix: "agony", cfg: { rate: 14, angle: -Math.PI / 2, spread: Math.PI, speed: 0.55, speedJitter: 0.30, ax: 0, ay: -0.22, life: 1.0, lifeJitter: 0.4, size: 0.18, sizeEnd: 0.05, color: "#bb44ee", alpha0: 0.85, alpha1: 0.0 } },
+    torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
   };
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
   const KIND_EMITTER_CFG = {
@@ -87,7 +88,7 @@ export function createStatusEmitterController({ world, fx }) {
       if (Array.isArray(e.tags)) {
         for (let t = 0; t < e.tags.length; t++) {
           const tag = e.tags[t];
-          const sc = STATUS_EMITTER_CFG[tag];
+          const sc = TAG_EMITTER_CFG[tag];
           if (!sc) continue;
           const key = `${sc.prefix}:${e.id}`;
           seenEmitterKeys.add(key);
@@ -121,8 +122,8 @@ export function createStatusEmitterController({ world, fx }) {
         origins.push({ key, x: e.pos.x, y: e.pos.y });
       }
     }
-    for (const tag in STATUS_EMITTER_CFG) {
-      const sc = STATUS_EMITTER_CFG[tag];
+    for (const tag in TAG_EMITTER_CFG) {
+      const sc = TAG_EMITTER_CFG[tag];
       if (!sc) continue;
       for (const id of sc.tracker) {
         if (!seenEmitterKeys.has(`${sc.prefix}:${id}`)) {

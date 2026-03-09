@@ -66,4 +66,20 @@ export const TOWNFOLK = Object.freeze({
     maxHp: 45,
     dialogue: "I'll patch up any damage around here.",
   },
+  herbalist: {
+    name: "Herbalist",
+    identity: "townfolk_herbalist",
+    role: "herbalist",
+    speed: 3,
+    maxHp: 25,
+    dialogue: "These herbs can heal or harm. Handle them with care.",
+  },
+  alchemist: {
+    name: "Alchemist",
+    identity: "townfolk_alchemist",
+    role: "alchemist",
+    speed: 2,
+    maxHp: 30,
+    dialogue: "A pinch of this, a drop of that... perfection takes patience.",
+  },
 });

@@ -3,13 +3,54 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { buildPalette } from "../src/display/palette/index.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { createPlayer } from "../src/rules/archetypes/Player.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
 
 Deno.test("palette includes shock trap and special weapon glyph keys", () => {
   const palette = buildPalette();
-  for (const key of ["trap_shock", "dragon_whelp", "ember_knife", "flametongue", "ashen_reaver", "nightfang_dagger", "venomfang_dagger", "nightfang", "venomfang"]) {
+  for (const key of [
+    "trap_shock",
+    "dragon_whelp",
+    "ember_knife",
+    "flametongue",
+    "ashen_reaver",
+    "nightfang_dagger",
+    "venomfang_dagger",
+    "nightfang",
+    "venomfang",
+    "mill_chest",
+    "smithy_chest",
+    "lumber_chest",
+    "herb_chest",
+    "tavern_chest",
+  ]) {
     assert(palette[key], `missing palette key: ${key}`);
+  }
+});
+
+Deno.test("town chest identities survive world-view projection", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  createPlayer(world, { x: 10, y: 10 });
+
+  const chestIds = [
+    ["mill_chest", 11],
+    ["smithy_chest", 12],
+    ["lumber_chest", 13],
+    ["herb_chest", 14],
+    ["tavern_chest", 15],
+  ];
+
+  for (const [identity, x] of chestIds) {
+    const id = world.create();
+    world.add(id, NamedIdentity, { name: identity, identity });
+    world.add(id, Position, { x, y: 10 });
+  }
+
+  const view = buildWorldView(world);
+  for (const [identity] of chestIds) {
+    const rec = view.entities.find((entity) => entity.kind === identity);
+    assert(rec, `missing projected chest kind: ${identity}`);
   }
 });
 

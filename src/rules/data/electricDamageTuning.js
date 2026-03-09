@@ -12,7 +12,7 @@ export const ELECTRIC_DAMAGE_TUNING = Object.freeze({
   conductivityMultiplierMax: 2.0,
   slotWeights: Object.freeze({
     armor: 0.55,
-    shield: 0.25,
+    offhand: 0.25,
     weapon: 0.20,
     legs: 0.15,
     gloves: 0.10,

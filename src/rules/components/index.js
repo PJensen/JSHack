@@ -65,3 +65,5 @@ export { SoundEmitter } from './SoundEmitter.js';
 export { CreatureType, CREATURE_TYPES, creatureTypeFromTags } from './CreatureType.js';
 export { Encumbrance } from './Encumbrance.js';
 export { Flying } from './Flying.js';
+export { Traits } from './Traits.js';
+export { TownState } from './TownState.js';

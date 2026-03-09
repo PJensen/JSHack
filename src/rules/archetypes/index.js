@@ -22,6 +22,15 @@ export {
   Pumpkin,
   createCorpse,
 } from './Food.js';
+export {
+  FlourSack,
+  WaterBucket,
+  FirewoodBundle,
+  LumberBundle,
+  WorkHatchet,
+  KitchenKnife,
+  TownStew,
+} from './TownGoods.js';
 export { SpikeTrap, SnakeTrap, ShockTrap } from './Traps.js';
 export { MagicItem } from './Items.js';
 export {
@@ -50,6 +59,8 @@ export {
   TavernPillar,
   TavernSign,
   Millstone,
+  LumberChest,
+  TavernChest,
 } from './Overworld.js';
 export {
   Fountain,

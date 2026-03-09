@@ -17,7 +17,7 @@ const CHARACTER_SLOT_ORDER = Object.freeze([
   'neck',
   'belt',
   'gloves',
-  'shield',
+  'offhand',
   'ring1',
   'ring2',
   'legs',

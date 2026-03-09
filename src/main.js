@@ -42,6 +42,7 @@ import { registerBuiltinCommands } from "./main/debug/consoleCommands.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
+import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
@@ -98,6 +99,7 @@ import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
 import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
+import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
   inventoryItems, inventoryContains, addToInventory,
@@ -321,6 +323,8 @@ const throwFx = createThrowFxController({
   },
 });
 
+const weatherFx = createWeatherFxController();
+
 function getTargetedSpellConfig(spellId) {
   return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;
 }
@@ -405,6 +409,8 @@ import {
   TILE_MOUNTAIN_B,
   TILE_MOUNTAIN_C,
   TILE_TREE,
+  TILE_SHALLOW_WATER,
+  TILE_LAVA,
   TILE_FARMLAND,
   TILE_FENCE,
   TILE_COBBLESTONE,
@@ -422,6 +428,8 @@ const _tileKindMap = {
   [TILE_GRASS_D]: 'grass_d',
   [TILE_WATER]:      'water',
   [TILE_WATER_DEEP]: 'water_deep',
+  [TILE_SHALLOW_WATER]: 'water',
+  [TILE_LAVA]: 'lava',
   [TILE_MOUNTAIN]:   'mountain',
   [TILE_MOUNTAIN_B]: 'mountain_b',
   [TILE_MOUNTAIN_C]: 'mountain_c',
@@ -430,6 +438,23 @@ const _tileKindMap = {
   [TILE_FENCE]:    'fence',
   [TILE_COBBLESTONE]: 'cobblestone',
 };
+
+const SURFACE_TILE_KINDS = Object.freeze({
+  waterShallow: Object.freeze({ family: "water", tone: "shallow" }),
+  water: Object.freeze({ family: "water", tone: "water" }),
+  waterDeep: Object.freeze({ family: "water", tone: "deep" }),
+  lava: Object.freeze({ family: "lava", tone: "bright" }),
+});
+
+function classifySurfaceTile(tile) {
+  switch (tile) {
+    case TILE_SHALLOW_WATER: return SURFACE_TILE_KINDS.waterShallow;
+    case TILE_WATER: return SURFACE_TILE_KINDS.water;
+    case TILE_WATER_DEEP: return SURFACE_TILE_KINDS.waterDeep;
+    case TILE_LAVA: return SURFACE_TILE_KINDS.lava;
+    default: return null;
+  }
+}
 
 // Allow URL override: ?dungeonScale=0.3 for compact debugging floors
 {
@@ -582,7 +607,7 @@ function _finalizeNewGame(classData) {
       if (eq && classDef) {
         if (classDef.equipment.weapon) eq.weapon = addStarterItem(classDef.equipment.weapon) || null;
         if (classDef.equipment.armor) eq.armor = addStarterItem(classDef.equipment.armor) || null;
-        if (classDef.equipment.shield) eq.shield = addStarterItem(classDef.equipment.shield) || null;
+        if (classDef.equipment.offhand) eq.offhand = addStarterItem(classDef.equipment.offhand) || null;
         if (classDef.equipment.neck) eq.neck = addStarterItem(classDef.equipment.neck) || null;
         if (classDef.equipment.feet) eq.feet = addStarterItem(classDef.equipment.feet) || null;
       }
@@ -760,7 +785,7 @@ const inputDisposers = [];
 
         let chestId = 0;
         for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-          if (ni.identity !== 'chest') continue;
+          if (!isChestIdentity(ni.identity)) continue;
           if (pos.x === p.pos.x && pos.y === p.pos.y) {
             chestId = eid;
             break;
@@ -1155,7 +1180,7 @@ addEventListener('ui:requestPickup', (e) => {
       if (!hasCapacityForItem(world, pe.id, id)) continue;
       // Find and remove from the chest that holds it
       for (const [cid, , ni] of world.query(Position, NamedIdentity)) {
-        if (ni.identity !== 'chest') continue;
+        if (!isChestIdentity(ni.identity)) continue;
         if (!inventoryContains(world, cid, id)) continue;
         transferItem(world, id, cid, pe.id);
         const count = world.get(id, ItemInfo)?.count || 1;
@@ -2604,6 +2629,7 @@ const displayRuntime = setupDisplayRuntime({
   getItemInfo,
   resolveItemDisplayName: resolveDisplayName,
   dispatchRulesAction,
+  classifySurfaceTile,
 });
 const {
   statusEmitterFx,
@@ -2611,6 +2637,7 @@ const {
   projectileFx,
   spellAreaFx,
   cloudFx,
+  surfaceAreaFx,
   ftext,
 } = displayRuntime;
 const flyingFx = createFlyingFxController(world);
@@ -2624,6 +2651,7 @@ bootAdvance("Prepared render resources");
 // ---- Render (display-only; consumes WorldView DTO) -------------------------
 let _bgGradH = 0; let _bgGrad = null;
 let _fxTime = 0; // display-side time accumulator for simple glyph FX
+let _dtSec = 0;  // frame delta for render-internal use
 
 // Reusable render buffers — hoisted out of hot functions to avoid per-frame GC
 const _stackMeta = new Map();
@@ -2637,6 +2665,8 @@ const _healthBarSeen = new Set();
 const _roofCoverKeys = new Set();
 /** @type {Map<string, number>} */
 const _roofParticleStamp = new Map();
+/** Separate stamp for large smoldering smoke particles (slower rate). @type {Map<string, number>} */
+const _roofSmokeParticleStamp = new Map();
 /** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
 const _healthBarsToDraw = [];
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
@@ -2800,7 +2830,8 @@ function roofCellKey(x, y) {
 }
 
 function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
-  if (!roof?.burning) return;
+  if (!roof?.burning && !roof?.smoking) return;
+  const _isBurning = !!roof.burning;
   const phase = ((Math.imul((roof.x | 0) + 11, 1103515245) ^ Math.imul((roof.y | 0) + 17, 12345)) >>> 0) / 0xffffffff;
   const bob = 0.5 + 0.5 * Math.sin(fxTime * 1.7 + phase * Math.PI * 2);
   const cx = roof.x + (phase - 0.5) * 0.22;
@@ -2819,15 +2850,17 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
   ctx.ellipse(cx - 0.10, cy - 0.22, 0.15, 0.09, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = `rgba(255,122,34,${(0.14 + bob * 0.08).toFixed(3)})`;
-  ctx.beginPath();
-  ctx.arc(roof.x - 0.04, roof.y - 0.05, 0.05, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = `rgba(255,210,120,${(0.08 + bob * 0.05).toFixed(3)})`;
-  ctx.beginPath();
-  ctx.arc(roof.x + 0.05, roof.y - 0.08, 0.03, 0, Math.PI * 2);
-  ctx.fill();
+  if (_isBurning) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(255,122,34,${(0.14 + bob * 0.08).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(roof.x - 0.04, roof.y - 0.05, 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,210,120,${(0.08 + bob * 0.05).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(roof.x + 0.05, roof.y - 0.08, 0.03, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.globalCompositeOperation = 'source-over';
   for (let i = 0; i < 4; i++) {
@@ -2846,6 +2879,39 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
   ctx.restore();
 
   if (quality === 'low' || !fx?.pool) return;
+
+  // Large billowing smoke for smoldering (post-fire) — slow rate, long TTL.
+  if (roof.smoking) {
+    const smokeTick = Math.floor(fxTime * 0.7 + phase * 7);
+    const smokeKey = roofCellKey(roof.x, roof.y);
+    const lastSmokeTick = _roofSmokeParticleStamp.get(smokeKey) ?? -1;
+    if (smokeTick !== lastSmokeTick) {
+      _roofSmokeParticleStamp.set(smokeKey, smokeTick);
+      // Three large billow puffs, each offset and staggered.
+      const drifts = [
+        { ox: (phase - 0.5) * 0.28, oy: -0.12, vxd:  0.04, life: 4.2 + bob * 0.6, s0: 0.80, s1: 0.42, rr: 64, gg: 62, bb: 58, a: 0.38 },
+        { ox: (phase - 0.5) * 0.14, oy: -0.06, vxd: -0.03, life: 3.6 + bob * 0.8, s0: 0.90, s1: 0.50, rr: 102, gg: 98, bb: 92, a: 0.30 },
+        { ox: (phase - 0.5) * 0.38, oy: -0.18, vxd:  0.02, life: 5.0 + bob * 0.5, s0: 0.66, s1: 0.30, rr: 148, gg: 144, bb: 136, a: 0.22 },
+      ];
+      for (let di = 0; di < drifts.length; di++) {
+        const d = drifts[di];
+        fx.pool.spawn(new Particle({
+          x: roof.x + d.ox,
+          y: roof.y + d.oy,
+          vx: d.vxd + (phase - 0.5) * 0.02,
+          vy: -0.07 - bob * 0.04,
+          ay: -0.008,
+          life: d.life,
+          size0: d.s0,
+          size1: d.s1,
+          r: d.rr, g: d.gg, b: d.bb,
+          a0: d.a,
+          a1: 0,
+        }));
+      }
+    }
+  }
+
   const particleTick = Math.floor(fxTime * 7 + phase * 13);
   const particleKey = roofCellKey(roof.x, roof.y);
   const lastTick = _roofParticleStamp.get(particleKey) ?? -1;
@@ -2880,7 +2946,7 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
     b: 168,
     a0: 0.34,
   }));
-  if (particleTick % 2 === 0) {
+  if (_isBurning && particleTick % 2 === 0) {
     fx.pool.spawn(new Particle({
       x: roof.x + 0.03 - phase * 0.10,
       y: roof.y - 0.06,
@@ -3063,6 +3129,7 @@ function drawEntityHealthBar(ctx, e) {
 function render(worldView) {
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
+  const effectiveWeather = worldView.playerSheltered ? "clear" : (worldView.weather || "clear");
 
   // Background (cache gradient by height to avoid per-frame allocations)
   bctx.save();
@@ -3117,6 +3184,9 @@ function render(worldView) {
       bctx.globalAlpha = 1.0;
     }
   }
+
+  surfaceAreaFx.tick(_dtSec, worldView, { vx0, vx1, vy0, vy1 }, effectiveWeather);
+  surfaceAreaFx.draw(bctx);
 
   // Pass 1.5: engravings on the ground (between tiles and entities)
   if (worldView.engravings && worldView.engravings.length) {
@@ -3556,6 +3626,11 @@ function render(worldView) {
     ftext,
   });
 
+  // Weather particles (rain) drawn above entities but under roofs
+  // Suppress when player is sheltered indoors (intact roof overhead)
+  weatherFx.tick(_dtSec, effectiveWeather, { vx0, vx1, vy0, vy1 }, cam);
+  weatherFx.draw(bctx, cam);
+
   _roofCoverKeys.clear();
   if (Array.isArray(worldView?.roofs) && worldView.roofs.length) {
     for (let i = 0; i < worldView.roofs.length; i++) {
@@ -3616,6 +3691,9 @@ function render(worldView) {
   ctx.drawImage(back, 0, 0);
   ctx.restore();
 
+  // Heavy rain dark tint overlay (also suppressed indoors)
+  weatherFx.drawScreenTint(ctx, W, H, effectiveWeather);
+
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
 
@@ -3635,6 +3713,7 @@ function frame(now) {
   const instFps = dtSec > 0 ? (1 / dtSec) : 0;
   _fpsEMA = _fpsEMA ? (_fpsEMA * 0.9 + instFps * 0.1) : instFps;
   _fxTime += dtSec;
+  _dtSec = dtSec;
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);

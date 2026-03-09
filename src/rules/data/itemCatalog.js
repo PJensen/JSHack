@@ -183,7 +183,7 @@ const STONECOAT_ALLOWED_SLOTS = Object.freeze(new Set([
   "gloves",
   "legs",
   "feet",
-  "shield",
+  "offhand",
   "ring",
   "ranged",
 ]));
@@ -503,6 +503,51 @@ function createPoisonCloudThrowHook(opts = {}) {
       hazardKind: "poison",
       hazardMedium: medium,
     };
+  };
+}
+
+/**
+ * Torch throw hook: landed torches start a small floor fire without consuming
+ * the torch item, so the normal base throw can still drop it on the tile.
+ *
+ * @param {{
+ *   turnsLeft?: number,
+ *   radius?: number,
+ *   tickDamage?: number,
+ * }} [opts]
+ */
+function createTorchThrowHook(opts = {}) {
+  const turnsLeft = Math.max(1, Number(opts?.turnsLeft ?? 3) | 0);
+  const radius = Math.max(0, Number(opts?.radius ?? 0) | 0);
+  const tickDamage = Math.max(0, Number(opts?.tickDamage ?? 2) | 0);
+
+  return (ctx, state) => {
+    const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+    const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+    const fallbackPoint = ctx.helpers.adjacentPoint(actorId);
+    const rawLandingX = Number(throwSpec?.to?.x ?? state?.targetX);
+    const rawLandingY = Number(throwSpec?.to?.y ?? state?.targetY);
+    const at = {
+      x: Number.isFinite(rawLandingX) ? (rawLandingX | 0) : (fallbackPoint.x | 0),
+      y: Number.isFinite(rawLandingY) ? (rawLandingY | 0) : (fallbackPoint.y | 0),
+    };
+
+    ctx.helpers.hazardSpawn({
+      kind: "fire",
+      medium: "floor",
+      turnsLeft,
+      radius,
+      tickDamage,
+      damageType: "fire",
+      cause: "torch_fire",
+      sourceId: actorId,
+      sourceKind: "torch",
+      identity: "torch_fire",
+      name: "Torch Fire",
+      meta: { source: "torch", delivery: "thrown" },
+    }, at);
+
+    return { consumed: false, at, hazardKind: "fire" };
   };
 }
 
@@ -1112,7 +1157,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Fireward Shield",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 3,
     rarityName: "rare",
@@ -1123,7 +1168,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Wooden Shield",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "wood",
     rarity: 1,
     rarityName: "common",
@@ -1134,7 +1179,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Iron Shield",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 2,
     rarityName: "magic",
@@ -1145,12 +1190,33 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Lantern",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 2,
     rarityName: "magic",
     bonuses: { visionRange: 3 },
     description: "A sturdy hooded lantern that casts a warm glow, illuminating the darkness ahead.",
+  },
+  torch: {
+    id: "torch",
+    catalogKind: "equipment",
+    name: "Torch",
+    type: "equip",
+    slot: "offhand",
+    material: "wood",
+    rarity: 1,
+    rarityName: "common",
+    weight: 1,
+    value: 2,
+    bonuses: {},
+    description: "A burning torch with a steady flame. It does not seem likely to run out any time soon.",
+    hooks: {
+      on_throw: createTorchThrowHook({
+        turnsLeft: 3,
+        radius: 0,
+        tickDamage: 2,
+      }),
+    },
   },
   iron_pickaxe: {
     id: "iron_pickaxe",
@@ -1261,7 +1327,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Spiked Pavise",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 2,
     rarityName: "magic",
@@ -1301,7 +1367,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Grounded Buckler",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 3,
     rarityName: "rare",
@@ -1405,7 +1471,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Steel Shield",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "steel",
     rarity: 2,
     rarityName: "magic",
@@ -1479,7 +1545,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Rusted Buckler",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 2,
     rarityName: "magic",
@@ -1630,7 +1696,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Wardkeeper Shield",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "steel",
     rarity: 4,
     rarityName: "epic",
@@ -1689,7 +1755,7 @@ export const ITEM_CATALOG = {
     catalogKind: "equipment",
     name: "Aegis of the Ancient",
     type: "equip",
-    slot: "shield",
+    slot: "offhand",
     material: "iron",
     rarity: 5,
     rarityName: "legendary",
@@ -1832,7 +1898,7 @@ export const ITEM_CATALOG = {
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
           meta: { source: "potion_stoneskin", kind: "armor_buff", masked: !state.identified },
         });
-        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "stoneskin", source: actorId }));
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "stoneskin", source: actorId, masked: !state.identified }));
         return { turns, potency };
       },
       on_throw: (ctx, state) => {
@@ -2090,7 +2156,7 @@ export const ITEM_CATALOG = {
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
           meta: { source: "potion_resist_fire", kind: "resist_buff", masked: !state.identified },
         });
-        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_fire", source: Number(state?.actor || ctx.actor || 0) | 0 }));
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_fire", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "fire", duration: 40 };
       },
     },
@@ -2128,7 +2194,7 @@ export const ITEM_CATALOG = {
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
           meta: { source: "potion_resist_poison", kind: "resist_buff", masked: !state.identified },
         });
-        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_poison", source: Number(state?.actor || ctx.actor || 0) | 0 }));
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_poison", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "poison", duration: 40 };
       },
     },
@@ -2198,7 +2264,7 @@ export const ITEM_CATALOG = {
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
           meta: { source: "potion_resist_electric", kind: "resist_buff", masked: !state.identified },
         });
-        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_electric", source: Number(state?.actor || ctx.actor || 0) | 0 }));
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_electric", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "electric", duration: 40 };
       },
     },
@@ -2236,7 +2302,7 @@ export const ITEM_CATALOG = {
           sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
           meta: { source: "potion_resist_acid", kind: "resist_buff", masked: !state.identified },
         });
-        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_acid", source: Number(state?.actor || ctx.actor || 0) | 0 }));
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_acid", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "acid", duration: 40 };
       },
     },

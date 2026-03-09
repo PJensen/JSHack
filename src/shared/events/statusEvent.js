@@ -2,7 +2,7 @@
  * Build a normalized status event payload for rules -> UI communication.
  * Contract fields: { id, kind, effect?, source?, at? }.
  */
-export function createStatusEvent({ id, kind, effect, source, at } = {}) {
+export function createStatusEvent({ id, kind, effect, source, at, masked } = {}) {
   const out = {
     id: Number(id || 0) | 0,
     kind: String(kind || "").trim().toLowerCase(),
@@ -12,6 +12,7 @@ export function createStatusEvent({ id, kind, effect, source, at } = {}) {
   if (at && Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))) {
     out.at = { x: Number(at.x) | 0, y: Number(at.y) | 0 };
   }
+  if (masked) out.masked = true;
   return out;
 }
 

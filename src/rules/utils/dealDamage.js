@@ -185,6 +185,7 @@ export function resolveResistance(world, targetId, rawAmount, type) {
  * @property {boolean} [bypassResist=false]- Skip resistance resolution
  * @property {boolean} [noTrigger=false]   - Suppress affix/hook triggers (prevents retaliate loops)
  * @property {{dx:number,dy:number,force:number}} [knockback] - Push target after damage is applied.
+ * @property {boolean} [offhand=false]     - Mark as off-hand hit (for display layer)
  */
 
 /**
@@ -272,6 +273,7 @@ export function dealDamage(world, spec) {
       critical,
       at: spec.at || undefined,
       noTrigger: !!spec.noTrigger,
+      offhand: !!spec.offhand,
     });
   } catch { /* */ }
 

@@ -67,8 +67,9 @@ export function equipItemSystem(world) {
       continue;
     }
 
-    // Determine target slot
-    const slot = (info.slot || '').toLowerCase();
+    // Determine target slot (legacy "shield" → "offhand" compat)
+    const rawSlot = (info.slot || '').toLowerCase();
+    const slot = rawSlot === 'shield' ? 'offhand' : rawSlot;
     let appliedSlot = null;
     const isSupportedSlot = slot === 'ring' || GEAR_SLOT_SET.has(slot) || info.type === 'ammo';
     if (!isSupportedSlot) {
@@ -94,11 +95,27 @@ export function equipItemSystem(world) {
     };
 
     if (slot === 'weapon') {
-      equipSingleSlot('weapon');
-      // two-handers occupy both hands — kick out any equipped shield
-      if (info.twoHanded && Number.isInteger(eq.shield) && eq.shield > 0) {
-        pushToInventory(eq.shield);
-        eq.shield = null;
+      // Auto-cascade: if weapon slot is occupied by a 1H, offhand is empty,
+      // and new item is also 1H, cascade to offhand for dual-wielding.
+      const mainOccupied = Number.isInteger(eq.weapon) && eq.weapon > 0;
+      const offhandEmpty = !Number.isInteger(eq.offhand) || eq.offhand <= 0;
+      const isOneHanded = !info.twoHanded;
+
+      if (mainOccupied && offhandEmpty && isOneHanded) {
+        const mainInfo = world.get(eq.weapon, ItemInfo);
+        if (mainInfo && !mainInfo.twoHanded) {
+          equipSingleSlot('offhand');
+        } else {
+          // Main hand is 2H — replace it, not cascade
+          equipSingleSlot('weapon');
+        }
+      } else {
+        equipSingleSlot('weapon');
+        // two-handers occupy both hands — kick out any equipped offhand
+        if (info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
+          pushToInventory(eq.offhand);
+          eq.offhand = null;
+        }
       }
     } else if (slot === 'ring') {
       if (!Number.isInteger(eq.ring1) || eq.ring1 <= 0) {
@@ -110,8 +127,8 @@ export function equipItemSystem(world) {
         pushToInventory(eq.ring1);
         eq.ring1 = itemId; appliedSlot = 'ring1';
       }
-    } else if (slot === 'shield') {
-      // can't equip a shield while wielding a two-handed weapon — kick it out first
+    } else if (slot === 'offhand') {
+      // can't equip an offhand while wielding a two-handed weapon — kick it out first
       if (Number.isInteger(eq.weapon) && eq.weapon > 0) {
         const weaponInfo = world.get(eq.weapon, ItemInfo);
         if (weaponInfo?.twoHanded) {
@@ -119,7 +136,7 @@ export function equipItemSystem(world) {
           eq.weapon = null;
         }
       }
-      equipSingleSlot('shield');
+      equipSingleSlot('offhand');
     } else if (slot === 'ammo' || info.type === 'ammo') {
       equipSingleSlot('ammo');
     } else if (!equipSingleSlot(slot)) {

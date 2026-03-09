@@ -12,6 +12,7 @@ import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { MONSTERS } from "../../rules/data/monsters.js";
 import { markExplored } from "../../rules/environment/dungeon/exploredMap.js";
 import { spawnDebugMonsterNearPlayer } from "./spawnDebugMonster.js";
+import { WeatherState } from "../../rules/components/WeatherState.js";
 
 /**
  * Register all built-in debug commands.
@@ -148,5 +149,37 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
       return 'Map revealed (200-tile radius). Run again to toggle off (next FOV update restores fog).';
     }
     return 'Reveal OFF — fog of war will restore on next move.';
+  });
+
+  // ---- weather [clear|rain|heavy_rain] ----
+  const WEATHER_TYPES = ['clear', 'rain', 'heavy_rain'];
+  console.registerCommand('weather', 'weather [clear|rain|heavy_rain] — view or set weather', (argsStr) => {
+    const arg = argsStr.trim().toLowerCase();
+
+    // Query current weather
+    let wsId = 0;
+    let ws = null;
+    for (const [id, w] of world.query(WeatherState)) {
+      wsId = id;
+      ws = w;
+      break;
+    }
+
+    if (!ws) return 'No WeatherState entity found (are you on the overworld?)';
+
+    if (!arg) return `Current weather: ${ws.current} (${ws.turnsRemaining} turns remaining)`;
+
+    if (!WEATHER_TYPES.includes(arg)) {
+      return `Unknown weather type: "${arg}"\nAvailable: ${WEATHER_TYPES.join(', ')}`;
+    }
+
+    const prev = ws.current;
+    world.set(wsId, WeatherState, {
+      current: arg,
+      turnsRemaining: 100,
+      transitionCooldown: 100,
+    });
+    world.emit?.("weather:changed", { weather: arg, prev });
+    return `Weather set to ${arg} (100 turns)`;
   });
 }

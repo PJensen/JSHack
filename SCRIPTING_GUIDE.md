@@ -334,7 +334,7 @@ my_sword: {
   catalogKind: "equipment",
   name: "My Sword",
   type: "equip",            // Always "equip" for equipment
-  slot: "weapon",           // weapon | armor | ring | shield
+  slot: "weapon",           // weapon | armor | ring | offhand
   material: "steel",        // Visual/mechanical flavoring
   rarity: 2,                // 1=common, 2=magic, 3=rare, 4=legendary
   rarityName: "magic",      // "common" | "magic" | "rare" | "legendary"
@@ -349,7 +349,7 @@ my_sword: {
 }
 ```
 
-**Valid slots:** `weapon`, `armor`, `ring`, `shield`
+**Valid slots:** `weapon`, `armor`, `ring`, `offhand`
 
 **Bonus stat names:**
 
@@ -953,7 +953,7 @@ Affixes are enchantments that items carry — either hardcoded via the item's `a
 // Add to AFFIX_DEFS at the bottom of affixes.js
 my_affix: {
   name: "My Affix",         // Display name shown on the item
-  slots: ["weapon"],        // Which slots can roll this: weapon | armor | ring | shield
+  slots: ["weapon"],        // Which slots can roll this: weapon | armor | ring | offhand
   triggers: ["onHit"],      // When the script fires. Empty array for passive-only.
   script: AFFIX_MY_AFFIX,   // The registered script key constant (see §4.2)
   weight: 20,               // Drop weight. Higher = more common. ~15–30 is typical.
@@ -1106,7 +1106,7 @@ serrated1: {
 
 ### 4.7 Full passive affix example
 
-An armor/shield affix that grants +3 defense and near-immunity to shock.
+An armor/offhand affix that grants +3 defense and near-immunity to shock.
 
 ```js
 const AFFIX_GROUNDED = "affix:grounded1";
@@ -1121,7 +1121,7 @@ registerScript(AFFIX_GROUNDED, {
 // Add to AFFIX_DEFS
 grounded1: {
   name: "Grounded",
-  slots: ["armor", "shield"],
+  slots: ["armor", "offhand"],
   triggers: [],
   passive: AFFIX_GROUNDED,
   weight: 12,

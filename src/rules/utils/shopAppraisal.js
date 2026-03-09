@@ -22,7 +22,7 @@ const BASE_BY_TYPE = Object.freeze({
 const SLOT_BONUS = Object.freeze({
   weapon: 22,
   armor: 24,
-  shield: 18,
+  offhand: 18,
   head: 12,
   neck: 12,
   belt: 10,

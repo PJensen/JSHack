@@ -8,17 +8,18 @@ import { equipmentPalette } from './equipment.js';
 const _CORPSE_SKIP_PREFIXES = [
   'player', 'corpse_',
   'floor', 'grass', 'water', 'mountain', 'tree', 'wall', 'door', 'stair',
-  'potion_', 'spellbook_', 'book_', 'scroll_', 'return_', 'ammo_',
-  'food_', 'reagent_', 'ore_', 'gem_', 'trap_',
+  'church_', 'potion_', 'spellbook_', 'book_', 'scroll_', 'return_', 'ammo_',
+  'food_', 'reagent_', 'ore_', 'material_', 'gem_', 'trap_',
 ];
 const _CORPSE_SKIP_KEYS = new Set([
   'gold', 'monster', 'bone', 'engraving', 'spawner', 'tombstone',
-  'chest', 'bed_home', 'house_sign', 'alchemy_bench',
+  'chest', 'mill_chest', 'smithy_chest', 'lumber_chest', 'herb_chest', 'tavern_chest',
+  'bed_home', 'house_sign', 'alchemy_bench',
   'berry_bush', 'herb_patch', 'thorn_bramble', 'venom_fern', 'venom_spores',
-  'anvil', 'furnace', 'furnace_unlit', 'cooking_fire',
+  'anvil', 'anvil_active', 'furnace', 'furnace_unlit', 'cooking_fire',
   'crop_wheat', 'crop_turnip', 'crop_pumpkin',
   'well', 'scarecrow', 'tavern_keg', 'tavern_table',
-  'tavern_bench', 'tavern_pillar', 'tavern_sign', 'millstone',
+  'tavern_bench', 'tavern_pillar', 'tavern_sign', 'millstone', 'millstone_active', 'smithy_sign',
   'farmland', 'fence', 'roof_thatch_shadow', 'roof_thatch_lit',
   'roof_thatch_shadow_charred', 'roof_thatch_lit_charred',
   'fountain', 'altar', 'shrine', 'statue', 'sarcophagus',

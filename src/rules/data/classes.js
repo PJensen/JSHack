@@ -19,7 +19,7 @@ export const CLASS_DEFS = {
     equipment: {
       weapon: 'axe_heavy',
       armor: 'leather_armor',
-      shield: null,
+      offhand: null,
       feet: 'boots_leather',
     },
     inventoryItems: [
@@ -47,7 +47,7 @@ export const CLASS_DEFS = {
     equipment: {
       weapon: 'staff_oak',
       armor: 'leather_armor',
-      shield: null,
+      offhand: null,
       feet: 'sandals_hemp',
     },
     inventoryItems: [
@@ -76,7 +76,7 @@ export const CLASS_DEFS = {
     equipment: {
       weapon: 'dagger_quick',
       armor: null,
-      shield: null,
+      offhand: null,
       feet: 'boots_leather',
 
     },
@@ -107,7 +107,7 @@ export const CLASS_DEFS = {
     equipment: {
       weapon: 'iron_pickaxe',
       armor: null,
-      shield: null,
+      offhand: null,
       neck: 'pendant_lucky',
       feet: 'boots_leather',
     },
@@ -137,7 +137,7 @@ export const CLASS_DEFS = {
     equipment: {
       weapon: 'staff_oak',
       armor: null,
-      shield: null,
+      offhand: null,
       feet: 'shoes_cloth',
     },
     inventoryItems: [
@@ -166,7 +166,7 @@ export const CLASS_DEFS = {
     equipment: {
       weapon: 'iron_mace',
       armor: 'leather_armor',
-      shield: 'shield_wood',
+      offhand: 'shield_wood',
       feet: 'shoes_cloth',
     },
     inventoryItems: [
