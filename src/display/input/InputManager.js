@@ -206,6 +206,13 @@ export class InputManager {
       return;
     }
 
+    // Economy graph toggle: '6'
+    if (key === '6') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:toggleEconomyGraph'));
+      return;
+    }
+
     // Apply tool: 'A' (Shift+A)
     if (key === "A") {
       e.preventDefault();

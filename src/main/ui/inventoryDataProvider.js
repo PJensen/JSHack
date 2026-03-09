@@ -597,9 +597,12 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       petAlive = world.has(petId, Position);
       break;
     }
+    const p = playerEntity(world);
+    const set = p ? world.get(p.id, Settings) : null;
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:settingsData', {
       detail: {
         identificationEnabled: isIdentificationEnabled(),
+        hungerEnabled: set ? set.hungerEnabled !== false : true,
         allItemIds: listAllItemIds(),
         allMonsterIds: listAllMonsterIds(),
         hasPet,
@@ -611,6 +614,16 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   addEventListener('ui:setIdentification', (ev) => {
     const enabled = !!ev?.detail?.enabled;
     setIdentificationEnabled(enabled);
+  });
+
+  addEventListener('ui:setHunger', (ev) => {
+    const enabled = !!ev?.detail?.enabled;
+    const p = playerEntity(world);
+    if (!p) return;
+    const cur = world.get(p.id, Settings);
+    if (cur) {
+      cur.hungerEnabled = enabled;
+    }
   });
 
   addEventListener('ui:debugGiveItem', (ev) => {

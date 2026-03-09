@@ -810,7 +810,6 @@ function createQuickSlot() {
 
   /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number, addedAt:number}>} */
   const stack = [];
-  const MAX_CHIPS = 2;
   const AUTO_DISMISS_MS = 12000;
 
   function actionable(it) {
@@ -826,24 +825,22 @@ function createQuickSlot() {
     if (dismissTimer) clearTimeout(dismissTimer);
     if (stack.length === 0) return;
     dismissTimer = setTimeout(() => {
-      stack.length = 0;
+      stack.shift();
       renderStack();
+      resetDismissTimer();
     }, AUTO_DISMISS_MS);
   }
 
   function renderStack() {
     el.innerHTML = '';
-    let shown = 0;
-    for (const it of stack) {
-      if (!actionable(it)) continue;
-      const chip = renderQuickChip(it, {
-        onUse: () => dispatchAction(it),
-        onDismiss: () => dismissTop(it.id)
-      });
-      el.appendChild(chip);
-      shown++;
-      if (shown >= MAX_CHIPS) break;
-    }
+    // Peek: show only the top (front) of the stack
+    const it = stack[0];
+    if (!it || !actionable(it)) return;
+    const chip = renderQuickChip(it, {
+      onUse: () => dispatchAction(it),
+      onDismiss: () => dismissTop()
+    });
+    el.appendChild(chip);
   }
 
   function dispatchAction(it) {
@@ -857,10 +854,10 @@ function createQuickSlot() {
     }
   }
 
-  function dismissTop(id) {
-    const idx = stack.findIndex((x) => x && x.id === id);
-    if (idx >= 0) stack.splice(idx, 1);
+  function dismissTop() {
+    stack.shift();
     renderStack();
+    resetDismissTimer();
   }
 
   window.addEventListener('ui:recentPickup', (ev) => {
@@ -870,8 +867,7 @@ function createQuickSlot() {
     if (!item) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
-    stack.unshift({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1), addedAt: Date.now() });
-    while (stack.length > MAX_CHIPS) stack.pop();
+    stack.push({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1), addedAt: Date.now() });
     renderStack();
     resetDismissTimer();
   });

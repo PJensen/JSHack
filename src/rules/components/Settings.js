@@ -8,7 +8,9 @@ export const Settings = defineComponent('Settings', {
   autoPickupKinds: ['currency'],
   // Max tile distance for manual pickups (e.g., via UI). 0 = same tile only.
   // Mobile-friendly default allows picking up adjacent tiles as well.
-  pickupRange: 1
+  pickupRange: 1,
+  // When false, hunger counter freezes and no hunger effects apply.
+  hungerEnabled: true
 }, {
   validate(rec) {
     /** @type {any} */
