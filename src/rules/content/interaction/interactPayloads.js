@@ -216,6 +216,15 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  // ── Townfolk NPC dialogue ──────────────────────────────────────────────────
+
+  talkToNPC: {
+    onInteract(ctx) {
+      const { world, actor, targetId, params } = ctx;
+      world.emit?.("npc:dialogue", { actor, targetId, text: params?.dialogue || "..." });
+    },
+  },
+
   // ── Signs & text ───────────────────────────────────────────────────────────
 
   readText: {

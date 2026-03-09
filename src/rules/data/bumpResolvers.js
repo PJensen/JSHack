@@ -78,7 +78,7 @@ const hostileMelee = {
     const actorFac = world.get(actor, Faction);
     const targetFac = world.get(ctx.target, Faction);
     // Shopkeepers / neutrals with Interactable are handled by npc-interact
-    if (targetFac && (targetFac.key === "shopkeeper" || targetFac.key === "neutral")
+    if (targetFac && (targetFac.key === "shopkeeper" || targetFac.key === "neutral" || targetFac.key === "townfolk")
         && world.has(ctx.target, Interactable)) return false;
     return areFactionsHostile(actorFac?.key, targetFac?.key);
   },
@@ -132,7 +132,7 @@ const npcInteract = {
     if (!(ctx.target > 0) || ctx.target === actor) return false;
     const fac = world.get(ctx.target, Faction);
     if (!fac) return false;
-    return (fac.key === "shopkeeper" || fac.key === "neutral")
+    return (fac.key === "shopkeeper" || fac.key === "neutral" || fac.key === "townfolk")
            && world.has(ctx.target, Interactable);
   },
   resolve(world, actor, ctx) {

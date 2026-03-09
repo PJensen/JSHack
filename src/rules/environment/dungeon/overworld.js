@@ -602,6 +602,16 @@ export function generateOverworldChunks(worldSeed) {
     addOutdoorSpawn(chunks, p, "harvest_venom_fern");
   }
 
+  // ── NPC Townspeople ────────────────────────────────────────────
+  addSpawn(chunks, farmX0 + 1, farmY0 + 1, "townfolk", { townfolkId: "farmer" });
+  addSpawn(chunks, homeX - 14, homeY - 2, "townfolk", { townfolkId: "woodcutter" });
+  addSpawn(chunks, homeX + 30, homeY - 20, "townfolk", { townfolkId: "miner" });
+  addSpawn(chunks, homeX - 5, homeY + 7, "townfolk", { townfolkId: "smith" });
+  addSpawn(chunks, churchX0 + 3, churchY0 + 3, "townfolk", { townfolkId: "priest" });
+  addSpawn(chunks, tavX0 + 3, tavY0 + 3, "townfolk", { townfolkId: "barkeep" });
+  addSpawn(chunks, fountainCX + 2, fountainCY, "townfolk", { townfolkId: "villager" });
+  addSpawn(chunks, homeX + 3, homeY + 3, "townfolk", { townfolkId: "mason" });
+
   const outChunks = [];
   for (const rec of chunks.values()) {
     outChunks.push({

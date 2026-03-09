@@ -19,6 +19,7 @@ import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem, installAggroFromDamageListener } from "../rules/systems/aiChaseSystem.js";
+import { aiTownfolkSystem } from "../rules/systems/aiTownfolkSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
@@ -110,6 +111,7 @@ export function configureWorld(world) {
   // Scurry before chase: dumb idle creatures set a random MoveIntent which
   // aiChaseSystem's existing intent-skip guard then honours.
   registerSystem(aiScurrySystem, 'ai');
+  registerSystem(aiTownfolkSystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');
   // Weapon pickup after chase so the monster's hunt state is settled first.
   registerSystem(aiWeaponPickupSystem, 'ai');

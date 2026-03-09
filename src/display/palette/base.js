@@ -108,7 +108,15 @@ export const basePalette = {
   familiar: { glyph: "f", fg: "#b366ff", glow: "#8833cc" },
 
   // NPCs
-  shopkeeper: { glyph: "@", fg: "#c47bff", glow: "#9955cc" },
+  shopkeeper:          { glyph: "@", fg: "#c47bff", glow: "#9955cc" },
+  townfolk_farmer:     { glyph: "@", fg: "#8bc34a", glow: "#558b2f" },
+  townfolk_woodcutter: { glyph: "@", fg: "#a1887f", glow: "#6d4c41" },
+  townfolk_miner:      { glyph: "@", fg: "#90a4ae", glow: "#546e7a" },
+  townfolk_smith:      { glyph: "@", fg: "#ff8a65", glow: "#d84315" },
+  townfolk_priest:     { glyph: "@", fg: "#ce93d8", glow: "#8e24aa" },
+  townfolk_barkeep:    { glyph: "@", fg: "#ffb74d", glow: "#e65100" },
+  townfolk_villager:   { glyph: "@", fg: "#a5d6a7", glow: "#388e3c" },
+  townfolk_mason:      { glyph: "@", fg: "#bcaaa4", glow: "#795548" },
 
   // Containers
   chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },

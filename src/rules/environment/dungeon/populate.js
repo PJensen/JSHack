@@ -8,7 +8,7 @@ import { ItemInfo } from '../../components/ItemInfo.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Collider } from '../../components/Collider.js';
 import { Polymorph } from '../../components/Polymorph.js';
-import { Shopkeeper } from '../../archetypes/Creatures.js';
+import { Shopkeeper, Human } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import { generateShopItem } from '../../data/shopStock.js';
@@ -55,6 +55,8 @@ import {
   FlowerBluebell,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
+import { TOWNFOLK } from '../../data/townfolk.js';
+import { TownfolkJob } from '../../components/TownfolkJob.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
@@ -896,6 +898,37 @@ export function materializeSpawn(world, spawn) {
         }
       }
       return null;
+    }
+    case 'townfolk': {
+      const def = TOWNFOLK[spawn.params.townfolkId];
+      if (!def) return null;
+      const id = createFrom(world, Human, {
+        x: spawn.x,
+        y: spawn.y,
+        name: def.name,
+        identity: def.identity,
+        faction: "townfolk",
+        maxHp: def.maxHp,
+        speed: def.speed,
+        intelligence: 10,
+      });
+      world.add(id, TownfolkJob, {
+        role: def.role,
+        state: "idle",
+        homeX: spawn.x,
+        homeY: spawn.y,
+        targetX: spawn.x,
+        targetY: spawn.y,
+        workTurns: 0,
+        idleTurns: 2 + Math.floor((world.rand?.() ?? Math.random()) * 5),
+        workSiteKind: "",
+        stuckTurns: 0,
+      });
+      world.add(id, Interactable, {
+        action: "talkToNPC",
+        params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+      });
+      return id;
     }
     default:
       return null;
