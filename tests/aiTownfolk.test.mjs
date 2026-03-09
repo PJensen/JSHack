@@ -7,11 +7,13 @@ import { Position }       from "../src/rules/components/Position.js";
 import { Player }         from "../src/rules/components/Player.js";
 import { NamedIdentity }  from "../src/rules/components/NamedIdentity.js";
 import { Faction }        from "../src/rules/components/Faction.js";
+import { Collider }       from "../src/rules/components/Collider.js";
+import { DoorState }      from "../src/rules/components/DoorState.js";
 import { MoveIntent }     from "../src/rules/components/Intents/MoveIntent.js";
 import { DungeonState }   from "../src/rules/components/DungeonState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../src/rules/components/TownfolkJob.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
-import { aiTownfolkSystem } from "../src/rules/systems/aiTownfolkSystem.js";
+import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/systems/aiTownfolkSystem.js";
 import { aiChaseSystem }    from "../src/rules/systems/aiChaseSystem.js";
 import { clearAll, loadChunk, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import {
@@ -54,13 +56,25 @@ function addTownfolk(world, x, y, role, opts = {}) {
   world.add(id, TownfolkJob, {
     role,
     state:        opts.state        ?? TOWNFOLK_STATES.idle,
+    scheduleEnabled: opts.scheduleEnabled ?? false,
     homeX:        opts.homeX        ?? x,
     homeY:        opts.homeY        ?? y,
+    bedX:         opts.bedX         ?? x,
+    bedY:         opts.bedY         ?? y,
+    workX:        opts.workX        ?? x,
+    workY:        opts.workY        ?? y,
+    workAuxX:     opts.workAuxX     ?? x,
+    workAuxY:     opts.workAuxY     ?? y,
+    pubX:         opts.pubX         ?? x,
+    pubY:         opts.pubY         ?? y,
     targetX:      opts.targetX      ?? x,
     targetY:      opts.targetY      ?? y,
     workTurns:    opts.workTurns    ?? 0,
     idleTurns:    opts.idleTurns    ?? 0,
     workSiteKind: opts.workSiteKind ?? "",
+    routineKind:  opts.routineKind  ?? "",
+    lastPhase:    opts.lastPhase    ?? "",
+    carrying:     opts.carrying     ?? "",
     stuckTurns:   opts.stuckTurns   ?? 0,
   });
   return id;
@@ -372,4 +386,99 @@ Deno.test("miner returns home carrying ore after work", () => {
   const job = world.get(npc, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.returning, "miner should be returning home");
   assertEquals(job.targetX, 5, "target should be homeX");
+});
+
+Deno.test("scheduled townfolk sleeps at home before dawn", () => {
+  const world = makeWorld(14);
+  world.step = 5;
+
+  const npc = addTownfolk(world, 6, 5, "villager", {
+    scheduleEnabled: true,
+    homeX: 6, homeY: 5,
+    bedX: 7, bedY: 5,
+    pubX: 10, pubY: 10,
+  });
+  world.set(npc, Position, { x: 7, y: 5 });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(npc, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.sleeping);
+  assertEquals(job.targetX, 7);
+  assertEquals(job.targetY, 5);
+});
+
+Deno.test("scheduled farmer alternates between field and mill during work hours", () => {
+  const world = makeWorld(15);
+  world.step = 34;
+
+  const farmer = addTownfolk(world, 8, 8, "farmer", {
+    scheduleEnabled: true,
+    homeX: 8, homeY: 8,
+    bedX: 7, bedY: 8,
+    workX: 12, workY: 12,
+    workAuxX: 4, workAuxY: 4,
+    pubX: 9, pubY: 9,
+  });
+  world.set(farmer, Position, { x: 4, y: 4 });
+
+  let milled = false;
+  world.on("townfolk:milled", () => { milled = true; });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(farmer, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.working);
+  assertEquals(job.workSiteKind, "mill");
+  assert(milled, "farmer should work the mill during the late work beat");
+});
+
+Deno.test("scheduled townfolk heads to the pub after work", () => {
+  const world = makeWorld(16);
+  world.step = 70;
+
+  const npc = addTownfolk(world, 6, 5, "smith", {
+    scheduleEnabled: true,
+    workX: 3, workY: 3,
+    workAuxX: 4, workAuxY: 3,
+    pubX: 9, pubY: 9,
+  });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(npc, TownfolkJob);
+  assertEquals(job.targetX, 9);
+  assertEquals(job.targetY, 9);
+  assertEquals(job.routineKind, "pub");
+});
+
+Deno.test("scheduled townfolk opens a closed door on its route and closes it after passing", () => {
+  const world = makeWorld(17);
+  world.step = 30;
+  installTownfolkDoorListener(world);
+
+  const npc = addTownfolk(world, 5, 5, "villager", {
+    scheduleEnabled: true,
+    homeX: 5, homeY: 5,
+    bedX: 5, bedY: 5,
+    workX: 8, workY: 5,
+    workAuxX: 8, workAuxY: 5,
+    pubX: 9, pubY: 9,
+  });
+  const door = world.create();
+  world.add(door, Position, { x: 6, y: 5 });
+  world.add(door, DoorState, { open: false, locked: false });
+  world.add(door, Collider, { solid: true, blocksSight: true });
+
+  aiTownfolkSystem(world);
+
+  let ds = world.get(door, DoorState);
+  assertEquals(ds.open, true, "townfolk should open the door instead of getting stuck");
+  assert(!world.has(npc, MoveIntent), "opening the door consumes the turn");
+
+  world.set(npc, Position, { x: 7, y: 5 });
+  world.emit("moved", { id: npc, from: { x: 6, y: 5 }, to: { x: 7, y: 5 } });
+
+  ds = world.get(door, DoorState);
+  assertEquals(ds.open, false, "door should close after the townfolk passes through");
 });
