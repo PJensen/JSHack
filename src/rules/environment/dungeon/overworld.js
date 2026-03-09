@@ -357,8 +357,9 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, eastWalkX, northWalkY, eastWalkX, southWalkY);
   carvePath(chunks, doorX, southWalkY, gateX, gateY - 1);
 
-  const stairX = homeX + 8;
-  const stairY = homeY + 1;
+  // Keep the first dungeon entrance visibly beside the player house on open ground.
+  const stairX = eastWalkX + 1;
+  const stairY = homeY + 2;
   carvePath(chunks, eastWalkX, southWalkY, stairX, stairY);
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
@@ -609,8 +610,8 @@ export function generateOverworldChunks(worldSeed) {
       }
     }
   }
-  // Short path connecting garden to stair path
-  carvePath(chunks, gardenCX, gardenCY - 3, homeX + 8, homeY + 3);
+  // Short path connecting garden to the house-side stair spur.
+  carvePath(chunks, gardenCX, gardenCY - 3, stairX + 1, southWalkY);
 
   // ── Worker cottages — actual homes for the town to sleep in ─────────────
   const farmerHouse = buildCottage(chunks, homeX + 6, homeY + 8, "north");
