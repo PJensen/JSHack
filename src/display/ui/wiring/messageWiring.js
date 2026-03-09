@@ -903,6 +903,31 @@ export function installMessageWiring({
     log(`${who} chop${who === 'You' ? '' : 's'} down the tree.`, 'system');
   });
 
+  // === Townfolk NPC events ===
+  world.on('npc:dialogue', ({ text }) => {
+    log(text, 'info');
+  });
+
+  world.on('townfolk:chopped', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('A woodcutter fells a tree.', 'ambient');
+  });
+
+  world.on('townfolk:repaired', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('A mason repairs some damage.', 'ambient');
+  });
+
+  world.on('townfolk:mined', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('A miner chips away at the rock.', 'ambient');
+  });
+
+  world.on('townfolk:carrying', ({ resource }) => {
+    // silent — just drives state; could add visible hauling later
+  });
+
+  world.on('townfolk:delivered', () => {
+    // silent — resource delivery is cosmetic
+  });
+
   world.on('tile:burned', ({ actor, x, y, burnedKind }) => {
     if (!canSeeAt(x, y)) return;
     const kind = String(burnedKind || 'tree');

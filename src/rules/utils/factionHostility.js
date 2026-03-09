@@ -23,6 +23,7 @@ const HOSTILITY = Object.freeze({
   enemy: Object.freeze(new Set(["player", "pet", "summoned", "stone_taunter"])),
   neutral: Object.freeze(new Set()),
   shopkeeper: Object.freeze(new Set()),
+  townfolk: Object.freeze(new Set()),
 });
 
 /**

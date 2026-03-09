@@ -1,0 +1,69 @@
+// rules/data/townfolk.js
+// NPC townspeople definitions for overworld depth 0.
+
+export const TOWNFOLK = Object.freeze({
+  farmer: {
+    name: "Farmer",
+    identity: "townfolk_farmer",
+    role: "farmer",
+    speed: 3,
+    maxHp: 30,
+    dialogue: "The crops grow well this season.",
+  },
+  woodcutter: {
+    name: "Woodcutter",
+    identity: "townfolk_woodcutter",
+    role: "woodcutter",
+    speed: 3,
+    maxHp: 40,
+    dialogue: "Plenty of timber to fell.",
+  },
+  miner: {
+    name: "Miner",
+    identity: "townfolk_miner",
+    role: "miner",
+    speed: 2,
+    maxHp: 40,
+    dialogue: "The mountain holds many secrets.",
+  },
+  smith: {
+    name: "Smith",
+    identity: "townfolk_smith",
+    role: "smith",
+    speed: 3,
+    maxHp: 50,
+    dialogue: "Bring me ore and I'll forge something fine.",
+  },
+  priest: {
+    name: "Priest",
+    identity: "townfolk_priest",
+    role: "priest",
+    speed: 2,
+    maxHp: 25,
+    dialogue: "May the gods watch over you.",
+  },
+  barkeep: {
+    name: "Barkeep",
+    identity: "townfolk_barkeep",
+    role: "barkeep",
+    speed: 3,
+    maxHp: 35,
+    dialogue: "What'll it be?",
+  },
+  villager: {
+    name: "Villager",
+    identity: "townfolk_villager",
+    role: "villager",
+    speed: 3,
+    maxHp: 20,
+    dialogue: "Fine day, isn't it?",
+  },
+  mason: {
+    name: "Mason",
+    identity: "townfolk_mason",
+    role: "mason",
+    speed: 3,
+    maxHp: 45,
+    dialogue: "I'll patch up any damage around here.",
+  },
+});
