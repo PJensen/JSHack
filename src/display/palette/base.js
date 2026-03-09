@@ -52,7 +52,7 @@ export const basePalette = {
   mountain_c: { glyph: "▲", fg: "#e0e3e6", glow: "#969ea4" },  // high-peak
   tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026" },
   farmland:  { glyph: "░", fg: "#8b7355", glow: "#5a4a38" },
-  fence:     { glyph: "#", fg: "#a08050", glow: "#6b5530" },
+  fence:     { glyph: "f", fg: "#a08050", glow: "#6b5530" },
   roof_thatch_shadow: { glyph: "▓", fg: "#9c7f2c", glow: "#6b5418" },
   roof_thatch_lit:    { glyph: "▓", fg: "#d8bf5a", glow: "#9d8221" },
   roof_thatch_shadow_charred: { glyph: "▓", fg: "#6c5530", glow: "#3b2410" },
