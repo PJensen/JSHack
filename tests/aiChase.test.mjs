@@ -82,6 +82,70 @@ Deno.test("monster north of player chases south", () => {
   assert(i2.dx === 0 && i2.dy === 1, `m2 should move south, got dx=${i2.dx} dy=${i2.dy}`);
 });
 
+Deno.test("smart monster routes around a wall with A*", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 7] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+
+  try {
+    const world = new World({ seed: 101 });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 5, y: 5 });
+    world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+
+    const goblin = world.create();
+    world.add(goblin, Position, { x: 8, y: 5 });
+    world.add(goblin, NamedIdentity, { name: "Goblin", identity: "goblin" });
+    world.add(goblin, Faction, { key: "enemy" });
+    addHuntingAggro(world, goblin, 5, 5);
+
+    aiChaseSystem(world);
+
+    const intent = world.get(goblin, MoveIntent);
+    assert(intent, "smart monster should still get a MoveIntent");
+    assertEquals(intent.dx, 0, "smart monster should route around the wall instead of bumping it");
+    assertEquals(intent.dy, -1, "smart monster should take the north detour first");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("dumb monster keeps greedy chase when a wall blocks the direct step", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 7] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+
+  try {
+    const world = new World({ seed: 102 });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 5, y: 5 });
+    world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+
+    const rat = world.create();
+    world.add(rat, Position, { x: 8, y: 5 });
+    world.add(rat, NamedIdentity, { name: "Rat", identity: "rat" });
+    world.add(rat, Faction, { key: "enemy" });
+    addHuntingAggro(world, rat, 5, 5);
+
+    aiChaseSystem(world);
+
+    const intent = world.get(rat, MoveIntent);
+    assert(intent, "dumb monster should still get a MoveIntent");
+    assertEquals(intent.dx, -1, "dumb monster should keep the simple greedy step");
+    assertEquals(intent.dy, 0, "dumb monster should not A* around the wall");
+  } finally {
+    clearAll();
+  }
+});
+
 Deno.test("diagonal chase: equal distance prefers x-axis", () => {
   const world = new World({ seed: 1 });
 

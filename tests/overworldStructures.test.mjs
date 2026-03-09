@@ -9,6 +9,7 @@ import {
   TILE_FARMLAND,
   TILE_FENCE,
   TILE_FLOOR,
+  TILE_STAIR_DOWN,
   TILE_WALL,
 } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll, isFlyable, isWalkable, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
@@ -84,6 +85,8 @@ const northWalkY = homeY - houseHalfH - 1;
 const southWalkY = spawnY;
 const westWalkX = homeX - houseHalfW - 1;
 const eastWalkX = homeX + houseHalfW + 1;
+const stairX = eastWalkX + 1;
+const stairY = homeY + 2;
 const gateX = homeX + 1;
 const gateY = homeY + 5;
 const farmX0 = homeX - 2;
@@ -115,6 +118,14 @@ Deno.test("overworld scales the player house down to a 9x5 footprint with a fron
   assertEquals(getWorldTile(chunks, doorX, southWalkY), TILE_FLOOR);
   assertEquals(getWorldTile(chunks, westWalkX, northWalkY), TILE_FLOOR);
   assertEquals(getWorldTile(chunks, eastWalkX, southWalkY), TILE_FLOOR);
+});
+
+Deno.test("overworld places the dungeon entrance on open ground beside the player house", () => {
+  const { chunks } = generateOverworldChunks(SEED);
+
+  assertEquals(getWorldTile(chunks, stairX, stairY), TILE_STAIR_DOWN);
+  assertEquals(getWorldTile(chunks, stairX - 1, stairY), TILE_FLOOR);
+  assertEquals(getWorldTile(chunks, stairX, stairY + 1), TILE_FLOOR);
 });
 
 Deno.test("overworld farm keeps the full tilled plot and uses a real fence gate", () => {

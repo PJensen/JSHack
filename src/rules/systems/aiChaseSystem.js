@@ -14,6 +14,7 @@
 //   retreat  (def.retreatHpPct) — creature flees when HP < threshold.
 
 import { Position }     from "../components/Position.js";
+import { Collider } from "../components/Collider.js";
 import { Faction }      from "../components/Faction.js";
 import { Speed }        from "../components/Speed.js";
 import { Player }       from "../components/Player.js";
@@ -21,6 +22,7 @@ import { Equipment }    from "../components/Equipment.js";
 import { ItemInfo }     from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Brain } from "../components/Brain.js";
+import { Flying } from "../components/Flying.js";
 import { Vitality }     from "../components/Vitality.js";
 import { MoveIntent }   from "../components/Intents/MoveIntent.js";
 import { FlyIntent } from "../components/Intents/FlyIntent.js";
@@ -35,16 +37,44 @@ import {
 import { getMonster }        from "../data/monsters.js";
 import { SeenCallbackContext } from "../data/callbacks/ai.js";
 import { runCallbackList }   from "../interaction/dispatch.js";
+import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import { forEachInRadius }   from "../utils/spatialIndex.js";
 import { statusStrength }    from "../utils/statusFacade.js";
 import { hasLOS }            from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { hasOverworldAerialLOS } from "../utils/flyingEligibility.js";
+import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.js";
+import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
 function chebyshevDistance(ax, ay, bx, by) {
   return Math.max(Math.abs((ax | 0) - (bx | 0)), Math.abs((ay | 0) - (by | 0)));
+}
+
+function isSmartPathingMonster(brain, def) {
+  return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
+}
+
+function isStepTraversable(world, actorId, x, y, targetX, targetY, canTraverseTile) {
+  if (!canTraverseTile(x, y)) return false;
+
+  const tile = getTile(x, y);
+  if (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP) return false;
+
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actorId) continue;
+    if (!pos || pos.x !== x || pos.y !== y) continue;
+    if (x === targetX && y === targetY) continue;
+
+    const col = world.get(id, Collider);
+    const vit = world.get(id, Vitality);
+    const solid = !!col?.solid;
+    const living = Number(vit?.hp || 0) > 0;
+    if (solid || living) return false;
+  }
+
+  return true;
 }
 
 // ── Damage-triggered aggro listener ──────────────────────────────────
@@ -325,6 +355,23 @@ export function aiChaseSystem(world) {
     const ay = Math.abs(dyt);
     let dx = 0, dy = 0;
     if (ax >= ay) { dx = Math.sign(dxt); dy = 0; } else { dy = Math.sign(dyt); dx = 0; }
+
+    if (!aggro.retreating && isSmartPathingMonster(brain, def)) {
+      const canTraverseTile = world.has(id, Flying) ? isFlyable : isWalkable;
+      const nx = (pos.x | 0) + dx;
+      const ny = (pos.y | 0) + dy;
+      if (!isStepTraversable(world, id, nx, ny, targetX, targetY, canTraverseTile)) {
+        const next = findNextCardinalStep(world, pos.x | 0, pos.y | 0, targetX, targetY, id, {
+          goalRadius: 0,
+          maxNodes: 256,
+          isPassable: canTraverseTile,
+        });
+        if (next) {
+          dx = next.dx | 0;
+          dy = next.dy | 0;
+        }
+      }
+    }
 
     // Retreating creatures flip their direction — run away from the target.
     if (aggro.retreating) {
