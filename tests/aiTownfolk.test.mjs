@@ -17,7 +17,7 @@ import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/syst
 import { aiChaseSystem }    from "../src/rules/systems/aiChaseSystem.js";
 import { clearAll, loadChunk, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import {
-  CHUNK_SIZE, TILE_FLOOR, TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN,
+  CHUNK_SIZE, TILE_FLOOR, TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_WALL, TILE_DOOR,
 } from "../src/rules/environment/dungeon/constants.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 
@@ -481,4 +481,46 @@ Deno.test("scheduled townfolk opens a closed door on its route and closes it aft
 
   ds = world.get(door, DoorState);
   assertEquals(ds.open, false, "door should close after the townfolk passes through");
+});
+
+Deno.test("townfolk pathing aligns to a one-door house exit before heading to an offset outdoor target", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+
+  for (let y = 4; y <= 8; y++) {
+    for (let x = 4; x <= 8; x++) {
+      const border = x === 4 || x === 8 || y === 4 || y === 8;
+      tiles[y * CHUNK_SIZE + x] = border ? TILE_WALL : TILE_FLOOR;
+    }
+  }
+  tiles[4 * CHUNK_SIZE + 6] = TILE_DOOR;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 18 });
+  const dsId = world.create();
+  world.add(dsId, DungeonState, {
+    worldSeed: 18,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 6, y: 6 });
+
+  const npc = addTownfolk(world, 6, 6, "villager", {
+    state: TOWNFOLK_STATES.walking,
+    targetX: 9,
+    targetY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assert(world.has(npc, MoveIntent), "townfolk should get a move toward the door alignment");
+  const intent = world.get(npc, MoveIntent);
+  assertEquals(intent.dx, 0, "townfolk should align with the doorway first");
+  assertEquals(intent.dy, -1, "townfolk should head north toward the door");
 });

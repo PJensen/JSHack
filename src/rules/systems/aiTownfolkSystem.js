@@ -12,6 +12,7 @@ import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
+import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import { isWalkable, getTile, setTile } from "../environment/dungeon/tileMap.js";
 import {
   getDestroyedTileLedger, getDestroyedTileRecord,
@@ -120,28 +121,19 @@ function findAdjacentWalkable(x, y) {
 }
 
 function stepToward(world, id, pos, tx, ty) {
-  const dx = tx - pos.x;
-  const dy = ty - pos.y;
+  const next = findNextCardinalStep(world, pos.x, pos.y, tx, ty, id, { goalRadius: 0, maxNodes: 256 });
+  const dx = next?.dx ?? 0;
+  const dy = next?.dy ?? 0;
   if (dx === 0 && dy === 0) return false;
 
-  const ax = Math.abs(dx);
-  const ay = Math.abs(dy);
-  const attempts = ax >= ay
-    ? [{ dx: Math.sign(dx), dy: 0 }, { dx: 0, dy: Math.sign(dy) }]
-    : [{ dx: 0, dy: Math.sign(dy) }, { dx: Math.sign(dx), dy: 0 }];
-
-  for (const dir of attempts) {
-    if (dir.dx === 0 && dir.dy === 0) continue;
-    const nx = pos.x + dir.dx;
-    const ny = pos.y + dir.dy;
-    if (!isWalkable(nx, ny)) continue;
-    const t = getTile(nx, ny);
-    if (t === TILE_STAIR_DOWN || t === TILE_STAIR_UP) continue;
-    if (maybeOpenDoor(world, id, nx, ny)) return true;
-    try { world.add(id, MoveIntent, { dx: dir.dx, dy: dir.dy }); } catch { return false; }
-    return true;
-  }
-  return false;
+  const nx = pos.x + dx;
+  const ny = pos.y + dy;
+  if (!isWalkable(nx, ny)) return false;
+  const t = getTile(nx, ny);
+  if (t === TILE_STAIR_DOWN || t === TILE_STAIR_UP) return false;
+  if (maybeOpenDoor(world, id, nx, ny)) return true;
+  try { world.add(id, MoveIntent, { dx, dy }); } catch { return false; }
+  return true;
 }
 
 function setIdle(job, world) {
