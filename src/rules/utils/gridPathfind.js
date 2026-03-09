@@ -20,13 +20,14 @@ function heuristic(x, y, tx, ty) {
   return Math.abs(tx - x) + Math.abs(ty - y);
 }
 
-function buildBlockedSet(world, actorId, targetX, targetY) {
+function buildBlockedSet(world, actorId, targetX, targetY, options = {}) {
+  const passThroughDoors = options.passThroughDoors === true;
   const blocked = new Set();
 
   for (const [id, pos] of world.query(Position)) {
     if (id === actorId) continue;
     if (!pos) continue;
-    if (world.has(id, DoorState)) continue;
+    if (passThroughDoors && world.has(id, DoorState)) continue;
 
     const col = world.get(id, Collider);
     const vit = world.get(id, Vitality);
@@ -59,11 +60,13 @@ function reconstructFirstStep(cameFrom, startKey, goalKey, startX, startY) {
 export function findNextCardinalStep(world, startX, startY, targetX, targetY, actorId, options = {}) {
   const maxNodes = Number.isFinite(options.maxNodes) ? options.maxNodes : 256;
   const goalRadius = Number.isFinite(options.goalRadius) ? options.goalRadius : 0;
+  const isPassable = typeof options.isPassable === "function" ? options.isPassable : isWalkable;
+  const allowStairs = options.allowStairs === true;
   const minX = Math.min(startX, targetX) - 8;
   const maxX = Math.max(startX, targetX) + 8;
   const minY = Math.min(startY, targetY) - 8;
   const maxY = Math.max(startY, targetY) + 8;
-  const blocked = buildBlockedSet(world, actorId, targetX, targetY);
+  const blocked = buildBlockedSet(world, actorId, targetX, targetY, options);
 
   const startKey = key(startX, startY);
   const open = [startKey];
@@ -100,9 +103,9 @@ export function findNextCardinalStep(world, startX, startY, targetX, targetY, ac
       const nx = cx + dir.dx;
       const ny = cy + dir.dy;
       if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
-      if (!isWalkable(nx, ny)) continue;
+      if (!isPassable(nx, ny)) continue;
       const tile = getTile(nx, ny);
-      if (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP) continue;
+      if (!allowStairs && (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP)) continue;
 
       const neighborKey = key(nx, ny);
       if (blocked.has(neighborKey)) continue;

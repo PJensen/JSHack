@@ -121,7 +121,11 @@ function findAdjacentWalkable(x, y) {
 }
 
 function stepToward(world, id, pos, tx, ty) {
-  const next = findNextCardinalStep(world, pos.x, pos.y, tx, ty, id, { goalRadius: 0, maxNodes: 256 });
+  const next = findNextCardinalStep(world, pos.x, pos.y, tx, ty, id, {
+    goalRadius: 0,
+    maxNodes: 256,
+    passThroughDoors: true,
+  });
   const dx = next?.dx ?? 0;
   const dy = next?.dy ?? 0;
   if (dx === 0 && dy === 0) return false;
