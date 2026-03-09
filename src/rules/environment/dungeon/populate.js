@@ -902,6 +902,16 @@ export function materializeSpawn(world, spawn) {
     case 'townfolk': {
       const def = TOWNFOLK[spawn.params.townfolkId];
       if (!def) return null;
+      const homeX = Number.isFinite(spawn.params.homeX) ? spawn.params.homeX : spawn.x;
+      const homeY = Number.isFinite(spawn.params.homeY) ? spawn.params.homeY : spawn.y;
+      const bedX = Number.isFinite(spawn.params.bedX) ? spawn.params.bedX : homeX;
+      const bedY = Number.isFinite(spawn.params.bedY) ? spawn.params.bedY : homeY;
+      const workX = Number.isFinite(spawn.params.workX) ? spawn.params.workX : spawn.x;
+      const workY = Number.isFinite(spawn.params.workY) ? spawn.params.workY : spawn.y;
+      const workAuxX = Number.isFinite(spawn.params.workAuxX) ? spawn.params.workAuxX : workX;
+      const workAuxY = Number.isFinite(spawn.params.workAuxY) ? spawn.params.workAuxY : workY;
+      const pubX = Number.isFinite(spawn.params.pubX) ? spawn.params.pubX : homeX;
+      const pubY = Number.isFinite(spawn.params.pubY) ? spawn.params.pubY : homeY;
       const id = createFrom(world, Human, {
         x: spawn.x,
         y: spawn.y,
@@ -915,13 +925,25 @@ export function materializeSpawn(world, spawn) {
       world.add(id, TownfolkJob, {
         role: def.role,
         state: "idle",
-        homeX: spawn.x,
-        homeY: spawn.y,
-        targetX: spawn.x,
-        targetY: spawn.y,
+        scheduleEnabled: Boolean(spawn.params.scheduleEnabled),
+        homeX,
+        homeY,
+        bedX,
+        bedY,
+        workX,
+        workY,
+        workAuxX,
+        workAuxY,
+        pubX,
+        pubY,
+        targetX: homeX,
+        targetY: homeY,
         workTurns: 0,
         idleTurns: 2 + Math.floor((world.rand?.() ?? Math.random()) * 5),
         workSiteKind: "",
+        routineKind: "",
+        lastPhase: "",
+        carrying: "",
         stuckTurns: 0,
       });
       world.add(id, Interactable, {

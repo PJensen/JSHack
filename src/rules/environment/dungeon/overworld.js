@@ -216,6 +216,34 @@ function paintStructure(chunks, floorCells, door) {
   setWorldTile(chunks, door.x, door.y, TILE_DOOR);
 }
 
+/**
+ * Build a compact cottage with a door and bed.
+ * Returns interior anchors for assigning residents.
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} x0
+ * @param {number} y0
+ * @param {"north"|"south"} doorSide
+ * @returns {{ doorX:number, doorY:number, sleepX:number, sleepY:number, standX:number, standY:number }}
+ */
+function buildCottage(chunks, x0, y0, doorSide = "south") {
+  const floorCells = [];
+  for (let y = y0 + 1; y <= y0 + 3; y++) {
+    for (let x = x0 + 1; x <= x0 + 3; x++) {
+      floorCells.push({ x, y });
+    }
+  }
+  const doorX = x0 + 2;
+  const doorY = doorSide === "north" ? y0 : y0 + 4;
+  paintStructure(chunks, floorCells, { x: doorX, y: doorY });
+
+  const sleepX = x0 + 1;
+  const sleepY = y0 + 2;
+  const standX = x0 + 2;
+  const standY = y0 + 2;
+  addSpawn(chunks, sleepX, sleepY, "home_bed");
+  return { doorX, doorY, sleepX, sleepY, standX, standY };
+}
+
 function isOutdoorGroundTile(tile) {
   return tile === TILE_GRASS
       || tile === TILE_GRASS_A
@@ -584,6 +612,39 @@ export function generateOverworldChunks(worldSeed) {
   // Short path connecting garden to stair path
   carvePath(chunks, gardenCX, gardenCY - 3, homeX + 8, homeY + 3);
 
+  // ── Worker cottages — actual homes for the town to sleep in ─────────────
+  const farmerHouse = buildCottage(chunks, homeX + 6, homeY + 8, "north");
+  carvePath(chunks, farmerHouse.doorX, farmerHouse.doorY - 1, eastWalkX, southWalkY);
+
+  const smithHouse = buildCottage(chunks, homeX - 12, homeY + 8, "north");
+  carvePath(chunks, smithHouse.doorX, smithHouse.doorY - 1, westWalkX, southWalkY);
+
+  const masonHouse = buildCottage(chunks, homeX + 11, homeY - 2, "south");
+  carvePath(chunks, masonHouse.doorX, masonHouse.doorY + 1, eastWalkX, homeY - 1);
+
+  const villagerHouse = buildCottage(chunks, homeX + 11, homeY + 2, "north");
+  carvePath(chunks, villagerHouse.doorX, villagerHouse.doorY - 1, eastWalkX, southWalkY);
+
+  const barkeepHouse = buildCottage(chunks, tavX0 + 9, tavY0 + 1, "south");
+  carvePath(chunks, barkeepHouse.doorX, barkeepHouse.doorY + 1, tavDoorX + 3, tavDoorY + 1);
+
+  const priestHouse = buildCottage(chunks, churchX0 - 7, churchY0 + 1, "south");
+  carvePath(chunks, priestHouse.doorX, priestHouse.doorY + 1, churchDoorX - 4, northWalkY);
+
+  const woodcutterHouse = buildCottage(chunks, homeX - 17, homeY - 4, "south");
+  carvePath(chunks, woodcutterHouse.doorX, woodcutterHouse.doorY + 1, westWalkX, homeY - 2);
+
+  const minerHouse = buildCottage(chunks, homeX + 15, homeY - 15, "south");
+  carvePath(chunks, minerHouse.doorX, minerHouse.doorY + 1, eastWalkX, northWalkY);
+
+  // Small quarry route close enough that the miner visibly commutes from town.
+  const mineWorkX = homeX + 18;
+  const mineWorkY = homeY - 20;
+  fillDisk(chunks, mineWorkX, mineWorkY, 3);
+  carvePath(chunks, eastWalkX, northWalkY, mineWorkX, mineWorkY + 2);
+  addSpawn(chunks, mineWorkX, mineWorkY, "harvest_stone");
+  addSpawn(chunks, mineWorkX + 1, mineWorkY - 1, "harvest_iron_ore");
+
   // Natural harvestables are placed after all structures so they cannot end up in walls or on paths.
   for (const p of berrySpots) {
     if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
@@ -603,14 +664,78 @@ export function generateOverworldChunks(worldSeed) {
   }
 
   // ── NPC Townspeople ────────────────────────────────────────────
-  addSpawn(chunks, farmX0 + 1, farmY0 + 1, "townfolk", { townfolkId: "farmer" });
-  addSpawn(chunks, homeX - 14, homeY - 2, "townfolk", { townfolkId: "woodcutter" });
-  addSpawn(chunks, homeX + 30, homeY - 20, "townfolk", { townfolkId: "miner" });
-  addSpawn(chunks, homeX - 5, homeY + 7, "townfolk", { townfolkId: "smith" });
-  addSpawn(chunks, churchX0 + 3, churchY0 + 3, "townfolk", { townfolkId: "priest" });
-  addSpawn(chunks, tavX0 + 3, tavY0 + 3, "townfolk", { townfolkId: "barkeep" });
-  addSpawn(chunks, fountainCX + 2, fountainCY, "townfolk", { townfolkId: "villager" });
-  addSpawn(chunks, homeX + 3, homeY + 3, "townfolk", { townfolkId: "mason" });
+  addSpawn(chunks, farmerHouse.standX, farmerHouse.standY, "townfolk", {
+    townfolkId: "farmer",
+    scheduleEnabled: true,
+    homeX: farmerHouse.standX, homeY: farmerHouse.standY,
+    bedX: farmerHouse.sleepX, bedY: farmerHouse.sleepY,
+    workX: homeX + 1, workY: homeY + 8,
+    workAuxX: millX0 + 2, workAuxY: millY0 + 2,
+    pubX: tavX0 + 2, pubY: tavY0 + 4,
+  });
+  addSpawn(chunks, woodcutterHouse.standX, woodcutterHouse.standY, "townfolk", {
+    townfolkId: "woodcutter",
+    scheduleEnabled: true,
+    homeX: woodcutterHouse.standX, homeY: woodcutterHouse.standY,
+    bedX: woodcutterHouse.sleepX, bedY: woodcutterHouse.sleepY,
+    workX: homeX - 18, workY: homeY - 6,
+    workAuxX: homeX - 21, workAuxY: homeY - 10,
+    pubX: tavX0 + 1, pubY: tavY0 + 4,
+  });
+  addSpawn(chunks, minerHouse.standX, minerHouse.standY, "townfolk", {
+    townfolkId: "miner",
+    scheduleEnabled: true,
+    homeX: minerHouse.standX, homeY: minerHouse.standY,
+    bedX: minerHouse.sleepX, bedY: minerHouse.sleepY,
+    workX: mineWorkX, workY: mineWorkY + 1,
+    workAuxX: mineWorkX + 1, workAuxY: mineWorkY - 1,
+    pubX: tavX0 + 6, pubY: tavY0 + 4,
+  });
+  addSpawn(chunks, smithHouse.standX, smithHouse.standY, "townfolk", {
+    townfolkId: "smith",
+    scheduleEnabled: true,
+    homeX: smithHouse.standX, homeY: smithHouse.standY,
+    bedX: smithHouse.sleepX, bedY: smithHouse.sleepY,
+    workX: homeX - 5, workY: homeY + 8,
+    workAuxX: homeX - 6, workAuxY: homeY + 7,
+    pubX: tavX0 + 5, pubY: tavY0 + 4,
+  });
+  addSpawn(chunks, priestHouse.standX, priestHouse.standY, "townfolk", {
+    townfolkId: "priest",
+    scheduleEnabled: true,
+    homeX: priestHouse.standX, homeY: priestHouse.standY,
+    bedX: priestHouse.sleepX, bedY: priestHouse.sleepY,
+    workX: churchX0 + 3, workY: churchY0 + 3,
+    workAuxX: churchX0 + 3, workAuxY: churchY0 + 1,
+    pubX: tavX0 + 4, pubY: tavY0 + 4,
+  });
+  addSpawn(chunks, barkeepHouse.standX, barkeepHouse.standY, "townfolk", {
+    townfolkId: "barkeep",
+    scheduleEnabled: true,
+    homeX: barkeepHouse.standX, homeY: barkeepHouse.standY,
+    bedX: barkeepHouse.sleepX, bedY: barkeepHouse.sleepY,
+    workX: tavX0 + 4, workY: tavY0 + 2,
+    workAuxX: tavX0 + 2, workAuxY: tavY0 + 1,
+    pubX: tavX0 + 3, pubY: tavY0 + 4,
+  });
+  addSpawn(chunks, villagerHouse.standX, villagerHouse.standY, "townfolk", {
+    townfolkId: "villager",
+    scheduleEnabled: true,
+    homeX: villagerHouse.standX, homeY: villagerHouse.standY,
+    bedX: villagerHouse.sleepX, bedY: villagerHouse.sleepY,
+    workX: gardenCX, workY: gardenCY,
+    workAuxX: homeX - 3, workAuxY: southWalkY + 1,
+    pubX: tavX0 + 6, pubY: tavY0 + 2,
+  });
+  addSpawn(chunks, masonHouse.standX, masonHouse.standY, "townfolk", {
+    townfolkId: "mason",
+    scheduleEnabled: true,
+    homeX: masonHouse.standX, homeY: masonHouse.standY,
+    bedX: masonHouse.sleepX, bedY: masonHouse.sleepY,
+    workX: fountainCX + 1, workY: fountainCY + 1,
+    workAuxX: churchDoorX, workAuxY: northWalkY,
+    pubX: tavX0 + 1, pubY: tavY0 + 2,
+  });
 
   const outChunks = [];
   for (const rec of chunks.values()) {
