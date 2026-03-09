@@ -22,7 +22,7 @@ function makeActor(world, name, eq, hp = 10, resistances = null) {
   const e = world.get(id, Equipment);
   if (eq?.weapon) e.weapon = eq.weapon;
   if (eq?.armor) e.armor = eq.armor;
-  if (eq?.shield) e.shield = eq.shield;
+  if (eq?.offhand) e.offhand = eq.offhand;
   if (eq?.ring1) e.ring1 = eq.ring1;
   if (eq?.ring2) e.ring2 = eq.ring2;
   return id;
@@ -152,9 +152,9 @@ Deno.test("insulated affix mitigates capacitive electric chip", () => {
   const worldB = new World({ seed: 202 });
   installAffixTriggers(worldB);
   const weaponB = makeEquip(worldB, { id: 'test_cap', name: 'Capacitive Blade', slot: 'weapon', bonuses: { attack: 6 }, affixes: ['capacitive1'] });
-  const insulatedShield = makeEquip(worldB, { id: 'test_insulated', name: 'Insulated Shield', slot: 'shield', bonuses: {}, affixes: ['insulated1'] });
+  const insulatedShield = makeEquip(worldB, { id: 'test_insulated', name: 'Insulated Shield', slot: 'offhand', bonuses: {}, affixes: ['insulated1'] });
   const heroB = makeActor(worldB, 'Hero', { weapon: weaponB }, 10);
-  const foeB = makeActor(worldB, 'Target', { shield: insulatedShield }, 10, { electric: { ohms: 1000, fibrillationA: 0.03 } });
+  const foeB = makeActor(worldB, 'Target', { offhand: insulatedShield }, 10, { electric: { ohms: 1000, fibrillationA: 0.03 } });
   worldB.add(heroB, Position, { x: 1, y: 1 });
   worldB.add(foeB, Position, { x: 1, y: 2 });
   equipmentSystem(worldB);

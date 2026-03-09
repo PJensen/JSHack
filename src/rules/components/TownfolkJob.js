@@ -9,6 +9,8 @@ export const TOWNFOLK_ROLES = Object.freeze({
   barkeep:    "barkeep",
   villager:   "villager",
   mason:      "mason",
+  herbalist:  "herbalist",
+  alchemist:  "alchemist",
 });
 
 export const TOWNFOLK_STATES = Object.freeze({
@@ -16,6 +18,7 @@ export const TOWNFOLK_STATES = Object.freeze({
   walking:    "walking",
   working:    "working",
   returning:  "returning",
+  delivering: "delivering",
   sleeping:   "sleeping",
   socializing:"socializing",
 });
@@ -42,5 +45,9 @@ export const TownfolkJob = defineComponent("TownfolkJob", {
   routineKind:  "",
   lastPhase:    "",
   carrying:     "",
+  carryCount:   0,
+  carryMax:     0,
+  deliverX:     0,
+  deliverY:     0,
   stuckTurns:   0,
 });

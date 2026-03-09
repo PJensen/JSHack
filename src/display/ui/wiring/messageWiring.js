@@ -491,23 +491,24 @@ export function installMessageWiring({
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
 
-  world.on('damaged', ({ target, amount, critical, crit, source }) => {
+  world.on('damaged', ({ target, amount, critical, crit, source, offhand }) => {
     const defName = nameOfEntity(target);
     const critTxt = (critical || crit) ? ' (CRIT!)' : '';
+    const handTxt = offhand ? ' (off-hand)' : '';
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
       let weaponLabel = '';
       const eq = compGet(Number(source || 0), Equipment);
-      const wid = Number(eq?.weapon || 0);
+      const wid = offhand ? Number(eq?.offhand || 0) : Number(eq?.weapon || 0);
       if (wid) {
         const wname = compGet(wid, NamedIdentity)?.name;
         if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
-      } else if (compHas(Number(source || 0), Player)) {
+      } else if (!offhand && compHas(Number(source || 0), Player)) {
         weaponLabel = ' with bare fists';
       }
-      log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}.`, 'combat');
+      log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
     } else {
-      log(`${defName} takes ${amount} damage${critTxt}.`, 'combat');
+      log(`${defName} takes ${amount} damage${critTxt}${handTxt}.`, 'combat');
     }
   });
 
@@ -675,6 +676,12 @@ export function installMessageWiring({
       const inter = compGet(Number(targetId || 0), NamedIdentity);
       if (inter?.identity === 'house_sign') {
         log('Home sweet home. Rest, gather, and prepare for another descent.', 'system');
+      } else if (inter?.identity === 'smithy_sign') {
+        log('The Black Smith — ore deliveries welcome.', 'system');
+      } else if (inter?.identity === 'apothecary_sign') {
+        log('The Apothecary — potions, salves, and remedies.', 'system');
+      } else if (inter?.identity === 'tombstone') {
+        log('The weathered inscription reads: "Rest eternal, faithful soul."', 'system');
       } else {
         log('You read the sign.', 'system');
       }
@@ -844,6 +851,47 @@ export function installMessageWiring({
     }
   });
 
+  world.on('mill:milled', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You grind wheat into fresh flour at the millstone.', 'system');
+  });
+
+  world.on('mill:failed', ({ actor, reason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'missing_wheat') {
+      log('You need wheat before the millstone can do any work.', 'system');
+      return;
+    }
+    if (reason === 'no_inventory') {
+      log('You need some way to carry the flour.', 'system');
+      return;
+    }
+    log('The millstone grinds to a halt.', 'system');
+  });
+
+  world.on('smithy:smelted', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You fire the forge and smelt ore into a workable iron ingot.', 'system');
+  });
+
+  world.on('smithy:forged', ({ actor, outputName }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You hammer out ${bracketizeName(String(outputName || 'new tools'))} at the anvil.`, 'system');
+  });
+
+  world.on('smithy:failed', ({ actor, reason, station }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (station === 'furnace') {
+      if (reason === 'missing_ore') log('You need iron ore to fire the forge.', 'system');
+      else if (reason === 'missing_fuel') log('The forge needs coal before you can smelt anything.', 'system');
+      else log('The forge sputters without producing anything useful.', 'system');
+      return;
+    }
+    if (reason === 'missing_iron') log('You need smelted iron before the anvil can shape anything.', 'system');
+    else if (reason === 'missing_lumber') log('You need lumber for handles and hafts before you can finish a tool.', 'system');
+    else log('You study the anvil, but you lack the right materials for the next job.', 'system');
+  });
+
   world.on('deathlog:open', () => {
     log('You open the Book of the Dead...', 'system');
     window.dispatchEvent(new CustomEvent('ui:openDeathLog'));
@@ -920,12 +968,52 @@ export function installMessageWiring({
     if (canSeeAt(x, y)) log('A miner chips away at the rock.', 'ambient');
   });
 
+  world.on('townfolk:harvested', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('A farmer picks a ripe crop.', 'ambient');
+  });
+
   world.on('townfolk:carrying', ({ resource }) => {
     // silent — just drives state; could add visible hauling later
   });
 
   world.on('townfolk:delivered', () => {
     // silent — resource delivery is cosmetic
+  });
+
+  world.on('townfolk:gathered_herbs', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('An herbalist gathers wild herbs.', 'ambient');
+  });
+
+  world.on('townfolk:brewed', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('An alchemist brews a potion.', 'ambient');
+  });
+
+  world.on('townfolk:smelted', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('The smith stokes the forge and draws out fresh iron.', 'ambient');
+  });
+
+  world.on('townfolk:stocked', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('An alchemist arranges potions on the shelves.', 'ambient');
+  });
+
+  world.on('townfolk:sorted_herbs', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('An herbalist sorts through dried herbs.', 'ambient');
+  });
+
+  world.on('town:produced', ({ chain, itemId }) => {
+    if (chain === 'mill') log('The mill turns stored grain into fresh flour.', 'ambient');
+    else if (chain === 'furnace') log('The forge roars as ore melts down into iron.', 'ambient');
+    else if (chain === 'smithy') log('Hammering rings out as the smith turns iron into tools.', 'ambient');
+  });
+
+  world.on('town:shortage', ({ food, materials, medicine }) => {
+    if (food) log('The town is running lean on food.', 'system');
+    else if (medicine) log('The apothecary stores are running low.', 'system');
+    else if (materials) log('The workshops are short on raw materials.', 'system');
+  });
+
+  world.on('town:threatened', ({ threatLevel }) => {
+    if (threatLevel > 0) log('The town stirs uneasily at a nearby threat.', 'system');
   });
 
   world.on('tile:burned', ({ actor, x, y, burnedKind }) => {
@@ -1030,5 +1118,23 @@ export function installMessageWiring({
   });
   world.on('combat:target-flying', () => {
     log('Out of reach!', 'info');
+  });
+
+  // === Weather events ===
+  world.on('weather:changed', ({ weather, prev }) => {
+    if (weather === 'rain') {
+      log('Rain begins to fall.', 'info');
+    } else if (weather === 'heavy_rain') {
+      log('The rain intensifies into a downpour.', 'info');
+    } else if (weather === 'clear' && (prev === 'rain' || prev === 'heavy_rain')) {
+      log('The rain lets up.', 'info');
+    }
+  });
+  world.on('weather:extinguish', ({ kind }) => {
+    if (kind === 'player') {
+      log('The rain douses the flames on you.', 'info');
+    } else if (kind === 'structure') {
+      log('The rain puts out a fire.', 'ambient');
+    }
   });
 }

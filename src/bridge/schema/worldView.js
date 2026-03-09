@@ -28,19 +28,20 @@ import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Burned } from "../../rules/components/Burned.js";
 import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
-/** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean }} RoofTileView */
+/** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 /** @type {Map<number, SolidView>} */
@@ -80,7 +81,7 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar"]);
+const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar", "cooking_fire"]);
 
 function xyKey(x, y) {
 	return `${x},${y}`;
@@ -98,6 +99,8 @@ const CARDINAL_STEPS = Object.freeze([
 	[0, -1],
 ]);
 const ROOF_BURN_PROPAGATION_LIMIT = 2;
+/** How many turns after burning a tile still smolders (emits smoke). */
+const SMOLDER_TURNS = 30;
 
 /**
  * @param {string} key
@@ -265,7 +268,9 @@ function collectFixedRoofedBuilding(identity, seedX, seedY) {
 		case "alchemy_bench":
 			return collectRectRoofedBuilding(seedX - 3, seedY, seedX + 3, seedY + 2, seedX, seedY + 3);
 		case "church_altar":
-			return collectRectRoofedBuilding(seedX - 2, seedY, seedX + 2, seedY + 4, seedX, seedY + 5);
+			return collectRoofedBuilding(seedX, seedY);
+		case "cooking_fire":
+			return collectRectRoofedBuilding(seedX - 6, seedY - 2, seedX, seedY, seedX - 3, seedY + 1);
 		case "millstone":
 			return collectRectRoofedBuilding(seedX - 1, seedY - 1, seedX + 1, seedY + 1, seedX, seedY + 2);
 		case "tavern_keg":
@@ -390,11 +395,13 @@ function collectOverworldRoofs(world, playerPos) {
 		const floorKeys = [...building.floorKeys];
 		if (floorKeys.some((key) => visited.has(key))) continue;
 		for (let i = 0; i < floorKeys.length; i++) visited.add(floorKeys[i]);
-		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) continue;
+		// Compute burn propagation (needed for both shelter check and roof rendering)
 		const burnedSeedStrengths = new Map();
 		const burnedSeedKeys = new Set();
 		const activeSeedStrengths = new Map();
 		const activeSeedKeys = new Set();
+		/** Floor keys adjacent to tiles destroyed within SMOLDER_TURNS (for post-fire smoke). */
+		const smolderingSeedKeys = new Set();
 		for (const [key] of Object.entries(destroyedTiles || {})) {
 			const rec = destroyedTiles[key];
 			if (
@@ -412,6 +419,7 @@ function collectOverworldRoofs(world, playerPos) {
 				burnedSeedKeys.add(floorKey);
 				const prev = Number(burnedSeedStrengths.get(floorKey) || 0);
 				if (strength > prev) burnedSeedStrengths.set(floorKey, strength);
+				if (age <= SMOLDER_TURNS) smolderingSeedKeys.add(floorKey);
 			}
 		}
 		for (const key of activeFireKeys) {
@@ -439,6 +447,27 @@ function collectOverworldRoofs(world, playerPos) {
 				exposedFloorKeys.add(floorKey);
 			}
 		}
+
+		// Player inside this building — determine shelter from weather, skip roof rendering
+		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) {
+			const nearBurned = keyWithinRadius(playerKey, burnedScoreKeys, 1);
+			const nearActiveFire = keyWithinRadius(playerKey, activeScoreKeys, 1);
+			const roofGone = nearBurned && !nearActiveFire;
+			if (building.floorKeys.has(playerKey)) {
+				_view.playerSheltered = !exposedFloorKeys.has(playerKey) && !roofGone;
+			} else {
+				// Door position — sheltered if adjacent to any covered floor
+				const { x, y } = keyToXY(playerKey);
+				let adjCovered = false;
+				for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+					const nk = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
+					if (building.floorKeys.has(nk) && !exposedFloorKeys.has(nk)) { adjCovered = true; break; }
+				}
+				_view.playerSheltered = adjCovered && !roofGone;
+			}
+			continue;
+		}
+
 		const roofTiles = roofTilesFromBuilding(
 			building.floorKeys,
 			building.doorKeys,
@@ -450,11 +479,17 @@ function collectOverworldRoofs(world, playerPos) {
 			const key = xyKey(roofTiles[i].x, roofTiles[i].y);
 			const nearBurned = keyWithinRadius(key, burnedScoreKeys, 1);
 			const nearActiveFire = keyWithinRadius(key, activeScoreKeys, 1);
-			if (nearBurned && !nearActiveFire) continue;
 			if (nearBurned) {
 				roofTiles[i].kind = roofTiles[i].kind.includes("_charred")
 					? roofTiles[i].kind
 					: `${roofTiles[i].kind}_charred`;
+				if (!nearActiveFire) {
+					// Burned but no active fire — keep as damaged charred tile at reduced alpha
+					roofTiles[i].alpha *= 0.45;
+					if (keyWithinRadius(key, smolderingSeedKeys, 1)) {
+						roofTiles[i].smoking = true;
+					}
+				}
 			}
 			if (nearActiveFire) {
 				roofTiles[i].burning = true;
@@ -497,6 +532,23 @@ function projectDisplayTags(world, id, rec) {
 		const t = normalizeDisplayStatusType(s?.type);
 		if (!t || !DISPLAY_STATUS_TAGS.has(t)) continue;
 		if (!rec.tags.includes(t)) rec.tags.push(t);
+	}
+}
+
+/**
+ * Project display-relevant tags from equipped items carried by an entity.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {EntityView} rec
+ */
+function projectEquipmentDisplayTags(world, id, rec) {
+	/** @type {any} */ const eq = /** @type any */ (world.get(id, Equipment));
+	if (!eq) return;
+	const offhandId = Number(eq.offhand || 0) | 0;
+	if (!(offhandId > 0)) return;
+	const offhandIdentity = String(world.get(offhandId, NamedIdentity)?.identity || "").toLowerCase();
+	if (offhandIdentity === "torch" && !rec.tags.includes("torch")) {
+		rec.tags.push("torch");
 	}
 }
 
@@ -579,7 +631,15 @@ export function buildWorldView(world) {
 	_view.emissives.length = 0;
 	_view.roofs.length = 0;
 	_view.engravings.length = 0;
+	_view.weather = "clear";
+	_view.playerSheltered = false;
 	_allEntities.length = 0;
+
+	// Read weather state (singleton on overworld)
+	for (const [, ws] of world.query(WeatherState)) {
+		_view.weather = ws.current || "clear";
+		break;
+	}
 
 	// Expose tile grid functions for direct grid-based rendering
 	_view.tileGrid = { getTile, forEachTileInRect };
@@ -642,6 +702,10 @@ export function buildWorldView(world) {
 				kind = door.open ? "door_open" : "door_closed";
 			} else if (objState && ident?.identity === "furnace") {
 				kind = objState.state === "lit" ? "furnace" : "furnace_unlit";
+			} else if (objState && ident?.identity === "millstone") {
+				kind = objState.state === "working" ? "millstone_active" : "millstone";
+			} else if (objState && ident?.identity === "anvil") {
+				kind = objState.state === "working" ? "anvil_active" : "anvil";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
@@ -667,6 +731,7 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
+			projectEquipmentDisplayTags(world, id, rec);
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
@@ -701,6 +766,10 @@ export function buildWorldView(world) {
 				kind = door.open ? "door_open" : "door_closed";
 			} else if (objState && ident?.identity === "furnace") {
 				kind = objState.state === "lit" ? "furnace" : "furnace_unlit";
+			} else if (objState && ident?.identity === "millstone") {
+				kind = objState.state === "working" ? "millstone_active" : "millstone";
+			} else if (objState && ident?.identity === "anvil") {
+				kind = objState.state === "working" ? "anvil_active" : "anvil";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
@@ -726,6 +795,7 @@ export function buildWorldView(world) {
 
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
+			projectEquipmentDisplayTags(world, id, rec);
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');

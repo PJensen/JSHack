@@ -8,7 +8,8 @@
  *  vx:number, vy:number,
  *  scaleStart:number, scaleEnd:number,
  *  batch:boolean, value:number|null, sign:number, justSpawned:boolean,
- *  flavor:'damage'|'gold'|'heal'|'status'|'custom', crit?:boolean
+ *  flavor:'damage'|'gold'|'heal'|'status'|'custom', crit?:boolean,
+ *  delay:number
  * }} FTItem */
 /** @typedef {{
  *  flavor?: 'damage'|'gold'|'heal'|'status'|'custom',
@@ -18,7 +19,8 @@
  *  dmg?: number,
  *  scaleStart?: number,
  *  scaleEnd?: number,
- *  crit?: boolean
+ *  crit?: boolean,
+ *  delay?: number
  * }} FTOptions */
 
 export class FloatText {
@@ -108,8 +110,11 @@ export class FloatText {
       sign: isNumber ? (String(text).trim().startsWith('-')?-1:1) : 0,
       justSpawned: true,
       flavor: (isDamage?'damage':(isGold?'gold':(isHeal?'heal':(isStatus?'status':'custom')))),
-      crit
+      crit,
+      delay: Math.max(0, Number(opts.delay || 0)),
     };
+    // Delayed entries must not batch with immediate ones
+    if (rec.delay > 0) rec.justSpawned = false;
     this.fct.push(rec);
     return rec;
   }
@@ -154,6 +159,8 @@ export class FloatText {
     this._now += Math.max(0, Number(dt)||0);
     if (!this.fct.length) return;
     for (const p of this.fct){
+      // Delayed entries count down before becoming active
+      if (p.delay > 0) { p.delay -= dt; if (p.delay > 0) continue; }
       p.ttl -= dt;
       p.justSpawned = false;
       // motion
@@ -177,6 +184,7 @@ export class FloatText {
     const m = (typeof ctx.getTransform === 'function') ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
     const worldFontPx = 0.9; // ~0.9 world units tall
     for (const p of this.fct){
+      if (p.delay > 0) continue; // still waiting
       const t = Math.max(0, Math.min(1, 1 - p.ttl / Math.max(1e-6, p.life)));
       // Non-linear punch for damage, linear for gold
   /** @param {number} u */

@@ -48,11 +48,22 @@ import {
   ChurchAltar,
   ChurchPew,
   ChurchSign,
+  ChurchFont,
+  ChurchWindow,
   FlowerRose,
   FlowerSunflower,
   FlowerTulip,
   FlowerDaisy,
   FlowerBluebell,
+  SmithyChest,
+  MillChest,
+  LumberChest,
+  SmithySign,
+  PotionShelf,
+  HerbChest,
+  TavernChest,
+  ApothecarySign,
+  GraveTombstone,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { TOWNFOLK } from '../../data/townfolk.js';
@@ -61,6 +72,7 @@ import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { addToInventory } from '../../utils/inventoryFacade.js';
+import { createItemById } from '../../utils/itemFactory.js';
 import {
   CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
   TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
@@ -824,6 +836,10 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, ChurchPew, { x: spawn.x, y: spawn.y });
     case 'church_sign':
       return createFrom(world, ChurchSign, { x: spawn.x, y: spawn.y });
+    case 'church_font':
+      return createFrom(world, ChurchFont, { x: spawn.x, y: spawn.y });
+    case 'church_window':
+      return createFrom(world, ChurchWindow, { x: spawn.x, y: spawn.y });
     case 'flower_rose':
       return createFrom(world, FlowerRose, { x: spawn.x, y: spawn.y });
     case 'flower_sunflower':
@@ -834,6 +850,24 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, FlowerDaisy, { x: spawn.x, y: spawn.y });
     case 'flower_bluebell':
       return createFrom(world, FlowerBluebell, { x: spawn.x, y: spawn.y });
+    case 'smithy_chest':
+      return createFrom(world, SmithyChest, { x: spawn.x, y: spawn.y });
+    case 'mill_chest':
+      return createFrom(world, MillChest, { x: spawn.x, y: spawn.y });
+    case 'lumber_chest':
+      return createFrom(world, LumberChest, { x: spawn.x, y: spawn.y });
+    case 'smithy_sign':
+      return createFrom(world, SmithySign, { x: spawn.x, y: spawn.y });
+    case 'potion_shelf':
+      return createFrom(world, PotionShelf, { x: spawn.x, y: spawn.y });
+    case 'herb_chest':
+      return createFrom(world, HerbChest, { x: spawn.x, y: spawn.y });
+    case 'tavern_chest':
+      return createFrom(world, TavernChest, { x: spawn.x, y: spawn.y });
+    case 'apothecary_sign':
+      return createFrom(world, ApothecarySign, { x: spawn.x, y: spawn.y });
+    case 'grave_tombstone':
+      return createFrom(world, GraveTombstone, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);
@@ -912,6 +946,8 @@ export function materializeSpawn(world, spawn) {
       const workAuxY = Number.isFinite(spawn.params.workAuxY) ? spawn.params.workAuxY : workY;
       const pubX = Number.isFinite(spawn.params.pubX) ? spawn.params.pubX : homeX;
       const pubY = Number.isFinite(spawn.params.pubY) ? spawn.params.pubY : homeY;
+      const deliverX = Number.isFinite(spawn.params.deliverX) ? spawn.params.deliverX : 0;
+      const deliverY = Number.isFinite(spawn.params.deliverY) ? spawn.params.deliverY : 0;
       const id = createFrom(world, Human, {
         x: spawn.x,
         y: spawn.y,
@@ -920,6 +956,7 @@ export function materializeSpawn(world, spawn) {
         faction: "townfolk",
         maxHp: def.maxHp,
         speed: def.speed,
+        capacity: 6,
         intelligence: 10,
       });
       world.add(id, TownfolkJob, {
@@ -944,12 +981,53 @@ export function materializeSpawn(world, spawn) {
         routineKind: "",
         lastPhase: "",
         carrying: "",
+        carryCount: 0,
+        carryMax: def.role === "farmer" ? 4 : 0,
+        deliverX,
+        deliverY,
         stuckTurns: 0,
       });
-      world.add(id, Interactable, {
-        action: "talkToNPC",
-        params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
-      });
+      // Alchemist is a shopkeeper — use openShop action instead of talkToNPC
+      if (def.role === "alchemist") {
+        world.add(id, Interactable, {
+          action: "openShop",
+          params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+        });
+        world.add(id, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
+        if (spawn.params.shopRoom) {
+          const roomEntity = world.create();
+          world.add(roomEntity, RoomMetadata, {
+            roomType: 'shop',
+            x: spawn.params.shopRoom.x,
+            y: spawn.params.shopRoom.y,
+            w: spawn.params.shopRoom.w,
+            h: spawn.params.shopRoom.h,
+            shopkeeperId: id,
+          });
+        }
+      } else {
+        world.add(id, Interactable, {
+          action: "talkToNPC",
+          params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+        });
+      }
+      // Miner spawns with pickaxe equipped
+      if (def.role === "miner") {
+        const pickId = createItemById(world, "iron_pickaxe");
+        if (pickId) {
+          addToInventory(world, id, pickId);
+          const eq = world.get(id, Equipment);
+          if (eq) eq.weapon = pickId;
+        }
+      }
+      if (def.role === "woodcutter") {
+        const hatchetId = createItemById(world, "tool_hatchet");
+        if (hatchetId) {
+          addToInventory(world, id, hatchetId);
+          const eq = world.get(id, Equipment);
+          if (eq) eq.weapon = hatchetId;
+        }
+      }
       return id;
     }
     default:

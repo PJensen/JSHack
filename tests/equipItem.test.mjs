@@ -33,7 +33,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   assert(eq.weapon === sword, `weapon should be sword, got ${eq.weapon}`);
   assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
 
-  // Swap weapon
+  // Equip second 1H weapon → cascades to offhand (dual-wield)
   const axe = makeItem(world, { id: 'axe', name: 'Axe', slot: 'weapon' });
   addToInventory(world, actor, axe);
 
@@ -41,7 +41,19 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   equipItemSystem(world);
 
   eq = world.get(actor, Equipment);
-  assert(eq.weapon === axe, `weapon should be axe, got ${eq.weapon}`);
+  assert(eq.weapon === sword, `weapon should still be sword, got ${eq.weapon}`);
+  assert(eq.offhand === axe, `offhand should be axe, got ${eq.offhand}`);
+
+  // Equip third weapon → replaces weapon slot (offhand occupied)
+  const mace = makeItem(world, { id: 'mace', name: 'Mace', slot: 'weapon' });
+  addToInventory(world, actor, mace);
+
+  world.add(actor, EquipIntent, { itemId: mace });
+  equipItemSystem(world);
+
+  eq = world.get(actor, Equipment);
+  assert(eq.weapon === mace, `weapon should be mace, got ${eq.weapon}`);
+  assert(eq.offhand === axe, `offhand should still be axe, got ${eq.offhand}`);
   assert(inventoryContains(world, actor, sword), 'old sword should be back in inventory');
 
   // Equip armor
@@ -118,14 +130,14 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   assert(eq.ring1 === ring3, `ring1 should be swapped to iron ring, got ${eq.ring1}`);
   assert(inventoryContains(world, actor, ring1), 'displaced ruby ring should be in inventory');
 
-  // Equip shield
-  const shield = makeItem(world, { id: 'buckler', name: 'Buckler', slot: 'shield' });
+  // Equip offhand
+  const shield = makeItem(world, { id: 'buckler', name: 'Buckler', slot: 'offhand' });
   addToInventory(world, actor, shield);
 
   world.add(actor, EquipIntent, { itemId: shield });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
-  assert(eq.shield === shield, `shield should be buckler, got ${eq.shield}`);
+  assert(eq.offhand === shield, `offhand should be buckler, got ${eq.offhand}`);
 
   // Equip feet slot
   const boots = makeItem(world, { id: 'boots_leather', name: 'Leather Boots', slot: 'feet' });
@@ -159,7 +171,7 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
   world.add(actor, EquipIntent, { itemId: ghost });
   equipItemSystem(world);
   eq = world.get(actor, Equipment);
-  assert(eq.weapon === axe, 'weapon should still be axe (ghost not in inventory)');
+  assert(eq.weapon === mace, 'weapon should still be mace (ghost not in inventory)');
 
   // Invalid: non-equip item
   const potion = world.create();

@@ -16,6 +16,7 @@ import { HazardArea } from '../src/rules/components/HazardArea.js';
 import { Potion } from '../src/rules/components/Potion.js';
 import { Consumable } from '../src/rules/components/Consumable.js';
 import { FoodDecay } from '../src/rules/components/FoodDecay.js';
+import { ObjectState } from '../src/rules/components/ObjectState.js';
 import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { WildBerries, WildHerbs, ThornPods, VenomFronds } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
@@ -597,6 +598,92 @@ Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   const fd = world.get(corpse, FoodDecay);
   assert(fd.turnsHeld === 0, 'turnsHeld should be reset to 0');
   assert(fd.shelfLife === 500, `shelfLife should be 500 (ration), got ${fd.shelfLife}`);
+});
+
+Deno.test("millstone mills wheat into flour", () => {
+  const world = new World({ seed: 74 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const wheat = world.create();
+  world.add(wheat, NamedIdentity, { name: "Wheat", identity: "food_wheat" });
+  world.add(wheat, ItemInfo, { type: "ingredient", weight: 1, value: 2, count: 2 });
+  addToInventory(world, actor, wheat);
+
+  const millstone = world.create();
+  world.add(millstone, Interactable, { action: "millGrain", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(millstone, ObjectState, { state: "idle" });
+
+  const milled = [];
+  world.on("mill:milled", (e) => milled.push(e));
+
+  world.add(actor, InteractIntent, { targetId: millstone });
+  interactionSystem(world);
+
+  assert(milled.length === 1, "millstone should emit a milling event");
+  assert(world.get(millstone, ObjectState)?.state === "working", "millstone should enter working state");
+  assert(inventoryItems(world, actor).some((id) => world.get(id, NamedIdentity)?.identity === "food_flour"), "actor should receive flour");
+});
+
+Deno.test("furnace smelts ore into iron ingots", () => {
+  const world = new World({ seed: 75 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const ore = world.create();
+  world.add(ore, NamedIdentity, { name: "Iron Ore", identity: "ore_iron" });
+  world.add(ore, ItemInfo, { type: "material", weight: 1, value: 4, count: 1 });
+  const coal = world.create();
+  world.add(coal, NamedIdentity, { name: "Coal", identity: "ore_coal" });
+  world.add(coal, ItemInfo, { type: "fuel", weight: 1, value: 2, count: 1 });
+  addToInventory(world, actor, ore);
+  addToInventory(world, actor, coal);
+
+  const furnace = world.create();
+  world.add(furnace, Interactable, { action: "smeltOre", params: { idleState: "unlit", activeState: "lit", activeDuration: 5 } });
+  world.add(furnace, ObjectState, { state: "unlit" });
+
+  const smelted = [];
+  world.on("smithy:smelted", (e) => smelted.push(e));
+
+  world.add(actor, InteractIntent, { targetId: furnace });
+  interactionSystem(world);
+
+  assert(smelted.length === 1, "furnace should emit a smelting event");
+  assert(world.get(furnace, ObjectState)?.state === "lit", "furnace should light while operating");
+  assert(inventoryItems(world, actor).some((id) => world.get(id, NamedIdentity)?.identity === "material_iron"), "actor should receive an iron ingot");
+});
+
+Deno.test("anvil forges carried iron and lumber into a tool", () => {
+  const world = new World({ seed: 76 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const iron = world.create();
+  world.add(iron, NamedIdentity, { name: "Iron Ingot", identity: "material_iron" });
+  world.add(iron, ItemInfo, { type: "material", weight: 1, value: 9, count: 1 });
+  const lumber = world.create();
+  world.add(lumber, NamedIdentity, { name: "Lumber", identity: "material_lumber" });
+  world.add(lumber, ItemInfo, { type: "material", weight: 1, value: 6, count: 1 });
+  addToInventory(world, actor, iron);
+  addToInventory(world, actor, lumber);
+
+  const anvil = world.create();
+  world.add(anvil, Interactable, { action: "forgeTools", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(anvil, ObjectState, { state: "idle" });
+
+  const forged = [];
+  world.on("smithy:forged", (e) => forged.push(e));
+
+  world.add(actor, InteractIntent, { targetId: anvil });
+  interactionSystem(world);
+
+  assert(forged.length === 1, "anvil should emit a forge event");
+  assert(world.get(anvil, ObjectState)?.state === "working", "anvil should enter working state");
+  assert(inventoryItems(world, actor).some((id) => {
+    const identity = world.get(id, NamedIdentity)?.identity;
+    return identity === "tool_kitchen_knife" || identity === "tool_hatchet" || identity === "iron_pickaxe";
+  }), "actor should receive a forged tool");
 });
 
 Deno.test("cooking fire: no corpses emits cooking:open with empty list", () => {

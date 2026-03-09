@@ -11,6 +11,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { ThrowIntent } from "../src/rules/components/Intents/ThrowIntent.js";
 import { ScriptVerb, registerScript } from "../src/rules/scripting.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("throw runtime default path drops item to landing tile with weighted range", () => {
@@ -218,4 +219,36 @@ Deno.test("throw runtime invokes ScriptVerb.ItemThrow with throw context", () =>
 
   assert(inventoryContains(world, actor, item), "skipBaseThrow should leave the item in inventory");
   assert(!world.has(item, Position), "skipBaseThrow should avoid ground placement");
+});
+
+Deno.test("throwing a torch starts a fire and still drops the torch item", () => {
+  const world = new World({ seed: 7107 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 999 });
+  world.add(actor, Position, { x: 10, y: 10 });
+
+  const torch = buildCatalogItem(world, "torch");
+  addToInventory(world, actor, torch);
+
+  world.add(actor, ThrowIntent, { itemId: torch, x: 12, y: 10 });
+  throwSystem(world);
+
+  assert(!inventoryContains(world, actor, torch), "thrown torch should leave inventory");
+
+  const torchPos = world.get(torch, Position);
+  assert(torchPos, "torch should land on the ground after the throw");
+  assertEquals(torchPos.x, 12);
+  assertEquals(torchPos.y, 10);
+
+  const fires = [];
+  for (const [id, pos, hazard] of world.query(Position, HazardArea)) {
+    if (String(hazard?.kind || "") !== "fire") continue;
+    fires.push({ id, pos, hazard });
+  }
+
+  assertEquals(fires.length, 1, "throwing a torch should create exactly one fire hazard");
+  assertEquals(fires[0].pos.x, 12);
+  assertEquals(fires[0].pos.y, 10);
+  assertEquals(fires[0].hazard.cause, "torch_fire");
+  assertEquals(fires[0].hazard.sourceKind, "torch");
 });

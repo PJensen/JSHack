@@ -158,24 +158,25 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   });
 
   // Floating text hooks: damage (messages handled in messageWiring)
-  world.on('damaged', ({ target, amount, critical, crit, at }) => {
+  world.on('damaged', ({ target, amount, critical, crit, at, offhand }) => {
     const t = Number(target || 0) || 0;
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(t);
     const hitIsPlayer = isPlayer(t);
     if (pos && canShowAt(pos.x, pos.y) && Number.isFinite(amount)) {
       const col = hitIsPlayer ? '#ff6060' : '#ffd966';
-      ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit) });
+      const delay = offhand ? 0.15 : 0;
+      ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
     }
   });
 
   // Status floating text (messages handled in messageWiring)
   world.on('status', (payload) => {
-    const { id, kind, effect, at } = normalizeStatusEvent(payload);
+    const { id, kind, effect, at, masked } = normalizeStatusEvent(payload);
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(Number(id || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
     const kindLower = (String(kind || '')).toLowerCase();
     const style = kindLower === 'miss' ? 'miss' : (kindLower === 'immune' ? 'immune' : 'status');
-    const label = resolveStatusLabel(kind, effect);
+    const label = masked ? kindLower.toUpperCase() || 'STATUS' : resolveStatusLabel(kind, effect);
     const opts = { style };
     if (kindLower === 'taunt' || kindLower === 'alert') opts.color = '#ffdd00';
     try { ftext.addStatus(pos.x, pos.y, label, opts); } catch (e) { console.debug('[floatTextWiring] ftext failed:', e); }

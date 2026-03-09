@@ -248,10 +248,10 @@ Deno.test("shieldWall1 affix applies stoneskin on damaged event", () => {
     const world = new World({ seed: s });
     installAffixTriggers(world);
 
-    const shield = makeEquip(world, { slot: 'shield', bonuses: {}, affixes: ['shieldWall1'] });
+    const shield = makeEquip(world, { slot: 'offhand', bonuses: {}, affixes: ['shieldWall1'] });
     const defender = makeActor(world, { x: 1, y: 1, hp: 50, faction: 'player' });
     const attacker = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
-    world.get(defender, Equipment).shield = shield;
+    world.get(defender, Equipment).offhand = shield;
 
     world.emit('damaged', { target: defender, amount: 5, source: attacker });
 
@@ -371,17 +371,17 @@ Deno.test("shield affixes fire on damaged event", async () => {
   });
   const { AFFIX_DEFS } = await import('../src/rules/data/affixes.js');
   AFFIX_DEFS['test_shield_slot'] = {
-    name: 'Test Shield Slot', slots: ['shield'], triggers: ['onDamaged'],
+    name: 'Test Shield Slot', slots: ['offhand'], triggers: ['onDamaged'],
     script: 'affix:test_shield_slot', weight: 1
   };
 
-  const shield = makeEquip(world, { slot: 'shield', bonuses: {}, affixes: ['test_shield_slot'] });
+  const shield = makeEquip(world, { slot: 'offhand', bonuses: {}, affixes: ['test_shield_slot'] });
   const defender = makeActor(world, { x: 1, y: 1, hp: 50 });
   const attacker = makeActor(world, { x: 1, y: 2, hp: 50 });
-  world.get(defender, Equipment).shield = shield;
+  world.get(defender, Equipment).offhand = shield;
 
   world.emit('damaged', { target: defender, amount: 5, source: attacker });
 
-  assert(fired, 'shield affix should have fired on damaged event');
+  assert(fired, 'offhand affix should have fired on damaged event');
   delete AFFIX_DEFS['test_shield_slot'];
 });

@@ -45,7 +45,7 @@ const HOME_LINES = Object.freeze([
  */
 export function overworldAmbientSystem(world) {
   let depth = 1;
-  for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
+  for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; break; }
   if (depth !== 0) return;
 
   let ppos = null;

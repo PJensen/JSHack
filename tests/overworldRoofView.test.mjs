@@ -38,7 +38,7 @@ Deno.test("overworld roofs appear from outside and hide only the building the pl
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
   world.add(player, Position, { x: spawn.x, y: spawn.y });
 
-  const houseInterior = posOfIdentity(world, "alchemy_bench");
+  const houseInterior = posOfIdentity(world, "cooking_fire");
   const cottageInterior = posOfIdentity(world, "bed_home");
   const tavernInterior = posOfIdentity(world, "tavern_keg");
   const windmillInterior = posOfIdentity(world, "millstone");

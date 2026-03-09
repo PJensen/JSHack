@@ -14,7 +14,7 @@ export const ItemInfo = defineComponent(
     description: "", // flavor text description of the item
     count: 1, // stacking count; >=1 for any item entity
     bonuses: {}, // flat bonuses: { attack, defense, maxHp, critChance, critMult, ... }
-    twoHanded: false, // requires both hands; blocks shield slot
+    twoHanded: false, // requires both hands; blocks offhand slot
     rarity: 1,
     rarityName: "common",
     affixes: [], // list of affix ids applied to this item (rules/data/affixes)

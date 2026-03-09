@@ -15,12 +15,22 @@
 import { DoorState } from "../../components/DoorState.js";
 import { Collider } from "../../components/Collider.js";
 import { Inventory } from "../../components/Inventory.js";
-import { inventoryItems, inventoryContains, addToInventory, removeFromInventory, hasCapacity } from "../../utils/inventoryFacade.js";
+import {
+  inventoryItems,
+  inventoryContains,
+  addToInventory,
+  removeFromInventory,
+  hasCapacity,
+  consumeFromStack,
+  getStackCount,
+} from "../../utils/inventoryFacade.js";
 import { Vitality } from "../../components/Vitality.js";
 import { Mana } from "../../components/Mana.js";
 import { Stamina } from "../../components/Stamina.js";
 import { ShopInventory } from "../../components/ShopInventory.js";
 import { HarvestNode } from "../../components/HarvestNode.js";
+import { GrowthStage } from "../../components/GrowthStage.js";
+import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Equipment } from "../../components/Equipment.js";
 import { Position } from "../../components/Position.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
@@ -43,6 +53,7 @@ import { Ashes } from "../../archetypes/Items.js";
 import { Encumbrance } from "../../components/Encumbrance.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
+import { createItemById } from "../../utils/itemFactory.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -64,6 +75,11 @@ const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
 const FOUNTAIN_COOLDOWN_MIN = 201;
 const FOUNTAIN_COOLDOWN_MAX = 259;
+const PLAYER_SMITH_RECIPES = Object.freeze([
+  Object.freeze({ key: "kitchen_knife", itemId: "tool_kitchen_knife", iron: 1, lumber: 1, outputName: "Kitchen Knife" }),
+  Object.freeze({ key: "work_hatchet", itemId: "tool_hatchet", iron: 1, lumber: 1, outputName: "Work Hatchet" }),
+  Object.freeze({ key: "iron_pickaxe", itemId: "iron_pickaxe", iron: 2, lumber: 1, outputName: "Iron Pickaxe" }),
+]);
 
 function deriveFountainCooldownTurns(world, targetId, params) {
   const explicit = Number(params?.cooldownTurns);
@@ -157,6 +173,117 @@ function setFountainState(world, targetId, updates) {
     params.maxCharges = Math.max(1, params.chargesRemaining | 0);
   }
   world.set(targetId, Interactable, { action: inter.action, params });
+}
+
+function setWorkstationActive(world, targetId, fallbackState) {
+  const inter = world.get(targetId, Interactable);
+  if (!inter) return;
+  const params = (inter.params && typeof inter.params === "object")
+    ? { ...inter.params }
+    : {};
+  const activeState = String(params.activeState || fallbackState || "working");
+  const duration = Math.max(1, Number(params.activeDuration || 4) | 0);
+  params.activeUntilStep = (Number(world.step || 0) | 0) + duration;
+  if (world.has(targetId, ObjectState)) {
+    world.set(targetId, ObjectState, { state: activeState });
+  }
+  world.set(targetId, Interactable, { action: inter.action, params });
+}
+
+function consumeIdentityUnits(world, ownerId, identity, amount) {
+  const result = consumeFromStack(world, ownerId, identity, amount);
+  if (result.consumed < amount) return false;
+  for (const itemId of result.entities) {
+    try { world.destroy(itemId); } catch {}
+  }
+  return true;
+}
+
+function giveCraftedItem(world, ownerId, itemId) {
+  const createdId = createItemById(world, itemId);
+  if (!(createdId > 0)) return 0;
+  if (world.has(ownerId, Inventory) && addToInventory(world, ownerId, createdId)) return createdId;
+  const pos = world.get(ownerId, Position);
+  if (pos) world.add(createdId, Position, { x: pos.x, y: pos.y });
+  return createdId;
+}
+
+function choosePlayerSmithRecipe(world, actor) {
+  const ironCount = getStackCount(world, actor, "material_iron");
+  const lumberCount = getStackCount(world, actor, "material_lumber");
+  if (ironCount <= 0) return { recipe: null, reason: "missing_iron" };
+  if (lumberCount <= 0) return { recipe: null, reason: "missing_lumber" };
+
+  for (const recipe of PLAYER_SMITH_RECIPES) {
+    const owned = getStackCount(world, actor, recipe.itemId);
+    if (owned > 0) continue;
+    if (ironCount >= recipe.iron && lumberCount >= recipe.lumber) {
+      return { recipe, reason: "" };
+    }
+  }
+  for (const recipe of PLAYER_SMITH_RECIPES) {
+    if (ironCount >= recipe.iron && lumberCount >= recipe.lumber) {
+      return { recipe, reason: "" };
+    }
+  }
+  return { recipe: null, reason: "missing_iron" };
+}
+
+function smeltOreAtFurnace(world, actor, targetId) {
+  if (!world.has(actor, Inventory)) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: "no_inventory", station: "furnace" });
+    return;
+  }
+  const oreCount = getStackCount(world, actor, "ore_iron");
+  const coalCount = getStackCount(world, actor, "ore_coal");
+  if (oreCount <= 0) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: "missing_ore", station: "furnace" });
+    return;
+  }
+  if (coalCount <= 0) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: "missing_fuel", station: "furnace" });
+    return;
+  }
+  if (!consumeIdentityUnits(world, actor, "ore_iron", 1) || !consumeIdentityUnits(world, actor, "ore_coal", 1)) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: "consume_failed", station: "furnace" });
+    return;
+  }
+  const itemId = giveCraftedItem(world, actor, "material_iron");
+  setWorkstationActive(world, targetId, "lit");
+  world.emit?.("smithy:smelted", {
+    actor,
+    targetId,
+    itemId,
+    outputIdentity: "material_iron",
+  });
+}
+
+function forgeAtAnvil(world, actor, targetId) {
+  if (!world.has(actor, Inventory)) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: "no_inventory", station: "anvil" });
+    return;
+  }
+  const choice = choosePlayerSmithRecipe(world, actor);
+  const recipe = choice.recipe;
+  if (!recipe) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: choice.reason || "no_recipe", station: "anvil" });
+    return;
+  }
+  if (!consumeIdentityUnits(world, actor, "material_iron", recipe.iron)
+      || !consumeIdentityUnits(world, actor, "material_lumber", recipe.lumber)) {
+    world.emit?.("smithy:failed", { actor, targetId, reason: "consume_failed", station: "anvil" });
+    return;
+  }
+  const itemId = giveCraftedItem(world, actor, recipe.itemId);
+  setWorkstationActive(world, targetId, "working");
+  world.emit?.("smithy:forged", {
+    actor,
+    targetId,
+    itemId,
+    recipeKey: recipe.key,
+    outputIdentity: recipe.itemId,
+    outputName: recipe.outputName,
+  });
 }
 
 // ─── Payload definitions ──────────────────────────────────────────────────────
@@ -318,11 +445,52 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  millGrain: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      if (!world.has(actor, Inventory)) {
+        world.emit?.("mill:failed", { actor, targetId, reason: "no_inventory" });
+        return;
+      }
+      const wheatCount = getStackCount(world, actor, "food_wheat");
+      if (wheatCount <= 0) {
+        world.emit?.("mill:failed", { actor, targetId, reason: "missing_wheat" });
+        return;
+      }
+      if (!consumeIdentityUnits(world, actor, "food_wheat", 1)) {
+        world.emit?.("mill:failed", { actor, targetId, reason: "consume_failed" });
+        return;
+      }
+      const itemId = giveCraftedItem(world, actor, "food_flour");
+      setWorkstationActive(world, targetId, "working");
+      world.emit?.("mill:milled", {
+        actor,
+        targetId,
+        itemId,
+        outputIdentity: "food_flour",
+      });
+    },
+  },
+
   // ── Furnace ────────────────────────────────────────────────────────────────
+
+  smeltOre: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      smeltOreAtFurnace(world, actor, targetId);
+    },
+  },
 
   toggleFurnace: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
+      const hasInventory = world.has(actor, Inventory);
+      const oreCount = hasInventory ? getStackCount(world, actor, "ore_iron") : 0;
+      const coalCount = hasInventory ? getStackCount(world, actor, "ore_coal") : 0;
+      if (oreCount > 0 && coalCount > 0) {
+        smeltOreAtFurnace(world, actor, targetId);
+        return;
+      }
       const os = world.get(targetId, ObjectState);
       const nowLit = os?.state !== "lit";
       if (os) world.set(targetId, ObjectState, { state: nowLit ? "lit" : "unlit" });
@@ -331,6 +499,13 @@ export const INTERACT_PAYLOADS = {
         action: "toggleFurnace",
         result: nowLit ? "lit" : "extinguished",
       });
+    },
+  },
+
+  forgeTools: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      forgeAtAnvil(world, actor, targetId);
     },
   },
 
@@ -642,6 +817,17 @@ export const INTERACT_PAYLOADS = {
         n.ready = false;
         n.regrowCountdown = n.regrowTurns;
       });
+
+      // Reset visual to bare soil (stage 0) immediately on harvest.
+      const gs = world.get(targetId, GrowthStage);
+      if (gs && gs.currentStage !== 0) {
+        world.mutate(targetId, GrowthStage, (r) => { r.currentStage = 0; });
+        const bareIdentity = gs.stageIdentities?.[0];
+        if (bareIdentity) {
+          const ni = world.get(targetId, NamedIdentity);
+          if (ni) world.set(targetId, NamedIdentity, { ...ni, identity: bareIdentity });
+        }
+      }
 
       world.emit?.("harvest:picked", {
         actor, targetId,

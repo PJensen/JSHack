@@ -42,7 +42,7 @@ function placeLich(world, x, y) {
   world.add(lich, Faction, { key: 'enemy' });
   world.add(lich, Equipment, {
     weapon: null, armor: null, head: null, neck: null, belt: null,
-    gloves: null, shield: null, ring1: null, ring2: null,
+    gloves: null, offhand: null, ring1: null, ring2: null,
     legs: null, ammo: null, ranged: null, feet: null,
     attackDerived: 4, defenseDerived: 5,
     maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,
@@ -131,7 +131,7 @@ Deno.test("goblin (intelligence 4) does NOT pick up weapons — not sapient enou
   world.add(goblin, Faction, { key: 'enemy' });
   world.add(goblin, Equipment, {
     weapon: null, armor: null, head: null, neck: null, belt: null,
-    gloves: null, shield: null, ring1: null, ring2: null,
+    gloves: null, offhand: null, ring1: null, ring2: null,
     legs: null, ammo: null, ranged: null, feet: null,
     attackDerived: 1, defenseDerived: 0,
     maxHpDerived: 0, critChanceDerived: 0, critMultDerived: 0,

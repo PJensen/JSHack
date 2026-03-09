@@ -6,9 +6,11 @@ import { Position } from "../src/rules/components/Position.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Flying } from "../src/rules/components/Flying.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
+import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 
 function addDungeonState(world, depth, profileType = 'default') {
   const id = world.create();
@@ -69,4 +71,27 @@ Deno.test("WorldView still hides cave flyers behind blocked LOS", () => {
   const view = buildWorldView(world);
   const visibleBat = view.entities.find((entity) => entity.id === bat);
   assert(!visibleBat, "expected cave flyer to stay hidden behind wall cover");
+});
+
+Deno.test("WorldView tags actors carrying an offhand torch for display emitters", () => {
+  clearAll();
+  clearExplored();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+
+  const world = new World({ seed: 13 });
+  addDungeonState(world, 1, "default");
+
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 1, y: 1 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Equipment, {});
+
+  const torch = buildCatalogItem(world, "torch");
+  world.get(player, Equipment).offhand = torch;
+
+  const view = buildWorldView(world);
+  const playerView = view.entities.find((entity) => entity.id === player);
+  assert(playerView, "expected player to appear in world view");
+  assert(playerView.tags.includes("torch"), "expected offhand torch to project a torch display tag");
 });
