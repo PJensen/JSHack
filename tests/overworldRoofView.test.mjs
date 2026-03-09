@@ -39,11 +39,13 @@ Deno.test("overworld roofs appear from outside and hide only the building the pl
   world.add(player, Position, { x: spawn.x, y: spawn.y });
 
   const houseInterior = posOfIdentity(world, "alchemy_bench");
+  const cottageInterior = posOfIdentity(world, "bed_home");
   const tavernInterior = posOfIdentity(world, "tavern_keg");
   const windmillInterior = posOfIdentity(world, "millstone");
 
   let view = buildWorldView(world);
   assert(roofHas(view, houseInterior.x, houseInterior.y), "house roof should show while the player is outside");
+  assert(roofHas(view, cottageInterior.x, cottageInterior.y), "cottage roof should show while the player is outside");
   assert(roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should show while the player is outside");
   assert(roofHas(view, windmillInterior.x, windmillInterior.y), "windmill roof should show while the player is outside");
   assert(!view.isVisible?.(houseInterior.x, houseInterior.y), "house interior should still be hidden by walls while the player is outside");
@@ -52,12 +54,21 @@ Deno.test("overworld roofs appear from outside and hide only the building the pl
   world.set(player, Position, houseInterior);
   view = buildWorldView(world);
   assert(!roofHas(view, houseInterior.x, houseInterior.y), "house roof should hide when the player steps inside");
+  assert(roofHas(view, cottageInterior.x, cottageInterior.y), "cottage roof should remain visible when the player is in the house");
   assert(roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should remain visible when the player is in the house");
   assert(roofHas(view, windmillInterior.x, windmillInterior.y), "windmill roof should remain visible when the player is in the house");
+
+  world.set(player, Position, cottageInterior);
+  view = buildWorldView(world);
+  assert(roofHas(view, houseInterior.x, houseInterior.y), "house roof should reappear when the player leaves it");
+  assert(!roofHas(view, cottageInterior.x, cottageInterior.y), "cottage roof should hide when the player steps inside");
+  assert(roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should remain visible when the player is in the cottage");
+  assert(roofHas(view, windmillInterior.x, windmillInterior.y), "windmill roof should remain visible when the player is in the cottage");
 
   world.set(player, Position, tavernInterior);
   view = buildWorldView(world);
   assert(roofHas(view, houseInterior.x, houseInterior.y), "house roof should reappear when the player leaves it");
+  assert(roofHas(view, cottageInterior.x, cottageInterior.y), "cottage roof should reappear when the player leaves it");
   assert(!roofHas(view, tavernInterior.x, tavernInterior.y), "tavern roof should hide when the player steps inside");
   assert(roofHas(view, windmillInterior.x, windmillInterior.y), "windmill roof should remain visible when the player is in the tavern");
 

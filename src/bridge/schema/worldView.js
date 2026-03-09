@@ -80,7 +80,7 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "tavern_keg", "millstone", "church_altar"]);
+const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar"]);
 
 function xyKey(x, y) {
 	return `${x},${y}`;
@@ -173,6 +173,108 @@ function collectRoofedBuilding(seedX, seedY) {
 
 	if (!floorKeys.size) return null;
 	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
+}
+
+function collectCottageBuildingFromBed(seedX, seedY) {
+	const floorXs = [seedX, seedX + 1, seedX + 2];
+	const floorYs = [seedY - 1, seedY, seedY + 1];
+	for (let iy = 0; iy < floorYs.length; iy++) {
+		for (let ix = 0; ix < floorXs.length; ix++) {
+			if (getTile(floorXs[ix], floorYs[iy]) !== TILE_FLOOR) return null;
+		}
+	}
+
+	const northDoor = { x: seedX + 1, y: seedY - 2 };
+	const southDoor = { x: seedX + 1, y: seedY + 2 };
+	let door = null;
+	if (getTile(northDoor.x, northDoor.y) === TILE_DOOR) door = northDoor;
+	else if (getTile(southDoor.x, southDoor.y) === TILE_DOOR) door = southDoor;
+	else return null;
+
+	const floorKeys = new Set();
+	for (let iy = 0; iy < floorYs.length; iy++) {
+		for (let ix = 0; ix < floorXs.length; ix++) {
+			floorKeys.add(xyKey(floorXs[ix], floorYs[iy]));
+		}
+	}
+
+	const doorKeys = new Set([xyKey(door.x, door.y)]);
+	const wallKeys = new Set();
+	for (let y = seedY - 2; y <= seedY + 2; y++) {
+		for (let x = seedX - 1; x <= seedX + 3; x++) {
+			const key = xyKey(x, y);
+			if (floorKeys.has(key) || doorKeys.has(key)) continue;
+			wallKeys.add(key);
+		}
+	}
+
+	const exposedFloorKeys = new Set();
+	for (const key of floorKeys) {
+		const { x, y } = keyToXY(key);
+		for (let i = 0; i < CARDINAL_STEPS.length; i++) {
+			const nx = x + CARDINAL_STEPS[i][0];
+			const ny = y + CARDINAL_STEPS[i][1];
+			const tile = getTile(nx, ny);
+			if (tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR) continue;
+			exposedFloorKeys.add(key);
+			break;
+		}
+	}
+
+	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
+}
+
+function collectRectRoofedBuilding(floorX0, floorY0, floorX1, floorY1, doorX, doorY) {
+	const floorKeys = new Set();
+	for (let y = floorY0; y <= floorY1; y++) {
+		for (let x = floorX0; x <= floorX1; x++) {
+			if (getTile(x, y) !== TILE_FLOOR) return null;
+			floorKeys.add(xyKey(x, y));
+		}
+	}
+	if (getTile(doorX, doorY) !== TILE_DOOR) return null;
+
+	const doorKeys = new Set([xyKey(doorX, doorY)]);
+	const wallKeys = new Set();
+	for (let y = floorY0 - 1; y <= floorY1 + 1; y++) {
+		for (let x = floorX0 - 1; x <= floorX1 + 1; x++) {
+			const key = xyKey(x, y);
+			if (floorKeys.has(key) || doorKeys.has(key)) continue;
+			wallKeys.add(key);
+		}
+	}
+
+	const exposedFloorKeys = new Set();
+	for (const key of floorKeys) {
+		const { x, y } = keyToXY(key);
+		for (let i = 0; i < CARDINAL_STEPS.length; i++) {
+			const nx = x + CARDINAL_STEPS[i][0];
+			const ny = y + CARDINAL_STEPS[i][1];
+			const tile = getTile(nx, ny);
+			if (tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR) continue;
+			exposedFloorKeys.add(key);
+			break;
+		}
+	}
+
+	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
+}
+
+function collectFixedRoofedBuilding(identity, seedX, seedY) {
+	switch (identity) {
+		case "alchemy_bench":
+			return collectRectRoofedBuilding(seedX - 3, seedY, seedX + 3, seedY + 2, seedX, seedY + 3);
+		case "church_altar":
+			return collectRectRoofedBuilding(seedX - 2, seedY, seedX + 2, seedY + 4, seedX, seedY + 5);
+		case "millstone":
+			return collectRectRoofedBuilding(seedX - 1, seedY - 1, seedX + 1, seedY + 1, seedX, seedY + 2);
+		case "tavern_keg":
+			return collectRectRoofedBuilding(seedX, seedY, seedX + 6, seedY + 4, seedX + 3, seedY + 5);
+		case "bed_home":
+			return collectCottageBuildingFromBed(seedX, seedY);
+		default:
+			return collectRoofedBuilding(seedX, seedY);
+	}
 }
 
 /**
@@ -283,7 +385,7 @@ function collectOverworldRoofs(world, playerPos) {
 	for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
 		const identity = String(ident?.identity || "");
 		if (!OVERWORLD_ROOF_SEED_IDENTITIES.has(identity)) continue;
-		const building = collectRoofedBuilding(pos.x, pos.y);
+		const building = collectFixedRoofedBuilding(identity, pos.x, pos.y);
 		if (!building) continue;
 		const floorKeys = [...building.floorKeys];
 		if (floorKeys.some((key) => visited.has(key))) continue;
