@@ -8,6 +8,7 @@ import { Hunger } from '../components/Hunger.js';
 import { Vitality } from '../components/Vitality.js';
 import { Equipment } from '../components/Equipment.js';
 import { Status } from '../components/Status.js';
+import { Settings } from '../components/Settings.js';
 import { HUNGER_STATUS_TYPES, HUNGER_POTENCY, getHungerLevel } from '../data/food.js';
 import { dealDamage } from '../utils/dealDamage.js';
 
@@ -18,6 +19,10 @@ import { dealDamage } from '../utils/dealDamage.js';
 export function hungerSystem(world) {
   for (const [id, hc] of world.query(Hunger)) {
     if (!hc) continue;
+
+    // Skip hunger processing if disabled in settings
+    const settings = world.get(id, Settings);
+    if (settings && settings.hungerEnabled === false) continue;
 
     // 1) Tick satiation or hunger (equipment hungerRate adds extra ticks)
     const eq = world.get(id, Equipment);
