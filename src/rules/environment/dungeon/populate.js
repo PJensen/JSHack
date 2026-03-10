@@ -64,6 +64,7 @@ import {
   TavernChest,
   ApothecarySign,
   GraveTombstone,
+  TownBell,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { TOWNFOLK } from '../../data/townfolk.js';
@@ -840,6 +841,8 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, ChurchFont, { x: spawn.x, y: spawn.y });
     case 'church_window':
       return createFrom(world, ChurchWindow, { x: spawn.x, y: spawn.y });
+    case 'town_bell':
+      return createFrom(world, TownBell, { x: spawn.x, y: spawn.y });
     case 'flower_rose':
       return createFrom(world, FlowerRose, { x: spawn.x, y: spawn.y });
     case 'flower_sunflower':

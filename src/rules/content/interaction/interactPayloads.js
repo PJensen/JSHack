@@ -667,6 +667,15 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  // ── Town Bell ────────────────────────────────────────────────────────────────
+
+  ringBell: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      world.emit?.("bell:rung", { actor, targetId });
+    },
+  },
+
   // ── Shrine ─────────────────────────────────────────────────────────────────
 
   touchShrine: {
