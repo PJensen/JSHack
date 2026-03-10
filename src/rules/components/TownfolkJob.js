@@ -21,6 +21,7 @@ export const TOWNFOLK_STATES = Object.freeze({
   delivering: "delivering",
   sleeping:   "sleeping",
   socializing:"socializing",
+  armed:      "armed",
 });
 
 export const TownfolkJob = defineComponent("TownfolkJob", {
@@ -50,4 +51,5 @@ export const TownfolkJob = defineComponent("TownfolkJob", {
   deliverX:     0,
   deliverY:     0,
   stuckTurns:   0,
+  guardTurnsLeft: 0,
 });

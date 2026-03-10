@@ -728,6 +728,10 @@ export function installMessageWiring({
     log('Your offering fails.', 'system');
   });
 
+  world.on('bell:rung', () => {
+    log('You ring the town bell \u2014 the villagers take up arms!', 'warning');
+  });
+
   world.on('shrine:touch', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const devotion = compGet(Number(actor || 0), Devotion);

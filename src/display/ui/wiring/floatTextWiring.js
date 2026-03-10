@@ -234,6 +234,14 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Town bell alarm
+  world.on('bell:rung', ({ targetId }) => {
+    const pos = getPosition(Number(targetId || 0));
+    if (pos && canShowAt(pos.x, pos.y)) {
+      try { ftext.addStatus(pos.x, pos.y - 0.3, 'ALARM!', { color: '#d4a017', life: 1.2 }); } catch (e) { console.debug('[floatTextWiring] bell ftext failed:', e); }
+    }
+  });
+
   // Flying: takeoff / land float text
   world.on('proc:fly:takeoff', ({ x, y }) => {
     if (!canShowAt(x, y)) return;
