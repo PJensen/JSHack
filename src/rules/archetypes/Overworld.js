@@ -346,6 +346,15 @@ export const ChurchWindow = defineArchetype(
   [Collider, { solid: true, blocksSight: true }],
 );
 
+export const TownBell = defineArchetype(
+  "TownBell",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Town Bell", identity: "bell" }],
+  [Material, { kind: "bronze" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "ringBell", params: null }],
+);
+
 // ── Garden flowers (non-solid: walkable decorative) ─────────────
 export const FlowerRose = defineArchetype(
   "FlowerRose",

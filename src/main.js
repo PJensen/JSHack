@@ -3651,25 +3651,29 @@ function render(worldView) {
     for (let i = 0; i < worldView.entities.length; i++) {
       const e = worldView.entities[i];
       if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-      if (!Array.isArray(e.tags) || !e.tags.includes('flying')) continue;
+      if (!Array.isArray(e.tags)) continue;
       if (!_roofCoverKeys.has(roofCellKey(e.pos.x, e.pos.y))) continue;
 
-      const flyingPresentation = flyingFx.getPresentation(e, _fxTime, cam.scale);
-      const renderEntity = flyingPresentation.progress > 0.001
-        ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
-        : e;
+      if (e.tags.includes('flying')) {
+        const flyingPresentation = flyingFx.getPresentation(e, _fxTime, cam.scale);
+        const renderEntity = flyingPresentation.progress > 0.001
+          ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+          : e;
 
-      drawFlyingShadow(bctx, flyingPresentation);
-      drawKindScaled(
-        glyphAtlas,
-        bctx,
-        resolveRenderableKind(glyphAtlas, renderEntity),
-        renderEntity.pos.x,
-        renderEntity.pos.y,
-        flyingPresentation.glyphScale
-      );
-      if (shouldShowHealthBar(renderEntity, _fxTime)) {
-        drawEntityHealthBar(bctx, renderEntity);
+        drawFlyingShadow(bctx, flyingPresentation);
+        drawKindScaled(
+          glyphAtlas,
+          bctx,
+          resolveRenderableKind(glyphAtlas, renderEntity),
+          renderEntity.pos.x,
+          renderEntity.pos.y,
+          flyingPresentation.glyphScale
+        );
+        if (shouldShowHealthBar(renderEntity, _fxTime)) {
+          drawEntityHealthBar(bctx, renderEntity);
+        }
+      } else if (e.tags.includes('above_roof')) {
+        drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
       }
     }
   }

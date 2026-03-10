@@ -738,6 +738,7 @@ export function buildWorldView(world) {
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
+			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 
 			_allEntities.push(rec);
 
@@ -802,6 +803,7 @@ export function buildWorldView(world) {
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
+			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 
 			_allEntities.push(rec);
 			if (isPlayer) {

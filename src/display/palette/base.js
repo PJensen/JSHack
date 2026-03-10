@@ -173,6 +173,7 @@ export const basePalette = {
   smithy_sign:   { glyph: "⚒", fg: "#d8c08a", glow: "#8b6f3f" },
   church_font:   { glyph: "⛲", fg: "#88bbff", glow: "#4477cc" },
   church_window: { glyph: "✦", fg: "#ff88cc", glow: "#cc44aa" },
+  bell:          { glyph: "🔔", fg: "#d4a017", glow: "#8b6914" },
   // Garden flowers (full-color emoji)
   flower_rose:       { glyph: "🌹", fg: "#ff3344", glow: "#cc1122" },
   flower_sunflower:  { glyph: "🌻", fg: "#ffdd33", glow: "#ccaa11" },

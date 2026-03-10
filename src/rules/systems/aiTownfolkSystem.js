@@ -1261,6 +1261,18 @@ export function aiTownfolkSystem(world) {
     if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
     if (world.has(id, MoveIntent)) return;
 
+    // Armed state overrides all other behaviour
+    if (job.state === TOWNFOLK_STATES.armed) {
+      job.guardTurnsLeft--;
+      if (job.guardTurnsLeft <= 0) {
+        job.state = TOWNFOLK_STATES.idle;
+        job.guardTurnsLeft = 0;
+        job.workTurns = 0;
+        job.stuckTurns = 0;
+      }
+      return;
+    }
+
     if (job.scheduleEnabled) {
       handleScheduledTownfolk(world, id, pos, job);
       return;
@@ -1284,6 +1296,24 @@ export function aiTownfolkSystem(world) {
         break;
       default:
         break;
+    }
+  });
+}
+
+const BELL_INSTALLED = Symbol.for("jshack:bellListener:installed");
+const BELL_GUARD_TURNS = 120;
+
+export function installBellListener(world) {
+  if (!world || world[BELL_INSTALLED]) return;
+  world[BELL_INSTALLED] = true;
+
+  world.on("bell:rung", () => {
+    for (const [id, job] of world.query(TownfolkJob)) {
+      if (!world.isAlive(id)) continue;
+      job.state = TOWNFOLK_STATES.armed;
+      job.guardTurnsLeft = BELL_GUARD_TURNS;
+      job.workTurns = 0;
+      job.stuckTurns = 0;
     }
   });
 }

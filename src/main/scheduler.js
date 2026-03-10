@@ -19,7 +19,7 @@ import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem, installAggroFromDamageListener } from "../rules/systems/aiChaseSystem.js";
-import { aiTownfolkSystem, installTownfolkDoorListener } from "../rules/systems/aiTownfolkSystem.js";
+import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
@@ -82,6 +82,7 @@ export function configureWorld(world) {
   // Install affix event listeners once per world
   installAffixTriggers(world);
   installTownfolkDoorListener(world);
+  installBellListener(world);
   // Install engraving scramble-on-step listener once per world
   installEngraveListeners(world);
   // Install bump-interact listener for immediate interactions (doors, chests, NPCs)

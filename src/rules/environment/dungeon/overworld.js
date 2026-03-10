@@ -704,6 +704,8 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, crossingX + 3, crossingY, "church_pew");
   // Sign outside south door
   addSpawn(chunks, churchDoorX + 1, churchDoorY + 1, "church_sign");
+  // Town bell outside church
+  addSpawn(chunks, churchDoorX - 2, churchDoorY, "town_bell");
 
   // ── Graveyard — fenced enclosure behind (north of) the church ──
   const gyX0 = crossingX - 4;
