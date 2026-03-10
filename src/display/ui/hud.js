@@ -833,9 +833,10 @@ function createQuickSlot() {
 
   function renderStack() {
     el.innerHTML = '';
-    // Peek: show only the top (front) of the stack
+    // Drain non-actionable items from the front, then peek at the top
+    while (stack.length > 0 && !actionable(stack[0])) stack.shift();
     const it = stack[0];
-    if (!it || !actionable(it)) return;
+    if (!it) return;
     const chip = renderQuickChip(it, {
       onUse: () => dispatchAction(it),
       onDismiss: () => dismissTop()
@@ -864,10 +865,12 @@ function createQuickSlot() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const item = e?.detail?.item;
+    console.debug('[quickSlot] ui:recentPickup received:', item);
     if (!item) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
     stack.push({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1), addedAt: Date.now() });
+    console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[0]:', stack[0] ? actionable(stack[0]) : 'empty');
     renderStack();
     resetDismissTimer();
   });
