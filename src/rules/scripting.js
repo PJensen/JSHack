@@ -5,6 +5,9 @@ const REGISTRY = new Map();
 export const ScriptVerb = Object.freeze({
   ProcEvaluate: "proc:evaluate",
   SpellCast: "spell:cast",
+  ProjectileActorImpact: "projectile:actorImpact",
+  ProjectileWallImpact: "projectile:wallImpact",
+  ProjectileMiss: "projectile:miss",
   AffixOnBeforeHit: "affix:onBeforeHit",
   AffixOnHit: "affix:onHit",
   AffixOnDamaged: "affix:onDamaged",

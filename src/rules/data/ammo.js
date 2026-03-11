@@ -1,13 +1,10 @@
 // rules/data/ammo.js
 // Data-driven ammo behavior keyed by ammo identity.
-// Hooks are plain (ctx) => void callbacks invoked via runCallbackList.
+// Projectile content is authored as script refs, not inline callback arrays.
 
-import {
-  bonusDamageOnProjectileActorImpact,
-  statusEffectOnProjectileActorImpact,
-} from "./callbacks/projectile.js";
+import { registerScript, ScriptVerb } from "../scripting.js";
 
-const EMPTY_HOOKS = Object.freeze([]);
+const EMPTY_HOOK_SCRIPTS = Object.freeze([]);
 
 export const AMMO_HOOK_ALIASES = Object.freeze({
   on_projectile_actor_impact: "onProjectileActorImpact",
@@ -21,6 +18,28 @@ export const AMMO_HOOK_KEYS = Object.freeze([
   "onProjectileMiss",
 ]);
 
+const AMMO_FIRE_ARROW_ACTOR_IMPACT = "ammo:fireArrows:onProjectileActorImpact";
+
+registerScript(AMMO_FIRE_ARROW_ACTOR_IMPACT, {
+  [ScriptVerb.ProjectileActorImpact]: (_world, ctx) => {
+    const extra = ctx.rollDice("1d4");
+    if (extra > 0) ctx.addDamage(extra);
+    ctx.deferResolved((resolvedCtx) => {
+      if (!resolvedCtx.applied || resolvedCtx.killed) return;
+      resolvedCtx.pushEffect(resolvedCtx.defender, {
+        key: "burn",
+        turnsLeft: 3,
+        potency: 2,
+        stacks: 1,
+      });
+      resolvedCtx.emit("proc:burning", {
+        actor: resolvedCtx.attacker,
+        target: resolvedCtx.defender,
+      });
+    });
+  },
+});
+
 /**
  * @param {string} key
  * @returns {string}
@@ -32,10 +51,21 @@ export function canonicalAmmoHookKey(key) {
 }
 
 /**
- * @param {Record<string, unknown> | null | undefined} source
- * @returns {Record<string, Function[]>}
+ * @param {any} value
+ * @returns {boolean}
  */
-function normalizeAmmoHooks(source) {
+function isScriptRefValue(value) {
+  if (typeof value === "string" && value) return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const key = value.ref ?? value.script ?? value.key ?? value.id ?? "";
+  return typeof key === "string" && key.length > 0;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} source
+ * @returns {Record<string, Array<string | object>>}
+ */
+function normalizeAmmoHookScripts(source) {
   if (!source || typeof source !== "object") return {};
   const out = {};
 
@@ -43,7 +73,7 @@ function normalizeAmmoHooks(source) {
     const key = AMMO_HOOK_KEYS[i];
     const direct = source[key];
     if (Array.isArray(direct)) {
-      out[key] = direct.filter((fn) => typeof fn === "function");
+      out[key] = direct.filter(isScriptRefValue);
       continue;
     }
 
@@ -53,7 +83,7 @@ function normalizeAmmoHooks(source) {
       if (canonical !== key) continue;
       const maybeList = source[alias];
       if (Array.isArray(maybeList)) {
-        out[key] = maybeList.filter((fn) => typeof fn === "function");
+        out[key] = maybeList.filter(isScriptRefValue);
         break;
       }
     }
@@ -64,12 +94,13 @@ function normalizeAmmoHooks(source) {
 
 /**
  * @param {any} def
- * @returns {Record<string, Function[]>}
+ * @returns {Record<string, Array<string | object>>}
  */
-export function resolveAmmoHooks(def) {
-  const topLevel = normalizeAmmoHooks(def);
-  const nested = normalizeAmmoHooks(def?.hooks && typeof def.hooks === "object" ? def.hooks : null);
-  return { ...topLevel, ...nested };
+export function resolveAmmoHookScripts(def) {
+  const topLevel = normalizeAmmoHookScripts(def);
+  const nestedScripts = normalizeAmmoHookScripts(def?.scripts && typeof def.scripts === "object" ? def.scripts : null);
+  const nestedHooks = normalizeAmmoHookScripts(def?.hooks && typeof def.hooks === "object" ? def.hooks : null);
+  return { ...topLevel, ...nestedHooks, ...nestedScripts };
 }
 
 const AMMO_ID_ALIASES = Object.freeze({
@@ -95,33 +126,26 @@ export const AMMO_DEFS = Object.freeze({
   ammo_arrows: Object.freeze({
     id: "ammo_arrows",
     name: "Arrows",
-    hooks: Object.freeze({
-      onProjectileActorImpact: EMPTY_HOOKS,
-      onProjectileWallImpact: EMPTY_HOOKS,
-      onProjectileMiss: EMPTY_HOOKS,
+    scripts: Object.freeze({
+      onProjectileActorImpact: EMPTY_HOOK_SCRIPTS,
+      onProjectileWallImpact: EMPTY_HOOK_SCRIPTS,
+      onProjectileMiss: EMPTY_HOOK_SCRIPTS,
     }),
   }),
   ammo_fire_arrows: Object.freeze({
     id: "ammo_fire_arrows",
     name: "Fire Arrows",
-    hooks: Object.freeze({
-      onProjectileActorImpact: Object.freeze([
-        bonusDamageOnProjectileActorImpact("1d4"),
-        statusEffectOnProjectileActorImpact(
-          { key: "burn", turnsLeft: 3, potency: 2, stacks: 1 },
-          "proc:burning",
-          { requireApplied: true, skipIfKilled: true },
-        ),
-      ]),
-      onProjectileWallImpact: EMPTY_HOOKS,
-      onProjectileMiss: EMPTY_HOOKS,
+    scripts: Object.freeze({
+      onProjectileActorImpact: Object.freeze([AMMO_FIRE_ARROW_ACTOR_IMPACT]),
+      onProjectileWallImpact: EMPTY_HOOK_SCRIPTS,
+      onProjectileMiss: EMPTY_HOOK_SCRIPTS,
     }),
   }),
 });
 
 /**
  * @param {string} key ammo identity (ammo_fire_arrows) or alias (fire_arrows, fire)
- * @returns {{ id:string, name:string, hooks?:Record<string, Function[]> }|null}
+ * @returns {{ id:string, name:string, scripts?:Record<string, Array<string|object>> }|null}
  */
 export function getAmmoDef(key) {
   const identity = normalizeAmmoIdentity(key);
@@ -131,12 +155,12 @@ export function getAmmoDef(key) {
 /**
  * @param {string} key ammo identity or alias
  * @param {string} hookKey canonical or alias hook key
- * @returns {Function[]}
+ * @returns {Array<string | object>}
  */
-export function getAmmoHooks(key, hookKey) {
+export function getAmmoHookScripts(key, hookKey) {
   const canonical = canonicalAmmoHookKey(hookKey);
-  if (!canonical) return EMPTY_HOOKS;
-  const hooks = resolveAmmoHooks(getAmmoDef(key));
-  const list = hooks[canonical];
-  return Array.isArray(list) ? list : EMPTY_HOOKS;
+  if (!canonical) return EMPTY_HOOK_SCRIPTS;
+  const scripts = resolveAmmoHookScripts(getAmmoDef(key));
+  const list = scripts[canonical];
+  return Array.isArray(list) ? list : EMPTY_HOOK_SCRIPTS;
 }
