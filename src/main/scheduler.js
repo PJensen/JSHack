@@ -67,6 +67,7 @@ import { installCurseHooks } from "../rules/systems/curseHooks.js";
 import { channelingSystem } from "../rules/systems/channelingSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
+import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -78,6 +79,7 @@ export function configureWorld(world) {
   clearSystems();
   installVirtuals(world);
   defineInventoryVirtuals(world);
+  defineDerivedStatVirtuals(world);
 
   // Install affix event listeners once per world
   installAffixTriggers(world);
