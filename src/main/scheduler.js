@@ -13,7 +13,6 @@ import { throwSystem } from "../rules/systems/throwSystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
-import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
@@ -165,7 +164,6 @@ export function configureWorld(world) {
   registerSystem(trapSystem, 'intents');
 
   // Phase: effects (derived first, then per-turn effects)
-  registerSystem(equipmentSystem, 'effects');
   // Weight derivation: bottom-up recomputation of Weight.total for bags/actors.
   registerSystem(weightDerivationSystem, 'effects');
   // Encumbrance recomputed after equipment + weight are settled; movement reads it next tick.

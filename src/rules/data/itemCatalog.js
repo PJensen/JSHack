@@ -11,8 +11,8 @@ import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
 import { Mana } from "../components/Mana.js";
-import { Equipment } from "../components/Equipment.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
+import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 
 /**
  * @param {string} identity
@@ -2035,8 +2035,7 @@ export const ITEM_CATALOG = {
         const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
         const stam = ctx.query.get(targetId, Stamina);
         if (!stam) return { restored: 0 };
-        const eq = ctx.query.get(targetId, Equipment);
-        const maxBonus = Number(eq?.maxStaminaDerived ?? 0);
+        const maxBonus = Number(getPassiveBonuses(ctx.world, targetId)?.maxStaminaDerived ?? 0);
         const cap = stam.maxStamina + maxBonus;
         const before = stam.stamina;
         stam.stamina = cap;
@@ -2068,8 +2067,7 @@ export const ITEM_CATALOG = {
         const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
         const mana = ctx.query.get(targetId, Mana);
         if (!mana) return { restored: 0 };
-        const eq = ctx.query.get(targetId, Equipment);
-        const maxBonus = Number(eq?.maxManaDerived ?? 0);
+        const maxBonus = Number(getPassiveBonuses(ctx.world, targetId)?.maxManaDerived ?? 0);
         const cap = mana.maxMana + maxBonus;
         const before = mana.mana;
         mana.mana = cap;
