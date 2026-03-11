@@ -1,0 +1,149 @@
+import { ItemInfo } from "../components/ItemInfo.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
+import { AFFIX_DEFS } from "../data/affixes.js";
+import { runScript, ScriptVerb } from "../scripting.js";
+
+export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
+  attackDerived: 0,
+  defenseDerived: 0,
+  maxHpDerived: 0,
+  critChanceDerived: 0,
+  critMultDerived: 0,
+  manaRegenDerived: 0,
+  maxManaDerived: 0,
+  staminaRegenDerived: 0,
+  maxStaminaDerived: 0,
+  kineticDRDerived: 0,
+  fireResistDerived: 0,
+  poisonResistDerived: 0,
+  acidResistDerived: 0,
+  radiationResistDerived: 0,
+  electricOhmsDerived: 0,
+  bluntResistDerived: 0,
+  slashResistDerived: 0,
+  pierceResistDerived: 0,
+  luckDerived: 0,
+  visionRangeDerived: 0,
+  hungerRateDerived: 0,
+});
+
+const PASSIVE_BONUSES_DEFINED = Symbol.for("jshack:passiveBonuses:virtuals:defined");
+const PASSIVE_BONUSES_VIRTUAL = Symbol.for("jshack:passiveBonuses:PassiveBonuses");
+
+const BONUS_KEY_MAP = Object.freeze({
+  attack: "attackDerived",
+  defense: "defenseDerived",
+  maxHp: "maxHpDerived",
+  critChance: "critChanceDerived",
+  critMult: "critMultDerived",
+  manaRegen: "manaRegenDerived",
+  maxMana: "maxManaDerived",
+  staminaRegen: "staminaRegenDerived",
+  maxStamina: "maxStaminaDerived",
+  kineticDR: "kineticDRDerived",
+  fireResist: "fireResistDerived",
+  poisonResist: "poisonResistDerived",
+  acidResist: "acidResistDerived",
+  radiationResist: "radiationResistDerived",
+  electricOhms: "electricOhmsDerived",
+  bluntResist: "bluntResistDerived",
+  slashResist: "slashResistDerived",
+  pierceResist: "pierceResistDerived",
+  luck: "luckDerived",
+  visionRange: "visionRangeDerived",
+  hungerRate: "hungerRateDerived",
+});
+
+function createPassiveBonusBag() {
+  return { ...PASSIVE_BONUS_DEFAULTS };
+}
+
+function normalizeBonusKey(key) {
+  const normalized = String(key || "");
+  if (Object.prototype.hasOwnProperty.call(PASSIVE_BONUS_DEFAULTS, normalized)) return normalized;
+  return BONUS_KEY_MAP[normalized] || "";
+}
+
+function addPassiveBonus(acc, key, value) {
+  const derivedKey = normalizeBonusKey(key);
+  if (!derivedKey) return;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return;
+  acc[derivedKey] += num;
+}
+
+function markAndAddPassiveBonus(acc, touched, key, value) {
+  const derivedKey = normalizeBonusKey(key);
+  if (!derivedKey) return;
+  touched.add(derivedKey);
+  addPassiveBonus(acc, derivedKey, value);
+}
+
+function applyItemBonuses(acc, touched, bonuses) {
+  if (!bonuses || typeof bonuses !== "object") return;
+  for (const [key, value] of Object.entries(bonuses)) {
+    markAndAddPassiveBonus(acc, touched, key, value);
+  }
+}
+
+function runAffixPassives(world, acc, touched, entityId, itemId, affixIds) {
+  for (let i = 0; i < (affixIds || []).length; i++) {
+    const aId = affixIds[i];
+    const affix = AFFIX_DEFS[aId];
+    if (!affix || !affix.passive) continue;
+    runScript(affix.passive, ScriptVerb.AffixPassive, world, {
+      world,
+      entityId,
+      itemId,
+      addBonus: (key, value) => markAndAddPassiveBonus(acc, touched, key, value),
+    });
+  }
+}
+
+export function resolvePassiveBonuses(world, entityId) {
+  const id = Number(entityId || 0) | 0;
+  const acc = createPassiveBonusBag();
+  if (!(id > 0) || !world?.isAlive?.(id)) return Object.freeze(acc);
+
+  const eq = world.get(id, Equipment);
+  if (!eq) return Object.freeze(acc);
+  const touched = new Set();
+
+  for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
+    const slot = NON_AMMO_GEAR_SLOTS[i];
+    const itemId = Number(eq[slot] || 0) | 0;
+    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
+    const info = world.get(itemId, ItemInfo);
+    if (!info) continue;
+    applyItemBonuses(acc, touched, info.bonuses);
+    runAffixPassives(world, acc, touched, id, itemId, info.affixes);
+  }
+
+  const keys = Object.keys(PASSIVE_BONUS_DEFAULTS);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (touched.has(key)) continue;
+    addPassiveBonus(acc, key, eq[key]);
+  }
+
+  return Object.freeze(acc);
+}
+
+export function definePassiveBonusVirtuals(world) {
+  if (world[PASSIVE_BONUSES_DEFINED]) return;
+  if (typeof world?.defineVirtual !== "function" || typeof world?.vget !== "function") {
+    throw new Error("definePassiveBonusVirtuals: installVirtuals(world) must run first");
+  }
+  world[PASSIVE_BONUSES_DEFINED] = true;
+  world[PASSIVE_BONUSES_VIRTUAL] = world.defineVirtual("PassiveBonuses", (w, id) => resolvePassiveBonuses(w, id));
+}
+
+export function getPassiveBonusesVirtual(world) {
+  return world?.[PASSIVE_BONUSES_VIRTUAL] || null;
+}
+
+export function getPassiveBonuses(world, entityId) {
+  const Virtual = getPassiveBonusesVirtual(world);
+  if (Virtual && typeof world?.vget === "function") return world.vget(entityId, Virtual);
+  return resolvePassiveBonuses(world, entityId);
+}

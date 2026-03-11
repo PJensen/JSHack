@@ -1,7 +1,9 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Position } from "../src/rules/components/Position.js";
+import { BaseStats } from "../src/rules/components/BaseStats.js";
 import { Brain } from "../src/rules/components/Brain.js";
+import { DerivedExpression } from "../src/rules/components/DerivedExpression.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
@@ -10,6 +12,7 @@ import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { runSpellScript } from "../src/rules/scripts/spells.js";
 import { getSpell } from "../src/rules/data/spells.js";
 import { createSpellDamageContext, scaleSpellDamage } from "../src/rules/utils/spellDamage.js";
+import { attach } from "../src/lib/ecs-js/index.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll as clearTileMap, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 
@@ -44,6 +47,26 @@ Deno.test("scaleSpellDamage preserves baseline damage and rewards extra intellig
 
   assertEquals(scaleSpellDamage(world, baseline, 10), 10);
   assert(scaleSpellDamage(world, smart, 10) > 10, "extra INT should increase spell damage");
+});
+
+Deno.test("scaleSpellDamage consumes resolved intelligence from stat expressions", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  const caster = makeCaster(world, { intelligence: 10 });
+  const focus = world.create();
+  const expr = world.create();
+
+  world.add(caster, BaseStats, { intelligence: 10 });
+  attach(world, focus, caster);
+  attach(world, expr, focus);
+  world.add(expr, DerivedExpression, {
+    target: "intelligence",
+    kind: "addConst",
+    value: 10,
+    stage: "base",
+    priority: 10,
+  });
+
+  assert(scaleSpellDamage(world, caster, 10) > 10, "resolved INT from expressions should scale spell damage");
 });
 
 Deno.test("destruction spell damage can crit using crit-derived stats", () => {

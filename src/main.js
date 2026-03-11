@@ -6,6 +6,7 @@
 import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
+import { getPassiveBonuses } from "./rules/utils/passiveBonuses.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
@@ -2418,8 +2419,8 @@ const isVisibleAt = (x, y) => {
     const pe = playerEntity(world);
     if (pe?.id && pe.pos) {
       const brain = world.get(pe.id, Brain);
-      const eq = world.get(pe.id, Equipment);
-      const radius = (brain?.visionRange ?? 8) + (eq?.visionRangeDerived ?? 0);
+      const passive = getPassiveBonuses(world, pe.id);
+      const radius = (brain?.visionRange ?? 8) + (passive?.visionRangeDerived ?? 0);
       const pad = 2;
       const bounds = {
         x0: pe.pos.x - radius - pad,

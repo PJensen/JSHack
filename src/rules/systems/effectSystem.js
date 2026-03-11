@@ -5,10 +5,10 @@ import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
 import { Stamina } from '../components/Stamina.js';
 import { Mana } from '../components/Mana.js';
-import { Equipment } from '../components/Equipment.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
+import { getPassiveBonuses } from '../utils/passiveBonuses.js';
 import { buildSpellDamageSpecFromContext } from '../utils/spellDamage.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
@@ -80,8 +80,8 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
     if (operation === 'stamina_restore') {
         const stam = world.get(id, Stamina);
         if (!stam) return;
-        const eq = world.get(id, Equipment);
-        const maxBonus = Number(eq?.maxStaminaDerived ?? 0);
+        const passive = getPassiveBonuses(world, id);
+        const maxBonus = Number(passive?.maxStaminaDerived ?? 0);
         const cap = stam.maxStamina + maxBonus;
         const before = stam.stamina;
         stam.stamina = Math.min(cap, stam.stamina + amount);
@@ -92,8 +92,8 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
     if (operation === 'mana_restore') {
         const mana = world.get(id, Mana);
         if (!mana) return;
-        const eq = world.get(id, Equipment);
-        const maxBonus = Number(eq?.maxManaDerived ?? 0);
+        const passive = getPassiveBonuses(world, id);
+        const maxBonus = Number(passive?.maxManaDerived ?? 0);
         const cap = mana.maxMana + maxBonus;
         const before = mana.mana;
         mana.mana = Math.min(cap, mana.mana + amount);

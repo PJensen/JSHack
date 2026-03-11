@@ -6,8 +6,9 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { installAffixTriggers } from '../src/rules/systems/affixTriggerSystem.js';
 import { registerScript, ScriptVerb } from '../src/rules/scripting.js';
+import { dealDamage } from '../src/rules/utils/dealDamage.js';
 
-Deno.test("custom affix heals defender on damaged event", async () => {
+Deno.test("custom affix heals defender after canonical damage application", async () => {
   const world = new World({ seed: 1 });
   installAffixTriggers(world);
 
@@ -39,15 +40,15 @@ Deno.test("custom affix heals defender on damaged event", async () => {
 
   world.get(defender, Equipment).armor = armor;
 
-  world.emit('damaged', { target: defender, amount: 5, source: attacker });
+  dealDamage(world, { target: defender, amount: 5, source: attacker });
 
   const defVit = world.get(defender, Vitality);
-  assert(defVit.hp === 16, `defender should be healed to 16, got ${defVit.hp}`);
+  assert(defVit.hp === 11, `defender should end at 11 hp after damage then heal, got ${defVit.hp}`);
 
   // No equipment: should not throw
   const naked = world.create();
   world.add(naked, Vitality, { maxHp: 10, hp: 5 });
-  world.emit('damaged', { target: naked, amount: 3, source: attacker });
+  dealDamage(world, { target: naked, amount: 3, source: attacker });
 
   delete AFFIX_DEFS['test_shield'];
 });
@@ -82,7 +83,7 @@ Deno.test("custom affix retaliates on damaged event", async () => {
   const a2 = world.create();
   world.add(a2, Vitality, { maxHp: 20, hp: 20 });
 
-  world.emit('damaged', { target: d2, amount: 5, source: a2 });
+  dealDamage(world, { target: d2, amount: 5, source: a2 });
 
   const a2Vit = world.get(a2, Vitality);
   assert(a2Vit.hp === 17, `attacker should take 3 retaliation, got hp=${a2Vit.hp}`);
