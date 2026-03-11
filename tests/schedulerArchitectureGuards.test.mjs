@@ -7,4 +7,8 @@ Deno.test("scheduler no longer registers legacy equipmentSystem", async () => {
     !text.includes("registerSystem(equipmentSystem"),
     "configureWorld should not schedule legacy equipmentSystem anymore",
   );
+  assert(
+    !text.includes("installAffixTriggers("),
+    "configureWorld should not install legacy affix trigger listeners anymore",
+  );
 });

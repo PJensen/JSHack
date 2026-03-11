@@ -11,6 +11,7 @@ import { MATERIAL_CATALOG } from "../data/materials.js";
 import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "./passiveBonuses.js";
+import { runLegacyOnDamagedReactions } from "./legacyAffixDispatch.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -277,6 +278,27 @@ export function dealDamage(world, spec) {
       offhand: !!spec.offhand,
     });
   } catch { /* */ }
+
+  if (!spec.noTrigger) {
+    runLegacyOnDamagedReactions(world, {
+      attacker: source,
+      defender: target,
+      amount: finalAmount,
+      noTrigger: false,
+    }, {
+      retaliate: (amount) => {
+        dealDamage(world, {
+          target: source,
+          amount: Math.max(0, amount | 0),
+          source: target,
+          type: 'physical',
+          cause: 'retaliation',
+          bypassResist: true,
+          noTrigger: true,
+        });
+      },
+    });
+  }
 
   // Step 6: Death check
   const killed = (vit.hp | 0) <= 0;

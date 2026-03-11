@@ -14,6 +14,7 @@ import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { resolveMeleeAttack } from '../src/rules/systems/combatSystem.js';
 import { rebuildSpatialIndex } from '../src/rules/utils/spatialIndex.js';
 import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
+import { dealDamage } from '../src/rules/utils/dealDamage.js';
 
 // Force affix registration
 await import('../src/rules/data/affixes.js');
@@ -253,7 +254,7 @@ Deno.test("shieldWall1 affix applies stoneskin on damaged event", () => {
     const attacker = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
     world.get(defender, Equipment).offhand = shield;
 
-    world.emit('damaged', { target: defender, amount: 5, source: attacker });
+    dealDamage(world, { target: defender, amount: 5, source: attacker });
 
     const ae = world.get(defender, ActiveEffects);
     const hasStoneskin = ae && ae.effects.some(e => e.key === 'stoneskin');
@@ -277,7 +278,7 @@ Deno.test("secondWind1 affix applies regen and restores stamina on damaged", () 
     const attacker = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
     world.get(defender, Equipment).armor = armor;
 
-    world.emit('damaged', { target: defender, amount: 5, source: attacker });
+    dealDamage(world, { target: defender, amount: 5, source: attacker });
 
     const ae = world.get(defender, ActiveEffects);
     const hasRegen = ae && ae.effects.some(e => e.key === 'regen');
@@ -380,7 +381,7 @@ Deno.test("shield affixes fire on damaged event", async () => {
   const attacker = makeActor(world, { x: 1, y: 2, hp: 50 });
   world.get(defender, Equipment).offhand = shield;
 
-  world.emit('damaged', { target: defender, amount: 5, source: attacker });
+  dealDamage(world, { target: defender, amount: 5, source: attacker });
 
   assert(fired, 'offhand affix should have fired on damaged event');
   delete AFFIX_DEFS['test_shield_slot'];

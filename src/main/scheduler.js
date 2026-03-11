@@ -35,7 +35,6 @@ import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
 import { movementSystem, installSpiderWebListener, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
-import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
@@ -82,8 +81,6 @@ export function configureWorld(world) {
   defineDerivedStatVirtuals(world);
   definePassiveBonusVirtuals(world);
 
-  // Install affix event listeners once per world
-  installAffixTriggers(world);
   installTownfolkDoorListener(world);
   installBellListener(world);
   // Install engraving scramble-on-step listener once per world
