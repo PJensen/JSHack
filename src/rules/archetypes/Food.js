@@ -10,9 +10,11 @@ import {
   SHELF_LIFE_RATION,
   SHELF_LIFE_CORPSE,
   CORPSE_WEIGHT,
+} from "../data/food.js";
+import {
   computeCorpseNutrition,
   getCorpseEatHooks,
-} from "../data/food.js";
+} from "../data/corpseFood.js";
 
 // Standard Ration archetype
 export const Ration = defineArchetype(

@@ -3,6 +3,7 @@ import { ScriptRef } from "./components/ScriptRef.js";
 const REGISTRY = new Map();
 
 export const ScriptVerb = Object.freeze({
+  ProcEvaluate: "proc:evaluate",
   SpellCast: "spell:cast",
   AffixOnBeforeHit: "affix:onBeforeHit",
   AffixOnHit: "affix:onHit",

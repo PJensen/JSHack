@@ -13,7 +13,6 @@ import { throwSystem } from "../rules/systems/throwSystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
-import { equipmentSystem } from "../rules/systems/equipmentSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
@@ -36,7 +35,6 @@ import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
 import { movementSystem, installSpiderWebListener, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
-import { installAffixTriggers } from "../rules/systems/affixTriggerSystem.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
@@ -67,6 +65,8 @@ import { installCurseHooks } from "../rules/systems/curseHooks.js";
 import { channelingSystem } from "../rules/systems/channelingSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
+import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
+import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -78,9 +78,9 @@ export function configureWorld(world) {
   clearSystems();
   installVirtuals(world);
   defineInventoryVirtuals(world);
+  defineDerivedStatVirtuals(world);
+  definePassiveBonusVirtuals(world);
 
-  // Install affix event listeners once per world
-  installAffixTriggers(world);
   installTownfolkDoorListener(world);
   installBellListener(world);
   // Install engraving scramble-on-step listener once per world
@@ -161,7 +161,6 @@ export function configureWorld(world) {
   registerSystem(trapSystem, 'intents');
 
   // Phase: effects (derived first, then per-turn effects)
-  registerSystem(equipmentSystem, 'effects');
   // Weight derivation: bottom-up recomputation of Weight.total for bags/actors.
   registerSystem(weightDerivationSystem, 'effects');
   // Encumbrance recomputed after equipment + weight are settled; movement reads it next tick.

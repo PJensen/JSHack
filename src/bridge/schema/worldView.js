@@ -31,6 +31,7 @@ import { DungeonState } from "../../rules/components/DungeonState.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Burned } from "../../rules/components/Burned.js";
 import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
+import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -655,8 +656,8 @@ export function buildWorldView(world) {
 	// Compute FOV (once per turn, idempotent via step check in updateFOV)
 	if (_view.player) {
 		const brain = world.get(_view.player.id, Brain);
-		const eq = world.get(_view.player.id, Equipment);
-		const radius = (brain?.visionRange ?? 8) + (eq?.visionRangeDerived ?? 0);
+		const passive = getPassiveBonuses(world, _view.player.id);
+		const radius = (brain?.visionRange ?? 8) + (passive?.visionRangeDerived ?? 0);
 		playerVisionRadius = radius;
 		const pad = 2;
 		const bounds = {
@@ -678,8 +679,8 @@ export function buildWorldView(world) {
 	if (_view.player) {
 		ensureSpatialIndex(world);
 		const brain = world.get(_view.player.id, Brain);
-		const eq2 = world.get(_view.player.id, Equipment);
-		const radius = (brain?.visionRange ?? 8) + (eq2?.visionRangeDerived ?? 0);
+		const passive = getPassiveBonuses(world, _view.player.id);
+		const radius = (brain?.visionRange ?? 8) + (passive?.visionRangeDerived ?? 0);
 		playerVisionRadius = radius;
 		const viewR = (radius | 0) + 4;
 		const x0 = _view.player.pos.x - viewR;

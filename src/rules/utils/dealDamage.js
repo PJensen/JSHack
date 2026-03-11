@@ -10,6 +10,8 @@ import { isEntityInvulnerable } from "./effectGuards.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
 import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
+import { getPassiveBonuses } from "./passiveBonuses.js";
+import { runLegacyOnDamagedReactions } from "./legacyAffixDispatch.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -104,14 +106,14 @@ export function resolveResistance(world, targetId, rawAmount, type) {
   const resist = world.get(targetId, Resistances);
   if (!resist) return rawAmount;
 
-  const eq = world.get(targetId, Equipment);
+  const passive = getPassiveBonuses(world, targetId);
 
   switch (type) {
     case 'electric':
     case 'plasma':
     case 'lightning': {
       const potionOhms = activeResistBonus(world, targetId, "resist_electric") * 1000;
-      const ohmBonus = Number(eq?.electricOhmsDerived ?? 0) + potionOhms;
+      const ohmBonus = Number(passive?.electricOhmsDerived ?? 0) + potionOhms;
       const baseOhms = resist?.electric?.ohms;
       const effectiveOhms = baseOhms === Infinity ? Infinity
         : (Number.isFinite(baseOhms) ? baseOhms + ohmBonus : ohmBonus);
@@ -121,47 +123,47 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       return Math.max(0, Math.floor(rawAmount * rMult * gMult));
     }
     case 'blunt': {
-      const drBonus = Number(eq?.kineticDRDerived ?? 0);
-      const multBonus = Number(eq?.bluntResistDerived ?? 0);
+      const drBonus = Number(passive?.kineticDRDerived ?? 0);
+      const multBonus = Number(passive?.bluntResistDerived ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'slash': {
-      const drBonus = Number(eq?.kineticDRDerived ?? 0);
-      const multBonus = Number(eq?.slashResistDerived ?? 0);
+      const drBonus = Number(passive?.kineticDRDerived ?? 0);
+      const multBonus = Number(passive?.slashResistDerived ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'pierce': {
-      const drBonus = Number(eq?.kineticDRDerived ?? 0);
-      const multBonus = Number(eq?.pierceResistDerived ?? 0);
+      const drBonus = Number(passive?.kineticDRDerived ?? 0);
+      const multBonus = Number(passive?.pierceResistDerived ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'physical': {
-      const drBonus = Number(eq?.kineticDRDerived ?? 0);
+      const drBonus = Number(passive?.kineticDRDerived ?? 0);
       return Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
     }
     case 'fire': {
-      const bonus = Number(eq?.fireResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_fire");
+      const bonus = Number(passive?.fireResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_fire");
       const effectiveMult = Math.max(0, (resist.thermal?.burnMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'poison': {
-      const bonus = Number(eq?.poisonResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_poison");
+      const bonus = Number(passive?.poisonResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_poison");
       const effectiveMult = Math.max(0, (resist.chemical?.toxMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'acid': {
-      const bonus = Number(eq?.acidResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_acid");
+      const bonus = Number(passive?.acidResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_acid");
       const effectiveMult = Math.max(0, (resist.chemical?.acidMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'radiation': {
-      const bonus = Number(eq?.radiationResistDerived ?? 0);
+      const bonus = Number(passive?.radiationResistDerived ?? 0);
       const effectiveMult = Math.max(0, (resist.radiation?.gamma ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
@@ -276,6 +278,27 @@ export function dealDamage(world, spec) {
       offhand: !!spec.offhand,
     });
   } catch { /* */ }
+
+  if (!spec.noTrigger) {
+    runLegacyOnDamagedReactions(world, {
+      attacker: source,
+      defender: target,
+      amount: finalAmount,
+      noTrigger: false,
+    }, {
+      retaliate: (amount) => {
+        dealDamage(world, {
+          target: source,
+          amount: Math.max(0, amount | 0),
+          source: target,
+          type: 'physical',
+          cause: 'retaliation',
+          bypassResist: true,
+          noTrigger: true,
+        });
+      },
+    });
+  }
 
   // Step 6: Death check
   const killed = (vit.hp | 0) <= 0;

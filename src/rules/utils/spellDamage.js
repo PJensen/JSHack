@@ -1,5 +1,6 @@
 import { Brain } from "../components/Brain.js";
 import { combatSeed, mulberry32 } from "./rng.js";
+import { resolveDerivedStats } from "./derivedStats.js";
 import { resolveCombatSnapshot } from "./resolveCombatSnapshot.js";
 
 /**
@@ -25,7 +26,12 @@ function hashString32(value) {
  */
 export function getSpellIntelligenceBonus(world, casterId) {
   const brain = (casterId > 0 && world.isAlive(casterId)) ? world.get(casterId, Brain) : null;
-  const intelligence = Number(brain?.intelligence || 10);
+  const resolved = resolveDerivedStats(world, casterId);
+  const intelligence = Math.max(
+    Number(resolved?.intelligence || 0),
+    Number(brain?.intelligence || 0),
+    10,
+  );
   return Math.max(0, intelligence - 10);
 }
 

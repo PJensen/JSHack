@@ -4,7 +4,8 @@ import { Hunger } from "../../components/Hunger.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Owner } from "../../components/Owner.js";
 import { Pet } from "../../components/Pet.js";
-import { getCorpseEatHooks, getDecayStage } from "../../data/food.js";
+import { getDecayStage } from "../../data/food.js";
+import { getCorpseEatHooks } from "../../data/corpseFood.js";
 import { runCallbackList } from "../../interaction/dispatch.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 

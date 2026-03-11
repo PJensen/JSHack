@@ -2,26 +2,45 @@
 // Eat callback context and shared factory functions for corpse eating hooks.
 // Callbacks are plain (ctx) => void functions invoked via runCallbackList.
 
-import { RuleActionContext } from "../../utils/actionContexts.js";
+import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { Hunger } from "../../components/Hunger.js";
 import { Resistances } from "../../components/Resistences.js";
+import { dealDamage } from "../../utils/dealDamage.js";
+import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 
 // ── EatCallbackContext ─────────────────────────────────────────────
 
 /**
  * Context passed to corpse eat hook callbacks.
- * Mutations are queued and only applied on commit().
+ * Standalone queued context for corpse-eat hooks.
  */
-export class EatCallbackContext extends RuleActionContext {
+export class EatCallbackContext {
   /**
    * @param {any} world
    * @param {number} actor - the entity eating the corpse
    * @param {number} itemId - the corpse entity being eaten
    */
   constructor(world, actor, itemId) {
-    super(world);
+    this.world = world;
     this.actor = actor;
     this.itemId = itemId;
+    this._cancelled = false;
+    this._cancelReason = null;
+    this._mutations = [];
     this._postCommitEvents = [];
+  }
+
+  get cancelled() { return this._cancelled; }
+  get cancelReason() { return this._cancelReason; }
+
+  /**
+   * @param {{ code: string, message: string, consumesTurn?: boolean } | string} reason
+   */
+  cancel(reason) {
+    this._cancelled = true;
+    this._cancelReason = typeof reason === "string"
+      ? { code: "FAIL", message: reason, consumesTurn: true }
+      : reason || { code: "FAIL", message: "Cancelled", consumesTurn: true };
   }
 
   /**
@@ -44,7 +63,7 @@ export class EatCallbackContext extends RuleActionContext {
    * @param {{ key:string, turnsLeft:number, potency:number, stacks?:number, sourceId?:number }} effect
    */
   pushEffect(effect) {
-    return super.pushEffect(this.actor, effect);
+    return this.queueMutation({ type: "pushEffect", entityId: this.actor, effect: { stacks: 1, ...effect } });
   }
 
   /**
@@ -54,7 +73,10 @@ export class EatCallbackContext extends RuleActionContext {
    * @returns {number} damage dealt
    */
   damage(amount, source = "corpse") {
-    return super.damage(this.actor, amount, source);
+    const value = Math.max(0, amount | 0);
+    if (value <= 0) return 0;
+    this.queueMutation({ type: "damage", entityId: this.actor, amount: value, source });
+    return value;
   }
 
   /**
@@ -71,12 +93,86 @@ export class EatCallbackContext extends RuleActionContext {
     });
   }
 
-  commit() {
-    const applied = super.commit();
-    if (this.cancelled) {
-      this._postCommitEvents.length = 0;
-      return applied;
+  /**
+   * @param {any} op
+   */
+  queueMutation(op) {
+    this._mutations.push(op);
+    return true;
+  }
+
+  _applyNutrition(op) {
+    const hunger = this.world.get(op.entityId, Hunger);
+    if (!hunger) return;
+    const amount = Number(op.nutrition || 0);
+    if (!Number.isFinite(amount) || amount === 0) return;
+    const nextHunger = Number(hunger.hunger || 0) - amount;
+    if (nextHunger < 0) {
+      hunger.hunger = 0;
+      hunger.satiation = Math.min(200, Number(hunger.satiation || 0) + Math.abs(nextHunger));
+      return;
     }
+    hunger.hunger = nextHunger;
+  }
+
+  _applyPushEffect(op) {
+    let ae = this.world.get(op.entityId, ActiveEffects);
+    if (!ae || !Array.isArray(ae.effects)) {
+      try { this.world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {}
+      ae = this.world.get(op.entityId, ActiveEffects);
+    }
+    if (!ae || !Array.isArray(ae.effects)) return;
+    upsertTimedEffect(ae.effects, { stacks: 1, ...(op.effect || {}) });
+  }
+
+  _applyElectricResistance(op) {
+    let resist = this.world.get(op.entityId, Resistances);
+    if (!resist) {
+      try { this.world.add(op.entityId, Resistances, {}); } catch {}
+      resist = this.world.get(op.entityId, Resistances);
+    }
+    if (!resist) return;
+    if (!resist.electric || typeof resist.electric !== "object") resist.electric = {};
+    const currentOhms = Number(resist.electric.ohms);
+    const nextOhms = Number(op.minOhms || 2400);
+    resist.electric.ohms = Number.isFinite(currentOhms)
+      ? Math.max(currentOhms, nextOhms)
+      : nextOhms;
+    if (!Number.isFinite(Number(resist.electric.fibrillationA))) {
+      resist.electric.fibrillationA = Number(op.fibrillationA || 0.03);
+    }
+  }
+
+  commit() {
+    if (this.cancelled) {
+      this._mutations.length = 0;
+      this._postCommitEvents.length = 0;
+      return [];
+    }
+    for (let i = 0; i < this._mutations.length; i++) {
+      const op = this._mutations[i];
+      switch (op?.type) {
+        case "nutrition":
+          this._applyNutrition(op);
+          break;
+        case "pushEffect":
+          this._applyPushEffect(op);
+          break;
+        case "damage":
+          dealDamage(this.world, {
+            target: op.entityId,
+            amount: op.amount,
+            cause: String(op.source || "corpse"),
+          });
+          break;
+        case "grantElectricResistance":
+          this._applyElectricResistance(op);
+          break;
+        default:
+          break;
+      }
+    }
+    this._mutations.length = 0;
     for (let i = 0; i < this._postCommitEvents.length; i++) {
       const entry = this._postCommitEvents[i];
       try { this.world.emit && this.world.emit(entry.eventName, entry.payload); } catch (e) { console.debug('[eat] emit ' + entry.eventName + ' failed:', e); }
@@ -86,8 +182,9 @@ export class EatCallbackContext extends RuleActionContext {
   }
 
   discard() {
+    this._mutations.length = 0;
     this._postCommitEvents.length = 0;
-    return super.discard();
+    return [];
   }
 }
 

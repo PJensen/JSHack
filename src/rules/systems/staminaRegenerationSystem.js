@@ -1,7 +1,7 @@
 // staminaRegenerationSystem.js
 // Regenerate stamina each turn using base regen + derived bonuses from equipment/status
 import { Stamina } from '../components/Stamina.js';
-import { Equipment } from '../components/Equipment.js';
+import { getPassiveBonuses } from '../utils/passiveBonuses.js';
 
 /**
  * Regenerate stamina each turn based on base rate plus equipment bonuses.
@@ -21,14 +21,14 @@ export function staminaRegenerationSystem(world) {
       continue;
     }
 
-    const eq = world.get(entity, Equipment);
-    const maxStaminaBonus = Number(eq?.maxStaminaDerived ?? 0);
+    const passive = getPassiveBonuses(world, entity);
+    const maxStaminaBonus = Number(passive?.maxStaminaDerived ?? 0);
     const effectiveMaxStamina = staminaComp.maxStamina + maxStaminaBonus;
 
     if (staminaComp.stamina >= effectiveMaxStamina) continue;
 
     const baseRate = Number(staminaComp.staminaRegen ?? 0);
-    const regenBonus = Number(eq?.staminaRegenDerived ?? 0);
+    const regenBonus = Number(passive?.staminaRegenDerived ?? 0);
     const rate = baseRate + regenBonus;
 
     staminaComp.stamina = Math.min(effectiveMaxStamina, staminaComp.stamina + rate);

@@ -15,6 +15,7 @@ import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
+import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -65,12 +66,12 @@ export function createHudFeeds(world, deps) {
     const vit = /** @type any */ (world.get(pe.id, Vitality));
     const mana = getPlayerMana();
     const stam = /** @type any */ (world.get(pe.id, Stamina));
-    const eq = /** @type any */ (world.get(pe.id, Equipment));
+    const passive = getPassiveBonuses(world, pe.id);
 
     const hp = Number(vit?.hp ?? 0);
     const maxHp = Number(vit?.maxHp ?? 0);
     const stamina = Number(stam?.stamina ?? 0);
-    const maxStaminaBonus = Number(eq?.maxStaminaDerived ?? 0);
+    const maxStaminaBonus = Number(passive?.maxStaminaDerived ?? 0);
     const maxStamina = Number(stam?.maxStamina ?? 100) + maxStaminaBonus;
     if (hp !== lastVitals.hp || maxHp !== lastVitals.maxHp ||
         mana.mana !== lastVitals.mana || mana.maxMana !== lastVitals.maxMana ||
@@ -86,16 +87,17 @@ export function createHudFeeds(world, deps) {
     const pe = playerEntity(world);
     if (!pe) return;
     const eq = /** @type any */ (world.get(pe.id, Equipment));
+    const passive = getPassiveBonuses(world, pe.id);
     const st = /** @type any */ (world.get(pe.id, ActiveEffects));
     const semanticStatus = /** @type any */ (world.get(pe.id, Status));
     const wid = Number(eq?.weapon || 0);
     const rangedId = Number(eq?.ranged || 0);
     const combat = resolveCombatSnapshot(world, pe.id, { mode: "melee" });
-    const atk = Number(eq?.attackDerived ?? combat?.attackDerived ?? 0);
-    const def = Number(eq?.defenseDerived ?? combat?.defenseDerived ?? 0);
-    const luck = Number(combat?.luck ?? eq?.luckDerived ?? 0);
+    const atk = Number(combat?.attackDerived ?? passive?.attackDerived ?? 0);
+    const def = Number(combat?.defenseDerived ?? passive?.defenseDerived ?? 0);
+    const luck = Number(combat?.luck ?? passive?.luckDerived ?? 0);
     const armorClass = Number(combat?.armorClass ?? (10 + def));
-    const critPct = (Number(combat?.critChance ?? eq?.critChanceDerived ?? 0) * 100) + luck;
+    const critPct = (Number(combat?.critChance ?? passive?.critChanceDerived ?? 0) * 100) + luck;
     const wInfo = wid ? world.get(wid, ItemInfo) : null;
     const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
     const rangedCount = Number(rangedInfo?.count || 0);

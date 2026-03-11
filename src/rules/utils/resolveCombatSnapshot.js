@@ -1,6 +1,8 @@
 import { Equipment } from "../components/Equipment.js";
 import { HUNGER_COMBAT_LEVELS } from "../data/hungerCombatLevels.js";
 import { resolveResistance } from "./dealDamage.js";
+import { resolveDerivedStats } from "./derivedStats.js";
+import { getPassiveBonuses } from "./passiveBonuses.js";
 import { statusStrength } from "./statusFacade.js";
 
 const MODE_RULES = Object.freeze({
@@ -54,12 +56,14 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
   const rules = getModeRules(mode);
 
   const eq = (id > 0 && world.isAlive(id)) ? world.get(id, Equipment) : null;
+  const passive = getPassiveBonuses(world, id);
+  const resolvedStats = resolveDerivedStats(world, id);
 
-  const attackDerived = Number(eq?.attackDerived || 0);
-  const defenseDerived = Number(eq?.defenseDerived || 0);
-  const luckDerived = Number(eq?.luckDerived || 0) + statusStrength(world, id, "lucky");
-  const critChanceDerived = Number(eq?.critChanceDerived || 0);
-  const critMultDerived = Number(eq?.critMultDerived || 0);
+  const attackDerived = Number(passive?.attackDerived || 0);
+  const defenseDerived = Number(passive?.defenseDerived || 0);
+  const luckDerived = Number(passive?.luckDerived || 0) + statusStrength(world, id, "lucky");
+  const critChanceDerived = Number(passive?.critChanceDerived || 0) + Number(resolvedStats?.critChance || 0);
+  const critMultDerived = Number(passive?.critMultDerived || 0) + Math.max(0, Number(resolvedStats?.critMultiplier || 1.5) - 1.5);
 
   let hunger = 0;
   for (let i = 0; i < HUNGER_COMBAT_LEVELS.length; i++) {
