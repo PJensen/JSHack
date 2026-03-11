@@ -15,11 +15,9 @@ import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { inventoryItems, removeFromInventory } from '../utils/inventoryFacade.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
-import { getAmmoHooks } from '../data/ammo.js';
-import { ProjectileImpactCallbackContext } from '../data/callbacks/projectile.js';
-import { runCallbackList } from '../interaction/dispatch.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
+import { runAmmoScripts } from '../utils/projectileScriptDispatch.js';
 
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
@@ -86,7 +84,7 @@ export function rangedAttackSystem(world) {
 
     // LOS check
     if (!hasLOS(ax, ay, tx, ty, isBlocked)) {
-      runAmmoCallbacks(world, ammoIdentity, 'onProjectileWallImpact', {
+      runAmmoScripts(world, ammoIdentity, 'onProjectileWallImpact', {
         phase: 'projectile-wall-impact',
         attacker,
         defender,
@@ -133,7 +131,7 @@ export function rangedAttackSystem(world) {
     const isNat1 = d20 === 1;
 
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
-      runAmmoCallbacks(world, ammoIdentity, 'onProjectileMiss', {
+      runAmmoScripts(world, ammoIdentity, 'onProjectileMiss', {
         phase: 'projectile-miss',
         attacker,
         defender,
@@ -171,7 +169,7 @@ export function rangedAttackSystem(world) {
     const critMult = 2 + (atkSnapshot.critMult || 0);
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
 
-    const actorImpactCtx = runAmmoCallbacks(world, ammoIdentity, 'onProjectileActorImpact', {
+    const actorImpactCtx = runAmmoScripts(world, ammoIdentity, 'onProjectileActorImpact', {
       phase: 'projectile-actor-impact',
       attacker,
       defender,
@@ -213,21 +211,6 @@ export function rangedAttackSystem(world) {
     world.emit?.('ranged:shot', { attacker, target: defender, hit: true, damage: dmg, style: ammoStyle });
     world.remove(attacker, RangedAttackIntent);
   }
-}
-
-/**
- * @param {any} world
- * @param {string} ammoIdentity
- * @param {string} hookName
- * @param {any} frame
- * @returns {ProjectileImpactCallbackContext|null}
- */
-function runAmmoCallbacks(world, ammoIdentity, hookName, frame) {
-  const hooks = getAmmoHooks(ammoIdentity, hookName);
-  if (!Array.isArray(hooks) || hooks.length === 0) return null;
-  const ctx = new ProjectileImpactCallbackContext(world, frame);
-  runCallbackList(hooks, ctx);
-  return ctx;
 }
 
 /** Decrement ammo count; destroy entity if last arrow. */

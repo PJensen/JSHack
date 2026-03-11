@@ -46,6 +46,17 @@ const AMMO_HOOK_KEYS = new Set([
 ]);
 
 /**
+ * @param {any} value
+ * @returns {boolean}
+ */
+function isScriptRefLike(value) {
+  if (typeof value === "string" && value) return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const key = value.ref ?? value.script ?? value.key ?? value.id ?? "";
+  return typeof key === "string" && key.length > 0;
+}
+
+/**
  * @param {string} itemId
  * @param {Record<string, any>} source
  * @param {string} sourceLabel
@@ -109,9 +120,11 @@ export function validateAmmoDefs(AMMO_DEFS) {
       throw new Error(`ammo ${id}: def must be an object`);
     }
     if (String(rec.id || id) !== id) throw new Error(`ammo ${id}: id mismatch`);
-    const hooksSurface = rec.hooks && typeof rec.hooks === "object" ? rec.hooks : rec;
-    for (const [key, value] of Object.entries(hooksSurface)) {
-      if (key === "id" || key === "name" || key === "hooks") continue;
+    const scriptsSurface = rec.scripts && typeof rec.scripts === "object"
+      ? rec.scripts
+      : (rec.hooks && typeof rec.hooks === "object" ? rec.hooks : rec);
+    for (const [key, value] of Object.entries(scriptsSurface)) {
+      if (key === "id" || key === "name" || key === "hooks" || key === "scripts") continue;
       if (!AMMO_HOOK_KEYS.has(key)) {
         throw new Error(`ammo ${id}: unknown hook key '${key}'`);
       }
@@ -119,8 +132,8 @@ export function validateAmmoDefs(AMMO_DEFS) {
         throw new Error(`ammo ${id}: hook '${key}' must be an array`);
       }
       for (let i = 0; i < value.length; i++) {
-        if (typeof value[i] !== "function") {
-          throw new Error(`ammo ${id}: hook '${key}' entry ${i} must be a function`);
+        if (!isScriptRefLike(value[i])) {
+          throw new Error(`ammo ${id}: hook '${key}' entry ${i} must be a script ref`);
         }
       }
     }
