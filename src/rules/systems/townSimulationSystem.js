@@ -32,6 +32,18 @@ function getWeather(world) {
   return "clear";
 }
 
+export function getTownEconomyData(world) {
+  for (const [, ts] of world.query(TownState)) {
+    return {
+      food: ts.foodStores,
+      materials: ts.materialStores,
+      medicine: ts.medicineStores,
+      morale: ts.morale,
+    };
+  }
+  return null;
+}
+
 function ensureTownState(world) {
   for (const [id, st] of world.query(TownState)) return [id, st];
   const id = world.create();
