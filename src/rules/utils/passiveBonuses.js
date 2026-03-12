@@ -1,6 +1,6 @@
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
-import { AFFIX_DEFS } from "../data/affixes.js";
+import { getAffixPassiveRefs } from "../data/affixes.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
 export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
@@ -89,14 +89,15 @@ function applyItemBonuses(acc, touched, bonuses) {
 function runAffixPassives(world, acc, touched, entityId, itemId, affixIds) {
   for (let i = 0; i < (affixIds || []).length; i++) {
     const aId = affixIds[i];
-    const affix = AFFIX_DEFS[aId];
-    if (!affix || !affix.passive) continue;
-    runScript(affix.passive, ScriptVerb.AffixPassive, world, {
-      world,
-      entityId,
-      itemId,
-      addBonus: (key, value) => markAndAddPassiveBonus(acc, touched, key, value),
-    });
+    const passiveRefs = getAffixPassiveRefs(aId);
+    for (let j = 0; j < passiveRefs.length; j++) {
+      runScript(passiveRefs[j], ScriptVerb.AffixPassive, world, {
+        world,
+        entityId,
+        itemId,
+        addBonus: (key, value) => markAndAddPassiveBonus(acc, touched, key, value),
+      });
+    }
   }
 }
 

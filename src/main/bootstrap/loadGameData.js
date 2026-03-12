@@ -5,7 +5,7 @@ import { MONSTERS } from "../../rules/data/monsters.js";
 import { SPELL_DEFS } from "../../rules/data/spells.js";
 import { ITEM_CATALOG } from "../../rules/data/itemCatalog.js";
 import { AMMO_DEFS } from "../../rules/data/ammo.js";
-import { AFFIX_DEFS } from "../../rules/data/affixes.js";
+import { listAffixEntries } from "../../rules/data/affixes.js";
 import { LOOT_TABLES } from "../../rules/data/lootTables.js";
 import { DEITY_DEFS } from "../../rules/data/deities.js";
 import { GEM_DEFS } from "../../rules/data/gems.js";
@@ -16,7 +16,7 @@ import {
 } from "../../rules/content/items/usePayloads.js";
 import { EFFECT_DEFS, EFFECT_OPERATION_IDS } from "../../rules/data/effectDefs.js";
 import { MATERIAL_REACTION_OUTCOME_IDS, MATERIAL_REACTION_RULES } from "../../rules/data/materialReactions.js";
-import { NUTRITION_BY_SIZE, CORPSE_DEFS } from "../../rules/data/food.js";
+import { NUTRITION_BY_SIZE, CORPSE_DEFS } from "../../rules/data/corpseFood.js";
 import { validateAll } from "../../rules/data/validate.js";
 
 /**
@@ -39,12 +39,13 @@ import { validateAll } from "../../rules/data/validate.js";
  */
 export function getGameDataLoadPlan() {
   const useItemPayloadKeys = Object.keys(USE_ITEM_PAYLOADS);
+  const affixEntries = listAffixEntries();
   /** @type {DataLoadPlanItem[]} */
   const datasets = [
     { id: "monsters", label: "Loading monster defs", total: MONSTERS.length },
     { id: "spells", label: "Loading spell defs", total: Object.keys(SPELL_DEFS).length },
     { id: "items", label: "Loading item catalog", total: Object.keys(ITEM_CATALOG).length },
-    { id: "affixes", label: "Loading affix defs", total: Object.keys(AFFIX_DEFS).length },
+    { id: "affixes", label: "Loading affix defs", total: affixEntries.length },
     { id: "loot", label: "Loading loot tables", total: Object.keys(LOOT_TABLES).length },
     { id: "deities", label: "Loading deity defs", total: Object.keys(DEITY_DEFS).length },
     { id: "gems", label: "Loading gem defs", total: Object.keys(GEM_DEFS).length },
@@ -128,10 +129,9 @@ export function loadGameData(opts = {}) {
     }
 
     if (ds.id === "affixes") {
-      const keys = Object.keys(AFFIX_DEFS);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        void AFFIX_DEFS[key];
+      const entries = listAffixEntries();
+      for (let i = 0; i < entries.length; i++) {
+        void entries[i];
         completed++;
         emit(ds, i + 1);
       }
@@ -242,7 +242,7 @@ export function loadGameData(opts = {}) {
       validateAll({
         ITEM_CATALOG,
         AMMO_DEFS,
-        AFFIX_DEFS,
+        AFFIXES: listAffixEntries(),
         MATERIAL_REACTION_RULES,
         MATERIAL_REACTION_OUTCOME_IDS,
         APPLY_PAYLOADS,

@@ -7,6 +7,7 @@ import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { installAffixTriggers } from '../src/rules/systems/affixTriggerSystem.js';
 import { registerScript, ScriptVerb } from '../src/rules/scripting.js';
 import { dealDamage } from '../src/rules/utils/dealDamage.js';
+import { registerAffixDefinition, unregisterAffixDefinition } from '../src/rules/data/affixes.js';
 
 Deno.test("custom affix heals defender after canonical damage application", async () => {
   const world = new World({ seed: 1 });
@@ -18,11 +19,10 @@ Deno.test("custom affix heals defender after canonical damage application", asyn
     }
   });
 
-  const { AFFIX_DEFS } = await import('../src/rules/data/affixes.js');
-  AFFIX_DEFS['test_shield'] = {
-    name: 'Test Shield', slots: ['armor'], triggers: ['onDamaged'],
-    script: 'affix:test_shield', weight: 1
-  };
+  registerAffixDefinition('test_shield', {
+    name: 'Test Shield', slots: ['armor'], weight: 1,
+    triggerScripts: { onDamaged: ['affix:test_shield'] },
+  });
 
   const attacker = world.create();
   world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
@@ -50,7 +50,7 @@ Deno.test("custom affix heals defender after canonical damage application", asyn
   world.add(naked, Vitality, { maxHp: 10, hp: 5 });
   dealDamage(world, { target: naked, amount: 3, source: attacker });
 
-  delete AFFIX_DEFS['test_shield'];
+  unregisterAffixDefinition('test_shield');
 });
 
 Deno.test("custom affix retaliates on damaged event", async () => {
@@ -63,11 +63,10 @@ Deno.test("custom affix retaliates on damaged event", async () => {
     }
   });
 
-  const { AFFIX_DEFS } = await import('../src/rules/data/affixes.js');
-  AFFIX_DEFS['test_thorns'] = {
-    name: 'Test Thorns', slots: ['armor'], triggers: ['onDamaged'],
-    script: 'affix:test_thorns', weight: 1
-  };
+  registerAffixDefinition('test_thorns', {
+    name: 'Test Thorns', slots: ['armor'], weight: 1,
+    triggerScripts: { onDamaged: ['affix:test_thorns'] },
+  });
 
   const d2 = world.create();
   world.add(d2, Vitality, { maxHp: 20, hp: 20 });
@@ -88,5 +87,5 @@ Deno.test("custom affix retaliates on damaged event", async () => {
   const a2Vit = world.get(a2, Vitality);
   assert(a2Vit.hp === 17, `attacker should take 3 retaliation, got hp=${a2Vit.hp}`);
 
-  delete AFFIX_DEFS['test_thorns'];
+  unregisterAffixDefinition('test_thorns');
 });

@@ -3,7 +3,7 @@
 // Resolves table IDs into drop descriptors, then materializes them as ECS entities.
 
 import { LOOT_TABLES } from './lootTables.js';
-import { AFFIX_DEFS } from './affixes.js';
+import { affixSupportsSlot, getAffixWeight, listAffixEntries } from './affixes.js';
 import { getCatalogItem, isCatalogEquipment } from './itemCatalog.js';
 import { getGem, pickGem } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
@@ -169,7 +169,7 @@ function weightedPick(entries, rng, opts) {
 // ── Affix rolling ───────────────────────────────────────────────────
 
 /**
- * Roll affixes for equipment. Filters by slot, uses AFFIX_DEFS.weight,
+ * Roll affixes for equipment. Filters by slot and uses affix registry weights,
  * no duplicate affixes per item.
  * @param {Object} rng
  * @param {string} equipId
@@ -187,9 +187,9 @@ function rollAffixes(rng, equipId, affixChance, maxCount) {
   const rawSlot = def.slot === 'shield' ? 'offhand' : def.slot;
   const slot = rawSlot === 'offhand' ? 'armor' : rawSlot;
 
-  const eligible = Object.entries(AFFIX_DEFS)
-    .filter(([, affix]) => affix.slots.includes(slot))
-    .map(([id, affix]) => ({ id, weight: affix.weight }));
+  const eligible = listAffixEntries()
+    .filter(({ id }) => affixSupportsSlot(id, slot))
+    .map(({ id }) => ({ id, weight: getAffixWeight(id) }));
 
   if (eligible.length === 0) return [];
 

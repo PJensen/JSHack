@@ -1,7 +1,7 @@
 import { assert } from "jsr:@std/assert";
 import { SPELL_DEFS, getSpell, listSpells } from '../src/rules/data/spells.js';
 import { ITEM_CATALOG, getCatalogItem, listCatalogItems } from '../src/rules/data/itemCatalog.js';
-import { AFFIX_DEFS, getAffix, listAffixes } from '../src/rules/data/affixes.js';
+import { getAffix, listAffixEntries, listAffixes } from '../src/rules/data/affixes.js';
 import { MONSTERS } from '../src/rules/data/monsters.js';
 import { registerScript, runScript, listRegisteredScripts, ScriptVerb } from '../src/rules/scripting.js';
 
@@ -60,19 +60,20 @@ Deno.test("blunt weapon and skeleton vulnerability data are wired", () => {
 });
 
 Deno.test("affix definitions are valid", () => {
-  assert(Object.keys(AFFIX_DEFS).length > 0, 'AFFIX_DEFS should not be empty');
+  const entries = listAffixEntries();
+  assert(entries.length > 0, 'affix registry should not be empty');
 
-  for (const [id, affix] of Object.entries(AFFIX_DEFS)) {
+  for (const { id, record: affix } of entries) {
     if (id.startsWith('test_')) continue;
     assert(typeof affix.name === 'string', `affix ${id} must have name`);
     assert(Array.isArray(affix.slots), `affix ${id} must have slots array`);
-    assert(Array.isArray(affix.triggers), `affix ${id} must have triggers array`);
+    assert(typeof affix.triggerScripts === 'object', `affix ${id} must have triggerScripts object`);
     assert(typeof affix.weight === 'number', `affix ${id} must have numeric weight`);
   }
 
   assert(getAffix('fierce') !== null, 'getAffix should find fierce');
   assert(getAffix('nonexistent') === null, 'getAffix should return null for missing');
-  assert(listAffixes().length >= Object.keys(AFFIX_DEFS).length, 'listAffixes should return all');
+  assert(listAffixes().length >= entries.length, 'listAffixes should return all');
 });
 
 Deno.test("scripting registry works", () => {

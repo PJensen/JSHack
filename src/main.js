@@ -78,7 +78,6 @@ import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { Brain } from "./rules/components/Brain.js";
 import { Mana } from "./rules/components/Mana.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
-import { AFFIX_DEFS } from "./rules/data/affixes.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
