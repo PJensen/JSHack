@@ -1,5 +1,6 @@
 import { assertEquals, assert } from "jsr:@std/assert";
 import { World, composeScheduler } from "../src/lib/ecs-js/index.js";
+import { QuestDefRef } from "../src/rules/components/QuestDefRef.js";
 import { emit, setVar } from "../src/rules/quests/actions.js";
 import { registerQuest } from "../src/rules/quests/registry.js";
 import { getQuestRecord, installQuestRuntime, instantiateQuest } from "../src/rules/quests/runtime.js";
@@ -100,6 +101,9 @@ Deno.test("instantiateQuest deduplicates matching quest instances for the same b
   const second = instantiateQuest(world, "test:quest_dedupe", { player: 3, giver: 7, target: 7 });
 
   assertEquals(second, first);
-  assertEquals([...world.query()].filter(([id]) => id === first).length >= 1, true);
+  const questIds = [...world.query(QuestDefRef)]
+    .filter(([, def]) => String(def.id || "") === "test:quest_dedupe")
+    .map(([id]) => id);
+  assertEquals(questIds, [first]);
   assertEquals(getQuestRecord(world, "test:quest_dedupe", 3)?.id, first);
 });

@@ -90,6 +90,8 @@ const westWalkX = homeX - houseHalfW - 1;
 const eastWalkX = homeX + houseHalfW + 1;
 const stairX = eastWalkX + 1;
 const stairY = homeY + 2;
+const wellX = stairX + 5;
+const wellY = stairY;
 const gateX = homeX + 1;
 const gateY = homeY + 5;
 const farmX0 = homeX - 4;
@@ -182,7 +184,7 @@ Deno.test("overworld crops are planted in vertical columns and scarecrows sit in
   assertEquals(turnip.length, 6);  // 1 turnip column × 6
   assertEquals(pumpkin.length, 6); // 1 pumpkin column × 6
   assertEquals(coordsOfKind(chunks, "scarecrow").length, 2);
-  assertEquals(coordsOfKind(chunks, "well"), [`${homeX - 3},${southWalkY + 1}`]);
+  assertEquals(coordsOfKind(chunks, "well"), [`${wellX},${wellY}`]);
 });
 
 Deno.test("tavern and windmill keep their intended footprints, doors, and interior props", () => {
@@ -244,9 +246,9 @@ Deno.test("overworld gem shop and town center props include the gem sign and bul
   const { chunks } = generateOverworldChunks(SEED);
 
   assertEquals(coordsOfKind(chunks, "gem_display_case"), [
-    `${gemX0 + 1},${gemY0 + 1}`,
-    `${gemX0 + 3},${gemY0 + 1}`,
     `${gemX0 + 5},${gemY0 + 1}`,
+    `${gemX0 + 3},${gemY0 + 1}`,
+    `${gemX0 + 1},${gemY0 + 1}`,
   ]);
   assertEquals(coordsOfKind(chunks, "gem_shop_sign"), [`${gemDoorX + 2},${gemDoorY + 1}`]);
   assertEquals(coordsOfKind(chunks, "message_board"), [`${fountainCX - 3},${fountainCY + 1}`]);
