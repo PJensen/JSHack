@@ -240,6 +240,7 @@ export const Well = defineArchetype(
   [NamedIdentity, { name: "Well", identity: "well" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "drinkWell", params: null }],
 );
 
 export const Scarecrow = defineArchetype(
@@ -498,12 +499,30 @@ export const ApothecarySign = defineArchetype(
   [Interactable, { action: "readText", params: { textId: "apothecary_sign" } }],
 );
 
+export const GemShopSign = defineArchetype(
+  "GemShopSign",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Gem Shop Sign", identity: "gem_shop_sign" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+  [Interactable, { action: "readText", params: { textId: "gem_shop_sign" } }],
+);
+
 export const GemDisplayCase = defineArchetype(
   "GemDisplayCase",
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Gem Display Case", identity: "gem_display_case" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
+);
+
+export const MessageBoard = defineArchetype(
+  "MessageBoard",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Town Message Board", identity: "message_board" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+  [Interactable, { action: "readTownBulletin", params: null }],
 );
 
 // ── Graveyard ────────────────────────────────────────────────────

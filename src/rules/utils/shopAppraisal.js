@@ -163,11 +163,13 @@ export function estimateItemValueFromInfo(info) {
 export function getUnidentifiedGemAppraisal(world, itemId) {
   const info = world.get(itemId, ItemInfo);
   if (!info || String(info.type || "").toLowerCase() !== "gem") return 0;
+  if (info.identified === true) return 0;
 
   const identity = String(world.get(itemId, NamedIdentity)?.identity || "");
   if (identity && isIdentified(identity)) return 0;
 
-  return Math.max(0, Math.ceil(toNumber(getUnidentifiedGemValue(String(info.description || "")), 0)));
+  const appearance = String(info.appearance || info.description || "");
+  return Math.max(0, Math.ceil(toNumber(getUnidentifiedGemValue(appearance), 0)));
 }
 
 /**

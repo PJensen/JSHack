@@ -811,7 +811,7 @@ function createQuickSlot() {
     zIndex: 901,
   });
 
-  /** @type {Array<{id:number, type:string, slot?:string, name:string, count:number, addedAt:number}>} */
+  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, addedAt:number}>} */
   const stack = [];
   const AUTO_DISMISS_MS = 12000;
 
@@ -842,6 +842,7 @@ function createQuickSlot() {
     if (!it) return;
     const chip = renderQuickChip(it, {
       onUse: () => dispatchAction(it),
+      onThrow: String(it.identity || '') === 'torch' ? () => dispatchThrow(it) : null,
       onDismiss: () => dismissTop()
     });
     el.appendChild(chip);
@@ -858,6 +859,11 @@ function createQuickSlot() {
     }
   }
 
+  function dispatchThrow(it) {
+    if (!(Number(it?.id || 0) > 0)) return;
+    window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
+  }
+
   function dismissTop() {
     stack.shift();
     renderStack();
@@ -872,7 +878,15 @@ function createQuickSlot() {
     if (!item) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
-    stack.push({ id: Number(item.id||0), type: String(item.type||''), slot: String(item.slot||''), name: String(item.name||'item'), count: Number(item.count||1), addedAt: Date.now() });
+    stack.push({
+      id: Number(item.id||0),
+      identity: String(item.identity || ''),
+      type: String(item.type||''),
+      slot: String(item.slot||''),
+      name: String(item.name||'item'),
+      count: Number(item.count||1),
+      addedAt: Date.now()
+    });
     console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[0]:', stack[0] ? actionable(stack[0]) : 'empty');
     renderStack();
     resetDismissTimer();
@@ -1003,7 +1017,7 @@ function createChannelingOverlay() {
   return { el };
 }
 
-/** @param {{id:number,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function}} h */
+/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null}} h */
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
@@ -1030,6 +1044,17 @@ function renderQuickChip(it, h) {
   btn.textContent = ACTION_LABELS[it.type] || 'Use';
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
+  let throwBtn = null;
+  if (typeof h.onThrow === 'function') {
+    throwBtn = document.createElement('button');
+    Object.assign(throwBtn.style, {
+      padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+    });
+    throwBtn.textContent = 'Throw';
+    throwBtn.addEventListener('click', () => h.onThrow && h.onThrow());
+  }
+
   const x = document.createElement('button');
   Object.assign(x.style, {
     padding: '6px 8px', background: '#101626', color: '#cfe8ff',
@@ -1042,6 +1067,7 @@ function renderQuickChip(it, h) {
   chip.appendChild(name);
   chip.appendChild(count);
   chip.appendChild(btn);
+  if (throwBtn) chip.appendChild(throwBtn);
   chip.appendChild(x);
   return chip;
 }

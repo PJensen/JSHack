@@ -540,7 +540,7 @@ export function initOverlays() {
   });
 
   // Shop overlay
-  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse', activeTab: 'buy' };
+  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse', activeTab: 'buy', vendorKind: '' };
   window.addEventListener('ui:openShop', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -549,12 +549,14 @@ export function initOverlays() {
     _shopState.buyMarkup = d.buyMarkup ?? 1.0;
     _shopState.sellDiscount = d.sellDiscount ?? 0.5;
     _shopState.mode = d.mode || 'browse';
+    _shopState.vendorKind = String(d.vendorKind || '');
     show(shop);
   });
   window.addEventListener('ui:closeShop', () => {
     _shopState.shopkeeperId = 0;
     _shopState.mode = 'browse';
     _shopState.activeTab = 'buy';
+    _shopState.vendorKind = '';
     hide(shop);
   });
   window.addEventListener('ui:shopData', (ev) => {
@@ -3998,6 +4000,7 @@ function renderShop(panel, data, state) {
   el.innerHTML = '';
 
   const mode = data?.mode || state?.mode || 'browse';
+  const vendorKind = String(data?.vendorKind || state?.vendorKind || '');
   const shopItems = data?.shopItems || [];
   const playerItems = data?.playerItems || [];
   const unpaidItems = data?.unpaidItems || [];
@@ -4006,14 +4009,27 @@ function renderShop(panel, data, state) {
 
   // Header
   const header = document.createElement('div');
-  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' });
+  Object.assign(header.style, { display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '10px' });
+  const titleWrap = document.createElement('div');
+  Object.assign(titleWrap.style, { display: 'flex', flexDirection: 'column', gap: '2px' });
   const title = document.createElement('div');
-  title.textContent = mode === 'checkout' ? 'Shopkeeper Invoice' : 'Shopkeeper';
+  title.textContent = mode === 'checkout'
+    ? (vendorKind === 'gem' ? 'Gem Dealer Invoice' : 'Shopkeeper Invoice')
+    : (vendorKind === 'gem' ? 'Gem Dealer' : 'Shopkeeper');
   title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
+  titleWrap.appendChild(title);
+  if (mode !== 'checkout' && vendorKind === 'gem') {
+    const subtitle = document.createElement('div');
+    subtitle.textContent = 'All stones on display are identified. Socketable gems list their effects in the tooltip.';
+    subtitle.style.fontSize = '12px';
+    subtitle.style.opacity = '0.78';
+    subtitle.style.maxWidth = '34ch';
+    titleWrap.appendChild(subtitle);
+  }
   const goldLabel = document.createElement('div');
   goldLabel.textContent = `Gold: ${gold}`;
   goldLabel.style.marginLeft = 'auto'; goldLabel.style.color = '#ffde5a'; goldLabel.style.fontWeight = 'bold';
-  header.appendChild(title); header.appendChild(goldLabel);
+  header.appendChild(titleWrap); header.appendChild(goldLabel);
   el.appendChild(header);
 
   if (mode === 'checkout') {

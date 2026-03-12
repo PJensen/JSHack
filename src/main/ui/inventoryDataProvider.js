@@ -468,7 +468,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         items.push(buildItemDisplayData(info, id));
       }
     }
-    _uiEventTarget.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:usableItemsData', { detail: { items: groupDisplayItems(items) } }));
   });
 
   // Provide all inventory items to the throw-chooser overlay when requested
@@ -482,7 +482,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         items.push(buildItemDisplayData(info, id));
       }
     }
-    _uiEventTarget.dispatchEvent(new CustomEvent('ui:throwableItemsData', { detail: { items } }));
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:throwableItemsData', { detail: { items: groupDisplayItems(items) } }));
   });
 
   // Provide applicable tools to the apply-tool chooser
@@ -694,17 +694,20 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   });
 
   addEventListener('ui:requestQuestJournalData', () => {
-    const quests = [];
+    const questMap = new Map();
     for (const [, def, state] of world.query(QuestDefRef, QuestState)) {
       const questDef = getQuestDef(def.id);
-      quests.push({
+      const rec = {
         questId: String(def.id || ''),
         title: String(questDef?.title || def.id || ''),
         status: String(state.status || 'active'),
         node: String(state.node || ''),
         t0: Number(state.t0 || 0),
-      });
+      };
+      const prev = questMap.get(rec.questId);
+      if (!prev || rec.t0 >= prev.t0) questMap.set(rec.questId, rec);
     }
+    const quests = Array.from(questMap.values()).sort((a, b) => a.t0 - b.t0 || a.title.localeCompare(b.title));
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:questJournalData', { detail: { quests } }));
   });
 

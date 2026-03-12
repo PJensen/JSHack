@@ -36,6 +36,8 @@ import { Position } from "../../components/Position.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
+import { DistrictProfile } from "../../components/DistrictProfile.js";
+import { DistrictState } from "../../components/DistrictState.js";
 import TombstoneComponent from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
@@ -54,6 +56,7 @@ import { Encumbrance } from "../../components/Encumbrance.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
+import { getDistrictBulletinVirtual, getPlayerOpportunityViewVirtual } from "../../utils/townInterpretationVirtuals.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -370,6 +373,22 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  readTownBulletin: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const districtBulletinVirtual = getDistrictBulletinVirtual(world);
+      const playerOpportunityVirtual = getPlayerOpportunityViewVirtual(world);
+      const districts = [];
+      for (const [districtId] of world.query(DistrictProfile, DistrictState)) {
+        const bulletin = districtBulletinVirtual ? world.vget(districtId, districtBulletinVirtual) : null;
+        if (bulletin) districts.push(bulletin);
+      }
+      districts.sort((a, b) => String(a?.label || "").localeCompare(String(b?.label || "")));
+      const opportunityView = playerOpportunityVirtual ? world.vget(actor, playerOpportunityVirtual) : null;
+      world.emit?.("town:bulletinBoard", { actor, targetId, districts, opportunityView });
+    },
+  },
+
   readTombstone: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
@@ -571,6 +590,24 @@ export const INTERACT_PAYLOADS = {
 
   descendStair: { onInteract() {} },
   ascendStair:  { onInteract() {} },
+
+  // ── Well ───────────────────────────────────────────────────────────────────
+
+  drinkWell: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const stamina = world.get(actor, Stamina);
+      if (stamina) {
+        const restoreAmt = Math.floor(stamina.maxStamina * 0.3);
+        const prev = stamina.stamina;
+        const next = Math.min(stamina.maxStamina, prev + restoreAmt);
+        world.set(actor, Stamina, { ...stamina, stamina: next, regenCooldown: 0 });
+        world.emit?.("well:drink", { actor, targetId, amount: next - prev });
+      } else {
+        world.emit?.("well:drink", { actor, targetId, amount: 0 });
+      }
+    },
+  },
 
   // ── Fountain ───────────────────────────────────────────────────────────────
 

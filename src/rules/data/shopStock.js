@@ -6,8 +6,7 @@ import { HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetyp
 import { resolveLootTable, materializeDrop } from './lootResolver.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
-import { listGems } from './gems.js';
-import { identify } from './identification.js';
+import { listGems, buildGemItemParams } from './gems.js';
 
 /**
  * Generate a shopkeeper's stock as entity IDs (no Position component).
@@ -133,18 +132,21 @@ export function generateGemShopStock(world, rng) {
     }
     for (let i = 0; i < Math.min(socketCount, pool.length); i++) {
         const gem = pool[i];
-        identify(gem.id); // vendor sells identified socketable gems
-        const id = createFrom(world, GemItem, { name: gem.name, identity: gem.id, weight: gem.weight, value: gem.value });
+        const params = buildGemItemParams(gem, { identified: true });
+        if (!params) continue;
+        const id = createFrom(world, GemItem, params);
         try { world.remove(id, Position); } catch {}
         items.push(id);
     }
 
-    // Misc gems: 4-6 common gems (unidentified appearance until player identifies)
+    // Misc gems: 4-6 common gemstones, also sold pre-identified in the gem shop.
     const miscPool = listGems().filter(g => g.material === 'gemstone' && g.value > 0 && g.prob > 0);
     const miscCount = rng.int(4, 6);
     for (let i = 0; i < miscCount; i++) {
         const gem = miscPool[rng.int(0, miscPool.length - 1)];
-        const id = createFrom(world, GemItem, { name: gem.name, identity: gem.id, weight: gem.weight, value: gem.value });
+        const params = buildGemItemParams(gem, { identified: true });
+        if (!params) continue;
+        const id = createFrom(world, GemItem, params);
         try { world.remove(id, Position); } catch {}
         items.push(id);
     }

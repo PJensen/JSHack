@@ -117,6 +117,12 @@ const apothX0 = homeX - 29;
 const apothY0 = homeY - 12;
 const apothDoorX = apothX0 + 5;
 const apothDoorY = apothY0 + 5;
+const gemX0 = apothX0 - 16;
+const gemY0 = apothY0;
+const gemDoorX = gemX0 + 3;
+const gemDoorY = gemY0 + 5;
+const fountainCX = homeX;
+const fountainCY = homeY - 6;
 const barkeepX0 = tavX0 + 12;
 const barkeepY0 = tavY0 + 1;
 const masonX0 = homeX + 23;
@@ -232,6 +238,18 @@ Deno.test("blacksmith building has correct footprint, door, and interior spawns"
   assertEquals(coordsOfKind(chunks, "anvil"), [`${smithyX0 + 3},${smithyY0 + 1}`]);
   assertEquals(coordsOfKind(chunks, "smithy_chest"), [`${smithyX0 + 1},${smithyY0 + 3}`]);
   assertEquals(coordsOfKind(chunks, "smithy_sign").length, 1);
+});
+
+Deno.test("overworld gem shop and town center props include the gem sign and bulletin board", () => {
+  const { chunks } = generateOverworldChunks(SEED);
+
+  assertEquals(coordsOfKind(chunks, "gem_display_case"), [
+    `${gemX0 + 1},${gemY0 + 1}`,
+    `${gemX0 + 3},${gemY0 + 1}`,
+    `${gemX0 + 5},${gemY0 + 1}`,
+  ]);
+  assertEquals(coordsOfKind(chunks, "gem_shop_sign"), [`${gemDoorX + 2},${gemDoorY + 1}`]);
+  assertEquals(coordsOfKind(chunks, "message_board"), [`${fountainCX - 3},${fountainCY + 1}`]);
 });
 
 Deno.test("overworld commute paths no longer punch holes in nearby buildings", () => {
