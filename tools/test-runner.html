@@ -425,13 +425,13 @@ function render() {
 	for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
 		if (pos.x < x0 || pos.x > x1 || pos.y < y0 || pos.y > y1) continue;
 		const tags = getEntityTags(id);
-		if (!tags.length) continue;
 		const wx = pos.x, wy = pos.y;
 		if (tags.includes('stunned') || tags.includes('confused')) drawStunnedStars(ctx, wx, wy, id);
 		if (tags.includes('frozen'))   drawFrozenHalo(ctx, wx, wy);
 		if (tags.includes('poisoned')) drawPoisonGlow(ctx, wx, wy, id);
 		if (tags.includes('bleeding')) drawBleedPulse(ctx, wx, wy, id);
 		if (tags.includes('shocked'))  drawShockArcs(ctx, wx, wy, id);
+		drawProcStateBadges(ctx, wx, wy, id);
 	}
 	ctx.restore();
 
@@ -616,6 +616,55 @@ function drawShockArcs(g, x, y, eid) {
 	g.restore();
 }
 
+// ── Proc state glyph badges (world space, above entity) ──────────
+const PROC_STATE_VIS_RUNNER = {
+	doom_clock:         { glyph: '\u231B',         r: 140, g: 60,  b: 220 },  // ⌛
+	cataclysm_mark:     { glyph: '\u2726',         r: 255, g: 120, b: 30  },  // ✦
+	echo_strike_memory: { glyph: '\u{1F47B}',      r: 80,  g: 150, b: 255 },  // 👻
+	soul_mortgage_debt: { glyph: '\u2696\uFE0F',   r: 200, g: 50,  b: 50  },  // ⚖️
+};
+
+function drawProcStateBadges(g, wx, wy, eid) {
+	const ae = world.get(eid, ActiveEffects);
+	if (!ae || !Array.isArray(ae.effects)) return;
+	let slot = 0;
+	for (const e of ae.effects) {
+		const vis = PROC_STATE_VIS_RUNNER[e.key];
+		if (!vis) continue;
+		const stacks = Math.max(1, Number(e.stacks || 1));
+		const freq = 2.2 + stacks * 0.9;
+		const pulse = 0.72 + 0.28 * Math.sin(_fxTime * freq + eid * 0.91);
+		const bx = wx + 0.30 + slot * 0.38;
+		const by = wy - 0.54;
+		const radius = 0.19;
+		g.save();
+		g.globalCompositeOperation = 'source-over';
+		g.globalAlpha = 0.55 * pulse;
+		g.fillStyle = 'rgba(0,0,0,0.6)';
+		g.beginPath(); g.arc(bx, by, radius + 0.04, 0, Math.PI * 2); g.fill();
+		g.globalAlpha = 0.88 * pulse;
+		g.fillStyle = `rgba(${vis.r},${vis.g},${vis.b},0.45)`;
+		g.beginPath(); g.arc(bx, by, radius, 0, Math.PI * 2); g.fill();
+		g.strokeStyle = `rgba(${vis.r},${vis.g},${vis.b},${(0.9 * pulse).toFixed(2)})`;
+		g.lineWidth = 0.035;
+		g.stroke();
+		g.globalAlpha = pulse;
+		g.font = '0.28px sans-serif';
+		g.textAlign = 'center';
+		g.textBaseline = 'middle';
+		g.fillStyle = '#fff';
+		g.fillText(vis.glyph, bx, by);
+		if (stacks > 1) {
+			g.globalAlpha = 1.0;
+			g.font = 'bold 0.15px monospace';
+			g.fillStyle = '#ffdd00';
+			g.fillText(String(stacks), bx + 0.13, by + 0.13);
+		}
+		g.restore();
+		slot++;
+	}
+}
+
 // ── Entity Inspector ──────────────────────────────────────────────
 function updateInspector() {
 	if (!world || !entityMap) { inspectorEl.innerHTML = ''; return; }
@@ -655,7 +704,10 @@ function updateInspector() {
 		const ae = world.get(id, ActiveEffects);
 		if (ae && ae.effects && ae.effects.length > 0) {
 			for (const eff of ae.effects) {
-				html += `<div class="entity-detail" style="color:#fca">${eff.key}: ${eff.turnsLeft} turns</div>`;
+				const stacksStr = (eff.stacks > 1) ? ` ×${eff.stacks}` : '';
+				const isProcState = eff.key in PROC_STATE_VIS_RUNNER;
+				const color = isProcState ? '#adf' : '#fca';
+				html += `<div class="entity-detail" style="color:${color}">${eff.key}${stacksStr}: ${eff.turnsLeft}t</div>`;
 			}
 		}
 
