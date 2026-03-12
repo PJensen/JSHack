@@ -44,6 +44,7 @@ import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
+import { drawProcStateBadges } from "./display/fx/procStateGlyphs.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
@@ -3041,59 +3042,6 @@ function drawRareStar(ctx, e, fxTime) {
   ctx.restore();
 }
 
-// Proc state glyph badges rendered above enemy entities.
-const PROC_STATE_VIS = {
-  doom_clock:     { glyph: '\u231B', r: 140, g: 60,  b: 220 },  // ⌛ hourglass — shadow countdown
-  cataclysm_mark: { glyph: '\u2726', r: 255, g: 120, b: 30  },  // ✦ star — marked for detonation
-};
-
-function drawProcStateGlyphs(ctx, entity, fxTime) {
-  const states = entity.procStates;
-  if (!states || !states.length) return;
-  const bx0 = entity.pos.x + 0.30;
-  const by  = entity.pos.y - 0.54;
-  for (let i = 0; i < states.length; i++) {
-    const { key, stacks } = states[i];
-    const vis = PROC_STATE_VIS[key];
-    if (!vis) continue;
-    const freq  = 2.2 + stacks * 0.9;
-    const pulse = 0.72 + 0.28 * Math.sin(fxTime * freq + entity.id * 0.91);
-    const bx = bx0 + i * 0.38;
-    const radius = 0.19;
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    // Drop shadow
-    ctx.globalAlpha = 0.55 * pulse;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.beginPath();
-    ctx.arc(bx, by, radius + 0.04, 0, Math.PI * 2);
-    ctx.fill();
-    // Colored disc
-    ctx.globalAlpha = 0.88 * pulse;
-    ctx.fillStyle = `rgba(${vis.r},${vis.g},${vis.b},0.45)`;
-    ctx.beginPath();
-    ctx.arc(bx, by, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = `rgba(${vis.r},${vis.g},${vis.b},${(0.9 * pulse).toFixed(2)})`;
-    ctx.lineWidth = 0.035;
-    ctx.stroke();
-    // Unicode glyph
-    ctx.globalAlpha = pulse;
-    ctx.font = '0.28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(vis.glyph, bx, by);
-    // Stack counter (offset bottom-right if > 1)
-    if (stacks > 1) {
-      ctx.globalAlpha = 1.0;
-      ctx.font = 'bold 0.15px monospace';
-      ctx.fillStyle = '#ffdd00';
-      ctx.fillText(String(stacks), bx + 0.13, by + 0.13);
-    }
-    ctx.restore();
-  }
-}
 
 /**
  * @param {number} n
@@ -3644,7 +3592,7 @@ function render(worldView) {
 
     // Glyph-FX: proc state badges (doom_clock, cataclysm_mark, etc.) — above-right of entity
     if (renderEntity.procStates) {
-      drawProcStateGlyphs(bctx, renderEntity, _fxTime);
+      drawProcStateBadges(bctx, renderEntity.pos.x, renderEntity.pos.y, renderEntity.procStates, _fxTime, renderEntity.id);
     }
   }
 
