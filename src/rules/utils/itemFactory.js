@@ -3,16 +3,12 @@
 
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from '../data/itemCatalogLoader.js';
-import { ITEM_CATALOG, getCatalogItem, isCatalogEquipment, isCatalogMagic } from '../data/itemCatalog.js';
+import { ITEM_CATALOG, getCatalogItem } from '../data/itemCatalog.js';
 import { getGem } from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
 import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
-import {
-  Ration, IronRation, WildBerries, WildHerbs, Wheat, Turnip, Pumpkin,
-  ThornPods, VenomFronds, IronOre, CoalOre, StoneChip,
-} from '../archetypes/Food.js';
 import {
   FlourSack,
   IronIngot,
@@ -33,20 +29,8 @@ const SIMPLE_ITEM_ARCHETYPES = {
   'potion_health': HealthPotion,
   'ammo_arrows': ArrowsStack,
   'ammo_fire_arrows': FireArrowsStack,
-  'food_ration': Ration,
-  'food_iron_ration': IronRation,
-  'food_wild_berries': WildBerries,
-  'food_wild_herbs': WildHerbs,
-  'food_wheat': Wheat,
-  'food_turnip': Turnip,
-  'food_pumpkin': Pumpkin,
   'food_flour': FlourSack,
   'food_stew': TownStew,
-  'reagent_thorn_pod': ThornPods,
-  'reagent_venom_frond': VenomFronds,
-  'ore_iron': IronOre,
-  'ore_coal': CoalOre,
-  'ore_stone': StoneChip,
   'water_bucket': WaterBucket,
   'fuel_firewood': FirewoodBundle,
   'material_iron': IronIngot,
@@ -86,7 +70,7 @@ export function createItemById(world, itemId, opts = {}) {
 
   // 2. Check unified catalog definitions
   const catalogDef = getCatalogItem(itemId);
-  if (catalogDef && (isCatalogEquipment(catalogDef) || isCatalogMagic(catalogDef))) {
+  if (catalogDef) {
     const buildOpts = { affixes };
     if (hasExplicitCount) buildOpts.count = count;
     return buildCatalogItem(world, itemId, buildOpts);
