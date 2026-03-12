@@ -30,6 +30,7 @@ const CHARACTER_MENU_TABS = Object.freeze([
   { key: 'character', icon: '@', label: 'Character', eventName: 'ui:openCharacter' },
   { key: 'inventory', icon: '\u{1F392}', label: 'Inventory', eventName: 'ui:openInventory' },
   { key: 'equipment', icon: '\u{1F6E1}\uFE0F', label: 'Equipment', eventName: 'ui:openEquipment' },
+  { key: 'quests', icon: '\u{1F4DC}', label: 'Quests', eventName: 'ui:openQuests' },
   { key: 'settings', icon: '\u2699\uFE0F', label: 'Settings', eventName: 'ui:openSettings' },
 ]);
 
@@ -41,7 +42,7 @@ function appendCharacterMenuTabs(host, activeKey) {
   const tabs = document.createElement('div');
   Object.assign(tabs.style, {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
     gap: '6px',
     marginBottom: '10px',
   });
@@ -110,6 +111,7 @@ export function initOverlays() {
   const char = ensurePanel('character');
   const equip = ensurePanel('equipment');
   const settingsPanel = ensurePanel('settings');
+  const questJournal = ensurePanel('quests');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const usePanel = ensurePanel('use');
@@ -170,6 +172,7 @@ export function initOverlays() {
     hide(char);
     hide(equip);
     hide(settingsPanel);
+    hide(questJournal);
     show(inv);
     // Request data from app; app will respond with ui:inventoryData
     window.dispatchEvent(new CustomEvent('ui:requestInventoryData', { detail: { slotFilter } }));
@@ -178,6 +181,7 @@ export function initOverlays() {
     hide(inv);
     hide(equip);
     hide(settingsPanel);
+    hide(questJournal);
     show(char);
     window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
   });
@@ -185,6 +189,7 @@ export function initOverlays() {
     hide(inv);
     hide(char);
     hide(settingsPanel);
+    hide(questJournal);
     show(equip);
     window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
   });
@@ -192,8 +197,17 @@ export function initOverlays() {
     hide(inv);
     hide(char);
     hide(equip);
+    hide(questJournal);
     show(settingsPanel);
     window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
+  });
+  window.addEventListener('ui:openQuests', () => {
+    hide(inv);
+    hide(char);
+    hide(equip);
+    hide(settingsPanel);
+    show(questJournal);
+    window.dispatchEvent(new CustomEvent('ui:requestQuestJournalData'));
   });
   // Toggle inventory panel open/close
   window.addEventListener('ui:toggleInventory', () => {
@@ -203,6 +217,7 @@ export function initOverlays() {
       hide(char);
       hide(equip);
       hide(settingsPanel);
+      hide(questJournal);
       show(inv);
       (/** @type {any} */ (inv))._inventorySlotFilter = '';
       window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
@@ -215,6 +230,7 @@ export function initOverlays() {
       hide(inv);
       hide(equip);
       hide(settingsPanel);
+      hide(questJournal);
       show(char);
       window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
     }
@@ -226,6 +242,7 @@ export function initOverlays() {
       hide(inv);
       hide(char);
       hide(settingsPanel);
+      hide(questJournal);
       show(equip);
       window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
     }
@@ -237,6 +254,7 @@ export function initOverlays() {
       hide(inv);
       hide(char);
       hide(equip);
+      hide(questJournal);
       show(settingsPanel);
       window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
     }
@@ -277,7 +295,7 @@ export function initOverlays() {
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
-      const tabPanels = [char, inv, equip, settingsPanel];
+      const tabPanels = [char, inv, equip, questJournal, settingsPanel];
       const curIdx = tabPanels.findIndex(p => p.style.display === 'block');
       if (curIdx !== -1) {
         e.preventDefault();
@@ -345,6 +363,12 @@ export function initOverlays() {
     const scrollOfIdentifyId = Number(e?.detail?.scrollOfIdentifyId || 0) | 0;
     (/** @type {any} */ (equip))._equipmentPlayerName = playerName;
     if (equip.style.display === 'block') renderEquipment(equip, equippedBySlot, playerName, scrollOfIdentifyId);
+  });
+  window.addEventListener('ui:questJournalData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const quests = Array.isArray(e?.detail?.quests) ? e.detail.quests : [];
+    if (questJournal.style.display === 'block') renderQuestJournal(questJournal, quests);
   });
   window.addEventListener('ui:messageLogData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -2498,6 +2522,106 @@ function makeCheckbox(label, checked, onChange) {
   row.appendChild(cb);
   row.appendChild(txt);
   return row;
+}
+
+// --- Quest Journal tab -------------------------------------------------------
+
+/**
+ * Human-readable label for a quest node + status pair.
+ * @param {string} node
+ * @param {string} status
+ * @returns {string}
+ */
+function questNodeLabel(node, status) {
+  if (status === 'complete') return 'Complete';
+  switch (node) {
+    case 'offer':   return 'Offered';
+    case 'survey':  return 'In Progress';
+    case 'report':  return 'Ready to Report';
+    default:        return node.charAt(0).toUpperCase() + node.slice(1);
+  }
+}
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {Array<{questId:string, title:string, status:string, node:string, t0:number}>} quests
+ */
+function renderQuestJournal(panel, quests) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+  el.style.overflowX = 'hidden';
+  appendCharacterMenuTabs(el, 'quests');
+
+  const heading = document.createElement('div');
+  heading.textContent = 'Quest Journal';
+  heading.style.fontWeight = 'bold';
+  heading.style.marginBottom = '10px';
+  el.appendChild(heading);
+
+  const active = quests.filter(q => q.status !== 'complete');
+  const done   = quests.filter(q => q.status === 'complete');
+
+  function appendSection(label, items) {
+    const sectionLabel = document.createElement('div');
+    Object.assign(sectionLabel.style, {
+      fontSize: '11px',
+      color: '#7ba7cc',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      marginBottom: '4px',
+      marginTop: label === 'Active' ? '0' : '14px',
+    });
+    sectionLabel.textContent = label;
+    el.appendChild(sectionLabel);
+
+    if (!items.length) {
+      const empty = document.createElement('div');
+      empty.textContent = label === 'Active' ? 'No active quests.' : 'None completed yet.';
+      Object.assign(empty.style, { opacity: '0.55', fontStyle: 'italic', fontSize: '12px', marginBottom: '4px' });
+      el.appendChild(empty);
+      return;
+    }
+
+    for (const q of items) {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '7px 10px',
+        marginBottom: '4px',
+        background: '#0a111f',
+        border: '1px solid #1e2d45',
+        borderRadius: '6px',
+        fontSize: '13px',
+      });
+
+      const titleEl = document.createElement('span');
+      titleEl.textContent = q.title || q.questId;
+      row.appendChild(titleEl);
+
+      const badge = document.createElement('span');
+      const nodeLabel = questNodeLabel(q.node, q.status);
+      badge.textContent = nodeLabel;
+      const isComplete = q.status === 'complete';
+      Object.assign(badge.style, {
+        fontSize: '10px',
+        fontWeight: 'bold',
+        padding: '2px 7px',
+        borderRadius: '10px',
+        flexShrink: '0',
+        marginLeft: '8px',
+        background: isComplete ? '#163a20' : (q.node === 'report' ? '#2a1f05' : '#0e1e35'),
+        color: isComplete ? '#5ecb72' : (q.node === 'report' ? '#f5c043' : '#5fb3ff'),
+        border: isComplete ? '1px solid #2a6e38' : (q.node === 'report' ? '1px solid #7a5a10' : '1px solid #1e4a7e'),
+      });
+      row.appendChild(badge);
+      el.appendChild(row);
+    }
+  }
+
+  appendSection('Active', active);
+  appendSection('Completed', done);
 }
 
 /**
