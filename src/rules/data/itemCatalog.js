@@ -3311,17 +3311,30 @@ export const ITEM_CATALOG = {
     },
   },
 
-  // ── Gem socket hooks (socketable gems; consumed when socketed) ─────────────
-  gem_ruby:     { id: "gem_ruby",     hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_ruby") } },
-  gem_sapphire: { id: "gem_sapphire", hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_sapphire") } },
-  gem_emerald:  { id: "gem_emerald",  hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_emerald") } },
-  gem_diamond:  { id: "gem_diamond",  hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_diamond") } },
-  gem_topaz:    { id: "gem_topaz",    hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_topaz") } },
-  gem_amethyst: { id: "gem_amethyst", hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_amethyst") } },
-  gem_opal:     { id: "gem_opal",     hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_opal") } },
-  gem_obsidian: { id: "gem_obsidian", hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_obsidian") } },
-  gem_garnet:   { id: "gem_garnet",   hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_garnet") } },
 };
+
+// ── Gem socket hook registry (separate from ITEM_CATALOG to avoid duplication) ──
+// Gems are defined in gems.js; hooks live here and are resolved via getGemItemHooks().
+const GEM_ITEM_HOOKS = Object.freeze({
+  gem_ruby:     { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_ruby") },
+  gem_sapphire: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_sapphire") },
+  gem_emerald:  { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_emerald") },
+  gem_diamond:  { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_diamond") },
+  gem_topaz:    { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_topaz") },
+  gem_amethyst: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_amethyst") },
+  gem_opal:     { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_opal") },
+  gem_obsidian: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_obsidian") },
+  gem_garnet:   { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_garnet") },
+});
+
+/**
+ * Returns gem socket hooks for a given gem identity, or null if not found.
+ * @param {string} identity
+ * @returns {{ canDipTarget: Function, onDip: Function } | null}
+ */
+export function getGemItemHooks(identity) {
+  return GEM_ITEM_HOOKS[String(identity || "").toLowerCase()] || null;
+}
 
 const ITEM_CATALOG_ID_ALIASES = Object.freeze({
   // Save compatibility: pre-catalog touchstone identity
