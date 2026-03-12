@@ -203,7 +203,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
     world.emit('hit', hitCtx);
     let hasVamp = false;
     runLegacyAffixScripts(world, source, 'onHit', hitCtx, {
-        onAffix: (affix) => {
+        onAffix: (_affixId, affix) => {
             if (affix?.name && String(affix.name).toLowerCase().includes('vamp')) hasVamp = true;
         },
     });
@@ -365,7 +365,7 @@ function resolveOffhandAttack(world, attacker, defender) {
     world.emit('hit', hitCtx);
     let hasVamp = false;
     runLegacyAffixScripts(world, source, 'onHit', hitCtx, {
-        onAffix: (affix) => {
+        onAffix: (_affixId, affix) => {
             if (affix?.name && String(affix.name).toLowerCase().includes('vamp')) hasVamp = true;
         },
     });

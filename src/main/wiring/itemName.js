@@ -9,7 +9,7 @@ import { FoodDecay } from "../../rules/components/FoodDecay.js";
 import { isIdentified } from "../../rules/data/identification.js";
 import { getUnidentifiedName, requiresIdentification } from "../../rules/data/itemAppearances.js";
 import { getDecayStage } from "../../rules/data/food.js";
-import { getAffix } from "../../rules/data/affixes.js";
+import { getAffixDescription, getAffixName } from "../../rules/data/affixes.js";
 import { Beatitude } from "../../rules/components/Beatitude.js";
 import {
   getSpell,
@@ -83,8 +83,7 @@ export function resolveItemDisplayName(world, entityId) {
  */
 export function resolveAffixes(rawAffixes) {
   return (Array.isArray(rawAffixes) ? rawAffixes : []).map(aid => {
-    const def = getAffix(aid);
-    return { id: aid, name: def?.name || aid, description: def?.description || '' };
+    return { id: aid, name: getAffixName(aid), description: getAffixDescription(aid) };
   });
 }
 

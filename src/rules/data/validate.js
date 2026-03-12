@@ -142,13 +142,40 @@ export function validateAmmoDefs(AMMO_DEFS) {
 }
 
 export function validateAffixes(AFFIX_DEFS) {
-  if (typeof AFFIX_DEFS !== 'object' || !AFFIX_DEFS) throw new Error('AFFIX_DEFS must be an object');
-  for (const [id, rec] of Object.entries(AFFIX_DEFS)) {
+  const entries = Array.isArray(AFFIX_DEFS)
+    ? AFFIX_DEFS.map((entry) => [String(entry?.id || ""), entry?.record ?? entry])
+    : (typeof AFFIX_DEFS === 'object' && AFFIX_DEFS
+        ? Object.entries(AFFIX_DEFS)
+        : null);
+  if (!entries) throw new Error('affix registry must be iterable');
+  for (const [id, rec] of entries) {
     if (typeof rec.name !== 'string' || !rec.name) throw new Error(`affix ${id}: name required`);
     if (!Array.isArray(rec.slots) || rec.slots.length === 0) throw new Error(`affix ${id}: slots required`);
-    if (!Array.isArray(rec.triggers)) throw new Error(`affix ${id}: triggers must be array`);
-    if (rec.script && typeof rec.script !== 'string' && typeof rec.script !== 'function') throw new Error(`affix ${id}: script must be string or function`);
-    if (rec.passive && typeof rec.passive !== 'string' && typeof rec.passive !== 'function') throw new Error(`affix ${id}: passive must be string or function`);
+    if (typeof rec.weight !== 'number') throw new Error(`affix ${id}: weight must be number`);
+    if (rec.description != null && typeof rec.description !== 'string') throw new Error(`affix ${id}: description must be string`);
+    if (rec.passiveRefs != null) {
+      if (!Array.isArray(rec.passiveRefs)) throw new Error(`affix ${id}: passiveRefs must be array`);
+      for (let i = 0; i < rec.passiveRefs.length; i++) {
+        const ref = rec.passiveRefs[i];
+        if (typeof ref !== 'string' && (!ref || typeof ref !== 'object')) {
+          throw new Error(`affix ${id}: passiveRefs[${i}] must be a script ref`);
+        }
+      }
+    }
+    if (rec.triggerScripts != null) {
+      if (typeof rec.triggerScripts !== 'object' || Array.isArray(rec.triggerScripts)) {
+        throw new Error(`affix ${id}: triggerScripts must be an object`);
+      }
+      for (const [trigger, refs] of Object.entries(rec.triggerScripts)) {
+        if (!Array.isArray(refs)) throw new Error(`affix ${id}: triggerScripts.${trigger} must be an array`);
+        for (let i = 0; i < refs.length; i++) {
+          const ref = refs[i];
+          if (typeof ref !== 'string' && (!ref || typeof ref !== 'object')) {
+            throw new Error(`affix ${id}: triggerScripts.${trigger}[${i}] must be a script ref`);
+          }
+        }
+      }
+    }
   }
   return true;
 }
@@ -407,7 +434,7 @@ export function validateHookCallbacks(defs, opts = {}) {
 export function validateAll({
   ITEM_CATALOG,
   AMMO_DEFS,
-  AFFIX_DEFS,
+  AFFIXES,
   MATERIAL_REACTION_RULES,
   MATERIAL_REACTION_OUTCOME_IDS,
   APPLY_PAYLOADS,
@@ -421,7 +448,7 @@ export function validateAll({
     && (AMMO_DEFS
       ? validateAmmoDefs(AMMO_DEFS)
       : true)
-    && validateAffixes(AFFIX_DEFS)
+    && validateAffixes(AFFIXES)
     && (MATERIAL_REACTION_RULES
       ? validateMaterialReactionRules(MATERIAL_REACTION_RULES, { outcomeIds: MATERIAL_REACTION_OUTCOME_IDS })
       : true)

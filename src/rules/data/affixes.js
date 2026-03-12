@@ -341,36 +341,130 @@ registerScript(AFFIX_SECOND_WIND, {
   },
 });
 
-export const AFFIX_DEFS = {
-  thorns1: { name: "Thorns I", slots: ["armor"], triggers: ["onHit"], script: AFFIX_THORNS, weight: 30 },
-  vamp1: { name: "Vampiric I", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_VAMP, weight: 20 },
-  fierce: { name: "Fierce", slots: ["weapon"], triggers: ["onBeforeHit"], script: AFFIX_FIERCE, weight: 25 },
-  guard1: { name: "Guarded", slots: ["armor"], passive: AFFIX_GUARD, triggers: [], weight: 25 },
-  life1: { name: "Healthy", slots: ["armor", "ring"], passive: AFFIX_LIFE, triggers: [], weight: 22 },
-  attuned1: { name: "Attuned", slots: ["ring"], passive: AFFIX_ATTUNED, triggers: [], weight: 20 },
-  fireWard1: { name: "Flame Ward", slots: ["armor", "offhand"], passive: AFFIX_FIRE_WARD, triggers: [], weight: 18 },
-  poisonWard1: { name: "Venom Ward", slots: ["armor", "ring"], passive: AFFIX_POISON_WARD, triggers: [], weight: 18 },
-  kineticWard1: { name: "Fortified", slots: ["armor", "offhand"], passive: AFFIX_KINETIC_WARD, triggers: [], weight: 15 },
-  caustic1: { name: "Caustic", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_CAUSTIC, weight: 16 },
-  capacitive1: { name: "Capacitive", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_CAPACITIVE, weight: 15 },
-  insulated1: { name: "Insulated", slots: ["armor", "offhand"], passive: AFFIX_INSULATED, triggers: [], weight: 16 },
-  lucky1: { name: "Lucky", slots: ["ring", "armor"], passive: AFFIX_LUCKY, triggers: [], weight: 18 },
-  venomous1: { name: "Venomous", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_VENOMOUS, weight: 14 },
-  chainLightning1: { name: "Chain Lightning", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_CHAIN_LIGHTNING, weight: 8 },
-  firestorm1: { name: "Firestorm", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_FIRESTORM, weight: 10 },
-  soulDrain1: { name: "Soul Drain", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_SOUL_DRAIN, weight: 7 },
-  berserk1: { name: "Berserking", slots: ["weapon", "ring"], triggers: ["onHit"], script: AFFIX_BERSERK, weight: 8 },
-  shieldWall1: { name: "Stoneskin Proc", slots: ["armor", "offhand"], triggers: ["onDamaged"], script: AFFIX_SHIELD_WALL, weight: 10 },
-  helmGuard1: { name: "Helm Guard", slots: ["head"], passive: AFFIX_GUARD, triggers: [], weight: 16 },
-  helmAttuned1: { name: "Helm of Attunement", slots: ["head"], passive: AFFIX_ATTUNED, triggers: [], weight: 14 },
-  manaSurge1: { name: "Mana Surge", slots: ["ring", "weapon"], triggers: ["onHit"], script: AFFIX_MANA_SURGE, weight: 10 },
-  executioner1: { name: "Executioner", slots: ["weapon"], triggers: ["onBeforeHit"], script: AFFIX_EXECUTIONER, weight: 6 },
-  frostbite1: { name: "Frostbite", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_FROSTBITE, weight: 10 },
-  hemorrhage1: { name: "Hemorrhage", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_HEMORRHAGE, weight: 12 },
-  secondWind1: { name: "Second Wind", slots: ["armor", "offhand"], triggers: ["onDamaged"], script: AFFIX_SECOND_WIND, weight: 8 },
-  flaming: { name: "Flaming", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_FLAMING, weight: 8 },
-  stunning1: { name: "Stunning", slots: ["weapon"], triggers: ["onHit"], script: AFFIX_STUNNING, weight: 0 },
-};
+const AFFIX_REGISTRY = new Map();
 
-export function listAffixes() { return Object.entries(AFFIX_DEFS).map(([id, rec]) => ({ id, ...rec })); }
-export function getAffix(id) { return AFFIX_DEFS[id] || null; }
+function normalizeRefList(value, fallbackSingle = null) {
+  if (Array.isArray(value)) return value.filter((entry) => typeof entry === "string" || (entry && typeof entry === "object"));
+  if (typeof fallbackSingle === "string" || (fallbackSingle && typeof fallbackSingle === "object")) return [fallbackSingle];
+  return [];
+}
+
+function normalizeTriggerScripts(spec) {
+  const source = (spec?.triggerScripts && typeof spec.triggerScripts === "object") ? spec.triggerScripts : null;
+  const out = Object.create(null);
+  if (source) {
+    for (const [trigger, refs] of Object.entries(source)) {
+      const list = normalizeRefList(refs);
+      if (list.length > 0) out[String(trigger)] = list;
+    }
+    return out;
+  }
+
+  const legacyTriggers = Array.isArray(spec?.triggers) ? spec.triggers : [];
+  const legacyScript = spec?.script ?? null;
+  for (let i = 0; i < legacyTriggers.length; i++) {
+    const trigger = String(legacyTriggers[i] || "");
+    const list = normalizeRefList(null, legacyScript);
+    if (trigger && list.length > 0) out[trigger] = list;
+  }
+  return out;
+}
+
+function normalizePassiveRefs(spec) {
+  if (Array.isArray(spec?.passiveRefs)) return normalizeRefList(spec.passiveRefs);
+  if (Array.isArray(spec?.passives)) return normalizeRefList(spec.passives);
+  return normalizeRefList(null, spec?.passive ?? spec?.passiveRef ?? null);
+}
+
+function normalizeAffixRecord(id, spec) {
+  const normalizedId = String(id || "").trim();
+  if (!normalizedId) throw new Error("affix id is required");
+  const slots = Array.isArray(spec?.slots) ? spec.slots.map((slot) => String(slot || "")).filter(Boolean) : [];
+  const triggerScripts = normalizeTriggerScripts(spec);
+  const passiveRefs = normalizePassiveRefs(spec);
+  return Object.freeze({
+    id: normalizedId,
+    name: String(spec?.name || normalizedId),
+    description: String(spec?.description || ""),
+    slots: Object.freeze(slots),
+    weight: Number(spec?.weight || 0),
+    passiveRefs: Object.freeze(passiveRefs),
+    triggerScripts: Object.freeze(Object.fromEntries(
+      Object.entries(triggerScripts).map(([trigger, refs]) => [trigger, Object.freeze(refs.slice())]),
+    )),
+  });
+}
+
+export function registerAffixDefinition(id, spec) {
+  const record = normalizeAffixRecord(id, spec);
+  AFFIX_REGISTRY.set(record.id, record);
+  return record;
+}
+
+export function unregisterAffixDefinition(id) {
+  AFFIX_REGISTRY.delete(String(id || ""));
+}
+
+[
+  ["thorns1", { name: "Thorns I", slots: ["armor"], weight: 30, triggerScripts: { onHit: [AFFIX_THORNS] } }],
+  ["vamp1", { name: "Vampiric I", slots: ["weapon"], weight: 20, triggerScripts: { onHit: [AFFIX_VAMP] } }],
+  ["fierce", { name: "Fierce", slots: ["weapon"], weight: 25, triggerScripts: { onBeforeHit: [AFFIX_FIERCE] } }],
+  ["guard1", { name: "Guarded", slots: ["armor"], weight: 25, passiveRefs: [AFFIX_GUARD] }],
+  ["life1", { name: "Healthy", slots: ["armor", "ring"], weight: 22, passiveRefs: [AFFIX_LIFE] }],
+  ["attuned1", { name: "Attuned", slots: ["ring"], weight: 20, passiveRefs: [AFFIX_ATTUNED] }],
+  ["fireWard1", { name: "Flame Ward", slots: ["armor", "offhand"], weight: 18, passiveRefs: [AFFIX_FIRE_WARD] }],
+  ["poisonWard1", { name: "Venom Ward", slots: ["armor", "ring"], weight: 18, passiveRefs: [AFFIX_POISON_WARD] }],
+  ["kineticWard1", { name: "Fortified", slots: ["armor", "offhand"], weight: 15, passiveRefs: [AFFIX_KINETIC_WARD] }],
+  ["caustic1", { name: "Caustic", slots: ["weapon"], weight: 16, triggerScripts: { onHit: [AFFIX_CAUSTIC] } }],
+  ["capacitive1", { name: "Capacitive", slots: ["weapon"], weight: 15, triggerScripts: { onHit: [AFFIX_CAPACITIVE] } }],
+  ["insulated1", { name: "Insulated", slots: ["armor", "offhand"], weight: 16, passiveRefs: [AFFIX_INSULATED] }],
+  ["lucky1", { name: "Lucky", slots: ["ring", "armor"], weight: 18, passiveRefs: [AFFIX_LUCKY] }],
+  ["venomous1", { name: "Venomous", slots: ["weapon"], weight: 14, triggerScripts: { onHit: [AFFIX_VENOMOUS] } }],
+  ["chainLightning1", { name: "Chain Lightning", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_CHAIN_LIGHTNING] } }],
+  ["firestorm1", { name: "Firestorm", slots: ["weapon"], weight: 10, triggerScripts: { onHit: [AFFIX_FIRESTORM] } }],
+  ["soulDrain1", { name: "Soul Drain", slots: ["weapon"], weight: 7, triggerScripts: { onHit: [AFFIX_SOUL_DRAIN] } }],
+  ["berserk1", { name: "Berserking", slots: ["weapon", "ring"], weight: 8, triggerScripts: { onHit: [AFFIX_BERSERK] } }],
+  ["shieldWall1", { name: "Stoneskin Proc", slots: ["armor", "offhand"], weight: 10, triggerScripts: { onDamaged: [AFFIX_SHIELD_WALL] } }],
+  ["helmGuard1", { name: "Helm Guard", slots: ["head"], weight: 16, passiveRefs: [AFFIX_GUARD] }],
+  ["helmAttuned1", { name: "Helm of Attunement", slots: ["head"], weight: 14, passiveRefs: [AFFIX_ATTUNED] }],
+  ["manaSurge1", { name: "Mana Surge", slots: ["ring", "weapon"], weight: 10, triggerScripts: { onHit: [AFFIX_MANA_SURGE] } }],
+  ["executioner1", { name: "Executioner", slots: ["weapon"], weight: 6, triggerScripts: { onBeforeHit: [AFFIX_EXECUTIONER] } }],
+  ["frostbite1", { name: "Frostbite", slots: ["weapon"], weight: 10, triggerScripts: { onHit: [AFFIX_FROSTBITE] } }],
+  ["hemorrhage1", { name: "Hemorrhage", slots: ["weapon"], weight: 12, triggerScripts: { onHit: [AFFIX_HEMORRHAGE] } }],
+  ["secondWind1", { name: "Second Wind", slots: ["armor", "offhand"], weight: 8, triggerScripts: { onDamaged: [AFFIX_SECOND_WIND] } }],
+  ["flaming", { name: "Flaming", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_FLAMING] } }],
+  ["stunning1", { name: "Stunning", slots: ["weapon"], weight: 0, triggerScripts: { onHit: [AFFIX_STUNNING] } }],
+].forEach(([id, spec]) => {
+  registerAffixDefinition(id, spec);
+});
+
+export function getAffix(id) { return AFFIX_REGISTRY.get(String(id || "")) || null; }
+export function listAffixes() { return Array.from(AFFIX_REGISTRY.values()).map((record) => ({ ...record })); }
+export function listAffixEntries() { return Array.from(AFFIX_REGISTRY.values()).map((record) => ({ id: record.id, record })); }
+export function listAffixIds() { return Array.from(AFFIX_REGISTRY.keys()); }
+export function getAffixName(id) { return String(getAffix(id)?.name || id || ""); }
+export function getAffixDescription(id) { return String(getAffix(id)?.description || ""); }
+export function getAffixWeight(id) { return Number(getAffix(id)?.weight || 0); }
+export function getAffixPassiveRefs(id) {
+  const refs = getAffix(id)?.passiveRefs;
+  return Array.isArray(refs) ? refs.slice() : [];
+}
+export function getAffixPassiveRef(id) { return getAffixPassiveRefs(id)[0] || null; }
+export function getAffixTriggerScripts(id, trigger) {
+  const record = getAffix(id);
+  if (!record) return [];
+  const list = record.triggerScripts?.[String(trigger || "")];
+  return Array.isArray(list) ? list.slice() : [];
+}
+export function getAffixTriggerScript(id) { return getAffixTriggerScripts(id, "onHit")[0] || null; }
+export function getAffixTriggers(id) {
+  const record = getAffix(id);
+  return record ? Object.keys(record.triggerScripts) : [];
+}
+export function affixHasTrigger(id, trigger) {
+  return getAffixTriggerScripts(id, trigger).length > 0;
+}
+export function affixSupportsSlot(id, slot) {
+  const slots = getAffix(id)?.slots;
+  return Array.isArray(slots) && slots.includes(String(slot || ""));
+}

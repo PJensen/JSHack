@@ -2,7 +2,11 @@ import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Vitality } from "../components/Vitality.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { AFFIX_DEFS } from "../data/affixes.js";
+import {
+  affixHasTrigger,
+  getAffix,
+  getAffixTriggerScripts,
+} from "../data/affixes.js";
 import { getMonster } from "../data/monsters.js";
 import { CombatCallbackContext } from "../data/callbacks/combat.js";
 import { runCallbackList } from "../interaction/dispatch.js";
@@ -18,7 +22,7 @@ const TRIGGER_TO_VERB = Object.freeze({
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
  * @param {number} entityId
- * @param {(affix:any, slotId:number, slot:string) => void} fn
+ * @param {(affixId:string, affix:any, slotId:number, slot:string) => void} fn
  * @param {{ includeSlots?: string[] | null, excludeSlots?: string[] | null }} [options]
  */
 export function forEachLegacyAffix(world, entityId, fn, options = {}) {
@@ -34,8 +38,8 @@ export function forEachLegacyAffix(world, entityId, fn, options = {}) {
     const info = world.get(slotId, ItemInfo);
     if (!info || !Array.isArray(info.affixes)) continue;
     for (const affixId of info.affixes) {
-      const affix = AFFIX_DEFS[affixId];
-      if (affix) fn(affix, slotId, slot);
+      const affix = getAffix(affixId);
+      if (affix) fn(String(affixId), affix, slotId, slot);
     }
   }
 }
@@ -80,15 +84,18 @@ export function createLegacyCombatFrame(world, base, helpers = {}) {
  * @param {number} entityId
  * @param {"onBeforeHit"|"onHit"|"onDamaged"} trigger
  * @param {any} frame
- * @param {{ includeSlots?: string[] | null, excludeSlots?: string[] | null, onAffix?:(affix:any, slotId:number, slot:string)=>void }} [options]
+ * @param {{ includeSlots?: string[] | null, excludeSlots?: string[] | null, onAffix?:(affixId:string, affix:any, slotId:number, slot:string)=>void }} [options]
  */
 export function runLegacyAffixScripts(world, entityId, trigger, frame, options = {}) {
   const verb = TRIGGER_TO_VERB[trigger];
   if (!verb) return;
-  forEachLegacyAffix(world, entityId, (affix, slotId, slot) => {
-    if (!affix?.triggers?.includes(trigger) || !affix.script) return;
-    runScript(affix.script, verb, world, frame);
-    if (typeof options.onAffix === "function") options.onAffix(affix, slotId, slot);
+  forEachLegacyAffix(world, entityId, (affixId, affix, slotId, slot) => {
+    const triggerScripts = getAffixTriggerScripts(affixId, trigger);
+    if (!affixHasTrigger(affixId, trigger) || triggerScripts.length === 0) return;
+    for (let i = 0; i < triggerScripts.length; i++) {
+      runScript(triggerScripts[i], verb, world, frame);
+    }
+    if (typeof options.onAffix === "function") options.onAffix(affixId, affix, slotId, slot);
   }, options);
 }
 

@@ -7,7 +7,7 @@ import { Status } from "../../rules/components/Status.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
-import { AFFIX_DEFS } from "../../rules/data/affixes.js";
+import { getAffixName } from "../../rules/data/affixes.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { Hunger } from "../../rules/components/Hunger.js";
 import { getHungerLevel } from "../../rules/data/food.js";
@@ -158,7 +158,7 @@ export function createHudFeeds(world, deps) {
     }
     const affixNames = affixIds
       .filter((id) => !/^thorns/i.test(String(id)))
-      .map((id) => (AFFIX_DEFS?.[id]?.name) || id);
+      .map((id) => getAffixName(id));
     const affixSig = affixNames.join("|");
 
     // Count ammo in player inventory

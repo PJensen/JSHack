@@ -15,6 +15,7 @@ import { resolveMeleeAttack } from '../src/rules/systems/combatSystem.js';
 import { rebuildSpatialIndex } from '../src/rules/utils/spatialIndex.js';
 import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
 import { dealDamage } from '../src/rules/utils/dealDamage.js';
+import { registerAffixDefinition, unregisterAffixDefinition } from '../src/rules/data/affixes.js';
 
 // Force affix registration
 await import('../src/rules/data/affixes.js');
@@ -370,11 +371,10 @@ Deno.test("shield affixes fire on damaged event", async () => {
   registerScript('affix:test_shield_slot', {
     [ScriptVerb.AffixOnDamaged]: () => { fired = true; }
   });
-  const { AFFIX_DEFS } = await import('../src/rules/data/affixes.js');
-  AFFIX_DEFS['test_shield_slot'] = {
-    name: 'Test Shield Slot', slots: ['offhand'], triggers: ['onDamaged'],
-    script: 'affix:test_shield_slot', weight: 1
-  };
+  registerAffixDefinition('test_shield_slot', {
+    name: 'Test Shield Slot', slots: ['offhand'], weight: 1,
+    triggerScripts: { onDamaged: ['affix:test_shield_slot'] },
+  });
 
   const shield = makeEquip(world, { slot: 'offhand', bonuses: {}, affixes: ['test_shield_slot'] });
   const defender = makeActor(world, { x: 1, y: 1, hp: 50 });
@@ -384,5 +384,5 @@ Deno.test("shield affixes fire on damaged event", async () => {
   dealDamage(world, { target: defender, amount: 5, source: attacker });
 
   assert(fired, 'offhand affix should have fired on damaged event');
-  delete AFFIX_DEFS['test_shield_slot'];
+  unregisterAffixDefinition('test_shield_slot');
 });
