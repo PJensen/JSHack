@@ -47,7 +47,16 @@ import {
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
-const DAY_LENGTH = 96;
+const SLEEP_PHASE_TURNS = 18;
+const BREAKFAST_PHASE_TURNS = 8;
+const WORK_PHASE_TURNS = 72;
+const PUB_PHASE_TURNS = 22;
+const HOME_PHASE_TURNS = 12;
+const DAY_LENGTH = SLEEP_PHASE_TURNS
+  + BREAKFAST_PHASE_TURNS
+  + WORK_PHASE_TURNS
+  + PUB_PHASE_TURNS
+  + HOME_PHASE_TURNS;
 const TOWNFOLK_DOOR_INSTALLED = Symbol.for("jshack:townfolkDoors:installed");
 
 const DIRS = [
@@ -315,10 +324,10 @@ function depleteNode(world, nodeId) {
 
 function getTownPhase(step) {
   const t = Math.max(0, step | 0) % DAY_LENGTH;
-  if (t < 18) return "sleep";
-  if (t < 26) return "breakfast";
-  if (t < 62) return "work";
-  if (t < 84) return "pub";
+  if (t < SLEEP_PHASE_TURNS) return "sleep";
+  if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS) return "breakfast";
+  if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS + WORK_PHASE_TURNS) return "work";
+  if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS + WORK_PHASE_TURNS + PUB_PHASE_TURNS) return "pub";
   return "home";
 }
 
