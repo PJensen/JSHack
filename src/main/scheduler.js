@@ -1,7 +1,7 @@
 // src/main/scheduler.js
 // Register rules systems into phases and set the world scheduler.
 
-import { composeScheduler, registerSystem, clearSystems, getOrderedSystems } from "../lib/ecs-js/index.js";
+import { composeScheduler, registerSystem, clearSystems, getOrderedSystems, installScriptsAPI } from "../lib/ecs-js/index.js";
 /** @typedef {import('../lib/ecs-js/index.js').World} World */
 import { drinkSystem } from "../rules/systems/drinkSystem.js";
 import { itemPickupSystem, autoPickupPostMoveSystem } from "../rules/systems/itemPickupSystem.js";
@@ -67,20 +67,27 @@ import { workstationStateSystem } from "../rules/systems/workstationStateSystem.
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
+import { installDialogRuntime } from "../rules/dialogues/runtime.js";
+import { installQuestRuntime } from "../rules/quests/runtime.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
 import "../rules/data/procPackages.js";
+import "../rules/quests/definitions/graveyardWatch.js";
+import "../rules/dialogues/townfolkDialogs.js";
 
 /**
  * @param {World} world
  */
 export function configureWorld(world) {
   clearSystems();
+  installScriptsAPI(world);
   installVirtuals(world);
   defineInventoryVirtuals(world);
   defineDerivedStatVirtuals(world);
   definePassiveBonusVirtuals(world);
+  installDialogRuntime(world);
+  installQuestRuntime(world);
 
   installTownfolkDoorListener(world);
   installBellListener(world);
@@ -199,7 +206,7 @@ export function configureWorld(world) {
   // Keep spatial index in sync after structural changes
   registerSystem(spatialIndexSystem, 'cleanup');
 
-  const baseScheduler = composeScheduler('ai', 'intents', 'effects', 'cleanup');
+  const baseScheduler = composeScheduler('ai', 'intents', 'effects', 'scripts', 'cleanup');
   const profEnabled = shouldProfileRules();
   if (!profEnabled) {
     world.setScheduler(baseScheduler);
@@ -207,8 +214,8 @@ export function configureWorld(world) {
   }
 
   // Build profiled scheduler: measure per system and per phase using high-res timer
-  /** @type {Array<'ai'|'intents'|'effects'|'cleanup'>} */
-  const phases = ['ai', 'intents', 'effects', 'cleanup'];
+  /** @type {Array<'ai'|'intents'|'effects'|'scripts'|'cleanup'>} */
+  const phases = ['ai', 'intents', 'effects', 'scripts', 'cleanup'];
   /** @type {Record<string, Function[]>} */
   const phaseSystems = Object.create(null);
   for (const ph of phases) phaseSystems[ph] = getOrderedSystems(ph);

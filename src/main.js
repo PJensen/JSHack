@@ -55,6 +55,7 @@ import { installRackWiring } from "./main/wiring/rackWiring.js";
 import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
 import { installCookingWiring } from "./main/wiring/cookingWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
+import { installDialogWiring } from "./main/wiring/dialogWiring.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
   hasSavegame,
@@ -125,6 +126,7 @@ import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
 import { MONSTERS, addGenocide } from "./rules/data/monsters.js";
 import { MonsterSpawner } from "./rules/components/MonsterSpawner.js";
+import { ensureStarterQuests } from "./rules/quests/runtime.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -698,6 +700,8 @@ function _finalizeNewGame(classData) {
       }
     }
   }
+
+  ensureStarterQuests(world);
 
   bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 
@@ -1924,6 +1928,7 @@ installCookingWiring({
   log: (msg) => messageLog.log({ text: msg, type: "system" }),
 });
 installDigWiring({ world });
+installDialogWiring({ world });
 installSavegameWiring({
   world,
   playerEntity,

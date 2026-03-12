@@ -348,6 +348,15 @@ export const INTERACT_PAYLOADS = {
   talkToNPC: {
     onInteract(ctx) {
       const { world, actor, targetId, params } = ctx;
+      const dialogId = String(params?.dialogId || "").trim();
+      if (dialogId) {
+        world.emit?.("dialog:openRequest", {
+          actorId: actor,
+          targetId,
+          dialogId,
+        });
+        return;
+      }
       world.emit?.("npc:dialogue", { actor, targetId, text: params?.dialogue || "..." });
     },
   },

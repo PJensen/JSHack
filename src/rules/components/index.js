@@ -74,3 +74,8 @@ export { Encumbrance } from './Encumbrance.js';
 export { Flying } from './Flying.js';
 export { Traits } from './Traits.js';
 export { TownState } from './TownState.js';
+export { QuestDefRef } from './QuestDefRef.js';
+export { QuestState } from './QuestState.js';
+export { QuestVars } from './QuestVars.js';
+export { QuestBindings } from './QuestBindings.js';
+export { QuestLog } from './QuestLog.js';
