@@ -68,6 +68,13 @@ function isHostileNear(world, source, origin, nearId, radius = 2) {
   return Math.max(dx, dy) <= radius;
 }
 
+function compareRicochetTargets(a, b) {
+  return a.distance - b.distance
+    || a.pos.y - b.pos.y
+    || a.pos.x - b.pos.x
+    || a.id - b.id;
+}
+
 registerScript(PROC_PACKAGE_KEYS.EchoStrike, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
     const source = Number(ctx?.source || 0) | 0;
@@ -120,19 +127,49 @@ registerScript(PROC_PACKAGE_KEYS.RicochetTheology, {
     if (!hasWall) return;
 
     const sourceFaction = world.get(source, Faction)?.key || "";
+    const ricochetTargets = [];
     for (const [nearId] of world.query(Position)) {
       if (!isHostileNear(world, source, pos, nearId, 2) || nearId === target) continue;
       const targetFaction = world.get(nearId, Faction)?.key || "";
       if (!areFactionsHostile(sourceFaction, targetFaction)) continue;
-      ctx.proc.dealDamage(nearId, Math.max(1, Math.floor(Number(ctx?.damage?.amount || 0) * 0.4)), "arcane", {
+      const nearPos = world.get(nearId, Position);
+      if (!nearPos) continue;
+      ricochetTargets.push({
+        id: nearId,
+        pos: nearPos,
+        distance: Math.max(Math.abs((nearPos.x | 0) - (pos.x | 0)), Math.abs((nearPos.y | 0) - (pos.y | 0))),
+      });
+    }
+
+    ricochetTargets.sort(compareRicochetTargets);
+    const bounceCount = Math.min(2, ricochetTargets.length);
+    for (let i = 0; i < bounceCount; i++) {
+      const rebound = ricochetTargets[i];
+      ctx.proc.dealDamage(rebound.id, Math.max(1, Math.floor(Number(ctx?.damage?.amount || 0) * 0.4)), "electric", {
         source,
         cause: "procPackage:ricochetTheology",
         noTrigger: true,
         nonLethal: true,
       });
-      ctx.proc.applyStatus(nearId, "shock", 2, 1);
-      emit(world, "proc:ricochetTheology", { actor: source, from: target, to: nearId });
-      return;
+      emit(world, "projectile:spawn", {
+        kind: "ricochet",
+        style: "ricochet_theology",
+        actor: source,
+        sourceId: target,
+        targetId: rebound.id,
+        from: { x: pos.x | 0, y: pos.y | 0 },
+        to: { x: rebound.pos.x | 0, y: rebound.pos.y | 0 },
+        speed: 14,
+      });
+      emit(world, "proc:ricochetTheology", {
+        actor: source,
+        from: target,
+        to: rebound.id,
+        bounceIndex: i,
+        bounceCount,
+        fromPos: { x: pos.x | 0, y: pos.y | 0 },
+        toPos: { x: rebound.pos.x | 0, y: rebound.pos.y | 0 },
+      });
     }
   },
 });

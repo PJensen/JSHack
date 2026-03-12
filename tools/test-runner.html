@@ -128,6 +128,7 @@ import {
 import { FloatText } from '../src/display/passes/vfx/text/floatText.js';
 import { installFloatTextWiring } from '../src/display/ui/wiring/floatTextWiring.js';
 import { Status } from '../src/rules/components/Status.js';
+import { createProjectileFxController } from '../src/display/fx/projectileFx.js';
 
 // ── Atlas ────────────────────────────────────────────────────────
 const atlas = createGlyphAtlas(basePalette, { sizePx: 64, fontPx: 56, glowLayers: 0 });
@@ -149,6 +150,8 @@ const ctx          = canvas.getContext('2d');
 
 // ── FloatText VFX ────────────────────────────────────────────────
 let ftext = null;         // FloatText instance, wired per-scenario
+let projectileFx = null;  // Projectile VFX controller, wired per-scenario
+const previewCam = {};
 
 function wireFloatText(w) {
 	ftext = new FloatText();
@@ -162,6 +165,17 @@ function wireFloatText(w) {
 		isPet: () => false,
 		isPlayer: (id) => w.has(id, Player),
 	});
+}
+
+function wireProjectileFx(w) {
+	const noopPool = { spawn() {} };
+	projectileFx = createProjectileFxController({
+		world: w,
+		cam: previewCam,
+		fx: { pool: noopPool },
+		getPosition: (id) => w.get(id, Position),
+	});
+	projectileFx.installListeners();
 }
 
 // ── State ────────────────────────────────────────────────────────
@@ -228,6 +242,7 @@ function resetScenario() {
 	world = result.world;
 	entityMap = result.entities;
 	wireFloatText(world);
+	wireProjectileFx(world);
 	stepIndex = -1;
 	lastCheck = null;
 	scenarioDesc.textContent = scenario.description || scenario.name;
@@ -443,6 +458,15 @@ function render() {
 		ftext.render(ctx);
 		ctx.restore();
 	}
+
+	// 8. Projectile VFX overlays (shared event-driven projectile path)
+	if (projectileFx) {
+		ctx.save();
+		ctx.translate(offsetX - x0 * cellSize + cellSize * 0.5, offsetY - y0 * cellSize + cellSize * 0.5);
+		ctx.scale(cellSize, cellSize);
+		projectileFx.draw(ctx);
+		ctx.restore();
+	}
 }
 
 function drawArrow(ctx, cx, cy, dx, dy, len) {
@@ -655,6 +679,7 @@ function frame(now) {
 	_lastFrame = now;
 	_fxTime += dt;
 	if (ftext) ftext.step(dt);
+	if (projectileFx) projectileFx.tick(dt);
 	render();
 	requestAnimationFrame(frame);
 }
