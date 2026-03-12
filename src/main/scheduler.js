@@ -70,6 +70,7 @@ import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
+import "../rules/data/procPackages.js";
 
 /**
  * @param {World} world
