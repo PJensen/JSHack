@@ -4,7 +4,7 @@
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from '../data/itemCatalogLoader.js';
 import { ITEM_CATALOG, getCatalogItem } from '../data/itemCatalog.js';
-import { getGem, buildGemItemParams } from '../data/gems.js';
+import * as gems from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
@@ -77,9 +77,9 @@ export function createItemById(world, itemId, opts = {}) {
   }
 
   // 3. Check gem definitions
-  const gemDef = getGem(itemId);
+    const gemDef = gems.getGem(itemId);
   if (gemDef) {
-    const params = buildGemItemParams(gemDef);
+    const params = gems.buildGemItemParams(gemDef);
     if (!params) return null;
     const id = createFrom(world, GemItem, params);
     return id;
