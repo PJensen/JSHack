@@ -18,6 +18,8 @@ export const ItemInfo = defineComponent(
     rarity: 1,
     rarityName: "common",
     affixes: [], // list of affix ids applied to this item (rules/data/affixes)
+    sockets: [], // gem ids socketed into this item (e.g. ['gem_ruby'])
+    maxSockets: 0, // maximum number of gem sockets this item can hold
   },
   {
     validate(rec) {

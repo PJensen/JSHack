@@ -549,6 +549,21 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  openGemVendor: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const shop = world.get(targetId, ShopInventory);
+      if (shop) {
+        world.emit?.("shop:open", {
+          actor, targetId,
+          buyMarkup: shop.buyMarkup ?? 1.5,
+          sellDiscount: shop.sellDiscount ?? 0.5,
+          vendorKind: "gem",
+        });
+      }
+    },
+  },
+
   // ── Stairs ─────────────────────────────────────────────────────────────────
   // Traversal is owned by the UI/app layer (tooltip tap / Enter key).
   // These entries exist so the interactable component is valid and the system

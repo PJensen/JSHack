@@ -144,6 +144,8 @@ export function buildItemDisplayData(world, itemId) {
     staminaCost: identified ? (info.staminaCost ?? null) : null,
     twoHanded: identified ? !!info.twoHanded : false,
     coating: identified && info.coating && typeof info.coating === 'object' ? { ...info.coating } : null,
+    sockets: Array.isArray(info.sockets) ? info.sockets.slice() : [],
+    maxSockets: Number(info.maxSockets || 0) | 0,
     spellId: linkedSpell?.id || null,
     detailLines,
     targetEffects,

@@ -41,6 +41,8 @@ export function buildCatalogItem(world, itemId, opts = {}) {
       ...(Array.isArray(def.affixes) ? def.affixes : []),
       ...(Array.isArray(opts.affixes) ? opts.affixes : []),
     ])],
+    sockets: [],
+    maxSockets: Number(def.maxSockets || 0) | 0,
     damageDice: def.damageDice || null,
     damageType: def.damageType || null,
     staminaCost: def.staminaCost ?? null,

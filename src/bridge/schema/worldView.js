@@ -86,7 +86,7 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar", "cooking_fire", "furnace"]);
+const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar", "cooking_fire", "furnace", "gem_display_case"]);
 
 function xyKey(x, y) {
 	return `${x},${y}`;
@@ -282,6 +282,8 @@ function collectFixedRoofedBuilding(identity, seedX, seedY) {
 			return collectRectRoofedBuilding(seedX, seedY, seedX + 6, seedY + 4, seedX + 3, seedY + 5);
 		case "furnace":
 			return collectRectRoofedBuilding(seedX, seedY, seedX + 2, seedY + 2, seedX + 3, seedY + 1);
+		case "gem_display_case":
+			return collectRectRoofedBuilding(seedX, seedY, seedX + 5, seedY + 3, seedX + 2, seedY + 4);
 		case "bed_home":
 			return collectCottageBuildingFromBed(seedX, seedY);
 		default:

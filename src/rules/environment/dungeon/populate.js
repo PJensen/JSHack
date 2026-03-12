@@ -11,7 +11,8 @@ import { Polymorph } from '../../components/Polymorph.js';
 import { Shopkeeper, Human } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
-import { generateShopItem } from '../../data/shopStock.js';
+import { generateShopItem, generateGemShopStock } from '../../data/shopStock.js';
+import { Unpaid } from '../../components/Unpaid.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
 import { pickMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner } from './tables.js';
@@ -63,6 +64,7 @@ import {
   HerbChest,
   TavernChest,
   ApothecarySign,
+  GemDisplayCase,
   GraveTombstone,
   TownBell,
 } from '../../archetypes/Overworld.js';
@@ -869,6 +871,8 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, TavernChest, { x: spawn.x, y: spawn.y });
     case 'apothecary_sign':
       return createFrom(world, ApothecarySign, { x: spawn.x, y: spawn.y });
+    case 'gem_display_case':
+      return createFrom(world, GemDisplayCase, { x: spawn.x, y: spawn.y });
     case 'grave_tombstone':
       return createFrom(world, GraveTombstone, { x: spawn.x, y: spawn.y });
     case 'tombstone': {
@@ -1007,6 +1011,37 @@ export function materializeSpawn(world, spawn) {
             h: spawn.params.shopRoom.h,
             shopkeeperId: id,
           });
+        }
+      } else if (def.role === "gem_vendor") {
+        world.add(id, Interactable, {
+          action: "openGemVendor",
+          params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+        });
+        world.add(id, ShopInventory, { buyMarkup: 1.5, sellDiscount: 0.5 });
+        if (spawn.params.shopRoom) {
+          const roomEntity = world.create();
+          world.add(roomEntity, RoomMetadata, {
+            roomType: 'shop',
+            x: spawn.params.shopRoom.x,
+            y: spawn.params.shopRoom.y,
+            w: spawn.params.shopRoom.w,
+            h: spawn.params.shopRoom.h,
+            shopkeeperId: id,
+          });
+          // Pre-stock gem shop with gem items placed inside the shop room
+          const gemRng = createRng(((world.seed >>> 0) ^ (spawn.x * 0x9e3779b9) ^ (spawn.y * 0x1f2d3c4e)) >>> 0);
+          const gemItems = generateGemShopStock(world, gemRng);
+          const sr = spawn.params.shopRoom;
+          for (let gi = 0; gi < gemItems.length; gi++) {
+            const itemId = gemItems[gi];
+            // Place items in a row inside the shop room
+            const px = sr.x + 1 + (gi % Math.max(1, sr.w - 2));
+            const py = sr.y + 1 + Math.floor(gi / Math.max(1, sr.w - 2));
+            world.add(itemId, Position, { x: px, y: py });
+            const info = world.get(itemId, ItemInfo);
+            const price = info ? Math.ceil(Number(info.value || 50) * 1.5) : 50;
+            try { world.add(itemId, Unpaid, { shopkeeperId: id, price }); } catch {}
+          }
         }
       } else {
         world.add(id, Interactable, {

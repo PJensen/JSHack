@@ -127,6 +127,7 @@ import { installPluralizationExtensions } from "./shared/utils/pluralization.js"
 import { MONSTERS, addGenocide } from "./rules/data/monsters.js";
 import { MonsterSpawner } from "./rules/components/MonsterSpawner.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
+import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -702,6 +703,7 @@ function _finalizeNewGame(classData) {
   }
 
   ensureStarterQuests(world);
+  ensureStarterFetchQuestItem(world);
 
   bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 

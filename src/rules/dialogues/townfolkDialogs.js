@@ -1,9 +1,77 @@
 import { TOWNFOLK } from "../data/townfolk.js";
+import { inventoryHasIdentity } from "../utils/townEconomy.js";
+import { getDistrictBulletin } from "../utils/townInterpretationVirtuals.js";
 import { registerDialog } from "./registry.js";
-import { STARTER_GRAVEYARD_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
+import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
+
+const PRIEST_FETCH_ITEM_ID = "book_dead";
 
 function priestQuest(world, actorId) {
-  return getQuestRecord(world, STARTER_GRAVEYARD_QUEST_ID, actorId);
+  return getQuestRecord(world, STARTER_PRIEST_FETCH_QUEST_ID, actorId);
+}
+
+function smithAmbientText(ctx, fallback) {
+  const bulletin = getDistrictBulletin(ctx.world, "workshop_row");
+  if (!bulletin) return fallback;
+  if (bulletin.shortageBand === "scarce" || bulletin.shortageBand === "panic") {
+    return "Repair queue's gone ugly. No iron worth the name and too many hands asking for steel.";
+  }
+  if (bulletin.pressureBand === "active" || bulletin.pressureBand === "bleeding") {
+    return "Every hammer stroke lands on somebody's worry these days.";
+  }
+  return fallback;
+}
+
+function barkeepAmbientText(ctx, fallback) {
+  const bulletin = getDistrictBulletin(ctx.world, "market_green");
+  if (!bulletin) return fallback;
+  if (bulletin.dangerBand === "dangerous" || bulletin.dangerBand === "closed") {
+    return "Travelers are drinking fast and leaving faster. Escort work is all anyone asks after.";
+  }
+  if (bulletin.shortageBand === "strained" || bulletin.shortageBand === "scarce" || bulletin.shortageBand === "panic") {
+    return "Kitchen's running tight tonight. If the stew gets any thinner, it'll learn to walk off on its own.";
+  }
+  return fallback;
+}
+
+function masonAmbientText(ctx, fallback) {
+  const bulletin = getDistrictBulletin(ctx.world, "civic_core");
+  if (!bulletin) return fallback;
+  if (bulletin.opportunities.includes("mason_repairs")) {
+    return "Cellars are settling wrong again. Give me dry stone and a free afternoon and I'll keep the town standing.";
+  }
+  if (bulletin.dangerBand === "dangerous" || bulletin.dangerBand === "closed") {
+    return "When the drains groan, walls follow. That's when everyone remembers my name.";
+  }
+  return fallback;
+}
+
+function priestAmbientText(ctx, fallback) {
+  const bulletin = getDistrictBulletin(ctx.world, "churchyard");
+  if (!bulletin) return fallback;
+  if (bulletin.pressureBand === "active" || bulletin.pressureBand === "bleeding") {
+    return "The churchyard feels wrong tonight. Keep your prayers short and your lamp trimmed.";
+  }
+  if (bulletin.shortageBand === "scarce" || bulletin.shortageBand === "panic") {
+    return "We are burning incense faster than the market can replace it.";
+  }
+  return fallback;
+}
+
+function ambientTownfolkText(def, ctx) {
+  const fallback = String(def?.dialogue || "Good day.");
+  switch (String(def?.role || "")) {
+    case "smith":
+      return smithAmbientText(ctx, fallback);
+    case "barkeep":
+      return barkeepAmbientText(ctx, fallback);
+    case "mason":
+      return masonAmbientText(ctx, fallback);
+    case "priest":
+      return priestAmbientText(ctx, fallback);
+    default:
+      return fallback;
+  }
 }
 
 for (const def of Object.values(TOWNFOLK)) {
@@ -13,7 +81,7 @@ for (const def of Object.values(TOWNFOLK)) {
     start: "root",
     nodes: {
       root: {
-        text: def.dialogue,
+        text: (ctx) => ambientTownfolkText(def, ctx),
         choices: [
           { id: "leave", label: "Goodbye.", close: true },
         ],
@@ -30,25 +98,30 @@ registerDialog({
       text: (ctx) => {
         const quest = priestQuest(ctx.world, ctx.actorId);
         const state = quest?.state;
-        if (!state) return "May the gods watch over you.";
+        if (!state) return priestAmbientText(ctx, "May the gods watch over you.");
         if (String(state.status || "") === "complete") {
-          return "The graves still for now. The town owes you a kindness.";
+          return "You brought back the old volume. I will keep it out of hungry hands.";
         }
         if (String(state.node || "") === "offer") {
-          return "The old graveyard has not been quiet. Will you look to the crypt for me?";
+          const prefix = priestAmbientText(ctx, "");
+          const base = "There is an old book below the church stairs. Bring me the Book of the Dead, and do not linger with it.";
+          return prefix ? `${prefix} ${base}` : base;
         }
-        if (String(state.node || "") === "survey") {
-          return "Go north, past the church. See what stirs among the stones, then return.";
+        if (String(state.node || "") === "recover") {
+          return "Go below and search the first dungeon level. The book should lie near the deeper stair.";
         }
         if (String(state.node || "") === "report") {
-          return "You have seen the graves. Tell me plainly: what did you find?";
+          if (inventoryHasIdentity(ctx.world, ctx.actorId, PRIEST_FETCH_ITEM_ID, 1)) {
+            return "You found it. Hand it here, and I will see it warded.";
+          }
+          return "You had the book in hand once. Find it again and bring it directly to me.";
         }
         return "May the gods watch over you.";
       },
       choices: [
         {
-          id: "accept_graveyard_watch",
-          label: "I will inspect the crypt.",
+          id: "accept_priest_fetch",
+          label: "I will bring it back.",
           visible: (ctx) => {
             const quest = priestQuest(ctx.world, ctx.actorId);
             return String(quest?.state?.status || "active") === "active"
@@ -58,7 +131,7 @@ registerDialog({
             {
               name: "dialog:accepted",
               payload: (ctx) => ({
-                questId: STARTER_GRAVEYARD_QUEST_ID,
+                questId: STARTER_PRIEST_FETCH_QUEST_ID,
                 playerId: ctx.actorId,
                 speakerId: ctx.targetId,
               }),
@@ -67,18 +140,19 @@ registerDialog({
           to: "accept_ack",
         },
         {
-          id: "report_graveyard_watch",
-          label: "The graves are restless.",
+          id: "turn_in_priest_fetch",
+          label: "Here is the book.",
           visible: (ctx) => {
             const quest = priestQuest(ctx.world, ctx.actorId);
             return String(quest?.state?.status || "active") === "active"
-              && String(quest?.state?.node || "") === "report";
+              && String(quest?.state?.node || "") === "report"
+              && inventoryHasIdentity(ctx.world, ctx.actorId, PRIEST_FETCH_ITEM_ID, 1);
           },
           emits: [
             {
               name: "dialog:reported",
               payload: (ctx) => ({
-                questId: STARTER_GRAVEYARD_QUEST_ID,
+                questId: STARTER_PRIEST_FETCH_QUEST_ID,
                 playerId: ctx.actorId,
                 speakerId: ctx.targetId,
               }),
@@ -92,9 +166,20 @@ registerDialog({
           visible: (ctx) => {
             const quest = priestQuest(ctx.world, ctx.actorId);
             return String(quest?.state?.status || "active") === "active"
-              && String(quest?.state?.node || "") === "survey";
+              && String(quest?.state?.node || "") === "recover";
           },
-          to: "survey_reminder",
+          to: "recover_reminder",
+        },
+        {
+          id: "lost_book",
+          label: "I still need to find it.",
+          visible: (ctx) => {
+            const quest = priestQuest(ctx.world, ctx.actorId);
+            return String(quest?.state?.status || "active") === "active"
+              && String(quest?.state?.node || "") === "report"
+              && !inventoryHasIdentity(ctx.world, ctx.actorId, PRIEST_FETCH_ITEM_ID, 1);
+          },
+          to: "lost_reminder",
         },
         {
           id: "leave",
@@ -104,19 +189,25 @@ registerDialog({
       ],
     },
     accept_ack: {
-      text: "Go carefully. Return once you have looked upon the old graves yourself.",
+      text: "The stair below the church will take you there. Bring the book back intact.",
       choices: [
         { id: "leave", label: "I will return.", close: true },
       ],
     },
-    survey_reminder: {
-      text: "Follow the path north of the church. Look among the tombs, then come back to me.",
+    recover_reminder: {
+      text: "Go below the church and search the first dungeon floor. The deeper stair is the likeliest place for it.",
+      choices: [
+        { id: "leave", label: "Understood.", close: true },
+      ],
+    },
+    lost_reminder: {
+      text: "Do not come back empty-handed. Find the book and put it into my hands.",
       choices: [
         { id: "leave", label: "Understood.", close: true },
       ],
     },
     report_ack: {
-      text: "Then we will keep the lamps lit and the doors barred. You have done enough for tonight.",
+      text: "Good. I will lock it away before sunset. You have done the town a service.",
       choices: [
         { id: "leave", label: "Goodbye.", close: true },
       ],

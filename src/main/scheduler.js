@@ -59,6 +59,8 @@ import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 import { weatherSystem } from "../rules/systems/weatherSystem.js";
 import { townSimulationSystem } from "../rules/systems/townSimulationSystem.js";
+import { entrancePressureSystem } from "../rules/systems/entrancePressureSystem.js";
+import { districtConditionSystem } from "../rules/systems/districtConditionSystem.js";
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
@@ -67,14 +69,16 @@ import { workstationStateSystem } from "../rules/systems/workstationStateSystem.
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
+import { defineTownInterpretationVirtuals } from "../rules/utils/townInterpretationVirtuals.js";
 import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
+import { installStarterFetchQuestHooks } from "../rules/quests/definitions/graveyardWatch.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
 import "../rules/data/procPackages.js";
-import "../rules/quests/definitions/graveyardWatch.js";
 import "../rules/dialogues/townfolkDialogs.js";
+import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 
 /**
  * @param {World} world
@@ -86,11 +90,14 @@ export function configureWorld(world) {
   defineInventoryVirtuals(world);
   defineDerivedStatVirtuals(world);
   definePassiveBonusVirtuals(world);
+  defineTownInterpretationVirtuals(world);
   installDialogRuntime(world);
   installQuestRuntime(world);
+  installStarterFetchQuestHooks(world);
 
   installTownfolkDoorListener(world);
   installBellListener(world);
+  installGemSocketListener(world);
   // Install engraving scramble-on-step listener once per world
   installEngraveListeners(world);
   // Install bump-interact listener for immediate interactions (doors, chests, NPCs)
@@ -188,6 +195,8 @@ export function configureWorld(world) {
   registerSystem(plantGrowthSystem, 'effects');
   registerSystem(weatherSystem, 'effects');
   registerSystem(townSimulationSystem, 'effects');
+  registerSystem(entrancePressureSystem, 'effects');
+  registerSystem(districtConditionSystem, 'effects');
   registerSystem(overworldAmbientSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick

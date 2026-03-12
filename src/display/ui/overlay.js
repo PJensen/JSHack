@@ -517,6 +517,28 @@ export function initOverlays() {
     });
   });
 
+  // Gem selector for weapon sockets ("Add Gem" action)
+  window.addEventListener('ui:openGemSelectorForWeapon', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const weaponId = Number(e?.detail?.weaponId || 0);
+    if (!(weaponId > 0)) return;
+    hide(inv);
+    hide(equip);
+    show(applyPanel);
+    window.dispatchEvent(new CustomEvent('ui:requestSocketableGemsData', { detail: { weaponId } }));
+  });
+  window.addEventListener('ui:socketableGemsData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const gems = (e?.detail?.items) || [];
+    const weaponId = Number(e?.detail?.weaponId || 0);
+    renderApplyToolChooser(applyPanel, gems, (gemId) => {
+      window.dispatchEvent(new CustomEvent('ui:requestApply', { detail: { toolId: gemId, targetItemId: weaponId } }));
+      hide(applyPanel);
+    });
+  });
+
   // Shop overlay
   let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse', activeTab: 'buy' };
   window.addEventListener('ui:openShop', (ev) => {
@@ -1672,6 +1694,23 @@ function renderItemDetails(container, it) {
     }
   }
 
+  // --- Socket circles ---
+  const maxSockets = Number(it.maxSockets || 0) | 0;
+  if (maxSockets > 0) {
+    const sockets = Array.isArray(it.sockets) ? it.sockets : [];
+    const sockRow = document.createElement('div');
+    sockRow.style.marginTop = '4px';
+    sockRow.style.letterSpacing = '2px';
+    sockRow.style.fontSize = '14px';
+    let circles = '';
+    for (let s = 0; s < maxSockets; s++) {
+      circles += s < sockets.length ? '\u25C8' : '\u25CB'; // ◈ filled, ○ empty
+    }
+    sockRow.textContent = circles;
+    sockRow.style.color = '#c8a860';
+    container.appendChild(sockRow);
+  }
+
   // --- Comparison deltas vs equipped item ---
   const cmp = it.equippedComparison;
   if (cmp) {
@@ -2068,6 +2107,16 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
         disabledReason: hasScroll ? '' : 'No Scroll of Identify',
       });
     }
+    if (hasItemId && Number(it.maxSockets || 0) > 0) {
+      const filledSockets = Array.isArray(it.sockets) ? it.sockets.length : 0;
+      const hasOpenSocket = filledSockets < Number(it.maxSockets || 0);
+      available.push({
+        key: 'add-gem',
+        label: 'Add Gem',
+        enabled: hasOpenSocket,
+        disabledReason: hasOpenSocket ? '' : 'All sockets filled',
+      });
+    }
     if (hasItemId) {
       available.push({ key: 'throw', label: 'Throw', enabled: true });
     }
@@ -2080,10 +2129,11 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
       equip: 1,
       use: 2,
       apply: 3,
-      identify: 4,
-      'set-spell': 5,
-      throw: 6,
-      drop: 7,
+      'add-gem': 4,
+      identify: 5,
+      'set-spell': 6,
+      throw: 7,
+      drop: 8,
     };
     available.sort((a, b) => {
       const ar = a.key === defaultKey ? 0 : (order[a.key] || 90);
@@ -2120,6 +2170,13 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
         window.dispatchEvent(new CustomEvent('ui:requestApply', {
           detail: { toolId: scrollOfIdentifyId, targetItemId: it.id },
         }));
+      }
+      return;
+    }
+    if (actionKey === 'add-gem') {
+      const weaponId = Number(it?.id || 0);
+      if (weaponId > 0) {
+        window.dispatchEvent(new CustomEvent('ui:openGemSelectorForWeapon', { detail: { weaponId } }));
       }
       return;
     }

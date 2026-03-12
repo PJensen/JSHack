@@ -1085,6 +1085,14 @@ export function installMessageWiring({
     }
   });
 
+  world.on('gem:socketed', ({ actor, weaponId, gemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== actor) return;
+    const weaponName = nameOfItem(weaponId);
+    const gName = String(gemId || '').replace(/_/g, ' ').replace(/^gem /, '');
+    log(`You socket the ${gName} into ${weaponName}.`, 'system');
+  });
+
   // === Identification events ===
   world.on('item:identified', ({ identity, name, appearance, category }) => {
     const displayName = bracketizeName(name);
