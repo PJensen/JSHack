@@ -521,7 +521,7 @@ export const MessageBoard = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Town Message Board", identity: "message_board" }],
   [Material, { kind: "wood" }],
-  [Collider, { solid: false, blocksSight: false }],
+  [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "readTownBulletin", params: null }],
 );
 

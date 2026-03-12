@@ -11,7 +11,7 @@ import { Polymorph } from '../../components/Polymorph.js';
 import { Shopkeeper, Human } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
-import { generateShopItem, generateGemShopStock } from '../../data/shopStock.js';
+import * as shopStock from '../../data/shopStock.js';
 import { Unpaid } from '../../components/Unpaid.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
@@ -749,7 +749,7 @@ export function materializeSpawn(world, spawn) {
       const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0x5470) >>> 0);
 
       // Generate exactly one item for this floor spawn (no orphan stock entities).
-      const itemId = generateShopItem(world, depth, shopRng);
+      const itemId = shopStock.generateShopItem(world, depth, shopRng);
       if (itemId == null) return null;
 
       // Place it on the floor
@@ -1036,7 +1036,7 @@ export function materializeSpawn(world, spawn) {
           });
           // Pre-stock gem shop with gem items placed inside the shop room
           const gemRng = createRng(((world.seed >>> 0) ^ (spawn.x * 0x9e3779b9) ^ (spawn.y * 0x1f2d3c4e)) >>> 0);
-          const gemItems = generateGemShopStock(world, gemRng);
+          const gemItems = shopStock.generateGemShopStock(world, gemRng);
           const sr = spawn.params.shopRoom;
           for (let gi = 0; gi < gemItems.length; gi++) {
             const itemId = gemItems[gi];
