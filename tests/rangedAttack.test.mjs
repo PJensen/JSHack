@@ -1,5 +1,5 @@
-import { assert } from "jsr:@std/assert";
-import { World } from '../src/lib/ecs-js/index.js';
+import { assert, assertEquals } from "jsr:@std/assert";
+import { children, World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
@@ -8,11 +8,13 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { ProcPackageNode } from '../src/rules/components/ProcPackageNode.js';
 import { RangedAttackIntent } from '../src/rules/components/Intents/RangedAttackIntent.js';
 import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
 import { inventoryContains, addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
+import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
 
 function makeBow(world) {
   const id = world.create();
@@ -220,6 +222,62 @@ Deno.test("ranged: player to pet faction is non-hostile", () => {
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'pet faction undamaged');
   assert(!events.some(e => e._event === 'damaged'), 'no damage event');
+});
+
+Deno.test("buildCatalogItem attaches proc packages for mirror bow", () => {
+  const world = new World({ seed: 55 });
+  const bowId = buildCatalogItem(world, "bow_mirror");
+  const packageChildren = [...children(world, bowId)].filter((id) => world.get(id, ProcPackageNode));
+  assertEquals(packageChildren.length, 1);
+  assertEquals(world.get(packageChildren[0], ProcPackageNode)?.packageId, "ricochetTheology");
+});
+
+Deno.test("ranged: mirror bow ricochets in live combat when target is wall-adjacent", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[3 * CHUNK_SIZE + 4] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 13 });
+  world.step = 1;
+  const projectileEvents = [];
+  world.on("projectile:spawn", (payload) => projectileEvents.push(payload));
+
+  const bowId = buildCatalogItem(world, "bow_mirror");
+  const ammoId = makeAmmo(world, 10);
+  const archer = world.create();
+  world.add(archer, Position, { x: 2, y: 4 });
+  world.add(archer, Vitality, { maxHp: 20, hp: 20 });
+  world.add(archer, Equipment, { ranged: bowId, ammo: ammoId, attackDerived: 1 });
+  world.add(archer, Inventory, { capacity: 20 });
+  world.add(archer, Faction, { key: "player" });
+  addToInventory(world, archer, bowId);
+  addToInventory(world, archer, ammoId);
+
+  const target = world.create();
+  world.add(target, Position, { x: 4, y: 4 });
+  world.add(target, Vitality, { maxHp: 20, hp: 20 });
+  world.add(target, Equipment, { defenseDerived: 0 });
+  world.add(target, Faction, { key: "enemy" });
+
+  const bystanderA = world.create();
+  world.add(bystanderA, Position, { x: 5, y: 4 });
+  world.add(bystanderA, Vitality, { maxHp: 20, hp: 20 });
+  world.add(bystanderA, Faction, { key: "enemy" });
+  world.add(bystanderA, ActiveEffects, { effects: [] });
+
+  const bystanderB = world.create();
+  world.add(bystanderB, Position, { x: 5, y: 5 });
+  world.add(bystanderB, Vitality, { maxHp: 20, hp: 20 });
+  world.add(bystanderB, Faction, { key: "enemy" });
+  world.add(bystanderB, ActiveEffects, { effects: [] });
+
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 4, toY: 4 });
+  rangedAttackSystem(world);
+
+  assertEquals(projectileEvents.length, 2);
+  assert(world.get(bystanderA, Vitality).hp < 20, "first ricochet target should take damage");
+  assert(world.get(bystanderB, Vitality).hp < 20, "second ricochet target should take damage");
 });
 
 Deno.test("ranged: fire ammo actor-impact hooks add damage and burning", () => {

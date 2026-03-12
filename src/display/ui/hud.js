@@ -677,6 +677,9 @@ function ensureEffectsStack(container) {
     resist_poison: { name: 'Poison Res', glyph: '\u{1F9EA}',     hue: 130 },
     resist_electric: { name: 'Elec Res', glyph: '\u{1F50C}',     hue: 50  },
     resist_acid:  { name: 'Acid Res',  glyph: '\u{1F9F4}',       hue: 80  },
+    // Proc states (player-side)
+    echo_strike_memory: { name: 'Echo',      glyph: '\u{1F47B}',    hue: 200 },  // 👻 spectral echo stored
+    soul_mortgage_debt: { name: 'Soul Debt', glyph: '\u2696\uFE0F', hue: 350 },  // ⚖️ debt accruing
     // Hunger levels
     satiated:     { name: 'Satiated',  glyph: '\u{1F60B}',       hue: 130 },
     peckish:      { name: 'Peckish',   glyph: '\u{1F37D}\uFE0F', hue: 55  },
