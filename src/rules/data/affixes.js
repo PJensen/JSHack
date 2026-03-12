@@ -341,6 +341,213 @@ registerScript(AFFIX_SECOND_WIND, {
   },
 });
 
+function emitProc(ctx, name, payload) {
+  ctx?.proc?.emit?.(name, payload);
+}
+
+function procDamageAmount(ctx) {
+  return Math.max(0, Number(ctx?.damage?.amount ?? ctx?.damage ?? 0));
+}
+
+registerScript(AFFIX_THORNS, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee01, 20)) return;
+    ctx.proc.dealDamage(ctx.source, 2, "physical", {
+      source: ctx.target,
+      cause: "retaliation",
+      bypassResist: true,
+      noTrigger: true,
+    });
+    ctx.proc.applyStatus(ctx.target, "thorns", 3, 1);
+    emitProc(ctx, "proc:thorns", { actor: ctx.target, target: ctx.source });
+  },
+});
+
+registerScript(AFFIX_VAMP, {
+  [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+    const amount = Math.max(1, Math.floor(procDamageAmount(ctx) / 3));
+    ctx.proc.heal(ctx.source, amount);
+    emitProc(ctx, "proc:vampiric", { actor: ctx.source, target: ctx.target, amount });
+  },
+});
+
+registerScript(AFFIX_FIERCE, {
+  [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+    ctx.proc.addBonusDamage(1);
+    emitProc(ctx, "proc:fierce", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_CAUSTIC, {
+  [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+    if (procDamageAmount(ctx) <= 0) return;
+    ctx.proc.dealDamage(ctx.target, 1, "acid", {
+      source: ctx.source,
+      cause: "affix:caustic",
+      noTrigger: true,
+      nonLethal: true,
+    });
+    emitProc(ctx, "proc:caustic", { actor: ctx.source, target: ctx.target, amount: 1 });
+  },
+});
+
+registerScript(AFFIX_CAPACITIVE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (procDamageAmount(ctx) <= 0) return;
+    ctx.proc.dealDamage(ctx.target, 1, "electric", {
+      source: ctx.source,
+      cause: "affix:capacitive",
+      noTrigger: true,
+      nonLethal: true,
+    });
+    emitProc(ctx, "proc:capacitive", { actor: ctx.source, target: ctx.target, amount: 1 });
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee03, 35)) return;
+    ctx.proc.applyStatus(ctx.target, "shock", 2, 1);
+    emitProc(ctx, "proc:shocked", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_VENOMOUS, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee04, 40)) return;
+    ctx.proc.applyStatus(ctx.target, "poison", 4, 2);
+    emitProc(ctx, "proc:poisoned", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_CHAIN_LIGHTNING, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee10, 15)) return;
+    const targetVit = world.get(ctx.target, Vitality);
+    if (!targetVit || (targetVit.hp | 0) <= 1) return;
+    ctx.proc.dealDamage(ctx.target, 2, "electric", {
+      source: ctx.source,
+      cause: "affix:chainLightning",
+      noTrigger: true,
+      nonLethal: true,
+    });
+    const defPos = world.get(ctx.target, Position);
+    if (defPos) {
+      let chained = false;
+      forEachInRadius(world, defPos.x, defPos.y, 2, (nearId) => {
+        if (chained || nearId === ctx.target || nearId === ctx.source) return;
+        if (!world.isAlive(nearId)) return;
+        const nearFac = world.get(nearId, Faction)?.key || "";
+        const atkFac = world.get(ctx.source, Faction)?.key || "";
+        if (!areFactionsHostile(atkFac, nearFac)) return;
+        ctx.proc.dealDamage(nearId, 1, "electric", {
+          source: ctx.source,
+          cause: "affix:chainLightning",
+          noTrigger: true,
+          nonLethal: true,
+        });
+        chained = true;
+      });
+    }
+    emitProc(ctx, "proc:chainLightning", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_FIRESTORM, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee11, 12)) return;
+    if (procDamageAmount(ctx) > 0) {
+      ctx.proc.dealDamage(ctx.target, 1, "fire", {
+        source: ctx.source,
+        cause: "affix:firestorm",
+        noTrigger: true,
+        nonLethal: true,
+      });
+    }
+    ctx.proc.applyStatus(ctx.target, "burning", 3, 2);
+    emitProc(ctx, "proc:firestorm", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_SOUL_DRAIN, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee12, 18)) return;
+    const amount = Math.max(1, Math.floor(procDamageAmount(ctx) / 2));
+    ctx.proc.heal(ctx.source, amount);
+    emitProc(ctx, "proc:soulDrain", { actor: ctx.source, target: ctx.target, amount });
+  },
+});
+
+registerScript(AFFIX_BERSERK, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee13, 10)) return;
+    ctx.proc.applyStatus(ctx.source, "berserk", 5, 1);
+    emitProc(ctx, "proc:berserking", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_SHIELD_WALL, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee14, 15)) return;
+    ctx.proc.applyStatus(ctx.target, "stoneskin", 4, 2);
+    emitProc(ctx, "proc:shieldWall", { actor: ctx.target, target: ctx.source });
+  },
+});
+
+registerScript(AFFIX_MANA_SURGE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee15, 20)) return;
+    ctx.proc.restoreResource(ctx.source, "mana", 3);
+    emitProc(ctx, "proc:manaSurge", { actor: ctx.source, amount: 3 });
+  },
+});
+
+registerScript(AFFIX_EXECUTIONER, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const vit = world.get(ctx.target, Vitality);
+    if (!vit || !(Number(vit.maxHp) > 0)) return;
+    if (Number(vit.hp) / Number(vit.maxHp) >= 0.3) return;
+    ctx.proc.addBonusDamage(3);
+    emitProc(ctx, "proc:executioner", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_FROSTBITE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee16, 20)) return;
+    ctx.proc.applyStatus(ctx.target, "frost", 3, 1);
+    emitProc(ctx, "proc:frostbite", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_HEMORRHAGE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee17, 25)) return;
+    ctx.proc.applyStatus(ctx.target, "bleed", 4, 2);
+    emitProc(ctx, "proc:hemorrhage", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_SECOND_WIND, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee18, 10)) return;
+    ctx.proc.applyStatus(ctx.target, "regen", 5, 1);
+    ctx.proc.restoreResource(ctx.target, "stamina", 5);
+    emitProc(ctx, "proc:secondWind", { actor: ctx.target });
+  },
+});
+
+registerScript(AFFIX_FLAMING, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee19, 50)) return;
+    ctx.proc.applyStatus(ctx.target, "burning", 3, 2);
+    emitProc(ctx, "proc:flaming", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_STUNNING, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1a, 25)) return;
+    ctx.proc.applyStatus(ctx.target, "stun", 1, 1);
+    emitProc(ctx, "proc:stunned", { actor: ctx.source, target: ctx.target });
+  },
+});
+
 const AFFIX_REGISTRY = new Map();
 
 function normalizeRefList(value, fallbackSingle = null) {

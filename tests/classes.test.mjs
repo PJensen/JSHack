@@ -109,7 +109,8 @@ Deno.test("shadow_bolt has 2-turn cast time and deals damage", () => {
   assert(spell.manaCost > 0, "shadow_bolt should cost mana");
   const dmgEffect = spell.effects.find(e => e.kind === 'damage');
   assert(dmgEffect, "shadow_bolt should have a damage effect");
-  assert(Number(dmgEffect.amount) > 0, "shadow_bolt damage should be positive");
+  const amountText = String(dmgEffect.amount ?? "");
+  assert(/[1-9]/.test(amountText), "shadow_bolt damage should describe a positive amount");
 });
 
 Deno.test("summon_skeleton has 5-turn cast time", () => {

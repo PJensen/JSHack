@@ -70,6 +70,8 @@ export function createProcAccumulator() {
     statusesToApply: [],
     buffsToAttach: [],
     resourcesToRestore: [],
+    vitalityToRestore: [],
+    directDamage: [],
     spawnedEntities: [],
     chargesToConsume: [],
     cancelled: false,
@@ -77,7 +79,7 @@ export function createProcAccumulator() {
   };
 }
 
-function createProcScriptApi(out, procNodeId) {
+function createProcScriptApi(world, out, procNodeId, ctx) {
   return Object.freeze({
     addBonusDamage(min, max = min, type = "physical") {
       out.bonusDamage.push({
@@ -132,24 +134,54 @@ function createProcScriptApi(out, procNodeId) {
         amount: Math.max(1, Number(amount || 1)),
       });
     },
+    heal(target, amount) {
+      out.vitalityToRestore.push({
+        source: procNodeId,
+        target: Number(target || 0),
+        amount: Number(amount || 0),
+      });
+    },
+    dealDamage(target, amount, type = "physical", options = {}) {
+      out.directDamage.push({
+        source: Number(options.source || ctx?.source || 0) | 0,
+        target: Number(target || 0),
+        amount: Number(amount || 0),
+        type: String(type || "physical"),
+        cause: String(options.cause || "proc"),
+        bypassResist: !!options.bypassResist,
+        bypassInvuln: !!options.bypassInvuln,
+        noTrigger: !!options.noTrigger,
+        nonLethal: !!options.nonLethal,
+        offhand: !!options.offhand,
+        at: options.at || undefined,
+      });
+    },
     cancel() {
       out.cancelled = true;
     },
     message(text) {
       out.messages.push({ source: procNodeId, text: String(text || "") });
     },
+    emit(name, payload = {}) {
+      try {
+        world.emit?.(String(name || ""), payload);
+      } catch {
+        // keep proc evaluation deterministic and side-effect bounded
+      }
+    },
   });
 }
 
 function runProcNodeScript(world, procNodeId, ctx, sourceStats, targetStats, out) {
   return runEntityScript(world, procNodeId, ScriptVerb.ProcEvaluate, {
+    ...ctx,
     procNodeId,
     event: ctx,
     ctx,
     sourceStats,
     targetStats,
     out,
-    proc: createProcScriptApi(out, procNodeId),
+    proc: createProcScriptApi(world, out, procNodeId, ctx),
   });
 }
 

@@ -979,7 +979,7 @@ export function materializeSpawn(world, spawn) {
         targetX: homeX,
         targetY: homeY,
         workTurns: 0,
-        idleTurns: 2 + Math.floor((world.rand?.() ?? Math.random()) * 5),
+        idleTurns: 2 + Math.floor((world.rand?.() ?? 0) * 5),
         workSiteKind: "",
         routineKind: "",
         lastPhase: "",

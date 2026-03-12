@@ -369,7 +369,7 @@ Deno.test("shield affixes fire on damaged event", async () => {
   let fired = false;
   const { registerScript, ScriptVerb } = await import('../src/rules/scripting.js');
   registerScript('affix:test_shield_slot', {
-    [ScriptVerb.AffixOnDamaged]: () => { fired = true; }
+    [ScriptVerb.ProcEvaluate]: () => { fired = true; }
   });
   registerAffixDefinition('test_shield_slot', {
     name: 'Test Shield Slot', slots: ['offhand'], weight: 1,

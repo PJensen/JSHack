@@ -11,7 +11,9 @@ import { MATERIAL_CATALOG } from "../data/materials.js";
 import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "./passiveBonuses.js";
-import { runLegacyOnDamagedReactions } from "./legacyAffixDispatch.js";
+import { createLegacyCombatFrame, runLegacyMonsterHook } from "./legacyAffixDispatch.js";
+import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from "./affixTopology.js";
+import { applyProcAccumulator } from "./procApplication.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -280,11 +282,28 @@ export function dealDamage(world, spec) {
   } catch { /* */ }
 
   if (!spec.noTrigger) {
-    runLegacyOnDamagedReactions(world, {
+    ensureEquippedAffixTopology(world, target);
+    const out = evaluateEquippedAffixProcs(world, target, {
+      kind: "onDamaged",
+      source,
+      target,
+      damage: {
+        amount: finalAmount,
+        type,
+        crit: critical,
+        blocked: false,
+      },
+      tags: new Set([String(type || "physical")]),
+      scratch: {},
+    });
+    applyProcAccumulator(world, out, { applyDamage: dealDamage });
+
+    const frame = createLegacyCombatFrame(world, {
       attacker: source,
       defender: target,
-      amount: finalAmount,
-      noTrigger: false,
+      weaponId: Number(spec.weaponId || 0) | 0,
+      damage: finalAmount,
+      world,
     }, {
       retaliate: (amount) => {
         dealDamage(world, {
@@ -298,6 +317,7 @@ export function dealDamage(world, spec) {
         });
       },
     });
+    runLegacyMonsterHook(world, target, "onDamaged", frame);
   }
 
   // Step 6: Death check
