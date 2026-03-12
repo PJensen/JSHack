@@ -15,6 +15,7 @@ import {
   attachProcNode,
   exprAddConst,
   gateEventKind,
+  gateHasActionTag,
 } from "../utils/statProcAuthoring.js";
 
 export const PROC_PACKAGE_KEYS = Object.freeze({
@@ -70,9 +71,38 @@ function isHostileNear(world, source, origin, nearId, radius = 2) {
 
 function compareRicochetTargets(a, b) {
   return a.distance - b.distance
+    || b.forward - a.forward
+    || a.lateral - b.lateral
     || a.pos.y - b.pos.y
     || a.pos.x - b.pos.x
     || a.id - b.id;
+}
+
+function getRicochetDirection(world, source, target) {
+  const sourcePos = world.get(source, Position);
+  const targetPos = world.get(target, Position);
+  if (!sourcePos || !targetPos) return null;
+  const dx = Math.sign((targetPos.x | 0) - (sourcePos.x | 0));
+  const dy = Math.sign((targetPos.y | 0) - (sourcePos.y | 0));
+  if (dx === 0 && dy === 0) return null;
+  return { dx, dy };
+}
+
+function scoreRicochetCandidate(direction, origin, candidatePos) {
+  if (!direction || !candidatePos) return null;
+  const rx = (candidatePos.x | 0) - (origin.x | 0);
+  const ry = (candidatePos.y | 0) - (origin.y | 0);
+  const forward = rx * direction.dx + ry * direction.dy;
+  if (forward <= 0) return null;
+
+  const lateral = Math.abs(rx * direction.dy - ry * direction.dx);
+  if (lateral > forward) return null;
+
+  return {
+    forward,
+    lateral,
+    distance: Math.max(Math.abs(rx), Math.abs(ry)),
+  };
 }
 
 registerScript(PROC_PACKAGE_KEYS.EchoStrike, {
@@ -112,6 +142,7 @@ registerScript(PROC_PACKAGE_KEYS.EchoStrike, {
 registerScript(PROC_PACKAGE_KEYS.RicochetTheology, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
     if (String(ctx?.kind || "") !== "onHit") return;
+    if (!ctx?.tags?.has?.("ranged") || !ctx?.tags?.has?.("projectile")) return;
     const source = Number(ctx?.source || 0) | 0;
     const target = Number(ctx?.target || 0) | 0;
     const pos = world.get(target, Position);
@@ -126,18 +157,21 @@ registerScript(PROC_PACKAGE_KEYS.RicochetTheology, {
     }
     if (!hasWall) return;
 
-    const sourceFaction = world.get(source, Faction)?.key || "";
+    const direction = getRicochetDirection(world, source, target);
+    if (!direction) return;
     const ricochetTargets = [];
     for (const [nearId] of world.query(Position)) {
-      if (!isHostileNear(world, source, pos, nearId, 2) || nearId === target) continue;
-      const targetFaction = world.get(nearId, Faction)?.key || "";
-      if (!areFactionsHostile(sourceFaction, targetFaction)) continue;
+      if (!(nearId > 0) || nearId === source || nearId === target || !world.isAlive?.(nearId)) continue;
       const nearPos = world.get(nearId, Position);
       if (!nearPos) continue;
+      const scoring = scoreRicochetCandidate(direction, pos, nearPos);
+      if (!scoring || scoring.distance > 2) continue;
       ricochetTargets.push({
         id: nearId,
         pos: nearPos,
-        distance: Math.max(Math.abs((nearPos.x | 0) - (pos.x | 0)), Math.abs((nearPos.y | 0) - (pos.y | 0))),
+        distance: scoring.distance,
+        forward: scoring.forward,
+        lateral: scoring.lateral,
       });
     }
 
@@ -307,7 +341,12 @@ const PROC_PACKAGE_SPECS = Object.freeze([
     hostIdeas: Object.freeze(["sanctified bucklers", "mirror bows", "cathedral hammers"]),
     passiveExpressions: Object.freeze([]),
     procTrees: Object.freeze([
-      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.RicochetTheology, priority: 10 }),
+      Object.freeze({
+        trigger: "onHit",
+        script: PROC_PACKAGE_KEYS.RicochetTheology,
+        priority: 10,
+        gates: Object.freeze([gateHasActionTag("ranged"), gateHasActionTag("projectile")]),
+      }),
     ]),
   }),
   Object.freeze({
@@ -384,7 +423,7 @@ export function attachProcPackage(world, parentId, packageId) {
     const tree = spec.procTrees[i];
     attachProcNode(world, packageNodeId, {
       priority: Number(tree.priority || 0),
-      gates: [gateEventKind(tree.trigger)],
+      gates: [gateEventKind(tree.trigger), ...(Array.isArray(tree.gates) ? tree.gates : [])],
       script: tree.script,
     });
   }

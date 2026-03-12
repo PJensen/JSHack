@@ -163,20 +163,23 @@ Deno.test("ricochet theology package rebounds off wall-adjacent targets", () => 
   const defender = world.create();
   const bystanderA = world.create();
   const bystanderB = world.create();
+  const backward = world.create();
   const projectileEvents = [];
   world.on("projectile:spawn", (payload) => projectileEvents.push(payload));
   world.add(attacker, Position, { x: 1, y: 1 });
   world.add(defender, Position, { x: 2, y: 1 });
   world.add(bystanderA, Position, { x: 3, y: 1 });
   world.add(bystanderB, Position, { x: 3, y: 2 });
+  world.add(backward, Position, { x: 1, y: 2 });
   world.add(attacker, Faction, { key: "player" });
   world.add(defender, Faction, { key: "enemy" });
   world.add(bystanderA, Faction, { key: "enemy" });
-  world.add(bystanderB, Faction, { key: "enemy" });
+  world.add(backward, Faction, { key: "enemy" });
   world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
   world.add(defender, Vitality, { maxHp: 20, hp: 20 });
   world.add(bystanderA, Vitality, { maxHp: 20, hp: 20 });
   world.add(bystanderB, Vitality, { maxHp: 20, hp: 20 });
+  world.add(backward, Vitality, { maxHp: 20, hp: 20 });
 
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
@@ -188,12 +191,13 @@ Deno.test("ricochet theology package rebounds off wall-adjacent targets", () => 
     target: defender,
     kind: "onHit",
     damage: { amount: 10, type: "physical" },
-    tags: new Set(["wallRicochet"]),
+    tags: new Set(["ranged", "projectile", "wallRicochet"]),
   });
   runScript(PROC_PACKAGE_KEYS.RicochetTheology, ScriptVerb.ProcEvaluate, world, ctx);
   assertEquals(ctx.directDamage.length, 2);
   assert(ctx.directDamage.some((entry) => entry.target === bystanderA && entry.type === "electric"), "expected first rebound to deal immediate electric damage");
   assert(ctx.directDamage.some((entry) => entry.target === bystanderB && entry.type === "electric"), "expected second rebound to deal immediate electric damage");
+  assert(!ctx.directDamage.some((entry) => entry.target === backward), "expected backward target to be ignored");
   assertEquals(ctx.statusesToApply, []);
   assertEquals(projectileEvents.length, 2);
 });
