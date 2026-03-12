@@ -8,11 +8,24 @@ import { Position } from "../../rules/components/Position.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
-import { addToInventory } from "../../rules/utils/inventoryFacade.js";
+import { addToInventory, inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { MONSTERS } from "../../rules/data/monsters.js";
 import { markExplored } from "../../rules/environment/dungeon/exploredMap.js";
 import { spawnDebugMonsterNearPlayer } from "./spawnDebugMonster.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
+import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
+import { ItemInfo } from "../../rules/components/ItemInfo.js";
+import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { attachProcPackage, listProcPackageIds } from "../../rules/data/procPackages.js";
+
+function describeItem(world, itemId) {
+  const info = world.get(itemId, ItemInfo);
+  const named = world.get(itemId, NamedIdentity);
+  const identity = named?.identity || "unknown";
+  const label = info?.name || named?.name || identity;
+  const count = Math.max(1, Number(info?.count || 1) | 0);
+  return `#${itemId} ${label} <${identity}> x${count}`;
+}
 
 /**
  * Register all built-in debug commands.
@@ -111,6 +124,75 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
     const result = spawnDebugMonsterNearPlayer(world, monsterId);
     if (!result.ok) return result.error;
     return `Spawned ${result.name} at (${result.x}, ${result.y})`;
+  });
+
+  // ---- inventory [list] ----
+  console.registerCommand('inventory', 'inventory list — list player inventory item ids', (argsStr) => {
+    const action = argsStr.trim().toLowerCase();
+    if (action && action !== 'list') return 'Usage: inventory list';
+
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+
+    const items = inventoryItems(world, pe.id);
+    if (!items.length) return 'Inventory is empty.';
+    return items.map((itemId) => describeItem(world, itemId)).join('\n');
+  });
+
+  // ---- equipment [list] ----
+  console.registerCommand('equipment', 'equipment list — list equipped item ids by slot', (argsStr) => {
+    const action = argsStr.trim().toLowerCase();
+    if (action && action !== 'list') return 'Usage: equipment list';
+
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+    const eq = world.get(pe.id, Equipment);
+    if (!eq) return 'Player has no Equipment component.';
+
+    const lines = [];
+    for (const slot of GEAR_SLOTS) {
+      const itemId = Number(eq[slot] || 0) | 0;
+      if (itemId > 0) {
+        lines.push(`${slot}: ${describeItem(world, itemId)}`);
+      } else {
+        lines.push(`${slot}: empty`);
+      }
+    }
+    return lines.join('\n');
+  });
+
+  // ---- enchant <item-id|slot:<name>> <proc-package-id> ----
+  console.registerCommand('enchant', 'enchant <item-id|slot:ranged> <proc-package-id> — attach a proc package to an item', (argsStr) => {
+    const parts = argsStr.split(/\s+/).filter(Boolean);
+    if (parts.length < 2) {
+      return `Usage: enchant <item-id|slot:ranged> <proc-package-id>\nAvailable packages: ${listProcPackageIds().join(', ')}`;
+    }
+
+    const targetRef = parts[0];
+    const packageId = parts[1];
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+
+    let itemId = 0;
+    if (targetRef.startsWith('slot:')) {
+      const slot = targetRef.slice(5);
+      if (!GEAR_SLOTS.includes(slot)) return `Unknown equipment slot: "${slot}"`;
+      const eq = world.get(pe.id, Equipment);
+      if (!eq) return 'Player has no Equipment component.';
+      itemId = Number(eq[slot] || 0) | 0;
+      if (!(itemId > 0)) return `No item equipped in slot "${slot}"`;
+    } else {
+      itemId = Number.parseInt(targetRef, 10) | 0;
+      if (!(itemId > 0) || !world.isAlive?.(itemId) || !world.has(itemId, ItemInfo)) {
+        return `Invalid item id: "${targetRef}"`;
+      }
+    }
+
+    const rootId = attachProcPackage(world, itemId, packageId);
+    if (!(rootId > 0)) {
+      return `Failed to attach proc package "${packageId}". Available: ${listProcPackageIds().join(', ')}`;
+    }
+    return `Attached ${packageId} to ${describeItem(world, itemId)} via package node #${rootId}`;
   });
 
   // ---- depth <n> ----
