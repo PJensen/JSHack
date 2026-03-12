@@ -156,7 +156,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   versionRow.appendChild(versionEl);
 
   const subscribeLink = document.createElement('a');
-  subscribeLink.href = 'https://pjensen.substack.com/s/js-hack';
+  subscribeLink.href = 'https://hackjs.substack.com/';
   subscribeLink.target = '_blank';
   subscribeLink.rel = 'noopener';
   subscribeLink.textContent = 'Subscribe to Updates';
