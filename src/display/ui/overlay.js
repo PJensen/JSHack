@@ -154,6 +154,25 @@ export function initOverlays() {
     unavailableMessage: 'No deity data',
   });
   root.appendChild(deityGraph.canvas);
+  const economyGraph = createDebugGraph({
+    id: 'economy-graph-layer',
+    title: 'Town Economy',
+    width: 240,
+    height: 160,
+    position: { left: '8px', bottom: '372px' },
+    zIndex: 910,
+    series: [
+      { key: 'food',      color: '#44cc44', label: 'Food' },
+      { key: 'materials', color: '#ff8800', label: 'Materials' },
+      { key: 'medicine',  color: '#aa44ff', label: 'Medicine' },
+      { key: 'morale',    color: '#ffcc00', label: 'Morale' },
+    ],
+    maxPoints: 60,
+    sampleInterval: 1000,
+    normalizedY: false,
+    unavailableMessage: 'Not on overworld',
+  });
+  root.appendChild(economyGraph.canvas);
   const deathLog = ensurePanel('deathLog');
   const bookReader = ensurePanel('bookReader');
   const deathScreen = ensureDeathScreen(root);
@@ -261,7 +280,7 @@ export function initOverlays() {
   });
   window.addEventListener('ui:settingsData', (ev) => {
     const data = /** @type {CustomEvent} */ (ev).detail || {};
-    renderSettings(settingsPanel, data, memoryGraph, deityGraph);
+    renderSettings(settingsPanel, data, memoryGraph, deityGraph, economyGraph);
   });
   // Toggle memory graph
   window.addEventListener('ui:toggleMemoryGraph', () => {
@@ -287,6 +306,21 @@ export function initOverlays() {
   window.addEventListener('debug:registerDeityMoodSampler', (ev) => {
     const fn = /** @type {CustomEvent} */ (ev).detail?.sampler;
     if (typeof fn === 'function') deityGraph.setSampler(fn);
+  });
+  // Toggle economy graph
+  window.addEventListener('ui:toggleEconomyGraph', () => {
+    if (economyGraph.canvas.style.display === 'block') {
+      economyGraph.hide();
+      economyGraph.stopSampling();
+    } else {
+      economyGraph.show();
+      economyGraph.startSampling();
+    }
+  });
+  // Late-bind economy sampler from main.js
+  window.addEventListener('debug:registerEconomySampler', (ev) => {
+    const fn = /** @type {CustomEvent} */ (ev).detail?.sampler;
+    if (typeof fn === 'function') economyGraph.setSampler(fn);
   });
   window.addEventListener('ui:openMessageLog', () => {
     show(log);
@@ -321,6 +355,11 @@ export function initOverlays() {
       if (deityGraph.canvas.style.display === 'block') {
         deityGraph.hide();
         deityGraph.stopSampling();
+        closed = true;
+      }
+      if (economyGraph.canvas.style.display === 'block') {
+        economyGraph.hide();
+        economyGraph.stopSampling();
         closed = true;
       }
       if ((/** @type {any} */ (ticker))._expanded) {
@@ -2361,7 +2400,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
  * @param {{ canvas: HTMLCanvasElement }} memGraph
  * @param {{ canvas: HTMLCanvasElement }} dtyGraph
  */
-function renderSettings(panel, data, memGraph, dtyGraph) {
+function renderSettings(panel, data, memGraph, dtyGraph, econGraph) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
@@ -2398,6 +2437,10 @@ function renderSettings(panel, data, memGraph, dtyGraph) {
 
   content.appendChild(makeCheckbox('Deity debugging', dtyGraph.canvas.style.display === 'block', () => {
     window.dispatchEvent(new CustomEvent('ui:toggleDeityMoodGraph'));
+  }));
+
+  content.appendChild(makeCheckbox('Economy graph', econGraph.canvas.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleEconomyGraph'));
   }));
 
   content.appendChild(makeCheckbox('Memory visualizer', memGraph.canvas.style.display === 'block', () => {
