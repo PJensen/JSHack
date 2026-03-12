@@ -5,6 +5,7 @@ import { ensureMemoryGraph } from './memoryGraph.js';
 import { createDebugGraph } from './debugGraph.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
+import { renderDialog } from './dialogOverlay.js';
 import { versionLoaded } from '../../shared/version.js';
 
 const PANEL_Z_BASE = 1200;
@@ -116,6 +117,7 @@ export function initOverlays() {
   const spells = ensurePanel('spells');
   const alchemy = ensurePanel('alchemy');
   const cooking = ensurePanel('cooking');
+  const dialog = ensurePanel('dialog');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
@@ -405,6 +407,46 @@ export function initOverlays() {
     const e = ev;
     const items = (e?.detail?.items) || [];
     renderThrowChooser(throwPanel, items);
+  });
+
+  window.addEventListener('ui:openDialog', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    hide(inv);
+    hide(char);
+    hide(equip);
+    hide(settingsPanel);
+    hide(pick);
+    hide(usePanel);
+    hide(throwPanel);
+    hide(spells);
+    hide(alchemy);
+    hide(cooking);
+    hide(shop);
+    hide(chest);
+    hide(rack);
+    hide(altar);
+    renderDialog(dialog, d);
+    show(dialog);
+    const escKey = (/** @type {KeyboardEvent} */ ke) => {
+      if (dialog.style.display !== 'block') return;
+      if (ke.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('ui:requestDialogClose', { detail: { sessionId: Number(d.sessionId || 0) | 0 } }));
+        ke.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', escKey);
+    const obs = new MutationObserver(() => {
+      if (dialog.style.display === 'none') {
+        window.removeEventListener('keydown', escKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(dialog, { attributes: true, attributeFilter: ['style'] });
+  });
+  window.addEventListener('ui:closeDialog', () => {
+    hide(dialog);
   });
 
   // Apply-tool chooser (two-step: pick tool, then pick target)

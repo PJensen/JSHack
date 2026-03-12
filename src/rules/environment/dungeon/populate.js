@@ -1011,7 +1011,11 @@ export function materializeSpawn(world, spawn) {
       } else {
         world.add(id, Interactable, {
           action: "talkToNPC",
-          params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+          params: {
+            dialogue: def.dialogue,
+            townfolkId: spawn.params.townfolkId,
+            dialogId: `townfolk:${def.role}`,
+          },
         });
       }
       // Miner spawns with pickaxe equipped

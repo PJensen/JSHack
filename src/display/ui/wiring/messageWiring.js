@@ -960,6 +960,21 @@ export function installMessageWiring({
     log(text, 'info');
   });
 
+  world.on('quest:started', ({ title }) => {
+    const label = String(title || 'Quest');
+    log(`Quest started: ${label}.`, 'system');
+  });
+
+  world.on('quest:advanced', ({ objective }) => {
+    const text = String(objective || '').trim();
+    if (text) log(`Objective updated: ${text}`, 'system');
+  });
+
+  world.on('quest:completed', ({ title }) => {
+    const label = String(title || 'Quest');
+    log(`Quest completed: ${label}.`, 'system');
+  });
+
   world.on('townfolk:chopped', ({ x, y }) => {
     if (canSeeAt(x, y)) log('A woodcutter fells a tree.', 'ambient');
   });
