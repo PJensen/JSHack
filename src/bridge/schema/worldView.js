@@ -625,6 +625,19 @@ function projectCombatUi(world, id, rec, playerFactionKey) {
 	rec.showHealthBar = areFactionsHostile(playerFactionKey, factionKey);
 }
 
+/** Populate rec.procStates with any active proc state effects on the entity (enemy-side). */
+function projectProcStateTags(world, id, rec) {
+	const ae = /** @type any */ (world.get(id, ActiveEffects));
+	if (!ae || !Array.isArray(ae.effects)) return;
+	for (const e of ae.effects) {
+		const key = String(e?.key || '');
+		if (!ENTITY_PROC_STATE_KEYS.has(key)) continue;
+		const stacks = Math.max(1, Number(e?.stacks || 1));
+		if (!rec.procStates) rec.procStates = [];
+		rec.procStates.push({ key, stacks });
+	}
+}
+
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @returns {WorldView}
@@ -727,13 +740,14 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
 				rec.layer = layer;
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
+				rec.procStates = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -742,6 +756,7 @@ export function buildWorldView(world) {
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
+			projectProcStateTags(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 
@@ -792,13 +807,14 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
 				rec.layer = layer;
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
+				rec.procStates = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -807,6 +823,7 @@ export function buildWorldView(world) {
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');
+			projectProcStateTags(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 

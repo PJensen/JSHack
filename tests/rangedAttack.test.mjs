@@ -9,7 +9,9 @@ import { Faction } from '../src/rules/components/Faction.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { ProcPackageNode } from '../src/rules/components/ProcPackageNode.js';
+import { AttackIntent } from '../src/rules/components/Intents/AttackIntent.js';
 import { RangedAttackIntent } from '../src/rules/components/Intents/RangedAttackIntent.js';
+import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
 import { inventoryContains, addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
@@ -269,15 +271,54 @@ Deno.test("ranged: mirror bow ricochets in live combat when target is wall-adjac
   const bystanderB = world.create();
   world.add(bystanderB, Position, { x: 5, y: 5 });
   world.add(bystanderB, Vitality, { maxHp: 20, hp: 20 });
-  world.add(bystanderB, Faction, { key: "enemy" });
   world.add(bystanderB, ActiveEffects, { effects: [] });
+
+  const backward = world.create();
+  world.add(backward, Position, { x: 3, y: 4 });
+  world.add(backward, Vitality, { maxHp: 20, hp: 20 });
+  world.add(backward, Faction, { key: "enemy" });
+  world.add(backward, ActiveEffects, { effects: [] });
 
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 4, toY: 4 });
   rangedAttackSystem(world);
 
   assertEquals(projectileEvents.length, 2);
   assert(world.get(bystanderA, Vitality).hp < 20, "first ricochet target should take damage");
-  assert(world.get(bystanderB, Vitality).hp < 20, "second ricochet target should take damage");
+  assert(world.get(bystanderB, Vitality).hp < 20, "forward non-hostile target should take damage");
+  assertEquals(world.get(backward, Vitality).hp, 20, "backward target should be ignored");
+});
+
+Deno.test("combat: mirror bow proc does not fire on melee hits", () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  world.step = 1;
+  const projectileEvents = [];
+  world.on("projectile:spawn", (payload) => projectileEvents.push(payload));
+
+  const bowId = buildCatalogItem(world, "bow_mirror");
+  const swordId = makeSword(world);
+  const hero = world.create();
+  world.add(hero, Position, { x: 1, y: 1 });
+  world.add(hero, Vitality, { maxHp: 20, hp: 20 });
+  world.add(hero, Equipment, { weapon: swordId, ranged: bowId });
+  world.add(hero, Faction, { key: "player" });
+
+  const foe = world.create();
+  world.add(foe, Position, { x: 1, y: 2 });
+  world.add(foe, Vitality, { maxHp: 20, hp: 20 });
+  world.add(foe, Equipment, { defenseDerived: 0 });
+  world.add(foe, Faction, { key: "enemy" });
+
+  const spectator = world.create();
+  world.add(spectator, Position, { x: 1, y: 3 });
+  world.add(spectator, Vitality, { maxHp: 20, hp: 20 });
+  world.add(spectator, Faction, { key: "enemy" });
+
+  world.add(hero, AttackIntent, { targetId: foe });
+  combatSystem(world);
+
+  assertEquals(projectileEvents.length, 0);
+  assertEquals(world.get(spectator, Vitality).hp, 20, "melee should not trigger bow ricochet");
 });
 
 Deno.test("ranged: fire ammo actor-impact hooks add damage and burning", () => {
