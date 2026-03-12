@@ -80,3 +80,26 @@ Deno.test("quest runtime compiles event edges and advances quest entities throug
   assertEquals(completed.length, 1);
   assertEquals(qid > 0, true);
 });
+
+Deno.test("instantiateQuest deduplicates matching quest instances for the same bindings", () => {
+  const world = new World({ seed: 88 });
+  world.setScheduler(composeScheduler("scripts"));
+
+  registerQuest({
+    id: "test:quest_dedupe",
+    title: "Deduped Quest",
+    version: 1,
+    nodes: {
+      offer: { on: {} },
+    },
+  });
+
+  installQuestRuntime(world);
+
+  const first = instantiateQuest(world, "test:quest_dedupe", { player: 3, giver: 7, target: 7 });
+  const second = instantiateQuest(world, "test:quest_dedupe", { player: 3, giver: 7, target: 7 });
+
+  assertEquals(second, first);
+  assertEquals([...world.query()].filter(([id]) => id === first).length >= 1, true);
+  assertEquals(getQuestRecord(world, "test:quest_dedupe", 3)?.id, first);
+});

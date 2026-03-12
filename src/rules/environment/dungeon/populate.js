@@ -64,7 +64,9 @@ import {
   HerbChest,
   TavernChest,
   ApothecarySign,
+  GemShopSign,
   GemDisplayCase,
+  MessageBoard,
   GraveTombstone,
   TownBell,
 } from '../../archetypes/Overworld.js';
@@ -871,8 +873,12 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, TavernChest, { x: spawn.x, y: spawn.y });
     case 'apothecary_sign':
       return createFrom(world, ApothecarySign, { x: spawn.x, y: spawn.y });
+    case 'gem_shop_sign':
+      return createFrom(world, GemShopSign, { x: spawn.x, y: spawn.y });
     case 'gem_display_case':
       return createFrom(world, GemDisplayCase, { x: spawn.x, y: spawn.y });
+    case 'message_board':
+      return createFrom(world, MessageBoard, { x: spawn.x, y: spawn.y });
     case 'grave_tombstone':
       return createFrom(world, GraveTombstone, { x: spawn.x, y: spawn.y });
     case 'tombstone': {

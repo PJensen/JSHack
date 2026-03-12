@@ -34,11 +34,12 @@ export function resolveItemDisplayName(world, entityId) {
 
   if (info && info.type === 'gem') {
     const identity = ni?.identity || '';
-    if (identity && isIdentified(identity)) {
+    const identified = info.identified === true || (identity && isIdentified(identity));
+    if (identified) {
       return ni?.name || info.description || info.type || 'gem';
     }
     // Unidentified gem: show appearance (e.g. "red gem")
-    return info.description || info.type || 'gem';
+    return info.appearance || info.description || info.type || 'gem';
   }
 
   // Check if this item requires identification
@@ -118,20 +119,26 @@ export function buildItemDisplayData(world, itemId) {
   // Determine if this item is unidentified
   const identity = ni?.identity || '';
   const needsId = requiresIdentification(info);
-  const identified = !needsId || (identity && isIdentified(identity));
+  const identified = info.identified === true || !needsId || (identity && isIdentified(identity));
 
   const spellId = identified ? spellIdFromIdentity(identity) : "";
   const linkedSpell = spellId ? getSpell(spellId) : null;
-  const detailLines = linkedSpell ? describeSpellDetailLines(linkedSpell) : [];
+  const detailLines = identified
+    ? [
+        ...(Array.isArray(info.detailLines) ? info.detailLines.map((line) => String(line || "").trim()).filter(Boolean) : []),
+        ...(linkedSpell ? describeSpellDetailLines(linkedSpell) : []),
+      ]
+    : [];
   const targetEffects = linkedSpell ? describeSpellTargetEffects(linkedSpell) : [];
   const description = identified
     ? (linkedSpell
-        ? String(linkedSpell.description || info.description || "").trim()
-        : (info.description || ""))
+        ? String(linkedSpell.description || info.details || info.description || "").trim()
+        : String(info.details || info.description || "").trim())
     : "";
 
   return {
     id: itemId,
+    identity,
     type: info.type || 'item',
     name: resolveItemDisplayName(world, itemId),
     slot: info.slot || '',

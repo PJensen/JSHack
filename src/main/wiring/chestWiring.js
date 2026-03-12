@@ -7,6 +7,7 @@ import {
   removeFromInventory, hasCapacityForItem, transferItem,
 } from "../../rules/utils/inventoryFacade.js";
 import { buildItemDisplayData } from "./itemName.js";
+import { groupDisplayItems } from "../ui/itemGrouping.js";
 
 const INSTALLED = Symbol.for("jshack:main:chestWiring:installed");
 
@@ -45,7 +46,9 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     }
     try {
       window.dispatchEvent(new CustomEvent("ui:chestData", { detail: {
-        chestId, chestItems, playerItems,
+        chestId,
+        chestItems: groupDisplayItems(chestItems),
+        playerItems: groupDisplayItems(playerItems),
       } }));
     } catch (e) { console.debug('[chestWiring] dispatch ui:chestData:', e); }
   }
@@ -91,7 +94,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
       if (detail) {
         try {
           window.dispatchEvent(new CustomEvent('ui:recentPickup', {
-            detail: { item: { id: detail.id, type: detail.type, slot: detail.slot, name: detail.name, count: detail.count } }
+            detail: { item: { id: detail.id, identity: detail.identity, type: detail.type, slot: detail.slot, name: detail.name, count: detail.count } }
           }));
         } catch (err) { console.debug('[chestWiring] dispatch ui:recentPickup:', err); }
       }

@@ -65,6 +65,83 @@ export function getGem(id) { return GEM_DEFS[id] || null; }
 export function listGems() { return Object.values(GEM_DEFS); }
 export function listGemIds() { return Object.keys(GEM_DEFS); }
 
+const GEM_SOCKET_DETAIL_LINES = Object.freeze({
+  gem_diamond: Object.freeze([
+    "Socketed: +2 attack, +2 defense.",
+  ]),
+  gem_ruby: Object.freeze([
+    "Socketed: +10% fire resist.",
+    "On hit: 25% chance to ignite the target.",
+  ]),
+  gem_sapphire: Object.freeze([
+    "Socketed: +1 defense.",
+    "On hit: 20% chance to inflict frost.",
+  ]),
+  gem_emerald: Object.freeze([
+    "Socketed: +10% poison resist.",
+    "On hit: 20% chance to poison the target.",
+  ]),
+  gem_topaz: Object.freeze([
+    "Socketed: +1 attack.",
+    "On hit: 20% chance to shock the target.",
+  ]),
+  gem_amethyst: Object.freeze([
+    "Socketed: +1 mana regeneration.",
+  ]),
+  gem_opal: Object.freeze([
+    "Socketed: +1 luck.",
+  ]),
+  gem_obsidian: Object.freeze([
+    "Socketed: +2 kinetic damage reduction.",
+  ]),
+  gem_garnet: Object.freeze([
+    "Socketed: +20% fire resist.",
+  ]),
+});
+
+/**
+ * @param {string|GemDef|undefined|null} gemOrId
+ * @returns {GemDef|null}
+ */
+function resolveGemDef(gemOrId) {
+  if (!gemOrId) return null;
+  if (typeof gemOrId === "string") return getGem(gemOrId);
+  if (typeof gemOrId === "object" && typeof gemOrId.id === "string") return gemOrId;
+  return null;
+}
+
+/**
+ * @param {string|GemDef|undefined|null} gemOrId
+ * @returns {string[]}
+ */
+export function describeGemDetailLines(gemOrId) {
+  const gem = resolveGemDef(gemOrId);
+  if (!gem) return [];
+  return GEM_SOCKET_DETAIL_LINES[gem.id] ? [...GEM_SOCKET_DETAIL_LINES[gem.id]] : [];
+}
+
+/**
+ * @param {string|GemDef|undefined|null} gemOrId
+ * @param {{ identified?: boolean }} [opts]
+ * @returns {null|{ name:string, identity:string, weight:number, value:number, appearance:string, description:string, details:string, detailLines:string[], identified:boolean }}
+ */
+export function buildGemItemParams(gemOrId, opts = {}) {
+  const gem = resolveGemDef(gemOrId);
+  if (!gem) return null;
+  const detailLines = describeGemDetailLines(gem);
+  return {
+    name: gem.name,
+    identity: gem.id,
+    weight: gem.weight,
+    value: gem.value,
+    appearance: gem.appearance,
+    description: gem.appearance,
+    details: detailLines.join(" "),
+    detailLines,
+    identified: opts.identified === true,
+  };
+}
+
 /**
  * Pick a random gem using probability weights.
  * @param {Object} rng - createRng() instance

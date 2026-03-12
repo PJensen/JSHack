@@ -527,8 +527,31 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, homeX, homeY + 10, "scarecrow");
   addSpawn(chunks, homeX, homeY + 14, "scarecrow");
 
-  // ── Well — south-west of house ────────────────────────────────
-  addSpawn(chunks, homeX - 3, southWalkY + 1, "well");
+  // ── Well plaza — east of the dungeon entrance ────────────────
+  // A cobblestone courtyard with a walkable well and short path from staircase.
+  const wellX = stairX + 5;
+  const wellY = stairY;
+  // Cobblestone path from stair to plaza entrance
+  for (let wx = stairX + 1; wx <= wellX - 2; wx++) {
+    setWorldTile(chunks, wx, wellY, TILE_COBBLESTONE);
+  }
+  // 3×3 cobblestone plaza centered on well
+  for (let wy = wellY - 1; wy <= wellY + 1; wy++) {
+    for (let wx = wellX - 1; wx <= wellX + 1; wx++) {
+      setWorldTile(chunks, wx, wy, TILE_COBBLESTONE);
+    }
+  }
+  // Flower beds north and south of plaza
+  addSpawn(chunks, wellX - 1, wellY - 2, "flower_rose");
+  addSpawn(chunks, wellX,     wellY - 2, "flower_bluebell");
+  addSpawn(chunks, wellX + 1, wellY - 2, "flower_rose");
+  addSpawn(chunks, wellX - 1, wellY + 2, "flower_tulip");
+  addSpawn(chunks, wellX,     wellY + 2, "flower_daisy");
+  addSpawn(chunks, wellX + 1, wellY + 2, "flower_tulip");
+  addSpawn(chunks, wellX + 2, wellY - 1, "flower_sunflower");
+  addSpawn(chunks, wellX + 2, wellY + 1, "flower_sunflower");
+  // Well in plaza center
+  addSpawn(chunks, wellX, wellY, "well");
 
   // ── Tavern — broader rectangle so the roof posts, bar, and seating read cleanly ──
   const tavX0 = homeX + 6;
@@ -757,6 +780,7 @@ export function generateOverworldChunks(worldSeed) {
     }
   }
   addSpawn(chunks, fountainCX, fountainCY, "fountain");
+  addSpawn(chunks, fountainCX - 3, fountainCY + 1, "message_board");
 
   // ── Flowers — small bed near fountain + scattered decorative across town ──
   const flowerKinds = [
@@ -835,9 +859,9 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, gemDoorX, gemDoorY + 1, gemDoorX, northWalkY);
   carvePath(chunks, gemDoorX, northWalkY, apothDoorX, northWalkY);
   addSpawn(chunks, gemX0 + 1, gemY0 + 1, "gem_display_case");
-  addSpawn(chunks, gemX0 + 4, gemY0 + 1, "potion_shelf");
-  addSpawn(chunks, gemX0 + 6, gemY0 + 2, "potion_shelf");
-  addSpawn(chunks, gemX0 + 6, gemY0 + 4, "potion_shelf");
+  addSpawn(chunks, gemX0 + 3, gemY0 + 1, "gem_display_case");
+  addSpawn(chunks, gemX0 + 5, gemY0 + 1, "gem_display_case");
+  addSpawn(chunks, gemDoorX + 2, gemDoorY + 1, "gem_shop_sign");
 
   const gemVendorHouse = buildCottage(chunks, gemX0 - 4, gemY0 - 8, "south");
   carvePathVerticalFirst(chunks, gemVendorHouse.doorX, gemVendorHouse.doorY + 1, gemDoorX, gemDoorY + 1);

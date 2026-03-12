@@ -5,7 +5,7 @@
 import { LOOT_TABLES } from './lootTables.js';
 import { affixSupportsSlot, getAffixWeight, listAffixEntries } from './affixes.js';
 import { getCatalogItem, isCatalogEquipment } from './itemCatalog.js';
-import { getGem, pickGem } from './gems.js';
+import { getGem, pickGem, buildGemItemParams } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from './itemCatalogLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
@@ -258,11 +258,9 @@ export function materializeDrop(world, drop, pos) {
     case "gem": {
       const gem = getGem(drop.params.gemId);
       if (!gem) return null;
-      const id = createFrom(world, GemItem, {
-        name: gem.name, identity: gem.id,
-        weight: gem.weight, value: gem.value,
-        description: gem.appearance,
-      });
+      const params = buildGemItemParams(gem);
+      if (!params) return null;
+      const id = createFrom(world, GemItem, params);
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;
     }

@@ -7,6 +7,33 @@ const ALL_CAPS_DB_BY_SOURCE = Object.freeze({
   home: 74,
 });
 
+const BULLETIN_OPPORTUNITY_LABELS = Object.freeze({
+  smith_repairs: "smith repairs posted",
+  escort_work: "escort contracts posted",
+  graveyard_watch: "graveyard watch requested",
+  mason_repairs: "mason repairs posted",
+});
+
+const BULLETIN_SHORTAGE_LABELS = Object.freeze({
+  iron_and_lumber_short: "iron and lumber are short",
+  bandages_and_stew_short: "bandages and stew are running short",
+  incense_and_bandages_short: "incense and bandages are running short",
+  repair_queue_growing: "the repair queue keeps growing",
+  market_stalls_thinning: "market stalls are thinning out",
+});
+
+const BULLETIN_SECTOR_LABELS = Object.freeze({
+  smith_repairs: "smith repairs",
+  escort_work: "escort work",
+  incense_trade: "incense trade",
+});
+
+const BULLETIN_RUMOR_LABELS = Object.freeze({
+  the_old_crypt_is_not_quiet: "Rumor: the old crypt is not quiet.",
+  watch_is_pulling_escorts_off_the_roads: "Rumor: the watch is pulling escorts off the roads.",
+  smiths_are_hammering_air: "Rumor: the smiths are hammering air.",
+});
+
 /**
  * Centralized message event handling
  * @param {{
@@ -78,6 +105,28 @@ export function installMessageWiring({
   );
 
   /** Format helpers for message log */
+  function formatBulletinDistrictLine(bulletin) {
+    const label = String(bulletin?.label || "District");
+    const fragments = [];
+    for (const tag of bulletin?.opportunities || []) {
+      if (BULLETIN_OPPORTUNITY_LABELS[tag]) fragments.push(BULLETIN_OPPORTUNITY_LABELS[tag]);
+    }
+    for (const tag of bulletin?.shortages || []) {
+      if (BULLETIN_SHORTAGE_LABELS[tag]) fragments.push(BULLETIN_SHORTAGE_LABELS[tag]);
+    }
+    if (!fragments.length) return `${label}: quiet for now.`;
+    return `${label}: ${fragments.join("; ")}.`;
+  }
+
+  function formatBulletinRumors(districts) {
+    for (const bulletin of Array.isArray(districts) ? districts : []) {
+      for (const rumor of bulletin?.rumors || []) {
+        if (BULLETIN_RUMOR_LABELS[rumor]) return BULLETIN_RUMOR_LABELS[rumor];
+      }
+    }
+    return "";
+  }
+
   function nameOfEntity(id) {
     const pe = playerEntity(world);
     const playerId = pe?.id || 0;
@@ -680,6 +729,8 @@ export function installMessageWiring({
         log('The Black Smith — ore deliveries welcome.', 'system');
       } else if (inter?.identity === 'apothecary_sign') {
         log('The Apothecary — potions, salves, and remedies.', 'system');
+      } else if (inter?.identity === 'gem_shop_sign') {
+        log('Gem Dealer — identified stones, socketables, and fine cuts.', 'system');
       } else if (inter?.identity === 'tombstone') {
         log('The weathered inscription reads: "Rest eternal, faithful soul."', 'system');
       } else {
@@ -696,7 +747,35 @@ export function installMessageWiring({
     }
   });
 
+  world.on('town:bulletinBoard', ({ actor, districts, opportunityView }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('--- TOWN BOARD ---', 'system');
+    const bulletins = Array.isArray(districts) ? districts : [];
+    if (!bulletins.length) {
+      log('The board is empty.', 'system');
+      return;
+    }
+    for (const bulletin of bulletins.slice(0, 4)) {
+      log(formatBulletinDistrictLine(bulletin), 'system');
+    }
+    const sectors = Array.isArray(opportunityView?.profitableSectors)
+      ? opportunityView.profitableSectors
+      : [];
+    if (sectors.length) {
+      const labels = sectors.map((sector) => BULLETIN_SECTOR_LABELS[sector] || String(sector || "").replace(/_/g, " "));
+      log(`Profitable work: ${labels.join(', ')}.`, 'system');
+    }
+    const rumor = formatBulletinRumors(bulletins);
+    if (rumor) log(rumor, 'system');
+  });
+
   // Room feature events
+  world.on('well:drink', ({ actor, amount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (amount > 0) log(`You draw cool water from the well. (+${amount} SP)`, 'system');
+    else log('You draw water from the well. You feel refreshed.', 'system');
+  });
+
   world.on('fountain:drink', ({ actor, effect, amount }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (effect === 'heal') log(`You drink from the fountain and feel refreshed. (+${amount} HP)`, 'system');

@@ -122,8 +122,28 @@ export function installQuestRuntime(world) {
   makeScriptRouter(buildQuestRoutes())(world);
 }
 
+function findQuestInstance(world, questId, bindings = {}) {
+  const wantedId = String(questId || "");
+  const wantedPlayer = Number(bindings.player || 0) | 0;
+  const wantedGiver = Number(bindings.giver || 0) | 0;
+  const wantedTarget = Number(bindings.target || 0) | 0;
+
+  for (const [id, def, bind] of world.query(QuestDefRef, QuestBindings)) {
+    if (String(def.id || "") !== wantedId) continue;
+    if (wantedPlayer > 0 && Number(bind.player || 0) !== wantedPlayer) continue;
+    if (wantedGiver > 0 && Number(bind.giver || 0) !== wantedGiver) continue;
+    if (wantedTarget > 0 && Number(bind.target || 0) !== wantedTarget) continue;
+    return id;
+  }
+  return 0;
+}
+
 export function instantiateQuest(world, questId, bindings = {}, varsOverrides = {}, opts = {}) {
   const compiled = compileQuest(questId);
+  if (opts.allowDuplicate !== true) {
+    const existing = findQuestInstance(world, compiled.id, bindings);
+    if (existing > 0) return existing;
+  }
   const id = world.create();
   const startNode = String(opts.node || "offer");
   const startStatus = String(opts.status || "active");
