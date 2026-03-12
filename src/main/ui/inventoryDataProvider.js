@@ -36,6 +36,9 @@ import { groupDisplayItems } from "./itemGrouping.js";
 import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
 import { isChestIdentity } from "../../shared/chests.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
+import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
+import { QuestState } from "../../rules/components/QuestState.js";
+import { getQuestDef } from "../../rules/quests/registry.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -673,6 +676,21 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       console.debug(`[settings] Resurrected pet ${petId}`);
       break;
     }
+  });
+
+  addEventListener('ui:requestQuestJournalData', () => {
+    const quests = [];
+    for (const [, def, state] of world.query(QuestDefRef, QuestState)) {
+      const questDef = getQuestDef(def.id);
+      quests.push({
+        questId: String(def.id || ''),
+        title: String(questDef?.title || def.id || ''),
+        status: String(state.status || 'active'),
+        node: String(state.node || ''),
+        t0: Number(state.t0 || 0),
+      });
+    }
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:questJournalData', { detail: { quests } }));
   });
 
   return { buildGroundPickupDetailAt };
