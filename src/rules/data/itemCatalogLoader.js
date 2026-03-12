@@ -4,6 +4,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Potion } from "../components/Potion.js";
+import { attachProcPackage } from "./procPackages.js";
 import { ScriptRef } from "../components/ScriptRef.js";
 
 /**
@@ -78,6 +79,14 @@ export function buildCatalogItem(world, itemId, opts = {}) {
   }
   if (typeof def.script === "string" && def.script) {
     world.add(id, ScriptRef, { ref: def.script, params: { from: def.id } });
+  }
+
+  const procPackages = [...new Set([
+    ...(Array.isArray(def.procPackages) ? def.procPackages : []),
+    ...(Array.isArray(opts.procPackages) ? opts.procPackages : []),
+  ])];
+  for (let i = 0; i < procPackages.length; i++) {
+    attachProcPackage(world, id, procPackages[i]);
   }
 
   return id;

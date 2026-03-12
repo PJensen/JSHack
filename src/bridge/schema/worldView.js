@@ -32,6 +32,7 @@ import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Burned } from "../../rules/components/Burned.js";
 import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
+import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -77,6 +78,9 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'wasting',
 	'agony',
 ]);
+// Proc state effect keys that should be projected onto enemy entity views for glyph fx.
+const ENTITY_PROC_STATE_KEYS = new Set(['doom_clock', 'cataclysm_mark']);
+
 const VENOM_GLOW_ITEM_KINDS = new Set(['nightfang_dagger', 'venomfang_dagger', 'nightfang', 'venomfang']);
 const POTION_GLOW_DISABLED_KINDS = new Set();
 

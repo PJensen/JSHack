@@ -5,7 +5,7 @@ import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { ProcPackageNode } from "../components/ProcPackageNode.js";
 import { Vitality } from "../components/Vitality.js";
-import { getTile, isOpaque } from "../environment/dungeon/tileMap.js";
+import { isOpaque } from "../environment/dungeon/tileMap.js";
 import { registerScript, getScriptHandlers, ScriptVerb } from "../scripting.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
@@ -122,7 +122,7 @@ registerScript(PROC_PACKAGE_KEYS.RicochetTheology, {
     for (let i = 0; i < neighbors.length && !hasWall; i++) {
       const nx = (pos.x | 0) + neighbors[i][0];
       const ny = (pos.y | 0) + neighbors[i][1];
-      if (isOpaque(getTile(nx, ny))) hasWall = true;
+      if (isOpaque(nx, ny)) hasWall = true;
     }
     if (!hasWall) return;
 
