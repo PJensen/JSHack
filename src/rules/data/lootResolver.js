@@ -5,7 +5,7 @@
 import { LOOT_TABLES } from './lootTables.js';
 import { affixSupportsSlot, getAffixWeight, listAffixEntries } from './affixes.js';
 import { getCatalogItem, isCatalogEquipment } from './itemCatalog.js';
-import { getGem, pickGem, buildGemItemParams } from './gems.js';
+import * as gems from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from './itemCatalogLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
@@ -99,7 +99,7 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
         break;
 
       case "gem": {
-        const gem = entry.gemId ? getGem(entry.gemId) : pickGem(rng, entry.materials ? { materials: entry.materials } : {});
+        const gem = entry.gemId ? gems.getGem(entry.gemId) : gems.pickGem(rng, entry.materials ? { materials: entry.materials } : {});
         if (gem) results.push({ kind: "gem", params: { gemId: gem.id } });
         break;
       }
@@ -256,9 +256,9 @@ export function materializeDrop(world, drop, pos) {
     }
 
     case "gem": {
-      const gem = getGem(drop.params.gemId);
+      const gem = gems.getGem(drop.params.gemId);
       if (!gem) return null;
-      const params = buildGemItemParams(gem);
+      const params = gems.buildGemItemParams(gem);
       if (!params) return null;
       const id = createFrom(world, GemItem, params);
       world.add(id, Position, { x: pos.x, y: pos.y });
