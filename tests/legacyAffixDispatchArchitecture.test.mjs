@@ -1,18 +1,29 @@
 import { assert } from "jsr:@std/assert";
 
-Deno.test("combatSystem uses shared legacy affix dispatch helpers", async () => {
-  const path = new URL("../src/rules/systems/combatSystem.js", import.meta.url);
-  const text = await Deno.readTextFile(path);
+Deno.test("combat runtime routes affix behavior through proc topology instead of legacy script dispatch", async () => {
+  const combatPath = new URL("../src/rules/systems/combatSystem.js", import.meta.url);
+  const combatText = await Deno.readTextFile(combatPath);
   assert(
-    text.includes("legacyAffixDispatch.js"),
-    "combatSystem should route legacy affix hooks through shared helper code",
+    combatText.includes("affixTopology.js"),
+    "combatSystem should use affix topology helpers",
   );
   assert(
-    !text.includes("AFFIX_DEFS"),
-    "combatSystem should not walk affix definitions directly anymore",
+    combatText.includes("procApplication.js"),
+    "combatSystem should apply proc accumulator outputs",
   );
   assert(
-    !text.includes("ScriptVerb.AffixOnBeforeHit") && !text.includes("ScriptVerb.AffixOnHit"),
-    "combatSystem should not dispatch legacy affix scripts inline anymore",
+    !combatText.includes("runLegacyAffixScripts"),
+    "combatSystem should not dispatch legacy affix scripts anymore",
+  );
+
+  const damagePath = new URL("../src/rules/utils/dealDamage.js", import.meta.url);
+  const damageText = await Deno.readTextFile(damagePath);
+  assert(
+    damageText.includes("evaluateEquippedAffixProcs"),
+    "dealDamage should evaluate affix procs directly",
+  );
+  assert(
+    !damageText.includes("runLegacyOnDamagedReactions"),
+    "dealDamage should not route onDamaged through legacy affix dispatch",
   );
 });

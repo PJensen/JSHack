@@ -21,9 +21,10 @@ import { Beatitude, BUC_CURSED } from '../components/Beatitude.js';
 import { Traits } from '../components/Traits.js';
 import {
     createLegacyCombatFrame,
-    runLegacyAffixScripts,
     runLegacyMonsterHook,
 } from '../utils/legacyAffixDispatch.js';
+import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from '../utils/affixTopology.js';
+import { applyProcAccumulator, rollBonusDamage } from '../utils/procApplication.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -42,6 +43,47 @@ function makeCombatFrame(world, base) {
             });
         },
     });
+}
+
+function buildProcContext(kind, {
+    source,
+    target,
+    item,
+    damage,
+    damageType,
+    crit,
+    tags,
+    scratch,
+    offhand = false,
+}) {
+    return {
+        kind,
+        source: Number(source || 0) | 0,
+        target: Number(target || 0) | 0,
+        item: Number(item || 0) | 0,
+        damage: {
+            amount: Math.max(0, Math.floor(Number(damage || 0))),
+            type: String(damageType || 'physical'),
+            crit: !!crit,
+            blocked: false,
+        },
+        tags: new Set(Array.isArray(tags) ? tags : []),
+        scratch: scratch || {},
+        offhand: !!offhand,
+    };
+}
+
+function applyPendingDamageProcPhase(world, actorId, ctx, rng, options = {}) {
+    const out = evaluateEquippedAffixProcs(world, actorId, ctx, options);
+    const bonusDamage = out.cancelled ? 0 : rollBonusDamage(world, out.bonusDamage, rng);
+    applyProcAccumulator(world, out, { applyDamage: dealDamage });
+    return Math.max(0, Math.floor(Number(ctx?.damage?.amount || 0) + bonusDamage));
+}
+
+function applyReactionProcPhase(world, actorId, ctx, options = {}) {
+    const out = evaluateEquippedAffixProcs(world, actorId, ctx, options);
+    applyProcAccumulator(world, out, { applyDamage: dealDamage });
+    return out;
 }
 
 /**
@@ -99,6 +141,8 @@ export function resolveMeleeAttack(world, attacker, defender) {
     if (!areFactionsHostile(af, df)) return false;
 
     const atkEq = world.get(source, Equipment);
+    ensureEquippedAffixTopology(world, source);
+    ensureEquippedAffixTopology(world, target);
 
     // Stamina gate: check if attacker has enough stamina for weapon
     const atkStam = world.get(source, Stamina);
@@ -192,23 +236,38 @@ export function resolveMeleeAttack(world, attacker, defender) {
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
     // Pre-hit hooks
+    const procScratch = {};
     const ctx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: weaponId || 0, damage: dmg, world });
     world.emit('beforeHit', ctx);
-    runLegacyAffixScripts(world, source, 'onBeforeHit', ctx);
-    runLegacyMonsterHook(world, source, 'onBeforeHit', ctx);
-    // Recompute damage if modified
     let finalDmg = Math.max(0, Math.floor(ctx.damage));
+    finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onBeforeHit', {
+        source,
+        target,
+        item: weaponId || 0,
+        damage: finalDmg,
+        damageType,
+        crit: isCrit,
+        tags: ['melee'],
+        scratch: procScratch,
+    }), () => r());
+    ctx.damage = finalDmg;
+    runLegacyMonsterHook(world, source, 'onBeforeHit', ctx);
+    finalDmg = Math.max(0, Math.floor(ctx.damage));
 
     const hitCtx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
     world.emit('hit', hitCtx);
-    let hasVamp = false;
-    runLegacyAffixScripts(world, source, 'onHit', hitCtx, {
-        onAffix: (_affixId, affix) => {
-            if (affix?.name && String(affix.name).toLowerCase().includes('vamp')) hasVamp = true;
-        },
-    });
     finalDmg = Math.max(0, Math.floor(hitCtx.damage));
-    if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg/3)));
+    finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onHit', {
+        source,
+        target,
+        item: ctx.weaponId || 0,
+        damage: finalDmg,
+        damageType,
+        crit: isCrit,
+        tags: ['melee'],
+        scratch: procScratch,
+    }), () => r());
+    hitCtx.damage = finalDmg;
 
     applyWeaponCoatingOnHit(world, {
         attacker: source,
@@ -218,10 +277,16 @@ export function resolveMeleeAttack(world, attacker, defender) {
     });
 
     runLegacyMonsterHook(world, source, 'onHit', hitCtx);
-    // Defender on-hit reactions (e.g., Thorns) — skip weapon-slot affixes so
-    // the defender's own weapon procs (like stunning) don't fire against themselves.
-    const defCtx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-    runLegacyAffixScripts(world, target, 'onHit', defCtx, { excludeSlots: ['weapon'] });
+    applyReactionProcPhase(world, target, buildProcContext('onHit', {
+        source,
+        target,
+        item: ctx.weaponId || 0,
+        damage: finalDmg,
+        damageType,
+        crit: isCrit,
+        tags: ['melee'],
+        scratch: procScratch,
+    }), { excludeSlots: ['weapon'] });
 
     // Route through canonical damage pipeline (handles invuln, events, death)
     if (finalDmg > 0) {
@@ -261,6 +326,8 @@ function resolveOffhandAttack(world, attacker, defender) {
 
     const atkEq = world.get(source, Equipment);
     if (!atkEq) return;
+    ensureEquippedAffixTopology(world, source);
+    ensureEquippedAffixTopology(world, target);
     const offhandId = Number(atkEq.offhand || 0) | 0;
     if (!(offhandId > 0)) return;
 
@@ -354,23 +421,41 @@ function resolveOffhandAttack(world, attacker, defender) {
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
     // Pre-hit hooks
+    const procScratch = {};
     const ctx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: offhandId, damage: dmg, world });
     world.emit('beforeHit', ctx);
-    runLegacyAffixScripts(world, source, 'onBeforeHit', ctx);
-    runLegacyMonsterHook(world, source, 'onBeforeHit', ctx);
     let finalDmg = Math.max(0, Math.floor(ctx.damage));
+    finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onBeforeHit', {
+        source,
+        target,
+        item: offhandId,
+        damage: finalDmg,
+        damageType,
+        crit: isCrit,
+        tags: ['melee', 'offhand'],
+        scratch: procScratch,
+        offhand: true,
+    }), () => r());
+    ctx.damage = finalDmg;
+    runLegacyMonsterHook(world, source, 'onBeforeHit', ctx);
+    finalDmg = Math.max(0, Math.floor(ctx.damage));
 
     // On-hit hooks
     const hitCtx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
     world.emit('hit', hitCtx);
-    let hasVamp = false;
-    runLegacyAffixScripts(world, source, 'onHit', hitCtx, {
-        onAffix: (_affixId, affix) => {
-            if (affix?.name && String(affix.name).toLowerCase().includes('vamp')) hasVamp = true;
-        },
-    });
     finalDmg = Math.max(0, Math.floor(hitCtx.damage));
-    if (hasVamp) hitCtx.healAttacker(Math.max(1, Math.floor(finalDmg / 3)));
+    finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onHit', {
+        source,
+        target,
+        item: ctx.weaponId || 0,
+        damage: finalDmg,
+        damageType,
+        crit: isCrit,
+        tags: ['melee', 'offhand'],
+        scratch: procScratch,
+        offhand: true,
+    }), () => r());
+    hitCtx.damage = finalDmg;
 
     applyWeaponCoatingOnHit(world, {
         attacker: source, defender: target,
@@ -379,10 +464,17 @@ function resolveOffhandAttack(world, attacker, defender) {
     });
 
     runLegacyMonsterHook(world, source, 'onHit', hitCtx);
-
-    // Defender on-hit reactions
-    const defCtx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
-    runLegacyAffixScripts(world, target, 'onHit', defCtx, { excludeSlots: ['weapon'] });
+    applyReactionProcPhase(world, target, buildProcContext('onHit', {
+        source,
+        target,
+        item: ctx.weaponId || 0,
+        damage: finalDmg,
+        damageType,
+        crit: isCrit,
+        tags: ['melee', 'offhand'],
+        scratch: procScratch,
+        offhand: true,
+    }), { excludeSlots: ['weapon'] });
 
     // Route through canonical damage pipeline with offhand flag
     if (finalDmg > 0) {

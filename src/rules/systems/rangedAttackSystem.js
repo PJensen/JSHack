@@ -18,6 +18,45 @@ import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
 import { runAmmoScripts } from '../utils/projectileScriptDispatch.js';
+import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from '../utils/affixTopology.js';
+import { applyProcAccumulator, rollBonusDamage } from '../utils/procApplication.js';
+
+function buildProcContext(kind, {
+  source,
+  target,
+  item,
+  damage,
+  crit,
+  scratch,
+  tags,
+}) {
+  return {
+    kind,
+    source: Number(source || 0) | 0,
+    target: Number(target || 0) | 0,
+    item: Number(item || 0) | 0,
+    damage: {
+      amount: Math.max(0, Math.floor(Number(damage || 0))),
+      type: 'pierce',
+      crit: !!crit,
+      blocked: false,
+    },
+    tags: new Set(Array.isArray(tags) ? tags : []),
+    scratch: scratch || {},
+  };
+}
+
+function applyPendingDamageProcPhase(world, actorId, ctx, rng, options = {}) {
+  const out = evaluateEquippedAffixProcs(world, actorId, ctx, options);
+  const bonusDamage = out.cancelled ? 0 : rollBonusDamage(world, out.bonusDamage, rng);
+  applyProcAccumulator(world, out, { applyDamage: dealDamage });
+  return Math.max(0, Math.floor(Number(ctx?.damage?.amount || 0) + bonusDamage));
+}
+
+function applyReactionProcPhase(world, actorId, ctx, options = {}) {
+  const out = evaluateEquippedAffixProcs(world, actorId, ctx, options);
+  applyProcAccumulator(world, out, { applyDamage: dealDamage });
+}
 
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
@@ -43,6 +82,8 @@ export function rangedAttackSystem(world) {
 
     // Require a bow in the ranged slot
     const eq = world.get(attacker, Equipment);
+    ensureEquippedAffixTopology(world, attacker);
+    ensureEquippedAffixTopology(world, defender);
     const weaponId = eq?.ranged || 0;
     const weaponInfo = weaponId ? world.get(weaponId, ItemInfo) : null;
     if (!weaponInfo || weaponInfo.subtype !== 'bow') {
@@ -168,6 +209,16 @@ export function rangedAttackSystem(world) {
     }
     const critMult = 2 + (atkSnapshot.critMult || 0);
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
+    const procScratch = {};
+    dmg = applyPendingDamageProcPhase(world, attacker, buildProcContext('onBeforeHit', {
+      source: attacker,
+      target: defender,
+      item: weaponId,
+      damage: dmg,
+      crit: isCrit,
+      scratch: procScratch,
+      tags: ['ranged', 'projectile'],
+    }), () => r());
 
     const actorImpactCtx = runAmmoScripts(world, ammoIdentity, 'onProjectileActorImpact', {
       phase: 'projectile-actor-impact',
@@ -188,6 +239,24 @@ export function rangedAttackSystem(world) {
     if (actorImpactCtx) {
       dmg = Math.max(0, actorImpactCtx.damage);
     }
+    dmg = applyPendingDamageProcPhase(world, attacker, buildProcContext('onHit', {
+      source: attacker,
+      target: defender,
+      item: weaponId,
+      damage: dmg,
+      crit: isCrit,
+      scratch: procScratch,
+      tags: ['ranged', 'projectile'],
+    }), () => r());
+    applyReactionProcPhase(world, defender, buildProcContext('onHit', {
+      source: attacker,
+      target: defender,
+      item: weaponId,
+      damage: dmg,
+      crit: isCrit,
+      scratch: procScratch,
+      tags: ['ranged', 'projectile'],
+    }), { excludeSlots: ['weapon'] });
 
     // Apply damage through canonical pipeline
     const result = dealDamage(world, {

@@ -4,18 +4,16 @@ import { Equipment } from '../src/rules/components/Equipment.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
-import { installAffixTriggers } from '../src/rules/systems/affixTriggerSystem.js';
 import { registerScript, ScriptVerb } from '../src/rules/scripting.js';
 import { dealDamage } from '../src/rules/utils/dealDamage.js';
 import { registerAffixDefinition, unregisterAffixDefinition } from '../src/rules/data/affixes.js';
 
 Deno.test("custom affix heals defender after canonical damage application", async () => {
   const world = new World({ seed: 1 });
-  installAffixTriggers(world);
 
   registerScript('affix:test_shield', {
-    [ScriptVerb.AffixOnDamaged]: (_world, ctx) => {
-      ctx.heal(ctx.defender, 1);
+    [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+      ctx.proc.heal(ctx.target, 1);
     }
   });
 
@@ -55,11 +53,15 @@ Deno.test("custom affix heals defender after canonical damage application", asyn
 
 Deno.test("custom affix retaliates on damaged event", async () => {
   const world = new World({ seed: 1 });
-  installAffixTriggers(world);
 
   registerScript('affix:test_thorns', {
-    [ScriptVerb.AffixOnDamaged]: (_world, ctx) => {
-      ctx.retaliate(3);
+    [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+      ctx.proc.dealDamage(ctx.source, 3, 'physical', {
+        source: ctx.target,
+        cause: 'retaliation',
+        bypassResist: true,
+        noTrigger: true,
+      });
     }
   });
 

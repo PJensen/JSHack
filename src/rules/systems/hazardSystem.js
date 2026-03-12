@@ -215,7 +215,7 @@ export function hazardSystem(world) {
           const key = `${nx},${ny}`;
           if (fireHazardCells.has(key)) continue;
           if (!isFlammableFireSpreadTile(getTile(nx, ny), overworld)) continue;
-          if ((world.rng?.() ?? Math.random()) >= spreadChance) continue;
+          if ((world.rand?.() ?? 0) >= spreadChance) continue;
 
           pendingFireSpreads.push({
             x: nx,

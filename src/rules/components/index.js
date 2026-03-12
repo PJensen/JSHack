@@ -4,6 +4,7 @@ export { DerivedExpression } from './DerivedExpression.js';
 export { ActivationGate } from './ActivationGate.js';
 export { ProcEffect } from './ProcEffect.js';
 export { ProcNode } from './ProcNode.js';
+export { AffixTopologyNode } from './AffixTopologyNode.js';
 export { ActiveEffects } from './ActiveEffects.js';
 export { Beatitude } from './Beatitude.js';
 export { Burned } from './Burned.js';

@@ -9,7 +9,6 @@ import { getGem, pickGem } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from './itemCatalogLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
-import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Brain } from '../components/Brain.js';
@@ -25,11 +24,14 @@ const ARCHETYPE_MAP = {
   GoldStack,
   ArrowsStack,
   ScrollOfMapping,
-  Ration,
-  IronRation,
-  WildBerries,
-  WildHerbs,
 };
+
+const CATALOG_ARCHETYPE_MAP = Object.freeze({
+  Ration: "food_ration",
+  IronRation: "food_iron_ration",
+  WildBerries: "food_wild_berries",
+  WildHerbs: "food_wild_herbs",
+});
 
 // ── Resolution ──────────────────────────────────────────────────────
 
@@ -232,8 +234,15 @@ export function materializeDrop(world, drop, pos) {
 
     case "archetype": {
       const arch = ARCHETYPE_MAP[drop.params.archetype];
-      if (!arch) return null;
-      const id = createFrom(world, arch, {});
+      let id = null;
+      if (arch) {
+        id = createFrom(world, arch, {});
+      } else {
+        const catalogId = CATALOG_ARCHETYPE_MAP[drop.params.archetype];
+        if (!catalogId) return null;
+        try { id = buildCatalogItem(world, catalogId); } catch { return null; }
+      }
+      if (!(id > 0)) return null;
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;
     }
