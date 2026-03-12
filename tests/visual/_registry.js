@@ -6,4 +6,8 @@ export const SCENARIOS = [
 	{ name: 'Rat Scurry',         path: './scurry.scenario.js' },
 	{ name: 'Floating Eye Stun',  path: './gazeStun.scenario.js' },
 	{ name: 'Ricochet Theology',  path: './ricochetTheology.scenario.js' },
+	{ name: 'Doom Clock',         path: './doomClock.scenario.js' },
+	{ name: 'Echo Strike',        path: './echoStrike.scenario.js' },
+	{ name: 'Cataclysm Chain',    path: './cataclysmChain.scenario.js' },
+	{ name: 'Soul Mortgage',      path: './soulMortgage.scenario.js' },
 ];
