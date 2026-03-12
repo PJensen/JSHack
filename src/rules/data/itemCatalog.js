@@ -167,6 +167,37 @@ function createTouchstoneDipHook() {
 /**
  * @param {any} state
  */
+function canGemSocketDipTarget(state) {
+  if (String(state?.toolInfo?.type || "") !== "gem") return false;
+  const gemDef = getGem(String(state?.toolIdentity || ""));
+  if (!gemDef?.socketable) return false;
+  const targetInfo = state?.targetInfo;
+  if (!targetInfo || String(targetInfo.type || "") !== "equip") return false;
+  if (String(targetInfo.slot || "") !== "weapon") return false;
+  const maxSockets = Number(targetInfo.maxSockets || 0);
+  const sockets = Array.isArray(targetInfo.sockets) ? targetInfo.sockets : [];
+  return maxSockets > 0 && sockets.length < maxSockets;
+}
+
+function createGemSocketDipHook(gemId) {
+  return (ctx, state) => {
+    const gemDef = getGem(gemId);
+    if (!gemDef?.socketable) return { applied: false };
+    const targetInfo = state.targetInfo;
+    const newSockets = Array.isArray(targetInfo.sockets) ? [...targetInfo.sockets, gemId] : [gemId];
+    const currentAffixes = Array.isArray(targetInfo.affixes) ? targetInfo.affixes : [];
+    const newAffixes = gemDef.socketAffixId && !currentAffixes.includes(gemDef.socketAffixId)
+      ? [...currentAffixes, gemDef.socketAffixId]
+      : [...currentAffixes];
+    ctx.helpers.patchItemInfo(state.targetId, { sockets: newSockets, affixes: newAffixes });
+    ctx.io.emit("gem:socketed", { actor: state.actor, weaponId: state.targetId, gemId });
+    return { applied: true, consumedTool: true };
+  };
+}
+
+/**
+ * @param {any} state
+ */
 function canPoisonDipTarget(state) {
   const toolType = String(state?.toolInfo?.type || "");
   const targetType = String(state?.targetInfo?.type || "");
@@ -582,6 +613,7 @@ export const ITEM_CATALOG = {
     rarity: 1,
     rarityName: "common",
     bonuses: { attack: 3 },
+    maxSockets: 2,
     damageDice: "1d8",
     staminaCost: 12,
     description: "A long steel blade wielded with both hands.",
@@ -598,6 +630,7 @@ export const ITEM_CATALOG = {
     bonuses: { attack: 2 },
     damageDice: "1d6",
     staminaCost: 8,
+    maxSockets: 1,
     description: "A trusty short blade. Quick to draw and easy to wield.",
   },
   dagger_quick: {
@@ -626,6 +659,7 @@ export const ITEM_CATALOG = {
     bonuses: { attack: 3, chop: 1 },
     damageDice: "1d8",
     staminaCost: 12,
+    maxSockets: 1,
     description: "A broad-headed axe that cleaves through armor and timber alike.",
   },
   iron_mace: {
@@ -641,6 +675,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d8",
     damageType: "blunt",
     staminaCost: 11,
+    maxSockets: 1,
     description: "A heavy iron head on a wooden haft. Favored by the faithful.",
     affixes: ["stunning1"],
   },
@@ -3275,6 +3310,17 @@ export const ITEM_CATALOG = {
       },
     },
   },
+
+  // ── Gem socket hooks (socketable gems; consumed when socketed) ─────────────
+  gem_ruby:     { id: "gem_ruby",     hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_ruby") } },
+  gem_sapphire: { id: "gem_sapphire", hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_sapphire") } },
+  gem_emerald:  { id: "gem_emerald",  hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_emerald") } },
+  gem_diamond:  { id: "gem_diamond",  hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_diamond") } },
+  gem_topaz:    { id: "gem_topaz",    hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_topaz") } },
+  gem_amethyst: { id: "gem_amethyst", hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_amethyst") } },
+  gem_opal:     { id: "gem_opal",     hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_opal") } },
+  gem_obsidian: { id: "gem_obsidian", hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_obsidian") } },
+  gem_garnet:   { id: "gem_garnet",   hooks: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_garnet") } },
 };
 
 const ITEM_CATALOG_ID_ALIASES = Object.freeze({

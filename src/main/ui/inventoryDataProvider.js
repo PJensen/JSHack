@@ -22,7 +22,7 @@ import { Speed } from "../../rules/components/Speed.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "../../rules/data/spells.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
-import { isApplyTool, listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
+import { isApplyTool, listApplyTargetsForTool, resolveApplyPayloadForWorld } from "../../rules/content/items/applyPayloads.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
@@ -496,6 +496,21 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       }
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:applyToolsData', { detail: { items } }));
+  });
+
+  // Provide socketable gems for a weapon's "Add Gem" selector
+  addEventListener('ui:requestSocketableGemsData', (ev) => {
+    const weaponId = Number(ev?.detail?.weaponId || 0) | 0;
+    const p = playerEntity(world);
+    const items = [];
+    if (p && weaponId > 0) {
+      for (const id of inventoryItems(world, p.id)) {
+        if (id === weaponId) continue;
+        const { payloadDef } = resolveApplyPayloadForWorld(world, { actor: p.id, toolId: id, targetId: weaponId });
+        if (payloadDef) items.push({ id, name: resolveItemDisplayName(world, id) });
+      }
+    }
+    _uiEventTarget.dispatchEvent(new CustomEvent('ui:socketableGemsData', { detail: { items, weaponId } }));
   });
 
   // Provide filtered targets for an apply tool

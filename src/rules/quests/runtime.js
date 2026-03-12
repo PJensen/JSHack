@@ -11,7 +11,8 @@ import { compileQuest, listQuestEventNames } from "./registry.js";
 
 const QUEST_RUNTIME_KEY = Symbol.for("jshack:quests:runtime:installed");
 const QUEST_SCRIPT_ID = "quest.runtime";
-export const STARTER_GRAVEYARD_QUEST_ID = "starter.graveyard_watch";
+export const STARTER_PRIEST_FETCH_QUEST_ID = "starter.priest_fetch";
+export const STARTER_GRAVEYARD_QUEST_ID = STARTER_PRIEST_FETCH_QUEST_ID;
 
 function cloneVars(data) {
   return structuredClone(data || {});
@@ -172,8 +173,8 @@ export function ensureStarterQuests(world) {
   }
   if (!(playerId > 0)) return 0;
 
-  if (findQuestEntity(world, STARTER_GRAVEYARD_QUEST_ID, playerId) > 0) {
-    return findQuestEntity(world, STARTER_GRAVEYARD_QUEST_ID, playerId);
+  if (findQuestEntity(world, STARTER_PRIEST_FETCH_QUEST_ID, playerId) > 0) {
+    return findQuestEntity(world, STARTER_PRIEST_FETCH_QUEST_ID, playerId);
   }
 
   let priestId = 0;
@@ -185,7 +186,7 @@ export function ensureStarterQuests(world) {
   }
   if (!(priestId > 0)) return 0;
 
-  return instantiateQuest(world, STARTER_GRAVEYARD_QUEST_ID, {
+  return instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
     player: playerId,
     giver: priestId,
     target: priestId,

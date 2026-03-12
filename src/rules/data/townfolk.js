@@ -82,4 +82,12 @@ export const TOWNFOLK = Object.freeze({
     maxHp: 30,
     dialogue: "A pinch of this, a drop of that... perfection takes patience.",
   },
+  gem_vendor: {
+    name: "Gem Merchant",
+    identity: "townfolk_gem_vendor",
+    role: "gem_vendor",
+    speed: 2,
+    maxHp: 30,
+    dialogue: "Gems of all kinds — raw, cut, and mysterious. I also appraise stones for a small fee.",
+  },
 });

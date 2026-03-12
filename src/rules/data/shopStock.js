@@ -2,10 +2,12 @@
 // Generate shop inventory items for a shopkeeper.
 
 import { createFrom } from '../../lib/ecs-js/archetype.js';
-import { HealthPotion, ArrowsStack, ScrollOfMapping } from '../archetypes/Items.js';
+import { HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
 import { resolveLootTable, materializeDrop } from './lootResolver.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
+import { listGems } from './gems.js';
+import { identify } from './identification.js';
 
 /**
  * Generate a shopkeeper's stock as entity IDs (no Position component).
@@ -109,4 +111,43 @@ export function generateShopItem(world, depth, rng) {
     const fallback = createFrom(world, HealthPotion, {});
     try { world.remove(fallback, Position); } catch {} // ECS: may not exist
     return fallback;
+}
+
+/**
+ * Generate gem vendor stock: socketable gems (pre-identified) + misc gems.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {Object} rng - createRng() instance
+ * @returns {number[]} array of item entity IDs
+ */
+export function generateGemShopStock(world, rng) {
+    const items = [];
+
+    // Socketable gems: pick 3-4 from the socketable pool, pre-identified
+    const socketableGems = listGems().filter(g => g.socketable && g.material === 'gemstone');
+    const socketCount = rng.int(3, 4);
+    // Deterministic shuffle via rng
+    const pool = socketableGems.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = rng.int(0, i);
+        const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    for (let i = 0; i < Math.min(socketCount, pool.length); i++) {
+        const gem = pool[i];
+        identify(gem.id); // vendor sells identified socketable gems
+        const id = createFrom(world, GemItem, { name: gem.name, identity: gem.id, weight: gem.weight, value: gem.value });
+        try { world.remove(id, Position); } catch {}
+        items.push(id);
+    }
+
+    // Misc gems: 4-6 common gems (unidentified appearance until player identifies)
+    const miscPool = listGems().filter(g => g.material === 'gemstone' && g.value > 0 && g.prob > 0);
+    const miscCount = rng.int(4, 6);
+    for (let i = 0; i < miscCount; i++) {
+        const gem = miscPool[rng.int(0, miscPool.length - 1)];
+        const id = createFrom(world, GemItem, { name: gem.name, identity: gem.id, weight: gem.weight, value: gem.value });
+        try { world.remove(id, Position); } catch {}
+        items.push(id);
+    }
+
+    return items;
 }

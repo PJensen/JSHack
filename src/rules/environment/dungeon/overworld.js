@@ -819,6 +819,29 @@ export function generateOverworldChunks(worldSeed) {
   const alchemistHouse = buildCottage(chunks, apothX0 + 8, apothY0 - 8, "south");
   carvePathVerticalFirst(chunks, alchemistHouse.doorX, alchemistHouse.doorY + 1, apothDoorX + 3, apothDoorY + 1);
 
+  // ── Gem Shop — small shop north-west of the apothecary ──────────────────────────────
+  const gemX0 = apothX0 - 16;
+  const gemY0 = apothY0;
+  const gemDoorX = gemX0 + 3;
+  const gemDoorY = gemY0 + 5;
+  fillDisk(chunks, gemX0 + 3, gemY0 + 2, 6);
+  const gemFloorCells = [];
+  for (let fy = gemY0 + 1; fy <= gemY0 + 4; fy++) {
+    for (let fx = gemX0 + 1; fx <= gemX0 + 6; fx++) {
+      gemFloorCells.push({ x: fx, y: fy });
+    }
+  }
+  paintStructure(chunks, gemFloorCells, { x: gemDoorX, y: gemDoorY });
+  carvePath(chunks, gemDoorX, gemDoorY + 1, gemDoorX, northWalkY);
+  carvePath(chunks, gemDoorX, northWalkY, apothDoorX, northWalkY);
+  addSpawn(chunks, gemX0 + 1, gemY0 + 1, "gem_display_case");
+  addSpawn(chunks, gemX0 + 4, gemY0 + 1, "potion_shelf");
+  addSpawn(chunks, gemX0 + 6, gemY0 + 2, "potion_shelf");
+  addSpawn(chunks, gemX0 + 6, gemY0 + 4, "potion_shelf");
+
+  const gemVendorHouse = buildCottage(chunks, gemX0 - 4, gemY0 - 8, "south");
+  carvePathVerticalFirst(chunks, gemVendorHouse.doorX, gemVendorHouse.doorY + 1, gemDoorX, gemDoorY + 1);
+
   // Scattered decorative flowers near buildings and paths
   const scatteredFlowers = [
     // Near farm fence
@@ -838,6 +861,7 @@ export function generateOverworldChunks(worldSeed) {
     { x: barkeepHouse.doorX - 1, y: barkeepHouse.doorY + 1 },
     { x: herbalistHouse.doorX + 1, y: herbalistHouse.doorY + 1 },
     { x: alchemistHouse.doorX - 1, y: alchemistHouse.doorY + 1 },
+    { x: gemVendorHouse.doorX + 1, y: gemVendorHouse.doorY + 1 },
   ];
   for (const p of scatteredFlowers) {
     const t = getWorldTile(chunks, p.x, p.y);
@@ -964,6 +988,15 @@ export function generateOverworldChunks(worldSeed) {
     workAuxX: apothX0 + 4, workAuxY: apothY0 + 2,
     pubX: tavX0 + 7, pubY: tavY0 + 2,
     shopRoom: { x: apothX0, y: apothY0, w: 10, h: 6 },
+  });
+  addSpawn(chunks, gemVendorHouse.standX, gemVendorHouse.standY, "townfolk", {
+    townfolkId: "gem_vendor",
+    scheduleEnabled: true,
+    homeX: gemVendorHouse.standX, homeY: gemVendorHouse.standY,
+    bedX: gemVendorHouse.sleepX, bedY: gemVendorHouse.sleepY,
+    workX: gemX0 + 2, workY: gemY0 + 2,
+    pubX: tavX0 + 5, pubY: tavY0 + 2,
+    shopRoom: { x: gemX0, y: gemY0, w: 8, h: 6 },
   });
 
   const outChunks = [];

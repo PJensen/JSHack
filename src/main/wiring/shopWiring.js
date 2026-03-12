@@ -13,6 +13,7 @@ import {
 } from "../../rules/utils/inventoryFacade.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
+import { identify, isIdentified } from "../../rules/data/identification.js";
 import { groupDisplayItems } from "../ui/itemGrouping.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
@@ -33,7 +34,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   if (world[INSTALLED] && world[API_KEY]) return world[API_KEY];
   world[INSTALLED] = true;
 
-  let activeShopSession = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: "browse" };
+  let activeShopSession = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: "browse", vendorKind: "" };
 
   function playerGoldCount() {
     const pe = playerEntity(world);
@@ -152,6 +153,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         buyMarkup,
         sellDiscount,
         mode,
+        vendorKind: activeShopSession.vendorKind,
       } }));
     } catch (e) { console.debug('[shopWiring] dispatch ui:shopData:', e); }
   }
@@ -183,7 +185,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     try { window.dispatchEvent(new CustomEvent("ui:closeShop")); } catch (e) { console.debug('[shopWiring] dispatch ui:closeShop:', e); }
   }
 
-  world.on("shop:open", ({ actor, targetId, buyMarkup, sellDiscount }) => {
+  world.on("shop:open", ({ actor, targetId, buyMarkup, sellDiscount, vendorKind }) => {
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
     if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
@@ -191,14 +193,16 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const shop = world.get(targetId, ShopInventory);
     const markup = buyMarkup ?? shop?.buyMarkup ?? 1.0;
     const discount = sellDiscount ?? shop?.sellDiscount ?? 0.5;
+    const vkind = String(vendorKind || "");
     activeShopSession = {
       shopkeeperId: Number(targetId) || 0,
       buyMarkup: markup,
       sellDiscount: discount,
       mode: "browse",
+      vendorKind: vkind,
     };
     dispatchShopData(targetId, markup, discount, "browse");
-    try { window.dispatchEvent(new CustomEvent("ui:openShop", { detail: { shopkeeperId: targetId, buyMarkup: markup, sellDiscount: discount, mode: "browse" } })); } catch (e) { console.debug('[shopWiring] dispatch ui:openShop:', e); }
+    try { window.dispatchEvent(new CustomEvent("ui:openShop", { detail: { shopkeeperId: targetId, buyMarkup: markup, sellDiscount: discount, mode: "browse", vendorKind: vkind } })); } catch (e) { console.debug('[shopWiring] dispatch ui:openShop:', e); }
   });
 
   addEventListener("ui:requestBuy", (ev) => {
@@ -429,6 +433,54 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     log(`You pay ${totalBill} gold for your purchases. "Thank you, come again!"`);
     activeShopSession.mode = "browse";
     closeShopUI();
+  });
+
+  const GEM_APPRAISE_FEE = 10;
+
+  addEventListener("ui:requestGemAppraise", (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const { shopkeeperId, itemId } = e?.detail || {};
+    const pe = playerEntity(world);
+    if (!pe) return;
+    if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+      log("The gem merchant is too far away.");
+      closeShopUI();
+      return;
+    }
+
+    const shop = world.get(shopkeeperId, ShopInventory);
+    if (!shop) return;
+    if (!inventoryContains(world, pe.id, itemId)) return;
+
+    const info = world.get(itemId, ItemInfo);
+    if (!info || String(info.type || "") !== "gem") {
+      log("The merchant only appraises gems.");
+      return;
+    }
+
+    const identity = world.get(itemId, NamedIdentity)?.identity;
+    if (!identity || isIdentified(identity)) {
+      log("That gem is already known to you.");
+      return;
+    }
+
+    const gold = playerGoldCount();
+    if (gold < GEM_APPRAISE_FEE) {
+      log(`The merchant charges ${GEM_APPRAISE_FEE} gold to appraise a gem. You cannot afford it.`);
+      return;
+    }
+
+    if (!spendGold(pe.id, GEM_APPRAISE_FEE)) {
+      log("You cannot afford the appraisal fee.");
+      return;
+    }
+
+    identify(identity);
+    const newName = resolveItemDisplayName(world, itemId);
+    log(`The merchant examines the stone. "Ah — ${bracketizeName(newName)}." (${GEM_APPRAISE_FEE} gold)`);
+
+    dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.5, shop.sellDiscount ?? 0.5, activeShopSession.mode);
   });
 
   const api = Object.freeze({

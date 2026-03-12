@@ -498,6 +498,14 @@ export const ApothecarySign = defineArchetype(
   [Interactable, { action: "readText", params: { textId: "apothecary_sign" } }],
 );
 
+export const GemDisplayCase = defineArchetype(
+  "GemDisplayCase",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Gem Display Case", identity: "gem_display_case" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
 // ── Graveyard ────────────────────────────────────────────────────
 export const GraveTombstone = defineArchetype(
   "GraveTombstone",
