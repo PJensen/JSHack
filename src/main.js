@@ -90,6 +90,7 @@ import { Devotion } from "./rules/components/Devotion.js";
 import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { initDeity, getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
+import { TownState } from "./rules/components/TownState.js";
 import { CastSpellIntent } from "./rules/components/Intents/CastSpellIntent.js";
 import { Channeling } from "./rules/components/Channeling.js";
 import { Interactable } from "./rules/components/Interactable.js";
@@ -882,6 +883,26 @@ window.dispatchEvent(new CustomEvent('debug:registerDeityMoodSampler', {
       const deity = getDeityInstance(dev.deityId);
       if (!deity) return null;
       return deity._queryPrecise();
+    }
+  }
+}));
+
+// Register town economy sampler for the debug graph.
+window.dispatchEvent(new CustomEvent('debug:registerEconomySampler', {
+  detail: {
+    sampler: () => {
+      for (const [, ds] of world.query(DungeonState)) {
+        if ((ds.depth || 0) !== 0) return null;
+      }
+      for (const [, ts] of world.query(TownState)) {
+        return {
+          food: ts.foodStores,
+          materials: ts.materialStores,
+          medicine: ts.medicineStores,
+          morale: ts.morale,
+        };
+      }
+      return null;
     }
   }
 }));
