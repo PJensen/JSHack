@@ -512,7 +512,7 @@ Deno.test("scheduled farmer can work a solid millstone from an adjacent tile", (
 
 Deno.test("scheduled townfolk heads to the pub after work", () => {
   const world = makeWorld(16);
-  world.step = 70;
+  world.step = 106;
 
   const npc = addTownfolk(world, 6, 5, "smith", {
     scheduleEnabled: true,
@@ -527,6 +527,28 @@ Deno.test("scheduled townfolk heads to the pub after work", () => {
   assertEquals(job.targetX, 9);
   assertEquals(job.targetY, 9);
   assertEquals(job.routineKind, "pub");
+});
+
+Deno.test("scheduled miner keeps the work routine during a long outbound trip", () => {
+  const world = makeWorld(116);
+  world.step = 80;
+
+  const miner = addTownfolk(world, 5, 5, "miner", {
+    scheduleEnabled: true,
+    homeX: 5, homeY: 5,
+    bedX: 5, bedY: 5,
+    workX: 45, workY: 5,
+    workAuxX: 45, workAuxY: 5,
+    pubX: 9, pubY: 9,
+  });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(miner, TownfolkJob);
+  assertEquals(job.routineKind, "mine");
+  assertEquals(job.targetX, 45);
+  assertEquals(job.targetY, 5);
+  assertEquals(job.state, TOWNFOLK_STATES.walking, "miner should still be commuting to work mid-shift");
 });
 
 Deno.test("scheduled townfolk opens a closed door on its route and closes it after passing", () => {
