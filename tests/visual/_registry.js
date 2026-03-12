@@ -5,4 +5,5 @@ export const SCENARIOS = [
 	{ name: 'Goblin Chase',       path: './chase.scenario.js' },
 	{ name: 'Rat Scurry',         path: './scurry.scenario.js' },
 	{ name: 'Floating Eye Stun',  path: './gazeStun.scenario.js' },
+	{ name: 'Ricochet Theology',  path: './ricochetTheology.scenario.js' },
 ];

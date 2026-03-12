@@ -26,6 +26,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {RadialFx[]} */
   const _fireballImpact = [];
 
+  // --- Ricochet Theology projectile state ---
+  /** @type {ArrowFx[]} */
+  const _ricochetFx = [];
+  /** @type {RadialFx[]} */
+  const _ricochetImpact = [];
+
   /** @param {number} dt */
   function tick(dt) {
     // Arrows
@@ -203,6 +209,82 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       _fireballImpact[i].tick(dt);
       if (_fireballImpact[i].expired) _fireballImpact.splice(i, 1);
     }
+
+    // Ricochet Theology projectiles
+    for (let i = _ricochetFx.length - 1; i >= 0; i--) {
+      const bolt = _ricochetFx[i];
+      bolt.tick(dt);
+
+      if (bolt.arrived) {
+        _ricochetImpact.push(new RadialFx({ x: bolt.to.x, y: bolt.to.y, radius: 0.55, ttl: 0.22 }));
+        startShake(cam, 2, 0.08);
+
+        if (fx?.pool) {
+          for (let k = 0; k < 10; k++) {
+            const angle = (k / 10) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+            const spd = 0.55 + Math.random() * 1.15;
+            fx.pool.spawn(new Particle({
+              x: bolt.to.x + (Math.random() - 0.5) * 0.18,
+              y: bolt.to.y + (Math.random() - 0.5) * 0.18,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd - 0.15,
+              ay: 0.18,
+              life: 0.12 + Math.random() * 0.16,
+              size0: 0.06 + Math.random() * 0.04,
+              size1: 0.01,
+              r: 110 + (Math.random() * 45 | 0),
+              g: 205 + (Math.random() * 35 | 0),
+              b: 255,
+              a0: 0.82,
+            }));
+          }
+        }
+
+        _ricochetFx.splice(i, 1);
+      }
+    }
+    for (let i = _ricochetImpact.length - 1; i >= 0; i--) {
+      _ricochetImpact[i].tick(dt);
+      if (_ricochetImpact[i].expired) _ricochetImpact.splice(i, 1);
+    }
+  }
+
+  function spawnTransientProjectile({
+    from,
+    to,
+    style = 'plain',
+    speed = 18,
+    minDuration = 0.06,
+    maxDuration = 0.4,
+  }) {
+    if (!from || !to) return;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const duration = Math.max(minDuration, Math.min(maxDuration, len / Math.max(0.01, Number(speed || 18))));
+    const entry = new ArrowFx({
+      from: { x: from.x, y: from.y },
+      to: { x: to.x, y: to.y },
+      duration,
+      dx: dx / len,
+      dy: dy / len,
+      len,
+      style,
+    });
+
+    if (style === 'shadow_bolt') {
+      _sboltFx.push(entry);
+      return;
+    }
+    if (style === 'fireball') {
+      _fireballFx.push(entry);
+      return;
+    }
+    if (style === 'ricochet_theology') {
+      _ricochetFx.push(entry);
+      return;
+    }
+    _arrowFx.push(entry);
   }
 
   /** @param {CanvasRenderingContext2D} ctx */
@@ -210,7 +292,8 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     const hasArrows = _arrowFx.length || _arrowSparks.length;
     const hasSbolt = _sboltFx.length || _sboltImpact.length;
     const hasFireball = _fireballFx.length || _fireballImpact.length;
-    if (!hasArrows && !hasSbolt && !hasFireball) return;
+    const hasRicochet = _ricochetFx.length || _ricochetImpact.length;
+    if (!hasArrows && !hasSbolt && !hasFireball && !hasRicochet) return;
     ctx.save();
 
     // Draw flying arrows
@@ -378,6 +461,51 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       ctx.restore();
     }
 
+    // --- Ricochet Theology projectile ---
+    if (_ricochetFx.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const bolt of _ricochetFx) {
+        const progress = bolt.progress;
+        const hx = bolt.from.x + (bolt.to.x - bolt.from.x) * progress;
+        const hy = bolt.from.y + (bolt.to.y - bolt.from.y) * progress;
+        const tailLen = Math.min(0.7, bolt.len * progress);
+        const tx = hx - bolt.dx * tailLen;
+        const ty = hy - bolt.dy * tailLen;
+
+        ctx.strokeStyle = 'rgba(90,190,255,0.25)';
+        ctx.lineWidth = 0.18;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.strokeStyle = 'rgba(180,240,255,0.92)';
+        ctx.lineWidth = 0.06;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.fillStyle = 'rgba(235,250,255,0.98)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.08, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // --- Ricochet Theology impact ---
+    if (_ricochetImpact.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const imp of _ricochetImpact) {
+        const t = imp.progress;
+        const ringR = t * (imp.radius + 0.16);
+        const ringA = 0.4 * (1 - t);
+        ctx.strokeStyle = `rgba(150,225,255,${ringA.toFixed(3)})`;
+        ctx.lineWidth = 0.07;
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
+        if (t < 0.3) {
+          const flashA = 0.55 * (1 - t / 0.3);
+          ctx.fillStyle = `rgba(220,245,255,${flashA.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(imp.x, imp.y, 0.14 + t * 0.12, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
     // --- Shadow Bolt impact ---
     if (_sboltImpact.length) {
       ctx.save();
@@ -416,18 +544,21 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const apos = getPosition(Number(attacker || 0));
       const dpos = getPosition(Number(target || 0));
       if (!apos || !dpos) return;
-      const dx = dpos.x - apos.x, dy = dpos.y - apos.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const speed = 18; // tiles per second
-      const duration = Math.max(0.06, Math.min(0.4, len / speed));
       const s = String(style || 'plain');
-      _arrowFx.push(new ArrowFx({
-        from: { x: apos.x, y: apos.y }, to: { x: dpos.x, y: dpos.y },
-        duration, dx: dx / len, dy: dy / len, len, style: s
-      }));
+      spawnTransientProjectile({
+        from: apos,
+        to: dpos,
+        style: s,
+        speed: 18,
+        minDuration: 0.06,
+        maxDuration: 0.4,
+      });
       startShake(cam, s === 'fire' ? 3 : 2, s === 'fire' ? 0.10 : 0.08);
       // Fire arrow: spawn trailing embers
       if (s === 'fire' && fx?.pool) {
+        const dx = dpos.x - apos.x;
+        const dy = dpos.y - apos.y;
+        const len = Math.hypot(dx, dy) || 1;
         for (let i = 0; i < 4; i++) {
           fx.pool.spawn(new Particle({
             x: apos.x + dx / len * 0.5, y: apos.y + dy / len * 0.5,
@@ -444,37 +575,40 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
 
     // Familiar Fireball: fiery orb projectile from familiar to target
     world.on('familiar:fireball', ({ from, to }) => {
-      if (!from || !to) return;
-      const dx = to.x - from.x, dy = to.y - from.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const speed = 8; // slower than arrows, visible fireball lob
-      const duration = Math.max(0.1, Math.min(0.6, len / speed));
-      _fireballFx.push(new ArrowFx({
-        from: { x: from.x, y: from.y },
-        to: { x: to.x, y: to.y },
-        duration,
-        dx: dx / len, dy: dy / len,
-        len,
+      spawnTransientProjectile({
+        from,
+        to,
         style: 'fireball',
-      }));
+        speed: 8,
+        minDuration: 0.1,
+        maxDuration: 0.6,
+      });
     });
 
     // Shadow Bolt: purple energy projectile from caster to target
     world.on('spell:shadow_bolt', ({ actor, targetId, from, to, fizzle }) => {
       if (fizzle) return;
-      if (!from || !to) return;
-      const dx = to.x - from.x, dy = to.y - from.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const speed = 10; // medium speed — slower than arrows (18)
-      const duration = Math.max(0.08, Math.min(0.7, len / speed));
-      _sboltFx.push(new ArrowFx({
-        from: { x: from.x, y: from.y },
-        to: { x: to.x, y: to.y },
-        duration,
-        dx: dx / len, dy: dy / len,
-        len,
+      spawnTransientProjectile({
+        from,
+        to,
         style: 'shadow_bolt',
-      }));
+        speed: 10,
+        minDuration: 0.08,
+        maxDuration: 0.7,
+      });
+    });
+
+    world.on('projectile:spawn', ({ style, from, to, sourceId, targetId, speed }) => {
+      const start = from || getPosition(Number(sourceId || 0));
+      const end = to || getPosition(Number(targetId || 0));
+      spawnTransientProjectile({
+        from: start,
+        to: end,
+        style: String(style || 'plain'),
+        speed: Number(speed || 18),
+        minDuration: 0.05,
+        maxDuration: 0.4,
+      });
     });
   }
 
