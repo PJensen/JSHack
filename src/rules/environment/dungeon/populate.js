@@ -36,8 +36,8 @@ import {
   Furnace,
   CookingFire,
   CropWheat,
-  CropTurnip,
-  CropPumpkin,
+  CropCarrot,
+  CropCorn,
   Well,
   Scarecrow,
   TavernKeg,
@@ -69,6 +69,21 @@ import {
   MessageBoard,
   GraveTombstone,
   TownBell,
+  Barrel,
+  Crate,
+  Woodpile,
+  HayBale,
+  LanternPost,
+  RainBarrel,
+  Wheelbarrow,
+  MarketStall,
+  Bench,
+  Boulder,
+  FallenLog,
+  LilyPad,
+  Cattail,
+  Birdbath,
+  Trellis,
 } from '../../archetypes/Overworld.js';
 import { pickDungeonBook } from '../../data/dungeonBooks.js';
 import { TOWNFOLK } from '../../data/townfolk.js';
@@ -815,10 +830,10 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, CookingFire, { x: spawn.x, y: spawn.y });
     case 'crop_wheat':
       return createFrom(world, CropWheat, { x: spawn.x, y: spawn.y });
-    case 'crop_turnip':
-      return createFrom(world, CropTurnip, { x: spawn.x, y: spawn.y });
-    case 'crop_pumpkin':
-      return createFrom(world, CropPumpkin, { x: spawn.x, y: spawn.y });
+    case 'crop_carrot':
+      return createFrom(world, CropCarrot, { x: spawn.x, y: spawn.y });
+    case 'crop_corn':
+      return createFrom(world, CropCorn, { x: spawn.x, y: spawn.y });
     case 'well':
       return createFrom(world, Well, { x: spawn.x, y: spawn.y });
     case 'scarecrow':
@@ -896,6 +911,39 @@ export function materializeSpawn(world, spawn) {
         epitaph: epitaph,
       });
     }
+    // Town decorations
+    case 'barrel':
+      return createFrom(world, Barrel, { x: spawn.x, y: spawn.y });
+    case 'crate':
+      return createFrom(world, Crate, { x: spawn.x, y: spawn.y });
+    case 'woodpile':
+      return createFrom(world, Woodpile, { x: spawn.x, y: spawn.y });
+    case 'hay_bale':
+      return createFrom(world, HayBale, { x: spawn.x, y: spawn.y });
+    case 'lantern_post':
+      return createFrom(world, LanternPost, { x: spawn.x, y: spawn.y });
+    case 'rain_barrel':
+      return createFrom(world, RainBarrel, { x: spawn.x, y: spawn.y });
+    case 'wheelbarrow':
+      return createFrom(world, Wheelbarrow, { x: spawn.x, y: spawn.y });
+    case 'market_stall':
+      return createFrom(world, MarketStall, { x: spawn.x, y: spawn.y });
+    case 'bench':
+      return createFrom(world, Bench, { x: spawn.x, y: spawn.y });
+    // Natural features
+    case 'boulder':
+      return createFrom(world, Boulder, { x: spawn.x, y: spawn.y });
+    case 'fallen_log':
+      return createFrom(world, FallenLog, { x: spawn.x, y: spawn.y });
+    case 'lily_pad':
+      return createFrom(world, LilyPad, { x: spawn.x, y: spawn.y });
+    case 'cattail':
+      return createFrom(world, Cattail, { x: spawn.x, y: spawn.y });
+    // Garden features
+    case 'birdbath':
+      return createFrom(world, Birdbath, { x: spawn.x, y: spawn.y });
+    case 'trellis':
+      return createFrom(world, Trellis, { x: spawn.x, y: spawn.y });
     // Room features
     case 'fountain':
       return createFrom(world, Fountain, { x: spawn.x, y: spawn.y });

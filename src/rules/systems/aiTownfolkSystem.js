@@ -66,11 +66,11 @@ const DIRS = [
   { dx: -1, dy: 0 },
 ];
 
-const CROP_KINDS = new Set(["wheat", "turnip", "pumpkin"]);
+const CROP_KINDS = new Set(["wheat", "carrot", "corn"]);
 const CROP_ITEM_IDS = Object.freeze({
   wheat: "food_wheat",
-  turnip: "food_turnip",
-  pumpkin: "food_pumpkin",
+  carrot: "food_carrot",
+  corn: "food_corn",
 });
 const HERB_ITEM_IDS = Object.freeze({
   herbs: "food_wild_herbs",
@@ -83,7 +83,7 @@ const ORE_ITEM_IDS = Object.freeze({
   stone: "ore_stone",
 });
 const CARRYING_ITEM_IDS = Object.freeze({
-  crops: ["food_wheat", "food_turnip", "food_pumpkin"],
+  crops: ["food_wheat", "food_carrot", "food_corn"],
   ore: ["ore_iron", "ore_coal", "ore_stone"],
   wood: ["material_lumber", "fuel_firewood"],
   herbs: ["food_wild_herbs", "reagent_thorn_pod", "reagent_venom_frond"],
@@ -235,6 +235,11 @@ function chooseSmithCraft(world, storage) {
   return null;
 }
 
+function deliverNear(pos) {
+  if (!pos) return null;
+  return findAdjacentWalkable(pos.x, pos.y) || pos;
+}
+
 function chooseVillagerHaul(world) {
   const storage = findTownContainers(world);
   const mill = storage.mill > 0 ? countInventoryByIdentity(world, storage.mill) : {};
@@ -246,49 +251,51 @@ function chooseVillagerHaul(world) {
   const millPos = getEntityPosition(world, storage.mill);
   const lumberPos = getEntityPosition(world, storage.lumber);
   const smithPos = getEntityPosition(world, storage.smithy);
+  const tavernDrop = deliverNear(tavernPos);
+  const smithDrop = deliverNear(smithPos);
 
-  if (storage.tavern > 0 && well && tavernPos && Number(tavern.water_bucket || 0) < 2) {
+  if (storage.tavern > 0 && well && tavernDrop && Number(tavern.water_bucket || 0) < 2) {
     return {
       x: well.x,
       y: well.y,
       kind: "fetch_water",
       state: TOWNFOLK_STATES.working,
       radius: 1,
-      deliverX: tavernPos.x,
-      deliverY: tavernPos.y,
+      deliverX: tavernDrop.x,
+      deliverY: tavernDrop.y,
     };
   }
-  if (storage.mill > 0 && storage.tavern > 0 && millPos && tavernPos && Number(mill.food_flour || 0) > 0 && Number(tavern.food_flour || 0) < 2) {
+  if (storage.mill > 0 && storage.tavern > 0 && millPos && tavernDrop && Number(mill.food_flour || 0) > 0 && Number(tavern.food_flour || 0) < 2) {
     return {
       x: millPos.x,
       y: millPos.y,
       kind: "haul_flour",
       state: TOWNFOLK_STATES.working,
       radius: 1,
-      deliverX: tavernPos.x,
-      deliverY: tavernPos.y,
+      deliverX: tavernDrop.x,
+      deliverY: tavernDrop.y,
     };
   }
-  if (storage.lumber > 0 && storage.tavern > 0 && lumberPos && tavernPos && Number(lumber.fuel_firewood || 0) > 0 && Number(tavern.fuel_firewood || 0) < 2) {
+  if (storage.lumber > 0 && storage.tavern > 0 && lumberPos && tavernDrop && Number(lumber.fuel_firewood || 0) > 0 && Number(tavern.fuel_firewood || 0) < 2) {
     return {
       x: lumberPos.x,
       y: lumberPos.y,
       kind: "haul_firewood",
       state: TOWNFOLK_STATES.working,
       radius: 1,
-      deliverX: tavernPos.x,
-      deliverY: tavernPos.y,
+      deliverX: tavernDrop.x,
+      deliverY: tavernDrop.y,
     };
   }
-  if (storage.lumber > 0 && storage.smithy > 0 && lumberPos && smithPos && Number(lumber.material_lumber || 0) > 0 && Number(smith.material_lumber || 0) < 2) {
+  if (storage.lumber > 0 && storage.smithy > 0 && lumberPos && smithDrop && Number(lumber.material_lumber || 0) > 0 && Number(smith.material_lumber || 0) < 2) {
     return {
       x: lumberPos.x,
       y: lumberPos.y,
       kind: "haul_lumber",
       state: TOWNFOLK_STATES.working,
       radius: 1,
-      deliverX: smithPos.x,
-      deliverY: smithPos.y,
+      deliverX: smithDrop.x,
+      deliverY: smithDrop.y,
     };
   }
   return null;
@@ -308,12 +315,31 @@ function findReadyNode(world, cx, cy, radius, kindFilter) {
   return best;
 }
 
+/** Find nearest crop that needs planting within radius. */
+function findNeedsPlantingNode(world, cx, cy, radius) {
+  let best = null;
+  let bestDist = Infinity;
+  forEachInRadius(world, cx, cy, radius, (eid, epos) => {
+    const node = world.get(eid, HarvestNode);
+    if (!node || !node.needsPlanting) return;
+    if (!CROP_KINDS.has(node.kind)) return;
+    const d = Math.abs(epos.x - cx) + Math.abs(epos.y - cy);
+    if (d < bestDist) { bestDist = d; best = { id: eid, x: epos.x, y: epos.y }; }
+  });
+  return best;
+}
+
 /** Harvest a HarvestNode: deplete it and reset its GrowthStage visuals. */
 function depleteNode(world, nodeId) {
   const node = world.get(nodeId, HarvestNode);
   if (!node) return;
   node.ready = false;
-  node.regrowCountdown = node.regrowTurns;
+  if (node.replantable) {
+    node.needsPlanting = true;
+    node.regrowCountdown = 0;
+  } else {
+    node.regrowCountdown = node.regrowTurns;
+  }
   const gs = world.get(nodeId, GrowthStage);
   if (gs && gs.stageIdentities?.length) {
     gs.currentStage = 0;
@@ -322,7 +348,7 @@ function depleteNode(world, nodeId) {
   }
 }
 
-function getTownPhase(step) {
+export function getTownPhase(step) {
   const t = Math.max(0, step | 0) % DAY_LENGTH;
   if (t < SLEEP_PHASE_TURNS) return "sleep";
   if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS) return "breakfast";
@@ -486,12 +512,20 @@ function handleIdle(world, id, pos, job) {
         job.targetY = crop.y;
         job.workSiteKind = "harvest_crop";
       } else {
-        // No ready crops — tend the field cosmetically
-        const ox = Math.floor(world.rand() * 5) - 2;
-        const oy = 1 + Math.floor(world.rand() * 5);
-        job.targetX = job.homeX + ox;
-        job.targetY = job.homeY + oy;
-        job.workSiteKind = "tend";
+        // No ready crops — plant any that need it
+        const plant = findNeedsPlantingNode(world, job.workX, job.workY, 15);
+        if (plant) {
+          job.targetX = plant.x;
+          job.targetY = plant.y;
+          job.workSiteKind = "plant_crop";
+        } else {
+          // Nothing to plant either — tend the field cosmetically
+          const ox = Math.floor(world.rand() * 5) - 2;
+          const oy = 1 + Math.floor(world.rand() * 5);
+          job.targetX = job.homeX + ox;
+          job.targetY = job.homeY + oy;
+          job.workSiteKind = "tend";
+        }
       }
       break;
     }
@@ -712,6 +746,30 @@ function handleWorking(world, id, pos, job) {
       }
       setCarry(job, "crops", Math.max(1, job.carryCount));
       emitSafe(world, "townfolk:carrying", { actor: id, resource: "crops" });
+      setReturning(job);
+      return;
+    }
+    case "plant_crop": {
+      let planted = false;
+      forEachInRadius(world, pos.x, pos.y, 1, (eid) => {
+        if (planted) return;
+        const n = world.get(eid, HarvestNode);
+        if (n && n.needsPlanting && CROP_KINDS.has(n.kind)) {
+          n.needsPlanting = false;
+          n.regrowCountdown = n.regrowTurns;
+          planted = true;
+          emitSafe(world, "townfolk:planted", { actor: id, x: pos.x, y: pos.y });
+        }
+      });
+      // Look for more to plant
+      const next = findNeedsPlantingNode(world, job.workX, job.workY, 15);
+      if (next) {
+        job.targetX = next.x;
+        job.targetY = next.y;
+        job.state = TOWNFOLK_STATES.walking;
+        job.stuckTurns = 0;
+        return;
+      }
       setReturning(job);
       return;
     }
@@ -1013,11 +1071,15 @@ function getRoleWorkTarget(world, job) {
         }
       }
       if ((workBeat % 2) === 0) {
-        // Harvest ready crops if any, otherwise tend
+        // Harvest ready crops if any, then plant, then tend
         const crop = findReadyNode(world, job.workX, job.workY, 15,
           (n) => CROP_KINDS.has(n.kind));
         if (crop) {
           return { x: crop.x, y: crop.y, kind: "harvest_crop", state: TOWNFOLK_STATES.working, radius: 1 };
+        }
+        const plant = findNeedsPlantingNode(world, job.workX, job.workY, 15);
+        if (plant) {
+          return { x: plant.x, y: plant.y, kind: "plant_crop", state: TOWNFOLK_STATES.working, radius: 1 };
         }
         return { x: job.workX, y: job.workY, kind: "tend", state: TOWNFOLK_STATES.working, radius: 1 };
       }
@@ -1171,6 +1233,7 @@ function emitRoleWork(world, id, pos, job, target) {
     || target.kind === "mine"
     || target.kind === "repair"
     || target.kind === "harvest_crop"
+    || target.kind === "plant_crop"
     || target.kind === "harvest_herb"
     || target.kind === "brew"
     || target.kind === "mill"
@@ -1250,6 +1313,8 @@ function handleScheduledTownfolk(world, id, pos, job) {
   emitRoleWork(world, id, pos, job, target);
 }
 
+const LANTERN_LAST_PHASE = Symbol.for("jshack:lanternLastPhase");
+
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function aiTownfolkSystem(world) {
   let depth = -1;
@@ -1258,6 +1323,20 @@ export function aiTownfolkSystem(world) {
     break;
   }
   if (depth !== 0) return;
+
+  // Auto-toggle lanterns on phase transitions
+  const phase = getTownPhase(world.step);
+  if (phase !== world[LANTERN_LAST_PHASE]) {
+    world[LANTERN_LAST_PHASE] = phase;
+    const shouldBeLit = (phase === "sleep" || phase === "pub" || phase === "home");
+    for (const [id, ident, os] of world.query(NamedIdentity, ObjectState)) {
+      if (ident.identity !== "lantern_post") continue;
+      const isLit = os.state === "lit";
+      if (shouldBeLit !== isLit) {
+        world.set(id, ObjectState, { state: shouldBeLit ? "lit" : "unlit" });
+      }
+    }
+  }
 
   let playerPos = null;
   for (const [, , pos] of world.query(Player, Position)) {

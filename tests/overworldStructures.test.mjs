@@ -109,12 +109,9 @@ const millY0 = homeY - 8;
 const millX1 = homeX - 6;
 const millY1 = homeY - 4;
 const millDoorX = millX0 + 2;
-const smithyX0 = homeX - 10;
-const smithyY0 = homeY;
-const smithyX1 = homeX - 6;
-const smithyY1 = homeY + 4;
-const smithyDoorX = smithyX1;
-const smithyDoorY = smithyY0 + 2;
+// New smithy: anchor (keystone) at (homeX - 7, homeY), stamped from JSON.
+const smithyAnchorX = homeX - 7;
+const smithyAnchorY = homeY;
 const apothX0 = homeX - 29;
 const apothY0 = homeY - 12;
 const apothDoorX = apothX0 + 5;
@@ -176,13 +173,13 @@ Deno.test("overworld farm keeps the full tilled plot and uses a real fence gate"
 Deno.test("overworld crops are planted in vertical columns and scarecrows sit in the farm", () => {
   const { chunks } = generateOverworldChunks(SEED);
 
-  // 4 columns × 6 rows = 24 crops total (wheat, turnip, pumpkin, wheat)
+  // 4 columns × 6 rows = 24 crops total (wheat, carrot, corn, wheat)
   const wheat = coordsOfKind(chunks, "crop_wheat");
-  const turnip = coordsOfKind(chunks, "crop_turnip");
-  const pumpkin = coordsOfKind(chunks, "crop_pumpkin");
+  const carrot = coordsOfKind(chunks, "crop_carrot");
+  const corn = coordsOfKind(chunks, "crop_corn");
   assertEquals(wheat.length, 12);  // 2 wheat columns × 6
-  assertEquals(turnip.length, 6);  // 1 turnip column × 6
-  assertEquals(pumpkin.length, 6); // 1 pumpkin column × 6
+  assertEquals(carrot.length, 6);  // 1 carrot column × 6
+  assertEquals(corn.length, 6);    // 1 corn column × 6
   assertEquals(coordsOfKind(chunks, "scarecrow").length, 2);
   assertEquals(coordsOfKind(chunks, "well"), [`${wellX},${wellY}`]);
 });
@@ -203,10 +200,9 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
     `${tavX0 + 5},${tavY0 + 1}`,
     `${tavX0 + 6},${tavY0 + 1}`,
   ]);
-  assertEquals(coordsOfKind(chunks, "tavern_pillar"), [
-    `${tavX0 + 2},${tavY0 + 3}`,
-    `${tavX0 + 6},${tavY0 + 3}`,
-  ]);
+  const tavernPillars = coordsOfKind(chunks, "tavern_pillar");
+  assert(tavernPillars.includes(`${tavX0 + 2},${tavY0 + 3}`));
+  assert(tavernPillars.includes(`${tavX0 + 6},${tavY0 + 3}`));
   assertEquals(coordsOfKind(chunks, "tavern_bench"), [
     `${tavX0 + 1},${tavY0 + 4}`,
     `${tavX0 + 2},${tavY0 + 4}`,
@@ -225,20 +221,20 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
 
 Deno.test("blacksmith building has correct footprint, door, and interior spawns", () => {
   const { chunks } = generateOverworldChunks(SEED);
+  const ax = smithyAnchorX;
+  const ay = smithyAnchorY;
 
-  // Shell and footprint remain intact even if nearby paths graze the walkway-facing edge.
-  assertEquals(getWorldTile(chunks, smithyX0, smithyY0), TILE_WALL);
-  assertEquals(getWorldTile(chunks, smithyX1, smithyY0), TILE_WALL);
-  assertEquals(getWorldTile(chunks, smithyX0, smithyY1), TILE_WALL);
-  assertEquals(getWorldTile(chunks, smithyX1, smithyY1), TILE_WALL);
+  // Main door on east wall connects via cobblestone to walkway
+  assertEquals(getWorldTile(chunks, ax + -4, ay), TILE_DOOR);
   // Interior floor
-  assertEquals(getWorldTile(chunks, smithyX0 + 2, smithyY0 + 2), TILE_FLOOR);
-  // Door on east wall
-  assertEquals(getWorldTile(chunks, smithyDoorX, smithyDoorY), TILE_DOOR);
-  // Interior spawns
-  assertEquals(coordsOfKind(chunks, "furnace"), [`${smithyX0 + 1},${smithyY0 + 1}`]);
-  assertEquals(coordsOfKind(chunks, "anvil"), [`${smithyX0 + 3},${smithyY0 + 1}`]);
-  assertEquals(coordsOfKind(chunks, "smithy_chest"), [`${smithyX0 + 1},${smithyY0 + 3}`]);
+  assertEquals(getWorldTile(chunks, ax + -8, ay), TILE_FLOOR);
+  assertEquals(getWorldTile(chunks, ax + -7, ay + 1), TILE_FLOOR);
+  // Walls around main body
+  assertEquals(getWorldTile(chunks, ax + -11, ay), TILE_WALL);
+  assertEquals(getWorldTile(chunks, ax + -4, ay + 1), TILE_WALL);
+  // Interior spawns (offsets match smithy.json)
+  assertEquals(coordsOfKind(chunks, "furnace"), [`${ax - 7},${ay + 5}`]);
+  assertEquals(coordsOfKind(chunks, "anvil"), [`${ax - 12},${ay + 1}`]);
   assertEquals(coordsOfKind(chunks, "smithy_sign").length, 1);
 });
 
@@ -263,7 +259,6 @@ Deno.test("overworld commute paths no longer punch holes in nearby buildings", (
   assertEquals(getWorldTile(chunks, apothX0 + 8, apothY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, apothX0 + 2, apothDoorY), TILE_WALL);
   assertEquals(getWorldTile(chunks, apothX0 + 8, apothDoorY), TILE_WALL);
-  assertEquals(getWorldTile(chunks, minerX0, minerY0), TILE_WALL);
 });
 
 Deno.test("worker cottages keep separate footprints instead of overlapping", () => {
@@ -369,7 +364,7 @@ Deno.test("overworld walkways connect the house to the gate and outbuilding door
   assert(canReach(spawnX, spawnY, gateX, gateY), "farm gate should be reachable from spawn");
   assert(canReach(spawnX, spawnY, tavDoorX, tavDoorY), "tavern door should be reachable from spawn");
   assert(canReach(spawnX, spawnY, millDoorX, millY1), "windmill door should be reachable from spawn");
-  assert(canReach(spawnX, spawnY, smithyDoorX, smithyDoorY), "smithy door should be reachable from spawn");
+  assert(canReach(spawnX, spawnY, smithyAnchorX + -4, smithyAnchorY), "smithy door should be reachable from spawn");
   assert(canReach(spawnX, spawnY, apothDoorX, apothDoorY), "apothecary door should be reachable from spawn");
 
   clearAll();

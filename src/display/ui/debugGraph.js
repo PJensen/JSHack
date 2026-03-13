@@ -37,7 +37,7 @@ export function createDebugGraph(config) {
     title,
     width = 240,
     height = 140,
-    position = { left: '8px', bottom: '56px' },
+    position = null,
     zIndex = 910,
     series,
     maxPoints = 100,
@@ -60,10 +60,11 @@ export function createDebugGraph(config) {
   canvas.id = id;
 
   const posStyle = {};
-  for (const [k, v] of Object.entries(position)) posStyle[k] = v;
+  if (position) {
+    for (const [k, v] of Object.entries(position)) posStyle[k] = v;
+  }
 
   Object.assign(canvas.style, {
-    position: 'fixed',
     width: width + 'px',
     height: height + 'px',
     pointerEvents: 'auto',
@@ -71,7 +72,7 @@ export function createDebugGraph(config) {
     display: 'none',
     borderRadius: '6px',
     overflow: 'hidden',
-    ...posStyle,
+    ...(position ? { position: 'fixed', ...posStyle } : {}),
   });
 
   ctx = canvas.getContext('2d');

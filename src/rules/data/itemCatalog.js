@@ -2870,10 +2870,10 @@ export const ITEM_CATALOG = {
       on_use: EAT_ON_USE,
     },
   },
-  food_turnip: {
-    id: "food_turnip",
+  food_carrot: {
+    id: "food_carrot",
     catalogKind: "food",
-    name: "Turnip",
+    name: "Carrot",
     type: "food",
     slot: "bag",
     material: "organic",
@@ -2881,15 +2881,15 @@ export const ITEM_CATALOG = {
     rarityName: "common",
     weight: 0.4,
     value: 4,
-    description: "A hearty turnip, fresh from the soil.",
+    description: "A fresh carrot, pulled straight from the soil.",
     hooks: {
       on_use: EAT_ON_USE,
     },
   },
-  food_pumpkin: {
-    id: "food_pumpkin",
+  food_corn: {
+    id: "food_corn",
     catalogKind: "food",
-    name: "Pumpkin",
+    name: "Corn",
     type: "food",
     slot: "bag",
     material: "organic",
@@ -2897,7 +2897,7 @@ export const ITEM_CATALOG = {
     rarityName: "common",
     weight: 1.0,
     value: 8,
-    description: "A large, bright orange pumpkin.",
+    description: "An ear of golden corn.",
     hooks: {
       on_use: EAT_ON_USE,
     },

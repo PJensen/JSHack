@@ -10,7 +10,7 @@ import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { ObjectState } from "../../rules/components/ObjectState.js";
-import { getTile, forEachTileInRect } from '../../rules/environment/dungeon/tileMap.js';
+import { getTile, forEachTileInRect, isRoofed } from '../../rules/environment/dungeon/tileMap.js';
 import { TILE_DOOR, TILE_FLOOR, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
 import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
@@ -86,7 +86,7 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar", "cooking_fire", "furnace", "gem_display_case"]);
+const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar", "cooking_fire", "gem_display_case"]);
 
 function xyKey(x, y) {
 	return `${x},${y}`;
@@ -281,7 +281,7 @@ function collectFixedRoofedBuilding(identity, seedX, seedY) {
 		case "tavern_keg":
 			return collectRectRoofedBuilding(seedX, seedY, seedX + 6, seedY + 4, seedX + 3, seedY + 5);
 		case "furnace":
-			return collectRectRoofedBuilding(seedX, seedY, seedX + 2, seedY + 2, seedX + 3, seedY + 1);
+			return collectRoofedBuilding(seedX, seedY);
 		case "gem_display_case":
 			return collectRectRoofedBuilding(seedX, seedY, seedX + 5, seedY + 3, seedX + 2, seedY + 4);
 		case "bed_home":
@@ -396,6 +396,79 @@ function collectOverworldRoofs(world, playerPos) {
 	const roofs = [];
 	const visited = new Set();
 
+	// ── Bitmap-based roofs (JSON-stamped buildings) ──
+	if (playerPos) {
+		const R = 24;
+		const bitmapKeys = new Set();
+		for (let sy = playerPos.y - R; sy <= playerPos.y + R; sy++) {
+			for (let sx = playerPos.x - R; sx <= playerPos.x + R; sx++) {
+				if (isRoofed(sx, sy)) bitmapKeys.add(xyKey(sx, sy));
+			}
+		}
+		const bitmapUsed = new Set();
+		for (const startKey of bitmapKeys) {
+			if (bitmapUsed.has(startKey)) continue;
+			// BFS to find connected component (one building)
+			const comp = new Set();
+			const q = [startKey];
+			comp.add(startKey);
+			for (let i = 0; i < q.length; i++) {
+				const { x, y } = keyToXY(q[i]);
+				for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+					const nk = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
+					if (!comp.has(nk) && bitmapKeys.has(nk)) { comp.add(nk); q.push(nk); }
+				}
+			}
+			for (const k of comp) bitmapUsed.add(k);
+
+			// Player inside this building — set shelter, skip rendering
+			if (playerKey && comp.has(playerKey)) {
+				const dtRec = destroyedTiles ? destroyedTiles[playerKey] : null;
+				const nearFire = keyWithinRadius(playerKey, activeFireKeys, 1);
+				_view.playerSheltered = !dtRec && !nearFire;
+				for (const k of comp) visited.add(k);
+				continue;
+			}
+
+			// Shadow/lit cutoff for this building
+			let minY = Infinity, maxY = -Infinity;
+			for (const key of comp) {
+				const { y } = keyToXY(key);
+				if (y < minY) minY = y;
+				if (y > maxY) maxY = y;
+			}
+			const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
+
+			// Generate roof tiles — 1:1 with ground tile state
+			for (const key of comp) {
+				visited.add(key);
+				const { x, y } = keyToXY(key);
+				const tile = getTile(x, y);
+				const isDoor = tile === TILE_DOOR;
+				let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
+				let alpha = isDoor ? 0.4 : 1.0;
+				let burning = false;
+				let smoking = false;
+				const dtRec = destroyedTiles ? destroyedTiles[key] : null;
+				const nearFire = keyWithinRadius(key, activeFireKeys, 1);
+				if (dtRec) {
+					kind += "_charred";
+					if (nearFire) {
+						burning = true;
+					} else {
+						alpha *= 0.45;
+						const age = Math.max(1, (_view.turn | 0) - (Number(dtRec.destroyedAtTurn || 0) | 0) + 1);
+						if (age <= SMOLDER_TURNS) smoking = true;
+					}
+				} else if (nearFire) {
+					burning = true;
+				}
+				roofs.push({ x, y, kind, alpha, burning, smoking });
+			}
+		}
+	}
+
+	// ── BFS-based roofs (legacy procedural buildings) ──
 	for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
 		const identity = String(ident?.identity || "");
 		if (!OVERWORLD_ROOF_SEED_IDENTITIES.has(identity)) continue;
@@ -728,6 +801,8 @@ export function buildWorldView(world) {
 				kind = objState.state === "working" ? "millstone_active" : "millstone";
 			} else if (objState && ident?.identity === "anvil") {
 				kind = objState.state === "working" ? "anvil_active" : "anvil";
+			} else if (objState && ident?.identity === "lantern_post") {
+				kind = objState.state === "lit" ? "lantern_post" : "lantern_post_unlit";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
@@ -795,6 +870,8 @@ export function buildWorldView(world) {
 				kind = objState.state === "working" ? "millstone_active" : "millstone";
 			} else if (objState && ident?.identity === "anvil") {
 				kind = objState.state === "working" ? "anvil_active" : "anvil";
+			} else if (objState && ident?.identity === "lantern_post") {
+				kind = objState.state === "lit" ? "lantern_post" : "lantern_post_unlit";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {

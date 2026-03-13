@@ -18,8 +18,8 @@ export {
   CoalOre,
   StoneChip,
   Wheat,
-  Turnip,
-  Pumpkin,
+  Carrot,
+  Corn,
   createCorpse,
 } from './Food.js';
 export {
@@ -49,8 +49,8 @@ export {
   Furnace,
   CookingFire,
   CropWheat,
-  CropTurnip,
-  CropPumpkin,
+  CropCarrot,
+  CropCorn,
   Well,
   Scarecrow,
   TavernKeg,

@@ -129,9 +129,9 @@ export const Wheat = defineArchetype(
   [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.8) }],
 );
 
-// Harvested from farm turnip crops.
-export const Turnip = defineArchetype(
-  "Turnip",
+// Harvested from farm carrot crops.
+export const Carrot = defineArchetype(
+  "Carrot",
   [Consumable, {
     effectParams: { nutrition: 130, special: null },
     remainingUses: 1,
@@ -139,18 +139,18 @@ export const Turnip = defineArchetype(
   }],
   [ItemInfo, {
     type: "food",
-    description: "A hearty turnip, fresh from the soil.",
+    description: "A fresh carrot, pulled straight from the soil.",
     weight: 0.4,
     value: 4,
     count: 1,
   }],
-  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Turnip", identity: "food_turnip" })],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Carrot", identity: "food_carrot" })],
   [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.6) }],
 );
 
-// Harvested from farm pumpkin crops.
-export const Pumpkin = defineArchetype(
-  "Pumpkin",
+// Harvested from farm corn crops.
+export const Corn = defineArchetype(
+  "Corn",
   [Consumable, {
     effectParams: { nutrition: 180, special: null },
     remainingUses: 1,
@@ -158,12 +158,12 @@ export const Pumpkin = defineArchetype(
   }],
   [ItemInfo, {
     type: "food",
-    description: "A large, bright orange pumpkin.",
+    description: "An ear of golden corn.",
     weight: 1.0,
     value: 8,
     count: 1,
   }],
-  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Pumpkin", identity: "food_pumpkin" })],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Corn", identity: "food_corn" })],
   [FoodDecay, { turnsHeld: 0, shelfLife: Math.floor(SHELF_LIFE_RATION * 0.7) }],
 );
 

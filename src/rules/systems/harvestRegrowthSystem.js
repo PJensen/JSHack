@@ -9,6 +9,7 @@ import { HarvestNode } from "../components/HarvestNode.js";
 export function harvestRegrowthSystem(world) {
   for (const [id, node] of world.query(HarvestNode)) {
     if (node.ready) continue;
+    if (node.needsPlanting) continue;
     const left = Number(node.regrowCountdown || 0);
     if (left > 1) {
       world.mutate(id, HarvestNode, (r) => { r.regrowCountdown = left - 1; });

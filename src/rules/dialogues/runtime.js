@@ -104,6 +104,17 @@ function openDialog(world, payload) {
   const def = getDialog(dialogId);
   if (!def) return;
 
+  const actorId = Number(payload?.actorId || 0) | 0;
+  const targetId = Number(payload?.targetId || 0) | 0;
+
+  // Close any existing dialog for the same actor+target pair (prevents duplicates
+  // from repeated bumps while still allowing a fresh re-open after quest state changes)
+  for (const [sid, session] of getSessions(world)) {
+    if (session.actorId === actorId && session.targetId === targetId) {
+      closeDialog(world, sid, "replaced");
+    }
+  }
+
   const sessionId = nextSessionId(world);
   const session = {
     sessionId,

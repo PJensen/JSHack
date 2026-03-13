@@ -43,7 +43,7 @@ import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
   WildBerries, WildHerbs, ThornPods, VenomFronds,
   DungeonMushrooms, IronOre, CoalOre, StoneChip,
-  Wheat, Turnip, Pumpkin,
+  Wheat, Carrot, Corn,
 } from "../../archetypes/Food.js";
 import { Monster } from "../../archetypes/Creatures.js";
 import { equipMonster } from "../../environment/dungeon/populate.js";
@@ -69,8 +69,8 @@ const CATALOG_ARCHETYPES = {
   "ore_coal":            CoalOre,
   "ore_stone":           StoneChip,
   "food_wheat":          Wheat,
-  "food_turnip":         Turnip,
-  "food_pumpkin":        Pumpkin,
+  "food_carrot":         Carrot,
+  "food_corn":           Corn,
 };
 
 const HARVEST_SEED_SALT = 0x48415256;
@@ -537,6 +537,20 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
+  toggleLantern: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const os = world.get(targetId, ObjectState);
+      const nowLit = os?.state !== "lit";
+      if (os) world.set(targetId, ObjectState, { state: nowLit ? "lit" : "unlit" });
+      world.emit?.("interaction", {
+        actor, targetId,
+        action: "toggleLantern",
+        result: nowLit ? "lit" : "extinguished",
+      });
+    },
+  },
+
   // ── Rest & recovery ────────────────────────────────────────────────────────
 
   restAtBed: {
@@ -882,10 +896,15 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const node = ctx.data.node;
 
-      // Start regrowth countdown.
+      // Start regrowth countdown (or mark for replanting if crop).
       world.mutate(targetId, HarvestNode, (n) => {
         n.ready = false;
-        n.regrowCountdown = n.regrowTurns;
+        if (n.replantable) {
+          n.needsPlanting = true;
+          n.regrowCountdown = 0;
+        } else {
+          n.regrowCountdown = n.regrowTurns;
+        }
       });
 
       // Reset visual to bare soil (stage 0) immediately on harvest.
