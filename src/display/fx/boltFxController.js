@@ -248,6 +248,72 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     }
   }
 
+  const STORM_LIGHTNING_VFX = Object.freeze({
+    outer: Object.freeze([140, 180, 255]),
+    mid:   Object.freeze([200, 225, 255]),
+    core:  Object.freeze([245, 252, 255]),
+    pulse: Object.freeze([220, 240, 255]),
+    spark: Object.freeze([160, 210, 255]),
+  });
+
+  function _spawnStormLightning({ x, y }) {
+    const ttl = 0.22 + Math.random() * 0.08;
+    const amp = 0.10 + Math.random() * 0.06;
+    const pal = STORM_LIGHTNING_VFX;
+
+    // Main bolt from sky to ground
+    _deityBolts.push(new DeityBoltFx({
+      from: { x, y: 0 }, to: { x, y },
+      ttl, amp, branch: false,
+      outer: pal.outer, mid: pal.mid, core: pal.core,
+    }));
+    _deityPulses.push(new PulseFx({ x, y, ttl: 0.28, color: pal.pulse }));
+    _screenBolts.push(new ScreenBoltFx({
+      x, y, ttl: ttl + 0.10, amp: 7, color: pal.core,
+    }));
+
+    // 2-3 forks
+    const forkCount = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < forkCount; i++) {
+      const tStart = 0.15 + Math.random() * 0.55;
+      const yStart = y * tStart;
+      const xStart = x + (Math.random() - 0.5) * 0.3;
+      const yEnd = Math.min(y + 1.2, yStart + 1.0 + Math.random() * 2.0);
+      const xEnd = xStart + (Math.random() - 0.5) * 1.2;
+      _deityBolts.push(new DeityBoltFx({
+        from: { x: xStart, y: yStart }, to: { x: xEnd, y: yEnd },
+        ttl: ttl * (0.6 + Math.random() * 0.3), amp: amp * 0.7, branch: true,
+        outer: pal.outer, mid: pal.mid, core: pal.core,
+      }));
+      _deityPulses.push(new PulseFx({
+        x: xEnd, y: yEnd, ttl: 0.14 + Math.random() * 0.10, max: 0.22,
+        color: pal.pulse,
+      }));
+    }
+
+    // Sparks at impact
+    if (fx?.pool) {
+      for (let i = 0; i < 18; i++) {
+        const t = Math.random();
+        fx.pool.spawn(new Particle({
+          x: x + (Math.random() - 0.5) * 0.3,
+          y: y * t + (Math.random() - 0.5) * 0.06,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: 0.6 + Math.random() * 2.0,
+          ay: 0.8,
+          life: 0.12 + Math.random() * 0.22,
+          size0: 0.05 + Math.random() * 0.05, size1: 0.01,
+          r: pal.spark[0], g: pal.spark[1], b: pal.spark[2],
+          a0: 0.85,
+          rotVel: (Math.random() - 0.5) * 2.2,
+        }));
+      }
+    }
+
+    startShake(cam, 4, 0.14);
+    _screenFlash.push(new ScreenFlashFx({ ttl: 0.10, color: pal.pulse }));
+  }
+
   function installListeners() {
     world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex = 0 }) => {
       if (from && to) {
@@ -264,6 +330,11 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         severityScale: Number(severityScale || 1),
         wrathDebt: Number(wrathDebt || 0),
       });
+    });
+    world.on('weather:lightning', ({ x, y }) => {
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        _spawnStormLightning({ x: Number(x), y: Number(y) });
+      }
     });
     world.on('monster:firebreath', ({ from, to, tiles, hitIds }) => {
       if (!from || !to) return;

@@ -6,10 +6,14 @@ import { GrowthStage } from "../components/GrowthStage.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 import { Burned } from "../components/Burned.js";
 import { Position } from "../components/Position.js";
+import { Vitality } from "../components/Vitality.js";
 import {
   getDestroyedTileLedger, destroyedTileKey, getDungeonStateRecord,
 } from "../utils/destroyedTiles.js";
-import { setTile } from "../environment/dungeon/tileMap.js";
+import { setTile, getTile } from "../environment/dungeon/tileMap.js";
+import { TILE_TREE, TILE_WATER, TILE_SHALLOW_WATER, TILE_WATER_DEEP } from "../environment/dungeon/constants.js";
+import { forEachInRadius } from "../utils/spatialIndex.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 // Weather durations (in turns)
 const CLEAR_MIN = 80;
@@ -22,6 +26,13 @@ const HEAVY_RAIN_MAX = 40;
 // Transition probabilities (cumulative)
 const P_RAIN = 0.30;
 const P_HEAVY = 0.10; // 10% heavy rain
+
+// Lightning strike tuning
+const LIGHTNING_CHANCE = 0.08;     // per-turn chance during heavy rain
+const LIGHTNING_RADIUS = 10;       // max distance from player
+const LIGHTNING_MIN_DMG = 3;
+const LIGHTNING_MAX_DMG = 8;
+const WATER_TILES = new Set([TILE_WATER, TILE_SHALLOW_WATER, TILE_WATER_DEEP]);
 
 // Ambient rain messages
 const RAIN_LINES = Object.freeze([
@@ -96,6 +107,9 @@ export function weatherSystem(world) {
       _waterCrops(world);
       _emitRainAmbient(world, current);
     }
+    if (current === "heavy_rain") {
+      _rollLightning(world);
+    }
 
     break; // singleton
   }
@@ -163,6 +177,68 @@ function _waterCrops(world) {
       });
     }
   }
+}
+
+/**
+ * Roll for a lightning strike during heavy rain.
+ * Strikes a random tile near the player; deals electric damage to entities,
+ * and chains through water tiles.
+ */
+function _rollLightning(world) {
+  if (world.rand() >= LIGHTNING_CHANCE) return;
+
+  // Find the player position
+  let px = 0, py = 0;
+  for (const [, , pos] of world.query(Player, Position)) {
+    px = pos.x; py = pos.y; break;
+  }
+
+  // Pick a random strike position near the player
+  const ox = Math.floor(world.rand() * (LIGHTNING_RADIUS * 2 + 1)) - LIGHTNING_RADIUS;
+  const oy = Math.floor(world.rand() * (LIGHTNING_RADIUS * 2 + 1)) - LIGHTNING_RADIUS;
+  const sx = px + ox;
+  const sy = py + oy;
+
+  const tile = getTile(sx, sy);
+
+  // Lightning is attracted to trees and water
+  const hitTree = tile === TILE_TREE;
+  const hitWater = WATER_TILES.has(tile);
+
+  // Base damage roll
+  const rawDmg = LIGHTNING_MIN_DMG + Math.floor(
+    world.rand() * (LIGHTNING_MAX_DMG - LIGHTNING_MIN_DMG + 1)
+  );
+
+  // Collect entities hit: at strike point, or within 1 tile if water (conduction)
+  const hitRadius = hitWater ? 1 : 0;
+  const hitEntities = [];
+  forEachInRadius(world, sx, sy, hitRadius, (id) => {
+    if (!world.get(id, Vitality)) return;
+    hitEntities.push(id);
+  });
+
+  // Apply damage to all hit entities
+  for (const id of hitEntities) {
+    const pos = world.get(id, Position);
+    dealDamage(world, {
+      target: id,
+      amount: rawDmg,
+      source: 0,
+      type: "lightning",
+      cause: "lightning",
+      at: pos ? { x: pos.x, y: pos.y } : undefined,
+    });
+  }
+
+  // Emit visual event
+  world.emit?.("weather:lightning", {
+    x: sx, y: sy,
+    hitTree,
+    hitWater,
+    damage: rawDmg,
+    hitCount: hitEntities.length,
+  });
 }
 
 /** @type {WeakMap<object, number>} */

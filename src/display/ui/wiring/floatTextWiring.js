@@ -234,6 +234,19 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Storm lightning strike
+  world.on('weather:lightning', ({ x, y, hitCount }) => {
+    if (!canShowAt(x, y)) return;
+    try {
+      ftext.addStatus(x, y - 0.45, (hitCount | 0) > 0 ? 'ZAP!' : 'CRACK!', {
+        color: '#88ccff',
+        life: 1.0,
+        scaleStart: 1.6,
+        scaleEnd: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] lightning ftext failed:', e); }
+  });
+
   // Town bell alarm
   world.on('bell:rung', ({ targetId }) => {
     const pos = getPosition(Number(targetId || 0));
