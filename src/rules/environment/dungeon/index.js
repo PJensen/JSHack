@@ -23,7 +23,7 @@ export { transitionToDepth } from './transition.js';
 export { populateChunk, materializeSpawn } from './populate.js';
 export { pickMonster, pickItem } from './tables.js';
 export { buildBSP, placeRooms, carveRooms, connectRooms, collectLeafRooms } from './bsp.js';
-export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isFlyable, isOpaque, forEachTileInRect, forEachLoadedTile, loadedChunkCount } from './tileMap.js';
+export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isFlyable, isOpaque, isRoofed, setRoofed, forEachTileInRect, forEachLoadedTile, loadedChunkCount } from './tileMap.js';
 export { markExplored } from './exploredMap.js';
 
 import { DungeonState } from '../../components/DungeonState.js';

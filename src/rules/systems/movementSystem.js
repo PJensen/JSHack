@@ -29,6 +29,9 @@ import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { DoorState } from "../components/DoorState.js";
 import { Encumbrance } from "../components/Encumbrance.js";
+import { Player } from "../components/Player.js";
+
+const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
@@ -214,7 +217,9 @@ export function movementSystem(world) {
         && isBlockedOnlyByWebs(world, tiles, nx, ny);
       const flyingOccupant = target > 0 && target !== actor && world.has(target, Flying);
 
-      if (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb) || flyingOccupant) {
+      const noclip = world[NOCLIP_SYM] && world.has(actor, Player);
+
+      if (!noclip && (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb) || flyingOccupant)) {
         // Blocked — delegate to bump resolver dispatch table
         resolveBump(world, actor, { nx, ny, mdx, mdy, target, tiles });
       } else {

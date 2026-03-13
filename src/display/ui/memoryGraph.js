@@ -17,7 +17,6 @@ export function ensureMemoryGraph(root) {
     title: 'Memory (MB)',
     width: 240,
     height: 140,
-    position: { left: '8px', bottom: '56px' },
     zIndex: 910,
     series: [
       { key: 'total', color: 'rgba(85, 170, 255, 0.35)', label: 'Total' },
@@ -35,6 +34,5 @@ export function ensureMemoryGraph(root) {
     unavailableMessage: 'Memory API not available\n(Chrome/Edge only)',
   });
 
-  root.appendChild(_instance.canvas);
   return _instance;
 }

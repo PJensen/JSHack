@@ -2,6 +2,9 @@
 // Deterministic depth-0 overworld generation (Perlin/fBM terrain + home clearing).
 
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
+import { stampBuilding } from "./stampBuilding.js";
+import smithyDef from "../../data/buildings/smithy.json" with { type: "json" };
+import churchDef from "../../data/buildings/church.json" with { type: "json" };
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -39,7 +42,7 @@ function chunkKey(cx, cy) { return `${cx},${cy}`; }
  * @param {number} y
  * @param {number} tile
  */
-function setWorldTile(chunks, x, y, tile) {
+export function setWorldTile(chunks, x, y, tile) {
   const cx = Math.floor(x / CHUNK_SIZE);
   const cy = Math.floor(y / CHUNK_SIZE);
   const chunk = chunks.get(chunkKey(cx, cy));
@@ -194,7 +197,7 @@ function carvePathVerticalFirst(chunks, x0, y0, x1, y1) {
  * @param {string} kind
  * @param {Record<string, any>} [params]
  */
-function addSpawn(chunks, x, y, kind, params = {}) {
+export function addSpawn(chunks, x, y, kind, params = {}) {
   const cx = Math.floor(x / CHUNK_SIZE);
   const cy = Math.floor(y / CHUNK_SIZE);
   const chunk = chunks.get(chunkKey(cx, cy));
@@ -515,8 +518,8 @@ export function generateOverworldChunks(worldSeed) {
   // 4 columns × 6 rows = 24 crops to feed the whole town.
   const cropCols = [
     { x: homeX - 3, kind: "crop_wheat" },
-    { x: homeX - 1, kind: "crop_turnip" },
-    { x: homeX + 1, kind: "crop_pumpkin" },
+    { x: homeX - 1, kind: "crop_carrot" },
+    { x: homeX + 1, kind: "crop_corn" },
     { x: homeX + 3, kind: "crop_wheat" },
   ];
   for (const col of cropCols) {
@@ -605,27 +608,42 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, millX0 + 2, millY0 + 2, "millstone");
   addSpawn(chunks, millX0 + 1, millY0 + 2, "mill_chest");
 
-  // ── The Black Smith — workshop south of the mill, door facing the west walkway ──
-  const smithyX0 = homeX - 10;
-  const smithyY0 = homeY;
-  const smithyX1 = homeX - 6;
-  const smithyY1 = homeY + 4;
-  for (let sy = smithyY0; sy <= smithyY1; sy++) {
-    for (let sx = smithyX0; sx <= smithyX1; sx++) {
-      const border = sx === smithyX0 || sx === smithyX1 || sy === smithyY0 || sy === smithyY1;
-      setWorldTile(chunks, sx, sy, border ? TILE_WALL : TILE_FLOOR);
+  // ── The Smithy — stamped from JSON building definition ──
+  // Anchor (keystone) offset so fenced yard clears the mill to the north.
+  const smithyAnchorX = homeX - 7;
+  const smithyAnchorY = homeY;
+  const smithyResult = stampBuilding(chunks, smithyDef, smithyAnchorX, smithyAnchorY);
+  // Extend cobblestone from building edge to the western walkway
+  for (let px = smithyAnchorX + 1; px <= westWalkX; px++) {
+    setWorldTile(chunks, px, smithyAnchorY, TILE_COBBLESTONE);
+  }
+  const smithyFurnace = smithyResult.spawns.furnace || { x: smithyAnchorX - 9, y: smithyAnchorY + 2 };
+  const smithyAnvil = smithyResult.spawns.anvil || { x: smithyAnchorX - 9, y: smithyAnchorY - 1 };
+  const smithyLumberDrop = smithyResult.waypoints?.deliver_lumber || smithyResult.spawns.lumber_chest || { x: smithyFurnace.x + 1, y: smithyFurnace.y + 1 };
+  const smithyOreDrop = smithyResult.waypoints?.deliver_ore || smithyResult.spawns.smithy_chest || { x: smithyFurnace.x + 1, y: smithyFurnace.y - 1 };
+
+  // Small ore outcrop near the smithy so the miner has a short commute.
+  const nearOreX = smithyAnchorX - 10;
+  const nearOreY = smithyAnchorY + 9;
+  fillDisk(chunks, nearOreX, nearOreY, 2);
+  addSpawn(chunks, nearOreX, nearOreY, "harvest_iron_ore");
+  addSpawn(chunks, nearOreX + 1, nearOreY, "harvest_coal_ore");
+  addSpawn(chunks, nearOreX - 1, nearOreY, "harvest_iron_ore");
+
+  // Stand of trees next to the ore outcrop for the woodcutter.
+  const nearTreeX = nearOreX;
+  const nearTreeY = nearOreY + 3;
+  fillDisk(chunks, nearTreeX, nearTreeY, 3);
+  for (let tx = nearTreeX - 1; tx <= nearTreeX + 1; tx++) {
+    for (let ty = nearTreeY - 1; ty <= nearTreeY + 1; ty++) {
+      if (tx === nearTreeX && ty === nearTreeY) continue;   // center walkable
+      if (tx === nearTreeX && ty === nearTreeY - 1) continue; // north entrance
+      setWorldTile(chunks, tx, ty, TILE_TREE);
     }
   }
-  const smithyDoorX = smithyX1;
-  const smithyDoorY = smithyY0 + 2;
-  setWorldTile(chunks, smithyDoorX, smithyDoorY, TILE_DOOR);
-  // Interior: furnace NW, anvil NE, chest SW
-  addSpawn(chunks, smithyX0 + 1, smithyY0 + 1, "furnace");
-  addSpawn(chunks, smithyX0 + 3, smithyY0 + 1, "anvil");
-  addSpawn(chunks, smithyX0 + 1, smithyY0 + 3, "smithy_chest");
-  addSpawn(chunks, smithyX0 + 3, smithyY0 + 3, "lumber_chest");
-  // Sign outside the door
-  addSpawn(chunks, smithyDoorX + 1, smithyDoorY + 1, "smithy_sign");
+
+  // Path from smithy area down to the ore/tree work area.
+  carvePath(chunks, nearOreX, smithyAnchorY + 7, nearOreX, nearOreY);
 
   // ── The Apothecary — compact, cleaner workspace with its own little cluster ─────────
   const apothX0 = homeX - 29;
@@ -671,64 +689,15 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, gardenX, gardenY + 1, "harvest_venom_fern");
   addSpawn(chunks, gardenX + 1, gardenY + 1, "harvest_thorn_bramble");
 
-  // ── Church — cruciform cathedral north of house ─────────────
-  // Latin-cross plan: nave runs N–S (altar at north, door at south
-  // facing the fountain plaza), transepts branch E–W at the crossing.
+  // ── Church — stamped from JSON building definition ─────────────
   const crossingX = homeX;
   const crossingY = homeY - 16;
   fillDisk(chunks, crossingX, crossingY, 8);
-  const churchFloorCells = [];
-  // Vertical arm: chancel (N) + crossing + nave (S) — 3 wide × 11 tall
-  for (let vy = crossingY - 4; vy <= crossingY + 6; vy++) {
-    for (let vx = crossingX - 1; vx <= crossingX + 1; vx++) {
-      churchFloorCells.push({ x: vx, y: vy });
-    }
-  }
-  // West transept wing: 3 wide × 3 tall
-  for (let ty = crossingY - 1; ty <= crossingY + 1; ty++) {
-    for (let tx = crossingX - 4; tx <= crossingX - 2; tx++) {
-      churchFloorCells.push({ x: tx, y: ty });
-    }
-  }
-  // East transept wing: 3 wide × 3 tall
-  for (let ty = crossingY - 1; ty <= crossingY + 1; ty++) {
-    for (let tx = crossingX + 2; tx <= crossingX + 4; tx++) {
-      churchFloorCells.push({ x: tx, y: ty });
-    }
-  }
+  const churchResult = stampBuilding(chunks, churchDef, crossingX, crossingY);
   const churchDoorX = crossingX;
   const churchDoorY = crossingY + 7;
-  paintStructure(chunks, churchFloorCells, { x: churchDoorX, y: churchDoorY });
   // Path from south door to fountain plaza / walkway
   carvePath(chunks, churchDoorX, churchDoorY + 1, churchDoorX, northWalkY);
-  // North end (chancel): stained glass window, altar, flanking torches
-  addSpawn(chunks, crossingX, crossingY - 4, "church_window");
-  addSpawn(chunks, crossingX, crossingY - 3, "church_altar");
-  addSpawn(chunks, crossingX - 1, crossingY - 4, "torch");
-  addSpawn(chunks, crossingX + 1, crossingY - 4, "torch");
-  // South end (narthex): baptismal font near the entrance
-  addSpawn(chunks, crossingX, crossingY + 5, "church_font");
-  // Nave pews — rows flanking the central aisle
-  addSpawn(chunks, crossingX - 1, crossingY + 2, "church_pew");
-  addSpawn(chunks, crossingX + 1, crossingY + 2, "church_pew");
-  addSpawn(chunks, crossingX - 1, crossingY + 3, "church_pew");
-  addSpawn(chunks, crossingX + 1, crossingY + 3, "church_pew");
-  addSpawn(chunks, crossingX - 1, crossingY + 4, "church_pew");
-  addSpawn(chunks, crossingX + 1, crossingY + 4, "church_pew");
-  addSpawn(chunks, crossingX - 1, crossingY + 5, "church_pew");
-  addSpawn(chunks, crossingX + 1, crossingY + 5, "church_pew");
-  // West transept: torches and pew
-  addSpawn(chunks, crossingX - 4, crossingY - 1, "torch");
-  addSpawn(chunks, crossingX - 4, crossingY + 1, "torch");
-  addSpawn(chunks, crossingX - 3, crossingY, "church_pew");
-  // East transept: torches and pew
-  addSpawn(chunks, crossingX + 4, crossingY - 1, "torch");
-  addSpawn(chunks, crossingX + 4, crossingY + 1, "torch");
-  addSpawn(chunks, crossingX + 3, crossingY, "church_pew");
-  // Sign outside south door
-  addSpawn(chunks, churchDoorX + 1, churchDoorY + 1, "church_sign");
-  // Town bell outside church
-  addSpawn(chunks, churchDoorX - 2, churchDoorY, "town_bell");
 
   // ── Graveyard — fenced enclosure behind (north of) the church ──
   const gyX0 = crossingX - 4;
@@ -804,8 +773,12 @@ export function generateOverworldChunks(worldSeed) {
   const farmerHouse = buildCottage(chunks, homeX + 8, homeY + 10, "north");
   carvePath(chunks, farmerHouse.doorX, farmerHouse.doorY - 1, eastWalkX, southWalkY);
 
-  const smithHouse = buildCottage(chunks, homeX - 15, homeY + 10, "north");
-  carvePath(chunks, smithHouse.doorX, smithHouse.doorY - 1, westWalkX, southWalkY);
+  // Smith + miner sleep at the smithy (beds placed via JSON building definition).
+  const smithyBeds = smithyResult.allSpawns?.home_bed || [];
+  const smithBed = smithyBeds[0] || { x: smithyAnchorX - 8, y: smithyAnchorY + 1 };
+  const minerBed = smithyBeds[1] || smithBed;
+  const smithHome = smithyResult.waypoints?.home || { x: smithBed.x + 1, y: smithBed.y };
+  const minerHome = smithyResult.waypoints?.miner_home || { x: minerBed.x + 1, y: minerBed.y };
 
   const masonHouse = buildCottage(chunks, homeX + 23, homeY - 5, "south");
   carvePath(chunks, masonHouse.doorX, masonHouse.doorY + 1, eastWalkX, homeY - 1);
@@ -831,11 +804,9 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, mineWorkX + 2, mineWorkY, "harvest_stone");
   addSpawn(chunks, mineWorkX - 1, mineWorkY - 1, "harvest_iron_ore");
 
-  const woodcutterHouse = buildCottage(chunks, homeX - 21, homeY - 5, "south");
-  carvePathVerticalFirst(chunks, woodcutterHouse.doorX, woodcutterHouse.doorY + 1, westWalkX, homeY - 2);
-
-  const minerHouse = buildCottage(chunks, homeX + 20, homeY - 18, "south");
-  carvePath(chunks, minerHouse.doorX, minerHouse.doorY + 1, eastWalkX, northWalkY);
+  // Woodcutter sleeps at the smithy (bed placed via JSON building definition).
+  const woodcutterBed = smithyBeds[2] || minerBed;
+  const woodcutterHome = smithyResult.waypoints?.woodcutter_home || { x: woodcutterBed.x + 1, y: woodcutterBed.y };
 
   const herbalistHouse = buildCottage(chunks, apothX0 - 4, apothY0 - 8, "south");
   carvePathVerticalFirst(chunks, herbalistHouse.doorX, herbalistHouse.doorY + 1, apothDoorX - 3, apothDoorY + 1);
@@ -876,11 +847,8 @@ export function generateOverworldChunks(worldSeed) {
     { x: churchDoorX + 2, y: churchDoorY + 1 },
     // Near cottage doorsteps
     { x: farmerHouse.doorX + 1, y: farmerHouse.doorY - 1 },
-    { x: smithHouse.doorX - 1, y: smithHouse.doorY - 1 },
     { x: masonHouse.doorX + 1, y: masonHouse.doorY + 1 },
     { x: villagerHouse.doorX - 1, y: villagerHouse.doorY - 1 },
-    { x: woodcutterHouse.doorX + 1, y: woodcutterHouse.doorY + 1 },
-    { x: minerHouse.doorX - 1, y: minerHouse.doorY + 1 },
     { x: priestHouse.doorX + 1, y: priestHouse.doorY + 1 },
     { x: barkeepHouse.doorX - 1, y: barkeepHouse.doorY + 1 },
     { x: herbalistHouse.doorX + 1, y: herbalistHouse.doorY + 1 },
@@ -928,33 +896,33 @@ export function generateOverworldChunks(worldSeed) {
     pubX: tavX0 + 2, pubY: tavY0 + 4,
     deliverX: millX0 + 1, deliverY: millY0 + 2,
   });
-  addSpawn(chunks, woodcutterHouse.standX, woodcutterHouse.standY, "townfolk", {
+  addSpawn(chunks, woodcutterHome.x, woodcutterHome.y, "townfolk", {
     townfolkId: "woodcutter",
     scheduleEnabled: true,
-    homeX: woodcutterHouse.standX, homeY: woodcutterHouse.standY,
-    bedX: woodcutterHouse.sleepX, bedY: woodcutterHouse.sleepY,
-    workX: homeX - 18, workY: homeY - 6,
+    homeX: woodcutterHome.x, homeY: woodcutterHome.y,
+    bedX: woodcutterBed.x, bedY: woodcutterBed.y,
+    workX: nearTreeX, workY: nearTreeY,
     workAuxX: homeX - 21, workAuxY: homeY - 10,
     pubX: tavX0 + 1, pubY: tavY0 + 4,
-    deliverX: smithyX0 + 3, deliverY: smithyY0 + 3,
+    deliverX: smithyLumberDrop.x, deliverY: smithyLumberDrop.y,
   });
-  addSpawn(chunks, minerHouse.standX, minerHouse.standY, "townfolk", {
+  addSpawn(chunks, minerHome.x, minerHome.y, "townfolk", {
     townfolkId: "miner",
     scheduleEnabled: true,
-    homeX: minerHouse.standX, homeY: minerHouse.standY,
-    bedX: minerHouse.sleepX, bedY: minerHouse.sleepY,
-    workX: mineWorkX, workY: mineWorkY + 1,
+    homeX: minerHome.x, homeY: minerHome.y,
+    bedX: minerBed.x, bedY: minerBed.y,
+    workX: nearOreX, workY: nearOreY,
     workAuxX: mineWorkX + 1, workAuxY: mineWorkY - 1,
     pubX: tavX0 + 6, pubY: tavY0 + 4,
-    deliverX: smithyX0 + 1, deliverY: smithyY0 + 3,
+    deliverX: smithyOreDrop.x, deliverY: smithyOreDrop.y,
   });
-  addSpawn(chunks, smithHouse.standX, smithHouse.standY, "townfolk", {
+  addSpawn(chunks, smithHome.x, smithHome.y, "townfolk", {
     townfolkId: "smith",
     scheduleEnabled: true,
-    homeX: smithHouse.standX, homeY: smithHouse.standY,
-    bedX: smithHouse.sleepX, bedY: smithHouse.sleepY,
-    workX: smithyX0 + 2, workY: smithyY0 + 2,
-    workAuxX: smithyX0 + 3, workAuxY: smithyY0 + 1,
+    homeX: smithHome.x, homeY: smithHome.y,
+    bedX: smithBed.x, bedY: smithBed.y,
+    workX: smithyFurnace.x + 1, workY: smithyFurnace.y,
+    workAuxX: smithyAnvil.x, workAuxY: smithyAnvil.y,
     pubX: tavX0 + 5, pubY: tavY0 + 4,
   });
   addSpawn(chunks, priestHouse.standX, priestHouse.standY, "townfolk", {

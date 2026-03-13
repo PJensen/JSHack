@@ -188,6 +188,7 @@ export const CropWheat = defineArchetype(
   [HarvestNode, {
     kind: "wheat", ready: true, regrowTurns: 200, regrowCountdown: 0,
     yield: "food_wheat", yieldMin: 1, yieldMax: 3,
+    replantable: true,
   }],
   [GrowthStage, {
     currentStage: 3, maxStage: 3,
@@ -197,37 +198,39 @@ export const CropWheat = defineArchetype(
   [Interactable, { action: "harvestNode", params: null }],
 );
 
-export const CropTurnip = defineArchetype(
-  "CropTurnip",
+export const CropCarrot = defineArchetype(
+  "CropCarrot",
   [Position, (p) => ({ x: p.x, y: p.y })],
-  [NamedIdentity, { name: "Turnip", identity: "crop_turnip" }],
+  [NamedIdentity, { name: "Carrot", identity: "crop_carrot" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [HarvestNode, {
-    kind: "turnip", ready: true, regrowTurns: 160, regrowCountdown: 0,
-    yield: "food_turnip", yieldMin: 1, yieldMax: 2,
+    kind: "carrot", ready: true, regrowTurns: 160, regrowCountdown: 0,
+    yield: "food_carrot", yieldMin: 1, yieldMax: 2,
+    replantable: true,
   }],
   [GrowthStage, {
     currentStage: 3, maxStage: 3,
-    stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_turnip"],
+    stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_carrot"],
     growInterval: 0, growCountdown: 0,
   }],
   [Interactable, { action: "harvestNode", params: null }],
 );
 
-export const CropPumpkin = defineArchetype(
-  "CropPumpkin",
+export const CropCorn = defineArchetype(
+  "CropCorn",
   [Position, (p) => ({ x: p.x, y: p.y })],
-  [NamedIdentity, { name: "Pumpkin", identity: "crop_pumpkin" }],
+  [NamedIdentity, { name: "Corn", identity: "crop_corn" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [HarvestNode, {
-    kind: "pumpkin", ready: true, regrowTurns: 280, regrowCountdown: 0,
-    yield: "food_pumpkin", yieldMin: 1, yieldMax: 1,
+    kind: "corn", ready: true, regrowTurns: 280, regrowCountdown: 0,
+    yield: "food_corn", yieldMin: 1, yieldMax: 1,
+    replantable: true,
   }],
   [GrowthStage, {
     currentStage: 3, maxStage: 3,
-    stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_pumpkin"],
+    stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_corn"],
     growInterval: 0, growCountdown: 0,
   }],
   [Interactable, { action: "harvestNode", params: null }],
@@ -533,4 +536,129 @@ export const GraveTombstone = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "readText", params: { textId: "grave_epitaph" } }],
+);
+
+// ── Town decorations ─────────────────────────────────────────────
+export const Barrel = defineArchetype(
+  "Barrel",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Barrel", identity: "barrel" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Crate = defineArchetype(
+  "Crate",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Crate", identity: "crate" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Woodpile = defineArchetype(
+  "Woodpile",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Woodpile", identity: "woodpile" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const HayBale = defineArchetype(
+  "HayBale",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Hay Bale", identity: "hay_bale" }],
+  [Material, { kind: "plant" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const LanternPost = defineArchetype(
+  "LanternPost",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Lantern Post", identity: "lantern_post" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [ObjectState, { state: "lit" }],
+  [Interactable, { action: "toggleLantern", params: null }],
+);
+
+export const RainBarrel = defineArchetype(
+  "RainBarrel",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Rain Barrel", identity: "rain_barrel" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Wheelbarrow = defineArchetype(
+  "Wheelbarrow",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Wheelbarrow", identity: "wheelbarrow" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const MarketStall = defineArchetype(
+  "MarketStall",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Market Stall", identity: "market_stall" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Bench = defineArchetype(
+  "Bench",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Bench", identity: "bench" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+// ── Natural features ─────────────────────────────────────────────
+export const Boulder = defineArchetype(
+  "Boulder",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Boulder", identity: "boulder" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const FallenLog = defineArchetype(
+  "FallenLog",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Fallen Log", identity: "fallen_log" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const LilyPad = defineArchetype(
+  "LilyPad",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Lily Pad", identity: "lily_pad" }],
+  [Material, { kind: "plant" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const Cattail = defineArchetype(
+  "Cattail",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Cattail", identity: "cattail" }],
+  [Material, { kind: "plant" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+// ── Garden features ──────────────────────────────────────────────
+export const Birdbath = defineArchetype(
+  "Birdbath",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Birdbath", identity: "birdbath" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const Trellis = defineArchetype(
+  "Trellis",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Trellis", identity: "trellis" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
 );

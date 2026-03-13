@@ -233,6 +233,13 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
     return 'Reveal OFF — fog of war will restore on next move.';
   });
 
+  // ---- noclip ----
+  const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
+  console.registerCommand('noclip', 'Toggle noclip (walk through walls)', () => {
+    world[NOCLIP_SYM] = !world[NOCLIP_SYM];
+    return `Noclip ${world[NOCLIP_SYM] ? 'ON' : 'OFF'}`;
+  });
+
   // ---- weather [clear|rain|heavy_rain] ----
   const WEATHER_TYPES = ['clear', 'rain', 'heavy_rain'];
   console.registerCommand('weather', 'weather [clear|rain|heavy_rain] — view or set weather', (argsStr) => {

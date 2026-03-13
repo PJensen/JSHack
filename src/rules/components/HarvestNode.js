@@ -29,6 +29,8 @@ export const HarvestNode = defineComponent("HarvestNode", {
   requiresTool: null,
   danger: null,
   hazard: null,
+  replantable: false,
+  needsPlanting: false,
 }, {
   validate(rec) {
     if (typeof rec.kind !== "string" || !rec.kind) throw new Error("HarvestNode.kind must be a non-empty string");

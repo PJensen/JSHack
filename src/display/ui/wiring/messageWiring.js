@@ -709,6 +709,9 @@ export function installMessageWiring({
     if (action === 'toggleDoor') {
       log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`, 'system');
     }
+    if (action === 'toggleLantern') {
+      log(result === 'lit' ? 'You light the lantern.' : 'You extinguish the lantern.', 'system');
+    }
     if (action === 'openChest') {
       log('You open the chest!', 'system');
     }
@@ -1068,6 +1071,10 @@ export function installMessageWiring({
 
   world.on('townfolk:harvested', ({ x, y }) => {
     if (canSeeAt(x, y)) log('A farmer picks a ripe crop.', 'ambient');
+  });
+
+  world.on('townfolk:planted', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('A farmer plants a seed.', 'ambient');
   });
 
   world.on('townfolk:carrying', ({ resource }) => {

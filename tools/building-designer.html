@@ -1,0 +1,1049 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>JS-Hack Building Designer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+:root{--bg:#0b0f13;--panel:#07100d;--muted:#9fd7aa;--accent:#73c08a;--border:rgba(36,69,55,0.5)}
+html,body{height:100%;margin:0;background:var(--bg);color:#d8f6de;font:13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+*{box-sizing:border-box}
+.wrap{display:grid;grid-template-columns:220px 1fr 320px;gap:8px;height:100vh;padding:8px}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid var(--border);border-radius:8px;padding:8px;overflow-y:auto}
+.left{display:flex;flex-direction:column;gap:4px}
+.center{display:flex;flex-direction:column;position:relative}
+.right{display:flex;flex-direction:column;gap:6px}
+h3{margin:0 0 4px;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px}
+.cat-header{font-size:11px;color:#7aa;margin:6px 0 2px;font-weight:600;border-bottom:1px solid rgba(100,200,150,0.1);padding-bottom:2px}
+.pal-grid{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px}
+.pal-item{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:4px;cursor:pointer;font-size:14px;background:rgba(0,0,0,0.3);position:relative}
+.pal-item:hover{border-color:var(--accent);background:rgba(40,80,60,0.3)}
+.pal-item.active{border-color:#5cff9a;background:rgba(40,120,60,0.3);box-shadow:0 0 6px rgba(92,255,154,0.3)}
+.pal-item .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#0a1a14;border:1px solid var(--border);padding:3px 6px;border-radius:4px;font-size:10px;white-space:nowrap;z-index:10;color:var(--muted)}
+.pal-item:hover .tip{display:block}
+#canvas{width:100%;height:100%;display:block;background:#04080a;border-radius:6px;cursor:crosshair}
+.hud{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:11px;color:#7aa;flex-shrink:0}
+.hud span{background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px}
+input[type=text],input[type=number]{width:100%;padding:5px 8px;border-radius:6px;border:1px solid #244537;background:rgba(0,0,0,0.3);color:var(--muted);font-size:12px}
+input[type=number]{width:60px}
+label.row{display:flex;gap:6px;align-items:center;font-size:12px}
+button{background:#082214;border:1px solid #244537;color:var(--muted);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px}
+button:hover{background:#0d3020;border-color:var(--accent)}
+button.warn{background:#3b1b1b;border-color:#7b3b3b}
+button.warn:hover{background:#5b2b2b}
+button.primary{background:#0d4020;border-color:#2d8b5a}
+.line{height:1px;background:rgba(160,220,180,0.06);margin:6px 0}
+textarea{width:100%;background:#04120e;color:#d8f6de;border:1px solid #123826;padding:6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace;font-size:11px;resize:vertical}
+.info-row{display:flex;gap:6px;align-items:center;font-size:11px;color:#7aa}
+.info-val{color:var(--muted);font-weight:600}
+.tool-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}
+.tool-btn{padding:4px 8px;font-size:11px;border-radius:4px}
+.tool-btn.active{border-color:#5cff9a;background:rgba(40,120,60,0.3)}
+.export-tabs{display:flex;gap:4px;margin-bottom:4px}
+.export-tab{flex:1;text-align:center;padding:4px;font-size:11px;border-radius:4px;cursor:pointer;border:1px solid #244537;background:rgba(0,0,0,0.2)}
+.export-tab.active{background:#0d4020;border-color:#2d8b5a}
+</style>
+
+<div class="wrap">
+  <!-- LEFT: Palette -->
+  <div class="panel left" id="palettePanel">
+    <h3>Palette</h3>
+    <div class="tool-row">
+      <button class="tool-btn active" id="toolPaint" onclick="setTool('paint')">Paint</button>
+      <button class="tool-btn" id="toolErase" onclick="setTool('erase')">Erase</button>
+      <button class="tool-btn" id="toolKeystone" onclick="setTool('keystone')">Keystone</button>
+      <button class="tool-btn" id="toolWaypoint" onclick="setTool('waypoint')">Waypoint</button>
+    </div>
+    <div id="paletteCats"></div>
+  </div>
+
+  <!-- CENTER: Canvas -->
+  <div class="center">
+    <div class="hud">
+      <span id="hudCoord">--</span>
+      <span id="hudRel">--</span>
+      <span id="hudTile">--</span>
+      <button onclick="toggleGrid()">Grid</button>
+      <button onclick="resetView()">Reset View</button>
+    </div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- RIGHT: Properties & Export -->
+  <div class="panel right">
+    <h3>Building</h3>
+    <label class="row">Name <input type="text" id="buildingName" value="my_building" /></label>
+    <div style="display:flex;gap:6px">
+      <label class="row">W <input type="number" id="gridW" value="24" min="4" max="64" onchange="resizeGrid()" /></label>
+      <label class="row">H <input type="number" id="gridH" value="24" min="4" max="64" onchange="resizeGrid()" /></label>
+    </div>
+    <div class="line"></div>
+
+    <h3>Selected Cell</h3>
+    <div class="info-row">Pos: <span class="info-val" id="selPos">--</span></div>
+    <div class="info-row">Rel: <span class="info-val" id="selRel">--</span></div>
+    <div class="info-row">Tile: <span class="info-val" id="selTile">--</span></div>
+    <div class="info-row">Entity: <span class="info-val" id="selEntity">--</span></div>
+    <div class="info-row">Waypoint: <span class="info-val" id="selWaypoint">--</span></div>
+    <div class="line"></div>
+
+    <h3>Waypoint</h3>
+    <label class="row">Name <input type="text" id="waypointName" value="waypoint_1" /></label>
+    <div class="info-row">Placed: <span class="info-val" id="waypointCount">0</span></div>
+    <div class="line"></div>
+
+    <h3>Keystone</h3>
+    <div class="info-row">Position: <span class="info-val" id="keystonePos">not set</span></div>
+    <div class="line"></div>
+
+    <h3>Export</h3>
+    <div class="export-tabs">
+      <div class="export-tab active" id="tabJSON" onclick="showTab('json')">JSON</div>
+      <div class="export-tab" id="tabJS" onclick="showTab('js')">JavaScript</div>
+    </div>
+    <textarea id="exportArea" rows="14" readonly></textarea>
+    <div style="display:flex;gap:4px">
+      <button class="primary" onclick="doExport()">Export</button>
+      <button onclick="copyExport()">Copy</button>
+      <button onclick="doImport()">Import JSON</button>
+    </div>
+    <div class="line"></div>
+    <div style="display:flex;gap:4px">
+      <button onclick="saveLocal()">Save WIP</button>
+      <button onclick="loadLocal()">Load WIP</button>
+      <button class="warn" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ════════════════════════════════════════════════════════════════
+// Live palette — imported from the game's canonical source
+// ════════════════════════════════════════════════════════════════
+import { basePalette } from "../src/display/palette/base.js";
+
+// ── Tile definitions ─────────────────────────────────────────────
+// paletteKey → category.  The designer key equals the basePalette key;
+// tile export uses TILE_CONST_MAP below to emit the right constant name.
+const TILE_ENTRIES = {
+  floor:          "Structure",
+  wall:           "Structure",
+  door_closed:    "Structure",
+  grass:          "Ground",
+  grass_a:        "Ground",
+  grass_c:        "Ground",
+  grass_d:        "Ground",
+  cobblestone:    "Ground",
+  farmland:       "Ground",
+  fence:          "Barriers",
+  water:          "Barriers",
+  water_deep:     "Barriers",
+  tree:           "Barriers",
+  mountain:       "Barriers",
+  mountain_b:     "Barriers",
+  mountain_c:     "Barriers",
+  stair_down:     "Stairs",
+  stair_up:       "Stairs",
+  ice:            "Hazards",
+  lava:           "Hazards",
+  shallow_water:  "Hazards",
+};
+
+// ── Entity definitions ──────────────────────────────────────────
+// Maps spawn-kind (the key used in addSpawn / populate.js) to
+// { pal: paletteKey, cat: category }.  When pal is omitted the
+// spawn-kind is also the basePalette key.
+const ENTITY_ENTRIES = {
+  // Furniture
+  home_bed:       { pal: "bed_home",    cat: "Furniture" },
+  tavern_table:   { cat: "Furniture" },
+  tavern_bench:   { cat: "Furniture" },
+  tavern_pillar:  { cat: "Furniture" },
+  church_pew:     { cat: "Furniture" },
+  church_altar:   { cat: "Furniture" },
+  church_font:    { cat: "Furniture" },
+  church_window:  { cat: "Furniture" },
+  bench:          { cat: "Furniture" },
+  // Workstations
+  furnace:        { cat: "Workstations" },
+  anvil:          { cat: "Workstations" },
+  cooking_fire:   { cat: "Workstations" },
+  millstone:      { cat: "Workstations" },
+  alchemy_bench:  { cat: "Workstations" },
+  // Storage
+  home_chest:     { pal: "chest",         cat: "Storage" },
+  smithy_chest:   { cat: "Storage" },
+  lumber_chest:   { cat: "Storage" },
+  mill_chest:     { cat: "Storage" },
+  herb_chest:     { cat: "Storage" },
+  tavern_chest:   { cat: "Storage" },
+  tavern_keg:     { cat: "Storage" },
+  potion_shelf:   { cat: "Storage" },
+  gem_display_case: { cat: "Storage" },
+  // Signs
+  home_sign:      { pal: "house_sign",    cat: "Signs" },
+  tavern_sign:    { cat: "Signs" },
+  smithy_sign:    { cat: "Signs" },
+  apothecary_sign: { cat: "Signs" },
+  gem_shop_sign:  { cat: "Signs" },
+  church_sign:    { cat: "Signs" },
+  message_board:  { cat: "Signs" },
+  // Nature / Outdoor
+  well:           { cat: "Nature" },
+  fountain:       { cat: "Nature" },
+  scarecrow:      { cat: "Nature" },
+  torch:          { cat: "Nature" },
+  grave_tombstone: { pal: "tombstone",   cat: "Nature" },
+  town_bell:      { pal: "bell",         cat: "Nature" },
+  // Town decorations
+  barrel:         { cat: "Town" },
+  crate:          { cat: "Town" },
+  woodpile:       { cat: "Town" },
+  hay_bale:       { cat: "Town" },
+  lantern_post:   { cat: "Town" },
+  rain_barrel:    { cat: "Town" },
+  wheelbarrow:    { cat: "Town" },
+  market_stall:   { cat: "Town" },
+  // Natural features
+  boulder:        { cat: "Nature" },
+  fallen_log:     { cat: "Nature" },
+  lily_pad:       { cat: "Nature" },
+  cattail:        { cat: "Nature" },
+  birdbath:       { cat: "Garden" },
+  trellis:        { cat: "Garden" },
+  // Flowers
+  flower_rose:      { cat: "Flowers" },
+  flower_sunflower: { cat: "Flowers" },
+  flower_tulip:     { cat: "Flowers" },
+  flower_daisy:     { cat: "Flowers" },
+  flower_bluebell:  { cat: "Flowers" },
+  // Crops
+  crop_wheat:     { cat: "Crops" },
+  crop_carrot:    { cat: "Crops" },
+  crop_corn:      { cat: "Crops" },
+  // Resources
+  harvest_berries:    { pal: "berry_bush",    cat: "Resources" },
+  harvest_herbs:      { pal: "herb_patch",    cat: "Resources" },
+  harvest_thorn_bramble: { pal: "thorn_bramble", cat: "Resources" },
+  harvest_venom_fern:    { pal: "venom_fern",    cat: "Resources" },
+  harvest_iron_ore:   { pal: "ore_vein_iron", cat: "Resources" },
+  harvest_coal_ore:   { pal: "ore_vein_coal", cat: "Resources" },
+  harvest_stone:      { pal: "ore_vein_stone", cat: "Resources" },
+  // Dungeon features
+  altar:          { cat: "Dungeon" },
+  shrine:         { cat: "Dungeon" },
+  statue:         { cat: "Dungeon" },
+  sarcophagus:    { cat: "Dungeon" },
+  pillar:         { cat: "Dungeon" },
+  weapon_rack:    { cat: "Dungeon" },
+  urn:            { cat: "Dungeon" },
+  web:            { cat: "Dungeon" },
+  mushrooms:      { cat: "Dungeon" },
+};
+
+// ── Build palettes from live basePalette data ───────────────────
+const TILE_PALETTE = {};
+for (const [key, cat] of Object.entries(TILE_ENTRIES)) {
+  const pal = basePalette[key];
+  if (!pal) continue;
+  // Use "door" as the designer key for door_closed (matches TILE_DOOR)
+  const designerKey = key === "door_closed" ? "door" : key;
+  TILE_PALETTE[designerKey] = { glyph: pal.glyph, fg: pal.fg, glow: pal.glow, cat };
+}
+
+const ENTITY_PALETTE = {};
+for (const [spawnKind, info] of Object.entries(ENTITY_ENTRIES)) {
+  const paletteKey = info.pal || spawnKind;
+  const pal = basePalette[paletteKey];
+  if (!pal) continue;
+  ENTITY_PALETTE[spawnKind] = { glyph: pal.glyph, fg: pal.fg, glow: pal.glow, cat: info.cat };
+}
+
+// Tile name → TILE_* constant for JS export
+const TILE_CONST_MAP = {
+  floor:"TILE_FLOOR", wall:"TILE_WALL", door:"TILE_DOOR",
+  stair_down:"TILE_STAIR_DOWN", stair_up:"TILE_STAIR_UP",
+  grass:"TILE_GRASS", grass_a:"TILE_GRASS_A", grass_c:"TILE_GRASS_C", grass_d:"TILE_GRASS_D",
+  water:"TILE_WATER", water_deep:"TILE_WATER_DEEP", shallow_water:"TILE_SHALLOW_WATER",
+  mountain:"TILE_MOUNTAIN", mountain_b:"TILE_MOUNTAIN_B", mountain_c:"TILE_MOUNTAIN_C",
+  tree:"TILE_TREE", ice:"TILE_ICE", lava:"TILE_LAVA",
+  farmland:"TILE_FARMLAND", fence:"TILE_FENCE", cobblestone:"TILE_COBBLESTONE",
+};
+
+// ════════════════════════════════════════════════════════════════
+// State
+// ════════════════════════════════════════════════════════════════
+let gridW = 24, gridH = 24;
+let tiles = [];      // gridW*gridH, null or tile-key string
+let entities = [];   // gridW*gridH, null or entity-key string
+let waypoints = [];  // gridW*gridH, null or waypoint-name string
+let keystone = null; // {x, y} in grid coords
+let currentTool = "paint"; // paint | erase | keystone | waypoint
+let selectedPalette = null; // { type:"tile"|"entity", key:string }
+let showGridLines = true;
+let activeTab = "json";
+
+// Camera
+let camX = 0, camY = 0, camZoom = 1;
+let dragging = false, dragStartX = 0, dragStartY = 0, camStartX = 0, camStartY = 0;
+let hoverX = -1, hoverY = -1;
+
+// Canvas
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function initGrid() {
+  tiles = new Array(gridW * gridH).fill(null);
+  entities = new Array(gridW * gridH).fill(null);
+  waypoints = new Array(gridW * gridH).fill(null);
+  keystone = null;
+}
+initGrid();
+
+function resizeGrid() {
+  const newW = Math.max(4, Math.min(64, +document.getElementById("gridW").value || 24));
+  const newH = Math.max(4, Math.min(64, +document.getElementById("gridH").value || 24));
+  const newTiles = new Array(newW * newH).fill(null);
+  const newEntities = new Array(newW * newH).fill(null);
+  const newWaypoints = new Array(newW * newH).fill(null);
+  for (let y = 0; y < Math.min(gridH, newH); y++) {
+    for (let x = 0; x < Math.min(gridW, newW); x++) {
+      newTiles[y * newW + x] = tiles[y * gridW + x];
+      newEntities[y * newW + x] = entities[y * gridW + x];
+      newWaypoints[y * newW + x] = waypoints[y * gridW + x];
+    }
+  }
+  gridW = newW; gridH = newH;
+  tiles = newTiles; entities = newEntities; waypoints = newWaypoints;
+  if (keystone && (keystone.x >= gridW || keystone.y >= gridH)) keystone = null;
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════
+// Build palette UI
+// ════════════════════════════════════════════════════════════════
+function buildPaletteUI() {
+  const container = document.getElementById("paletteCats");
+  container.innerHTML = "";
+
+  // Tile categories
+  const tileCats = {};
+  for (const [k, v] of Object.entries(TILE_PALETTE)) {
+    (tileCats[v.cat] ??= []).push({ key: k, ...v, type: "tile" });
+  }
+  const hdrTiles = document.createElement("div");
+  hdrTiles.className = "cat-header";
+  hdrTiles.textContent = "TILES";
+  container.appendChild(hdrTiles);
+
+  for (const [cat, items] of Object.entries(tileCats)) {
+    const hdr = document.createElement("div");
+    hdr.className = "cat-header";
+    hdr.textContent = cat;
+    hdr.style.fontSize = "10px";
+    container.appendChild(hdr);
+    const grid = document.createElement("div");
+    grid.className = "pal-grid";
+    for (const item of items) {
+      const el = document.createElement("div");
+      el.className = "pal-item";
+      el.dataset.type = "tile";
+      el.dataset.key = item.key;
+      el.style.color = item.fg;
+      el.textContent = item.glyph;
+      el.innerHTML += `<span class="tip">${item.key}</span>`;
+      el.onclick = () => selectPalette("tile", item.key);
+      grid.appendChild(el);
+    }
+    container.appendChild(grid);
+  }
+
+  // Entity categories
+  const entCats = {};
+  for (const [k, v] of Object.entries(ENTITY_PALETTE)) {
+    (entCats[v.cat] ??= []).push({ key: k, ...v, type: "entity" });
+  }
+  const hdrEnts = document.createElement("div");
+  hdrEnts.className = "cat-header";
+  hdrEnts.textContent = "ENTITIES";
+  hdrEnts.style.marginTop = "10px";
+  container.appendChild(hdrEnts);
+
+  for (const [cat, items] of Object.entries(entCats)) {
+    const hdr = document.createElement("div");
+    hdr.className = "cat-header";
+    hdr.textContent = cat;
+    hdr.style.fontSize = "10px";
+    container.appendChild(hdr);
+    const grid = document.createElement("div");
+    grid.className = "pal-grid";
+    for (const item of items) {
+      const el = document.createElement("div");
+      el.className = "pal-item";
+      el.dataset.type = "entity";
+      el.dataset.key = item.key;
+      el.style.color = item.fg;
+      el.textContent = item.glyph;
+      el.innerHTML += `<span class="tip">${item.key}</span>`;
+      el.onclick = () => selectPalette("entity", item.key);
+      grid.appendChild(el);
+    }
+    container.appendChild(grid);
+  }
+}
+
+function selectPalette(type, key) {
+  selectedPalette = { type, key };
+  currentTool = "paint";
+  updateToolButtons();
+  // Highlight active
+  document.querySelectorAll(".pal-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.type === type && el.dataset.key === key);
+  });
+}
+
+function setTool(tool) {
+  currentTool = tool;
+  if (tool !== "paint") {
+    selectedPalette = null;
+    document.querySelectorAll(".pal-item").forEach(el => el.classList.remove("active"));
+  }
+  updateToolButtons();
+}
+
+function updateToolButtons() {
+  document.getElementById("toolPaint").classList.toggle("active", currentTool === "paint");
+  document.getElementById("toolErase").classList.toggle("active", currentTool === "erase");
+  document.getElementById("toolKeystone").classList.toggle("active", currentTool === "keystone");
+  document.getElementById("toolWaypoint").classList.toggle("active", currentTool === "waypoint");
+}
+
+function updateWaypointCount() {
+  const count = waypoints.filter(w => w !== null).length;
+  document.getElementById("waypointCount").textContent = count;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Canvas rendering
+// ════════════════════════════════════════════════════════════════
+const CELL = 28;
+
+function resetView() {
+  camZoom = 1;
+  camX = 0;
+  camY = 0;
+  render();
+}
+
+function toggleGrid() {
+  showGridLines = !showGridLines;
+  render();
+}
+
+function render() {
+  const dpr = window.devicePixelRatio || 1;
+  const cw = canvas.clientWidth;
+  const ch = canvas.clientHeight;
+  canvas.width = cw * dpr;
+  canvas.height = ch * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  ctx.fillStyle = "#04080a";
+  ctx.fillRect(0, 0, cw, ch);
+
+  ctx.save();
+  ctx.translate(cw / 2 + camX, ch / 2 + camY);
+  ctx.scale(camZoom, camZoom);
+
+  const cellPx = CELL;
+  const totalW = gridW * cellPx;
+  const totalH = gridH * cellPx;
+  const ox = -totalW / 2;
+  const oy = -totalH / 2;
+
+  // Grid background
+  ctx.fillStyle = "#0a1218";
+  ctx.fillRect(ox, oy, totalW, totalH);
+
+  // Draw cells
+  for (let gy = 0; gy < gridH; gy++) {
+    for (let gx = 0; gx < gridW; gx++) {
+      const idx = gy * gridW + gx;
+      const px = ox + gx * cellPx;
+      const py = oy + gy * cellPx;
+
+      // Tile background
+      const tileKey = tiles[idx];
+      if (tileKey && TILE_PALETTE[tileKey]) {
+        const pal = TILE_PALETTE[tileKey];
+        ctx.fillStyle = pal.glow;
+        ctx.fillRect(px, py, cellPx, cellPx);
+        ctx.fillStyle = pal.fg;
+        ctx.font = `${cellPx * 0.6}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pal.glyph, px + cellPx / 2, py + cellPx / 2 + 1);
+      }
+
+      // Entity overlay
+      const entKey = entities[idx];
+      if (entKey && ENTITY_PALETTE[entKey]) {
+        const pal = ENTITY_PALETTE[entKey];
+        // Dim background to show entity
+        if (tileKey) {
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.fillRect(px, py, cellPx, cellPx);
+        }
+        ctx.fillStyle = pal.fg;
+        ctx.font = `${cellPx * 0.65}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pal.glyph, px + cellPx / 2, py + cellPx / 2 + 1);
+      }
+
+      // Waypoint marker
+      const wpName = waypoints[idx];
+      if (wpName) {
+        ctx.strokeStyle = "#b47aff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const wcx = px + cellPx / 2, wcy = py + cellPx / 2;
+        const wr = cellPx / 2 - 4;
+        ctx.moveTo(wcx, wcy - wr);
+        ctx.lineTo(wcx + wr, wcy);
+        ctx.lineTo(wcx, wcy + wr);
+        ctx.lineTo(wcx - wr, wcy);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        // Truncated name label
+        ctx.fillStyle = "#d8b4ff";
+        ctx.font = `${Math.max(7, cellPx * 0.28)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        const label = wpName.length > 6 ? wpName.slice(0, 5) + "…" : wpName;
+        ctx.fillText(label, px + cellPx / 2, py + cellPx - 1);
+      }
+
+      // Keystone diamond
+      if (keystone && keystone.x === gx && keystone.y === gy) {
+        ctx.strokeStyle = "#5cff9a";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const cx = px + cellPx / 2, cy = py + cellPx / 2;
+        const r = cellPx / 2 - 2;
+        ctx.moveTo(cx, cy - r);
+        ctx.lineTo(cx + r, cy);
+        ctx.lineTo(cx, cy + r);
+        ctx.lineTo(cx - r, cy);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+
+      // Hover highlight
+      if (gx === hoverX && gy === hoverY) {
+        ctx.fillStyle = "rgba(92,255,154,0.12)";
+        ctx.fillRect(px, py, cellPx, cellPx);
+        ctx.strokeStyle = "rgba(92,255,154,0.5)";
+        ctx.strokeRect(px + 0.5, py + 0.5, cellPx - 1, cellPx - 1);
+      }
+    }
+  }
+
+  // Grid lines
+  if (showGridLines) {
+    ctx.strokeStyle = "rgba(100,200,150,0.08)";
+    ctx.lineWidth = 0.5;
+    for (let gx = 0; gx <= gridW; gx++) {
+      ctx.beginPath();
+      ctx.moveTo(ox + gx * cellPx, oy);
+      ctx.lineTo(ox + gx * cellPx, oy + totalH);
+      ctx.stroke();
+    }
+    for (let gy = 0; gy <= gridH; gy++) {
+      ctx.beginPath();
+      ctx.moveTo(ox, oy + gy * cellPx);
+      ctx.lineTo(ox + totalW, oy + gy * cellPx);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+// ════════════════════════════════════════════════════════════════
+// Input handling
+// ════════════════════════════════════════════════════════════════
+function screenToGrid(sx, sy) {
+  const cw = canvas.clientWidth;
+  const ch = canvas.clientHeight;
+  const totalW = gridW * CELL;
+  const totalH = gridH * CELL;
+  const ox = -totalW / 2;
+  const oy = -totalH / 2;
+  const wx = (sx - cw / 2 - camX) / camZoom - ox;
+  const wy = (sy - cw / 2 - camY + (cw - ch) / 2) / camZoom - oy;
+  // Recalculate properly
+  const worldX = (sx - cw / 2 - camX) / camZoom;
+  const worldY = (sy - ch / 2 - camY) / camZoom;
+  const gx = Math.floor((worldX - ox) / CELL);
+  const gy = Math.floor((worldY - oy) / CELL);
+  return { gx, gy };
+}
+
+function inBounds(gx, gy) {
+  return gx >= 0 && gy >= 0 && gx < gridW && gy < gridH;
+}
+
+let painting = false;
+
+canvas.addEventListener("mousedown", (e) => {
+  if (e.button === 1) {
+    // Middle button: pan
+    dragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    camStartX = camX;
+    camStartY = camY;
+    e.preventDefault();
+    return;
+  }
+  if (e.button === 0) {
+    const rect = canvas.getBoundingClientRect();
+    const { gx, gy } = screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
+    if (!inBounds(gx, gy)) return;
+    applyTool(gx, gy, e);
+    painting = true;
+  }
+  if (e.button === 2) {
+    // Right click: erase (waypoint → entity → tile priority)
+    const rect = canvas.getBoundingClientRect();
+    const { gx, gy } = screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
+    if (!inBounds(gx, gy)) return;
+    const idx = gy * gridW + gx;
+    if (waypoints[idx]) { waypoints[idx] = null; updateWaypointCount(); }
+    else if (entities[idx]) { entities[idx] = null; }
+    else { tiles[idx] = null; }
+    render();
+    updateCellInfo(gx, gy);
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (dragging) {
+    camX = camStartX + (e.clientX - dragStartX);
+    camY = camStartY + (e.clientY - dragStartY);
+    render();
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  const { gx, gy } = screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
+  hoverX = gx; hoverY = gy;
+  updateHUD(gx, gy);
+  if (painting && inBounds(gx, gy)) {
+    applyTool(gx, gy, e);
+  }
+  render();
+});
+
+canvas.addEventListener("mouseup", (e) => {
+  if (e.button === 1) dragging = false;
+  painting = false;
+});
+
+canvas.addEventListener("mouseleave", () => {
+  hoverX = -1; hoverY = -1;
+  painting = false;
+  render();
+});
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  camZoom = Math.max(0.3, Math.min(4, camZoom * factor));
+  render();
+}, { passive: false });
+
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function applyTool(gx, gy, e) {
+  const idx = gy * gridW + gx;
+  if (currentTool === "keystone") {
+    keystone = { x: gx, y: gy };
+    document.getElementById("keystonePos").textContent = `(${gx}, ${gy})`;
+    render();
+    return;
+  }
+  if (currentTool === "waypoint") {
+    const name = document.getElementById("waypointName").value.trim();
+    if (!name) return;
+    waypoints[idx] = name;
+    updateWaypointCount();
+    render();
+    updateCellInfo(gx, gy);
+    return;
+  }
+  if (currentTool === "erase") {
+    if (waypoints[idx]) { waypoints[idx] = null; updateWaypointCount(); }
+    else if (entities[idx]) { entities[idx] = null; }
+    else { tiles[idx] = null; }
+    render();
+    updateCellInfo(gx, gy);
+    return;
+  }
+  if (currentTool === "paint" && selectedPalette) {
+    if (selectedPalette.type === "tile") {
+      tiles[idx] = selectedPalette.key;
+    } else {
+      entities[idx] = selectedPalette.key;
+    }
+    render();
+    updateCellInfo(gx, gy);
+  }
+}
+
+function updateHUD(gx, gy) {
+  const coordEl = document.getElementById("hudCoord");
+  const relEl = document.getElementById("hudRel");
+  const tileEl = document.getElementById("hudTile");
+  if (!inBounds(gx, gy)) {
+    coordEl.textContent = "--";
+    relEl.textContent = "--";
+    tileEl.textContent = "--";
+    return;
+  }
+  coordEl.textContent = `(${gx}, ${gy})`;
+  if (keystone) {
+    const dx = gx - keystone.x;
+    const dy = gy - keystone.y;
+    relEl.textContent = `dx:${dx >= 0 ? "+" : ""}${dx} dy:${dy >= 0 ? "+" : ""}${dy}`;
+  } else {
+    relEl.textContent = "no keystone";
+  }
+  const idx = gy * gridW + gx;
+  const parts = [];
+  if (tiles[idx]) parts.push(tiles[idx]);
+  if (entities[idx]) parts.push(entities[idx]);
+  if (waypoints[idx]) parts.push("wp:" + waypoints[idx]);
+  tileEl.textContent = parts.length ? parts.join(" + ") : "empty";
+  updateCellInfo(gx, gy);
+}
+
+function updateCellInfo(gx, gy) {
+  if (!inBounds(gx, gy)) return;
+  const idx = gy * gridW + gx;
+  document.getElementById("selPos").textContent = `(${gx}, ${gy})`;
+  if (keystone) {
+    document.getElementById("selRel").textContent = `(${gx - keystone.x}, ${gy - keystone.y})`;
+  } else {
+    document.getElementById("selRel").textContent = "no keystone";
+  }
+  document.getElementById("selTile").textContent = tiles[idx] || "none";
+  document.getElementById("selEntity").textContent = entities[idx] || "none";
+  document.getElementById("selWaypoint").textContent = waypoints[idx] || "none";
+}
+
+// ════════════════════════════════════════════════════════════════
+// Export
+// ════════════════════════════════════════════════════════════════
+function showTab(tab) {
+  activeTab = tab;
+  document.getElementById("tabJSON").classList.toggle("active", tab === "json");
+  document.getElementById("tabJS").classList.toggle("active", tab === "js");
+  doExport();
+}
+
+function doExport() {
+  const area = document.getElementById("exportArea");
+  if (activeTab === "json") {
+    area.value = exportJSON();
+  } else {
+    area.value = exportJS();
+  }
+}
+
+function exportJSON() {
+  const name = document.getElementById("buildingName").value || "building";
+  const kx = keystone ? keystone.x : 0;
+  const ky = keystone ? keystone.y : 0;
+  const tileList = [];
+  const spawnList = [];
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = y * gridW + x;
+      if (tiles[idx]) {
+        tileList.push({ dx: x - kx, dy: y - ky, tile: tiles[idx] });
+      }
+      if (entities[idx]) {
+        spawnList.push({ dx: x - kx, dy: y - ky, kind: entities[idx] });
+      }
+    }
+  }
+  const waypointList = [];
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = y * gridW + x;
+      if (waypoints[idx]) {
+        waypointList.push({ dx: x - kx, dy: y - ky, name: waypoints[idx] });
+      }
+    }
+  }
+  const obj = {
+    name,
+    keystone: { x: kx, y: ky },
+    width: gridW,
+    height: gridH,
+    tiles: tileList,
+    spawns: spawnList,
+    waypoints: waypointList,
+  };
+  return JSON.stringify(obj, null, 2);
+}
+
+function exportJS() {
+  const name = document.getElementById("buildingName").value || "building";
+  const kx = keystone ? keystone.x : 0;
+  const ky = keystone ? keystone.y : 0;
+  const varName = name.replace(/[^a-zA-Z0-9]/g, "_");
+
+  const lines = [];
+  lines.push(`// ── ${name} ──`);
+  lines.push(`const ${varName}X0 = anchorX;`);
+  lines.push(`const ${varName}Y0 = anchorY;`);
+
+  // Separate floor/door from other tiles
+  const floorCells = [];
+  let doorCell = null;
+  const otherTiles = [];
+
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = y * gridW + x;
+      const t = tiles[idx];
+      if (!t) continue;
+      const dx = x - kx;
+      const dy = y - ky;
+      if (t === "floor") {
+        floorCells.push({ dx, dy });
+      } else if (t === "door") {
+        doorCell = { dx, dy };
+      } else if (t === "wall") {
+        // Walls auto-generated by paintStructure, skip
+      } else {
+        otherTiles.push({ dx, dy, tile: t });
+      }
+    }
+  }
+
+  // Use paintStructure if we have floor cells
+  if (floorCells.length > 0) {
+    // Detect if floor is a rectangle
+    const minDx = Math.min(...floorCells.map(c => c.dx));
+    const maxDx = Math.max(...floorCells.map(c => c.dx));
+    const minDy = Math.min(...floorCells.map(c => c.dy));
+    const maxDy = Math.max(...floorCells.map(c => c.dy));
+    const rectW = maxDx - minDx + 1;
+    const rectH = maxDy - minDy + 1;
+    const isRect = floorCells.length === rectW * rectH;
+
+    lines.push("");
+    if (isRect && floorCells.length > 4) {
+      lines.push(`const ${varName}Floor = [];`);
+      lines.push(`for (let dy = ${minDy}; dy <= ${maxDy}; dy++) {`);
+      lines.push(`  for (let dx = ${minDx}; dx <= ${maxDx}; dx++) {`);
+      lines.push(`    ${varName}Floor.push({ x: ${varName}X0 + dx, y: ${varName}Y0 + dy });`);
+      lines.push(`  }`);
+      lines.push(`}`);
+    } else {
+      const cellStr = floorCells.map(c => `[${c.dx},${c.dy}]`).join(",");
+      lines.push(`const ${varName}Floor = [];`);
+      lines.push(`for (const [dx, dy] of [${cellStr}]) {`);
+      lines.push(`  ${varName}Floor.push({ x: ${varName}X0 + dx, y: ${varName}Y0 + dy });`);
+      lines.push(`}`);
+    }
+
+    if (doorCell) {
+      lines.push(`paintStructure(chunks, ${varName}Floor, { x: ${varName}X0 + ${doorCell.dx}, y: ${varName}Y0 + ${doorCell.dy} });`);
+    } else {
+      lines.push(`// WARNING: no door defined — paintStructure needs a door`);
+      lines.push(`// paintStructure(chunks, ${varName}Floor, { x: ${varName}X0 + 0, y: ${varName}Y0 + 0 });`);
+    }
+  }
+
+  // Other tile types (cobblestone, farmland, etc.)
+  if (otherTiles.length > 0) {
+    lines.push("");
+    lines.push("// Additional tiles");
+    for (const t of otherTiles) {
+      const constName = TILE_CONST_MAP[t.tile] || `TILE_${t.tile.toUpperCase()}`;
+      lines.push(`setWorldTile(chunks, ${varName}X0 + ${t.dx}, ${varName}Y0 + ${t.dy}, ${constName});`);
+    }
+  }
+
+  // Entity spawns
+  const spawnList = [];
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = y * gridW + x;
+      if (entities[idx]) {
+        spawnList.push({ dx: x - kx, dy: y - ky, kind: entities[idx] });
+      }
+    }
+  }
+
+  if (spawnList.length > 0) {
+    lines.push("");
+    lines.push("// Spawns");
+    for (const s of spawnList) {
+      lines.push(`addSpawn(chunks, ${varName}X0 + ${s.dx}, ${varName}Y0 + ${s.dy}, "${s.kind}");`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function copyExport() {
+  const area = document.getElementById("exportArea");
+  navigator.clipboard.writeText(area.value).catch(() => {
+    area.select();
+    document.execCommand("copy");
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// Import
+// ════════════════════════════════════════════════════════════════
+function doImport() {
+  const input = prompt("Paste building JSON:");
+  if (!input) return;
+  try {
+    const obj = JSON.parse(input);
+    if (!obj.tiles) throw new Error("Missing tiles array");
+    document.getElementById("buildingName").value = obj.name || "building";
+    gridW = obj.width || 24;
+    gridH = obj.height || 24;
+    document.getElementById("gridW").value = gridW;
+    document.getElementById("gridH").value = gridH;
+    initGrid();
+    const kx = obj.keystone ? obj.keystone.x : 0;
+    const ky = obj.keystone ? obj.keystone.y : 0;
+    keystone = { x: kx, y: ky };
+    document.getElementById("keystonePos").textContent = `(${kx}, ${ky})`;
+    for (const t of obj.tiles) {
+      const gx = t.dx + kx;
+      const gy = t.dy + ky;
+      if (inBounds(gx, gy)) {
+        tiles[gy * gridW + gx] = t.tile;
+      }
+    }
+    if (obj.spawns) {
+      for (const s of obj.spawns) {
+        const gx = s.dx + kx;
+        const gy = s.dy + ky;
+        if (inBounds(gx, gy)) {
+          entities[gy * gridW + gx] = s.kind;
+        }
+      }
+    }
+    if (obj.waypoints) {
+      for (const w of obj.waypoints) {
+        const gx = w.dx + kx;
+        const gy = w.dy + ky;
+        if (inBounds(gx, gy)) {
+          waypoints[gy * gridW + gx] = w.name;
+        }
+      }
+    }
+    updateWaypointCount();
+    render();
+  } catch (e) {
+    alert("Import error: " + e.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// localStorage persistence
+// ════════════════════════════════════════════════════════════════
+const STORAGE_KEY = "jshack_building_designer";
+
+function saveLocal() {
+  const data = {
+    name: document.getElementById("buildingName").value,
+    gridW, gridH, tiles, entities, waypoints, keystone
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadLocal() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) { alert("No saved design found"); return; }
+  try {
+    const data = JSON.parse(raw);
+    document.getElementById("buildingName").value = data.name || "building";
+    gridW = data.gridW || 24;
+    gridH = data.gridH || 24;
+    document.getElementById("gridW").value = gridW;
+    document.getElementById("gridH").value = gridH;
+    tiles = data.tiles || new Array(gridW * gridH).fill(null);
+    entities = data.entities || new Array(gridW * gridH).fill(null);
+    waypoints = data.waypoints || new Array(gridW * gridH).fill(null);
+    keystone = data.keystone || null;
+    if (keystone) {
+      document.getElementById("keystonePos").textContent = `(${keystone.x}, ${keystone.y})`;
+    }
+    updateWaypointCount();
+    render();
+  } catch (e) {
+    alert("Load error: " + e.message);
+  }
+}
+
+function clearAll() {
+  if (!confirm("Clear the entire canvas?")) return;
+  initGrid();
+  document.getElementById("keystonePos").textContent = "not set";
+  updateWaypointCount();
+  render();
+}
+
+// ════════════════════════════════════════════════════════════════
+// Keyboard shortcuts
+// ════════════════════════════════════════════════════════════════
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  if (e.key === "p") setTool("paint");
+  if (e.key === "e") setTool("erase");
+  if (e.key === "k") setTool("keystone");
+  if (e.key === "w") setTool("waypoint");
+  if (e.key === "g") toggleGrid();
+});
+
+// ════════════════════════════════════════════════════════════════
+// Expose to global scope for inline onclick handlers
+// ════════════════════════════════════════════════════════════════
+window.setTool = setTool;
+window.toggleGrid = toggleGrid;
+window.resetView = resetView;
+window.resizeGrid = resizeGrid;
+window.showTab = showTab;
+window.doExport = doExport;
+window.copyExport = copyExport;
+window.doImport = doImport;
+window.saveLocal = saveLocal;
+window.loadLocal = loadLocal;
+window.clearAll = clearAll;
+
+// ════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════
+buildPaletteUI();
+
+// Auto-load if saved
+if (localStorage.getItem(STORAGE_KEY)) {
+  loadLocal();
+}
+
+// Handle resize
+const ro = new ResizeObserver(() => render());
+ro.observe(canvas);
+render();
+</script>

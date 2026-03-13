@@ -3,6 +3,7 @@
 
 import { ensureMemoryGraph } from './memoryGraph.js';
 import { createDebugGraph } from './debugGraph.js';
+import { createTileInspector } from './tileInspector.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
@@ -132,13 +133,27 @@ export function initOverlays() {
   const devNoticeTip = ensureDevNoticeTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const gestureDebug = ensureGestureDebugLayer(root);
+  // Flex container for debug graph overlays — graphs stack bottom-up
+  const debugGraphStack = document.createElement('div');
+  Object.assign(debugGraphStack.style, {
+    position: 'fixed',
+    left: '8px',
+    bottom: '56px',
+    display: 'flex',
+    flexDirection: 'column-reverse',
+    gap: '8px',
+    zIndex: '910',
+    pointerEvents: 'none',
+  });
+  root.appendChild(debugGraphStack);
+
   const memoryGraph = ensureMemoryGraph(root);
+  debugGraphStack.appendChild(memoryGraph.canvas);
   const deityGraph = createDebugGraph({
     id: 'deity-mood-graph-layer',
     title: 'Deity Mood',
     width: 240,
     height: 160,
-    position: { left: '8px', bottom: '204px' },
     zIndex: 910,
     series: [
       { key: 'wrath',     color: '#ff4444', label: 'Wrath' },
@@ -153,13 +168,12 @@ export function initOverlays() {
     normalizedY: true,
     unavailableMessage: 'No deity data',
   });
-  root.appendChild(deityGraph.canvas);
+  debugGraphStack.appendChild(deityGraph.canvas);
   const economyGraph = createDebugGraph({
     id: 'economy-graph-layer',
     title: 'Town Economy',
     width: 240,
     height: 160,
-    position: { left: '8px', bottom: '372px' },
     zIndex: 910,
     series: [
       { key: 'food',      color: '#44cc44', label: 'Food' },
@@ -172,7 +186,9 @@ export function initOverlays() {
     normalizedY: false,
     unavailableMessage: 'Not on overworld',
   });
-  root.appendChild(economyGraph.canvas);
+  debugGraphStack.appendChild(economyGraph.canvas);
+  const tileInspector = createTileInspector();
+  debugGraphStack.appendChild(tileInspector.el);
   const deathLog = ensurePanel('deathLog');
   const bookReader = ensurePanel('bookReader');
   const deathScreen = ensureDeathScreen(root);
@@ -280,14 +296,20 @@ export function initOverlays() {
   });
   window.addEventListener('ui:settingsData', (ev) => {
     const data = /** @type {CustomEvent} */ (ev).detail || {};
-    renderSettings(settingsPanel, data, memoryGraph, deityGraph, economyGraph);
+    renderSettings(settingsPanel, data, memoryGraph, deityGraph, economyGraph, tileInspector);
   });
+  // Helper: hide tile inspector (mutual exclusivity with debug graphs)
+  function hideTileInspector() {
+    tileInspector.hide();
+    tileInspector.stopPolling();
+  }
   // Toggle memory graph
   window.addEventListener('ui:toggleMemoryGraph', () => {
     if (memoryGraph.canvas.style.display === 'block') {
       memoryGraph.hide();
       memoryGraph.stopSampling();
     } else {
+      hideTileInspector();
       memoryGraph.show();
       memoryGraph.startSampling();
     }
@@ -298,6 +320,7 @@ export function initOverlays() {
       deityGraph.hide();
       deityGraph.stopSampling();
     } else {
+      hideTileInspector();
       deityGraph.show();
       deityGraph.startSampling();
     }
@@ -313,6 +336,7 @@ export function initOverlays() {
       economyGraph.hide();
       economyGraph.stopSampling();
     } else {
+      hideTileInspector();
       economyGraph.show();
       economyGraph.startSampling();
     }
@@ -321,6 +345,24 @@ export function initOverlays() {
   window.addEventListener('debug:registerEconomySampler', (ev) => {
     const fn = /** @type {CustomEvent} */ (ev).detail?.sampler;
     if (typeof fn === 'function') economyGraph.setSampler(fn);
+  });
+  // Toggle tile inspector (mutually exclusive with all debug graphs)
+  window.addEventListener('ui:toggleTileInspector', () => {
+    if (tileInspector.el.style.display === 'block') {
+      hideTileInspector();
+    } else {
+      // Hide all debug graphs
+      memoryGraph.hide(); memoryGraph.stopSampling();
+      deityGraph.hide(); deityGraph.stopSampling();
+      economyGraph.hide(); economyGraph.stopSampling();
+      tileInspector.show();
+      tileInspector.startPolling();
+    }
+  });
+  // Late-bind tile inspector sampler from main.js
+  window.addEventListener('debug:registerTileInspectorSampler', (ev) => {
+    const fn = /** @type {CustomEvent} */ (ev).detail?.sampler;
+    if (typeof fn === 'function') tileInspector.setSampler(fn);
   });
   window.addEventListener('ui:openMessageLog', () => {
     show(log);
@@ -500,9 +542,17 @@ export function initOverlays() {
       }
     };
     window.addEventListener('keydown', escKey);
+    // Backdrop click should close the dialog session, not just hide the panel
+    const backdropClose = (/** @type {PointerEvent} */ pe) => {
+      if (pe.target === dialog) {
+        window.dispatchEvent(new CustomEvent('ui:requestDialogClose', { detail: { sessionId: Number(d.sessionId || 0) | 0 } }));
+      }
+    };
+    dialog.addEventListener('pointerdown', backdropClose);
     const obs = new MutationObserver(() => {
       if (dialog.style.display === 'none') {
         window.removeEventListener('keydown', escKey);
+        dialog.removeEventListener('pointerdown', backdropClose);
         obs.disconnect();
       }
     });
@@ -2400,7 +2450,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
  * @param {{ canvas: HTMLCanvasElement }} memGraph
  * @param {{ canvas: HTMLCanvasElement }} dtyGraph
  */
-function renderSettings(panel, data, memGraph, dtyGraph, econGraph) {
+function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
@@ -2445,6 +2495,10 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph) {
 
   content.appendChild(makeCheckbox('Memory visualizer', memGraph.canvas.style.display === 'block', () => {
     window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
+  }));
+
+  content.appendChild(makeCheckbox('Tile inspector', tileInsp.el.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleTileInspector'));
   }));
 
   function makeAutocompleteActionRow({ ids, placeholder, buttonText, eventName, detailKey }) {

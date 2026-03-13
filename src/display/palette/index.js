@@ -17,7 +17,7 @@ const _CORPSE_SKIP_KEYS = new Set([
   'bed_home', 'house_sign', 'alchemy_bench',
   'berry_bush', 'herb_patch', 'thorn_bramble', 'venom_fern', 'venom_spores',
   'anvil', 'anvil_active', 'furnace', 'furnace_unlit', 'cooking_fire',
-  'crop_wheat', 'crop_turnip', 'crop_pumpkin',
+  'crop_wheat', 'crop_carrot', 'crop_corn',
   'well', 'scarecrow', 'tavern_keg', 'tavern_table',
   'tavern_bench', 'tavern_pillar', 'tavern_sign', 'millstone', 'millstone_active', 'smithy_sign',
   'apothecary_sign', 'gem_shop_sign', 'gem_display_case', 'message_board',

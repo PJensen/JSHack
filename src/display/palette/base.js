@@ -158,8 +158,8 @@ export const basePalette = {
   herb_growing:  { glyph: "🌿", fg: "#63a85f", glow: "#3e6b3c" },
   // Overworld structures
   crop_wheat:    { glyph: "🌾", fg: "#d4a830", glow: "#a07820" },
-  crop_turnip:   { glyph: "🥕", fg: "#7ecc5a", glow: "#4a9030" },
-  crop_pumpkin:  { glyph: "🎃", fg: "#e87820", glow: "#b85a10" },
+  crop_carrot:   { glyph: "🥕", fg: "#7ecc5a", glow: "#4a9030" },
+  crop_corn:     { glyph: "🌽", fg: "#e8c820", glow: "#b89a10" },
   well:          { glyph: "O", fg: "#7799bb", glow: "#445566" },
   scarecrow:     { glyph: "T", fg: "#b89070", glow: "#7a5a3a" },
   tavern_keg:    { glyph: "o", fg: "#8b5a2b", glow: "#5a3a1a" },
@@ -184,6 +184,25 @@ export const basePalette = {
   flower_tulip:      { glyph: "🌷", fg: "#ff66aa", glow: "#cc3388" },
   flower_daisy:      { glyph: "🌼", fg: "#ffeeaa", glow: "#ccbb77" },
   flower_bluebell:   { glyph: "🌸", fg: "#7799ff", glow: "#4466cc" },
+  // Town decorations
+  barrel:        { glyph: "o", fg: "#a07040", glow: "#6a4828" },
+  crate:         { glyph: "▪", fg: "#9a7a50", glow: "#6a5030" },
+  woodpile:      { glyph: "≡", fg: "#8b6840", glow: "#5a4028" },
+  hay_bale:      { glyph: "▓", fg: "#d4b44a", glow: "#a08828" },
+  lantern_post:  { glyph: "♦", fg: "#ffcc55", glow: "#cc9922" },
+  lantern_post_unlit: { glyph: "♦", fg: "#665533", glow: "#332211" },
+  rain_barrel:   { glyph: "U", fg: "#7a8a94", glow: "#4a5a64" },
+  wheelbarrow:   { glyph: "⊂", fg: "#8a7a5a", glow: "#5a4a32" },
+  market_stall:  { glyph: "⌂", fg: "#c4a060", glow: "#8a6830" },
+  bench:         { glyph: "▬", fg: "#9a7850", glow: "#6a5030" },
+  // Natural features
+  boulder:       { glyph: "●", fg: "#8a8e93", glow: "#5a5e63" },
+  fallen_log:    { glyph: "═", fg: "#6a5a3a", glow: "#3a2a18" },
+  lily_pad:      { glyph: "◌", fg: "#5aaa4a", glow: "#3a7a2a" },
+  cattail:       { glyph: "|", fg: "#7a9a5a", glow: "#4a6a32" },
+  // Garden features
+  birdbath:      { glyph: "⊙", fg: "#99aabb", glow: "#667788" },
+  trellis:       { glyph: "⊞", fg: "#7a9a5a", glow: "#4a6a32" },
 
   // Room features
   fountain:    { glyph: "⛲", fg: "#66bbee", glow: "#3388aa" },
@@ -228,8 +247,8 @@ export const basePalette = {
   reagent_thorn_pod: { glyph: "✶", fg: "#a08f63", glow: "#6f6242" },
   reagent_venom_frond: { glyph: "☤", fg: "#9ccc69", glow: "#5f8d3c" },
   food_wheat:    { glyph: "%", fg: "#d4a830", glow: "#a07820" },
-  food_turnip:   { glyph: "%", fg: "#7ecc5a", glow: "#4a9030" },
-  food_pumpkin:  { glyph: "%", fg: "#e87820", glow: "#b85a10" },
+  food_carrot:   { glyph: "%", fg: "#7ecc5a", glow: "#4a9030" },
+  food_corn:     { glyph: "%", fg: "#e8c820", glow: "#b89a10" },
   // Ore items (dropped from mining nodes)
   ore_iron:  { glyph: "≡", fg: "#b86840", glow: "#7a3a18" },
   ore_coal:  { glyph: "■", fg: "#404040", glow: "#202020" },

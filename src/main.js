@@ -117,7 +117,8 @@ import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
-import { updateFOV, isVisible as isTileVisible } from "./rules/environment/dungeon/exploredMap.js";
+import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored } from "./rules/environment/dungeon/exploredMap.js";
+import { getTile, isWalkable, isOpaque, isFlyable } from "./rules/environment/dungeon/tileMap.js";
 import { resetIdentification, identify, restoreIdentification, setIdentificationEnabled } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
@@ -895,6 +896,51 @@ window.dispatchEvent(new CustomEvent('debug:registerEconomySampler', {
         if ((ds.currentDepth || 0) !== 0) return null;
       }
       return getTownEconomyData(world);
+    }
+  }
+}));
+
+// Register tile inspector sampler for the debug panel (key 5).
+const _TILE_NAMES = {
+  0:'void', 1:'floor', 2:'wall', 3:'door', 4:'stair_down', 5:'stair_up',
+  6:'grass', 7:'water', 8:'mountain', 9:'tree', 10:'grass_a', 11:'grass_c',
+  12:'grass_d', 13:'mountain_b', 14:'mountain_c', 15:'water_deep',
+  16:'ice', 17:'shallow_water', 18:'lava', 19:'farmland', 20:'fence', 21:'cobblestone',
+};
+window.dispatchEvent(new CustomEvent('debug:registerTileInspectorSampler', {
+  detail: {
+    sampler: () => {
+      const pe = playerEntity(world);
+      if (!pe) return null;
+      const { x, y } = pe.pos;
+      const tt = getTile(x, y);
+      const entities = [];
+      forEachInRadius(world, x, y, 0, (id, _pos) => {
+        const ni = world.get(id, NamedIdentity);
+        const comps = [];
+        for (const [ckey, store] of world._store) {
+          try {
+            if (store && typeof store.has === 'function' && store.has(id)) {
+              const data = (typeof store.get === 'function') ? store.get(id) : null;
+              const name = store._comp?.name || ckey?.description || '?';
+              comps.push({ name, data });
+            }
+          } catch { /* ignore */ }
+        }
+        entities.push({
+          id,
+          name: ni?.name || '???',
+          identity: ni?.identity || '',
+          components: comps,
+        });
+      });
+      return {
+        x, y, tileType: tt,
+        tileName: _TILE_NAMES[tt] || `unknown(${tt})`,
+        walkable: isWalkable(x, y), opaque: isOpaque(x, y), flyable: isFlyable(x, y),
+        visible: isTileVisible(x, y), explored: isTileExplored(x, y),
+        entities,
+      };
     }
   }
 }));

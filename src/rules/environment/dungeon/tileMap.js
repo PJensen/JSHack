@@ -13,6 +13,8 @@ import {
 
 // chunk key: "cx,cy" -> Uint8Array (the chunk.tiles reference)
 const _chunks = new Map();
+// chunk key: "cx,cy" -> Uint8Array (1 = roofed by a JSON building, 0 = not)
+const _roofed = new Map();
 
 // Precomputed walkability per tile type (indexed by TILE_* constants)
 const _walkable = new Uint8Array(32);
@@ -80,11 +82,13 @@ export function loadChunk(cx, cy, tiles) {
  */
 export function unloadChunk(cx, cy) {
   _chunks.delete(_key(cx, cy));
+  _roofed.delete(_key(cx, cy));
 }
 
 /** Remove all chunk data (for depth transitions). */
 export function clearAll() {
   _chunks.clear();
+  _roofed.clear();
 }
 
 /**
@@ -163,6 +167,47 @@ export function isFlyable(x, y) {
  */
 export function isOpaque(x, y) {
   return _opaque[getTile(x, y)] === 1;
+}
+
+/**
+ * Check whether a world tile is marked as roofed (by a JSON-stamped building).
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function isRoofed(x, y) {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const cx = Math.floor(xi / CHUNK_SIZE);
+  const cy = Math.floor(yi / CHUNK_SIZE);
+  const arr = _roofed.get(_key(cx, cy));
+  if (!arr) return false;
+  const lx = xi - cx * CHUNK_SIZE;
+  const ly = yi - cy * CHUNK_SIZE;
+  return arr[ly * CHUNK_SIZE + lx] === 1;
+}
+
+/**
+ * Mark a world tile as roofed (called during building stamping).
+ * Auto-creates the backing array for the chunk if needed.
+ * @param {number} x
+ * @param {number} y
+ * @param {boolean} val
+ */
+export function setRoofed(x, y, val) {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const cx = Math.floor(xi / CHUNK_SIZE);
+  const cy = Math.floor(yi / CHUNK_SIZE);
+  const k = _key(cx, cy);
+  let arr = _roofed.get(k);
+  if (!arr) {
+    arr = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+    _roofed.set(k, arr);
+  }
+  const lx = xi - cx * CHUNK_SIZE;
+  const ly = yi - cy * CHUNK_SIZE;
+  arr[ly * CHUNK_SIZE + lx] = val ? 1 : 0;
 }
 
 /**
