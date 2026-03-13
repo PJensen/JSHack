@@ -1243,4 +1243,15 @@ export function installMessageWiring({
       log('The rain puts out a fire.', 'ambient');
     }
   });
+  world.on('weather:lightning', ({ x, y, hitTree, hitWater, hitCount }) => {
+    if ((hitCount | 0) > 0) {
+      log('A bolt of lightning strikes!', 'danger');
+    } else if (hitTree) {
+      log('Lightning splinters a nearby tree!', 'system');
+    } else if (hitWater) {
+      log('Lightning crackles across the water!', 'system');
+    } else {
+      log('Lightning strikes the ground nearby!', 'system');
+    }
+  });
 }
