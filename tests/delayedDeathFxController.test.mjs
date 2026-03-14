@@ -55,3 +55,41 @@ Deno.test("delayed death fx ignores immediate deaths without projectile delay", 
 
   assertEquals(fx.isItemHidden(item), false);
 });
+
+Deno.test("delayed death fx preserves the victim render record until impact", () => {
+  const world = new World({ seed: 1 });
+  const victim = world.create();
+  world.add(victim, Position, { x: 9, y: 3 });
+
+  const harness = createFxHarness();
+  const fx = createDelayedDeathFxController({ world, getFxTime: harness.getFxTime });
+  fx.installListeners();
+
+  const liveEntity = {
+    id: victim,
+    kind: "orc",
+    pos: { x: 9, y: 3 },
+    tags: ["enemy"],
+    layer: 300,
+    hp: 4,
+    maxHp: 10,
+    isPet: false,
+    showHealthBar: true,
+  };
+  fx.syncWorldView({ entities: [liveEntity] });
+
+  world.emit("damaged", { target: victim, projectileDelay: 0.4 });
+  world.emit("died", { id: victim });
+
+  let renderables = fx.getRenderableEntities([]);
+  assertEquals(renderables.length, 1);
+  assertEquals(renderables[0].id, victim);
+  assertEquals(renderables[0].kind, "orc");
+  assertEquals(renderables[0].showHealthBar, false);
+  assertEquals(renderables[0].hp, 0);
+
+  harness.advance(0.41);
+  fx.tick(0.41);
+  renderables = fx.getRenderableEntities([]);
+  assertEquals(renderables.length, 0);
+});

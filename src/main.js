@@ -3293,9 +3293,11 @@ function render(worldView) {
   _stackMeta.clear(); // "x,y" -> topItemId
   _healthBarsToDraw.length = 0;
   flyingFx.syncWorldView(worldView);
+  delayedDeathFx.syncWorldView(worldView);
+  const renderEntities = delayedDeathFx.getRenderableEntities(worldView.entities);
   const stackMeta = _stackMeta;
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
+  for (let i = 0; i < renderEntities.length; i++) {
+    const e = renderEntities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
     if (layer !== 100) continue;
@@ -3310,8 +3312,8 @@ function render(worldView) {
   // 2) top ground item second
   const deferredItems = [];
 
-  for (let i = 0; i < worldView.entities.length; i++) {
-    const e = worldView.entities[i];
+  for (let i = 0; i < renderEntities.length; i++) {
+    const e = renderEntities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
@@ -3725,8 +3727,8 @@ function render(worldView) {
   }
 
   if (_roofCoverKeys.size > 0) {
-    for (let i = 0; i < worldView.entities.length; i++) {
-      const e = worldView.entities[i];
+    for (let i = 0; i < renderEntities.length; i++) {
+      const e = renderEntities[i];
       if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
       if (!Array.isArray(e.tags)) continue;
       if (!_roofCoverKeys.has(roofCellKey(e.pos.x, e.pos.y))) continue;
