@@ -15,6 +15,8 @@ import {
   DAY_NAMES,
   MONTHS,
   PHASE_TURNS,
+  MOON_PHASES,
+  getMoonPhase,
   getTownPhase,
   getCalendarDate,
 } from '../src/rules/data/calendar.js';
@@ -38,6 +40,12 @@ Deno.test("DAY_NAMES has DAYS_PER_WEEK entries", () => {
 
 Deno.test("MONTHS has MONTHS_PER_YEAR entries", () => {
   assertEquals(MONTHS.length, MONTHS_PER_YEAR);
+});
+
+Deno.test("MOON_PHASES exposes the 8 unicode moon glyphs", () => {
+  assertEquals(MOON_PHASES.length, 8);
+  assertEquals(MOON_PHASES[0].emoji, "🌑");
+  assertEquals(MOON_PHASES[4].emoji, "🌕");
 });
 
 Deno.test("getTownPhase returns sleep at step 0", () => {
@@ -104,6 +112,21 @@ Deno.test("getCalendarDate: startDay offsets the calendar", () => {
 Deno.test("getCalendarDate: formatted string includes ordinal", () => {
   const d = getCalendarDate(0, 0, 847);
   assertEquals(d.formatted, "Sunna, 1st of Martius — Year 847");
+});
+
+Deno.test("getMoonPhase follows the 28-day lunar month", () => {
+  assertEquals(getMoonPhase(0).key, "new");
+  assertEquals(getMoonPhase(3).key, "new");
+  assertEquals(getMoonPhase(4).key, "waxing_crescent");
+  assertEquals(getMoonPhase(14).key, "full");
+  assertEquals(getMoonPhase(27).key, "waning_crescent");
+});
+
+Deno.test("getCalendarDate includes moon metadata", () => {
+  const d = getCalendarDate(TURNS_PER_DAY * 14, 0, 847);
+  assertEquals(d.moonPhase, "full");
+  assertEquals(d.moonEmoji, "🌕");
+  assertEquals(d.moonLabel, "Full Moon");
 });
 
 Deno.test("getCalendarDate: ordinals (2nd, 3rd, 11th, 21st)", () => {

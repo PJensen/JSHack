@@ -55,6 +55,7 @@ export function initStatusLine() {
 
   let calFormatted = "";
   let calSeason = "";
+  let calMoonEmoji = "";
 
   function colorForDelta(value) {
     const n = Number(value || 0);
@@ -114,7 +115,7 @@ export function initStatusLine() {
     calLine.replaceChildren();
     if (!calFormatted) return;
     const span = document.createElement('span');
-    span.textContent = calFormatted;
+    span.textContent = calMoonEmoji ? `${calMoonEmoji} ${calFormatted}` : calFormatted;
     Object.assign(span.style, { color: SEASON_COLORS[calSeason] || '#cfd3dc' });
     calLine.appendChild(span);
   }
@@ -160,6 +161,7 @@ export function initStatusLine() {
     const e = ev;
     calFormatted = String(e?.detail?.formatted || "");
     calSeason = String(e?.detail?.season || "");
+    calMoonEmoji = String(e?.detail?.moonEmoji || "");
     renderCalendar();
   });
 
