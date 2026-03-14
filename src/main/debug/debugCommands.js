@@ -7,6 +7,9 @@ import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
+import { ItemInfo } from "../../rules/components/ItemInfo.js";
+import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { resolveItemDisplayName } from "../wiring/itemName.js";
 
 /**
  * Apply URL-param debug commands (?give, ?effects) to the player.
@@ -49,6 +52,23 @@ export function applyDebugCommands({ world, runtimeConfig }) {
               if (createdItemId !== null) {
                 addToInventory(world, pe.id, createdItemId);
                 console.debug(`[?give] Created ${count}x ${itemId}`);
+                // Notify quick-slot UI so "Use"/"Read"/etc. chip appears
+                const info = world.get(createdItemId, ItemInfo);
+                if (info && info.type !== 'currency') {
+                  try {
+                    const ni = world.get(createdItemId, NamedIdentity);
+                    window.dispatchEvent(new CustomEvent('ui:recentPickup', {
+                      detail: { item: {
+                        id: Number(createdItemId),
+                        identity: ni?.identity || '',
+                        type: info.type || 'item',
+                        slot: info.slot || '',
+                        name: resolveItemDisplayName(world, createdItemId),
+                        count: info.count || 1
+                      }}
+                    }));
+                  } catch (e) { console.debug('[?give] dispatch ui:recentPickup:', e); }
+                }
               } else {
                 console.warn(`[?give] Unknown item: "${itemId}"`);
               }

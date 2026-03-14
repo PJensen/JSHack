@@ -773,3 +773,51 @@ Deno.test("scheduled barkeep can cook beside a solid cooking fire", () => {
   assertEquals(countInventory(world, tavernChest, "food_stew"), 1, "tavern chest should receive stew");
   assertEquals(countInventory(world, tavernChest, "water_bucket"), 1, "water bucket should still be present after cooking");
 });
+
+import { GrowthStage } from "../src/rules/components/GrowthStage.js";
+
+Deno.test("farmer auto-replants crop immediately after harvesting", () => {
+  const world = makeWorld(30);
+
+  // Place a ready wheat crop at (8, 5)
+  const crop = world.create();
+  world.add(crop, Position, { x: 8, y: 5 });
+  world.add(crop, NamedIdentity, { name: "Wheat", identity: "crop_wheat" });
+  world.add(crop, Material, { kind: "wood" });
+  world.add(crop, Collider, { solid: true, blocksSight: false });
+  world.add(crop, HarvestNode, {
+    kind: "wheat", ready: true, regrowTurns: 200, regrowCountdown: 0,
+    yield: "food_wheat", yieldMin: 1, yieldMax: 1,
+    replantable: true, needsPlanting: false,
+  });
+  world.add(crop, GrowthStage, {
+    currentStage: 3, maxStage: 3,
+    stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_wheat"],
+    growInterval: 0, growCountdown: 0,
+  });
+
+  // Farmer adjacent to crop, ready to harvest
+  const farmer = addTownfolk(world, 7, 5, "farmer", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "harvest_crop",
+    homeX: 3, homeY: 5,
+    workX: 8, workY: 5,
+  });
+
+  let harvested = false;
+  let planted = false;
+  world.on("townfolk:harvested", () => { harvested = true; });
+  world.on("townfolk:planted", () => { planted = true; });
+
+  aiTownfolkSystem(world);
+
+  const node = world.get(crop, HarvestNode);
+  assert(harvested, "farmer should harvest the crop");
+  assert(planted, "farmer should auto-replant immediately after harvest");
+  assertEquals(node.ready, false, "crop should not be ready after harvest");
+  assertEquals(node.needsPlanting, false, "crop should not need planting after auto-replant");
+  assertEquals(node.regrowCountdown, 200, "regrow countdown should be set");
+  assertEquals(countInventory(world, farmer, "food_wheat"), 1, "farmer should carry the harvested wheat");
+  assertEquals(countInventory(world, farmer, "seed_wheat"), 0, "seed should be consumed by planting");
+});
