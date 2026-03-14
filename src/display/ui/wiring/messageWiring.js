@@ -184,6 +184,10 @@ export function installMessageWiring({
     if (k === "iron_ore") return "iron ore";
     if (k === "coal_ore") return "coal";
     if (k === "stone") return "stone chips";
+    if (k === "wheat") return "wheat";
+    if (k === "carrot") return "carrots";
+    if (k === "corn") return "corn";
+    if (k === "tree") return "wood";
     return "berries";
   }
 
@@ -196,6 +200,10 @@ export function installMessageWiring({
     if (k === "iron_ore") return "iron vein";
     if (k === "coal_ore") return "coal seam";
     if (k === "stone") return "stone outcrop";
+    if (k === "wheat") return "wheat";
+    if (k === "carrot") return "carrot plant";
+    if (k === "corn") return "corn stalk";
+    if (k === "tree") return "tree";
     return "berry bush";
   }
 
@@ -874,6 +882,10 @@ export function installMessageWiring({
     else if (k === "herbs") what = "A herb patch looks fresh again.";
     else if (k === "thorn_bramble") what = "A thorn bramble thickens nearby.";
     else if (k === "venom_fern") what = "A venom fern unfurls fresh fronds nearby.";
+    else if (k === "wheat") what = "A wheat crop has grown back.";
+    else if (k === "carrot") what = "A carrot plant sprouts anew.";
+    else if (k === "corn") what = "A corn stalk shoots up nearby.";
+    else if (k === "tree") what = "A tree has regrown nearby.";
     else what = "A berry bush ripens nearby.";
     log(what, 'ambient');
   });
