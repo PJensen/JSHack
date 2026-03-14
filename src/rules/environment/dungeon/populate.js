@@ -52,6 +52,10 @@ import {
   ChurchSign,
   ChurchFont,
   ChurchWindow,
+  WindowArched,
+  WindowIronGrate,
+  WindowShuttered,
+  WindowRound,
   FlowerRose,
   FlowerSunflower,
   FlowerTulip,
@@ -909,6 +913,14 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, ChurchFont, { x: spawn.x, y: spawn.y });
     case 'church_window':
       return createFrom(world, ChurchWindow, { x: spawn.x, y: spawn.y });
+    case 'window_arched':
+      return createFrom(world, WindowArched, { x: spawn.x, y: spawn.y });
+    case 'window_iron_grate':
+      return createFrom(world, WindowIronGrate, { x: spawn.x, y: spawn.y });
+    case 'window_shuttered':
+      return createFrom(world, WindowShuttered, { x: spawn.x, y: spawn.y });
+    case 'window_round':
+      return createFrom(world, WindowRound, { x: spawn.x, y: spawn.y });
     case 'town_bell':
       return createFrom(world, TownBell, { x: spawn.x, y: spawn.y });
     case 'flower_rose':
