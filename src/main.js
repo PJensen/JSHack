@@ -2702,6 +2702,7 @@ const displayRuntime = setupDisplayRuntime({
 const {
   statusEmitterFx,
   boltFx,
+  delayedDeathFx,
   projectileFx,
   spellAreaFx,
   cloudFx,
@@ -3299,6 +3300,7 @@ function render(worldView) {
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
     if (layer !== 100) continue;
     if (throwFx.isItemHidden(e.id)) continue;
+    if (delayedDeathFx.isItemHidden(e.id)) continue;
     // worldView.entities is sorted by id within a tile/layer; later ids are drawn on top.
     stackMeta.set(`${e.pos.x},${e.pos.y}`, e.id);
   }
@@ -3315,6 +3317,7 @@ function render(worldView) {
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
 
     if (layer === 100) {
+      if (throwFx.isItemHidden(e.id) || delayedDeathFx.isItemHidden(e.id)) continue;
       const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
       if (topItemId === e.id) deferredItems.push(e);
       continue;
@@ -3801,6 +3804,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
+  delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
