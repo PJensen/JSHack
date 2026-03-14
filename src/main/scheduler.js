@@ -47,7 +47,6 @@ import { engraveSystem, installEngraveListeners } from "../rules/systems/engrave
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { shopAmbientSoundSystem } from "../rules/systems/shopAmbientSoundSystem.js";
-import { gravityWellSystem } from "../rules/systems/gravityWellSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
@@ -190,8 +189,6 @@ export function configureWorld(world) {
   // Food decay ticks after hunger (rot inventory food each turn)
   registerSystem(foodDecaySystem, 'effects');
   registerSystem(itemCooldownSystem, 'effects');
-  // Gravity well pull resolves before hazard tick damage.
-  registerSystem(gravityWellSystem, 'effects');
   registerSystem(hazardSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');

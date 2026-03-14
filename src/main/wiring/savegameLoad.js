@@ -3,6 +3,7 @@ import { buildSavegameSerializationRegistry } from "./savegameSerializationRegis
 import { clearSpatialIndex } from "../../rules/utils/spatialIndex.js";
 import { invalidateTileQueryCache } from "../../rules/utils/tileQueryCache.js";
 import { normalizeInventorySnapshot } from "../../rules/utils/inventorySnapshotMigration.js";
+import { ensureCalendarState } from "../../rules/utils/calendarState.js";
 
 export const SAVEGAME_KEY = "jshack:savegame:v1";
 
@@ -125,6 +126,7 @@ export function restoreSnapshotFromSavegame(world, save) {
   }
 
   applySnapshot(world, normalizedSave.world, reg, { mode: "replace" });
+  ensureCalendarState(world);
   clearSpatialIndex(world);
   invalidateTileQueryCache(world);
   return { playerId: validity.playerId || 0 };

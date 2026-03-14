@@ -5,11 +5,10 @@ import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { ProcPackageNode } from "../components/ProcPackageNode.js";
 import { Vitality } from "../components/Vitality.js";
-import { isOpaque, isWalkable } from "../environment/dungeon/tileMap.js";
+import { isOpaque } from "../environment/dungeon/tileMap.js";
 import { registerScript, getScriptHandlers, ScriptVerb } from "../scripting.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
-import { spawnHazard } from "../utils/hazardSpawn.js";
 import {
   addAttachedComponent,
   attachDerivedExpression,
@@ -26,7 +25,6 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   DoomClock: "procPackage:doomClock",
   SoulMortgage: "procPackage:soulMortgage",
   CataclysmChain: "procPackage:cataclysmChain",
-  GravityWell: "procPackage:gravityWell",
   BloodTithe: "procPackage:bloodTithe",
   FoolsErrand: "procPackage:foolsErrand",
 });
@@ -325,43 +323,6 @@ registerScript(PROC_PACKAGE_KEYS.CataclysmChain, {
   },
 });
 
-// ── Gravity Well ──────────────────────────────────────────────────────────
-// OnCritKill: spawn a gravity hazard at the corpse.  Each tick the hazard
-// system deals 2 shadow damage; a dedicated gravityWellSystem pulls enemies
-// 1 tile toward the center.
-registerScript(PROC_PACKAGE_KEYS.GravityWell, {
-  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
-    if (String(ctx?.kind || "") !== "onCritKill") return;
-    const source = Number(ctx?.source || 0) | 0;
-    const target = Number(ctx?.target || 0) | 0;
-    if (!(source > 0) || !(target > 0)) return;
-    const pos = world.get(target, Position);
-    if (!pos) return;
-    const x = pos.x | 0;
-    const y = pos.y | 0;
-
-    spawnHazard(world, {
-      x,
-      y,
-      kind: "gravity_well",
-      medium: "air",
-      turnsLeft: 4,
-      radius: 2,
-      tickDamage: 2,
-      damageType: "shadow",
-      cause: "gravity_well",
-      sourceId: source,
-      sourceKind: "proc",
-      identity: "gravity_well",
-      name: "Gravity Well",
-      meta: { pull: true },
-    });
-
-    ctx.proc.message("A gravity well tears open.");
-    emit(world, "proc:gravityWell:spawn", { actor: source, target, at: { x, y } });
-  },
-});
-
 // ── Blood Tithe ───────────────────────────────────────────────────────────
 // OnHit: bank 10% of dealt damage as blood_tithe_debt stacks on self (max 20).
 // OnDamaged: detonate all stacks as a burst heal, then clear.
@@ -501,17 +462,6 @@ const PROC_PACKAGE_SPECS = Object.freeze([
       Object.freeze({ trigger: "onCritKill", script: PROC_PACKAGE_KEYS.CataclysmChain, priority: 10 }),
       Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.CataclysmChain, priority: 20 }),
       Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.CataclysmChain, priority: 30 }),
-    ]),
-  }),
-  Object.freeze({
-    id: "gravityWell",
-    name: "Gravity Well",
-    summary: "Crit kills tear open a vortex that drags nearby foes inward and gnaws at them with shadow.",
-    stateKeys: Object.freeze([]),
-    hostIdeas: Object.freeze(["singularity shards", "void hammers", "black-star gems"]),
-    passiveExpressions: Object.freeze([]),
-    procTrees: Object.freeze([
-      Object.freeze({ trigger: "onCritKill", script: PROC_PACKAGE_KEYS.GravityWell, priority: 10 }),
     ]),
   }),
   Object.freeze({

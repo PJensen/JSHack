@@ -5,6 +5,7 @@ import { assertEquals, assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { CalendarState } from '../src/rules/components/CalendarState.js';
 import { calendarSystem } from '../src/rules/systems/calendarSystem.js';
+import { ensureCalendarState } from '../src/rules/utils/calendarState.js';
 import {
   TURNS_PER_DAY,
   DAYS_PER_WEEK,
@@ -207,4 +208,18 @@ Deno.test("calendarSystem emits calendar:newYear when year rolls over", () => {
   assertEquals(yearEvents.length, 1);
   assertEquals(yearEvents[0].prev, 847);
   assertEquals(yearEvents[0].next, 848);
+});
+
+Deno.test("ensureCalendarState creates one singleton and reuses it", () => {
+  const world = new World({ seed: 1 });
+  const first = ensureCalendarState(world);
+  const second = ensureCalendarState(world);
+
+  assertEquals(second, first);
+
+  const rows = Array.from(world.query(CalendarState));
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0][0], first);
+  assertEquals(rows[0][1].startDay, 56);
+  assertEquals(rows[0][1].startYear, 847);
 });
