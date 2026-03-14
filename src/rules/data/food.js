@@ -2,6 +2,7 @@
 // Nutrition, decay, and hunger constants for food systems.
 
 import { HUNGER_COMBAT_LEVELS } from "./hungerCombatLevels.js";
+import { TURNS_PER_DAY } from "./calendar.js";
 
 /** Standard ration nutrition values. */
 export const RATION_NUTRITION = 400;
@@ -51,14 +52,28 @@ export const CORPSE_WEIGHT = {
 // Single source of truth for level names, thresholds, and penalties.
 // Consumed by hungerSystem, combatSystem, manaRegenerationSystem, and display.
 
-/** Severity thresholds (frozen). */
+const HALF_DAY_TURNS = Math.max(1, Math.floor(TURNS_PER_DAY * 0.5));
+const ONE_DAY_TURNS = Math.max(1, TURNS_PER_DAY);
+const THREE_DAY_TURNS = Math.max(ONE_DAY_TURNS + 1, TURNS_PER_DAY * 3);
+const FIVE_DAY_TURNS = Math.max(THREE_DAY_TURNS + 1, TURNS_PER_DAY * 5);
+const SEVEN_DAY_TURNS = Math.max(FIVE_DAY_TURNS + 1, TURNS_PER_DAY * 7);
+
+/**
+ * Severity thresholds (frozen), scaled from TURNS_PER_DAY.
+ *
+ * Target pacing (baseline hungerRate = 1):
+ * - peckish: around half-day
+ * - hungry: around day 1
+ * - starving: around day 5
+ * - wasting: around day 7+
+ */
 export const HUNGER_LEVELS = Object.freeze([
-  Object.freeze({ name: 'normal',   min: 0,    max: 199  }),
-  Object.freeze({ name: 'peckish',  min: 200,  max: 399  }),
-  Object.freeze({ name: 'hungry',   min: 400,  max: 599  }),
-  Object.freeze({ name: 'famished', min: 600,  max: 799  }),
-  Object.freeze({ name: 'starving', min: 800,  max: 999  }),
-  Object.freeze({ name: 'wasting',  min: 1000, max: Infinity }),
+  Object.freeze({ name: 'normal',   min: 0,               max: HALF_DAY_TURNS - 1 }),
+  Object.freeze({ name: 'peckish',  min: HALF_DAY_TURNS,  max: ONE_DAY_TURNS - 1 }),
+  Object.freeze({ name: 'hungry',   min: ONE_DAY_TURNS,   max: THREE_DAY_TURNS - 1 }),
+  Object.freeze({ name: 'famished', min: THREE_DAY_TURNS, max: FIVE_DAY_TURNS - 1 }),
+  Object.freeze({ name: 'starving', min: FIVE_DAY_TURNS,  max: SEVEN_DAY_TURNS - 1 }),
+  Object.freeze({ name: 'wasting',  min: SEVEN_DAY_TURNS, max: Infinity }),
 ]);
 
 /** All status types that the hunger system projects (for filtering). */

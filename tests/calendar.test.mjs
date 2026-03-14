@@ -102,11 +102,13 @@ Deno.test("getCalendarDate: after 364 days the year increments", () => {
 });
 
 Deno.test("getCalendarDate: startDay offsets the calendar", () => {
-  // startDay=56 means game starts on day 56 of the year (first of Maius)
-  const d = getCalendarDate(0, 56, 847);
-  assertEquals(d.dayTotal, 56);
+  // startDay=70 means game starts on day 70 of the year (15th of Maius, full moon)
+  const d = getCalendarDate(0, 70, 847);
+  assertEquals(d.dayTotal, 70);
   assertEquals(d.monthIndex, 2);  // 56/28 = 2
   assertEquals(d.monthName, "Maius");
+  assertEquals(d.dayOfMonth, 14);
+  assertEquals(d.moonPhase, "full");
 });
 
 Deno.test("getCalendarDate: formatted string includes ordinal", () => {
@@ -243,6 +245,6 @@ Deno.test("ensureCalendarState creates one singleton and reuses it", () => {
   const rows = Array.from(world.query(CalendarState));
   assertEquals(rows.length, 1);
   assertEquals(rows[0][0], first);
-  assertEquals(rows[0][1].startDay, 56);
+  assertEquals(rows[0][1].startDay, 70);
   assertEquals(rows[0][1].startYear, 847);
 });

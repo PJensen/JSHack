@@ -11,7 +11,7 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * The remaining fields are written every tick by calendarSystem.
  */
 export const CalendarState = defineComponent("CalendarState", {
-  startDay:   56,   // day-of-year offset (0-based); 56 = 1st of Maius (late spring)
+  startDay:   70,   // day-of-year offset (0-based); 70 = 15th of Maius, a full moon
   startYear:  847,
 
   // Cache — written by calendarSystem each tick

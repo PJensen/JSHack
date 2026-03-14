@@ -4,11 +4,13 @@ import { Hunger } from "../src/rules/components/Hunger.js";
 import { Status } from "../src/rules/components/Status.js";
 import { Traits } from "../src/rules/components/Traits.js";
 import { hungerSystem } from "../src/rules/systems/hungerSystem.js";
+import { getHungerLevel } from "../src/rules/data/food.js";
+import { TURNS_PER_DAY } from "../src/rules/data/calendar.js";
 
 Deno.test("hungerSystem creates Status when hunger penalty applies", () => {
   const world = new World({ seed: 1 });
   const id = world.create();
-  world.add(id, Hunger, { hunger: 400, satiation: 0 }); // -> hungry
+  world.add(id, Hunger, { hunger: TURNS_PER_DAY + 10, satiation: 0 }); // -> hungry
 
   hungerSystem(world);
 
@@ -22,7 +24,7 @@ Deno.test("hungerSystem creates Status when hunger penalty applies", () => {
 Deno.test("hungerSystem preserves non-hunger statuses while replacing hunger status", () => {
   const world = new World({ seed: 1 });
   const id = world.create();
-  world.add(id, Hunger, { hunger: 650, satiation: 0 }); // famished
+  world.add(id, Hunger, { hunger: (TURNS_PER_DAY * 3) + 10, satiation: 0 }); // famished
   world.add(id, Status, {
     statuses: [
       { type: "poisoned", duration: 3, potency: 1, stacks: 1 },
@@ -60,4 +62,10 @@ Deno.test("hungerSystem does not grant gluttonous when satiation below cap", () 
 
   const tr = world.get(id, Traits);
   assert(!tr || tr.gluttonous === false, "gluttonous should not be set below cap");
+});
+
+Deno.test("getHungerLevel matches day-based pacing", () => {
+  assert(getHungerLevel(TURNS_PER_DAY - 1) === "peckish", "end of day 1 should be peckish");
+  assert(getHungerLevel(TURNS_PER_DAY) === "hungry", "day 1 should transition to hungry");
+  assert(getHungerLevel(TURNS_PER_DAY * 5) === "starving", "day 5 should transition to starving");
 });

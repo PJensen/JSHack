@@ -27,6 +27,7 @@ import { Beatitude } from '../components/Beatitude.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
 import { getSpell } from '../data/spells.js';
+import { getHungerLevel } from '../data/food.js';
 
 /** @type {Map<string, import('../../lib/deity-js/deity.js').Deity>} */
 const _deities = new Map();
@@ -917,8 +918,19 @@ function assessPlayerNeeds(world, playerId) {
   // Check hunger
   if (world.has(playerId, Hunger)) {
     const hunger = world.get(playerId, Hunger);
-    if (hunger.hunger > 200) {
-      needs.push({ type: 'food', urgency: Math.min(1.0, hunger.hunger / 1000) });
+    if (hunger?.satiation <= 0) {
+      const level = getHungerLevel(Number(hunger?.hunger || 0));
+      if (level === 'wasting') {
+        needs.push({ type: 'food', urgency: 1.0 });
+      } else if (level === 'starving') {
+        needs.push({ type: 'food', urgency: 0.9 });
+      } else if (level === 'famished') {
+        needs.push({ type: 'food', urgency: 0.7 });
+      } else if (level === 'hungry') {
+        needs.push({ type: 'food', urgency: 0.4 });
+      } else if (level === 'peckish') {
+        needs.push({ type: 'food', urgency: 0.2 });
+      }
     }
   }
 
