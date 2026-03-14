@@ -60,7 +60,7 @@ const ROOFABLE = new Set(["floor", "wall", "door"]);
  * @param {object} def - parsed building JSON (tiles[], spawns[], waypoints[], rooms[])
  * @param {number} anchorX - world X of the keystone (cobblestone attachment point)
  * @param {number} anchorY - world Y of the keystone
- * @returns {{ spawns: Object<string, {x:number,y:number}>, waypoints: Object<string, {x:number,y:number}> }}
+ * @returns {{ spawns: Object<string, {x:number,y:number}>, waypoints: Object<string, {x:number,y:number}>, shop: { vendorRole:string, door:{x:number,y:number}|null, work:{x:number,y:number}|null, room:object|null } | null }}
  */
 export function stampBuilding(chunks, def, anchorX, anchorY) {
   // Place tiles + mark roofed bitmap for floor/wall/door
@@ -112,10 +112,24 @@ export function stampBuilding(chunks, def, anchorX, anchorY) {
     }
   }
 
+  let shopMeta = null;
+  if (def.shop && typeof def.shop === "object") {
+    const doorName = String(def.shop.doorWaypoint || "");
+    const workName = String(def.shop.workWaypoint || "");
+    const roomName = String(def.shop.room || "");
+    shopMeta = {
+      vendorRole: String(def.shop.vendorRole || ""),
+      door: doorName ? (waypointPositions[doorName] || null) : null,
+      work: workName ? (waypointPositions[workName] || null) : null,
+      room: roomName ? (roomPositions[roomName] || null) : null,
+    };
+  }
+
   return {
     spawns: spawnPositions,
     waypoints: waypointPositions,
     allSpawns: allSpawnPositions,
     rooms: roomPositions,
+    shop: shopMeta,
   };
 }
