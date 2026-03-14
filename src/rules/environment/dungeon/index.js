@@ -38,6 +38,7 @@ import { StairDown, StairUp } from '../../archetypes/Stairs.js';
 import { CHUNK_SIZE, TILE_VOID, TILE_WALL, TILE_FLOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
+import { ensureCalendarState } from '../../utils/calendarState.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { generateOverworldChunks } from './overworld.js';
 import { WeatherState } from '../../components/WeatherState.js';
@@ -270,6 +271,7 @@ export function initDungeon(world, opts = {}) {
     floorEntityIds: entityIds,
     downStairPositions: downStairPositions || [],
   });
+  ensureCalendarState(world);
 
   // Create weather singleton for overworld
   if (depth === 0) {
