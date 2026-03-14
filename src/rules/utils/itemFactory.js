@@ -98,7 +98,7 @@ export function isValidItemId(itemId) {
   return !!(
     SIMPLE_ITEM_ARCHETYPES[itemId] ||
     getCatalogItem(itemId) ||
-    getGem(itemId)
+    gems.getGem(itemId)
   );
 }
 
