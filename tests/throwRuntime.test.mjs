@@ -147,8 +147,10 @@ Deno.test("throw runtime weapon impacts hostile entity on landing tile", () => {
   addToInventory(world, actor, dagger);
 
   const impacts = [];
+  const damaged = [];
   const results = [];
   world.on("item:throw-impact", (ev) => impacts.push(ev));
+  world.on("damaged", (ev) => damaged.push(ev));
   world.on("interaction:result", (ev) => results.push(ev));
 
   world.add(actor, ThrowIntent, { itemId: dagger, x: 12, y: 10 });
@@ -165,6 +167,7 @@ Deno.test("throw runtime weapon impacts hostile entity on landing tile", () => {
   assertEquals(impacts[0].itemId, dagger);
   assertEquals(impacts[0].targetId, target);
   assert(impacts[0].damage > 0, "impact event should include positive damage");
+  assert((damaged[0]?.projectileDelay || 0) > 0, "thrown impact damage should carry projectileDelay");
 
   const vit = world.get(target, Vitality);
   assert(vit.hp < 12, "thrown weapon should reduce target hp");

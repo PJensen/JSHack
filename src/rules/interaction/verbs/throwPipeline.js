@@ -63,6 +63,15 @@ function normalizePoint(point, fallback) {
   };
 }
 
+function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
+  const dx = Number(to?.x || 0) - Number(from?.x || 0);
+  const dy = Number(to?.y || 0) - Number(from?.y || 0);
+  const dist = Math.hypot(dx, dy);
+  if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
+  const raw = dist / speed;
+  return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
+}
+
 /**
  * @param {any} input
  * @param {{ x: number, y: number }} actorPos
@@ -297,12 +306,14 @@ export function throwPipeline(ctx) {
         const df = ctx.query.get(defender, Faction)?.key || "";
         if (areFactionsHostile(af, df)) {
           const damage = rollThrowImpactDamage(ctx, info || {}, actor);
+          const projectileDelay = computeProjectileDelay(throwSpec.from, landing, 26, 0.09, 0.32);
           ctx.mutate.queue({
             type: "damage",
             entityId: defender,
             amount: damage,
             source: actor,
             damageType: "physical",
+            projectileDelay,
           });
           metrics.impacted = true;
           metrics.impactDamage = damage;

@@ -116,6 +116,8 @@ Deno.test("ranged: hit with bow, ammo, LOS clear, in range", () => {
   assert(!world.has(archer, RangedAttackIntent), 'intent removed');
   assert(events.some(e => e._event === 'ranged:shot'), 'ranged:shot emitted');
   assert(events.some(e => e._event === 'damaged'), 'damaged emitted');
+  const hit = events.find(e => e._event === 'damaged');
+  assert((hit?.projectileDelay || 0) > 0, 'ranged hits should carry projectileDelay');
 });
 
 Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
