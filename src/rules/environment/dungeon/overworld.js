@@ -983,6 +983,7 @@ export function generateOverworldChunks(worldSeed) {
     workAuxX: apothX0 + 4, workAuxY: apothY0 + 2,
     pubX: tavX0 + 7, pubY: tavY0 + 2,
     shopRoom: { x: apothX0, y: apothY0, w: 10, h: 6 },
+    shopDoor: { x: apothDoorX, y: apothDoorY },
   });
   addSpawn(chunks, gemVendorHouse.standX, gemVendorHouse.standY, "townfolk", {
     townfolkId: "gem_vendor",
@@ -992,6 +993,7 @@ export function generateOverworldChunks(worldSeed) {
     workX: gemX0 + 2, workY: gemY0 + 2,
     pubX: tavX0 + 5, pubY: tavY0 + 2,
     shopRoom: { x: gemX0, y: gemY0, w: 8, h: 6 },
+    shopDoor: { x: gemDoorX, y: gemDoorY },
   });
 
   const outChunks = [];

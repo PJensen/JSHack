@@ -20,7 +20,7 @@ export { generateChunk, edgeGate, findDoorPositions } from './chunk.js';
 export { materializeChunk } from './materialize.js';
 export { generateFloorPlan, stairWorldPos } from './floorPlan.js';
 export { transitionToDepth } from './transition.js';
-export { populateChunk, materializeSpawn } from './populate.js';
+export { populateChunk, materializeSpawn, reconcileShopDoorAccess } from './populate.js';
 export { pickMonster, pickItem } from './tables.js';
 export { buildBSP, placeRooms, carveRooms, connectRooms, collectLeafRooms } from './bsp.js';
 export { loadChunk, unloadChunk, clearAll, getTile, isWalkable, isFlyable, isOpaque, isRoofed, setRoofed, forEachTileInRect, forEachLoadedTile, loadedChunkCount } from './tileMap.js';
@@ -29,7 +29,7 @@ export { markExplored } from './exploredMap.js';
 import { DungeonState } from '../../components/DungeonState.js';
 import { generateChunk } from './chunk.js';
 import { materializeChunk } from './materialize.js';
-import { populateChunk } from './populate.js';
+import { populateChunk, reconcileShopDoorAccess } from './populate.js';
 import { generateFloorPlan } from './floorPlan.js';
 import { chunkSeed } from './seed.js';
 import { createRng } from '../../../lib/ecs-js/rng.js';
@@ -89,6 +89,8 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
         });
       }
     }
+
+    reconcileShopDoorAccess(world);
 
     const downStairPositions = [];
     for (const chunkData of ow.chunks) {
