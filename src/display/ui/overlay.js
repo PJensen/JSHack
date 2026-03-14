@@ -2831,6 +2831,12 @@ function renderQuestJournal(panel, quests) {
  * @param {{ playerName?: string, stats?: Record<string, any>, activeEffects?: Array<any> }} data
  */
 function renderCharacterSheet(panel, data) {
+  const SEASON_COLORS = {
+    spring: '#7ec87a',
+    summer: '#f0c95a',
+    autumn: '#d4834a',
+    winter: '#8ab4d6',
+  };
   const existingDetach = /** @type {any} */ (panel)._characterSheetDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] character sheet detach failed:', e); }
@@ -2844,12 +2850,30 @@ function renderCharacterSheet(panel, data) {
   const playerName = String(data?.playerName || 'Hero').trim() || 'Hero';
   const stats = data?.stats && typeof data.stats === 'object' ? data.stats : {};
   const activeEffects = Array.isArray(data?.activeEffects) ? data.activeEffects : [];
+  const calendar = data?.calendar && typeof data.calendar === 'object' ? data.calendar : null;
 
   const title = document.createElement('div');
   title.textContent = `${playerName} · Character Sheet`;
   title.style.fontWeight = 'bold';
   title.style.marginBottom = '8px';
   el.appendChild(title);
+
+  if (calendar?.formatted) {
+    const calendarCard = document.createElement('div');
+    Object.assign(calendarCard.style, {
+      marginBottom: '10px',
+      padding: '8px 10px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: '#0a111f',
+      fontSize: '13px',
+      lineHeight: '1.4',
+      color: SEASON_COLORS[String(calendar?.season || '')] || '#cfe8ff',
+      wordBreak: 'break-word',
+    });
+    calendarCard.textContent = String(calendar.formatted);
+    el.appendChild(calendarCard);
+  }
 
   const statCard = document.createElement('div');
   Object.assign(statCard.style, {
