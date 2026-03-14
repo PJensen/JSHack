@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport"
-		content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+		content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 	<title>JS-hack</title>
 	<meta property="og:title" content="JS-Hack" />
 	<meta property="og:description" content="A browser roguelike. Descend the dungeon. Die heroically. Share the shame." />
@@ -176,7 +176,12 @@
 				background: rgba(50, 90, 140, 0.5);
 			}
 
-			@keyframes bootBrandPulse {
+			/* Prevent pinch-zoom during boot before JS lockdown loads */
+		#boot-loader, #boot-loader * {
+			touch-action: none;
+		}
+
+		@keyframes bootBrandPulse {
 				0%, 100% { opacity: 0.7; transform: translateY(0); }
 				50% { opacity: 1; transform: translateY(-1px); }
 			}

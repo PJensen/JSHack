@@ -62,10 +62,16 @@ export function clientToWorld(cam, clientX, clientY, canvas) {
     return [cam.x, cam.y];
   }
   const rect = canvas.getBoundingClientRect();
-  const sx = Number(clientX) - rect.left;
-  const sy = Number(clientY) - rect.top;
+  // offsetWidth/Height give the CSS layout size *before* CSS transforms,
+  // matching the coordinate space the canvas buffer is rendered into.
+  // getBoundingClientRect reflects transforms (e.g. page-zoom compensation),
+  // so we scale pointer coords from rendered space back to logical space.
+  const logicalW = canvas.offsetWidth || rect.width;
+  const logicalH = canvas.offsetHeight || rect.height;
+  const sx = (Number(clientX) - rect.left) * (logicalW / rect.width);
+  const sy = (Number(clientY) - rect.top) * (logicalH / rect.height);
   if (!Number.isFinite(sx) || !Number.isFinite(sy)) {
     return [cam.x, cam.y];
   }
-  return screenToWorld(cam, sx, sy, { width: rect.width, height: rect.height });
+  return screenToWorld(cam, sx, sy, { width: logicalW, height: logicalH });
 }

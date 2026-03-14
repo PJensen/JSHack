@@ -26,8 +26,18 @@ export function createCanvasSetup({ canvasId, TILE_PX, dprCap }) {
     const maxCap = Math.max(1, Math.floor(dprCap || 1));
     const dpr = Math.max(1, Math.min(rawDpr, maxCap));
 
-    const vw = Math.max(1, (window.innerWidth | 0));
-    const vh = Math.max(1, (window.innerHeight | 0));
+    // Use visualViewport for consistent sizing between PWA and browser mode.
+    // On mobile browsers the URL bar / bottom nav eat into the viewport, and
+    // window.innerHeight can report the "large viewport" (iOS) or miss resize
+    // events when the URL bar animates. visualViewport gives the true visible
+    // area. Multiply by pageZoom to recover the "intended" unzoomed layout
+    // dimensions so the game shows the same tile count regardless of any
+    // accidental pinch-zoom the browser may have stored.
+    const vv = window.visualViewport;
+    const pageZoom = (vv && vv.scale > 0) ? vv.scale : 1;
+    const vw = Math.max(1, Math.round(vv ? vv.width * pageZoom : window.innerWidth) | 0);
+    const vh = Math.max(1, Math.round(vv ? vv.height * pageZoom : window.innerHeight) | 0);
+
     const cols = Math.max(1, Math.floor(vw / TILE_PX));
     const rows = Math.max(1, Math.floor(vh / TILE_PX));
     const cssW = cols * TILE_PX;
@@ -35,6 +45,16 @@ export function createCanvasSetup({ canvasId, TILE_PX, dprCap }) {
 
     canvas.style.width = cssW + "px";
     canvas.style.height = cssH + "px";
+
+    // Counter-scale for page zoom so the game fills the same physical area
+    // regardless of browser-stored zoom (PWA mode always starts at 1x).
+    if (Math.abs(pageZoom - 1) > 0.01) {
+      canvas.style.transformOrigin = "center";
+      canvas.style.transform = `scale(${1 / pageZoom})`;
+    } else {
+      canvas.style.transform = "";
+    }
+
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -50,6 +70,9 @@ export function createCanvasSetup({ canvasId, TILE_PX, dprCap }) {
   }
 
   addEventListener("resize", resize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", resize);
+  }
   resize();
 
   return state;
