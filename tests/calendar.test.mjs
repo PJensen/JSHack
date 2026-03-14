@@ -67,7 +67,7 @@ Deno.test("getCalendarDate: step 0 with startDay=0, startYear=1 gives day 0, mon
   assertEquals(d.monthIndex, 0);
   assertEquals(d.year, 1);
   assertEquals(d.dayName, "Ashday");
-  assertEquals(d.monthName, "Thawmire");
+  assertEquals(d.monthName, "Martius");
   assertEquals(d.season, "spring");
 });
 
@@ -81,7 +81,7 @@ Deno.test("getCalendarDate: one full day advances dayTotal by 1", () => {
 Deno.test("getCalendarDate: after 28 days we are in month index 1", () => {
   const d = getCalendarDate(TURNS_PER_DAY * 28, 0, 1);
   assertEquals(d.monthIndex, 1);
-  assertEquals(d.monthName, "Sowsrest");
+  assertEquals(d.monthName, "Aprilis");
   assertEquals(d.dayOfMonth, 0);
 });
 
@@ -93,16 +93,16 @@ Deno.test("getCalendarDate: after 364 days the year increments", () => {
 });
 
 Deno.test("getCalendarDate: startDay offsets the calendar", () => {
-  // startDay=56 means game starts on day 56 of the year (first of Brightwater)
+  // startDay=56 means game starts on day 56 of the year (first of Maius)
   const d = getCalendarDate(0, 56, 847);
   assertEquals(d.dayTotal, 56);
   assertEquals(d.monthIndex, 2);  // 56/28 = 2
-  assertEquals(d.monthName, "Brightwater");
+  assertEquals(d.monthName, "Maius");
 });
 
 Deno.test("getCalendarDate: formatted string includes ordinal", () => {
   const d = getCalendarDate(0, 0, 847);
-  assertEquals(d.formatted, "Ashday, 1st of Thawmire — Year 847");
+  assertEquals(d.formatted, "Ashday, 1st of Martius — Year 847");
 });
 
 Deno.test("getCalendarDate: ordinals (2nd, 3rd, 11th, 21st)", () => {
@@ -175,7 +175,7 @@ Deno.test("calendarSystem emits calendar:newMonth on month boundary", () => {
   assertEquals(monthEvents.length, 1);
   assertEquals(monthEvents[0].prev, 0);
   assertEquals(monthEvents[0].next, 1);
-  assertEquals(monthEvents[0].name, "Sowsrest");
+  assertEquals(monthEvents[0].name, "Aprilis");
 });
 
 Deno.test("calendarSystem emits calendar:newSeason on season boundary", () => {

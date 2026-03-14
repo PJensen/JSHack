@@ -399,6 +399,11 @@ function resolveOffhandAttack(world, attacker, defender) {
 
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
         world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
+        applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
+            source, target, item: offhandId, damage: 0,
+            damageType: 'physical', crit: false, tags: ['melee', 'offhand'],
+            scratch: {}, offhand: true,
+        }), () => r());
         return;
     }
 
