@@ -21,13 +21,13 @@ export const TURNS_PER_YEAR  = TURNS_PER_DAY * DAYS_PER_YEAR;
 
 // ── Day-of-week names (7-day archaic week) ──────────────────────────
 export const DAY_NAMES = Object.freeze([
-  "Ashday",
-  "Stonesday",
-  "Ironday",
-  "Waterday",
-  "Grainday",
-  "Boneday",
-  "Restday",
+  "Sunna",
+  "Máni",
+  "Týr",
+  "Odin",
+  "Thor",
+  "Frigg",
+  "Saturn",
 ]);
 
 // ── Seasons ─────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ export function getCalendarDate(step, startDay = 0, startYear = 1) {
   const monthName = month.name;
   const season    = month.season;
 
-  // "Ironday, 14th of September — Year 847"
+  // "Týr, 14th of September — Year 847"
   const ordinal   = ordinalSuffix(dayOfMonth + 1);
   const formatted = `${dayName}, ${ordinal} of ${monthName} — Year ${yearNum}`;
 

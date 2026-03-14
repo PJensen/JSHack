@@ -66,7 +66,7 @@ Deno.test("getCalendarDate: step 0 with startDay=0, startYear=1 gives day 0, mon
   assertEquals(d.dayOfMonth, 0);
   assertEquals(d.monthIndex, 0);
   assertEquals(d.year, 1);
-  assertEquals(d.dayName, "Ashday");
+  assertEquals(d.dayName, "Sunna");
   assertEquals(d.monthName, "Martius");
   assertEquals(d.season, "spring");
 });
@@ -75,7 +75,7 @@ Deno.test("getCalendarDate: one full day advances dayTotal by 1", () => {
   const d = getCalendarDate(TURNS_PER_DAY, 0, 1);
   assertEquals(d.dayTotal, 1);
   assertEquals(d.dayOfWeek, 1);
-  assertEquals(d.dayName, "Stonesday");
+  assertEquals(d.dayName, "Máni");
 });
 
 Deno.test("getCalendarDate: after 28 days we are in month index 1", () => {
@@ -102,7 +102,7 @@ Deno.test("getCalendarDate: startDay offsets the calendar", () => {
 
 Deno.test("getCalendarDate: formatted string includes ordinal", () => {
   const d = getCalendarDate(0, 0, 847);
-  assertEquals(d.formatted, "Ashday, 1st of Martius — Year 847");
+  assertEquals(d.formatted, "Sunna, 1st of Martius — Year 847");
 });
 
 Deno.test("getCalendarDate: ordinals (2nd, 3rd, 11th, 21st)", () => {
@@ -185,7 +185,7 @@ Deno.test("calendarSystem emits calendar:newSeason on season boundary", () => {
   const seasonEvents = [];
   world.on("calendar:newSeason", (e) => seasonEvents.push(e));
 
-  // Jump to day 84 (month 3 = Longsun = summer)
+  // Jump to day 84 (month 3 = Iunius = summer)
   world.step = TURNS_PER_DAY * 84;
   calendarSystem(world);
 
