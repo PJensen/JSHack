@@ -10,6 +10,8 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Status } from "../src/rules/components/Status.js";
+import { CalendarState } from "../src/rules/components/CalendarState.js";
+import { getCalendarDate, TURNS_PER_DAY } from "../src/rules/data/calendar.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
@@ -142,6 +144,40 @@ Deno.test("character data dedupes effect/status aliases into one active effect r
   const activeEffects = Array.isArray(payload?.activeEffects) ? payload.activeEffects : [];
   const poisonedRows = activeEffects.filter((entry) => String(entry?.key || "") === "poisoned");
   assertEquals(poisonedRows.length, 1, "poison alias rows should collapse to one canonical poisoned entry");
+});
+
+Deno.test("character data includes calendar payload for the character sheet", () => {
+  const world = new World({ seed: 77 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+
+  const calendarEntity = world.create();
+  world.add(calendarEntity, CalendarState, { startDay: 0, startYear: 847 });
+  world.step = TURNS_PER_DAY * 2;
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any} */
+  let payload = null;
+  const onCharacterData = (ev) => {
+    payload = ev?.detail || null;
+  };
+  addEventListener("ui:characterData", onCharacterData);
+  dispatchEvent(new CustomEvent("ui:requestCharacterData"));
+  removeEventListener("ui:characterData", onCharacterData);
+
+  assert(payload, "expected ui:characterData payload");
+  assertEquals(payload?.calendar?.formatted, getCalendarDate(world.step, 0, 847).formatted);
+  assertEquals(payload?.calendar?.season, "spring");
 });
 
 Deno.test("settings data exposes monster ids for spawn autocomplete", () => {

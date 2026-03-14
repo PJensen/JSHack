@@ -18,8 +18,10 @@ import { Hunger } from "../../rules/components/Hunger.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { CalendarState } from "../../rules/components/CalendarState.js";
 import { Speed } from "../../rules/components/Speed.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "../../rules/data/spells.js";
+import { getCalendarDate } from "../../rules/data/calendar.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { isApplyTool, listApplyTargetsForTool, resolveApplyPayloadForWorld } from "../../rules/content/items/applyPayloads.js";
@@ -351,6 +353,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     let equippedBySlot = Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, { item: null, blocked: false }]));
     let playerName = 'Hero';
+    let calendar = null;
     const stats = {
       hp: 0,
       maxHp: 0,
@@ -445,8 +448,12 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         break;
       }
     }
+    for (const [, cs] of world.query(CalendarState)) {
+      calendar = getCalendarDate(world.step, cs.startDay, cs.startYear);
+      break;
+    }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:characterData', {
-      detail: { equippedBySlot, playerName, stats, activeEffects },
+      detail: { equippedBySlot, playerName, stats, activeEffects, calendar },
     }));
   });
 

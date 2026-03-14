@@ -6,7 +6,7 @@
 // from that assumption when tuning.
 
 // ── Master tunable ──────────────────────────────────────────────────
-export const TURNS_PER_DAY = 132;
+export const TURNS_PER_DAY = 720; // 24 hours × 60 minutes ÷ 2 minutes per turn
 
 // ── Calendar structure ──────────────────────────────────────────────
 export const DAYS_PER_WEEK   = 7;
