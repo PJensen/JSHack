@@ -1046,10 +1046,11 @@ export const INTERACT_PAYLOADS = {
       }
 
       for (let i = 0; i < count; i++) {
-        // Scatter multi-spawns so they don't stack on the same tile.
-        const ox = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1);
+        // Spawn adjacent to the sarcophagus, never on top of it.
+        const ADJACENT = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+        const { dx, dy } = ADJACENT[i % ADJACENT.length];
         const eid = createFrom(world, Monster, {
-          x: pos.x + ox, y: pos.y,
+          x: pos.x + dx, y: pos.y + dy,
           name, identity, faction: "enemy",
           maxHp, attackDerived, defenseDerived, naturalDamageDice, speed: 1,
         });

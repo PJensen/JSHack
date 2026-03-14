@@ -419,10 +419,20 @@ Deno.test("sarcophagus: spawns skeleton on first interaction", () => {
   assert(events[0].targetId === sarc, 'event should reference the sarcophagus');
 
   let skeletonFound = false;
-  for (const [, ni] of world.query(NamedIdentity)) {
-    if (ni.identity === 'skeleton') { skeletonFound = true; break; }
+  let skeletonOnSarcophagus = false;
+  const sarcPos = world.get(sarc, Position);
+  for (const [sid, ni] of world.query(NamedIdentity)) {
+    if (ni.identity === 'skeleton' || ni.identity === 'skeleton_archer') {
+      skeletonFound = true;
+      const skPos = world.get(sid, Position);
+      if (skPos && skPos.x === sarcPos.x && skPos.y === sarcPos.y) {
+        skeletonOnSarcophagus = true;
+      }
+      break;
+    }
   }
   assert(skeletonFound, 'a skeleton should be spawned');
+  assert(!skeletonOnSarcophagus, 'skeleton should spawn adjacent to the sarcophagus, not on top of it');
 });
 
 Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
