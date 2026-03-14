@@ -58,6 +58,7 @@ import { plantGrowthSystem } from "../rules/systems/plantGrowthSystem.js";
 import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.js";
 import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 import { weatherSystem } from "../rules/systems/weatherSystem.js";
+import { calendarSystem } from "../rules/systems/calendarSystem.js";
 import { townSimulationSystem } from "../rules/systems/townSimulationSystem.js";
 import { entrancePressureSystem } from "../rules/systems/entrancePressureSystem.js";
 import { districtConditionSystem } from "../rules/systems/districtConditionSystem.js";
@@ -193,6 +194,7 @@ export function configureWorld(world) {
   registerSystem(staminaRegenerationSystem, 'effects');
   registerSystem(harvestRegrowthSystem, 'effects');
   registerSystem(plantGrowthSystem, 'effects');
+  registerSystem(calendarSystem, 'effects');
   registerSystem(weatherSystem, 'effects');
   registerSystem(townSimulationSystem, 'effects');
   registerSystem(entrancePressureSystem, 'effects');
