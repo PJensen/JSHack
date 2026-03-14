@@ -90,6 +90,22 @@ export const DEITY_DEFS = {
       window: 8, minStreak: 2, bonusPerKill: 0.1, maxBonus: 0.5,
       killAction: 'kill', offerType: 'frenzy', offerFactor: 0.5, offerAlignment: 'chaotic',
     },
+    specialHooks: {
+      'ascetic:milestone': {
+        type: 'action',
+        verb: 'betray',
+        magnitude: 0.14,
+        target: 'austerity',
+        message: '{deity} sneers at your self-denial.',
+      },
+      'ascetic:lapse': {
+        type: 'offer',
+        verb: 'indulgence',
+        value: 0.12,
+        alignment: 'chaotic',
+        message: '{deity} approves your savage appetite.',
+      },
+    },
   },
 
   seraphine: {
@@ -180,6 +196,22 @@ export const DEITY_DEFS = {
       // Loki loves the audacity of offering corrupted items
       'altar:offer:cursed':   { type: 'action', verb: 'steal', magnitude: 0.35, target: 'cursed_offering',
                                 message: '{deity} cackles at your brazen offering!' },
+      // Strict austerity is boring to a trickster.
+      'ascetic:milestone': {
+        type: 'action',
+        verb: 'betray',
+        magnitude: 0.09,
+        target: 'austerity',
+        message: '{deity} yawns at your monkish restraint.',
+      },
+      // A lapse is more entertaining than discipline.
+      'ascetic:lapse': {
+        type: 'action',
+        verb: 'steal',
+        magnitude: 0.12,
+        target: 'indulgent_prank',
+        message: '{deity} laughs at your delicious lack of restraint.',
+      },
     },
   },
 
