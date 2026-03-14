@@ -6,7 +6,9 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Owner } from "../src/rules/components/Owner.js";
 import { Pet } from "../src/rules/components/Pet.js";
 import { Status } from "../src/rules/components/Status.js";
+import { Traits } from "../src/rules/components/Traits.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
+import { Hunger } from "../src/rules/components/Hunger.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { deitySystem, getDeityInstance, initDeity } from "../src/rules/systems/deitySystem.js";
 
@@ -204,4 +206,52 @@ Deno.test("shrine touch is cooldown-gated to prevent spam", () => {
   assertEquals(communionEvents[0].effect, "blessing");
   assertEquals(communionEvents[1].effect, "cooldown");
   assert(Number(communionEvents[1].cooldownRemaining || 0) > 0, "cooldown event should report remaining turns");
+});
+
+Deno.test("gluttonous trait slightly boosts deity food miracle output", () => {
+  function hungerAfterMiracle(gluttonous) {
+    const world = new World({ seed: gluttonous ? 0xA11CE : 0xBEEF });
+    const playerId = createPlayer(world, { name: gluttonous ? "Glutton" : "Normal" });
+    if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+    else world.add(playerId, Devotion, { deityId: "seraphine" });
+    if (world.has(playerId, Hunger)) world.set(playerId, Hunger, { hunger: 900, satiation: 0 });
+    else world.add(playerId, Hunger, { hunger: 900, satiation: 0 });
+    if (gluttonous) {
+      if (world.has(playerId, Traits)) world.set(playerId, Traits, { gluttonous: true });
+      else world.add(playerId, Traits, { gluttonous: true });
+    }
+
+    const deity = initDeity("seraphine", world);
+    deitySystem(world); // install listeners
+    deity._emit("miracle", { serenity: 1, tick: 100 });
+    return Number(world.get(playerId, Hunger)?.hunger || 0);
+  }
+
+  const normalAfter = hungerAfterMiracle(false);
+  const gluttonAfter = hungerAfterMiracle(true);
+  assert(gluttonAfter < normalAfter, "gluttonous miracle should reduce hunger more than normal");
+  assert((normalAfter - gluttonAfter) >= 70, "gluttonous bonus should be a meaningful but modest bump");
+});
+
+Deno.test("deity reads food events and records approval/offense actions", () => {
+  const world = new World({ seed: 0xF00D });
+  const playerId = createPlayer(world, { name: "Hero" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+  else world.add(playerId, Devotion, { deityId: "seraphine" });
+  if (world.has(playerId, Traits)) world.set(playerId, Traits, { gluttonous: true });
+  else world.add(playerId, Traits, { gluttonous: true });
+
+  initDeity("seraphine", world);
+  deitySystem(world); // install listeners
+  const deity = getDeityInstance("seraphine");
+  assert(deity, "deity should initialize");
+
+  world.emit("hunger:ate", { actor: playerId, nutrition: 700 });
+  world.emit("hunger:sickened", { actor: playerId, type: "decay" });
+
+  const actions = deity.ledger.ofType("action");
+  const createFood = actions.some((e) => e?.meta?.actionType === "create" && e?.meta?.target === "food");
+  const betrayFood = actions.some((e) => e?.meta?.actionType === "betray" && String(e?.meta?.target || "").startsWith("food_"));
+  assert(createFood, "hunger:ate should register a deity create(food) action");
+  assert(betrayFood, "hunger:sickened should register a deity betray(food_*) action");
 });
