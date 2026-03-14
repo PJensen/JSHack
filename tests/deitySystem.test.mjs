@@ -301,3 +301,69 @@ Deno.test("ascetic lapses can displease restraint-focused deities", () => {
     "overeating should trigger Seraphine ascetic lapse hook"
   );
 });
+
+Deno.test("loki treats ascetic discipline as boring and lapses as amusing", () => {
+  const world = new World({ seed: 0x10A1 });
+  const playerId = createPlayer(world, { name: "Trickster" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "loki" });
+  else world.add(playerId, Devotion, { deityId: "loki" });
+  if (world.has(playerId, Hunger)) world.set(playerId, Hunger, { hunger: 900, satiation: 0 });
+  else world.add(playerId, Hunger, { hunger: 900, satiation: 0 });
+
+  initDeity("loki", world);
+  deitySystem(world);
+  const deity = getDeityInstance("loki");
+  assert(deity, "deity should initialize");
+
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+
+  let actions = deity.ledger.ofType("action");
+  assert(
+    actions.some((e) => e?.meta?.actionType === "betray" && e?.meta?.target === "austerity"),
+    "Loki should dislike strict ascetic discipline"
+  );
+
+  world.set(playerId, Hunger, { hunger: 0, satiation: 80 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 80 });
+
+  actions = deity.ledger.ofType("action");
+  assert(
+    actions.some((e) => e?.meta?.actionType === "steal" && e?.meta?.target === "indulgent_prank"),
+    "Loki should enjoy indulgent lapses"
+  );
+});
+
+Deno.test("molkhar rewards lapses and disdains ascetic restraint", () => {
+  const world = new World({ seed: 0xA01C });
+  const playerId = createPlayer(world, { name: "Raider" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "molkhar" });
+  else world.add(playerId, Devotion, { deityId: "molkhar" });
+  if (world.has(playerId, Hunger)) world.set(playerId, Hunger, { hunger: 900, satiation: 0 });
+  else world.add(playerId, Hunger, { hunger: 900, satiation: 0 });
+
+  initDeity("molkhar", world);
+  deitySystem(world);
+  const deity = getDeityInstance("molkhar");
+  assert(deity, "deity should initialize");
+
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+
+  let actions = deity.ledger.ofType("action");
+  assert(
+    actions.some((e) => e?.meta?.actionType === "betray" && e?.meta?.target === "austerity"),
+    "Mol'Khar should disdain ascetic restraint"
+  );
+
+  world.set(playerId, Hunger, { hunger: 0, satiation: 80 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 80 });
+
+  const offers = deity.ledger.ofType("offer");
+  assert(
+    offers.some((e) => e?.meta?.offeringType === "indulgence"),
+    "Mol'Khar should treat indulgent lapses as offerings"
+  );
+});
