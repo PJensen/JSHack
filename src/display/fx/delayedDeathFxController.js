@@ -22,6 +22,10 @@ export function createDelayedDeathFxController({ world, getFxTime }) {
   const delayedDeathCells = new Map();
   /** @type {Map<number, number>} */
   const hiddenItems = new Map();
+  /** @type {Map<number, any>} */
+  const entitySnapshots = new Map();
+  /** @type {Map<number, { until:number, entity:any }>} */
+  const ghostEntities = new Map();
   const now = () => Math.max(0, Number(getFxTime?.() || 0));
 
   function isItemHidden(id) {
@@ -41,6 +45,9 @@ export function createDelayedDeathFxController({ world, getFxTime }) {
     }
     for (const [itemId, until] of hiddenItems) {
       if (!(until > t)) hiddenItems.delete(itemId);
+    }
+    for (const [id, rec] of ghostEntities) {
+      if (!(Number(rec?.until || 0) > t)) ghostEntities.delete(id);
     }
   }
 
@@ -65,6 +72,19 @@ export function createDelayedDeathFxController({ world, getFxTime }) {
       const pos = world.get(targetId, Position);
       if (!pos) return;
       delayedDeathCells.set(cellKey(pos.x, pos.y), { until, startedAt: now() });
+      const snap = entitySnapshots.get(targetId);
+      if (snap) {
+        ghostEntities.set(targetId, {
+          until,
+          entity: {
+            ...snap,
+            pos: { x: snap.pos.x, y: snap.pos.y },
+            tags: Array.isArray(snap.tags) ? snap.tags.slice() : [],
+            showHealthBar: false,
+            hp: 0,
+          },
+        });
+      }
     });
 
     world.on("item:dropped", ({ itemId, at }) => {
@@ -85,9 +105,41 @@ export function createDelayedDeathFxController({ world, getFxTime }) {
     prune();
   }
 
+  function syncWorldView(worldView) {
+    const entities = Array.isArray(worldView?.entities) ? worldView.entities : [];
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i];
+      if (!(Number(entity?.id || 0) > 0)) continue;
+      entitySnapshots.set(entity.id, {
+        ...entity,
+        pos: { x: entity.pos.x, y: entity.pos.y },
+        tags: Array.isArray(entity.tags) ? entity.tags.slice() : [],
+      });
+    }
+  }
+
+  function getRenderableEntities(entities) {
+    prune();
+    const live = Array.isArray(entities) ? entities : [];
+    if (ghostEntities.size === 0) return live;
+    const out = live.slice();
+    const liveIds = new Set();
+    for (let i = 0; i < live.length; i++) {
+      const id = Number(live[i]?.id || 0) | 0;
+      if (id > 0) liveIds.add(id);
+    }
+    for (const [id, rec] of ghostEntities) {
+      if (liveIds.has(id)) continue;
+      out.push(rec.entity);
+    }
+    return out;
+  }
+
   return {
+    getRenderableEntities,
     installListeners,
     isItemHidden,
+    syncWorldView,
     tick,
   };
 }
