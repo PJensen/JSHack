@@ -717,6 +717,10 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
     return;
   }
 
+  // Projectile travel duration (must match display-layer frostbolt: speed 8, min 0.1, max 0.6)
+  const _frostDist = Math.hypot(target.x - apos.x, target.y - apos.y) || 1;
+  const _frostDelay = Math.max(0.1, Math.min(0.6, _frostDist / 8));
+
   // Apply cold damage
   dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
     spell,
@@ -724,6 +728,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
     type: 'cold',
     cause: 'spell:frost',
     at: { x: target.x, y: target.y },
+    projectileDelay: _frostDelay,
   }));
 
   // Compute frost duration from target mass: lighter = longer slow
@@ -957,6 +962,10 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
     return;
   }
 
+  // Projectile travel duration (must match display-layer shadow_bolt: speed 10, min 0.08, max 0.7)
+  const _sbDist = Math.hypot(target.x - apos.x, target.y - apos.y) || 1;
+  const _sbDelay = Math.max(0.08, Math.min(0.7, _sbDist / 10));
+
   // Apply shadow damage — no status effect
   dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
     spell,
@@ -964,6 +973,7 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
     type: 'shadow',
     cause: 'spell:shadow_bolt',
     at: { x: target.x, y: target.y },
+    projectileDelay: _sbDelay,
   }));
 
   // Emit VFX event
