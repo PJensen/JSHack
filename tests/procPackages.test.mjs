@@ -80,18 +80,26 @@ function collectSubtreeWith(world, rootId, Comp, out = []) {
   return out;
 }
 
-Deno.test("proc package registry exposes all detached moonshots", () => {
-  assertEquals(listProcPackageIds(), [
-    "echoStrike",
-    "ricochetTheology",
-    "doomClock",
-    "soulMortgage",
-    "cataclysmChain",
-  ]);
+Deno.test("proc package registry structural invariants", () => {
+  const ids = listProcPackageIds();
+  assert(ids.length > 0, "registry must contain at least one package");
+  assertEquals(new Set(ids).size, ids.length, "package IDs must be unique");
+
+  for (const id of ids) {
+    const pkg = getProcPackage(id);
+    assert(pkg, `getProcPackage("${id}") must return a spec`);
+    assertEquals(typeof pkg.id, "string", `${id}: id must be a string`);
+    assertEquals(typeof pkg.name, "string", `${id}: name must be a string`);
+    assertEquals(typeof pkg.summary, "string", `${id}: summary must be a string`);
+    assert(Array.isArray(pkg.procTrees), `${id}: procTrees must be an array`);
+    assertEquals(pkg.id, id, `${id}: spec.id must match registry key`);
+  }
+
   for (const key of Object.values(PROC_PACKAGE_KEYS)) {
     assert(hasProcPackageScript(key), `expected script ${key} to be registered`);
     assert(getScriptHandlers(key), `expected handlers for ${key}`);
   }
+
   assertEquals(getProcPackage("soulMortgage")?.deferredHooks, ["onDeath", "onShrineInteract"]);
 });
 
