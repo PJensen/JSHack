@@ -818,7 +818,7 @@ function createQuickSlot() {
   function actionable(it) {
     const t = String(it.type||'');
     if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
-    if (t === 'gem' || t === 'tool') return true;
+    if (t === 'tool') return true;
     if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
     return false;
   }
@@ -1040,7 +1040,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  const ACTION_LABELS = { equip: 'Equip', ammo: 'Equip', wand: 'Equip', potion: 'Drink', food: 'Eat', scroll: 'Read', learn: 'Learn', book: 'Read', gem: 'Appraise', tool: 'Use' };
+  const ACTION_LABELS = { equip: 'Equip', ammo: 'Equip', wand: 'Equip', potion: 'Drink', food: 'Eat', scroll: 'Read', learn: 'Learn', book: 'Read', tool: 'Use' };
   btn.textContent = ACTION_LABELS[it.type] || 'Use';
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
