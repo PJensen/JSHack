@@ -4,10 +4,15 @@
 import { createRng } from '../../../lib/ecs-js/rng.js';
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Position } from '../../components/Position.js';
+import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Collider } from '../../components/Collider.js';
+import { Material } from '../../components/Material.js';
 import { Polymorph } from '../../components/Polymorph.js';
+import { DoorKey } from '../../components/DoorKey.js';
+import { DoorLock } from '../../components/DoorLock.js';
+import { DoorState } from '../../components/DoorState.js';
 import { Shopkeeper, Human } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
@@ -97,7 +102,7 @@ import { TownfolkJob } from '../../components/TownfolkJob.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
-import { addToInventory } from '../../utils/inventoryFacade.js';
+import { addToInventory, inventoryItems } from '../../utils/inventoryFacade.js';
 import { createItemById } from '../../utils/itemFactory.js';
 import {
   CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
@@ -127,6 +132,102 @@ const ROOM_FEATURES = [
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
 const SHOP_MIMIC_CHANCE = 0.08;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
+
+function findDoorEntityAt(world, x, y) {
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (pos.x === x && pos.y === y) return id;
+  }
+  return 0;
+}
+
+function createShopDoorKey(world, lockId, role) {
+  const itemId = world.create();
+  const label = role === "gem_vendor" ? "Gem Shop Key" : "Apothecary Key";
+  const identity = role === "gem_vendor" ? "key_gem_shop" : "key_apothecary";
+  world.add(itemId, NamedIdentity, { name: label, identity });
+  world.add(itemId, ItemInfo, {
+    type: "tool",
+    slot: "",
+    weight: 0.1,
+    value: 0,
+    description: `A shop key cut for ${role === "gem_vendor" ? "the gem shop" : "the apothecary"} door.`,
+    count: 1,
+  });
+  world.add(itemId, Material, { kind: "iron" });
+  world.add(itemId, DoorKey, { lockId });
+  return itemId;
+}
+
+function shopDoorLockId(role, x, y) {
+  return `overworld:shop:${String(role || "vendor")}:${Number(x) | 0},${Number(y) | 0}`;
+}
+
+function actorHasShopDoorKey(world, actorId, lockId) {
+  for (const itemId of inventoryItems(world, actorId)) {
+    if (String(world.get(itemId, DoorKey)?.lockId || "") === lockId) return true;
+  }
+  return false;
+}
+
+function ensureShopDoorAccess(world, actorId, role, doorId) {
+  if (!(actorId > 0) || !(doorId > 0)) return;
+  const pos = world.get(doorId, Position);
+  if (!pos) return;
+
+  const lockId = shopDoorLockId(role, pos.x, pos.y);
+  if (world.has(doorId, DoorLock)) world.set(doorId, DoorLock, { lockId });
+  else world.add(doorId, DoorLock, { lockId });
+
+  const doorState = world.get(doorId, DoorState);
+  if (doorState) {
+    world.set(doorId, DoorState, { ...doorState, open: false, locked: true });
+  }
+
+  if (!actorHasShopDoorKey(world, actorId, lockId)) {
+    const keyId = createShopDoorKey(world, lockId, String(role || ""));
+    addToInventory(world, actorId, keyId);
+  }
+}
+
+function assignShopDoorKey(world, actorId, role, shopDoor) {
+  if (!(actorId > 0) || !shopDoor) return;
+  const doorId = findDoorEntityAt(world, Number(shopDoor.x) | 0, Number(shopDoor.y) | 0);
+  const lockId = shopDoorLockId(role, Number(shopDoor.x) | 0, Number(shopDoor.y) | 0);
+  if (!actorHasShopDoorKey(world, actorId, lockId)) {
+    const keyId = createShopDoorKey(world, lockId, String(role || ""));
+    addToInventory(world, actorId, keyId);
+  }
+  if (doorId > 0) ensureShopDoorAccess(world, actorId, role, doorId);
+}
+
+function isDoorOnRoomPerimeter(pos, room) {
+  if (!pos || !room) return false;
+  if (pos.x < room.x || pos.x >= room.x + room.w || pos.y < room.y || pos.y >= room.y + room.h) return false;
+  return pos.x === room.x
+    || pos.x === (room.x + room.w - 1)
+    || pos.y === room.y
+    || pos.y === (room.y + room.h - 1);
+}
+
+function findRoomDoor(world, room) {
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (isDoorOnRoomPerimeter(pos, room)) return id;
+  }
+  return 0;
+}
+
+export function reconcileShopDoorAccess(world) {
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType !== "shop") continue;
+    const actorId = Number(room.shopkeeperId || 0) | 0;
+    if (!(actorId > 0)) continue;
+    const job = world.get(actorId, TownfolkJob);
+    if (!job) continue;
+    const doorId = findRoomDoor(world, room);
+    if (!(doorId > 0)) continue;
+    ensureShopDoorAccess(world, actorId, job.role, doorId);
+  }
+}
 
 function stockDisplayContainer(world, id, spawn, stockKind) {
   const inv = /** @type {any} */ (world.get(id, Inventory));
@@ -1119,6 +1220,7 @@ export function materializeSpawn(world, spawn) {
           params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
         });
         world.add(id, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
+        assignShopDoorKey(world, id, def.role, spawn.params.shopDoor);
         if (spawn.params.shopRoom) {
           const roomEntity = world.create();
           world.add(roomEntity, RoomMetadata, {
@@ -1136,6 +1238,7 @@ export function materializeSpawn(world, spawn) {
           params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
         });
         world.add(id, ShopInventory, { buyMarkup: 1.5, sellDiscount: 0.5 });
+        assignShopDoorKey(world, id, def.role, spawn.params.shopDoor);
         if (spawn.params.shopRoom) {
           const roomEntity = world.create();
           world.add(roomEntity, RoomMetadata, {

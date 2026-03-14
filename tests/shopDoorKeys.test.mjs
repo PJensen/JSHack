@@ -1,0 +1,371 @@
+import { assert, assertEquals } from "jsr:@std/assert";
+import { World } from "../src/lib/ecs-js/index.js";
+import { generateFloor } from "../src/rules/environment/dungeon/index.js";
+import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
+import { CHUNK_SIZE, TILE_DOOR, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
+import { Collider } from "../src/rules/components/Collider.js";
+import { DoorKey } from "../src/rules/components/DoorKey.js";
+import { DoorLock } from "../src/rules/components/DoorLock.js";
+import { DoorState } from "../src/rules/components/DoorState.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { Faction } from "../src/rules/components/Faction.js";
+import { Interactable } from "../src/rules/components/Interactable.js";
+import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
+import { Inventory } from "../src/rules/components/Inventory.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Player } from "../src/rules/components/Player.js";
+import { Position } from "../src/rules/components/Position.js";
+import { RoomMetadata } from "../src/rules/components/RoomMetadata.js";
+import { TownfolkJob, TOWNFOLK_STATES } from "../src/rules/components/TownfolkJob.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
+import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
+import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/systems/aiTownfolkSystem.js";
+import { cleanupSystem } from "../src/rules/systems/cleanupSystem.js";
+
+function createKey(world, lockId, name = "Shop Key") {
+  const keyId = world.create();
+  world.add(keyId, NamedIdentity, { name, identity: `${name.toLowerCase().replace(/\s+/g, "_")}_${lockId}` });
+  world.add(keyId, ItemInfo, { type: "tool", weight: 0.1, count: 1, description: "A shop key." });
+  world.add(keyId, DoorKey, { lockId });
+  return keyId;
+}
+
+function createDoor(world, x, y, lockId, locked = true) {
+  const doorId = world.create();
+  world.add(doorId, Position, { x, y });
+  world.add(doorId, Interactable, { action: "toggleDoor", params: null });
+  world.add(doorId, DoorState, { open: false, locked });
+  world.add(doorId, Collider, { solid: true, blocksSight: true });
+  world.add(doorId, DoorLock, { lockId });
+  return doorId;
+}
+
+function isDoorOnRoomPerimeter(pos, room) {
+  if (!pos || !room) return false;
+  if (pos.x < room.x || pos.x >= room.x + room.w || pos.y < room.y || pos.y >= room.y + room.h) return false;
+  return pos.x === room.x
+    || pos.x === room.x + room.w - 1
+    || pos.y === room.y
+    || pos.y === room.y + room.h - 1;
+}
+
+Deno.test("matching shop key unlocks and opens the locked shop door", () => {
+  const world = new World({ seed: 7 });
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 5 });
+
+  const lockId = "overworld:shop:alchemist:10,10";
+  const doorId = createDoor(world, 10, 10, lockId, true);
+  addToInventory(world, actor, createKey(world, lockId, "Apothecary Key"));
+
+  world.add(actor, InteractIntent, { targetId: doorId });
+  interactionSystem(world);
+
+  const door = world.get(doorId, DoorState);
+  const collider = world.get(doorId, Collider);
+  assertEquals(door.open, true);
+  assertEquals(door.locked, false);
+  assertEquals(collider.solid, false);
+  assertEquals(collider.blocksSight, false);
+});
+
+Deno.test("shopkeeper locks their shop door behind them after moving off it", () => {
+  const world = new World({ seed: 8 });
+  const actor = world.create();
+  const lockId = "overworld:shop:gem_vendor:3,3";
+
+  world.add(actor, Position, { x: 3, y: 4 });
+  world.add(actor, Faction, { key: "townfolk" });
+  world.add(actor, Inventory, { capacity: 5 });
+  world.add(actor, TownfolkJob, {
+    role: "gem_vendor",
+    state: TOWNFOLK_STATES.idle,
+    scheduleEnabled: false,
+    homeX: 3, homeY: 4,
+    bedX: 3, bedY: 4,
+    workX: 3, workY: 4,
+    workAuxX: 3, workAuxY: 4,
+    pubX: 3, pubY: 4,
+    targetX: 3, targetY: 4,
+    workTurns: 0,
+    idleTurns: 0,
+    workSiteKind: "",
+    routineKind: "",
+    lastPhase: "",
+    carrying: "",
+    carryCount: 0,
+    carryMax: 0,
+    deliverX: 0,
+    deliverY: 0,
+    stuckTurns: 0,
+  });
+  addToInventory(world, actor, createKey(world, lockId, "Gem Shop Key"));
+
+  const doorId = createDoor(world, 3, 3, lockId, false);
+  world.set(doorId, DoorState, { open: true, locked: false });
+  world.set(doorId, Collider, { solid: false, blocksSight: false });
+  const roomId = world.create();
+  world.add(roomId, RoomMetadata, {
+    roomType: "shop",
+    x: 2,
+    y: 1,
+    w: 3,
+    h: 3,
+    shopkeeperId: actor,
+  });
+
+  installTownfolkDoorListener(world);
+  world.emit("moved", { id: actor, from: { x: 3, y: 3 }, to: { x: 3, y: 4 } });
+
+  const door = world.get(doorId, DoorState);
+  const collider = world.get(doorId, Collider);
+  assertEquals(door.open, false);
+  assertEquals(door.locked, true);
+  assertEquals(collider.solid, true);
+  assertEquals(collider.blocksSight, true);
+});
+
+Deno.test("shopkeeper entering their shop closes the door without locking it", () => {
+  const world = new World({ seed: 81 });
+  const actor = world.create();
+  const lockId = "overworld:shop:alchemist:6,6";
+
+  world.add(actor, Position, { x: 6, y: 5 });
+  world.add(actor, Faction, { key: "townfolk" });
+  world.add(actor, Inventory, { capacity: 5 });
+  world.add(actor, TownfolkJob, {
+    role: "alchemist",
+    state: TOWNFOLK_STATES.idle,
+    scheduleEnabled: false,
+    homeX: 6, homeY: 5,
+    bedX: 6, bedY: 5,
+    workX: 6, workY: 5,
+    workAuxX: 6, workAuxY: 5,
+    pubX: 6, pubY: 5,
+    targetX: 6, targetY: 5,
+    workTurns: 0,
+    idleTurns: 0,
+    workSiteKind: "",
+    routineKind: "",
+    lastPhase: "",
+    carrying: "",
+    carryCount: 0,
+    carryMax: 0,
+    deliverX: 0,
+    deliverY: 0,
+    stuckTurns: 0,
+  });
+  addToInventory(world, actor, createKey(world, lockId, "Apothecary Key"));
+
+  const doorId = createDoor(world, 6, 6, lockId, false);
+  world.set(doorId, DoorState, { open: true, locked: false });
+  world.set(doorId, Collider, { solid: false, blocksSight: false });
+  const roomId = world.create();
+  world.add(roomId, RoomMetadata, {
+    roomType: "shop",
+    x: 5,
+    y: 4,
+    w: 3,
+    h: 3,
+    shopkeeperId: actor,
+  });
+
+  installTownfolkDoorListener(world);
+  world.emit("moved", { id: actor, from: { x: 6, y: 6 }, to: { x: 6, y: 5 } });
+
+  const door = world.get(doorId, DoorState);
+  assertEquals(door.open, false);
+  assertEquals(door.locked, false);
+});
+
+Deno.test("shopkeeper AI can unlock their own shop door with the matching key", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 6] = TILE_DOOR;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 9 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, {
+    worldSeed: 9,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 5, y: 5 });
+
+  const actor = world.create();
+  const lockId = "overworld:shop:alchemist:6,5";
+  world.add(actor, Position, { x: 5, y: 5 });
+  world.add(actor, Faction, { key: "townfolk" });
+  world.add(actor, Inventory, { capacity: 5 });
+  world.add(actor, Equipment, {});
+  world.add(actor, TownfolkJob, {
+    role: "alchemist",
+    state: TOWNFOLK_STATES.walking,
+    scheduleEnabled: false,
+    homeX: 5, homeY: 5,
+    bedX: 5, bedY: 5,
+    workX: 7, workY: 5,
+    workAuxX: 7, workAuxY: 5,
+    pubX: 5, pubY: 5,
+    targetX: 7,
+    targetY: 5,
+    workTurns: 0,
+    idleTurns: 0,
+    workSiteKind: "",
+    routineKind: "",
+    lastPhase: "",
+    carrying: "",
+    carryCount: 0,
+    carryMax: 0,
+    deliverX: 0,
+    deliverY: 0,
+    stuckTurns: 0,
+  });
+  addToInventory(world, actor, createKey(world, lockId, "Apothecary Key"));
+
+  const doorId = createDoor(world, 6, 5, lockId, true);
+  aiTownfolkSystem(world);
+
+  const door = world.get(doorId, DoorState);
+  assertEquals(door.open, true);
+  assertEquals(door.locked, false);
+  assert(!world.has(actor, MoveIntent), "opening the door should consume the action for this tick");
+});
+
+Deno.test("dead shopkeeper drops their shop key", () => {
+  const world = new World({ seed: 10 });
+  const actor = world.create();
+  const lockId = "overworld:shop:alchemist:12,9";
+
+  world.add(actor, Position, { x: 12, y: 9 });
+  world.add(actor, Inventory, { capacity: 5 });
+  world.add(actor, Vitality, { maxHp: 10, hp: 0 });
+  world.add(actor, NamedIdentity, { name: "Alchemist", identity: "townfolk_alchemist" });
+
+  const keyId = createKey(world, lockId, "Apothecary Key");
+  addToInventory(world, actor, keyId);
+
+  cleanupSystem(world);
+
+  const pos = world.get(keyId, Position);
+  assert(pos, "key should be placed on the ground");
+  assertEquals(pos.x, 12);
+  assertEquals(pos.y, 9);
+  assertEquals(world.get(keyId, DoorKey)?.lockId, lockId);
+});
+
+Deno.test("overworld gem vendor gets a keyed locked shop door after generation", () => {
+  clearAll();
+  const world = new World({ seed: 0xC0FFEE });
+  generateFloor(world, world.seed >>> 0, 0);
+
+  let gemVendorId = 0;
+  for (const [id, named] of world.query(NamedIdentity)) {
+    if (named.identity === "townfolk_gem_vendor") {
+      gemVendorId = id;
+      break;
+    }
+  }
+  assert(gemVendorId > 0, "expected gem vendor to spawn");
+
+  const keyIds = inventoryItems(world, gemVendorId)
+    .filter((itemId) => String(world.get(itemId, DoorKey)?.lockId || "").includes("gem_vendor"));
+  assertEquals(keyIds.length, 1, "gem vendor should have exactly one matching shop key");
+
+  let shopRoom = null;
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType === "shop" && room.shopkeeperId === gemVendorId) {
+      shopRoom = room;
+      break;
+    }
+  }
+  assert(shopRoom, "expected gem vendor shop room metadata");
+
+  let shopDoorId = 0;
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (isDoorOnRoomPerimeter(pos, shopRoom)) {
+      shopDoorId = id;
+      break;
+    }
+  }
+  assert(shopDoorId > 0, "expected a physical gem shop door");
+
+  const doorState = world.get(shopDoorId, DoorState);
+  const doorLock = world.get(shopDoorId, DoorLock);
+  assertEquals(doorState.open, false);
+  assertEquals(doorState.locked, true);
+  assert(doorLock?.lockId?.includes("gem_vendor"), "expected gem shop door lock to be assigned");
+  assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
+});
+
+Deno.test("scheduled gem vendor stays in the shop while the player is inside", () => {
+  const world = new World({ seed: 11 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, {
+    worldSeed: 11,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+  world.step = 100;
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 11, y: 11 });
+
+  const actor = world.create();
+  world.add(actor, Faction, { key: "townfolk" });
+  world.add(actor, Position, { x: 10, y: 10 });
+  world.add(actor, TownfolkJob, {
+    role: "gem_vendor",
+    state: TOWNFOLK_STATES.idle,
+    scheduleEnabled: true,
+    homeX: 2, homeY: 2,
+    bedX: 2, bedY: 2,
+    workX: 10, workY: 10,
+    workAuxX: 10, workAuxY: 10,
+    pubX: 20, pubY: 20,
+    targetX: 2, targetY: 2,
+    workTurns: 0,
+    idleTurns: 0,
+    workSiteKind: "",
+    routineKind: "",
+    lastPhase: "",
+    carrying: "",
+    carryCount: 0,
+    carryMax: 0,
+    deliverX: 0,
+    deliverY: 0,
+    stuckTurns: 0,
+  });
+
+  const roomId = world.create();
+  world.add(roomId, RoomMetadata, {
+    roomType: "shop",
+    x: 9,
+    y: 9,
+    w: 4,
+    h: 4,
+    shopkeeperId: actor,
+  });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(actor, TownfolkJob);
+  assertEquals(world.has(actor, MoveIntent), false, "gem vendor should not leave while serving a customer");
+  assertEquals(job.targetX, 10);
+  assertEquals(job.targetY, 10);
+  assertEquals(job.routineKind, "tend_stall");
+});

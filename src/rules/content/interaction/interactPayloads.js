@@ -57,6 +57,7 @@ import { Encumbrance } from "../../components/Encumbrance.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
+import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
 import { getDistrictBulletinVirtual, getPlayerOpportunityViewVirtual } from "../../utils/townInterpretationVirtuals.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
@@ -307,7 +308,7 @@ export const INTERACT_PAYLOADS = {
     beforeInteract(ctx) {
       const { world, actor, targetId } = ctx;
       const ds = world.get(targetId, DoorState);
-      if (ds?.locked) {
+      if (ds?.locked && !actorHasDoorKey(world, actor, targetId)) {
         world.emit?.("interaction", { actor, targetId, action: "toggleDoor", result: "locked" });
         ctx.cancel("LOCKED", "The door is locked.");
       }
@@ -316,14 +317,10 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const ds = world.get(targetId, DoorState);
       const nowOpen = !(ds?.open);
-      if (ds) world.set(targetId, DoorState, { open: nowOpen });
-      const col = world.get(targetId, Collider);
-      if (col) world.set(targetId, Collider, { solid: !nowOpen, blocksSight: !nowOpen });
-      world.emit?.("interaction", {
-        actor, targetId,
-        action: "toggleDoor",
-        result: nowOpen ? "opened" : "closed",
-      });
+      setDoorState(world, targetId, {
+        open: nowOpen,
+        locked: nowOpen ? false : !!ds?.locked,
+      }, actor);
     },
   },
 

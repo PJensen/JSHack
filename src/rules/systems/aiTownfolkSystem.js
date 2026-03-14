@@ -8,6 +8,7 @@ import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../components/TownfolkJob.js";
+import { DoorLock } from "../components/DoorLock.js";
 import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
@@ -19,9 +20,9 @@ import { Equipment } from "../components/Equipment.js";
 import { ObjectState } from "../components/ObjectState.js";
 import { TownState } from "../components/TownState.js";
 import { WeatherState } from "../components/WeatherState.js";
+import { RoomMetadata } from "../components/RoomMetadata.js";
 import { createItemById } from "../utils/itemFactory.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
-import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import {
   createInventoryItem,
@@ -44,6 +45,7 @@ import {
   TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from "../environment/dungeon/constants.js";
 import { getTownPhase } from "../data/calendar.js";
+import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
@@ -399,40 +401,62 @@ function doorOccupied(world, x, y) {
   return false;
 }
 
-function setDoorOpen(world, doorId, open, actor = 0) {
-  const ds = world.get(doorId, DoorState);
-  if (!ds || ds.open === open) return false;
-  world.set(doorId, DoorState, { ...ds, open });
-  const col = world.get(doorId, Collider);
-  if (col) world.set(doorId, Collider, { ...col, solid: !open, blocksSight: !open });
-  invalidateTileQueryCache(world);
-  emitSafe(world, "interaction", {
-    actor,
-    targetId: doorId,
-    action: "toggleDoor",
-    result: open ? "opened" : "closed",
-  });
-  return true;
+function isInRoom(x, y, room) {
+  return x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+}
+
+function findOwnedShopRoom(world, actorId, x, y) {
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType !== "shop") continue;
+    if (Number(room.shopkeeperId || 0) !== (actorId | 0)) continue;
+    if (isInRoom(x, y, room)) return room;
+  }
+  return null;
+}
+
+function findOwnedShopRoomByActor(world, actorId) {
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType !== "shop") continue;
+    if (Number(room.shopkeeperId || 0) !== (actorId | 0)) continue;
+    return room;
+  }
+  return null;
+}
+
+function shopHasCustomer(world, actorId) {
+  const room = findOwnedShopRoomByActor(world, actorId);
+  if (!room) return false;
+  for (const [, , pos] of world.query(Player, Position)) {
+    if (isInRoom(pos.x, pos.y, room)) return true;
+  }
+  return false;
 }
 
 export function installTownfolkDoorListener(world) {
   if (!world || world[TOWNFOLK_DOOR_INSTALLED]) return;
   world[TOWNFOLK_DOOR_INSTALLED] = true;
 
-  world.on("moved", ({ id, from }) => {
+  world.on("moved", ({ id, from, to }) => {
     const fac = world.get(id, Faction);
     if (fac?.key !== "townfolk") return;
     const door = findDoorAt(world, from?.x, from?.y);
     if (!door || !door.state?.open) return;
     if (doorOccupied(world, from.x, from.y)) return;
-    setDoorOpen(world, door.id, false, id);
+    const room = findOwnedShopRoom(world, id, from.x, from.y);
+    const canLock = !!world.get(door.id, DoorLock)?.lockId && actorHasDoorKey(world, id, door.id);
+    const goingOut = room && to ? !isInRoom(to.x, to.y, room) : false;
+    setDoorState(world, door.id, {
+      open: false,
+      locked: !!(canLock && goingOut),
+    }, id);
   });
 }
 
 function maybeOpenDoor(world, actorId, x, y) {
   const door = findDoorAt(world, x, y);
   if (!door || door.state?.open) return false;
-  setDoorOpen(world, door.id, true, actorId);
+  if (door.state?.locked && !actorHasDoorKey(world, actorId, door.id)) return false;
+  setDoorState(world, door.id, { open: true, locked: false }, actorId);
   return true;
 }
 
@@ -1158,7 +1182,10 @@ function getRoleWorkTarget(world, job) {
   }
 }
 
-function getScheduleTarget(world, job) {
+function getScheduleTarget(world, actorId, job) {
+  if (shopHasCustomer(world, actorId)) {
+    return { phase: "shop_customer", ...getRoleWorkTarget(world, job) };
+  }
   const phase = getTownPhase(world.step);
   if (phase === "sleep") {
     return { phase, x: job.bedX || job.homeX, y: job.bedY || job.homeY, kind: "sleep", state: TOWNFOLK_STATES.sleeping, radius: 0 };
@@ -1246,7 +1273,7 @@ function emitRoleWork(world, id, pos, job, target) {
 }
 
 function handleScheduledTownfolk(world, id, pos, job) {
-  const target = getScheduleTarget(world, job);
+  const target = getScheduleTarget(world, id, job);
   const phaseChanged = target.phase !== job.lastPhase;
   if (Number.isFinite(target.deliverX)) job.deliverX = target.deliverX;
   if (Number.isFinite(target.deliverY)) job.deliverY = target.deliverY;
