@@ -1285,4 +1285,19 @@ export function installMessageWiring({
       log('Lightning strikes the ground nearby!', 'system');
     }
   });
+
+  // === Calendar events ===
+  world.on('calendar:newDay', ({ next }) => {
+    // Quiet — day ticks are frequent, no log spam.
+  });
+  world.on('calendar:newMonth', ({ name }) => {
+    log(`The month of ${name} begins.`, 'system');
+  });
+  world.on('calendar:newSeason', ({ next }) => {
+    const label = next.charAt(0).toUpperCase() + next.slice(1);
+    log(`${label} has arrived.`, 'system');
+  });
+  world.on('calendar:newYear', ({ next }) => {
+    log(`A new year dawns — Year ${next}.`, 'system');
+  });
 }

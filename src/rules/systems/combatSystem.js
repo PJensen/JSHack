@@ -201,6 +201,12 @@ export function resolveMeleeAttack(world, attacker, defender) {
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
         // Miss (include attacker for better UX logging)
         world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
+        // onMiss proc phase — gives proc packages (e.g. Fool's Errand) a window
+        applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
+            source, target, item: weaponId || 0, damage: 0,
+            damageType: 'physical', crit: false, tags: ['melee'],
+            scratch: {},
+        }), () => r());
         return true;
     }
 

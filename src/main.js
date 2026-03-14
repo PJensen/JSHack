@@ -3811,6 +3811,7 @@ function frame(now) {
   hudFeeds.updateGoldHUD();
   hudFeeds.updatePetHUD();
   hudFeeds.updateActiveSpellHUD();
+  hudFeeds.updateCalendarHUD();
 
   // Render
   const view = getCachedView();

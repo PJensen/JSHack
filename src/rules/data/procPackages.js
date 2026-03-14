@@ -5,15 +5,17 @@ import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { ProcPackageNode } from "../components/ProcPackageNode.js";
 import { Vitality } from "../components/Vitality.js";
-import { isOpaque } from "../environment/dungeon/tileMap.js";
+import { isOpaque, isWalkable } from "../environment/dungeon/tileMap.js";
 import { registerScript, getScriptHandlers, ScriptVerb } from "../scripting.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { spawnHazard } from "../utils/hazardSpawn.js";
 import {
   addAttachedComponent,
   attachDerivedExpression,
   attachProcNode,
   exprAddConst,
+  gateChance,
   gateEventKind,
   gateHasActionTag,
 } from "../utils/statProcAuthoring.js";
@@ -24,6 +26,9 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   DoomClock: "procPackage:doomClock",
   SoulMortgage: "procPackage:soulMortgage",
   CataclysmChain: "procPackage:cataclysmChain",
+  GravityWell: "procPackage:gravityWell",
+  BloodTithe: "procPackage:bloodTithe",
+  FoolsErrand: "procPackage:foolsErrand",
 });
 
 function ensureActiveEffects(world, entityId) {
@@ -320,6 +325,114 @@ registerScript(PROC_PACKAGE_KEYS.CataclysmChain, {
   },
 });
 
+// ── Gravity Well ──────────────────────────────────────────────────────────
+// OnCritKill: spawn a gravity hazard at the corpse.  Each tick the hazard
+// system deals 2 shadow damage; a dedicated gravityWellSystem pulls enemies
+// 1 tile toward the center.
+registerScript(PROC_PACKAGE_KEYS.GravityWell, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onCritKill") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const pos = world.get(target, Position);
+    if (!pos) return;
+    const x = pos.x | 0;
+    const y = pos.y | 0;
+
+    spawnHazard(world, {
+      x,
+      y,
+      kind: "gravity_well",
+      medium: "air",
+      turnsLeft: 4,
+      radius: 2,
+      tickDamage: 2,
+      damageType: "shadow",
+      cause: "gravity_well",
+      sourceId: source,
+      sourceKind: "proc",
+      identity: "gravity_well",
+      name: "Gravity Well",
+      meta: { pull: true },
+    });
+
+    ctx.proc.message("A gravity well tears open.");
+    emit(world, "proc:gravityWell:spawn", { actor: source, target, at: { x, y } });
+  },
+});
+
+// ── Blood Tithe ───────────────────────────────────────────────────────────
+// OnHit: bank 10% of dealt damage as blood_tithe_debt stacks on self (max 20).
+// OnDamaged: detonate all stacks as a burst heal, then clear.
+registerScript(PROC_PACKAGE_KEYS.BloodTithe, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+
+    if (kind === "onHit") {
+      if (!(target > 0)) return;
+      const amount = Math.max(0, Number(ctx?.damage?.amount || 0));
+      if (amount <= 0) return;
+      const tithe = Math.max(1, Math.floor(amount * 0.1));
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const existing = getEffect(world, source, "blood_tithe_debt");
+      const next = Math.min(20, Math.max(1, Number(existing?.stacks || 0) + tithe));
+      upsertTimedEffect(ae.effects, {
+        key: "blood_tithe_debt",
+        turnsLeft: 99,
+        potency: next,
+        stacks: next,
+      });
+      emit(world, "proc:bloodTithe:bank", { actor: source, target, banked: tithe, total: next });
+      return;
+    }
+
+    if (kind === "onDamaged") {
+      const debt = getEffect(world, source, "blood_tithe_debt");
+      const stacks = Math.max(0, Number(debt?.stacks || 0));
+      if (stacks <= 0) return;
+      removeEffect(world, source, "blood_tithe_debt");
+      ctx.proc.heal(source, stacks);
+      ctx.proc.message("Blood debt repaid.");
+      emit(world, "proc:bloodTithe:burst", { actor: source, healed: stacks });
+      return;
+    }
+  },
+});
+
+// ── Fool's Errand ─────────────────────────────────────────────────────────
+// OnMiss (30% chance): apply confuse (2 turns) to both attacker AND defender.
+// With luck ≥ 5 only the defender is confused.
+registerScript(PROC_PACKAGE_KEYS.FoolsErrand, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onMiss") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+
+    // Luck-based mercy: if source has luck >= 5, only confuse defender
+    const vit = world.get(source, Vitality);
+    const luckyEnough = Number(vit?.luck || 0) >= 5;
+
+    ctx.proc.applyStatus(target, "confused", 2, 1);
+    if (!luckyEnough) {
+      ctx.proc.applyStatus(source, "confused", 2, 1);
+    }
+    ctx.proc.message(luckyEnough
+      ? "Your wild miss bewilders the enemy!"
+      : "Such a spectacular miss — everyone is bewildered!");
+    emit(world, "proc:foolsErrand:bewildered", {
+      actor: source,
+      target,
+      selfConfused: !luckyEnough,
+    });
+  },
+});
+
 const PROC_PACKAGE_SPECS = Object.freeze([
   Object.freeze({
     id: "echoStrike",
@@ -388,6 +501,45 @@ const PROC_PACKAGE_SPECS = Object.freeze([
       Object.freeze({ trigger: "onCritKill", script: PROC_PACKAGE_KEYS.CataclysmChain, priority: 10 }),
       Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.CataclysmChain, priority: 20 }),
       Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.CataclysmChain, priority: 30 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "gravityWell",
+    name: "Gravity Well",
+    summary: "Crit kills tear open a vortex that drags nearby foes inward and gnaws at them with shadow.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["singularity shards", "void hammers", "black-star gems"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onCritKill", script: PROC_PACKAGE_KEYS.GravityWell, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "bloodTithe",
+    name: "Blood Tithe",
+    summary: "Banks a fraction of every wound you deal; when you take a hit the debt is repaid as healing.",
+    stateKeys: Object.freeze(["blood_tithe_debt"]),
+    hostIdeas: Object.freeze(["sanguine rings", "leech blades", "blood-pact talismans"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.BloodTithe, priority: 10 }),
+      Object.freeze({ trigger: "onDamaged", script: PROC_PACKAGE_KEYS.BloodTithe, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "foolsErrand",
+    name: "Fool's Errand",
+    summary: "Whiffed attacks have a chance to confuse everyone involved — you included.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["jester bells", "chaos wands", "drunken-master wraps"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({
+        trigger: "onMiss",
+        script: PROC_PACKAGE_KEYS.FoolsErrand,
+        priority: 10,
+        gates: Object.freeze([gateChance(0.3)]),
+      }),
     ]),
   }),
 ]);

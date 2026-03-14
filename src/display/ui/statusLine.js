@@ -1,16 +1,23 @@
 // display/ui/statusLine.js
 // NetHack-style horizontal status line (bottom of screen, above action bar).
+// Two rows: calendar line (top) + stats line (bottom).
+
+const SEASON_COLORS = {
+  spring: '#7ec87a',
+  summer: '#f0c95a',
+  autumn: '#d4834a',
+  winter: '#8ab4d6',
+};
 
 export function initStatusLine() {
   let root = document.getElementById('ui-root');
   if (!root) return;
 
-  const line = document.createElement('div');
-  Object.assign(line.style, {
+  // Shared style base for both lines
+  const lineBase = {
     position: 'fixed',
     left: '8px',
     right: '8px',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))',
     textAlign: 'center',
     fontFamily: 'monospace',
     fontSize: 'min(12px, 3vw)',
@@ -21,8 +28,21 @@ export function initStatusLine() {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  };
+
+  // Stats line (bottom) — existing
+  const statsLine = document.createElement('div');
+  Object.assign(statsLine.style, lineBase, {
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))',
   });
-  root.appendChild(line);
+  root.appendChild(statsLine);
+
+  // Calendar line — sits directly above the stats line
+  const calLine = document.createElement('div');
+  Object.assign(calLine.style, lineBase, {
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 28px + env(safe-area-inset-bottom, 0px))',
+  });
+  root.appendChild(calLine);
 
   let depth = 1;
   let turn = 0;
@@ -32,6 +52,9 @@ export function initStatusLine() {
   let luck = 0;
   let armorClass = 10;
   let critPct = 0;
+
+  let calFormatted = "";
+  let calSeason = "";
 
   function colorForDelta(value) {
     const n = Number(value || 0);
@@ -64,7 +87,7 @@ export function initStatusLine() {
     parts.push(wrap);
   }
 
-  function render() {
+  function renderStats() {
     const parts = [];
     pushSegment(parts, 'DLvl', String(depth));
     pushSegment(parts, 'Turn', String(turn));
@@ -75,23 +98,32 @@ export function initStatusLine() {
     pushSegment(parts, 'AC', String(armorClass), colorForDelta(armorClass - 10));
     pushSegment(parts, 'Crit', fmtSignedPct(critPct), colorForDelta(critPct));
 
-    line.replaceChildren();
+    statsLine.replaceChildren();
     for (let i = 0; i < parts.length; i++) {
       if (i > 0) {
         const sep = document.createElement('span');
         sep.textContent = ' \u2022 ';
         Object.assign(sep.style, { color: '#7f8793' });
-        line.appendChild(sep);
+        statsLine.appendChild(sep);
       }
-      line.appendChild(parts[i]);
+      statsLine.appendChild(parts[i]);
     }
+  }
+
+  function renderCalendar() {
+    calLine.replaceChildren();
+    if (!calFormatted) return;
+    const span = document.createElement('span');
+    span.textContent = calFormatted;
+    Object.assign(span.style, { color: SEASON_COLORS[calSeason] || '#cfd3dc' });
+    calLine.appendChild(span);
   }
 
   window.addEventListener('ui:updateDepth', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     depth = Number(e?.detail?.depth ?? depth);
-    render();
+    renderStats();
   });
 
   window.addEventListener('ui:updateVitals', (ev) => {
@@ -102,14 +134,14 @@ export function initStatusLine() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     turn = Math.max(0, Number(e?.detail?.turn ?? turn) | 0);
-    render();
+    renderStats();
   });
 
   window.addEventListener('ui:updateGold', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     gold = Math.max(0, Number(e?.detail?.gold ?? gold) | 0);
-    render();
+    renderStats();
   });
 
   window.addEventListener('ui:updateCombatHUD', (ev) => {
@@ -120,8 +152,17 @@ export function initStatusLine() {
     luck = Number(e?.detail?.luck ?? 0);
     armorClass = Number(e?.detail?.armorClass ?? (10 + def));
     critPct = Number(e?.detail?.critChancePercent ?? 0);
-    render();
+    renderStats();
   });
 
-  render();
+  window.addEventListener('ui:updateCalendar', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    calFormatted = String(e?.detail?.formatted || "");
+    calSeason = String(e?.detail?.season || "");
+    renderCalendar();
+  });
+
+  renderStats();
+  renderCalendar();
 }
