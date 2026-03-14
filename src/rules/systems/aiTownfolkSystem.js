@@ -43,20 +43,11 @@ import { appraiseItemValue } from "../utils/shopAppraisal.js";
 import {
   TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from "../environment/dungeon/constants.js";
+import { getTownPhase } from "../data/calendar.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
-const SLEEP_PHASE_TURNS = 18;
-const BREAKFAST_PHASE_TURNS = 8;
-const WORK_PHASE_TURNS = 72;
-const PUB_PHASE_TURNS = 22;
-const HOME_PHASE_TURNS = 12;
-const DAY_LENGTH = SLEEP_PHASE_TURNS
-  + BREAKFAST_PHASE_TURNS
-  + WORK_PHASE_TURNS
-  + PUB_PHASE_TURNS
-  + HOME_PHASE_TURNS;
 const TOWNFOLK_DOOR_INSTALLED = Symbol.for("jshack:townfolkDoors:installed");
 
 const DIRS = [
@@ -353,14 +344,8 @@ function depleteNode(world, nodeId) {
   }
 }
 
-export function getTownPhase(step) {
-  const t = Math.max(0, step | 0) % DAY_LENGTH;
-  if (t < SLEEP_PHASE_TURNS) return "sleep";
-  if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS) return "breakfast";
-  if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS + WORK_PHASE_TURNS) return "work";
-  if (t < SLEEP_PHASE_TURNS + BREAKFAST_PHASE_TURNS + WORK_PHASE_TURNS + PUB_PHASE_TURNS) return "pub";
-  return "home";
-}
+// getTownPhase is now imported from ../data/calendar.js
+export { getTownPhase } from "../data/calendar.js";
 
 function getTownState(world) {
   for (const [, state] of world.query(TownState)) return state;
