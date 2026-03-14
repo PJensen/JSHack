@@ -40,29 +40,29 @@ export const basePalette = {
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
   mimic:    { glyph: "M", fg: "#b07a3f", glow: "#7a4d1f" },
   // Tiles
-  floor: { glyph: ".", fg: "#446", glow: "#224" },
-  grass_a:  { glyph: "'", fg: "#cce07a", glow: "#8ab850" },  // sparse/bare
-  grass:    { glyph: ",", fg: "#90c858", glow: "#5a9038" },  // light
-  grass_c:  { glyph: ";", fg: "#6aaa42", glow: "#447828" },  // medium
-  grass_d:  { glyph: "`", fg: "#94c04e", glow: "#5a8030" },  // thick/lush
-  water:      { glyph: "~", fg: "#5ea8d4", glow: "#3a6a90" },  // shallow
-  water_deep: { glyph: "≈", fg: "#3a6fa0", glow: "#1e3f60" },  // open/deep
-  lava:       { glyph: "≈", fg: "#ff8b36", glow: "#8f2e10" },
-  mountain:   { glyph: "⛰", fg: "#9da0a4", glow: "#5a5d61" },  // foothills
-  mountain_b: { glyph: "∧", fg: "#bec1c4", glow: "#6e7174" },  // mid-peak
-  mountain_c: { glyph: "▲", fg: "#e0e3e6", glow: "#969ea4" },  // high-peak
-  tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026" },
-  farmland:  { glyph: "░", fg: "#8b7355", glow: "#5a4a38" },
-  fence:     { glyph: "f", fg: "#a08050", glow: "#6b5530" },
-  roof_thatch_shadow: { glyph: "▓", fg: "#9c7f2c", glow: "#6b5418" },
-  roof_thatch_lit:    { glyph: "▓", fg: "#d8bf5a", glow: "#9d8221" },
-  roof_thatch_shadow_charred: { glyph: "▓", fg: "#6c5530", glow: "#3b2410" },
-  roof_thatch_lit_charred:    { glyph: "▓", fg: "#b98642", glow: "#6f3210" },
-  wall: { glyph: "#", fg: "#99a", glow: "#667" },
-  door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7" },
-  door_open: { glyph: "/", fg: "#cc9", glow: "#aa7" },
-  stair_down: { glyph: ">", fg: "#ccc", glow: "#888" },
-  stair_up:   { glyph: "<", fg: "#ccc", glow: "#888" },
+  floor: { glyph: ".", fg: "#446", glow: "#224", bg: "#1a1c28" },
+  grass_a:  { glyph: "'", fg: "#cce07a", glow: "#8ab850", bg: "#2a3a1a" },  // sparse/bare
+  grass:    { glyph: ",", fg: "#90c858", glow: "#5a9038", bg: "#1e3214" },  // light
+  grass_c:  { glyph: ";", fg: "#6aaa42", glow: "#447828", bg: "#182c10" },  // medium
+  grass_d:  { glyph: "`", fg: "#94c04e", glow: "#5a8030", bg: "#223616" },  // thick/lush
+  water:      { glyph: "~", fg: "#5ea8d4", glow: "#3a6a90", bg: "#0e2a3a" },  // shallow
+  water_deep: { glyph: "≈", fg: "#3a6fa0", glow: "#1e3f60", bg: "#0a1828" },  // open/deep
+  lava:       { glyph: "≈", fg: "#ff8b36", glow: "#8f2e10", bg: "#3a1008" },
+  mountain:   { glyph: "⛰", fg: "#9da0a4", glow: "#5a5d61", bg: "#2a2c2e" },  // foothills
+  mountain_b: { glyph: "∧", fg: "#bec1c4", glow: "#6e7174", bg: "#343638" },  // mid-peak
+  mountain_c: { glyph: "▲", fg: "#e0e3e6", glow: "#969ea4", bg: "#3e4042" },  // high-peak
+  tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026", bg: "#142610" },
+  farmland:  { glyph: "░", fg: "#8b7355", glow: "#5a4a38", bg: "#302818" },
+  fence:     { glyph: "f", fg: "#a08050", glow: "#6b5530", bg: "#1e3214" },
+  roof_thatch_shadow: { glyph: "▓", fg: "#9c7f2c", glow: "#6b5418", bg: "#4a3c14" },
+  roof_thatch_lit:    { glyph: "▓", fg: "#d8bf5a", glow: "#9d8221", bg: "#6b5418" },
+  roof_thatch_shadow_charred: { glyph: "▓", fg: "#6c5530", glow: "#3b2410", bg: "#3a2a14" },
+  roof_thatch_lit_charred:    { glyph: "▓", fg: "#b98642", glow: "#6f3210", bg: "#5a3c18" },
+  wall: { glyph: "#", fg: "#99a", glow: "#667", bg: "#222328" },
+  door_closed: { glyph: "+", fg: "#cc9", glow: "#aa7", bg: "#1a1c28" },
+  door_open: { glyph: "/", fg: "#cc9", glow: "#aa7", bg: "#1a1c28" },
+  stair_down: { glyph: ">", fg: "#ccc", glow: "#888", bg: "#1a1c28" },
+  stair_up:   { glyph: "<", fg: "#ccc", glow: "#888", bg: "#1a1c28" },
   gold: { glyph: "$", fg: "#ffde5a", glow: "#fc6" },
   // Potions
   potion:             { glyph: "!", fg: "#8fd7ff", glow: "#6bc7ff" },
@@ -169,7 +169,7 @@ export const basePalette = {
   tavern_sign:   { glyph: "🍺", fg: "#d4a830", glow: "#a07820" },
   millstone:     { glyph: "◎", fg: "#9a9a9a", glow: "#5a5a5a" },
   millstone_active: { glyph: "◉", fg: "#d8d2b0", glow: "#b08a3a" },
-  cobblestone:   { glyph: "·", fg: "#8a8e93", glow: "#555a5e" },
+  cobblestone:   { glyph: "·", fg: "#8a8e93", glow: "#555a5e", bg: "#2a2c30" },
   // Church
   church_altar:  { glyph: "⛩", fg: "#cc99ff", glow: "#9966cc" },
   church_pew:    { glyph: "▭", fg: "#8a6040", glow: "#5a3a28" },
