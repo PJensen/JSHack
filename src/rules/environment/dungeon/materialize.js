@@ -12,6 +12,8 @@ import {
   CHUNK_SIZE, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from './constants.js';
 
+const SHOP_FLOOR_ITEM_KINDS = new Set(["shop_item", "alchemy_shop_item"]);
+
 /**
  * Create ECS entities for interactive tiles and spawn features.
  * Floor/wall tiles are handled by the TileMap — no entities created for them.
@@ -61,9 +63,9 @@ export function materializeChunk(world, chunk, opts = {}) {
   // Post-process: Add Unpaid components to shop items with correct shopkeeperId
   for (const [roomId, room] of world.query(RoomMetadata)) {
     if (room.roomType === 'shop' && room.shopkeeperId > 0) {
-      // Find all shop_item spawns in this room and add Unpaid components
+      // Find authored floor stock in this room and mark it as unpaid shop goods.
       for (const sp of chunk.spawns) {
-        if (sp.kind === 'shop_item' && sp._itemId && sp._calculatedPrice) {
+        if (SHOP_FLOOR_ITEM_KINDS.has(sp.kind) && sp._itemId && sp._calculatedPrice) {
           const itemId = sp._itemId;
           const pos = world.get(itemId, Position);
           if (pos &&
