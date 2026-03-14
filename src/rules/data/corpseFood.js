@@ -12,11 +12,11 @@ import {
  * These values represent "hunger reduction" when the food is consumed.
  */
 export const NUTRITION_BY_SIZE = {
-  XS: 80,
-  S: 150,
-  M: 300,
-  L: 500,
-  XL: 800,
+  XS: 90,
+  S: 180,
+  M: 360,
+  L: 600,
+  XL: 900,
 };
 
 /**
