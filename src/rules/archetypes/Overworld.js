@@ -490,6 +490,8 @@ export const PotionShelf = defineArchetype(
   [NamedIdentity, { name: "Potion Shelf", identity: "potion_shelf" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
+  [Inventory, { capacity: 6 }],
+  [Interactable, { action: "browseRack", params: null }],
 );
 
 export const HerbChest = defineArchetype(
@@ -536,6 +538,8 @@ export const GemDisplayCase = defineArchetype(
   [NamedIdentity, { name: "Gem Display Case", identity: "gem_display_case" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
+  [Inventory, { capacity: 6 }],
+  [Interactable, { action: "browseRack", params: null }],
 );
 
 export const MessageBoard = defineArchetype(

@@ -7,7 +7,12 @@ import { Position } from '../src/rules/components/Position.js';
 import { DoorState } from '../src/rules/components/DoorState.js';
 import { Collider } from '../src/rules/components/Collider.js';
 import { Interactable } from '../src/rules/components/Interactable.js';
+import { Inventory } from '../src/rules/components/Inventory.js';
+import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { RoomMetadata } from '../src/rules/components/RoomMetadata.js';
+import { Unpaid } from '../src/rules/components/Unpaid.js';
 import { loadChunk, clearAll, isWalkable, isOpaque } from '../src/rules/environment/dungeon/tileMap.js';
+import { inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 
 Deno.test("materializeChunk creates correct entity count (doors + spawns only)", () => {
   const world = new World({ seed: 42 });
@@ -104,4 +109,50 @@ Deno.test("materializeChunk returns trackable entity IDs", () => {
   for (const id of ids) {
     assert(typeof id === 'number', 'IDs are numbers');
   }
+});
+
+Deno.test("potion shelves and gem display cases act like stocked rack-style containers in shop rooms", () => {
+  const world = new World({ seed: 42 });
+  const roomEntity = world.create();
+  world.add(roomEntity, RoomMetadata, {
+    roomType: 'shop',
+    x: 1,
+    y: 1,
+    w: 8,
+    h: 8,
+    shopkeeperId: 9001,
+  });
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    depth: 0,
+    seed: 42,
+    tiles: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_VOID),
+    rooms: [],
+    doors: [],
+    spawns: [
+      { x: 2, y: 2, kind: 'potion_shelf', params: {} },
+      { x: 4, y: 2, kind: 'gem_display_case', params: {} },
+    ],
+  };
+
+  materializeChunk(world, chunk);
+
+  const found = new Map();
+  for (const [id, inv, pos, named] of world.query(Inventory, Position, NamedIdentity)) {
+    if (String(named.identity) !== 'potion_shelf' && String(named.identity) !== 'gem_display_case') continue;
+    assert(world.has(id, Interactable), `${named.identity} should be interactable`);
+    const items = inventoryItems(world, id);
+    assert(items.length > 0, `${named.identity} should start stocked`);
+    for (const itemId of items) {
+      const unpaid = world.get(itemId, Unpaid);
+      assert(unpaid, `${named.identity} stock should be marked unpaid in shop rooms`);
+      assert(unpaid.shopkeeperId === 9001, `${named.identity} stock should belong to the room's shopkeeper`);
+    }
+    found.set(String(named.identity), items.length);
+  }
+
+  assert(found.has('potion_shelf'), 'expected a potion shelf');
+  assert(found.has('gem_display_case'), 'expected a gem display case');
 });

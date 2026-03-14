@@ -149,6 +149,23 @@ export function generateAlchemyShopItem(world, rng) {
 }
 
 /**
+ * Generate exactly one gem shop display item entity ID (no Position component).
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {Object} rng
+ * @returns {number|null}
+ */
+export function generateGemShopItem(world, rng) {
+    const socketableGems = gems.listGems().filter(g => g.socketable && g.material === 'gemstone');
+    const miscPool = gems.listGems().filter(g => g.material === 'gemstone' && g.value > 0 && g.prob > 0);
+    const pool = (rng.next() < 0.4 ? socketableGems : miscPool);
+    if (!pool.length) return null;
+    const gem = pool[rng.int(0, pool.length - 1)];
+    const params = gems.buildGemItemParams(gem, { identified: true });
+    if (!params) return null;
+    return stripPosition(world, createFrom(world, GemItem, params));
+}
+
+/**
  * Generate gem vendor stock: socketable gems (pre-identified) + misc gems.
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {Object} rng - createRng() instance
