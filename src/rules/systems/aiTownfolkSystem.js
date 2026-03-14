@@ -530,35 +530,15 @@ function handleIdle(world, id, pos, job) {
       break;
     }
     case TOWNFOLK_ROLES.woodcutter: {
-      let best = null;
-      let bestDist = Infinity;
-      for (let r = 1; r <= WORK_RANGE; r++) {
-        for (let ddx = -r; ddx <= r; ddx++) {
-          for (let ddy = -r; ddy <= r; ddy++) {
-            if (Math.abs(ddx) !== r && Math.abs(ddy) !== r) continue;
-            const tx = job.homeX + ddx;
-            const ty = job.homeY + ddy;
-            if (getTile(tx, ty) !== TILE_TREE) continue;
-            const d = Math.abs(ddx) + Math.abs(ddy);
-            if (d < bestDist) {
-              bestDist = d;
-              best = { x: tx, y: ty };
-            }
-          }
-        }
-        if (best) break;
-      }
-      if (!best) {
+      const tree = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
+        (n) => n.kind === "tree");
+      if (!tree) {
         job.idleTurns = 8;
         return;
       }
-      const adj = findAdjacentWalkable(best.x, best.y);
-      if (!adj) {
-        job.idleTurns = 5;
-        return;
-      }
-      job.targetX = adj.x;
-      job.targetY = adj.y;
+      const adj = findAdjacentWalkable(tree.x, tree.y);
+      job.targetX = adj ? adj.x : tree.x;
+      job.targetY = adj ? adj.y : tree.y;
       job.workSiteKind = "chop";
       break;
     }
@@ -700,12 +680,17 @@ function handleWorking(world, id, pos, job) {
         setIdle(job, world);
         return;
       }
-      for (const d of DIRS) {
-        const tx = pos.x + d.dx;
-        const ty = pos.y + d.dy;
-        if (getTile(tx, ty) !== TILE_TREE) continue;
-        setTile(tx, ty, TILE_GRASS);
-        emitSafe(world, "townfolk:chopped", { actor: id, x: tx, y: ty });
+      let treeId = 0;
+      forEachInRadius(world, pos.x, pos.y, 1, (eid) => {
+        if (treeId) return;
+        const n = world.get(eid, HarvestNode);
+        if (n && n.ready && n.kind === "tree") treeId = eid;
+      });
+      if (treeId) {
+        depleteNode(world, treeId);
+        const col = world.get(treeId, Collider);
+        if (col) world.set(treeId, Collider, { solid: false, blocksSight: false });
+        emitSafe(world, "townfolk:chopped", { actor: id, x: pos.x, y: pos.y });
         carryCreated(world, id, "material_lumber");
         carryCreated(world, id, "fuel_firewood");
         setCarry(job, "wood", 2);
@@ -1085,8 +1070,14 @@ function getRoleWorkTarget(world, job) {
       }
       return { x: job.workAuxX, y: job.workAuxY, kind: "mill", state: TOWNFOLK_STATES.working, radius: 0 };
     }
-    case TOWNFOLK_ROLES.woodcutter:
+    case TOWNFOLK_ROLES.woodcutter: {
+      const tree = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
+        (n) => n.kind === "tree");
+      if (tree) {
+        return { x: tree.x, y: tree.y, kind: "chop", state: TOWNFOLK_STATES.working, radius: 1 };
+      }
       return { x: job.workX, y: job.workY, kind: "chop", state: TOWNFOLK_STATES.working, radius: 1 };
+    }
     case TOWNFOLK_ROLES.miner: {
       const ore = findReadyNode(world, job.workX, job.workY, 8,
         (n) => n.requiresTool === "dig");

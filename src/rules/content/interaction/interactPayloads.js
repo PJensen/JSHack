@@ -45,6 +45,7 @@ import {
   DungeonMushrooms, IronOre, CoalOre, StoneChip,
   Wheat, Carrot, Corn,
 } from "../../archetypes/Food.js";
+import { LumberBundle } from "../../archetypes/TownGoods.js";
 import { Monster } from "../../archetypes/Creatures.js";
 import { equipMonster } from "../../environment/dungeon/populate.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
@@ -71,6 +72,7 @@ const CATALOG_ARCHETYPES = {
   "food_wheat":          Wheat,
   "food_carrot":         Carrot,
   "food_corn":           Corn,
+  "material_lumber":     LumberBundle,
 };
 
 const HARVEST_SEED_SALT = 0x48415256;
@@ -916,6 +918,12 @@ export const INTERACT_PAYLOADS = {
           const ni = world.get(targetId, NamedIdentity);
           if (ni) world.set(targetId, NamedIdentity, { ...ni, identity: bareIdentity });
         }
+      }
+
+      // Chopped trees become walkable stumps.
+      if (node.kind === "tree") {
+        const col = world.get(targetId, Collider);
+        if (col) world.set(targetId, Collider, { solid: false, blocksSight: false });
       }
 
       world.emit?.("harvest:picked", {

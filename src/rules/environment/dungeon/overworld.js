@@ -638,7 +638,7 @@ export function generateOverworldChunks(worldSeed) {
     for (let ty = nearTreeY - 1; ty <= nearTreeY + 1; ty++) {
       if (tx === nearTreeX && ty === nearTreeY) continue;   // center walkable
       if (tx === nearTreeX && ty === nearTreeY - 1) continue; // north entrance
-      setWorldTile(chunks, tx, ty, TILE_TREE);
+      addSpawn(chunks, tx, ty, "tree_node");
     }
   }
 

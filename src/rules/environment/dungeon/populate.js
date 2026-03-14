@@ -31,6 +31,7 @@ import {
   OreVeinIron,
   OreVeinCoal,
   OreVeinStone,
+  TreeNode,
   AlchemyBench,
   Anvil,
   Furnace,
@@ -820,6 +821,8 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, OreVeinCoal, { x: spawn.x, y: spawn.y });
     case 'harvest_stone':
       return createFrom(world, OreVeinStone, { x: spawn.x, y: spawn.y });
+    case 'tree_node':
+      return createFrom(world, TreeNode, { x: spawn.x, y: spawn.y });
     case 'alchemy_bench':
       return createFrom(world, AlchemyBench, { x: spawn.x, y: spawn.y });
     case 'anvil':
