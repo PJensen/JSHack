@@ -185,6 +185,7 @@ export const basePalette = {
   window_iron_grate: { glyph: "⊞", fg: "#8899aa", glow: "#556677" },
   window_shuttered:  { glyph: "⊟", fg: "#b89060", glow: "#7a5a38" },
   window_round:      { glyph: "◎", fg: "#99bbdd", glow: "#5588aa" },
+  window_rect:       { glyph: "█", fg: "#88bbee", glow: "#5588bb" },
   bell:          { glyph: "🔔", fg: "#d4a017", glow: "#8b6914" },
   // Garden flowers (full-color emoji)
   flower_rose:       { glyph: "🌹", fg: "#ff3344", glow: "#cc1122" },

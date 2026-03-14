@@ -56,6 +56,7 @@ import {
   WindowIronGrate,
   WindowShuttered,
   WindowRound,
+  WindowRect,
   FlowerRose,
   FlowerSunflower,
   FlowerTulip,
@@ -921,6 +922,8 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, WindowShuttered, { x: spawn.x, y: spawn.y });
     case 'window_round':
       return createFrom(world, WindowRound, { x: spawn.x, y: spawn.y });
+    case 'window_rect':
+      return createFrom(world, WindowRect, { x: spawn.x, y: spawn.y });
     case 'town_bell':
       return createFrom(world, TownBell, { x: spawn.x, y: spawn.y });
     case 'flower_rose':

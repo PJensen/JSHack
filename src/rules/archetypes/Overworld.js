@@ -401,6 +401,14 @@ export const WindowRound = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
 );
 
+export const WindowRect = defineArchetype(
+  "WindowRect",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Window", identity: "window_rect" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
 export const TownBell = defineArchetype(
   "TownBell",
   [Position, (p) => ({ x: p.x, y: p.y })],
