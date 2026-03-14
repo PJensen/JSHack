@@ -12,7 +12,7 @@ export function ensureCalendarState(world, overrides = {}) {
 
   const id = world.create();
   world.add(id, CalendarState, {
-    startDay: 56,
+    startDay: 70,
     startYear: 847,
     ...overrides,
   });

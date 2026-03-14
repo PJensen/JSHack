@@ -9,9 +9,13 @@ import { Vitality } from '../components/Vitality.js';
 import { Status } from '../components/Status.js';
 import { Settings } from '../components/Settings.js';
 import { HUNGER_STATUS_TYPES, HUNGER_POTENCY, getHungerLevel } from '../data/food.js';
+import { TURNS_PER_DAY } from '../data/calendar.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { getPassiveBonuses } from '../utils/passiveBonuses.js';
 import { Traits } from '../components/Traits.js';
+
+const STARVING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 8));
+const WASTING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 16));
 
 /**
  * hungerSystem — processes hunger escalation each tick.
@@ -48,12 +52,12 @@ export function hungerSystem(world) {
     // 2) Apply HP effects based on severity
     const vit = world.get(id, Vitality);
     if (vit) {
-      // Starving: 1 HP damage every 5 turns
-      if (level === 'starving' && turn % 5 === 0) {
+      // Starving: 1 HP damage every ~1/8 day
+      if (level === 'starving' && turn % STARVING_DAMAGE_INTERVAL === 0) {
         dealDamage(world, { target: id, amount: 1, type: 'starvation', cause: 'starvation', bypassInvuln: true, bypassResist: true });
       }
-      // Wasting: 2 HP damage every 3 turns
-      if (level === 'wasting' && turn % 3 === 0) {
+      // Wasting: 2 HP damage every ~1/16 day
+      if (level === 'wasting' && turn % WASTING_DAMAGE_INTERVAL === 0) {
         dealDamage(world, { target: id, amount: 2, type: 'starvation', cause: 'starvation', bypassInvuln: true, bypassResist: true });
       }
       // Satiated bonus: heal 1 HP every 5 turns

@@ -8,6 +8,7 @@ import { Beatitude } from "../components/Beatitude.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getDeityInstance } from "./deitySystem.js";
 import { hasStatus } from "../utils/statusFacade.js";
+import { getHungerLevel } from "../data/food.js";
 
 /**
  * praySystem — processes PrayIntent by calling deity.pray()
@@ -114,15 +115,20 @@ function assessDistress(world, playerId) {
   // Check hunger
   if (world.has(playerId, Hunger)) {
     const hunger = world.get(playerId, Hunger);
-    if (hunger.hunger > 800) {
-      needs.push('food');
-      severity += 0.9; // Starving
-    } else if (hunger.hunger > 400) {
-      needs.push('food');
-      severity += 0.5; // Very hungry
-    } else if (hunger.hunger > 200) {
-      needs.push('food');
-      severity += 0.2; // Hungry
+    if (hunger?.satiation > 0) {
+      // Satiated actors are not in food distress.
+    } else {
+      const level = getHungerLevel(Number(hunger?.hunger || 0));
+      if (level === 'wasting' || level === 'starving') {
+        needs.push('food');
+        severity += 0.9;
+      } else if (level === 'famished') {
+        needs.push('food');
+        severity += 0.5;
+      } else if (level === 'hungry' || level === 'peckish') {
+        needs.push('food');
+        severity += 0.2;
+      }
     }
   }
 
