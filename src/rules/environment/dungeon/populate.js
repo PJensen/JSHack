@@ -121,6 +121,28 @@ const ROOM_FEATURES = [
 ];
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
 const SHOP_MIMIC_CHANCE = 0.08;
+const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
+
+function stockDisplayContainer(world, id, spawn, stockKind) {
+  const inv = /** @type {any} */ (world.get(id, Inventory));
+  if (!inv) return id;
+
+  const seed = ((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ ((spawn.x * 0x45d9f3b) >>> 0) ^ ((spawn.y * 0x119de1f3) >>> 0)) >>> 0;
+  const rng = createRng(seed);
+  const count = stockKind === "gem" ? rng.int(2, 4) : rng.int(2, 3);
+
+  for (let i = 0; i < count; i++) {
+    let itemId = null;
+    if (stockKind === "alchemy") itemId = shopStock.generateAlchemyShopItem(world, rng);
+    else if (stockKind === "gem") itemId = shopStock.generateGemShopItem(world, rng);
+    if (!(itemId > 0)) continue;
+    const info = world.get(itemId, ItemInfo);
+    if (info) world.mutate(itemId, ItemInfo, (r) => { r.identified = true; });
+    addToInventory(world, id, itemId);
+  }
+
+  return id;
+}
 
 function pickRoomFeature(rng) {
   let roll = rng.next() * ROOM_FEATURE_TOTAL_WEIGHT;
@@ -908,7 +930,7 @@ export function materializeSpawn(world, spawn) {
     case 'smithy_sign':
       return createFrom(world, SmithySign, { x: spawn.x, y: spawn.y });
     case 'potion_shelf':
-      return createFrom(world, PotionShelf, { x: spawn.x, y: spawn.y });
+      return stockDisplayContainer(world, createFrom(world, PotionShelf, { x: spawn.x, y: spawn.y }), spawn, "alchemy");
     case 'herb_chest':
       return createFrom(world, HerbChest, { x: spawn.x, y: spawn.y });
     case 'tavern_chest':
@@ -918,7 +940,7 @@ export function materializeSpawn(world, spawn) {
     case 'gem_shop_sign':
       return createFrom(world, GemShopSign, { x: spawn.x, y: spawn.y });
     case 'gem_display_case':
-      return createFrom(world, GemDisplayCase, { x: spawn.x, y: spawn.y });
+      return stockDisplayContainer(world, createFrom(world, GemDisplayCase, { x: spawn.x, y: spawn.y }), spawn, "gem");
     case 'message_board':
       return createFrom(world, MessageBoard, { x: spawn.x, y: spawn.y });
     case 'grave_tombstone':

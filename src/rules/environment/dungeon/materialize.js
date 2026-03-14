@@ -8,11 +8,16 @@ import { materializeSpawn } from './populate.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { Unpaid } from '../../components/Unpaid.js';
 import { Position } from '../../components/Position.js';
+import { Inventory } from '../../components/Inventory.js';
+import { NamedIdentity } from '../../components/NamedIdentity.js';
+import { inventoryItems } from '../../utils/inventoryFacade.js';
+import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shopAppraisal.js';
 import {
   CHUNK_SIZE, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from './constants.js';
 
 const SHOP_FLOOR_ITEM_KINDS = new Set(["shop_item", "alchemy_shop_item"]);
+const SHOP_DISPLAY_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
 
 /**
  * Create ECS entities for interactive tiles and spawn features.
@@ -79,6 +84,24 @@ export function materializeChunk(world, chunk, opts = {}) {
               });
             } catch {} // ECS: may already exist
           }
+        }
+      }
+
+      for (const [displayId, inv, pos, named] of world.query(Inventory, Position, NamedIdentity)) {
+        if (!SHOP_DISPLAY_IDENTITIES.has(String(named?.identity || ""))) continue;
+        if (!(pos.x >= room.x && pos.x < room.x + room.w && pos.y >= room.y && pos.y < room.y + room.h)) continue;
+
+        for (const itemId of inventoryItems(world, displayId)) {
+          if (world.has(itemId, Unpaid)) continue;
+          const price = Math.ceil(appraiseItemValue(world, itemId, {
+            unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
+          }) * 1.3);
+          try {
+            world.add(itemId, Unpaid, {
+              shopkeeperId: room.shopkeeperId,
+              price,
+            });
+          } catch {}
         }
       }
     }

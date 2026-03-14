@@ -13,12 +13,34 @@ export function installRackWiring({ world, log }) {
   if (world[INSTALLED]) return;
   world[INSTALLED] = true;
 
-  world.on("rack:looted", ({ count }) => {
+  function containerName(targetId) {
+    return String(world.get(Number(targetId || 0) | 0, NamedIdentity)?.identity || "");
+  }
+
+  world.on("rack:looted", ({ count, targetId }) => {
     const n = Number(count || 0) | 0;
+    const identity = containerName(targetId);
+    if (identity === "potion_shelf") {
+      log(n === 1 ? "A potion tumbles from the shelf." : "Potions tumble from the shelf.");
+      return;
+    }
+    if (identity === "gem_display_case") {
+      log(n === 1 ? "A gem drops from the display case." : "Gems drop from the display case.");
+      return;
+    }
     log(n === 1 ? "A weapon clatters to the ground." : "Weapons clatter to the ground.");
   });
 
-  world.on("rack:empty", () => {
+  world.on("rack:empty", ({ targetId }) => {
+    const identity = containerName(targetId);
+    if (identity === "potion_shelf") {
+      log("The potion shelf is empty.");
+      return;
+    }
+    if (identity === "gem_display_case") {
+      log("The display case is empty.");
+      return;
+    }
     log("The rack is empty.");
   });
 }
