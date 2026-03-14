@@ -26,6 +26,12 @@ export function createGlyphAtlas(palette, opts = {}) {
     g.textBaseline = 'middle';
     g.font = `900 ${fontPx}px monospace`;
 
+    // Bake background fill if palette entry has a bg colour
+    if (look.bg) {
+      g.fillStyle = look.bg;
+      g.fillRect(0, 0, sizePx, sizePx);
+    }
+
     // Bake glow once, if enabled
     if (glowLayers > 0) {
       g.globalCompositeOperation = 'lighter';
