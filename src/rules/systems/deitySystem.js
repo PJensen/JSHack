@@ -19,6 +19,7 @@ import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Vitality } from '../components/Vitality.js';
 import { Hunger } from '../components/Hunger.js';
 import { Status } from '../components/Status.js';
+import { Traits } from '../components/Traits.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Faction } from '../components/Faction.js';
 import { Equipment, NON_AMMO_GEAR_SLOTS } from '../components/Equipment.js';
@@ -50,6 +51,9 @@ const WRATH_DEBT_CONSUME_PER_WRATH = 0.6;
 const SHRINE_TOUCH_COOLDOWN_TURNS = 30;
 const SHRINE_TOUCH_PROTECT_MAGNITUDE = 0.35;
 const SHRINE_TOUCH_PLEA_VALUE = 0.25;
+const GLUTTONOUS_FOOD_URGENCY_BONUS = 0.12;
+const GLUTTONOUS_MIRACLE_FEED_BONUS = 80;
+const GLUTTONOUS_FOOD_REACTION_MULT = 1.2;
 const OFFENSE_SEVERITY_WEIGHTS = Object.freeze({
   minor: 0.15,
   grave: 0.45,
@@ -493,6 +497,37 @@ function wireWorldEvents(world) {
     resolved.deity.action('create', { magnitude: 0.2, target: 'harvest' });
   });
 
+  // Eating food is a small positive "create/life" signal.
+  world.on('hunger:ate', ({ actor, nutrition }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const actorId = Number(actor || 0) | 0;
+    const tr = world.get(actorId, Traits);
+    const gluttonous = !!tr?.gluttonous;
+    const baseMagnitude = 0.08 + Math.min(0.2, Math.max(0, Number(nutrition || 0)) / 900);
+    const magnitude = gluttonous
+      ? Math.min(1, baseMagnitude * GLUTTONOUS_FOOD_REACTION_MULT)
+      : baseMagnitude;
+    resolved.deity.action('create', { magnitude, target: 'food' });
+  });
+
+  // Food sickness is a minor offense signal.
+  world.on('hunger:sickened', ({ actor, type }) => {
+    const resolved = resolvePlayerDeity(world, actor);
+    if (!resolved) return;
+    const actorId = Number(actor || 0) | 0;
+    const tr = world.get(actorId, Traits);
+    const gluttonous = !!tr?.gluttonous;
+    const baseMagnitude = 0.16;
+    const magnitude = gluttonous
+      ? Math.min(1, baseMagnitude * GLUTTONOUS_FOOD_REACTION_MULT)
+      : baseMagnitude;
+    resolved.deity.action('betray', {
+      magnitude,
+      target: `food_${String(type || 'tainted')}`,
+    });
+  });
+
   // ── Protect ───────────────────────────────────────────────────────────────
   // Disarming traps — making the dungeon safer.
   world.on('trap:disarmed', ({ actor }) => {
@@ -846,7 +881,10 @@ function wireDeityMiracles(deity, deityId, world) {
       } else if (primaryNeed === 'food' && world.has(playerId, Hunger)) {
         // Satiate hunger
         const hunger = world.get(playerId, Hunger);
-        const feedAmount = deityDef?.alignment === 'chaotic' ? 300 : 500;
+        const tr = world.get(playerId, Traits);
+        const gluttonous = !!tr?.gluttonous;
+        const feedAmount = (deityDef?.alignment === 'chaotic' ? 300 : 500)
+          + (gluttonous ? GLUTTONOUS_MIRACLE_FEED_BONUS : 0);
         hunger.hunger = Math.max(0, hunger.hunger - feedAmount);
         hunger.satiation = (hunger.satiation || 0) + 50;
         world.emit('deity:miracle', {
@@ -905,6 +943,8 @@ function wireDeityMiracles(deity, deityId, world) {
  */
 function assessPlayerNeeds(world, playerId) {
   const needs = [];
+  const tr = world.get(playerId, Traits);
+  const gluttonous = !!tr?.gluttonous;
 
   // Check HP
   if (world.has(playerId, Vitality)) {
@@ -923,13 +963,13 @@ function assessPlayerNeeds(world, playerId) {
       if (level === 'wasting') {
         needs.push({ type: 'food', urgency: 1.0 });
       } else if (level === 'starving') {
-        needs.push({ type: 'food', urgency: 0.9 });
+        needs.push({ type: 'food', urgency: Math.min(1, 0.9 + (gluttonous ? GLUTTONOUS_FOOD_URGENCY_BONUS : 0)) });
       } else if (level === 'famished') {
-        needs.push({ type: 'food', urgency: 0.7 });
+        needs.push({ type: 'food', urgency: Math.min(1, 0.7 + (gluttonous ? GLUTTONOUS_FOOD_URGENCY_BONUS : 0)) });
       } else if (level === 'hungry') {
-        needs.push({ type: 'food', urgency: 0.4 });
+        needs.push({ type: 'food', urgency: Math.min(1, 0.4 + (gluttonous ? GLUTTONOUS_FOOD_URGENCY_BONUS : 0)) });
       } else if (level === 'peckish') {
-        needs.push({ type: 'food', urgency: 0.2 });
+        needs.push({ type: 'food', urgency: Math.min(1, 0.2 + (gluttonous ? GLUTTONOUS_FOOD_URGENCY_BONUS : 0)) });
       }
     }
   }
