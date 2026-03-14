@@ -9,6 +9,8 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { getAffixName } from "../../rules/data/affixes.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { CalendarState } from "../../rules/components/CalendarState.js";
+import { getCalendarDate } from "../../rules/data/calendar.js";
 import { Hunger } from "../../rules/components/Hunger.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { Pet } from "../../rules/components/Pet.js";
@@ -46,6 +48,7 @@ export function createHudFeeds(world, deps) {
   let lastPetExists = false;
   let lastPetState = "";
   let lastSpellMana = -1;
+  let lastCalendarDay = -1;
 
   function sumPlayerGold(playerId) {
     const items = inventoryItems(world, playerId);
@@ -266,6 +269,19 @@ export function createHudFeeds(world, deps) {
     }
   }
 
+  function updateCalendarHUD() {
+    for (const [, cs] of world.query(CalendarState)) {
+      const day = cs.dayTotal;
+      if (day === lastCalendarDay) break;
+      lastCalendarDay = day;
+      const date = getCalendarDate(world.step, cs.startDay, cs.startYear);
+      try {
+        window.dispatchEvent(new CustomEvent("ui:updateCalendar", { detail: date }));
+      } catch (e) { console.debug('[hudFeeds] dispatch ui:updateCalendar:', e); }
+      break;
+    }
+  }
+
   return {
     updateVitalsHUD,
     updateCombatHUD,
@@ -274,5 +290,6 @@ export function createHudFeeds(world, deps) {
     updateGoldHUD,
     updatePetHUD,
     updateActiveSpellHUD,
+    updateCalendarHUD,
   };
 }
