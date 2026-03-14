@@ -83,6 +83,9 @@ textarea{width:100%;background:#04120e;color:#d8f6de;border:1px solid #123826;pa
     <div class="info-row">Tile: <span class="info-val" id="selTile">--</span></div>
     <div class="info-row">Entity: <span class="info-val" id="selEntity">--</span></div>
     <div class="info-row">Waypoint: <span class="info-val" id="selWaypoint">--</span></div>
+    <label class="row" style="display:block;margin-top:6px">Spawn Params JSON</label>
+    <textarea id="spawnParams" rows="5" placeholder="{ }"></textarea>
+    <div class="info-row">Params: <span class="info-val" id="spawnParamsStatus">no entity selected</span></div>
     <div class="line"></div>
 
     <h3>Waypoint</h3>
@@ -95,6 +98,8 @@ textarea{width:100%;background:#04120e;color:#d8f6de;border:1px solid #123826;pa
     <div class="line"></div>
 
     <h3>Export</h3>
+    <label class="row" style="display:block">Extra Top-Level JSON</label>
+    <textarea id="extraData" rows="6" placeholder="{&quot;rooms&quot;:[...] }"></textarea>
     <div class="export-tabs">
       <div class="export-tab active" id="tabJSON" onclick="showTab('json')">JSON</div>
       <div class="export-tab" id="tabJS" onclick="showTab('js')">JavaScript</div>
@@ -280,12 +285,15 @@ const TILE_CONST_MAP = {
 let gridW = 24, gridH = 24;
 let tiles = [];      // gridW*gridH, null or tile-key string
 let entities = [];   // gridW*gridH, null or entity-key string
+let entityParams = []; // gridW*gridH, null or params object for entity spawn
 let waypoints = [];  // gridW*gridH, null or waypoint-name string
 let keystone = null; // {x, y} in grid coords
 let currentTool = "paint"; // paint | erase | keystone | waypoint
 let selectedPalette = null; // { type:"tile"|"entity", key:string }
 let showGridLines = true;
 let activeTab = "json";
+let selectedX = -1, selectedY = -1;
+let extraData = {};
 
 // Camera
 let camX = 0, camY = 0, camZoom = 1;
@@ -299,6 +307,7 @@ const ctx = canvas.getContext("2d");
 function initGrid() {
   tiles = new Array(gridW * gridH).fill(null);
   entities = new Array(gridW * gridH).fill(null);
+  entityParams = new Array(gridW * gridH).fill(null);
   waypoints = new Array(gridW * gridH).fill(null);
   keystone = null;
 }
@@ -309,16 +318,18 @@ function resizeGrid() {
   const newH = Math.max(4, Math.min(64, +document.getElementById("gridH").value || 24));
   const newTiles = new Array(newW * newH).fill(null);
   const newEntities = new Array(newW * newH).fill(null);
+  const newEntityParams = new Array(newW * newH).fill(null);
   const newWaypoints = new Array(newW * newH).fill(null);
   for (let y = 0; y < Math.min(gridH, newH); y++) {
     for (let x = 0; x < Math.min(gridW, newW); x++) {
       newTiles[y * newW + x] = tiles[y * gridW + x];
       newEntities[y * newW + x] = entities[y * gridW + x];
+      newEntityParams[y * newW + x] = entityParams[y * gridW + x];
       newWaypoints[y * newW + x] = waypoints[y * gridW + x];
     }
   }
   gridW = newW; gridH = newH;
-  tiles = newTiles; entities = newEntities; waypoints = newWaypoints;
+  tiles = newTiles; entities = newEntities; entityParams = newEntityParams; waypoints = newWaypoints;
   if (keystone && (keystone.x >= gridW || keystone.y >= gridH)) keystone = null;
   render();
 }
@@ -627,7 +638,7 @@ canvas.addEventListener("mousedown", (e) => {
     if (!inBounds(gx, gy)) return;
     const idx = gy * gridW + gx;
     if (waypoints[idx]) { waypoints[idx] = null; updateWaypointCount(); }
-    else if (entities[idx]) { entities[idx] = null; }
+    else if (entities[idx]) { entities[idx] = null; entityParams[idx] = null; }
     else { tiles[idx] = null; }
     render();
     updateCellInfo(gx, gy);
@@ -690,7 +701,7 @@ function applyTool(gx, gy, e) {
   }
   if (currentTool === "erase") {
     if (waypoints[idx]) { waypoints[idx] = null; updateWaypointCount(); }
-    else if (entities[idx]) { entities[idx] = null; }
+    else if (entities[idx]) { entities[idx] = null; entityParams[idx] = null; }
     else { tiles[idx] = null; }
     render();
     updateCellInfo(gx, gy);
@@ -700,6 +711,7 @@ function applyTool(gx, gy, e) {
     if (selectedPalette.type === "tile") {
       tiles[idx] = selectedPalette.key;
     } else {
+      if (entities[idx] !== selectedPalette.key) entityParams[idx] = null;
       entities[idx] = selectedPalette.key;
     }
     render();
@@ -736,6 +748,8 @@ function updateHUD(gx, gy) {
 
 function updateCellInfo(gx, gy) {
   if (!inBounds(gx, gy)) return;
+  selectedX = gx;
+  selectedY = gy;
   const idx = gy * gridW + gx;
   document.getElementById("selPos").textContent = `(${gx}, ${gy})`;
   if (keystone) {
@@ -746,6 +760,28 @@ function updateCellInfo(gx, gy) {
   document.getElementById("selTile").textContent = tiles[idx] || "none";
   document.getElementById("selEntity").textContent = entities[idx] || "none";
   document.getElementById("selWaypoint").textContent = waypoints[idx] || "none";
+  syncSpawnParamsEditor();
+}
+
+function syncSpawnParamsEditor() {
+  const area = document.getElementById("spawnParams");
+  const status = document.getElementById("spawnParamsStatus");
+  if (!inBounds(selectedX, selectedY)) {
+    area.value = "";
+    area.disabled = true;
+    status.textContent = "no cell selected";
+    return;
+  }
+  const idx = selectedY * gridW + selectedX;
+  if (!entities[idx]) {
+    area.value = "";
+    area.disabled = true;
+    status.textContent = "no entity selected";
+    return;
+  }
+  area.disabled = false;
+  area.value = entityParams[idx] ? JSON.stringify(entityParams[idx], null, 2) : "";
+  status.textContent = entityParams[idx] ? "valid" : "empty";
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -780,7 +816,10 @@ function exportJSON() {
         tileList.push({ dx: x - kx, dy: y - ky, tile: tiles[idx] });
       }
       if (entities[idx]) {
-        spawnList.push({ dx: x - kx, dy: y - ky, kind: entities[idx] });
+        const params = entityParams[idx];
+        spawnList.push(params && Object.keys(params).length
+          ? { dx: x - kx, dy: y - ky, kind: entities[idx], params }
+          : { dx: x - kx, dy: y - ky, kind: entities[idx] });
       }
     }
   }
@@ -801,6 +840,7 @@ function exportJSON() {
     tiles: tileList,
     spawns: spawnList,
     waypoints: waypointList,
+    ...extraData,
   };
   return JSON.stringify(obj, null, 2);
 }
@@ -891,7 +931,12 @@ function exportJS() {
     for (let x = 0; x < gridW; x++) {
       const idx = y * gridW + x;
       if (entities[idx]) {
-        spawnList.push({ dx: x - kx, dy: y - ky, kind: entities[idx] });
+        spawnList.push({
+          dx: x - kx,
+          dy: y - ky,
+          kind: entities[idx],
+          params: entityParams[idx] || null,
+        });
       }
     }
   }
@@ -900,7 +945,8 @@ function exportJS() {
     lines.push("");
     lines.push("// Spawns");
     for (const s of spawnList) {
-      lines.push(`addSpawn(chunks, ${varName}X0 + ${s.dx}, ${varName}Y0 + ${s.dy}, "${s.kind}");`);
+      const paramsArg = s.params && Object.keys(s.params).length ? `, ${JSON.stringify(s.params)}` : "";
+      lines.push(`addSpawn(chunks, ${varName}X0 + ${s.dx}, ${varName}Y0 + ${s.dy}, "${s.kind}"${paramsArg});`);
     }
   }
 
@@ -924,34 +970,47 @@ function doImport() {
   try {
     const obj = JSON.parse(input);
     if (!obj.tiles) throw new Error("Missing tiles array");
-    document.getElementById("buildingName").value = obj.name || "building";
-    gridW = obj.width || 24;
-    gridH = obj.height || 24;
+    const {
+      name,
+      width,
+      height,
+      keystone: importedKeystone,
+      tiles: importedTiles,
+      spawns: importedSpawns,
+      waypoints: importedWaypoints,
+      ...rest
+    } = obj;
+    extraData = rest;
+    document.getElementById("extraData").value = Object.keys(extraData).length ? JSON.stringify(extraData, null, 2) : "";
+    document.getElementById("buildingName").value = name || "building";
+    gridW = width || 24;
+    gridH = height || 24;
     document.getElementById("gridW").value = gridW;
     document.getElementById("gridH").value = gridH;
     initGrid();
-    const kx = obj.keystone ? obj.keystone.x : 0;
-    const ky = obj.keystone ? obj.keystone.y : 0;
+    const kx = importedKeystone ? importedKeystone.x : 0;
+    const ky = importedKeystone ? importedKeystone.y : 0;
     keystone = { x: kx, y: ky };
     document.getElementById("keystonePos").textContent = `(${kx}, ${ky})`;
-    for (const t of obj.tiles) {
+    for (const t of importedTiles) {
       const gx = t.dx + kx;
       const gy = t.dy + ky;
       if (inBounds(gx, gy)) {
         tiles[gy * gridW + gx] = t.tile;
       }
     }
-    if (obj.spawns) {
-      for (const s of obj.spawns) {
+    if (importedSpawns) {
+      for (const s of importedSpawns) {
         const gx = s.dx + kx;
         const gy = s.dy + ky;
         if (inBounds(gx, gy)) {
           entities[gy * gridW + gx] = s.kind;
+          entityParams[gy * gridW + gx] = s.params || null;
         }
       }
     }
-    if (obj.waypoints) {
-      for (const w of obj.waypoints) {
+    if (importedWaypoints) {
+      for (const w of importedWaypoints) {
         const gx = w.dx + kx;
         const gy = w.dy + ky;
         if (inBounds(gx, gy)) {
@@ -961,6 +1020,7 @@ function doImport() {
     }
     updateWaypointCount();
     render();
+    syncSpawnParamsEditor();
   } catch (e) {
     alert("Import error: " + e.message);
   }
@@ -974,7 +1034,7 @@ const STORAGE_KEY = "jshack_building_designer";
 function saveLocal() {
   const data = {
     name: document.getElementById("buildingName").value,
-    gridW, gridH, tiles, entities, waypoints, keystone
+    gridW, gridH, tiles, entities, entityParams, waypoints, keystone, extraData
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -991,13 +1051,17 @@ function loadLocal() {
     document.getElementById("gridH").value = gridH;
     tiles = data.tiles || new Array(gridW * gridH).fill(null);
     entities = data.entities || new Array(gridW * gridH).fill(null);
+    entityParams = data.entityParams || new Array(gridW * gridH).fill(null);
     waypoints = data.waypoints || new Array(gridW * gridH).fill(null);
     keystone = data.keystone || null;
+    extraData = data.extraData || {};
+    document.getElementById("extraData").value = Object.keys(extraData).length ? JSON.stringify(extraData, null, 2) : "";
     if (keystone) {
       document.getElementById("keystonePos").textContent = `(${keystone.x}, ${keystone.y})`;
     }
     updateWaypointCount();
     render();
+    syncSpawnParamsEditor();
   } catch (e) {
     alert("Load error: " + e.message);
   }
@@ -1006,9 +1070,12 @@ function loadLocal() {
 function clearAll() {
   if (!confirm("Clear the entire canvas?")) return;
   initGrid();
+  extraData = {};
   document.getElementById("keystonePos").textContent = "not set";
+  document.getElementById("extraData").value = "";
   updateWaypointCount();
   render();
+  syncSpawnParamsEditor();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1038,6 +1105,47 @@ window.saveLocal = saveLocal;
 window.loadLocal = loadLocal;
 window.clearAll = clearAll;
 
+document.getElementById("spawnParams").addEventListener("input", (e) => {
+  const area = e.currentTarget;
+  const status = document.getElementById("spawnParamsStatus");
+  if (!inBounds(selectedX, selectedY)) return;
+  const idx = selectedY * gridW + selectedX;
+  if (!entities[idx]) return;
+  const raw = area.value.trim();
+  if (!raw) {
+    entityParams[idx] = null;
+    status.textContent = "empty";
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      throw new Error("spawn params must be a JSON object");
+    }
+    entityParams[idx] = parsed;
+    status.textContent = "valid";
+  } catch (err) {
+    status.textContent = err.message;
+  }
+});
+
+document.getElementById("extraData").addEventListener("input", (e) => {
+  const raw = e.currentTarget.value.trim();
+  if (!raw) {
+    extraData = {};
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      throw new Error("extra data must be a JSON object");
+    }
+    extraData = parsed;
+  } catch {
+    // Keep the last valid extraData until the JSON is fixed.
+  }
+});
+
 // ════════════════════════════════════════════════════════════════
 // Init
 // ════════════════════════════════════════════════════════════════
@@ -1052,4 +1160,5 @@ if (localStorage.getItem(STORAGE_KEY)) {
 const ro = new ResizeObserver(() => render());
 ro.observe(canvas);
 render();
+syncSpawnParamsEditor();
 </script>
