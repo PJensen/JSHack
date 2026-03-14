@@ -34,21 +34,21 @@ export const DAY_NAMES = Object.freeze([
 export const SEASONS = Object.freeze(["spring", "summer", "autumn", "winter"]);
 
 // ── Month definitions (13 lunar months) ─────────────────────────────
-// 4 seasons × 3 months + 1 intercalary month ("Voidtide") at year-end.
+// 4 seasons × 3 months + 1 intercalary month ("Mercedonius") at year-end.
 export const MONTHS = Object.freeze([
-  { name: "Thawmire",    season: "spring" },
-  { name: "Sowsrest",    season: "spring" },
-  { name: "Brightwater", season: "spring" },
-  { name: "Longsun",     season: "summer" },
-  { name: "Ember",       season: "summer" },
-  { name: "Goldtide",    season: "summer" },
-  { name: "Reaptide",    season: "autumn" },
-  { name: "Hollowmoon",  season: "autumn" },
-  { name: "Ashfall",     season: "autumn" },
-  { name: "Frostmarch",  season: "winter" },
-  { name: "Deadsleep",   season: "winter" },
-  { name: "Ironmoon",    season: "winter" },
-  { name: "Voidtide",    season: "winter" },  // intercalary 13th month
+  { name: "Martius",     season: "spring" },
+  { name: "Aprilis",     season: "spring" },
+  { name: "Maius",       season: "spring" },
+  { name: "Iunius",      season: "summer" },
+  { name: "Quintilis",   season: "summer" },
+  { name: "Sextilis",    season: "summer" },
+  { name: "September",   season: "autumn" },
+  { name: "October",     season: "autumn" },
+  { name: "November",    season: "autumn" },
+  { name: "December",    season: "winter" },
+  { name: "Ianuarius",   season: "winter" },
+  { name: "Februarius",  season: "winter" },
+  { name: "Mercedonius", season: "winter" },  // intercalary 13th month
 ]);
 
 // ── Town-day phase proportions ──────────────────────────────────────
@@ -144,7 +144,7 @@ export function getCalendarDate(step, startDay = 0, startYear = 1) {
   const monthName = month.name;
   const season    = month.season;
 
-  // "Ironday, 14th of Reaptide — Year 847"
+  // "Ironday, 14th of September — Year 847"
   const ordinal   = ordinalSuffix(dayOfMonth + 1);
   const formatted = `${dayName}, ${ordinal} of ${monthName} — Year ${yearNum}`;
 
