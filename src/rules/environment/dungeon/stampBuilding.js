@@ -57,7 +57,7 @@ const ROOFABLE = new Set(["floor", "wall", "door"]);
 /**
  * Stamp a building definition onto the world.
  * @param {Map} chunks - chunk map from overworld generation
- * @param {object} def - parsed building JSON (tiles[], spawns[], waypoints[])
+ * @param {object} def - parsed building JSON (tiles[], spawns[], waypoints[], rooms[])
  * @param {number} anchorX - world X of the keystone (cobblestone attachment point)
  * @param {number} anchorY - world Y of the keystone
  * @returns {{ spawns: Object<string, {x:number,y:number}>, waypoints: Object<string, {x:number,y:number}> }}
@@ -97,5 +97,25 @@ export function stampBuilding(chunks, def, anchorX, anchorY) {
     }
   }
 
-  return { spawns: spawnPositions, waypoints: waypointPositions, allSpawns: allSpawnPositions };
+  const roomPositions = {};
+  if (Array.isArray(def.rooms)) {
+    for (const room of def.rooms) {
+      const name = String(room?.name || room?.roomType || "");
+      if (!name) continue;
+      roomPositions[name] = {
+        ...room,
+        x: anchorX + (Number(room.dx) | 0),
+        y: anchorY + (Number(room.dy) | 0),
+        w: Number(room.w) | 0,
+        h: Number(room.h) | 0,
+      };
+    }
+  }
+
+  return {
+    spawns: spawnPositions,
+    waypoints: waypointPositions,
+    allSpawns: allSpawnPositions,
+    rooms: roomPositions,
+  };
 }
