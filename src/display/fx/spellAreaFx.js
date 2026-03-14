@@ -1,10 +1,10 @@
 // src/display/fx/spellAreaFx.js
-// Blink, meteor, blastwave, and frost spell VFX (world-space; display-only).
+// Blink, meteor, blastwave spell VFX (world-space; display-only).
 
 import { startShake } from "../camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
-import { RadialFx, LineFx, BlinkFx, PhaseStrikeFx } from "./fxEntries.js";
+import { RadialFx, BlinkFx, PhaseStrikeFx } from "./fxEntries.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number }} deps
@@ -47,12 +47,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
   /** @type {RadialFx[]} */
   const _blastwaveFx = [];
 
-  // --- Frost state ---
-  /** @type {LineFx[]} */
-  const _frostBeamFx = [];
-  /** @type {RadialFx[]} */
-  const _frostImpactFx = [];
-
   // --- Flash Heal state ---
   /** @type {RadialFx[]} */
   const _flashHealFx = [];
@@ -75,14 +69,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     for (let i = _blastwaveFx.length - 1; i >= 0; i--) {
       _blastwaveFx[i].tick(dt);
       if (_blastwaveFx[i].expired) _blastwaveFx.splice(i, 1);
-    }
-    for (let i = _frostBeamFx.length - 1; i >= 0; i--) {
-      _frostBeamFx[i].tick(dt);
-      if (_frostBeamFx[i].expired) _frostBeamFx.splice(i, 1);
-    }
-    for (let i = _frostImpactFx.length - 1; i >= 0; i--) {
-      _frostImpactFx[i].tick(dt);
-      if (_frostImpactFx[i].expired) _frostImpactFx.splice(i, 1);
     }
     for (let i = _flashHealFx.length - 1; i >= 0; i--) {
       _flashHealFx[i].tick(dt);
@@ -219,82 +205,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
         ctx.beginPath(); ctx.arc(bw.x, bw.y, 0.3, 0, Math.PI * 2); ctx.fill();
       }
     }
-    ctx.restore();
-  }
-
-  // --- Draw: Frost ---
-  /** @param {CanvasRenderingContext2D} ctx */
-  function drawFrost(ctx) {
-    if (!_frostBeamFx.length && !_frostImpactFx.length) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-
-    // Frost beam: icy ray from caster to target with jittered crystalline edges
-    for (const eff of _frostBeamFx) {
-      const alpha = eff.alpha;
-      const pts = jitterLine(eff.from, eff.to, 14, 0.07 * alpha);
-
-      // Outer frost glow (wide, pale cyan)
-      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      ctx.strokeStyle = `rgba(100,200,255,${0.15 * alpha})`;
-      ctx.lineWidth = 0.25;
-      pathPolyline(ctx, pts); ctx.stroke();
-
-      // Mid icy shimmer
-      ctx.strokeStyle = `rgba(150,230,255,${0.35 * alpha})`;
-      ctx.lineWidth = 0.10;
-      pathPolyline(ctx, pts); ctx.stroke();
-
-      // Core (bright white-blue)
-      const core = jitterLine(eff.from, eff.to, 16, 0.03 * alpha);
-      ctx.strokeStyle = `rgba(220,245,255,${0.85 * alpha})`;
-      ctx.lineWidth = 0.04;
-      pathPolyline(ctx, core); ctx.stroke();
-    }
-
-    // Impact crystallisation: expanding hexagonal frost bloom
-    for (const imp of _frostImpactFx) {
-      const t = imp.progress; // 0→1 over lifetime
-
-      // Phase 1: bright white flash on impact (first 12%)
-      if (t < 0.12) {
-        const flashT = t / 0.12;
-        const flashR = 0.15 + flashT * 0.6;
-        const flashA = 0.8 * (1 - flashT);
-        ctx.fillStyle = `rgba(230,245,255,${flashA})`;
-        ctx.beginPath(); ctx.arc(imp.x, imp.y, flashR, 0, Math.PI * 2); ctx.fill();
-      }
-
-      // Phase 2: expanding ice ring (cyan, sharp)
-      const ringR = t * (imp.radius + 0.3);
-      const ringA = 0.5 * (1 - t);
-      ctx.strokeStyle = `rgba(120,210,255,${ringA})`;
-      ctx.lineWidth = 0.08 * (1 - t * 0.6);
-      ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
-
-      // Phase 3: inner frost disc (pale blue, fades fast)
-      if (t < 0.5) {
-        const discA = 0.18 * (1 - t / 0.5);
-        ctx.fillStyle = `rgba(180,230,255,${discA})`;
-        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR * 0.55, 0, Math.PI * 2); ctx.fill();
-      }
-
-      // Phase 4: crystalline spokes (6 radial lines outward like ice cracks)
-      const spokeA = 0.4 * (1 - t);
-      if (spokeA > 0.01) {
-        ctx.strokeStyle = `rgba(200,240,255,${spokeA})`;
-        ctx.lineWidth = 0.03;
-        for (let s = 0; s < 6; s++) {
-          const angle = (s / 6) * Math.PI * 2 + 0.2; // slight offset for asymmetry
-          const spokeLen = ringR * (0.7 + 0.3 * Math.sin(s * 1.7 + t * 4));
-          ctx.beginPath();
-          ctx.moveTo(imp.x, imp.y);
-          ctx.lineTo(imp.x + Math.cos(angle) * spokeLen, imp.y + Math.sin(angle) * spokeLen);
-          ctx.stroke();
-        }
-      }
-    }
-
     ctx.restore();
   }
 
@@ -546,55 +456,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       }
     });
 
-    world.on('spell:frost', ({ actor, targetId, from, at, duration, mass, fizzle }) => {
-      if (fizzle) return; // no target; skip VFX
-      if (!from || !at) return;
-      // Icy beam from caster → target
-      _frostBeamFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: at.x, y: at.y }, ttl: 0.22 }));
-      // Impact crystallisation burst at target
-      _frostImpactFx.push(new RadialFx({ x: at.x, y: at.y, radius: 0.8, ttl: 0.55 }));
-      // Light camera shake (cold snap)
-      startShake(cam, 3, 0.14);
-      // Ice shard particles radiating outward from impact
-      const N = 20;
-      for (let i = 0; i < N; i++) {
-        const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-        const spd = 0.6 + Math.random() * 1.8;
-        const life = 0.35 + Math.random() * 0.35;
-        fx.pool.spawn(new Particle({
-          x: at.x + (Math.random() - 0.5) * 0.3,
-          y: at.y + (Math.random() - 0.5) * 0.3,
-          vx: Math.cos(angle) * spd,
-          vy: Math.sin(angle) * spd - 0.4, // slight upward drift
-          ay: 0.3, // gentle downward settle
-          life,
-          size0: 0.12 + Math.random() * 0.10,
-          size1: 0.02,
-          r: 140 + (Math.random() * 60 | 0), g: 220 + (Math.random() * 35 | 0), b: 255,
-          a0: 0.9,
-          rot: Math.random() * Math.PI * 2,
-          rotVel: (Math.random() - 0.5) * 4,
-        }));
-      }
-      // Slow-falling snowflake motes (lingering cold)
-      const M = 8;
-      for (let i = 0; i < M; i++) {
-        fx.pool.spawn(new Particle({
-          x: at.x + (Math.random() - 0.5) * 1.2,
-          y: at.y + (Math.random() - 0.5) * 0.6,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: 0.2 + Math.random() * 0.3,
-          life: 0.7 + Math.random() * 0.5,
-          size0: 0.06 + Math.random() * 0.05,
-          size1: 0.01,
-          r: 220, g: 240, b: 255,
-          a0: 0.6,
-          rotVel: (Math.random() - 0.5) * 2,
-        }));
-      }
-    });
-
-    // Shadow bolt VFX is handled by projectileFx (purple energy projectile).
+    // Frost + Shadow bolt VFX are handled by projectileFx (projectile style).
 
     world.on('spell:flash_heal', ({ at, amount }) => {
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
@@ -738,5 +600,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrost, drawFlashHeal, drawPhaseStrike, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawPhaseStrike, installListeners };
 }

@@ -903,6 +903,18 @@ export function installMessageWiring({
     }
   });
 
+  world.on('harvest:seed_drop', ({ actor, kind }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = kind === 'wheat' ? 'wheat' : kind === 'carrot' ? 'carrot' : kind === 'corn' ? 'corn' : kind;
+    log(`You find some ${label} seeds!`, 'system');
+  });
+
+  world.on('seed:planted', ({ actor, kind }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = kind === 'wheat' ? 'wheat' : kind === 'carrot' ? 'carrot' : kind === 'corn' ? 'corn' : kind;
+    log(`You plant ${label} seeds in the soil.`, 'system');
+  });
+
   world.on('alchemy:open', ({ actor, ingredients }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const summary = formatIngredientBag(ingredients, { includeZero: true });

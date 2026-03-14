@@ -26,6 +26,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {RadialFx[]} */
   const _fireballImpact = [];
 
+  // --- Frost Bolt projectile state ---
+  /** @type {ArrowFx[]} */
+  const _frostboltFx = [];
+  /** @type {RadialFx[]} */
+  const _frostboltImpact = [];
+
   // --- Ricochet Theology projectile state ---
   /** @type {ArrowFx[]} */
   const _ricochetFx = [];
@@ -210,6 +216,87 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       if (_fireballImpact[i].expired) _fireballImpact.splice(i, 1);
     }
 
+    // Frost Bolt projectiles
+    for (let i = _frostboltFx.length - 1; i >= 0; i--) {
+      const fb = _frostboltFx[i];
+
+      // Spawn trailing ice particles during flight
+      if (fx?.pool && fb.progress < 1) {
+        const hx = fb.from.x + (fb.to.x - fb.from.x) * fb.progress;
+        const hy = fb.from.y + (fb.to.y - fb.from.y) * fb.progress;
+        const count = Math.max(1, Math.ceil(dt * 80));
+        for (let j = 0; j < count; j++) {
+          fx.pool.spawn(new Particle({
+            x: hx + (Math.random() - 0.5) * 0.1,
+            y: hy + (Math.random() - 0.5) * 0.1,
+            vx: -fb.dx * 0.8 + (Math.random() - 0.5) * 0.9,
+            vy: -fb.dy * 0.8 + (Math.random() - 0.5) * 0.9 - 0.3,
+            ay: 0.2,
+            life: 0.2 + Math.random() * 0.25,
+            size0: 0.1 + Math.random() * 0.08,
+            size1: 0.02,
+            r: 140 + (Math.random() * 60 | 0),
+            g: 210 + (Math.random() * 40 | 0),
+            b: 255,
+            a0: 0.8,
+          }));
+        }
+      }
+
+      fb.tick(dt);
+
+      if (fb.arrived) {
+        // Impact radial burst
+        _frostboltImpact.push(new RadialFx({ x: fb.to.x, y: fb.to.y, radius: 0.7, ttl: 0.40 }));
+        startShake(cam, 3, 0.14);
+
+        // Ice shard particle burst at impact
+        if (fx?.pool) {
+          for (let k = 0; k < 20; k++) {
+            const angle = (k / 20) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+            const spd = 0.6 + Math.random() * 1.8;
+            fx.pool.spawn(new Particle({
+              x: fb.to.x + (Math.random() - 0.5) * 0.3,
+              y: fb.to.y + (Math.random() - 0.5) * 0.3,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd - 0.4,
+              ay: 0.3,
+              life: 0.35 + Math.random() * 0.35,
+              size0: 0.12 + Math.random() * 0.10,
+              size1: 0.02,
+              r: 140 + (Math.random() * 60 | 0),
+              g: 220 + (Math.random() * 35 | 0),
+              b: 255,
+              a0: 0.9,
+              rot: Math.random() * Math.PI * 2,
+              rotVel: (Math.random() - 0.5) * 4,
+            }));
+          }
+          // Slow-falling snowflake motes (lingering cold)
+          for (let k = 0; k < 8; k++) {
+            fx.pool.spawn(new Particle({
+              x: fb.to.x + (Math.random() - 0.5) * 1.0,
+              y: fb.to.y + (Math.random() - 0.5) * 0.6,
+              vx: (Math.random() - 0.5) * 0.3,
+              vy: 0.2 + Math.random() * 0.3,
+              life: 0.7 + Math.random() * 0.5,
+              size0: 0.06 + Math.random() * 0.05,
+              size1: 0.01,
+              r: 220, g: 240, b: 255,
+              a0: 0.6,
+              rotVel: (Math.random() - 0.5) * 2,
+            }));
+          }
+        }
+        _frostboltFx.splice(i, 1);
+      }
+    }
+    // Frost bolt impacts
+    for (let i = _frostboltImpact.length - 1; i >= 0; i--) {
+      _frostboltImpact[i].tick(dt);
+      if (_frostboltImpact[i].expired) _frostboltImpact.splice(i, 1);
+    }
+
     // Ricochet Theology projectiles
     for (let i = _ricochetFx.length - 1; i >= 0; i--) {
       const bolt = _ricochetFx[i];
@@ -280,6 +367,10 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       _fireballFx.push(entry);
       return;
     }
+    if (style === 'frostbolt') {
+      _frostboltFx.push(entry);
+      return;
+    }
     if (style === 'ricochet_theology') {
       _ricochetFx.push(entry);
       return;
@@ -292,8 +383,9 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     const hasArrows = _arrowFx.length || _arrowSparks.length;
     const hasSbolt = _sboltFx.length || _sboltImpact.length;
     const hasFireball = _fireballFx.length || _fireballImpact.length;
+    const hasFrostbolt = _frostboltFx.length || _frostboltImpact.length;
     const hasRicochet = _ricochetFx.length || _ricochetImpact.length;
-    if (!hasArrows && !hasSbolt && !hasFireball && !hasRicochet) return;
+    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet) return;
     ctx.save();
 
     // Draw flying arrows
@@ -461,6 +553,72 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       ctx.restore();
     }
 
+    // --- Frost Bolt projectile ---
+    if (_frostboltFx.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const fb of _frostboltFx) {
+        const progress = fb.progress;
+        const hx = fb.from.x + (fb.to.x - fb.from.x) * progress;
+        const hy = fb.from.y + (fb.to.y - fb.from.y) * progress;
+        // Tail trails behind the head
+        const tailLen = Math.min(0.9, fb.len * progress);
+        const tx = hx - fb.dx * tailLen;
+        const ty = hy - fb.dy * tailLen;
+
+        // Wide icy glow trail
+        ctx.strokeStyle = 'rgba(80,180,255,0.25)';
+        ctx.lineWidth = 0.3;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        // Inner bright cyan trail
+        ctx.strokeStyle = 'rgba(150,220,255,0.6)';
+        ctx.lineWidth = 0.14;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+
+        // Outer frost glow
+        ctx.fillStyle = 'rgba(100,200,255,0.3)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.28, 0, Math.PI * 2); ctx.fill();
+        // Bright icy-white core orb
+        ctx.fillStyle = 'rgba(180,235,255,0.9)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.16, 0, Math.PI * 2); ctx.fill();
+        // White center
+        ctx.fillStyle = 'rgba(230,245,255,0.95)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.07, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // --- Frost Bolt impact ---
+    if (_frostboltImpact.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const imp of _frostboltImpact) {
+        const t = imp.progress;
+        // Bright white-blue flash on impact
+        if (t < 0.2) {
+          const flashT = t / 0.2;
+          const flashR = 0.2 + flashT * 0.45;
+          const flashA = 0.8 * (1 - flashT);
+          ctx.fillStyle = `rgba(200,235,255,${flashA.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(imp.x, imp.y, flashR, 0, Math.PI * 2); ctx.fill();
+        }
+        // Expanding ice ring
+        const ringR = t * (imp.radius + 0.3);
+        const ringA = 0.45 * (1 - t);
+        ctx.strokeStyle = `rgba(120,210,255,${ringA.toFixed(3)})`;
+        ctx.lineWidth = 0.1 * (1 - t * 0.5);
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
+        // Inner frost disc
+        if (t < 0.35) {
+          const discA = 0.25 * (1 - t / 0.35);
+          ctx.fillStyle = `rgba(160,230,255,${discA.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR * 0.45, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
     // --- Ricochet Theology projectile ---
     if (_ricochetFx.length) {
       ctx.save();
@@ -579,6 +737,20 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         from,
         to,
         style: 'fireball',
+        speed: 8,
+        minDuration: 0.1,
+        maxDuration: 0.6,
+      });
+    });
+
+    // Frost Bolt: icy projectile from caster to target
+    world.on('spell:frost', ({ from, at, fizzle }) => {
+      if (fizzle) return;
+      if (!from || !at) return;
+      spawnTransientProjectile({
+        from,
+        to: at,
+        style: 'frostbolt',
         speed: 8,
         minDuration: 0.1,
         maxDuration: 0.6,

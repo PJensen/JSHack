@@ -72,6 +72,11 @@ const CROP_ITEM_IDS = Object.freeze({
   carrot: "food_carrot",
   corn: "food_corn",
 });
+const SEED_ITEM_IDS = Object.freeze({
+  wheat: "seed_wheat",
+  carrot: "seed_carrot",
+  corn: "seed_corn",
+});
 const HERB_ITEM_IDS = Object.freeze({
   herbs: "food_wild_herbs",
   thorn_bramble: "reagent_thorn_pod",
@@ -714,6 +719,11 @@ function handleWorking(world, id, pos, job) {
         depleteNode(world, cropId);
         const itemId = CROP_ITEM_IDS[String(cropNode?.kind || "")] || "food_wheat";
         carryCreated(world, id, itemId);
+        // 30% chance to also get a seed.
+        if (world.rand() < 0.3) {
+          const seedId = SEED_ITEM_IDS[String(cropNode?.kind || "")];
+          if (seedId) carryCreated(world, id, seedId);
+        }
         job.carryCount++;
         emitSafe(world, "townfolk:harvested", { actor: id, x: pos.x, y: pos.y });
         // Look for more if not full
