@@ -38,6 +38,7 @@ import { isChestIdentity } from "../../shared/chests.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
 import { QuestState } from "../../rules/components/QuestState.js";
+import { Encumbrance } from "../../rules/components/Encumbrance.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
 
 const _installed = Symbol.for('inventoryDataProvider');
@@ -320,6 +321,19 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       const groupedBagItems = groupDisplayItems(bagItems);
       const filteredItems = slotFilter ? groupedBagItems.filter((it) => matchesSlotFilter(it, slotFilter)) : groupedBagItems;
     const scrollOfIdentifyId = p ? findScrollOfIdentify(p.id) : 0;
+    let encumbrance = null;
+    if (p) {
+      const enc = world.get(p.id, Encumbrance);
+      const stam = world.get(p.id, Stamina);
+      const maxStaminaBonus = Number(getPassiveBonuses(world, p.id)?.maxStaminaDerived ?? 0);
+      const limit = stam ? (Number(stam.maxStamina || 0) + maxStaminaBonus) : null;
+      encumbrance = {
+        current: enc ? enc.current : 0,
+        limit,
+        overloaded: enc ? enc.overloaded : false,
+        heavilyLoaded: enc ? enc.heavilyLoaded : false,
+      };
+    }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:inventoryData', {
       detail: {
         items: filteredItems,
@@ -328,6 +342,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         ground,
         slotFilter,
         scrollOfIdentifyId,
+        encumbrance,
       },
     }));
   });

@@ -422,7 +422,8 @@ export function initOverlays() {
     const ground = e?.detail?.ground || null;
     const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
     const scrollOfIdentifyId = Number(e?.detail?.scrollOfIdentifyId || 0) | 0;
-    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId);
+    const encumbrance = e?.detail?.encumbrance || null;
+    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId, encumbrance);
     if (equip.style.display === 'block') {
       const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
       renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId);
@@ -1648,6 +1649,18 @@ function renderItemDetails(container, it) {
   title.style.marginBottom = '4px';
   container.appendChild(title);
 
+  // --- Item weight ---
+  const itemWeight = Number(it.weight || 0);
+  if (itemWeight > 0) {
+    const wLine = document.createElement('div');
+    const count = Math.max(1, Number(it.count ?? 1) | 0);
+    wLine.textContent = count > 1
+      ? `Weight: ${itemWeight} kg \u00d7${count} = ${(itemWeight * count).toFixed(1)} kg`
+      : `Weight: ${itemWeight} kg`;
+    Object.assign(wLine.style, { color: '#8899aa', fontSize: '12px', marginBottom: '2px' });
+    container.appendChild(wLine);
+  }
+
   // --- Consumable effect description (potions, scrolls, food, wands) ---
   const isConsumable = it.type === 'potion' || it.type === 'scroll' || it.type === 'food' || it.type === 'wand' || it.type === 'learn' || it.type === 'book';
   const consumableDesc = isConsumable ? String(it.description || '').trim() : '';
@@ -1921,7 +1934,7 @@ function show(panel) {
 function hide(panel) { panel.style.display = 'none'; hideItemTooltip(); }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] @param {string} [slotFilter] */
-function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentifyId = 0) {
+function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentifyId = 0, encumbrance = null) {
   const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] inventory detach failed:', e); }
@@ -1937,6 +1950,39 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
   title.style.fontWeight = 'bold';
   title.style.marginBottom = '8px';
   el.appendChild(title);
+
+  // ── Carry weight bar ──────────────────────────────────────────────
+  if (encumbrance && encumbrance.limit != null && encumbrance.limit > 0) {
+    const cur = Number(encumbrance.current || 0);
+    const lim = Number(encumbrance.limit);
+    const ratio = Math.min(cur / lim, 1.0);
+    const barColor = encumbrance.overloaded ? '#e06a6a' : encumbrance.heavilyLoaded ? '#d9963b' : '#4a8a5a';
+
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      marginBottom: '8px', fontSize: '12px', color: '#cfe8ff',
+    });
+
+    const label = document.createElement('span');
+    label.textContent = `Weight: ${cur.toFixed(1)} / ${lim} kg`;
+    if (encumbrance.overloaded) label.style.color = '#e06a6a';
+    else if (encumbrance.heavilyLoaded) label.style.color = '#d9963b';
+    row.appendChild(label);
+
+    const track = document.createElement('div');
+    Object.assign(track.style, {
+      marginTop: '3px', height: '6px', background: '#1a2233',
+      borderRadius: '3px', overflow: 'hidden', border: '1px solid #2d3b52',
+    });
+    const fill = document.createElement('div');
+    Object.assign(fill.style, {
+      height: '100%', width: `${(ratio * 100).toFixed(1)}%`,
+      background: barColor, borderRadius: '3px', transition: 'width 0.2s',
+    });
+    track.appendChild(fill);
+    row.appendChild(track);
+    el.appendChild(row);
+  }
 
   if (!items.length) {
     (/** @type {any} */ (panel))._inventorySelectionKey = '';

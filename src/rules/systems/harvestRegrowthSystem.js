@@ -1,4 +1,5 @@
 import { HarvestNode } from "../components/HarvestNode.js";
+import { Collider } from "../components/Collider.js";
 
 /**
  * Tick regrowth countdown for harvested nodes.
@@ -21,6 +22,11 @@ export function harvestRegrowthSystem(world) {
       regrowTurns: node.regrowTurns,
       regrowCountdown: 0,
     });
+    // Regrown trees become solid again.
+    if (node.kind === "tree") {
+      const col = world.get(id, Collider);
+      if (col) world.set(id, Collider, { solid: true, blocksSight: true });
+    }
     world.emit?.("harvest:regrown", { id, kind: node.kind });
   }
 }

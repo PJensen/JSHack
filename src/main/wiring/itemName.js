@@ -158,5 +158,6 @@ export function buildItemDisplayData(world, itemId) {
     targetEffects,
     identified,
     beatitude: identified ? (world.get(itemId, Beatitude)?.state || null) : null,
+    weight: Number(info.weight || 0),
   };
 }

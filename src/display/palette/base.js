@@ -152,6 +152,10 @@ export const basePalette = {
   furnace:       { glyph: "🫕", fg: "#ff8533", glow: "#cc4400" },
   furnace_unlit: { glyph: "🫕", fg: "#8a6040", glow: "#553320" },
   cooking_fire: { glyph: "♨", fg: "#ff9944", glow: "#dd5500" },
+  // Tree harvest stages
+  tree_stump:    { glyph: ".", fg: "#8b6914", glow: "#5a4a10" },
+  tree_sapling:  { glyph: "🌱", fg: "#5a9040", glow: "#3a6020" },
+  tree_harvest:  { glyph: "🌳", fg: "#2d8b2d", glow: "#1a5a1a" },
   // Growth stage glyphs
   farmland_tilled: { glyph: "⁙", fg: "#8b7355", glow: "#5a4a38" },
   seedling:      { glyph: "🌱", fg: "#7ecc5a", glow: "#4a9030" },
