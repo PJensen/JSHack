@@ -141,6 +141,7 @@ export function buildSpellDamageSpecFromContext(world, targetId, context, option
     noTrigger: !!options?.noTrigger,
     bypassInvuln: !!options?.bypassInvuln,
     bypassResist: !!options?.bypassResist,
+    projectileDelay: options?.projectileDelay || 0,
   };
 }
 
