@@ -21,8 +21,7 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   spellAreaFx.drawBlink(bctx);
   spellAreaFx.drawMeteor(bctx);
   spellAreaFx.drawBlastwave(bctx);
-  spellAreaFx.drawFrost(bctx);
-  // Shadow bolt VFX is drawn by projectileFx.draw() (purple energy projectile).
+  // Frost + Shadow bolt VFX are drawn by projectileFx.draw() (projectile style).
   if (typeof spellAreaFx.drawFlashHeal === "function") {
     spellAreaFx.drawFlashHeal(bctx);
   }

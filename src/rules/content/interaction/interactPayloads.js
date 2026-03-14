@@ -76,6 +76,12 @@ const CATALOG_ARCHETYPES = {
 };
 
 const HARVEST_SEED_SALT = 0x48415256;
+const SEED_DROP_SALT = 0x5345ED01;
+const SEED_ITEM_IDS = Object.freeze({
+  wheat: "seed_wheat",
+  carrot: "seed_carrot",
+  corn: "seed_corn",
+});
 const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
 const FOUNTAIN_COOLDOWN_MIN = 201;
@@ -775,6 +781,22 @@ export const INTERACT_PAYLOADS = {
       }
 
       if (!node.ready) {
+        // Allow seed planting on needsPlanting crop nodes.
+        if (node.needsPlanting) {
+          const seedCatalogId = SEED_ITEM_IDS[node.kind];
+          if (seedCatalogId) {
+            const items = inventoryItems(world, actor);
+            for (let i = 0; i < items.length; i++) {
+              const ni = world.get(items[i], NamedIdentity);
+              if (ni && ni.identity === seedCatalogId) {
+                ctx.data.plantMode = true;
+                ctx.data.seedEntityId = items[i];
+                ctx.data.node = node;
+                return;
+              }
+            }
+          }
+        }
         world.emit?.("harvest:empty", {
           actor, targetId,
           kind: node.kind,
@@ -814,6 +836,18 @@ export const INTERACT_PAYLOADS = {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
       const node = ctx.data.node;
+
+      // Seed planting mode — consume seed and start growth.
+      if (ctx.data.plantMode) {
+        removeFromInventory(world, actor, ctx.data.seedEntityId);
+        try { world.destroy(ctx.data.seedEntityId); } catch {}
+        world.mutate(targetId, HarvestNode, (n) => {
+          n.needsPlanting = false;
+          n.regrowCountdown = n.regrowTurns;
+        });
+        world.emit?.("seed:planted", { actor, targetId, kind: node.kind });
+        return;
+      }
 
       const r = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, HARVEST_SEED_SALT));
       const spread = Math.max(1, (node.yieldMax - node.yieldMin + 1) | 0);
@@ -933,6 +967,21 @@ export const INTERACT_PAYLOADS = {
         itemId: ctx.data.resultItemId,
         regrowTurns: node.regrowTurns,
       });
+
+      // 30% chance to drop seeds for replantable crops.
+      if (node.replantable) {
+        const seedCatalogId = SEED_ITEM_IDS[node.kind];
+        if (seedCatalogId) {
+          const sr = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, SEED_DROP_SALT));
+          if (sr() < 0.3) {
+            const seedEntity = createItemById(world, seedCatalogId);
+            if (seedEntity) {
+              addToInventory(world, actor, seedEntity);
+              world.emit?.("harvest:seed_drop", { actor, targetId, kind: node.kind, seedItemId: seedCatalogId });
+            }
+          }
+        }
+      }
     },
   },
 

@@ -28,6 +28,8 @@ import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
+import { HarvestNode } from "../src/rules/components/HarvestNode.js";
+import { Material } from "../src/rules/components/Material.js";
 
 // ── helpers ────────────────────────────────────────────────────────
 
@@ -229,12 +231,10 @@ Deno.test("returning townfolk transitions to idle when near home", () => {
   assert(job.idleTurns > 0, "idleTurns should be set for next cycle");
 });
 
-Deno.test("woodcutter chops adjacent tree tile on work completion", () => {
+Deno.test("woodcutter chops adjacent TreeNode entity on work completion", () => {
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_FLOOR);
-  // Place a tree at (8, 5)
-  tiles[5 * CHUNK_SIZE + 8] = TILE_TREE;
   loadChunk(0, 0, tiles);
 
   const world = new World({ seed: 8 });
@@ -246,6 +246,17 @@ Deno.test("woodcutter chops adjacent tree tile on work completion", () => {
   const player = world.create();
   world.add(player, Player);
   world.add(player, Position, { x: 5, y: 5 });
+
+  // Place a TreeNode entity at (8, 5)
+  const tree = world.create();
+  world.add(tree, Position, { x: 8, y: 5 });
+  world.add(tree, NamedIdentity, { name: "Tree", identity: "tree_harvest" });
+  world.add(tree, Material, { kind: "wood" });
+  world.add(tree, Collider, { solid: true, blocksSight: true });
+  world.add(tree, HarvestNode, {
+    kind: "tree", ready: true, regrowTurns: 350, regrowCountdown: 0,
+    yield: "material_lumber", yieldMin: 1, yieldMax: 1, requiresTool: "chop",
+  });
 
   // Woodcutter at (7, 5), adjacent to tree at (8, 5)
   const npc = addTownfolk(world, 7, 5, "woodcutter", {
@@ -263,7 +274,10 @@ Deno.test("woodcutter chops adjacent tree tile on work completion", () => {
 
   aiTownfolkSystem(world);
 
-  assertEquals(getTile(8, 5), TILE_GRASS, "tree should be replaced with grass");
+  const node = world.get(tree, HarvestNode);
+  assertEquals(node.ready, false, "tree should be depleted");
+  const col = world.get(tree, Collider);
+  assertEquals(col.solid, false, "chopped tree stump should be walkable");
   assert(chopped, "townfolk:chopped event should fire");
   assertEquals(countInventory(world, npc, "material_lumber"), 1, "woodcutter should carry lumber");
   assertEquals(countInventory(world, npc, "fuel_firewood"), 1, "woodcutter should carry firewood");
