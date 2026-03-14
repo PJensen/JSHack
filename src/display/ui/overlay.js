@@ -2871,7 +2871,9 @@ function renderCharacterSheet(panel, data) {
       color: SEASON_COLORS[String(calendar?.season || '')] || '#cfe8ff',
       wordBreak: 'break-word',
     });
-    calendarCard.textContent = String(calendar.formatted);
+    const moonEmoji = String(calendar?.moonEmoji || '');
+    const moonLabel = String(calendar?.moonLabel || '');
+    calendarCard.textContent = `${moonEmoji ? `${moonEmoji} ` : ''}${String(calendar.formatted)}${moonLabel ? ` · ${moonLabel}` : ''}`;
     el.appendChild(calendarCard);
   }
 

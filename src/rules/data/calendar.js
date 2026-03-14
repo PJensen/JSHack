@@ -51,6 +51,17 @@ export const MONTHS = Object.freeze([
   { name: "Mercedonius", season: "winter" },  // intercalary 13th month
 ]);
 
+export const MOON_PHASES = Object.freeze([
+  { key: "new", emoji: "\uD83C\uDF11", name: "New Moon" },
+  { key: "waxing_crescent", emoji: "\uD83C\uDF12", name: "Waxing Crescent" },
+  { key: "first_quarter", emoji: "\uD83C\uDF13", name: "First Quarter" },
+  { key: "waxing_gibbous", emoji: "\uD83C\uDF14", name: "Waxing Gibbous" },
+  { key: "full", emoji: "\uD83C\uDF15", name: "Full Moon" },
+  { key: "waning_gibbous", emoji: "\uD83C\uDF16", name: "Waning Gibbous" },
+  { key: "last_quarter", emoji: "\uD83C\uDF17", name: "Last Quarter" },
+  { key: "waning_crescent", emoji: "\uD83C\uDF18", name: "Waning Crescent" },
+]);
+
 // ── Town-day phase proportions ──────────────────────────────────────
 // Expressed as fractions of TURNS_PER_DAY so a single constant change
 // rescales the whole schedule.  Fractions must sum to 1.
@@ -124,6 +135,9 @@ export function getTownPhase(step) {
  *   dayName:     string,
  *   monthName:   string,
  *   phase:       string,
+ *   moonPhase:   string,
+ *   moonEmoji:   string,
+ *   moonLabel:   string,
  *   formatted:   string,
  * }}
  */
@@ -139,6 +153,7 @@ export function getCalendarDate(step, startDay = 0, startYear = 1) {
 
   const month  = MONTHS[monthIndex];
   const phase  = getTownPhase(step);
+  const moon = getMoonPhase(dayOfMonth);
 
   const dayName   = DAY_NAMES[dayOfWeek];
   const monthName = month.name;
@@ -158,8 +173,17 @@ export function getCalendarDate(step, startDay = 0, startYear = 1) {
     dayName,
     monthName,
     phase,
+    moonPhase: moon.key,
+    moonEmoji: moon.emoji,
+    moonLabel: moon.name,
     formatted,
   };
+}
+
+export function getMoonPhase(dayOfMonth) {
+  const normalizedDay = Math.max(0, Number(dayOfMonth || 0) | 0) % DAYS_PER_MONTH;
+  const phaseIndex = Math.floor((normalizedDay * MOON_PHASES.length) / DAYS_PER_MONTH);
+  return MOON_PHASES[phaseIndex] || MOON_PHASES[0];
 }
 
 function ordinalSuffix(n) {
