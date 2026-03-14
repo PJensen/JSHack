@@ -255,3 +255,49 @@ Deno.test("deity reads food events and records approval/offense actions", () => 
   assert(createFood, "hunger:ate should register a deity create(food) action");
   assert(betrayFood, "hunger:sickened should register a deity betray(food_*) action");
 });
+
+Deno.test("ascetic milestone can please deities that value restraint", () => {
+  const world = new World({ seed: 0xA5C37 });
+  const playerId = createPlayer(world, { name: "Ascetic" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+  else world.add(playerId, Devotion, { deityId: "seraphine" });
+  if (world.has(playerId, Hunger)) world.set(playerId, Hunger, { hunger: 900, satiation: 0 });
+  else world.add(playerId, Hunger, { hunger: 900, satiation: 0 });
+
+  initDeity("seraphine", world);
+  deitySystem(world);
+  const deity = getDeityInstance("seraphine");
+  assert(deity, "deity should initialize");
+
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+  world.emit("hunger:ate", { actor: playerId, nutrition: 100 });
+
+  const offers = deity.ledger.ofType("offer");
+  assert(
+    offers.some((e) => e?.meta?.offeringType === "discipline"),
+    "disciplined hunger behavior should trigger Seraphine ascetic milestone hook"
+  );
+});
+
+Deno.test("ascetic lapses can displease restraint-focused deities", () => {
+  const world = new World({ seed: 0xA5C38 });
+  const playerId = createPlayer(world, { name: "Glutton" });
+  if (world.has(playerId, Devotion)) world.set(playerId, Devotion, { deityId: "seraphine" });
+  else world.add(playerId, Devotion, { deityId: "seraphine" });
+  if (world.has(playerId, Hunger)) world.set(playerId, Hunger, { hunger: 0, satiation: 120 });
+  else world.add(playerId, Hunger, { hunger: 0, satiation: 120 });
+
+  initDeity("seraphine", world);
+  deitySystem(world);
+  const deity = getDeityInstance("seraphine");
+  assert(deity, "deity should initialize");
+
+  world.emit("hunger:ate", { actor: playerId, nutrition: 80 });
+
+  const actions = deity.ledger.ofType("action");
+  assert(
+    actions.some((e) => e?.meta?.actionType === "betray" && e?.meta?.target === "gluttony"),
+    "overeating should trigger Seraphine ascetic lapse hook"
+  );
+});
