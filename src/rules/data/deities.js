@@ -46,6 +46,7 @@
  * @property {SpellSchoolReaction[]} [spellSchoolReactions]
  * @property {Record<string,{type:'action'|'offer',verb:string,magnitude?:number,target?:string,value?:number,alignment?:string,message?:string}>} [specialHooks]
  *   Keys: 'trap:triggered:enemy', 'trap:triggered:self', 'altar:offer:cursed', 'cooking:cooked:bonus'
+ *         'ascetic:milestone', 'ascetic:lapse'
  *   Use '{deity}' in message as a placeholder for deity.name.
  * @property {KillStreakConfig}     [killStreakConfig]
  */
@@ -123,6 +124,22 @@ export const DEITY_DEFS = {
       // Phase strike is violent trickery — Seraphine disapproves
       { school: 'trickery', spellId: 'phase_strike', type: 'action', verb: 'betray', magnitude: 0.1, target: 'violent_trickery' },
     ],
+    specialHooks: {
+      'ascetic:milestone': {
+        type: 'offer',
+        verb: 'discipline',
+        value: 0.2,
+        alignment: 'lawful',
+        message: '{deity} honors your disciplined restraint.',
+      },
+      'ascetic:lapse': {
+        type: 'action',
+        verb: 'betray',
+        magnitude: 0.08,
+        target: 'gluttony',
+        message: '{deity} frowns at your indulgence.',
+      },
+    },
   },
 
   loki: {
@@ -199,6 +216,20 @@ export const DEITY_DEFS = {
     specialHooks: {
       // Cooking corpses closes the cycle — transformation rather than raw consumption
       'cooking:cooked:bonus': { type: 'action', verb: 'protect', magnitude: 0.2, target: 'cycle_of_life' },
+      'ascetic:milestone': {
+        type: 'action',
+        verb: 'protect',
+        magnitude: 0.2,
+        target: 'inner_balance',
+        message: '{deity} approves your balanced restraint.',
+      },
+      'ascetic:lapse': {
+        type: 'action',
+        verb: 'destroy',
+        magnitude: 0.06,
+        target: 'imbalance',
+        message: '{deity} sighs as balance slips from your grasp.',
+      },
     },
   },
 };

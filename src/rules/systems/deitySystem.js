@@ -29,6 +29,7 @@ import { dealDamage } from '../utils/dealDamage.js';
 import { hasStatus } from '../utils/statusFacade.js';
 import { getSpell } from '../data/spells.js';
 import { getHungerLevel } from '../data/food.js';
+import { TURNS_PER_DAY } from '../data/calendar.js';
 
 /** @type {Map<string, import('../../lib/deity-js/deity.js').Deity>} */
 const _deities = new Map();
@@ -38,6 +39,7 @@ const _wired = new WeakSet();
 const WORLD_EVENTS_INSTALLED = Symbol.for('jshack:deity:worldEvents:installed');
 const WRATH_DEBT_KEY = Symbol.for('jshack:deity:wrathDebt');
 const SHRINE_TOUCH_COOLDOWN_KEY = Symbol.for('jshack:deity:shrineTouchCooldown');
+const ASCETIC_STATE_KEY = Symbol.for('jshack:deity:asceticState');
 
 /** @type {WeakMap<import('../../lib/deity-js/deity.js').Deity, WeakSet<import('../../lib/ecs-js/index.js').World>>} */
 const _miraclesWired = new WeakMap();
@@ -54,6 +56,12 @@ const SHRINE_TOUCH_PLEA_VALUE = 0.25;
 const GLUTTONOUS_FOOD_URGENCY_BONUS = 0.12;
 const GLUTTONOUS_MIRACLE_FEED_BONUS = 80;
 const GLUTTONOUS_FOOD_REACTION_MULT = 1.2;
+const ASCETIC_REWARD_SCORE_THRESHOLD = 3;
+const ASCETIC_REWARD_COOLDOWN_TURNS = Math.max(1, TURNS_PER_DAY);
+const ASCETIC_PENALTY_OVEREAT = 3;
+const ASCETIC_PENALTY_PREMATURE = 2;
+const ASCETIC_PENALTY_SICKENED = 2;
+const ASCETIC_DISCIPLINED_LEVELS = Object.freeze(new Set(['hungry', 'famished', 'starving', 'wasting']));
 const OFFENSE_SEVERITY_WEIGHTS = Object.freeze({
   minor: 0.15,
   grave: 0.45,
@@ -218,6 +226,40 @@ function ensureShrineTouchCooldownStore(world) {
  */
 function shrineTouchCooldownSlot(playerId, deityId) {
   return `${deityId}:${playerId}`;
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {Map<number, { score: number, lastRewardTurn: number, lastMealTurn: number, lastLapseTurn: number }>}
+ */
+function ensureAsceticStateStore(world) {
+  const current = world[ASCETIC_STATE_KEY];
+  if (current instanceof Map) return current;
+  const created = new Map();
+  world[ASCETIC_STATE_KEY] = created;
+  return created;
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{ deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }} resolved
+ * @param {number} actorId
+ * @param {'ascetic:milestone'|'ascetic:lapse'} hookKey
+ */
+function applyAsceticHook(world, resolved, actorId, hookKey) {
+  const hook = getDeity(resolved.deityId)?.specialHooks?.[hookKey];
+  if (!hook) return;
+  applyDeityReaction(resolved.deity, hook);
+  const msg = String(hook.message || '').replace('{deity}', resolved.deity.name);
+  if (msg) {
+    world.emit?.('deity:nicheEvent', {
+      playerId: actorId,
+      deityId: resolved.deityId,
+      deityName: resolved.deity.name,
+      event: hookKey.replace(':', '_'),
+      message: msg,
+    });
+  }
 }
 
 // ── Niche deity interaction helpers ───────────────────────────────────
@@ -509,6 +551,37 @@ function wireWorldEvents(world) {
       ? Math.min(1, baseMagnitude * GLUTTONOUS_FOOD_REACTION_MULT)
       : baseMagnitude;
     resolved.deity.action('create', { magnitude, target: 'food' });
+
+    const asceticStore = ensureAsceticStateStore(world);
+    const now = Number(world.step || 0) | 0;
+    const prev = asceticStore.get(actorId);
+    const state = prev || {
+      score: 0,
+      lastRewardTurn: -1_000_000_000,
+      lastMealTurn: -1,
+      lastLapseTurn: -1,
+    };
+    const hunger = world.get(actorId, Hunger);
+    const level = hunger?.satiation > 0 ? 'satiated' : getHungerLevel(Number(hunger?.hunger || 0));
+
+    if (hunger?.satiation > 0) {
+      state.score = Math.max(0, Number(state.score || 0) - ASCETIC_PENALTY_OVEREAT);
+      state.lastLapseTurn = now;
+      applyAsceticHook(world, resolved, actorId, 'ascetic:lapse');
+    } else if (!ASCETIC_DISCIPLINED_LEVELS.has(level)) {
+      state.score = Math.max(0, Number(state.score || 0) - ASCETIC_PENALTY_PREMATURE);
+      state.lastLapseTurn = now;
+      applyAsceticHook(world, resolved, actorId, 'ascetic:lapse');
+    } else {
+      state.score = Math.min(12, Number(state.score || 0) + 1);
+      const elapsedSinceReward = now - Number(state.lastRewardTurn || 0);
+      if (state.score >= ASCETIC_REWARD_SCORE_THRESHOLD && elapsedSinceReward >= ASCETIC_REWARD_COOLDOWN_TURNS) {
+        state.lastRewardTurn = now;
+        applyAsceticHook(world, resolved, actorId, 'ascetic:milestone');
+      }
+    }
+    state.lastMealTurn = now;
+    asceticStore.set(actorId, state);
   });
 
   // Food sickness is a minor offense signal.
@@ -526,6 +599,20 @@ function wireWorldEvents(world) {
       magnitude,
       target: `food_${String(type || 'tainted')}`,
     });
+
+    const asceticStore = ensureAsceticStateStore(world);
+    const now = Number(world.step || 0) | 0;
+    const prev = asceticStore.get(actorId);
+    const state = prev || {
+      score: 0,
+      lastRewardTurn: -1_000_000_000,
+      lastMealTurn: -1,
+      lastLapseTurn: -1,
+    };
+    state.score = Math.max(0, Number(state.score || 0) - ASCETIC_PENALTY_SICKENED);
+    state.lastLapseTurn = now;
+    asceticStore.set(actorId, state);
+    applyAsceticHook(world, resolved, actorId, 'ascetic:lapse');
   });
 
   // ── Protect ───────────────────────────────────────────────────────────────
