@@ -300,6 +300,11 @@ Deno.test("apothecary uses a tighter cleaner footprint with shelves off the cent
     `${apothX0 + 8},${apothY0 + 2}`,
     `${apothX0 + 8},${apothY0 + 4}`,
   ].sort());
+  assertEquals(coordsOfKind(chunks, "alchemy_shop_item"), [
+    `${apothX0 + 4},${apothY0 + 3}`,
+    `${apothX0 + 6},${apothY0 + 3}`,
+    `${apothX0 + 7},${apothY0 + 4}`,
+  ].sort());
 });
 
 Deno.test("wild harvestables stay on exterior ground rather than structure tiles", () => {

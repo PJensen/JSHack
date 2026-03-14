@@ -1,11 +1,12 @@
 import { assert } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { createRng } from "../src/lib/ecs-js/rng.js";
-import { generateGemShopStock, generateShopItem } from "../src/rules/data/shopStock.js";
+import { generateAlchemyShopItem, generateGemShopStock, generateShopItem } from "../src/rules/data/shopStock.js";
 import { materializeSpawn } from "../src/rules/environment/dungeon/populate.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
+import { Potion } from "../src/rules/components/Potion.js";
 
 Deno.test("generateShopItem creates exactly one inventory-only item", () => {
   const world = new World({ seed: 123 });
@@ -36,6 +37,35 @@ Deno.test("shop_item spawn materializes one floor item without extra stock entit
   assert(itemId != null, "shop_item spawn should create an item");
   assert(after === before + 1, "shop_item spawn should create exactly one item entity");
   assert(world.has(itemId, Position), "shop_item should be placed on floor");
+});
+
+Deno.test("alchemy shop floor items are potion stock without extra entities", () => {
+  const world = new World({ seed: 321 });
+  const rng = createRng(0xA11C0E);
+
+  const itemId = generateAlchemyShopItem(world, rng);
+
+  assert(itemId != null, "alchemy shop item should be created");
+  assert(world.has(itemId, Potion), "alchemy shop stock should be potion-themed");
+  assert(!world.has(itemId, Position), "alchemy shop stock should start inventory-only");
+});
+
+Deno.test("alchemy_shop_item spawn materializes one floor potion", () => {
+  const world = new World({ seed: 321 });
+  const before = [...world.query(ItemInfo)].length;
+
+  const itemId = materializeSpawn(world, {
+    x: 12,
+    y: 9,
+    kind: "alchemy_shop_item",
+    params: {},
+  });
+  const after = [...world.query(ItemInfo)].length;
+
+  assert(itemId != null, "alchemy_shop_item should create an item");
+  assert(after === before + 1, "alchemy_shop_item should create exactly one item entity");
+  assert(world.has(itemId, Position), "alchemy_shop_item should be placed on the floor");
+  assert(world.has(itemId, Potion), "alchemy_shop_item should place a potion on the floor");
 });
 
 Deno.test("gem vendor stock is pre-identified and carries gem detail metadata", () => {

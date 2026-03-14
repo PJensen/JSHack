@@ -669,6 +669,9 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, apothX0 + 6, apothY0 + 1, "potion_shelf");
   addSpawn(chunks, apothX0 + 8, apothY0 + 2, "potion_shelf");
   addSpawn(chunks, apothX0 + 8, apothY0 + 4, "potion_shelf");
+  addSpawn(chunks, apothX0 + 4, apothY0 + 3, "alchemy_shop_item");
+  addSpawn(chunks, apothX0 + 6, apothY0 + 3, "alchemy_shop_item");
+  addSpawn(chunks, apothX0 + 7, apothY0 + 4, "alchemy_shop_item");
   addSpawn(chunks, apothDoorX + 1, apothDoorY + 1, "apothecary_sign");
   // Dangerous plant garden — offset from the doorway so it does not clog the shopfront.
   const gardenX = apothX0 + 12;

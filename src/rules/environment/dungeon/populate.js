@@ -790,6 +790,30 @@ export function materializeSpawn(world, spawn) {
 
       return itemId;
     }
+    case 'alchemy_shop_item': {
+      const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0xA1C8) >>> 0);
+
+      const itemId = shopStock.generateAlchemyShopItem(world, shopRng);
+      if (itemId == null) return null;
+
+      world.add(itemId, Position, { x: spawn.x, y: spawn.y });
+
+      const info = world.get(itemId, ItemInfo);
+      if (info) {
+        world.mutate(itemId, ItemInfo, r => { r.identified = true; });
+      }
+
+      if (info) {
+        const baseValue = appraiseItemValue(world, itemId, {
+          unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
+        });
+        const price = Math.ceil(baseValue * 1.3);
+        spawn._calculatedPrice = price;
+        spawn._itemId = itemId;
+      }
+
+      return itemId;
+    }
     case 'book': {
       let id = null;
       try {
