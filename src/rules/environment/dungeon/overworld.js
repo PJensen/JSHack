@@ -5,6 +5,7 @@ import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
 import { stampBuilding } from "./stampBuilding.js";
 import smithyDef from "../../data/buildings/smithy.json" with { type: "json" };
 import churchDef from "../../data/buildings/church.json" with { type: "json" };
+import apothecaryDef from "../../data/buildings/apothecary.json" with { type: "json" };
 import gemStoreDef from "../../data/buildings/gem_store.json" with { type: "json" };
 import {
   CHUNK_SIZE,
@@ -646,34 +647,19 @@ export function generateOverworldChunks(worldSeed) {
   // Path from smithy area down to the ore/tree work area.
   carvePath(chunks, nearOreX, smithyAnchorY + 7, nearOreX, nearOreY);
 
-  // ── The Apothecary — compact, cleaner workspace with its own little cluster ─────────
+  // ── The Apothecary — stamped from JSON building definition ───────────────────────────
   const apothX0 = homeX - 29;
   const apothY0 = homeY - 12;
   fillDisk(chunks, apothX0 + 5, apothY0 + 3, 8);
-  const apothFloorCells = [];
-  // Interior: 8 wide × 4 tall with a clear center aisle from the door.
-  for (let ay = apothY0 + 1; ay <= apothY0 + 4; ay++) {
-    for (let ax = apothX0 + 1; ax <= apothX0 + 8; ax++) {
-      apothFloorCells.push({ x: ax, y: ay });
-    }
-  }
   const apothDoorX = apothX0 + 5;
   const apothDoorY = apothY0 + 5;
-  paintStructure(chunks, apothFloorCells, { x: apothDoorX, y: apothDoorY });
+  const apothResult = stampBuilding(chunks, apothecaryDef, apothDoorX, apothDoorY);
+  const apothDoor = apothResult.shop?.door || apothResult.waypoints?.shop_door || { x: apothDoorX, y: apothDoorY };
+  const apothVendorWork = apothResult.shop?.work || apothResult.waypoints?.vendor_work || { x: apothX0 + 2, y: apothY0 + 2 };
+  const apothShopRoom = apothResult.shop?.room || apothResult.rooms?.shop || { x: apothX0, y: apothY0, w: 10, h: 6 };
   // Path from door south to walkway level, then east to the western walkway.
-  carvePath(chunks, apothDoorX, apothDoorY + 1, apothDoorX, northWalkY);
-  carvePath(chunks, apothDoorX, northWalkY, westWalkX, northWalkY);
-  // Interior: workbench left, storage along the back/right wall, clean traffic lane.
-  addSpawn(chunks, apothX0 + 2, apothY0 + 2, "alchemy_bench");
-  addSpawn(chunks, apothX0 + 2, apothY0 + 4, "herb_chest");
-  addSpawn(chunks, apothX0 + 4, apothY0 + 1, "potion_shelf");
-  addSpawn(chunks, apothX0 + 6, apothY0 + 1, "potion_shelf");
-  addSpawn(chunks, apothX0 + 8, apothY0 + 2, "potion_shelf");
-  addSpawn(chunks, apothX0 + 8, apothY0 + 4, "potion_shelf");
-  addSpawn(chunks, apothX0 + 4, apothY0 + 3, "alchemy_shop_item");
-  addSpawn(chunks, apothX0 + 6, apothY0 + 3, "alchemy_shop_item");
-  addSpawn(chunks, apothX0 + 7, apothY0 + 4, "alchemy_shop_item");
-  addSpawn(chunks, apothDoorX + 1, apothDoorY + 1, "apothecary_sign");
+  carvePath(chunks, apothDoor.x, apothDoor.y + 1, apothDoor.x, northWalkY);
+  carvePath(chunks, apothDoor.x, northWalkY, westWalkX, northWalkY);
   // Dangerous plant garden — offset from the doorway so it does not clog the shopfront.
   const gardenX = apothX0 + 12;
   const gardenY = apothY0 + 1;
@@ -823,9 +809,9 @@ export function generateOverworldChunks(worldSeed) {
   const gemAnchorY = apothY0 + 5;
   fillDisk(chunks, gemAnchorX, gemAnchorY - 3, 6);
   const gemResult = stampBuilding(chunks, gemStoreDef, gemAnchorX, gemAnchorY);
-  const gemDoor = gemResult.waypoints?.shop_door || { x: gemAnchorX, y: gemAnchorY };
-  const gemVendorWork = gemResult.waypoints?.vendor_work || { x: gemAnchorX - 1, y: gemAnchorY - 3 };
-  const gemShopRoom = gemResult.rooms?.shop || { x: gemAnchorX - 3, y: gemAnchorY - 5, w: 8, h: 6 };
+  const gemDoor = gemResult.shop?.door || gemResult.waypoints?.shop_door || { x: gemAnchorX, y: gemAnchorY };
+  const gemVendorWork = gemResult.shop?.work || gemResult.waypoints?.vendor_work || { x: gemAnchorX - 1, y: gemAnchorY - 3 };
+  const gemShopRoom = gemResult.shop?.room || gemResult.rooms?.shop || { x: gemAnchorX - 3, y: gemAnchorY - 5, w: 8, h: 6 };
   carvePath(chunks, gemDoor.x, gemDoor.y + 1, gemDoor.x, northWalkY);
   carvePath(chunks, gemDoor.x, northWalkY, apothDoorX, northWalkY);
 
@@ -967,18 +953,18 @@ export function generateOverworldChunks(worldSeed) {
     deliverX: apothX0 + 1, deliverY: apothY0 + 3,
   });
   addSpawn(chunks, alchemistHouse.standX, alchemistHouse.standY, "townfolk", {
-    townfolkId: "alchemist",
+    townfolkId: apothResult.shop?.vendorRole || "alchemist",
     scheduleEnabled: true,
     homeX: alchemistHouse.standX, homeY: alchemistHouse.standY,
     bedX: alchemistHouse.sleepX, bedY: alchemistHouse.sleepY,
-    workX: apothX0 + 2, workY: apothY0 + 2,
+    workX: apothVendorWork.x, workY: apothVendorWork.y,
     workAuxX: apothX0 + 4, workAuxY: apothY0 + 2,
     pubX: tavX0 + 7, pubY: tavY0 + 2,
-    shopRoom: { x: apothX0, y: apothY0, w: 10, h: 6 },
-    shopDoor: { x: apothDoorX, y: apothDoorY },
+    shopRoom: { x: apothShopRoom.x, y: apothShopRoom.y, w: apothShopRoom.w, h: apothShopRoom.h },
+    shopDoor: { x: apothDoor.x, y: apothDoor.y },
   });
   addSpawn(chunks, gemVendorHouse.standX, gemVendorHouse.standY, "townfolk", {
-    townfolkId: "gem_vendor",
+    townfolkId: gemResult.shop?.vendorRole || "gem_vendor",
     scheduleEnabled: true,
     homeX: gemVendorHouse.standX, homeY: gemVendorHouse.standY,
     bedX: gemVendorHouse.sleepX, bedY: gemVendorHouse.sleepY,
