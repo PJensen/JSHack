@@ -80,8 +80,6 @@ export function createDelayedDeathFxController({ world, getFxTime }) {
             ...snap,
             pos: { x: snap.pos.x, y: snap.pos.y },
             tags: Array.isArray(snap.tags) ? snap.tags.slice() : [],
-            showHealthBar: false,
-            hp: 0,
           },
         });
       }
