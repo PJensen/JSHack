@@ -57,7 +57,7 @@ export const IronRation = defineArchetype(
 export const WildBerries = defineArchetype(
   "WildBerries",
   [Consumable, {
-    effectParams: { nutrition: 120, special: null },
+    effectParams: { nutrition: 150, special: null },
     remainingUses: 1,
     potency: 0,
   }],
@@ -76,7 +76,7 @@ export const WildBerries = defineArchetype(
 export const WildHerbs = defineArchetype(
   "WildHerbs",
   [Consumable, {
-    effectParams: { nutrition: 70, special: null },
+    effectParams: { nutrition: 90, special: null },
     remainingUses: 1,
     potency: 0,
   }],
@@ -95,7 +95,7 @@ export const WildHerbs = defineArchetype(
 export const DungeonMushrooms = defineArchetype(
   "DungeonMushrooms",
   [Consumable, {
-    effectParams: { nutrition: 100, special: null },
+    effectParams: { nutrition: 130, special: null },
     remainingUses: 1,
     potency: 0,
   }],
@@ -114,7 +114,7 @@ export const DungeonMushrooms = defineArchetype(
 export const Wheat = defineArchetype(
   "Wheat",
   [Consumable, {
-    effectParams: { nutrition: 150, special: null },
+    effectParams: { nutrition: 240, special: null },
     remainingUses: 1,
     potency: 0,
   }],
@@ -133,7 +133,7 @@ export const Wheat = defineArchetype(
 export const Carrot = defineArchetype(
   "Carrot",
   [Consumable, {
-    effectParams: { nutrition: 130, special: null },
+    effectParams: { nutrition: 200, special: null },
     remainingUses: 1,
     potency: 0,
   }],
@@ -152,7 +152,7 @@ export const Carrot = defineArchetype(
 export const Corn = defineArchetype(
   "Corn",
   [Consumable, {
-    effectParams: { nutrition: 180, special: null },
+    effectParams: { nutrition: 300, special: null },
     remainingUses: 1,
     potency: 0,
   }],

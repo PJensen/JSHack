@@ -4,9 +4,14 @@
 import { HUNGER_COMBAT_LEVELS } from "./hungerCombatLevels.js";
 import { TURNS_PER_DAY } from "./calendar.js";
 
-/** Standard ration nutrition values. */
-export const RATION_NUTRITION = 400;
-export const IRON_RATION_NUTRITION = 600;
+/**
+ * Baseline ration nutrition values (hunger reduction).
+ * Tuned for TURNS_PER_DAY = 720:
+ * - ration: about half a day
+ * - iron ration: about one day (survival, slight deficit)
+ */
+export const RATION_NUTRITION = 360;
+export const IRON_RATION_NUTRITION = 700;
 
 // ── Food decay constants ─────────────────────────────────────────
 // Shelf life values and decay stage thresholds for the FoodDecay component.
