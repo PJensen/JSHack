@@ -11,6 +11,7 @@ import { Settings } from '../components/Settings.js';
 import { HUNGER_STATUS_TYPES, HUNGER_POTENCY, getHungerLevel } from '../data/food.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { getPassiveBonuses } from '../utils/passiveBonuses.js';
+import { Traits } from '../components/Traits.js';
 
 /**
  * hungerSystem — processes hunger escalation each tick.
@@ -23,6 +24,13 @@ export function hungerSystem(world) {
     // Skip hunger processing if disabled in settings
     const settings = world.get(id, Settings);
     if (settings && settings.hungerEnabled === false) continue;
+
+    // Flag gluttonous trait when satiation hits the 200 cap
+    if (hc.satiation >= 200) {
+      const tr = world.get(id, Traits);
+      if (tr) { tr.gluttonous = true; }
+      else { world.add(id, Traits, { gluttonous: true }); }
+    }
 
     // 1) Tick satiation or hunger (equipment hungerRate adds extra ticks)
     const passive = getPassiveBonuses(world, id);
