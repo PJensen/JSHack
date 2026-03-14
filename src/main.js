@@ -1350,7 +1350,7 @@ world.on('scroll:genocide', ({ actor }) => {
   let bestScore = Infinity;
   for (const m of MONSTERS) {
     const name = m.name.toLowerCase();
-    if (name === query) { best = m; break; }
+    if (name === query) { best = m; bestScore = 0; break; }
     const score = name.startsWith(query) ? 1
       : name.includes(query) ? 2
       : query.startsWith(name) ? 3
@@ -1508,6 +1508,7 @@ world.on('item:pickup', ({ actor, itemId, stackedIntoId }) => {
       detail: {
         item: {
           id: Number(resolvedId),
+          identity: world.get(resolvedId, NamedIdentity)?.identity || '',
           type: info.type || 'item',
           slot: info.slot || '',
           name: resolveItemDisplayName(world, resolvedId),

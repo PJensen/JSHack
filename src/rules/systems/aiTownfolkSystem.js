@@ -722,6 +722,14 @@ function handleWorking(world, id, pos, job) {
         // Always get a seed from the harvest.
         const seedId = SEED_ITEM_IDS[String(cropNode?.kind || "")];
         if (seedId) carryCreated(world, id, seedId);
+        // Auto-replant: farmer plants immediately after harvesting (already adjacent).
+        const hn = world.get(cropId, HarvestNode);
+        if (hn && hn.needsPlanting) {
+          hn.needsPlanting = false;
+          hn.regrowCountdown = hn.regrowTurns;
+          if (seedId) consumeInventoryIdentity(world, id, seedId, 1);
+          emitSafe(world, "townfolk:planted", { actor: id, x: pos.x, y: pos.y });
+        }
         job.carryCount++;
         emitSafe(world, "townfolk:harvested", { actor: id, x: pos.x, y: pos.y });
         // Look for more if not full
