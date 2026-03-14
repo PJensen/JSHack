@@ -318,14 +318,24 @@ export function throwPipeline(ctx) {
       }
     }
 
-    ctx.mutate.queue({
-      type: "dropFromInventory",
-      entityId: itemId,
-      inventoryOwnerId: actor,
-      x: landing.x,
-      y: landing.y,
-      emitEvent: false,
-    });
+    const throwInfo = ctx.query.itemInfo(itemId);
+    const stackCount = Math.max(1, Number(throwInfo?.count || 1) | 0);
+
+    if (stackCount > 1) {
+      // Decrement the stack in inventory; spawn a single copy at landing.
+      ctx.mutate.patchItemInfo(itemId, { count: stackCount - 1 });
+      const identity = ctx.query.identity(itemId);
+      ctx.mutate.spawnItem(identity, landing.x, landing.y, { count: 1 });
+    } else {
+      ctx.mutate.queue({
+        type: "dropFromInventory",
+        entityId: itemId,
+        inventoryOwnerId: actor,
+        x: landing.x,
+        y: landing.y,
+        emitEvent: false,
+      });
+    }
     metrics.dropped = true;
     ctx.io.emit("item:thrown", {
       actor,
