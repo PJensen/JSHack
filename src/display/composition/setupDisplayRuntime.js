@@ -1,6 +1,7 @@
 import { FloatText } from "../passes/vfx/text/floatText.js";
 import { createStatusEmitterController } from "../passes/vfx/particles/statusEmitterController.js";
 import { createBoltFxController } from "../fx/boltFxController.js";
+import { createDelayedDeathFxController } from "../fx/delayedDeathFxController.js";
 import { createProjectileFxController } from "../fx/projectileFx.js";
 import { createSpellAreaFxController } from "../fx/spellAreaFx.js";
 import { createCloudFxController } from "../fx/cloudFx.js";
@@ -36,6 +37,9 @@ export function setupDisplayRuntime({
   const boltFx = createBoltFxController({ world, cam, fx, getPosition });
   boltFx.installListeners();
 
+  const delayedDeathFx = createDelayedDeathFxController({ world, getFxTime });
+  delayedDeathFx.installListeners();
+
   const projectileFx = createProjectileFxController({ world, cam, fx, getPosition });
   projectileFx.installListeners();
 
@@ -63,5 +67,5 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  return { statusEmitterFx, boltFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, ftext };
+  return { statusEmitterFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, ftext };
 }
