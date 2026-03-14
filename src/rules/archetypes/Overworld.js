@@ -366,7 +366,39 @@ export const ChurchWindow = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Stained Glass Window", identity: "church_window" }],
   [Material, { kind: "stone" }],
-  [Collider, { solid: true, blocksSight: true }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const WindowArched = defineArchetype(
+  "WindowArched",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Arched Window", identity: "window_arched" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const WindowIronGrate = defineArchetype(
+  "WindowIronGrate",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Iron Grate Window", identity: "window_iron_grate" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const WindowShuttered = defineArchetype(
+  "WindowShuttered",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Shuttered Window", identity: "window_shuttered" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const WindowRound = defineArchetype(
+  "WindowRound",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Round Window", identity: "window_round" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
 );
 
 export const TownBell = defineArchetype(

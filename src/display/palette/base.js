@@ -181,6 +181,10 @@ export const basePalette = {
   smithy_sign:   { glyph: "⚒", fg: "#d8c08a", glow: "#8b6f3f" },
   church_font:   { glyph: "⛲", fg: "#88bbff", glow: "#4477cc" },
   church_window: { glyph: "✦", fg: "#ff88cc", glow: "#cc44aa" },
+  window_arched:     { glyph: "⌐", fg: "#aabbcc", glow: "#667799" },
+  window_iron_grate: { glyph: "⊞", fg: "#8899aa", glow: "#556677" },
+  window_shuttered:  { glyph: "⊟", fg: "#b89060", glow: "#7a5a38" },
+  window_round:      { glyph: "◎", fg: "#99bbdd", glow: "#5588aa" },
   bell:          { glyph: "🔔", fg: "#d4a017", glow: "#8b6914" },
   // Garden flowers (full-color emoji)
   flower_rose:       { glyph: "🌹", fg: "#ff3344", glow: "#cc1122" },
