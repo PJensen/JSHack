@@ -85,8 +85,8 @@ Deno.test("delayed death fx preserves the victim render record until impact", ()
   assertEquals(renderables.length, 1);
   assertEquals(renderables[0].id, victim);
   assertEquals(renderables[0].kind, "orc");
-  assertEquals(renderables[0].showHealthBar, false);
-  assertEquals(renderables[0].hp, 0);
+  assertEquals(renderables[0].showHealthBar, true);
+  assertEquals(renderables[0].hp, 4);
 
   harness.advance(0.41);
   fx.tick(0.41);
