@@ -1,13 +1,23 @@
 import { HarvestNode } from "../components/HarvestNode.js";
 import { Collider } from "../components/Collider.js";
+import { WeatherState } from "../components/WeatherState.js";
 
 /**
  * Tick regrowth countdown for harvested nodes.
  * When countdown reaches zero, node becomes ready again.
+ * Growth only occurs while it is raining.
  *
  * @param {import("../../lib/ecs-js/index.js").World} world
  */
 export function harvestRegrowthSystem(world) {
+  // Only grow during rain.
+  let raining = false;
+  for (const [, ws] of world.query(WeatherState)) {
+    raining = ws.current === "rain" || ws.current === "heavy_rain";
+    break;
+  }
+  if (!raining) return;
+
   for (const [id, node] of world.query(HarvestNode)) {
     if (node.ready) continue;
     if (node.needsPlanting) continue;
