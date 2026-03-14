@@ -719,11 +719,9 @@ function handleWorking(world, id, pos, job) {
         depleteNode(world, cropId);
         const itemId = CROP_ITEM_IDS[String(cropNode?.kind || "")] || "food_wheat";
         carryCreated(world, id, itemId);
-        // 30% chance to also get a seed.
-        if (world.rand() < 0.3) {
-          const seedId = SEED_ITEM_IDS[String(cropNode?.kind || "")];
-          if (seedId) carryCreated(world, id, seedId);
-        }
+        // Always get a seed from the harvest.
+        const seedId = SEED_ITEM_IDS[String(cropNode?.kind || "")];
+        if (seedId) carryCreated(world, id, seedId);
         job.carryCount++;
         emitSafe(world, "townfolk:harvested", { actor: id, x: pos.x, y: pos.y });
         // Look for more if not full

@@ -929,6 +929,7 @@ export const INTERACT_PAYLOADS = {
     },
 
     afterInteract(ctx) {
+      if (ctx.data.plantMode) return; // planting handled in onInteract
       const { world, actor, targetId } = ctx;
       const node = ctx.data.node;
 
@@ -968,17 +969,14 @@ export const INTERACT_PAYLOADS = {
         regrowTurns: node.regrowTurns,
       });
 
-      // 30% chance to drop seeds for replantable crops.
+      // Always drop a seed for replantable crops.
       if (node.replantable) {
         const seedCatalogId = SEED_ITEM_IDS[node.kind];
         if (seedCatalogId) {
-          const sr = mulberry32(combatSeed(world.seed, world.step, actor | 0, targetId | 0, SEED_DROP_SALT));
-          if (sr() < 0.3) {
-            const seedEntity = createItemById(world, seedCatalogId);
-            if (seedEntity) {
-              addToInventory(world, actor, seedEntity);
-              world.emit?.("harvest:seed_drop", { actor, targetId, kind: node.kind, seedItemId: seedCatalogId });
-            }
+          const seedEntity = createItemById(world, seedCatalogId);
+          if (seedEntity) {
+            addToInventory(world, actor, seedEntity);
+            world.emit?.("harvest:seed_drop", { actor, targetId, kind: node.kind, seedItemId: seedCatalogId });
           }
         }
       }

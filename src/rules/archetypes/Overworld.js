@@ -201,16 +201,16 @@ export const CookingFire = defineArchetype(
 export const CropWheat = defineArchetype(
   "CropWheat",
   [Position, (p) => ({ x: p.x, y: p.y })],
-  [NamedIdentity, { name: "Tilled Soil", identity: "farmland_tilled" }],
+  [NamedIdentity, { name: "Wheat", identity: "crop_wheat" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [HarvestNode, {
-    kind: "wheat", ready: false, regrowTurns: 200, regrowCountdown: 0,
+    kind: "wheat", ready: true, regrowTurns: 200, regrowCountdown: 0,
     yield: "food_wheat", yieldMin: 1, yieldMax: 3,
-    replantable: true, needsPlanting: true,
+    replantable: true, needsPlanting: false,
   }],
   [GrowthStage, {
-    currentStage: 0, maxStage: 3,
+    currentStage: 3, maxStage: 3,
     stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_wheat"],
     growInterval: 0, growCountdown: 0,
   }],
@@ -220,16 +220,16 @@ export const CropWheat = defineArchetype(
 export const CropCarrot = defineArchetype(
   "CropCarrot",
   [Position, (p) => ({ x: p.x, y: p.y })],
-  [NamedIdentity, { name: "Tilled Soil", identity: "farmland_tilled" }],
+  [NamedIdentity, { name: "Carrot", identity: "crop_carrot" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [HarvestNode, {
-    kind: "carrot", ready: false, regrowTurns: 160, regrowCountdown: 0,
+    kind: "carrot", ready: true, regrowTurns: 160, regrowCountdown: 0,
     yield: "food_carrot", yieldMin: 1, yieldMax: 2,
-    replantable: true, needsPlanting: true,
+    replantable: true, needsPlanting: false,
   }],
   [GrowthStage, {
-    currentStage: 0, maxStage: 3,
+    currentStage: 3, maxStage: 3,
     stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_carrot"],
     growInterval: 0, growCountdown: 0,
   }],
@@ -239,16 +239,16 @@ export const CropCarrot = defineArchetype(
 export const CropCorn = defineArchetype(
   "CropCorn",
   [Position, (p) => ({ x: p.x, y: p.y })],
-  [NamedIdentity, { name: "Tilled Soil", identity: "farmland_tilled" }],
+  [NamedIdentity, { name: "Corn", identity: "crop_corn" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [HarvestNode, {
-    kind: "corn", ready: false, regrowTurns: 280, regrowCountdown: 0,
+    kind: "corn", ready: true, regrowTurns: 280, regrowCountdown: 0,
     yield: "food_corn", yieldMin: 1, yieldMax: 1,
-    replantable: true, needsPlanting: true,
+    replantable: true, needsPlanting: false,
   }],
   [GrowthStage, {
-    currentStage: 0, maxStage: 3,
+    currentStage: 3, maxStage: 3,
     stageIdentities: ["farmland_tilled", "seedling", "herb_growing", "crop_corn"],
     growInterval: 0, growCountdown: 0,
   }],
