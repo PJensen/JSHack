@@ -36,6 +36,8 @@ export function plantGrowthSystem(world) {
       // Crop mode: derive stage from HarvestNode countdown
       if (hn.ready) {
         newStage = gs.maxStage;
+      } else if (hn.needsPlanting) {
+        newStage = 0;
       } else {
         const total = hn.regrowTurns || 1;
         const remaining = hn.regrowCountdown || 0;
