@@ -31,6 +31,9 @@ const PET_CORPSE_HEAL_THRESHOLD = 0.75;
 const FAMILIAR_FIRE_RANGE = 8;
 const FAMILIAR_FIRE_COOLDOWN = 10;
 const FAMILIAR_FIRE_DMG = 4;
+const FAMILIAR_FIRE_SPEED = 8;
+const FAMILIAR_FIRE_MIN_DURATION = 0.1;
+const FAMILIAR_FIRE_MAX_DURATION = 0.6;
 const CORPSE_HEAL_NUTRITION_DIVISOR = 120;
 const FELINE_TOXIC_IMMUNITY = 0.85;
 const FLEE_CORPSE_SEARCH_RADIUS = 8;
@@ -256,6 +259,15 @@ function isFamiliar(world, petId) {
   return String(ni?.identity || '').toLowerCase() === 'familiar';
 }
 
+function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
+  const dx = Number(to?.x || 0) - Number(from?.x || 0);
+  const dy = Number(to?.y || 0) - Number(from?.y || 0);
+  const dist = Math.hypot(dx, dy);
+  if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
+  const raw = dist / speed;
+  return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
+}
+
 /**
  * Familiar fire bolt: find nearest enemy in LOS within range and shoot a fire bolt.
  * Returns true if a bolt was fired (consuming the pet's turn).
@@ -296,6 +308,13 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
     source: petId,
     type: 'fire',
     cause: 'familiar:fire_bolt',
+    projectileDelay: computeProjectileDelay(
+      petPos,
+      { x: toX, y: toY },
+      FAMILIAR_FIRE_SPEED,
+      FAMILIAR_FIRE_MIN_DURATION,
+      FAMILIAR_FIRE_MAX_DURATION,
+    ),
   });
   petState.rangedCooldown = FAMILIAR_FIRE_COOLDOWN;
 

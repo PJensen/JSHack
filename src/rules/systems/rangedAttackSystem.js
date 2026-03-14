@@ -21,6 +21,19 @@ import { runAmmoScripts } from '../utils/projectileScriptDispatch.js';
 import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from '../utils/affixTopology.js';
 import { applyProcAccumulator, rollBonusDamage } from '../utils/procApplication.js';
 
+const RANGED_PROJECTILE_SPEED = 18;
+const RANGED_PROJECTILE_MIN_DURATION = 0.06;
+const RANGED_PROJECTILE_MAX_DURATION = 0.4;
+
+function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
+  const dx = Number(to?.x || 0) - Number(from?.x || 0);
+  const dy = Number(to?.y || 0) - Number(from?.y || 0);
+  const dist = Math.hypot(dx, dy);
+  if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
+  const raw = dist / speed;
+  return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
+}
+
 function buildProcContext(kind, {
   source,
   target,
@@ -267,6 +280,13 @@ export function rangedAttackSystem(world) {
       cause: 'ranged',
       critical: isCrit,
       bypassResist: true,
+      projectileDelay: computeProjectileDelay(
+        { x: ax, y: ay },
+        { x: tx, y: ty },
+        RANGED_PROJECTILE_SPEED,
+        RANGED_PROJECTILE_MIN_DURATION,
+        RANGED_PROJECTILE_MAX_DURATION,
+      ),
     });
 
     if (actorImpactCtx) {

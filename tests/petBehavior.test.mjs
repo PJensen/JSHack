@@ -119,6 +119,34 @@ Deno.test("kitty can munch special-effect corpses", () => {
   assert(world.get(corpseId, Consumable).effectParams.nutrition === 75, "nutrition should be reduced after munch");
 });
 
+Deno.test("familiar fire bolt damage carries projectile delay", () => {
+  const world = new World({ seed: 42 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 10, y: 10 });
+
+  const familiarId = world.create();
+  world.add(familiarId, Pet);
+  world.add(familiarId, Position, { x: 2, y: 2 });
+  world.add(familiarId, Vitality, { hp: 8, maxHp: 8 });
+  world.add(familiarId, NamedIdentity, { name: "Familiar", identity: "familiar" });
+  world.add(familiarId, Faction, { key: "pet" });
+
+  const targetId = world.create();
+  world.add(targetId, Position, { x: 5, y: 2 });
+  world.add(targetId, Vitality, { hp: 10, maxHp: 10 });
+  world.add(targetId, Faction, { key: "enemy" });
+
+  const damaged = [];
+  world.on("damaged", (ev) => damaged.push(ev));
+
+  petBehaviorSystem(world);
+
+  assert(damaged.length >= 1, "familiar should fire at visible enemy");
+  assert((damaged[0]?.projectileDelay || 0) > 0, "familiar fire bolt should carry projectileDelay");
+});
+
 Deno.test("pet only munches corpses below 75% HP", () => {
   const world = new World({ seed: 42 });
 

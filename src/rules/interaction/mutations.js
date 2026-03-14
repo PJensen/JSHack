@@ -57,6 +57,7 @@ export function applyMutation(world, op, resolvers = {}) {
         type: op.damageType || 'generic',
         cause: typeof op.source === 'string' ? op.source : 'item',
         source: typeof op.source === 'number' ? op.source : 0,
+        projectileDelay: Number(op.projectileDelay || 0),
       });
       break;
     }
@@ -461,7 +462,7 @@ export function applyMutation(world, op, resolvers = {}) {
 }
 
 /**
- * @typedef {{ type: 'damage', entityId: number, amount: number, source: string }} DamageOp
+ * @typedef {{ type: 'damage', entityId: number, amount: number, source: string|number, projectileDelay?: number }} DamageOp
  * @typedef {{ type: 'heal', entityId: number, amount: number }} HealOp
  * @typedef {{ type: 'pushEffect', entityId: number, effect: { key: string, turnsLeft: number, potency: number, stacks?: number, sourceId?: number } }} PushEffectOp
  * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
