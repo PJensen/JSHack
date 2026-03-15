@@ -571,6 +571,20 @@ function openBubbleDialog(detail = {}) {
 
 function layoutBubbleDialog() {
   if (!_bubbleDialogState.open) return;
+  const speakerPos = getPosition(_bubbleDialogState.targetId || _bubbleDialogState.actorId);
+  const pe = playerEntity(world);
+  if (speakerPos && pe) {
+    const dist = Math.max(
+      Math.abs((speakerPos.x | 0) - (pe.pos.x | 0)),
+      Math.abs((speakerPos.y | 0) - (pe.pos.y | 0)),
+    );
+    if (dist > 1) {
+      window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
+        detail: { sessionId: _bubbleDialogState.sessionId },
+      }));
+      return;
+    }
+  }
   const targetId = _bubbleDialogState.targetId || _bubbleDialogState.actorId;
   const pos = getPosition(targetId);
   if (!pos) {
@@ -768,7 +782,7 @@ world.on("prayer", ({ actor }) => {
     }
     if (priestId > 0) {
       const arrivalTile = findNearestValidTileAround(world, pe.pos, {
-        maxDistance: 2,
+        maxDistance: 1,
         exclude: [{ x: pe.pos.x | 0, y: pe.pos.y | 0 }],
       });
       if (arrivalTile) {
@@ -779,15 +793,15 @@ world.on("prayer", ({ actor }) => {
           onArrive: () => {
             queueScriptedSpeechBubble({
               entityId: priestId,
-              text: "Thank you for saving our town.",
+              text: "The gods have blessed this town through you. Thank you for saving us.",
               delaySec: 0.2,
-              durationSec: 2.8,
+              durationSec: 3.4,
             });
             queueScriptedSpeechBubble({
               entityId: priestId,
-              text: "We'll have this patched up in a few days.",
+              text: "Do not fear the wreckage. We'll have the square singing again in a few days.",
               delaySec: 0.15,
-              durationSec: 3.6,
+              durationSec: 4.2,
             });
           },
         });
