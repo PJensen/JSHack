@@ -76,22 +76,22 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   function spawnFireCloudEmbers(x, y, count = 8) {
     if (!fx?.pool) return;
     for (let i = 0; i < count; i++) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
-      const speed = 0.18 + Math.random() * 0.55;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.95;
+      const speed = 0.30 + Math.random() * 0.70;
       fx.pool.spawn(new Particle({
-        x: x + (Math.random() - 0.5) * 0.28,
-        y: y + 0.10 + (Math.random() - 0.5) * 0.12,
-        vx: Math.cos(angle) * speed * 0.45,
-        vy: Math.sin(angle) * speed - 0.10,
-        ay: -0.06,
-        life: 0.18 + Math.random() * 0.24,
-        size0: 0.07 + Math.random() * 0.06,
-        size1: 0.01,
+        x: x + (Math.random() - 0.5) * 0.22,
+        y: y + 0.08 + (Math.random() - 0.5) * 0.10,
+        vx: Math.cos(angle) * speed * 0.34,
+        vy: Math.sin(angle) * speed - 0.16,
+        ay: -0.10,
+        life: 0.28 + Math.random() * 0.26,
+        size0: 0.10 + Math.random() * 0.08,
+        size1: 0.018,
         r: 255,
-        g: 100 + ((Math.random() * 120) | 0),
-        b: 10 + ((Math.random() * 28) | 0),
-        a0: 0.72,
-        rotVel: (Math.random() - 0.5) * 1.9,
+        g: 150 + ((Math.random() * 90) | 0),
+        b: 24 + ((Math.random() * 36) | 0),
+        a0: 0.88,
+        rotVel: (Math.random() - 0.5) * 1.4,
       }));
     }
   }
@@ -100,8 +100,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     _burnPlumes.push({
       x,
       y,
-      ttl: 0.80 + Math.random() * 0.45 + strength * 0.08,
-      max: 0.80 + Math.random() * 0.45 + strength * 0.08,
+      ttl: 1.90 + Math.random() * 0.90 + strength * 0.22,
+      max: 1.90 + Math.random() * 0.90 + strength * 0.22,
       strength: Math.max(0.8, Number(strength) || 1),
       phase: Math.random() * Math.PI * 2,
       embers: !!embers,
@@ -457,40 +457,52 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       const plume = _burnPlumes[i];
       const life = plume.max > 0 ? Math.max(0, Math.min(1, plume.ttl / plume.max)) : 0;
       const age = 1 - life;
-      const lift = age * (0.42 + plume.strength * 0.22);
-      const sway = Math.sin(_fxTime * 2.6 + plume.phase) * 0.08;
-      const cx = plume.x + sway * (0.45 + age * 0.55);
-      const cy = plume.y - 0.14 - lift;
-      const smokeAlpha = Math.max(0, life * 0.28);
+      const age2 = age * age;
+      const lift = age * (0.34 + plume.strength * 0.16) + age2 * (0.26 + plume.strength * 0.14);
+      const sway = Math.sin(_fxTime * 1.9 + plume.phase) * (0.02 + age * 0.07);
+      const drift = Math.cos(_fxTime * 1.1 + plume.phase * 0.7) * age * 0.04;
+      const cx = plume.x + sway + drift;
+      const cy = plume.y - 0.10 - lift;
+      const smokeAlpha = Math.max(0, (0.05 + age * 0.10 + age2 * 0.18) * (0.85 + plume.strength * 0.10));
+      const baseRx = 0.18 + plume.strength * 0.06 + age * 0.05;
+      const baseRy = 0.10 + plume.strength * 0.03 + age * 0.06;
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = `rgba(20,18,16,${smokeAlpha.toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, 0.20 + plume.strength * 0.08, 0.12 + plume.strength * 0.04, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, baseRx, baseRy, age * 0.18, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = `rgba(54,42,34,${(smokeAlpha * 0.7).toFixed(3)})`;
+      ctx.fillStyle = `rgba(54,42,34,${(smokeAlpha * 0.72).toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(cx - 0.08, cy - 0.08, 0.14 + plume.strength * 0.06, 0.10 + plume.strength * 0.04, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx - 0.07 - age * 0.03, cy - 0.09 - age * 0.03, baseRx * 0.78, baseRy * 0.92, -0.22, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(cx + 0.07, cy - 0.12, 0.12 + plume.strength * 0.05, 0.09 + plume.strength * 0.03, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 0.06 + age * 0.04, cy - 0.14 - age * 0.05, baseRx * 0.68, baseRy * 0.84, 0.24, 0, Math.PI * 2);
       ctx.fill();
 
       if (!plume.embers) continue;
       ctx.globalCompositeOperation = 'lighter';
-      const emberAlpha = Math.max(0, life * 0.42);
-      for (let j = 0; j < 3; j++) {
+      const emberAlpha = Math.max(0, 0.12 + life * 0.30 + age * 0.22);
+      for (let j = 0; j < 4; j++) {
         const sparkPhase = plume.phase + j * 2.1;
-        const ex = plume.x + Math.sin(_fxTime * 5.8 + sparkPhase) * (0.06 + j * 0.03);
-        const ey = plume.y - 0.05 - age * (0.20 + j * 0.08) + Math.cos(_fxTime * 4.2 + sparkPhase) * 0.03;
+        const ex = plume.x + Math.sin(_fxTime * 4.6 + sparkPhase) * (0.03 + j * 0.018);
+        const ey = plume.y - 0.03 - age * (0.24 + j * 0.10) + Math.cos(_fxTime * 3.7 + sparkPhase) * 0.02;
         ctx.fillStyle = j === 0
-          ? `rgba(255,235,180,${emberAlpha.toFixed(3)})`
-          : `rgba(255,116,32,${(emberAlpha * 0.82).toFixed(3)})`;
+          ? `rgba(255,248,210,${emberAlpha.toFixed(3)})`
+          : j === 1
+            ? `rgba(255,194,92,${(emberAlpha * 0.95).toFixed(3)})`
+            : `rgba(255,108,26,${(emberAlpha * 0.86).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(ex, ey, 0.024 + j * 0.004, 0, Math.PI * 2);
+        ctx.arc(ex, ey, 0.030 + j * 0.006, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      const coreAlpha = Math.max(0, 0.16 + life * 0.24);
+      ctx.fillStyle = `rgba(255,214,120,${coreAlpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(plume.x, plume.y - 0.04, 0.06 + plume.strength * 0.014, 0.11 + plume.strength * 0.028, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     ctx.restore();

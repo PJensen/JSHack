@@ -26,7 +26,7 @@ export function createStatusEmitterController({ world, fx }) {
 
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
   const TAG_EMITTER_CFG = {
-    burning: { tracker: burningEmitters, prefix: "burn", cfg: { rate: 18, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.8, speedJitter: 0.4, ax: 0, ay: -0.5, life: 0.7, lifeJitter: 0.3, size: 0.28, sizeEnd: 0.06, color: "#ff8c00", alpha0: 0.9, alpha1: 0.0, offsetX: 0, offsetY: -0.15 } },
+    burning: { tracker: burningEmitters, prefix: "burn", cfg: { rate: 24, angle: -Math.PI / 2, spread: Math.PI / 7, speed: 0.95, speedJitter: 0.32, ax: 0, ay: -0.72, life: 0.95, lifeJitter: 0.28, size: 0.36, sizeEnd: 0.08, color: "#ffb347", alpha0: 0.98, alpha1: 0.0, offsetX: 0, offsetY: -0.18 } },
     bleeding: { tracker: bleedEmitters, prefix: "bleed", cfg: { rate: 14, angle: Math.PI / 2, spread: Math.PI / 8, speed: 0.55, speedJitter: 0.3, ax: 0, ay: 1.2, life: 0.9, lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05, color: "#bb1111", alpha0: 0.9, alpha1: 0.0 } },
     poisoned: { tracker: poisonEmitters, prefix: "poison", cfg: { rate: 4, angle: 0, spread: Math.PI * 2, speed: 0.15, speedJitter: 0.1, ax: 0, ay: -0.04, life: 1.6, lifeJitter: 0.5, size: 0.08, sizeEnd: 0.03, color: "#33ff55", alpha0: 0.35, alpha1: 0.0 } },
     regen: { tracker: regenEmitters, prefix: "regen", cfg: { rate: 12, angle: -Math.PI / 2, spread: Math.PI / 4, speed: 0.4, speedJitter: 0.15, ax: 0, ay: -0.1, life: 1.0, lifeJitter: 0.4, size: 0.15, sizeEnd: 0.04, color: "#f6faff", alpha0: 0.8, alpha1: 0.0 } },

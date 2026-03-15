@@ -201,20 +201,23 @@ function collectOverworldRoofs(world, playerPos) {
 			for (const key of renderKeys) {
 				const { x, y } = keyToXY(key);
 				const tile = getTile(x, y);
+				const destroyedHere = destroyedTileKeys.has(key);
 				const nearFire = keyWithinRadius(key, activeFireKeys, 1);
 				const singed = keyWithinRadius(key, destroyedTileKeys, 1);
 				if (tile === TILE_FLOOR) {
 					let exposed = false;
+					let adjacentDestroyed = false;
 					for (let j = 0; j < CARDINAL_STEPS.length; j++) {
 						const nx = x + CARDINAL_STEPS[j][0];
 						const ny = y + CARDINAL_STEPS[j][1];
+						if (destroyedTileKeys.has(xyKey(nx, ny))) adjacentDestroyed = true;
 						if (!comp.has(xyKey(nx, ny))) continue;
 						if (!isRoofBearingTile(getTile(nx, ny))) {
 							exposed = true;
 							break;
 						}
 					}
-					if (exposed || (singed && !nearFire)) continue;
+					if (exposed || ((destroyedHere || adjacentDestroyed) && !nearFire)) continue;
 				}
 				const isDoor = tile === TILE_DOOR;
 				let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
