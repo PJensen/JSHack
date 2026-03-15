@@ -116,6 +116,8 @@ const apothX0 = homeX - 29;
 const apothY0 = homeY - 12;
 const apothDoorX = apothX0 + 5;
 const apothDoorY = apothY0 + 5;
+const herbalistDoorX = apothX0 - 2;
+const herbalistDoorY = apothY0 - 4;
 const gemX0 = apothX0 - 16;
 const gemY0 = apothY0;
 const gemDoorX = gemX0 + 3;
@@ -293,7 +295,7 @@ Deno.test("apothecary uses a tighter cleaner footprint with shelves off the cent
   assertEquals(getWorldTile(chunks, apothX0 + 5, apothY0 + 3), TILE_FLOOR);
   assertEquals(getWorldTile(chunks, apothDoorX, apothDoorY), TILE_DOOR);
   assertEquals(coordsOfKind(chunks, "alchemy_bench"), [`${apothX0 + 2},${apothY0 + 2}`]);
-  assertEquals(coordsOfKind(chunks, "herb_chest"), [`${apothX0 + 2},${apothY0 + 4}`]);
+  assert(coordsOfKind(chunks, "herb_chest").includes(`${apothX0 + 2},${apothY0 + 4}`), "apothecary should include its herb chest");
   assertEquals(coordsOfKind(chunks, "potion_shelf"), [
     `${apothX0 + 4},${apothY0 + 1}`,
     `${apothX0 + 6},${apothY0 + 1}`,
@@ -305,6 +307,18 @@ Deno.test("apothecary uses a tighter cleaner footprint with shelves off the cent
     `${apothX0 + 6},${apothY0 + 3}`,
     `${apothX0 + 7},${apothY0 + 4}`,
   ].sort());
+});
+
+Deno.test("herbalist hut is an eclectic stamped outbuilding with its own storage and garden clutter", () => {
+  const { chunks } = generateOverworldChunks(SEED);
+
+  assertEquals(getWorldTile(chunks, herbalistDoorX - 4, herbalistDoorY - 6), TILE_WALL);
+  assertEquals(getWorldTile(chunks, herbalistDoorX, herbalistDoorY), TILE_DOOR);
+  assertEquals(getWorldTile(chunks, herbalistDoorX, herbalistDoorY + 1), TILE_FLOOR);
+  assert(coordsOfKind(chunks, "home_bed").includes(`${herbalistDoorX - 2},${herbalistDoorY - 4}`), "herbalist hut should include a bed");
+  assert(coordsOfKind(chunks, "herb_chest").includes(`${herbalistDoorX + 1},${herbalistDoorY - 3}`), "herbalist hut should include an herb chest");
+  assert(coordsOfKind(chunks, "rain_barrel").includes(`${herbalistDoorX - 2},${herbalistDoorY + 1}`), "herbalist hut should include a rain barrel");
+  assert(coordsOfKind(chunks, "trellis").includes(`${herbalistDoorX + 3},${herbalistDoorY - 1}`), "herbalist hut should include a trellis");
 });
 
 Deno.test("wild harvestables stay on exterior ground rather than structure tiles", () => {
@@ -370,7 +384,9 @@ Deno.test("overworld walkways connect the house to the gate and outbuilding door
   assert(canReach(spawnX, spawnY, tavDoorX, tavDoorY), "tavern door should be reachable from spawn");
   assert(canReach(spawnX, spawnY, millDoorX, millY1), "windmill door should be reachable from spawn");
   assert(canReach(spawnX, spawnY, smithyAnchorX + -4, smithyAnchorY), "smithy door should be reachable from spawn");
+  assert(canReach(spawnX, spawnY, herbalistDoorX, herbalistDoorY), "herbalist hut door should be reachable from spawn");
   assert(canReach(spawnX, spawnY, apothDoorX, apothDoorY), "apothecary door should be reachable from spawn");
+  assert(canReach(herbalistDoorX, herbalistDoorY, apothDoorX, apothDoorY), "herbalist hut should connect to the apothecary by road");
 
   clearAll();
 });

@@ -21,18 +21,40 @@ export const TOWN_STORAGE = Object.freeze({
 });
 
 export function findTownContainers(world) {
-  /** @type {{ mill:number, smithy:number, lumber:number, herb:number, tavern:number, alchemist:number, home:number }} */
-  const out = { mill: 0, smithy: 0, lumber: 0, herb: 0, tavern: 0, alchemist: 0, home: 0 };
+  /** @type {{ mill:number, smithy:number, lumber:number, herb:number, tavern:number, alchemist:number, herbalist:number, home:number }} */
+  const out = { mill: 0, smithy: 0, lumber: 0, herb: 0, tavern: 0, alchemist: 0, herbalist: 0, home: 0 };
+  /** @type {number[]} */
+  const herbCandidates = [];
   for (const [id, ni] of world.query(NamedIdentity)) {
     const name = String(ni.name || "");
     const identity = String(ni.identity || "");
     if (!out.mill && world.has(id, Inventory) && (identity === "mill_chest" || name === TOWN_STORAGE.mill)) out.mill = id;
     else if (!out.smithy && world.has(id, Inventory) && (identity === "smithy_chest" || name === TOWN_STORAGE.smithy)) out.smithy = id;
     else if (!out.lumber && world.has(id, Inventory) && (identity === "lumber_chest" || name === TOWN_STORAGE.lumber)) out.lumber = id;
-    else if (!out.herb && world.has(id, Inventory) && (identity === "herb_chest" || name === TOWN_STORAGE.herb)) out.herb = id;
+    else if (world.has(id, Inventory) && (identity === "herb_chest" || name === TOWN_STORAGE.herb)) herbCandidates.push(id);
     else if (!out.tavern && world.has(id, Inventory) && (identity === "tavern_chest" || name === TOWN_STORAGE.tavern)) out.tavern = id;
     else if (!out.alchemist && identity === "townfolk_alchemist" && world.has(id, ShopInventory)) out.alchemist = id;
+    else if (!out.herbalist && identity === "townfolk_herbalist") out.herbalist = id;
     else if (!out.home && name === "Stash Chest" && world.has(id, Inventory)) out.home = id;
+  }
+  if (herbCandidates.length > 0) {
+    const anchorId = out.herbalist || out.alchemist;
+    const anchorPos = anchorId > 0 ? world.get(anchorId, Position) : null;
+    let bestId = herbCandidates[0];
+    let bestDist = Infinity;
+    for (const chestId of herbCandidates) {
+      const pos = world.get(chestId, Position);
+      if (!anchorPos || !pos) {
+        bestId = chestId;
+        break;
+      }
+      const dist = Math.abs(pos.x - anchorPos.x) + Math.abs(pos.y - anchorPos.y);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestId = chestId;
+      }
+    }
+    out.herb = bestId;
   }
   return out;
 }

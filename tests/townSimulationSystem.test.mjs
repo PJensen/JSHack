@@ -5,6 +5,7 @@ import { Faction } from "../src/rules/components/Faction.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
+import { ShopInventory } from "../src/rules/components/ShopInventory.js";
 import { TownState } from "../src/rules/components/TownState.js";
 import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { townSimulationSystem } from "../src/rules/systems/townSimulationSystem.js";
@@ -121,6 +122,53 @@ Deno.test("townSimulationSystem keeps a visible tavern meal reserve instead of d
   townSimulationSystem(world);
 
   assertEquals(countInventory(world, tavern, "food_stew"), 1, "town should keep at least one prepared meal on hand");
+});
+
+Deno.test("townSimulationSystem counts the herbalist stash instead of the apothecary chest", () => {
+  const world = new World({ seed: 104 });
+  world.step = 24;
+
+  const ds = world.create();
+  world.add(ds, DungeonState, {
+    worldSeed: 104,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+
+  const ws = world.create();
+  world.add(ws, WeatherState, { current: "clear", turnsRemaining: 20, transitionCooldown: 0 });
+
+  const sign = world.create();
+  world.add(sign, NamedIdentity, { name: "Home Sign", identity: "house_sign" });
+  world.add(sign, Position, { x: 10, y: 10 });
+
+  const alchemist = world.create();
+  world.add(alchemist, NamedIdentity, { name: "Alchemist", identity: "townfolk_alchemist" });
+  world.add(alchemist, Position, { x: 30, y: 30 });
+  world.add(alchemist, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
+
+  const herbalist = world.create();
+  world.add(herbalist, NamedIdentity, { name: "Herbalist", identity: "townfolk_herbalist" });
+  world.add(herbalist, Position, { x: 6, y: 8 });
+
+  const apothecaryChest = addStorage(world, "Herb Chest", "herb_chest", 31, 30);
+  const herbalistChest = addStorage(world, "Herb Chest", "herb_chest", 7, 8);
+  seedInventory(world, herbalistChest, "food_wild_herbs", 2);
+  seedInventory(world, herbalistChest, "reagent_venom_frond", 1);
+
+  const stateId = world.create();
+  world.add(stateId, TownState, { nextPulseStep: 0 });
+
+  townSimulationSystem(world);
+
+  const state = world.get(stateId, TownState);
+  assert(state, "TownState should exist");
+  assertEquals(countInventory(world, apothecaryChest, "food_wild_herbs"), 0);
+  assertEquals(countInventory(world, herbalistChest, "food_wild_herbs"), 2);
+  assertEquals(state.medicineStores, 3);
+  assertEquals(state.lowMedicine, false);
 });
 
 Deno.test("townSimulationSystem tracks weather and hostile pressure in morale", () => {

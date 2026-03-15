@@ -4,6 +4,7 @@ import { CHUNK_SIZE, TILE_GRASS } from "../src/rules/environment/dungeon/constan
 import { stampBuilding } from "../src/rules/environment/dungeon/stampBuilding.js";
 import apothecaryDef from "../src/rules/data/buildings/apothecary.json" with { type: "json" };
 import gemStoreDef from "../src/rules/data/buildings/gem_store.json" with { type: "json" };
+import herbalistHutDef from "../src/rules/data/buildings/herbalist_hut.json" with { type: "json" };
 
 function makeChunks() {
   return new Map([
@@ -46,4 +47,11 @@ Deno.test("stampBuilding resolves shop metadata from authored building JSON", ()
     x: 37,
     y: 45,
   });
+
+  const hut = stampBuilding(makeChunks(), herbalistHutDef, 18, 28);
+  assertEquals(hut.shop, null);
+  assertEquals(hut.waypoints.front_door, { x: 18, y: 28 });
+  assertEquals(hut.waypoints.resident_home, { x: 18, y: 26 });
+  assertEquals(hut.waypoints.herb_work, { x: 19, y: 25 });
+  assertEquals(hut.spawns.home_bed, { x: 16, y: 24 });
 });
