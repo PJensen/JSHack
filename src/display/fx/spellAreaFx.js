@@ -7,9 +7,9 @@ import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx } from "./fxEntries.js";
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, ftext?: { addDamage: Function, addStatus?: Function } }} deps
  */
-export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime }) {
+export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, ftext }) {
   // --- Blink state ---
   /** @type {BlinkFx[]} */
   const _blinkFx = [];
@@ -47,10 +47,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
   /** @type {RadialFx[]} */
   const _blastwaveFx = [];
 
-  // --- Genocide wave state ---
-  /** @type {Array<{ x:number, y:number, radius:number, ttl:number, max:number, targets:Array<{ x:number, y:number, burstAt:number, popped:boolean }> }>} */
-  const _genocideWaveFx = [];
-
   // --- Flash Heal state ---
   /** @type {RadialFx[]} */
   const _flashHealFx = [];
@@ -73,36 +69,6 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     for (let i = _blastwaveFx.length - 1; i >= 0; i--) {
       _blastwaveFx[i].tick(dt);
       if (_blastwaveFx[i].expired) _blastwaveFx.splice(i, 1);
-    }
-    for (let i = _genocideWaveFx.length - 1; i >= 0; i--) {
-      const wave = _genocideWaveFx[i];
-      wave.ttl -= dt;
-      const progress = wave.max > 0 ? Math.max(0, Math.min(1, 1 - (wave.ttl / wave.max))) : 1;
-      const ringR = progress * wave.radius;
-      for (const target of wave.targets) {
-        if (target.popped || ringR < target.burstAt) continue;
-        target.popped = true;
-        const burstCount = PERF.quality === 'low' ? 8 : 14;
-        for (let j = 0; j < burstCount; j++) {
-          const angle = (Math.PI * 2 * j / burstCount) + (Math.random() - 0.5) * 0.45;
-          const speed = 0.25 + Math.random() * 1.8;
-          fx.pool.spawn(new Particle({
-            x: target.x,
-            y: target.y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            ay: 0.05,
-            life: 0.18 + Math.random() * 0.22,
-            size0: 0.12 + Math.random() * 0.08,
-            size1: 0.02,
-            r: 255,
-            g: 230 + ((Math.random() * 20) | 0),
-            b: 170 + ((Math.random() * 40) | 0),
-            a0: 0.88,
-          }));
-        }
-      }
-      if (wave.ttl <= 0) _genocideWaveFx.splice(i, 1);
     }
     for (let i = _flashHealFx.length - 1; i >= 0; i--) {
       _flashHealFx[i].tick(dt);
@@ -222,63 +188,24 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
       const t = bw.progress; // 0→1
       // Expanding ring
       const ringR = t * (bw.radius + 0.5);
-      const ringA = 0.6 * (1 - t);
-      ctx.strokeStyle = `rgba(180,210,255,${ringA})`;
-      ctx.lineWidth = 0.12 * (1 - t * 0.7);
+      const ringA = 0.8 * (1 - t * 0.55);
+      ctx.strokeStyle = `rgba(215,235,255,${ringA})`;
+      ctx.lineWidth = Math.max(0.12, 0.32 * (1 - t * 0.68));
       ctx.beginPath(); ctx.arc(bw.x, bw.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `rgba(140,190,255,${(ringA * 0.65).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.06, 0.14 * (1 - t * 0.55));
+      ctx.beginPath(); ctx.arc(bw.x, bw.y, Math.max(0, ringR - 0.28), 0, Math.PI * 2); ctx.stroke();
       // Inner filled disc (fades fast)
-      if (t < 0.4) {
-        const discA = 0.2 * (1 - t / 0.4);
+      if (t < 0.55) {
+        const discA = 0.26 * (1 - t / 0.55);
         ctx.fillStyle = `rgba(220,240,255,${discA})`;
-        ctx.beginPath(); ctx.arc(bw.x, bw.y, ringR * 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bw.x, bw.y, ringR * 0.68, 0, Math.PI * 2); ctx.fill();
       }
       // Bright center flash
-      if (t < 0.1) {
-        const cFlashA = 0.5 * (1 - t / 0.1);
+      if (t < 0.16) {
+        const cFlashA = 0.7 * (1 - t / 0.16);
         ctx.fillStyle = `rgba(255,255,255,${cFlashA})`;
-        ctx.beginPath(); ctx.arc(bw.x, bw.y, 0.3, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    ctx.restore();
-  }
-
-  /** @param {CanvasRenderingContext2D} ctx */
-  function drawGenocideWave(ctx) {
-    if (!_genocideWaveFx.length) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const TAU = Math.PI * 2;
-    for (const wave of _genocideWaveFx) {
-      const t = wave.max > 0 ? Math.max(0, Math.min(1, 1 - (wave.ttl / wave.max))) : 1;
-      const alpha = wave.max > 0 ? Math.max(0, Math.min(1, wave.ttl / wave.max)) : 0;
-      const ringR = t * wave.radius;
-      const shellA = 0.85 * (1 - t * 0.45) * alpha;
-      ctx.strokeStyle = `rgba(255,236,180,${shellA.toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.08, 0.34 - t * 0.16);
-      ctx.beginPath();
-      ctx.arc(wave.x, wave.y, ringR, 0, TAU);
-      ctx.stroke();
-
-      ctx.strokeStyle = `rgba(255,120,70,${(shellA * 0.45).toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.04, 0.15 - t * 0.06);
-      ctx.beginPath();
-      ctx.arc(wave.x, wave.y, ringR + 0.28, 0, TAU);
-      ctx.stroke();
-
-      if (t < 0.24) {
-        const flashT = t / 0.24;
-        ctx.fillStyle = `rgba(255,250,230,${(0.45 * (1 - flashT)).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(wave.x, wave.y, 0.5 + flashT * 1.8, 0, TAU);
-        ctx.fill();
-      }
-
-      const hazeA = 0.14 * (1 - t) * alpha;
-      if (hazeA > 0.01) {
-        ctx.fillStyle = `rgba(255,180,110,${hazeA.toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(wave.x, wave.y, Math.max(0.6, ringR * 0.72), 0, TAU);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(bw.x, bw.y, 0.45, 0, Math.PI * 2); ctx.fill();
       }
     }
     ctx.restore();
@@ -512,87 +439,31 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
 
     world.on('spell:blastwave', ({ actor, origin, knockbacks, radius }) => {
       if (origin && Number.isFinite(origin.x)) {
-        _blastwaveFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.35 }));
-        startShake(cam, 5, 0.22);
+        const waveRadius = Math.max(2, Number(radius) || 2);
+        const ttl = Math.max(0.45, Math.min(1.6, 0.24 + waveRadius * 0.06));
+        _blastwaveFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: waveRadius, ttl }));
+        if (waveRadius >= 6) {
+          _blastwaveFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: Math.max(2, waveRadius * 0.8), ttl: ttl * 0.86 }));
+        }
+        if (waveRadius >= 10) {
+          _blastwaveFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: Math.max(2, waveRadius * 0.58), ttl: ttl * 0.72 }));
+        }
+        startShake(cam, Math.min(14, 5 + Math.floor(waveRadius / 2)), Math.min(0.55, 0.18 + waveRadius * 0.015));
         // Radial particle burst
-        const N = 24;
+        const N = waveRadius >= 10 ? 40 : (waveRadius >= 6 ? 32 : 24);
         for (let i = 0; i < N; i++) {
           const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-          const spd = 2.0 + Math.random() * 1.5;
+          const spd = 2.0 + Math.random() * Math.max(1.5, waveRadius * 0.2);
           fx.pool.spawn(new Particle({
             x: origin.x, y: origin.y,
             vx: Math.cos(angle) * spd,
             vy: Math.sin(angle) * spd,
-            life: 0.25 + Math.random() * 0.15,
-            size0: 0.18, size1: 0.03,
-            r: 200, g: 220, b: 255,
-            a0: 0.8,
+            life: 0.3 + Math.random() * 0.22,
+            size0: 0.18 + Math.random() * 0.06, size1: 0.03,
+            r: 210, g: 225, b: 255,
+            a0: 0.85,
           }));
         }
-      }
-    });
-
-    world.on('scroll:genocide:wave', ({ origin, radius, targets }) => {
-      if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return;
-      const waveRadius = Number.isFinite(radius) ? Math.max(8, radius) : 14;
-      const ttl = Math.max(0.8, Math.min(1.45, 0.7 + waveRadius * 0.025));
-      _blastwaveFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: waveRadius, ttl }));
-      _genocideWaveFx.push({
-        x: origin.x,
-        y: origin.y,
-        radius: waveRadius,
-        ttl,
-        max: ttl,
-        targets: Array.isArray(targets)
-          ? targets
-            .filter((target) => Number.isFinite(target?.x) && Number.isFinite(target?.y))
-            .map((target) => ({
-              x: target.x,
-              y: target.y,
-              burstAt: Math.hypot(target.x - origin.x, target.y - origin.y),
-              popped: false,
-            }))
-          : [],
-      });
-      startShake(cam, Math.min(13, 7 + Math.floor(waveRadius / 3)), Math.min(0.5, 0.24 + waveRadius * 0.01));
-
-      const spokes = PERF.quality === 'low' ? 24 : 44;
-      for (let i = 0; i < spokes; i++) {
-        const angle = (i / spokes) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
-        const speed = 3.8 + Math.random() * Math.min(5.8, waveRadius * 0.32);
-        fx.pool.spawn(new Particle({
-          x: origin.x,
-          y: origin.y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          ay: 0.03,
-          life: 0.38 + Math.random() * 0.36,
-          size0: 0.26 + Math.random() * 0.16,
-          size1: 0.03,
-          r: 255,
-          g: 220 + ((Math.random() * 25) | 0),
-          b: 150 + ((Math.random() * 35) | 0),
-          a0: 0.9,
-        }));
-      }
-      const coreBurst = PERF.quality === 'low' ? 18 : 28;
-      for (let i = 0; i < coreBurst; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 0.4 + Math.random() * 2.6;
-        fx.pool.spawn(new Particle({
-          x: origin.x + (Math.random() - 0.5) * 0.2,
-          y: origin.y + (Math.random() - 0.5) * 0.2,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          ay: 0.04,
-          life: 0.25 + Math.random() * 0.3,
-          size0: 0.32 + Math.random() * 0.16,
-          size1: 0.04,
-          r: 255,
-          g: 245,
-          b: 210,
-          a0: 0.95,
-        }));
       }
     });
 
@@ -740,5 +611,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime })
     });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawGenocideWave, drawFlashHeal, drawPhaseStrike, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawPhaseStrike, installListeners };
 }

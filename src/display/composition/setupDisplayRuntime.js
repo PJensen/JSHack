@@ -43,17 +43,17 @@ export function setupDisplayRuntime({
   const projectileFx = createProjectileFxController({ world, cam, fx, getPosition });
   projectileFx.installListeners();
 
-  const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime });
+  const ftext = new FloatText();
+  try {
+    /** @type any */ (window).float_text = (x, y, text, opts) => ftext.add(x, y, text, opts || {});
+  } catch (e) { console.debug("[setupDisplayRuntime] float_text global setup failed:", e); }
+
+  const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, ftext });
   spellAreaFx.installListeners();
 
   const cloudFx = createCloudFxController({ world, cam, fx, getFxTime, getPosition });
   cloudFx.installListeners();
   const surfaceAreaFx = createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, PERF });
-
-  const ftext = new FloatText();
-  try {
-    /** @type any */ (window).float_text = (x, y, text, opts) => ftext.add(x, y, text, opts || {});
-  } catch (e) { console.debug("[setupDisplayRuntime] float_text global setup failed:", e); }
 
   installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer });
   installEventUiWiring({

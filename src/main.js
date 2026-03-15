@@ -336,6 +336,19 @@ function syncPrayButtonHighlight(active) {
 function openingPromptY(pos) {
   return (Number(pos?.y || 0) - 1.15);
 }
+
+function getSpeakerBubbleLiftPx() {
+  const scale = Math.max(1, Number(cam?.scale) || 1);
+  return Math.max(32, Math.min(96, Math.round(scale * 1.15)));
+}
+
+function getSpeakerBubbleAnchorPos(pos) {
+  return {
+    x: Number(pos?.x || 0),
+    y: Number(pos?.y || 0) - 0.68,
+  };
+}
+
 let _bubbleDialogState = {
   open: false,
   sessionId: 0,
