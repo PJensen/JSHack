@@ -9,7 +9,7 @@ import { MonsterSpawner } from "../src/rules/components/MonsterSpawner.js";
 import { installGenocideListener } from "../src/rules/systems/genocideSystem.js";
 import { clearGenocides, isGenocided } from "../src/rules/data/monsters.js";
 
-Deno.test("genocide request emits a huge outward wave and only kills the chosen monster type", () => {
+Deno.test("genocide request only kills the chosen monster type and disables its spawners", () => {
   clearGenocides();
   try {
     const world = new World({ seed: 0xC0FFEE });
@@ -42,9 +42,9 @@ Deno.test("genocide request emits a huge outward wave and only kills the chosen 
       isActive: true,
     });
 
-    const waves = [];
+    const damaged = [];
     const messages = [];
-    world.on("scroll:genocide:wave", (event) => waves.push(event));
+    world.on("damaged", (event) => damaged.push(event));
     world.on("message", (event) => messages.push(event));
 
     world.emit("scroll:genocide:request", { actor, query: "gob" });
@@ -55,12 +55,8 @@ Deno.test("genocide request emits a huge outward wave and only kills the chosen 
     assertEquals(world.get(spawner, MonsterSpawner)?.isActive, false);
     assert(isGenocided("goblin"));
 
-    assertEquals(waves.length, 1);
-    assertEquals(waves[0].monsterId, "goblin");
-    assertEquals(waves[0].targets.length, 2);
-    assertEquals(waves[0].origin.x, 10);
-    assertEquals(waves[0].origin.y, 10);
-    assert(waves[0].radius >= 15, "wave radius should read as huge");
+    assertEquals(damaged.length, 2);
+    assert(damaged.every((event) => Number(event?.amount) === 9999), "genocide should emit 9999 damage for each target");
 
     assert(messages.some((event) => String(event?.text || "").includes("You have genocided all Goblins")));
   } finally {

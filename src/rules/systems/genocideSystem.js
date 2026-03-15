@@ -52,16 +52,6 @@ function resolveGenocideTarget(query) {
   return bestScore > 4 ? null : best;
 }
 
-function buildWaveRadius(origin, targets) {
-  let farthest = 0;
-  for (const target of targets) {
-    const dx = (target.x | 0) - (origin.x | 0);
-    const dy = (target.y | 0) - (origin.y | 0);
-    farthest = Math.max(farthest, Math.hypot(dx, dy));
-  }
-  return Math.max(14, Math.ceil(farthest) + 3);
-}
-
 export function installGenocideListener(world) {
   if (!world || world[GENOCIDE_LISTENER_INSTALLED]) return;
   world[GENOCIDE_LISTENER_INSTALLED] = true;
@@ -83,9 +73,9 @@ export function installGenocideListener(world) {
       if (!ident || ident.identity !== best.id) continue;
       if (!faction || faction.key !== "enemy") continue;
       if (!vit || vit.hp <= 0) continue;
+      targets.push({ id, x: pos.x | 0, y: pos.y | 0 });
       world.mutate(id, Vitality, (record) => { record.hp = 0; });
       killed++;
-      targets.push({ id, x: pos.x | 0, y: pos.y | 0 });
     }
 
     for (const [id, spawner] of world.query(MonsterSpawner)) {
@@ -93,20 +83,15 @@ export function installGenocideListener(world) {
       world.mutate(id, MonsterSpawner, (record) => { record.isActive = false; });
     }
 
-    const origin = originPos
-      ? { x: originPos.x | 0, y: originPos.y | 0 }
-      : (targets[0] ? { x: targets[0].x | 0, y: targets[0].y | 0 } : { x: 0, y: 0 });
-
-    world.emit?.("scroll:genocide:wave", {
-      actor: actor | 0,
-      query: String(query || ""),
-      monsterId: best.id,
-      monsterName: best.name,
-      killed,
-      origin,
-      radius: buildWaveRadius(origin, targets),
-      targets,
-    });
+    for (const target of targets) {
+      world.emit?.("damaged", {
+        source: actor | 0,
+        target: target.id | 0,
+        amount: 9999,
+        critical: true,
+        at: { x: target.x | 0, y: target.y | 0 },
+      });
+    }
 
     world.emit?.("message", {
       text: `You have genocided all ${best.name}s! ${killed > 0 ? `${killed} perish${killed === 1 ? "es" : ""} instantly.` : ""}`,
