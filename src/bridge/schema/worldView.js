@@ -10,7 +10,7 @@ import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { ObjectState } from "../../rules/components/ObjectState.js";
-import { getTile, forEachTileInRect, isRoofed } from '../../rules/environment/dungeon/tileMap.js';
+import { getTile, forEachTileInRect, forEachLoadedTile, isRoofed } from '../../rules/environment/dungeon/tileMap.js';
 import { TILE_DOOR, TILE_FLOOR, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
 import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
@@ -86,8 +86,6 @@ const POTION_GLOW_DISABLED_KINDS = new Set();
 
 /** @type {EntityView[]} reusable temp buffer for entity collection before FOV filter */
 const _allEntities = [];
-const OVERWORLD_ROOF_SEED_IDENTITIES = new Set(["alchemy_bench", "bed_home", "tavern_keg", "millstone", "church_altar", "cooking_fire", "gem_display_case"]);
-
 function xyKey(x, y) {
 	return `${x},${y}`;
 }
@@ -103,9 +101,12 @@ const CARDINAL_STEPS = Object.freeze([
 	[0, 1],
 	[0, -1],
 ]);
-const ROOF_BURN_PROPAGATION_LIMIT = 2;
 /** How many turns after burning a tile still smolders (emits smoke). */
 const SMOLDER_TURNS = 30;
+
+function isRoofBearingTile(tile) {
+	return tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR;
+}
 
 /**
  * @param {string} key
@@ -121,255 +122,6 @@ function keyWithinRadius(key, candidates, radius = 1) {
 		}
 	}
 	return false;
-}
-
-/**
- * Flood-fill one indoor floor region, then wrap it with any touching doors/walls for roof rendering.
- * @param {number} seedX
- * @param {number} seedY
- */
-function collectRoofedBuilding(seedX, seedY) {
-	if (getTile(seedX, seedY) !== TILE_FLOOR) return null;
-	const floorKeys = new Set();
-	const doorKeys = new Set();
-	const wallKeys = new Set();
-	const exposedFloorKeys = new Set();
-	const queue = [[seedX, seedY]];
-	const seen = new Set([xyKey(seedX, seedY)]);
-	const cardinal = [
-		[1, 0],
-		[-1, 0],
-		[0, 1],
-		[0, -1],
-	];
-
-	for (let i = 0; i < queue.length; i++) {
-		const [x, y] = queue[i];
-		if (getTile(x, y) !== TILE_FLOOR) continue;
-		const key = xyKey(x, y);
-		floorKeys.add(key);
-		for (let j = 0; j < cardinal.length; j++) {
-			const nx = x + cardinal[j][0];
-			const ny = y + cardinal[j][1];
-			const nextKey = xyKey(nx, ny);
-			const tile = getTile(nx, ny);
-			if (tile === TILE_FLOOR && !seen.has(nextKey)) {
-				seen.add(nextKey);
-				queue.push([nx, ny]);
-			} else if (tile === TILE_DOOR) {
-				doorKeys.add(nextKey);
-			} else if (tile !== TILE_FLOOR && tile !== TILE_WALL) {
-				exposedFloorKeys.add(key);
-			}
-		}
-	}
-
-	const shellKeys = [...floorKeys, ...doorKeys];
-	for (let i = 0; i < shellKeys.length; i++) {
-		const { x, y } = keyToXY(shellKeys[i]);
-		for (let dy = -1; dy <= 1; dy++) {
-			for (let dx = -1; dx <= 1; dx++) {
-				if (dx === 0 && dy === 0) continue;
-				const nx = x + dx;
-				const ny = y + dy;
-				if (getTile(nx, ny) === TILE_WALL) {
-					wallKeys.add(xyKey(nx, ny));
-				}
-			}
-		}
-	}
-
-	if (!floorKeys.size) return null;
-	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
-}
-
-function collectCottageBuildingFromBed(seedX, seedY) {
-	const floorXs = [seedX, seedX + 1, seedX + 2];
-	const floorYs = [seedY - 1, seedY, seedY + 1];
-	for (let iy = 0; iy < floorYs.length; iy++) {
-		for (let ix = 0; ix < floorXs.length; ix++) {
-			if (getTile(floorXs[ix], floorYs[iy]) !== TILE_FLOOR) return null;
-		}
-	}
-
-	const northDoor = { x: seedX + 1, y: seedY - 2 };
-	const southDoor = { x: seedX + 1, y: seedY + 2 };
-	let door = null;
-	if (getTile(northDoor.x, northDoor.y) === TILE_DOOR) door = northDoor;
-	else if (getTile(southDoor.x, southDoor.y) === TILE_DOOR) door = southDoor;
-	else return null;
-
-	const floorKeys = new Set();
-	for (let iy = 0; iy < floorYs.length; iy++) {
-		for (let ix = 0; ix < floorXs.length; ix++) {
-			floorKeys.add(xyKey(floorXs[ix], floorYs[iy]));
-		}
-	}
-
-	const doorKeys = new Set([xyKey(door.x, door.y)]);
-	const wallKeys = new Set();
-	for (let y = seedY - 2; y <= seedY + 2; y++) {
-		for (let x = seedX - 1; x <= seedX + 3; x++) {
-			const key = xyKey(x, y);
-			if (floorKeys.has(key) || doorKeys.has(key)) continue;
-			wallKeys.add(key);
-		}
-	}
-
-	const exposedFloorKeys = new Set();
-	for (const key of floorKeys) {
-		const { x, y } = keyToXY(key);
-		for (let i = 0; i < CARDINAL_STEPS.length; i++) {
-			const nx = x + CARDINAL_STEPS[i][0];
-			const ny = y + CARDINAL_STEPS[i][1];
-			const tile = getTile(nx, ny);
-			if (tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR) continue;
-			exposedFloorKeys.add(key);
-			break;
-		}
-	}
-
-	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
-}
-
-function collectRectRoofedBuilding(floorX0, floorY0, floorX1, floorY1, doorX, doorY) {
-	const floorKeys = new Set();
-	for (let y = floorY0; y <= floorY1; y++) {
-		for (let x = floorX0; x <= floorX1; x++) {
-			if (getTile(x, y) !== TILE_FLOOR) return null;
-			floorKeys.add(xyKey(x, y));
-		}
-	}
-	if (getTile(doorX, doorY) !== TILE_DOOR) return null;
-
-	const doorKeys = new Set([xyKey(doorX, doorY)]);
-	const wallKeys = new Set();
-	for (let y = floorY0 - 1; y <= floorY1 + 1; y++) {
-		for (let x = floorX0 - 1; x <= floorX1 + 1; x++) {
-			const key = xyKey(x, y);
-			if (floorKeys.has(key) || doorKeys.has(key)) continue;
-			wallKeys.add(key);
-		}
-	}
-
-	const exposedFloorKeys = new Set();
-	for (const key of floorKeys) {
-		const { x, y } = keyToXY(key);
-		for (let i = 0; i < CARDINAL_STEPS.length; i++) {
-			const nx = x + CARDINAL_STEPS[i][0];
-			const ny = y + CARDINAL_STEPS[i][1];
-			const tile = getTile(nx, ny);
-			if (tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR) continue;
-			exposedFloorKeys.add(key);
-			break;
-		}
-	}
-
-	return { floorKeys, doorKeys, wallKeys, exposedFloorKeys };
-}
-
-function collectFixedRoofedBuilding(identity, seedX, seedY) {
-	switch (identity) {
-		case "alchemy_bench":
-			return collectRectRoofedBuilding(seedX - 3, seedY, seedX + 3, seedY + 2, seedX, seedY + 3);
-		case "church_altar":
-			return collectRoofedBuilding(seedX, seedY);
-		case "cooking_fire":
-			return collectRectRoofedBuilding(seedX - 6, seedY - 2, seedX, seedY, seedX - 3, seedY + 1);
-		case "millstone":
-			return collectRectRoofedBuilding(seedX - 1, seedY - 1, seedX + 1, seedY + 1, seedX, seedY + 2);
-		case "tavern_keg":
-			return collectRectRoofedBuilding(seedX, seedY, seedX + 6, seedY + 4, seedX + 3, seedY + 5);
-		case "furnace":
-			return collectRoofedBuilding(seedX, seedY);
-		case "gem_display_case":
-			return collectRectRoofedBuilding(seedX, seedY, seedX + 5, seedY + 3, seedX + 2, seedY + 4);
-		case "bed_home":
-			return collectCottageBuildingFromBed(seedX, seedY);
-		default:
-			return collectRoofedBuilding(seedX, seedY);
-	}
-}
-
-/**
- * @param {Set<string>} floorKeys
- * @param {Set<string>} doorKeys
- * @param {Set<string>} wallKeys
- * @param {number} alpha
- */
-function roofTilesFromBuilding(floorKeys, doorKeys, wallKeys, exposedFloorKeys, alpha) {
-	const coveredFloorKeys = [...floorKeys].filter((key) => !exposedFloorKeys.has(key));
-	if (!coveredFloorKeys.length) return [];
-	const coveredShellKeys = new Set();
-	const shellCandidates = [...wallKeys, ...doorKeys];
-	for (let i = 0; i < shellCandidates.length; i++) {
-		const shellKey = shellCandidates[i];
-		const { x, y } = keyToXY(shellKey);
-		for (let dy = -1; dy <= 1; dy++) {
-			for (let dx = -1; dx <= 1; dx++) {
-				if (dx === 0 && dy === 0) continue;
-				if (floorKeys.has(xyKey(x + dx, y + dy)) && !exposedFloorKeys.has(xyKey(x + dx, y + dy))) {
-					coveredShellKeys.add(shellKey);
-				}
-			}
-		}
-	}
-	const allKeys = [...coveredShellKeys, ...coveredFloorKeys];
-	const doorKeySet = new Set(doorKeys);
-	let minY = Infinity;
-	let maxY = -Infinity;
-	for (let i = 0; i < allKeys.length; i++) {
-		const { y } = keyToXY(allKeys[i]);
-		if (y < minY) minY = y;
-		if (y > maxY) maxY = y;
-	}
-	const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
-	return allKeys.map((key) => {
-		const { x, y } = keyToXY(key);
-		const singed = keyWithinRadius(key, exposedFloorKeys, 1);
-		const tileAlpha = (doorKeySet.has(key) ? alpha * 0.4 : alpha) * (singed ? 0.92 : 1.0);
-		let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
-		if (singed) kind += "_charred";
-		return { x, y, kind, alpha: tileAlpha, burning: false };
-	});
-}
-
-/**
- * @param {Set<string>} floorKeys
- * @param {Set<string>} sourceKeys
- * @param {Map<string, number>} seedStrengths
- * @returns {Map<string, number>}
- */
-function propagateBurnScores(floorKeys, sourceKeys, seedStrengths) {
-	const scores = new Map();
-	const queue = [];
-	for (const key of sourceKeys) {
-		if (!floorKeys.has(key)) continue;
-		const strength = Math.max(0, Number(seedStrengths.get(key) || 0));
-		if (!(strength > 0)) continue;
-		const prev = Number(scores.get(key) || -Infinity);
-		if (strength <= prev) continue;
-		scores.set(key, strength);
-		queue.push(key);
-	}
-	for (let i = 0; i < queue.length; i++) {
-		const key = queue[i];
-		const score = Number(scores.get(key) || 0);
-		if (!(score > 1)) continue;
-		const { x, y } = keyToXY(key);
-		for (let j = 0; j < CARDINAL_STEPS.length; j++) {
-			const nx = x + CARDINAL_STEPS[j][0];
-			const ny = y + CARDINAL_STEPS[j][1];
-			const nextKey = xyKey(nx, ny);
-			if (!floorKeys.has(nextKey)) continue;
-			const nextScore = score - 1;
-			const prev = Number(scores.get(nextKey) || -Infinity);
-			if (nextScore <= prev) continue;
-			scores.set(nextKey, nextScore);
-			queue.push(nextKey);
-		}
-	}
-	return scores;
 }
 
 /**
@@ -394,21 +146,24 @@ function collectOverworldRoofs(world, playerPos) {
 	}
 	const playerKey = playerPos ? xyKey(playerPos.x, playerPos.y) : "";
 	const roofs = [];
-	const visited = new Set();
-
-	// ── Bitmap-based roofs (JSON-stamped buildings) ──
-	if (playerPos) {
-		const R = 24;
-		const bitmapKeys = new Set();
-		for (let sy = playerPos.y - R; sy <= playerPos.y + R; sy++) {
-			for (let sx = playerPos.x - R; sx <= playerPos.x + R; sx++) {
-				if (isRoofed(sx, sy)) bitmapKeys.add(xyKey(sx, sy));
-			}
+	const destroyedTileKeys = new Set();
+	const smolderingRoofKeys = new Set();
+	for (const [key, rec] of Object.entries(destroyedTiles || {})) {
+		destroyedTileKeys.add(key);
+		const age = Math.max(1, (_view.turn | 0) - (Number(rec?.destroyedAtTurn || 0) | 0) + 1);
+		if (age <= SMOLDER_TURNS) {
+			smolderingRoofKeys.add(key);
 		}
+	}
+
+	if (playerPos) {
+		const bitmapKeys = new Set();
+		forEachLoadedTile((x, y) => {
+			if (isRoofed(x, y)) bitmapKeys.add(xyKey(x, y));
+		});
 		const bitmapUsed = new Set();
 		for (const startKey of bitmapKeys) {
 			if (bitmapUsed.has(startKey)) continue;
-			// BFS to find connected component (one building)
 			const comp = new Set();
 			const q = [startKey];
 			comp.add(startKey);
@@ -421,162 +176,64 @@ function collectOverworldRoofs(world, playerPos) {
 			}
 			for (const k of comp) bitmapUsed.add(k);
 
-			// Player inside this building — set shelter, skip rendering
-			if (playerKey && comp.has(playerKey)) {
-				const dtRec = destroyedTiles ? destroyedTiles[playerKey] : null;
-				const nearFire = keyWithinRadius(playerKey, activeFireKeys, 1);
-				_view.playerSheltered = !dtRec && !nearFire;
-				for (const k of comp) visited.add(k);
-				continue;
-			}
-
-			// Shadow/lit cutoff for this building
-			let minY = Infinity, maxY = -Infinity;
+			const renderKeys = [];
+			let minY = Infinity;
+			let maxY = -Infinity;
 			for (const key of comp) {
-				const { y } = keyToXY(key);
+				const { x, y } = keyToXY(key);
+				if (!isRoofBearingTile(getTile(x, y))) continue;
+				renderKeys.push(key);
 				if (y < minY) minY = y;
 				if (y > maxY) maxY = y;
 			}
+			if (!renderKeys.length) continue;
+
+			if (playerKey && comp.has(playerKey)) {
+				const playerTile = getTile(playerPos.x, playerPos.y);
+				const nearDestroyed = keyWithinRadius(playerKey, destroyedTileKeys, 1);
+				const nearFire = keyWithinRadius(playerKey, activeFireKeys, 1);
+				_view.playerSheltered = isRoofBearingTile(playerTile) && !nearDestroyed && !nearFire;
+				continue;
+			}
+
 			const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
 
-			// Generate roof tiles — 1:1 with ground tile state
-			for (const key of comp) {
-				visited.add(key);
+			for (const key of renderKeys) {
 				const { x, y } = keyToXY(key);
 				const tile = getTile(x, y);
+				const nearFire = keyWithinRadius(key, activeFireKeys, 1);
+				const singed = keyWithinRadius(key, destroyedTileKeys, 1);
+				if (tile === TILE_FLOOR) {
+					let exposed = false;
+					for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+						const nx = x + CARDINAL_STEPS[j][0];
+						const ny = y + CARDINAL_STEPS[j][1];
+						if (!comp.has(xyKey(nx, ny))) continue;
+						if (!isRoofBearingTile(getTile(nx, ny))) {
+							exposed = true;
+							break;
+						}
+					}
+					if (exposed || (singed && !nearFire)) continue;
+				}
 				const isDoor = tile === TILE_DOOR;
 				let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
 				let alpha = isDoor ? 0.4 : 1.0;
 				let burning = false;
 				let smoking = false;
-				const dtRec = destroyedTiles ? destroyedTiles[key] : null;
-				const nearFire = keyWithinRadius(key, activeFireKeys, 1);
-				if (dtRec) {
+				if (singed) {
 					kind += "_charred";
 					if (nearFire) {
 						burning = true;
 					} else {
 						alpha *= 0.45;
-						const age = Math.max(1, (_view.turn | 0) - (Number(dtRec.destroyedAtTurn || 0) | 0) + 1);
-						if (age <= SMOLDER_TURNS) smoking = true;
+						smoking = keyWithinRadius(key, smolderingRoofKeys, 1);
 					}
 				} else if (nearFire) {
 					burning = true;
 				}
 				roofs.push({ x, y, kind, alpha, burning, smoking });
 			}
-		}
-	}
-
-	// ── BFS-based roofs (legacy procedural buildings) ──
-	for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
-		const identity = String(ident?.identity || "");
-		if (!OVERWORLD_ROOF_SEED_IDENTITIES.has(identity)) continue;
-		const building = collectFixedRoofedBuilding(identity, pos.x, pos.y);
-		if (!building) continue;
-		const floorKeys = [...building.floorKeys];
-		if (floorKeys.some((key) => visited.has(key))) continue;
-		for (let i = 0; i < floorKeys.length; i++) visited.add(floorKeys[i]);
-		// Compute burn propagation (needed for both shelter check and roof rendering)
-		const burnedSeedStrengths = new Map();
-		const burnedSeedKeys = new Set();
-		const activeSeedStrengths = new Map();
-		const activeSeedKeys = new Set();
-		/** Floor keys adjacent to tiles destroyed within SMOLDER_TURNS (for post-fire smoke). */
-		const smolderingSeedKeys = new Set();
-		for (const [key] of Object.entries(destroyedTiles || {})) {
-			const rec = destroyedTiles[key];
-			if (
-				!building.floorKeys.has(key)
-				&& !building.doorKeys.has(key)
-				&& !building.wallKeys.has(key)
-				&& !keyWithinRadius(key, building.floorKeys, 1)
-			) continue;
-			const age = Math.max(1, (_view.turn | 0) - (Number(rec?.destroyedAtTurn || 0) | 0) + 1);
-			const strength = Math.min(ROOF_BURN_PROPAGATION_LIMIT, age);
-			const { x, y } = keyToXY(key);
-			for (let j = 0; j < CARDINAL_STEPS.length; j++) {
-				const floorKey = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
-				if (!building.floorKeys.has(floorKey)) continue;
-				burnedSeedKeys.add(floorKey);
-				const prev = Number(burnedSeedStrengths.get(floorKey) || 0);
-				if (strength > prev) burnedSeedStrengths.set(floorKey, strength);
-				if (age <= SMOLDER_TURNS) smolderingSeedKeys.add(floorKey);
-			}
-		}
-		for (const key of activeFireKeys) {
-			if (
-				!building.floorKeys.has(key)
-				&& !building.doorKeys.has(key)
-				&& !building.wallKeys.has(key)
-				&& !keyWithinRadius(key, building.floorKeys, 1)
-			) continue;
-			const { x, y } = keyToXY(key);
-			for (let j = 0; j < CARDINAL_STEPS.length; j++) {
-				const floorKey = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
-				if (!building.floorKeys.has(floorKey)) continue;
-				activeSeedKeys.add(floorKey);
-				activeSeedStrengths.set(floorKey, ROOF_BURN_PROPAGATION_LIMIT);
-			}
-		}
-		const burnedScores = propagateBurnScores(building.floorKeys, burnedSeedKeys, burnedSeedStrengths);
-		const activeScores = propagateBurnScores(building.floorKeys, activeSeedKeys, activeSeedStrengths);
-		const burnedScoreKeys = new Set(burnedScores.keys());
-		const activeScoreKeys = new Set(activeScores.keys());
-		const exposedFloorKeys = new Set(building.exposedFloorKeys);
-		for (const floorKey of building.floorKeys) {
-			if (Number(burnedScores.get(floorKey) || 0) > 0 && Number(activeScores.get(floorKey) || 0) <= 0) {
-				exposedFloorKeys.add(floorKey);
-			}
-		}
-
-		// Player inside this building — determine shelter from weather, skip roof rendering
-		if (playerKey && (building.floorKeys.has(playerKey) || building.doorKeys.has(playerKey))) {
-			const nearBurned = keyWithinRadius(playerKey, burnedScoreKeys, 1);
-			const nearActiveFire = keyWithinRadius(playerKey, activeScoreKeys, 1);
-			const roofGone = nearBurned && !nearActiveFire;
-			if (building.floorKeys.has(playerKey)) {
-				_view.playerSheltered = !exposedFloorKeys.has(playerKey) && !roofGone;
-			} else {
-				// Door position — sheltered if adjacent to any covered floor
-				const { x, y } = keyToXY(playerKey);
-				let adjCovered = false;
-				for (let j = 0; j < CARDINAL_STEPS.length; j++) {
-					const nk = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
-					if (building.floorKeys.has(nk) && !exposedFloorKeys.has(nk)) { adjCovered = true; break; }
-				}
-				_view.playerSheltered = adjCovered && !roofGone;
-			}
-			continue;
-		}
-
-		const roofTiles = roofTilesFromBuilding(
-			building.floorKeys,
-			building.doorKeys,
-			building.wallKeys,
-			exposedFloorKeys,
-			1.0
-		);
-		for (let i = 0; i < roofTiles.length; i++) {
-			const key = xyKey(roofTiles[i].x, roofTiles[i].y);
-			const nearBurned = keyWithinRadius(key, burnedScoreKeys, 1);
-			const nearActiveFire = keyWithinRadius(key, activeScoreKeys, 1);
-			if (nearBurned) {
-				roofTiles[i].kind = roofTiles[i].kind.includes("_charred")
-					? roofTiles[i].kind
-					: `${roofTiles[i].kind}_charred`;
-				if (!nearActiveFire) {
-					// Burned but no active fire — keep as damaged charred tile at reduced alpha
-					roofTiles[i].alpha *= 0.45;
-					if (keyWithinRadius(key, smolderingSeedKeys, 1)) {
-						roofTiles[i].smoking = true;
-					}
-				}
-			}
-			if (nearActiveFire) {
-				roofTiles[i].burning = true;
-			}
-			roofs.push(roofTiles[i]);
 		}
 	}
 

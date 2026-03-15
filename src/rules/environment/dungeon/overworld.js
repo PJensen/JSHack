@@ -28,6 +28,7 @@ import {
   TILE_FENCE,
   TILE_COBBLESTONE,
 } from "./constants.js";
+import { setRoofed } from "./tileMap.js";
 
 export const OVERWORLD_EXTENT = Object.freeze({
   minCX: -2,
@@ -211,6 +212,11 @@ function xyKey(x, y) {
   return `${x},${y}`;
 }
 
+function setStructureTile(chunks, x, y, tile, roofed = false) {
+  setWorldTile(chunks, x, y, tile);
+  setRoofed(x, y, roofed);
+}
+
 /**
  * Paint a wall-bounded structure from explicit interior floor cells.
  * The wall ring is inferred from the interior, so irregular plans stay easy to author.
@@ -223,7 +229,7 @@ function paintStructure(chunks, floorCells, door) {
   const wallKeys = new Set();
 
   for (const cell of floorCells) {
-    setWorldTile(chunks, cell.x, cell.y, TILE_FLOOR);
+    setStructureTile(chunks, cell.x, cell.y, TILE_FLOOR, true);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
@@ -239,9 +245,9 @@ function paintStructure(chunks, floorCells, door) {
 
   for (const key of wallKeys) {
     const [x, y] = key.split(",").map(Number);
-    setWorldTile(chunks, x, y, TILE_WALL);
+    setStructureTile(chunks, x, y, TILE_WALL, true);
   }
-  setWorldTile(chunks, door.x, door.y, TILE_DOOR);
+  setStructureTile(chunks, door.x, door.y, TILE_DOOR, true);
 }
 
 /**
@@ -373,11 +379,11 @@ export function generateOverworldChunks(worldSeed) {
   for (let y = homeY - halfH; y <= homeY + halfH; y++) {
     for (let x = homeX - halfW; x <= homeX + halfW; x++) {
       const border = x === homeX - halfW || x === homeX + halfW || y === homeY - halfH || y === homeY + halfH;
-      setWorldTile(chunks, x, y, border ? TILE_WALL : TILE_FLOOR);
+      setStructureTile(chunks, x, y, border ? TILE_WALL : TILE_FLOOR, true);
     }
   }
 
-  setWorldTile(chunks, doorX, doorY, TILE_DOOR);
+  setStructureTile(chunks, doorX, doorY, TILE_DOOR, true);
 
   // Settlement walkways: a simple ring around the house plus a front path to the farm gate.
   carvePath(chunks, westWalkX, northWalkY, eastWalkX, northWalkY);
@@ -600,11 +606,11 @@ export function generateOverworldChunks(worldSeed) {
   for (let my = millY0; my <= millY1; my++) {
     for (let mx = millX0; mx <= millX1; mx++) {
       const border = mx === millX0 || mx === millX1 || my === millY0 || my === millY1;
-      setWorldTile(chunks, mx, my, border ? TILE_WALL : TILE_FLOOR);
+      setStructureTile(chunks, mx, my, border ? TILE_WALL : TILE_FLOOR, true);
     }
   }
   const millDoorX = millX0 + 2;
-  setWorldTile(chunks, millDoorX, millY1, TILE_DOOR);
+  setStructureTile(chunks, millDoorX, millY1, TILE_DOOR, true);
   carvePath(chunks, millDoorX, millY1 + 1, westWalkX, northWalkY);
   // Interior
   addSpawn(chunks, millX0 + 2, millY0 + 2, "millstone");
