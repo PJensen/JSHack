@@ -243,6 +243,67 @@ Deno.test("shopkeeper AI can unlock their own shop door with the matching key", 
   assert(!world.has(actor, MoveIntent), "opening the door should consume the action for this tick");
 });
 
+Deno.test("herbalist AI can unlock the apothecary door when given the shared shop key", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 6] = TILE_DOOR;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 91 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, {
+    worldSeed: 91,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 5, y: 5 });
+
+  const actor = world.create();
+  const lockId = "overworld:shop:alchemist:6,5";
+  world.add(actor, Position, { x: 5, y: 5 });
+  world.add(actor, Faction, { key: "townfolk" });
+  world.add(actor, Inventory, { capacity: 5 });
+  world.add(actor, Equipment, {});
+  world.add(actor, TownfolkJob, {
+    role: "herbalist",
+    state: TOWNFOLK_STATES.walking,
+    scheduleEnabled: false,
+    homeX: 5, homeY: 5,
+    bedX: 5, bedY: 5,
+    workX: 7, workY: 5,
+    workAuxX: 7, workAuxY: 5,
+    pubX: 5, pubY: 5,
+    targetX: 7,
+    targetY: 5,
+    workTurns: 0,
+    idleTurns: 0,
+    workSiteKind: "",
+    routineKind: "",
+    lastPhase: "",
+    carrying: "",
+    carryCount: 0,
+    carryMax: 0,
+    deliverX: 0,
+    deliverY: 0,
+    stuckTurns: 0,
+  });
+  addToInventory(world, actor, createKey(world, lockId, "Apothecary Key"));
+
+  const doorId = createDoor(world, 6, 5, lockId, true);
+  aiTownfolkSystem(world);
+
+  const door = world.get(doorId, DoorState);
+  assertEquals(door.open, true);
+  assertEquals(door.locked, false);
+  assert(!world.has(actor, MoveIntent), "opening the door should consume the action for this tick");
+});
+
 Deno.test("dead shopkeeper drops their shop key", () => {
   const world = new World({ seed: 10 });
   const actor = world.create();
@@ -307,6 +368,44 @@ Deno.test("overworld gem vendor gets a keyed locked shop door after generation",
   assertEquals(doorState.locked, true);
   assert(doorLock?.lockId?.includes("gem_vendor"), "expected gem shop door lock to be assigned");
   assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
+});
+
+Deno.test("overworld herbalist gets a matching apothecary key for shared shop access", () => {
+  clearAll();
+  const world = new World({ seed: 0xC0FFEE });
+  generateFloor(world, world.seed >>> 0, 0);
+
+  let herbalistId = 0;
+  let alchemistId = 0;
+  for (const [id, named] of world.query(NamedIdentity)) {
+    if (named.identity === "townfolk_herbalist") herbalistId = id;
+    if (named.identity === "townfolk_alchemist") alchemistId = id;
+  }
+  assert(herbalistId > 0, "expected herbalist to spawn");
+  assert(alchemistId > 0, "expected alchemist to spawn");
+
+  let shopRoom = null;
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType === "shop" && room.shopkeeperId === alchemistId) {
+      shopRoom = room;
+      break;
+    }
+  }
+  assert(shopRoom, "expected apothecary shop room metadata");
+
+  let shopDoorId = 0;
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (isDoorOnRoomPerimeter(pos, shopRoom)) {
+      shopDoorId = id;
+      break;
+    }
+  }
+  assert(shopDoorId > 0, "expected a physical apothecary door");
+
+  const doorLock = world.get(shopDoorId, DoorLock);
+  const matchingKeyIds = inventoryItems(world, herbalistId)
+    .filter((itemId) => String(world.get(itemId, DoorKey)?.lockId || "") === String(doorLock?.lockId || ""));
+  assertEquals(matchingKeyIds.length, 1, "herbalist should have exactly one matching apothecary key");
 });
 
 Deno.test("scheduled gem vendor stays in the shop while the player is inside", () => {
