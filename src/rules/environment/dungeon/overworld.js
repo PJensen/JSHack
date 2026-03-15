@@ -957,6 +957,8 @@ export function generateOverworldChunks(worldSeed) {
     workAuxX: gardenX + 1, workAuxY: gardenY + 1,
     pubX: tavX0 + 3, pubY: tavY0 + 2,
     deliverX: apothX0 + 1, deliverY: apothY0 + 3,
+    shopDoorRole: apothResult.shop?.vendorRole || "alchemist",
+    shopDoor: { x: apothDoor.x, y: apothDoor.y },
   });
   addSpawn(chunks, alchemistHouse.standX, alchemistHouse.standY, "townfolk", {
     townfolkId: apothResult.shop?.vendorRole || "alchemist",

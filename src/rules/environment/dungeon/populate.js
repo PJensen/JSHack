@@ -1220,7 +1220,7 @@ export function materializeSpawn(world, spawn) {
           params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
         });
         world.add(id, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
-        assignShopDoorKey(world, id, def.role, spawn.params.shopDoor);
+        assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
         if (spawn.params.shopRoom) {
           const roomEntity = world.create();
           world.add(roomEntity, RoomMetadata, {
@@ -1238,7 +1238,7 @@ export function materializeSpawn(world, spawn) {
           params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
         });
         world.add(id, ShopInventory, { buyMarkup: 1.5, sellDiscount: 0.5 });
-        assignShopDoorKey(world, id, def.role, spawn.params.shopDoor);
+        assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
         if (spawn.params.shopRoom) {
           const roomEntity = world.create();
           world.add(roomEntity, RoomMetadata, {
@@ -1273,6 +1273,9 @@ export function materializeSpawn(world, spawn) {
             dialogId: `townfolk:${def.role}`,
           },
         });
+        if (spawn.params.shopDoor) {
+          assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
+        }
       }
       // Miner spawns with pickaxe equipped
       if (def.role === "miner") {
