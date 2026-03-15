@@ -7,6 +7,7 @@ import smithyDef from "../../data/buildings/smithy.json" with { type: "json" };
 import churchDef from "../../data/buildings/church.json" with { type: "json" };
 import apothecaryDef from "../../data/buildings/apothecary.json" with { type: "json" };
 import gemStoreDef from "../../data/buildings/gem_store.json" with { type: "json" };
+import herbalistHutDef from "../../data/buildings/herbalist_hut.json" with { type: "json" };
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -804,8 +805,14 @@ export function generateOverworldChunks(worldSeed) {
   const woodcutterBed = smithyBeds[2] || minerBed;
   const woodcutterHome = smithyResult.waypoints?.woodcutter_home || { x: woodcutterBed.x + 1, y: woodcutterBed.y };
 
-  const herbalistHouse = buildCottage(chunks, apothX0 - 4, apothY0 - 8, "south");
-  carvePathVerticalFirst(chunks, herbalistHouse.doorX, herbalistHouse.doorY + 1, apothDoorX - 3, apothDoorY + 1);
+  const herbalistDoorX = apothX0 - 2;
+  const herbalistDoorY = apothY0 - 4;
+  const herbalistResult = stampBuilding(chunks, herbalistHutDef, herbalistDoorX, herbalistDoorY);
+  const herbalistDoor = herbalistResult.waypoints?.front_door || { x: herbalistDoorX, y: herbalistDoorY };
+  const herbalistHome = herbalistResult.waypoints?.resident_home || { x: herbalistDoorX, y: herbalistDoorY - 2 };
+  const herbalistBed = herbalistResult.spawns?.home_bed || { x: herbalistDoorX - 2, y: herbalistDoorY - 4 };
+  const herbalistWork = herbalistResult.waypoints?.herb_work || { x: herbalistDoorX + 1, y: herbalistDoorY - 3 };
+  carvePathVerticalFirst(chunks, herbalistDoor.x, herbalistDoor.y + 1, apothDoorX - 2, apothDoorY + 1);
 
   const alchemistHouse = buildCottage(chunks, apothX0 + 8, apothY0 - 8, "south");
   carvePathVerticalFirst(chunks, alchemistHouse.doorX, alchemistHouse.doorY + 1, apothDoorX + 3, apothDoorY + 1);
@@ -838,7 +845,7 @@ export function generateOverworldChunks(worldSeed) {
     { x: villagerHouse.doorX - 1, y: villagerHouse.doorY - 1 },
     { x: priestHouse.doorX + 1, y: priestHouse.doorY + 1 },
     { x: barkeepHouse.doorX - 1, y: barkeepHouse.doorY + 1 },
-    { x: herbalistHouse.doorX + 1, y: herbalistHouse.doorY + 1 },
+    { x: herbalistDoor.x + 1, y: herbalistDoor.y + 1 },
     { x: alchemistHouse.doorX - 1, y: alchemistHouse.doorY + 1 },
     { x: gemVendorHouse.doorX + 1, y: gemVendorHouse.doorY + 1 },
   ];
@@ -948,17 +955,15 @@ export function generateOverworldChunks(worldSeed) {
     workAuxX: churchDoorX, workAuxY: northWalkY,
     pubX: tavX0 + 1, pubY: tavY0 + 2,
   });
-  addSpawn(chunks, herbalistHouse.standX, herbalistHouse.standY, "townfolk", {
+  addSpawn(chunks, herbalistHome.x, herbalistHome.y, "townfolk", {
     townfolkId: "herbalist",
     scheduleEnabled: true,
-    homeX: herbalistHouse.standX, homeY: herbalistHouse.standY,
-    bedX: herbalistHouse.sleepX, bedY: herbalistHouse.sleepY,
+    homeX: herbalistHome.x, homeY: herbalistHome.y,
+    bedX: herbalistBed.x, bedY: herbalistBed.y,
     workX: gardenX, workY: gardenY,
-    workAuxX: gardenX + 1, workAuxY: gardenY + 1,
+    workAuxX: herbalistWork.x, workAuxY: herbalistWork.y,
     pubX: tavX0 + 3, pubY: tavY0 + 2,
-    deliverX: apothX0 + 1, deliverY: apothY0 + 3,
-    shopDoorRole: apothResult.shop?.vendorRole || "alchemist",
-    shopDoor: { x: apothDoor.x, y: apothDoor.y },
+    deliverX: herbalistWork.x, deliverY: herbalistWork.y,
   });
   addSpawn(chunks, alchemistHouse.standX, alchemistHouse.standY, "townfolk", {
     townfolkId: apothResult.shop?.vendorRole || "alchemist",
