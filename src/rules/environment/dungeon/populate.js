@@ -1208,7 +1208,7 @@ export function materializeSpawn(world, spawn) {
         lastPhase: "",
         carrying: "",
         carryCount: 0,
-        carryMax: def.role === "farmer" ? 4 : 0,
+        carryMax: def.role === "farmer" ? 4 : def.role === "herbalist" ? 3 : 0,
         deliverX,
         deliverY,
         stuckTurns: 0,

@@ -55,7 +55,7 @@
     { "dx": 1, "dy": -2, "tile": "floor" },
     { "dx": 2, "dy": -2, "tile": "floor" },
     { "dx": 3, "dy": -2, "tile": "wall" },
-    { "dx": 4, "dy": -2, "tile": "grass_c" },
+    { "dx": 4, "dy": -2, "tile": "wall" },
 
     { "dx": -4, "dy": -1, "tile": "wall" },
     { "dx": -3, "dy": -1, "tile": "wall" },
@@ -64,8 +64,8 @@
     { "dx": 0, "dy": -1, "tile": "floor" },
     { "dx": 1, "dy": -1, "tile": "floor" },
     { "dx": 2, "dy": -1, "tile": "wall" },
-    { "dx": 3, "dy": -1, "tile": "grass_c" },
-    { "dx": 4, "dy": -1, "tile": "grass_c" },
+    { "dx": 3, "dy": -1, "tile": "wall" },
+    { "dx": 4, "dy": -1, "tile": "wall" },
 
     { "dx": -1, "dy": 0, "tile": "wall" },
     { "dx": 0, "dy": 0, "tile": "door" },
