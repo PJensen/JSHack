@@ -35,6 +35,16 @@ import { initHUD } from "./display/ui/hud.js";
 import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
 import { createHudFeeds } from "./main/ui/hudFeeds.js";
+import {
+  getLogicalCanvasSize,
+  placeBubbleBox,
+  projectBubbleAnchor,
+} from "./main/ui/bubblePlacement.js";
+import {
+  activateScriptedSpeechBubble,
+  advanceScriptedSpeechBubble,
+  createScriptedSpeechBubble,
+} from "./main/ui/scriptedSpeechState.js";
 import { createActiveSpellController } from "./main/spells/activeSpellController.js";
 import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
@@ -155,6 +165,15 @@ const CAMERA_START_SCALE = (() => {
   return window.matchMedia("(max-width: 760px)").matches
     ? CAMERA_START_SCALE_MOBILE
     : CAMERA_START_SCALE_DESKTOP;
+})();
+const OPENING_CAMERA_SCALE_MOBILE = TILE_PX * 0.82;
+const OPENING_CAMERA_SCALE = (() => {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return CAMERA_START_SCALE;
+  }
+  return window.matchMedia("(max-width: 760px)").matches
+    ? OPENING_CAMERA_SCALE_MOBILE
+    : CAMERA_START_SCALE;
 })();
 
 const _canvasSetup = createCanvasSetup({ canvasId: 'stage', TILE_PX, dprCap: PERF.dprCap });
@@ -329,6 +348,10 @@ let _scriptedSpeechBubble = {
   delaySec: 0,
   ttlSec: 0,
   durationSec: 0,
+  delayTurns: 0,
+  holdTurns: 0,
+  usesTurnPacing: false,
+  lastStepSeen: null,
   onShow: null,
 };
 let _scriptedSpeechBubbleQueue = [];
@@ -346,17 +369,30 @@ let _scriptedWalk = {
   onArrive: null,
 };
 
-function queueScriptedSpeechBubble({ entityId, text, delaySec = 0, durationSec = 3.4, onShow = null }) {
-  const next = {
-    entityId: Number(entityId || 0) | 0,
-    text: String(text || ""),
-    delaySec: Math.max(0, Number(delaySec) || 0),
-    ttlSec: Math.max(0, Number(durationSec) || 0),
-    durationSec: Math.max(0, Number(durationSec) || 0),
-    onShow: typeof onShow === "function" ? onShow : null,
-  };
+function activateQueuedScriptedSpeechBubble(next) {
+  _scriptedSpeechBubble = activateScriptedSpeechBubble(next, world.step | 0);
+}
+
+function queueScriptedSpeechBubble({
+  entityId,
+  text,
+  delaySec = 0,
+  durationSec = 3.4,
+  delayTurns = 0,
+  holdTurns = 0,
+  onShow = null,
+}) {
+  const next = createScriptedSpeechBubble({
+    entityId,
+    text,
+    delaySec,
+    durationSec,
+    delayTurns,
+    holdTurns,
+    onShow,
+  });
   if (!(_scriptedSpeechBubble.entityId > 0) && !_scriptedSpeechBubble.text) {
-    _scriptedSpeechBubble = next;
+    activateQueuedScriptedSpeechBubble(next);
     return;
   }
   _scriptedSpeechBubbleQueue.push(next);
@@ -413,57 +449,123 @@ function tickScriptedWalk(dtSec) {
 
 function tickScriptedSpeechBubble(dtSec) {
   if (!(_scriptedSpeechBubble.entityId > 0) || !_scriptedSpeechBubble.text) return;
-  const dt = Math.max(0, Number(dtSec) || 0);
-  if (_scriptedSpeechBubble.delaySec > 0) {
-    _scriptedSpeechBubble.delaySec = Math.max(0, _scriptedSpeechBubble.delaySec - dt);
-    if (_scriptedSpeechBubble.delaySec === 0 && typeof _scriptedSpeechBubble.onShow === "function") {
-      const fn = _scriptedSpeechBubble.onShow;
-      _scriptedSpeechBubble.onShow = null;
-      try { fn(); } catch (e) { console.debug("[main] scripted speech bubble onShow failed:", e); }
+  const result = advanceScriptedSpeechBubble(_scriptedSpeechBubble, world.step | 0, dtSec);
+  _scriptedSpeechBubble = result.bubble;
+  if (typeof result.onShow === "function") {
+    try { result.onShow(); } catch (e) { console.debug("[main] scripted speech bubble onShow failed:", e); }
+  }
+  if (result.isExpired) {
+    const next = _scriptedSpeechBubbleQueue.shift();
+    if (next) activateQueuedScriptedSpeechBubble(next);
+    else {
+      _scriptedSpeechBubble = createScriptedSpeechBubble({ entityId: 0, text: "" });
     }
-    return;
   }
-  _scriptedSpeechBubble.ttlSec = Math.max(0, _scriptedSpeechBubble.ttlSec - dt);
-  if (_scriptedSpeechBubble.ttlSec <= 0) {
-    _scriptedSpeechBubble = _scriptedSpeechBubbleQueue.shift() || { entityId: 0, text: "", delaySec: 0, ttlSec: 0, durationSec: 0, onShow: null };
-  }
+}
+
+function getSpeakerBubbleLiftPx() {
+  const scale = Math.max(1, Number(cam?.scale) || 1);
+  return Math.max(32, Math.min(96, Math.round(scale * 1.15)));
+}
+
+function getSpeakerBubbleAnchorPos(pos) {
+  return {
+    x: Number(pos?.x || 0),
+    y: Number(pos?.y || 0) - 0.68,
+  };
 }
 
 function drawScriptedSpeechBubble(ctx) {
   const bubble = _scriptedSpeechBubble;
-  if (!(bubble.entityId > 0) || !bubble.text || bubble.delaySec > 0) return;
+  if (!(bubble.entityId > 0) || !bubble.text) return;
+  if (bubble.delaySec > 0) return;
+  if (bubble.usesTurnPacing && (bubble.delayTurns | 0) > 0) return;
   if (!world.isAlive(bubble.entityId)) return;
   const pos = world.get(bubble.entityId, Position);
   if (!pos) return;
 
-  const [sx, sy] = worldToScreen(cam, pos.x, pos.y, back);
-  const padX = 12;
-  const padY = 8;
-  const maxWidth = Math.min(canvas.width * 0.44, 360);
+  const anchor = getSpeakerBubbleAnchorPos(pos);
+  const logicalCanvas = getLogicalCanvasSize(canvas, _canvasSetup.cssW, _canvasSetup.cssH);
+  const projected = projectBubbleAnchor(
+    cam,
+    anchor,
+    logicalCanvas,
+    { left: 0, top: 0 }
+  );
+  const dprScale = Math.max(
+    1,
+    canvas.width / Math.max(1, logicalCanvas.width)
+  );
+  const sx = projected.localX * dprScale;
+  const sy = projected.localY * dprScale;
+  const padX = 12 * dprScale;
+  const maxWidth = Math.min(logicalCanvas.width * 0.44, 360) * dprScale;
   const text = bubble.text;
   const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
 
   ctx.save();
-  ctx.font = "600 15px 'Trebuchet MS', sans-serif";
+  ctx.font = `600 ${Math.round(15 * dprScale)}px 'Trebuchet MS', sans-serif`;
   const textWidth = Math.min(maxWidth, Math.ceil(ctx.measureText(text).width));
   const boxW = textWidth + (padX * 2);
-  const boxH = 34;
-  const boxX = Math.round(sx - (boxW / 2));
-  const boxY = Math.round(sy - 62);
+  const boxH = 34 * dprScale;
+  const lift = getSpeakerBubbleLiftPx() * dprScale;
+  const tailH = Math.max(14, 14 * dprScale);
+  const tailHalfW = Math.max(10, 10 * dprScale);
+  const placed = placeBubbleBox({
+    anchorX: sx,
+    anchorY: sy,
+    boxWidth: boxW,
+    boxHeight: boxH,
+    liftPx: lift,
+    tailHeight: tailH,
+    viewportWidth: canvas.width,
+    viewportHeight: canvas.height,
+    margin: 10 * dprScale,
+    bottomMargin: 30 * dprScale,
+  });
+  const boxX = placed.left;
+  const boxY = placed.top;
   const alpha = 0.78 + (fade * 0.22);
+  const tailTipX = Math.round(sx - (2 * dprScale));
+  const tailTipY = boxY + boxH + tailH;
+  const lineDx = sx - tailTipX;
+  const lineDy = sy - tailTipY;
+  const lineDist = Math.hypot(lineDx, lineDy);
+
+  if (lineDist > (8 * dprScale)) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(90,74,48,${Math.min(1, alpha + 0.08).toFixed(3)})`;
+    ctx.lineWidth = Math.max(2, 3 * dprScale);
+    ctx.setLineDash([Math.max(5, 7 * dprScale), Math.max(4, 6 * dprScale)]);
+    ctx.lineDashOffset = 0;
+    ctx.beginPath();
+    ctx.moveTo(tailTipX, tailTipY);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(252,248,238,${Math.min(1, alpha + 0.16).toFixed(3)})`;
+    ctx.strokeStyle = `rgba(75,62,43,${Math.min(1, alpha + 0.12).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1.5, 2.5 * dprScale);
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, Math.max(4, 5 * dprScale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 
   ctx.fillStyle = `rgba(253,249,235,${alpha.toFixed(3)})`;
   ctx.strokeStyle = `rgba(57,46,32,${Math.min(1, alpha + 0.1).toFixed(3)})`;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = Math.max(1, 2 * dprScale);
   ctx.beginPath();
-  ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+  ctx.roundRect(boxX, boxY, boxW, boxH, 12 * dprScale);
   ctx.fill();
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(Math.round(sx - 8), boxY + boxH - 1);
-  ctx.lineTo(Math.round(sx + 2), boxY + boxH - 1);
-  ctx.lineTo(Math.round(sx - 2), boxY + boxH + 12);
+  ctx.moveTo(Math.round(sx - tailHalfW), boxY + boxH - 1);
+  ctx.lineTo(Math.round(sx + (tailHalfW * 0.25)), boxY + boxH - 1);
+  ctx.lineTo(tailTipX, tailTipY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -471,7 +573,7 @@ function drawScriptedSpeechBubble(ctx) {
   ctx.fillStyle = `rgba(32,26,18,${Math.min(1, alpha + 0.12).toFixed(3)})`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, Math.round(sx), boxY + Math.round(boxH / 2) + 1, maxWidth);
+  ctx.fillText(text, Math.round(sx), boxY + Math.round(boxH / 2) + dprScale, maxWidth);
   ctx.restore();
 }
 
@@ -480,6 +582,9 @@ function createBubbleDialogUi() {
   const title = document.createElement("div");
   const body = document.createElement("div");
   const choices = document.createElement("div");
+  const tail = document.createElement("div");
+  const connector = document.createElement("div");
+  const speakerDot = document.createElement("div");
 
   el.id = "speech-bubble-dialog";
   Object.assign(el.style, {
@@ -497,6 +602,48 @@ function createBubbleDialogUi() {
     background: "rgba(252,248,238,0.98)",
     boxShadow: "0 10px 28px rgba(0,0,0,0.28)",
     transform: "translate(-9999px, -9999px)",
+    overflow: "visible",
+  });
+  Object.assign(tail.style, {
+    position: "absolute",
+    left: "50%",
+    bottom: "-14px",
+    width: "20px",
+    height: "20px",
+    background: "rgba(252,248,238,0.98)",
+    borderRight: "2px solid rgba(75,62,43,0.9)",
+    borderBottom: "2px solid rgba(75,62,43,0.9)",
+    transform: "translateX(-50%) rotate(45deg)",
+    borderBottomRightRadius: "4px",
+    pointerEvents: "none",
+    boxShadow: "4px 4px 10px rgba(0,0,0,0.10)",
+  });
+  Object.assign(connector.style, {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    width: "0",
+    height: "3px",
+    display: "none",
+    pointerEvents: "none",
+    transformOrigin: "0 50%",
+    backgroundImage: "repeating-linear-gradient(90deg, rgba(90,74,48,0.92) 0 7px, rgba(90,74,48,0) 7px 13px)",
+    filter: "drop-shadow(0 0 1px rgba(255,250,240,0.85))",
+    zIndex: "91",
+  });
+  Object.assign(speakerDot.style, {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    width: "10px",
+    height: "10px",
+    display: "none",
+    pointerEvents: "none",
+    borderRadius: "999px",
+    border: "2px solid rgba(75,62,43,0.95)",
+    background: "rgba(252,248,238,1)",
+    boxShadow: "0 0 0 2px rgba(255,250,240,0.65)",
+    zIndex: "92",
   });
   Object.assign(title.style, {
     font: "700 14px 'Trebuchet MS', sans-serif",
@@ -517,8 +664,11 @@ function createBubbleDialogUi() {
   el.appendChild(title);
   el.appendChild(body);
   el.appendChild(choices);
+  el.appendChild(tail);
+  document.body.appendChild(connector);
+  document.body.appendChild(speakerDot);
   document.body.appendChild(el);
-  return { el, title, body, choices };
+  return { el, title, body, choices, tail, connector, speakerDot };
 }
 
 const bubbleDialogUi = createBubbleDialogUi();
@@ -527,6 +677,9 @@ function closeBubbleDialog() {
   _bubbleDialogState = { open: false, sessionId: 0, actorId: 0, targetId: 0 };
   bubbleDialogUi.el.style.display = "none";
   bubbleDialogUi.el.style.transform = "translate(-9999px, -9999px)";
+  bubbleDialogUi.connector.style.display = "none";
+  bubbleDialogUi.connector.style.width = "0";
+  bubbleDialogUi.speakerDot.style.display = "none";
   bubbleDialogUi.choices.innerHTML = "";
 }
 
@@ -591,16 +744,42 @@ function layoutBubbleDialog() {
     closeBubbleDialog();
     return;
   }
-  const cssCanvas = {
+  const anchor = getSpeakerBubbleAnchorPos(pos);
+  const rect = typeof canvas.getBoundingClientRect === "function"
+    ? canvas.getBoundingClientRect()
+    : { left: 0, top: 0, width: canvas.offsetWidth || _canvasSetup.cssW, height: canvas.offsetHeight || _canvasSetup.cssH };
+  const logicalCanvas = {
     width: canvas.offsetWidth || _canvasSetup.cssW,
     height: canvas.offsetHeight || _canvasSetup.cssH,
   };
-  const [sx, sy] = worldToScreen(cam, pos.x, pos.y, cssCanvas);
+  const [localX, localY] = worldToScreen(cam, anchor.x, anchor.y, logicalCanvas);
+  const sx = rect.left + localX;
+  const sy = rect.top + localY;
   const boxW = bubbleDialogUi.el.offsetWidth || 280;
   const boxH = bubbleDialogUi.el.offsetHeight || 120;
-  const left = Math.max(10, Math.min(cssCanvas.width - boxW - 10, Math.round(sx - (boxW / 2))));
-  const top = Math.max(10, Math.min(cssCanvas.height - boxH - 30, Math.round(sy - boxH - 42)));
+  const lift = getSpeakerBubbleLiftPx();
+  const viewportW = typeof window !== "undefined" ? window.innerWidth : logicalCanvas.width;
+  const viewportH = typeof window !== "undefined" ? window.innerHeight : logicalCanvas.height;
+  const left = Math.max(10, Math.min(viewportW - boxW - 10, Math.round(sx - (boxW / 2))));
+  const top = Math.max(10, Math.min(viewportH - boxH - 30, Math.round(sy - boxH - 12 - lift)));
   bubbleDialogUi.el.style.transform = `translate(${left}px, ${top}px)`;
+
+  const tailTipX = left + (boxW * 0.5);
+  const tailTipY = top + boxH + 18;
+  const dx = sx - tailTipX;
+  const dy = sy - tailTipY;
+  const dist = Math.hypot(dx, dy);
+  if (dist > 6) {
+    bubbleDialogUi.connector.style.display = "block";
+    bubbleDialogUi.connector.style.width = `${Math.round(dist)}px`;
+    bubbleDialogUi.connector.style.transform = `translate(${Math.round(tailTipX)}px, ${Math.round(tailTipY)}px) rotate(${Math.atan2(dy, dx)}rad)`;
+    bubbleDialogUi.speakerDot.style.display = "block";
+    bubbleDialogUi.speakerDot.style.transform = `translate(${Math.round(sx - 5)}px, ${Math.round(sy - 5)}px)`;
+  } else {
+    bubbleDialogUi.connector.style.display = "none";
+    bubbleDialogUi.connector.style.width = "0";
+    bubbleDialogUi.speakerDot.style.display = "none";
+  }
 }
 
 function stopOpeningSequence() {
@@ -640,6 +819,7 @@ function handOffOpeningCameraToPlayer() {
   if (!_openingSequence.active) return;
   _openingSequence.cameraLocked = false;
   _openingSequence.awaitingPrayer = true;
+  zoomTo(cam, CAMERA_START_SCALE, 0.28);
   syncOpeningPrayerGateFlag();
   syncPrayButtonHighlight(true);
   showOpeningPrayerPrompt();
@@ -677,6 +857,7 @@ function startOpeningSequence() {
     cam.targetX = dragonPos.x;
     cam.targetY = dragonPos.y;
   }
+  zoomTo(cam, OPENING_CAMERA_SCALE, 0.3);
 }
 
 function tickOpeningSequence(dtSec) {
@@ -794,14 +975,12 @@ world.on("prayer", ({ actor }) => {
             queueScriptedSpeechBubble({
               entityId: priestId,
               text: "The gods have blessed this town through you. Thank you for saving us.",
-              delaySec: 0.2,
-              durationSec: 3.4,
+              holdTurns: 2,
             });
             queueScriptedSpeechBubble({
               entityId: priestId,
               text: "Do not fear the wreckage. We'll have the square singing again in a few days.",
-              delaySec: 0.15,
-              durationSec: 4.2,
+              holdTurns: 2,
             });
           },
         });
@@ -1974,6 +2153,15 @@ addEventListener("ui:openBubbleDialog", (ev) => {
 
 addEventListener("ui:closeBubbleDialog", () => {
   closeBubbleDialog();
+});
+
+addEventListener("keydown", (ev) => {
+  if (!_bubbleDialogState.open) return;
+  if (ev.key !== "Escape") return;
+  window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
+    detail: { sessionId: _bubbleDialogState.sessionId },
+  }));
+  ev.preventDefault();
 });
 
 // Spell picker data feed and selection
