@@ -62,6 +62,7 @@ export function setupDisplayRuntime({
     getActiveSpellId,
     setActiveSpell,
     getPlayerEntity,
+    getPosition,
     getItemInfo,
     resolveItemDisplayName,
     dispatchRulesAction,

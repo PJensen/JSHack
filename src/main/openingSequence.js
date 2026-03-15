@@ -8,6 +8,7 @@ import { Vitality } from "../rules/components/Vitality.js";
 import { isFlyable } from "../rules/environment/dungeon/tileMap.js";
 import { getMonster } from "../rules/data/monsters.js";
 import { dealDamage } from "../rules/utils/dealDamage.js";
+import { findNearestValidTileAround } from "../rules/utils/queries.js";
 import { hasLOS } from "../shared/math/gridLOS.js";
 import { spawnMonsterEntity } from "../rules/utils/spawnMonsterEntity.js";
 import { buildBlocksVisionMap, blockedCallback } from "../rules/utils/vision.js";
@@ -215,4 +216,37 @@ export function primeOpeningDeityFavor(deity) {
   }
   deity._prevDominant = "serenity";
   return true;
+}
+
+export function bringOpeningPriestToPlayer(world, playerId) {
+  const actorId = Number(playerId || 0) | 0;
+  if (!(actorId > 0) || !world.isAlive(actorId)) return 0;
+
+  let priestId = 0;
+  for (const [id, ident] of world.query(NamedIdentity)) {
+    if (String(ident?.identity || "") === "townfolk_priest") {
+      priestId = id;
+      break;
+    }
+  }
+  if (!(priestId > 0) || !world.isAlive(priestId)) return 0;
+
+  const playerPos = world.get(actorId, Position);
+  if (!playerPos) return 0;
+  const priestPos = world.get(priestId, Position);
+  const landing = findNearestValidTileAround(world, playerPos, {
+    maxDistance: 2,
+    exclude: [{ x: playerPos.x | 0, y: playerPos.y | 0 }],
+  });
+  if (!landing) return priestId;
+
+  world.set(priestId, Position, { x: landing.x | 0, y: landing.y | 0 });
+  try {
+    world.emit?.("moved", {
+      id: priestId,
+      from: priestPos ? { x: priestPos.x | 0, y: priestPos.y | 0 } : { x: landing.x | 0, y: landing.y | 0 },
+      to: { x: landing.x | 0, y: landing.y | 0 },
+    });
+  } catch {}
+  return priestId;
 }

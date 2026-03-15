@@ -9,7 +9,7 @@ import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.
 import { getPassiveBonuses } from "./rules/utils/passiveBonuses.js";
 
 // display/ camera + director utilities (pure display resources)
-import { createCamera, updateCamera, applyCamera, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
+import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
 import { updateShake } from "./display/camera/shake.js";
 import { zoomTo } from "./display/camera/utils.js";
 import {
@@ -323,6 +323,146 @@ function openingPromptY(pos) {
   return (Number(pos?.y || 0) - 1.15);
 }
 
+let _scriptedSpeechBubble = {
+  entityId: 0,
+  text: "",
+  delaySec: 0,
+  ttlSec: 0,
+  durationSec: 0,
+  onShow: null,
+};
+let _scriptedWalk = {
+  entityId: 0,
+  target: null,
+  stepDelaySec: 0,
+  accumulatorSec: 0,
+  onArrive: null,
+};
+
+function queueScriptedSpeechBubble({ entityId, text, delaySec = 0, durationSec = 3.4, onShow = null }) {
+  _scriptedSpeechBubble = {
+    entityId: Number(entityId || 0) | 0,
+    text: String(text || ""),
+    delaySec: Math.max(0, Number(delaySec) || 0),
+    ttlSec: Math.max(0, Number(durationSec) || 0),
+    durationSec: Math.max(0, Number(durationSec) || 0),
+    onShow: typeof onShow === "function" ? onShow : null,
+  };
+}
+
+function queueScriptedWalk({ entityId, target, stepDelaySec = 0.18, onArrive = null }) {
+  _scriptedWalk = {
+    entityId: Number(entityId || 0) | 0,
+    target: target && Number.isInteger(target.x) && Number.isInteger(target.y)
+      ? { x: target.x | 0, y: target.y | 0 }
+      : null,
+    stepDelaySec: Math.max(0.05, Number(stepDelaySec) || 0.18),
+    accumulatorSec: 0,
+    onArrive: typeof onArrive === "function" ? onArrive : null,
+  };
+}
+
+function tickScriptedWalk(dtSec) {
+  if (!(_scriptedWalk.entityId > 0) || !_scriptedWalk.target) return;
+  if (!world.isAlive(_scriptedWalk.entityId)) {
+    _scriptedWalk = { entityId: 0, target: null, stepDelaySec: 0, accumulatorSec: 0, onArrive: null };
+    return;
+  }
+  _scriptedWalk.accumulatorSec += Math.max(0, Number(dtSec) || 0);
+  while (_scriptedWalk.accumulatorSec >= _scriptedWalk.stepDelaySec) {
+    _scriptedWalk.accumulatorSec -= _scriptedWalk.stepDelaySec;
+    const pos = world.get(_scriptedWalk.entityId, Position);
+    if (!pos) break;
+    const tx = _scriptedWalk.target.x | 0;
+    const ty = _scriptedWalk.target.y | 0;
+    const dx = tx - (pos.x | 0);
+    const dy = ty - (pos.y | 0);
+    if (dx === 0 && dy === 0) {
+      const fn = _scriptedWalk.onArrive;
+      _scriptedWalk = { entityId: 0, target: null, stepDelaySec: 0, accumulatorSec: 0, onArrive: null };
+      if (typeof fn === "function") {
+        try { fn(); } catch (e) { console.debug("[main] scripted walk onArrive failed:", e); }
+      }
+      return;
+    }
+    const stepX = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
+    const stepY = stepX === 0 ? Math.sign(dy) : 0;
+    const next = { x: (pos.x | 0) + stepX, y: (pos.y | 0) + stepY };
+    world.set(_scriptedWalk.entityId, Position, next);
+    try {
+      world.emit?.("moved", {
+        id: _scriptedWalk.entityId,
+        from: { x: pos.x | 0, y: pos.y | 0 },
+        to: next,
+      });
+    } catch {}
+  }
+}
+
+function tickScriptedSpeechBubble(dtSec) {
+  if (!(_scriptedSpeechBubble.entityId > 0) || !_scriptedSpeechBubble.text) return;
+  const dt = Math.max(0, Number(dtSec) || 0);
+  if (_scriptedSpeechBubble.delaySec > 0) {
+    _scriptedSpeechBubble.delaySec = Math.max(0, _scriptedSpeechBubble.delaySec - dt);
+    if (_scriptedSpeechBubble.delaySec === 0 && typeof _scriptedSpeechBubble.onShow === "function") {
+      const fn = _scriptedSpeechBubble.onShow;
+      _scriptedSpeechBubble.onShow = null;
+      try { fn(); } catch (e) { console.debug("[main] scripted speech bubble onShow failed:", e); }
+    }
+    return;
+  }
+  _scriptedSpeechBubble.ttlSec = Math.max(0, _scriptedSpeechBubble.ttlSec - dt);
+  if (_scriptedSpeechBubble.ttlSec <= 0) {
+    _scriptedSpeechBubble = { entityId: 0, text: "", delaySec: 0, ttlSec: 0, durationSec: 0, onShow: null };
+  }
+}
+
+function drawScriptedSpeechBubble(ctx) {
+  const bubble = _scriptedSpeechBubble;
+  if (!(bubble.entityId > 0) || !bubble.text || bubble.delaySec > 0) return;
+  if (!world.isAlive(bubble.entityId)) return;
+  const pos = world.get(bubble.entityId, Position);
+  if (!pos) return;
+
+  const [sx, sy] = worldToScreen(cam, pos.x, pos.y, back);
+  const padX = 12;
+  const padY = 8;
+  const maxWidth = Math.min(canvas.width * 0.44, 360);
+  const text = bubble.text;
+  const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
+
+  ctx.save();
+  ctx.font = "600 16px Georgia, serif";
+  const textWidth = Math.min(maxWidth, Math.ceil(ctx.measureText(text).width));
+  const boxW = textWidth + (padX * 2);
+  const boxH = 34;
+  const boxX = Math.round(sx - (boxW / 2));
+  const boxY = Math.round(sy - 62);
+  const alpha = 0.78 + (fade * 0.22);
+
+  ctx.fillStyle = `rgba(253,249,235,${alpha.toFixed(3)})`;
+  ctx.strokeStyle = `rgba(57,46,32,${Math.min(1, alpha + 0.1).toFixed(3)})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(Math.round(sx - 8), boxY + boxH - 1);
+  ctx.lineTo(Math.round(sx + 2), boxY + boxH - 1);
+  ctx.lineTo(Math.round(sx - 2), boxY + boxH + 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(32,26,18,${Math.min(1, alpha + 0.12).toFixed(3)})`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, Math.round(sx), boxY + Math.round(boxH / 2) + 1, maxWidth);
+  ctx.restore();
+}
+
 function stopOpeningSequence() {
   _openingSequence.active = false;
   _openingSequence.dragonId = 0;
@@ -493,6 +633,34 @@ world.on("prayer", ({ actor }) => {
     syncOpeningPrayerGateFlag();
     syncPrayButtonHighlight(false);
     _openingSequence.releaseDelaySec = OPENING_SEQUENCE_RELEASE_DELAY_SEC;
+    let priestId = 0;
+    for (const [id, ident] of world.query(NamedIdentity)) {
+      if (String(ident?.identity || "") === "townfolk_priest") {
+        priestId = id;
+        break;
+      }
+    }
+    if (priestId > 0) {
+      const arrivalTile = findNearestValidTileAround(world, pe.pos, {
+        maxDistance: 2,
+        exclude: [{ x: pe.pos.x | 0, y: pe.pos.y | 0 }],
+      });
+      if (arrivalTile) {
+        queueScriptedWalk({
+          entityId: priestId,
+          target: arrivalTile,
+          stepDelaySec: 0.18,
+          onArrive: () => {
+            queueScriptedSpeechBubble({
+              entityId: priestId,
+              text: "Sorry about the damage. We'll have this patched up in a couple days.",
+              delaySec: 0.2,
+              durationSec: 4.6,
+            });
+          },
+        });
+      }
+    }
     stopOpeningSequence();
   }
 });
@@ -2692,7 +2860,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   });
 }, { capture: true });
 
-function worldToScreen({ x, y, size = 1 }) {
+function particleWorldToScreen({ x, y, size = 1 }) {
   const sx = (x - cam.x) * cam.scale + canvas.width / (ctx.getTransform().a || 1) * 0.5;
   const sy = (y - cam.y) * cam.scale + canvas.height / (ctx.getTransform().d || 1) * 0.5;
   return { x: sx, y: sy, size: size * cam.scale };
@@ -2927,6 +3095,7 @@ const displayRuntime = setupDisplayRuntime({
   isPet: isPetEntity,
   isPlayer: isPlayerEntity,
   getPlayerEntity,
+  getPosition,
   getItemInfo,
   resolveItemDisplayName: resolveDisplayName,
   dispatchRulesAction,
@@ -4016,6 +4185,7 @@ function render(worldView) {
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
+  drawScriptedSpeechBubble(ctx);
 
   drawRulesProfilerOverlay({ ctx, quality: PERF.quality, prof: /** @type any */ (window).__JSHACK_RULES_PROF });
 }
@@ -4046,6 +4216,8 @@ function frame(now) {
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
+  tickScriptedWalk(dtSec);
+  tickScriptedSpeechBubble(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
   hudFeeds.updateVitalsHUD();
