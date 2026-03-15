@@ -29,9 +29,6 @@ const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
 const DEFAULT_FIRE_SPREAD_CHANCE = 0.25;
 const DEFAULT_FIRE_SPREAD_TURNS = 2;
-const THATCHED_ROOF_FIRE_SPREAD_CHANCE = 0.35;
-const THATCHED_ROOF_FIRE_SPREAD_TURNS = 3;
-const THATCHED_ROOF_BURN_TURNS = ROOF_BURN_TURNS + 3;
 const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
   [-1, 0],           [1, 0],
@@ -68,10 +65,6 @@ function burnedTileKind(tile) {
 
 function isRoofBearingBurn(tile) {
   return tile === TILE_WALL || tile === TILE_DOOR;
-}
-
-function isThatchedRoofStructureTile(tile, overworld) {
-  return !!overworld && isRoofBearingBurn(tile);
 }
 
 function isFlammableFireSpreadTile(tile, overworld) {
@@ -140,11 +133,6 @@ function getFireSpreadTurns(hazard, turnsBefore) {
   return clampInt(hazard?.meta?.fireSpreadTurns, Math.max(1, turnsBefore - 1), 1);
 }
 
-function getRoofBurnTurns(tile, overworld) {
-  if (isThatchedRoofStructureTile(tile, overworld)) return THATCHED_ROOF_BURN_TURNS;
-  return isRoofBearingBurn(tile) ? ROOF_BURN_TURNS : 0;
-}
-
 /**
  * Generic hazard resolver for persistent AoE entities.
  * `medium` is metadata only for now (`air` vs `floor`).
@@ -198,7 +186,7 @@ export function hazardSystem(world) {
           cause,
           sourceId,
           sourceKind,
-          roofTurnsLeft: getRoofBurnTurns(tileBefore, overworld),
+          roofTurnsLeft: isRoofBearingBurn(tileBefore) ? ROOF_BURN_TURNS : 0,
         });
         try {
           world.emit?.("tile:burned", {
@@ -226,19 +214,13 @@ export function hazardSystem(world) {
           const ny = (pos.y | 0) + dy;
           const key = `${nx},${ny}`;
           if (fireHazardCells.has(key)) continue;
-          const nextTile = getTile(nx, ny);
-          if (!isFlammableFireSpreadTile(nextTile, overworld)) continue;
-          const nextSpreadChance = isThatchedRoofStructureTile(nextTile, overworld)
-            ? Math.max(spreadChance, THATCHED_ROOF_FIRE_SPREAD_CHANCE)
-            : spreadChance;
-          if ((world.rand?.() ?? 0) >= nextSpreadChance) continue;
+          if (!isFlammableFireSpreadTile(getTile(nx, ny), overworld)) continue;
+          if ((world.rand?.() ?? 0) >= spreadChance) continue;
 
           pendingFireSpreads.push({
             x: nx,
             y: ny,
-            turnsLeft: isThatchedRoofStructureTile(nextTile, overworld)
-              ? Math.max(spreadTurns, THATCHED_ROOF_FIRE_SPREAD_TURNS)
-              : spreadTurns,
+            turnsLeft: spreadTurns,
             tickDamage,
             damageType,
             cause,
