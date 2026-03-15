@@ -12,6 +12,7 @@ const _installed = Symbol.for('jshack:display:eventUiWiring:installed');
  *   getActiveSpellId: () => string|null,
  *   setActiveSpell: (id: string) => void,
  *   getPlayerEntity: () => ({ id:number, pos:{x:number,y:number} } | null),
+ *   getPosition: (id:number) => ({ x:number, y:number } | null),
  *   getItemInfo: (id:number) => any,
  *   resolveItemDisplayName: (id:number) => string,
  *   dispatchRulesAction: (action:any) => void,
@@ -23,6 +24,7 @@ export function installEventUiWiring({
   getActiveSpellId,
   setActiveSpell,
   getPlayerEntity,
+  getPosition,
   getItemInfo,
   resolveItemDisplayName,
   dispatchRulesAction,
@@ -34,6 +36,20 @@ export function installEventUiWiring({
   world.on('engrave', ({ text, x, y, profane }) => {
     const color = profane ? '#ff6655' : '#8899aa';
     try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color, life: 1.2 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
+  });
+
+  world.on('npc:dialogue', ({ actor, targetId, text }) => {
+    const speakerId = Number(actor || targetId || 0) | 0;
+    const pos = getPlayerEntity()?.id === speakerId
+      ? getPlayerEntity()?.pos
+      : null;
+    let bubblePos = pos || null;
+    if (!bubblePos && speakerId > 0 && typeof getPosition === 'function') {
+      bubblePos = getPosition(speakerId) || null;
+    }
+    const line = String(text || '').trim();
+    if (!bubblePos || !line) return;
+    try { ftext.addStatus(bubblePos.x, bubblePos.y - 1.05, `"${line}"`, { color: '#f6f1d0', life: 2.8 }); } catch (e) { console.debug('[eventUiWiring] npc dialogue ftext failed:', e); }
   });
 
   // Refresh inventory UI when any item is used (consumed/learned/etc.)
