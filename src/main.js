@@ -145,6 +145,7 @@ import {
   findOpeningDragonSpawn,
   OPENING_SEQUENCE_PRAYER_PROMPT,
   OPENING_SEQUENCE_RELEASE_DELAY_SEC,
+  OPENING_SEQUENCE_STOP_DISTANCE,
   performOpeningPrayerSmite,
   primeOpeningDeityFavor,
   spawnOpeningDragonWhelp,
@@ -313,16 +314,20 @@ updateBootProgress("Game data loaded", _bootDoneUnits);
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 
 const OPENING_SEQUENCE_TURN_INTERVAL_SEC = 0.18;
+const OPENING_SMITE_DELAY_TURNS = 3;
 let _openingSequence = {
   active: false,
   dragonId: 0,
   turnAccumulator: 0,
   releaseDelaySec: 0,
+  smiteDelayTurns: 0,
   lastFocusPos: null,
   cameraLocked: false,
   awaitingPrayer: false,
+  awaitingSmite: false,
   promptShown: false,
 };
+let _pendingSmite = null;
 
 function syncOpeningPrayerGateFlag() {
   try {
@@ -790,10 +795,13 @@ function stopOpeningSequence() {
   _openingSequence.dragonId = 0;
   _openingSequence.turnAccumulator = 0;
   _openingSequence.releaseDelaySec = 0;
+  _openingSequence.smiteDelayTurns = 0;
   _openingSequence.lastFocusPos = null;
   _openingSequence.cameraLocked = false;
   _openingSequence.awaitingPrayer = false;
+  _openingSequence.awaitingSmite = false;
   _openingSequence.promptShown = false;
+  _pendingSmite = null;
   syncOpeningPrayerGateFlag();
   syncPrayButtonHighlight(false);
 }
@@ -886,6 +894,24 @@ function tickOpeningSequence(dtSec) {
     return;
   }
 
+  if (_openingSequence.awaitingSmite && _pendingSmite) {
+    _openingSequence.turnAccumulator += Math.max(0, Number(dtSec) || 0);
+    while (_openingSequence.awaitingSmite && _openingSequence.turnAccumulator >= OPENING_SEQUENCE_TURN_INTERVAL_SEC) {
+      _openingSequence.turnAccumulator -= OPENING_SEQUENCE_TURN_INTERVAL_SEC;
+      _openingSequence.smiteDelayTurns = Math.max(0, _openingSequence.smiteDelayTurns - 1);
+      if (_openingSequence.smiteDelayTurns <= 0) {
+        const s = _pendingSmite;
+        _pendingSmite = null;
+        _openingSequence.awaitingSmite = false;
+        executeOpeningSmite(s.dragonId, s.deityId, s.deityName, s.dragonPos, pe);
+        stepSim(1);
+        break;
+      }
+      stepSim(1);
+    }
+    return;
+  }
+
   _openingSequence.turnAccumulator += Math.max(0, Number(dtSec) || 0);
   while (_openingSequence.active && _openingSequence.cameraLocked && _openingSequence.turnAccumulator >= OPENING_SEQUENCE_TURN_INTERVAL_SEC) {
     _openingSequence.turnAccumulator -= OPENING_SEQUENCE_TURN_INTERVAL_SEC;
@@ -894,6 +920,11 @@ function tickOpeningSequence(dtSec) {
     if (!world.isAlive(_openingSequence.dragonId)) {
       stopOpeningSequence();
       return;
+    }
+    const dp = world.get(_openingSequence.dragonId, Position);
+    if (dp && Math.max(Math.abs((dp.x|0) - (pe.pos.x|0)), Math.abs((dp.y|0) - (pe.pos.y|0))) <= OPENING_SEQUENCE_STOP_DISTANCE) {
+      handOffOpeningCameraToPlayer();
+      break;
     }
   }
 }
@@ -907,40 +938,35 @@ world.on("died", ({ id }) => {
   _postMortemInterval = setInterval(() => { world.tick(1); }, 500);
 });
 
+function openingDragonNearPlayer() {
+  const dp = world.get(_openingSequence.dragonId, Position);
+  const pe = playerEntity(world);
+  if (!dp || !pe) return false;
+  return Math.max(Math.abs((dp.x|0) - (pe.pos.x|0)), Math.abs((dp.y|0) - (pe.pos.y|0))) <= OPENING_SEQUENCE_STOP_DISTANCE;
+}
+
 world.on("beforeHit", (ctx) => {
   if (!_openingSequence.active) return;
   const pe = playerEntity(world);
   if (!pe) return;
   if ((ctx?.attacker | 0) === (_openingSequence.dragonId | 0) && (ctx?.defender | 0) === (pe.id | 0)) {
-    handOffOpeningCameraToPlayer();
+    if (openingDragonNearPlayer()) handOffOpeningCameraToPlayer();
   }
 });
 
 world.on("damaged", ({ source, target }) => {
   if (!_openingSequence.active) return;
   if ((source | 0) !== (_openingSequence.dragonId | 0)) return;
-  if (world.has(target, Player)) handOffOpeningCameraToPlayer();
+  if (world.has(target, Player) && openingDragonNearPlayer()) handOffOpeningCameraToPlayer();
 });
 
 world.on("monster:firebreath", ({ actor, target }) => {
   if (!_openingSequence.active) return;
   if ((actor | 0) !== (_openingSequence.dragonId | 0)) return;
-  if (world.has(target, Player)) handOffOpeningCameraToPlayer();
+  if (world.has(target, Player) && openingDragonNearPlayer()) handOffOpeningCameraToPlayer();
 });
 
-world.on("prayer", ({ actor }) => {
-  if (!_openingSequence.active) return;
-  const pe = playerEntity(world);
-  if (!pe || (Number(actor || 0) | 0) !== (pe.id | 0)) return;
-  if (!_openingSequence.awaitingPrayer) return;
-  if (!(_openingSequence.dragonId > 0) || !world.isAlive(_openingSequence.dragonId)) return;
-
-  const devotion = world.get(pe.id, Devotion);
-  const deityId = String(devotion?.deityId || "");
-  const deity = deityId ? getDeityInstance(deityId) : null;
-  const deityName = String(deity?.name || getDeity(deityId)?.name || "The heavens");
-  const dragonPos = world.get(_openingSequence.dragonId, Position) || _openingSequence.lastFocusPos;
-
+function executeOpeningSmite(dragonId, deityId, deityName, dragonPos, pe) {
   try {
     if (dragonPos && typeof ftext?.addStatus === "function") {
       ftext.addStatus(dragonPos.x, dragonPos.y - 0.75, "SMITE!", {
@@ -952,10 +978,7 @@ world.on("prayer", ({ actor }) => {
     }
   } catch (e) { console.debug("[main] opening smite ftext failed:", e); }
 
-  if (performOpeningPrayerSmite(world, { dragonId: _openingSequence.dragonId, deityId, deityName })) {
-    _openingSequence.awaitingPrayer = false;
-    syncOpeningPrayerGateFlag();
-    syncPrayButtonHighlight(false);
+  if (performOpeningPrayerSmite(world, { dragonId, deityId, deityName })) {
     _openingSequence.releaseDelaySec = OPENING_SEQUENCE_RELEASE_DELAY_SEC;
     let priestId = 0;
     for (const [id, ident] of world.query(NamedIdentity)) {
@@ -991,6 +1014,29 @@ world.on("prayer", ({ actor }) => {
     }
     stopOpeningSequence();
   }
+}
+
+world.on("prayer", ({ actor }) => {
+  if (!_openingSequence.active) return;
+  const pe = playerEntity(world);
+  if (!pe || (Number(actor || 0) | 0) !== (pe.id | 0)) return;
+  if (!_openingSequence.awaitingPrayer) return;
+  if (_openingSequence.awaitingSmite) return;
+  if (!(_openingSequence.dragonId > 0) || !world.isAlive(_openingSequence.dragonId)) return;
+
+  const devotion = world.get(pe.id, Devotion);
+  const deityId = String(devotion?.deityId || "");
+  const deity = deityId ? getDeityInstance(deityId) : null;
+  const deityName = String(deity?.name || getDeity(deityId)?.name || "The heavens");
+  const dragonPos = world.get(_openingSequence.dragonId, Position) || _openingSequence.lastFocusPos;
+
+  _openingSequence.awaitingPrayer = false;
+  _openingSequence.awaitingSmite = true;
+  _openingSequence.smiteDelayTurns = OPENING_SMITE_DELAY_TURNS;
+  _openingSequence.turnAccumulator = 0;
+  syncOpeningPrayerGateFlag();
+  syncPrayButtonHighlight(false);
+  _pendingSmite = { dragonId: _openingSequence.dragonId, deityId, deityName, dragonPos };
 });
 
 // --- Active spell selection (app-side state) ---------------------------------

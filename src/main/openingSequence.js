@@ -13,6 +13,7 @@ import { hasLOS } from "../shared/math/gridLOS.js";
 import { spawnMonsterEntity } from "../rules/utils/spawnMonsterEntity.js";
 import { buildBlocksVisionMap, blockedCallback } from "../rules/utils/vision.js";
 
+export const OPENING_SEQUENCE_STOP_DISTANCE = 2;
 export const OPENING_SEQUENCE_DRAGON_IDENTITY = "dragon_whelp";
 export const OPENING_SEQUENCE_PRAYER_PROMPT = "I should pray.";
 export const OPENING_SEQUENCE_BONUS_HP = 12;
