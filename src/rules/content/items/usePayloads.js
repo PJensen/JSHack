@@ -4,6 +4,7 @@ import { Hunger } from "../../components/Hunger.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Owner } from "../../components/Owner.js";
 import { Pet } from "../../components/Pet.js";
+import { Traits } from "../../components/Traits.js";
 import { getDecayStage } from "../../data/food.js";
 import { getCorpseEatHooks } from "../../data/corpseFood.js";
 import { runCallbackList } from "../../interaction/dispatch.js";
@@ -52,7 +53,11 @@ function runCorpseEatHooks(ctx, state) {
     nutritionTotal += nutrition;
   }
 
-  if (decayInfo && ctx.helpers.chance(decayInfo.sicknessChance)) {
+  const actorTraits = ctx.query.get(actor, Traits);
+  const sicknessChance = actorTraits?.iron_stomach
+    ? decayInfo?.sicknessChance * 0.5
+    : decayInfo?.sicknessChance;
+  if (decayInfo && ctx.helpers.chance(sicknessChance)) {
     ctx.mutate.pushEffect(actor, { key: "disease", turnsLeft: 15, potency: 1, stacks: 1, sourceId: itemId });
     ctx.io.emit("hunger:sickened", { actor, type: "decay" });
   }
@@ -108,6 +113,12 @@ function runCorpseEatHooks(ctx, state) {
           minOhms: Number(minOhms),
           fibrillationA: Number(fibrillationA),
         });
+      },
+      chance(prob) {
+        return ctx.helpers.chance(prob);
+      },
+      setTrait(key, value) {
+        ctx.mutate.queue({ type: "setTrait", entityId: actor, key: String(key || ""), value });
       },
       cancel(reason) {
         this.cancelled = true;

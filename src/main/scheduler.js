@@ -66,6 +66,7 @@ import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSy
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
 import { channelingSystem } from "../rules/systems/channelingSystem.js";
+import { installGenocideListener } from "../rules/systems/genocideSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
@@ -122,6 +123,7 @@ export function configureWorld(world) {
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
   installCurseHooks(world);
+  installGenocideListener(world);
   // Elevate enemy AggroState when they take damage (even off-screen).
   installAggroFromDamageListener(world);
 

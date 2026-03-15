@@ -234,6 +234,44 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Permanent trait gained from corpse eating
+  world.on('corpse:trait-gained', ({ actor, name }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const label = String(name || 'TRAIT').toUpperCase();
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.5, label + '!', {
+        color: '#ffd966',
+        life: 1.8,
+        scaleStart: 1.6,
+        scaleEnd: 1.0,
+      });
+    } catch (e) {
+      console.debug('[floatTextWiring] trait gained ftext failed:', e);
+    }
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.3 + Math.random() * 0.5;
+      try {
+        fx.pool.spawn(new Particle({
+          x: pos.x,
+          y: pos.y - 0.1,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.2,
+          life: 0.3 + Math.random() * 0.25,
+          size0: 0.1,
+          size1: 0.02,
+          r: 255,
+          g: 217,
+          b: 102,
+          a0: 0.9,
+        }));
+      } catch (e) {
+        console.debug('[floatTextWiring] trait gained fx failed:', e);
+      }
+    }
+  });
+
   // Storm lightning strike
   world.on('weather:lightning', ({ x, y, hitCount }) => {
     if (!canShowAt(x, y)) return;

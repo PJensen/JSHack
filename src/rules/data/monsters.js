@@ -746,6 +746,8 @@ export function isGenocided(id) { return _genocided.has(id); }
 /** @returns {string[]} */
 export function getAllGenocided() { return [..._genocided]; }
 
+export function clearGenocides() { _genocided.clear(); }
+
 /** @param {number} tier @returns {MonsterDef[]} */
 export function getMonstersByTier(tier) {
   const pool = _byTier[Math.min(tier, _byTier.length - 1)] || _byTier[_byTier.length - 1];

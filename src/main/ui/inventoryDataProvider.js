@@ -41,7 +41,14 @@ import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
 import { QuestState } from "../../rules/components/QuestState.js";
 import { Encumbrance } from "../../rules/components/Encumbrance.js";
+import { Traits } from "../../rules/components/Traits.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
+
+const TRAIT_DISPLAY = Object.freeze({
+  iron_stomach:  { label: "Iron Stomach",  description: "Halves sickness chance from spoiled food." },
+  ambidextrous:  { label: "Ambidextrous",  description: "No off-hand penalties when dual-wielding." },
+  gluttonous:    { label: "Gluttonous",    description: "Increased deity reaction to food events." },
+});
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
@@ -390,6 +397,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       depth: 0,
     };
     let activeEffects = [];
+    const traits = [];
     equippedBySlot.brain = { item: null, blocked: false };
     if (p) {
       const eq = world.get(p.id, Equipment);
@@ -443,6 +451,12 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       stats.hungerLevel = String(hungerLevel || "normal");
       stats.gold = sumPlayerGold(p.id);
       activeEffects = buildStatusRows(p.id);
+      const traitComp = world.get(p.id, Traits);
+      if (traitComp) {
+        for (const [key, meta] of Object.entries(TRAIT_DISPLAY)) {
+          if (traitComp[key]) traits.push({ key, label: meta.label, description: meta.description });
+        }
+      }
       for (const [, ds] of world.query(DungeonState)) {
         stats.depth = Math.max(0, Number(ds?.currentDepth || 0) | 0);
         break;
@@ -453,7 +467,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       break;
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:characterData', {
-      detail: { equippedBySlot, playerName, stats, activeEffects, calendar },
+      detail: { equippedBySlot, playerName, stats, activeEffects, traits, calendar },
     }));
   });
 

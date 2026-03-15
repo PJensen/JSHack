@@ -696,6 +696,13 @@ export function installMessageWiring({
     log(`You desecrate ${label}.`, 'deity');
   });
 
+  world.on('corpse:trait-gained', ({ actor, trait, name }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = String(name || trait || 'unknown');
+    log(`Your stomach hardens \u2014 you've developed an ${label}!`, 'legendary');
+  });
+
   // === Environment events ===
   world.on('engrave', ({ actor, text, x, y }) => {
     const who = nameOfEntity(actor);

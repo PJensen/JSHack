@@ -275,19 +275,17 @@ export function initHUD() {
   }
 
   // Touch event handlers
-  petBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault(); // Prevent mouse event emulation
+  petBtn.addEventListener('touchstart', () => {
     startPress();
-  });
+  }, { passive: true });
 
-  petBtn.addEventListener('touchend', (e) => {
-    e.preventDefault();
+  petBtn.addEventListener('touchend', () => {
     endPress();
-  });
+  }, { passive: true });
 
   petBtn.addEventListener('touchcancel', () => {
     cancelPress();
-  });
+  }, { passive: true });
 
   // Mouse event handlers
   petBtn.addEventListener('mousedown', (e) => {

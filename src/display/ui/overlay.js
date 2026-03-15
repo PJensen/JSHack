@@ -435,7 +435,8 @@ export function initOverlays() {
     const playerName = String(e?.detail?.playerName || 'Hero');
     const stats = e?.detail?.stats || {};
     const activeEffects = Array.isArray(e?.detail?.activeEffects) ? e.detail.activeEffects : [];
-    if (char.style.display === 'block') renderCharacterSheet(char, { playerName, stats, activeEffects });
+    const traits = Array.isArray(e?.detail?.traits) ? e.detail.traits : [];
+    if (char.style.display === 'block') renderCharacterSheet(char, { playerName, stats, activeEffects, traits });
   });
   window.addEventListener('ui:equipmentData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -2849,6 +2850,7 @@ function renderCharacterSheet(panel, data) {
   const playerName = String(data?.playerName || 'Hero').trim() || 'Hero';
   const stats = data?.stats && typeof data.stats === 'object' ? data.stats : {};
   const activeEffects = Array.isArray(data?.activeEffects) ? data.activeEffects : [];
+  const traits = Array.isArray(data?.traits) ? data.traits : [];
   const calendar = data?.calendar && typeof data.calendar === 'object' ? data.calendar : null;
 
   const title = document.createElement('div');
@@ -2973,6 +2975,39 @@ function renderCharacterSheet(panel, data) {
       resistCard.appendChild(row);
     }
     el.appendChild(resistCard);
+  }
+
+  if (traits.length > 0) {
+    const traitsTitle = document.createElement('div');
+    traitsTitle.textContent = 'Traits';
+    traitsTitle.style.marginTop = '10px';
+    traitsTitle.style.fontWeight = 'bold';
+    el.appendChild(traitsTitle);
+
+    const traitsCard = document.createElement('div');
+    Object.assign(traitsCard.style, {
+      marginTop: '6px',
+      padding: '8px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: '#0a111f',
+      fontSize: '13px',
+    });
+    for (const t of traits) {
+      const row = document.createElement('div');
+      row.style.marginBottom = '4px';
+      const lbl = document.createElement('span');
+      lbl.textContent = String(t.label || t.key || '');
+      lbl.style.color = '#ffd966';
+      lbl.style.fontWeight = 'bold';
+      const desc = document.createElement('span');
+      desc.textContent = ` \u2014 ${String(t.description || '')}`;
+      desc.style.opacity = '0.85';
+      row.appendChild(lbl);
+      row.appendChild(desc);
+      traitsCard.appendChild(row);
+    }
+    el.appendChild(traitsCard);
   }
 
   const effectsTitle = document.createElement('div');

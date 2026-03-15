@@ -38,6 +38,7 @@ import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
 import { DistrictProfile } from "../../components/DistrictProfile.js";
 import { DistrictState } from "../../components/DistrictState.js";
+import { DungeonState } from "../../components/DungeonState.js";
 import TombstoneComponent from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
@@ -78,6 +79,15 @@ const CATALOG_ARCHETYPES = {
 
 const HARVEST_SEED_SALT = 0x48415256;
 const SEED_DROP_SALT = 0x5345ED01;
+
+function isEntityOnCurrentFloor(world, entityId) {
+  const id = Number(entityId || 0) | 0;
+  if (!(id > 0) || !world.isAlive(id)) return false;
+  for (const [, ds] of world.query(DungeonState)) {
+    return Array.isArray(ds?.floorEntityIds) && ds.floorEntityIds.includes(id);
+  }
+  return false;
+}
 const SEED_ITEM_IDS = Object.freeze({
   wheat: "seed_wheat",
   carrot: "seed_carrot",
@@ -356,6 +366,7 @@ export const INTERACT_PAYLOADS = {
   talkToNPC: {
     onInteract(ctx) {
       const { world, actor, targetId, params } = ctx;
+      if (!isEntityOnCurrentFloor(world, targetId)) return;
       const dialogId = String(params?.dialogId || "").trim();
       if (dialogId) {
         world.emit?.("dialog:openRequest", {

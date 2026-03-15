@@ -5,6 +5,7 @@
 import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { Hunger } from "../../components/Hunger.js";
 import { Resistances } from "../../components/Resistences.js";
+import { Traits } from "../../components/Traits.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 
@@ -80,6 +81,26 @@ export class EatCallbackContext {
   }
 
   /**
+   * Deterministic RNG chance check.
+   * @param {number} prob - 0.0–1.0
+   * @returns {boolean}
+   */
+  chance(prob) {
+    if (prob >= 1) return true;
+    if (prob <= 0) return false;
+    return this.world.rand() < prob;
+  }
+
+  /**
+   * Queue a trait field update on the eating actor.
+   * @param {string} key - Traits component field name
+   * @param {*} value
+   */
+  setTrait(key, value) {
+    return this.queueMutation({ type: "setTrait", entityId: this.actor, key, value });
+  }
+
+  /**
    * Queue electric resistance grant on the eating actor.
    * @param {number} [minOhms]
    * @param {number} [fibrillationA]
@@ -125,6 +146,17 @@ export class EatCallbackContext {
     upsertTimedEffect(ae.effects, { stacks: 1, ...(op.effect || {}) });
   }
 
+  _applySetTrait(op) {
+    const key = String(op.key || "");
+    if (!key) return;
+    let tr = this.world.get(op.entityId, Traits);
+    if (!tr) {
+      try { this.world.add(op.entityId, Traits, {}); } catch {}
+      tr = this.world.get(op.entityId, Traits);
+    }
+    if (tr) tr[key] = op.value;
+  }
+
   _applyElectricResistance(op) {
     let resist = this.world.get(op.entityId, Resistances);
     if (!resist) {
@@ -149,6 +181,7 @@ export class EatCallbackContext {
       this._postCommitEvents.length = 0;
       return [];
     }
+    const applied = [];
     for (let i = 0; i < this._mutations.length; i++) {
       const op = this._mutations[i];
       switch (op?.type) {
@@ -168,9 +201,13 @@ export class EatCallbackContext {
         case "grantElectricResistance":
           this._applyElectricResistance(op);
           break;
+        case "setTrait":
+          this._applySetTrait(op);
+          break;
         default:
           break;
       }
+      applied.push(op);
     }
     this._mutations.length = 0;
     for (let i = 0; i < this._postCommitEvents.length; i++) {
@@ -236,4 +273,27 @@ export function cancelEat(code, message, consumesTurn = true) {
   return (ctx) => {
     ctx.cancel({ code: reasonCode, message: reasonMessage, consumesTurn });
   };
+}
+
+// ── Trait progression factories ──────────────────────────────────
+
+const IRON_STOMACH_THRESHOLD = 3;
+
+/**
+ * Track rat/bat corpse consumption. After eating IRON_STOMACH_THRESHOLD
+ * disease-carrying corpses, grant the iron_stomach permanent trait.
+ */
+export function corpseIronStomachProgress(ctx) {
+  const traits = ctx.world.get(ctx.actor, Traits);
+  if (traits?.iron_stomach) return;
+  const count = (Number(traits?.ratCorpsesEaten) || 0) + 1;
+  ctx.setTrait("ratCorpsesEaten", count);
+  if (count >= IRON_STOMACH_THRESHOLD) {
+    ctx.setTrait("iron_stomach", true);
+    ctx.emit("corpse:trait-gained", {
+      actor: ctx.actor,
+      trait: "iron_stomach",
+      name: "Iron Stomach",
+    });
+  }
 }
