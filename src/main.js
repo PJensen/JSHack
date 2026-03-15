@@ -504,6 +504,7 @@ function drawScriptedSpeechBubble(ctx) {
   const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
 
   ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.font = `600 ${Math.round(15 * dprScale)}px 'Trebuchet MS', sans-serif`;
   const textWidth = Math.min(maxWidth, Math.ceil(ctx.measureText(text).width));
   const boxW = textWidth + (padX * 2);
@@ -753,8 +754,10 @@ function layoutBubbleDialog() {
     height: canvas.offsetHeight || _canvasSetup.cssH,
   };
   const [localX, localY] = worldToScreen(cam, anchor.x, anchor.y, logicalCanvas);
-  const sx = rect.left + localX;
-  const sy = rect.top + localY;
+  const rxScale = rect.width / logicalCanvas.width;
+  const ryScale = rect.height / logicalCanvas.height;
+  const sx = rect.left + localX * rxScale;
+  const sy = rect.top + localY * ryScale;
   const boxW = bubbleDialogUi.el.offsetWidth || 280;
   const boxH = bubbleDialogUi.el.offsetHeight || 120;
   const lift = getSpeakerBubbleLiftPx();
