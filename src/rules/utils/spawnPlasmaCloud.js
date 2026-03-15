@@ -19,8 +19,8 @@ function clampInt(value, fallback, min = 0) {
 export function spawnPlasmaCloud(world, params) {
   if (!world || !params) return 0;
 
-  const x = clampInt(params.x, 0);
-  const y = clampInt(params.y, 0);
+  const x = Number.isFinite(params.x) ? (params.x | 0) : 0;
+  const y = Number.isFinite(params.y) ? (params.y | 0) : 0;
   const turnsLeft = clampInt(params.turnsLeft, DEFAULT_TURNS, 1);
   const radius = clampInt(params.radius, DEFAULT_RADIUS, 0);
   const damage = clampInt(params.damage, DEFAULT_DAMAGE, 0);
