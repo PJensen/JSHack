@@ -2903,20 +2903,21 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
   const _isBurning = !!roof.burning;
   const phase = ((Math.imul((roof.x | 0) + 11, 1103515245) ^ Math.imul((roof.y | 0) + 17, 12345)) >>> 0) / 0xffffffff;
   const bob = 0.5 + 0.5 * Math.sin(fxTime * 1.7 + phase * Math.PI * 2);
-  const cx = roof.x + (phase - 0.5) * 0.22;
-  const cy = roof.y - 0.18 - bob * 0.16;
+  const swell = roof.smoking ? 1 : 0.7;
+  const cx = roof.x + (phase - 0.5) * 0.18 + Math.sin(fxTime * 0.9 + phase * 5.1) * 0.025 * swell;
+  const cy = roof.y - 0.16 - bob * 0.12 - swell * 0.05;
 
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = `rgba(26,24,22,${(0.24 + bob * 0.16).toFixed(3)})`;
+  ctx.fillStyle = `rgba(26,24,22,${(0.18 + bob * 0.09 + swell * 0.08).toFixed(3)})`;
   ctx.beginPath();
-  ctx.ellipse(cx, cy, 0.22, 0.13, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, 0.22 + swell * 0.03, 0.12 + swell * 0.03, 0.10, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(cx + 0.08, cy - 0.14, 0.18, 0.11, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 0.06, cy - 0.13 - swell * 0.03, 0.18 + swell * 0.02, 0.11 + swell * 0.02, 0.18, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(cx - 0.10, cy - 0.22, 0.15, 0.09, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - 0.09, cy - 0.22 - swell * 0.06, 0.15 + swell * 0.03, 0.09 + swell * 0.03, -0.18, 0, Math.PI * 2);
   ctx.fill();
 
   if (_isBurning) {
@@ -2934,8 +2935,8 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
   ctx.globalCompositeOperation = 'source-over';
   for (let i = 0; i < 4; i++) {
     const ashPhase = phase * 11.0 + i * 0.97;
-    const fall = (_fxTime * (0.55 + i * 0.08) + ashPhase) % 1.0;
-    const ax = roof.x - 0.18 + i * 0.11 + Math.sin(_fxTime * 1.3 + ashPhase) * 0.03;
+    const fall = (fxTime * (0.55 + i * 0.08) + ashPhase) % 1.0;
+    const ax = roof.x - 0.18 + i * 0.11 + Math.sin(fxTime * 1.3 + ashPhase) * 0.03;
     const ay = roof.y - 0.10 + fall * 0.42;
     const alpha = 0.20 + (1 - fall) * 0.18;
     ctx.strokeStyle = `rgba(170,168,160,${alpha.toFixed(3)})`;
@@ -2958,9 +2959,9 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
       _roofSmokeParticleStamp.set(smokeKey, smokeTick);
       // Three large billow puffs, each offset and staggered.
       const drifts = [
-        { ox: (phase - 0.5) * 0.28, oy: -0.12, vxd:  0.04, life: 4.2 + bob * 0.6, s0: 0.80, s1: 0.42, rr: 64, gg: 62, bb: 58, a: 0.38 },
-        { ox: (phase - 0.5) * 0.14, oy: -0.06, vxd: -0.03, life: 3.6 + bob * 0.8, s0: 0.90, s1: 0.50, rr: 102, gg: 98, bb: 92, a: 0.30 },
-        { ox: (phase - 0.5) * 0.38, oy: -0.18, vxd:  0.02, life: 5.0 + bob * 0.5, s0: 0.66, s1: 0.30, rr: 148, gg: 144, bb: 136, a: 0.22 },
+        { ox: (phase - 0.5) * 0.28, oy: -0.12, vxd:  0.04, life: 7.6 + bob * 1.2, s0: 0.80, s1: 0.42, rr: 64, gg: 62, bb: 58, a: 0.38 },
+        { ox: (phase - 0.5) * 0.14, oy: -0.06, vxd: -0.03, life: 6.8 + bob * 1.4, s0: 0.90, s1: 0.50, rr: 102, gg: 98, bb: 92, a: 0.30 },
+        { ox: (phase - 0.5) * 0.38, oy: -0.18, vxd:  0.02, life: 8.8 + bob * 1.0, s0: 0.66, s1: 0.30, rr: 148, gg: 144, bb: 136, a: 0.22 },
       ];
       for (let di = 0; di < drifts.length; di++) {
         const d = drifts[di];
@@ -2968,14 +2969,14 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
           x: roof.x + d.ox,
           y: roof.y + d.oy,
           vx: d.vxd + (phase - 0.5) * 0.02,
-          vy: -0.07 - bob * 0.04,
-          ay: -0.008,
+          vy: -0.10 - bob * 0.05,
+          ay: -0.012,
           life: d.life,
           size0: d.s0,
           size1: d.s1,
           r: d.rr, g: d.gg, b: d.bb,
-          a0: d.a,
-          a1: 0,
+          a0: d.a * 0.45,
+          a1: Math.min(0.46, d.a * 1.18),
         }));
       }
     }
@@ -2991,15 +2992,16 @@ function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
     x: roof.x + (phase - 0.5) * 0.18,
     y: roof.y - 0.14,
     vx: (phase - 0.5) * 0.05,
-    vy: -0.10 - bob * 0.05,
-    ay: -0.02,
-    life: 0.65 + bob * 0.18,
-    size0: 0.055,
-    size1: 0.018,
+    vy: -0.14 - bob * 0.06,
+    ay: -0.03,
+    life: 1.55 + bob * 0.45,
+    size0: 0.045,
+    size1: 0.020,
     r: 72,
     g: 70,
     b: 66,
-    a0: 0.40,
+    a0: 0.14,
+    a1: 0.30,
   }));
   fx.pool.spawn(new Particle({
     x: roof.x - 0.10 + bob * 0.08,

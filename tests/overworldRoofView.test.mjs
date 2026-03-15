@@ -168,3 +168,36 @@ Deno.test("overworld roofs char and smoke as fire moves through a breached build
   clearAll();
   clearExplored();
 });
+
+Deno.test("overworld roof damage persists after nearby fire burns out", () => {
+  clearAll();
+  clearExplored();
+
+  const world = new World({ seed: 0xBAD5EED });
+  const spawn = initDungeon(world, { startDepth: 0 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Position, { x: spawn.x, y: spawn.y });
+
+  const tavernInterior = posOfIdentity(world, "tavern_keg");
+  assert(setTile(tavernInterior.x, tavernInterior.y - 1, TILE_GRASS), "expected to open the tavern north wall to grass");
+  markDestroyedTile(world, {
+    x: tavernInterior.x,
+    y: tavernInterior.y - 1,
+    originalTile: TILE_WALL,
+    currentTile: TILE_GRASS,
+    destroyedAtTurn: world.step | 0,
+    burnedKind: "wall",
+    cause: "wildfire",
+  });
+
+  const view = buildWorldView(world);
+  const roof = roofAt(view, tavernInterior.x + 1, tavernInterior.y);
+  assert(roof, "adjacent roof should remain visible after the fire has finished");
+  assert(String(roof.kind || "").includes("charred"), "adjacent roof should stay charred");
+  assertEquals(roof.burning, false);
+
+  clearAll();
+  clearExplored();
+});
