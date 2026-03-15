@@ -13,51 +13,43 @@ import { Player } from "../rules/components/Player.js";
 import { DungeonState } from "../rules/components/DungeonState.js";
 import { NamedIdentity } from "../rules/components/NamedIdentity.js";
 
-export function createScriptedSequenceController({
+function createEmptyBubble() {
+  return createScriptedSpeechBubble({ entityId: 0, text: "" });
+}
+
+function normalizePoint(point) {
+  if (!point || !Number.isInteger(point.x) || !Number.isInteger(point.y)) return null;
+  return { x: point.x | 0, y: point.y | 0 };
+}
+
+export function createSceneRuntime({
   world,
   getPlayerEntity,
   getCam,
   getCanvas,
   getCanvasSetup,
 }) {
-  let speechBubble = createScriptedSpeechBubble({ entityId: 0, text: "" });
+  let speechBubble = createEmptyBubble();
+  /** @type {Array<any>} */
   let speechQueue = [];
-  let walk = {
-    entityId: 0,
-    resolveEntityId: null,
-    target: null,
-    resolveTarget: null,
-    stepDelaySec: 0,
-    accumulatorSec: 0,
-    onArrive: null,
-    targetLocked: false,
-  };
-
-  function emptyBubble() {
-    return createScriptedSpeechBubble({ entityId: 0, text: "" });
-  }
+  /** @type {Array<any>} */
+  let sceneQueue = [];
+  /** @type {any|null} */
+  let activeScene = null;
 
   function clearSpeechState() {
-    speechBubble = emptyBubble();
+    speechBubble = createEmptyBubble();
     speechQueue = [];
   }
 
-  function clearWalkState() {
-    walk = {
-      entityId: 0,
-      resolveEntityId: null,
-      target: null,
-      resolveTarget: null,
-      stepDelaySec: 0,
-      accumulatorSec: 0,
-      onArrive: null,
-      targetLocked: false,
-    };
+  function clearSceneState() {
+    activeScene = null;
+    sceneQueue = [];
   }
 
   function clearAll() {
     clearSpeechState();
-    clearWalkState();
+    clearSceneState();
   }
 
   function isEntityOnCurrentFloor(entityId) {
@@ -111,7 +103,7 @@ export function createScriptedSequenceController({
       }
       bubble = speechQueue.shift() || null;
     }
-    speechBubble = emptyBubble();
+    speechBubble = createEmptyBubble();
   }
 
   function queueSpeechBubble({
@@ -143,78 +135,183 @@ export function createScriptedSequenceController({
     speechQueue.push(next);
   }
 
-  function queueWalk({ entityId, target, stepDelaySec = 0.18, onArrive = null }) {
-    walk = {
+  function createWalkBeat({ entityId, resolveEntityId = null, target = null, resolveTarget = null, stepDelaySec = 0.18, onArrive = null }) {
+    return {
+      type: "walk",
       entityId: Number(entityId || 0) | 0,
-      resolveEntityId: null,
-      target: target && Number.isInteger(target.x) && Number.isInteger(target.y)
-        ? { x: target.x | 0, y: target.y | 0 }
-        : null,
-      resolveTarget: null,
-      stepDelaySec: Math.max(0.05, Number(stepDelaySec) || 0.18),
-      accumulatorSec: 0,
-      onArrive: typeof onArrive === "function" ? onArrive : null,
-      targetLocked: !!target,
-    };
-  }
-
-  function queueResolvedWalk({ resolveEntityId, resolveTarget, stepDelaySec = 0.18, onArrive = null }) {
-    walk = {
-      entityId: 0,
       resolveEntityId: typeof resolveEntityId === "function" ? resolveEntityId : null,
-      target: null,
+      target: normalizePoint(target),
       resolveTarget: typeof resolveTarget === "function" ? resolveTarget : null,
       stepDelaySec: Math.max(0.05, Number(stepDelaySec) || 0.18),
       accumulatorSec: 0,
       onArrive: typeof onArrive === "function" ? onArrive : null,
-      targetLocked: false,
+      targetLocked: !!target,
+      started: false,
     };
   }
 
-  function tickWalk(dtSec) {
-    if (typeof walk.resolveEntityId === "function") {
-      walk.entityId = Number(walk.resolveEntityId() || 0) | 0;
+  function queueWalk({ entityId, target, stepDelaySec = 0.18, onArrive = null }) {
+    queueScene([{ type: "walk", entityId, target, stepDelaySec, onArrive }], { append: true });
+  }
+
+  function queueResolvedWalk({ resolveEntityId, resolveTarget, stepDelaySec = 0.18, onArrive = null }) {
+    queueScene([{ type: "walk", resolveEntityId, resolveTarget, stepDelaySec, onArrive }], { append: true });
+  }
+
+  function createBeat(beat) {
+    if (!beat || typeof beat !== "object") return null;
+    switch (String(beat.type || "")) {
+      case "walk":
+        return createWalkBeat(beat);
+      case "wait":
+        return {
+          type: "wait",
+          remainingSec: Math.max(0, Number(beat.durationSec) || 0),
+        };
+      case "say":
+        return {
+          type: "say",
+          config: { ...beat },
+          started: false,
+        };
+      case "emit":
+        return {
+          type: "emit",
+          name: String(beat.name || ""),
+          payload: beat.payload,
+          started: false,
+        };
+      case "call":
+        return {
+          type: "call",
+          fn: typeof beat.fn === "function" ? beat.fn : null,
+          started: false,
+        };
+      default:
+        return null;
     }
-    if (!(walk.entityId > 0) || !world.isAlive(walk.entityId)) {
-      walk.target = null;
-      walk.targetLocked = false;
+  }
+
+  function queueScene(beats, { append = true } = {}) {
+    const normalized = Array.isArray(beats) ? beats.map(createBeat).filter(Boolean) : [];
+    if (normalized.length <= 0) return false;
+    if (!append) {
+      clearSceneState();
+      clearSpeechState();
+    }
+    sceneQueue.push({ beats: normalized, index: 0 });
+    return true;
+  }
+
+  function playScene(beats, opts = {}) {
+    return queueScene(beats, { append: !!opts.append });
+  }
+
+  function startNextScene() {
+    if (activeScene || sceneQueue.length <= 0) return;
+    activeScene = sceneQueue.shift() || null;
+  }
+
+  function finishBeat() {
+    if (!activeScene) return;
+    activeScene.index += 1;
+    if (activeScene.index >= activeScene.beats.length) {
+      activeScene = null;
+    }
+  }
+
+  function tickWalkBeat(beat, dtSec) {
+    if (typeof beat.resolveEntityId === "function") {
+      beat.entityId = Number(beat.resolveEntityId() || 0) | 0;
+    }
+    if (!(beat.entityId > 0) || !world.isAlive(beat.entityId)) {
+      finishBeat();
       return;
     }
-    if (!walk.targetLocked && typeof walk.resolveTarget === "function") {
-      const nextTarget = walk.resolveTarget();
-      walk.target = nextTarget && Number.isInteger(nextTarget.x) && Number.isInteger(nextTarget.y)
-        ? { x: nextTarget.x | 0, y: nextTarget.y | 0 }
-        : null;
-      walk.targetLocked = !!walk.target;
+    if (!beat.targetLocked && typeof beat.resolveTarget === "function") {
+      beat.target = normalizePoint(beat.resolveTarget());
+      beat.targetLocked = !!beat.target;
     }
-    if (!walk.target) return;
+    if (!beat.target) {
+      finishBeat();
+      return;
+    }
 
-    walk.accumulatorSec += Math.max(0, Number(dtSec) || 0);
-    while (walk.accumulatorSec >= walk.stepDelaySec) {
-      walk.accumulatorSec -= walk.stepDelaySec;
-      const pos = world.get(walk.entityId, Position);
-      if (!pos) break;
-      const dx = (walk.target.x | 0) - (pos.x | 0);
-      const dy = (walk.target.y | 0) - (pos.y | 0);
+    beat.accumulatorSec += Math.max(0, Number(dtSec) || 0);
+    while (beat.accumulatorSec >= beat.stepDelaySec) {
+      beat.accumulatorSec -= beat.stepDelaySec;
+      const pos = world.get(beat.entityId, Position);
+      if (!pos) {
+        finishBeat();
+        return;
+      }
+      const dx = (beat.target.x | 0) - (pos.x | 0);
+      const dy = (beat.target.y | 0) - (pos.y | 0);
       if (dx === 0 && dy === 0) {
-        const fn = walk.onArrive;
-        clearWalkState();
+        const fn = beat.onArrive;
+        finishBeat();
         if (typeof fn === "function") {
-          try { fn(); } catch (e) { console.debug("[scriptedSequenceController] walk onArrive failed:", e); }
+          try { fn(); } catch (e) { console.debug("[sceneRuntime] walk onArrive failed:", e); }
         }
         return;
       }
       const stepX = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
       const stepY = stepX === 0 ? Math.sign(dy) : 0;
       const next = { x: (pos.x | 0) + stepX, y: (pos.y | 0) + stepY };
-      world.set(walk.entityId, Position, next);
+      world.set(beat.entityId, Position, next);
       try {
         world.emit?.("moved", {
-          id: walk.entityId,
+          id: beat.entityId,
           from: { x: pos.x | 0, y: pos.y | 0 },
           to: next,
         });
       } catch {}
+    }
+  }
+
+  function tickScene(dtSec) {
+    startNextScene();
+    if (!activeScene) return;
+    const beat = activeScene.beats[activeScene.index];
+    if (!beat) {
+      activeScene = null;
+      return;
+    }
+
+    switch (beat.type) {
+      case "walk":
+        tickWalkBeat(beat, dtSec);
+        return;
+      case "wait":
+        beat.remainingSec = Math.max(0, beat.remainingSec - Math.max(0, Number(dtSec) || 0));
+        if (beat.remainingSec <= 0) finishBeat();
+        return;
+      case "say":
+        if (!beat.started) {
+          beat.started = true;
+          queueSpeechBubble(beat.config);
+        }
+        if (!(speechBubble.entityId > 0) && !speechQueue.length) finishBeat();
+        return;
+      case "emit":
+        if (!beat.started) {
+          beat.started = true;
+          if (beat.name) {
+            const payload = typeof beat.payload === "function" ? beat.payload() : beat.payload;
+            world.emit?.(beat.name, payload);
+          }
+        }
+        finishBeat();
+        return;
+      case "call":
+        if (!beat.started) {
+          beat.started = true;
+          try { beat.fn?.(); } catch (e) { console.debug("[sceneRuntime] call beat failed:", e); }
+        }
+        finishBeat();
+        return;
+      default:
+        finishBeat();
     }
   }
 
@@ -227,17 +324,17 @@ export function createScriptedSequenceController({
     const result = advanceScriptedSpeechBubble(speechBubble, world.step | 0, dtSec);
     speechBubble = result.bubble;
     if (typeof result.onShow === "function") {
-      try { result.onShow(); } catch (e) { console.debug("[scriptedSequenceController] speech onShow failed:", e); }
+      try { result.onShow(); } catch (e) { console.debug("[sceneRuntime] speech onShow failed:", e); }
     }
     if (result.isExpired) {
       const next = speechQueue.shift();
       if (next) activateQueuedSpeech(next);
-      else speechBubble = emptyBubble();
+      else speechBubble = createEmptyBubble();
     }
   }
 
   function tick(dtSec) {
-    tickWalk(dtSec);
+    tickScene(dtSec);
     tickSpeech(dtSec);
   }
 
@@ -346,13 +443,17 @@ export function createScriptedSequenceController({
   return {
     canActorAddressPlayer,
     clearAll,
+    clearSceneState,
     clearSpeechState,
-    clearWalkState,
     drawSpeechBubble,
     findEntityIdByIdentity,
+    playScene,
     queueResolvedWalk,
+    queueScene,
     queueSpeechBubble,
     queueWalk,
     tick,
   };
 }
+
+export const createScriptedSequenceController = createSceneRuntime;

@@ -35,7 +35,7 @@ import { initHUD } from "./display/ui/hud.js";
 import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
 import { createHudFeeds } from "./main/ui/hudFeeds.js";
-import { createScriptedSequenceController } from "./main/scriptedSequenceController.js";
+import { createSceneRuntime } from "./main/sceneRuntime.js";
 import { createActiveSpellController } from "./main/spells/activeSpellController.js";
 import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
@@ -127,20 +127,8 @@ import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
-import { addGenocide } from "./rules/data/monsters.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
-import {
-  applyOpeningInvulnerability,
-  findOpeningDragonSpawn,
-  OPENING_SEQUENCE_PRAYER_PROMPT,
-  OPENING_SEQUENCE_RELEASE_DELAY_SEC,
-  OPENING_SEQUENCE_STOP_DISTANCE,
-  performOpeningPrayerSmite,
-  primeOpeningDeityFavor,
-  spawnOpeningDragonWhelp,
-  syncOpeningDragonAggro,
-} from "./main/openingSequence.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -157,16 +145,6 @@ const CAMERA_START_SCALE = (() => {
     ? CAMERA_START_SCALE_MOBILE
     : CAMERA_START_SCALE_DESKTOP;
 })();
-const OPENING_CAMERA_SCALE_MOBILE = TILE_PX * 0.82;
-const OPENING_CAMERA_SCALE = (() => {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return CAMERA_START_SCALE;
-  }
-  return window.matchMedia("(max-width: 760px)").matches
-    ? OPENING_CAMERA_SCALE_MOBILE
-    : CAMERA_START_SCALE;
-})();
-
 const _canvasSetup = createCanvasSetup({ canvasId: 'stage', TILE_PX, dprCap: PERF.dprCap });
 const { canvas, ctx, back, bctx } = _canvasSetup;
 
@@ -303,40 +281,6 @@ updateBootProgress("Game data loaded", _bootDoneUnits);
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 
-const OPENING_SEQUENCE_TURN_INTERVAL_SEC = 0.18;
-const OPENING_SMITE_DELAY_TURNS = 3;
-let _openingSequence = {
-  active: false,
-  dragonId: 0,
-  turnAccumulator: 0,
-  releaseDelaySec: 0,
-  smiteDelayTurns: 0,
-  lastFocusPos: null,
-  cameraLocked: false,
-  awaitingPrayer: false,
-  awaitingSmite: false,
-  promptShown: false,
-};
-let _pendingSmite = null;
-
-function syncOpeningPrayerGateFlag() {
-  try {
-    /** @type {any} */ (window).__JSHACK_OPENING_AWAITING_PRAYER = !!_openingSequence.awaitingPrayer;
-  } catch {}
-}
-
-function syncPrayButtonHighlight(active) {
-  try {
-    window.dispatchEvent(new CustomEvent('ui:highlightPrayButton', {
-      detail: { active: !!active },
-    }));
-  } catch (e) { console.debug('[main] dispatch ui:highlightPrayButton:', e); }
-}
-
-function openingPromptY(pos) {
-  return (Number(pos?.y || 0) - 1.15);
-}
-
 function getSpeakerBubbleLiftPx() {
   const scale = Math.max(1, Number(cam?.scale) || 1);
   return Math.max(32, Math.min(96, Math.round(scale * 1.15)));
@@ -354,6 +298,7 @@ let _bubbleDialogState = {
   sessionId: 0,
   actorId: 0,
   targetId: 0,
+  maxDistance: 2,
 };
 
 function createBubbleDialogUi() {
@@ -453,7 +398,7 @@ function createBubbleDialogUi() {
 const bubbleDialogUi = createBubbleDialogUi();
 
 function closeBubbleDialog() {
-  _bubbleDialogState = { open: false, sessionId: 0, actorId: 0, targetId: 0 };
+  _bubbleDialogState = { open: false, sessionId: 0, actorId: 0, targetId: 0, maxDistance: 2 };
   bubbleDialogUi.el.style.display = "none";
   bubbleDialogUi.el.style.transform = "translate(-9999px, -9999px)";
   bubbleDialogUi.connector.style.display = "none";
@@ -469,6 +414,7 @@ function openBubbleDialog(detail = {}) {
     sessionId: Number(detail?.sessionId || 0) | 0,
     actorId: Number(detail?.actorId || 0) | 0,
     targetId: Number(detail?.targetId || 0) | 0,
+    maxDistance: Math.max(1, Number(detail?.maxDistance || 2) | 0),
   };
   bubbleDialogUi.title.textContent = String(detail?.speakerName || "Someone");
   bubbleDialogUi.body.textContent = String(detail?.text || "...");
@@ -510,7 +456,7 @@ function layoutBubbleDialog() {
       Math.abs((speakerPos.x | 0) - (pe.pos.x | 0)),
       Math.abs((speakerPos.y | 0) - (pe.pos.y | 0)),
     );
-    if (dist > 1) {
+    if (dist > (_bubbleDialogState.maxDistance | 0)) {
       window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
         detail: { sessionId: _bubbleDialogState.sessionId },
       }));
@@ -563,145 +509,6 @@ function layoutBubbleDialog() {
   }
 }
 
-function stopOpeningSequence() {
-  _openingSequence.active = false;
-  _openingSequence.dragonId = 0;
-  _openingSequence.turnAccumulator = 0;
-  _openingSequence.releaseDelaySec = 0;
-  _openingSequence.smiteDelayTurns = 0;
-  _openingSequence.lastFocusPos = null;
-  _openingSequence.cameraLocked = false;
-  _openingSequence.awaitingPrayer = false;
-  _openingSequence.awaitingSmite = false;
-  _openingSequence.promptShown = false;
-  _pendingSmite = null;
-  syncOpeningPrayerGateFlag();
-  syncPrayButtonHighlight(false);
-}
-
-function showOpeningPrayerPrompt() {
-  if (_openingSequence.promptShown) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  _openingSequence.promptShown = true;
-  try {
-    if (typeof ftext?.addStatus === "function") {
-      ftext.addStatus(pe.pos.x, openingPromptY(pe.pos), OPENING_SEQUENCE_PRAYER_PROMPT, {
-        color: "#ffe27a",
-        life: 4.5,
-        scaleStart: 1.45,
-        scaleEnd: 1.0,
-      });
-    }
-  } catch (e) { console.debug("[main] opening prayer prompt ftext failed:", e); }
-  try {
-    messageLog.log({ text: OPENING_SEQUENCE_PRAYER_PROMPT, type: "hint" });
-  } catch (e) { console.debug("[main] opening prayer prompt log failed:", e); }
-}
-
-function handOffOpeningCameraToPlayer() {
-  if (!_openingSequence.active) return;
-  _openingSequence.cameraLocked = false;
-  _openingSequence.awaitingPrayer = true;
-  zoomTo(cam, CAMERA_START_SCALE, 0.28);
-  syncOpeningPrayerGateFlag();
-  syncPrayButtonHighlight(true);
-  showOpeningPrayerPrompt();
-}
-
-function startOpeningSequence() {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const spawnPos = findOpeningDragonSpawn(world, pe.pos);
-  if (!spawnPos) return;
-
-  addGenocide("dragon_whelp");
-  const dragonId = spawnOpeningDragonWhelp(world, {
-    playerId: pe.id,
-    playerPos: pe.pos,
-    spawnPos,
-  });
-  if (!(dragonId > 0)) return;
-
-  _openingSequence.active = true;
-  _openingSequence.dragonId = dragonId;
-  _openingSequence.turnAccumulator = 0;
-  _openingSequence.releaseDelaySec = 0;
-  _openingSequence.cameraLocked = true;
-  _openingSequence.awaitingPrayer = false;
-  _openingSequence.promptShown = false;
-  syncOpeningPrayerGateFlag();
-  syncPrayButtonHighlight(false);
-
-  const dragonPos = world.get(dragonId, Position);
-  if (dragonPos) {
-    _openingSequence.lastFocusPos = { x: dragonPos.x, y: dragonPos.y };
-    cam.x = dragonPos.x;
-    cam.y = dragonPos.y;
-    cam.targetX = dragonPos.x;
-    cam.targetY = dragonPos.y;
-  }
-  zoomTo(cam, OPENING_CAMERA_SCALE, 0.3);
-}
-
-function tickOpeningSequence(dtSec) {
-  if (!_openingSequence.active) return;
-  _openingSequence.releaseDelaySec = Math.max(0, Number(_openingSequence.releaseDelaySec || 0) - Math.max(0, Number(dtSec) || 0));
-  if (!(_openingSequence.dragonId > 0)) {
-    stopOpeningSequence();
-    return;
-  }
-
-  const dragonPos = world.get(_openingSequence.dragonId, Position);
-  if (dragonPos) {
-    _openingSequence.lastFocusPos = { x: dragonPos.x, y: dragonPos.y };
-  }
-  if (!world.isAlive(_openingSequence.dragonId)) {
-    if (_openingSequence.releaseDelaySec <= 0) stopOpeningSequence();
-    return;
-  }
-
-  const pe = playerEntity(world);
-  if (!pe) {
-    stopOpeningSequence();
-    return;
-  }
-
-  if (_openingSequence.awaitingSmite && _pendingSmite) {
-    _openingSequence.turnAccumulator += Math.max(0, Number(dtSec) || 0);
-    while (_openingSequence.awaitingSmite && _openingSequence.turnAccumulator >= OPENING_SEQUENCE_TURN_INTERVAL_SEC) {
-      _openingSequence.turnAccumulator -= OPENING_SEQUENCE_TURN_INTERVAL_SEC;
-      _openingSequence.smiteDelayTurns = Math.max(0, _openingSequence.smiteDelayTurns - 1);
-      if (_openingSequence.smiteDelayTurns <= 0) {
-        const s = _pendingSmite;
-        _pendingSmite = null;
-        _openingSequence.awaitingSmite = false;
-        executeOpeningSmite(s.dragonId, s.deityId, s.deityName, s.dragonPos, pe);
-        stepSim(1);
-        break;
-      }
-      stepSim(1);
-    }
-    return;
-  }
-
-  _openingSequence.turnAccumulator += Math.max(0, Number(dtSec) || 0);
-  while (_openingSequence.active && _openingSequence.cameraLocked && _openingSequence.turnAccumulator >= OPENING_SEQUENCE_TURN_INTERVAL_SEC) {
-    _openingSequence.turnAccumulator -= OPENING_SEQUENCE_TURN_INTERVAL_SEC;
-    syncOpeningDragonAggro(world, _openingSequence.dragonId, pe.id, pe.pos);
-    stepSim(1);
-    if (!world.isAlive(_openingSequence.dragonId)) {
-      stopOpeningSequence();
-      return;
-    }
-    const dp = world.get(_openingSequence.dragonId, Position);
-    if (dp && Math.max(Math.abs((dp.x|0) - (pe.pos.x|0)), Math.abs((dp.y|0) - (pe.pos.y|0))) <= OPENING_SEQUENCE_STOP_DISTANCE) {
-      handOffOpeningCameraToPlayer();
-      break;
-    }
-  }
-}
-
 // Post-mortem: keep the simulation ticking after the player dies so the world
 // continues to evolve (fires spread, monsters roam, etc.).
 let _postMortemInterval = 0;
@@ -709,120 +516,6 @@ world.on("died", ({ id }) => {
   if (!world.has(id, Player)) return;
   if (_postMortemInterval) return;
   _postMortemInterval = setInterval(() => { world.tick(1); }, 500);
-});
-
-function openingDragonNearPlayer() {
-  const dp = world.get(_openingSequence.dragonId, Position);
-  const pe = playerEntity(world);
-  if (!dp || !pe) return false;
-  return Math.max(Math.abs((dp.x|0) - (pe.pos.x|0)), Math.abs((dp.y|0) - (pe.pos.y|0))) <= OPENING_SEQUENCE_STOP_DISTANCE;
-}
-
-world.on("beforeHit", (ctx) => {
-  if (!_openingSequence.active) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  if ((ctx?.attacker | 0) === (_openingSequence.dragonId | 0) && (ctx?.defender | 0) === (pe.id | 0)) {
-    if (openingDragonNearPlayer()) handOffOpeningCameraToPlayer();
-  }
-});
-
-world.on("damaged", ({ source, target }) => {
-  if (!_openingSequence.active) return;
-  if ((source | 0) !== (_openingSequence.dragonId | 0)) return;
-  if (world.has(target, Player) && openingDragonNearPlayer()) handOffOpeningCameraToPlayer();
-});
-
-world.on("monster:firebreath", ({ actor, target }) => {
-  if (!_openingSequence.active) return;
-  if ((actor | 0) !== (_openingSequence.dragonId | 0)) return;
-  if (world.has(target, Player) && openingDragonNearPlayer()) handOffOpeningCameraToPlayer();
-});
-
-function executeOpeningSmite(dragonId, deityId, deityName, dragonPos, pe) {
-  try {
-    if (dragonPos && typeof ftext?.addStatus === "function") {
-      ftext.addStatus(dragonPos.x, dragonPos.y - 0.75, "SMITE!", {
-        color: "#fff4b5",
-        life: 1.6,
-        scaleStart: 1.8,
-        scaleEnd: 1.0,
-      });
-    }
-  } catch (e) { console.debug("[main] opening smite ftext failed:", e); }
-
-  if (performOpeningPrayerSmite(world, { dragonId, deityId, deityName })) {
-    _openingSequence.releaseDelaySec = OPENING_SEQUENCE_RELEASE_DELAY_SEC;
-    let priestId = 0;
-    for (const [id, ident] of world.query(NamedIdentity)) {
-      if (String(ident?.identity || "") === "townfolk_priest") {
-        priestId = id;
-        break;
-      }
-    }
-    if (priestId > 0) {
-      const arrivalTile = findNearestValidTileAround(world, pe.pos, {
-        maxDistance: 1,
-        exclude: [{ x: pe.pos.x | 0, y: pe.pos.y | 0 }],
-      });
-      if (arrivalTile) {
-        scriptedSequence.queueResolvedWalk({
-          resolveEntityId: () => scriptedSequence.findEntityIdByIdentity("townfolk_priest"),
-          resolveTarget: () => {
-            const peNow = playerEntity(world);
-            const priestNow = scriptedSequence.findEntityIdByIdentity("townfolk_priest");
-            if (!(priestNow > 0) || !peNow) return null;
-            if (!scriptedSequence.canActorAddressPlayer(priestNow, Infinity)) return null;
-            return findNearestValidTileAround(world, peNow.pos, {
-              maxDistance: 1,
-              exclude: [{ x: peNow.pos.x | 0, y: peNow.pos.y | 0 }],
-            });
-          },
-          stepDelaySec: 0.18,
-          onArrive: () => {
-            scriptedSequence.queueSpeechBubble({
-              entityId: priestId,
-              resolveEntityId: () => scriptedSequence.findEntityIdByIdentity("townfolk_priest"),
-              text: "The gods have blessed this town through you. Thank you for saving us.",
-              holdTurns: 2,
-              canShow: () => scriptedSequence.canActorAddressPlayer(scriptedSequence.findEntityIdByIdentity("townfolk_priest"), 2),
-            });
-            scriptedSequence.queueSpeechBubble({
-              entityId: priestId,
-              resolveEntityId: () => scriptedSequence.findEntityIdByIdentity("townfolk_priest"),
-              text: "Do not fear the wreckage. We'll have the square singing again in a few days.",
-              holdTurns: 2,
-              canShow: () => scriptedSequence.canActorAddressPlayer(scriptedSequence.findEntityIdByIdentity("townfolk_priest"), 2),
-            });
-          },
-        });
-      }
-    }
-    stopOpeningSequence();
-  }
-}
-
-world.on("prayer", ({ actor }) => {
-  if (!_openingSequence.active) return;
-  const pe = playerEntity(world);
-  if (!pe || (Number(actor || 0) | 0) !== (pe.id | 0)) return;
-  if (!_openingSequence.awaitingPrayer) return;
-  if (_openingSequence.awaitingSmite) return;
-  if (!(_openingSequence.dragonId > 0) || !world.isAlive(_openingSequence.dragonId)) return;
-
-  const devotion = world.get(pe.id, Devotion);
-  const deityId = String(devotion?.deityId || "");
-  const deity = deityId ? getDeityInstance(deityId) : null;
-  const deityName = String(deity?.name || getDeity(deityId)?.name || "The heavens");
-  const dragonPos = world.get(_openingSequence.dragonId, Position) || _openingSequence.lastFocusPos;
-
-  _openingSequence.awaitingPrayer = false;
-  _openingSequence.awaitingSmite = true;
-  _openingSequence.smiteDelayTurns = OPENING_SMITE_DELAY_TURNS;
-  _openingSequence.turnAccumulator = 0;
-  syncOpeningPrayerGateFlag();
-  syncPrayButtonHighlight(false);
-  _pendingSmite = { dragonId: _openingSequence.dragonId, deityId, deityName, dragonPos };
 });
 
 // --- Active spell selection (app-side state) ---------------------------------
@@ -1122,8 +815,6 @@ function _finalizeNewGame(classData) {
         maxMana: stats.maxMana ?? 50,
         manaRegen: stats.manaRegen ?? 0.1,
       });
-      // Opening sequence safety window
-      applyOpeningInvulnerability(world, pe.id);
       // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
       world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
 
@@ -1237,9 +928,6 @@ function _finalizeNewGame(classData) {
       if (deityId) {
         if (!dev) world.add(pe.id, Devotion, { deityId });
         initDeity(deityId, world);
-        if (!_savegameLoaded) {
-          primeOpeningDeityFavor(getDeityInstance(deityId));
-        }
       }
     }
   }
@@ -1263,10 +951,6 @@ function _finalizeNewGame(classData) {
   // Initial world tick — runs all systems once so status effects, equipment stats,
   // and other derived state are fully resolved before the first frame renders.
   stepSim(1);
-
-  if (!_savegameLoaded) {
-    startOpeningSequence();
-  }
 
   bootAdvance("Starting render loop");
   requestAnimationFrame((now) => {
@@ -1899,23 +1583,6 @@ addEventListener('ui:pray', () => {
   rulesHandler({ type: 'rules.pray', payload: {} });
 });
 
-addEventListener('ui:openingPrayerOnly', () => {
-  try {
-    const pe = playerEntity(world);
-    if (pe && typeof ftext?.addStatus === 'function') {
-      ftext.addStatus(pe.pos.x, openingPromptY(pe.pos), OPENING_SEQUENCE_PRAYER_PROMPT, {
-        color: '#ffe27a',
-        life: 1.8,
-        scaleStart: 1.15,
-        scaleEnd: 1.0,
-      });
-    }
-  } catch (e) { console.debug('[main] opening prayer-only ftext failed:', e); }
-  try {
-    messageLog.log({ text: 'Prayer is the only remedy.', type: 'hint' });
-  } catch (e) { console.debug('[main] opening prayer-only log failed:', e); }
-});
-
 addEventListener("ui:openBubbleDialog", (ev) => {
   const detail = /** @type {CustomEvent} */ (ev).detail || {};
   openBubbleDialog(detail);
@@ -1927,12 +1594,10 @@ addEventListener("ui:closeBubbleDialog", () => {
 
 world.on("dungeon:transitioned", () => {
   closeBubbleDialog();
-  stopOpeningSequence();
 });
 
 world.on("dungeon:teleport-depth", () => {
   closeBubbleDialog();
-  stopOpeningSequence();
 });
 
 addEventListener("keydown", (ev) => {
@@ -2825,7 +2490,7 @@ addEventListener('ui:requestDrop', (ev) => {
 
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
-const scriptedSequence = createScriptedSequenceController({
+const sceneRuntime = createSceneRuntime({
   world,
   getPlayerEntity: () => playerEntity(world),
   getCam: () => cam,
@@ -4320,7 +3985,7 @@ function render(worldView) {
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
-  scriptedSequence.drawSpeechBubble(ctx);
+  sceneRuntime.drawSpeechBubble(ctx);
 
   drawRulesProfilerOverlay({ ctx, quality: PERF.quality, prof: /** @type any */ (window).__JSHACK_RULES_PROF });
 }
@@ -4342,7 +4007,6 @@ function frame(now) {
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
-  tickOpeningSequence(dtSec);
   flushPendingStairTransition();
 
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
@@ -4351,7 +4015,7 @@ function frame(now) {
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
-  scriptedSequence.tick(dtSec);
+  sceneRuntime.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
   hudFeeds.updateVitalsHUD();
@@ -4366,15 +4030,7 @@ function frame(now) {
 
   // Render
   const view = getCachedView();
-  if (_openingSequence.active && _openingSequence.cameraLocked) {
-    const dragonPos = world.get(_openingSequence.dragonId, Position);
-    const focusPos = dragonPos || _openingSequence.lastFocusPos;
-    if (focusPos && !cam._detached) {
-      followEntity(cam, focusPos, dtSec, 5.0);
-    } else {
-      stopOpeningSequence();
-    }
-  } else if (view.player && !cam._detached) {
+  if (view.player && !cam._detached) {
     followEntity(cam, view.player.pos, dtSec, 6.0);
   }
 
