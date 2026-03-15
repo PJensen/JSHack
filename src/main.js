@@ -332,6 +332,12 @@ let _scriptedSpeechBubble = {
   onShow: null,
 };
 let _scriptedSpeechBubbleQueue = [];
+let _bubbleDialogState = {
+  open: false,
+  sessionId: 0,
+  actorId: 0,
+  targetId: 0,
+};
 let _scriptedWalk = {
   entityId: 0,
   target: null,
@@ -467,6 +473,120 @@ function drawScriptedSpeechBubble(ctx) {
   ctx.textBaseline = "middle";
   ctx.fillText(text, Math.round(sx), boxY + Math.round(boxH / 2) + 1, maxWidth);
   ctx.restore();
+}
+
+function createBubbleDialogUi() {
+  const el = document.createElement("div");
+  const title = document.createElement("div");
+  const body = document.createElement("div");
+  const choices = document.createElement("div");
+
+  el.id = "speech-bubble-dialog";
+  Object.assign(el.style, {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    zIndex: "90",
+    display: "none",
+    pointerEvents: "auto",
+    minWidth: "220px",
+    maxWidth: "min(78vw, 360px)",
+    padding: "10px 12px 12px",
+    borderRadius: "16px",
+    border: "2px solid rgba(75,62,43,0.9)",
+    background: "rgba(252,248,238,0.98)",
+    boxShadow: "0 10px 28px rgba(0,0,0,0.28)",
+    transform: "translate(-9999px, -9999px)",
+  });
+  Object.assign(title.style, {
+    font: "700 14px 'Trebuchet MS', sans-serif",
+    color: "#4b3e2b",
+    marginBottom: "6px",
+  });
+  Object.assign(body.style, {
+    font: "400 15px 'Trebuchet MS', sans-serif",
+    lineHeight: "1.35",
+    color: "#261f16",
+    marginBottom: "10px",
+  });
+  Object.assign(choices.style, {
+    display: "grid",
+    gap: "8px",
+  });
+
+  el.appendChild(title);
+  el.appendChild(body);
+  el.appendChild(choices);
+  document.body.appendChild(el);
+  return { el, title, body, choices };
+}
+
+const bubbleDialogUi = createBubbleDialogUi();
+
+function closeBubbleDialog() {
+  _bubbleDialogState = { open: false, sessionId: 0, actorId: 0, targetId: 0 };
+  bubbleDialogUi.el.style.display = "none";
+  bubbleDialogUi.el.style.transform = "translate(-9999px, -9999px)";
+  bubbleDialogUi.choices.innerHTML = "";
+}
+
+function openBubbleDialog(detail = {}) {
+  const choices = Array.isArray(detail?.choices) ? detail.choices : [];
+  _bubbleDialogState = {
+    open: true,
+    sessionId: Number(detail?.sessionId || 0) | 0,
+    actorId: Number(detail?.actorId || 0) | 0,
+    targetId: Number(detail?.targetId || 0) | 0,
+  };
+  bubbleDialogUi.title.textContent = String(detail?.speakerName || "Someone");
+  bubbleDialogUi.body.textContent = String(detail?.text || "...");
+  bubbleDialogUi.choices.innerHTML = "";
+  for (const choice of choices) {
+    const btn = document.createElement("button");
+    btn.textContent = String(choice?.label || choice?.id || "Continue");
+    Object.assign(btn.style, {
+      minHeight: "40px",
+      padding: "8px 10px",
+      borderRadius: "10px",
+      border: "1px solid rgba(75,62,43,0.35)",
+      background: "rgba(255,255,255,0.96)",
+      color: "#241d15",
+      font: "600 14px 'Trebuchet MS', sans-serif",
+      textAlign: "left",
+      cursor: "pointer",
+      touchAction: "manipulation",
+    });
+    btn.addEventListener("click", () => {
+      window.dispatchEvent(new CustomEvent("ui:requestDialogChoice", {
+        detail: {
+          sessionId: _bubbleDialogState.sessionId,
+          choiceId: String(choice?.id || ""),
+        },
+      }));
+    });
+    bubbleDialogUi.choices.appendChild(btn);
+  }
+  bubbleDialogUi.el.style.display = "block";
+}
+
+function layoutBubbleDialog() {
+  if (!_bubbleDialogState.open) return;
+  const targetId = _bubbleDialogState.targetId || _bubbleDialogState.actorId;
+  const pos = getPosition(targetId);
+  if (!pos) {
+    closeBubbleDialog();
+    return;
+  }
+  const cssCanvas = {
+    width: canvas.offsetWidth || _canvasSetup.cssW,
+    height: canvas.offsetHeight || _canvasSetup.cssH,
+  };
+  const [sx, sy] = worldToScreen(cam, pos.x, pos.y, cssCanvas);
+  const boxW = bubbleDialogUi.el.offsetWidth || 280;
+  const boxH = bubbleDialogUi.el.offsetHeight || 120;
+  const left = Math.max(10, Math.min(cssCanvas.width - boxW - 10, Math.round(sx - (boxW / 2))));
+  const top = Math.max(10, Math.min(cssCanvas.height - boxH - 30, Math.round(sy - boxH - 42)));
+  bubbleDialogUi.el.style.transform = `translate(${left}px, ${top}px)`;
 }
 
 function stopOpeningSequence() {
@@ -1831,6 +1951,15 @@ addEventListener('ui:openingPrayerOnly', () => {
   try {
     messageLog.log({ text: 'Prayer is the only remedy.', type: 'hint' });
   } catch (e) { console.debug('[main] opening prayer-only log failed:', e); }
+});
+
+addEventListener("ui:openBubbleDialog", (ev) => {
+  const detail = /** @type {CustomEvent} */ (ev).detail || {};
+  openBubbleDialog(detail);
+});
+
+addEventListener("ui:closeBubbleDialog", () => {
+  closeBubbleDialog();
 });
 
 // Spell picker data feed and selection
@@ -4240,6 +4369,7 @@ function frame(now) {
   hudFeeds.updatePetHUD();
   hudFeeds.updateActiveSpellHUD();
   hudFeeds.updateCalendarHUD();
+  layoutBubbleDialog();
 
   // Render
   const view = getCachedView();

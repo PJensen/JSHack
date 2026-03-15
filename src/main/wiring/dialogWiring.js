@@ -12,13 +12,19 @@ export function installDialogWiring({ world }) {
 
   world.on("dialog:opened", (detail) => {
     try {
-      window.dispatchEvent(new CustomEvent("ui:openDialog", { detail }));
-    } catch (e) { console.debug("[dialogWiring] dispatch ui:openDialog:", e); }
+      const choices = Array.isArray(detail?.choices) ? detail.choices : [];
+      const wantsOverlay = detail?.presentation === "overlay" || choices.length > 4;
+      window.dispatchEvent(new CustomEvent(
+        wantsOverlay ? "ui:openDialog" : "ui:openBubbleDialog",
+        { detail }
+      ));
+    } catch (e) { console.debug("[dialogWiring] dispatch dialog open:", e); }
   });
 
   world.on("dialog:closed", (detail) => {
     try {
       window.dispatchEvent(new CustomEvent("ui:closeDialog", { detail }));
+      window.dispatchEvent(new CustomEvent("ui:closeBubbleDialog", { detail }));
     } catch (e) { console.debug("[dialogWiring] dispatch ui:closeDialog:", e); }
   });
 
