@@ -27,8 +27,8 @@ import { markDestroyedTile, ROOF_BURN_TURNS, tickDestroyedTileLedger } from "../
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
-const DEFAULT_FIRE_SPREAD_CHANCE = 0.25;
-const DEFAULT_FIRE_SPREAD_TURNS = 2;
+const DEFAULT_FIRE_SPREAD_CHANCE = 0.3;
+const DEFAULT_FIRE_SPREAD_TURNS = 5;
 const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
   [-1, 0],           [1, 0],
