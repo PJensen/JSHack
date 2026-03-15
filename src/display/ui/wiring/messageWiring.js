@@ -1152,6 +1152,7 @@ export function installMessageWiring({
       if (kind === 'wall') log('The wall burns open in a shower of sparks.', 'system');
       else if (kind === 'door') log('The door burns off its hinges.', 'system');
       else if (kind === 'fence') log('The fence burns away in a quick rush of flame.', 'system');
+      else if (kind === 'roof') log('The roof catches and starts to burn through.', 'system');
       else log('The tree burns down to ash.', 'system');
       return;
     }
@@ -1160,6 +1161,7 @@ export function installMessageWiring({
     if (kind === 'wall') log(`${who} ${burnVerb(who)} through the wall.`, 'system');
     else if (kind === 'door') log(`${who} ${burnVerb(who)} the door off its hinges.`, 'system');
     else if (kind === 'fence') log(`${who} ${burnVerb(who)} the fence down.`, 'system');
+    else if (kind === 'roof') log(`${who} ${burnVerb(who)} through the roof.`, 'system');
     else log(`${who} ${burnVerb(who)} the tree to ash.`, 'system');
   });
 

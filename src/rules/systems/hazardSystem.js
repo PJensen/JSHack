@@ -17,18 +17,23 @@ import {
   TILE_TREE,
   TILE_WALL,
 } from "../environment/dungeon/constants.js";
-import { getTile, setTile } from "../environment/dungeon/tileMap.js";
+import { getTile, isRoofed, setTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Ashes } from "../archetypes/Items.js";
-import { markDestroyedTile, ROOF_BURN_TURNS, tickDestroyedTileLedger } from "../utils/destroyedTiles.js";
+import {
+  getDestroyedTileRecord,
+  markDestroyedTile,
+  ROOF_BURN_TURNS,
+  tickDestroyedTileLedger,
+} from "../utils/destroyedTiles.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
-const DEFAULT_FIRE_SPREAD_CHANCE = 0.3;
-const DEFAULT_FIRE_SPREAD_TURNS = 5;
+const DEFAULT_FIRE_SPREAD_CHANCE = 0.25;
+const DEFAULT_FIRE_SPREAD_TURNS = 2;
 const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
   [-1, 0],           [1, 0],
@@ -67,9 +72,17 @@ function isRoofBearingBurn(tile) {
   return tile === TILE_WALL || tile === TILE_DOOR;
 }
 
-function isFlammableFireSpreadTile(tile, overworld) {
+function isRoofFuelTile(world, x, y, tile, overworld) {
+  if (!overworld) return false;
+  if (tile !== TILE_FLOOR) return false;
+  if (!isRoofed(x, y)) return false;
+  return !getDestroyedTileRecord(world, x, y);
+}
+
+function isFlammableFireSpreadTile(world, x, y, tile, overworld) {
   if (tile === TILE_TREE) return true;
   if (!overworld) return false;
+  if (isRoofFuelTile(world, x, y, tile, overworld)) return true;
   return tile === TILE_FENCE || tile === TILE_DOOR || tile === TILE_WALL;
 }
 
@@ -173,9 +186,37 @@ export function hazardSystem(world) {
     if (kind === "fire" && medium === "floor") {
       burnFlammableEntitiesAt(world, pos.x, pos.y, source, hazardId, cause, sourceId, sourceKind);
       const tileBefore = getTile(pos.x, pos.y);
+      const roofFuel = isRoofFuelTile(world, pos.x, pos.y, tileBefore, overworld);
       const replacementTile = getBurnedTileReplacement(tileBefore, overworld);
-      if (replacementTile !== null && setTile(pos.x, pos.y, replacementTile)) {
-        const burnedKind = burnedTileKind(tileBefore);
+      const burnedKind = roofFuel ? "roof" : burnedTileKind(tileBefore);
+      if (roofFuel) {
+        markDestroyedTile(world, {
+          x: pos.x | 0,
+          y: pos.y | 0,
+          originalTile: tileBefore,
+          currentTile: tileBefore,
+          destroyedAtTurn: world.step | 0,
+          burnedKind,
+          cause,
+          sourceId,
+          sourceKind,
+          roofTurnsLeft: ROOF_BURN_TURNS,
+        });
+        try {
+          world.emit?.("tile:burned", {
+            actor: source,
+            hazardId,
+            x: pos.x | 0,
+            y: pos.y | 0,
+            cause,
+            sourceId,
+            sourceKind,
+            burnedKind,
+            tileBefore,
+            tileAfter: tileBefore,
+          });
+        } catch { /* */ }
+      } else if (replacementTile !== null && setTile(pos.x, pos.y, replacementTile)) {
         markDestroyedTile(world, {
           x: pos.x | 0,
           y: pos.y | 0,
@@ -214,7 +255,7 @@ export function hazardSystem(world) {
           const ny = (pos.y | 0) + dy;
           const key = `${nx},${ny}`;
           if (fireHazardCells.has(key)) continue;
-          if (!isFlammableFireSpreadTile(getTile(nx, ny), overworld)) continue;
+          if (!isFlammableFireSpreadTile(world, nx, ny, getTile(nx, ny), overworld)) continue;
           if ((world.rand?.() ?? 0) >= spreadChance) continue;
 
           pendingFireSpreads.push({
