@@ -43,6 +43,8 @@ function buildContext(world, session, choice = null) {
     dialogId: session.dialogId,
     nodeId: session.nodeId,
     speakerName: session.speakerName,
+    presentation: session.presentation,
+    maxDistance: session.maxDistance,
     choice,
   };
 }
@@ -81,6 +83,15 @@ function emitDialogOpened(world, session) {
   if (!nodeDef) return false;
   const ctx = buildContext(world, session);
   const text = String(evalMaybe(nodeDef.text, ctx, "...") || "...");
+  const presentation = String(
+    evalMaybe(nodeDef.presentation, ctx, session.presentation || def.presentation || "bubble") || "bubble"
+  );
+  const maxDistance = Math.max(
+    1,
+    Number(evalMaybe(nodeDef.maxDistance, ctx, session.maxDistance || def.maxDistance || 2) || 2) | 0
+  );
+  session.presentation = presentation;
+  session.maxDistance = maxDistance;
   const choices = visibleChoices(world, session, nodeDef).map((choice) => ({
     id: choice.id,
     label: choice.label,
@@ -93,6 +104,8 @@ function emitDialogOpened(world, session) {
     nodeId: session.nodeId,
     speakerName: session.speakerName,
     text,
+    presentation,
+    maxDistance,
     choices,
   });
   return true;
@@ -119,12 +132,13 @@ function openDialog(world, payload) {
 
   const actorId = Number(payload?.actorId || 0) | 0;
   const targetId = Number(payload?.targetId || 0) | 0;
+  if (actorId > 0 && !isEntityOnCurrentFloor(world, actorId)) return;
   if (!isEntityOnCurrentFloor(world, targetId)) return;
 
-  // Close any existing dialog for the same actor+target pair (prevents duplicates
-  // from repeated bumps while still allowing a fresh re-open after quest state changes)
+  // Only one live session per actor. Re-opening the same NPC should refresh state;
+  // opening a different NPC should replace the older conversation cleanly.
   for (const [sid, session] of getSessions(world)) {
-    if (session.actorId === actorId && session.targetId === targetId) {
+    if (session.actorId === actorId) {
       closeDialog(world, sid, "replaced");
     }
   }
@@ -137,6 +151,8 @@ function openDialog(world, payload) {
     dialogId,
     nodeId: String(payload?.nodeId || def.start || "root"),
     speakerName: speakerName(world, Number(payload?.targetId || 0) | 0),
+    presentation: String(payload?.presentation || def.presentation || "bubble"),
+    maxDistance: Math.max(1, Number(payload?.maxDistance || def.maxDistance || 2) | 0),
   };
   getSessions(world).set(sessionId, session);
   if (!emitDialogOpened(world, session)) closeDialog(world, sessionId, "invalid");
