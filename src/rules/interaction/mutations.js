@@ -29,6 +29,7 @@ import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
+import { Traits } from "../components/Traits.js";
 
 /**
  * @param {any} world
@@ -427,6 +428,17 @@ export function applyMutation(world, op, resolvers = {}) {
       if (!Number.isFinite(resist.electric.fibrillationA)) {
         resist.electric.fibrillationA = Number.isFinite(op.fibrillationA) ? Number(op.fibrillationA) : 0.03;
       }
+      break;
+    }
+    case "setTrait": {
+      const key = String(op.key || "");
+      if (!key) break;
+      let tr = /** @type any */ (world.get(op.entityId, Traits));
+      if (!tr) {
+        try { world.add(op.entityId, Traits, {}); } catch {}
+        tr = /** @type any */ (world.get(op.entityId, Traits));
+      }
+      if (tr) tr[key] = op.value;
       break;
     }
     case "revealLoadedMap": {

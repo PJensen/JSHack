@@ -17,6 +17,7 @@ import { Potion } from '../src/rules/components/Potion.js';
 import { Consumable } from '../src/rules/components/Consumable.js';
 import { FoodDecay } from '../src/rules/components/FoodDecay.js';
 import { ObjectState } from '../src/rules/components/ObjectState.js';
+import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { createFrom } from '../src/lib/ecs-js/archetype.js';
 import { WildBerries, WildHerbs, ThornPods, VenomFronds } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
@@ -155,6 +156,31 @@ Deno.test("read text emits event with textId", () => {
 
   assert(textEvents.length === 1, 'should emit readText event');
   assert(textEvents[0].textId === 'intro', `textId should be 'intro'`);
+});
+
+Deno.test("interactionSystem ignores off-floor targets", () => {
+  const world = new World({ seed: 1 });
+
+  const actor = world.create();
+  const chest = world.create();
+  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Inventory, { capacity: 20 });
+
+  const dungeonState = world.create();
+  world.add(dungeonState, DungeonState, {
+    worldSeed: world.seed >>> 0,
+    currentDepth: 1,
+    floorEntityIds: [],
+  });
+
+  const chestEvents = [];
+  world.on('chest:open', (e) => chestEvents.push(e));
+
+  world.add(actor, InteractIntent, { targetId: chest });
+  interactionSystem(world);
+
+  assert(chestEvents.length === 0, 'off-floor target should not interact');
+  assert(!world.has(actor, InteractIntent), 'InteractIntent should still be consumed');
 });
 
 Deno.test("stairs do not emit stair traversal from interactionSystem", () => {

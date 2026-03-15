@@ -1,4 +1,5 @@
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { DungeonState } from "../components/DungeonState.js";
 import { getDialog } from "./registry.js";
 
 const DIALOG_RUNTIME_KEY = Symbol.for("jshack:dialog:runtime:installed");
@@ -19,6 +20,18 @@ function nextSessionId(world) {
 function speakerName(world, targetId) {
   const ni = world.get(targetId, NamedIdentity);
   return String(ni?.name || "Someone");
+}
+
+function isEntityOnCurrentFloor(world, entityId) {
+  const id = Number(entityId || 0) | 0;
+  if (!(id > 0) || !world.isAlive(id)) return false;
+  let sawDungeonState = false;
+  for (const [, ds] of world.query(DungeonState)) {
+    sawDungeonState = true;
+    if (!Array.isArray(ds?.floorEntityIds)) return false;
+    return ds.floorEntityIds.includes(id);
+  }
+  return !sawDungeonState;
 }
 
 function buildContext(world, session, choice = null) {
@@ -106,6 +119,7 @@ function openDialog(world, payload) {
 
   const actorId = Number(payload?.actorId || 0) | 0;
   const targetId = Number(payload?.targetId || 0) | 0;
+  if (!isEntityOnCurrentFloor(world, targetId)) return;
 
   // Close any existing dialog for the same actor+target pair (prevents duplicates
   // from repeated bumps while still allowing a fresh re-open after quest state changes)
@@ -133,6 +147,10 @@ function chooseDialog(world, payload) {
   if (!(sessionId > 0)) return;
   const session = getSessions(world).get(sessionId);
   if (!session) return;
+  if (!isEntityOnCurrentFloor(world, session.targetId)) {
+    closeDialog(world, sessionId, "off_floor");
+    return;
+  }
 
   const def = getDialog(session.dialogId);
   const nodeDef = def?.nodes?.[session.nodeId];
@@ -187,4 +205,10 @@ export function installDialogRuntime(world) {
   world.on("dialog:openRequest", (payload) => openDialog(world, payload));
   world.on("dialog:choose", (payload) => chooseDialog(world, payload));
   world.on("dialog:cancel", ({ sessionId }) => closeDialog(world, Number(sessionId || 0) | 0, "cancel"));
+  const closeAll = (reason) => {
+    const sessionIds = [...getSessions(world).keys()];
+    for (const sessionId of sessionIds) closeDialog(world, sessionId, reason);
+  };
+  world.on("dungeon:teleport-depth", () => closeAll("transition"));
+  world.on("dungeon:transitioned", () => closeAll("transition"));
 }

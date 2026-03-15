@@ -2,6 +2,7 @@
 
 import {
   cancelEat,
+  corpseIronStomachProgress,
   corpseStatusEffect,
   corpseDamage,
   grantElectricResist,
@@ -38,10 +39,10 @@ const EMPTY_HOOKS = Object.freeze([]);
  */
 export const CORPSE_DEFS = Object.freeze({
   corpse_rat: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1)]),
+    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1), corpseIronStomachProgress]),
   }),
   corpse_bat: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1)]),
+    onEat: Object.freeze([corpseStatusEffect("disease", 20, 1), corpseIronStomachProgress]),
   }),
   corpse_grid_bug: Object.freeze({
     onEat: Object.freeze([corpseDamage(3)]),

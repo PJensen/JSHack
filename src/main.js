@@ -35,16 +35,7 @@ import { initHUD } from "./display/ui/hud.js";
 import { initPetMenu } from "./display/ui/petMenu.js";
 import { initStatusLine } from "./display/ui/statusLine.js";
 import { createHudFeeds } from "./main/ui/hudFeeds.js";
-import {
-  getLogicalCanvasSize,
-  placeBubbleBox,
-  projectBubbleAnchor,
-} from "./main/ui/bubblePlacement.js";
-import {
-  activateScriptedSpeechBubble,
-  advanceScriptedSpeechBubble,
-  createScriptedSpeechBubble,
-} from "./main/ui/scriptedSpeechState.js";
+import { createScriptedSequenceController } from "./main/scriptedSequenceController.js";
 import { createActiveSpellController } from "./main/spells/activeSpellController.js";
 import { applyDebugCommands } from "./main/debug/debugCommands.js";
 import { installSceneControls } from "./main/debug/sceneControls.js";
@@ -136,8 +127,7 @@ import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
-import { MONSTERS, addGenocide } from "./rules/data/monsters.js";
-import { MonsterSpawner } from "./rules/components/MonsterSpawner.js";
+import { addGenocide } from "./rules/data/monsters.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
 import {
@@ -346,242 +336,12 @@ function syncPrayButtonHighlight(active) {
 function openingPromptY(pos) {
   return (Number(pos?.y || 0) - 1.15);
 }
-
-let _scriptedSpeechBubble = {
-  entityId: 0,
-  text: "",
-  delaySec: 0,
-  ttlSec: 0,
-  durationSec: 0,
-  delayTurns: 0,
-  holdTurns: 0,
-  usesTurnPacing: false,
-  lastStepSeen: null,
-  onShow: null,
-};
-let _scriptedSpeechBubbleQueue = [];
 let _bubbleDialogState = {
   open: false,
   sessionId: 0,
   actorId: 0,
   targetId: 0,
 };
-let _scriptedWalk = {
-  entityId: 0,
-  target: null,
-  stepDelaySec: 0,
-  accumulatorSec: 0,
-  onArrive: null,
-};
-
-function activateQueuedScriptedSpeechBubble(next) {
-  _scriptedSpeechBubble = activateScriptedSpeechBubble(next, world.step | 0);
-}
-
-function queueScriptedSpeechBubble({
-  entityId,
-  text,
-  delaySec = 0,
-  durationSec = 3.4,
-  delayTurns = 0,
-  holdTurns = 0,
-  onShow = null,
-}) {
-  const next = createScriptedSpeechBubble({
-    entityId,
-    text,
-    delaySec,
-    durationSec,
-    delayTurns,
-    holdTurns,
-    onShow,
-  });
-  if (!(_scriptedSpeechBubble.entityId > 0) && !_scriptedSpeechBubble.text) {
-    activateQueuedScriptedSpeechBubble(next);
-    return;
-  }
-  _scriptedSpeechBubbleQueue.push(next);
-}
-
-function queueScriptedWalk({ entityId, target, stepDelaySec = 0.18, onArrive = null }) {
-  _scriptedWalk = {
-    entityId: Number(entityId || 0) | 0,
-    target: target && Number.isInteger(target.x) && Number.isInteger(target.y)
-      ? { x: target.x | 0, y: target.y | 0 }
-      : null,
-    stepDelaySec: Math.max(0.05, Number(stepDelaySec) || 0.18),
-    accumulatorSec: 0,
-    onArrive: typeof onArrive === "function" ? onArrive : null,
-  };
-}
-
-function tickScriptedWalk(dtSec) {
-  if (!(_scriptedWalk.entityId > 0) || !_scriptedWalk.target) return;
-  if (!world.isAlive(_scriptedWalk.entityId)) {
-    _scriptedWalk = { entityId: 0, target: null, stepDelaySec: 0, accumulatorSec: 0, onArrive: null };
-    return;
-  }
-  _scriptedWalk.accumulatorSec += Math.max(0, Number(dtSec) || 0);
-  while (_scriptedWalk.accumulatorSec >= _scriptedWalk.stepDelaySec) {
-    _scriptedWalk.accumulatorSec -= _scriptedWalk.stepDelaySec;
-    const pos = world.get(_scriptedWalk.entityId, Position);
-    if (!pos) break;
-    const tx = _scriptedWalk.target.x | 0;
-    const ty = _scriptedWalk.target.y | 0;
-    const dx = tx - (pos.x | 0);
-    const dy = ty - (pos.y | 0);
-    if (dx === 0 && dy === 0) {
-      const fn = _scriptedWalk.onArrive;
-      _scriptedWalk = { entityId: 0, target: null, stepDelaySec: 0, accumulatorSec: 0, onArrive: null };
-      if (typeof fn === "function") {
-        try { fn(); } catch (e) { console.debug("[main] scripted walk onArrive failed:", e); }
-      }
-      return;
-    }
-    const stepX = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
-    const stepY = stepX === 0 ? Math.sign(dy) : 0;
-    const next = { x: (pos.x | 0) + stepX, y: (pos.y | 0) + stepY };
-    world.set(_scriptedWalk.entityId, Position, next);
-    try {
-      world.emit?.("moved", {
-        id: _scriptedWalk.entityId,
-        from: { x: pos.x | 0, y: pos.y | 0 },
-        to: next,
-      });
-    } catch {}
-  }
-}
-
-function tickScriptedSpeechBubble(dtSec) {
-  if (!(_scriptedSpeechBubble.entityId > 0) || !_scriptedSpeechBubble.text) return;
-  const result = advanceScriptedSpeechBubble(_scriptedSpeechBubble, world.step | 0, dtSec);
-  _scriptedSpeechBubble = result.bubble;
-  if (typeof result.onShow === "function") {
-    try { result.onShow(); } catch (e) { console.debug("[main] scripted speech bubble onShow failed:", e); }
-  }
-  if (result.isExpired) {
-    const next = _scriptedSpeechBubbleQueue.shift();
-    if (next) activateQueuedScriptedSpeechBubble(next);
-    else {
-      _scriptedSpeechBubble = createScriptedSpeechBubble({ entityId: 0, text: "" });
-    }
-  }
-}
-
-function getSpeakerBubbleLiftPx() {
-  const scale = Math.max(1, Number(cam?.scale) || 1);
-  return Math.max(32, Math.min(96, Math.round(scale * 1.15)));
-}
-
-function getSpeakerBubbleAnchorPos(pos) {
-  return {
-    x: Number(pos?.x || 0),
-    y: Number(pos?.y || 0) - 0.68,
-  };
-}
-
-function drawScriptedSpeechBubble(ctx) {
-  const bubble = _scriptedSpeechBubble;
-  if (!(bubble.entityId > 0) || !bubble.text) return;
-  if (bubble.delaySec > 0) return;
-  if (bubble.usesTurnPacing && (bubble.delayTurns | 0) > 0) return;
-  if (!world.isAlive(bubble.entityId)) return;
-  const pos = world.get(bubble.entityId, Position);
-  if (!pos) return;
-
-  const anchor = getSpeakerBubbleAnchorPos(pos);
-  const logicalCanvas = getLogicalCanvasSize(canvas, _canvasSetup.cssW, _canvasSetup.cssH);
-  const projected = projectBubbleAnchor(
-    cam,
-    anchor,
-    logicalCanvas,
-    { left: 0, top: 0 }
-  );
-  const dprScale = Math.max(
-    1,
-    canvas.width / Math.max(1, logicalCanvas.width)
-  );
-  const sx = projected.localX * dprScale;
-  const sy = projected.localY * dprScale;
-  const padX = 12 * dprScale;
-  const maxWidth = Math.min(logicalCanvas.width * 0.44, 360) * dprScale;
-  const text = bubble.text;
-  const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
-
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.font = `600 ${Math.round(15 * dprScale)}px 'Trebuchet MS', sans-serif`;
-  const textWidth = Math.min(maxWidth, Math.ceil(ctx.measureText(text).width));
-  const boxW = textWidth + (padX * 2);
-  const boxH = 34 * dprScale;
-  const lift = getSpeakerBubbleLiftPx() * dprScale;
-  const tailH = Math.max(14, 14 * dprScale);
-  const tailHalfW = Math.max(10, 10 * dprScale);
-  const placed = placeBubbleBox({
-    anchorX: sx,
-    anchorY: sy,
-    boxWidth: boxW,
-    boxHeight: boxH,
-    liftPx: lift,
-    tailHeight: tailH,
-    viewportWidth: canvas.width,
-    viewportHeight: canvas.height,
-    margin: 10 * dprScale,
-    bottomMargin: 30 * dprScale,
-  });
-  const boxX = placed.left;
-  const boxY = placed.top;
-  const alpha = 0.78 + (fade * 0.22);
-  const tailTipX = Math.round(sx - (2 * dprScale));
-  const tailTipY = boxY + boxH + tailH;
-  const lineDx = sx - tailTipX;
-  const lineDy = sy - tailTipY;
-  const lineDist = Math.hypot(lineDx, lineDy);
-
-  if (lineDist > (8 * dprScale)) {
-    ctx.save();
-    ctx.strokeStyle = `rgba(90,74,48,${Math.min(1, alpha + 0.08).toFixed(3)})`;
-    ctx.lineWidth = Math.max(2, 3 * dprScale);
-    ctx.setLineDash([Math.max(5, 7 * dprScale), Math.max(4, 6 * dprScale)]);
-    ctx.lineDashOffset = 0;
-    ctx.beginPath();
-    ctx.moveTo(tailTipX, tailTipY);
-    ctx.lineTo(sx, sy);
-    ctx.stroke();
-
-    ctx.fillStyle = `rgba(252,248,238,${Math.min(1, alpha + 0.16).toFixed(3)})`;
-    ctx.strokeStyle = `rgba(75,62,43,${Math.min(1, alpha + 0.12).toFixed(3)})`;
-    ctx.lineWidth = Math.max(1.5, 2.5 * dprScale);
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.arc(sx, sy, Math.max(4, 5 * dprScale), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  ctx.fillStyle = `rgba(253,249,235,${alpha.toFixed(3)})`;
-  ctx.strokeStyle = `rgba(57,46,32,${Math.min(1, alpha + 0.1).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1, 2 * dprScale);
-  ctx.beginPath();
-  ctx.roundRect(boxX, boxY, boxW, boxH, 12 * dprScale);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(Math.round(sx - tailHalfW), boxY + boxH - 1);
-  ctx.lineTo(Math.round(sx + (tailHalfW * 0.25)), boxY + boxH - 1);
-  ctx.lineTo(tailTipX, tailTipY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = `rgba(32,26,18,${Math.min(1, alpha + 0.12).toFixed(3)})`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, Math.round(sx), boxY + Math.round(boxH / 2) + dprScale, maxWidth);
-  ctx.restore();
-}
 
 function createBubbleDialogUi() {
   const el = document.createElement("div");
@@ -993,20 +753,33 @@ function executeOpeningSmite(dragonId, deityId, deityName, dragonPos, pe) {
         exclude: [{ x: pe.pos.x | 0, y: pe.pos.y | 0 }],
       });
       if (arrivalTile) {
-        queueScriptedWalk({
-          entityId: priestId,
-          target: arrivalTile,
+        scriptedSequence.queueResolvedWalk({
+          resolveEntityId: () => scriptedSequence.findEntityIdByIdentity("townfolk_priest"),
+          resolveTarget: () => {
+            const peNow = playerEntity(world);
+            const priestNow = scriptedSequence.findEntityIdByIdentity("townfolk_priest");
+            if (!(priestNow > 0) || !peNow) return null;
+            if (!scriptedSequence.canActorAddressPlayer(priestNow, Infinity)) return null;
+            return findNearestValidTileAround(world, peNow.pos, {
+              maxDistance: 1,
+              exclude: [{ x: peNow.pos.x | 0, y: peNow.pos.y | 0 }],
+            });
+          },
           stepDelaySec: 0.18,
           onArrive: () => {
-            queueScriptedSpeechBubble({
+            scriptedSequence.queueSpeechBubble({
               entityId: priestId,
+              resolveEntityId: () => scriptedSequence.findEntityIdByIdentity("townfolk_priest"),
               text: "The gods have blessed this town through you. Thank you for saving us.",
               holdTurns: 2,
+              canShow: () => scriptedSequence.canActorAddressPlayer(scriptedSequence.findEntityIdByIdentity("townfolk_priest"), 2),
             });
-            queueScriptedSpeechBubble({
+            scriptedSequence.queueSpeechBubble({
               entityId: priestId,
+              resolveEntityId: () => scriptedSequence.findEntityIdByIdentity("townfolk_priest"),
               text: "Do not fear the wreckage. We'll have the square singing again in a few days.",
               holdTurns: 2,
+              canShow: () => scriptedSequence.canActorAddressPlayer(scriptedSequence.findEntityIdByIdentity("townfolk_priest"), 2),
             });
           },
         });
@@ -2101,73 +1874,8 @@ world.on('scroll:genocide', ({ actor }) => {
     world.emit?.('message', { text: 'The scroll crumbles to dust, unused.', type: 'system' });
     return;
   }
-  const query = input.trim().toLowerCase();
-
-  // Match against all monster definitions: exact name > startsWith > includes > edit distance
-  let best = null;
-  let bestScore = Infinity;
-  for (const m of MONSTERS) {
-    const name = m.name.toLowerCase();
-    if (name === query) { best = m; bestScore = 0; break; }
-    const score = name.startsWith(query) ? 1
-      : name.includes(query) ? 2
-      : query.startsWith(name) ? 3
-      : editDistance(query, name);
-    if (score < bestScore) { bestScore = score; best = m; }
-  }
-
-  if (!best || bestScore > 4) {
-    world.emit?.('message', { text: 'The scroll burns, but nothing happens.', type: 'system' });
-    return;
-  }
-
-  addGenocide(best.id);
-
-  // Kill all living monsters of this type on the current floor
-  let killed = 0;
-  for (const [id] of world.query(NamedIdentity)) {
-    const ni = world.get(id, NamedIdentity);
-    if (!ni || ni.identity !== best.id) continue;
-    const fac = world.get(id, Faction);
-    if (!fac || fac.key !== 'enemy') continue;
-    const vit = world.get(id, Vitality);
-    if (!vit || vit.hp <= 0) continue;
-    world.mutate(id, Vitality, (v) => { v.hp = 0; });
-    killed++;
-  }
-
-  // Deactivate spawners for this monster type
-  for (const [id, sp] of world.query(MonsterSpawner)) {
-    if (sp?.spawnParams?.identity === best.id) {
-      world.mutate(id, MonsterSpawner, (r) => { r.isActive = false; });
-    }
-  }
-
-  world.emit?.('message', {
-    text: `You have genocided all ${best.name}s! ${killed > 0 ? `${killed} perish${killed === 1 ? 'es' : ''} instantly.` : ''}`,
-    type: 'system',
-  });
+  world.emit?.('scroll:genocide:request', { actor, query: input.trim() });
 });
-
-/** Simple Levenshtein edit distance for genocide string matching. */
-function editDistance(a, b) {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      const cost = b[i - 1] === a[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost,
-      );
-    }
-  }
-  return matrix[b.length][a.length];
-}
 
 // Pray button → dispatch pray action
 addEventListener('ui:pray', () => {
@@ -2202,6 +1910,16 @@ addEventListener("ui:openBubbleDialog", (ev) => {
 
 addEventListener("ui:closeBubbleDialog", () => {
   closeBubbleDialog();
+});
+
+world.on("dungeon:transitioned", () => {
+  closeBubbleDialog();
+  stopOpeningSequence();
+});
+
+world.on("dungeon:teleport-depth", () => {
+  closeBubbleDialog();
+  stopOpeningSequence();
 });
 
 addEventListener("keydown", (ev) => {
@@ -3094,6 +2812,13 @@ addEventListener('ui:requestDrop', (ev) => {
 
 // ---- Display camera (resource) ---------------------------------------------
 const cam = createCamera(); // { x,y, scale, target*, shake* }
+const scriptedSequence = createScriptedSequenceController({
+  world,
+  getPlayerEntity: () => playerEntity(world),
+  getCam: () => cam,
+  getCanvas: () => canvas,
+  getCanvasSetup: () => _canvasSetup,
+});
 cam.scale = CAMERA_START_SCALE;
 cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
@@ -4582,7 +4307,7 @@ function render(worldView) {
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
-  drawScriptedSpeechBubble(ctx);
+  scriptedSequence.drawSpeechBubble(ctx);
 
   drawRulesProfilerOverlay({ ctx, quality: PERF.quality, prof: /** @type any */ (window).__JSHACK_RULES_PROF });
 }
@@ -4613,8 +4338,7 @@ function frame(now) {
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
-  tickScriptedWalk(dtSec);
-  tickScriptedSpeechBubble(dtSec);
+  scriptedSequence.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
   hudFeeds.updateVitalsHUD();
