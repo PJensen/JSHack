@@ -17,7 +17,7 @@ import {
   TILE_TREE,
   TILE_WALL,
 } from "../src/rules/environment/dungeon/constants.js";
-import { clearAll, getTile, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
+import { clearAll, getTile, loadChunk, setRoofed } from "../src/rules/environment/dungeon/tileMap.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { getDestroyedTileRecord, ROOF_BURN_TURNS } from "../src/rules/utils/destroyedTiles.js";
 import { spawnHazard } from "../src/rules/utils/hazardSpawn.js";
@@ -309,6 +309,64 @@ Deno.test("overworld fire hazards burn wooden structure tiles into ruin tiles", 
     assert(fenceScar, "fence burn should persist its original tile");
     assertEquals(fenceScar.originalTile, TILE_FENCE);
     assertEquals(fenceScar.roofTurnsLeft, 0);
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("overworld roof fuel burns through roofed floors without turning floors into endless fuel", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_GRASS);
+  tiles[5 * CHUNK_SIZE + 5] = TILE_WALL;
+  tiles[5 * CHUNK_SIZE + 6] = TILE_FLOOR;
+  loadChunk(0, 0, tiles);
+  setRoofed(5, 5, true);
+  setRoofed(6, 5, true);
+
+  try {
+    const world = new World({ seed: 9210 });
+    addOverworldState(world);
+    const spawned = [];
+    const burned = [];
+    world.on("hazard:spawned", (event) => spawned.push(event));
+    world.on("tile:burned", (event) => burned.push(event));
+
+    spawnHazard(world, {
+      x: 5,
+      y: 5,
+      kind: "fire",
+      medium: "floor",
+      turnsLeft: 3,
+      radius: 0,
+      tickDamage: 0,
+      damageType: "fire",
+      cause: "wildfire",
+      meta: { fireSpreadChance: 1, fireSpreadTurns: 2 },
+    });
+
+    hazardSystem(world);
+    assert(
+      spawned.some((event) => event.kind === "fire" && event.at?.x === 6 && event.at?.y === 5),
+      "fire should spread from the shell onto the roof fuel above the interior floor",
+    );
+
+    hazardSystem(world);
+    const roofScar = getDestroyedTileRecord(world, 6, 5);
+    assert(roofScar, "roofed floor should record a burned roof cell");
+    assertEquals(roofScar.originalTile, TILE_FLOOR);
+    assertEquals(roofScar.currentTile, TILE_FLOOR);
+    assertEquals(roofScar.burnedKind, "roof");
+    assertEquals(roofScar.roofTurnsLeft, ROOF_BURN_TURNS);
+    assertEquals(getTile(6, 5), TILE_FLOOR, "interior floor should remain floor while the roof burns away");
+    assert(burned.some((event) => event.x === 6 && event.y === 5 && event.burnedKind === "roof"));
+
+    const spawnedBefore = spawned.length;
+    for (let i = 0; i < 4; i++) hazardSystem(world);
+    assertEquals(
+      spawned.length,
+      spawnedBefore,
+      "a burned-through roof cell should not keep reigniting as infinite fuel",
+    );
   } finally {
     clearAll();
   }
