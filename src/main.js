@@ -3263,6 +3263,11 @@ const fx = new ParticleFX({ capacity: PERF.particleCapacity, seedBase: (world.se
 fx.ctx = bctx;
 // Avoid expensive per-particle transforms: draw in world units under camera transform
 fx.worldToScreen = (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ size, /** @type {{x:number,y:number,size:number}} */ out) => { out.x = x; out.y = y; out.size = size; };
+world.on('dungeon:transitioned', () => {
+  fx.pool.count = 0;
+  _roofParticleStamp.clear();
+  _roofSmokeParticleStamp.clear();
+});
 const getPosition = (id) => world.get(Number(id || 0), Position) || null;
 const isPetEntity = (id) => world.has(Number(id || 0), Pet);
 const isPlayerEntity = (id) => world.has(Number(id || 0), Player);
