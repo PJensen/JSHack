@@ -331,6 +331,7 @@ let _scriptedSpeechBubble = {
   durationSec: 0,
   onShow: null,
 };
+let _scriptedSpeechBubbleQueue = [];
 let _scriptedWalk = {
   entityId: 0,
   target: null,
@@ -340,7 +341,7 @@ let _scriptedWalk = {
 };
 
 function queueScriptedSpeechBubble({ entityId, text, delaySec = 0, durationSec = 3.4, onShow = null }) {
-  _scriptedSpeechBubble = {
+  const next = {
     entityId: Number(entityId || 0) | 0,
     text: String(text || ""),
     delaySec: Math.max(0, Number(delaySec) || 0),
@@ -348,6 +349,11 @@ function queueScriptedSpeechBubble({ entityId, text, delaySec = 0, durationSec =
     durationSec: Math.max(0, Number(durationSec) || 0),
     onShow: typeof onShow === "function" ? onShow : null,
   };
+  if (!(_scriptedSpeechBubble.entityId > 0) && !_scriptedSpeechBubble.text) {
+    _scriptedSpeechBubble = next;
+    return;
+  }
+  _scriptedSpeechBubbleQueue.push(next);
 }
 
 function queueScriptedWalk({ entityId, target, stepDelaySec = 0.18, onArrive = null }) {
@@ -413,7 +419,7 @@ function tickScriptedSpeechBubble(dtSec) {
   }
   _scriptedSpeechBubble.ttlSec = Math.max(0, _scriptedSpeechBubble.ttlSec - dt);
   if (_scriptedSpeechBubble.ttlSec <= 0) {
-    _scriptedSpeechBubble = { entityId: 0, text: "", delaySec: 0, ttlSec: 0, durationSec: 0, onShow: null };
+    _scriptedSpeechBubble = _scriptedSpeechBubbleQueue.shift() || { entityId: 0, text: "", delaySec: 0, ttlSec: 0, durationSec: 0, onShow: null };
   }
 }
 
@@ -432,7 +438,7 @@ function drawScriptedSpeechBubble(ctx) {
   const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
 
   ctx.save();
-  ctx.font = "600 16px Georgia, serif";
+  ctx.font = "600 15px 'Trebuchet MS', sans-serif";
   const textWidth = Math.min(maxWidth, Math.ceil(ctx.measureText(text).width));
   const boxW = textWidth + (padX * 2);
   const boxH = 34;
@@ -653,9 +659,15 @@ world.on("prayer", ({ actor }) => {
           onArrive: () => {
             queueScriptedSpeechBubble({
               entityId: priestId,
-              text: "Sorry about the damage. We'll have this patched up in a couple days.",
+              text: "Thank you for saving our town.",
               delaySec: 0.2,
-              durationSec: 4.6,
+              durationSec: 2.8,
+            });
+            queueScriptedSpeechBubble({
+              entityId: priestId,
+              text: "We'll have this patched up in a few days.",
+              delaySec: 0.15,
+              durationSec: 3.6,
             });
           },
         });
