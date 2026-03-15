@@ -843,8 +843,20 @@ function handleWorking(world, id, pos, job) {
       });
       if (herbId) depleteNode(world, herbId);
       carryCreated(world, id, HERB_ITEM_IDS[herbKind] || "food_wild_herbs");
+      job.carryCount++;
       emitSafe(world, "townfolk:gathered_herbs", { actor: id, x: pos.x, y: pos.y });
-      setCarry(job, "herbs");
+      if (job.carryMax > 0 && job.carryCount < job.carryMax) {
+        const next = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
+          (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern");
+        if (next) {
+          job.targetX = next.x;
+          job.targetY = next.y;
+          job.state = TOWNFOLK_STATES.walking;
+          job.stuckTurns = 0;
+          return;
+        }
+      }
+      setCarry(job, "herbs", Math.max(1, job.carryCount));
       emitSafe(world, "townfolk:carrying", { actor: id, resource: "herbs" });
       setReturning(job);
       return;
@@ -1143,13 +1155,10 @@ function getRoleWorkTarget(world, job) {
       return { x: job.workX, y: job.workY, kind: "inspect", state: TOWNFOLK_STATES.working, radius: 1 };
     }
     case TOWNFOLK_ROLES.herbalist: {
-      if ((workBeat % 2) === 0) {
-        const herb = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
-          (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern");
-        if (herb) {
-          return { x: herb.x, y: herb.y, kind: "harvest_herb", state: TOWNFOLK_STATES.working, radius: 1 };
-        }
-        return { x: job.workX, y: job.workY, kind: "sort_herbs", state: TOWNFOLK_STATES.working, radius: 1 };
+      const herb = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
+        (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern");
+      if (herb) {
+        return { x: herb.x, y: herb.y, kind: "harvest_herb", state: TOWNFOLK_STATES.working, radius: 1 };
       }
       return { x: job.workAuxX, y: job.workAuxY, kind: "sort_herbs", state: TOWNFOLK_STATES.working, radius: 1 };
     }

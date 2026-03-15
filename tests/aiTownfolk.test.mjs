@@ -87,6 +87,8 @@ function addTownfolk(world, x, y, role, opts = {}) {
     routineKind:  opts.routineKind  ?? "",
     lastPhase:    opts.lastPhase    ?? "",
     carrying:     opts.carrying     ?? "",
+    carryCount:   opts.carryCount   ?? 0,
+    carryMax:     opts.carryMax     ?? (role === "farmer" ? 4 : role === "herbalist" ? 3 : 0),
     deliverX:     opts.deliverX     ?? 0,
     deliverY:     opts.deliverY     ?? 0,
     stuckTurns:   opts.stuckTurns   ?? 0,
@@ -669,6 +671,93 @@ Deno.test("alchemist brew consumes herbs and reagents from the herb chest", () =
   }
 
   assert(brewedAntiVenom, "alchemist should brew an anti-venom potion when venom fronds are available");
+});
+
+Deno.test("scheduled herbalist leaves the hut for ready herbs even on the indoor sorting beat", () => {
+  const world = makeWorld(191);
+  world.step = 30;
+
+  const herbNode = world.create();
+  world.add(herbNode, Position, { x: 12, y: 5 });
+  world.add(herbNode, HarvestNode, {
+    kind: "venom_fern",
+    ready: true,
+    regrowTurns: 20,
+    regrowCountdown: 0,
+    yield: "reagent_venom_frond",
+    yieldMin: 1,
+    yieldMax: 1,
+  });
+  world.add(herbNode, Material, { kind: "wood" });
+
+  const herbalist = addTownfolk(world, 8, 5, "herbalist", {
+    scheduleEnabled: true,
+    state: TOWNFOLK_STATES.idle,
+    homeX: 8,
+    homeY: 5,
+    bedX: 7,
+    bedY: 5,
+    workX: 12,
+    workY: 5,
+    workAuxX: 8,
+    workAuxY: 5,
+    pubX: 8,
+    pubY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assert(world.has(herbalist, MoveIntent), "herbalist should head out to gather");
+  const intent = world.get(herbalist, MoveIntent);
+  assertEquals(intent.dx, 1, "herbalist should move toward the herb patch instead of idling indoors");
+  assertEquals(intent.dy, 0);
+});
+
+Deno.test("herbalist keeps gathering until the satchel is full before returning home", () => {
+  const world = makeWorld(192);
+
+  const herbA = world.create();
+  world.add(herbA, Position, { x: 8, y: 5 });
+  world.add(herbA, HarvestNode, {
+    kind: "herbs",
+    ready: true,
+    regrowTurns: 20,
+    regrowCountdown: 0,
+    yield: "food_wild_herbs",
+    yieldMin: 1,
+    yieldMax: 1,
+  });
+
+  const herbB = world.create();
+  world.add(herbB, Position, { x: 10, y: 5 });
+  world.add(herbB, HarvestNode, {
+    kind: "venom_fern",
+    ready: true,
+    regrowTurns: 20,
+    regrowCountdown: 0,
+    yield: "reagent_venom_frond",
+    yieldMin: 1,
+    yieldMax: 1,
+  });
+
+  const herbalist = addTownfolk(world, 8, 5, "herbalist", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "harvest_herb",
+    workX: 9,
+    workY: 5,
+    targetX: 8,
+    targetY: 5,
+    carryMax: 3,
+  });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(herbalist, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.walking, "herbalist should continue to the next patch instead of returning immediately");
+  assertEquals(job.targetX, 10);
+  assertEquals(job.targetY, 5);
+  assertEquals(job.carryCount, 1);
 });
 
 Deno.test("villager hauls flour from the mill chest into the tavern chest", () => {
