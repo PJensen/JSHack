@@ -1030,6 +1030,14 @@ No force-push to master. No amend on pushed commits.
 
 ## Common pitfalls & debugging
 
+### World coordinates can be negative
+
+**Symptom**: Hazards, spawns, or effects appear at (0, 0) instead of the correct position
+
+**Cause**: Using `Math.max(0, value)` or `clampInt(value, fallback, min=0)` on world coordinates. World-space coordinates (Position.x, Position.y) **can be negative** — the dungeon extends in all directions from the origin. Clamping to min=0 silently destroys negative coordinates.
+
+**Rule**: Never clamp x/y world coordinates to a minimum of 0. Validate that they are finite integers, but allow the full integer range. Use `Number.isFinite(v) ? (v | 0) : fallback` instead of `Math.max(0, v | 0)`.
+
 ### Rules layer importing from display
 
 **Symptom**: `import ... from '../../display/...'` in rules/
