@@ -2819,7 +2819,7 @@ world.on('moved', ({ id, to }) => {
     if (ni.identity !== 'shopkeeper') continue;
     const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
     if (dist === 1) {
-      log('A shopkeeper is nearby. Bump to trade.');
+      world.emit?.('message', { text: 'A shopkeeper is nearby. Bump to trade.', type: 'system' });
       break;
     }
   }
@@ -2829,7 +2829,7 @@ world.on('moved', ({ id, to }) => {
     if (ni.identity !== 'weapon_rack') continue;
     const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
     if (dist === 1) {
-      log('A weapon rack is here. Bump to browse.');
+      world.emit?.('message', { text: 'A weapon rack is here. Bump to browse.', type: 'system' });
       break;
     }
   }
