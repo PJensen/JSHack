@@ -31,6 +31,15 @@ export function makeRulesDispatcher(world, getActorId) {
     if (typeof window !== "undefined") {
       try {
         if (/** @type {any} */ (window).__JSHACK_INPUT_LOCKED === true) return;
+        if (
+          /** @type {any} */ (window).__JSHACK_OPENING_AWAITING_PRAYER === true
+          && String(action?.type || "") !== "rules.pray"
+        ) {
+          try {
+            window.dispatchEvent(new CustomEvent("ui:openingPrayerOnly"));
+          } catch {}
+          return;
+        }
       } catch (e) { console.debug('[rulesDispatch] input lock check failed:', e); }
     }
 

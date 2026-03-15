@@ -130,6 +130,16 @@ import { MONSTERS, addGenocide } from "./rules/data/monsters.js";
 import { MonsterSpawner } from "./rules/components/MonsterSpawner.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
+import {
+  applyOpeningInvulnerability,
+  findOpeningDragonSpawn,
+  OPENING_SEQUENCE_PRAYER_PROMPT,
+  OPENING_SEQUENCE_RELEASE_DELAY_SEC,
+  performOpeningPrayerSmite,
+  primeOpeningDeityFavor,
+  spawnOpeningDragonWhelp,
+  syncOpeningDragonAggro,
+} from "./main/openingSequence.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -282,6 +292,210 @@ updateBootProgress("Game data loaded", _bootDoneUnits);
 
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
+
+const OPENING_SEQUENCE_TURN_INTERVAL_SEC = 0.18;
+let _openingSequence = {
+  active: false,
+  dragonId: 0,
+  turnAccumulator: 0,
+  releaseDelaySec: 0,
+  lastFocusPos: null,
+  cameraLocked: false,
+  awaitingPrayer: false,
+  promptShown: false,
+};
+
+function syncOpeningPrayerGateFlag() {
+  try {
+    /** @type {any} */ (window).__JSHACK_OPENING_AWAITING_PRAYER = !!_openingSequence.awaitingPrayer;
+  } catch {}
+}
+
+function syncPrayButtonHighlight(active) {
+  try {
+    window.dispatchEvent(new CustomEvent('ui:highlightPrayButton', {
+      detail: { active: !!active },
+    }));
+  } catch (e) { console.debug('[main] dispatch ui:highlightPrayButton:', e); }
+}
+
+function openingPromptY(pos) {
+  return (Number(pos?.y || 0) - 1.15);
+}
+
+function stopOpeningSequence() {
+  _openingSequence.active = false;
+  _openingSequence.dragonId = 0;
+  _openingSequence.turnAccumulator = 0;
+  _openingSequence.releaseDelaySec = 0;
+  _openingSequence.lastFocusPos = null;
+  _openingSequence.cameraLocked = false;
+  _openingSequence.awaitingPrayer = false;
+  _openingSequence.promptShown = false;
+  syncOpeningPrayerGateFlag();
+  syncPrayButtonHighlight(false);
+}
+
+function showOpeningPrayerPrompt() {
+  if (_openingSequence.promptShown) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  _openingSequence.promptShown = true;
+  try {
+    if (typeof ftext?.addStatus === "function") {
+      ftext.addStatus(pe.pos.x, openingPromptY(pe.pos), OPENING_SEQUENCE_PRAYER_PROMPT, {
+        color: "#ffe27a",
+        life: 4.5,
+        scaleStart: 1.45,
+        scaleEnd: 1.0,
+      });
+    }
+  } catch (e) { console.debug("[main] opening prayer prompt ftext failed:", e); }
+  try {
+    messageLog.log({ text: OPENING_SEQUENCE_PRAYER_PROMPT, type: "hint" });
+  } catch (e) { console.debug("[main] opening prayer prompt log failed:", e); }
+}
+
+function handOffOpeningCameraToPlayer() {
+  if (!_openingSequence.active) return;
+  _openingSequence.cameraLocked = false;
+  _openingSequence.awaitingPrayer = true;
+  syncOpeningPrayerGateFlag();
+  syncPrayButtonHighlight(true);
+  showOpeningPrayerPrompt();
+}
+
+function startOpeningSequence() {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const spawnPos = findOpeningDragonSpawn(world, pe.pos);
+  if (!spawnPos) return;
+
+  addGenocide("dragon_whelp");
+  const dragonId = spawnOpeningDragonWhelp(world, {
+    playerId: pe.id,
+    playerPos: pe.pos,
+    spawnPos,
+  });
+  if (!(dragonId > 0)) return;
+
+  _openingSequence.active = true;
+  _openingSequence.dragonId = dragonId;
+  _openingSequence.turnAccumulator = 0;
+  _openingSequence.releaseDelaySec = 0;
+  _openingSequence.cameraLocked = true;
+  _openingSequence.awaitingPrayer = false;
+  _openingSequence.promptShown = false;
+  syncOpeningPrayerGateFlag();
+  syncPrayButtonHighlight(false);
+
+  const dragonPos = world.get(dragonId, Position);
+  if (dragonPos) {
+    _openingSequence.lastFocusPos = { x: dragonPos.x, y: dragonPos.y };
+    cam.x = dragonPos.x;
+    cam.y = dragonPos.y;
+    cam.targetX = dragonPos.x;
+    cam.targetY = dragonPos.y;
+  }
+}
+
+function tickOpeningSequence(dtSec) {
+  if (!_openingSequence.active) return;
+  _openingSequence.releaseDelaySec = Math.max(0, Number(_openingSequence.releaseDelaySec || 0) - Math.max(0, Number(dtSec) || 0));
+  if (!(_openingSequence.dragonId > 0)) {
+    stopOpeningSequence();
+    return;
+  }
+
+  const dragonPos = world.get(_openingSequence.dragonId, Position);
+  if (dragonPos) {
+    _openingSequence.lastFocusPos = { x: dragonPos.x, y: dragonPos.y };
+  }
+  if (!world.isAlive(_openingSequence.dragonId)) {
+    if (_openingSequence.releaseDelaySec <= 0) stopOpeningSequence();
+    return;
+  }
+
+  const pe = playerEntity(world);
+  if (!pe) {
+    stopOpeningSequence();
+    return;
+  }
+
+  _openingSequence.turnAccumulator += Math.max(0, Number(dtSec) || 0);
+  while (_openingSequence.active && _openingSequence.cameraLocked && _openingSequence.turnAccumulator >= OPENING_SEQUENCE_TURN_INTERVAL_SEC) {
+    _openingSequence.turnAccumulator -= OPENING_SEQUENCE_TURN_INTERVAL_SEC;
+    syncOpeningDragonAggro(world, _openingSequence.dragonId, pe.id, pe.pos);
+    stepSim(1);
+    if (!world.isAlive(_openingSequence.dragonId)) {
+      stopOpeningSequence();
+      return;
+    }
+  }
+}
+
+// Post-mortem: keep the simulation ticking after the player dies so the world
+// continues to evolve (fires spread, monsters roam, etc.).
+let _postMortemInterval = 0;
+world.on("died", ({ id }) => {
+  if (!world.has(id, Player)) return;
+  if (_postMortemInterval) return;
+  _postMortemInterval = setInterval(() => { world.tick(1); }, 500);
+});
+
+world.on("beforeHit", (ctx) => {
+  if (!_openingSequence.active) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  if ((ctx?.attacker | 0) === (_openingSequence.dragonId | 0) && (ctx?.defender | 0) === (pe.id | 0)) {
+    handOffOpeningCameraToPlayer();
+  }
+});
+
+world.on("damaged", ({ source, target }) => {
+  if (!_openingSequence.active) return;
+  if ((source | 0) !== (_openingSequence.dragonId | 0)) return;
+  if (world.has(target, Player)) handOffOpeningCameraToPlayer();
+});
+
+world.on("monster:firebreath", ({ actor, target }) => {
+  if (!_openingSequence.active) return;
+  if ((actor | 0) !== (_openingSequence.dragonId | 0)) return;
+  if (world.has(target, Player)) handOffOpeningCameraToPlayer();
+});
+
+world.on("prayer", ({ actor }) => {
+  if (!_openingSequence.active) return;
+  const pe = playerEntity(world);
+  if (!pe || (Number(actor || 0) | 0) !== (pe.id | 0)) return;
+  if (!_openingSequence.awaitingPrayer) return;
+  if (!(_openingSequence.dragonId > 0) || !world.isAlive(_openingSequence.dragonId)) return;
+
+  const devotion = world.get(pe.id, Devotion);
+  const deityId = String(devotion?.deityId || "");
+  const deity = deityId ? getDeityInstance(deityId) : null;
+  const deityName = String(deity?.name || getDeity(deityId)?.name || "The heavens");
+  const dragonPos = world.get(_openingSequence.dragonId, Position) || _openingSequence.lastFocusPos;
+
+  try {
+    if (dragonPos && typeof ftext?.addStatus === "function") {
+      ftext.addStatus(dragonPos.x, dragonPos.y - 0.75, "SMITE!", {
+        color: "#fff4b5",
+        life: 1.6,
+        scaleStart: 1.8,
+        scaleEnd: 1.0,
+      });
+    }
+  } catch (e) { console.debug("[main] opening smite ftext failed:", e); }
+
+  if (performOpeningPrayerSmite(world, { dragonId: _openingSequence.dragonId, deityId, deityName })) {
+    _openingSequence.awaitingPrayer = false;
+    syncOpeningPrayerGateFlag();
+    syncPrayButtonHighlight(false);
+    _openingSequence.releaseDelaySec = OPENING_SEQUENCE_RELEASE_DELAY_SEC;
+    stopOpeningSequence();
+  }
+});
 
 // --- Active spell selection (app-side state) ---------------------------------
 /** @type {string|null} */
@@ -580,13 +794,8 @@ function _finalizeNewGame(classData) {
         maxMana: stats.maxMana ?? 50,
         manaRegen: stats.manaRegen ?? 0.1,
       });
-      // 10-turn invulnerability at start
-      const ae = world.get(pe.id, ActiveEffects);
-      if (ae && Array.isArray(ae.effects)) {
-        ae.effects.push({ key: 'invulnerable', turnsLeft: 10, potency: 1 });
-      } else {
-        world.add(pe.id, ActiveEffects, { effects: [{ key: 'invulnerable', turnsLeft: 10, potency: 1 }] });
-      }
+      // Opening sequence safety window
+      applyOpeningInvulnerability(world, pe.id);
       // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
       world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
 
@@ -622,7 +831,6 @@ function _finalizeNewGame(classData) {
           addStarterItem(itemId, { count });
         }
       }
-
       // Starting spell(s) from class — supports both startingSpell (string) and startingSpells (array)
       const forcedClassSpell = classDef?.id === "cleric" ? "flash_heal" : null;
       /** @type {string[]} */
@@ -641,6 +849,7 @@ function _finalizeNewGame(classData) {
         brain.learnedSpellIds = [...classSpells, ...existing];
         setActiveSpell(classSpells[0]);
       }
+
     }
 
     // Spawn pet next to the player (familiar for warlock, kitty otherwise)
@@ -700,6 +909,9 @@ function _finalizeNewGame(classData) {
       if (deityId) {
         if (!dev) world.add(pe.id, Devotion, { deityId });
         initDeity(deityId, world);
+        if (!_savegameLoaded) {
+          primeOpeningDeityFavor(getDeityInstance(deityId));
+        }
       }
     }
   }
@@ -723,6 +935,10 @@ function _finalizeNewGame(classData) {
   // Initial world tick — runs all systems once so status effects, equipment stats,
   // and other derived state are fully resolved before the first frame renders.
   stepSim(1);
+
+  if (!_savegameLoaded) {
+    startOpeningSequence();
+  }
 
   bootAdvance("Starting render loop");
   requestAnimationFrame((now) => {
@@ -1418,6 +1634,23 @@ addEventListener('ui:pray', () => {
   if (!pe) return;
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({ type: 'rules.pray', payload: {} });
+});
+
+addEventListener('ui:openingPrayerOnly', () => {
+  try {
+    const pe = playerEntity(world);
+    if (pe && typeof ftext?.addStatus === 'function') {
+      ftext.addStatus(pe.pos.x, openingPromptY(pe.pos), OPENING_SEQUENCE_PRAYER_PROMPT, {
+        color: '#ffe27a',
+        life: 1.8,
+        scaleStart: 1.15,
+        scaleEnd: 1.0,
+      });
+    }
+  } catch (e) { console.debug('[main] opening prayer-only ftext failed:', e); }
+  try {
+    messageLog.log({ text: 'Prayer is the only remedy.', type: 'hint' });
+  } catch (e) { console.debug('[main] opening prayer-only log failed:', e); }
 });
 
 // Spell picker data feed and selection
@@ -3704,7 +3937,6 @@ function render(worldView) {
     cloudFx,
     fx,
     PERF,
-    ftext,
   });
 
   // Weather particles (rain) drawn above entities but under roofs
@@ -3768,6 +4000,9 @@ function render(worldView) {
     fxTime: _fxTime,
   });
 
+  // Float text is the top-most world-space layer so roofs and cover never occlude it.
+  ftext.render(bctx);
+
   bctx.restore();
 
   // Present backbuffer once (reset transform to identity for exact pixel copy)
@@ -3802,6 +4037,7 @@ function frame(now) {
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
+  tickOpeningSequence(dtSec);
   flushPendingStairTransition();
 
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
@@ -3823,9 +4059,15 @@ function frame(now) {
 
   // Render
   const view = getCachedView();
-  // keep camera centered on player if present (unless debug-detached)
-  if (view.player && !cam._detached) {
-    // Directly set follow target at player world coords
+  if (_openingSequence.active && _openingSequence.cameraLocked) {
+    const dragonPos = world.get(_openingSequence.dragonId, Position);
+    const focusPos = dragonPos || _openingSequence.lastFocusPos;
+    if (focusPos && !cam._detached) {
+      followEntity(cam, focusPos, dtSec, 5.0);
+    } else {
+      stopOpeningSequence();
+    }
+  } else if (view.player && !cam._detached) {
     followEntity(cam, view.player.pos, dtSec, 6.0);
   }
 

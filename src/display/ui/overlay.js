@@ -916,7 +916,6 @@ export function initOverlays() {
     }
 
     if (String(d?.cause || '').toLowerCase() === 'divine_wrath') {
-      // Let divine strike VFX read before the opaque death panel takes over.
       deathScreenShowTimer = window.setTimeout(() => {
         deathScreenShowTimer = 0;
         showDeathScreen();
