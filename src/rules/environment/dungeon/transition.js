@@ -9,7 +9,7 @@ import { PetState } from '../../components/PetState.js';
 import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Flying } from '../../components/Flying.js';
-import { clearAll as clearTileMap } from './tileMap.js';
+import { clearAll as clearTileMap, setTile } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
 import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
@@ -172,6 +172,16 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions, profileType: newProfileType } =
     generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions);
   let entityIds = generatedEntityIds;
+
+  // Re-apply destroyed tiles from the ledger so burned walls stay destroyed
+  // after the tile map is regenerated from scratch.
+  if (ds && ds.destroyedTiles && typeof ds.destroyedTiles === 'object') {
+    for (const rec of Object.values(ds.destroyedTiles)) {
+      if (rec && Number.isFinite(rec.x) && Number.isFinite(rec.y) && Number.isFinite(rec.currentTile)) {
+        setTile(rec.x, rec.y, rec.currentTile);
+      }
+    }
+  }
 
   const cachedFloor = _floorEntityCache.get(newDepth) ?? _loadPersistedFloor(worldSeed, newDepth);
   const normalizedSnapshot = normalizeInventorySnapshot(cachedFloor?.snapshot);
