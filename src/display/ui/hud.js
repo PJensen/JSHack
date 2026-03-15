@@ -500,6 +500,26 @@ export function initHUD() {
     }
   });
 
+  function setPrayButtonHighlight(active) {
+    const enabled = !!active;
+    prayBtn.dataset.openingHighlight = enabled ? 'true' : 'false';
+    prayBtn.style.transform = enabled ? 'translateY(-1px) scale(1.04)' : '';
+    prayBtn.style.borderColor = enabled ? '#f3d46b' : '#2d3b52';
+    prayBtn.style.background = enabled
+      ? 'linear-gradient(180deg, #4b3a12 0%, #2a1f0a 100%)'
+      : '#101626';
+    prayBtn.style.boxShadow = enabled
+      ? '0 0 0 2px rgba(243,212,107,0.28), 0 0 18px rgba(243,212,107,0.45)'
+      : 'none';
+    prayBtn.style.color = enabled ? '#fff2b8' : '#cfe8ff';
+  }
+
+  window.addEventListener('ui:highlightPrayButton', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    setPrayButtonHighlight(Boolean(e?.detail?.active));
+  });
+
   // Update label when app sets active spell
   window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore

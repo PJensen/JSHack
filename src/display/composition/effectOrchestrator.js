@@ -13,7 +13,7 @@ export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, t
 /**
  * Draw world-space effects in the canonical pass order.
  */
-export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, fx, PERF, ftext }) {
+export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, fx, PERF }) {
   if (!bctx) return;
   throwFx.draw(bctx, worldView, glyphAtlas);
   boltFx.drawBolts(bctx);
@@ -37,7 +37,6 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
     alphaScale: 0.9,
     shape: (PERF.quality === "low" ? "rect" : "circle"),
   });
-  ftext.render(bctx);
 }
 
 /**
