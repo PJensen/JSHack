@@ -3,6 +3,8 @@ const INGREDIENT_LABELS = Object.freeze({
   herbs: "Herbs",
   thornPods: "Thorn Pods",
   venomFronds: "Venom Fronds",
+  moonleaf: "Moonleaf",
+  emberRoot: "Ember Root",
 });
 
 function ingredientLabel(key) {

@@ -12,6 +12,7 @@ import {
   findTownAnchor,
   findTownContainers,
 } from "../utils/townEconomy.js";
+import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 
 const PULSE_BASE = 12;
 const LOW_FOOD_THRESHOLD = 4;
@@ -82,18 +83,11 @@ function totalToolCount(world, storage, identity) {
 
 function chooseForgeOutput(world, storage) {
   const smith = storage.smithy > 0 ? countInventoryByIdentity(world, storage.smithy) : {};
-  if ((smith.material_lumber || 0) < 1) return null;
-
-  if (totalToolCount(world, storage, "tool_kitchen_knife") < 1 && (smith.material_iron || 0) >= 1) {
-    return { itemId: "tool_kitchen_knife", iron: 1, coal: 1, lumber: 1 };
-  }
-  if (totalToolCount(world, storage, "tool_hatchet") < 1 && (smith.material_iron || 0) >= 1) {
-    return { itemId: "tool_hatchet", iron: 1, coal: 1, lumber: 1 };
-  }
-  if (totalToolCount(world, storage, "iron_pickaxe") < 2 && (smith.material_iron || 0) >= 2) {
-    return { itemId: "iron_pickaxe", iron: 2, coal: 1, lumber: 1 };
-  }
-  return null;
+  const craftable = SMITH_RECIPES.filter((recipe) =>
+    (smith.material_iron || 0) >= recipe.iron
+    && (smith.material_lumber || 0) >= recipe.lumber
+  );
+  return chooseSmithRecipe(craftable, (itemId) => totalToolCount(world, storage, itemId));
 }
 
 function pulseIndustry(world, state, storage, weather) {
@@ -190,7 +184,12 @@ export function townSimulationSystem(world) {
     + (smith.tool_kitchen_knife || 0)
     + (lumber.material_lumber || 0)
     + (lumber.fuel_firewood || 0);
-  const medicineStores = (herb.food_wild_herbs || 0) + (herb.reagent_thorn_pod || 0) + (herb.reagent_venom_frond || 0) + shopStock;
+  const medicineStores = (herb.food_wild_herbs || 0)
+    + (herb.reagent_thorn_pod || 0)
+    + (herb.reagent_venom_frond || 0)
+    + (herb.reagent_moonleaf || 0)
+    + (herb.reagent_ember_root || 0)
+    + shopStock;
   const lowFood = foodStores < LOW_FOOD_THRESHOLD;
   const lowMaterials = materialStores < LOW_MATERIAL_THRESHOLD;
   const lowMedicine = medicineStores < LOW_MEDICINE_THRESHOLD;

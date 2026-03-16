@@ -92,6 +92,33 @@ export const VenomFern = defineArchetype(
   [Interactable, { action: "harvestNode", params: null }],
 );
 
+export const MoonleafCluster = defineArchetype(
+  "MoonleafCluster",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Moonleaf Cluster", identity: "moonleaf_cluster" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, {
+    kind: "moonleaf", ready: true, regrowTurns: 252, regrowCountdown: 0,
+    yield: "reagent_moonleaf", yieldMin: 2, yieldMax: 3,
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
+);
+
+export const EmberRootPatch = defineArchetype(
+  "EmberRootPatch",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Ember Root Patch", identity: "ember_root_patch" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [HarvestNode, {
+    kind: "ember_root", ready: true, regrowTurns: 276, regrowCountdown: 0,
+    yield: "reagent_ember_root", yieldMin: 1, yieldMax: 2,
+    danger: { type: "fire", dmgMin: 1, dmgMax: 2, cause: "ember_root" },
+  }],
+  [Interactable, { action: "harvestNode", params: null }],
+);
+
 export const OreVeinIron = defineArchetype(
   "OreVeinIron",
   [Position, (p) => ({ x: p.x, y: p.y })],

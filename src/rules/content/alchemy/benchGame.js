@@ -11,6 +11,8 @@ export const ALCHEMY_INGREDIENTS = Object.freeze({
   herbs: Object.freeze({ identity: "food_wild_herbs", label: "herbs" }),
   thornPods: Object.freeze({ identity: "reagent_thorn_pod", label: "thorn pods" }),
   venomFronds: Object.freeze({ identity: "reagent_venom_frond", label: "venom fronds" }),
+  moonleaf: Object.freeze({ identity: "reagent_moonleaf", label: "moonleaf" }),
+  emberRoot: Object.freeze({ identity: "reagent_ember_root", label: "ember root" }),
 });
 
 export const ALCHEMY_RECIPES = Object.freeze([
@@ -50,6 +52,42 @@ export const ALCHEMY_RECIPES = Object.freeze([
     requirements: Object.freeze({ herbs: 2, thornPods: 1 }),
     flavor: "Granular suspension that hardens flesh and gear.",
   }),
+  Object.freeze({
+    key: "moon_tonic",
+    label: "Moon Tonic",
+    outputIdentity: "potion_mana",
+    outputName: "Potion of Mana",
+    outputCount: 1,
+    requirements: Object.freeze({ herbs: 1, moonleaf: 2 }),
+    flavor: "A cool draught that steadies the mind and replenishes arcane reserves.",
+  }),
+  Object.freeze({
+    key: "antidote_philter",
+    label: "Antidote Philter",
+    outputIdentity: "potion_anti_venom",
+    outputName: "Potion of Antivenom",
+    outputCount: 1,
+    requirements: Object.freeze({ moonleaf: 1, venomFronds: 1, herbs: 1 }),
+    flavor: "Silver leaf and bitter fronds bind into a reliable antidote.",
+  }),
+  Object.freeze({
+    key: "ember_vigor",
+    label: "Ember Vigor",
+    outputIdentity: "potion_vigor",
+    outputName: "Potion of Vigor",
+    outputCount: 1,
+    requirements: Object.freeze({ berries: 1, emberRoot: 1, herbs: 1 }),
+    flavor: "A warming stimulant that puts heat back in tired blood.",
+  }),
+  Object.freeze({
+    key: "fireward_distillate",
+    label: "Fireward Distillate",
+    outputIdentity: "potion_resist_fire",
+    outputName: "Potion of Fire Resistance",
+    outputCount: 1,
+    requirements: Object.freeze({ emberRoot: 2, thornPods: 1 }),
+    flavor: "A resinous brew that leaves the throat burning and the skin warded.",
+  }),
 ]);
 
 function getInventory(world, actor) {
@@ -75,6 +113,8 @@ function countIngredients(world, actor) {
     herbs: 0,
     thornPods: 0,
     venomFronds: 0,
+    moonleaf: 0,
+    emberRoot: 0,
   };
 
   for (const itemId of inventoryItems(world, actor)) {
@@ -88,6 +128,8 @@ function countIngredients(world, actor) {
     if (ni.identity === ALCHEMY_INGREDIENTS.herbs.identity) out.herbs += count;
     if (ni.identity === ALCHEMY_INGREDIENTS.thornPods.identity) out.thornPods += count;
     if (ni.identity === ALCHEMY_INGREDIENTS.venomFronds.identity) out.venomFronds += count;
+    if (ni.identity === ALCHEMY_INGREDIENTS.moonleaf.identity) out.moonleaf += count;
+    if (ni.identity === ALCHEMY_INGREDIENTS.emberRoot.identity) out.emberRoot += count;
   }
   return out;
 }

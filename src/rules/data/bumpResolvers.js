@@ -145,9 +145,10 @@ const objectInteract = {
   name: "object-interact",
   test(world, actor, ctx) {
     if (!world.has(actor, Player)) return false;
-    if (ctx.target > 0) return false; // living target handled above
     const interactId = ctx.tiles.interactableByCell.get(`${ctx.nx},${ctx.ny}`);
-    return interactId > 0;
+    if (!(interactId > 0)) return false;
+    if (ctx.target > 0 && ctx.target !== interactId) return false; // living target handled above
+    return true;
   },
   resolve(world, actor, ctx) {
     const interactId = ctx.tiles.interactableByCell.get(`${ctx.nx},${ctx.ny}`);

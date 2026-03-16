@@ -162,6 +162,8 @@ export function installMessageWiring({
     herbs: "herbs",
     thornPods: "thorn pods",
     venomFronds: "venom fronds",
+    moonleaf: "moonleaf",
+    emberRoot: "ember root",
   });
 
   function formatIngredientBag(rec, { includeZero = false } = {}) {
@@ -180,6 +182,8 @@ export function installMessageWiring({
     if (k === "herbs") return "herbs";
     if (k === "thorn_bramble") return "thorn pods";
     if (k === "venom_fern") return "venom fronds";
+    if (k === "moonleaf") return "moonleaf";
+    if (k === "ember_root") return "ember roots";
     if (k === "mushrooms") return "mushrooms";
     if (k === "iron_ore") return "iron ore";
     if (k === "coal_ore") return "coal";
@@ -196,6 +200,8 @@ export function installMessageWiring({
     if (k === "herbs") return "herb patch";
     if (k === "thorn_bramble") return "thorn bramble";
     if (k === "venom_fern") return "venom fern";
+    if (k === "moonleaf") return "moonleaf cluster";
+    if (k === "ember_root") return "ember root patch";
     if (k === "mushrooms") return "mushroom patch";
     if (k === "iron_ore") return "iron vein";
     if (k === "coal_ore") return "coal seam";

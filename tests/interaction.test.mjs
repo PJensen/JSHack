@@ -19,7 +19,7 @@ import { FoodDecay } from '../src/rules/components/FoodDecay.js';
 import { ObjectState } from '../src/rules/components/ObjectState.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { createFrom } from '../src/lib/ecs-js/archetype.js';
-import { WildBerries, WildHerbs, ThornPods, VenomFronds } from '../src/rules/archetypes/Food.js';
+import { WildBerries, WildHerbs, ThornPods, VenomFronds, Moonleaf, EmberRoot } from '../src/rules/archetypes/Food.js';
 import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
 import { fountainRegrowthSystem } from '../src/rules/systems/fountainRegrowthSystem.js';
 import { addToInventory, inventoryContains, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
@@ -718,8 +718,62 @@ Deno.test("anvil forges carried iron and lumber into a tool", () => {
   assert(world.get(anvil, ObjectState)?.state === "working", "anvil should enter working state");
   assert(inventoryItems(world, actor).some((id) => {
     const identity = world.get(id, NamedIdentity)?.identity;
-    return identity === "tool_kitchen_knife" || identity === "tool_hatchet" || identity === "iron_pickaxe";
+    return identity === "tool_kitchen_knife"
+      || identity === "tool_hatchet"
+      || identity === "iron_pickaxe"
+      || identity === "shield_iron"
+      || identity === "warhammer";
   }), "actor should receive a forged tool");
+});
+
+Deno.test("alchemy bench crafts moon tonic from herbs and moonleaf", () => {
+  const world = new World({ seed: 91 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const herbs = createFrom(world, WildHerbs, {});
+  const moonleafA = createFrom(world, Moonleaf, {});
+  const moonleafB = createFrom(world, Moonleaf, {});
+  addToInventory(world, actor, herbs);
+  addToInventory(world, actor, moonleafA);
+  addToInventory(world, actor, moonleafB);
+
+  const bench = world.create();
+  world.add(bench, Interactable, { action: "brewAlchemy", params: null });
+
+  const crafted = [];
+  world.on("alchemy:crafted", (e) => crafted.push(e));
+
+  world.add(actor, InteractIntent, { targetId: bench, mode: "brew", recipe: "moon_tonic" });
+  interactionSystem(world);
+
+  assert(crafted.length === 1, "moon tonic recipe should craft");
+  assert(crafted[0].outputIdentity === "potion_mana", "moon tonic should craft a mana potion");
+});
+
+Deno.test("alchemy bench crafts fireward distillate from ember root and thorn pods", () => {
+  const world = new World({ seed: 92 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const emberA = createFrom(world, EmberRoot, {});
+  const emberB = createFrom(world, EmberRoot, {});
+  const thorn = createFrom(world, ThornPods, {});
+  addToInventory(world, actor, emberA);
+  addToInventory(world, actor, emberB);
+  addToInventory(world, actor, thorn);
+
+  const bench = world.create();
+  world.add(bench, Interactable, { action: "brewAlchemy", params: null });
+
+  const crafted = [];
+  world.on("alchemy:crafted", (e) => crafted.push(e));
+
+  world.add(actor, InteractIntent, { targetId: bench, mode: "brew", recipe: "fireward_distillate" });
+  interactionSystem(world);
+
+  assert(crafted.length === 1, "fireward recipe should craft");
+  assert(crafted[0].outputIdentity === "potion_resist_fire", "fireward recipe should craft fire resist potion");
 });
 
 Deno.test("cooking fire: no corpses emits cooking:open with empty list", () => {

@@ -452,6 +452,16 @@ export function generateOverworldChunks(worldSeed) {
     { x: homeX - 27, y: homeY - 24 },
     { x: homeX - 22, y: homeY + 29 },
   ];
+  const moonleafSpots = [
+    { x: homeX + 18, y: homeY - 14 },
+    { x: homeX - 19, y: homeY + 12 },
+    { x: homeX + 14, y: homeY + 18 },
+  ];
+  const emberRootSpots = [
+    { x: homeX + 24, y: homeY - 8 },
+    { x: homeX - 23, y: homeY - 17 },
+    { x: homeX - 16, y: homeY + 23 },
+  ];
 
   function _impassable(/** @type {number | undefined} */ t) {
     return t === TILE_WATER || t === TILE_WATER_DEEP
@@ -876,6 +886,16 @@ export function generateOverworldChunks(worldSeed) {
     addOutdoorSpawn(chunks, p, "harvest_venom_fern", (x, y) => {
       if (poisonGarden.has(`${x},${y}`)) return true;
       return Math.max(Math.abs(x - homeX), Math.abs(y - homeY)) >= 20;
+    });
+  }
+  for (const p of moonleafSpots) {
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addOutdoorSpawn(chunks, p, "harvest_moonleaf");
+  }
+  for (const p of emberRootSpots) {
+    if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
+    addOutdoorSpawn(chunks, p, "harvest_ember_root", (x, y) => {
+      return Math.max(Math.abs(x - homeX), Math.abs(y - homeY)) >= 14;
     });
   }
 
