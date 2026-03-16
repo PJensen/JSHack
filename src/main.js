@@ -54,6 +54,7 @@ import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installRackWiring } from "./main/wiring/rackWiring.js";
 import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
+import { installAnvilWiring } from "./main/wiring/anvilWiring.js";
 import { installCookingWiring } from "./main/wiring/cookingWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installDialogWiring } from "./main/wiring/dialogWiring.js";
@@ -2161,6 +2162,15 @@ const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messag
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installRackWiring({ world, log: (msg) => messageLog.log({ text: msg, type: 'system' }) });
 installAlchemyWiring({
+  world,
+  playerEntity,
+  dispatchRules: (action) => {
+    const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+    rulesHandler(action);
+  },
+  log: (msg) => messageLog.log({ text: msg, type: "system" }),
+});
+installAnvilWiring({
   world,
   playerEntity,
   dispatchRules: (action) => {

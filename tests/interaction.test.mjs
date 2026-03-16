@@ -709,12 +709,15 @@ Deno.test("anvil forges carried iron and lumber into a tool", () => {
   world.add(anvil, ObjectState, { state: "idle" });
 
   const forged = [];
+  const opened = [];
   world.on("smithy:forged", (e) => forged.push(e));
+  world.on("smithy:open", (e) => opened.push(e));
 
-  world.add(actor, InteractIntent, { targetId: anvil });
+  world.add(actor, InteractIntent, { targetId: anvil, mode: "forge", recipe: "kitchen_knife" });
   interactionSystem(world);
 
   assert(forged.length === 1, "anvil should emit a forge event");
+  assert(opened.length === 1, "anvil should refresh smithing panel data after forging");
   assert(world.get(anvil, ObjectState)?.state === "working", "anvil should enter working state");
   assert(inventoryItems(world, actor).some((id) => {
     const identity = world.get(id, NamedIdentity)?.identity;
@@ -724,6 +727,28 @@ Deno.test("anvil forges carried iron and lumber into a tool", () => {
       || identity === "shield_iron"
       || identity === "warhammer";
   }), "actor should receive a forged tool");
+});
+
+Deno.test("anvil opens smithing panel instead of forging immediately", () => {
+  const world = new World({ seed: 93 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const anvil = world.create();
+  world.add(anvil, Interactable, { action: "forgeTools", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(anvil, ObjectState, { state: "idle" });
+
+  const opened = [];
+  const forged = [];
+  world.on("smithy:open", (e) => opened.push(e));
+  world.on("smithy:forged", (e) => forged.push(e));
+
+  world.add(actor, InteractIntent, { targetId: anvil });
+  interactionSystem(world);
+
+  assert(opened.length === 1, "anvil should open smithing data");
+  assert(forged.length === 0, "anvil should not forge without a selected recipe");
+  assert(world.get(anvil, ObjectState)?.state === "idle", "anvil should stay idle while choosing");
 });
 
 Deno.test("alchemy bench crafts moon tonic from herbs and moonleaf", () => {

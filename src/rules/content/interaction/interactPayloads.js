@@ -57,10 +57,10 @@ import { Ashes } from "../../archetypes/Items.js";
 import { Encumbrance } from "../../components/Encumbrance.js";
 import { brewAtAlchemyBench, emitAlchemyBenchOpen } from "../alchemy/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
+import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
 import { getDistrictBulletinVirtual, getPlayerOpportunityViewVirtual } from "../../utils/townInterpretationVirtuals.js";
-import { SMITH_RECIPES, chooseSmithRecipe } from "../../data/smithRecipes.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -227,18 +227,6 @@ function giveCraftedItem(world, ownerId, itemId) {
   return createdId;
 }
 
-function choosePlayerSmithRecipe(world, actor) {
-  const ironCount = getStackCount(world, actor, "material_iron");
-  const lumberCount = getStackCount(world, actor, "material_lumber");
-  if (ironCount <= 0) return { recipe: null, reason: "missing_iron" };
-  if (lumberCount <= 0) return { recipe: null, reason: "missing_lumber" };
-
-  const craftable = SMITH_RECIPES.filter((recipe) => ironCount >= recipe.iron && lumberCount >= recipe.lumber);
-  const recipe = chooseSmithRecipe(craftable, (itemId) => getStackCount(world, actor, itemId));
-  if (recipe) return { recipe, reason: "" };
-  return { recipe: null, reason: "missing_iron" };
-}
-
 function smeltOreAtFurnace(world, actor, targetId) {
   if (!world.has(actor, Inventory)) {
     world.emit?.("smithy:failed", { actor, targetId, reason: "no_inventory", station: "furnace" });
@@ -265,34 +253,6 @@ function smeltOreAtFurnace(world, actor, targetId) {
     targetId,
     itemId,
     outputIdentity: "material_iron",
-  });
-}
-
-function forgeAtAnvil(world, actor, targetId) {
-  if (!world.has(actor, Inventory)) {
-    world.emit?.("smithy:failed", { actor, targetId, reason: "no_inventory", station: "anvil" });
-    return;
-  }
-  const choice = choosePlayerSmithRecipe(world, actor);
-  const recipe = choice.recipe;
-  if (!recipe) {
-    world.emit?.("smithy:failed", { actor, targetId, reason: choice.reason || "no_recipe", station: "anvil" });
-    return;
-  }
-  if (!consumeIdentityUnits(world, actor, "material_iron", recipe.iron)
-      || !consumeIdentityUnits(world, actor, "material_lumber", recipe.lumber)) {
-    world.emit?.("smithy:failed", { actor, targetId, reason: "consume_failed", station: "anvil" });
-    return;
-  }
-  const itemId = giveCraftedItem(world, actor, recipe.itemId);
-  setWorkstationActive(world, targetId, "working");
-  world.emit?.("smithy:forged", {
-    actor,
-    targetId,
-    itemId,
-    recipeKey: recipe.key,
-    outputIdentity: recipe.itemId,
-    outputName: recipe.outputName,
   });
 }
 
@@ -536,8 +496,15 @@ export const INTERACT_PAYLOADS = {
 
   forgeTools: {
     onInteract(ctx) {
-      const { world, actor, targetId } = ctx;
-      forgeAtAnvil(world, actor, targetId);
+      const { world, actor, targetId, intent } = ctx;
+      const recipeKey = String(intent?.recipe || "").trim().toLowerCase();
+      if (!recipeKey) {
+        emitAnvilOpen(world, actor, targetId);
+        return;
+      }
+      if (forgeAtAnvil(world, actor, targetId, recipeKey)) {
+        setWorkstationActive(world, targetId, "working");
+      }
     },
   },
 
