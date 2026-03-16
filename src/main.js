@@ -3324,6 +3324,43 @@ function drawRareStar(ctx, e, fxTime) {
   ctx.restore();
 }
 
+/**
+ * Draw a yellow "!" above quest giver NPCs (mirrors drawRareStar pattern).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawQuestBang(ctx, e, fxTime) {
+  const cx = e.pos.x;
+  const cy = e.pos.y - 0.72;
+
+  // Gentle bob
+  const bob = Math.sin(fxTime * 2.0) * 0.03;
+  const dy = cy + bob;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Soft yellow glow halo
+  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, 0.18);
+  halo.addColorStop(0, 'rgba(255,220,40,0.25)');
+  halo.addColorStop(1, 'rgba(255,200,0,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, dy, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // "!" glyph
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = 'rgba(255,220,40,0.95)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 0.32px sans-serif';
+  ctx.fillText('!', cx, dy);
+
+  ctx.restore();
+}
+
 
 /**
  * @param {number} n
@@ -3569,6 +3606,9 @@ function render(worldView) {
     }
     if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rare')) {
       drawRareStar(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('quest_giver')) {
+      drawQuestBang(bctx, renderEntity, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -3897,6 +3937,9 @@ function render(worldView) {
     }
     if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
       drawRareStar(bctx, e, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('quest_giver')) {
+      drawQuestBang(bctx, e, _fxTime);
     }
   }
 

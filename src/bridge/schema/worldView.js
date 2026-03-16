@@ -28,6 +28,8 @@ import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { QuestBindings } from "../../rules/components/QuestBindings.js";
+import { QuestState } from "../../rules/components/QuestState.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Burned } from "../../rules/components/Burned.js";
 import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
@@ -46,6 +48,7 @@ import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
+const _questGiverIds = new Set(); // entity IDs that are active quest givers
 /** @type {Map<number, SolidView>} */
 const _solidRecs = new Map();    // id -> { id, x, y }
 
@@ -396,6 +399,12 @@ export function buildWorldView(world) {
 		break;
 	}
 
+	// Collect active quest giver entity IDs for display tag projection.
+	_questGiverIds.clear();
+	for (const [, state, bind] of world.query(QuestState, QuestBindings)) {
+		if (state.status === 'active' && bind.giver > 0) _questGiverIds.add(bind.giver);
+	}
+
 	// Expose tile grid functions for direct grid-based rendering
 	_view.tileGrid = { getTile, forEachTileInRect };
 	let playerVisionRadius = 0;
@@ -496,6 +505,7 @@ export function buildWorldView(world) {
 			projectProcStateTags(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
+			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
 
 			_allEntities.push(rec);
 
@@ -565,6 +575,7 @@ export function buildWorldView(world) {
 			projectProcStateTags(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
+			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
 
 			_allEntities.push(rec);
 			if (isPlayer) {
