@@ -8,6 +8,12 @@ import { Terrain } from '../src/rules/components/Terrain.js';
 import { Interactable } from '../src/rules/components/Interactable.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { CHUNK_SIZE } from '../src/rules/environment/dungeon/constants.js';
+import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
+
+function extentChunkCount(plan) {
+  return (plan.extent.maxCX - plan.extent.minCX + 1)
+    * (plan.extent.maxCY - plan.extent.minCY + 1);
+}
 
 Deno.test("floor plan is deterministic", () => {
   const a = generateFloorPlan(42, 1);
@@ -95,4 +101,46 @@ Deno.test("different depths produce different floor plans", () => {
   const p1 = generateFloorPlan(42, 1);
   const p2 = generateFloorPlan(42, 2);
   assert(p1.seed !== p2.seed, 'different seeds');
+});
+
+Deno.test("dungeonScale changes the raw floor footprint", () => {
+  const previous = dungeonConfig.dungeonScale;
+  try {
+    dungeonConfig.dungeonScale = 0.1;
+    const tiny = generateFloorPlan(42, 4);
+
+    dungeonConfig.dungeonScale = 0.3;
+    const compact = generateFloorPlan(42, 4);
+
+    dungeonConfig.dungeonScale = 1.0;
+    const standard = generateFloorPlan(42, 4);
+
+    dungeonConfig.dungeonScale = 2.0;
+    const huge = generateFloorPlan(42, 4);
+
+    assert(extentChunkCount(tiny) <= extentChunkCount(compact), 'tiny footprint should not exceed compact');
+    assert(extentChunkCount(compact) <= extentChunkCount(standard), 'compact footprint should not exceed standard');
+    assert(extentChunkCount(compact) < extentChunkCount(standard), 'standard footprint should exceed compact');
+    assert(extentChunkCount(standard) < extentChunkCount(huge), 'huge footprint should exceed standard');
+  } finally {
+    dungeonConfig.dungeonScale = previous;
+  }
+});
+
+Deno.test("early floors are airier and later floors are denser", () => {
+  const previousScale = dungeonConfig.dungeonScale;
+  const previousSparsity = dungeonConfig.roomSparsity;
+  try {
+    dungeonConfig.dungeonScale = 0.3;
+    dungeonConfig.roomSparsity = 0.35;
+
+    const early = generateFloorPlan(42, 1);
+    const late = generateFloorPlan(42, 12);
+
+    assert(early.profile.roomSparsity > late.profile.roomSparsity, 'early floors should omit more rooms than late floors');
+    assert(extentChunkCount(early) < extentChunkCount(late), 'later floors should span a larger footprint');
+  } finally {
+    dungeonConfig.dungeonScale = previousScale;
+    dungeonConfig.roomSparsity = previousSparsity;
+  }
 });

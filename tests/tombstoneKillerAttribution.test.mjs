@@ -116,14 +116,14 @@ Deno.test("tombstone: mutual kill — player kills demon, hellfire kills player,
     const player = world.create();
     world.add(player, Player);
     world.add(player, Vitality, { maxHp: 20, hp: 2 });
-    world.add(player, Equipment, { attackDerived: 10, naturalDamageDice: '1d4' });
+    world.add(player, Equipment, { accuracyDerived: 10, damagePowerDerived: 10, naturalDamageDice: '1d4' });
     world.add(player, Position, { x: 5, y: 5 });
     world.add(player, Faction, { key: 'player' });
     world.add(player, NamedIdentity, { name: 'Hero', identity: 'hero' });
 
     const demon = world.create();
     world.add(demon, Vitality, { maxHp: 1, hp: 1 });
-    world.add(demon, Equipment, { defenseDerived: 0 });
+    world.add(demon, Equipment, { evadeDerived: 0 });
     world.add(demon, Position, { x: 5, y: 6 });
     world.add(demon, Faction, { key: 'enemy' });
     world.add(demon, NamedIdentity, { name: 'Hellfire Demon', identity: 'demon' });

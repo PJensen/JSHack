@@ -28,7 +28,8 @@ Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
 
   assert(eq.weapon === sword, 'sword equipped in weapon slot');
   assert(inventoryContains(world, player, sword), 'sword remains in inventory (visible)');
-  assert(eq.attackDerived === 2, 'attack derived from sword bonuses');
+  assert(eq.accuracyDerived === 2, 'accuracy derived from sword bonuses');
+  assert(eq.damagePowerDerived === 2, 'damagePower derived from sword bonuses');
 
   world.add(player, EquipIntent, { itemId: armor });
   equipItemSystem(world);
@@ -36,7 +37,7 @@ Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
 
   assert(eq.armor === armor, 'armor equipped in armor slot');
   assert(inventoryContains(world, player, armor), 'armor remains in inventory (visible)');
-  assert(eq.defenseDerived >= 1, 'defense derived from armor bonuses');
+  assert(eq.evadeDerived >= 1, 'evade derived from armor bonuses');
 
   /** @type {any} */
   const infoSword = world.get(sword, ItemInfo);

@@ -861,7 +861,7 @@ export const ITEM_CATALOG = {
     material: "gold",
     rarity: 3,
     rarityName: "rare",
-    bonuses: { maxMana: 15, manaRegen: 0.4 },
+    bonuses: { maxMana: 15, manaRegen: 0.4, spellHit: 1 },
     description: "A pale sapphire set in gold that sharpens the mind.",
   },
   // ── Neck: late-game ──────────────────────────────────────────────
@@ -912,7 +912,7 @@ export const ITEM_CATALOG = {
     material: "gold",
     rarity: 5,
     rarityName: "legendary",
-    bonuses: { maxMana: 30, manaRegen: 0.8, critChance: 0.05 },
+    bonuses: { maxMana: 30, manaRegen: 0.8, critChance: 0.05, spellHit: 3 },
     description: "An ancient conduit that draws mana from the ether itself.",
   },
   belt_leather: {
@@ -1082,8 +1082,8 @@ export const ITEM_CATALOG = {
     material: "cloth",
     rarity: 4,
     rarityName: "epic",
-    bonuses: { defense: 1, maxMana: 12, manaRegen: 0.5, critChance: 0.03 },
-    description: "Silk wraps stitched with silver thread that hums with residual magic.",
+    bonuses: { defense: 1, maxMana: 12, manaRegen: 0.5, critChance: 0.03, spellHit: 2 },
+    description: "Silk wraps stitched with silver thread that steady hostile spellwork and hum with residual magic.",
   },
   // ── Gloves: endgame ──────────────────────────────────────────────
   gauntlets_dragonscale: {
@@ -1163,7 +1163,7 @@ export const ITEM_CATALOG = {
     material: "silver",
     rarity: 3,
     rarityName: "rare",
-    bonuses: { manaRegen: 0.5 },
+    bonuses: { manaRegen: 0.5, spellHit: 1 },
   },
   ring_fire_resist: {
     id: "ring_fire_resist",
@@ -2435,6 +2435,40 @@ export const ITEM_CATALOG = {
     rarity: 1,
     rarityName: "rare",
     description: "Grants the ability to cast Frost.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_blizzard: {
+    id: "book_blizzard",
+    catalogKind: "magic",
+    name: "Spellbook of Blizzard",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "rare",
+    description: "Grants the ability to cast Blizzard.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_firestorm: {
+    id: "book_firestorm",
+    catalogKind: "magic",
+    name: "Spellbook of Firestorm",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "rare",
+    description: "Grants the ability to cast Firestorm.",
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",

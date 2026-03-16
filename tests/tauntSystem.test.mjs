@@ -150,7 +150,7 @@ Deno.test("taunted enemy bump-attacks statue and can damage it", () => {
     world.add(enemy, Position, { x: 3, y: 3 });
     world.add(enemy, Faction, { key: "enemy" });
     world.add(enemy, Vitality, { maxHp: 30, hp: 30 });
-    world.add(enemy, Equipment, { attackDerived: 100, naturalDamageDice: "1d8" });
+    world.add(enemy, Equipment, { accuracyDerived: 100, damagePowerDerived: 100, naturalDamageDice: "1d8" });
     world.add(enemy, ActiveEffects, {
       effects: [{ key: "taunt", turnsLeft: 3, potency: 1, sourceId: statue }],
     });
@@ -196,7 +196,7 @@ Deno.test("pet does not attack allied stone_taunter", () => {
     world.add(pet, Position, { x: 3, y: 3 });
     world.add(pet, Faction, { key: "pet" });
     world.add(pet, Vitality, { maxHp: 30, hp: 30 });
-    world.add(pet, Equipment, { attackDerived: 100, naturalDamageDice: "1d8" });
+    world.add(pet, Equipment, { accuracyDerived: 100, damagePowerDerived: 100, naturalDamageDice: "1d8" });
 
     world.add(pet, MoveIntent, { dx: 1, dy: 0 });
     movementSystem(world);

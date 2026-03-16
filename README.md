@@ -272,19 +272,31 @@ Events keep the scheduler in control and execution order predictable.
 
 ### 🎮 Core Features
 
-- **Turn-based roguelike gameplay** — classic dungeon crawling
-- **Monster AI** — chase the player, respect obstacles
-- **Item system** — potions, scrolls, weapons, armor, wands
-- **Magic system** — fireball, lightning bolt, heal, and more
-- **Equipment** — weapons, armor, with affix modifiers
-- **Status effects** — poison, burn, regen, stun
-- **Hunger system** — eat food or suffer penalties
-- **Deity favor** — worship gods, gain boons or invoke wrath
-- **Pet companions** — they follow and fight for you
-- **Traps** — pressure plates, arrow traps, spike pits
-- **Shops** — buy and sell items
-- **Dungeon generation** — procedural levels with rooms and corridors
-- **FOV & exploration** — shadowcasting visibility, fog of war
+- **Turn-based roguelike gameplay** — classic dungeon crawling with multi-floor dungeons
+- **4 character classes** — Warlock, Archaeologist, Cleric, Druid — each with unique starting gear
+- **Monster AI** — 10-level intelligence tiers driving pack alerting, retreat, ambush, and scurry
+- **28 monsters across 4 tiers** — rats to dragons, with flying creatures and gaze attacks
+- **Item system** — 363+ items: potions, scrolls, weapons, armor, wands, gems, crafting materials
+- **Magic system** — 15 spells across destruction, support, and summoning schools; channeling and INT-based crits
+- **Dual-wielding** — equip two one-handed weapons with offhand penalties
+- **Equipment** — canonical gear slots (weapon, offhand, armor, helmet, ring, ammo) with affix modifiers
+- **Status effects** — poison, burn, regen, stun, berserk, curse, confusion, paralysis, and more
+- **Hunger & survival** — eat food or suffer; carry weight and encumbrance matter
+- **Deity favor** — worship gods, gain boons or invoke wrath; ascetic and dietary tracking
+- **Pet companions** — they follow, fight, and have opinions
+- **Overworld village** — 11 NPC townspeople with scheduled daily routines and a full economy chain
+- **Weather system** — rain and heavy rain with gameplay effects (extinguishes fire, waters crops)
+- **Calendar** — 13 lunar months, 8 moon phases, archaic week, 4 seasons
+- **Plant growth & farming** — crops grow through visual stages, harvestable resources regrow
+- **Quests** — quest system with NPC quest givers and economy-driven objectives
+- **Crafting** — alchemy bench, smithing window, cooking with stateful furnace
+- **Traps** — pressure plates, arrow traps, spike pits — and you can disarm them
+- **Shops** — buy and sell items with appraisal pricing
+- **Dungeon generation** — procedural levels with biome slices, Perlin noise, and boulder puzzles
+- **FOV & exploration** — shadowcasting visibility, fog of war, lantern vision
+- **Identification & curses** — unidentified items and cursed gear
+- **Score system** — your performance is quantified
+- **Fire spread** — flames propagate across structures and can be extinguished by rain
 
 ### 🔧 Developer Tools
 
@@ -294,16 +306,20 @@ Events keep the scheduler in control and execution order predictable.
 - **Spatial indexing** — fast radius queries for AI and effects
 - **Script system** — attach behavior to entities without hardcoding
 - **Hot reload** — edit JS, refresh browser, see changes instantly
+- **1,086 tests** across 209 test files — Deno-powered, deterministic, no flakes
+- **PWA** — installable on mobile, no app store required
+- **Debug console** — spawn monsters, inspect state, remembers prior commands
 
 ### 📚 Content
 
-- **26 systems** — movement, combat, AI, items, effects, spawning, cleanup
-- **30+ components** — Position, Vitality, Inventory, Brain, Equipment, etc.
-- **12 archetype files** — Player, Creatures, Items, Tiles, Doors, Stairs, Traps, etc.
-- **Spell library** — offensive, defensive, utility spells
-- **Monster roster** — kobolds, goblins, orcs, trolls, and more
-- **Item database** — consumables, equipment, treasures
-- **Deity pantheon** — multiple gods with unique mechanics
+- **72 systems** — movement, combat, AI, items, effects, weather, economy, crafting, spawning, cleanup
+- **105 components** — Position, Vitality, Inventory, Brain, Equipment, WeatherState, CalendarState, TownfolkJob, and more
+- **16 archetype files** — Player, Creatures, Items, Tiles, Doors, Stairs, Traps, Food, TownGoods, Overworld, etc.
+- **15 spells** — destruction (lightning, meteor, blizzard, firestorm, shadow bolt), support (heal, flash heal), summoning (skeleton), teleportation (blink, homecoming)
+- **28 monsters across 4 dungeon tiers** — rats and goblins up through dragons, mind flayers, and ancient wyrms
+- **363+ items** — weapons, armor, potions, scrolls, gems, crafting materials, food, tools
+- **11 NPC townspeople** — farmer, smith, miner, barkeep, herbalist, and more — with full economy simulation
+- **Deity pantheon** — multiple gods with unique mechanics, dietary tracking, and ascetic hooks
 
 All data-driven. All modifiable. All in plain JavaScript files.
 
@@ -316,16 +332,19 @@ JSHack/
 ├── index.html              # Entry point (serve over HTTP)
 ├── src/
 │   ├── rules/              # Pure deterministic simulation
-│   │   ├── systems/        # 26 game logic systems
-│   │   ├── components/     # 30+ data containers
+│   │   ├── systems/        # 72 game logic systems
+│   │   ├── components/     # 105 data containers
 │   │   ├── archetypes/     # Entity templates
 │   │   ├── scripts/        # Behavior hooks (spells, items, traps)
-│   │   ├── data/           # Spells, monsters, items, loot tables
-│   │   └── environment/    # Dungeon generation, FOV, tiles
+│   │   ├── data/           # Spells, monsters, items, loot tables, calendar
+│   │   ├── quests/         # Quest definitions and runtime
+│   │   ├── content/        # Interactions, dialog, NPC behaviors
+│   │   └── environment/    # Dungeon generation, overworld, FOV, tiles
 │   ├── bridge/             # Rules ↔ Display contract
 │   │   └── schema/         # WorldView, MapView DTOs
 │   ├── display/            # Rendering & presentation
 │   │   ├── passes/         # Render pipeline (glyphs, VFX, particles)
+│   │   ├── fx/             # Weather, projectile, cloud, spell area VFX
 │   │   ├── camera/         # Camera controller, follow, shake, zoom
 │   │   ├── input/          # Touch & keyboard input routing
 │   │   ├── ui/             # HUD, inventory, messages, overlays
@@ -335,7 +354,7 @@ JSHack/
 │   │   └── input/          # Input → Intent conversion
 │   ├── shared/             # Pure utilities (math, grid algorithms)
 │   └── lib/                # Vendored libraries (ecs-js, deity-js)
-├── tests/                  # Test suite (Deno)
+├── tests/                  # 209 test files, 1,086 tests (Deno)
 ├── reference/              # Demos and examples
 └── AGENTS.md               # Guide for AI/autonomous agents
 ```

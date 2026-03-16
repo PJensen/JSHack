@@ -299,8 +299,15 @@ export function applyMutation(world, op, resolvers = {}) {
       const spawnY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
       const maxHp = Number.isFinite(op.maxHp) ? (Number(op.maxHp) | 0) : Math.max(1, Number(def.baseHp || 1) | 0);
       const faction = String(op.faction || "enemy");
-      const attackDerived = Number.isFinite(op.attackDerived) ? Number(op.attackDerived) : Number(def.attack || 0);
-      const defenseDerived = Number.isFinite(op.defenseDerived) ? Number(op.defenseDerived) : Number(def.defense || 0);
+      const accuracyDerived = Number.isFinite(op.accuracyDerived)
+        ? Number(op.accuracyDerived)
+        : Number(def.attack || 0);
+      const damagePowerDerived = Number.isFinite(op.damagePowerDerived)
+        ? Number(op.damagePowerDerived)
+        : Number(def.attack || 0);
+      const evadeDerived = Number.isFinite(op.evadeDerived)
+        ? Number(op.evadeDerived)
+        : Number(def.defense || 0);
       const naturalDamageDice = String(op.naturalDamageDice || def.damageDice || "1d2");
       const speed = Number.isFinite(op.speed) ? Number(op.speed) : Number(def.speed || 1);
       const resistances = (op.resistances && typeof op.resistances === "object")
@@ -313,13 +320,20 @@ export function applyMutation(world, op, resolvers = {}) {
         identity: monsterId,
         maxHp,
         faction,
-        attackDerived,
-        defenseDerived,
+        accuracyDerived,
+        damagePowerDerived,
+        evadeDerived,
         naturalDamageDice,
         sizeClass: op.sizeClass || def.sizeClass,
         massKg: Number.isFinite(op.massKg) ? Number(op.massKg) : Number(def.massKg || 0),
         resistances,
         speed,
+        equipment: op.equipment || def.equipment || null,
+        learnedSpellIds: Array.isArray(op.learnedSpellIds)
+          ? op.learnedSpellIds.slice()
+          : (Array.isArray(def.learnedSpellIds) ? def.learnedSpellIds.slice() : []),
+        maxMana: Number.isFinite(op.maxMana) ? Number(op.maxMana) : Number(def.maxMana || 0),
+        manaRegen: Number.isFinite(op.manaRegen) ? Number(op.manaRegen) : Number(def.manaRegen || 0),
         creatureType: creatureTypeFromTags(def.tags || []),
       });
 
@@ -484,7 +498,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'removeTimedEffectsByKey', entityId: number, keys: string[] }} RemoveTimedEffectsByKeyOp
  * @typedef {{ type: 'setMaterial', entityId: number, kind: string }} SetMaterialOp
  * @typedef {{ type: 'spawnItem', itemId: string, x?: number, y?: number, count?: number, affixes?: string[], ownerId?: number, material?: string, patchItemInfo?: Record<string, unknown>, emitEvent?: boolean }} SpawnItemOp
- * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, attackDerived?: number, defenseDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean }} SpawnMonsterOp
+ * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, accuracyDerived?: number, damagePowerDerived?: number, evadeDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean }} SpawnMonsterOp
  * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp

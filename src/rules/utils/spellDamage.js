@@ -1,7 +1,12 @@
 import { Brain } from "../components/Brain.js";
+import { Faction } from "../components/Faction.js";
 import { combatSeed, mulberry32 } from "./rng.js";
+import { createStatusEvent } from "../../shared/events/statusEvent.js";
+import { areFactionsHostile } from "./factionHostility.js";
+import { resolveCanonicalStats } from "./canonicalStats.js";
 import { resolveDerivedStats } from "./derivedStats.js";
 import { resolveCombatSnapshot } from "./resolveCombatSnapshot.js";
+import { statusStrength } from "./statusFacade.js";
 
 /**
  * @param {string} value
@@ -27,12 +32,89 @@ function hashString32(value) {
 export function getSpellIntelligenceBonus(world, casterId) {
   const brain = (casterId > 0 && world.isAlive(casterId)) ? world.get(casterId, Brain) : null;
   const resolved = resolveDerivedStats(world, casterId);
-  const intelligence = Math.max(
+  const spellPower = Math.max(
+    Number(resolved?.spellPower || 0),
     Number(resolved?.intelligence || 0),
     Number(brain?.intelligence || 0),
     10,
   );
-  return Math.max(0, intelligence - 10);
+  return Math.max(0, spellPower - 10);
+}
+
+function getSpellHitBonus(world, casterId) {
+  const brain = (casterId > 0 && world.isAlive(casterId)) ? world.get(casterId, Brain) : null;
+  const canonical = resolveCanonicalStats(world, casterId);
+  const brainIntelligence = Math.max(0, Number(brain?.intelligence || 0));
+  const brainSpellHit = Math.floor(Math.max(0, brainIntelligence - 10) / 2);
+  const confusedPenalty = statusStrength(world, casterId, "confused") * 4;
+  const mindwipedPenalty = statusStrength(world, casterId, "mindwiped") * 6;
+  const mindlockedPenalty = statusStrength(world, casterId, "mindlocked") * 10;
+  const hallucinatingPenalty = statusStrength(world, casterId, "hallucinating") * 10;
+  const impairedPenalty = confusedPenalty + mindwipedPenalty + mindlockedPenalty + hallucinatingPenalty;
+  const baseSpellHit = Math.max(
+    Number(canonical?.spellHit || 0),
+    brainSpellHit,
+  );
+  return Math.max(0, baseSpellHit - impairedPenalty);
+}
+
+function getSpellAvoidBonus(world, targetId) {
+  const canonical = resolveCanonicalStats(world, targetId);
+  return Math.max(0, Number(canonical?.spellAvoid || 0));
+}
+
+function isHostileSpellTarget(world, casterId, targetId) {
+  const sourceId = Number(casterId || 0) | 0;
+  const defenderId = Number(targetId || 0) | 0;
+  if (!(sourceId > 0) || !(defenderId > 0) || sourceId === defenderId) return false;
+
+  const sourceFaction = world.get(sourceId, Faction);
+  const targetFaction = world.get(defenderId, Faction);
+  if (!sourceFaction || !targetFaction) return false;
+  return areFactionsHostile(sourceFaction.key, targetFaction.key);
+}
+
+export function getSpellHitChancePct(world, casterId, targetId) {
+  const spellHit = getSpellHitBonus(world, casterId);
+  const spellAvoid = getSpellAvoidBonus(world, targetId);
+  return Math.max(0, Math.min(100, 100 + spellHit - spellAvoid));
+}
+
+export function rollSpellHit(world, casterId, targetId, spell = {}, salt = 0) {
+  if (!isHostileSpellTarget(world, casterId, targetId)) return true;
+  const hitChancePct = getSpellHitChancePct(world, casterId, targetId);
+  if (hitChancePct <= 0) return false;
+  if (hitChancePct >= 100) return true;
+
+  const key = String(spell?.id || spell?.cause || "spell");
+  const rng = mulberry32(combatSeed(world.seed, world.step, casterId | 0, targetId | 0, hashString32(key) ^ 0x51e117 ^ (salt >>> 0)));
+  return (rng() * 100) < hitChancePct;
+}
+
+export function emitSpellMiss(world, casterId, targetId, spell = {}, options = {}) {
+  const sourceId = Number(casterId || 0) | 0;
+  const defenderId = Number(targetId || 0) | 0;
+  const spellId = String(options?.spellId || spell?.id || "");
+  const cause = String(options?.cause || spell?.cause || (spellId ? `spell:${spellId}` : "spell"));
+  const hitChancePct = Number.isFinite(options?.hitChancePct)
+    ? Number(options.hitChancePct)
+    : getSpellHitChancePct(world, sourceId, defenderId);
+  const at = options?.at;
+
+  try {
+    world.emit?.("status", createStatusEvent({ id: defenderId, kind: "miss", source: sourceId }));
+  } catch {}
+  try {
+    world.emit?.("spell:miss", {
+      actor: sourceId,
+      source: sourceId,
+      targetId: defenderId,
+      spellId,
+      cause,
+      at,
+      hitChancePct,
+    });
+  } catch {}
 }
 
 /**
@@ -122,6 +204,9 @@ export function rollSpellCriticalFromContext(world, targetId, context = {}, salt
  *   bypassResist?:boolean,
  *   cause?:string,
  *   type?:string,
+ *   missed?:boolean,
+ *   hitChancePct?:number,
+ *   spellId?:string,
  * }} [options]
  */
 export function buildSpellDamageSpecFromContext(world, targetId, context, options = {}) {
@@ -138,6 +223,9 @@ export function buildSpellDamageSpecFromContext(world, targetId, context, option
     cause,
     at: options?.at,
     critical,
+    missed: !!options?.missed,
+    hitChancePct: Number(options?.hitChancePct || 0),
+    spellId: String(options?.spellId || context?.spellId || ""),
     noTrigger: !!options?.noTrigger,
     bypassInvuln: !!options?.bypassInvuln,
     bypassResist: !!options?.bypassResist,
@@ -166,8 +254,13 @@ export function buildSpellDamageSpec(world, casterId, targetId, options) {
     cause: options?.cause,
     type: options?.type,
   });
+  const hitChancePct = getSpellHitChancePct(world, casterId, targetId);
+  const missed = !rollSpellHit(world, casterId, targetId, options?.spell || {}, Number(options?.salt || 0));
   return buildSpellDamageSpecFromContext(world, targetId, context, {
     ...options,
     baseAmount: scaleSpellDamageFromBonus(Number(options?.baseAmount || 0), context.intelligenceBonus),
+    hitChancePct,
+    missed,
+    spellId: context.spellId,
   });
 }

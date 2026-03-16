@@ -3,6 +3,7 @@
 // Operates on a Uint8Array tile grid — no ECS dependency.
 
 import { TILE_VOID, TILE_FLOOR, TILE_WALL } from './constants.js';
+import { dungeonConfig } from './dungeonConfig.js';
 
 // Fallback BSP parameters used when no profile is provided.
 // These mirror the values previously imported from constants.js.
@@ -94,28 +95,30 @@ export function placeRooms(node, rng, profile = null) {
   const minRoomSize = profile?.minRoomSize ?? _DEF_MIN_ROOM_SIZE;
   const maxRoomSize = profile?.maxRoomSize ?? _DEF_MAX_ROOM_SIZE;
   const roomMargin  = profile?.roomMargin  ?? _DEF_ROOM_MARGIN;
+  const configuredSparsity = profile?.roomSparsity ?? dungeonConfig.roomSparsity ?? 0;
+  const roomSparsity = Math.max(0, Math.min(1, configuredSparsity));
 
-  if (node.left || node.right) {
-    // Internal node: recurse
-    if (node.left)  placeRooms(node.left, rng, profile);
-    if (node.right) placeRooms(node.right, rng, profile);
-    return;
+  const leaves = [];
+  _collectLeaves(node, leaves);
+
+  const eligibleLeaves = leaves.filter(leaf => {
+    const maxW = leaf.w - 2 * roomMargin;
+    const maxH = leaf.h - 2 * roomMargin;
+    return maxW >= minRoomSize && maxH >= minRoomSize;
+  });
+  if (eligibleLeaves.length === 0) return;
+
+  const keepRatio = 1 - roomSparsity;
+  const minimumRooms = eligibleLeaves.length >= 2 ? 2 : 1;
+  const keepCount = Math.max(
+    minimumRooms,
+    Math.min(eligibleLeaves.length, Math.round(eligibleLeaves.length * keepRatio)),
+  );
+
+  const chosenLeaves = _pickLeafSubset(eligibleLeaves, keepCount, rng);
+  for (const leaf of chosenLeaves) {
+    _placeRoomInLeaf(leaf, rng, minRoomSize, maxRoomSize, roomMargin);
   }
-
-  // Leaf: place a room
-  const maxW = node.w - 2 * roomMargin;
-  const maxH = node.h - 2 * roomMargin;
-
-  if (maxW < minRoomSize || maxH < minRoomSize) return; // too small
-
-  const rw = rng.int(minRoomSize, Math.min(maxW, maxRoomSize));
-  const rh = rng.int(minRoomSize, Math.min(maxH, maxRoomSize));
-
-  // Random position within the leaf
-  const rx = node.x + roomMargin + (maxW > rw ? rng.int(0, maxW - rw) : 0);
-  const ry = node.y + roomMargin + (maxH > rh ? rng.int(0, maxH - rh) : 0);
-
-  node.room = { x: rx, y: ry, w: rw, h: rh };
 }
 
 /**
@@ -219,6 +222,38 @@ function _collectRooms(node, out) {
   if (node.right) _collectRooms(node.right, out);
 }
 
+function _collectLeaves(node, out) {
+  if (!node.left && !node.right) {
+    out.push(node);
+    return;
+  }
+  if (node.left) _collectLeaves(node.left, out);
+  if (node.right) _collectLeaves(node.right, out);
+}
+
+function _pickLeafSubset(leaves, keepCount, rng) {
+  const pool = leaves.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    const tmp = pool[i];
+    pool[i] = pool[j];
+    pool[j] = tmp;
+  }
+  return pool.slice(0, keepCount);
+}
+
+function _placeRoomInLeaf(node, rng, minRoomSize, maxRoomSize, roomMargin) {
+  const maxW = node.w - 2 * roomMargin;
+  const maxH = node.h - 2 * roomMargin;
+  if (maxW < minRoomSize || maxH < minRoomSize) return;
+
+  const rw = rng.int(minRoomSize, Math.min(maxW, maxRoomSize));
+  const rh = rng.int(minRoomSize, Math.min(maxH, maxRoomSize));
+  const rx = node.x + roomMargin + (maxW > rw ? rng.int(0, maxW - rw) : 0);
+  const ry = node.y + roomMargin + (maxH > rh ? rng.int(0, maxH - rh) : 0);
+  node.room = { x: rx, y: ry, w: rw, h: rh };
+}
+
 /**
  * Carve a horizontal corridor from (x1,y) to (x2,y).
  * width=1: single tile row. width=2: two tile rows (y and y+1).
@@ -226,16 +261,12 @@ function _collectRooms(node, out) {
 function _carveCorridorH(tiles, stride, x1, y, x2, width = 1) {
   const lo = Math.min(x1, x2);
   const hi = Math.max(x1, x2);
+  const corridorTiles = [];
   for (let x = lo; x <= hi; x++) {
-    _setFloor(tiles, stride, x, y);
-    _setWallIfVoid(tiles, stride, x, y - 1);
-    if (width >= 2) {
-      _setFloor(tiles, stride, x, y + 1);
-      _setWallIfVoid(tiles, stride, x, y + 2);
-    } else {
-      _setWallIfVoid(tiles, stride, x, y + 1);
-    }
+    corridorTiles.push([x, y]);
+    if (width >= 2) corridorTiles.push([x, y + 1]);
   }
+  _paintCorridor(tiles, stride, corridorTiles);
 }
 
 /**
@@ -245,14 +276,24 @@ function _carveCorridorH(tiles, stride, x1, y, x2, width = 1) {
 function _carveCorridorV(tiles, stride, x, y1, y2, width = 1) {
   const lo = Math.min(y1, y2);
   const hi = Math.max(y1, y2);
+  const corridorTiles = [];
   for (let y = lo; y <= hi; y++) {
+    corridorTiles.push([x, y]);
+    if (width >= 2) corridorTiles.push([x + 1, y]);
+  }
+  _paintCorridor(tiles, stride, corridorTiles);
+}
+
+function _paintCorridor(tiles, stride, corridorTiles) {
+  for (const [x, y] of corridorTiles) {
     _setFloor(tiles, stride, x, y);
-    _setWallIfVoid(tiles, stride, x - 1, y);
-    if (width >= 2) {
-      _setFloor(tiles, stride, x + 1, y);
-      _setWallIfVoid(tiles, stride, x + 2, y);
-    } else {
-      _setWallIfVoid(tiles, stride, x + 1, y);
+  }
+  for (const [x, y] of corridorTiles) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        _setWallIfVoid(tiles, stride, x + dx, y + dy);
+      }
     }
   }
 }

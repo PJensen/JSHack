@@ -12,10 +12,10 @@ Deno.test("CombatCallbackContext exposes deterministic stats facade", () => {
   const world = new World({ seed: 8801 });
 
   const attacker = world.create();
-  world.add(attacker, Equipment, { attackDerived: 4, defenseDerived: 0 });
+  world.add(attacker, Equipment, { accuracyDerived: 4, damagePowerDerived: 4, evadeDerived: 0 });
 
   const defender = world.create();
-  world.add(defender, Equipment, { attackDerived: 0, defenseDerived: 2 });
+  world.add(defender, Equipment, { accuracyDerived: 0, damagePowerDerived: 0, evadeDerived: 2 });
   world.add(defender, Resistances, { kinetic: { DR: 3, bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0 } });
   world.add(defender, Status, {
     statuses: [{ type: "stoneskin", duration: 4, potency: 2, stacks: 1 }],
@@ -43,7 +43,7 @@ Deno.test("interaction runtime callback context exposes stats/query/helpers stat
   const world = new World({ seed: 8802 });
 
   const actor = world.create();
-  world.add(actor, Equipment, { attackDerived: 2, defenseDerived: 3 });
+  world.add(actor, Equipment, { accuracyDerived: 2, damagePowerDerived: 2, evadeDerived: 3 });
   world.add(actor, ActiveEffects, {
     effects: [{ key: "hangover", turnsLeft: 4, potency: 1, stacks: 1 }],
   });
@@ -51,7 +51,7 @@ Deno.test("interaction runtime callback context exposes stats/query/helpers stat
   const primary = world.create();
 
   const target = world.create();
-  world.add(target, Equipment, { attackDerived: 0, defenseDerived: 1 });
+  world.add(target, Equipment, { accuracyDerived: 0, damagePowerDerived: 0, evadeDerived: 1 });
   world.add(target, Resistances, {
     thermal: { burnMult: 0.6 },
     kinetic: { DR: 0, bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0 },

@@ -53,10 +53,13 @@ Deno.test("cleric starts with one vial of holy water", () => {
   assertEquals(holyWater.count, 1);
 });
 
-Deno.test("cleric starts with flash_heal as their class spell", () => {
+Deno.test("cleric starts with flash_heal and smite as class spells", () => {
   const cleric = getClass("cleric");
-  assertEquals(cleric.startingSpell, "flash_heal");
+  assert(Array.isArray(cleric.startingSpells), "cleric should expose startingSpells");
+  assert(cleric.startingSpells.includes("flash_heal"), "cleric should start with flash_heal");
+  assert(cleric.startingSpells.includes("smite"), "cleric should start with smite");
   assert(getSpell("flash_heal"), "flash_heal spell definition should exist");
+  assert(getSpell("smite"), "smite spell definition should exist");
 });
 
 Deno.test("warden has highest maxHp", () => {
@@ -100,6 +103,20 @@ Deno.test("warlock starts with summon_skeleton and shadow_bolt", () => {
   assert(warlock.startingSpells.includes('shadow_bolt'), 'warlock should start with shadow_bolt');
   assert(getSpell("summon_skeleton"), "summon_skeleton spell definition should exist");
   assert(getSpell("shadow_bolt"), "shadow_bolt spell definition should exist");
+});
+
+Deno.test("warlock starts with arcane handwraps for spell hit", () => {
+  const warlock = getClass("warlock");
+  assertEquals(warlock.equipment.gloves, "gloves_arcane");
+  const gloves = getCatalogItem("gloves_arcane");
+  assert(gloves, "gloves_arcane should exist");
+  assertEquals(Number(gloves.bonuses?.spellHit || 0), 2);
+});
+
+Deno.test("caster jewelry exposes spell hit bonuses", () => {
+  assertEquals(Number(getCatalogItem("ring_arcana")?.bonuses?.spellHit || 0), 1);
+  assertEquals(Number(getCatalogItem("amulet_focus")?.bonuses?.spellHit || 0), 1);
+  assertEquals(Number(getCatalogItem("amulet_arcanum")?.bonuses?.spellHit || 0), 3);
 });
 
 Deno.test("shadow_bolt has 2-turn cast time and deals damage", () => {

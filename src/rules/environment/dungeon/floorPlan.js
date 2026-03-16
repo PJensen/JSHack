@@ -8,6 +8,96 @@ import { dungeonConfig } from './dungeonConfig.js';
 import { OVERWORLD_EXTENT } from './overworld.js';
 import { pickProfile } from './profiles/index.js';
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function resolveBaseFootprintRadius(scale) {
+  if (scale <= 0.15) return 0;
+  if (scale <= 0.5) return 0;
+  return Math.min(12, Math.max(1, Math.round(scale * 2) - 1));
+}
+
+function resolveGrowthBudget(scale, depth) {
+  const delta = Math.max(0, depth - 1);
+  return delta + Math.floor(delta * Math.max(0, scale) * 0.5);
+}
+
+function resolveFloorProfile(profile, depth) {
+  if (!profile) return profile;
+  if (profile.roomSparsity != null) return profile;
+
+  const base = clamp(Number(dungeonConfig.roomSparsity) || 0, 0, 1);
+  const depthT = clamp((Math.max(1, depth) - 1) / 12, 0, 1);
+  const airyEarlyBias = (1 - depthT) * 0.18;
+  const compactLateBias = depthT * 0.12;
+
+  return {
+    ...profile,
+    roomSparsity: clamp(base + airyEarlyBias - compactLateBias, 0.05, 0.75),
+  };
+}
+
+function buildExtent(chunkPositions, paddingX, paddingY) {
+  return {
+    minCX: Math.min(...chunkPositions.map((s) => s.chunkX)) - paddingX,
+    maxCX: Math.max(...chunkPositions.map((s) => s.chunkX)) + paddingX,
+    minCY: Math.min(...chunkPositions.map((s) => s.chunkY)) - paddingY,
+    maxCY: Math.max(...chunkPositions.map((s) => s.chunkY)) + paddingY,
+  };
+}
+
+function buildSymmetricExtent(paddingX, paddingY) {
+  return {
+    minCX: -paddingX,
+    maxCX: paddingX,
+    minCY: -paddingY,
+    maxCY: paddingY,
+  };
+}
+
+function expandExtentToInclude(extent, chunkPositions) {
+  return {
+    minCX: Math.min(extent.minCX, ...chunkPositions.map((s) => s.chunkX)),
+    maxCX: Math.max(extent.maxCX, ...chunkPositions.map((s) => s.chunkX)),
+    minCY: Math.min(extent.minCY, ...chunkPositions.map((s) => s.chunkY)),
+    maxCY: Math.max(extent.maxCY, ...chunkPositions.map((s) => s.chunkY)),
+  };
+}
+
+function collectPrefabCandidates(extent) {
+  const candidates = [];
+  for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
+    for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
+      if (cx === 0 && cy === 0) continue;
+      candidates.push({ chunkX: cx, chunkY: cy });
+    }
+  }
+  return candidates;
+}
+
+function ensurePrefabCandidates(candidates, needed) {
+  const seen = new Set(candidates.map((c) => `${c.chunkX},${c.chunkY}`));
+  const fallback = [
+    { chunkX: 1, chunkY: 0 },
+    { chunkX: -1, chunkY: 0 },
+    { chunkX: 0, chunkY: 1 },
+    { chunkX: 0, chunkY: -1 },
+    { chunkX: 2, chunkY: 0 },
+    { chunkX: -2, chunkY: 0 },
+    { chunkX: 0, chunkY: 2 },
+    { chunkX: 0, chunkY: -2 },
+  ];
+  for (const candidate of fallback) {
+    if (candidates.length >= needed) break;
+    const key = `${candidate.chunkX},${candidate.chunkY}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(candidate);
+  }
+  return candidates;
+}
+
 /**
  * @typedef {Object} StairPlacement
  * @property {number} chunkX
@@ -59,12 +149,19 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   const seed = floorSeed(worldSeed, depth);
   const rng = createRng(seed);
 
-  const scale = dungeonConfig.dungeonScale;
+  const scale = Math.max(0.1, Number(dungeonConfig.dungeonScale) || 0.3);
+  const baseRadius = resolveBaseFootprintRadius(scale);
+  const growthBudget = resolveGrowthBudget(scale, depth);
+  const paddingX = growthBudget <= 0
+    ? baseRadius
+    : Math.min(12, baseRadius + Math.floor((growthBudget + 2) / 2));
+  const paddingY = growthBudget <= 0
+    ? baseRadius
+    : Math.min(12, baseRadius + Math.floor((growthBudget + 1) / 2));
 
-  // Progressive dungeon size: place down-stairs further from origin on
-  // deeper floors.  dungeonScale modulates the growth rate —
-  // 0.3 (compact/mobile) grows slowly, 1.0 grows every ~3 floors.
-  const stairOffset = Math.min(3, Math.floor(depth * scale / 3));
+  // Footprint and stair spread are both driven from dungeonScale so the knob
+  // changes the actual floor size instead of only nudging stair placement.
+  const stairOffset = Math.floor(growthBudget / 2);
 
   // Down stairs: generate minDownStairs–maxDownStairs per floor, each with an independent
   // chunk offset so they spread across the floor on deeper levels.
@@ -111,17 +208,43 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     }
   }
 
-  // Derive chunk extent from stair positions + 1 chunk padding
-  const padding = Math.max(1, Math.round(scale));
-  const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
-  const extent = {
-    minCX: Math.min(...allChunkPositions.map(s => s.chunkX)) - padding,
-    maxCX: Math.max(...allChunkPositions.map(s => s.chunkX)) + padding,
-    minCY: Math.min(...allChunkPositions.map(s => s.chunkY)) - padding,
-    maxCY: Math.max(...allChunkPositions.map(s => s.chunkY)) + padding,
-  };
+  const prefabRules = [];
+  if (depth === 1) {
+    prefabRules.push("room_boulder_puzzle");
+    prefabRules.push("room_lava_puzzle_dead_end");
+  }
 
-  const profile = pickProfile(rng, depth);
+  // Derive chunk extent from the furthest stair plus a scale-driven footprint
+  // radius.
+  const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
+  let extent = expandExtentToInclude(buildSymmetricExtent(paddingX, paddingY), allChunkPositions);
+
+  const profile = resolveFloorProfile(pickProfile(rng, depth), depth);
+
+  // Prefab rooms: hand-authored set pieces placed in non-origin chunks.
+  const prefabRooms = [];
+  if (prefabRules.length > 0) {
+    const candidates = ensurePrefabCandidates(collectPrefabCandidates(extent), prefabRules.length);
+    const orderedCandidates = candidates
+      .slice()
+      .sort((a, b) => {
+        const da = Math.abs(a.chunkX) + Math.abs(a.chunkY);
+        const db = Math.abs(b.chunkX) + Math.abs(b.chunkY);
+        if (da !== db) return da - db;
+        if (Math.abs(a.chunkY) !== Math.abs(b.chunkY)) return Math.abs(a.chunkY) - Math.abs(b.chunkY);
+        if (Math.abs(a.chunkX) !== Math.abs(b.chunkX)) return Math.abs(a.chunkX) - Math.abs(b.chunkX);
+        if (a.chunkY !== b.chunkY) return a.chunkY - b.chunkY;
+        return a.chunkX - b.chunkX;
+      });
+    for (let i = 0; i < prefabRules.length && i < orderedCandidates.length; i++) {
+      const pick = orderedCandidates[i];
+      const roomId = prefabRules[i];
+      prefabRooms.push({ chunkX: pick.chunkX, chunkY: pick.chunkY, roomId });
+    }
+    if (prefabRooms.length > 0) {
+      extent = expandExtentToInclude(extent, prefabRooms);
+    }
+  }
 
   return {
     depth,
@@ -132,6 +255,7 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     difficultyMult: 1.0 + (depth - 1) * 0.017,
     theme: profile.theme,
     profile,
+    prefabRooms,
   };
 }
 

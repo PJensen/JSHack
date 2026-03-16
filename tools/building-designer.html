@@ -88,6 +88,34 @@ textarea{width:100%;background:#04120e;color:#d8f6de;border:1px solid #123826;pa
     <div class="info-row">Params: <span class="info-val" id="spawnParamsStatus">no entity selected</span></div>
     <div class="line"></div>
 
+    <h3>Spawn Tools</h3>
+    <div class="info-row">Kind: <span class="info-val" id="spawnHelperKind">none</span></div>
+    <label class="row" style="display:block;margin-top:6px">Forced Monster</label>
+    <input type="text" id="monsterIdInput" list="monsterIds" placeholder="skeleton_archer" />
+    <datalist id="monsterIds"></datalist>
+    <div style="display:flex;gap:4px;margin-top:4px">
+      <button onclick="applyMonsterSpawn()">Set Monster Spawn</button>
+      <button onclick="clearSelectedSpawnParams()">Clear Params</button>
+    </div>
+    <label class="row" style="display:block;margin-top:8px">Gem Display Stock</label>
+    <select id="gemStockTier" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid #244537;background:rgba(0,0,0,0.3);color:var(--muted);font-size:12px">
+      <option value="">normal</option>
+      <option value="rare">rare</option>
+      <option value="epic">epic</option>
+      <option value="rare_or_epic">rare_or_epic</option>
+    </select>
+    <button style="margin-top:4px" onclick="applyGemDisplayStockTier()">Set Gem Display Stock</button>
+    <label class="row" style="display:block;margin-top:8px">Chest Loot Table</label>
+    <select id="chestLootTable" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid #244537;background:rgba(0,0,0,0.3);color:var(--muted);font-size:12px">
+      <option value="">default</option>
+      <option value="chest:basic">chest:basic</option>
+      <option value="chest:magic">chest:magic</option>
+      <option value="rack:weapons">rack:weapons</option>
+      <option value="rack:weapons:magic">rack:weapons:magic</option>
+    </select>
+    <button style="margin-top:4px" onclick="applyChestLootTable()">Set Chest Loot</button>
+    <div class="line"></div>
+
     <h3>Waypoint</h3>
     <label class="row">Name <input type="text" id="waypointName" value="waypoint_1" /></label>
     <div class="info-row">Placed: <span class="info-val" id="waypointCount">0</span></div>
@@ -124,6 +152,7 @@ textarea{width:100%;background:#04120e;color:#d8f6de;border:1px solid #123826;pa
 // Live palette — imported from the game's canonical source
 // ════════════════════════════════════════════════════════════════
 import { basePalette } from "../src/display/palette/base.js";
+import { MONSTERS, getMonster } from "../src/rules/data/monsters.js";
 
 // ── Tile definitions ─────────────────────────────────────────────
 // paletteKey → category.  The designer key equals the basePalette key;
@@ -157,6 +186,14 @@ const TILE_ENTRIES = {
 // { pal: paletteKey, cat: category }.  When pal is omitted the
 // spawn-kind is also the basePalette key.
 const ENTITY_ENTRIES = {
+  monster:        { cat: "Actors" },
+  spawner:        { cat: "Actors" },
+  mimic:          { cat: "Actors" },
+  gold:           { cat: "Loot" },
+  chest:          { cat: "Loot" },
+  shop_item:      { pal: "chest", cat: "Loot", glyph: "!", fg: "#d9cf8b", glow: "#786d2a" },
+  book:           { pal: "book_blue", cat: "Loot" },
+  trap:           { cat: "Hazards", glyph: "^", fg: "#ff7b7b", glow: "#8a2f2f" },
   // Furniture
   home_bed:       { pal: "bed_home",    cat: "Furniture" },
   tavern_table:   { cat: "Furniture" },
@@ -250,6 +287,10 @@ const ENTITY_ENTRIES = {
   mushrooms:      { cat: "Dungeon" },
 };
 
+const MONSTER_IDS = MONSTERS.map((m) => m.id).sort();
+const GEM_STOCK_TIERS = new Set(["", "rare", "epic", "rare_or_epic"]);
+const CHEST_LOOT_TABLES = new Set(["", "chest:basic", "chest:magic", "rack:weapons", "rack:weapons:magic"]);
+
 // ── Build palettes from live basePalette data ───────────────────
 const TILE_PALETTE = {};
 for (const [key, cat] of Object.entries(TILE_ENTRIES)) {
@@ -264,8 +305,13 @@ const ENTITY_PALETTE = {};
 for (const [spawnKind, info] of Object.entries(ENTITY_ENTRIES)) {
   const paletteKey = info.pal || spawnKind;
   const pal = basePalette[paletteKey];
-  if (!pal) continue;
-  ENTITY_PALETTE[spawnKind] = { glyph: pal.glyph, fg: pal.fg, glow: pal.glow, cat: info.cat };
+  if (!pal && !info.glyph) continue;
+  ENTITY_PALETTE[spawnKind] = {
+    glyph: info.glyph || pal.glyph,
+    fg: info.fg || pal.fg,
+    glow: info.glow || pal.glow,
+    cat: info.cat,
+  };
 }
 
 // Tile name → TILE_* constant for JS export
@@ -312,6 +358,54 @@ function initGrid() {
   keystone = null;
 }
 initGrid();
+
+function selectedIndex() {
+  return inBounds(selectedX, selectedY) ? (selectedY * gridW + selectedX) : -1;
+}
+
+function selectedEntityKind() {
+  const idx = selectedIndex();
+  return idx >= 0 ? (entities[idx] || null) : null;
+}
+
+function setSelectedEntity(kind, params = null) {
+  const idx = selectedIndex();
+  if (idx < 0) return false;
+  entities[idx] = kind;
+  entityParams[idx] = params;
+  render();
+  updateCellInfo(selectedX, selectedY);
+  return true;
+}
+
+function validateEntityParams(kind, params) {
+  if (!kind) return { ok: true, message: "no entity selected" };
+  if (params == null) return { ok: true, message: "empty" };
+  if (Array.isArray(params) || typeof params !== "object") {
+    return { ok: false, message: "spawn params must be a JSON object" };
+  }
+  if (kind === "monster") {
+    const monsterId = String(params.monsterId || "").trim();
+    if (!monsterId) return { ok: false, message: "monster requires params.monsterId" };
+    if (!getMonster(monsterId)) return { ok: false, message: `unknown monsterId: ${monsterId}` };
+    return { ok: true, message: `monster: ${monsterId}` };
+  }
+  if (kind === "gem_display_case") {
+    const tier = String(params.stockTier || "");
+    if (!GEM_STOCK_TIERS.has(tier)) {
+      return { ok: false, message: `invalid stockTier: ${tier}` };
+    }
+    return { ok: true, message: tier ? `gem stock: ${tier}` : "gem stock: normal" };
+  }
+  if (kind === "chest") {
+    const lootTable = String(params.lootTable || "");
+    if (!CHEST_LOOT_TABLES.has(lootTable)) {
+      return { ok: false, message: `unsupported lootTable: ${lootTable}` };
+    }
+    return { ok: true, message: lootTable ? `loot: ${lootTable}` : "loot: default" };
+  }
+  return { ok: true, message: "valid" };
+}
 
 function resizeGrid() {
   const newW = Math.max(4, Math.min(64, +document.getElementById("gridW").value || 24));
@@ -436,6 +530,16 @@ function updateToolButtons() {
 function updateWaypointCount() {
   const count = waypoints.filter(w => w !== null).length;
   document.getElementById("waypointCount").textContent = count;
+}
+
+function populateMonsterDatalist() {
+  const list = document.getElementById("monsterIds");
+  list.innerHTML = "";
+  for (const id of MONSTER_IDS) {
+    const option = document.createElement("option");
+    option.value = id;
+    list.appendChild(option);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -766,22 +870,74 @@ function updateCellInfo(gx, gy) {
 function syncSpawnParamsEditor() {
   const area = document.getElementById("spawnParams");
   const status = document.getElementById("spawnParamsStatus");
+  const helperKind = document.getElementById("spawnHelperKind");
+  const monsterInput = document.getElementById("monsterIdInput");
+  const gemTier = document.getElementById("gemStockTier");
+  const chestLoot = document.getElementById("chestLootTable");
   if (!inBounds(selectedX, selectedY)) {
     area.value = "";
     area.disabled = true;
     status.textContent = "no cell selected";
+    helperKind.textContent = "none";
+    monsterInput.value = "";
+    gemTier.value = "";
+    chestLoot.value = "";
     return;
   }
   const idx = selectedY * gridW + selectedX;
-  if (!entities[idx]) {
+  const kind = entities[idx];
+  helperKind.textContent = kind || "none";
+  if (!kind) {
     area.value = "";
     area.disabled = true;
     status.textContent = "no entity selected";
+    monsterInput.value = "";
+    gemTier.value = "";
+    chestLoot.value = "";
     return;
   }
   area.disabled = false;
   area.value = entityParams[idx] ? JSON.stringify(entityParams[idx], null, 2) : "";
-  status.textContent = entityParams[idx] ? "valid" : "empty";
+  const validation = validateEntityParams(kind, entityParams[idx]);
+  status.textContent = validation.message;
+  monsterInput.value = kind === "monster" ? String(entityParams[idx]?.monsterId || "") : "";
+  gemTier.value = kind === "gem_display_case" ? String(entityParams[idx]?.stockTier || "") : "";
+  chestLoot.value = kind === "chest" ? String(entityParams[idx]?.lootTable || "") : "";
+}
+
+function applyMonsterSpawn() {
+  if (!inBounds(selectedX, selectedY)) return;
+  const monsterId = document.getElementById("monsterIdInput").value.trim();
+  if (!monsterId) {
+    alert("Enter a monster id.");
+    return;
+  }
+  if (!getMonster(monsterId)) {
+    alert(`Unknown monster id: ${monsterId}`);
+    return;
+  }
+  setSelectedEntity("monster", { monsterId });
+}
+
+function applyGemDisplayStockTier() {
+  if (!inBounds(selectedX, selectedY)) return;
+  const stockTier = document.getElementById("gemStockTier").value;
+  const params = stockTier ? { stockTier } : null;
+  setSelectedEntity("gem_display_case", params);
+}
+
+function applyChestLootTable() {
+  if (!inBounds(selectedX, selectedY)) return;
+  const lootTable = document.getElementById("chestLootTable").value;
+  const params = lootTable ? { lootTable } : null;
+  setSelectedEntity("chest", params);
+}
+
+function clearSelectedSpawnParams() {
+  const idx = selectedIndex();
+  if (idx < 0 || !entities[idx]) return;
+  entityParams[idx] = null;
+  syncSpawnParamsEditor();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1104,26 +1260,32 @@ window.doImport = doImport;
 window.saveLocal = saveLocal;
 window.loadLocal = loadLocal;
 window.clearAll = clearAll;
+window.applyMonsterSpawn = applyMonsterSpawn;
+window.applyGemDisplayStockTier = applyGemDisplayStockTier;
+window.applyChestLootTable = applyChestLootTable;
+window.clearSelectedSpawnParams = clearSelectedSpawnParams;
 
 document.getElementById("spawnParams").addEventListener("input", (e) => {
   const area = e.currentTarget;
   const status = document.getElementById("spawnParamsStatus");
   if (!inBounds(selectedX, selectedY)) return;
   const idx = selectedY * gridW + selectedX;
-  if (!entities[idx]) return;
+  const kind = entities[idx];
+  if (!kind) return;
   const raw = area.value.trim();
   if (!raw) {
     entityParams[idx] = null;
-    status.textContent = "empty";
+    status.textContent = validateEntityParams(kind, null).message;
+    syncSpawnParamsEditor();
     return;
   }
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-      throw new Error("spawn params must be a JSON object");
-    }
+    const validation = validateEntityParams(kind, parsed);
+    if (!validation.ok) throw new Error(validation.message);
     entityParams[idx] = parsed;
-    status.textContent = "valid";
+    status.textContent = validation.message;
+    syncSpawnParamsEditor();
   } catch (err) {
     status.textContent = err.message;
   }
@@ -1150,6 +1312,7 @@ document.getElementById("extraData").addEventListener("input", (e) => {
 // Init
 // ════════════════════════════════════════════════════════════════
 buildPaletteUI();
+populateMonsterDatalist();
 
 // Auto-load if saved
 if (localStorage.getItem(STORAGE_KEY)) {

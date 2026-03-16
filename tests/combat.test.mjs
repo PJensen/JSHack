@@ -51,8 +51,8 @@ Deno.test("d20 combat with affix triggers: fierce, vamp, thorns", () => {
   const world = new World({ seed: 123 });
   installAffixTriggers(world);
 
-  const sword = makeEquip(world, { id: 'sword_plain', name: 'Sword', slot: 'weapon', bonuses: { attack: 2 }, affixes: ['fierce', 'vamp1'] });
-  const thorns = makeEquip(world, { id: 'leather_armor', name: 'Leather', slot: 'armor', bonuses: { defense: 1 }, affixes: ['thorns1'] });
+  const sword = makeEquip(world, { id: 'sword_plain', name: 'Sword', slot: 'weapon', bonuses: { accuracy: 2, damagePower: 2 }, affixes: ['fierce', 'vamp1'] });
+  const thorns = makeEquip(world, { id: 'leather_armor', name: 'Leather', slot: 'armor', bonuses: { evade: 1 }, affixes: ['thorns1'] });
 
   const hero = makeActor(world, 'Hero', { weapon: sword }, 9);
   const foe = makeActor(world, 'Goblin', { armor: thorns });
@@ -83,7 +83,7 @@ Deno.test("blunt melee deals extra damage to skeleton-style resistance profile",
       id: 'test_blunt_mace',
       name: 'Test Mace',
       slot: 'weapon',
-      bonuses: { attack: 12 },
+      bonuses: { accuracy: 12, damagePower: 12 },
       damageType: 'blunt',
     });
     const hero = makeActor(world, 'Hero', { weapon: mace }, 30);
@@ -111,7 +111,7 @@ Deno.test("blunt melee deals extra damage to skeleton-style resistance profile",
 Deno.test("caustic affix adds acid chip that is blocked by acid immunity", () => {
   const worldA = new World({ seed: 202 });
   installAffixTriggers(worldA);
-  const weaponA = makeEquip(worldA, { id: 'test_caustic', name: 'Caustic Blade', slot: 'weapon', bonuses: { attack: 6 }, affixes: ['caustic1'] });
+  const weaponA = makeEquip(worldA, { id: 'test_caustic', name: 'Caustic Blade', slot: 'weapon', bonuses: { accuracy: 6, damagePower: 6 }, affixes: ['caustic1'] });
   const heroA = makeActor(worldA, 'Hero', { weapon: weaponA }, 10);
   const foeA = makeActor(worldA, 'Target', {}, 10, { chemical: { acidMult: 1.0 } });
   worldA.add(heroA, Position, { x: 1, y: 1 });
@@ -123,7 +123,7 @@ Deno.test("caustic affix adds acid chip that is blocked by acid immunity", () =>
 
   const worldB = new World({ seed: 202 });
   installAffixTriggers(worldB);
-  const weaponB = makeEquip(worldB, { id: 'test_caustic', name: 'Caustic Blade', slot: 'weapon', bonuses: { attack: 6 }, affixes: ['caustic1'] });
+  const weaponB = makeEquip(worldB, { id: 'test_caustic', name: 'Caustic Blade', slot: 'weapon', bonuses: { accuracy: 6, damagePower: 6 }, affixes: ['caustic1'] });
   const heroB = makeActor(worldB, 'Hero', { weapon: weaponB }, 10);
   const foeB = makeActor(worldB, 'Target', {}, 10, { chemical: { acidMult: 0.0 } });
   worldB.add(heroB, Position, { x: 1, y: 1 });
@@ -139,7 +139,7 @@ Deno.test("caustic affix adds acid chip that is blocked by acid immunity", () =>
 Deno.test("insulated affix mitigates capacitive electric chip", () => {
   const worldA = new World({ seed: 202 });
   installAffixTriggers(worldA);
-  const weaponA = makeEquip(worldA, { id: 'test_cap', name: 'Capacitive Blade', slot: 'weapon', bonuses: { attack: 6 }, affixes: ['capacitive1'] });
+  const weaponA = makeEquip(worldA, { id: 'test_cap', name: 'Capacitive Blade', slot: 'weapon', bonuses: { accuracy: 6, damagePower: 6 }, affixes: ['capacitive1'] });
   const heroA = makeActor(worldA, 'Hero', { weapon: weaponA }, 10);
   const foeA = makeActor(worldA, 'Target', {}, 10, { electric: { ohms: 1000, fibrillationA: 0.03 } });
   worldA.add(heroA, Position, { x: 1, y: 1 });
@@ -151,7 +151,7 @@ Deno.test("insulated affix mitigates capacitive electric chip", () => {
 
   const worldB = new World({ seed: 202 });
   installAffixTriggers(worldB);
-  const weaponB = makeEquip(worldB, { id: 'test_cap', name: 'Capacitive Blade', slot: 'weapon', bonuses: { attack: 6 }, affixes: ['capacitive1'] });
+  const weaponB = makeEquip(worldB, { id: 'test_cap', name: 'Capacitive Blade', slot: 'weapon', bonuses: { accuracy: 6, damagePower: 6 }, affixes: ['capacitive1'] });
   const insulatedShield = makeEquip(worldB, { id: 'test_insulated', name: 'Insulated Shield', slot: 'offhand', bonuses: {}, affixes: ['insulated1'] });
   const heroB = makeActor(worldB, 'Hero', { weapon: weaponB }, 10);
   const foeB = makeActor(worldB, 'Target', { offhand: insulatedShield }, 10, { electric: { ohms: 1000, fibrillationA: 0.03 } });

@@ -27,8 +27,10 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
-import { buildSpellDamageSpec, createSpellDamageContext, getSpellIntelligenceBonus, scaleSpellDamage } from "../utils/spellDamage.js";
+import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
+import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 
@@ -73,6 +75,19 @@ function getFlashHealSpellLevel(world, actor, spell, intent) {
 }
 
 /**
+ * @param {string} value
+ * @returns {number}
+ */
+function hashString32(value) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i) & 0xff;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/**
  * Build a LOS blocker callback that accounts for terrain opacity and entities
  * with Collider.blocksSight (e.g. closed doors).
  *
@@ -81,6 +96,192 @@ function getFlashHealSpellLevel(world, actor, spell, intent) {
  */
 function createLOSBlocker(world) {
   return blockedCallback(buildBlocksVisionMap(world));
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ radius?:number }} spell
+ * @returns {number}
+ */
+function resolveSpellRadius(world, actor, spell) {
+  const base = Math.max(0, Number(spell?.radius || 0) | 0);
+  const passive = getPassiveBonuses(world, actor);
+  const bonus = Math.max(0, Math.floor(Number(passive?.spellRadiusDerived || 0)));
+  return Math.max(0, base + bonus);
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ range?:number, id?:string }} spell
+ * @param {{ x?:number, y?:number }} intent
+ * @returns {{ ok:boolean, center?:{x:number,y:number}, reason?:string, range?:number }}
+ */
+function resolveStormCenter(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return { ok: false, reason: "no_caster_pos" };
+  const tx = Number(intent?.x);
+  const ty = Number(intent?.y);
+  const maxRange = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 10);
+  if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
+    return { ok: false, reason: "no_target", range: maxRange };
+  }
+  const center = { x: tx | 0, y: ty | 0 };
+  const dist = chebyshev(apos, center);
+  if (!(dist > 0) || dist > maxRange) {
+    return { ok: false, reason: "out_of_range", range: maxRange };
+  }
+  const isBlocked = createLOSBlocker(world);
+  if (!hasSpellLineOfSight(world, {
+    sourceId: actor,
+    sourcePos: apos,
+    targetPos: center,
+    range: maxRange,
+    isBlocked,
+    allowFlyingOccupantAtTarget: true,
+  })) {
+    return { ok: false, reason: "blocked_los", range: maxRange };
+  }
+  return { ok: true, center };
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ id?:string, boltsPerTick?:number }} spell
+ * @param {{ x?:number, y?:number }} intent
+ * @param {{ type:'cold'|'fire', cause:string, eventName:string, burn?:boolean, frost?:boolean, baseDamage:number }} tuning
+ */
+function runStormScript(world, actor, spell, intent, tuning) {
+  const storm = resolveStormCenter(world, actor, spell, intent);
+  if (!storm.ok || !storm.center) {
+    try {
+      world.emit && world.emit(`${String(tuning.eventName)}:failed`, {
+        actor,
+        spellId: spell.id,
+        reason: storm.reason || "invalid_target",
+        range: storm.range,
+      });
+    } catch (e) { console.debug("[spells] emit storm failed:", e); }
+    return;
+  }
+
+  const radius = resolveSpellRadius(world, actor, spell);
+  const center = storm.center;
+  const tiles = [];
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      tiles.push({ x: center.x + dx, y: center.y + dy });
+    }
+  }
+  if (tiles.length <= 0) return;
+
+  const boltCount = Math.max(1, Number(spell?.boltsPerTick || 3) | 0);
+  const impactRadius = 1;
+  const impactKeys = new Set();
+  /** @type {Array<{x:number,y:number, radius:number}>} */
+  const impacts = [];
+  const centerSalt = ((((center.x & 0xffff) << 16) ^ (center.y & 0xffff)) ^ hashString32(String(spell?.id || ""))) >>> 0;
+  const rng = mulberry32(combatSeed(world.seed, world.step, actor, boltCount, centerSalt));
+
+  while (impacts.length < boltCount && impactKeys.size < tiles.length) {
+    const idx = (rng() * tiles.length) | 0;
+    const pick = tiles[idx];
+    const key = `${pick.x},${pick.y}`;
+    if (impactKeys.has(key)) continue;
+    impactKeys.add(key);
+    impacts.push({ x: pick.x, y: pick.y, radius: impactRadius });
+  }
+
+  for (let i = 0; i < impacts.length; i++) {
+    const impact = impacts[i];
+    for (const [id, pos] of world.query(Position)) {
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      const dist = Math.max(Math.abs((pos.x | 0) - impact.x), Math.abs((pos.y | 0) - impact.y));
+      if (dist > impactRadius) continue;
+
+      const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+        spell,
+        baseAmount: tuning.baseDamage,
+        type: tuning.type,
+        cause: tuning.cause,
+        at: { x: impact.x, y: impact.y },
+        salt: centerSalt ^ (id * 131) ^ (i + 1),
+      }));
+
+      if (result.applied && !result.killed && tuning.burn) {
+        const ae = /** @type any */ (world.get(id, ActiveEffects));
+        const effect = createSpellDotEffect(world, actor, spell, {
+          key: "burn",
+          turnsLeft: 3,
+          potency: Math.max(1, scaleSpellDamage(world, actor, 1)),
+          stacks: 1,
+          cause: `${tuning.cause}:burn`,
+          type: "fire",
+        });
+        if (ae && Array.isArray(ae.effects)) upsertTimedEffect(ae.effects, effect);
+        else {
+          try { world.add(id, ActiveEffects, { effects: [effect] }); } catch {}
+        }
+      }
+      if (result.applied && !result.killed && tuning.frost) {
+        let ae = /** @type any */ (world.get(id, ActiveEffects));
+        if (!ae) {
+          try { world.add(id, ActiveEffects, { effects: [] }); } catch {}
+          ae = /** @type any */ (world.get(id, ActiveEffects));
+        }
+        if (ae && Array.isArray(ae.effects)) {
+          const existing = ae.effects.find((effect) => effect?.key === "frost");
+          if (existing) {
+            existing.turnsLeft = Math.max(Number(existing.turnsLeft || 0), 2);
+            existing.stacks = Math.min(3, Math.max(1, Number(existing.stacks || 1)) + 1);
+          } else {
+            ae.effects.push({
+              key: "frost",
+              turnsLeft: 2,
+              potency: 1,
+              stacks: 1,
+              startedAtTurn: world.step,
+              sourceId: actor,
+            });
+          }
+        }
+      }
+    }
+
+    if (tuning.burn) {
+      try {
+        spawnHazard(world, {
+          x: impact.x,
+          y: impact.y,
+          kind: "fire",
+          medium: "floor",
+          turnsLeft: 3,
+          radius: 0,
+          tickDamage: 2,
+          damageType: "fire",
+          cause: "firestorm_fire",
+          sourceId: actor,
+          sourceKind: "firestorm",
+          identity: "firestorm_fire",
+          name: "Firestorm Fire",
+          meta: { source: "firestorm", delivery: "storm_impact" },
+        });
+      } catch {}
+    }
+  }
+
+  try {
+    world.emit && world.emit(tuning.eventName, {
+      actor,
+      origin: center,
+      radius,
+      impacts,
+      boltsPerTick: impacts.length,
+    });
+  } catch (e) { console.debug("[spells] emit storm event failed:", e); }
 }
 
 /**
@@ -124,6 +325,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   /** @type {{x:number,y:number}|null} */
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const isBlocked = createLOSBlocker(world);
 
   const MAX_R = 12; // tiles
@@ -133,13 +335,13 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   // Helper: distance squared
   const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx*dx + dy*dy; };
 
-  // Collect candidate targets (monsters only for now)
+  // Collect candidate targets (hostiles only)
   /** @type {Array<{id:number,x:number,y:number}>} */
   const candidates = [];
   for (const [id, p] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
-    if (!fac || fac.key !== 'enemy') continue;
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp|0) <= 0) continue;
     // within max radius (LOS is checked per-hop, not globally)
@@ -660,9 +862,35 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     }
   }
 
+  for (let dy = -RADIUS; dy <= RADIUS; dy++) {
+    for (let dx = -RADIUS; dx <= RADIUS; dx++) {
+      const dist = Math.max(Math.abs(dx), Math.abs(dy));
+      if (dist > RADIUS) continue;
+      try {
+        spawnHazard(world, {
+          x: ox + dx,
+          y: oy + dy,
+          kind: "fire",
+          medium: "floor",
+          turnsLeft: dist <= 1 ? 3 : 2,
+          radius: 0,
+          tickDamage: dist <= 1 ? 2 : 1,
+          damageType: "fire",
+          cause: "meteor_fire",
+          sourceId: actor,
+          sourceKind: "meteor",
+          identity: "meteor_fire",
+          name: "Meteor Fire",
+          meta: { source: "meteor", delivery: "impact" },
+        });
+      } catch {}
+    }
+  }
+
   try {
     world.emit && world.emit('spell:meteor', {
       actor,
+      from: { x: apos.x, y: apos.y },
       origin: { x: ox, y: oy },
       radius: RADIUS,
       randomized,
@@ -713,7 +941,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
   if (!target) {
     // No valid target; emit a fizzle pulse at caster
-    try { world.emit && world.emit('spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
+    try { world.emit && world.emit('spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, projectileDelay: 0, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
     return;
   }
 
@@ -722,7 +950,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   const _frostDelay = Math.max(0.1, Math.min(0.6, _frostDist / 8));
 
   // Apply cold damage
-  dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+  const frostResult = dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
     spell,
     baseAmount: BASE_DMG,
     type: 'cold',
@@ -739,24 +967,57 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   const massPenalty = Math.floor(Math.max(0, massKg - 40) / 30);
   const duration = Math.max(2, baseDuration - massPenalty);
 
-  // Apply frost effect via ActiveEffects (ECS-compliant: read-then-mutate)
-  let ae = /** @type any */ (world.get(target.id, ActiveEffects));
-  if (!ae) {
-    try { world.add(target.id, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
-    ae = /** @type any */ (world.get(target.id, ActiveEffects));
-  }
-  if (ae && Array.isArray(ae.effects)) {
-    const existing = ae.effects.find(/** @param {any} e */ (e) => e.key === 'frost');
-    if (existing) {
-      existing.turnsLeft = Math.max(existing.turnsLeft, duration);
-      existing.stacks = Math.min((existing.stacks || 1) + 1, 3);
-    } else {
-      ae.effects.push({ key: 'frost', turnsLeft: duration, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
+  if (frostResult.applied) {
+    // Apply frost effect via ActiveEffects (ECS-compliant: read-then-mutate)
+    let ae = /** @type any */ (world.get(target.id, ActiveEffects));
+    if (!ae) {
+      try { world.add(target.id, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
+      ae = /** @type any */ (world.get(target.id, ActiveEffects));
+    }
+    if (ae && Array.isArray(ae.effects)) {
+      const existing = ae.effects.find(/** @param {any} e */ (e) => e.key === 'frost');
+      if (existing) {
+        existing.turnsLeft = Math.max(existing.turnsLeft, duration);
+        existing.stacks = Math.min((existing.stacks || 1) + 1, 3);
+      } else {
+        ae.effects.push({ key: 'frost', turnsLeft: duration, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
+      }
     }
   }
 
   // Emit semantic event for display VFX
-  try { world.emit && world.emit('spell:frost', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y }, duration, mass: massKg }); } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
+  try {
+    world.emit && world.emit('spell:frost', {
+      actor,
+      targetId: target.id,
+      from: { x: apos.x, y: apos.y },
+      at: { x: target.x, y: target.y },
+      duration: frostResult.applied ? duration : 0,
+      mass: massKg,
+      projectileDelay: _frostDelay,
+      missed: frostResult.reason === 'missed',
+    });
+  } catch (e) { console.debug('[spells] emit spell:frost failed:', e); }
+};
+
+REGISTRY["blizzard"] = function blizzardScript(world, actor, spell, intent) {
+  runStormScript(world, actor, spell, intent, {
+    type: "cold",
+    cause: "spell:blizzard",
+    eventName: "spell:blizzard",
+    frost: true,
+    baseDamage: 2,
+  });
+};
+
+REGISTRY["firestorm"] = function firestormScript(world, actor, spell, intent) {
+  runStormScript(world, actor, spell, intent, {
+    type: "fire",
+    cause: "spell:firestorm",
+    eventName: "spell:firestorm",
+    burn: true,
+    baseDamage: 2,
+  });
 };
 
 // Heal — restore HP to self or target. Range 6 tiles, heals 20-35 HP based on caster intelligence.
@@ -874,10 +1135,99 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
   } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
 };
 
+// Smite — holy bolt against a hostile target in line of sight.
+REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const isBlocked = createLOSBlocker(world);
+
+  const maxRange = Math.max(1, Number(spell?.range || 8));
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  let preferredTargetId = Number(intent?.targetId || 0) | 0;
+  if (!(preferredTargetId > 0)) {
+    const tx = Number(intent?.x);
+    const ty = Number(intent?.y);
+    if (Number.isFinite(tx) && Number.isFinite(ty)) {
+      for (const [id, p] of world.query(Position)) {
+        if ((p.x | 0) === (tx | 0) && (p.y | 0) === (ty | 0)) {
+          preferredTargetId = id | 0;
+          break;
+        }
+      }
+    }
+  }
+
+  /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+  const candidates = [];
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac) continue;
+    const actorFaction = /** @type any */ (world.get(actor, Faction))?.key || 'player';
+    if (!areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist2 = d2(apos.x, apos.y, p.x, p.y);
+    if (dist2 <= maxRange * maxRange) {
+      candidates.push({ id, x: p.x | 0, y: p.y | 0, dist2 });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    if (a.id === preferredTargetId && b.id !== preferredTargetId) return -1;
+    if (b.id === preferredTargetId && a.id !== preferredTargetId) return 1;
+    return a.dist2 - b.dist2;
+  });
+
+  let target = null;
+  for (const c of candidates) {
+    if (hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: c.id,
+      sourcePos: apos,
+      targetPos: c,
+      range: maxRange,
+      isBlocked,
+    })) {
+      target = c;
+      break;
+    }
+  }
+
+  if (!target) {
+    try { world.emit && world.emit('spell:smite', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:smite fizzle failed:', e); }
+    return;
+  }
+
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+    spell,
+    baseAmount: 6,
+    type: 'holy',
+    cause: 'spell:smite',
+    at: { x: target.x, y: target.y },
+    salt: target.id,
+  }));
+
+  try {
+    world.emit && world.emit('spell:smite', {
+      actor,
+      targetId: target.id,
+      at: { x: target.x, y: target.y },
+      amount: result.amount || 0,
+      missed: result.reason === 'missed',
+    });
+  } catch (e) { console.debug('[spells] emit spell:smite failed:', e); }
+};
+
 // Summon Skeleton — spawn a friendly skeleton near the caster.
 REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim().toLowerCase();
+  const summonFaction = (actorFaction === "player" || actorFaction === "pet" || actorFaction === "summoned")
+    ? "summoned"
+    : (actorFaction || "summoned");
 
   // Find a walkable tile near the caster
   const spawnTile = findNearestValidTileAround(world, apos, {
@@ -895,10 +1245,11 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
     y: spawnTile.y,
     name: 'Summoned Skeleton',
     identity: 'skeleton',
-    faction: 'summoned',
+    faction: summonFaction,
     maxHp: 12,
-    attackDerived: 2,
-    defenseDerived: 2,
+    accuracyDerived: 2,
+    damagePowerDerived: 2,
+    evadeDerived: 2,
     naturalDamageDice: '1d6',
     sizeClass: 'M',
     massKg: 25,
@@ -913,6 +1264,7 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
     world.emit && world.emit('spell:summon_skeleton', {
       actor,
       skeletonId,
+      faction: summonFaction,
       at: { x: spawnTile.x, y: spawnTile.y },
     });
   } catch (e) { console.debug('[spells] emit spell:summon_skeleton failed:', e); }
@@ -922,6 +1274,7 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
 REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const isBlocked = createLOSBlocker(world);
 
   const MAX_R = Number(spell.range || 10);
@@ -935,7 +1288,7 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   for (const [id, p] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
-    if (!fac || !areFactionsHostile('player', fac.key)) continue;
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
     const dist2 = d2(apos.x, apos.y, p.x, p.y);
@@ -967,7 +1320,7 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   const _sbDelay = Math.max(0.08, Math.min(0.7, _sbDist / 10));
 
   // Apply shadow damage — no status effect
-  dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
     spell,
     baseAmount: BASE_DMG,
     type: 'shadow',
@@ -977,13 +1330,22 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   }));
 
   // Emit VFX event
-  try { world.emit && world.emit('spell:shadow_bolt', { actor, targetId: target.id, from: { x: apos.x, y: apos.y }, to: { x: target.x, y: target.y } }); } catch (e) { console.debug('[spells] emit spell:shadow_bolt failed:', e); }
+  try {
+    world.emit && world.emit('spell:shadow_bolt', {
+      actor,
+      targetId: target.id,
+      from: { x: apos.x, y: apos.y },
+      to: { x: target.x, y: target.y },
+      missed: result.reason === 'missed',
+    });
+  } catch (e) { console.debug('[spells] emit spell:shadow_bolt failed:', e); }
 };
 
 // Agony — shadow DOT curse, intelligence-scaled potency and duration.
 REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
 
   const MAX_R = Math.max(1, Number(spell.range || 8));
   const isBlocked = createLOSBlocker(world);
@@ -1000,7 +1362,7 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
     for (const [id, p] of world.query(Position)) {
       if (id === actor) continue;
       const fac = /** @type any */ (world.get(id, Faction));
-      if (!fac || !areFactionsHostile('player', fac.key)) continue;
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
       const vit = /** @type any */ (world.get(id, Vitality));
       if (!vit || (vit.hp | 0) <= 0) continue;
       const dist2v = d2(apos.x, apos.y, p.x, p.y);
@@ -1050,6 +1412,26 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   const dist = chebyshev(apos, tpos);
   if (dist > MAX_R) {
     try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true, reason: 'out_of_range' }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
+    return;
+  }
+
+  const hitChancePct = getSpellHitChancePct(world, actor, targetId);
+  if (!rollSpellHit(world, actor, targetId, spell)) {
+    emitSpellMiss(world, actor, targetId, spell, {
+      cause: 'spell:agony',
+      hitChancePct,
+      at: { x: tpos.x, y: tpos.y },
+    });
+    try {
+      world.emit && world.emit('spell:agony', {
+        actor,
+        targetId,
+        from: { x: apos.x, y: apos.y },
+        at: { x: tpos.x, y: tpos.y },
+        missed: true,
+        hitChancePct,
+      });
+    } catch (e) { console.debug('[spells] emit spell:agony miss failed:', e); }
     return;
   }
 

@@ -132,7 +132,16 @@ const ROOM_FEATURES = [
   { kind: 'urn',         weight: 7 },
 ];
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
+const DEAD_END_ROOM_THEMES = [
+  { kind: 'treasure', weight: 14 },
+  { kind: 'trapped_treasure', weight: 8 },
+  { kind: 'sanctuary', weight: 6 },
+  { kind: 'lore_nook', weight: 5 },
+  { kind: 'lair', weight: 5 },
+];
+const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
 const SHOP_MIMIC_CHANCE = 0.08;
+const DEAD_END_CONTENT_CHANCE = 1.0;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
 
 function findDoorEntityAt(world, x, y) {
@@ -242,7 +251,9 @@ function stockDisplayContainer(world, id, spawn, stockKind) {
   for (let i = 0; i < count; i++) {
     let itemId = null;
     if (stockKind === "alchemy") itemId = shopStock.generateAlchemyShopItem(world, rng);
-    else if (stockKind === "gem") itemId = shopStock.generateGemShopItem(world, rng);
+    else if (stockKind === "gem") itemId = shopStock.generateGemDisplayItem(world, rng, {
+      stockTier: spawn?.params?.stockTier || null,
+    });
     if (!(itemId > 0)) continue;
     const info = world.get(itemId, ItemInfo);
     if (info) world.mutate(itemId, ItemInfo, (r) => { r.identified = true; });
@@ -273,6 +284,15 @@ function _pickFeature(rng, pool) {
     if (roll <= 0) return f.kind;
   }
   return candidates[candidates.length - 1].kind;
+}
+
+function pickDeadEndTheme(rng) {
+  let roll = rng.next() * DEAD_END_THEME_TOTAL_WEIGHT;
+  for (const theme of DEAD_END_ROOM_THEMES) {
+    roll -= theme.weight;
+    if (roll <= 0) return theme.kind;
+  }
+  return DEAD_END_ROOM_THEMES[DEAD_END_ROOM_THEMES.length - 1].kind;
 }
 
 /**
@@ -316,8 +336,38 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const entryRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
     ? chunk.rooms[0]
     : null;
+  const eligibleDeadEndRooms = chunk.rooms.filter((room) => {
+    const isDeadEnd = countRoomEntrances(room, chunk) === 1;
+    const isEntryRoom = !!entryRoom &&
+      room.x === entryRoom.x &&
+      room.y === entryRoom.y &&
+      room.w === entryRoom.w &&
+      room.h === entryRoom.h;
+    return isDeadEnd && !isEntryRoom;
+  });
+
+  // Solid spawn kinds that should be marked solid in the solidPositions set.
+  const SOLID_PREFAB_KINDS = new Set([
+    'statue', 'urn', 'pillar', 'sarcophagus', 'fountain', 'altar', 'shrine',
+  ]);
 
   for (const room of chunk.rooms) {
+    // Prefab rooms use their own spawn list — skip normal population entirely.
+    if (room.prefab && Array.isArray(room.prefabSpawns)) {
+      for (const s of room.prefabSpawns) {
+        const params = { ...(s.params || {}) };
+        if (s.kind === "monster" && typeof params.monsterId === "string") {
+          const resolved = pickSpecificMonster(params.monsterId, floorPlan.depth);
+          if (!resolved) continue;
+          spawns.push({ x: s.x, y: s.y, kind: "monster", params: resolved });
+          continue;
+        }
+        spawns.push({ x: s.x, y: s.y, kind: s.kind, params });
+        if (SOLID_PREFAB_KINDS.has(s.kind)) markSolid(s.x, s.y);
+      }
+      continue;
+    }
+
     const area = room.w * room.h;
 
     // Place a room feature (~50% of non-entry rooms get one)
@@ -494,7 +544,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
-  // Depth 1 guaranteed content: skeleton archers, a rare monster, rat/spider spawners.
+  // Depth 1 guaranteed content: skeleton archer, a rare monster,
+  // and two mixed vermin/humanoid nests to preserve rat fodder and variety.
   // Only inject into the origin chunk so they appear once per floor.
   if (floorPlan.depth === 1 && chunk.chunkX === 0 && chunk.chunkY === 0) {
     const nonEntryRooms = chunk.rooms.filter(r => r !== entryRoom);
@@ -516,8 +567,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const rareParams = pickSpecificMonster('pit_viper', 1);
       if (rareParams) spawns.push({ x: rx, y: ry, kind: 'monster', params: rareParams });
 
-      // Guaranteed rat/spider spawners (2 nests, picking rat or cave_spider)
-      const verminIds = ['rat', 'cave_spider'];
+      // Guaranteed mixed spawners (2 nests, preserving rat fodder and adding variety)
+      const verminIds = ['rat', 'cave_spider', 'goblin'];
       for (let i = 0; i < 2; i++) {
         const vRoom = nextRoom();
         let vx, vy, vAttempts = 0;
@@ -548,21 +599,13 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
 
   // Shopkeeper: one per chunk, only in dead-end rooms (exactly one perimeter entrance), ~30% chance.
   // Extra rule: never use the origin chunk's spawn room (rooms[0] in chunk 0,0).
-  const spawnRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
-    ? chunk.rooms[0]
-    : null;
-  const eligibleShopRooms = chunk.rooms.filter((room) => {
-    const isDeadEnd = countRoomEntrances(room, chunk) === 1;
-    const isSpawnRoom = !!spawnRoom &&
-      room.x === spawnRoom.x &&
-      room.y === spawnRoom.y &&
-      room.w === spawnRoom.w &&
-      room.h === spawnRoom.h;
-    return isDeadEnd && !isSpawnRoom;
-  });
   const shopChance = floorPlan.profile?.shopChance ?? 0.30;
-  if (eligibleShopRooms.length > 0 && rng.next() < shopChance) {
-    const room = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
+  let shopRoom = null;
+  if (eligibleDeadEndRooms.length > 0 && rng.next() < shopChance) {
+    shopRoom = eligibleDeadEndRooms[rng.int(0, eligibleDeadEndRooms.length - 1)];
+  }
+  if (shopRoom) {
+    const room = shopRoom;
 
     // Shop rooms must not start with regular dungeon enemies, spawners, or traps.
     for (let i = spawns.length - 1; i >= 0; i--) {
@@ -617,6 +660,25 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         params: { depth: floorPlan.depth }
       });
     }
+  }
+
+  for (const room of eligibleDeadEndRooms) {
+    if (shopRoom && room.x === shopRoom.x && room.y === shopRoom.y && room.w === shopRoom.w && room.h === shopRoom.h) {
+      continue;
+    }
+    if (rng.next() >= DEAD_END_CONTENT_CHANCE) continue;
+
+    const theme = pickDeadEndTheme(rng);
+    applyDeadEndTheme({
+      room,
+      rng,
+      spawns,
+      floorPlan,
+      chunk,
+      isSolid,
+      markSolid,
+      theme,
+    });
   }
 
   // Tombstone spawning: retrieve tombstones for this depth
@@ -730,6 +792,147 @@ function isPointInRoom(x, y, room) {
   return x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
 }
 
+function isSameRoom(a, b) {
+  return !!a && !!b
+    && a.x === b.x
+    && a.y === b.y
+    && a.w === b.w
+    && a.h === b.h;
+}
+
+function removeRoomSpawns(spawns, room, predicate) {
+  for (let i = spawns.length - 1; i >= 0; i--) {
+    const spawn = spawns[i];
+    if (!isPointInRoom(spawn.x, spawn.y, room)) continue;
+    if (predicate(spawn)) spawns.splice(i, 1);
+  }
+}
+
+function pickRoomInteriorSpot(room, rng, isBlocked, reserved = new Set(), tries = 16) {
+  if (room.w <= 2 || room.h <= 2) return null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const x = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+    const y = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+    const key = `${x},${y}`;
+    if (reserved.has(key)) continue;
+    if (isBlocked(x, y)) continue;
+    reserved.add(key);
+    return { x, y };
+  }
+
+  const fallbackX = room.x + Math.floor(room.w / 2);
+  const fallbackY = room.y + Math.floor(room.h / 2);
+  const fallbackKey = `${fallbackX},${fallbackY}`;
+  if (!reserved.has(fallbackKey) && !isBlocked(fallbackX, fallbackY)) {
+    reserved.add(fallbackKey);
+    return { x: fallbackX, y: fallbackY };
+  }
+  return null;
+}
+
+function applyDeadEndTheme(ctx) {
+  const { room, rng, spawns, floorPlan, isSolid, markSolid, theme } = ctx;
+  const reserved = new Set();
+
+  switch (theme) {
+    case 'treasure': {
+      const chestPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (chestPos) {
+        markSolid(chestPos.x, chestPos.y);
+        spawns.push({
+          x: chestPos.x,
+          y: chestPos.y,
+          kind: 'chest',
+          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 8 ? 'chest:magic' : 'chest:basic' },
+        });
+      }
+      const goldPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (goldPos) {
+        spawns.push({
+          x: goldPos.x,
+          y: goldPos.y,
+          kind: 'gold',
+          params: { count: rng.int(12, 36) + floorPlan.depth * 3 },
+        });
+      }
+      break;
+    }
+    case 'trapped_treasure': {
+      const chestPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (chestPos) {
+        markSolid(chestPos.x, chestPos.y);
+        spawns.push({
+          x: chestPos.x,
+          y: chestPos.y,
+          kind: 'chest',
+          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 6 ? 'chest:magic' : 'chest:basic' },
+        });
+      }
+      const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (trapPos) {
+        spawns.push({
+          x: trapPos.x,
+          y: trapPos.y,
+          kind: 'trap',
+          params: pickTrap(rng, floorPlan.depth),
+        });
+      }
+      break;
+    }
+    case 'sanctuary': {
+      removeRoomSpawns(spawns, room, (spawn) => spawn.kind === 'monster' || spawn.kind === 'spawner' || spawn.kind === 'trap');
+      const featureRoll = rng.next();
+      const sanctuaryKind = featureRoll < 0.34 ? 'fountain' : (featureRoll < 0.67 ? 'shrine' : 'altar');
+      const featurePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (featurePos) {
+        markSolid(featurePos.x, featurePos.y);
+        spawns.push({ x: featurePos.x, y: featurePos.y, kind: sanctuaryKind, params: { depth: floorPlan.depth } });
+      }
+      const itemPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (itemPos) {
+        const item = pickItem(rng, floorPlan.depth);
+        spawns.push({ x: itemPos.x, y: itemPos.y, kind: item.kind, params: item });
+      }
+      break;
+    }
+    case 'lore_nook': {
+      const statuePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (statuePos) {
+        markSolid(statuePos.x, statuePos.y);
+        spawns.push({ x: statuePos.x, y: statuePos.y, kind: rng.next() < 0.5 ? 'statue' : 'urn', params: { depth: floorPlan.depth } });
+      }
+      const bookPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (bookPos) {
+        const book = pickDungeonBook(rng);
+        spawns.push({ x: bookPos.x, y: bookPos.y, kind: 'book', params: { bookId: book.id } });
+      }
+      break;
+    }
+    case 'lair': {
+      const chestPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (chestPos) {
+        markSolid(chestPos.x, chestPos.y);
+        spawns.push({
+          x: chestPos.x,
+          y: chestPos.y,
+          kind: 'chest',
+          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 8 ? 'chest:magic' : 'chest:basic' },
+        });
+      }
+      const monsterPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (monsterPos) {
+        spawns.push({
+          x: monsterPos.x,
+          y: monsterPos.y,
+          kind: 'monster',
+          params: pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null),
+        });
+      }
+      break;
+    }
+  }
+}
+
 /**
  * Equip a monster entity with items defined in its equipment spec.
  * @param {import('../../../lib/ecs-js/index.js').World} world
@@ -765,14 +968,18 @@ export function materializeSpawn(world, spawn) {
         identity: p.identity,
         maxHp: p.maxHp,
         faction: p.faction,
-        attackDerived: p.attackDerived,
-        defenseDerived: p.defenseDerived,
+        accuracyDerived: p.accuracyDerived,
+        damagePowerDerived: p.damagePowerDerived,
+        evadeDerived: p.evadeDerived,
         naturalDamageDice: p.naturalDamageDice,
         naturalScript: p.naturalScript,
         sizeClass: p.sizeClass,
         massKg: p.massKg,
         resistances: p.resistances,
         speed: p.speed,
+        learnedSpellIds: p.learnedSpellIds,
+        maxMana: p.maxMana,
+        manaRegen: p.manaRegen,
         creatureType: p.creatureType,
       });
       if (p.equipment) equipMonster(world, id, p.equipment);

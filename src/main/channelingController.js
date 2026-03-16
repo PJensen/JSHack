@@ -8,6 +8,7 @@
 
 import { WaitIntent } from "../rules/components/Intents/WaitIntent.js";
 import { Channeling } from "../rules/components/Channeling.js";
+import { Mana } from "../rules/components/Mana.js";
 import { getSpell } from "../rules/data/spells.js";
 import { setInputLock } from "../display/input/inputLock.js";
 
@@ -76,6 +77,8 @@ export function installChannelingController(world, getActorId) {
         stopLoop();
         return;
       }
+      const currentChannel = world.get(actorId, Channeling);
+      const modeBeforeTick = String(currentChannel?.mode || 'cast');
 
       // Add WaitIntent and tick the world
       try { world.add(actorId, WaitIntent, {}); } catch {}
@@ -85,24 +88,35 @@ export function installChannelingController(world, getActorId) {
       if (world.has(actorId, Channeling)) {
         scheduleNextTick();
       } else {
-        // Channeling completed — the CastSpellIntent was deferred during
-        // the tick (intents phase buffers structural mutations).  Run one
-        // more tick so castSpellSystem can pick it up and fire the spell.
-        try { world.add(actorId, WaitIntent, {}); } catch {}
-        try { world.tick(1); } catch {}
+        // Cast-time channel completion defers CastSpellIntent until the next tick.
+        if (modeBeforeTick === 'cast') {
+          try { world.add(actorId, WaitIntent, {}); } catch {}
+          try { world.tick(1); } catch {}
+        }
         stopLoop();
       }
     }, TICK_INTERVAL_MS);
   }
 
-  function startLoop(spellId) {
+  function startLoop(spellId, mode = "cast", manaPerTick = 0) {
     try { setInputLock('channeling', true); } catch {}
 
     // Dispatch UI start event so the HUD can show the channeling overlay
     const spell = getSpell(spellId || '');
     const spellName = spell?.name || spellId || 'Spell';
     const castTime = spell?.castTime || 0;
-    uiEvent('ui:channeling:start', { spellId, spellName, castTime });
+    const actorId = getActorId();
+    const ch = actorId ? world.get(actorId, Channeling) : null;
+    const mana = actorId ? world.get(actorId, Mana) : null;
+    uiEvent('ui:channeling:start', {
+      spellId,
+      spellName,
+      castTime,
+      mode,
+      manaPerTick: Number(ch?.manaPerTick ?? manaPerTick ?? 0),
+      manaRemaining: Number(mana?.mana ?? 0),
+      manaMax: Number(mana?.maxMana ?? 0),
+    });
 
     // Install ESC handler for cancellation
     _escHandler = (ev) => {
@@ -122,16 +136,16 @@ export function installChannelingController(world, getActorId) {
   }
 
   // Listen for channeling events on the player
-  world.on('channeling:start', ({ actor, spellId }) => {
+  world.on('channeling:start', ({ actor, spellId, mode, manaPerTick }) => {
     const actorId = getActorId();
     if (actor !== actorId) return; // Only auto-tick for the player
-    startLoop(spellId);
+    startLoop(spellId, mode, manaPerTick);
   });
 
-  world.on('channeling:tick', ({ actor, spellId, turnsRemaining, turnsTotal }) => {
+  world.on('channeling:tick', ({ actor, spellId, mode, turnsRemaining, turnsTotal, manaPerTick, manaRemaining, manaMax }) => {
     const actorId = getActorId();
     if (actor !== actorId) return;
-    uiEvent('ui:channeling:tick', { spellId, turnsRemaining, turnsTotal });
+    uiEvent('ui:channeling:tick', { spellId, mode, turnsRemaining, turnsTotal, manaPerTick, manaRemaining, manaMax });
   });
 
   world.on('channeling:complete', ({ actor }) => {

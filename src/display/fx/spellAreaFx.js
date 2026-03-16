@@ -55,6 +55,56 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
   /** @type {PhaseStrikeFx[]} */
   const _phaseStrikeFx = [];
 
+  // --- Smite state ---
+  /** @type {RadialFx[]} */
+  const _smiteFx = [];
+
+  const STORM_VOLLEY_SWAY_MAX_RAD = Math.PI / 36; // +/- 5deg
+  const STORM_LOCAL_SWAY_MAX_RAD = Math.PI / 60; // +/- 3deg
+
+  function spawnStormProjectile(to, style, lane = 0, sharedSway = 0) {
+    if (!to || !Number.isFinite(to.x) || !Number.isFinite(to.y)) return;
+    const localSway = (Math.random() - 0.5) * 2 * STORM_LOCAL_SWAY_MAX_RAD;
+    const totalSway = sharedSway + localSway;
+    const fallDistance = 4.2 + Math.random() * 1.4;
+    const driftX = Math.tan(totalSway) * fallDistance;
+    const from = {
+      x: Number(to.x) + driftX + (lane * 0.18) + ((Math.random() - 0.5) * 0.24),
+      y: Number(to.y) - fallDistance,
+    };
+    try {
+      world.emit?.('projectile:spawn', {
+        style,
+        from,
+        to: { x: Number(to.x), y: Number(to.y) },
+        speed: 8,
+      });
+    } catch (e) { console.debug('[spellAreaFx] emit projectile:spawn failed:', e); }
+  }
+
+  function spawnMeteorProjectile(to) {
+    if (!to || !Number.isFinite(to.x) || !Number.isFinite(to.y)) return;
+    const sway = (Math.random() - 0.5) * 2 * STORM_VOLLEY_SWAY_MAX_RAD;
+    const fallDistance = 5.2 + Math.random() * 1.2;
+    const driftX = Math.tan(sway) * fallDistance;
+    try {
+      world.emit?.('projectile:spawn', {
+        style: 'fireball',
+        from: {
+          x: Number(to.x) + driftX + ((Math.random() - 0.5) * 0.18),
+          y: Number(to.y) - fallDistance,
+        },
+        to: { x: Number(to.x), y: Number(to.y) },
+        speed: 7,
+      });
+    } catch (e) { console.debug('[spellAreaFx] emit meteor projectile:spawn failed:', e); }
+  }
+
+  function stormImpactRadius(radius) {
+    const base = Math.max(0.42, Number(radius || 1) * 0.48);
+    return Math.min(0.72, base);
+  }
+
   // --- Tick ---
   /** @param {number} dt */
   function tick(dt) {
@@ -77,6 +127,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
     for (let i = _phaseStrikeFx.length - 1; i >= 0; i--) {
       _phaseStrikeFx[i].tick(dt);
       if (_phaseStrikeFx[i].expired) _phaseStrikeFx.splice(i, 1);
+    }
+    for (let i = _smiteFx.length - 1; i >= 0; i--) {
+      _smiteFx[i].tick(dt);
+      if (_smiteFx[i].expired) _smiteFx.splice(i, 1);
     }
   }
 
@@ -361,6 +415,56 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
     ctx.restore();
   }
 
+  // --- Draw: Smite ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawSmite(ctx) {
+    if (!_smiteFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    for (const eff of _smiteFx) {
+      const t = eff.progress; // 0→1
+      const alpha = eff.alpha;
+      // Vertical beam (descends from above, narrows as it fades)
+      const beamH = 3.5;
+      const beamTopY = eff.y - beamH;
+      const beamW = Math.max(0.02, 0.28 * (1 - t * 0.7));
+      const beamA = 0.75 * alpha;
+      const grad = ctx.createLinearGradient(eff.x, beamTopY, eff.x, eff.y);
+      grad.addColorStop(0, `rgba(255,255,220,0)`);
+      grad.addColorStop(0.4, `rgba(255,230,140,${(beamA * 0.5).toFixed(3)})`);
+      grad.addColorStop(1, `rgba(255,220,80,${beamA.toFixed(3)})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(eff.x - beamW, beamTopY, beamW * 2, beamH);
+      // Outer beam glow (wider, softer)
+      const outerW = beamW * 3;
+      const outerGrad = ctx.createLinearGradient(eff.x, beamTopY, eff.x, eff.y);
+      outerGrad.addColorStop(0, `rgba(255,240,180,0)`);
+      outerGrad.addColorStop(0.5, `rgba(255,220,120,${(beamA * 0.15).toFixed(3)})`);
+      outerGrad.addColorStop(1, `rgba(255,200,60,${(beamA * 0.3).toFixed(3)})`);
+      ctx.fillStyle = outerGrad;
+      ctx.fillRect(eff.x - outerW, beamTopY, outerW * 2, beamH);
+      // Impact flash (bright white-gold at target)
+      if (t < 0.25) {
+        const flashT = t / 0.25;
+        const flashR = 0.15 + flashT * 0.65;
+        const flashA = 0.85 * (1 - flashT);
+        ctx.fillStyle = `rgba(255,255,230,${flashA.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(eff.x, eff.y, flashR, 0, TAU); ctx.fill();
+      }
+      // Expanding golden ring
+      const ringR = 0.1 + t * 1.2;
+      ctx.strokeStyle = `rgba(255,220,80,${(0.7 * alpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.04, 0.16 * (1 - t * 0.6));
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, 0, TAU); ctx.stroke();
+      // Inner golden glow disc
+      const glowR = 0.15 + t * 0.5;
+      ctx.fillStyle = `rgba(255,210,80,${(0.25 * alpha).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, glowR, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // --- Listeners ---
   function installListeners() {
     world.on('spell:blink', ({ from, to, randomized }) => {
@@ -411,8 +515,9 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       startShake(cam, randomized ? 4 : 3, randomized ? 0.14 : 0.12);
     });
 
-    world.on('spell:meteor', ({ actor, origin, radius }) => {
+    world.on('spell:meteor', ({ actor, from, origin, radius }) => {
       if (origin && Number.isFinite(origin.x)) {
+        spawnMeteorProjectile(origin);
         _meteorFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.45 }));
         startShake(cam, 7, 0.30);
         // Fire particle burst
@@ -435,6 +540,76 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
           }));
         }
       }
+    });
+
+    world.on('spell:blizzard', ({ impacts }) => {
+      if (!Array.isArray(impacts) || impacts.length <= 0) return;
+      const volleySway = (Math.random() - 0.5) * 2 * STORM_VOLLEY_SWAY_MAX_RAD;
+      for (let i = 0; i < impacts.length; i++) {
+        const impact = impacts[i];
+        if (!impact || !Number.isFinite(impact.x) || !Number.isFinite(impact.y)) continue;
+        spawnStormProjectile(impact, 'frostbolt', (i % 3) - 1, volleySway);
+        _blastwaveFx.push(new RadialFx({
+          x: Number(impact.x),
+          y: Number(impact.y),
+          radius: stormImpactRadius(impact.radius),
+          ttl: 0.14,
+        }));
+        for (let j = 0; j < 5; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 0.18 + Math.random() * 0.45;
+          fx.pool.spawn(new Particle({
+            x: Number(impact.x) + (Math.random() - 0.5) * 0.18,
+            y: Number(impact.y) + (Math.random() - 0.5) * 0.12,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - 0.05,
+            ay: 0.18,
+            life: 0.12 + Math.random() * 0.08,
+            size0: 0.04 + Math.random() * 0.025,
+            size1: 0.02,
+            r: 190,
+            g: 225 + ((Math.random() * 20) | 0),
+            b: 255,
+            a0: 0.82,
+          }));
+        }
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    world.on('spell:firestorm', ({ impacts }) => {
+      if (!Array.isArray(impacts) || impacts.length <= 0) return;
+      const volleySway = (Math.random() - 0.5) * 2 * STORM_VOLLEY_SWAY_MAX_RAD;
+      for (let i = 0; i < impacts.length; i++) {
+        const impact = impacts[i];
+        if (!impact || !Number.isFinite(impact.x) || !Number.isFinite(impact.y)) continue;
+        spawnStormProjectile(impact, 'fireball', (i % 3) - 1, volleySway);
+        _meteorFx.push(new RadialFx({
+          x: Number(impact.x),
+          y: Number(impact.y),
+          radius: stormImpactRadius(impact.radius),
+          ttl: 0.16,
+        }));
+        for (let j = 0; j < 6; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 0.2 + Math.random() * 0.6;
+          fx.pool.spawn(new Particle({
+            x: Number(impact.x) + (Math.random() - 0.5) * 0.16,
+            y: Number(impact.y) + (Math.random() - 0.5) * 0.10,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - 0.08,
+            ay: 0.22,
+            life: 0.12 + Math.random() * 0.10,
+            size0: 0.05 + Math.random() * 0.03,
+            size1: 0.02,
+            r: 255,
+            g: 110 + ((Math.random() * 80) | 0),
+            b: 40,
+            a0: 0.88,
+          }));
+        }
+      }
+      startShake(cam, 3, 0.1);
     });
 
     world.on('spell:blastwave', ({ actor, origin, knockbacks, radius }) => {
@@ -513,6 +688,54 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
         }));
       }
       startShake(cam, Number(amount || 0) > 0 ? 3 : 2, 0.12);
+    });
+
+    world.on('spell:smite', ({ actor, targetId, at, amount, missed, fizzle }) => {
+      if (fizzle) return;
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smiteFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.2, ttl: 0.42 }));
+      // Golden radial particle burst
+      const scale = PERF.quality === 'low' ? 0.65 : (PERF.quality === 'high' ? 1.25 : 1.0);
+      const burstCount = Math.max(10, Math.round(20 * scale));
+      for (let i = 0; i < burstCount; i++) {
+        const angle = (Math.PI * 2 * i / burstCount) + (Math.random() - 0.5) * 0.5;
+        const speed = 0.6 + Math.random() * 1.4;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.14,
+          y: at.y + (Math.random() - 0.5) * 0.14,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.3,
+          ay: 0.2,
+          life: 0.25 + Math.random() * 0.35,
+          size0: 0.12 + Math.random() * 0.08,
+          size1: 0.02,
+          r: 255,
+          g: 220 + ((Math.random() * 35) | 0),
+          b: 60 + ((Math.random() * 60) | 0),
+          a0: 0.92,
+          rotVel: (Math.random() - 0.5) * 2.0,
+        }));
+      }
+      // Rising motes (holy sparkles drifting upward)
+      const moteCount = Math.max(6, Math.round(12 * scale));
+      for (let i = 0; i < moteCount; i++) {
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.8,
+          y: at.y + (Math.random() - 0.5) * 0.5,
+          vx: (Math.random() - 0.5) * 0.2,
+          vy: -(0.15 + Math.random() * 0.35),
+          ay: -0.02,
+          life: 0.5 + Math.random() * 0.5,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 255,
+          g: 250,
+          b: 200,
+          a0: 0.6,
+          rotVel: (Math.random() - 0.5) * 1.5,
+        }));
+      }
+      startShake(cam, 4, 0.14);
     });
 
     world.on('spell:phase_strike', ({ from, to, hits, randomized }) => {
@@ -611,5 +834,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
     });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawPhaseStrike, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, installListeners };
 }

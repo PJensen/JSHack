@@ -5,9 +5,12 @@ import { Vitality } from '../src/rules/components/Vitality.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { Status } from '../src/rules/components/Status.js';
 import { Collider } from '../src/rules/components/Collider.js';
+import { DungeonState } from '../src/rules/components/DungeonState.js';
+import { HazardArea } from '../src/rules/components/HazardArea.js';
 import { runSpellScript } from '../src/rules/scripts/spells.js';
-import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
-import { clearAll as clearTileMap, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
+import { hazardSystem } from '../src/rules/systems/hazardSystem.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_TREE, TILE_GRASS } from '../src/rules/environment/dungeon/constants.js';
+import { clearAll as clearTileMap, getTile, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
 
 const SPELL = { id: 'meteor', name: 'Meteor', manaCost: 12, range: 12, script: 'meteor' };
 
@@ -24,6 +27,17 @@ function makeEntity(world, x, y, hp, faction) {
   world.add(id, Vitality, { maxHp: hp, hp });
   if (faction) world.add(id, Faction, { key: faction });
   return id;
+}
+
+function addOverworldState(world) {
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, {
+    worldSeed: 0xC0FFEE,
+    currentDepth: 0,
+    profileType: 'overworld',
+    floorEntityIds: [],
+  });
+  return dungeonId;
 }
 
 Deno.test("meteor: AoE damage at target — full damage within radius 1", () => {
@@ -84,6 +98,8 @@ Deno.test("meteor: spell:meteor event emitted", () => {
   runSpellScript(world, caster, SPELL, { x: 10, y: 10 });
 
   assert(events.length >= 1, 'spell:meteor emitted');
+  assertEquals(events[0]?.from?.x, 0);
+  assertEquals(events[0]?.from?.y, 0);
 });
 
 Deno.test("meteor: explicit target out of range fails", () => {
@@ -163,4 +179,40 @@ Deno.test("meteor: confused caster reroutes from caster LOS cone", () => {
   assertEquals(meteorEvents[0].randomized, true);
   assertEquals(meteorEvents[0].randomReason, 'confused');
   assert(hitNearCaster > 0 || hitMarked === 0, 'randomized cast should not reliably honor marked tile');
+});
+
+Deno.test("meteor: impact stamps floor fire hazards that burn overworld terrain", () => {
+  clearTileMap();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  for (let y = 8; y <= 12; y++) {
+    for (let x = 8; x <= 12; x++) {
+      tiles[y * CHUNK_SIZE + x] = TILE_TREE;
+    }
+  }
+  for (let x = 0; x <= 10; x++) tiles[10 * CHUNK_SIZE + x] = TILE_FLOOR;
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 41 });
+  addOverworldState(world);
+  const caster = makeEntity(world, 0, 10, 20, 'player');
+
+  runSpellScript(world, caster, SPELL, { x: 10, y: 10 });
+
+  let meteorFires = 0;
+  for (const [, , hazard] of world.query(Position, HazardArea)) {
+    if (String(hazard?.kind || '') !== 'fire') continue;
+    if (String(hazard?.cause || '') !== 'meteor_fire') continue;
+    meteorFires += 1;
+  }
+  assert(meteorFires > 0, 'meteor should spawn floor fire hazards across its blast area');
+
+  hazardSystem(world);
+
+  let burnedTrees = 0;
+  for (let y = 8; y <= 12; y++) {
+    for (let x = 8; x <= 12; x++) {
+      if (getTile(x, y) === TILE_GRASS) burnedTrees += 1;
+    }
+  }
+  assert(burnedTrees > 0, 'meteor fire hazards should burn flammable overworld tiles');
 });

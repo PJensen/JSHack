@@ -27,10 +27,10 @@ const S_GARNET   = "gem_socket:garnet:passive";
 
 // ── Register passive scripts ─────────────────────────────────────
 registerScript(S_RUBY,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.10) });
-registerScript(S_SAPPHIRE, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("defense", 1) });
+registerScript(S_SAPPHIRE, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("evade", 1) });
 registerScript(S_EMERALD,  { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("poisonResist", 0.10) });
-registerScript(S_DIAMOND,  { [ScriptVerb.AffixPassive]: (_w, ctx) => { ctx.addBonus("attack", 2); ctx.addBonus("defense", 2); } });
-registerScript(S_TOPAZ,    { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("attack", 1) });
+registerScript(S_DIAMOND,  { [ScriptVerb.AffixPassive]: (_w, ctx) => { ctx.addBonus("accuracy", 2); ctx.addBonus("damagePower", 2); ctx.addBonus("evade", 2); } });
+registerScript(S_TOPAZ,    { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("accuracy", 1) });
 registerScript(S_AMETHYST, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("manaRegen", 1) });
 registerScript(S_OPAL,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("luck", 1) });
 registerScript(S_OBSIDIAN, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("kineticDR", 2) });

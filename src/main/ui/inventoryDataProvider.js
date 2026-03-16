@@ -24,6 +24,7 @@ import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "
 import { getCalendarDate } from "../../rules/data/calendar.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
+import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { isApplyTool, listApplyTargetsForTool, resolveApplyPayloadForWorld } from "../../rules/content/items/applyPayloads.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
@@ -362,6 +363,15 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     let playerName = 'Hero';
     let calendar = null;
     const stats = {
+      strength: 0,
+      dexterity: 0,
+      intelligence: 0,
+      vitalityStat: 0,
+      accuracy: 0,
+      damagePower: 0,
+      evade: 0,
+      mitigation: 0,
+      spellPower: 0,
       hp: 0,
       maxHp: 0,
       mana: 0,
@@ -407,6 +417,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       const stamina = world.get(p.id, Stamina);
       const hunger = world.get(p.id, Hunger);
       const combat = resolveCombatSnapshot(world, p.id, { mode: "melee" });
+      const canonical = resolveCanonicalStats(world, p.id);
       equippedBySlot = buildEquippedBySlot(eq);
       equippedBySlot.brain = { item: null, blocked: false };
       playerName = String(world.get(p.id, NamedIdentity)?.name || 'Hero');
@@ -424,12 +435,21 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       stats.maxMana = Math.max(0, (Number(mana?.maxMana || 0) | 0) + maxManaBonus);
       stats.stamina = Math.max(0, Number(stamina?.stamina || 0) | 0);
       stats.maxStamina = Math.max(0, (Number(stamina?.maxStamina || 0) | 0) + maxStaminaBonus);
-      stats.attack = Math.max(0, Number(combat?.attackBonus ?? passive?.attackDerived ?? 0));
-      stats.defense = Math.max(0, Number(combat?.defenseDerived ?? passive?.defenseDerived ?? 0));
+      stats.strength = Number(canonical?.strength || 0);
+      stats.dexterity = Number(canonical?.dexterity || 0);
+      stats.intelligence = Number(canonical?.intelligence || 0);
+      stats.vitalityStat = Number(canonical?.vitality || 0);
+      stats.accuracy = Number(canonical?.accuracy || 0);
+      stats.damagePower = Number(canonical?.damagePower || 0);
+      stats.evade = Number(canonical?.evade || 0);
+      stats.mitigation = Number(canonical?.mitigation || 0);
+      stats.spellPower = Number(canonical?.spellPower || 0);
+      stats.attack = Math.max(0, Number(combat?.attackBonus ?? (1 + stats.accuracy)));
+      stats.defense = Math.max(0, Number(stats.evade));
       stats.armorClass = Math.max(0, Number(combat?.armorClass ?? (10 + stats.defense)));
-      stats.luck = Number(combat?.luck ?? passive?.luckDerived ?? 0);
-      stats.critChancePercent = (Number(combat?.critChance ?? passive?.critChanceDerived ?? 0) * 100) + stats.luck;
-      stats.critMult = Number(combat?.critMult ?? passive?.critMultDerived ?? 0);
+      stats.luck = Number(combat?.luck ?? canonical?.luck ?? 0);
+      stats.critChancePercent = (Number(combat?.critChance ?? canonical?.critChancePhysical ?? 0) * 100) + stats.luck;
+      stats.critMult = Number(combat?.critMult ?? canonical?.critMultPhysical ?? 0);
       stats.damageFlatBonus = Number(combat?.damageFlatBonus ?? 0);
       stats.manaRegen = Number(mana?.manaRegen ?? 0) + Number(passive?.manaRegenDerived ?? 0);
       stats.manaRegenDerived = Number(passive?.manaRegenDerived ?? 0);
@@ -438,15 +458,15 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       stats.maxHpDerived = Number(passive?.maxHpDerived ?? 0);
       const spd = world.get(p.id, Speed);
       stats.speed = Number(spd?.actEvery ?? 1);
-      stats.kineticDR = Number(passive?.kineticDRDerived ?? 0);
-      stats.fireResist = Number(passive?.fireResistDerived ?? 0);
-      stats.poisonResist = Number(passive?.poisonResistDerived ?? 0);
-      stats.acidResist = Number(passive?.acidResistDerived ?? 0);
-      stats.radiationResist = Number(passive?.radiationResistDerived ?? 0);
-      stats.electricResist = Number(passive?.electricOhmsDerived ?? 0);
-      stats.bluntResist = Number(passive?.bluntResistDerived ?? 0);
-      stats.slashResist = Number(passive?.slashResistDerived ?? 0);
-      stats.pierceResist = Number(passive?.pierceResistDerived ?? 0);
+      stats.kineticDR = Number(canonical?.kineticDR ?? 0);
+      stats.fireResist = Number(canonical?.fireResist ?? 0);
+      stats.poisonResist = Number(canonical?.poisonResist ?? 0);
+      stats.acidResist = Number(canonical?.acidResist ?? 0);
+      stats.radiationResist = Number(canonical?.radiationResist ?? 0);
+      stats.electricResist = Number(canonical?.electricOhms ?? 0);
+      stats.bluntResist = Number(canonical?.bluntResist ?? 0);
+      stats.slashResist = Number(canonical?.slashResist ?? 0);
+      stats.pierceResist = Number(canonical?.pierceResist ?? 0);
       stats.hunger = rawHunger;
       stats.hungerLevel = String(hungerLevel || "normal");
       stats.gold = sumPlayerGold(p.id);
@@ -608,14 +628,15 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       const stamina = world.get(p.id, Stamina);
       const hunger = world.get(p.id, Hunger);
       const combat = resolveCombatSnapshot(world, p.id, { mode: "melee" });
+      const canonical = resolveCanonicalStats(world, p.id);
       const rawHunger = Math.max(0, Number(hunger?.hunger || 0) | 0);
       stats.hp = `${Math.max(0, Number(vit?.hp || 0) | 0)}/${Math.max(0, Number(vit?.maxHp || 0) | 0)}`;
       stats.mana = `${Math.max(0, Number(mana?.mana || 0) | 0)}/${Math.max(0, Number(mana?.maxMana || 0) | 0)}`;
       stats.stamina = `${Math.max(0, Number(stamina?.stamina || 0) | 0)}/${Math.max(0, Number(stamina?.maxStamina || 0) | 0)}`;
-      stats.attack = Math.max(0, Number(combat?.attackBonus ?? passive?.attackDerived ?? 0));
-      stats.defense = Math.max(0, Number(combat?.defenseDerived ?? passive?.defenseDerived ?? 0));
+      stats.attack = Math.max(0, Number(combat?.attackBonus ?? (1 + Number(canonical?.accuracy || 0))));
+      stats.defense = Math.max(0, Number(canonical?.evade || 0));
       stats.armorClass = Math.max(0, Number(combat?.armorClass ?? (10 + stats.defense)));
-      stats.luck = Number(combat?.luck ?? passive?.luckDerived ?? 0);
+      stats.luck = Number(combat?.luck ?? canonical?.luck ?? 0);
       stats.gold = sumPlayerGold(p.id);
       stats.hungerLevel = (hunger?.satiation > 0) ? "satiated" : getHungerLevel(rawHunger);
       stats.turn = Math.max(0, Number(world.step || 0) | 0);

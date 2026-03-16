@@ -145,19 +145,15 @@ export function configureWorld(world) {
 
   // Phase: intents (intent consumers + steering)
   // Knockback resolves before standard movement so positions are committed first.
-  registerSystem(knockbackSystem, 'intents');
+  registerSystem(knockbackSystem, 'intents', { before: [movementSystem] });
   registerSystem(flyIntentSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
-  registerSystem(throwSystem, 'intents');
   registerSystem(applySystem, 'intents');
   registerSystem(equipItemSystem, 'intents');
   registerSystem(itemDropSystem, 'intents');
-  registerSystem(rangedAttackSystem, 'intents');
-  registerSystem(channelingSystem, 'intents');   // countdown before castSpellSystem fires
-  registerSystem(castSpellSystem, 'intents');
   registerSystem(engraveSystem, 'intents');
   // Shopkeeper system must run BEFORE movementSystem to block exits
   registerSystem(shopkeeperSystem, 'intents');
@@ -165,12 +161,21 @@ export function configureWorld(world) {
   registerSystem(tauntSteeringSystem, 'intents');
   // Refill dry fountains at cooldown before interaction tries to drink.
   registerSystem(fountainRegrowthSystem, 'intents');
-  registerSystem(movementSystem, 'intents');
+  // Resolve movement before targeted ranged actions so same-tick attacks use
+  // the destination a target actually reaches this turn.
+  registerSystem(movementSystem, 'intents', {
+    after: [knockbackSystem, shopkeeperSystem, tauntSteeringSystem, fountainRegrowthSystem],
+    before: [throwSystem, rangedAttackSystem, channelingSystem, castSpellSystem, interactionSystem, combatSystem],
+  });
+  registerSystem(throwSystem, 'intents', { after: [movementSystem] });
+  registerSystem(rangedAttackSystem, 'intents', { after: [movementSystem] });
+  registerSystem(channelingSystem, 'intents', { after: [movementSystem] });   // countdown before castSpellSystem fires
+  registerSystem(castSpellSystem, 'intents', { after: [movementSystem, channelingSystem] });
   // interactionSystem must run AFTER movementSystem: bump-to-interact adds
   // InteractIntent during movement; processing it in the same tick prevents
   // the shop overlay from re-firing on every subsequent action.
-  registerSystem(interactionSystem, 'intents');
-  registerSystem(combatSystem, 'intents');
+  registerSystem(interactionSystem, 'intents', { after: [movementSystem] });
+  registerSystem(combatSystem, 'intents', { after: [movementSystem] });
   // Run pickup after movement so stepping onto items can pick them up immediately
   registerSystem(itemPickupSystem, 'intents');
   // Disarm attempts resolve before traps trigger (so disarming prevents stepping-trigger)

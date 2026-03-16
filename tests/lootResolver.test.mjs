@@ -19,12 +19,12 @@ Deno.test("known spells are suppressed from spellbook drops", () => {
       totalBooks++;
     }
   }
-  // We should still get books (the unknown ones: blastwave, frost, blink)
+  // We should still get books from the remaining unknown pool.
   assert(totalBooks > 0, "should still drop unknown spellbooks");
 });
 
 Deno.test("all spells known suppresses entire spellbook sub-table", () => {
-  const knownSpells = new Set(["lightning", "meteor", "blastwave", "frost", "blink"]);
+  const knownSpells = new Set(["lightning", "meteor", "blastwave", "frost", "blizzard", "blink", "firestorm"]);
   const opts = { knownSpells };
 
   for (let seed = 1; seed <= 50; seed++) {

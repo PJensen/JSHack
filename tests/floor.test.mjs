@@ -3,6 +3,7 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { CHUNK_SIZE } from '../src/rules/environment/dungeon/constants.js';
 import { loadedChunkCount, clearAll, getTile, isWalkable } from '../src/rules/environment/dungeon/tileMap.js';
 import { initDungeon, generateFloor } from '../src/rules/environment/dungeon/index.js';
+import { generateFloorPlan } from '../src/rules/environment/dungeon/floorPlan.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
 
 Deno.test("initDungeon generates floor with tile data", () => {
@@ -68,14 +69,36 @@ Deno.test("generateFloor is deterministic", () => {
   assert(result1.spawnY === result2.spawnY, 'same spawn Y');
 });
 
-Deno.test("floor generates multiple chunks within extent", () => {
+Deno.test("floor loads exactly the chunks described by the floor extent", () => {
   clearAll();
   const world = new World({ seed: 42 });
+  const plan = generateFloorPlan(world.seed >>> 0, 1);
   initDungeon(world);
 
-  // With stairs at chunk coords 1-3 from origin + padding,
-  // we should have significantly more than 1 chunk loaded
-  assert(loadedChunkCount() > 1, `expected multiple chunks, got ${loadedChunkCount()}`);
+  const expectedChunks = (plan.extent.maxCX - plan.extent.minCX + 1)
+    * (plan.extent.maxCY - plan.extent.minCY + 1);
+  assert(loadedChunkCount() === expectedChunks, `expected ${expectedChunks} loaded chunks, got ${loadedChunkCount()}`);
+});
+
+Deno.test("floor boundary does not expose walkable tiles into unloaded void", () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  const plan = generateFloorPlan(world.seed >>> 0, 1);
+  generateFloor(world, 42, 1);
+
+  const minX = plan.extent.minCX * CHUNK_SIZE;
+  const maxX = (plan.extent.maxCX + 1) * CHUNK_SIZE - 1;
+  const minY = plan.extent.minCY * CHUNK_SIZE;
+  const maxY = (plan.extent.maxCY + 1) * CHUNK_SIZE - 1;
+
+  for (let x = minX; x <= maxX; x++) {
+    assert(!isWalkable(x, minY), `top boundary tile (${x},${minY}) should not be walkable`);
+    assert(!isWalkable(x, maxY), `bottom boundary tile (${x},${maxY}) should not be walkable`);
+  }
+  for (let y = minY; y <= maxY; y++) {
+    assert(!isWalkable(minX, y), `left boundary tile (${minX},${y}) should not be walkable`);
+    assert(!isWalkable(maxX, y), `right boundary tile (${maxX},${y}) should not be walkable`);
+  }
 });
 
 Deno.test("generateFloor emits monotonic chunk progress callbacks", () => {

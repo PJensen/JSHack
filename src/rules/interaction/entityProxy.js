@@ -32,8 +32,9 @@ const PROP_MAP = {
   maxHp:    [Vitality, "maxHp"],
 
   // Equipment (derived stats)
-  attackDerived:    [Equipment, "attackDerived"],
-  defenseDerived:   [Equipment, "defenseDerived"],
+  accuracyDerived:  [Equipment, "accuracyDerived"],
+  damagePowerDerived: [Equipment, "damagePowerDerived"],
+  evadeDerived:     [Equipment, "evadeDerived"],
   maxHpDerived:     [Equipment, "maxHpDerived"],
   critChanceDerived:[Equipment, "critChanceDerived"],
   critMultDerived:  [Equipment, "critMultDerived"],

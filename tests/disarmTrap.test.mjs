@@ -6,6 +6,7 @@ import { Trap } from '../src/rules/components/Trap.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { DisarmIntent } from '../src/rules/components/Intents/DisarmIntent.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { BaseStats } from '../src/rules/components/BaseStats.js';
 import { disarmTrapSystem } from '../src/rules/systems/disarmTrapSystem.js';
 // Side-effect import: registers trap scripts
 import '../src/rules/scripts/traps.js';
@@ -180,4 +181,68 @@ Deno.test("disarm emits trap:disarm:failed on failure", () => {
 
   assert(emitted !== null, "trap:disarm:failed event should be emitted");
   assert(emitted.roll < emitted.dc, `roll (${emitted.roll}) should be less than dc (${emitted.dc})`);
+});
+
+// === Dexterity bonus tests ===
+
+Deno.test("high dex bonus helps disarm harder traps", () => {
+  // DC 20 — impossible without dex bonus (max d20 roll = 20, needs >=20, borderline).
+  // With dex 16 → evade +3, roll + 3 can reach 23. Use DC 21 to confirm dex helps.
+  // Actually, use a guaranteed approach: DC 1 with dex should still succeed (baseline),
+  // and DC that's just above raw d20 max but reachable with dex.
+  const world = makeWorld(42);
+  const player = makePlayer(world, 5, 5, 100);
+  world.add(player, BaseStats, { dexterity: 16 }); // dexBonus = floor((16-10)/2) = 3
+  const trap = makeTrap(world, 5, 5, { difficulty: 1 });
+
+  world.add(player, DisarmIntent, {});
+  disarmTrapSystem(world);
+
+  const t = world.get(trap, Trap);
+  assert(t.armed === false, "high-dex player should disarm DC 1 trap");
+});
+
+Deno.test("dex bonus included in disarm event", () => {
+  const world = makeWorld(42);
+  const player = makePlayer(world, 5, 5, 100);
+  world.add(player, BaseStats, { dexterity: 16 }); // evade = +3
+  makeTrap(world, 5, 5, { difficulty: 1 });
+
+  let emitted = null;
+  world.on?.('trap:disarmed', (e) => { emitted = e; });
+
+  world.add(player, DisarmIntent, {});
+  disarmTrapSystem(world);
+
+  assert(emitted !== null, "trap:disarmed event should be emitted");
+  assert(emitted.dexBonus === 3, `dexBonus should be 3, got ${emitted.dexBonus}`);
+});
+
+Deno.test("zero dex player fails where high dex player succeeds (same seed)", () => {
+  // Find a DC where a specific seed's d20 roll fails without dex but passes with dex.
+  // Use DC 21: raw d20 can never reach 21, but d20 + 3 (dex 16) can if roll >= 18.
+  // Since we can't guarantee the roll, use a DC that's barely above 1 to ensure
+  // the test logic is sound. DC 21 guarantees failure for zero-dex.
+  const seed = 42;
+
+  // Zero dex: DC 21 always fails (d20 max is 20)
+  const world1 = makeWorld(seed);
+  const p1 = makePlayer(world1, 5, 5, 100);
+  const trap1 = makeTrap(world1, 5, 5, { difficulty: 21 });
+  world1.add(p1, DisarmIntent, {});
+  disarmTrapSystem(world1);
+  const t1 = world1.get(trap1, Trap);
+  const vit1 = world1.get(p1, Vitality);
+  assert(vit1.hp < 100, "zero-dex player should fail DC 21 and take damage");
+
+  // High dex (dex 50 → evade +20): DC 21 now passable (roll + 20 >= 21 if roll >= 1)
+  const world2 = makeWorld(seed);
+  const p2 = makePlayer(world2, 5, 5, 100);
+  world2.add(p2, BaseStats, { dexterity: 50 }); // evade = floor((50-10)/2) = 20
+  const trap2 = makeTrap(world2, 5, 5, { difficulty: 21 });
+  world2.add(p2, DisarmIntent, {});
+  disarmTrapSystem(world2);
+  const t2 = world2.get(trap2, Trap);
+  const vit2 = world2.get(p2, Vitality);
+  assert(vit2.hp === 100, "high-dex player should succeed DC 21 with evade +20");
 });

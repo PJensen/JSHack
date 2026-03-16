@@ -83,7 +83,7 @@ function setup(opts = {}) {
   const archer = world.create();
   world.add(archer, Position, { x: opts.ax ?? 0, y: opts.ay ?? 0 });
   world.add(archer, Vitality, { maxHp: 20, hp: 20 });
-  world.add(archer, Equipment, { ranged: bowId, attackDerived: 1 });
+  world.add(archer, Equipment, { ranged: bowId, accuracyDerived: 1, damagePowerDerived: 1 });
   world.add(archer, Inventory, { capacity: 20 });
   addToInventory(world, archer, bowId);
   addToInventory(world, archer, ammoId);
@@ -92,7 +92,7 @@ function setup(opts = {}) {
   const target = world.create();
   world.add(target, Position, { x: opts.tx ?? 5, y: opts.ty ?? 0 });
   world.add(target, Vitality, { maxHp: opts.targetHp ?? 10, hp: opts.targetHp ?? 10 });
-  world.add(target, Equipment, { defenseDerived: 0 });
+  world.add(target, Equipment, { evadeDerived: 0 });
   world.add(target, Faction, { key: opts.targetFaction || 'enemy' });
 
   return { world, archer, target, bowId, ammoId };
@@ -124,7 +124,7 @@ Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
   const events = [];
   const { world, archer, target } = setup();
   const swordId = makeSword(world);
-  world.set(archer, Equipment, { ranged: swordId, attackDerived: 1 });
+  world.set(archer, Equipment, { ranged: swordId, accuracyDerived: 1, damagePowerDerived: 1 });
   trackEvents(world, events);
   world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
   rangedAttackSystem(world);
@@ -252,7 +252,7 @@ Deno.test("ranged: mirror bow ricochets in live combat when target is wall-adjac
   const archer = world.create();
   world.add(archer, Position, { x: 2, y: 4 });
   world.add(archer, Vitality, { maxHp: 20, hp: 20 });
-  world.add(archer, Equipment, { ranged: bowId, ammo: ammoId, attackDerived: 1 });
+  world.add(archer, Equipment, { ranged: bowId, ammo: ammoId, accuracyDerived: 1, damagePowerDerived: 1 });
   world.add(archer, Inventory, { capacity: 20 });
   world.add(archer, Faction, { key: "player" });
   addToInventory(world, archer, bowId);
@@ -261,7 +261,7 @@ Deno.test("ranged: mirror bow ricochets in live combat when target is wall-adjac
   const target = world.create();
   world.add(target, Position, { x: 4, y: 4 });
   world.add(target, Vitality, { maxHp: 20, hp: 20 });
-  world.add(target, Equipment, { defenseDerived: 0 });
+  world.add(target, Equipment, { evadeDerived: 0 });
   world.add(target, Faction, { key: "enemy" });
 
   const bystanderA = world.create();
@@ -308,7 +308,7 @@ Deno.test("combat: mirror bow proc does not fire on melee hits", () => {
   const foe = world.create();
   world.add(foe, Position, { x: 1, y: 2 });
   world.add(foe, Vitality, { maxHp: 20, hp: 20 });
-  world.add(foe, Equipment, { defenseDerived: 0 });
+  world.add(foe, Equipment, { evadeDerived: 0 });
   world.add(foe, Faction, { key: "enemy" });
 
   const spectator = world.create();

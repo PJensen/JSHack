@@ -253,3 +253,37 @@ Deno.test("messageWiring only logs flying messages for visible creatures", () =>
   assert(visibleLog.entries[0].text.includes("takes to the air"));
   assert(visibleLog.entries[1].text.includes("lands"));
 });
+
+Deno.test("messageWiring scopes spell:not-known text by actor", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  const warlockId = world.create();
+  world.add(warlockId, NamedIdentity, { name: "Warlock", identity: "skeletal_agony_warlock" });
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("spell:not-known", { actor: playerId, spellId: "agony" });
+  world.emit("spell:not-known", { actor: warlockId, spellId: "agony" });
+
+  const texts = messageLog.entries.map((e) => e.text);
+  assert(texts.some((m) => /You don't know that spell/.test(m)), "player should get player-facing not-known text");
+  assert(texts.some((m) => /tries to cast an unknown spell/.test(m)), "enemy should get enemy-facing not-known text");
+});
+
+Deno.test("messageWiring scopes spell:oom text by actor", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  const warlockId = world.create();
+  world.add(warlockId, NamedIdentity, { name: "Warlock", identity: "skeletal_agony_warlock" });
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("spell:oom", { actor: playerId, spellId: "agony", need: 8, have: 0 });
+  world.emit("spell:oom", { actor: warlockId, spellId: "agony", need: 8, have: 0 });
+
+  const texts = messageLog.entries.map((e) => e.text);
+  assert(texts.some((m) => /Not enough mana to cast/.test(m)), "player should get player-facing oom text");
+  assert(texts.some((m) => /lacks mana/.test(m)), "enemy should get enemy-facing oom text");
+});

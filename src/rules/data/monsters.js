@@ -16,7 +16,7 @@ import {
   phaseOutOnDamaged,
   mindflayerBlastOnHit,
 } from "./callbacks/combat.js";
-import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS } from "./callbacks/ai.js";
+import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath } from "./callbacks/death.js";
 
 export const MONSTERS = [
@@ -160,12 +160,12 @@ export const MONSTERS = [
     id: 'snake',
     name: 'Snake',
     tags: ['beast', 'venomous'],
-    tier: 1,
+    tier: 0,
     intelligence: 2,   // basic animal instinct
     aggro: 'passive',  // defensive — strikes only when approached
-    baseHp: 7,
-    hpPerLevel: 1.2,
-    attack: 1,
+    baseHp: 6,
+    hpPerLevel: 1,
+    attack: 0,
     defense: 0,
     damageDice: '1d3',
     sizeClass: 'XS',
@@ -291,6 +291,44 @@ export const MONSTERS = [
   },
 
   {
+    id: 'skeletal_shadow_caster',
+    name: 'Skeletal Shadow Caster',
+    tags: ['undead', 'skeletal', 'caster'],
+    tier: 1,
+    intelligence: 9,
+    visionRange: 9,
+    packSense: true, packRadius: 8,
+    baseHp: 9,
+    hpPerLevel: 1.4,
+    attack: 1,
+    defense: 1,
+    damageDice: '1d4',
+    sizeClass: 'M',
+    massKg: 24,
+    resistances: {
+      kinetic: { DR: 3, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+    },
+    speed: 2,
+    learnedSpellIds: ['shadow_bolt'],
+    maxMana: 36,
+    manaRegen: 0.14,
+    hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'shadow_bolt',
+          minRange: 2,
+          maxRange: 10,
+          cooldownTurns: 9,
+          chance: 0.6,
+        }),
+      ],
+    },
+    specials: ['Casts Shadow Bolt'],
+    description: 'A rune-etched skeleton that hurls bolts of abyssal shade from behind the line.',
+  },
+
+  {
     id: 'floating_eye',
     name: 'Floating Eye',
     tags: ['aberration', 'psychic'],
@@ -315,6 +353,42 @@ export const MONSTERS = [
       onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
     },
     description: 'A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.',
+  },
+
+  {
+    id: 'kobold_shaman',
+    name: 'Kobold Shaman',
+    tags: ['humanoid', 'kobold', 'caster'],
+    tier: 0,
+    intelligence: 8,   // smart caster — retreats when pressured
+    visionRange: 9,
+    retreatHpPct: 0.30,
+    baseHp: 6,
+    hpPerLevel: 1,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d3',
+    sizeClass: 'S',
+    massKg: 25,
+    resistances: { kinetic: { DR: 1 } },
+    speed: 2,
+    learnedSpellIds: ['lightning'],
+    maxMana: 21,
+    manaRegen: 0.14,
+    hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'lightning',
+          minRange: 2,
+          maxRange: 10,
+          cooldownTurns: 8,
+          chance: 0.65,
+        }),
+      ],
+      onHit: [statusEffectOnHit(25, 0xdead0300, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
+    },
+    specials: ['Casts Lightning', 'Shock 25%'],
+    description: 'A scrawny kobold draped in fraying cloth, crackling with stolen thunder.',
   },
 
   // ── Tier 1 (floors 6-10) ───────────────────────────────────────────
@@ -343,6 +417,59 @@ export const MONSTERS = [
     specials: ["Bleed 20%"],
     description: 'A skeletal bowman with practiced aim. Its arrows leave jagged wounds.',
     equipment: { ranged: 'bow_short', ammo: 'arrows' },
+  },
+  {
+    id: 'skeletal_agony_warlock',
+    name: 'Skeletal Agony Warlock',
+    tags: ['undead', 'skeletal', 'caster', 'warlock'],
+    tier: 2,
+    intelligence: 10,
+    visionRange: 9,
+    retreatHpPct: 0.25,
+    baseHp: 13,
+    hpPerLevel: 1.8,
+    attack: 2,
+    defense: 2,
+    damageDice: '1d6',
+    sizeClass: 'M',
+    massKg: 26,
+    resistances: {
+      kinetic: { DR: 4, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
+      chemical: { toxMult: 0 },
+      electric: { ohms: 60 },
+    },
+    speed: 2,
+    learnedSpellIds: ['agony', 'summon_skeleton', 'shadow_bolt'],
+    maxMana: 58,
+    manaRegen: 0.22,
+    hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'summon_skeleton',
+          targeting: 'self',
+          cooldownTurns: 18,
+          chance: 0.35,
+          maxAlliesInRadius: 4,
+          allyRadius: 7,
+        }),
+        castSpellOnLOS({
+          spellId: 'agony',
+          minRange: 1,
+          maxRange: 8,
+          cooldownTurns: 8,
+          chance: 1,
+        }),
+        castSpellOnLOS({
+          spellId: 'shadow_bolt',
+          minRange: 1,
+          maxRange: 10,
+          cooldownTurns: 10,
+          chance: 0.45,
+        }),
+      ],
+    },
+    specials: ['Casts Agony', 'Summons Skeletons', 'Casts Shadow Bolt'],
+    description: 'A black-boned warlock that curses from range and drags fresh skeletons into the fight.',
   },
   {
     id: 'orc',
@@ -395,13 +522,13 @@ export const MONSTERS = [
     id: 'spider',
     name: 'Spider',
     tags: ['beast', 'venomous'],
-    tier: 1,
+    tier: 0,
     intelligence: 3,   // cunning predator
     packSense: true, packRadius: 6,
-    baseHp: 10,
-    hpPerLevel: 1.5,
-    attack: 2,
-    defense: 1,
+    baseHp: 8,
+    hpPerLevel: 1.2,
+    attack: 1,
+    defense: 0,
     damageDice: '1d4',
     sizeClass: 'S',
     massKg: 15,
@@ -792,4 +919,4 @@ export function getMonsterTags(monsterId) {
   return Array.isArray(def?.tags) ? def.tags : [];
 }
 
-/** @typedef {{ id:string, name:string, tags?:string[], tier:number, intelligence?:number, visionRange?:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null }} MonsterDef */
+/** @typedef {{ id:string, name:string, tags?:string[], tier:number, intelligence?:number, visionRange?:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null, learnedSpellIds?:string[], maxMana?:number, manaRegen?:number }} MonsterDef */

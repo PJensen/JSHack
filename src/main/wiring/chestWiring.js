@@ -87,19 +87,6 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
 
     log(`You take ${bracketizeName(itemName)} from the chest.`);
 
-    // Notify quick-action chip stack for non-currency items
-    const pickupInfo = world.get(itemId, ItemInfo);
-    if (pickupInfo && pickupInfo.type !== 'currency') {
-      const detail = buildItemDisplayData(world, itemId);
-      if (detail) {
-        try {
-          window.dispatchEvent(new CustomEvent('ui:recentPickup', {
-            detail: { item: { id: detail.id, identity: detail.identity, type: detail.type, slot: detail.slot, name: detail.name, count: detail.count } }
-          }));
-        } catch (err) { console.debug('[chestWiring] dispatch ui:recentPickup:', err); }
-      }
-    }
-
     dispatchChestData(chestId);
     refreshInventoryUi();
   });

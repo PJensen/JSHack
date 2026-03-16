@@ -13,8 +13,21 @@ import { Consumable } from "../src/rules/components/Consumable.js";
 import { FoodDecay } from "../src/rules/components/FoodDecay.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Faction } from "../src/rules/components/Faction.js";
+import {
+  clearAll,
+  loadChunk,
+  setTile,
+} from "../src/rules/environment/dungeon/tileMap.js";
+import {
+  CHUNK_SIZE,
+  TILE_FLOOR,
+  TILE_LAVA,
+} from "../src/rules/environment/dungeon/constants.js";
 
-function addCorpse(world, { x, y, name, identity, nutrition = 300, turnsHeld = 0, shelfLife = 150 }) {
+function addCorpse(
+  world,
+  { x, y, name, identity, nutrition = 300, turnsHeld = 0, shelfLife = 150 },
+) {
   const corpseId = world.create();
   world.add(corpseId, Position, { x, y });
   world.add(corpseId, NamedIdentity, { name, identity });
@@ -34,6 +47,12 @@ function addCorpse(world, { x, y, name, identity, nutrition = 300, turnsHeld = 0
   return corpseId;
 }
 
+function loadFloorChunk() {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+}
+
 Deno.test("pet behavior ignores dead pet corpses", () => {
   const world = new World({ seed: 42 });
 
@@ -48,8 +67,14 @@ Deno.test("pet behavior ignores dead pet corpses", () => {
 
   petBehaviorSystem(world);
 
-  assert(!world.has(corpseId, MoveIntent), "dead pet corpse should not receive MoveIntent");
-  assert(!world.has(corpseId, PetState), "dead pet corpse should not enter pet AI states");
+  assert(
+    !world.has(corpseId, MoveIntent),
+    "dead pet corpse should not receive MoveIntent",
+  );
+  assert(
+    !world.has(corpseId, PetState),
+    "dead pet corpse should not enter pet AI states",
+  );
   const pos = world.get(corpseId, Position);
   assert(pos && pos.x === 0 && pos.y === 0, "dead pet corpse should not move");
 });
@@ -82,12 +107,24 @@ Deno.test("kitty munches basic corpse underfoot, heals, and leaves a half-eaten 
 
   assert(world.isAlive(corpseId), "corpse should remain after first munch");
   assert(world.get(kittyId, Vitality).hp > 5, "kitty should heal");
-  assert(world.get(corpseId, Consumable).effectParams.nutrition === 150, "nutrition should be reduced after partial munch");
-  assert(world.get(corpseId, NamedIdentity).name.startsWith("Half-eaten "), "corpse should be marked as half-eaten");
-  assert(!world.has(kittyId, MoveIntent), "munching should consume pet action for this tick");
+  assert(
+    world.get(corpseId, Consumable).effectParams.nutrition === 150,
+    "nutrition should be reduced after partial munch",
+  );
+  assert(
+    world.get(corpseId, NamedIdentity).name.startsWith("Half-eaten "),
+    "corpse should be marked as half-eaten",
+  );
+  assert(
+    !world.has(kittyId, MoveIntent),
+    "munching should consume pet action for this tick",
+  );
 
   assert(munchEvents.length === 1, "expected one pet:corpse-munch event");
-  assert(munchEvents[0].partial === true, "event should report partial corpse consumption");
+  assert(
+    munchEvents[0].partial === true,
+    "event should report partial corpse consumption",
+  );
   assert(munchEvents[0].heal > 0, "event should include healing amount");
 });
 
@@ -115,8 +152,14 @@ Deno.test("kitty can munch special-effect corpses", () => {
   petBehaviorSystem(world);
 
   assert(world.isAlive(corpseId), "corpse should remain after first munch");
-  assert(world.get(kittyId, Vitality).hp > 5, "kitty should heal from special corpse munch");
-  assert(world.get(corpseId, Consumable).effectParams.nutrition === 75, "nutrition should be reduced after munch");
+  assert(
+    world.get(kittyId, Vitality).hp > 5,
+    "kitty should heal from special corpse munch",
+  );
+  assert(
+    world.get(corpseId, Consumable).effectParams.nutrition === 75,
+    "nutrition should be reduced after munch",
+  );
 });
 
 Deno.test("familiar fire bolt damage carries projectile delay", () => {
@@ -130,7 +173,10 @@ Deno.test("familiar fire bolt damage carries projectile delay", () => {
   world.add(familiarId, Pet);
   world.add(familiarId, Position, { x: 2, y: 2 });
   world.add(familiarId, Vitality, { hp: 8, maxHp: 8 });
-  world.add(familiarId, NamedIdentity, { name: "Familiar", identity: "familiar" });
+  world.add(familiarId, NamedIdentity, {
+    name: "Familiar",
+    identity: "familiar",
+  });
   world.add(familiarId, Faction, { key: "pet" });
 
   const targetId = world.create();
@@ -144,7 +190,10 @@ Deno.test("familiar fire bolt damage carries projectile delay", () => {
   petBehaviorSystem(world);
 
   assert(damaged.length >= 1, "familiar should fire at visible enemy");
-  assert((damaged[0]?.projectileDelay || 0) > 0, "familiar fire bolt should carry projectileDelay");
+  assert(
+    (damaged[0]?.projectileDelay || 0) > 0,
+    "familiar fire bolt should carry projectileDelay",
+  );
 });
 
 Deno.test("pet only munches corpses below 75% HP", () => {
@@ -170,8 +219,48 @@ Deno.test("pet only munches corpses below 75% HP", () => {
 
   petBehaviorSystem(world);
 
-  assert(world.get(kittyId, Vitality).hp === 8, "healthy kitty should not munch");
-  assert(world.get(corpseId, Consumable).effectParams.nutrition === 300, "corpse should remain untouched above threshold");
+  assert(
+    world.get(kittyId, Vitality).hp === 8,
+    "healthy kitty should not munch",
+  );
+  assert(
+    world.get(corpseId, Consumable).effectParams.nutrition === 300,
+    "corpse should remain untouched above threshold",
+  );
+});
+
+Deno.test("kitty strongly avoids stepping into lava when a safe lane exists", () => {
+  loadFloorChunk();
+  try {
+    setTile(2, 1, TILE_LAVA);
+
+    const world = new World({ seed: 42 });
+
+    const playerId = world.create();
+    world.add(playerId, Player, {});
+    world.add(playerId, Position, { x: 2, y: 3 });
+
+    const kittyId = world.create();
+    world.add(kittyId, Pet);
+    world.add(kittyId, Position, { x: 1, y: 1 });
+    world.add(kittyId, Vitality, { hp: 10, maxHp: 10 });
+    world.add(kittyId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+
+    petBehaviorSystem(world);
+
+    const intent = world.get(kittyId, MoveIntent);
+    assert(intent, "kitty should still decide to move");
+    assert(
+      !(intent.dx === 1 && intent.dy === 0),
+      "kitty should avoid the lava tile directly east",
+    );
+    assert(
+      intent.dx === 0 && intent.dy === 1,
+      "kitty should take the safe south lane instead",
+    );
+  } finally {
+    clearAll();
+  }
 });
 
 Deno.test("feline has strong toxic resistance when munching decayed corpses", () => {
@@ -217,11 +306,18 @@ Deno.test("feline has strong toxic resistance when munching decayed corpses", ()
 
   const kittyEffects = world.get(kittyId, ActiveEffects)?.effects || [];
   const wolfEffects = world.get(wolfId, ActiveEffects)?.effects || [];
-  const kittyDiseased = kittyEffects.some((e) => String(e?.key || "") === "disease");
-  const wolfDiseased = wolfEffects.some((e) => String(e?.key || "") === "disease");
+  const kittyDiseased = kittyEffects.some((e) =>
+    String(e?.key || "") === "disease"
+  );
+  const wolfDiseased = wolfEffects.some((e) =>
+    String(e?.key || "") === "disease"
+  );
 
   assert(kittyDiseased === false, "kitty should resist most decay toxin procs");
-  assert(wolfDiseased === true, "non-feline pet should still suffer decay toxin");
+  assert(
+    wolfDiseased === true,
+    "non-feline pet should still suffer decay toxin",
+  );
 });
 
 Deno.test("pet flees at 50% threshold and seeks safe corpse to heal", () => {
@@ -251,7 +347,10 @@ Deno.test("pet flees at 50% threshold and seeks safe corpse to heal", () => {
   const state = world.get(kittyId, PetState);
   assert(state?.state === "fleeing", "pet should enter fleeing below 50% hp");
   const move = world.get(kittyId, MoveIntent);
-  assert(move?.dx === 1 && move?.dy === 0, "fleeing pet should step toward safe corpse");
+  assert(
+    move?.dx === 1 && move?.dy === 0,
+    "fleeing pet should step toward safe corpse",
+  );
 });
 
 Deno.test("fleeing pet ignores unsafe corpse and retreats toward player", () => {
@@ -287,5 +386,8 @@ Deno.test("fleeing pet ignores unsafe corpse and retreats toward player", () => 
   const state = world.get(kittyId, PetState);
   assert(state?.state === "fleeing", "pet should still be in fleeing state");
   const move = world.get(kittyId, MoveIntent);
-  assert(move?.dx === 0 && move?.dy === 1, "unsafe corpse should be ignored; pet should retreat toward player");
+  assert(
+    move?.dx === 0 && move?.dy === 1,
+    "unsafe corpse should be ignored; pet should retreat toward player",
+  );
 });

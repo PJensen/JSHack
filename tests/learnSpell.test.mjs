@@ -21,6 +21,13 @@ function makeLightningBook(world) {
   return id;
 }
 
+function makeSpellBook(world, spellId, spellName) {
+  const id = world.create();
+  world.add(id, NamedIdentity, { name: `Spellbook of ${spellName}`, identity: `book_${spellId}` });
+  world.add(id, ItemInfo, { type: 'learn', slot: 'brain', weight: 1, value: 0, description: `Teaches ${spellName}`, count: 1 });
+  return id;
+}
+
 Deno.test("using a spellbook teaches the spell and consumes the book", () => {
   const world = new World({ seed: 1 });
   world.setScheduler((w) => scheduler(w));
@@ -41,4 +48,29 @@ Deno.test("using a spellbook teaches the spell and consumes the book", () => {
   assert(Array.isArray(brain2.learnedSpellIds) && brain2.learnedSpellIds.includes('lightning'), 'learned lightning');
   assert(!inventoryContains(world, player, book), 'book consumed');
   assert(!world.isAlive(book), 'book entity destroyed');
+});
+
+Deno.test("storm spellbooks teach blizzard and firestorm", () => {
+  const world = new World({ seed: 2 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Storm Mage' });
+  const books = [
+    makeSpellBook(world, 'blizzard', 'Blizzard'),
+    makeSpellBook(world, 'firestorm', 'Firestorm'),
+  ];
+
+  for (const book of books) {
+    addToInventory(world, player, book);
+    world.add(player, UseIntent, { itemId: book });
+    world.tick(1);
+  }
+
+  const brain = world.get(player, Brain);
+  assert(Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes('blizzard'), 'learned blizzard');
+  assert(Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes('firestorm'), 'learned firestorm');
+  for (const book of books) {
+    assert(!inventoryContains(world, player, book), `book ${book} consumed`);
+    assert(!world.isAlive(book), `book ${book} destroyed`);
+  }
 });

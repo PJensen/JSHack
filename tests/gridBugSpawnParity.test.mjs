@@ -4,12 +4,14 @@ import { configureWorld } from "../src/main/scheduler.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { AggroState } from "../src/rules/components/AggroState.js";
 import { Anatomy } from "../src/rules/components/Anatomy.js";
+import { Brain } from "../src/rules/components/Brain.js";
 import { Collider } from "../src/rules/components/Collider.js";
 import { CreatureType } from "../src/rules/components/CreatureType.js";
 import { Encumbrance } from "../src/rules/components/Encumbrance.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
+import { Mana } from "../src/rules/components/Mana.js";
 import { MonsterSpawner } from "../src/rules/components/MonsterSpawner.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Physiology } from "../src/rules/components/Physiology.js";
@@ -158,4 +160,34 @@ Deno.test("grid_bug parity: debug spawn, dungeon spawn, and spawner child share 
     assertEquals(String(event?.kind || ""), "plasma");
     assertEquals(String(event?.identity || ""), "plasma_cloud");
   }
+});
+
+Deno.test("caster parity: mutation spawn keeps warlock learned spells and mana", () => {
+  setupFloorTiles();
+
+  const world = new World({ seed: 0xC0FFEE });
+  configureWorld(world);
+
+  applyMutation(world, {
+    type: "spawnMonster",
+    monsterId: "skeletal_agony_warlock",
+    x: 3,
+    y: 3,
+    emitEvent: false,
+  }, { getMonster });
+
+  const warlockId = findEntityAt(world, 3, 3, "skeletal_agony_warlock");
+  assert(warlockId > 0, "mutation spawn should create warlock");
+
+  const brain = world.get(warlockId, Brain);
+  const mana = world.get(warlockId, Mana);
+
+  assert(Array.isArray(brain?.learnedSpellIds), "warlock should have learnedSpellIds array");
+  assert(brain.learnedSpellIds.includes("shadow_bolt"), "warlock should know shadow_bolt");
+  assert(brain.learnedSpellIds.includes("agony"), "warlock should know agony");
+  assert(brain.learnedSpellIds.includes("summon_skeleton"), "warlock should know summon_skeleton");
+
+  assert(mana, "warlock should have mana component");
+  assertEquals(Number(mana?.maxMana || 0), 58);
+  assertEquals(Number(mana?.mana || 0), 58);
 });

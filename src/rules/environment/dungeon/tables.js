@@ -16,14 +16,18 @@ function toMonsterSpawnParams(def, depth) {
     identity: def.id,
     maxHp: Math.floor(def.baseHp + depth * def.hpPerLevel),
     faction: 'enemy',
-    attackDerived: def.attack,
-    defenseDerived: def.defense,
+    accuracyDerived: def.attack,
+    damagePowerDerived: def.attack,
+    evadeDerived: def.defense,
     naturalDamageDice: def.damageDice,
     sizeClass: def.sizeClass,
     massKg: def.massKg,
     resistances: def.resistances,
     speed: def.speed,
     equipment: def.equipment || null,
+    learnedSpellIds: Array.isArray(def.learnedSpellIds) ? [...def.learnedSpellIds] : [],
+    maxMana: Number.isFinite(def.maxMana) ? Number(def.maxMana) : 0,
+    manaRegen: Number.isFinite(def.manaRegen) ? Number(def.manaRegen) : 0,
     creatureType: creatureTypeFromTags(def.tags || []),
   };
 }
@@ -125,6 +129,19 @@ const PACK_SIZE_BY_CLASS = {
   'XL': { min: 1, max: 1 },   // gigantic creatures - never pack
 };
 
+const SPAWNER_WHITELIST_MONSTER_IDS = new Set([
+  'rat',
+  'bat',
+  'cave_spider',
+  'spider',
+  'cave_snake',
+  'snake',
+]);
+
+function isSpawnerEligibleMonster(def) {
+  return !!def && SPAWNER_WHITELIST_MONSTER_IDS.has(def.id);
+}
+
 /**
  * Create spawn params for a specific monster by ID.
  * @param {string} monsterId
@@ -146,7 +163,7 @@ export function pickSpecificMonster(monsterId, depth) {
  */
 export function pickSpecificSpawner(rng, monsterId, depth) {
   const params = pickSpecificMonster(monsterId, depth);
-  if (!params) return null;
+  if (!params || !isSpawnerEligibleMonster({ id: params.identity })) return null;
   const packRange = PACK_SIZE_BY_CLASS[params.sizeClass] || PACK_SIZE_BY_CLASS['M'];
   const packSize = rng.int(packRange.min, packRange.max);
   return { monsterType: params, packSize, depth };
@@ -159,8 +176,13 @@ export function pickSpecificSpawner(rng, monsterId, depth) {
  * @returns {{monsterType:Object, packSize:number, depth:number}}
  */
 export function pickSpawner(rng, depth, monsterFilter = null) {
-  // Spawners use the same tier-based pool as individual monsters.
-  const monsterParams = pickMonster(rng, depth, monsterFilter);
+  // Spawners use the same tier-based pool as individual monsters,
+  // with a narrow eligibility gate for non-nesting creatures.
+  const spawnerFilter = (def) => {
+    if (!isSpawnerEligibleMonster(def)) return false;
+    return monsterFilter ? monsterFilter(def) : true;
+  };
+  const monsterParams = pickMonster(rng, depth, spawnerFilter);
 
   // Look up pack size based on monster's size class
   const packRange = PACK_SIZE_BY_CLASS[monsterParams.sizeClass] || PACK_SIZE_BY_CLASS['M'];

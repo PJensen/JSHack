@@ -25,6 +25,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   if (typeof spellAreaFx.drawFlashHeal === "function") {
     spellAreaFx.drawFlashHeal(bctx);
   }
+  if (typeof spellAreaFx.drawSmite === "function") {
+    spellAreaFx.drawSmite(bctx);
+  }
   spellAreaFx.drawPhaseStrike(bctx);
   projectileFx.draw(bctx);
   if (typeof cloudFx.drawFire === "function") {

@@ -314,4 +314,15 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       });
     } catch (e) { console.debug('[floatTextWiring] fly land ftext failed:', e); }
   });
+
+  world.on('trap:avoided', ({ victimId }) => {
+    const pos = getPosition(Number(victimId || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.4, 'DODGED!', {
+        color: '#40e0d0',
+        life: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] trap avoided ftext failed:', e); }
+  });
 }

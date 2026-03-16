@@ -146,6 +146,19 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch (e) { console.debug('[hud] dispatch ui:pray:', e); }
   });
 
+  // Wait button
+  const waitBtn = document.createElement('button');
+  waitBtn.id = 'btn-wait';
+  waitBtn.textContent = 'Wait';
+  Object.assign(waitBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  waitBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:wait')); } catch (e) { console.debug('[hud] dispatch ui:wait:', e); }
+  });
+
   // Submit bug report button
   const bugBtn = document.createElement('button');
   bugBtn.id = 'btn-bug-report';
@@ -212,6 +225,7 @@ export function initHUD() {
     shoot: '\u{1F3F9}',       // 🏹
     zap: '\u26A1',            // ⚡
     pray: '\u{1F64F}',        // 🙏
+    wait: '\u23F3',           // ⏳
     bug: '\u{1F47E}',         // 👾
     petDefault: '\u{1F43E}',  // 🐾
   });
@@ -311,7 +325,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, prayBtn, bugBtn];
+  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, prayBtn, waitBtn, bugBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -389,24 +403,28 @@ export function initHUD() {
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
+  setDesktopLabel(waitBtn, 'Wait'); setMobileLabel(waitBtn, 'Wait');
   setDesktopLabel(bugBtn, 'Submit Bug Report'); setMobileLabel(bugBtn, 'Submit Bug Report');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
+  setDesktopIcon(waitBtn, ACTION_ICONS.wait); setMobileIcon(waitBtn, ACTION_ICONS.wait);
   setDesktopIcon(bugBtn, ACTION_ICONS.bug); setMobileIcon(bugBtn, ACTION_ICONS.bug);
   setBarLabel(charBtn, 'Char');
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
+  setBarLabel(waitBtn, 'Wait');
   setBarLabel(bugBtn, 'Bug');
   charBtn.dataset.keyHint = 'c';
   petBtn.dataset.keyHint = 'p';
   castBtn.dataset.keyHint = 'f';
   shootBtn.dataset.keyHint = 'r';
   prayBtn.dataset.keyHint = 'P';
+  waitBtn.dataset.keyHint = '.';
 
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
@@ -629,6 +647,7 @@ export function initHUD() {
   bar.appendChild(castBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(prayBtn);
+  bar.appendChild(waitBtn);
   bar.appendChild(bugBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
@@ -657,7 +676,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, charBtn, shootBtn, prayBtn, petBtn, bugBtn };
+  return { castBtn, charBtn, shootBtn, prayBtn, waitBtn, petBtn, bugBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
@@ -903,6 +922,9 @@ function createQuickSlot() {
       slot: String(item.slot||''),
       name: String(item.name||'item'),
       count: Number(item.count||1),
+      rarityName: String(item.rarityName || 'common'),
+      glyph: String(item.glyph || ''),
+      glyphColor: String(item.glyphColor || ''),
       addedAt: Date.now()
     });
     console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[0]:', stack[0] ? actionable(stack[0]) : 'empty');
@@ -1005,21 +1027,43 @@ function createChannelingOverlay() {
   el.appendChild(cancelBtn);
 
   let castTime = 0;
+  let channelMode = 'cast';
+  let sustainManaPerTick = 0;
 
   window.addEventListener('ui:channeling:start', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const name = String(e?.detail?.spellName || 'Spell');
+    channelMode = String(e?.detail?.mode || 'cast');
     castTime = Math.max(1, Number(e?.detail?.castTime || 1));
+    sustainManaPerTick = Math.max(0, Number(e?.detail?.manaPerTick || 0));
     label.textContent = `Channeling ${name}...`;
-    barInner.style.width = '0%';
-    progressText.textContent = `0 / ${castTime}`;
+    if (channelMode === 'sustain') {
+      const manaRemaining = Math.max(0, Number(e?.detail?.manaRemaining || 0));
+      const manaMax = Math.max(1, Number(e?.detail?.manaMax || manaRemaining || 1));
+      const pct = Math.min(100, Math.max(0, (manaRemaining / manaMax) * 100));
+      barInner.style.width = pct + '%';
+      progressText.textContent = `${manaRemaining.toFixed(1)} mana, -${sustainManaPerTick}/tick`;
+    } else {
+      barInner.style.width = '0%';
+      progressText.textContent = `0 / ${castTime}`;
+    }
     el.style.display = 'flex';
   });
 
   window.addEventListener('ui:channeling:tick', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
+    const mode = String(e?.detail?.mode || channelMode || 'cast');
+    if (mode === 'sustain') {
+      const manaRemaining = Math.max(0, Number(e?.detail?.manaRemaining || 0));
+      const manaMax = Math.max(1, Number(e?.detail?.manaMax || manaRemaining || 1));
+      const manaPerTick = Math.max(0, Number(e?.detail?.manaPerTick || sustainManaPerTick || 0));
+      const pct = Math.min(100, Math.max(0, (manaRemaining / manaMax) * 100));
+      barInner.style.width = pct + '%';
+      progressText.textContent = `${manaRemaining.toFixed(1)} mana, -${manaPerTick}/tick`;
+      return;
+    }
     const remaining = Number(e?.detail?.turnsRemaining || 0);
     const total = Math.max(1, Number(e?.detail?.turnsTotal || castTime || 1));
     const elapsed = total - remaining;
@@ -1043,9 +1087,21 @@ function renderQuickChip(it, h) {
     padding: '6px 8px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
   });
+  if (it.glyph) {
+    const gl = document.createElement('div');
+    gl.textContent = it.glyph;
+    gl.style.color = it.glyphColor || '#cfe8ff';
+    gl.style.fontSize = '16px';
+    gl.style.lineHeight = '1';
+    chip.appendChild(gl);
+  }
   const name = document.createElement('div');
   name.textContent = `[${String(it.name||'item')}]`;
-  name.style.color = '#9cf';
+  const rn = String(it.rarityName || 'common').toLowerCase();
+  if (rn === 'rare' || rn === 'magic') { name.style.color = '#55aaff'; name.style.fontWeight = 'bold'; }
+  else if (rn === 'epic') { name.style.color = '#c47bff'; name.style.fontWeight = 'bold'; }
+  else if (rn === 'legendary') { name.style.color = '#ff9f3b'; name.style.fontWeight = 'bold'; }
+  else name.style.color = '#9cf';
   const count = document.createElement('div');
   count.dataset.role = 'count';
   count.style.opacity = '0.8';

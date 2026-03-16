@@ -9,8 +9,9 @@ import { combatSystem } from "../src/rules/systems/combatSystem.js";
 
 function runSingleMelee({
   seed,
-  attackDerived,
-  defenseDerived,
+  accuracyDerived,
+  damagePowerDerived,
+  evadeDerived,
   attackerStatuses = null,
   defenderStatuses = null,
 }) {
@@ -19,8 +20,9 @@ function runSingleMelee({
   const attacker = world.create();
   world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
   world.add(attacker, Equipment, {
-    attackDerived,
-    defenseDerived: 0,
+    accuracyDerived,
+    damagePowerDerived,
+    evadeDerived: 0,
     naturalDamageDice: "1d8",
   });
   world.add(attacker, Position, { x: 5, y: 5 });
@@ -29,8 +31,9 @@ function runSingleMelee({
   const defender = world.create();
   world.add(defender, Vitality, { maxHp: 20, hp: 20 });
   world.add(defender, Equipment, {
-    attackDerived: 0,
-    defenseDerived,
+    accuracyDerived: 0,
+    damagePowerDerived: 0,
+    evadeDerived,
   });
   world.add(defender, Position, { x: 5, y: 6 });
   if (defenderStatuses) world.add(defender, Status, { statuses: defenderStatuses });
@@ -46,13 +49,15 @@ function runSingleMelee({
 Deno.test("combatSystem: weakened attacker loses melee accuracy", () => {
   const baseline = runSingleMelee({
     seed: 5,
-    attackDerived: 4,
-    defenseDerived: 0,
+    accuracyDerived: 4,
+    damagePowerDerived: 4,
+    evadeDerived: 0,
   });
   const weakened = runSingleMelee({
     seed: 5,
-    attackDerived: 4,
-    defenseDerived: 0,
+    accuracyDerived: 4,
+    damagePowerDerived: 4,
+    evadeDerived: 0,
     attackerStatuses: [{ type: "weakened", duration: 5, potency: 2, stacks: 1 }],
   });
 
@@ -63,13 +68,15 @@ Deno.test("combatSystem: weakened attacker loses melee accuracy", () => {
 Deno.test("combatSystem: cursed defender is easier to hit", () => {
   const baseline = runSingleMelee({
     seed: 9,
-    attackDerived: 1,
-    defenseDerived: 1,
+    accuracyDerived: 1,
+    damagePowerDerived: 1,
+    evadeDerived: 1,
   });
   const cursedDefender = runSingleMelee({
     seed: 9,
-    attackDerived: 1,
-    defenseDerived: 1,
+    accuracyDerived: 1,
+    damagePowerDerived: 1,
+    evadeDerived: 1,
     defenderStatuses: [{ type: "cursed", duration: 5, potency: 1, stacks: 1 }],
   });
 
@@ -80,13 +87,15 @@ Deno.test("combatSystem: cursed defender is easier to hit", () => {
 Deno.test("combatSystem: blessed attacker gains melee accuracy", () => {
   const baseline = runSingleMelee({
     seed: 9,
-    attackDerived: 1,
-    defenseDerived: 1,
+    accuracyDerived: 1,
+    damagePowerDerived: 1,
+    evadeDerived: 1,
   });
   const blessedAttacker = runSingleMelee({
     seed: 9,
-    attackDerived: 1,
-    defenseDerived: 1,
+    accuracyDerived: 1,
+    damagePowerDerived: 1,
+    evadeDerived: 1,
     attackerStatuses: [{ type: "blessed", duration: 5, potency: 1, stacks: 1 }],
   });
 
