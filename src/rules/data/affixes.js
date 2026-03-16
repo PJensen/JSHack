@@ -143,7 +143,7 @@ registerScript(AFFIX_FIERCE, {
 
 registerScript(AFFIX_GUARD, {
   [ScriptVerb.AffixPassive]: (_world, ctx) => {
-    ctx.addBonus("defense", 1);
+    ctx.addBonus("evade", 1);
   },
 });
 

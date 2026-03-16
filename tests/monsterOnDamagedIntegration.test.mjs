@@ -27,13 +27,13 @@ Deno.test("demon hellfire retaliation fires through full combat pipeline", () =>
 
     const attacker = world.create();
     world.add(attacker, Vitality, { maxHp: 50, hp: 50 });
-    world.add(attacker, Equipment, { attackDerived: 10, naturalDamageDice: '1d4' });
+    world.add(attacker, Equipment, { accuracyDerived: 10, damagePowerDerived: 10, naturalDamageDice: '1d4' });
     world.add(attacker, Position, { x: 5, y: 5 });
     world.add(attacker, Faction, { key: 'player' });
 
     const demon = world.create();
     world.add(demon, Vitality, { maxHp: 100, hp: 100 });
-    world.add(demon, Equipment, { defenseDerived: 0 });
+    world.add(demon, Equipment, { evadeDerived: 0 });
     world.add(demon, Position, { x: 5, y: 6 });
     world.add(demon, Faction, { key: 'enemy' });
     world.add(demon, NamedIdentity, { name: 'Demon', identity: 'demon' });
@@ -68,13 +68,13 @@ Deno.test("skeleton reassemble proc fires through full combat pipeline for some 
 
     const attacker = world.create();
     world.add(attacker, Vitality, { maxHp: 50, hp: 50 });
-    world.add(attacker, Equipment, { attackDerived: 10, naturalDamageDice: '1d4' });
+    world.add(attacker, Equipment, { accuracyDerived: 10, damagePowerDerived: 10, naturalDamageDice: '1d4' });
     world.add(attacker, Position, { x: 5, y: 5 });
     world.add(attacker, Faction, { key: 'player' });
 
     const skeleton = world.create();
     world.add(skeleton, Vitality, { maxHp: 100, hp: 100 });
-    world.add(skeleton, Equipment, { defenseDerived: 0 });
+    world.add(skeleton, Equipment, { evadeDerived: 0 });
     world.add(skeleton, Position, { x: 5, y: 6 });
     world.add(skeleton, Faction, { key: 'enemy' });
     world.add(skeleton, NamedIdentity, { name: 'Skeleton', identity: 'skeleton' });

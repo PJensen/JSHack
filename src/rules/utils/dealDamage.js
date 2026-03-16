@@ -10,7 +10,7 @@ import { isEntityInvulnerable } from "./effectGuards.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
 import { ELECTRIC_DAMAGE_TUNING } from "../data/electricDamageTuning.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
-import { getPassiveBonuses } from "./passiveBonuses.js";
+import { resolveCanonicalStats } from "./canonicalStats.js";
 import { createLegacyCombatFrame, runLegacyMonsterHook } from "./legacyAffixDispatch.js";
 import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from "./affixTopology.js";
 import { applyProcAccumulator } from "./procApplication.js";
@@ -108,14 +108,14 @@ export function resolveResistance(world, targetId, rawAmount, type) {
   const resist = world.get(targetId, Resistances);
   if (!resist) return rawAmount;
 
-  const passive = getPassiveBonuses(world, targetId);
+  const resolved = resolveCanonicalStats(world, targetId);
 
   switch (type) {
     case 'electric':
     case 'plasma':
     case 'lightning': {
       const potionOhms = activeResistBonus(world, targetId, "resist_electric") * 1000;
-      const ohmBonus = Number(passive?.electricOhmsDerived ?? 0) + potionOhms;
+      const ohmBonus = Number(resolved?.electricOhms ?? 0) + potionOhms;
       const baseOhms = resist?.electric?.ohms;
       const effectiveOhms = baseOhms === Infinity ? Infinity
         : (Number.isFinite(baseOhms) ? baseOhms + ohmBonus : ohmBonus);
@@ -125,47 +125,47 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       return Math.max(0, Math.floor(rawAmount * rMult * gMult));
     }
     case 'blunt': {
-      const drBonus = Number(passive?.kineticDRDerived ?? 0);
-      const multBonus = Number(passive?.bluntResistDerived ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0);
+      const multBonus = Number(resolved?.bluntResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'slash': {
-      const drBonus = Number(passive?.kineticDRDerived ?? 0);
-      const multBonus = Number(passive?.slashResistDerived ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0);
+      const multBonus = Number(resolved?.slashResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'pierce': {
-      const drBonus = Number(passive?.kineticDRDerived ?? 0);
-      const multBonus = Number(passive?.pierceResistDerived ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0);
+      const multBonus = Number(resolved?.pierceResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'physical': {
-      const drBonus = Number(passive?.kineticDRDerived ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0);
       return Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
     }
     case 'fire': {
-      const bonus = Number(passive?.fireResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_fire");
+      const bonus = Number(resolved?.fireResist ?? 0) + activeResistBonus(world, targetId, "resist_fire");
       const effectiveMult = Math.max(0, (resist.thermal?.burnMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'poison': {
-      const bonus = Number(passive?.poisonResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_poison");
+      const bonus = Number(resolved?.poisonResist ?? 0) + activeResistBonus(world, targetId, "resist_poison");
       const effectiveMult = Math.max(0, (resist.chemical?.toxMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'acid': {
-      const bonus = Number(passive?.acidResistDerived ?? 0) + activeResistBonus(world, targetId, "resist_acid");
+      const bonus = Number(resolved?.acidResist ?? 0) + activeResistBonus(world, targetId, "resist_acid");
       const effectiveMult = Math.max(0, (resist.chemical?.acidMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
     case 'radiation': {
-      const bonus = Number(passive?.radiationResistDerived ?? 0);
+      const bonus = Number(resolved?.radiationResist ?? 0);
       const effectiveMult = Math.max(0, (resist.radiation?.gamma ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
@@ -188,6 +188,9 @@ export function resolveResistance(world, targetId, rawAmount, type) {
  * @property {boolean} [bypassInvuln=false]- Skip invulnerability check
  * @property {boolean} [bypassResist=false]- Skip resistance resolution
  * @property {boolean} [noTrigger=false]   - Suppress affix/hook triggers (prevents retaliate loops)
+ * @property {boolean} [missed=false]      - Spell or attack missed before damage was applied
+ * @property {number}  [hitChancePct=0]    - Hit chance used for miss reporting
+ * @property {string}  [spellId=""]        - Spell id for spell-miss reporting
  * @property {{dx:number,dy:number,force:number}} [knockback] - Push target after damage is applied.
  * @property {boolean} [offhand=false]     - Mark as off-hand hit (for display layer)
  * @property {number}  [projectileDelay=0] - Seconds before float text appears (projectile travel time)
@@ -199,7 +202,7 @@ export function resolveResistance(world, targetId, rawAmount, type) {
  * @property {boolean} killed   - Whether target reached 0 HP
  * @property {number}  amount   - Final damage dealt (after resistances)
  * @property {number}  rawAmount- Original damage before resistances
- * @property {string}  reason   - 'applied' | 'invalid-target' | 'no-vitality' | 'zero-amount' | 'invulnerable' | 'resisted'
+ * @property {string}  reason   - 'applied' | 'invalid-target' | 'no-vitality' | 'zero-amount' | 'missed' | 'invulnerable' | 'resisted'
  */
 
 const ZERO_RESULT = Object.freeze({ applied: false, killed: false, amount: 0, rawAmount: 0 });
@@ -230,6 +233,26 @@ export function dealDamage(world, spec) {
   const type = String(spec.type || 'physical').toLowerCase();
   const cause = spec.cause || type;
   const critical = !!spec.critical;
+
+  if (spec.missed) {
+    try {
+      world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
+    } catch { /* */ }
+    if (String(spec.spellId || cause).startsWith('spell') || String(cause).startsWith('spell:')) {
+      try {
+        world.emit?.('spell:miss', {
+          actor: source,
+          source,
+          targetId: target,
+          spellId: String(spec.spellId || ''),
+          cause,
+          at: spec.at || undefined,
+          hitChancePct: Number(spec.hitChancePct || 0),
+        });
+      } catch { /* */ }
+    }
+    return { ...ZERO_RESULT, rawAmount, reason: 'missed' };
+  }
 
   // Step 2: Invulnerability gate
   if (!spec.bypassInvuln && isEntityInvulnerable(world, target)) {

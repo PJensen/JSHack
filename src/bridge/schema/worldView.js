@@ -35,6 +35,8 @@ import { Burned } from "../../rules/components/Burned.js";
 import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
+import { DistrictProfile } from "../../rules/components/DistrictProfile.js";
+import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -451,6 +453,7 @@ export function buildWorldView(world) {
 		forEachInRect(world, x0, y0, x1, y1, (id, pos) => {
 			if (world.has(id, PlasmaCloud) || world.has(id, HazardArea)) return;
 			if (world.has(id, Burned)) return;
+			if (world.has(id, DistrictProfile) || world.has(id, EntranceProfile)) return;
 			// Hide unrevealed traps — completely invisible until triggered
 			/** @type {any} */ const trap = /** @type any */ (world.get(id, Trap));
 			if (trap && !trap.revealed) return;
@@ -521,6 +524,7 @@ export function buildWorldView(world) {
 		for (const [id, pos] of world.query(Position)) {
 			if (world.has(id, PlasmaCloud) || world.has(id, HazardArea)) continue;
 			if (world.has(id, Burned)) continue;
+			if (world.has(id, DistrictProfile) || world.has(id, EntranceProfile)) continue;
 			// Hide unrevealed traps — completely invisible until triggered
 			/** @type {any} */ const trap2 = /** @type any */ (world.get(id, Trap));
 			if (trap2 && !trap2.revealed) continue;

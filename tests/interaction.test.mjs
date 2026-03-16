@@ -1,35 +1,55 @@
-import { assert } from "jsr:@std/assert";
-import { World } from '../src/lib/ecs-js/index.js';
-import { Interactable } from '../src/rules/components/Interactable.js';
-import { InteractIntent } from '../src/rules/components/Intents/InteractIntent.js';
-import { DoorState } from '../src/rules/components/DoorState.js';
-import { Collider } from '../src/rules/components/Collider.js';
-import { Inventory } from '../src/rules/components/Inventory.js';
-import { HarvestNode } from '../src/rules/components/HarvestNode.js';
-import { Position } from '../src/rules/components/Position.js';
-import { Vitality } from '../src/rules/components/Vitality.js';
-import { Mana } from '../src/rules/components/Mana.js';
-import { Stamina } from '../src/rules/components/Stamina.js';
-import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
-import { ItemInfo } from '../src/rules/components/ItemInfo.js';
-import { HazardArea } from '../src/rules/components/HazardArea.js';
-import { Potion } from '../src/rules/components/Potion.js';
-import { Consumable } from '../src/rules/components/Consumable.js';
-import { FoodDecay } from '../src/rules/components/FoodDecay.js';
-import { ObjectState } from '../src/rules/components/ObjectState.js';
-import { DungeonState } from '../src/rules/components/DungeonState.js';
-import { createFrom } from '../src/lib/ecs-js/archetype.js';
-import { WildBerries, WildHerbs, ThornPods, VenomFronds, Moonleaf, EmberRoot } from '../src/rules/archetypes/Food.js';
-import { interactionSystem } from '../src/rules/systems/interactionSystem.js';
-import { fountainRegrowthSystem } from '../src/rules/systems/fountainRegrowthSystem.js';
-import { addToInventory, inventoryContains, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
+import { assert, assertEquals } from "jsr:@std/assert";
+import { World } from "../src/lib/ecs-js/index.js";
+import { Interactable } from "../src/rules/components/Interactable.js";
+import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
+import { DoorState } from "../src/rules/components/DoorState.js";
+import { Collider } from "../src/rules/components/Collider.js";
+import { Inventory } from "../src/rules/components/Inventory.js";
+import { HarvestNode } from "../src/rules/components/HarvestNode.js";
+import { Position } from "../src/rules/components/Position.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
+import { Mana } from "../src/rules/components/Mana.js";
+import { Stamina } from "../src/rules/components/Stamina.js";
+import { Player } from "../src/rules/components/Player.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { Potion } from "../src/rules/components/Potion.js";
+import { Consumable } from "../src/rules/components/Consumable.js";
+import { FoodDecay } from "../src/rules/components/FoodDecay.js";
+import { ObjectState } from "../src/rules/components/ObjectState.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
+import { Devotion } from "../src/rules/components/Devotion.js";
+import { Owner } from "../src/rules/components/Owner.js";
+import { Pet } from "../src/rules/components/Pet.js";
+import { createFrom } from "../src/lib/ecs-js/archetype.js";
+import {
+  EmberRoot,
+  Moonleaf,
+  ThornPods,
+  VenomFronds,
+  WildBerries,
+  WildHerbs,
+} from "../src/rules/archetypes/Food.js";
+import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import { fountainRegrowthSystem } from "../src/rules/systems/fountainRegrowthSystem.js";
+import {
+  deitySystem,
+  getDeityInstance,
+  initDeity,
+} from "../src/rules/systems/deitySystem.js";
+import {
+  addToInventory,
+  inventoryContains,
+  inventoryItems,
+} from "../src/rules/utils/inventoryFacade.js";
 
 Deno.test("toggle door: closed → open → closed", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
   const door = world.create();
-  world.add(door, Interactable, { action: 'toggleDoor', params: null });
+  world.add(door, Interactable, { action: "toggleDoor", params: null });
   world.add(door, DoorState, { open: false, locked: false });
   world.add(door, Collider, { solid: true, blocksSight: true });
 
@@ -40,9 +60,12 @@ Deno.test("toggle door: closed → open → closed", () => {
   let ds = world.get(door, DoorState);
   let col = world.get(door, Collider);
   assert(ds.open === true, `door should be open, got ${ds.open}`);
-  assert(col.solid === false, 'open door should not be solid');
-  assert(col.blocksSight === false, 'open door should not block sight');
-  assert(!world.has(actor, InteractIntent), 'InteractIntent should be consumed');
+  assert(col.solid === false, "open door should not be solid");
+  assert(col.blocksSight === false, "open door should not block sight");
+  assert(
+    !world.has(actor, InteractIntent),
+    "InteractIntent should be consumed",
+  );
 
   // Close
   world.add(actor, InteractIntent, { targetId: door });
@@ -50,9 +73,9 @@ Deno.test("toggle door: closed → open → closed", () => {
 
   ds = world.get(door, DoorState);
   col = world.get(door, Collider);
-  assert(ds.open === false, 'door should be closed again');
-  assert(col.solid === true, 'closed door should be solid');
-  assert(col.blocksSight === true, 'closed door should block sight');
+  assert(ds.open === false, "door should be closed again");
+  assert(col.solid === true, "closed door should be solid");
+  assert(col.blocksSight === true, "closed door should block sight");
 });
 
 Deno.test("locked door stays closed and emits locked event", () => {
@@ -60,19 +83,22 @@ Deno.test("locked door stays closed and emits locked event", () => {
 
   const actor = world.create();
   const door = world.create();
-  world.add(door, Interactable, { action: 'toggleDoor', params: null });
+  world.add(door, Interactable, { action: "toggleDoor", params: null });
   world.add(door, DoorState, { open: false, locked: true });
   world.add(door, Collider, { solid: true, blocksSight: true });
 
   world.add(actor, InteractIntent, { targetId: door });
 
   const events = [];
-  world.on('interaction', e => events.push(e));
+  world.on("interaction", (e) => events.push(e));
   interactionSystem(world);
 
   const ds = world.get(door, DoorState);
-  assert(ds.open === false, 'locked door should stay closed');
-  assert(events.some(e => e.result === 'locked'), 'should emit locked interaction event');
+  assert(ds.open === false, "locked door should stay closed");
+  assert(
+    events.some((e) => e.result === "locked"),
+    "should emit locked interaction event",
+  );
 });
 
 Deno.test("open chest emits chest:open event", () => {
@@ -80,21 +106,23 @@ Deno.test("open chest emits chest:open event", () => {
 
   const actor = world.create();
   const chest = world.create();
-  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
-  const ci1 = world.create(); world.add(ci1, ItemInfo, { type: 'equip', count: 1 });
-  const ci2 = world.create(); world.add(ci2, ItemInfo, { type: 'equip', count: 1 });
+  const ci1 = world.create();
+  world.add(ci1, ItemInfo, { type: "equip", count: 1 });
+  const ci2 = world.create();
+  world.add(ci2, ItemInfo, { type: "equip", count: 1 });
   addToInventory(world, chest, ci1);
   addToInventory(world, chest, ci2);
 
   world.add(actor, InteractIntent, { targetId: chest });
   const chestEvents = [];
-  world.on('chest:open', e => chestEvents.push(e));
+  world.on("chest:open", (e) => chestEvents.push(e));
   interactionSystem(world);
 
-  assert(chestEvents.length === 1, 'should emit chest:open event');
-  assert(chestEvents[0].targetId === chest, 'event should reference the chest');
-  assert(chestEvents[0].chestItems.length === 2, 'should include chest items');
+  assert(chestEvents.length === 1, "should emit chest:open event");
+  assert(chestEvents[0].targetId === chest, "event should reference the chest");
+  assert(chestEvents[0].chestItems.length === 2, "should include chest items");
 });
 
 Deno.test("chest remains interactable after opening", () => {
@@ -102,7 +130,7 @@ Deno.test("chest remains interactable after opening", () => {
 
   const actor = world.create();
   const chest = world.create();
-  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
 
   // Open chest twice
@@ -111,7 +139,10 @@ Deno.test("chest remains interactable after opening", () => {
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);
 
-  assert(world.has(chest, Interactable), 'chest should still be interactable after multiple opens');
+  assert(
+    world.has(chest, Interactable),
+    "chest should still be interactable after multiple opens",
+  );
 });
 
 Deno.test("chest:open event includes copy of items", () => {
@@ -119,17 +150,20 @@ Deno.test("chest:open event includes copy of items", () => {
 
   const actor = world.create();
   const chest = world.create();
-  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
-  const ci1 = world.create(); world.add(ci1, ItemInfo, { type: 'equip', count: 1 });
-  const ci2 = world.create(); world.add(ci2, ItemInfo, { type: 'equip', count: 1 });
-  const ci3 = world.create(); world.add(ci3, ItemInfo, { type: 'equip', count: 1 });
+  const ci1 = world.create();
+  world.add(ci1, ItemInfo, { type: "equip", count: 1 });
+  const ci2 = world.create();
+  world.add(ci2, ItemInfo, { type: "equip", count: 1 });
+  const ci3 = world.create();
+  world.add(ci3, ItemInfo, { type: "equip", count: 1 });
   addToInventory(world, chest, ci1);
   addToInventory(world, chest, ci2);
   addToInventory(world, chest, ci3);
 
   const events = [];
-  world.on('chest:open', e => events.push(e));
+  world.on("chest:open", (e) => events.push(e));
 
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);
@@ -139,7 +173,10 @@ Deno.test("chest:open event includes copy of items", () => {
   assert(events[0].chestItems.length === 3);
   // Ensure it's a copy, not a reference
   events[0].chestItems.push(999);
-  assert(inventoryItems(world, chest).length === 3, 'original inventory should be unchanged');
+  assert(
+    inventoryItems(world, chest).length === 3,
+    "original inventory should be unchanged",
+  );
 });
 
 Deno.test("read text emits event with textId", () => {
@@ -147,15 +184,20 @@ Deno.test("read text emits event with textId", () => {
 
   const actor = world.create();
   const sign = world.create();
-  world.add(sign, Interactable, { action: 'readText', params: { textId: 'intro' } });
+  world.add(sign, Interactable, {
+    action: "readText",
+    params: { textId: "intro" },
+  });
 
   world.add(actor, InteractIntent, { targetId: sign });
   const textEvents = [];
-  world.on('interaction', e => { if (e.action === 'readText') textEvents.push(e); });
+  world.on("interaction", (e) => {
+    if (e.action === "readText") textEvents.push(e);
+  });
   interactionSystem(world);
 
-  assert(textEvents.length === 1, 'should emit readText event');
-  assert(textEvents[0].textId === 'intro', `textId should be 'intro'`);
+  assert(textEvents.length === 1, "should emit readText event");
+  assert(textEvents[0].textId === "intro", `textId should be 'intro'`);
 });
 
 Deno.test("interactionSystem ignores off-floor targets", () => {
@@ -163,7 +205,7 @@ Deno.test("interactionSystem ignores off-floor targets", () => {
 
   const actor = world.create();
   const chest = world.create();
-  world.add(chest, Interactable, { action: 'openChest', params: {} });
+  world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
 
   const dungeonState = world.create();
@@ -174,13 +216,16 @@ Deno.test("interactionSystem ignores off-floor targets", () => {
   });
 
   const chestEvents = [];
-  world.on('chest:open', (e) => chestEvents.push(e));
+  world.on("chest:open", (e) => chestEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);
 
-  assert(chestEvents.length === 0, 'off-floor target should not interact');
-  assert(!world.has(actor, InteractIntent), 'InteractIntent should still be consumed');
+  assert(chestEvents.length === 0, "off-floor target should not interact");
+  assert(
+    !world.has(actor, InteractIntent),
+    "InteractIntent should still be consumed",
+  );
 });
 
 Deno.test("stairs do not emit stair traversal from interactionSystem", () => {
@@ -189,18 +234,21 @@ Deno.test("stairs do not emit stair traversal from interactionSystem", () => {
   const stairDown = world.create();
   const stairUp = world.create();
 
-  world.add(stairDown, Interactable, { action: 'descendStair', params: null });
-  world.add(stairUp, Interactable, { action: 'ascendStair', params: null });
+  world.add(stairDown, Interactable, { action: "descendStair", params: null });
+  world.add(stairUp, Interactable, { action: "ascendStair", params: null });
 
   const stairEvents = [];
-  world.on('stair:traverse', e => stairEvents.push(e));
+  world.on("stair:traverse", (e) => stairEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: stairDown });
   interactionSystem(world);
   world.add(actor, InteractIntent, { targetId: stairUp });
   interactionSystem(world);
 
-  assert(stairEvents.length === 0, 'stairs should be traversed only by UI flow');
+  assert(
+    stairEvents.length === 0,
+    "stairs should be traversed only by UI flow",
+  );
 });
 
 Deno.test("harvest node creates food and enters regrow cooldown", () => {
@@ -209,48 +257,70 @@ Deno.test("harvest node creates food and enters regrow cooldown", () => {
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
 
   const node = world.create();
-  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'berries' } });
+  world.add(node, Interactable, {
+    action: "harvestNode",
+    params: { kind: "berries" },
+  });
   world.add(node, HarvestNode, {
-    kind: 'berries', ready: true, regrowTurns: 9, regrowCountdown: 0,
-    yield: 'food_wild_berries', yieldMin: 1, yieldMax: 3,
+    kind: "berries",
+    ready: true,
+    regrowTurns: 9,
+    regrowCountdown: 0,
+    yield: "food_wild_berries",
+    yieldMin: 1,
+    yieldMax: 3,
   });
   world.add(node, Position, { x: 1, y: 1 });
 
   const events = [];
-  world.on('harvest:picked', (e) => events.push(e));
+  world.on("harvest:picked", (e) => events.push(e));
 
   world.add(actor, InteractIntent, { targetId: node });
   interactionSystem(world);
 
-  assert(events.length === 1, 'harvest should emit picked event');
+  assert(events.length === 1, "harvest should emit picked event");
   const hn = world.get(node, HarvestNode);
-  assert(hn.ready === false, 'node should become unready');
-  assert(hn.regrowCountdown === 9, 'node should start regrow countdown');
+  assert(hn.ready === false, "node should become unready");
+  assert(hn.regrowCountdown === 9, "node should start regrow countdown");
 
   const actorItems = inventoryItems(world, actor);
-  assert(actorItems.length >= 1, 'actor should receive harvested item');
+  assert(actorItems.length >= 1, "actor should receive harvested item");
   const first = actorItems[0];
   const ni = world.get(first, NamedIdentity);
   const info = world.get(first, ItemInfo);
-  assert(ni.identity === 'food_wild_berries', `expected berries, got ${ni.identity}`);
-  assert((info.count || 0) >= 1, 'harvest count should be at least 1');
+  assert(
+    ni.identity === "food_wild_berries",
+    `expected berries, got ${ni.identity}`,
+  );
+  assert((info.count || 0) >= 1, "harvest count should be at least 1");
 });
 
 Deno.test("harvest node reports empty while regrowing", () => {
   const world = new World({ seed: 19 });
   const actor = world.create();
   const node = world.create();
-  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'herbs' } });
-  world.add(node, HarvestNode, { kind: 'herbs', ready: false, regrowTurns: 7, regrowCountdown: 5 });
+  world.add(node, Interactable, {
+    action: "harvestNode",
+    params: { kind: "herbs" },
+  });
+  world.add(node, HarvestNode, {
+    kind: "herbs",
+    ready: false,
+    regrowTurns: 7,
+    regrowCountdown: 5,
+  });
 
   const events = [];
-  world.on('harvest:empty', (e) => events.push(e));
+  world.on("harvest:empty", (e) => events.push(e));
 
   world.add(actor, InteractIntent, { targetId: node });
   interactionSystem(world);
 
-  assert(events.length === 1, 'should emit empty harvest event');
-  assert(events[0].regrowCountdown === 5, 'should include remaining regrow time');
+  assert(events.length === 1, "should emit empty harvest event");
+  assert(
+    events[0].regrowCountdown === 5,
+    "should include remaining regrow time",
+  );
 });
 
 Deno.test("restAtBed restores hp, mana, and stamina", () => {
@@ -259,11 +329,18 @@ Deno.test("restAtBed restores hp, mana, and stamina", () => {
   const bed = world.create();
   world.add(actor, Vitality, { maxHp: 20, hp: 3 });
   world.add(actor, Mana, { maxMana: 12, mana: 1, manaRegen: 0.1 });
-  world.add(actor, Stamina, { maxStamina: 100, stamina: 4, staminaRegen: 2, regenCooldown: 9 });
-  world.add(bed, Interactable, { action: 'restAtBed', params: null });
+  world.add(actor, Stamina, {
+    maxStamina: 100,
+    stamina: 4,
+    staminaRegen: 2,
+    regenCooldown: 9,
+  });
+  world.add(bed, Interactable, { action: "restAtBed", params: null });
 
   let rested = 0;
-  world.on('bed:rested', () => { rested++; });
+  world.on("bed:rested", () => {
+    rested++;
+  });
 
   world.add(actor, InteractIntent, { targetId: bed });
   interactionSystem(world);
@@ -271,11 +348,11 @@ Deno.test("restAtBed restores hp, mana, and stamina", () => {
   const v = world.get(actor, Vitality);
   const m = world.get(actor, Mana);
   const s = world.get(actor, Stamina);
-  assert(v.hp === v.maxHp, 'hp should be fully restored');
-  assert(m.mana === m.maxMana, 'mana should be fully restored');
-  assert(s.stamina === s.maxStamina, 'stamina should be fully restored');
-  assert((s.regenCooldown || 0) === 0, 'regen cooldown should be reset');
-  assert(rested === 1, 'rest event should fire');
+  assert(v.hp === v.maxHp, "hp should be fully restored");
+  assert(m.mana === m.maxMana, "mana should be fully restored");
+  assert(s.stamina === s.maxStamina, "stamina should be fully restored");
+  assert((s.regenCooldown || 0) === 0, "regen cooldown should be reset");
+  assert(rested === 1, "rest event should fire");
 });
 
 Deno.test("thorn bramble harvest hurts actor and yields thorn pods", () => {
@@ -286,29 +363,43 @@ Deno.test("thorn bramble harvest hurts actor and yields thorn pods", () => {
   world.add(actor, Vitality, { maxHp: 20, hp: 20 });
 
   const node = world.create();
-  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'thorn_bramble' } });
+  world.add(node, Interactable, {
+    action: "harvestNode",
+    params: { kind: "thorn_bramble" },
+  });
   world.add(node, HarvestNode, {
-    kind: 'thorn_bramble', ready: true, regrowTurns: 11, regrowCountdown: 0,
-    yield: 'reagent_thorn_pod', yieldMin: 2, yieldMax: 4,
-    danger: { type: 'physical', dmgMin: 1, dmgMax: 3, cause: 'thorn_bramble' },
+    kind: "thorn_bramble",
+    ready: true,
+    regrowTurns: 11,
+    regrowCountdown: 0,
+    yield: "reagent_thorn_pod",
+    yieldMin: 2,
+    yieldMax: 4,
+    danger: { type: "physical", dmgMin: 1, dmgMax: 3, cause: "thorn_bramble" },
   });
   world.add(node, Position, { x: 5, y: 4 });
 
   const dangerEvents = [];
-  world.on('harvest:danger', (e) => dangerEvents.push(e));
+  world.on("harvest:danger", (e) => dangerEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: node });
   interactionSystem(world);
 
-  assert(dangerEvents.some((e) => e.effect === 'physical'), 'thorn harvest should emit physical danger event');
+  assert(
+    dangerEvents.some((e) => e.effect === "physical"),
+    "thorn harvest should emit physical danger event",
+  );
   const vit = world.get(actor, Vitality);
-  assert(vit.hp < vit.maxHp, 'thorn harvest should damage actor');
+  assert(vit.hp < vit.maxHp, "thorn harvest should damage actor");
 
   const actorItems = inventoryItems(world, actor);
-  assert(actorItems.length >= 1, 'actor should receive harvested item');
+  assert(actorItems.length >= 1, "actor should receive harvested item");
   const first = actorItems[0];
   const ni = world.get(first, NamedIdentity);
-  assert(ni.identity === 'reagent_thorn_pod', `expected thorn pods, got ${ni.identity}`);
+  assert(
+    ni.identity === "reagent_thorn_pod",
+    `expected thorn pods, got ${ni.identity}`,
+  );
 });
 
 Deno.test("venom fern harvest spawns poison hazard and hurts actor", () => {
@@ -319,39 +410,59 @@ Deno.test("venom fern harvest spawns poison hazard and hurts actor", () => {
   world.add(actor, Vitality, { maxHp: 18, hp: 18 });
 
   const node = world.create();
-  world.add(node, Interactable, { action: 'harvestNode', params: { kind: 'venom_fern' } });
+  world.add(node, Interactable, {
+    action: "harvestNode",
+    params: { kind: "venom_fern" },
+  });
   world.add(node, HarvestNode, {
-    kind: 'venom_fern', ready: true, regrowTurns: 14, regrowCountdown: 0,
-    yield: 'reagent_venom_frond', yieldMin: 2, yieldMax: 3,
-    danger: { type: 'poison', dmgMin: 1, dmgMax: 2, cause: 'venom_fern' },
-    hazard: { kind: 'poison', turnsLeft: 2, tickDamage: 1, identity: 'venom_spores', name: 'Venom Spores' },
+    kind: "venom_fern",
+    ready: true,
+    regrowTurns: 14,
+    regrowCountdown: 0,
+    yield: "reagent_venom_frond",
+    yieldMin: 2,
+    yieldMax: 3,
+    danger: { type: "poison", dmgMin: 1, dmgMax: 2, cause: "venom_fern" },
+    hazard: {
+      kind: "poison",
+      turnsLeft: 2,
+      tickDamage: 1,
+      identity: "venom_spores",
+      name: "Venom Spores",
+    },
   });
   world.add(node, Position, { x: 7, y: 6 });
 
   const dangerEvents = [];
-  world.on('harvest:danger', (e) => dangerEvents.push(e));
+  world.on("harvest:danger", (e) => dangerEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: node });
   interactionSystem(world);
 
-  assert(dangerEvents.some((e) => e.effect === 'poison'), 'venom fern should emit poison danger event');
+  assert(
+    dangerEvents.some((e) => e.effect === "poison"),
+    "venom fern should emit poison danger event",
+  );
   const vit = world.get(actor, Vitality);
-  assert(vit.hp < vit.maxHp, 'venom fern harvest should damage actor');
+  assert(vit.hp < vit.maxHp, "venom fern harvest should damage actor");
 
   let foundHazard = false;
   for (const [, ni, hazard] of world.query(NamedIdentity, HazardArea)) {
-    if (ni.identity === 'venom_spores' && String(hazard.kind) === 'poison') {
+    if (ni.identity === "venom_spores" && String(hazard.kind) === "poison") {
       foundHazard = true;
       break;
     }
   }
-  assert(foundHazard, 'venom fern harvest should create poison hazard');
+  assert(foundHazard, "venom fern harvest should create poison hazard");
 
   const actorItems = inventoryItems(world, actor);
-  assert(actorItems.length >= 1, 'venom fern should yield a harvested item');
+  assert(actorItems.length >= 1, "venom fern should yield a harvested item");
   const first = actorItems[0];
   const ni = world.get(first, NamedIdentity);
-  assert(ni.identity === 'reagent_venom_frond', `expected venom fronds, got ${ni.identity}`);
+  assert(
+    ni.identity === "reagent_venom_frond",
+    `expected venom fronds, got ${ni.identity}`,
+  );
 });
 
 Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consumes ingredients", () => {
@@ -361,33 +472,46 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
   world.add(actor, Position, { x: 3, y: 3 });
 
   const berries = createFrom(world, WildBerries, {});
-  world.mutate(berries, ItemInfo, (r) => { r.count = 3; });
+  world.mutate(berries, ItemInfo, (r) => {
+    r.count = 3;
+  });
   const herbs = createFrom(world, WildHerbs, {});
-  world.mutate(herbs, ItemInfo, (r) => { r.count = 4; });
+  world.mutate(herbs, ItemInfo, (r) => {
+    r.count = 4;
+  });
   const thornPods = createFrom(world, ThornPods, {});
-  world.mutate(thornPods, ItemInfo, (r) => { r.count = 1; });
+  world.mutate(thornPods, ItemInfo, (r) => {
+    r.count = 1;
+  });
   const venomFronds = createFrom(world, VenomFronds, {});
-  world.mutate(venomFronds, ItemInfo, (r) => { r.count = 2; });
+  world.mutate(venomFronds, ItemInfo, (r) => {
+    r.count = 2;
+  });
   addToInventory(world, actor, berries);
   addToInventory(world, actor, herbs);
   addToInventory(world, actor, thornPods);
   addToInventory(world, actor, venomFronds);
 
   const bench = world.create();
-  world.add(bench, Interactable, { action: 'brewAlchemy', params: null });
+  world.add(bench, Interactable, { action: "brewAlchemy", params: null });
   world.add(bench, Position, { x: 4, y: 3 });
 
   const openEvents = [];
   const crafted = [];
-  world.on('alchemy:open', (e) => openEvents.push(e));
-  world.on('alchemy:crafted', (e) => crafted.push(e));
+  world.on("alchemy:open", (e) => openEvents.push(e));
+  world.on("alchemy:crafted", (e) => crafted.push(e));
 
   world.add(actor, InteractIntent, { targetId: bench });
   interactionSystem(world);
-  assert(openEvents.length === 1, 'bench interaction should emit alchemy:open');
-  const venomRecipe = openEvents[0].recipes.find((r) => r.key === 'venom_draft');
-  assert(venomRecipe, 'venom recipe should be offered');
-  assert((venomRecipe.requirements?.venomFronds || 0) >= 1, 'venom recipe should require venom fronds');
+  assert(openEvents.length === 1, "bench interaction should emit alchemy:open");
+  const venomRecipe = openEvents[0].recipes.find((r) =>
+    r.key === "venom_draft"
+  );
+  assert(venomRecipe, "venom recipe should be offered");
+  assert(
+    (venomRecipe.requirements?.venomFronds || 0) >= 1,
+    "venom recipe should require venom fronds",
+  );
 
   function countIdentity(identity) {
     let total = 0;
@@ -399,30 +523,43 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
     }
     return total;
   }
-  const thornBefore = countIdentity('reagent_thorn_pod');
-  const venomBefore = countIdentity('reagent_venom_frond');
+  const thornBefore = countIdentity("reagent_thorn_pod");
+  const venomBefore = countIdentity("reagent_venom_frond");
 
-  world.add(actor, InteractIntent, { targetId: bench, mode: 'brew', recipe: 'venom_draft' });
+  world.add(actor, InteractIntent, {
+    targetId: bench,
+    mode: "brew",
+    recipe: "venom_draft",
+  });
   interactionSystem(world);
-  assert(crafted.length === 1, 'brew mode should craft a potion');
-  assert(crafted[0].outputIdentity === 'potion_poison', 'should craft poison potion');
+  assert(crafted.length === 1, "brew mode should craft a potion");
+  assert(
+    crafted[0].outputIdentity === "potion_poison",
+    "should craft poison potion",
+  );
 
   let poisonId = 0;
   for (const id of inventoryItems(world, actor)) {
     const ni = world.get(id, NamedIdentity);
-    if (ni?.identity === 'potion_poison') {
+    if (ni?.identity === "potion_poison") {
       poisonId = id;
       break;
     }
   }
-  assert(poisonId > 0, 'inventory should contain crafted poison potion');
-  assert(world.has(poisonId, Potion), 'crafted poison should be a legitimate potion entity');
-  assert(world.get(poisonId, ItemInfo)?.type === 'potion', 'crafted poison item type should be potion');
+  assert(poisonId > 0, "inventory should contain crafted poison potion");
+  assert(
+    world.has(poisonId, Potion),
+    "crafted poison should be a legitimate potion entity",
+  );
+  assert(
+    world.get(poisonId, ItemInfo)?.type === "potion",
+    "crafted poison item type should be potion",
+  );
 
-  const thornAfter = countIdentity('reagent_thorn_pod');
-  const venomAfter = countIdentity('reagent_venom_frond');
-  assert(thornAfter < thornBefore, 'thorn pod inventory should be consumed');
-  assert(venomAfter < venomBefore, 'venom frond inventory should be consumed');
+  const thornAfter = countIdentity("reagent_thorn_pod");
+  const venomAfter = countIdentity("reagent_venom_frond");
+  assert(thornAfter < thornBefore, "thorn pod inventory should be consumed");
+  assert(venomAfter < venomBefore, "venom frond inventory should be consumed");
 });
 
 // ── Sarcophagus ───────────────────────────────────────────────────────────────
@@ -432,23 +569,23 @@ Deno.test("sarcophagus: spawns skeleton on first interaction", () => {
 
   const actor = world.create();
   const sarc = world.create();
-  world.add(sarc, Interactable, { action: 'openSarcophagus', params: null });
+  world.add(sarc, Interactable, { action: "openSarcophagus", params: null });
   world.add(sarc, Position, { x: 5, y: 5 });
 
   const events = [];
-  world.on('sarcophagus:opened', (e) => events.push(e));
+  world.on("sarcophagus:opened", (e) => events.push(e));
 
   world.add(actor, InteractIntent, { targetId: sarc });
   interactionSystem(world);
 
-  assert(events.length === 1, 'should emit sarcophagus:opened');
-  assert(events[0].targetId === sarc, 'event should reference the sarcophagus');
+  assert(events.length === 1, "should emit sarcophagus:opened");
+  assert(events[0].targetId === sarc, "event should reference the sarcophagus");
 
   let skeletonFound = false;
   let skeletonOnSarcophagus = false;
   const sarcPos = world.get(sarc, Position);
   for (const [sid, ni] of world.query(NamedIdentity)) {
-    if (ni.identity === 'skeleton' || ni.identity === 'skeleton_archer') {
+    if (ni.identity === "skeleton" || ni.identity === "skeleton_archer") {
       skeletonFound = true;
       const skPos = world.get(sid, Position);
       if (skPos && skPos.x === sarcPos.x && skPos.y === sarcPos.y) {
@@ -457,8 +594,11 @@ Deno.test("sarcophagus: spawns skeleton on first interaction", () => {
       break;
     }
   }
-  assert(skeletonFound, 'a skeleton should be spawned');
-  assert(!skeletonOnSarcophagus, 'skeleton should spawn adjacent to the sarcophagus, not on top of it');
+  assert(skeletonFound, "a skeleton should be spawned");
+  assert(
+    !skeletonOnSarcophagus,
+    "skeleton should spawn adjacent to the sarcophagus, not on top of it",
+  );
 });
 
 Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
@@ -466,21 +606,24 @@ Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
 
   const actor = world.create();
   const sarc = world.create();
-  world.add(sarc, Interactable, { action: 'openSarcophagus', params: null });
+  world.add(sarc, Interactable, { action: "openSarcophagus", params: null });
   world.add(sarc, Position, { x: 3, y: 3 });
 
   world.add(actor, InteractIntent, { targetId: sarc });
   interactionSystem(world);
 
-  assert(!world.has(sarc, Interactable), 'sarcophagus should lose Interactable after opening');
+  assert(
+    !world.has(sarc, Interactable),
+    "sarcophagus should lose Interactable after opening",
+  );
 
   // Second interaction should be a no-op (no Interactable component).
   const events = [];
-  world.on('sarcophagus:opened', (e) => events.push(e));
+  world.on("sarcophagus:opened", (e) => events.push(e));
   world.add(actor, InteractIntent, { targetId: sarc });
   interactionSystem(world);
 
-  assert(events.length === 0, 'second interaction should do nothing');
+  assert(events.length === 0, "second interaction should do nothing");
 });
 
 // ── Altar — two-phase offering ────────────────────────────────────────────────
@@ -490,25 +633,36 @@ Deno.test("altar: phase 1 emits offer prompt with inventory items", () => {
 
   const actor = world.create();
   const altar = world.create();
-  world.add(altar, Interactable, { action: 'prayAltar', params: null });
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
   world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
 
   // Put an item in inventory.
   const itemId = world.create();
   world.add(itemId, ItemInfo, {
-    type: 'potion', slot: 'bag', weight: 1, value: 50,
-    description: 'test', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "test",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
   });
   addToInventory(world, actor, itemId);
 
   const prompts = [];
-  world.on('altar:offerPrompt', (e) => prompts.push(e));
+  world.on("altar:offerPrompt", (e) => prompts.push(e));
 
   world.add(actor, InteractIntent, { targetId: altar });
   interactionSystem(world);
 
-  assert(prompts.length === 1, 'should emit altar:offerPrompt');
-  assert(prompts[0].items.includes(itemId), 'prompt should include the offerable item');
+  assert(prompts.length === 1, "should emit altar:offerPrompt");
+  assert(
+    prompts[0].items.includes(itemId),
+    "prompt should include the offerable item",
+  );
 });
 
 Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
@@ -516,27 +670,38 @@ Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
 
   const actor = world.create();
   const altar = world.create();
-  world.add(altar, Interactable, { action: 'prayAltar', params: null });
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
   world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
 
   const itemId = world.create();
   world.add(itemId, ItemInfo, {
-    type: 'potion', slot: 'bag', weight: 1, value: 50,
-    description: 'test', count: 1, bonuses: {}, rarity: 1, rarityName: 'common', affixes: [],
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "test",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
   });
   addToInventory(world, actor, itemId);
 
   const offers = [];
-  world.on('altar:offer', (e) => offers.push(e));
+  world.on("altar:offer", (e) => offers.push(e));
 
   // Phase 2: offer the selected item.
-  world.add(actor, InteractIntent, { targetId: altar, mode: 'offer', itemId });
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId });
   interactionSystem(world);
 
-  assert(offers.length === 1, 'should emit altar:offer');
-  assert(offers[0].value === 0.25, 'should report normalized value (50/200)');
-  assert(offers[0].itemName === 'test', 'should report item name');
-  assert(!inventoryContains(world, actor, itemId), 'offered item should be removed from inventory');
+  assert(offers.length === 1, "should emit altar:offer");
+  assert(offers[0].value === 0.25, "should report normalized value (50/200)");
+  assert(offers[0].itemName === "test", "should report item name");
+  assert(
+    !inventoryContains(world, actor, itemId),
+    "offered item should be removed from inventory",
+  );
 });
 
 Deno.test("altar: offer fails gracefully when item is not in inventory", () => {
@@ -544,18 +709,151 @@ Deno.test("altar: offer fails gracefully when item is not in inventory", () => {
 
   const actor = world.create();
   const altar = world.create();
-  world.add(altar, Interactable, { action: 'prayAltar', params: null });
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
   world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
 
   const failures = [];
-  world.on('altar:offerFailed', (e) => failures.push(e));
+  world.on("altar:offerFailed", (e) => failures.push(e));
 
   // Try to offer an item that isn't in inventory.
-  world.add(actor, InteractIntent, { targetId: altar, mode: 'offer', itemId: 9999 });
+  world.add(actor, InteractIntent, {
+    targetId: altar,
+    mode: "offer",
+    itemId: 9999,
+  });
   interactionSystem(world);
 
-  assert(failures.length === 1, 'should emit altar:offerFailed');
-  assert(failures[0].reason === 'not_owned', 'should explain the failure reason');
+  assert(failures.length === 1, "should emit altar:offerFailed");
+  assert(
+    failures[0].reason === "not_owned",
+    "should explain the failure reason",
+  );
+});
+
+Deno.test("altar: offering your pet corpse can resurrect it when the deity still favors you", () => {
+  const world = new World({ seed: 0xCA7A17 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(actor, Player, {});
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+  world.add(actor, Position, { x: 4, y: 4 });
+  world.add(actor, Devotion, { deityId: "seraphine" });
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(altar, Position, { x: 5, y: 4 });
+
+  initDeity("seraphine", world);
+  deitySystem(world);
+
+  const corpseId = world.create();
+  world.add(corpseId, Pet);
+  world.add(corpseId, Owner, { ownerId: actor });
+  world.add(corpseId, NamedIdentity, {
+    name: "Kitty Corpse",
+    identity: "corpse_kitty",
+  });
+  world.add(corpseId, ItemInfo, {
+    type: "food",
+    slot: "bag",
+    weight: 2,
+    value: 25,
+    description: "pet remains",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, corpseId);
+
+  const resurrected = [];
+  world.on("pet:resurrected", (e) => resurrected.push(e));
+
+  world.add(actor, InteractIntent, {
+    targetId: altar,
+    mode: "offer",
+    itemId: corpseId,
+  });
+  interactionSystem(world);
+
+  assertEquals(resurrected.length, 1, "should emit pet:resurrected");
+  assert(
+    !inventoryContains(world, actor, corpseId),
+    "offered corpse should leave inventory",
+  );
+  assert(
+    world.has(resurrected[0].petId, Pet),
+    "a pet entity should be restored",
+  );
+  assertEquals(
+    world.get(resurrected[0].petId, NamedIdentity)?.identity,
+    "kitty",
+  );
+  assertEquals(world.get(resurrected[0].petId, Owner)?.ownerId, actor);
+});
+
+Deno.test("altar: pet resurrection is denied when the deity is displeased", () => {
+  const world = new World({ seed: 0xBAD777 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(actor, Player, {});
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+  world.add(actor, Position, { x: 4, y: 4 });
+  world.add(actor, Devotion, { deityId: "seraphine" });
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(altar, Position, { x: 5, y: 4 });
+
+  const deity = initDeity("seraphine", world);
+  deitySystem(world);
+  for (let i = 0; i < 10; i++) {
+    deity.desecrate("test");
+    deity.tick(1);
+  }
+  const mood = getDeityInstance("seraphine")._queryPrecise();
+  assert(
+    mood.wrath >= 0.34 || mood.serenity < mood.wrath,
+    "test setup should produce poor standing",
+  );
+
+  const corpseId = world.create();
+  world.add(corpseId, Pet);
+  world.add(corpseId, Owner, { ownerId: actor });
+  world.add(corpseId, NamedIdentity, {
+    name: "Kitty Corpse",
+    identity: "corpse_kitty",
+  });
+  world.add(corpseId, ItemInfo, {
+    type: "food",
+    slot: "bag",
+    weight: 2,
+    value: 25,
+    description: "pet remains",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, corpseId);
+
+  const denied = [];
+  world.on("altar:resurrectionDenied", (e) => denied.push(e));
+
+  world.add(actor, InteractIntent, {
+    targetId: altar,
+    mode: "offer",
+    itemId: corpseId,
+  });
+  interactionSystem(world);
+
+  assertEquals(denied.length, 1, "should emit altar:resurrectionDenied");
+  assertEquals(denied[0].reason, "standing");
+  const livingPets = [];
+  for (const [id, _pet, vit] of world.query(Pet, Vitality)) {
+    if ((vit?.hp || 0) > 0) livingPets.push(id);
+  }
+  assertEquals(livingPets.length, 0, "no living pet should be created");
 });
 
 // ── Cooking fire ──────────────────────────────────────────────────────────────
@@ -568,72 +866,103 @@ Deno.test("cooking fire: phase 1 emits cooking:open with corpses and herbs", () 
 
   // Add a corpse to inventory.
   const corpse = world.create();
-  world.add(corpse, NamedIdentity, { name: "Rat Corpse", identity: "corpse_rat" });
+  world.add(corpse, NamedIdentity, {
+    name: "Rat Corpse",
+    identity: "corpse_rat",
+  });
   world.add(corpse, ItemInfo, { type: "food", weight: 2, value: 5, count: 1 });
-  world.add(corpse, Consumable, { effectParams: { nutrition: 150, corpseIdentity: "corpse_rat" }, remainingUses: 1, potency: 0 });
+  world.add(corpse, Consumable, {
+    effectParams: { nutrition: 150, corpseIdentity: "corpse_rat" },
+    remainingUses: 1,
+    potency: 0,
+  });
   world.add(corpse, FoodDecay, { turnsHeld: 20, shelfLife: 150 });
   addToInventory(world, actor, corpse);
 
   // Add herbs to inventory.
   const herbs = createFrom(world, WildHerbs, {});
-  world.mutate(herbs, ItemInfo, (r) => { r.count = 3; });
+  world.mutate(herbs, ItemInfo, (r) => {
+    r.count = 3;
+  });
   addToInventory(world, actor, herbs);
 
   const fire = world.create();
-  world.add(fire, Interactable, { action: 'cookFood', params: null });
+  world.add(fire, Interactable, { action: "cookFood", params: null });
   world.add(fire, Position, { x: 4, y: 3 });
 
   const openEvents = [];
-  world.on('cooking:open', (e) => openEvents.push(e));
+  world.on("cooking:open", (e) => openEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: fire });
   interactionSystem(world);
 
-  assert(openEvents.length === 1, 'should emit cooking:open');
-  assert(Array.isArray(openEvents[0].corpses), 'should include corpses array');
-  assert(openEvents[0].corpses.length === 1, 'should list the one corpse');
-  assert(openEvents[0].corpses[0] === corpse, 'corpse entity id should match');
-  assert(openEvents[0].herbs.count === 3, 'should count herbs');
+  assert(openEvents.length === 1, "should emit cooking:open");
+  assert(Array.isArray(openEvents[0].corpses), "should include corpses array");
+  assert(openEvents[0].corpses.length === 1, "should list the one corpse");
+  assert(openEvents[0].corpses[0] === corpse, "corpse entity id should match");
+  assert(openEvents[0].herbs.count === 3, "should count herbs");
 });
 
 Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   const world = new World({ seed: 71 });
-  world.setScheduler((w) => { interactionSystem(w); });
+  world.setScheduler((w) => {
+    interactionSystem(w);
+  });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
   world.add(actor, Position, { x: 3, y: 3 });
 
   // Add a corpse to inventory.
   const corpse = world.create();
-  world.add(corpse, NamedIdentity, { name: "Orc Corpse", identity: "corpse_orc" });
+  world.add(corpse, NamedIdentity, {
+    name: "Orc Corpse",
+    identity: "corpse_orc",
+  });
   world.add(corpse, ItemInfo, { type: "food", weight: 4, value: 10, count: 1 });
-  world.add(corpse, Consumable, { effectParams: { nutrition: 300, corpseIdentity: "corpse_orc" }, remainingUses: 1, potency: 0 });
+  world.add(corpse, Consumable, {
+    effectParams: { nutrition: 300, corpseIdentity: "corpse_orc" },
+    remainingUses: 1,
+    potency: 0,
+  });
   world.add(corpse, FoodDecay, { turnsHeld: 50, shelfLife: 150 });
   addToInventory(world, actor, corpse);
 
   const fire = world.create();
-  world.add(fire, Interactable, { action: 'cookFood', params: null });
+  world.add(fire, Interactable, { action: "cookFood", params: null });
   world.add(fire, Position, { x: 4, y: 3 });
 
   const cooked = [];
-  world.on('cooking:cooked', (e) => cooked.push(e));
+  world.on("cooking:cooked", (e) => cooked.push(e));
 
   // Dispatch through tick() like the real game does, so ECS deferral is active.
-  world.add(actor, InteractIntent, { targetId: fire, mode: 'cook', itemId: corpse });
+  world.add(actor, InteractIntent, {
+    targetId: fire,
+    mode: "cook",
+    itemId: corpse,
+  });
   world.tick(1);
 
-  assert(cooked.length === 1, 'should emit cooking:cooked');
-  assert(cooked[0].itemId === corpse, 'cooked event should reference the item');
+  assert(cooked.length === 1, "should emit cooking:cooked");
+  assert(cooked[0].itemId === corpse, "cooked event should reference the item");
 
   // The corpse entity should now be a ration (same entity id, new identity).
   const ni = world.get(corpse, NamedIdentity);
-  assert(ni.identity === 'food_ration', `expected food_ration, got ${ni.identity}`);
-  assert(inventoryContains(world, actor, corpse), 'ration should still be in inventory');
+  assert(
+    ni.identity === "food_ration",
+    `expected food_ration, got ${ni.identity}`,
+  );
+  assert(
+    inventoryContains(world, actor, corpse),
+    "ration should still be in inventory",
+  );
 
   // FoodDecay should be reset to fresh with ration shelf life.
   const fd = world.get(corpse, FoodDecay);
-  assert(fd.turnsHeld === 0, 'turnsHeld should be reset to 0');
-  assert(fd.shelfLife === 500, `shelfLife should be 500 (ration), got ${fd.shelfLife}`);
+  assert(fd.turnsHeld === 0, "turnsHeld should be reset to 0");
+  assert(
+    fd.shelfLife === 500,
+    `shelfLife should be 500 (ration), got ${fd.shelfLife}`,
+  );
 });
 
 Deno.test("millstone mills wheat into flour", () => {
@@ -643,11 +972,19 @@ Deno.test("millstone mills wheat into flour", () => {
 
   const wheat = world.create();
   world.add(wheat, NamedIdentity, { name: "Wheat", identity: "food_wheat" });
-  world.add(wheat, ItemInfo, { type: "ingredient", weight: 1, value: 2, count: 2 });
+  world.add(wheat, ItemInfo, {
+    type: "ingredient",
+    weight: 1,
+    value: 2,
+    count: 2,
+  });
   addToInventory(world, actor, wheat);
 
   const millstone = world.create();
-  world.add(millstone, Interactable, { action: "millGrain", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(millstone, Interactable, {
+    action: "millGrain",
+    params: { idleState: "idle", activeState: "working", activeDuration: 4 },
+  });
   world.add(millstone, ObjectState, { state: "idle" });
 
   const milled = [];
@@ -657,8 +994,16 @@ Deno.test("millstone mills wheat into flour", () => {
   interactionSystem(world);
 
   assert(milled.length === 1, "millstone should emit a milling event");
-  assert(world.get(millstone, ObjectState)?.state === "working", "millstone should enter working state");
-  assert(inventoryItems(world, actor).some((id) => world.get(id, NamedIdentity)?.identity === "food_flour"), "actor should receive flour");
+  assert(
+    world.get(millstone, ObjectState)?.state === "working",
+    "millstone should enter working state",
+  );
+  assert(
+    inventoryItems(world, actor).some((id) =>
+      world.get(id, NamedIdentity)?.identity === "food_flour"
+    ),
+    "actor should receive flour",
+  );
 });
 
 Deno.test("furnace smelts ore into iron ingots", () => {
@@ -676,7 +1021,10 @@ Deno.test("furnace smelts ore into iron ingots", () => {
   addToInventory(world, actor, coal);
 
   const furnace = world.create();
-  world.add(furnace, Interactable, { action: "smeltOre", params: { idleState: "unlit", activeState: "lit", activeDuration: 5 } });
+  world.add(furnace, Interactable, {
+    action: "smeltOre",
+    params: { idleState: "unlit", activeState: "lit", activeDuration: 5 },
+  });
   world.add(furnace, ObjectState, { state: "unlit" });
 
   const smelted = [];
@@ -686,8 +1034,16 @@ Deno.test("furnace smelts ore into iron ingots", () => {
   interactionSystem(world);
 
   assert(smelted.length === 1, "furnace should emit a smelting event");
-  assert(world.get(furnace, ObjectState)?.state === "lit", "furnace should light while operating");
-  assert(inventoryItems(world, actor).some((id) => world.get(id, NamedIdentity)?.identity === "material_iron"), "actor should receive an iron ingot");
+  assert(
+    world.get(furnace, ObjectState)?.state === "lit",
+    "furnace should light while operating",
+  );
+  assert(
+    inventoryItems(world, actor).some((id) =>
+      world.get(id, NamedIdentity)?.identity === "material_iron"
+    ),
+    "actor should receive an iron ingot",
+  );
 });
 
 Deno.test("anvil forges carried iron and lumber into a tool", () => {
@@ -696,16 +1052,35 @@ Deno.test("anvil forges carried iron and lumber into a tool", () => {
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
 
   const iron = world.create();
-  world.add(iron, NamedIdentity, { name: "Iron Ingot", identity: "material_iron" });
-  world.add(iron, ItemInfo, { type: "material", weight: 1, value: 9, count: 1 });
+  world.add(iron, NamedIdentity, {
+    name: "Iron Ingot",
+    identity: "material_iron",
+  });
+  world.add(iron, ItemInfo, {
+    type: "material",
+    weight: 1,
+    value: 9,
+    count: 1,
+  });
   const lumber = world.create();
-  world.add(lumber, NamedIdentity, { name: "Lumber", identity: "material_lumber" });
-  world.add(lumber, ItemInfo, { type: "material", weight: 1, value: 6, count: 1 });
+  world.add(lumber, NamedIdentity, {
+    name: "Lumber",
+    identity: "material_lumber",
+  });
+  world.add(lumber, ItemInfo, {
+    type: "material",
+    weight: 1,
+    value: 6,
+    count: 1,
+  });
   addToInventory(world, actor, iron);
   addToInventory(world, actor, lumber);
 
   const anvil = world.create();
-  world.add(anvil, Interactable, { action: "forgeTools", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(anvil, Interactable, {
+    action: "forgeTools",
+    params: { idleState: "idle", activeState: "working", activeDuration: 4 },
+  });
   world.add(anvil, ObjectState, { state: "idle" });
 
   const forged = [];
@@ -713,20 +1088,33 @@ Deno.test("anvil forges carried iron and lumber into a tool", () => {
   world.on("smithy:forged", (e) => forged.push(e));
   world.on("smithy:open", (e) => opened.push(e));
 
-  world.add(actor, InteractIntent, { targetId: anvil, mode: "forge", recipe: "kitchen_knife" });
+  world.add(actor, InteractIntent, {
+    targetId: anvil,
+    mode: "forge",
+    recipe: "kitchen_knife",
+  });
   interactionSystem(world);
 
   assert(forged.length === 1, "anvil should emit a forge event");
-  assert(opened.length === 1, "anvil should refresh smithing panel data after forging");
-  assert(world.get(anvil, ObjectState)?.state === "working", "anvil should enter working state");
-  assert(inventoryItems(world, actor).some((id) => {
-    const identity = world.get(id, NamedIdentity)?.identity;
-    return identity === "tool_kitchen_knife"
-      || identity === "tool_hatchet"
-      || identity === "iron_pickaxe"
-      || identity === "shield_iron"
-      || identity === "warhammer";
-  }), "actor should receive a forged tool");
+  assert(
+    opened.length === 1,
+    "anvil should refresh smithing panel data after forging",
+  );
+  assert(
+    world.get(anvil, ObjectState)?.state === "working",
+    "anvil should enter working state",
+  );
+  assert(
+    inventoryItems(world, actor).some((id) => {
+      const identity = world.get(id, NamedIdentity)?.identity;
+      return identity === "tool_kitchen_knife" ||
+        identity === "tool_hatchet" ||
+        identity === "iron_pickaxe" ||
+        identity === "shield_iron" ||
+        identity === "warhammer";
+    }),
+    "actor should receive a forged tool",
+  );
 });
 
 Deno.test("anvil opens smithing panel instead of forging immediately", () => {
@@ -735,7 +1123,10 @@ Deno.test("anvil opens smithing panel instead of forging immediately", () => {
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
 
   const anvil = world.create();
-  world.add(anvil, Interactable, { action: "forgeTools", params: { idleState: "idle", activeState: "working", activeDuration: 4 } });
+  world.add(anvil, Interactable, {
+    action: "forgeTools",
+    params: { idleState: "idle", activeState: "working", activeDuration: 4 },
+  });
   world.add(anvil, ObjectState, { state: "idle" });
 
   const opened = [];
@@ -747,8 +1138,14 @@ Deno.test("anvil opens smithing panel instead of forging immediately", () => {
   interactionSystem(world);
 
   assert(opened.length === 1, "anvil should open smithing data");
-  assert(forged.length === 0, "anvil should not forge without a selected recipe");
-  assert(world.get(anvil, ObjectState)?.state === "idle", "anvil should stay idle while choosing");
+  assert(
+    forged.length === 0,
+    "anvil should not forge without a selected recipe",
+  );
+  assert(
+    world.get(anvil, ObjectState)?.state === "idle",
+    "anvil should stay idle while choosing",
+  );
 });
 
 Deno.test("alchemy bench crafts moon tonic from herbs and moonleaf", () => {
@@ -769,11 +1166,18 @@ Deno.test("alchemy bench crafts moon tonic from herbs and moonleaf", () => {
   const crafted = [];
   world.on("alchemy:crafted", (e) => crafted.push(e));
 
-  world.add(actor, InteractIntent, { targetId: bench, mode: "brew", recipe: "moon_tonic" });
+  world.add(actor, InteractIntent, {
+    targetId: bench,
+    mode: "brew",
+    recipe: "moon_tonic",
+  });
   interactionSystem(world);
 
   assert(crafted.length === 1, "moon tonic recipe should craft");
-  assert(crafted[0].outputIdentity === "potion_mana", "moon tonic should craft a mana potion");
+  assert(
+    crafted[0].outputIdentity === "potion_mana",
+    "moon tonic should craft a mana potion",
+  );
 });
 
 Deno.test("alchemy bench crafts fireward distillate from ember root and thorn pods", () => {
@@ -794,11 +1198,18 @@ Deno.test("alchemy bench crafts fireward distillate from ember root and thorn po
   const crafted = [];
   world.on("alchemy:crafted", (e) => crafted.push(e));
 
-  world.add(actor, InteractIntent, { targetId: bench, mode: "brew", recipe: "fireward_distillate" });
+  world.add(actor, InteractIntent, {
+    targetId: bench,
+    mode: "brew",
+    recipe: "fireward_distillate",
+  });
   interactionSystem(world);
 
   assert(crafted.length === 1, "fireward recipe should craft");
-  assert(crafted[0].outputIdentity === "potion_resist_fire", "fireward recipe should craft fire resist potion");
+  assert(
+    crafted[0].outputIdentity === "potion_resist_fire",
+    "fireward recipe should craft fire resist potion",
+  );
 });
 
 Deno.test("cooking fire: no corpses emits cooking:open with empty list", () => {
@@ -807,16 +1218,16 @@ Deno.test("cooking fire: no corpses emits cooking:open with empty list", () => {
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
 
   const fire = world.create();
-  world.add(fire, Interactable, { action: 'cookFood', params: null });
+  world.add(fire, Interactable, { action: "cookFood", params: null });
 
   const openEvents = [];
-  world.on('cooking:open', (e) => openEvents.push(e));
+  world.on("cooking:open", (e) => openEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: fire });
   interactionSystem(world);
 
-  assert(openEvents.length === 1, 'should emit cooking:open');
-  assert(openEvents[0].corpses.length === 0, 'corpses should be empty');
+  assert(openEvents.length === 1, "should emit cooking:open");
+  assert(openEvents[0].corpses.length === 0, "corpses should be empty");
 });
 
 Deno.test("cooking fire: cooking item not in inventory emits cooking:failed", () => {
@@ -825,16 +1236,20 @@ Deno.test("cooking fire: cooking item not in inventory emits cooking:failed", ()
   world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
 
   const fire = world.create();
-  world.add(fire, Interactable, { action: 'cookFood', params: null });
+  world.add(fire, Interactable, { action: "cookFood", params: null });
 
   const failures = [];
-  world.on('cooking:failed', (e) => failures.push(e));
+  world.on("cooking:failed", (e) => failures.push(e));
 
-  world.add(actor, InteractIntent, { targetId: fire, mode: 'cook', itemId: 9999 });
+  world.add(actor, InteractIntent, {
+    targetId: fire,
+    mode: "cook",
+    itemId: 9999,
+  });
   interactionSystem(world);
 
-  assert(failures.length === 1, 'should emit cooking:failed');
-  assert(failures[0].reason === 'not_owned', 'reason should be not_owned');
+  assert(failures.length === 1, "should emit cooking:failed");
+  assert(failures[0].reason === "not_owned", "reason should be not_owned");
 });
 
 Deno.test("fountain has finite uses and becomes dry", () => {
@@ -844,14 +1259,14 @@ Deno.test("fountain has finite uses and becomes dry", () => {
 
   const fountain = world.create();
   world.add(fountain, Interactable, {
-    action: 'drinkFountain',
-    params: { chargesRemaining: 2, primaryEffect: 'heal' },
+    action: "drinkFountain",
+    params: { chargesRemaining: 2, primaryEffect: "heal" },
   });
 
   const drinks = [];
   const dry = [];
-  world.on('fountain:drink', (e) => drinks.push(e));
-  world.on('fountain:dry', (e) => dry.push(e));
+  world.on("fountain:drink", (e) => drinks.push(e));
+  world.on("fountain:dry", (e) => dry.push(e));
 
   world.add(actor, InteractIntent, { targetId: fountain });
   interactionSystem(world);
@@ -861,9 +1276,15 @@ Deno.test("fountain has finite uses and becomes dry", () => {
   interactionSystem(world);
 
   const inter = world.get(fountain, Interactable);
-  assert((inter?.params?.chargesRemaining | 0) === 0, 'fountain should have no charges left');
-  assert(drinks.length === 2, `expected 2 successful drinks, got ${drinks.length}`);
-  assert(dry.length >= 1, 'dry event should be emitted once depleted');
+  assert(
+    (inter?.params?.chargesRemaining | 0) === 0,
+    "fountain should have no charges left",
+  );
+  assert(
+    drinks.length === 2,
+    `expected 2 successful drinks, got ${drinks.length}`,
+  );
+  assert(dry.length >= 1, "dry event should be emitted once depleted");
 });
 
 Deno.test("fountain beneficial effect is stable per fountain", () => {
@@ -874,12 +1295,12 @@ Deno.test("fountain beneficial effect is stable per fountain", () => {
 
   const fountain = world.create();
   world.add(fountain, Interactable, {
-    action: 'drinkFountain',
-    params: { chargesRemaining: 20, primaryEffect: 'mana' },
+    action: "drinkFountain",
+    params: { chargesRemaining: 20, primaryEffect: "mana" },
   });
 
   const drinks = [];
-  world.on('fountain:drink', (e) => drinks.push(e));
+  world.on("fountain:drink", (e) => drinks.push(e));
 
   for (let i = 0; i < 12; i++) {
     world.step = i;
@@ -887,9 +1308,17 @@ Deno.test("fountain beneficial effect is stable per fountain", () => {
     interactionSystem(world);
   }
 
-  const beneficial = drinks.filter((e) => e.effect === 'heal' || e.effect === 'mana');
-  assert(beneficial.length > 0, 'expected at least one beneficial fountain roll');
-  assert(beneficial.every((e) => e.effect === 'mana'), 'mana fountain should never emit heal effect');
+  const beneficial = drinks.filter((e) =>
+    e.effect === "heal" || e.effect === "mana"
+  );
+  assert(
+    beneficial.length > 0,
+    "expected at least one beneficial fountain roll",
+  );
+  assert(
+    beneficial.every((e) => e.effect === "mana"),
+    "mana fountain should never emit heal effect",
+  );
 });
 
 Deno.test("dry fountain refills after cooldown and can be used again", () => {
@@ -899,11 +1328,11 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
 
   const fountain = world.create();
   world.add(fountain, Interactable, {
-    action: 'drinkFountain',
+    action: "drinkFountain",
     params: {
       chargesRemaining: 0,
       maxCharges: 2,
-      primaryEffect: 'heal',
+      primaryEffect: "heal",
       cooldownTurns: 201,
       dryUntilStep: 205,
     },
@@ -913,23 +1342,35 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
   const drinks = [];
   const dry = [];
   const refilled = [];
-  world.on('fountain:drink', (e) => drinks.push(e));
-  world.on('fountain:dry', (e) => dry.push(e));
-  world.on('fountain:refilled', (e) => refilled.push(e));
+  world.on("fountain:drink", (e) => drinks.push(e));
+  world.on("fountain:dry", (e) => dry.push(e));
+  world.on("fountain:refilled", (e) => refilled.push(e));
 
   world.step = 204;
   world.add(actor, InteractIntent, { targetId: fountain });
   interactionSystem(world);
-  assert(drinks.length === 0, 'dry fountain should not be usable before cooldown');
-  assert(dry.length >= 1, 'should emit dry while still cooling down');
+  assert(
+    drinks.length === 0,
+    "dry fountain should not be usable before cooldown",
+  );
+  assert(dry.length >= 1, "should emit dry while still cooling down");
 
   world.step = 205;
   fountainRegrowthSystem(world);
   world.add(actor, InteractIntent, { targetId: fountain });
   interactionSystem(world);
 
-  assert(refilled.length === 1, 'fountain should emit refilled event at cooldown completion');
-  assert(drinks.length === 1, 'fountain should be drinkable again after refill');
+  assert(
+    refilled.length === 1,
+    "fountain should emit refilled event at cooldown completion",
+  );
+  assert(
+    drinks.length === 1,
+    "fountain should be drinkable again after refill",
+  );
   const inter = world.get(fountain, Interactable);
-  assert((inter?.params?.chargesRemaining | 0) === 1, 'one charge should remain after the first post-refill drink');
+  assert(
+    (inter?.params?.chargesRemaining | 0) === 1,
+    "one charge should remain after the first post-refill drink",
+  );
 });

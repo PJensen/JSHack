@@ -4,6 +4,8 @@ import { Position } from "../src/rules/components/Position.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { Collider } from "../src/rules/components/Collider.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { runSpellScript } from "../src/rules/scripts/spells.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll as clearTileMap, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
@@ -21,6 +23,7 @@ function makeEntity(world, x, y, hp, faction) {
   const id = world.create();
   world.add(id, Position, { x, y });
   world.add(id, Vitality, { maxHp: hp, hp });
+  world.add(id, Equipment, {});
   if (faction) world.add(id, Faction, { key: faction });
   return id;
 }
@@ -42,4 +45,45 @@ Deno.test("frost: blocksight collider prevents targeting through it", () => {
   assertEquals(world.get(target, Vitality).hp, 20);
   assertEquals(events.length, 1);
   assertEquals(events[0].fizzle, true);
+  assertEquals(events[0].projectileDelay, 0);
+});
+
+Deno.test("frost: emits projectile delay matching travel time", () => {
+  loadFlatFloor();
+  const world = new World({ seed: 12 });
+  const events = [];
+  world.on("spell:frost", (ev) => events.push(ev));
+
+  const caster = makeEntity(world, 2, 2, 20, "player");
+  makeEntity(world, 6, 2, 20, "enemy");
+
+  runSpellScript(world, caster, SPELL, {});
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].fizzle, undefined);
+  assertEquals(events[0].projectileDelay, 0.5);
+});
+
+Deno.test("frost: publishes VFX event on miss and does not apply frost", () => {
+  loadFlatFloor();
+  const world = new World({ seed: 13 });
+  const frostEvents = [];
+  const missEvents = [];
+  world.on("spell:frost", (ev) => frostEvents.push(ev));
+  world.on("spell:miss", (ev) => missEvents.push(ev));
+
+  const caster = makeEntity(world, 2, 2, 20, "player");
+  const target = makeEntity(world, 6, 2, 20, "enemy");
+  world.get(target, Equipment).spellAvoidDerived = 200;
+
+  runSpellScript(world, caster, SPELL, {});
+
+  assertEquals(frostEvents.length, 1);
+  assertEquals(frostEvents[0].targetId, target);
+  assertEquals(frostEvents[0].missed, true);
+  assertEquals(frostEvents[0].projectileDelay, 0.5);
+  assertEquals(missEvents.length, 1);
+  assertEquals(missEvents[0].spellId, "frost");
+  assertEquals(world.get(target, Vitality).hp, 20);
+  assertEquals(!!world.get(target, ActiveEffects)?.effects?.some((effect) => effect.key === "frost"), false);
 });

@@ -25,7 +25,7 @@ Deno.test("bump attack resolves during the same tick (no deferred next-turn hit)
     const attacker = world.create();
     world.add(attacker, Position, { x: 3, y: 3 });
     world.add(attacker, Vitality, { maxHp: 30, hp: 30 });
-    world.add(attacker, Equipment, { attackDerived: 100, naturalDamageDice: "1d4" });
+    world.add(attacker, Equipment, { accuracyDerived: 100, damagePowerDerived: 100, naturalDamageDice: "1d4" });
     world.add(attacker, Faction, { key: "player" });
 
     const defender = world.create();

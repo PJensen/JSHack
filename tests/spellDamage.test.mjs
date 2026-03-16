@@ -8,10 +8,11 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Status } from "../src/rules/components/Status.js";
 import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { runSpellScript } from "../src/rules/scripts/spells.js";
 import { getSpell } from "../src/rules/data/spells.js";
-import { createSpellDamageContext, scaleSpellDamage } from "../src/rules/utils/spellDamage.js";
+import { createSpellDamageContext, getSpellHitChancePct, scaleSpellDamage } from "../src/rules/utils/spellDamage.js";
 import { attach } from "../src/lib/ecs-js/index.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll as clearTileMap, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
@@ -22,19 +23,27 @@ function loadFlatFloor() {
   loadChunk(0, 0, tiles);
 }
 
-function makeCaster(world, { x = 1, y = 1, intelligence = 10, critChanceDerived = 0, critMultDerived = 0 } = {}) {
+function makeCaster(world, {
+  x = 1,
+  y = 1,
+  intelligence = 10,
+  critChanceDerived = 0,
+  critMultDerived = 0,
+  spellHitDerived = 0,
+} = {}) {
   const id = world.create();
   world.add(id, Position, { x, y });
   world.add(id, Brain, { learnedSpellIds: [], intelligence });
-  world.add(id, Equipment, { critChanceDerived, critMultDerived });
+  world.add(id, Equipment, { critChanceDerived, critMultDerived, spellHitDerived });
   world.add(id, Faction, { key: "player" });
   world.add(id, Vitality, { hp: 30, maxHp: 30 });
   return id;
 }
 
-function makeTarget(world, { x = 2, y = 1, hp = 40, faction = "enemy" } = {}) {
+function makeTarget(world, { x = 2, y = 1, hp = 40, faction = "enemy", spellAvoidDerived = 0 } = {}) {
   const id = world.create();
   world.add(id, Position, { x, y });
+  world.add(id, Equipment, { spellAvoidDerived });
   world.add(id, Faction, { key: faction });
   world.add(id, Vitality, { hp, maxHp: hp });
   return id;
@@ -67,6 +76,101 @@ Deno.test("scaleSpellDamage consumes resolved intelligence from stat expressions
   });
 
   assert(scaleSpellDamage(world, caster, 10) > 10, "resolved INT from expressions should scale spell damage");
+});
+
+Deno.test("scaleSpellDamage consumes resolved spellPower from stat expressions", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  const caster = makeCaster(world, { intelligence: 10 });
+  const focus = world.create();
+  const expr = world.create();
+
+  world.add(caster, BaseStats, { intelligence: 10 });
+  attach(world, focus, caster);
+  attach(world, expr, focus);
+  world.add(expr, DerivedExpression, {
+    target: "spellPower",
+    kind: "addConst",
+    value: 10,
+    stage: "derived",
+    priority: 10,
+  });
+
+  assert(scaleSpellDamage(world, caster, 10) > 10, "resolved spellPower from expressions should scale spell damage");
+});
+
+Deno.test("hostile spell damage can miss when spellAvoid beats spellHit", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  const caster = makeCaster(world, { intelligence: 10, spellHitDerived: 0 });
+  const target = makeTarget(world, { x: 4, y: 1, hp: 40, spellAvoidDerived: 200 });
+  const missEvents = [];
+  const damageEvents = [];
+  world.on("spell:miss", (event) => missEvents.push(event));
+  world.on("damaged", (event) => damageEvents.push(event));
+
+  runSpellScript(world, caster, getSpell("shadow_bolt"), {});
+
+  assertEquals(world.get(target, Vitality).hp, 40);
+  assertEquals(damageEvents.length, 0);
+  assertEquals(missEvents.length, 1);
+  assertEquals(missEvents[0].spellId, "shadow_bolt");
+  assertEquals(missEvents[0].targetId, target);
+});
+
+Deno.test("confused and mindwiped statuses reduce hostile spell hit chance", () => {
+  const world = new World({ seed: 0x5157 });
+  const caster = makeCaster(world, { intelligence: 18, spellHitDerived: 6 });
+  const target = makeTarget(world, { x: 4, y: 1, hp: 40, spellAvoidDerived: 20 });
+
+  const baseline = getSpellHitChancePct(world, caster, target);
+  world.add(caster, Status, {
+    statuses: [
+      { type: "confused", duration: 3, potency: 1, stacks: 1 },
+      { type: "mindwiped", duration: 3, potency: 1, stacks: 1 },
+    ],
+  });
+  const impaired = getSpellHitChancePct(world, caster, target);
+
+  assert(baseline > impaired, `expected impaired spell hit chance below baseline (${baseline} > ${impaired})`);
+  assert((baseline - impaired) >= 6, `expected combined mental debuffs to cut spell hit materially, got ${baseline - impaired}`);
+});
+
+Deno.test("confused caster can be forced into a spell miss by the hit penalty", () => {
+  const world = new World({ seed: 0x5158 });
+  const caster = makeCaster(world, { intelligence: 18, spellHitDerived: 6 });
+  const target = makeTarget(world, { x: 4, y: 1, hp: 40, spellAvoidDerived: 106 });
+  const missEvents = [];
+  world.on("spell:miss", (event) => missEvents.push(event));
+
+  world.add(caster, Status, {
+    statuses: [{ type: "confused", duration: 3, potency: 1, stacks: 1 }],
+  });
+
+  runSpellScript(world, caster, getSpell("shadow_bolt"), {});
+
+  assertEquals(world.get(target, Vitality).hp, 40);
+  assertEquals(missEvents.length, 1);
+  assertEquals(missEvents[0].spellId, "shadow_bolt");
+});
+
+Deno.test("agony applies when spellHit beats spellAvoid and misses otherwise", () => {
+  loadFlatFloor();
+  const spell = getSpell("agony");
+
+  const hitWorld = new World({ seed: 0xAAA1 });
+  const hitCaster = makeCaster(hitWorld, { x: 1, y: 1, intelligence: 18, spellHitDerived: 20 });
+  const hitTarget = makeTarget(hitWorld, { x: 2, y: 1, hp: 40, spellAvoidDerived: 0 });
+  runSpellScript(hitWorld, hitCaster, spell, { targetId: hitTarget, x: 2, y: 1 });
+  assert(hitWorld.get(hitTarget, ActiveEffects)?.effects?.some((effect) => effect.key === "agony"), "Agony should land when spell hit wins");
+
+  const missWorld = new World({ seed: 0xAAA2 });
+  const missCaster = makeCaster(missWorld, { x: 1, y: 1, intelligence: 10, spellHitDerived: 0 });
+  const missTarget = makeTarget(missWorld, { x: 2, y: 1, hp: 40, spellAvoidDerived: 200 });
+  const missEvents = [];
+  missWorld.on("spell:miss", (event) => missEvents.push(event));
+  runSpellScript(missWorld, missCaster, spell, { targetId: missTarget, x: 2, y: 1 });
+  assert(!missWorld.get(missTarget, ActiveEffects)?.effects?.some((effect) => effect.key === "agony"), "Agony should not apply on miss");
+  assertEquals(missEvents.length, 1);
+  assertEquals(missEvents[0].spellId, "agony");
 });
 
 Deno.test("destruction spell damage can crit using crit-derived stats", () => {

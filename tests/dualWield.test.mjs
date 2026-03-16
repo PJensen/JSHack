@@ -519,9 +519,9 @@ Deno.test("dual wield: offhand fires even when main hand misses", () => {
     });
 
     // Low attack bonus to increase miss chance
-    const sword = makeWeapon(world, { id: 'sword', name: 'Sword', bonuses: { attack: 0 } });
+    const sword = makeWeapon(world, { id: 'sword', name: 'Sword', bonuses: { accuracy: 0, damagePower: 0 } });
     // High attack bonus on offhand to increase hit chance
-    const dagger = makeWeapon(world, { id: 'dagger', name: 'Dagger', damageDice: '1d4', staminaCost: 5, bonuses: { attack: 15 } });
+    const dagger = makeWeapon(world, { id: 'dagger', name: 'Dagger', damageDice: '1d4', staminaCost: 5, bonuses: { accuracy: 15, damagePower: 15 } });
 
     const hero = makeActor(world, 'Hero', 50);
     const eq = world.get(hero, Equipment);
@@ -532,7 +532,7 @@ Deno.test("dual wield: offhand fires even when main hand misses", () => {
     // Give defender decent defense to make main miss more likely
     const foe = makeActor(world, 'Goblin', 50);
     const foeEq = world.get(foe, Equipment);
-    foeEq.defenseDerived = 5;
+    foeEq.evadeDerived = 5;
 
     world.add(hero, Position, { x: 1, y: 1 });
     world.add(foe, Position, { x: 1, y: 2 });

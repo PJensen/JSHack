@@ -125,3 +125,42 @@ Deno.test("derived stat virtuals project cached stat and damage views", () => {
     critMultiplier: 2,
   });
 });
+
+Deno.test("resolveDerivedStats synthesizes dexterity into combat channels", () => {
+  const world = new World({ seed: 0xD3E });
+  const actor = world.create();
+  world.add(actor, BaseStats, {
+    dexterity: 18,
+    strength: 10,
+    intelligence: 10,
+    vitality: 10,
+  });
+
+  const stats = resolveDerivedStats(world, actor);
+  assertEquals(stats.accuracy, 4, "dexterity should add to accuracy");
+  assertEquals(stats.evade, 4, "dexterity should add to evade");
+  assertEquals(stats.critChancePhysical, 0.04, "dexterity should add physical crit chance");
+});
+
+Deno.test("resolveDerivedStats synthesizes core stats into canonical combat channels", () => {
+  const world = new World({ seed: 0x51A7 });
+  const actor = world.create();
+  world.add(actor, BaseStats, {
+    strength: 18,
+    intelligence: 18,
+    dexterity: 18,
+    vitality: 18,
+    critChance: 0.05,
+  });
+
+  const stats = resolveDerivedStats(world, actor);
+  assertEquals(stats.accuracy, 4, "dexterity should add to accuracy");
+  assertEquals(stats.evade, 4, "dexterity should add to evade");
+  assertEquals(stats.damagePower, 4, "strength should add to damage power");
+  assertEquals(stats.mitigation, 4, "vitality should add to mitigation");
+  assertEquals(stats.spellHit, 4, "intelligence should add to spell hit");
+  assertEquals(stats.spellAvoid, 0, "spell avoid should stay neutral without explicit sources");
+  assertEquals(stats.spellPower, 18, "intelligence should feed spell power");
+  assertEquals(stats.critChancePhysical, 0.09, "physical crit should include base crit plus dexterity");
+  assertEquals(stats.critChanceSpell, 0.09, "spell crit should include base crit plus intelligence");
+});

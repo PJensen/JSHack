@@ -32,6 +32,7 @@ export class InputManager {
       moved: false,
     };
 
+    this._cheatBuffer = "";
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
     this._onPointerMove = (e) => this._handlePointerMove(e);
@@ -97,6 +98,16 @@ export class InputManager {
   _handleKeyDown(e) {
     const { key, code } = e;
     const lowerKey = key?.toLowerCase?.();
+
+    // Cheat code detection (IDDQD → god mode)
+    if (lowerKey && lowerKey.length === 1) {
+      this._cheatBuffer = (this._cheatBuffer + lowerKey).slice(-5);
+      if (this._cheatBuffer === "iddqd") {
+        this._cheatBuffer = "";
+        try { this.target?.dispatchEvent?.(new CustomEvent('debug:toggleGodMode')); } catch {}
+        return;
+      }
+    }
 
     // Cast active spell: 'f' should be reliable even if a stale UI panel is left open.
     // Keep text-entry fields safe so typing never triggers a cast.

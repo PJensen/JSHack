@@ -20,6 +20,9 @@
  * @property {number} [minIntelligence]
  * @property {number} [range]   // max casting range in tiles
  * @property {number} [castTime] // turns to channel before casting (0 or omitted = instant)
+ * @property {boolean} [channeling] // true = sustained realtime channel until cancelled
+ * @property {number} [manaPerTick] // mana drained each channel tick when channeling
+ * @property {number} [boltsPerTick] // storm impacts per sustain tick
  * @property {string} [script]  // optional key for scripted behavior
  * @property {string} [description] // flavor-forward tooltip text
  * @property {'self'|'target'|'auto'|'path'|'area'|'enemy'} [targeting]
@@ -143,6 +146,48 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'frost', duration: '2-5 turns (longer on lighter targets)' },
     ],
   },
+  blizzard: {
+    id: 'blizzard',
+    name: 'Blizzard',
+    symbol: '\u2744',
+    schools: ['destruction'],
+    manaCost: 3,
+    manaPerTick: 3,
+    channeling: true,
+    boltsPerTick: 3,
+    minIntelligence: 0,
+    range: 10,
+    radius: 3,
+    script: 'blizzard',
+    targeting: 'area',
+    description: 'Hold the sky open and let winter keep striking the ground you chose.',
+    effects: [
+      { kind: 'damage', element: 'cold', amount: 'Repeated low-damage ice strikes in the chosen storm area' },
+      { kind: 'status', status: 'frost', duration: 'Brief slowing on creatures caught by an impact' },
+      { kind: 'utility', note: 'Sustained channel; spends mana every realtime tick until cancelled or emptied' },
+    ],
+  },
+  firestorm: {
+    id: 'firestorm',
+    name: 'Firestorm',
+    symbol: '\u{1F525}',
+    schools: ['destruction'],
+    manaCost: 4,
+    manaPerTick: 4,
+    channeling: true,
+    boltsPerTick: 3,
+    minIntelligence: 0,
+    range: 10,
+    radius: 3,
+    script: 'firestorm',
+    targeting: 'area',
+    description: 'Sustain a rain of cinders and falling embers over a marked patch of ground.',
+    effects: [
+      { kind: 'damage', element: 'fire', amount: 'Repeated low-damage fire strikes in the chosen storm area' },
+      { kind: 'status', status: 'burn', duration: 'Short burning applied to survivors struck by an impact' },
+      { kind: 'utility', note: 'Sustained channel; spends mana every realtime tick until cancelled or emptied' },
+    ],
+  },
   heal: {
     id: 'heal',
     name: 'Heal',
@@ -175,6 +220,22 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Consumes roughly a quarter of a cleric\'s starting mana' },
       { kind: 'utility', note: 'Restores 22% of max HP (minimum 1)' },
       { kind: 'damage', element: 'holy', amount: '2 base to adjacent hostile creatures; INT-scaled, can crit' },
+    ],
+  },
+  smite: {
+    id: 'smite',
+    name: 'Smite',
+    symbol: '\u2726',
+    schools: ['holy', 'destruction'],
+    manaCost: 6,
+    minIntelligence: 0,
+    range: 8,
+    script: 'smite',
+    targeting: 'target',
+    description: 'Call down a clean spear of judgment on the nearest sinner in sight.',
+    effects: [
+      { kind: 'damage', element: 'holy', amount: '6 base, INT-scaled, can crit' },
+      { kind: 'utility', note: 'Targets a hostile creature in line of sight' },
     ],
   },
   summon_skeleton: {
@@ -261,7 +322,9 @@ export function listSpells() {
 export function describeSpellDetailLines(spell) {
   if (!spell) return [];
   return [
-    `Mana ${Number(spell.manaCost || 0)}`,
+    spell.channeling
+      ? `Mana ${Number(spell.manaPerTick ?? spell.manaCost ?? 0)} / tick`
+      : `Mana ${Number(spell.manaCost || 0)}`,
     Number.isFinite(spell.range) ? `Range ${Number(spell.range) | 0}` : "",
     Number.isFinite(spell.minIntelligence) && Number(spell.minIntelligence) > 0
       ? `Int ${Number(spell.minIntelligence) | 0}+`
@@ -269,6 +332,7 @@ export function describeSpellDetailLines(spell) {
     Number.isFinite(spell.castTime) && Number(spell.castTime) > 0
       ? `Cast ${Number(spell.castTime) | 0} turns`
       : "",
+    spell.channeling ? "Channel: Sustained" : "",
   ].filter(Boolean);
 }
 

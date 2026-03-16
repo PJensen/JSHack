@@ -354,15 +354,34 @@ export function installMessageWiring({
   });
 
   world.on('spell:not-known', ({ actor, spellId }) => {
-    log(`You don't know that spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+    const who = nameOfEntity(actor);
+    if (who === 'You') {
+      log(`You don't know that spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+      return;
+    }
+    log(`${who} tries to cast an unknown spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
   });
 
   world.on('spell:unknown', ({ actor, spellId }) => {
-    log(`Unknown spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+    const who = nameOfEntity(actor);
+    if (who === 'You') {
+      log(`Unknown spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+      return;
+    }
+    log(`${who} attempts an invalid spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
   });
 
   world.on('spell:oom', ({ actor, spellId, need, have }) => {
-    log(`Not enough mana to cast [${String(spellId || 'spell')}] (need ${need}, have ${have}).`, 'system');
+    const who = nameOfEntity(actor);
+    if (who === 'You') {
+      log(`Not enough mana to cast [${String(spellId || 'spell')}] (need ${need}, have ${have}).`, 'system');
+      return;
+    }
+    if (spellId) {
+      log(`${who} lacks mana for [${String(spellId)}].`, 'system');
+      return;
+    }
+    log(`${who} lacks mana to cast.`, 'system');
   });
 
   world.on('spell:fizzle', ({ actor, spellId, confused }) => {
@@ -397,8 +416,9 @@ export function installMessageWiring({
     log(`You begin channeling ${label}...`, 'system');
   });
 
-  world.on('channeling:tick', ({ actor, spellId, turnsRemaining, turnsTotal }) => {
+  world.on('channeling:tick', ({ actor, spellId, mode, turnsRemaining, turnsTotal }) => {
     if (nameOfEntity(actor) !== 'You') return;
+    if (mode === 'sustain') return;
     const elapsed = Math.max(0, (turnsTotal || 0) - (turnsRemaining || 0));
     log(`Channeling... (${elapsed}/${turnsTotal || '?'})`, 'system');
   });
@@ -407,6 +427,8 @@ export function installMessageWiring({
     if (nameOfEntity(actor) !== 'You') return;
     if (reason === 'dead') {
       log('Channeling interrupted by death.', 'combat');
+    } else if (reason === 'oom') {
+      log('Your mana gives out and the channel collapses.', 'system');
     } else {
       log('Channeling interrupted.', 'system');
     }
@@ -419,6 +441,12 @@ export function installMessageWiring({
       return;
     }
     log('You cannot act right now.', 'system');
+  });
+
+  world.on('spell:smite', ({ actor, fizzle }) => {
+    if (!fizzle) return;
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Smite finds no target.', 'system');
   });
 
   world.on('spell:flash_heal', ({ actor, reason, amount }) => {
@@ -539,6 +567,28 @@ export function installMessageWiring({
     }
     log('Meteor fizzles.', 'system');
   });
+
+  function installStormFailureMessage(eventName, spellName) {
+    world.on(eventName, ({ actor, reason, range }) => {
+      if (nameOfEntity(actor) !== 'You') return;
+      if (reason === 'no_target') {
+        log(`${spellName} needs a target tile.`, 'system');
+        return;
+      }
+      if (reason === 'out_of_range') {
+        log(`${spellName} target is out of range (${Number(range || 10) | 0} tiles).`, 'system');
+        return;
+      }
+      if (reason === 'blocked_los') {
+        log(`${spellName} target must be in line of sight.`, 'system');
+        return;
+      }
+      log(`${spellName} fizzles.`, 'system');
+    });
+  }
+
+  installStormFailureMessage('spell:blizzard:failed', 'Blizzard');
+  installStormFailureMessage('spell:firestorm:failed', 'Firestorm');
 
   world.on('monster:firebreath', ({ actor, target }) => {
     if (nameOfEntity(target) !== 'You') return;
@@ -1270,6 +1320,23 @@ export function installMessageWiring({
   });
   world.on('combat:target-flying', () => {
     log('Out of reach!', 'info');
+  });
+
+  // === Trap events ===
+  world.on('trap:avoided', ({ victimId, trapId, type }) => {
+    const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+    const name = trapNames[type] || 'trap';
+    log(`You nimbly dodge the ${name}!`, 'info');
+  });
+  world.on('trap:disarmed', ({ actor, trapType }) => {
+    const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+    const name = trapNames[trapType] || 'trap';
+    log(`You carefully disarm the ${name}.`, 'info');
+  });
+  world.on('trap:disarm:failed', ({ actor, trapType }) => {
+    const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+    const name = trapNames[trapType] || 'trap';
+    log(`You fumble the ${name} — it triggers!`, 'danger');
   });
 
   // === Weather events ===

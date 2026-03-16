@@ -1,8 +1,6 @@
-import { Equipment } from "../components/Equipment.js";
 import { HUNGER_COMBAT_LEVELS } from "../data/hungerCombatLevels.js";
 import { resolveResistance } from "./dealDamage.js";
-import { resolveDerivedStats } from "./derivedStats.js";
-import { getPassiveBonuses } from "./passiveBonuses.js";
+import { resolveCanonicalStats } from "./canonicalStats.js";
 import { statusStrength } from "./statusFacade.js";
 
 const MODE_RULES = Object.freeze({
@@ -55,15 +53,14 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
   const mode = String(context.mode || "melee").toLowerCase();
   const rules = getModeRules(mode);
 
-  const eq = (id > 0 && world.isAlive(id)) ? world.get(id, Equipment) : null;
-  const passive = getPassiveBonuses(world, id);
-  const resolvedStats = resolveDerivedStats(world, id);
+  const resolvedStats = resolveCanonicalStats(world, id);
 
-  const attackDerived = Number(passive?.attackDerived || 0);
-  const defenseDerived = Number(passive?.defenseDerived || 0);
-  const luckDerived = Number(passive?.luckDerived || 0) + statusStrength(world, id, "lucky");
-  const critChanceDerived = Number(passive?.critChanceDerived || 0) + Number(resolvedStats?.critChance || 0);
-  const critMultDerived = Number(passive?.critMultDerived || 0) + Math.max(0, Number(resolvedStats?.critMultiplier || 1.5) - 1.5);
+  const accuracy = Number(resolvedStats?.accuracy || 0);
+  const damagePower = Number(resolvedStats?.damagePower || 0);
+  const evade = Number(resolvedStats?.evade || 0);
+  const luck = Number(resolvedStats?.luck || 0) + statusStrength(world, id, "lucky");
+  const critChance = Number(resolvedStats?.critChancePhysical || 0);
+  const critMult = Number(resolvedStats?.critMultPhysical || 0);
 
   let hunger = 0;
   for (let i = 0; i < HUNGER_COMBAT_LEVELS.length; i++) {
@@ -83,9 +80,9 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
   /** @type {Array<{stat:'attack'|'defense', source:string, value:number, reason:string}>} */
   const modifiers = [];
 
-  let attackBonus = 1 + attackDerived;
+  let attackBonus = 1 + accuracy;
   pushModifier(modifiers, "attack", "base", 1, "base-to-hit");
-  pushModifier(modifiers, "attack", "equipment:attackDerived", attackDerived, "equipment-derived");
+  pushModifier(modifiers, "attack", "resolved:accuracy", accuracy, "resolved-accuracy");
 
   if (rules.includeAttackStatuses) {
     pushModifier(modifiers, "attack", "status:disease", -statusTotals.disease, "disease-penalty");
@@ -108,9 +105,9 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     attackBonus = 0;
   }
 
-  let defenseContribution = defenseDerived;
+  let defenseContribution = evade;
   pushModifier(modifiers, "defense", "base", 10, "base-armor-class");
-  pushModifier(modifiers, "defense", "equipment:defenseDerived", defenseDerived, "equipment-derived");
+  pushModifier(modifiers, "defense", "resolved:evade", evade, "resolved-evade");
 
   if (rules.includeDefenseStatuses) {
     pushModifier(modifiers, "defense", "status:disease", -statusTotals.disease, "disease-penalty");
@@ -143,13 +140,15 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     mode,
     attackBonus,
     armorClass: 10 + defenseContribution,
-    damageFlatBonus: Math.max(0, Math.floor(attackDerived / 2)),
+    damageFlatBonus: Math.max(0, Math.floor(damagePower / 2)),
     damageMult: statusTotals.berserk > 0 ? 4 : 1,
-    attackDerived,
-    defenseDerived,
-    luck: luckDerived,
-    critChance: critChanceDerived,
-    critMult: critMultDerived,
+    accuracy,
+    damagePower,
+    evade,
+    mitigation: Number(resolvedStats?.mitigation || 0),
+    luck,
+    critChance,
+    critMult,
     status: Object.freeze({ ...statusTotals }),
     modifiers: Object.freeze(modifiers),
   };

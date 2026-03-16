@@ -81,6 +81,7 @@ import { createPlayer } from "./rules/archetypes/Player.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { Brain } from "./rules/components/Brain.js";
+import { BaseStats } from "./rules/components/BaseStats.js";
 import { Mana } from "./rules/components/Mana.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
 import { buildPalette } from "./display/palette/index.js";
@@ -118,7 +119,7 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
-import { resolveItemDisplayName } from "./main/wiring/itemName.js";
+import { resolveItemDisplayName, buildItemDisplayData } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored } from "./rules/environment/dungeon/exploredMap.js";
 import { getTile, isWalkable, isOpaque, isFlyable } from "./rules/environment/dungeon/tileMap.js";
@@ -527,6 +528,7 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
   blink: Object.freeze({
     fallbackRange: 10,
     requiresLOS: false,
+    requiresVisible: false,
     describePrompt(range) {
       return `Choose blink destination (up to ${range} tiles). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
@@ -534,19 +536,39 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
   meteor: Object.freeze({
     fallbackRange: 12,
     requiresLOS: true,
+    requiresVisible: false,
     describePrompt(range) {
       return `Choose meteor target (LOS, range ${range}). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
+    },
+  }),
+  blizzard: Object.freeze({
+    fallbackRange: 10,
+    requiresLOS: true,
+    requiresVisible: true,
+    useVisionRange: true,
+    describePrompt(range) {
+      return `Choose blizzard target (visible tile, up to ${range} tiles). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
+    },
+  }),
+  firestorm: Object.freeze({
+    fallbackRange: 10,
+    requiresLOS: true,
+    requiresVisible: true,
+    useVisionRange: true,
+    describePrompt(range) {
+      return `Choose firestorm target (visible tile, up to ${range} tiles). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
   }),
   phase_strike: Object.freeze({
     fallbackRange: 10,
     requiresLOS: false,
+    requiresVisible: false,
     describePrompt(range) {
       return `Choose Phase Strike destination (up to ${range} tiles). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
   }),
 });
-/** @type {{ spellId: string, spellName: string, range: number, requiresLOS: boolean }|null} */
+/** @type {{ spellId: string, spellName: string, range: number, requiresLOS: boolean, requiresVisible?: boolean }|null} */
 let _pendingSpellTargeting = null;
 /** @type {{ actorId: number, itemId: number, itemName: string, range: number }|null} */
 let _pendingThrowTargeting = null;
@@ -609,6 +631,14 @@ function clampTargetToRange(fromX, fromY, toX, toY, maxRange) {
   const cx = ox + Math.round(dx * scale);
   const cy = oy + Math.round(dy * scale);
   return { x: cx, y: cy };
+}
+
+function getPlayerVisionRange() {
+  const pe = playerEntity(world);
+  if (!pe?.id) return 0;
+  const brain = world.get(pe.id, Brain);
+  const passive = getPassiveBonuses(world, pe.id);
+  return Math.max(1, ((Number(brain?.visionRange ?? 8) | 0) + (Number(passive?.visionRangeDerived ?? 0) | 0)));
 }
 
 const spellCtrl = createActiveSpellController(world);
@@ -703,6 +733,14 @@ function classifySurfaceTile(tile) {
 {
   const ds = runtimeConfig.dungeonScale;
   if (Number.isFinite(ds) && ds > 0) dungeonConfig.dungeonScale = ds;
+}
+
+// Allow URL override: ?sparsity=0.55 for airier room layouts inside each chunk
+{
+  const sparsity = runtimeConfig.sparsity;
+  if (Number.isFinite(sparsity) && sparsity >= 0 && sparsity <= 1) {
+    dungeonConfig.roomSparsity = sparsity;
+  }
 }
 
 // Allow URL override: ?floor=0|1|... to choose start depth.
@@ -827,6 +865,14 @@ function _finalizeNewGame(classData) {
         if (stats.visionRange != null) brain.visionRange = stats.visionRange;
       }
 
+      // Base stats from class (strength, dexterity, vitality, intelligence)
+      world.add(pe.id, BaseStats, {
+        strength: stats.strength ?? 10,
+        intelligence: stats.intelligence ?? 10,
+        dexterity: stats.dexterity ?? 10,
+        vitality: stats.vitality ?? 10,
+      });
+
       // Class-driven loadout
       const inv = world.get(pe.id, Inventory);
       const eq = world.get(pe.id, Equipment);
@@ -834,18 +880,17 @@ function _finalizeNewGame(classData) {
         if (!inv) return 0;
         const createdId = createItemById(world, itemId, opts);
         if (!(createdId > 0)) return 0;
-        if (!addToInventory(world, pe.id, createdId)) return 0;
+        if (!addToInventory(world, pe.id, createdId, { silent: true })) return 0;
         // Starting gear is always identified
         identify(itemId);
         return createdId;
       };
 
       if (eq && classDef) {
-        if (classDef.equipment.weapon) eq.weapon = addStarterItem(classDef.equipment.weapon) || null;
-        if (classDef.equipment.armor) eq.armor = addStarterItem(classDef.equipment.armor) || null;
-        if (classDef.equipment.offhand) eq.offhand = addStarterItem(classDef.equipment.offhand) || null;
-        if (classDef.equipment.neck) eq.neck = addStarterItem(classDef.equipment.neck) || null;
-        if (classDef.equipment.feet) eq.feet = addStarterItem(classDef.equipment.feet) || null;
+        for (const [slot, itemId] of Object.entries(classDef.equipment || {})) {
+          if (!(slot in eq)) continue;
+          eq[slot] = itemId ? (addStarterItem(itemId) || null) : null;
+        }
       }
       if (classDef) {
         for (const { itemId, count } of classDef.inventoryItems) {
@@ -853,12 +898,9 @@ function _finalizeNewGame(classData) {
         }
       }
       // Starting spell(s) from class — supports both startingSpell (string) and startingSpells (array)
-      const forcedClassSpell = classDef?.id === "cleric" ? "flash_heal" : null;
       /** @type {string[]} */
       const classSpells = [];
-      if (forcedClassSpell) {
-        classSpells.push(forcedClassSpell);
-      } else if (Array.isArray(classDef?.startingSpells)) {
+      if (Array.isArray(classDef?.startingSpells)) {
         for (const s of classDef.startingSpells) { if (s) classSpells.push(String(s)); }
       } else if (classDef?.startingSpell) {
         classSpells.push(String(classDef.startingSpell));
@@ -896,8 +938,9 @@ function _finalizeNewGame(classData) {
         world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
         world.add(petId, Vitality, { maxHp: 30, hp: 30 });
         world.add(petId, Equipment, {
-          attackDerived: 2,
-          defenseDerived: 2
+          accuracyDerived: 2,
+          damagePowerDerived: 2,
+          evadeDerived: 2
         });
         world.add(petId, PetState, {
           state: 'following',
@@ -1197,10 +1240,11 @@ addEventListener('ui:castActiveSpell', () => {
   if (targetedCfg) {
     const spell = getSpell(id);
     const spellName = String(spell?.name || id);
-    const range = Math.max(
+    const configuredRange = Math.max(
       1,
       Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : (Number(targetedCfg.fallbackRange) | 0),
     );
+    const range = targetedCfg.useVisionRange === true ? getPlayerVisionRange() : configuredRange;
     if (_pendingSpellTargeting?.spellId === id) {
       _pendingSpellTargeting = null;
       _targetCursor = null;
@@ -1212,6 +1256,7 @@ addEventListener('ui:castActiveSpell', () => {
       spellName,
       range,
       requiresLOS: targetedCfg.requiresLOS === true,
+      requiresVisible: targetedCfg.requiresVisible === true,
     };
     // Initialize keyboard cursor at player position
     const _pe = playerEntity(world);
@@ -1417,6 +1462,10 @@ addEventListener('keydown', (ev) => {
           return;
         }
       }
+      if (pending.requiresVisible && !isVisibleAt(finalTx, finalTy)) {
+        try { messageLog.log({ text: `${pending.spellName} target must be visible.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+        return;
+      }
       _pendingSpellTargeting = null;
       _targetCursor = null;
       const rulesHandler = makeRulesDispatcher(world, () => pe.id);
@@ -1576,6 +1625,15 @@ world.on('scroll:genocide', ({ actor }) => {
   world.emit?.('scroll:genocide:request', { actor, query: input.trim() });
 });
 
+// Wait button → dispatch wait action
+addEventListener('ui:wait', () => {
+  if (isSimUiBlocked()) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.wait', payload: {} });
+});
+
 // Pray button → dispatch pray action
 addEventListener('ui:pray', () => {
   if (isSimUiBlocked()) return;
@@ -1686,24 +1744,25 @@ world.on('item:pickup', ({ actor, itemId, count }) => {
     ftext.addGold(pos.x, pos.y, n, { color: '#ffcd45' });
   }
 });
-// Dispatch quick-slot notification for non-currency pickups
-world.on('item:pickup', ({ actor, itemId, stackedIntoId }) => {
+// Centralized quick-slot chip for any item entering player inventory
+world.on('inventory:added', ({ ownerId, itemId }) => {
   const pe = playerEntity(world);
-  if (!pe || pe.id !== actor) return;
-  // When stacked, the original entity is destroyed; use the surviving stack entity.
-  const resolvedId = (stackedIntoId > 0) ? stackedIntoId : itemId;
-  const info = world.get(resolvedId, ItemInfo);
+  if (!pe || pe.id !== ownerId) return;
+  const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
         item: {
-          id: Number(resolvedId),
-          identity: world.get(resolvedId, NamedIdentity)?.identity || '',
+          id: Number(itemId),
+          identity: world.get(itemId, NamedIdentity)?.identity || '',
           type: info.type || 'item',
           slot: info.slot || '',
-          name: resolveItemDisplayName(world, resolvedId),
-          count: info.count || 1
+          name: resolveItemDisplayName(world, itemId),
+          count: info.count || 1,
+          rarityName: info.rarityName || 'common',
+          glyph: palette?.[world.get(itemId, NamedIdentity)?.identity]?.glyph || '',
+          glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff'
         }
       }
     }));
@@ -2614,6 +2673,15 @@ canvas.addEventListener('pointerdown', (ev) => {
         return;
       }
     }
+    if (pendingSpell.requiresVisible && !isVisibleAt(tx, ty)) {
+      try {
+        messageLog.log({
+          text: `${pendingSpell.spellName} target must be visible.`,
+          type: 'system',
+        });
+      } catch (e) { console.debug('[main] messageLog failed:', e); }
+      return;
+    }
 
     _pendingSpellTargeting = null;
     _targetCursor = null;
@@ -2915,6 +2983,7 @@ const displayRuntime = setupDisplayRuntime({
 });
 const {
   statusEmitterFx,
+  statusPresentationDelayFx,
   boltFx,
   delayedDeathFx,
   projectileFx,
@@ -4084,7 +4153,8 @@ function frame(now) {
   layoutBubbleDialog();
 
   // Render
-  const view = getCachedView();
+  const rawView = getCachedView();
+  const view = statusPresentationDelayFx.filterWorldView(rawView, _fxTime);
   if (view.player && !cam._detached) {
     followEntity(cam, view.player.pos, dtSec, 6.0);
   }

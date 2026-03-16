@@ -10,13 +10,20 @@ import { Inventory } from "../components/Inventory.js";
 import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { destroyInventoryRoot, inventoryItems, removeFromInventory } from "../utils/inventoryFacade.js";
+import {
+  destroyInventoryRoot,
+  inventoryItems,
+  removeFromInventory,
+} from "../utils/inventoryFacade.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { Pet } from "../components/Pet.js";
 import { Owner } from "../components/Owner.js";
-import { Player } from "../components/Player.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
-import { getMonster, getMonsterLootTable, getMonsterTags } from "../data/monsters.js";
+import {
+  getMonster,
+  getMonsterLootTable,
+  getMonsterTags,
+} from "../data/monsters.js";
 import { dropLoot } from "../data/lootResolver.js";
 import { createCorpse } from "../archetypes/Food.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
@@ -38,20 +45,27 @@ export function cleanupSystem(world) {
         for (const itemId of items) {
           const info = world.get(itemId, ItemInfo);
           removeFromInventory(world, id, itemId);
-          try { world.add(itemId, Position, { x: pos.x, y: pos.y }); } catch { /* already had pos or deferred */ }
-          try { world.emit && world.emit('item:dropped', { actor: id, itemId, count: info?.count || 1, at: { x: pos.x, y: pos.y } }); } catch (e) { console.debug('[cleanupSystem] emit item:dropped failed:', e); }
+          try {
+            world.add(itemId, Position, { x: pos.x, y: pos.y });
+          } catch { /* already had pos or deferred */ }
+          try {
+            world.emit &&
+              world.emit("item:dropped", {
+                actor: id,
+                itemId,
+                count: info?.count || 1,
+                at: { x: pos.x, y: pos.y },
+              });
+          } catch (e) {
+            console.debug("[cleanupSystem] emit item:dropped failed:", e);
+          }
         }
       }
       // Check if this was a pet before cleanup
       const wasPet = world.has(id, Pet);
-      let petOwnerId = 0;
-      if (wasPet) {
-        // Find the owner (player who had this pet)
-        for (const [playerId] of world.query(Player)) {
-          petOwnerId = playerId;
-          break;
-        }
-      }
+      const petOwnerId = wasPet
+        ? (Number(world.get(id, Owner)?.ownerId || 0) | 0)
+        : 0;
 
       // Generate loot from monster's loot table
       const ident = world.get(id, NamedIdentity);
@@ -59,35 +73,44 @@ export function cleanupSystem(world) {
         const monsterDef = getMonster(ident.identity);
 
         // For pets without monster definitions, create a fallback definition
-        const effectiveMonsterDef = monsterDef || (wasPet ? {
-          id: ident.identity || 'pet',
-          name: ident.name || 'Pet',
-          sizeClass: 'S',
-          massKg: 10,
-          tier: 0
-        } : null);
+        const effectiveMonsterDef = monsterDef || (wasPet
+          ? {
+            id: ident.identity || "pet",
+            name: ident.name || "Pet",
+            sizeClass: "S",
+            massKg: 10,
+            tier: 0,
+          }
+          : null);
 
         if (effectiveMonsterDef) {
           // Drop loot only if there's a real monster definition with a loot table
           if (monsterDef) {
             const tableId = getMonsterLootTable(monsterDef);
             const step = world.step | 0;
-            const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ ((id * 0x517cc1b7) >>> 0)) >>> 0;
+            const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^
+              ((id * 0x517cc1b7) >>> 0)) >>> 0;
             const rng = createRng(lootSeed);
             let depth = 1;
-            for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
+            for (const [, ds] of world.query(DungeonState)) {
+              depth = ds.currentDepth || 1;
+              break;
+            }
             dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
           }
 
           // Drop a corpse for the killed monster or pet
           // Pets ALWAYS drop corpses (100% chance)
           // Other monsters: Base 25% chance, +10% per tier (higher tier = more likely)
-          const corpseChance = wasPet ? 1.0 : Math.min(1.0, 0.25 + (effectiveMonsterDef.tier || 0) * 0.10);
+          const corpseChance = wasPet
+            ? 1.0
+            : Math.min(1.0, 0.25 + (effectiveMonsterDef.tier || 0) * 0.10);
           // Use the RNG if available, otherwise just check corpseChance directly
           let shouldCreateCorpse = false;
           if (monsterDef) {
             const step = world.step | 0;
-            const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^ ((id * 0x517cc1b7) >>> 0)) >>> 0;
+            const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^
+              ((id * 0x517cc1b7) >>> 0)) >>> 0;
             const rng = createRng(lootSeed);
             const corpseRoll = rng.next();
             shouldCreateCorpse = corpseRoll < corpseChance;
@@ -99,14 +122,17 @@ export function cleanupSystem(world) {
           if (shouldCreateCorpse) {
             // Skeletal monsters drop bones instead of corpses
             const tags = getMonsterTags(effectiveMonsterDef.id);
-            const isSkeletal = tags.includes('skeletal');
+            const isSkeletal = tags.includes("skeletal");
 
             let droppedId;
             if (isSkeletal && !wasPet) {
               droppedId = createFrom(world, Bone, {});
               world.add(droppedId, Position, { x: pos.x, y: pos.y });
             } else {
-              droppedId = createCorpse(world, effectiveMonsterDef, { x: pos.x, y: pos.y });
+              droppedId = createCorpse(world, effectiveMonsterDef, {
+                x: pos.x,
+                y: pos.y,
+              });
             }
 
             // If this was a pet, mark the corpse with Pet tag and Owner
@@ -117,7 +143,14 @@ export function cleanupSystem(world) {
               } catch { /* */ }
             }
 
-            try { world.emit && world.emit('item:dropped', { itemId: droppedId, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }
+            try {
+              world.emit &&
+                world.emit("item:dropped", {
+                  itemId: droppedId,
+                  count: 1,
+                  at: { x: pos.x, y: pos.y },
+                });
+            } catch { /* */ }
           }
         }
       }
@@ -125,11 +158,11 @@ export function cleanupSystem(world) {
       // Emit betrayal event if a pet died
       if (wasPet && petOwnerId) {
         try {
-          world.emit && world.emit('pet:died', {
+          world.emit && world.emit("pet:died", {
             petId: id,
             ownerId: petOwnerId,
-            name: ident?.name || 'pet',
-            at: pos
+            name: ident?.name || "pet",
+            at: pos,
           });
         } catch { /* */ }
       }

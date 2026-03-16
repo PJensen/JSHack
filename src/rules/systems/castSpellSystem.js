@@ -7,6 +7,7 @@ import { runSpellScript } from "../scripts/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { resolveDerivedStats } from "../utils/derivedStats.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -128,25 +129,50 @@ export function castSpellSystem(world) {
       }
     }
 
+    const minIntelligence = Math.max(0, Number(spell?.minIntelligence || 0) | 0);
+    if (minIntelligence > 0) {
+      const resolved = resolveDerivedStats(world, actor);
+      const currentIntelligence = Math.max(
+        Number(resolved?.intelligence || 0),
+        Number(brain?.intelligence || 0),
+      );
+      if (currentIntelligence < minIntelligence) {
+        try {
+          world.emit && world.emit("spell:int-too-low", {
+            actor,
+            spellId: spell.id,
+            need: minIntelligence,
+            have: currentIntelligence,
+          });
+        } catch (e) { console.debug('[castSpellSystem] emit spell:int-too-low failed:', e); }
+        world.remove(actor, CastSpellIntent);
+        continue;
+      }
+    }
+
     /** @type {{ mana?: number, maxMana?:number }|null} */
     const mana = /** @type any */ (world.get(actor, Mana));
 
     const confusion = resolveConfusedCast(world, actor, spell, learned);
     const resolvedSpell = confusion.spell;
+    const isSustainedChannel = !!resolvedSpell?.channeling;
+    const manaCost = isSustainedChannel
+      ? Number(resolvedSpell.manaPerTick ?? resolvedSpell.manaCost ?? 0)
+      : Number(resolvedSpell.manaCost || 0);
 
-    // Channeled casts already paid mana when channeling started — skip deduction.
+    // Sustained channels gate on one tick of mana up front but spend it during the
+    // realtime channel loop. Cast-time channels keep the existing upfront payment.
     if (!fromChanneling) {
       const have = Number(mana?.mana ?? 0);
-      const cost = Number(resolvedSpell.manaCost || 0);
-      if (have < cost) {
-        try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: cost, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
+      if (have < manaCost) {
+        try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: manaCost, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
         world.remove(actor, CastSpellIntent);
         continue;
       }
 
-      // Deduct mana and suppress regen this turn
-      if (mana) {
-        mana.mana = have - cost;
+      if (mana && !isSustainedChannel) {
+        // Deduct upfront mana and suppress regen this turn for instant/cast-time spells.
+        mana.mana = have - manaCost;
         mana.regenCooldown = MANA_REGEN_COOLDOWN;
       }
     }
@@ -173,8 +199,10 @@ export function castSpellSystem(world) {
     if (castTime > 0 && !fromChanneling) {
       try {
         world.add(actor, Channeling, {
+          mode: "cast",
           turnsRemaining: castTime,
           turnsTotal: castTime,
+          manaPerTick: 0,
           spellId: resolvedSpell.id,
           targetId: intent.targetId || actor,
           x: intent.x ?? null,
@@ -183,6 +211,31 @@ export function castSpellSystem(world) {
       } catch {}
       try {
         world.emit?.('channeling:start', { actor, spellId: resolvedSpell.id, castTime });
+      } catch {}
+      world.remove(actor, CastSpellIntent);
+      continue;
+    }
+
+    if (isSustainedChannel && !fromChanneling) {
+      try {
+        world.add(actor, Channeling, {
+          mode: "sustain",
+          turnsRemaining: 0,
+          turnsTotal: 0,
+          manaPerTick: manaCost,
+          spellId: resolvedSpell.id,
+          targetId: intent.targetId || actor,
+          x: intent.x ?? null,
+          y: intent.y ?? null,
+        });
+      } catch {}
+      try {
+        world.emit?.("channeling:start", {
+          actor,
+          spellId: resolvedSpell.id,
+          mode: "sustain",
+          manaPerTick: manaCost,
+        });
       } catch {}
       world.remove(actor, CastSpellIntent);
       continue;

@@ -1,6 +1,7 @@
 import { assert } from "jsr:@std/assert";
 import { generateChunk, edgeGate, findDoorPositions } from '../src/rules/environment/dungeon/chunk.js';
 import { CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR } from '../src/rules/environment/dungeon/constants.js';
+import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
 
 function floodFill(tiles, stride, sx, sy) {
   const visited = new Set();
@@ -162,5 +163,44 @@ Deno.test("rooms have world-coordinate positions", () => {
     assert(room.y >= oy, `room.y >= chunk origin y`);
     assert(room.x + room.w <= ox + CHUNK_SIZE, `room fits in chunk x`);
     assert(room.y + room.h <= oy + CHUNK_SIZE, `room fits in chunk y`);
+  }
+});
+
+Deno.test("room sparsity reduces per-chunk room count", () => {
+  const previous = dungeonConfig.roomSparsity;
+  const seeds = [1, 42, 123, 777, 999];
+
+  try {
+    dungeonConfig.roomSparsity = 0;
+    const denseCount = seeds.reduce((sum, seed) => sum + generateChunk(seed, 1, 0, 0).rooms.length, 0);
+
+    dungeonConfig.roomSparsity = 0.75;
+    const sparseCount = seeds.reduce((sum, seed) => sum + generateChunk(seed, 1, 0, 0).rooms.length, 0);
+
+    assert(sparseCount < denseCount, `expected sparse chunks to have fewer rooms (${sparseCount} < ${denseCount})`);
+  } finally {
+    dungeonConfig.roomSparsity = previous;
+  }
+});
+
+Deno.test("generated chunks do not leave interior floor tiles touching void", () => {
+  for (const seed of [1, 42, 123, 777]) {
+    const chunk = generateChunk(seed, 1, 0, 0);
+    for (let y = 1; y < CHUNK_SIZE - 1; y++) {
+      for (let x = 1; x < CHUNK_SIZE - 1; x++) {
+        const tile = chunk.tiles[y * CHUNK_SIZE + x];
+        if (tile !== TILE_FLOOR && tile !== TILE_DOOR) continue;
+        const neighbors = [
+          chunk.tiles[y * CHUNK_SIZE + x - 1],
+          chunk.tiles[y * CHUNK_SIZE + x + 1],
+          chunk.tiles[(y - 1) * CHUNK_SIZE + x],
+          chunk.tiles[(y + 1) * CHUNK_SIZE + x],
+        ];
+        assert(
+          neighbors.every((neighbor) => neighbor !== TILE_VOID),
+          `seed ${seed} leaked void next to walkable tile at (${x},${y})`
+        );
+      }
+    }
   }
 });

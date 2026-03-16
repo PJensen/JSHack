@@ -8,6 +8,7 @@ import { Position } from "../components/Position.js";
 import { Trap } from "../components/Trap.js";
 import { mulberry32, rngInt, combatSeed, pct } from "../utils/rng.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+import { resolveCanonicalStats } from "../utils/canonicalStats.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
@@ -66,9 +67,12 @@ export function disarmTrapSystem(world) {
     const roll = rngInt(rng, 1, 20);
     const dc = t.difficulty || 10;
 
-    // Luck modifier: positive luck gives a lucky save on failure,
-    // negative luck can fumble a success.
-    let success = roll >= dc;
+    // Dexterity bonus: evade stat includes dexBonus + equipment bonuses
+    const stats = resolveCanonicalStats(world, actorId);
+    const dexBonus = Number(stats?.evade || 0);
+
+    // Skill check: d20 + dexBonus vs DC
+    let success = (roll + dexBonus) >= dc;
     const passive = getPassiveBonuses(world, actorId);
     const luck = Number(passive?.luckDerived || 0) + statusStrength(world, actorId, "lucky");
     if (!success && luck > 0) {
@@ -86,6 +90,7 @@ export function disarmTrapSystem(world) {
         trapType: t.type,
         roll,
         dc,
+        dexBonus,
       });
     } else {
       // Failure — trap triggers on the actor
@@ -106,6 +111,7 @@ export function disarmTrapSystem(world) {
         trapType: t.type,
         roll,
         dc,
+        dexBonus,
       });
     }
   }

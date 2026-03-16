@@ -6,8 +6,10 @@ import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { transitionToDepth } from '../src/rules/environment/dungeon/transition.js';
-import { initDungeon } from '../src/rules/environment/dungeon/index.js';
-import { loadedChunkCount, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
+import { initDungeon, generateFloor } from '../src/rules/environment/dungeon/index.js';
+import { loadedChunkCount, clearAll, getTile, isWalkable, forEachLoadedTile } from '../src/rules/environment/dungeon/tileMap.js';
+import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
+import { TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { spawnPlasmaCloud } from "../src/rules/utils/spawnPlasmaCloud.js";
 
 function makePlayerAt(world, x, y) {
@@ -121,4 +123,59 @@ Deno.test("transitionToDepth destroys tracked hazards from prior floor", () => {
     if (kind === "plasma" || identity === "plasma_cloud") plasmaHazards++;
   }
   assert(plasmaHazards === 0, "tracked cloud hazards should not survive transition");
+});
+
+Deno.test("inherited up stairs preserve exact world coordinates across dungeon scales", () => {
+  const previousScale = dungeonConfig.dungeonScale;
+  const scales = [0.1, 0.3, 1.0, 2.0];
+  const seeds = [42, 777, 9999];
+
+  try {
+    for (const scale of scales) {
+      dungeonConfig.dungeonScale = scale;
+      for (const seed of seeds) {
+        clearAll();
+        const upperWorld = new World({ seed });
+        const upperFloor = generateFloor(upperWorld, seed, 1);
+        const priorDownStairPositions = upperFloor.downStairPositions.slice();
+
+        clearAll();
+        const lowerWorld = new World({ seed });
+        const lowerFloor = generateFloor(lowerWorld, seed, 2, null, null, priorDownStairPositions);
+
+        const reachable = new Set();
+        const queue = [[lowerFloor.spawnX, lowerFloor.spawnY]];
+        reachable.add(`${lowerFloor.spawnX},${lowerFloor.spawnY}`);
+        while (queue.length > 0) {
+          const [cx, cy] = queue.shift();
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = cx + dx;
+            const ny = cy + dy;
+            const key = `${nx},${ny}`;
+            if (reachable.has(key)) continue;
+            if (!isWalkable(nx, ny)) continue;
+            reachable.add(key);
+            queue.push([nx, ny]);
+          }
+        }
+
+        for (const pos of priorDownStairPositions) {
+          const tile = getTile(pos.x, pos.y);
+          assert(tile === TILE_STAIR_UP, `scale ${scale} seed ${seed}: expected up stair at (${pos.x},${pos.y}), got tile ${tile}`);
+          assert(isWalkable(pos.x, pos.y), `scale ${scale} seed ${seed}: inherited up stair at (${pos.x},${pos.y}) must be walkable`);
+          assert(reachable.has(`${pos.x},${pos.y}`), `scale ${scale} seed ${seed}: inherited up stair at (${pos.x},${pos.y}) must be reachable`);
+        }
+
+        let inheritedCount = 0;
+        forEachLoadedTile((x, y, tile) => {
+          if (tile !== TILE_STAIR_UP) return;
+          if (priorDownStairPositions.some((pos) => pos.x === x && pos.y === y)) inheritedCount++;
+        });
+        assert(inheritedCount === priorDownStairPositions.length, `scale ${scale} seed ${seed}: expected ${priorDownStairPositions.length} inherited up stairs, got ${inheritedCount}`);
+      }
+    }
+  } finally {
+    dungeonConfig.dungeonScale = previousScale;
+    clearAll();
+  }
 });

@@ -32,6 +32,7 @@ JSHack has burned twice (Oct 23 and Nov 6, 2025) by violating these constraints.
 0.4. **Hacking is the point**: We are **absolutely HACKING and having fun exploiting JavaScript**. Clever tricks are encouraged. Over-engineering is not. Push the language, don't fight it.
 0.5. **No build step, ever**: Pure ES modules, no transpilation, no bundling. This is non-negotiable.
 0.6. **Deno, not Node**: All tooling, testing, and scripts use Deno. If you write a test or utility script, it runs on Deno.
+0.7. **CANNON, not release valves**: For each domain operation, there must be one canonical implementation path. Every alternate entry point must delegate to it and stay parity-tested.
 
 **Game-specific constraints (keep the roguelike pure):**
 
@@ -86,6 +87,21 @@ Rules:
 - It must **not** become a cross-system queue.
 - In rules code, only `src/rules/utils/actionContexts.js` may import it directly.
 - If you need multi-system ordering, use intent components + scheduler phases (`intents`, `effects`, `cleanup`), not transaction ops.
+
+### Canonical pathways (CANNON)
+
+As the codebase grows, avoid one-off "release valves" that bypass canonical construction/mutation logic.
+
+Rules:
+- For any repeated operation (spawn monster, spawn item, cast spell, apply status), define exactly one canonical implementation.
+- All alternate call sites (debug commands, scripts, transactions, dungeon materialization, spawners) must delegate to the canonical path.
+- If an alternate call site cannot delegate, it must reproduce the full canonical payload and have a parity regression test.
+- Never ship ad-hoc bootstrap patches as permanent behavior when canonical-path parity can be fixed at the source.
+
+Required parity pattern:
+- Add/maintain a parity test that compares outcomes across all spawn vectors for the same entity family.
+- Example for monsters: debug mutation spawn, dungeon materialize spawn, and spawner child spawn must produce equivalent gameplay-relevant components (identity, brain/spells, mana, resistances, speed, creature type, hooks behavior).
+- Treat parity drift as a blocker, not a cleanup task.
 
 ---
 
@@ -1099,6 +1115,17 @@ if (!world[INSTALLED]) {
 3. Verify correct `ScriptVerb` is used
 4. Check for typos in script key (`registerScript` vs `ScriptRef.ref`)
 
+### Spawn parity drift (canonical path violation)
+
+**Symptom**: A monster behaves differently depending on where it was spawned (debug spawn vs dungeon vs spawner vs script).
+
+**Cause**: Multiple spawn paths constructing partial payloads (e.g., missing `learnedSpellIds`, `maxMana`, `manaRegen`, equipment) instead of delegating to the canonical spawn path.
+
+**Fix**:
+1. Route all spawn paths through canonical constructors/utilities.
+2. Ensure each route carries full monster definition payload.
+3. Add/update parity tests to enforce component equivalence across spawn vectors.
+
 ---
 
 ## Maintenance rituals
@@ -1110,6 +1137,8 @@ if (!world[INSTALLED]) {
 - [ ] No system-to-system calls (use events with Symbol tracking)
 - [ ] No imports from `rules/` inside `display/`
 - [ ] No DOM/window/rAF references in `rules/`
+- [ ] Canonical-path parity preserved (no one-off spawn/cast/apply bypasses)
+- [ ] Alternate entry points delegate to canonical utilities or have parity tests
 - [ ] Works on mobile with touch (test on phone or DevTools mobile sim)
 - [ ] All new systems have tests (Deno tests, not Node)
 - [ ] Commit messages are descriptive

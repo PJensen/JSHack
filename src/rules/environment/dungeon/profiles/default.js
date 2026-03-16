@@ -14,6 +14,7 @@
  * @property {number}        roomMargin     - gap between room edge and leaf boundary
  * @property {number}        splitRatioMin  - BSP split position lower bound (0–1)
  * @property {number}        splitRatioMax  - BSP split position upper bound (0–1)
+ * @property {number|null}   roomSparsity   - null = use dungeonConfig.roomSparsity; 0–1 omits more leaf rooms
  * @property {number}        corridorWidth  - corridor tile width (1 = single, 2 = wide)
  * @property {number}        doorChance     - probability a valid doorway becomes a door (0–1)
  * @property {Function|null} postProcess    - fn(tiles, rng, CHUNK_SIZE) mutates in place; called after BSP/generator, before edge gates
@@ -36,6 +37,7 @@ export const DEFAULT_PROFILE = {
   roomMargin:     1,
   splitRatioMin:  0.40,
   splitRatioMax:  0.60,
+  roomSparsity:   null,
   corridorWidth:  1,
   doorChance:     0.6,
   postProcess:    null,

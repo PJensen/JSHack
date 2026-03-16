@@ -219,14 +219,17 @@ export function forEachItem(world, ownerId, callback) {
 
 /**
  * Add an item entity to the owner's inventory root.
+ * @param {object} [opts]
+ * @param {boolean} [opts.silent] - suppress inventory:added event
  */
-export function addToInventory(world, ownerId, itemId) {
+export function addToInventory(world, ownerId, itemId, opts) {
   if (!(itemId > 0) || !world.isAlive(itemId)) return false;
   const rootId = getOrCreateInventoryRoot(world, ownerId);
   if (!(rootId > 0)) return false;
   ensureWeightRecord(world, itemId);
   attach(world, itemId, rootId);
   removeImmediate(world, itemId, Position);
+  if (!opts?.silent) world.emit('inventory:added', { ownerId, itemId });
   return true;
 }
 
@@ -250,14 +253,17 @@ export function clearInventory(world, ownerId) {
 
 /**
  * Move a single item between two inventory owners.
+ * @param {object} [opts]
+ * @param {boolean} [opts.silent] - suppress inventory:added event
  */
-export function transferItem(world, itemId, fromId, toId) {
+export function transferItem(world, itemId, fromId, toId, opts) {
   const fromContainerId = resolveContainerReadOnly(world, fromId);
   if (!fromContainerId || getParent(world, itemId) !== fromContainerId) return false;
   const toRootId = getOrCreateInventoryRoot(world, toId);
   if (!(toRootId > 0)) return false;
   reparent(world, itemId, toRootId);
   removeImmediate(world, itemId, Position);
+  if (!opts?.silent) world.emit('inventory:added', { ownerId: toId, itemId });
   return true;
 }
 

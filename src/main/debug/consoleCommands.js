@@ -16,6 +16,7 @@ import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Faction } from "../../rules/components/Faction.js";
 import { attachProcPackage, listProcPackageIds } from "../../rules/data/procPackages.js";
 
 function describeItem(world, itemId) {
@@ -98,21 +99,36 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
   });
 
   // ---- god ----
-  let _godMode = false;
-  console.registerCommand('god', 'Toggle god mode (invincibility)', () => {
-    _godMode = !_godMode;
+  const GOD_SYM = Symbol.for("jshack:debug:godMode");
+  function toggleGodMode() {
+    world[GOD_SYM] = !world[GOD_SYM];
     const pe = playerEntity(world);
     if (!pe) return 'No player entity found.';
-    const vit = world.get(pe.id, Vitality);
-    if (_godMode) {
-      // Set HP very high
-      if (vit) { vit.maxHp = 99999; vit.hp = 99999; }
+    let ae = world.get(pe.id, ActiveEffects);
+    if (world[GOD_SYM]) {
+      if (!ae) {
+        world.add(pe.id, ActiveEffects, { effects: [] });
+        ae = world.get(pe.id, ActiveEffects);
+      }
+      if (!ae.effects.some(e => e.key === 'invulnerable')) {
+        ae.effects.push({ key: 'invulnerable', turnsLeft: 999999, potency: 1, stacks: 1 });
+      }
     } else {
-      // Reset to a reasonable value (keep current if sane)
-      if (vit && vit.maxHp > 9999) { vit.maxHp = 20; vit.hp = 20; }
+      if (ae) ae.effects = ae.effects.filter(e => e.key !== 'invulnerable');
     }
-    return `God mode ${_godMode ? 'ON' : 'OFF'}`;
-  });
+    const msg = `God mode ${world[GOD_SYM] ? 'ON' : 'OFF'}`;
+    messageLog.log({ text: msg, type: 'system' });
+    return msg;
+  }
+  console.registerCommand('god', 'Toggle god mode (invincibility)', toggleGodMode);
+
+  // Allow keyboard cheat code (IDDQD) to trigger god mode
+  try {
+    window.addEventListener('debug:toggleGodMode', () => {
+      toggleGodMode();
+      world.tick(0);
+    });
+  } catch { /* no window in test env */ }
 
   // ---- spawn <monster_id> ----
   console.registerCommand('spawn', 'spawn <monster_id> — spawn monster near player', (argsStr) => {
@@ -124,6 +140,43 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
     const result = spawnDebugMonsterNearPlayer(world, monsterId);
     if (!result.ok) return result.error;
     return `Spawned ${result.name} at (${result.x}, ${result.y})`;
+  });
+
+  // ---- monsters ----
+  console.registerCommand('monsters', 'List hostile monsters on the current floor', () => {
+    const pe = playerEntity(world);
+    const playerPos = pe ? world.get(pe.id, Position) : null;
+
+    const rows = [];
+    for (const [id, pos, vit, named, faction] of world.query(Position, Vitality, NamedIdentity, Faction)) {
+      if (faction?.key !== 'enemy') continue;
+      const name = named?.name || named?.identity || `entity ${id}`;
+      const identity = named?.identity || 'unknown';
+      const hp = `${Number(vit?.hp ?? 0)}/${Number(vit?.maxHp ?? 0)}`;
+      const dist = playerPos ? Math.abs(pos.x - playerPos.x) + Math.abs(pos.y - playerPos.y) : null;
+      rows.push({
+        id,
+        x: pos.x,
+        y: pos.y,
+        hp,
+        name,
+        identity,
+        dist: dist ?? Number.POSITIVE_INFINITY,
+      });
+    }
+
+    if (!rows.length) return 'No hostile monsters on the current floor.';
+
+    rows.sort((a, b) => {
+      if (a.dist !== b.dist) return a.dist - b.dist;
+      if (a.y !== b.y) return a.y - b.y;
+      if (a.x !== b.x) return a.x - b.x;
+      return a.id - b.id;
+    });
+
+    return rows
+      .map((row) => `#${row.id} ${row.name} <${row.identity}> @ (${row.x}, ${row.y}) HP ${row.hp}${Number.isFinite(row.dist) ? ` d=${row.dist}` : ''}`)
+      .join('\n');
   });
 
   // ---- inventory [list] ----

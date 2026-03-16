@@ -4,8 +4,10 @@ import { getAffixPassiveRefs } from "../data/affixes.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
 export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
-  attackDerived: 0,
-  defenseDerived: 0,
+  accuracyDerived: 0,
+  damagePowerDerived: 0,
+  evadeDerived: 0,
+  mitigationDerived: 0,
   maxHpDerived: 0,
   critChanceDerived: 0,
   critMultDerived: 0,
@@ -23,6 +25,9 @@ export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
   slashResistDerived: 0,
   pierceResistDerived: 0,
   luckDerived: 0,
+  spellHitDerived: 0,
+  spellAvoidDerived: 0,
+  spellRadiusDerived: 0,
   visionRangeDerived: 0,
   hungerRateDerived: 0,
 });
@@ -31,8 +36,10 @@ const PASSIVE_BONUSES_DEFINED = Symbol.for("jshack:passiveBonuses:virtuals:defin
 const PASSIVE_BONUSES_VIRTUAL = Symbol.for("jshack:passiveBonuses:PassiveBonuses");
 
 const BONUS_KEY_MAP = Object.freeze({
-  attack: "attackDerived",
-  defense: "defenseDerived",
+  accuracy: "accuracyDerived",
+  damagePower: "damagePowerDerived",
+  evade: "evadeDerived",
+  mitigation: "mitigationDerived",
   maxHp: "maxHpDerived",
   critChance: "critChanceDerived",
   critMult: "critMultDerived",
@@ -50,6 +57,9 @@ const BONUS_KEY_MAP = Object.freeze({
   slashResist: "slashResistDerived",
   pierceResist: "pierceResistDerived",
   luck: "luckDerived",
+  spellHit: "spellHitDerived",
+  spellAvoid: "spellAvoidDerived",
+  spellRadius: "spellRadiusDerived",
   visionRange: "visionRangeDerived",
   hungerRate: "hungerRateDerived",
 });
@@ -73,6 +83,19 @@ function addPassiveBonus(acc, key, value) {
 }
 
 function markAndAddPassiveBonus(acc, touched, key, value) {
+  const normalized = String(key || "");
+  if (normalized === "attack") {
+    touched.add("accuracyDerived");
+    touched.add("damagePowerDerived");
+    addPassiveBonus(acc, "accuracyDerived", value);
+    addPassiveBonus(acc, "damagePowerDerived", value);
+    return;
+  }
+  if (normalized === "defense") {
+    touched.add("evadeDerived");
+    addPassiveBonus(acc, "evadeDerived", value);
+    return;
+  }
   const derivedKey = normalizeBonusKey(key);
   if (!derivedKey) return;
   touched.add(derivedKey);

@@ -3,7 +3,7 @@ import { createRng } from '../src/lib/ecs-js/rng.js';
 import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { populateChunk, materializeSpawn } from '../src/rules/environment/dungeon/populate.js';
-import { pickMonster, pickItem, pickSpawner } from '../src/rules/environment/dungeon/tables.js';
+import { pickMonster, pickItem, pickSpawner, pickSpecificSpawner } from '../src/rules/environment/dungeon/tables.js';
 import { getMonstersByTier, getMonster } from '../src/rules/data/monsters.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
@@ -45,6 +45,35 @@ Deno.test("pickSpawner uses tier pool on shallow depth", () => {
   const tier0 = getMonstersByTier(0);
   const tier0Ids = new Set(tier0.map(m => m.id));
   assert(tier0Ids.has(sp.monsterType.identity), `expected tier 0 monster, got ${sp.monsterType.identity}`);
+  assert(sp.monsterType.identity !== 'kobold_shaman', 'kobold shaman must not be selected for spawners');
+});
+
+Deno.test("pickSpecificSpawner excludes kobold shaman", () => {
+  const rng = createRng(42);
+  const sp = pickSpecificSpawner(rng, 'kobold_shaman', 1);
+  assertEquals(sp, null);
+});
+
+Deno.test("pickSpawner uses nesting whitelist", () => {
+  const rng = createRng(1337);
+  const allowed = new Set([
+    'rat',
+    'bat',
+    'cave_spider',
+    'spider',
+    'cave_snake',
+    'snake',
+    // Rare upgrades from whitelisted bases in pickMonster.
+    'pit_viper',
+    'cave_bear',
+    'dragon_whelp',
+  ]);
+
+  for (let i = 0; i < 200; i++) {
+    const sp = pickSpawner(rng, 1);
+    const identity = sp.monsterType.identity;
+    assert(allowed.has(identity), `spawner monster must be whitelisted nesting type, got ${identity}`);
+  }
 });
 
 Deno.test("pickItem returns valid kinds", () => {
@@ -173,8 +202,9 @@ Deno.test("spawner wiring: kind -> identity -> worldView -> palette", () => {
         identity: 'rat',
         maxHp: 5,
         faction: 'enemy',
-        attackDerived: 0,
-        defenseDerived: 0,
+        accuracyDerived: 0,
+        damagePowerDerived: 0,
+        evadeDerived: 0,
         naturalDamageDice: '1d3',
         sizeClass: 'S',
         massKg: 2,
@@ -397,4 +427,81 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
 
   const mimics = spawns.filter((s) => inShopRoom(s) && s.kind === "mimic");
   assert(mimics.length === 1, "shop room should allow a rare mimic spawn");
+});
+
+Deno.test("dead-end rooms always receive reward content", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+
+  for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  for (let y = 14; y < 20; y++) for (let x = 14; x < 20; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+
+  // One opening out of the spawn room and one opening out of the dead-end room.
+  tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
+  tiles[16 * CHUNK_SIZE + 13] = TILE_FLOOR;
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    tiles,
+    rooms: [
+      { x: 1, y: 1, w: 6, h: 6 },
+      { x: 14, y: 14, w: 6, h: 6 },
+    ],
+    doors: [],
+  };
+  const floorPlan = {
+    depth: 4,
+    difficultyMult: 1.2,
+    profile: { doorFeatureRate: 0, shopChance: 0, featurePool: null, monsterFilter: null },
+  };
+  const rng = {
+    next: () => 0.99,
+    int: (min) => min,
+    choice: (arr) => arr[arr.length - 1],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const deadEndRoom = chunk.rooms[1];
+  const rewardKinds = new Set(['chest', 'gold', 'book', 'potion', 'equipment', 'arrows', 'fire_arrows', 'scroll']);
+  const roomRewards = spawns.filter((spawn) =>
+    spawn.x >= deadEndRoom.x && spawn.x < deadEndRoom.x + deadEndRoom.w
+    && spawn.y >= deadEndRoom.y && spawn.y < deadEndRoom.y + deadEndRoom.h
+    && rewardKinds.has(spawn.kind)
+  );
+
+  assert(roomRewards.length > 0, 'dead-end room should always contain a reward');
+});
+
+Deno.test("dead-end rooms can receive curated treasure content", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 10; y < 16; y++) for (let x = 10; x < 16; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[12 * CHUNK_SIZE + 9] = TILE_FLOOR; // one west entrance
+
+  const room = { x: 10, y: 10, w: 6, h: 6 };
+  room.x = CHUNK_SIZE + 10;
+  const chunk = {
+    chunkX: 1,
+    chunkY: 0,
+    tiles,
+    rooms: [room],
+    doors: [],
+  };
+  const floorPlan = { depth: 2, difficultyMult: 1.0, profile: { shopChance: 0, doorFeatureRate: 0 } };
+  const rng = {
+    next: () => 0,
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const chest = spawns.find((spawn) => spawn.kind === "chest");
+  assert(chest, "expected a treasure chest in deterministic dead-end room");
+  assert(
+    chest.x >= room.x && chest.x < room.x + room.w && chest.y >= room.y && chest.y < room.y + room.h,
+    "dead-end chest should be placed inside the terminal room",
+  );
 });

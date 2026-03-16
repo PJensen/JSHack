@@ -10,10 +10,10 @@ Deno.test("ProjectileImpactCallbackContext exposes stats facade and deferred res
   const world = new World({ seed: 9001 });
 
   const attacker = world.create();
-  world.add(attacker, Equipment, { attackDerived: 4, defenseDerived: 0 });
+  world.add(attacker, Equipment, { accuracyDerived: 4, damagePowerDerived: 4, evadeDerived: 0 });
 
   const defender = world.create();
-  world.add(defender, Equipment, { attackDerived: 0, defenseDerived: 2 });
+  world.add(defender, Equipment, { accuracyDerived: 0, damagePowerDerived: 0, evadeDerived: 2 });
   world.add(defender, Resistances, { kinetic: { DR: 3, bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0 } });
   world.add(defender, Status, {
     statuses: [{ type: "stoneskin", duration: 4, potency: 2, stacks: 1 }],

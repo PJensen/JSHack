@@ -12,10 +12,12 @@ const GUARDED_FILES = Object.freeze([
 ]);
 
 const FORBIDDEN_TOKENS = Object.freeze([
-  "eq?.attackDerived",
-  "eq.attackDerived",
-  "eq?.defenseDerived",
-  "eq.defenseDerived",
+  "eq?.accuracyDerived",
+  "eq.accuracyDerived",
+  "eq?.damagePowerDerived",
+  "eq.damagePowerDerived",
+  "eq?.evadeDerived",
+  "eq.evadeDerived",
   "eq?.maxHpDerived",
   "eq.maxHpDerived",
   "eq?.critChanceDerived",
@@ -68,7 +70,9 @@ Deno.test("migrated rules files do not read Equipment.*Derived directly", async 
       if (text.includes(token)) offenders.push(`${relPath}::${token}`);
     }
 
-    const usesPassive = text.includes("getPassiveBonuses(") || text.includes("resolveDerivedStats(");
+    const usesPassive = text.includes("getPassiveBonuses(")
+      || text.includes("resolveDerivedStats(")
+      || text.includes("resolveCanonicalStats(");
     if (!usesPassive) offenders.push(`${relPath}::missing passive resolver usage`);
   }
 

@@ -2,6 +2,179 @@
 
 ---
 
+## March 13–16, 2026
+
+**The Overworld Expansion**
+
+> *"gave the herbalist the key to the alchemy shoppe."*
+
+The overworld stopped being a village-shaped collection of empty boxes and started being an actual place. Buildings have interiors. NPCs have things to say. There is a smithing window. There is a gem store. The herbalist has an alchemy shop and — after one memorable commit — was finally given the key to it.
+
+**Buildings & Overworld**
+- New buildings: **herbalist hut**, **apothecary**, **gem store** — all with locked doors and proximity-based access.
+- **Building editor** added. Buildings are now stamped from JSON definitions. The overworld is data-driven and the editor works. These two facts took longer to make true simultaneously than expected.
+- **Smithing window** with crafting recipes. You can see what the smith can make. The smith can also see what the smith can make.
+- **Message board** added to the overworld. It has messages. They are on the board.
+- **Bonfire** added. It does what bonfires do.
+
+**NPCs & Dialog**
+- NPC **speech bubbles** with proximity-based triggering. Walk near someone, they talk. Walk away, they stop. Socially appropriate AI.
+- **Quest giver visuals** added. You can now tell who wants something from you before they start talking.
+- **Opening/boot sequence** is now scripted. The game has an introduction. It was tuned. Then tuned again.
+
+**Spells & Combat**
+- Two new spells: **Blizzard** and **Firestorm**. The elements have escalated.
+- **Boulder puzzle** rooms added. Push the boulder. Solve the puzzle. Feel clever.
+- **Stepwise movement** architecture reworked. Movement is now broken into discrete steps. This matters more than it sounds.
+- **Dead end rooms** with sparsity controls. Dungeons are less uniform. Some corridors go nowhere. This is a feature.
+
+**Balance**
+- Stat sweeps conducted across the board. Numbers went up. Some numbers went down. The numbers are now more correct than they were.
+
+---
+
+## March 6–12, 2026
+
+**The Living World Update**
+
+> *"CHECKPOINT: npc work, yikes"*
+
+The overworld gained a heartbeat. Eleven villagers wake up, eat breakfast, go to work, visit the pub, and go home — every day, on a calendar that tracks lunar months and moon phases. The weather changes. Crops grow. The economy produces goods that flow between buildings through a supply chain that the developer designed on purpose and then spent several days making actually work.
+
+**Townspeople & Economy**
+- **11 NPC townspeople** with scheduled AI routines: farmer, woodcutter, miner, smith, priest, barkeep, villager, mason, herbalist, alchemist, and gem vendor. They have jobs. They do their jobs. Some of them are better at their jobs than others.
+- **Full economy chain**: miner digs ore → smith smelts and forges tools → woodcutter chops trees → villager hauls goods between buildings → farmer harvests crops → barkeep cooks stew. It's a supply chain. It mostly works.
+- NPCs **eat stew** from the tavern during pub phase. Once per day. Tracked by `lastAteDay`. They remember when they last ate. This took effort.
+- Workers auto-equip their role tools from the smithy chest when unarmed. The woodcutter will not chop with his hands.
+
+**Weather**
+- **Weather system** added: clear (60%), rain (30%), heavy rain (10%). Each with turn-based duration.
+- Rain **extinguishes burning** — on the player, on structures. The rain is helpful.
+- Rain **waters crops** for 2× growth speed. The rain is very helpful.
+- Ambient rain **sound messages**. The dungeon has weather now. It sets a mood.
+- Heavy rain gets a **dark screen tint**. Visibility is reduced. Atmosphere is increased.
+
+**Calendar & Time**
+- **13 lunar months × 28 days = 364-day year**. Seven-day archaic week (Sunna, Máni, Týr, Odin, Thor, Frigg, Saturn). The calendar is Norse-flavored and mathematically clean.
+- **8 moon phases** with emoji glyphs. The moon waxes and wanes. This is tracked.
+- **4 seasons** plus an intercalary month (Mercedonius). The calendar has opinions about time.
+- Town phases (sleep, breakfast, work, pub, home) are proportional to `TURNS_PER_DAY`. Change one constant and the entire world recalculates. This was the design goal. It works.
+
+**Plant Growth**
+- **Crops grow through visual stages**: seedling 🌱 → growing 🌿 → mature (wheat 🌾, turnip 🥕, pumpkin 🎃). The emoji are load-bearing.
+- Flowers grow on standalone timers. Crops grow in sync with their harvest node. Two growth modes, one system.
+
+**Dungeon & Combat**
+- **4 dungeon biome slices** with Perlin noise generation and per-biome monster filters. The dungeon has districts now.
+- **Proc trees and enchanting** system (early). Items can be stamped with procedural effect trees. The system exists. It will grow.
+- **Ricochet** mechanics added. Projectiles bounce. Then ricochet was fixed. Then fixed again. Then gated more carefully.
+- **Deity ascetic hooks** added. The gods now care whether you overeat. The gods have strong opinions about portion control.
+
+---
+
+## March 1–5, 2026
+
+**The Class & Combat Update**
+
+> *"CC took 5 tries to change a constant."*
+
+Characters have classes now. Four of them: Warlock, Archaeologist, Cleric, Druid. Each starts with different gear, stats, and a reason to exist. Spells crit based on Intelligence. Monsters have ten tiers of intelligence driving four distinct AI behaviors. The Floating Eye will paralyze you if you stand still for five turns in its gaze. You can dual-wield weapons. You can fly. There is a dragon.
+
+**Character Classes**
+- **Warlock**: exists to dig deep into spell mechanics. Starts with channeling capability.
+- **Archaeologist**: starts with identification tools. The past is their profession.
+- **Cleric**: gets a mace and holy water. The faith is practical.
+- **Druid**: small defensive bump. Nature finds a way.
+- **Character creation** screen now uses a 2×3 grid as initially intended. It was not 2×3 before. It is now.
+
+**Combat & Spells**
+- **Channeling system** added. Spells can be charged over multiple turns. Shadow Bolt is the first channeled spell.
+- **Shadow Bolt**: a new DOT spell that scales with Intelligence. Required VFX, targeting, and dedicated timed effect work. It hits for 12 now, at a bit more mana cost.
+- **Spell schools** added with specialized hooks and clearmindedness. Magic is organized.
+- **Spells now CRIT** and are driven by INT. The numbers are larger when you're smarter.
+- **Dual-wielding**: equip two one-handed weapons. Offhand gets -3 to hit, 0.75× damage, half stamina cost. Independent RNG salts. Auto-cascade equip logic so 1H + occupied weapon slot → offhand.
+- **Carry weight and encumbrance** system. Your inventory has mass. Excess mass has consequences.
+
+**Monster AI**
+- **10-level intelligence tiers** drive four AI behaviors: passive (bats, snakes won't aggro on sight), pack alerting (first sighting alerts nearby same-species), retreat (flee when HP% drops below threshold), and ambush (hold position until adjacent).
+- **Scurry behavior** for dumb monsters (intelligence ≤ 3): 50% chance to rest each turn. Low rand = rest. High rand = move. This was harder to test than expected.
+- Sapient humanoids (intelligence ≥ 10) **pick up weapons** from the floor when hunting and unarmed. The lich will arm itself. You have been warned.
+
+**Flying & Dragons**
+- **Flying creatures** added. Airborne actors ignore floor hazards. Flying and attacking in the same turn is not allowed — `FlyIntent` component enforces this.
+- **Dragon whelp** added as the first flying monster. **Cinematic dragon breath VFX** added because dragons deserve it.
+- **Overworld aerial LOS** extended for flying creatures.
+
+**Floating Eye**
+- The **Floating Eye gaze stun**: 5 consecutive WAIT turns in its line of sight → player stunned for 5 turns. Escalating pip bar (◈◈○○○) warns you. "The Floating Eye's gaze sears through you — you are paralyzed!" The eye is slow (speed 1, acts every 3 ticks). It is patient.
+
+**Dungeon**
+- **Multi-stair positional-identity system**: floors can have many stair pairs. Position IS identity — descend at (x,y), arrive at (x,y). No pair IDs needed. Forced stairs carved with 3×3 floor area and L-shaped corridors to nearest room when landing in void.
+- **Navigation tests** added: flood-fill reachability, stair connectivity, single connected component per floor. Five seeds × two depths.
+
+**Identification & Curses**
+- **Identification system** for items. Some items are not what they appear to be. The system tracks what you know.
+- **Curse mechanics** (early). Items can be cursed. The implications are being explored.
+- **Polymorph system** (early). Transformation is possible. The system is young.
+
+**Quality of Life**
+- **Lantern** added with adjustable vision radius. You carry your own light now.
+- **Healthbars** added. Enemies have visible HP bars. The information asymmetry has decreased.
+- **PWA support** added. The game is installable. On your phone. As an app. No app store involved.
+- **Fire spread** (early). Flames propagate. The implications are being managed.
+- **Anti-venom** item added. Spiders were absolutely lethal early on. Balance was addressed.
+
+---
+
+## February 20 – February 28, 2026
+
+**The Arsenal & Architecture Update**
+
+> *"CC took 5 tries to change a constant. Plasma, lightning, and electric. Fixing CC's stuff again. SHOCKING."*
+
+The architecture solidified. Gear slots became canonical. Helmets exist. Alchemy exists (early). You can cook things. You can disarm traps. You can go berserk. A score system tracks how well you're doing. The developer spent an unreasonable number of commits fixing things the AI assistant introduced incorrectly, including — famously — five attempts to change a single constant.
+
+**Gear & Equipment**
+- **Canonical gear slots** finalized: weapon, offhand, armor, helmet, ring, ammo. They are defined. They are used. The ambiguity is over.
+- **Head gear slot** (helmets) added. Iron helm is the first. Your skull has protection now.
+- **Weapon coatings** added. Apply things to your weapon. The things have effects.
+- **Beatitude** system (blessed/cursed/uncursed). Items have spiritual states. Holy water is relevant.
+- **Two-handed weapons** added (oak staff is the first 2H weapon). You need both hands. The offhand is occupied.
+
+**Crafting & Interaction**
+- **Alchemy bench** (version 0 and 0.1). Recipes exist. The bench processes them.
+- **Cooking system** with stateful furnace. Things go in raw. Things come out cooked. The furnace remembers its state.
+- **Trap disarming** added. You can defuse traps instead of stepping on them. A tooltip appears. The tooltip was adjusted.
+- **Pushable boulders and statues**. Physics-adjacent puzzle elements. Swap positions with objects.
+- **Weapon racks** improved dramatically — bump the rack, it throws the weapon at you. This is correct behavior.
+
+**Combat & Status**
+- **Berserk** status added. Rage has mechanical consequences.
+- **Web trails** added. Spiders leave webs. The webs are sticky and relevant.
+- Phase Strike, deity memory graph, and potion improvements arrived in a single commit. That commit was busy.
+- **Sarcophagi** spawn skeletons (adjacent to, not on top of — this was a bug, then a fix, then a PR).
+
+**Overworld & Environment**
+- **Mining and ore** on the overworld. There is rock. You can extract metal from it.
+- **Harvest nodes** with labels and regrowth timers. Berry bushes regenerate. Trees can be chopped.
+- **Torches** placed in sacred spaces. The lighting has returned, but this time it serves the dungeon.
+- **Perlin noise** adjustments for finer-grained terrain. The overworld has more texture.
+
+**UX & Display**
+- **Healthbars** added to enemies. Simple, visible, informative.
+- **Score system** added. Your performance is quantified. The numbers go up.
+- **Concentric gauge HUD**. Status effects displayed vertically. The HUD has depth now.
+- **Proc state glyphs** and **blink VFX** added. Visual feedback for triggered effects.
+- **PWA** (Progressive Web App) support. Install it on your phone. No app store. No build step. Just a service worker and a manifest.
+- **Bug reporting** integrated with version display and settings tab.
+
+**Under the Hood**
+- `features/arch0-slight-return` merged. Then code hygiene branch merged. Then 474 tests pass. Then 475.
+- Main.js refactored into modular helpers: canvas setup, input controllers, debug commands, UI data providers, FX controllers — all extracted to dedicated files. The monolith was carved into pieces.
+- Multiple AI-introduced issues corrected. `Math.random` was used instead of `world.rand` — determinism was broken and restored. Constants were changed incorrectly on five separate attempts. The corrections have been applied. The developer's patience has been noted.
+
+---
+
 ## February 19, 2026
 
 **Deep Integration Phase Begins**

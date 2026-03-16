@@ -2,6 +2,7 @@ import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { generateChunk } from '../src/rules/environment/dungeon/chunk.js';
 import { materializeChunk } from '../src/rules/environment/dungeon/materialize.js';
+import { materializeSpawn } from '../src/rules/environment/dungeon/populate.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_VOID } from '../src/rules/environment/dungeon/constants.js';
 import { Position } from '../src/rules/components/Position.js';
 import { DoorState } from '../src/rules/components/DoorState.js';
@@ -9,6 +10,7 @@ import { Collider } from '../src/rules/components/Collider.js';
 import { Interactable } from '../src/rules/components/Interactable.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { RoomMetadata } from '../src/rules/components/RoomMetadata.js';
 import { Unpaid } from '../src/rules/components/Unpaid.js';
 import { loadChunk, clearAll, isWalkable, isOpaque } from '../src/rules/environment/dungeon/tileMap.js';
@@ -155,4 +157,23 @@ Deno.test("potion shelves and gem display cases act like stocked rack-style cont
 
   assert(found.has('potion_shelf'), 'expected a potion shelf');
   assert(found.has('gem_display_case'), 'expected a gem display case');
+});
+
+Deno.test("gem display case can be authored to stock rare or epic gems", () => {
+  const world = new World({ seed: 42 });
+  const id = materializeSpawn(world, {
+    x: 4,
+    y: 2,
+    kind: 'gem_display_case',
+    params: { stockTier: 'rare_or_epic' },
+  });
+
+  assert(id != null, "expected gem display case to materialize");
+  const items = inventoryItems(world, id);
+  assert(items.length > 0, "expected authored gem display case to start stocked");
+  for (const itemId of items) {
+    const info = world.get(itemId, ItemInfo);
+    assert(info, "expected stocked gem to have item info");
+    assert(info.value >= 1500, `expected rare-or-epic gem value, got ${info.value}`);
+  }
 });

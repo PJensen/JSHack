@@ -6,6 +6,7 @@ import { createProjectileFxController } from "../fx/projectileFx.js";
 import { createSpellAreaFxController } from "../fx/spellAreaFx.js";
 import { createCloudFxController } from "../fx/cloudFx.js";
 import { createSurfaceAreaFxController } from "../fx/surfaceAreaFx.js";
+import { createStatusPresentationDelayController } from "../fx/statusPresentationDelayController.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 
@@ -33,6 +34,8 @@ export function setupDisplayRuntime({
 }) {
   const statusEmitterFx = createStatusEmitterController({ world, fx });
   statusEmitterFx.installListeners();
+  const statusPresentationDelayFx = createStatusPresentationDelayController({ world, getFxTime });
+  statusPresentationDelayFx.installListeners();
 
   const boltFx = createBoltFxController({ world, cam, fx, getPosition });
   boltFx.installListeners();
@@ -68,5 +71,5 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  return { statusEmitterFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, ftext };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, ftext };
 }

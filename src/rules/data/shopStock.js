@@ -155,14 +155,37 @@ export function generateAlchemyShopItem(world, rng) {
  * @returns {number|null}
  */
 export function generateGemShopItem(world, rng) {
+    return generateGemDisplayItem(world, rng, {});
+}
+
+/**
+ * Generate exactly one gem display item with optional value-tier filtering.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {Object} rng
+ * @param {{ stockTier?: string|null }} [opts]
+ * @returns {number|null}
+ */
+export function generateGemDisplayItem(world, rng, opts = {}) {
     const socketableGems = gems.listGems().filter(g => g.socketable && g.material === 'gemstone');
     const miscPool = gems.listGems().filter(g => g.material === 'gemstone' && g.value > 0 && g.prob > 0);
-    const pool = (rng.next() < 0.4 ? socketableGems : miscPool);
+    let pool = (rng.next() < 0.4 ? socketableGems : miscPool);
+    pool = filterGemPoolByTier(pool, opts.stockTier);
+    if (!pool.length) pool = filterGemPoolByTier(miscPool, opts.stockTier);
+    if (!pool.length) pool = miscPool;
     if (!pool.length) return null;
     const gem = pool[rng.int(0, pool.length - 1)];
     const params = gems.buildGemItemParams(gem, { identified: true });
     if (!params) return null;
     return stripPosition(world, createFrom(world, GemItem, params));
+}
+
+function filterGemPoolByTier(pool, stockTier) {
+    const tier = String(stockTier || "").toLowerCase();
+    if (!tier) return pool.slice();
+    if (tier === "rare") return pool.filter(g => g.value >= 1500 && g.value < 3000);
+    if (tier === "epic") return pool.filter(g => g.value >= 3000);
+    if (tier === "rare_or_epic") return pool.filter(g => g.value >= 1500);
+    return pool.slice();
 }
 
 /**

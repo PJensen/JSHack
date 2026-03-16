@@ -1,31 +1,46 @@
 // src/rules/systems/petBehaviorSystem.js
 // State-aware pet AI system - replaces petFollowSystem
 
-import { Position } from '../components/Position.js';
-import { Pet } from '../components/Pet.js';
-import { PetState } from '../components/PetState.js';
-import { Player } from '../components/Player.js';
-import { Inventory } from '../components/Inventory.js';
-import { ItemInfo } from '../components/ItemInfo.js';
-import { NamedIdentity } from '../components/NamedIdentity.js';
-import { inventoryContains, inventoryItems, removeFromInventory } from '../utils/inventoryFacade.js';
-import { Consumable } from '../components/Consumable.js';
-import { FoodDecay } from '../components/FoodDecay.js';
-import { ActiveEffects } from '../components/ActiveEffects.js';
-import { MoveIntent } from '../components/Intents/MoveIntent.js';
-import { PickupIntent } from '../components/Intents/PickupIntent.js';
-import { MeleeAttackIntent } from '../components/Intents/MeleeAttackIntent.js';
-import { Vitality } from '../components/Vitality.js';
-import { Faction } from '../components/Faction.js';
-import { findNearestValidTileAround } from '../utils/queries.js';
-import { areFactionsHostile } from '../utils/factionHostility.js';
-import { getItemsAt } from '../utils/tileQueryCache.js';
-import { worldRand } from '../utils/rng.js';
-import { getDecayStage } from '../data/food.js';
-import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
+import { Position } from "../components/Position.js";
+import { Pet } from "../components/Pet.js";
+import { PetState } from "../components/PetState.js";
+import { Player } from "../components/Player.js";
+import { Inventory } from "../components/Inventory.js";
+import { ItemInfo } from "../components/ItemInfo.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import {
+  inventoryContains,
+  inventoryItems,
+  removeFromInventory,
+} from "../utils/inventoryFacade.js";
+import { Consumable } from "../components/Consumable.js";
+import { FoodDecay } from "../components/FoodDecay.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
+import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { PickupIntent } from "../components/Intents/PickupIntent.js";
+import { MeleeAttackIntent } from "../components/Intents/MeleeAttackIntent.js";
+import { Vitality } from "../components/Vitality.js";
+import { Faction } from "../components/Faction.js";
+import { findNearestValidTileAround } from "../utils/queries.js";
+import { areFactionsHostile } from "../utils/factionHostility.js";
+import { getItemsAt } from "../utils/tileQueryCache.js";
+import { worldRand } from "../utils/rng.js";
+import { getDecayStage } from "../data/food.js";
+import { blockedCallback, buildBlocksVisionMap } from "../utils/vision.js";
 import { computeFOV } from "../../shared/math/fov.js";
 import { dealDamage } from "../utils/dealDamage.js";
-import { FOLLOW_DISTANCE, TELEPORT_DISTANCE, GUARD_RADIUS, FLEE_THRESHOLD } from './petConstants.js';
+import {
+  getTile,
+  isLoaded,
+  isWalkable,
+} from "../environment/dungeon/tileMap.js";
+import { TILE_LAVA } from "../environment/dungeon/constants.js";
+import {
+  FLEE_THRESHOLD,
+  FOLLOW_DISTANCE,
+  GUARD_RADIUS,
+  TELEPORT_DISTANCE,
+} from "./petConstants.js";
 
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
 const FAMILIAR_FIRE_RANGE = 8;
@@ -38,6 +53,7 @@ const CORPSE_HEAL_NUTRITION_DIVISOR = 120;
 const FELINE_TOXIC_IMMUNITY = 0.85;
 const FLEE_CORPSE_SEARCH_RADIUS = 8;
 const FLEE_CORPSE_THREAT_RADIUS = 2;
+const FELINE_LAVA_MISSTEP_CHANCE = 0.05;
 
 /**
  * petBehaviorSystem - state-aware pet AI
@@ -67,7 +83,7 @@ export function petBehaviorSystem(world) {
     let petState = world.get(id, PetState);
     if (!petState) {
       world.add(id, PetState, {
-        state: 'following',
+        state: "following",
         targetX: null,
         targetY: null,
         targetItemId: 0,
@@ -88,7 +104,9 @@ export function petBehaviorSystem(world) {
     if (petState.rangedCooldown > 0) {
       petState.rangedCooldown -= 1;
       if (petState.rangedCooldown <= 0 && isFamiliar(world, id)) {
-        try { world.emit?.('familiar:ready', { id }); } catch { /* */ }
+        try {
+          world.emit?.("familiar:ready", { id });
+        } catch { /* */ }
       }
     }
     if (petState.rangedCooldown <= 0 && isFamiliar(world, id)) {
@@ -102,31 +120,31 @@ export function petBehaviorSystem(world) {
 
     // Execute behavior based on current state
     switch (petState.state) {
-      case 'following':
+      case "following":
         behaviorFollowing(world, id, pos, playerPos, playerId);
         break;
 
-      case 'fetching':
+      case "fetching":
         behaviorFetching(world, id, petState, pos, playerPos);
         break;
 
-      case 'returning':
+      case "returning":
         behaviorReturning(world, id, petState, pos, playerPos, playerId);
         break;
 
-      case 'guarding':
+      case "guarding":
         behaviorGuarding(world, id, petState, pos, playerPos);
         break;
 
-      case 'staying':
+      case "staying":
         behaviorStaying(world, id, petState, pos, playerPos);
         break;
 
-      case 'fleeing':
+      case "fleeing":
         behaviorFleeing(world, id, pos, playerPos);
         break;
 
-      case 'idle':
+      case "idle":
         // Do nothing
         break;
     }
@@ -159,10 +177,11 @@ function isCorpseItemOnFloor(world, itemId) {
   if (!world.has(itemId, Position)) return false;
 
   const info = world.get(itemId, ItemInfo);
-  if (!info || String(info.type || '').toLowerCase() !== 'food') return false;
+  if (!info || String(info.type || "").toLowerCase() !== "food") return false;
 
-  const ident = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
-  if (!ident.startsWith('corpse_')) return false;
+  const ident = String(world.get(itemId, NamedIdentity)?.identity || "")
+    .toLowerCase();
+  if (!ident.startsWith("corpse_")) return false;
   return true;
 }
 
@@ -171,39 +190,59 @@ function consumeCorpseForPet(world, petId, corpseId, vit) {
   const baseNutrition = Math.max(0, Number(cons?.effectParams?.nutrition || 0));
   const biteNutrition = Math.max(1, Math.ceil(baseNutrition / 2));
   const decay = world.get(corpseId, FoodDecay);
-  const decayInfo = decay ? getDecayStage(decay.turnsHeld, decay.shelfLife) : null;
-  const nutrition = decayInfo ? Math.floor(biteNutrition * decayInfo.nutritionMult) : biteNutrition;
+  const decayInfo = decay
+    ? getDecayStage(decay.turnsHeld, decay.shelfLife)
+    : null;
+  const nutrition = decayInfo
+    ? Math.floor(biteNutrition * decayInfo.nutritionMult)
+    : biteNutrition;
 
   const missing = Math.max(0, (vit.maxHp | 0) - (vit.hp | 0));
-  const healBase = Math.max(1, Math.floor(Math.max(0, nutrition) / CORPSE_HEAL_NUTRITION_DIVISOR));
+  const healBase = Math.max(
+    1,
+    Math.floor(Math.max(0, nutrition) / CORPSE_HEAL_NUTRITION_DIVISOR),
+  );
   const healAmount = Math.min(missing, healBase);
 
   if (healAmount > 0) {
     vit.hp = Math.min(vit.maxHp, vit.hp + healAmount);
-    try { world.emit?.('healed', { id: petId, amount: healAmount }); } catch {}
+    try {
+      world.emit?.("healed", { id: petId, amount: healAmount });
+    } catch {}
   }
 
   const feline = isFelinePet(world, petId);
-  const toxinApplied = maybeApplyDecayToxin(world, petId, corpseId, decayInfo, feline);
-  const toxinResisted = !toxinApplied && feline && Number(decayInfo?.sicknessChance || 0) > 0;
+  const toxinApplied = maybeApplyDecayToxin(
+    world,
+    petId,
+    corpseId,
+    decayInfo,
+    feline,
+  );
+  const toxinResisted = !toxinApplied && feline &&
+    Number(decayInfo?.sicknessChance || 0) > 0;
 
   const corpseIdent = world.get(corpseId, NamedIdentity);
-  const corpseIdentity = String(corpseIdent?.identity || '');
-  const corpseNameBefore = String(corpseIdent?.name || 'corpse');
+  const corpseIdentity = String(corpseIdent?.identity || "");
+  const corpseNameBefore = String(corpseIdent?.name || "corpse");
   const remainingNutrition = Math.max(0, baseNutrition - biteNutrition);
   const partial = remainingNutrition > 0;
-  if (cons && cons.effectParams && typeof cons.effectParams === 'object') {
+  if (cons && cons.effectParams && typeof cons.effectParams === "object") {
     cons.effectParams.nutrition = remainingNutrition;
   }
   if (partial && corpseIdent && !/^half-eaten\s+/i.test(corpseNameBefore)) {
     corpseIdent.name = `Half-eaten ${corpseNameBefore}`;
   }
-  const corpseNameAfter = String(world.get(corpseId, NamedIdentity)?.name || corpseNameBefore);
+  const corpseNameAfter = String(
+    world.get(corpseId, NamedIdentity)?.name || corpseNameBefore,
+  );
   if (!partial) {
-    try { world.destroy(corpseId); } catch {}
+    try {
+      world.destroy(corpseId);
+    } catch {}
   }
   try {
-    world.emit?.('pet:corpse-munch', {
+    world.emit?.("pet:corpse-munch", {
       petId,
       corpseId,
       corpseName: corpseNameAfter,
@@ -212,35 +251,41 @@ function consumeCorpseForPet(world, petId, corpseId, vit) {
       nutrition: Number.isFinite(nutrition) ? nutrition : 0,
       remainingNutrition,
       partial,
-      decayStage: String(decayInfo?.stage || 'fresh'),
+      decayStage: String(decayInfo?.stage || "fresh"),
       resistedToxin: toxinResisted,
     });
-  } catch (e) { console.debug('[petBehaviorSystem] emit pet:corpse-munch failed:', e); }
+  } catch (e) {
+    console.debug("[petBehaviorSystem] emit pet:corpse-munch failed:", e);
+  }
 }
 
 function maybeApplyDecayToxin(world, petId, corpseId, decayInfo, feline) {
   const baseChance = Number(decayInfo?.sicknessChance || 0);
   if (!(baseChance > 0)) return false;
 
-  const finalChance = feline ? (baseChance * (1 - FELINE_TOXIC_IMMUNITY)) : baseChance;
+  const finalChance = feline
+    ? (baseChance * (1 - FELINE_TOXIC_IMMUNITY))
+    : baseChance;
   if (!(finalChance > 0)) return false;
 
   const roll = worldRand(world);
   if (!(roll < finalChance)) return false;
 
   addActiveEffect(world, petId, {
-    key: 'disease',
+    key: "disease",
     turnsLeft: 15,
     potency: 1,
     stacks: 1,
     sourceId: corpseId,
   });
-  try { world.emit?.('hunger:sickened', { actor: petId, type: 'decay' }); } catch {}
+  try {
+    world.emit?.("hunger:sickened", { actor: petId, type: "decay" });
+  } catch {}
   return true;
 }
 
 function addActiveEffect(world, entityId, effect) {
-  if (!(entityId > 0) || !effect || typeof effect !== 'object') return;
+  if (!(entityId > 0) || !effect || typeof effect !== "object") return;
   let ae = world.get(entityId, ActiveEffects);
   if (!ae) {
     try {
@@ -256,7 +301,7 @@ function addActiveEffect(world, entityId, effect) {
 
 function isFamiliar(world, petId) {
   const ni = world.get(petId, NamedIdentity);
-  return String(ni?.identity || '').toLowerCase() === 'familiar';
+  return String(ni?.identity || "").toLowerCase() === "familiar";
 }
 
 function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
@@ -265,7 +310,10 @@ function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
   const dist = Math.hypot(dx, dy);
   if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
   const raw = dist / speed;
-  return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
+  return Math.max(
+    Number(minDuration) || 0,
+    Math.min(Number(maxDuration) || raw, raw),
+  );
 }
 
 /**
@@ -273,15 +321,22 @@ function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
  * Returns true if a bolt was fired (consuming the pet's turn).
  */
 function tryFamiliarFireBolt(world, petId, petPos, petState) {
-  const petFaction = String(world.get(petId, Faction)?.key || 'pet');
+  const petFaction = String(world.get(petId, Faction)?.key || "pet");
 
   // Build visible set using shadowcasting — same algorithm as player FOV
   const isBlocked = blockedCallback(buildBlocksVisionMap(world));
-  const visible = computeFOV(petPos.x | 0, petPos.y | 0, FAMILIAR_FIRE_RANGE, isBlocked);
+  const visible = computeFOV(
+    petPos.x | 0,
+    petPos.y | 0,
+    FAMILIAR_FIRE_RANGE,
+    isBlocked,
+  );
 
   let bestId = 0;
   let bestDist = Infinity;
-  for (const [eid, fac, epos, evit] of world.query(Faction, Position, Vitality)) {
+  for (
+    const [eid, fac, epos, evit] of world.query(Faction, Position, Vitality)
+  ) {
     if (!evit || (evit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
     const dx = (epos.x | 0) - (petPos.x | 0);
@@ -306,8 +361,8 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
     target: bestId,
     amount: FAMILIAR_FIRE_DMG,
     source: petId,
-    type: 'fire',
-    cause: 'familiar:fire_bolt',
+    type: "fire",
+    cause: "familiar:fire_bolt",
     projectileDelay: computeProjectileDelay(
       petPos,
       { x: toX, y: toY },
@@ -320,15 +375,17 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
 
   // Emit dedicated fireball VFX event with pre-resolved positions (not ranged:shot)
   try {
-    world.emit?.('familiar:fireball', {
+    world.emit?.("familiar:fireball", {
       from: { x: petPos.x, y: petPos.y },
       to: { x: toX, y: toY },
     });
-  } catch (e) { console.debug('[petBehaviorSystem] emit familiar:fireball failed:', e); }
+  } catch (e) {
+    console.debug("[petBehaviorSystem] emit familiar:fireball failed:", e);
+  }
 
   // Tell display to suppress familiar ambient particles during cooldown
   try {
-    world.emit?.('familiar:fired', { id: petId });
+    world.emit?.("familiar:fired", { id: petId });
   } catch { /* */ }
 
   return true;
@@ -336,15 +393,15 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
 
 function isFelinePet(world, petId) {
   const ni = world.get(petId, NamedIdentity);
-  const identity = String(ni?.identity || '').toLowerCase();
-  const name = String(ni?.name || '').toLowerCase();
+  const identity = String(ni?.identity || "").toLowerCase();
+  const name = String(ni?.name || "").toLowerCase();
   return (
-    identity.includes('cat')
-    || identity.includes('kitty')
-    || identity.includes('feline')
-    || name.includes('cat')
-    || name.includes('kitty')
-    || name.includes('feline')
+    identity.includes("cat") ||
+    identity.includes("kitty") ||
+    identity.includes("feline") ||
+    name.includes("cat") ||
+    name.includes("kitty") ||
+    name.includes("feline")
   );
 }
 
@@ -353,33 +410,50 @@ function isFelinePet(world, petId) {
  */
 function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
   // Flee if low health (overrides all other states except fleeing)
-  if (petState.state !== 'fleeing') {
+  if (petState.state !== "fleeing") {
     const vit = world.get(petId, Vitality);
     if (vit && vit.hp > 0 && (vit.hp / vit.maxHp) < FLEE_THRESHOLD) {
-      petState.state = 'fleeing';
+      petState.state = "fleeing";
       petState.stateEnteredTurn = world.step;
       petState.targetX = null;
       petState.targetY = null;
       petState.targetItemId = 0;
-      try { world.emit?.('pet:state:auto', { petId, newState: 'fleeing', reason: 'low_health' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
+      try {
+        world.emit?.("pet:state:auto", {
+          petId,
+          newState: "fleeing",
+          reason: "low_health",
+        });
+      } catch (e) {
+        console.debug("[petBehaviorSystem] emit pet:state:auto failed:", e);
+      }
       return;
     }
   }
 
   // Return to following if health restored while fleeing
-  if (petState.state === 'fleeing') {
+  if (petState.state === "fleeing") {
     const vit = world.get(petId, Vitality);
     if (vit && (vit.hp / vit.maxHp) >= FLEE_THRESHOLD + 0.1) { // +0.1 for hysteresis
-      petState.state = 'following';
+      petState.state = "following";
       petState.stateEnteredTurn = world.step;
-      try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'health_restored' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
+      try {
+        world.emit?.("pet:state:auto", {
+          petId,
+          newState: "following",
+          reason: "health_restored",
+        });
+      } catch (e) {
+        console.debug("[petBehaviorSystem] emit pet:state:auto failed:", e);
+      }
       return;
     }
   }
 
   // Teleport if too far from player (except when staying/guarding)
   // Pets that are commanded to stay or guard should remain at their post
-  const shouldTeleport = petState.state !== 'staying' && petState.state !== 'guarding';
+  const shouldTeleport = petState.state !== "staying" &&
+    petState.state !== "guarding";
 
   if (shouldTeleport) {
     const dx = playerPos.x - petPos.x;
@@ -392,32 +466,62 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
       });
       if (teleportTile) {
         world.set(petId, Position, teleportTile);
-        try { world.emit?.('pet:teleported', { petId, from: petPos, to: teleportTile }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:teleported failed:', e); }
+        try {
+          world.emit?.("pet:teleported", {
+            petId,
+            from: petPos,
+            to: teleportTile,
+          });
+        } catch (e) {
+          console.debug("[petBehaviorSystem] emit pet:teleported failed:", e);
+        }
       }
       return;
     }
   }
 
   // Auto-transition from fetching to returning when item is picked up
-  if (petState.state === 'fetching') {
-    if (petState.targetItemId > 0 && inventoryContains(world, petId, petState.targetItemId)) {
-      petState.state = 'returning';
+  if (petState.state === "fetching") {
+    if (
+      petState.targetItemId > 0 &&
+      inventoryContains(world, petId, petState.targetItemId)
+    ) {
+      petState.state = "returning";
       petState.stateEnteredTurn = world.step;
       petState.targetX = null;
       petState.targetY = null;
-      try { world.emit?.('pet:state:auto', { petId, newState: 'returning', reason: 'item_picked_up' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
+      try {
+        world.emit?.("pet:state:auto", {
+          petId,
+          newState: "returning",
+          reason: "item_picked_up",
+        });
+      } catch (e) {
+        console.debug("[petBehaviorSystem] emit pet:state:auto failed:", e);
+      }
       return;
     }
 
     // Cancel fetch if target item no longer exists or moved
     if (petState.targetItemId > 0) {
-      if (!world.isAlive(petState.targetItemId) || !world.has(petState.targetItemId, Position)) {
-        petState.state = 'following';
+      if (
+        !world.isAlive(petState.targetItemId) ||
+        !world.has(petState.targetItemId, Position)
+      ) {
+        petState.state = "following";
         petState.targetItemId = 0;
         petState.targetX = null;
         petState.targetY = null;
         petState.stateEnteredTurn = world.step;
-        try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'fetch_target_lost' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
+        try {
+          world.emit?.("pet:state:auto", {
+            petId,
+            newState: "following",
+            reason: "fetch_target_lost",
+          });
+        } catch (e) {
+          console.debug("[petBehaviorSystem] emit pet:state:auto failed:", e);
+        }
         return;
       }
     }
@@ -425,20 +529,24 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
 }
 
 function findSafeCorpseForFleeing(world, petId, petPos, playerPos) {
-  const petFaction = String(world.get(petId, Faction)?.key || 'pet');
+  const petFaction = String(world.get(petId, Faction)?.key || "pet");
   let best = null;
   let bestScore = Infinity;
 
   for (const [itemId, itemPos, info] of world.query(Position, ItemInfo)) {
-    if (!info || String(info.type || '').toLowerCase() !== 'food') continue;
+    if (!info || String(info.type || "").toLowerCase() !== "food") continue;
     if (!isCorpseItemOnFloor(world, itemId)) continue;
 
-    const distFromPet = Math.abs((itemPos.x | 0) - (petPos.x | 0)) + Math.abs((itemPos.y | 0) - (petPos.y | 0));
+    const distFromPet = Math.abs((itemPos.x | 0) - (petPos.x | 0)) +
+      Math.abs((itemPos.y | 0) - (petPos.y | 0));
     if (distFromPet > FLEE_CORPSE_SEARCH_RADIUS) continue;
 
-    if (countHostilesNearTile(world, itemPos.x | 0, itemPos.y | 0, petFaction) > 0) continue;
+    if (
+      countHostilesNearTile(world, itemPos.x | 0, itemPos.y | 0, petFaction) > 0
+    ) continue;
 
-    const distFromPlayer = Math.abs((itemPos.x | 0) - (playerPos.x | 0)) + Math.abs((itemPos.y | 0) - (playerPos.y | 0));
+    const distFromPlayer = Math.abs((itemPos.x | 0) - (playerPos.x | 0)) +
+      Math.abs((itemPos.y | 0) - (playerPos.y | 0));
     const score = distFromPet + distFromPlayer;
     if (score < bestScore) {
       bestScore = score;
@@ -497,7 +605,7 @@ function behaviorFetching(world, petId, petState, petPos, playerPos) {
 
   if (petState.targetX === null || petState.targetY === null) {
     // No target - return to following
-    petState.state = 'following';
+    petState.state = "following";
     petState.stateEnteredTurn = world.step;
     return;
   }
@@ -511,7 +619,10 @@ function behaviorFetching(world, petId, petState, petPos, playerPos) {
     if (petState.targetItemId > 0 && world.isAlive(petState.targetItemId)) {
       if (!world.has(petId, PickupIntent)) {
         try {
-          world.add(petId, PickupIntent, { targetId: petState.targetItemId, count: null });
+          world.add(petId, PickupIntent, {
+            targetId: petState.targetItemId,
+            count: null,
+          });
         } catch {} // ECS: may already exist
       }
     }
@@ -525,7 +636,14 @@ function behaviorFetching(world, petId, petState, petPos, playerPos) {
 /**
  * Returning behavior: return to player with fetched item
  */
-function behaviorReturning(world, petId, petState, petPos, playerPos, playerId) {
+function behaviorReturning(
+  world,
+  petId,
+  petState,
+  petPos,
+  playerPos,
+  playerId,
+) {
   const dx = playerPos.x - petPos.x;
   const dy = playerPos.y - petPos.y;
   const dist = Math.abs(dx) + Math.abs(dy);
@@ -535,10 +653,18 @@ function behaviorReturning(world, petId, petState, petPos, playerPos, playerId) 
     deliverItemsToPlayer(world, petId, playerId, playerPos);
 
     // After delivery, return to following
-    petState.state = 'following';
+    petState.state = "following";
     petState.targetItemId = 0;
     petState.stateEnteredTurn = world.step;
-    try { world.emit?.('pet:state:auto', { petId, newState: 'following', reason: 'delivery_complete' }); } catch (e) { console.debug('[petBehaviorSystem] emit pet:state:auto failed:', e); }
+    try {
+      world.emit?.("pet:state:auto", {
+        petId,
+        newState: "following",
+        reason: "delivery_complete",
+      });
+    } catch (e) {
+      console.debug("[petBehaviorSystem] emit pet:state:auto failed:", e);
+    }
     return;
   }
 
@@ -552,7 +678,7 @@ function behaviorReturning(world, petId, petState, petPos, playerPos, playerId) 
 function behaviorGuarding(world, petId, petState, petPos, playerPos) {
   if (petState.targetX === null || petState.targetY === null) {
     // No guard position - return to following
-    petState.state = 'following';
+    petState.state = "following";
     petState.stateEnteredTurn = world.step;
     return;
   }
@@ -591,7 +717,7 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
       try {
         world.add(petId, MeleeAttackIntent, {
           sourceId: petId,
-          targetId: closestEnemy
+          targetId: closestEnemy,
         });
       } catch {} // ECS: may already exist
     }
@@ -617,7 +743,12 @@ function behaviorStaying(world, petId, petState, petPos, playerPos) {
  * If no safe corpse exists, retreat toward player.
  */
 function behaviorFleeing(world, petId, petPos, playerPos) {
-  const corpseTarget = findSafeCorpseForFleeing(world, petId, petPos, playerPos);
+  const corpseTarget = findSafeCorpseForFleeing(
+    world,
+    petId,
+    petPos,
+    playerPos,
+  );
   if (corpseTarget) {
     moveToward(world, petId, corpseTarget.x, corpseTarget.y);
     return;
@@ -647,13 +778,56 @@ function moveToward(world, petId, targetX, targetY) {
   const ay = Math.abs(dy);
 
   let mx = 0, my = 0;
-  if (ax >= ay) { mx = Math.sign(dx); } else { my = Math.sign(dy); }
+  if (ax >= ay) mx = Math.sign(dx);
+  else my = Math.sign(dy);
+
+  const feline = isFelinePet(world, petId);
+  if (feline && wouldStepIntoLoadedLava(pos.x, pos.y, mx, my)) {
+    const alt = pickNonLavaStep(pos, dx, dy);
+    if (alt) {
+      mx = alt.dx;
+      my = alt.dy;
+    } else if (worldRand(world) >= FELINE_LAVA_MISSTEP_CHANCE) {
+      return;
+    }
+  }
 
   if ((mx | my) === 0) return;
 
   if (!world.has(petId, MoveIntent)) {
-    try { world.add(petId, MoveIntent, { dx: mx, dy: my }); } catch {} // ECS: may already exist
+    try {
+      world.add(petId, MoveIntent, { dx: mx, dy: my });
+    } catch {} // ECS: may already exist
   }
+}
+
+function wouldStepIntoLoadedLava(x, y, dx, dy) {
+  const nx = (x | 0) + (dx | 0);
+  const ny = (y | 0) + (dy | 0);
+  if (!isLoaded(nx, ny)) return false;
+  return getTile(nx, ny) === TILE_LAVA;
+}
+
+function pickNonLavaStep(pos, dx, dy) {
+  const candidates = [];
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    if ((dy | 0) !== 0) candidates.push({ dx: 0, dy: Math.sign(dy) });
+    if ((dx | 0) !== 0) candidates.push({ dx: Math.sign(dx), dy: 0 });
+  } else {
+    if ((dx | 0) !== 0) candidates.push({ dx: Math.sign(dx), dy: 0 });
+    if ((dy | 0) !== 0) candidates.push({ dx: 0, dy: Math.sign(dy) });
+  }
+
+  for (let i = 0; i < candidates.length; i++) {
+    const step = candidates[i];
+    const nx = (pos.x | 0) + step.dx;
+    const ny = (pos.y | 0) + step.dy;
+    if (isLoaded(nx, ny) && !isWalkable(nx, ny)) continue;
+    if (wouldStepIntoLoadedLava(pos.x, pos.y, step.dx, step.dy)) continue;
+    return step;
+  }
+
+  return null;
 }
 
 /**
@@ -665,18 +839,20 @@ function deliverItemsToPlayer(world, petId, playerId, playerPos) {
 
   for (const itemId of items) {
     const itemName = world.get(itemId, NamedIdentity)?.name ||
-                     world.get(itemId, ItemInfo)?.description || 'item';
+      world.get(itemId, ItemInfo)?.description || "item";
     removeFromInventory(world, petId, itemId);
     try {
       world.add(itemId, Position, { x: playerPos.x, y: playerPos.y });
     } catch {} // ECS: may already exist
     try {
-      world.emit?.('pet:deliver', {
+      world.emit?.("pet:deliver", {
         petId,
         actor: playerId,
         itemId,
-        itemName
+        itemName,
       });
-    } catch (e) { console.debug('[petBehaviorSystem] emit pet:deliver failed:', e); }
+    } catch (e) {
+      console.debug("[petBehaviorSystem] emit pet:deliver failed:", e);
+    }
   }
 }

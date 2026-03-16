@@ -160,3 +160,27 @@ Deno.test("no floor tiles on chunk boundary edges (rooms have walls)", () => {
   // edges might. Just verify it's not excessive.
   assert(edgeFloors < CHUNK_SIZE, `edge floors should be minimal (got ${edgeFloors})`);
 });
+
+Deno.test("corridors and rooms do not expose interior floor directly to void", () => {
+  const tiles = makeTiles();
+  const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, createRng(42));
+  placeRooms(tree, createRng(42));
+  carveRooms(tree, tiles, CHUNK_SIZE);
+  connectRooms(tree, tiles, CHUNK_SIZE, createRng(42));
+
+  for (let y = 1; y < CHUNK_SIZE - 1; y++) {
+    for (let x = 1; x < CHUNK_SIZE - 1; x++) {
+      if (tiles[y * CHUNK_SIZE + x] !== TILE_FLOOR) continue;
+      const neighbors = [
+        tiles[y * CHUNK_SIZE + x - 1],
+        tiles[y * CHUNK_SIZE + x + 1],
+        tiles[(y - 1) * CHUNK_SIZE + x],
+        tiles[(y + 1) * CHUNK_SIZE + x],
+      ];
+      assert(
+        neighbors.every((tile) => tile !== TILE_VOID),
+        `floor at (${x},${y}) should be sealed from void`
+      );
+    }
+  }
+});

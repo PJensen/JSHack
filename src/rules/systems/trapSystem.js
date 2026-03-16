@@ -3,6 +3,9 @@ import { Trap } from "../components/Trap.js";
 import { Vitality } from "../components/Vitality.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { runScript, ScriptVerb } from "../scripting.js";
+import { resolveCanonicalStats } from "../utils/canonicalStats.js";
+import { mulberry32, rngInt, combatSeed, pct } from "../utils/rng.js";
+import { statusStrength } from "../utils/statusFacade.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function trapSystem(world) {
@@ -20,6 +23,30 @@ export function trapSystem(world) {
       }
     }
     if (!victimId) continue;
+
+    // Dex-based avoidance: d20 + evade vs (DC + 5)
+    const dc = t.difficulty || 10;
+    const stats = resolveCanonicalStats(world, victimId);
+    const evade = Number(stats?.evade || 0);
+    const avoidSeed = combatSeed(world.seed, world.step, victimId, tid, 0x7A9);
+    const avoidRng = mulberry32(avoidSeed);
+    const avoidRoll = rngInt(avoidRng, 1, 20);
+    let avoided = (avoidRoll + evade) >= (dc + 5);
+
+    // Luck modifier: positive luck saves, negative luck fumbles
+    const luck = Number(stats?.luck || 0) + statusStrength(world, victimId, "lucky");
+    if (!avoided && luck > 0) {
+      avoided = pct(avoidRng, luck);
+    } else if (avoided && luck < 0) {
+      avoided = !pct(avoidRng, -luck);
+    }
+
+    if (avoided) {
+      // Reveal trap but leave it armed — you dodged, didn't disable
+      try { world.set(tid, Trap, { ...t, revealed: true }); } catch {}
+      try { world.emit('trap:avoided', { victimId, trapId: tid, type: t.type }); } catch {}
+      continue;
+    }
 
     // Reveal and name before triggering so logs show source
     const ident = world.get(tid, NamedIdentity);

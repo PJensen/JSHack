@@ -3,10 +3,15 @@
 // Callbacks are plain (ctx) => void functions invoked via runCallbackList.
 
 import { HazardArea } from "../../components/HazardArea.js";
+import { CastSpellIntent } from "../../components/Intents/CastSpellIntent.js";
+import { Channeling } from "../../components/Channeling.js";
+import { Faction } from "../../components/Faction.js";
+import { Mana } from "../../components/Mana.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { Vitality } from "../../components/Vitality.js";
+import { getSpell } from "../../data/spells.js";
 import { bresenhamLine } from "../../../shared/math/bresenham.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
@@ -16,6 +21,7 @@ import { worldChance } from "../../utils/rng.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
+const SPELL_CAST_COOLDOWN_KEY = Symbol.for("jshack:ai:castSpellOnLOS:cooldown");
 
 function manhattan(a, b) {
   return Math.abs((a.x | 0) - (b.x | 0)) + Math.abs((a.y | 0) - (b.y | 0));
@@ -128,6 +134,63 @@ function fireBreathOnCooldown(world, actor, cooldownTurns) {
 function markFireBreathUsed(world, actor) {
   const store = ensureFireBreathCooldownState(world);
   store.set(actor | 0, Number(world.step || 0) | 0);
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @returns {Map<string, number>}
+ */
+function ensureSpellCastCooldownState(world) {
+  const rec = world[SPELL_CAST_COOLDOWN_KEY];
+  if (rec instanceof Map) return rec;
+  const created = new Map();
+  world[SPELL_CAST_COOLDOWN_KEY] = created;
+  return created;
+}
+
+/**
+ * @param {number} actor
+ * @param {string} spellId
+ * @returns {string}
+ */
+function spellCastCooldownSlot(actor, spellId) {
+  return `${actor | 0}:${String(spellId || "")}`;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {string} spellId
+ * @returns {number}
+ */
+function getSpellCastLastTurn(world, actor, spellId) {
+  const store = ensureSpellCastCooldownState(world);
+  const last = Number(store.get(spellCastCooldownSlot(actor, spellId)));
+  return Number.isFinite(last) ? (last | 0) : -1e9;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {string} spellId
+ * @param {number} cooldownTurns
+ * @returns {boolean}
+ */
+function spellCastOnCooldown(world, actor, spellId, cooldownTurns) {
+  if (!(cooldownTurns > 0)) return false;
+  const now = Number(world.step || 0) | 0;
+  const last = getSpellCastLastTurn(world, actor, spellId);
+  return (now - last) < cooldownTurns;
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @param {number} actor
+ * @param {string} spellId
+ */
+function markSpellCastUsed(world, actor, spellId) {
+  const store = ensureSpellCastCooldownState(world);
+  store.set(spellCastCooldownSlot(actor, spellId), Number(world.step || 0) | 0);
 }
 
 // ── SeenCallbackContext ───────────────────────────────────────────
@@ -558,5 +621,95 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
       target: ctx.target,
       stacks: ae.effects.find(e => e.key === 'mindwipe')?.stacks ?? 1,
     });
+  };
+}
+
+/**
+ * Queue a CastSpellIntent for a monster while it has LOS to target.
+ * Uses cooldown/chance/range gating and optional ally-count cap to avoid
+ * runaway summon spam.
+ *
+ * @param {{
+ *   spellId: string,
+ *   targeting?: "enemy"|"self",
+ *   minRange?: number,
+ *   maxRange?: number,
+ *   cooldownTurns?: number,
+ *   chance?: number,
+ *   consumeTurn?: boolean,
+ *   maxAlliesInRadius?: number,
+ *   allyRadius?: number,
+ * }} opts
+ */
+export function castSpellOnLOS(opts) {
+  const spellId = String(opts?.spellId || "").trim();
+  const targeting = String(opts?.targeting || "enemy") === "self" ? "self" : "enemy";
+  const minRange = Math.max(0, Number.isFinite(opts?.minRange) ? (Number(opts.minRange) | 0) : 0);
+  const maxRangeOpt = Number.isFinite(opts?.maxRange) ? (Number(opts.maxRange) | 0) : -1;
+  const cooldownTurns = Math.max(0, Number.isFinite(opts?.cooldownTurns) ? (Number(opts.cooldownTurns) | 0) : 8);
+  const chance = Number.isFinite(opts?.chance) ? Math.max(0, Math.min(1, Number(opts.chance))) : 1;
+  const consumeTurn = opts?.consumeTurn !== false;
+  const maxAlliesInRadius = Number.isFinite(opts?.maxAlliesInRadius) ? (Number(opts.maxAlliesInRadius) | 0) : -1;
+  const allyRadius = Math.max(1, Number.isFinite(opts?.allyRadius) ? (Number(opts.allyRadius) | 0) : 6);
+
+  return (ctx) => {
+    if (!ctx || ctx.cancelled) return;
+    if (!spellId) return;
+    if (!ctx.canActThisTurn || ctx.hasQueuedMove) return;
+    if (!worldChance(ctx.world, chance)) return;
+    if (ctx.world.has(ctx.actor, CastSpellIntent) || ctx.world.has(ctx.actor, Channeling)) return;
+
+    const spell = getSpell(spellId);
+    if (!spell) return;
+    if (spellCastOnCooldown(ctx.world, ctx.actor, spellId, cooldownTurns)) return;
+
+    const actorPos = ctx.actorPos;
+    const targetPos = ctx.targetPos;
+    const maxRange = maxRangeOpt >= 0
+      ? Math.max(minRange, maxRangeOpt)
+      : Math.max(minRange, Number(spell.range || 8) | 0);
+
+    if (targeting !== "self") {
+      if (!actorPos || !targetPos) return;
+      const dist = chebyshev(actorPos, targetPos);
+      if (dist < minRange || dist > maxRange) return;
+    }
+
+    if (maxAlliesInRadius >= 0) {
+      const faction = String(ctx.world.get(ctx.actor, Faction)?.key || "").trim();
+      if (faction && actorPos) {
+        let allies = 0;
+        for (const [_id, pos, fac, vit] of ctx.world.query(Position, Faction, Vitality)) {
+          if (!pos || !fac || !vit || (vit.hp | 0) <= 0) continue;
+          if (String(fac.key || "") !== faction) continue;
+          if (chebyshev(actorPos, pos) > allyRadius) continue;
+          allies++;
+        }
+        if (allies > maxAlliesInRadius) return;
+      }
+    }
+
+    const mana = ctx.world.get(ctx.actor, Mana);
+    const needMana = Number(spell.manaCost || 0);
+    if (mana && Number(mana.mana || 0) < needMana) return;
+
+    const castIntent = { spellId };
+    if (targeting !== "self" && (ctx.target | 0) > 0) {
+      castIntent.targetId = ctx.target | 0;
+    }
+
+    try {
+      ctx.world.add(ctx.actor, CastSpellIntent, castIntent);
+    } catch {
+      return;
+    }
+
+    markSpellCastUsed(ctx.world, ctx.actor, spellId);
+    ctx.emit("monster:castSpellIntent", {
+      actor: ctx.actor,
+      spellId,
+      targetId: Number(castIntent.targetId || 0) | 0,
+    });
+    if (consumeTurn) ctx.setHandled(true);
   };
 }

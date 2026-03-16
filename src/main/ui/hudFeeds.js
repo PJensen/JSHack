@@ -18,6 +18,7 @@ import { PetState } from "../../rules/components/PetState.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
+import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -91,16 +92,18 @@ export function createHudFeeds(world, deps) {
     if (!pe) return;
     const eq = /** @type any */ (world.get(pe.id, Equipment));
     const passive = getPassiveBonuses(world, pe.id);
+    const canonical = resolveCanonicalStats(world, pe.id);
     const st = /** @type any */ (world.get(pe.id, ActiveEffects));
     const semanticStatus = /** @type any */ (world.get(pe.id, Status));
     const wid = Number(eq?.weapon || 0);
     const rangedId = Number(eq?.ranged || 0);
     const combat = resolveCombatSnapshot(world, pe.id, { mode: "melee" });
-    const atk = Number(combat?.attackDerived ?? passive?.attackDerived ?? 0);
-    const def = Number(combat?.defenseDerived ?? passive?.defenseDerived ?? 0);
-    const luck = Number(combat?.luck ?? passive?.luckDerived ?? 0);
+    const atk = Number(combat?.attackBonus ?? (1 + Number(canonical?.accuracy || 0)));
+    const def = Number(canonical?.evade ?? 0);
+    const luck = Number(combat?.luck ?? canonical?.luck ?? 0);
     const armorClass = Number(combat?.armorClass ?? (10 + def));
-    const critPct = (Number(combat?.critChance ?? passive?.critChanceDerived ?? 0) * 100) + luck;
+    const critPct = (Number(combat?.critChance ?? canonical?.critChancePhysical ?? 0) * 100) + luck;
+    const mitigation = Number(canonical?.mitigation ?? 0);
     const wInfo = wid ? world.get(wid, ItemInfo) : null;
     const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
     const rangedCount = Number(rangedInfo?.count || 0);
@@ -182,6 +185,7 @@ export function createHudFeeds(world, deps) {
           weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk, coating: wCoating } : null,
           ranged: rangedId ? { id: rangedId, name: rangedName || null, isWand: rangedType === 'wand', count: rangedCount } : null,
           defense: def,
+          mitigation,
           luck,
           armorClass,
           critChancePercent: critPct,

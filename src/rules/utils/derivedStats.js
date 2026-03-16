@@ -8,6 +8,30 @@ export const RESOLVED_STAT_DEFAULTS = Object.freeze({
   intelligence: 0,
   dexterity: 0,
   vitality: 0,
+  accuracy: 0,
+  damagePower: 0,
+  evade: 0,
+  mitigation: 0,
+  critChancePhysical: 0,
+  critChanceSpell: 0,
+  critMultPhysical: 0,
+  critMultSpell: 0,
+  spellHit: 0,
+  spellAvoid: 0,
+  spellPower: 0,
+  luck: 0,
+  kineticDR: 0,
+  fireResist: 0,
+  poisonResist: 0,
+  acidResist: 0,
+  radiationResist: 0,
+  electricOhms: 0,
+  bluntResist: 0,
+  slashResist: 0,
+  pierceResist: 0,
+  spellRadius: 0,
+  visionRange: 0,
+  hungerRate: 0,
   staminaRegen: 0,
   critChance: 0,
   critMultiplier: 1.5,
@@ -94,6 +118,33 @@ function applyBaseStats(sheet, base) {
   }
 }
 
+function synthesizeCanonicalChannels(sheet) {
+  const strength = Number(sheet.strength || 0);
+  const intelligence = Number(sheet.intelligence || 0);
+  const dexterity = Number(sheet.dexterity || 0);
+  const vitality = Number(sheet.vitality || 0);
+  const critChance = Number(sheet.critChance || 0);
+  const critMultLegacy = Number(sheet.critMultiplier || 1.5);
+  const strBonus = Math.floor(Math.max(0, strength - 10) / 2);
+  const dexBonus = Math.floor(Math.max(0, dexterity - 10) / 2);
+  const vitBonus = Math.floor(Math.max(0, vitality - 10) / 2);
+  const intBonus = Math.floor(Math.max(0, intelligence - 10) / 2);
+
+  sheet.accuracy += dexBonus;
+  sheet.evade += dexBonus;
+  sheet.damagePower += strBonus;
+  sheet.mitigation += vitBonus;
+
+  sheet.critChancePhysical += critChance;
+  sheet.critChanceSpell += critChance;
+  sheet.critChancePhysical += dexBonus * 0.01;
+  sheet.critChanceSpell += intBonus * 0.01;
+  sheet.critMultPhysical += Math.max(0, critMultLegacy - 1.5);
+  sheet.critMultSpell += Math.max(0, critMultLegacy - 1.5);
+  sheet.spellHit += intBonus;
+  sheet.spellPower += Math.max(0, intelligence);
+}
+
 export function evalDerivedExpression(sheet, expr) {
   const target = String(expr?.target || "");
   if (!Object.prototype.hasOwnProperty.call(sheet, target)) return false;
@@ -135,6 +186,18 @@ export function evalDerivedExpression(sheet, expr) {
 }
 
 function applyFinalHygiene(sheet) {
+  sheet.accuracy = Number(sheet.accuracy || 0);
+  sheet.damagePower = Number(sheet.damagePower || 0);
+  sheet.evade = Number(sheet.evade || 0);
+  sheet.mitigation = Math.max(0, Number(sheet.mitigation || 0));
+  sheet.critChancePhysical = Math.max(0, Math.min(0.95, Number(sheet.critChancePhysical || 0)));
+  sheet.critChanceSpell = Math.max(0, Math.min(0.95, Number(sheet.critChanceSpell || 0)));
+  sheet.critMultPhysical = Math.max(0, Number(sheet.critMultPhysical || 0));
+  sheet.critMultSpell = Math.max(0, Number(sheet.critMultSpell || 0));
+  sheet.spellHit = Number(sheet.spellHit || 0);
+  sheet.spellAvoid = Number(sheet.spellAvoid || 0);
+  sheet.spellPower = Math.max(0, Number(sheet.spellPower || 0));
+  sheet.luck = Number(sheet.luck || 0);
   sheet.critChance = Math.max(0, Math.min(0.95, Number(sheet.critChance || 0)));
   sheet.critMultiplier = Math.max(1, Number(sheet.critMultiplier || 1));
   sheet.baseDamageMin = Math.max(0, Number(sheet.baseDamageMin || 0));
@@ -156,6 +219,7 @@ export function resolveDerivedStats(world, actorId) {
     evalDerivedExpression(sheet, expressions[i].expr);
   }
 
+  synthesizeCanonicalChannels(sheet);
   applyFinalHygiene(sheet);
   return Object.freeze(sheet);
 }
@@ -195,6 +259,7 @@ export function explainDerivedStats(world, actorId) {
     }));
   }
 
+  synthesizeCanonicalChannels(sheet);
   applyFinalHygiene(sheet);
 
   return Object.freeze({

@@ -82,7 +82,7 @@ export function equipItemSystem(world) {
       if (!Number.isInteger(id) || id <= 0) return;
       // Item may already be in inventory (hierarchy child). If not, add it.
       if (!inventoryContains(world, actor, id)) {
-        addToInventory(world, actor, id);
+        addToInventory(world, actor, id, { silent: true });
       }
     };
 

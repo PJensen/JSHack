@@ -2945,11 +2945,20 @@ function renderCharacterSheet(panel, data) {
 
   // [label, value, color|null]  — null = default text color
   const statRows = [
+    ['Strength', `${Number(stats.strength || 0)}`, deltaColor(stats.strength)],
+    ['Dexterity', `${Number(stats.dexterity || 0)}`, deltaColor(stats.dexterity)],
+    ['Intelligence', `${Number(stats.intelligence || 0)}`, deltaColor(stats.intelligence)],
+    ['Vitality', `${Number(stats.vitalityStat || 0)}`, deltaColor(stats.vitalityStat)],
     ['HP', `${Number(stats.hp || 0)}/${Number(stats.maxHp || 0)}`],
     ['Mana', `${Number(stats.mana || 0)}/${Number(stats.maxMana || 0)}`],
     ['Stamina', `${Number(stats.stamina || 0)}/${Number(stats.maxStamina || 0)}`],
     ['Attack', `${Number(stats.attack || 0)}`, deltaColor(stats.attack)],
     ['Defense', `${Number(stats.defense || 0)}`, deltaColor(stats.defense)],
+    ['Accuracy', `${Number(stats.accuracy || 0)}`, deltaColor(stats.accuracy)],
+    ['Damage Power', `${Number(stats.damagePower || 0)}`, deltaColor(stats.damagePower)],
+    ['Evade', `${Number(stats.evade || 0)}`, deltaColor(stats.evade)],
+    ['Mitigation', `${Number(stats.mitigation || 0)}`, deltaColor(stats.mitigation)],
+    ['Spell Power', `${Number(stats.spellPower || 0)}`, deltaColor(stats.spellPower)],
     ['Armor Class', `${Number(stats.armorClass || 0)}`, deltaColor(stats.armorClass, 10)],
     ['Luck', `${Number(stats.luck || 0)}`, deltaColor(stats.luck)],
     ['Crit %', `${Number(stats.critChancePercent || 0).toFixed(1)}`, deltaColor(stats.critChancePercent)],
