@@ -58,6 +58,7 @@ import { installAnvilWiring } from "./main/wiring/anvilWiring.js";
 import { installCookingWiring } from "./main/wiring/cookingWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installDialogWiring } from "./main/wiring/dialogWiring.js";
+import { installSpeechBubbleWiring } from "./main/wiring/speechBubbleWiring.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
   hasSavegame,
@@ -2507,6 +2508,7 @@ const sceneRuntime = createSceneRuntime({
   getCanvas: () => canvas,
   getCanvasSetup: () => _canvasSetup,
 });
+installSpeechBubbleWiring({ world, sceneRuntime });
 cam.scale = CAMERA_START_SCALE;
 cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
