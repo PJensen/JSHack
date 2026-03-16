@@ -38,20 +38,6 @@ export function installEventUiWiring({
     try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color, life: 1.2 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
   });
 
-  world.on('npc:dialogue', ({ actor, targetId, text }) => {
-    const speakerId = Number(actor || targetId || 0) | 0;
-    const pos = getPlayerEntity()?.id === speakerId
-      ? getPlayerEntity()?.pos
-      : null;
-    let bubblePos = pos || null;
-    if (!bubblePos && speakerId > 0 && typeof getPosition === 'function') {
-      bubblePos = getPosition(speakerId) || null;
-    }
-    const line = String(text || '').trim();
-    if (!bubblePos || !line) return;
-    try { ftext.addStatus(bubblePos.x, bubblePos.y - 1.05, `"${line}"`, { color: '#f6f1d0', life: 2.8 }); } catch (e) { console.debug('[eventUiWiring] npc dialogue ftext failed:', e); }
-  });
-
   // Refresh inventory UI when any item is used (consumed/learned/etc.)
   world.on('item:used', ({ actor, itemId }) => {
     try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[eventUiWiring] dispatch ui:itemUsed:', e); }

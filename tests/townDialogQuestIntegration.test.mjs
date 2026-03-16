@@ -2,6 +2,7 @@ import { assertEquals, assert } from "jsr:@std/assert";
 import { World, composeScheduler } from "../src/lib/ecs-js/index.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { QuestState } from "../src/rules/components/QuestState.js";
@@ -25,6 +26,12 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
 
   const priest = world.create();
   world.add(priest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
+  const dungeon = world.create();
+  world.add(dungeon, DungeonState, {
+    worldSeed: 91,
+    currentDepth: 0,
+    floorEntityIds: [priest],
+  });
 
   instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
     player,

@@ -1,5 +1,6 @@
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { DungeonState } from "../components/DungeonState.js";
+import { Player } from "../components/Player.js";
 import { getDialog } from "./registry.js";
 
 const DIALOG_RUNTIME_KEY = Symbol.for("jshack:dialog:runtime:installed");
@@ -25,6 +26,7 @@ function speakerName(world, targetId) {
 function isEntityOnCurrentFloor(world, entityId) {
   const id = Number(entityId || 0) | 0;
   if (!(id > 0) || !world.isAlive(id)) return false;
+  if (world.has(id, Player)) return true;
   let sawDungeonState = false;
   for (const [, ds] of world.query(DungeonState)) {
     sawDungeonState = true;
