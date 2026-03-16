@@ -6,6 +6,8 @@ const EMPTY_INGREDIENTS = Object.freeze({
   herbs: 0,
   thornPods: 0,
   venomFronds: 0,
+  moonleaf: 0,
+  emberRoot: 0,
 });
 
 /**

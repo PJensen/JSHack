@@ -195,6 +195,30 @@ Deno.test("movementSystem: player bumps door triggers bump:interact", () => {
   } finally { clearAll(); }
 });
 
+Deno.test("movementSystem: player bumps anvil triggers bump:interact", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 142 });
+
+    const anvil = world.create();
+    world.add(anvil, Position, { x: 4, y: 3 });
+    world.add(anvil, Collider, { solid: true, blocksSight: false });
+    world.add(anvil, Interactable, { action: "forgeTools" });
+
+    const player = world.create();
+    world.add(player, Position, { x: 3, y: 3 });
+    world.add(player, Player);
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+
+    let interacted = false;
+    world.on("bump:interact", () => { interacted = true; });
+
+    movementSystem(world);
+
+    assert(interacted, "player bump into anvil should trigger bump:interact");
+  } finally { clearAll(); }
+});
+
 // ── tile reaction delegation ────────────────────────────────────────
 
 Deno.test("movementSystem: player with dig weapon digs wall via bump", () => {

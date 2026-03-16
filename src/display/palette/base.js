@@ -141,6 +141,8 @@ export const basePalette = {
   herb_patch: { glyph: "✿", fg: "#63a85f", glow: "#3e6b3c" },
   thorn_bramble: { glyph: "☘", fg: "#7ea157", glow: "#415b2e" },
   venom_fern: { glyph: "☣", fg: "#a5d95c", glow: "#648431" },
+  moonleaf_cluster: { glyph: "✺", fg: "#d5e4ff", glow: "#8194c5" },
+  ember_root_patch: { glyph: "♨", fg: "#d57b3a", glow: "#9a3f14" },
   venom_spores: { glyph: "◌", fg: "#9dd46f", glow: "#5f8d3c" },
   // Mining nodes
   ore_vein_iron:  { glyph: "◈", fg: "#c0754a", glow: "#8a3e1e" },
@@ -255,6 +257,8 @@ export const basePalette = {
   food_mushrooms:    { glyph: "🍄", fg: "#c8b898", glow: "#8a7a5a" },
   reagent_thorn_pod: { glyph: "✶", fg: "#a08f63", glow: "#6f6242" },
   reagent_venom_frond: { glyph: "☤", fg: "#9ccc69", glow: "#5f8d3c" },
+  reagent_moonleaf: { glyph: "❋", fg: "#d7e3ff", glow: "#8292c4" },
+  reagent_ember_root: { glyph: "♢", fg: "#e09a54", glow: "#9a4f1d" },
   food_wheat:    { glyph: "%", fg: "#d4a830", glow: "#a07820" },
   food_carrot:   { glyph: "%", fg: "#7ecc5a", glow: "#4a9030" },
   food_corn:     { glyph: "%", fg: "#e8c820", glow: "#b89a10" },

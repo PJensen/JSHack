@@ -8,6 +8,7 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Stamina } from "../src/rules/components/Stamina.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
+import { Collider } from "../src/rules/components/Collider.js";
 import { AttackIntent } from "../src/rules/components/Intents/AttackIntent.js";
 import { resolveBump, BUMP_RESOLVERS } from "../src/rules/data/bumpResolvers.js";
 import { loadChunk, clearAll, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
@@ -128,6 +129,30 @@ Deno.test("bumpResolvers: player bumps door (interactable, no living target)", (
 
     assert(handled, "object interact should be handled");
     assert(interacted, "should trigger bump:interact for door");
+  } finally { clearAll(); }
+});
+
+Deno.test("bumpResolvers: object interact tolerates target matching the interactable id", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 43 });
+    const actor = world.create();
+    world.add(actor, Position, { x: 3, y: 3 });
+    world.add(actor, Player);
+
+    const anvil = world.create();
+    world.add(anvil, Position, { x: 4, y: 3 });
+    world.add(anvil, Interactable, { action: "forgeTools" });
+    world.add(anvil, Collider, { solid: true, blocksSight: false });
+
+    let interacted = false;
+    world.on("bump:interact", () => { interacted = true; });
+
+    const ctx = makeBumpCtx(world, { nx: 4, ny: 3, mdx: 1, mdy: 0, target: anvil });
+    const handled = resolveBump(world, actor, ctx);
+
+    assert(handled, "solid interactable should still be handled");
+    assert(interacted, "should trigger bump:interact for anvil");
   } finally { clearAll(); }
 });
 

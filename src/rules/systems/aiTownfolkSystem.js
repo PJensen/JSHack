@@ -46,6 +46,7 @@ import {
 } from "../environment/dungeon/constants.js";
 import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
+import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
@@ -74,6 +75,8 @@ const HERB_ITEM_IDS = Object.freeze({
   herbs: "food_wild_herbs",
   thorn_bramble: "reagent_thorn_pod",
   venom_fern: "reagent_venom_frond",
+  moonleaf: "reagent_moonleaf",
+  ember_root: "reagent_ember_root",
 });
 const ORE_ITEM_IDS = Object.freeze({
   iron_ore: "ore_iron",
@@ -84,7 +87,7 @@ const CARRYING_ITEM_IDS = Object.freeze({
   crops: ["food_wheat", "food_carrot", "food_corn"],
   ore: ["ore_iron", "ore_coal", "ore_stone"],
   wood: ["material_lumber", "fuel_firewood"],
-  herbs: ["food_wild_herbs", "reagent_thorn_pod", "reagent_venom_frond"],
+  herbs: ["food_wild_herbs", "reagent_thorn_pod", "reagent_venom_frond", "reagent_moonleaf", "reagent_ember_root"],
   water: ["water_bucket"],
   flour: ["food_flour"],
   firewood: ["fuel_firewood"],
@@ -208,29 +211,9 @@ function totalTownToolCount(world, storage, identity) {
 function chooseSmithCraft(world, storage) {
   const smith = storage.smithy > 0 ? countInventoryByIdentity(world, storage.smithy) : {};
   const hasIron = Number(smith.material_iron || 0);
-  const hasLumber = Number(smith.material_lumber || 0) >= 1;
-  if (!hasLumber) return null;
-
-  const knifeCount = totalTownToolCount(world, storage, "tool_kitchen_knife");
-  if (knifeCount < 1 && hasIron >= 1) {
-    return { itemId: "tool_kitchen_knife", iron: 1, coal: 1, lumber: 1 };
-  }
-
-  const hatchetCount = totalTownToolCount(world, storage, "tool_hatchet");
-  if (hatchetCount < 1 && hasIron >= 1) {
-    return { itemId: "tool_hatchet", iron: 1, coal: 1, lumber: 1 };
-  }
-
-  const pickCount = totalTownToolCount(world, storage, "iron_pickaxe");
-  if (pickCount < 2 && hasIron >= 2) {
-    return { itemId: "iron_pickaxe", iron: 2, coal: 1, lumber: 1 };
-  }
-
-  if (Number(smith.tool_hatchet || 0) < 2 && hasIron >= 1) {
-    return { itemId: "tool_hatchet", iron: 1, coal: 1, lumber: 1 };
-  }
-
-  return null;
+  const hasLumber = Number(smith.material_lumber || 0);
+  const craftable = SMITH_RECIPES.filter((recipe) => hasIron >= recipe.iron && hasLumber >= recipe.lumber);
+  return chooseSmithRecipe(craftable, (itemId) => totalTownToolCount(world, storage, itemId));
 }
 
 function deliverNear(pos) {
@@ -624,7 +607,7 @@ function handleIdle(world, id, pos, job) {
     }
     case TOWNFOLK_ROLES.herbalist: {
       const herb = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
-        (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern");
+        (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern" || n.kind === "moonleaf" || n.kind === "ember_root");
       if (herb) {
         job.targetX = herb.x;
         job.targetY = herb.y;
@@ -836,7 +819,7 @@ function handleWorking(world, id, pos, job) {
       forEachInRadius(world, pos.x, pos.y, 1, (eid) => {
         if (herbId) return;
         const n = world.get(eid, HarvestNode);
-        if (n && n.ready && (n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern")) {
+        if (n && n.ready && (n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern" || n.kind === "moonleaf" || n.kind === "ember_root")) {
           herbId = eid;
           herbKind = n.kind;
         }
@@ -847,7 +830,7 @@ function handleWorking(world, id, pos, job) {
       emitSafe(world, "townfolk:gathered_herbs", { actor: id, x: pos.x, y: pos.y });
       if (job.carryMax > 0 && job.carryCount < job.carryMax) {
         const next = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
-          (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern");
+          (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern" || n.kind === "moonleaf" || n.kind === "ember_root");
         if (next) {
           job.targetX = next.x;
           job.targetY = next.y;
@@ -964,24 +947,44 @@ function handleWorking(world, id, pos, job) {
       const herbCount = Number(stock.food_wild_herbs || 0);
       const thornCount = Number(stock.reagent_thorn_pod || 0);
       const venomCount = Number(stock.reagent_venom_frond || 0);
+      const moonleafCount = Number(stock.reagent_moonleaf || 0);
+      const emberRootCount = Number(stock.reagent_ember_root || 0);
       if (countShopStock(world, id) >= BREW_STOCK_LIMIT) {
         emitSafe(world, "townfolk:stocked", { actor: id, x: pos.x, y: pos.y });
         setReturning(job);
         return;
       }
-      if (herbCount <= 0 || (thornCount + venomCount) <= 0 || !(herbChest > 0)) {
+      if ((herbCount + moonleafCount + emberRootCount) <= 0 || (thornCount + venomCount + moonleafCount + emberRootCount) <= 0 || !(herbChest > 0)) {
         emitSafe(world, "townfolk:sorted_herbs", { actor: id, x: pos.x, y: pos.y });
         setReturning(job);
         return;
       }
-      consumeInventoryIdentity(world, herbChest, "food_wild_herbs", 1);
-      const potionKey = venomCount > 0
+      if (moonleafCount > 0 && venomCount > 0) {
+        consumeInventoryIdentity(world, herbChest, "reagent_moonleaf", 1);
+        consumeInventoryIdentity(world, herbChest, "reagent_venom_frond", 1);
+      } else if (emberRootCount > 0 && thornCount > 0) {
+        consumeInventoryIdentity(world, herbChest, "reagent_ember_root", 1);
+        consumeInventoryIdentity(world, herbChest, "reagent_thorn_pod", 1);
+      } else {
+        if (herbCount > 0) consumeInventoryIdentity(world, herbChest, "food_wild_herbs", 1);
+        if (moonleafCount > 0) consumeInventoryIdentity(world, herbChest, "reagent_moonleaf", 1);
+        else if (emberRootCount > 0) consumeInventoryIdentity(world, herbChest, "reagent_ember_root", 1);
+        else if (venomCount > 0) consumeInventoryIdentity(world, herbChest, "reagent_venom_frond", 1);
+        else if (thornCount > 0) consumeInventoryIdentity(world, herbChest, "reagent_thorn_pod", 1);
+      }
+      const potionKey = moonleafCount > 0 && venomCount > 0
         ? "potion_anti_venom"
-        : thornCount > 0
-          ? (world.rand() < 0.5 ? "potion_stoneskin" : "potion_vigor")
-          : BREW_POTIONS[Math.floor(world.rand() * BREW_POTIONS.length)];
-      if (venomCount > 0) consumeInventoryIdentity(world, herbChest, "reagent_venom_frond", 1);
-      else if (thornCount > 0) consumeInventoryIdentity(world, herbChest, "reagent_thorn_pod", 1);
+        : emberRootCount > 0 && thornCount > 0
+          ? "potion_resist_fire"
+          : moonleafCount > 0
+            ? "potion_mana"
+            : emberRootCount > 0
+              ? "potion_vigor"
+              : venomCount > 0
+                ? "potion_anti_venom"
+                : thornCount > 0
+                  ? (world.rand() < 0.5 ? "potion_stoneskin" : "potion_vigor")
+                  : BREW_POTIONS[Math.floor(world.rand() * BREW_POTIONS.length)];
       const potionId = createItemById(world, potionKey);
       if (potionId) {
         world.add(potionId, Position, { x: pos.x, y: pos.y });
@@ -1156,7 +1159,7 @@ function getRoleWorkTarget(world, job) {
     }
     case TOWNFOLK_ROLES.herbalist: {
       const herb = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
-        (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern");
+        (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern" || n.kind === "moonleaf" || n.kind === "ember_root");
       if (herb) {
         return { x: herb.x, y: herb.y, kind: "harvest_herb", state: TOWNFOLK_STATES.working, radius: 1 };
       }
@@ -1167,7 +1170,10 @@ function getRoleWorkTarget(world, job) {
       const herbChest = storage.herb;
       const herbStock = herbChest > 0 ? countInventoryByIdentity(world, herbChest) : {};
       const canBrew = (herbStock.food_wild_herbs || 0) > 0
-        && ((herbStock.reagent_thorn_pod || 0) > 0 || (herbStock.reagent_venom_frond || 0) > 0);
+        || (herbStock.reagent_moonleaf || 0) > 0
+        || (herbStock.reagent_ember_root || 0) > 0
+        || (herbStock.reagent_thorn_pod || 0) > 0
+        || (herbStock.reagent_venom_frond || 0) > 0;
       if (townState?.lowMedicine && canBrew) {
         return { x: job.workX, y: job.workY, kind: "brew", state: TOWNFOLK_STATES.working, radius: 1 };
       }

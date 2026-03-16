@@ -660,7 +660,7 @@ export function initOverlays() {
   // Alchemy bench overlay
   let _alchemyState = {
     benchId: 0,
-    ingredients: { berries: 0, herbs: 0, thornPods: 0, venomFronds: 0 },
+    ingredients: { berries: 0, herbs: 0, thornPods: 0, venomFronds: 0, moonleaf: 0, emberRoot: 0 },
     recipes: [],
   };
   window.addEventListener('ui:openAlchemyBench', (ev) => {
@@ -695,7 +695,7 @@ export function initOverlays() {
       benchId: Number(d.benchId || _alchemyState.benchId || 0) | 0,
       ingredients: d.ingredients && typeof d.ingredients === 'object'
         ? d.ingredients
-        : { berries: 0, herbs: 0, thornPods: 0, venomFronds: 0 },
+        : { berries: 0, herbs: 0, thornPods: 0, venomFronds: 0, moonleaf: 0, emberRoot: 0 },
       recipes: Array.isArray(d.recipes) ? d.recipes : [],
     };
     renderAlchemyBench(alchemy, _alchemyState);

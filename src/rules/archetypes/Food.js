@@ -193,6 +193,32 @@ export const VenomFronds = defineArchetype(
   [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Venom Fronds", identity: "reagent_venom_frond" })],
 );
 
+// Gathered from moonleaf clusters; used for restorative and antidote brews.
+export const Moonleaf = defineArchetype(
+  "Moonleaf",
+  [ItemInfo, {
+    type: "ingredient",
+    description: "Cool silver leaves prized by apothecaries for calming infusions.",
+    weight: 0.15,
+    value: 8,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Moonleaf", identity: "reagent_moonleaf" })],
+);
+
+// Dug from hot red roots; used for vigor and fireproofing brews.
+export const EmberRoot = defineArchetype(
+  "EmberRoot",
+  [ItemInfo, {
+    type: "ingredient",
+    description: "A fibrous root that holds a dry, peppery heat.",
+    weight: 0.2,
+    value: 8,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Ember Root", identity: "reagent_ember_root" })],
+);
+
 // Mined from iron ore veins in the overworld.
 export const IronOre = defineArchetype(
   "IronOre",

@@ -33,6 +33,8 @@ import {
   HerbPatch,
   ThornBramble,
   VenomFern,
+  MoonleafCluster,
+  EmberRootPatch,
   OreVeinIron,
   OreVeinCoal,
   OreVeinStone,
@@ -967,6 +969,10 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, ThornBramble, { x: spawn.x, y: spawn.y });
     case 'harvest_venom_fern':
       return createFrom(world, VenomFern, { x: spawn.x, y: spawn.y });
+    case 'harvest_moonleaf':
+      return createFrom(world, MoonleafCluster, { x: spawn.x, y: spawn.y });
+    case 'harvest_ember_root':
+      return createFrom(world, EmberRootPatch, { x: spawn.x, y: spawn.y });
     case 'harvest_iron_ore':
       return createFrom(world, OreVeinIron, { x: spawn.x, y: spawn.y });
     case 'harvest_coal_ore':

@@ -42,7 +42,7 @@ import { DungeonState } from "../../components/DungeonState.js";
 import TombstoneComponent from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
-  WildBerries, WildHerbs, ThornPods, VenomFronds,
+  WildBerries, WildHerbs, ThornPods, VenomFronds, Moonleaf, EmberRoot,
   DungeonMushrooms, IronOre, CoalOre, StoneChip,
   Wheat, Carrot, Corn,
 } from "../../archetypes/Food.js";
@@ -60,6 +60,7 @@ import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
 import { getDistrictBulletinVirtual, getPlayerOpportunityViewVirtual } from "../../utils/townInterpretationVirtuals.js";
+import { SMITH_RECIPES, chooseSmithRecipe } from "../../data/smithRecipes.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -68,6 +69,8 @@ const CATALOG_ARCHETYPES = {
   "food_mushrooms":      DungeonMushrooms,
   "reagent_thorn_pod":   ThornPods,
   "reagent_venom_frond": VenomFronds,
+  "reagent_moonleaf":    Moonleaf,
+  "reagent_ember_root":  EmberRoot,
   "ore_iron":            IronOre,
   "ore_coal":            CoalOre,
   "ore_stone":           StoneChip,
@@ -97,12 +100,6 @@ const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
 const FOUNTAIN_COOLDOWN_MIN = 201;
 const FOUNTAIN_COOLDOWN_MAX = 259;
-const PLAYER_SMITH_RECIPES = Object.freeze([
-  Object.freeze({ key: "kitchen_knife", itemId: "tool_kitchen_knife", iron: 1, lumber: 1, outputName: "Kitchen Knife" }),
-  Object.freeze({ key: "work_hatchet", itemId: "tool_hatchet", iron: 1, lumber: 1, outputName: "Work Hatchet" }),
-  Object.freeze({ key: "iron_pickaxe", itemId: "iron_pickaxe", iron: 2, lumber: 1, outputName: "Iron Pickaxe" }),
-]);
-
 function deriveFountainCooldownTurns(world, targetId, params) {
   const explicit = Number(params?.cooldownTurns);
   if (Number.isFinite(explicit) && explicit > 0) return explicit | 0;
@@ -236,18 +233,9 @@ function choosePlayerSmithRecipe(world, actor) {
   if (ironCount <= 0) return { recipe: null, reason: "missing_iron" };
   if (lumberCount <= 0) return { recipe: null, reason: "missing_lumber" };
 
-  for (const recipe of PLAYER_SMITH_RECIPES) {
-    const owned = getStackCount(world, actor, recipe.itemId);
-    if (owned > 0) continue;
-    if (ironCount >= recipe.iron && lumberCount >= recipe.lumber) {
-      return { recipe, reason: "" };
-    }
-  }
-  for (const recipe of PLAYER_SMITH_RECIPES) {
-    if (ironCount >= recipe.iron && lumberCount >= recipe.lumber) {
-      return { recipe, reason: "" };
-    }
-  }
+  const craftable = SMITH_RECIPES.filter((recipe) => ironCount >= recipe.iron && lumberCount >= recipe.lumber);
+  const recipe = chooseSmithRecipe(craftable, (itemId) => getStackCount(world, actor, itemId));
+  if (recipe) return { recipe, reason: "" };
   return { recipe: null, reason: "missing_iron" };
 }
 
