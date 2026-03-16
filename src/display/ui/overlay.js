@@ -5,6 +5,7 @@ import { ensureMemoryGraph } from './memoryGraph.js';
 import { createDebugGraph } from './debugGraph.js';
 import { createTileInspector } from './tileInspector.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
+import { renderAnvil } from './anvilOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { versionLoaded } from '../../shared/version.js';
@@ -699,6 +700,50 @@ export function initOverlays() {
       recipes: Array.isArray(d.recipes) ? d.recipes : [],
     };
     renderAlchemyBench(alchemy, _alchemyState);
+  });
+
+  // Anvil overlay
+  let _anvilState = {
+    anvilId: 0,
+    materials: { iron: 0, lumber: 0 },
+    recipes: [],
+  };
+  window.addEventListener('ui:openAnvil', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _anvilState.anvilId = Number(d.anvilId || 0) | 0;
+    show(alchemy);
+    renderAnvil(alchemy, _anvilState);
+    const escKey = (/** @type {KeyboardEvent} */ ke) => {
+      if (alchemy.style.display !== 'block') return;
+      if (ke.key === 'Escape') { hide(alchemy); ke.preventDefault(); }
+    };
+    window.addEventListener('keydown', escKey);
+    const obs = new MutationObserver(() => {
+      if (alchemy.style.display === 'none') {
+        window.removeEventListener('keydown', escKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(alchemy, { attributes: true, attributeFilter: ['style'] });
+  });
+  window.addEventListener('ui:closeAnvil', () => {
+    _anvilState.anvilId = 0;
+    hide(alchemy);
+  });
+  window.addEventListener('ui:anvilData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _anvilState = {
+      anvilId: Number(d.anvilId || _anvilState.anvilId || 0) | 0,
+      materials: d.materials && typeof d.materials === 'object'
+        ? d.materials
+        : { iron: 0, lumber: 0 },
+      recipes: Array.isArray(d.recipes) ? d.recipes : [],
+    };
+    renderAnvil(alchemy, _anvilState);
   });
 
   // Cooking fire overlay

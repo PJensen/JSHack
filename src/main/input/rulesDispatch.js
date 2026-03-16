@@ -218,6 +218,15 @@ export function makeRulesDispatcher(world, getActorId) {
         world?.tick?.(1);
         break;
       }
+      case "rules.forgeAtAnvil": {
+        const { anvilId = 0, recipe = "" } = action.payload || {};
+        if (!Number.isInteger(anvilId) || anvilId <= 0) break;
+        const recipeKey = String(recipe || "").trim().toLowerCase();
+        if (!recipeKey) break;
+        world?.add?.(actorId, InteractIntent, { targetId: anvilId, mode: "forge", recipe: recipeKey });
+        world?.tick?.(1);
+        break;
+      }
       case "rules.altarOffer": {
         const { altarId = 0, itemId = 0 } = action.payload || {};
         if (!Number.isInteger(altarId) || altarId <= 0) break;
