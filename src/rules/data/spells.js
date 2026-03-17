@@ -330,7 +330,7 @@ export const SPELL_DEFS = {
     selfTargetable: true,
     description: 'Veil the target\'s sight, degrading vision over several turns and leaving them stumbling in the dark.',
     effects: [
-      { kind: 'status', status: 'blinded', duration: '3–4 ticks ramp-in, 4 ticks hold, 3 ticks recovery' },
+      { kind: 'status', status: 'blinded', duration: '2 ticks ramp-in, 16 ticks hold, 4 ticks recovery' },
       { kind: 'utility', note: 'Reduces effective vision range; graded by remaining vision threshold' },
     ],
   },

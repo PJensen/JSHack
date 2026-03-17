@@ -1558,11 +1558,11 @@ REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
     return;
   }
 
-  // Apply the vision envelope: ramp-in 3, hold 4, ramp-out 3, recover to original
+  // Apply the vision envelope: ramp-in 4, hold 12, ramp-out 4, recover to original
   // toValue is 20% of current effective vision (significant impairment, not total blackout)
   const currentVision = getEffectiveVisionRange(world, targetId);
   const toValue = Math.max(1, Math.round(currentVision * 0.2));
-  blind(world, targetId, toValue, 3, 4, 3);
+  blind(world, targetId, toValue, 2, 16, 4);
 
   try {
     world.emit && world.emit('spell:blind', {
