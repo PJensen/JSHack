@@ -4271,8 +4271,8 @@ function renderShop(panel, data, state) {
   Object.assign(titleWrap.style, { display: 'flex', flexDirection: 'column', gap: '2px' });
   const title = document.createElement('div');
   title.textContent = mode === 'checkout'
-    ? (vendorKind === 'gem' ? 'Gem Dealer Invoice' : 'Shopkeeper Invoice')
-    : (vendorKind === 'gem' ? 'Gem Dealer' : 'Shopkeeper');
+    ? (vendorKind === 'gem' ? 'Gem Dealer Invoice' : vendorKind === 'book' ? 'Bookseller Invoice' : 'Shopkeeper Invoice')
+    : (vendorKind === 'gem' ? 'Gem Dealer' : vendorKind === 'book' ? 'Bookseller' : 'Shopkeeper');
   title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
   titleWrap.appendChild(title);
   if (mode !== 'checkout' && vendorKind === 'gem') {

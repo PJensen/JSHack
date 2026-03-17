@@ -1286,6 +1286,11 @@ export function materializeSpawn(world, spawn) {
       const info = world.get(itemId, ItemInfo);
       if (info) {
         world.mutate(itemId, ItemInfo, r => { r.identified = true; });
+        const price = Math.ceil(appraiseItemValue(world, itemId, {
+          unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
+        }) * 1.2);
+        spawn._calculatedPrice = price;
+        spawn._itemId = itemId;
       }
       return itemId;
     }
@@ -1493,6 +1498,35 @@ export function materializeSpawn(world, spawn) {
             world.add(itemId, Position, { x: px, y: py });
             const info = world.get(itemId, ItemInfo);
             const price = info ? Math.ceil(Number(info.value || 50) * 1.5) : 50;
+            try { world.add(itemId, Unpaid, { shopkeeperId: id, price }); } catch {}
+          }
+        }
+      } else if (def.role === "book_vendor") {
+        world.add(id, Interactable, {
+          action: "openBookVendor",
+          params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+        });
+        world.add(id, ShopInventory, { buyMarkup: 1.2, sellDiscount: 0.5 });
+        assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
+        if (spawn.params.shopRoom) {
+          const roomEntity = world.create();
+          world.add(roomEntity, RoomMetadata, {
+            roomType: 'shop',
+            x: spawn.params.shopRoom.x,
+            y: spawn.params.shopRoom.y,
+            w: spawn.params.shopRoom.w,
+            h: spawn.params.shopRoom.h,
+            shopkeeperId: id,
+          });
+          const sr = spawn.params.shopRoom;
+          for (const [itemId, pos, info] of world.query(Position, ItemInfo)) {
+            if (!pos || !info) continue;
+            if (pos.x < sr.x || pos.x >= sr.x + sr.w || pos.y < sr.y || pos.y >= sr.y + sr.h) continue;
+            const kind = String(info.type || "");
+            if (kind !== "book" && kind !== "learn" && kind !== "scroll") continue;
+            const price = Math.ceil(appraiseItemValue(world, itemId, {
+              unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
+            }) * 1.2);
             try { world.add(itemId, Unpaid, { shopkeeperId: id, price }); } catch {}
           }
         }

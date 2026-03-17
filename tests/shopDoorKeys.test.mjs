@@ -19,6 +19,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Position } from "../src/rules/components/Position.js";
 import { RoomMetadata } from "../src/rules/components/RoomMetadata.js";
+import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { TownfolkJob, TOWNFOLK_STATES } from "../src/rules/components/TownfolkJob.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
@@ -307,6 +308,61 @@ Deno.test("overworld gem vendor gets a keyed locked shop door after generation",
   assertEquals(doorState.locked, true);
   assert(doorLock?.lockId?.includes("gem_vendor"), "expected gem shop door lock to be assigned");
   assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
+});
+
+Deno.test("overworld book vendor gets a keyed locked shop door and owned stock after generation", () => {
+  clearAll();
+  const world = new World({ seed: 0xC0FFEE });
+  generateFloor(world, world.seed >>> 0, 0);
+
+  let bookVendorId = 0;
+  for (const [id, named] of world.query(NamedIdentity)) {
+    if (named.identity === "townfolk_book_vendor") {
+      bookVendorId = id;
+      break;
+    }
+  }
+  assert(bookVendorId > 0, "expected book vendor to spawn");
+
+  const keyIds = inventoryItems(world, bookVendorId)
+    .filter((itemId) => String(world.get(itemId, DoorKey)?.lockId || "").includes("book_vendor"));
+  assertEquals(keyIds.length, 1, "book vendor should have exactly one matching shop key");
+
+  let shopRoom = null;
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType === "shop" && room.shopkeeperId === bookVendorId) {
+      shopRoom = room;
+      break;
+    }
+  }
+  assert(shopRoom, "expected book vendor shop room metadata");
+
+  let shopDoorId = 0;
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (isDoorOnRoomPerimeter(pos, shopRoom)) {
+      shopDoorId = id;
+      break;
+    }
+  }
+  assert(shopDoorId > 0, "expected a physical book shop door");
+
+  const doorState = world.get(shopDoorId, DoorState);
+  const doorLock = world.get(shopDoorId, DoorLock);
+  assertEquals(doorState.open, false);
+  assertEquals(doorState.locked, true);
+  assert(doorLock?.lockId?.includes("book_vendor"), "expected book shop door lock to be assigned");
+  assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
+
+  let ownedBookStock = 0;
+  for (const [itemId, unpaid, pos, info] of world.query(Unpaid, Position, ItemInfo)) {
+    if (Number(unpaid.shopkeeperId || 0) !== bookVendorId) continue;
+    if (!shopRoom) continue;
+    if (pos.x < shopRoom.x || pos.x >= shopRoom.x + shopRoom.w || pos.y < shopRoom.y || pos.y >= shopRoom.y + shopRoom.h) continue;
+    const kind = String(info.type || "");
+    if (kind !== "book" && kind !== "learn" && kind !== "scroll") continue;
+    ownedBookStock++;
+  }
+  assert(ownedBookStock > 0, "expected the bookseller to own unpaid book or scroll stock inside the shop");
 });
 
 Deno.test("overworld herbalist does not get the apothecary key", () => {
