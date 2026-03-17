@@ -471,6 +471,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const ix = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const iy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
       const item = pickItem(rng, floorPlan.depth);
+      if (isSolid(ix, iy)) continue;
       spawns.push({
         x: ix, y: iy,
         kind: item.kind,
@@ -722,7 +723,9 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     const bx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
     const by = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
     const book = pickDungeonBook(rng);
-    spawns.push({ x: bx, y: by, kind: 'book', params: { bookId: book.id } });
+    if (!isSolid(bx, by)) {
+      spawns.push({ x: bx, y: by, kind: 'book', params: { bookId: book.id } });
+    }
   }
 
   return spawns;
