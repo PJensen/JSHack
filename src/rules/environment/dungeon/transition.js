@@ -16,7 +16,7 @@ import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 import { normalizeInventorySnapshot } from '../../utils/inventorySnapshotMigration.js';
 import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
-import { destroySubtree, Parent, Sibling } from '../../../lib/ecs-js/hierarchy.js';
+import { destroySubtree, Parent, Sibling, children } from '../../../lib/ecs-js/hierarchy.js';
 
 /** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
 const _exploredCache = new Map();
@@ -128,6 +128,18 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
     for (const [id] of world.query(Player)) _permanentIds.add(id);
     for (const [id] of world.query(Pet)) _permanentIds.add(id);
     for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
+    // Also exclude hierarchy descendants (InventoryRoot, inventory items, etc.)
+    // so they are never included in the floor snapshot. Without this, restored
+    // zombie copies corrupt the player's Parent linked-list on later transitions.
+    for (const root of [..._permanentIds]) {
+      const stack = [root];
+      while (stack.length) {
+        const cur = stack.pop();
+        for (const cid of children(world, cur)) {
+          if (!_permanentIds.has(cid)) { _permanentIds.add(cid); stack.push(cid); }
+        }
+      }
+    }
     const floorIds = Array.from(world.alive)
       .filter(id => Number.isInteger(id) && id > 0 && !_permanentIds.has(id));
     const entry = {
