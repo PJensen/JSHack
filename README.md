@@ -551,6 +551,8 @@ Now go build something weird. ⚡
 
 ---
 
+**Every line of code in this project was written by AI agents. Not one line was typed by a human. The human directed; the agents built. This is what agentic development looks like when the codebase is simple enough to reason about. Directed, not easy — agentic development demands architecture, judgment, and relentless iteration.**
+
 **Follow development:** [hackjs.substack.com](http://hackjs.substack.com/)
 
 ---
