@@ -22,7 +22,7 @@ python3 -m http.server 8000
 
 ### 📱 Mobile-first, touch-first
 
-This isn't "mobile-friendly" — it's **mobile-native**. Touch controls are primary. Designed for phones. Keyboard works great too, but we built this for your thumb on a subway, not a mouse at a desk.
+This isn't "mobile-friendly" — it's **mobile-native**. Touch controls are primary. Designed for phones. Keyboard works great too, but the game was built for a thumb on a subway, not a mouse at a desk.
 
 - Tap sides to move (cardinal directions)
 - Double-tap to pick up items
@@ -62,7 +62,7 @@ See [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) for the philosophy.
 
 ### 🔧 Built to be hacked
 
-We're not "shipping a product" — we're **exploiting JavaScript for fun**. Clever tricks encouraged. Weird experiments welcome. Open your console, poke around, break things, fix them. This is a playground.
+This isn't "shipping a product" — it's **exploiting JavaScript for fun**. Clever tricks encouraged. Weird experiments welcome. Open your console, poke around, break things, fix them. This is a playground.
 
 Every decision prioritizes hackability:
 - No transpilation (edit and refresh)
@@ -365,28 +365,28 @@ JSHack/
 
 ## Philosophy
 
-### We believe in:
+### This project values:
 
 - **Zero build steps** — pure ES modules, instant feedback
 - **Determinism** — seeded RNG, reproducible runs, testable logic
 - **Transparency** — no frameworks, no magic, just readable code
 - **Hackability** — one file = one idea, easy to modify
 - **Mobile-first** — touch is primary, phones are the platform
-- **Fun** — we're hacking and exploring JavaScript, not shipping enterprise software
+- **Fun** — hacking and exploring JavaScript, not shipping enterprise software
 
-### We avoid:
+### This project avoids:
 
 - ❌ Build tools (webpack, babel, rollup)
 - ❌ Frameworks (React, Vue, Angular)
 - ❌ Dependencies (zero npm packages)
 - ❌ TypeScript (just JavaScript)
-- ❌ Node (we use Deno for tests)
+- ❌ Node (Deno is used for tests)
 - ❌ Backwards compatibility hacks (just rework it)
 - ❌ Art assets (every glyph is Unicode — zero sprites, zero images, zero textures)
 
-**If you can't `console.log` it and understand it immediately, we're doing it wrong.**
+**If it can't be `console.log`'d and understood immediately, something is wrong.**
 
-For more on why we reject the modern web toolchain, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project is proof of what native browser tooling can do without the bullshit — and a major proof of what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
+For more on why the modern web toolchain is rejected here, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project is proof of what native browser tooling can do without the bullshit — and a major proof of what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
 
 ---
 
@@ -468,7 +468,7 @@ Maintained automatically by `spatialIndexSystem` in the cleanup phase.
 
 ## Testing
 
-We use **Deno** (not Node) for testing:
+**Deno** (not Node) is used for testing:
 
 ```bash
 deno test --allow-read tests/
