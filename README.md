@@ -385,6 +385,8 @@ JSHack/
 
 **If you can't `console.log` it and understand it immediately, we're doing it wrong.**
 
+For more on why we reject the modern web toolchain, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project is proof of what native browser tooling can do without the bullshit — and a major proof of what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
+
 ---
 
 ## Advanced Topics
@@ -545,6 +547,10 @@ Because JavaScript doesn't need frameworks and build tools to be powerful. Becau
 That's it. That's the whole pitch.
 
 Now go build something weird. ⚡
+
+---
+
+**Follow development:** [hackjs.substack.com](http://hackjs.substack.com/)
 
 ---
 
