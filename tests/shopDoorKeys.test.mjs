@@ -26,6 +26,7 @@ import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFaca
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/systems/aiTownfolkSystem.js";
 import { cleanupSystem } from "../src/rules/systems/cleanupSystem.js";
+import { shopkeeperSystem } from "../src/rules/systems/shopkeeperSystem.js";
 
 function createKey(world, lockId, name = "Shop Key") {
   const keyId = world.create();
@@ -363,6 +364,57 @@ Deno.test("overworld book vendor gets a keyed locked shop door and owned stock a
     ownedBookStock++;
   }
   assert(ownedBookStock > 0, "expected the bookseller to own unpaid book or scroll stock inside the shop");
+});
+
+Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
+  clearAll();
+  const world = new World({ seed: 0xC0FFEE });
+  generateFloor(world, world.seed >>> 0, 0);
+
+  let bookVendorId = 0;
+  let shopRoom = null;
+  let stolenItemId = 0;
+  for (const [id, named] of world.query(NamedIdentity)) {
+    if (named.identity === "townfolk_book_vendor") {
+      bookVendorId = id;
+      break;
+    }
+  }
+  assert(bookVendorId > 0, "expected book vendor to spawn");
+
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType === "shop" && room.shopkeeperId === bookVendorId) {
+      shopRoom = room;
+      break;
+    }
+  }
+  assert(shopRoom, "expected bookseller shop room");
+
+  for (const [itemId, unpaid, pos, info] of world.query(Unpaid, Position, ItemInfo)) {
+    if (Number(unpaid.shopkeeperId || 0) !== bookVendorId) continue;
+    if (pos.x < shopRoom.x || pos.x >= shopRoom.x + shopRoom.w || pos.y < shopRoom.y || pos.y >= shopRoom.y + shopRoom.h) continue;
+    const kind = String(info.type || "");
+    if (kind !== "book" && kind !== "learn" && kind !== "scroll") continue;
+    stolenItemId = itemId;
+    break;
+  }
+  assert(stolenItemId > 0, "expected unpaid bookseller stock");
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Inventory, { capacity: 20 });
+  world.add(playerId, Position, { x: shopRoom.x + 1, y: shopRoom.y + 1 });
+  addToInventory(world, playerId, stolenItemId);
+  try { world.remove(stolenItemId, Position); } catch {}
+
+  const blocked = [];
+  world.on("shop:exit-blocked", (ev) => blocked.push(ev));
+
+  world.add(playerId, MoveIntent, { dx: 0, dy: shopRoom.h });
+  shopkeeperSystem(world);
+
+  assertEquals(blocked.length, 1, "bookseller should block leaving with unpaid stock");
+  assertEquals(blocked[0].shopkeeperId, bookVendorId);
 });
 
 Deno.test("overworld herbalist does not get the apothecary key", () => {
