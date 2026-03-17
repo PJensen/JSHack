@@ -22,7 +22,7 @@ python3 -m http.server 8000
 
 ### 📱 Mobile-first, touch-first
 
-This isn't "mobile-friendly" — it's **mobile-native**. Touch controls are primary. Designed for phones. Keyboard works great too, but we built this for your thumb on a subway, not a mouse at a desk.
+This isn't "mobile-friendly" — it's **mobile-native**. Touch controls are primary. Designed for phones. Keyboard works great too, but the game was built for a thumb on a subway, not a mouse at a desk.
 
 - Tap sides to move (cardinal directions)
 - Double-tap to pick up items
@@ -468,7 +468,7 @@ Maintained automatically by `spatialIndexSystem` in the cleanup phase.
 
 ## Testing
 
-We use **Deno** (not Node) for testing:
+**Deno** (not Node) is used for testing:
 
 ```bash
 deno test --allow-read tests/
