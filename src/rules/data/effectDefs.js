@@ -200,4 +200,10 @@ export const EFFECT_DEFS = [
     operation: "damage",
     statuses: ["agony"],
   },
+  {
+    id: "blinded",
+    keys: ["blinded", "blind"],
+    operation: "none",
+    statuses: ["blinded"],
+  },
 ];
