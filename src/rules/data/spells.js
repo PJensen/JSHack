@@ -157,7 +157,7 @@ export const SPELL_DEFS = {
     boltsPerTick: 3,
     minIntelligence: 0,
     range: 10,
-    radius: 3,
+    radius: 2,
     script: 'blizzard',
     targeting: 'area',
     description: 'Hold the sky open and let winter keep striking the ground you chose.',
