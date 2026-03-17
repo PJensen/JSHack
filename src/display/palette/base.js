@@ -136,6 +136,7 @@ export const basePalette = {
   townfolk_herbalist:  { glyph: "@", fg: "#81c784", glow: "#2e7d32" },
   townfolk_alchemist:  { glyph: "@", fg: "#80deea", glow: "#00838f" },
   townfolk_gem_vendor: { glyph: "@", fg: "#8fdcff", glow: "#3ea0d4" },
+  townfolk_book_vendor: { glyph: "@", fg: "#d4a76a", glow: "#8b6914" },
 
   // Containers
   chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
@@ -150,6 +151,7 @@ export const basePalette = {
   tavern_chest:   { glyph: "]", fg: "#d7a15d", glow: "#8f5225" },
   apothecary_sign: { glyph: "⚗", fg: "#b39ddb", glow: "#7e57c2" },
   gem_shop_sign: { glyph: "💎", fg: "#bdefff", glow: "#68bde2" },
+  book_shop_sign: { glyph: "📖", fg: "#d4a76a", glow: "#8b6914" },
   gem_display_case: { glyph: "◇", fg: "#d7f3ff", glow: "#75b8d2" },
   message_board: { glyph: "🪧", fg: "#d8c08a", glow: "#8b6f3f" },
   berry_bush: { glyph: "❀", fg: "#8b4ea9", glow: "#5a2d75" },
