@@ -90,7 +90,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_poison', count: 2 },
       { itemId: 'scroll_identify', count: 1 },
     ],
-    startingSpell: 'phase_strike',
+    startingSpells: ['phase_strike', 'blind'],
   },
 
   archeologist: {
