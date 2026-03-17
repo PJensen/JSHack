@@ -38,6 +38,9 @@ export function installDeathShareWiring({ world }) {
   if (!world || world[INSTALLED_KEY]) return;
   world[INSTALLED_KEY] = true;
 
+  /** @type {{ depth: number, score: number, seed: number, killerName: string|null, cause: string|undefined, shareUrl: string }|null} */
+  let _pendingDeathDetail = null;
+
   world.on("died", ({ id, killer, cause }) => {
     if (!world.has(id, Player)) return;
 
@@ -64,15 +67,21 @@ export function installDeathShareWiring({ world }) {
       cause,
     });
 
+    _pendingDeathDetail = {
+      depth,
+      score: score?.current ?? 0,
+      seed,
+      killerName,
+      cause,
+      shareUrl,
+    };
+  });
+
+  world.on("postMortemComplete", () => {
+    if (!_pendingDeathDetail) return;
     EVENT_TARGET.dispatchEvent(new CustomEvent("ui:playerDied", {
-      detail: {
-        depth,
-        score: score?.current ?? 0,
-        seed,
-        killerName,
-        cause,
-        shareUrl,
-      },
+      detail: _pendingDeathDetail,
     }));
+    _pendingDeathDetail = null;
   });
 }
