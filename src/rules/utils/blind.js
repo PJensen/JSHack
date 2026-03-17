@@ -14,6 +14,10 @@ import { Brain } from '../components/Brain.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { getPassiveBonuses } from './passiveBonuses.js';
 
+function durationTicks(value) {
+  return Math.max(0, Number(value) | 0);
+}
+
 /**
  * Piecewise-linear envelope interpolation.
  * Deterministic: value is computed from elapsed ticks alone, not accumulated deltas.
@@ -33,24 +37,29 @@ import { getPassiveBonuses } from './passiveBonuses.js';
  * @returns {number}
  */
 export function computeEnvelopeValue(startValue, toValue, endValue, rampIn, hold, rampOut, elapsed) {
+  const inTicks = durationTicks(rampIn);
+  const holdTicks = durationTicks(hold);
+  const outTicks = durationTicks(rampOut);
+
   if (elapsed <= 0) return startValue;
-  const total = (Number(rampIn) || 0) + (Number(hold) || 0) + (Number(rampOut) || 0);
+  const total = inTicks + holdTicks + outTicks;
   if (elapsed > total) return endValue;
 
   // Ramp-in phase
-  if (rampIn > 0 && elapsed <= rampIn) {
-    const t = elapsed / rampIn;
+  if (inTicks > 0 && elapsed <= inTicks) {
+    const t = elapsed / inTicks;
     return startValue + (toValue - startValue) * t;
   }
 
   // Hold phase: elapsed is in [rampIn, rampIn + hold]
-  if (elapsed <= rampIn + hold) {
+  if (elapsed <= inTicks + holdTicks) {
     return toValue;
   }
 
-  // Ramp-out phase (or instant jump when rampOut === 0)
-  if (rampOut <= 0) return toValue;
-  const t = (elapsed - rampIn - hold) / rampOut;
+  // Ramp-out phase. With outTicks=0 there is no recovery segment; the active
+  // effect remains at toValue until expiry, then callers observe endValue.
+  if (outTicks <= 0) return toValue;
+  const t = (elapsed - inTicks - holdTicks) / outTicks;
   return toValue + (endValue - toValue) * Math.min(1, t);
 }
 
