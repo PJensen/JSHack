@@ -14,6 +14,7 @@ export function createStatusEmitterController({ world, fx }) {
   const cursedEmitters = new Set();
   const blessedEmitters = new Set();
   const agonyEmitters = new Set();
+  const blindedEmitters = new Set();
   const fountainEmitters = new Set();
   const furnaceEmitters = new Set();
   const cookFireEmitters = new Set();
@@ -35,6 +36,7 @@ export function createStatusEmitterController({ world, fx }) {
     cursed: { tracker: cursedEmitters, prefix: "cursed", cfg: { rate: 12, angle: -Math.PI / 2, spread: Math.PI, speed: 0.5, speedJitter: 0.3, ax: 0, ay: -0.25, life: 1.2, lifeJitter: 0.4, size: 0.14, sizeEnd: 0.02, color: "#8822cc", alpha0: 0.7, alpha1: 0.0 } },
     blessed: { tracker: blessedEmitters, prefix: "blessed", cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.6, speedJitter: 0.2, ax: 0, ay: -0.35, life: 1.0, lifeJitter: 0.3, size: 0.09, sizeEnd: 0.02, color: "#ffcc00", alpha0: 0.8, alpha1: 0.0 } },
     agony: { tracker: agonyEmitters, prefix: "agony", cfg: { rate: 14, angle: -Math.PI / 2, spread: Math.PI, speed: 0.55, speedJitter: 0.30, ax: 0, ay: -0.22, life: 1.0, lifeJitter: 0.4, size: 0.18, sizeEnd: 0.05, color: "#bb44ee", alpha0: 0.85, alpha1: 0.0 } },
+    blinded: { tracker: blindedEmitters, prefix: "blind", cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI * 2, speed: 0.25, speedJitter: 0.15, ax: 0, ay: -0.08, life: 1.4, lifeJitter: 0.5, size: 0.14, sizeEnd: 0.03, color: "#6633aa", alpha0: 0.7, alpha1: 0.0 } },
     torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
   };
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
