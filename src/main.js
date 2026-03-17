@@ -3392,6 +3392,43 @@ function drawRareStar(ctx, e, fxTime) {
 }
 
 /**
+ * Draw a 👁️ icon above blinded entities for the duration of the effect.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawBlindEye(ctx, e, fxTime) {
+  const cx = e.pos.x;
+  const cy = e.pos.y - 0.72;
+
+  // Gentle pulse
+  const pulse = 0.85 + Math.sin(fxTime * 2.5) * 0.15;
+  const dy = cy + Math.sin(fxTime * 1.8) * 0.025;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Soft violet glow halo
+  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, 0.2);
+  halo.addColorStop(0, `rgba(120,60,200,${(0.25 * pulse).toFixed(2)})`);
+  halo.addColorStop(1, 'rgba(100,50,180,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, dy, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eye glyph
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 0.9 * pulse;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '0.32px sans-serif';
+  ctx.fillText('\u{1F441}\u{FE0F}', cx, dy);
+
+  ctx.restore();
+}
+
+/**
  * Draw a yellow "!" above quest giver NPCs (mirrors drawRareStar pattern).
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
@@ -3654,6 +3691,9 @@ function render(worldView) {
       if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('quest_giver')) {
         drawQuestBang(bctx, e, _fxTime);
       }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('blinded')) {
+        drawBlindEye(bctx, e, _fxTime);
+      }
       continue;
     }
 
@@ -3690,6 +3730,9 @@ function render(worldView) {
     }
     if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('quest_giver')) {
       drawQuestBang(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('blinded')) {
+      drawBlindEye(bctx, renderEntity, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)

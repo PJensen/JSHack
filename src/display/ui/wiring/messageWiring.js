@@ -543,6 +543,22 @@ export function installMessageWiring({
     log('Phase Strike fizzles.', 'system');
   });
 
+  world.on('spell:blind', ({ actor, targetId, fizzle, reason }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (fizzle) {
+      if (who === 'You') {
+        if (reason === 'no_los') log('Blind fizzles — no line of sight.', 'system');
+        else if (reason === 'out_of_range') log('Blind fizzles — target out of range.', 'system');
+        else log('Blind finds no target.', 'system');
+      }
+      return;
+    }
+    if (who === 'You') log(`You veil ${tgt}'s sight in darkness.`, 'combat');
+    else if (tgt === 'You') log(`${who} veils your sight in darkness!`, 'danger');
+    else log(`${who} blinds ${tgt}.`, 'combat');
+  });
+
   world.on('spell:rampage', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     log('You enter a blood rage!', 'combat');
