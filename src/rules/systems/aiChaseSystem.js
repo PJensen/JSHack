@@ -34,6 +34,7 @@ import {
   SEARCH_TURNS_ALERTED,
   SEARCH_TURNS_CURIOUS,
 } from "../components/AggroState.js";
+import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { getMonster }        from "../data/monsters.js";
 import { SeenCallbackContext } from "../data/callbacks/ai.js";
 import { runCallbackList }   from "../interaction/dispatch.js";
@@ -54,6 +55,18 @@ function chebyshevDistance(ax, ay, bx, by) {
 
 function isSmartPathingMonster(brain, def) {
   return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
+}
+
+/**
+ * Returns true if this monster's creature type grants it the ability to open doors.
+ * Humanoids, undead (skeletal hands), and demons can operate door handles.
+ */
+function monsterCanOpenDoors(world, id) {
+  const ct = world.get(id, CreatureType);
+  const type = ct?.type;
+  return type === CREATURE_TYPES.humanoid
+      || type === CREATURE_TYPES.undead
+      || type === CREATURE_TYPES.demon;
 }
 
 function isStepTraversable(world, actorId, x, y, targetX, targetY, canTraverseTile) {
@@ -358,6 +371,7 @@ export function aiChaseSystem(world) {
 
     if (!aggro.retreating && isSmartPathingMonster(brain, def)) {
       const canTraverseTile = world.has(id, Flying) ? isFlyable : isWalkable;
+      const canOpenDoors = monsterCanOpenDoors(world, id);
       const nx = (pos.x | 0) + dx;
       const ny = (pos.y | 0) + dy;
       if (!isStepTraversable(world, id, nx, ny, targetX, targetY, canTraverseTile)) {
@@ -365,6 +379,7 @@ export function aiChaseSystem(world) {
           goalRadius: 0,
           maxNodes: 256,
           isPassable: canTraverseTile,
+          passThroughDoors: canOpenDoors,
         });
         if (next) {
           dx = next.dx | 0;

@@ -22,7 +22,10 @@ import { Stamina } from "../components/Stamina.js";
 import { Position } from "../components/Position.js";
 import { Pushable } from "../components/Pushable.js";
 import { Flying } from "../components/Flying.js";
+import { DoorState } from "../components/DoorState.js";
+import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { setDoorState } from "../utils/doorAccess.js";
 import { findTileReaction } from "./tileReactions.js";
 import { getTile, setTile, isLoaded, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_VOID } from "../environment/dungeon/constants.js";
@@ -62,6 +65,34 @@ function emitSafe(world, event, payload) {
 function targetIsAtBumpTile(targetId, nx, ny, tiles) {
   if (!(targetId > 0)) return false;
   return tiles.livingByCell.get(`${nx},${ny}`) === targetId;
+}
+
+/**
+ * Returns true if the creature's type indicates it has hands (can open doors).
+ * Humanoids, undead (skeletal hands), and demons can operate door handles.
+ * Beasts, constructs, plants, and elementals cannot.
+ */
+function creatureHasHands(world, actorId) {
+  const ct = world.get(actorId, CreatureType);
+  const type = ct?.type;
+  return type === CREATURE_TYPES.humanoid
+      || type === CREATURE_TYPES.undead
+      || type === CREATURE_TYPES.demon;
+}
+
+/**
+ * Find the first closed, unlocked door entity at (nx, ny) via the tile snapshot.
+ * Returns the door entity ID or 0 if none.
+ */
+function findOpenableDoorAt(world, nx, ny, tiles) {
+  const k = `${nx},${ny}`;
+  const ids = tiles.byCell.get(k);
+  if (!ids) return 0;
+  for (let i = 0; i < ids.length; i++) {
+    const ds = world.get(ids[i], DoorState);
+    if (ds && !ds.open && !ds.locked) return ids[i];
+  }
+  return 0;
 }
 
 // ── resolvers (priority order) ──────────────────────────────────────
@@ -137,6 +168,26 @@ const npcInteract = {
   },
   resolve(world, actor, ctx) {
     emitSafe(world, "bump:interact", { actor, target: ctx.target });
+  },
+};
+
+/**
+ * Enemy door-open: a non-player enemy with hands (humanoid/undead/demon creature type)
+ * bumps into a closed, unlocked door and opens it rather than being blocked.
+ * The monster spends its action this turn opening the door; it will walk through next turn.
+ */
+const enemyDoorOpen = {
+  name: "enemy-door-open",
+  test(world, actor, ctx) {
+    if (world.has(actor, Player)) return false; // player uses objectInteract
+    if (!isManhattan1(ctx.mdx, ctx.mdy)) return false;
+    if (!creatureHasHands(world, actor)) return false;
+    return findOpenableDoorAt(world, ctx.nx, ctx.ny, ctx.tiles) > 0;
+  },
+  resolve(world, actor, ctx) {
+    const doorId = findOpenableDoorAt(world, ctx.nx, ctx.ny, ctx.tiles);
+    if (!(doorId > 0)) return;
+    setDoorState(world, doorId, { open: true, locked: false }, actor);
   },
 };
 
@@ -254,6 +305,7 @@ export const BUMP_RESOLVERS = [
   hostileMelee,
   petSwap,
   npcInteract,
+  enemyDoorOpen,
   objectInteract,
   pushEntity,
   tileReaction,
