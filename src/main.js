@@ -3629,10 +3629,8 @@ function render(worldView) {
     stackMeta.set(`${e.pos.x},${e.pos.y}`, e.id);
   }
 
-  // Draw order requirement:
-  // 1) actors/terrain entities first
-  // 2) top ground item second
-  const deferredItems = [];
+  // Draw order: items (layer 100) → doors (200) → actors (300) → player (400)
+  // Entities are sorted by layer, so drawing inline gives correct z-order.
 
   for (let i = 0; i < renderEntities.length; i++) {
     const e = renderEntities[i];
@@ -3643,7 +3641,23 @@ function render(worldView) {
     if (layer === 100) {
       if (throwFx.isItemHidden(e.id) || delayedDeathFx.isItemHidden(e.id)) continue;
       const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
-      if (topItemId === e.id) deferredItems.push(e);
+      if (topItemId !== e.id) continue;
+      drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
+        drawGlowingTagAura(bctx, e, _fxTime);
+      }
+      if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
+        drawVenomTagAura(bctx, e, _fxTime);
+      }
+      if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
+        drawPotionGlyphAura(bctx, e, _fxTime);
+      }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
+        drawRareStar(bctx, e, _fxTime);
+      }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('quest_giver')) {
+        drawQuestBang(bctx, e, _fxTime);
+      }
       continue;
     }
 
@@ -3993,26 +4007,7 @@ function render(worldView) {
     }
   }
 
-  for (let i = 0; i < deferredItems.length; i++) {
-    const e = deferredItems[i];
-    const k = (typeof e.kind === 'string') ? e.kind : 'default';
-    drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
-      drawGlowingTagAura(bctx, e, _fxTime);
-    }
-    if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
-      drawVenomTagAura(bctx, e, _fxTime);
-    }
-    if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
-      drawPotionGlyphAura(bctx, e, _fxTime);
-    }
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
-      drawRareStar(bctx, e, _fxTime);
-    }
-    if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('quest_giver')) {
-      drawQuestBang(bctx, e, _fxTime);
-    }
-  }
+
 
   for (let i = 0; i < _healthBarsToDraw.length; i++) {
     drawEntityHealthBar(bctx, _healthBarsToDraw[i]);
