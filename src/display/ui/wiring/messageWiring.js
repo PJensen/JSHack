@@ -543,6 +543,11 @@ export function installMessageWiring({
     log('Phase Strike fizzles.', 'system');
   });
 
+  world.on('spell:rampage', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You enter a blood rage!', 'combat');
+  });
+
   world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {

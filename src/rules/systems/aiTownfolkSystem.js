@@ -625,7 +625,8 @@ function handleIdle(world, id, pos, job) {
       job.workSiteKind = "brew";
       break;
     }
-    case TOWNFOLK_ROLES.gem_vendor: {
+    case TOWNFOLK_ROLES.gem_vendor:
+    case TOWNFOLK_ROLES.book_vendor: {
       job.targetX = job.workX;
       job.targetY = job.workY;
       job.workSiteKind = "tend_stall";
@@ -1183,6 +1184,7 @@ function getRoleWorkTarget(world, job) {
       return { x: job.workAuxX, y: job.workAuxY, kind: "stock_shelves", state: TOWNFOLK_STATES.working, radius: 1 };
     }
     case TOWNFOLK_ROLES.gem_vendor:
+    case TOWNFOLK_ROLES.book_vendor:
       return { x: job.workX, y: job.workY, kind: "tend_stall", state: TOWNFOLK_STATES.working, radius: 0 };
     case TOWNFOLK_ROLES.villager:
     default:

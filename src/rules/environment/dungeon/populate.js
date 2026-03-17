@@ -77,6 +77,7 @@ import {
   HerbChest,
   TavernChest,
   ApothecarySign,
+  BookShopSign,
   GemShopSign,
   GemDisplayCase,
   MessageBoard,
@@ -151,17 +152,22 @@ function findDoorEntityAt(world, x, y) {
   return 0;
 }
 
+const SHOP_KEY_META = {
+  gem_vendor:  { label: "Gem Shop Key",  identity: "key_gem_shop",   desc: "the gem shop" },
+  alchemist:   { label: "Apothecary Key", identity: "key_apothecary", desc: "the apothecary" },
+  book_vendor: { label: "Book Shop Key",  identity: "key_book_shop",  desc: "the book shop" },
+};
+
 function createShopDoorKey(world, lockId, role) {
   const itemId = world.create();
-  const label = role === "gem_vendor" ? "Gem Shop Key" : "Apothecary Key";
-  const identity = role === "gem_vendor" ? "key_gem_shop" : "key_apothecary";
-  world.add(itemId, NamedIdentity, { name: label, identity });
+  const meta = SHOP_KEY_META[role] || { label: "Shop Key", identity: "key_shop", desc: "a shop" };
+  world.add(itemId, NamedIdentity, { name: meta.label, identity: meta.identity });
   world.add(itemId, ItemInfo, {
     type: "tool",
     slot: "",
     weight: 0.1,
     value: 0,
-    description: `A shop key cut for ${role === "gem_vendor" ? "the gem shop" : "the apothecary"} door.`,
+    description: `A shop key cut for ${meta.desc} door.`,
     count: 1,
   });
   world.add(itemId, Material, { kind: "iron" });
@@ -1270,6 +1276,19 @@ export function materializeSpawn(world, spawn) {
       return createFrom(world, GemShopSign, { x: spawn.x, y: spawn.y });
     case 'gem_display_case':
       return stockDisplayContainer(world, createFrom(world, GemDisplayCase, { x: spawn.x, y: spawn.y }), spawn, "gem");
+    case 'book_shop_sign':
+      return createFrom(world, BookShopSign, { x: spawn.x, y: spawn.y });
+    case 'book_shop_item': {
+      const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0xB00C) >>> 0);
+      const itemId = shopStock.generateBookShopItem(world, shopRng);
+      if (itemId == null) return null;
+      world.add(itemId, Position, { x: spawn.x, y: spawn.y });
+      const info = world.get(itemId, ItemInfo);
+      if (info) {
+        world.mutate(itemId, ItemInfo, r => { r.identified = true; });
+      }
+      return itemId;
+    }
     case 'message_board':
       return createFrom(world, MessageBoard, { x: spawn.x, y: spawn.y });
     case 'grave_tombstone':

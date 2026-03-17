@@ -77,6 +77,7 @@ export {
   HerbChest,
   TavernChest,
   ApothecarySign,
+  BookShopSign,
   GemDisplayCase,
   GraveTombstone,
   TownBell,

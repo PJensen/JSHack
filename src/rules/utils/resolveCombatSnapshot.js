@@ -90,6 +90,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "attack", "status:weakened", -statusTotals.weakened, "weakened-penalty");
     pushModifier(modifiers, "attack", "status:cursed", -statusTotals.cursed, "cursed-penalty");
     pushModifier(modifiers, "attack", "status:blessed", statusTotals.blessed, "blessed-bonus");
+    pushModifier(modifiers, "attack", "status:berserk", statusTotals.berserk > 0 ? 3 : 0, "berserk-bonus");
 
     attackBonus += (
       -statusTotals.disease
@@ -97,6 +98,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
       -statusTotals.weakened
       -statusTotals.cursed
       +statusTotals.blessed
+      +(statusTotals.berserk > 0 ? 3 : 0)
     );
   }
 
@@ -141,7 +143,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     attackBonus,
     armorClass: 10 + defenseContribution,
     damageFlatBonus: Math.max(0, Math.floor(damagePower / 2)),
-    damageMult: statusTotals.berserk > 0 ? 4 : 1,
+    damageMult: statusTotals.berserk > 0 ? 1.5 : 1,
     accuracy,
     damagePower,
     evade,

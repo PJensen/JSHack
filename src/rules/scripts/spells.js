@@ -1469,6 +1469,26 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   } catch (e) { console.debug('[spells] emit spell:agony failed:', e); }
 };
 
+REGISTRY['rampage'] = function rampageScript(world, actor, _spell, _intent) {
+  const pos = world.get(actor, Position);
+  if (!pos) return;
+
+  let ae = world.get(actor, ActiveEffects);
+  if (!ae) {
+    world.add(actor, ActiveEffects, { effects: [] });
+    ae = world.get(actor, ActiveEffects);
+  }
+  ae.effects.push({
+    key: 'berserk',
+    turnsLeft: 101,
+    potency: 1,
+    stacks: 1,
+    sourceId: actor,
+  });
+
+  world.emit('spell:rampage', { actor, at: { x: pos.x, y: pos.y } });
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world

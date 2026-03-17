@@ -59,6 +59,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
   /** @type {RadialFx[]} */
   const _smiteFx = [];
 
+  // --- Rampage state ---
+  /** @type {RadialFx[]} */
+  const _rampageFx = [];
+
   const STORM_VOLLEY_SWAY_MAX_RAD = Math.PI / 36; // +/- 5deg
   const STORM_LOCAL_SWAY_MAX_RAD = Math.PI / 60; // +/- 3deg
 
@@ -131,6 +135,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
     for (let i = _smiteFx.length - 1; i >= 0; i--) {
       _smiteFx[i].tick(dt);
       if (_smiteFx[i].expired) _smiteFx.splice(i, 1);
+    }
+    for (let i = _rampageFx.length - 1; i >= 0; i--) {
+      _rampageFx[i].tick(dt);
+      if (_rampageFx[i].expired) _rampageFx.splice(i, 1);
     }
   }
 
@@ -460,6 +468,39 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       // Inner golden glow disc
       const glowR = 0.15 + t * 0.5;
       ctx.fillStyle = `rgba(255,210,80,${(0.25 * alpha).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, glowR, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Rampage ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawRampage(ctx) {
+    if (!_rampageFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+    for (const eff of _rampageFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+      // Inner blood-red flash
+      if (t < 0.3) {
+        const ft = t / 0.3;
+        const flashR = 0.2 + ft * 1.0;
+        const flashA = 0.8 * (1 - ft) * alpha;
+        ctx.fillStyle = `rgba(255,40,20,${flashA.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(eff.x, eff.y, flashR, 0, TAU); ctx.fill();
+      }
+      // Expanding rage ring
+      const ringR = 0.15 + t * 1.6;
+      ctx.strokeStyle = `rgba(255,80,20,${(0.7 * alpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.04, 0.2 * (1 - t * 0.6));
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, 0, TAU); ctx.stroke();
+      // Outer pulsing orange glow
+      const pulse = 0.6 + 0.4 * Math.sin(_fxTime * 16 + eff.x * 0.5);
+      const glowR = 0.3 + t * 0.8;
+      ctx.fillStyle = `rgba(255,100,20,${(0.2 * alpha * pulse).toFixed(3)})`;
       ctx.beginPath(); ctx.arc(eff.x, eff.y, glowR, 0, TAU); ctx.fill();
     }
     ctx.restore();
@@ -832,7 +873,54 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
 
       startShake(cam, 5, 0.18);
     });
+
+    world.on('spell:rampage', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _rampageFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.8, ttl: 0.5 }));
+      // Red/orange particle burst
+      const scale = PERF.quality === 'low' ? 0.65 : (PERF.quality === 'high' ? 1.25 : 1.0);
+      const burstCount = Math.max(12, Math.round(24 * scale));
+      for (let i = 0; i < burstCount; i++) {
+        const angle = (Math.PI * 2 * i / burstCount) + (Math.random() - 0.5) * 0.5;
+        const speed = 0.7 + Math.random() * 1.6;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.14,
+          y: at.y + (Math.random() - 0.5) * 0.14,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.2,
+          ay: 0.15,
+          life: 0.22 + Math.random() * 0.35,
+          size0: 0.13 + Math.random() * 0.09,
+          size1: 0.02,
+          r: 255,
+          g: 50 + ((Math.random() * 60) | 0),
+          b: 10 + ((Math.random() * 30) | 0),
+          a0: 0.95,
+          rotVel: (Math.random() - 0.5) * 2.5,
+        }));
+      }
+      // Rising rage embers
+      const emberCount = Math.max(6, Math.round(14 * scale));
+      for (let i = 0; i < emberCount; i++) {
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.9,
+          y: at.y + (Math.random() - 0.5) * 0.5,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: -(0.2 + Math.random() * 0.5),
+          ay: -0.03,
+          life: 0.5 + Math.random() * 0.5,
+          size0: 0.07 + Math.random() * 0.05,
+          size1: 0.01,
+          r: 255,
+          g: 120 + ((Math.random() * 80) | 0),
+          b: 20,
+          a0: 0.7,
+          rotVel: (Math.random() - 0.5) * 2.0,
+        }));
+      }
+      startShake(cam, 4, 0.16);
+    });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, installListeners };
 }

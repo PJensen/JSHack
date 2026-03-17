@@ -283,6 +283,21 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'agony', duration: '6-10 turns, snapshotted from cast-time INT' },
     ],
   },
+  rampage: {
+    id: 'rampage',
+    name: 'Rampage',
+    symbol: '\u{1F4A2}',    // 💢
+    schools: ['alteration'],
+    manaCost: 20,
+    minIntelligence: 0,
+    script: 'rampage',
+    targeting: 'self',
+    description: 'Spend every drop of mana to fuel a long, savage battle fury.',
+    effects: [
+      { kind: 'status', status: 'berserk', duration: '100 turns' },
+      { kind: 'utility', note: '+3 to-hit accuracy and 1.5x melee damage' },
+    ],
+  },
   phase_strike: {
     id: 'phase_strike',
     name: 'Phase Strike',

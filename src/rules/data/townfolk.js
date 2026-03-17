@@ -90,4 +90,12 @@ export const TOWNFOLK = Object.freeze({
     maxHp: 30,
     dialogue: "Gems of all kinds — raw, cut, and mysterious. I also appraise stones for a small fee.",
   },
+  book_vendor: {
+    name: "Bookseller",
+    identity: "townfolk_book_vendor",
+    role: "book_vendor",
+    speed: 2,
+    maxHp: 25,
+    dialogue: "Spells, scrolls, and stories — knowledge is the sharpest weapon.",
+  },
 });

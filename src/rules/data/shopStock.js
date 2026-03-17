@@ -189,6 +189,40 @@ function filterGemPoolByTier(pool, stockTier) {
 }
 
 /**
+ * Generate exactly one book shop floor item entity ID (no Position component).
+ * 50% spell books (learn), 50% scrolls (one-time cast).
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {Object} rng
+ * @returns {number|null}
+ */
+export function generateBookShopItem(world, rng) {
+    const pick = chooseWeighted(rng, [
+        // Spell books (learn permanently)
+        { id: "book_lightning", weight: 10 },
+        { id: "book_meteor", weight: 10 },
+        { id: "book_blastwave", weight: 12 },
+        { id: "book_blink", weight: 10 },
+        { id: "book_frost", weight: 14 },
+        { id: "book_blizzard", weight: 8 },
+        { id: "book_firestorm", weight: 8 },
+        { id: "book_heal", weight: 14 },
+        // Scrolls (single-use)
+        { id: "scroll_identify", weight: 18 },
+        { id: "scroll_mapping", weight: 14 },
+        { id: "scroll_blastwave", weight: 10 },
+        { id: "scroll_heal", weight: 12 },
+        { id: "scroll_homecoming", weight: 8 },
+        { id: "scroll_fire", weight: 10 },
+        { id: "scroll_remove_curse", weight: 6 },
+        { id: "scroll_summon_skeleton", weight: 6 },
+    ]);
+    if (!pick?.id) return null;
+    const itemId = createItemById(world, pick.id);
+    if (!(itemId > 0)) return null;
+    return stripPosition(world, itemId);
+}
+
+/**
  * Generate gem vendor stock: socketable gems (pre-identified) + misc gems.
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {Object} rng - createRng() instance

@@ -197,6 +197,21 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Rampage: bold red float text when berserk activates.
+  world.on('spell:rampage', ({ actor }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (pos && canShowAt(pos.x, pos.y)) {
+      try {
+        ftext.addStatus(pos.x, pos.y - 0.45, 'RAMPAGE!', {
+          color: '#ff3a10',
+          life: 1.4,
+          scaleStart: 1.6,
+          scaleEnd: 1.0,
+        });
+      } catch (e) { console.debug('[floatTextWiring] rampage ftext failed:', e); }
+    }
+  });
+
   // Gaze stun: strong psychic lock burst on the player.
   world.on('proc:gaze:stun', ({ target }) => {
     const pos = getPosition(Number(target || 0));
