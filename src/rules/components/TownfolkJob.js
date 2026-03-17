@@ -12,6 +12,7 @@ export const TOWNFOLK_ROLES = Object.freeze({
   herbalist:  "herbalist",
   alchemist:  "alchemist",
   gem_vendor: "gem_vendor",
+  book_vendor: "book_vendor",
 });
 
 export const TOWNFOLK_STATES = Object.freeze({

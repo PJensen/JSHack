@@ -8,6 +8,7 @@ import churchDef from "../../data/buildings/church.json" with { type: "json" };
 import apothecaryDef from "../../data/buildings/apothecary.json" with { type: "json" };
 import gemStoreDef from "../../data/buildings/gem_store.json" with { type: "json" };
 import herbalistHutDef from "../../data/buildings/herbalist_hut.json" with { type: "json" };
+import bookShopDef from "../../data/buildings/book_shop.json" with { type: "json" };
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -841,6 +842,19 @@ export function generateOverworldChunks(worldSeed) {
   const gemVendorHouse = buildCottage(chunks, gemShopRoom.x - 4, gemShopRoom.y - 8, "south");
   carvePathVerticalFirst(chunks, gemVendorHouse.doorX, gemVendorHouse.doorY + 1, gemDoor.x, gemDoor.y + 1);
 
+  // ── Book Shop — stamped from JSON building definition ──────────────────────────────
+  const bookAnchorX = homeX + 12;
+  const bookAnchorY = homeY - 14;
+  fillDisk(chunks, bookAnchorX, bookAnchorY - 3, 6);
+  const bookResult = stampBuilding(chunks, bookShopDef, bookAnchorX, bookAnchorY);
+  const bookDoor = bookResult.shop?.door || bookResult.waypoints?.shop_door || { x: bookAnchorX, y: bookAnchorY };
+  const bookVendorWork = bookResult.shop?.work || bookResult.waypoints?.vendor_work || { x: bookAnchorX - 1, y: bookAnchorY - 3 };
+  const bookShopRoom = bookResult.shop?.room || bookResult.rooms?.shop || { x: bookAnchorX - 3, y: bookAnchorY - 5, w: 8, h: 6 };
+  const bookBed = bookResult.spawns?.home_bed || { x: bookAnchorX + 3, y: bookAnchorY - 1 };
+  // Path from door south to east walkway, then west to walkway ring
+  carvePath(chunks, bookDoor.x, bookDoor.y + 1, bookDoor.x, northWalkY);
+  carvePath(chunks, bookDoor.x, northWalkY, eastWalkX, northWalkY);
+
   // Scattered decorative flowers near buildings and paths
   const scatteredFlowers = [
     // Near farm fence
@@ -1005,6 +1019,17 @@ export function generateOverworldChunks(worldSeed) {
     pubX: tavX0 + 5, pubY: tavY0 + 2,
     shopRoom: { x: gemShopRoom.x, y: gemShopRoom.y, w: gemShopRoom.w, h: gemShopRoom.h },
     shopDoor: { x: gemDoor.x, y: gemDoor.y },
+  });
+  // Book vendor — lives and sleeps in the shop
+  addSpawn(chunks, bookVendorWork.x, bookVendorWork.y, "townfolk", {
+    townfolkId: bookResult.shop?.vendorRole || "book_vendor",
+    scheduleEnabled: true,
+    homeX: bookBed.x, homeY: bookBed.y,
+    bedX: bookBed.x, bedY: bookBed.y,
+    workX: bookVendorWork.x, workY: bookVendorWork.y,
+    pubX: tavX0 + 4, pubY: tavY0 + 2,
+    shopRoom: { x: bookShopRoom.x, y: bookShopRoom.y, w: bookShopRoom.w, h: bookShopRoom.h },
+    shopDoor: { x: bookDoor.x, y: bookDoor.y },
   });
 
   const outChunks = [];

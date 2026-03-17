@@ -29,6 +29,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
     spellAreaFx.drawSmite(bctx);
   }
   spellAreaFx.drawPhaseStrike(bctx);
+  if (typeof spellAreaFx.drawRampage === "function") {
+    spellAreaFx.drawRampage(bctx);
+  }
   projectileFx.draw(bctx);
   if (typeof cloudFx.drawFire === "function") {
     cloudFx.drawFire(bctx);
