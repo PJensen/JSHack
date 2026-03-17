@@ -120,6 +120,19 @@ export function initHUD() {
     }
   });
 
+  // Spell-select button (opens spell picker directly)
+  const spellSelectBtn = document.createElement('button');
+  spellSelectBtn.id = 'btn-spell-select';
+  spellSelectBtn.textContent = 'Spells';
+  Object.assign(spellSelectBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  spellSelectBtn.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('ui:openSpellPicker'));
+  });
+
   // Ranged attack button (to the right of Cast)
   const shootBtn = document.createElement('button');
   shootBtn.id = 'btn-shoot';
@@ -173,6 +186,7 @@ export function initHUD() {
   const ACTION_ICONS = Object.freeze({
     character: '@',
     cast: '\u2726',           // ✦
+    spells: '\u{1F4D6}',      // 📖
     shoot: '\u{1F3F9}',       // 🏹
     zap: '\u26A1',            // ⚡
     pray: '\u{1F64F}',        // 🙏
@@ -276,7 +290,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, prayBtn, waitBtn];
+  const commandButtons = [charBtn, petBtn, castBtn, spellSelectBtn, shootBtn, prayBtn, waitBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -352,24 +366,28 @@ export function initHUD() {
   setDesktopLabel(charBtn, 'Character'); setMobileLabel(charBtn, 'Character');
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
+  setDesktopLabel(spellSelectBtn, 'Spells'); setMobileLabel(spellSelectBtn, 'Spells');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopLabel(waitBtn, 'Wait'); setMobileLabel(waitBtn, 'Wait');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
+  setDesktopIcon(spellSelectBtn, ACTION_ICONS.spells); setMobileIcon(spellSelectBtn, ACTION_ICONS.spells);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
   setDesktopIcon(waitBtn, ACTION_ICONS.wait); setMobileIcon(waitBtn, ACTION_ICONS.wait);
   setBarLabel(charBtn, 'Char');
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
+  setBarLabel(spellSelectBtn, 'Spells');
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
   setBarLabel(waitBtn, 'Wait');
   charBtn.dataset.keyHint = 'c';
   petBtn.dataset.keyHint = 'p';
   castBtn.dataset.keyHint = 'f';
+  spellSelectBtn.dataset.keyHint = 'S';
   shootBtn.dataset.keyHint = 'r';
   prayBtn.dataset.keyHint = 'P';
   waitBtn.dataset.keyHint = '.';
@@ -593,6 +611,7 @@ export function initHUD() {
   bar.appendChild(charBtn);
   bar.appendChild(petBtn);
   bar.appendChild(castBtn);
+  bar.appendChild(spellSelectBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(prayBtn);
   bar.appendChild(waitBtn);
@@ -623,7 +642,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, charBtn, shootBtn, prayBtn, waitBtn, petBtn };
+  return { castBtn, charBtn, spellSelectBtn, shootBtn, prayBtn, waitBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
