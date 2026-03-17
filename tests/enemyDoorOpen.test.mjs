@@ -150,9 +150,39 @@ Deno.test("already-open door is not handled by enemy-door-open resolver", () => 
   assert(!handled, 'enemy-door-open resolver should not fire for an open door');
 });
 
-// ── Player uses objectInteract, not enemyDoorOpen ─────────────────────────────
+// ── Shopkeeper / townfolk are never intercepted ───────────────────────────────
 
-Deno.test("player bump-into-door uses bump:interact (objectInteract), not enemyDoorOpen", () => {
+Deno.test("shopkeeper (humanoid) is NOT intercepted by enemyDoorOpen — uses own door logic", () => {
+  const world = new World({ seed: 9 });
+  const shopkeeper = world.create();
+  world.add(shopkeeper, Position, { x: 3, y: 5 });
+  world.add(shopkeeper, Faction, { key: 'shopkeeper' }); // not 'enemy'
+  world.add(shopkeeper, CreatureType, { type: CREATURE_TYPES.humanoid });
+
+  const door = addDoor(world, 4, 5);
+  const tiles = makeTiles(door, 4, 5);
+
+  // enemyDoorOpen must not fire for shopkeepers
+  const handled = resolveBump(world, shopkeeper, { nx: 4, ny: 5, mdx: 1, mdy: 0, target: 0, tiles });
+
+  assertEquals(world.get(door, DoorState).open, false, 'shopkeeper should NOT be intercepted by enemyDoorOpen');
+});
+
+Deno.test("townfolk (humanoid) is NOT intercepted by enemyDoorOpen — uses own door logic", () => {
+  const world = new World({ seed: 10 });
+  const npc = world.create();
+  world.add(npc, Position, { x: 3, y: 5 });
+  world.add(npc, Faction, { key: 'townfolk' }); // not 'enemy'
+  world.add(npc, CreatureType, { type: CREATURE_TYPES.humanoid });
+
+  const door = addDoor(world, 4, 5);
+  const tiles = makeTiles(door, 4, 5);
+
+  // enemyDoorOpen must not fire for townfolk
+  resolveBump(world, npc, { nx: 4, ny: 5, mdx: 1, mdy: 0, target: 0, tiles });
+
+  assertEquals(world.get(door, DoorState).open, false, 'townfolk should NOT be intercepted by enemyDoorOpen');
+});
   const world = new World({ seed: 8 });
   const player = world.create();
   world.add(player, Player);

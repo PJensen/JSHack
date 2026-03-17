@@ -175,11 +175,16 @@ const npcInteract = {
  * Enemy door-open: a non-player enemy with hands (humanoid/undead/demon creature type)
  * bumps into a closed, unlocked door and opens it rather than being blocked.
  * The monster spends its action this turn opening the door; it will walk through next turn.
+ *
+ * Only fires for enemy faction actors — shopkeepers and townfolk have their own
+ * door-handling logic in aiTownfolkSystem and must not be intercepted here.
  */
 const enemyDoorOpen = {
   name: "enemy-door-open",
   test(world, actor, ctx) {
     if (world.has(actor, Player)) return false; // player uses objectInteract
+    const fac = world.get(actor, Faction);
+    if (!fac || fac.key !== "enemy") return false; // shopkeepers/townfolk use their own door logic
     if (!isManhattan1(ctx.mdx, ctx.mdy)) return false;
     if (!creatureHasHands(world, actor)) return false;
     return findOpenableDoorAt(world, ctx.nx, ctx.ny, ctx.tiles) > 0;
