@@ -6,7 +6,7 @@
 import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
-import { getPassiveBonuses } from "./rules/utils/passiveBonuses.js";
+import { getEffectiveVisionRange } from "./rules/utils/blind.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
@@ -636,9 +636,7 @@ function clampTargetToRange(fromX, fromY, toX, toY, maxRange) {
 function getPlayerVisionRange() {
   const pe = playerEntity(world);
   if (!pe?.id) return 0;
-  const brain = world.get(pe.id, Brain);
-  const passive = getPassiveBonuses(world, pe.id);
-  return Math.max(1, ((Number(brain?.visionRange ?? 8) | 0) + (Number(passive?.visionRangeDerived ?? 0) | 0)));
+  return Math.max(1, getEffectiveVisionRange(world, pe.id) | 0);
 }
 
 const spellCtrl = createActiveSpellController(world);
@@ -2766,9 +2764,7 @@ const isVisibleAt = (x, y) => {
     _floatTextFovStep = step;
     const pe = playerEntity(world);
     if (pe?.id && pe.pos) {
-      const brain = world.get(pe.id, Brain);
-      const passive = getPassiveBonuses(world, pe.id);
-      const radius = (brain?.visionRange ?? 8) + (passive?.visionRangeDerived ?? 0);
+      const radius = getEffectiveVisionRange(world, pe.id);
       const pad = 2;
       const bounds = {
         x0: pe.pos.x - radius - pad,

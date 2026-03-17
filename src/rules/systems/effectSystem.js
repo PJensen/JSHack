@@ -5,11 +5,13 @@ import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
 import { Stamina } from '../components/Stamina.js';
 import { Mana } from '../components/Mana.js';
+import { Brain } from '../components/Brain.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
 import { getPassiveBonuses } from '../utils/passiveBonuses.js';
 import { buildSpellDamageSpecFromContext } from '../utils/spellDamage.js';
+import { computeEnvelopeValue } from '../utils/blind.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -168,6 +170,14 @@ export function effectSystem(world) {
                 continue;
             }
 
+            // Stat envelope effect (temporal stat pressure: ramp-in / hold / ramp-out)
+            if (e.key === 'stat_envelope') {
+                if (!Number.isInteger(e.turnsLeft) || e.turnsLeft < 0) e.turnsLeft = 0;
+                processStatEnvelopeEffect(world, id, e, nextStatuses);
+                e.turnsLeft -= 1;
+                continue;
+            }
+
             // Defensive defaults
             e.turnsLeft = Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0;
             const stacks = (e.stacks && e.stacks > 0) ? e.stacks : 1;
@@ -238,3 +248,50 @@ function upsertStatus(map, rec) {
 // Optional callback registry for script-driven effects
 const effectCallbacks = Object.create(null);
 export function registerEffectCallback(key, fn) { if (key) effectCallbacks[key] = fn; }
+
+/**
+ * Process one tick of a 'stat_envelope' effect.
+ *
+ * - Reports 'blinded' status when a visionRange envelope is reducing vision below its start value.
+ * - On the final tick (turnsLeft will reach 0 after decrement), applies permanent injury to
+ *   Brain.visionRange when endValue !== startValue — this models lasting damage from the effect.
+ *
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} entityId
+ * @param {any} e
+ * @param {Map<string,any>} nextStatuses
+ */
+function processStatEnvelopeEffect(world, entityId, e, nextStatuses) {
+    const rampIn  = Number(e.rampIn  || 0);
+    const hold    = Number(e.hold    || 0);
+    const rampOut = Number(e.rampOut || 0);
+    const totalTicks = rampIn + hold + rampOut;
+    const turnsLeft  = Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0;
+    // Use elapsed+1 so the effect starts on the tick it is processed, consistent
+    // with how getEffectiveVisionRange reads the post-decrement turnsLeft.
+    const elapsed    = totalTicks - turnsLeft + 1;
+
+    const startValue = Number(e.startValue ?? 0);
+    const toValue    = Number(e.toValue    ?? 0);
+    const endValue   = Number(e.endValue   ?? startValue);
+
+    const currentValue = computeEnvelopeValue(startValue, toValue, endValue, rampIn, hold, rampOut, elapsed);
+
+    if (e.stat === 'visionRange') {
+        // Report blinded status whenever the envelope is actively reducing vision
+        if (currentValue < startValue) {
+            upsertStatus(nextStatuses, {
+                type: 'blinded',
+                duration: turnsLeft,
+                potency: Math.max(0, startValue - currentValue),
+                stacks: 1,
+            });
+        }
+
+        // Apply permanent injury on the final tick (turnsLeft will become 0 after decrement)
+        if (turnsLeft === 1 && endValue !== startValue) {
+            const brain = world.get(entityId, Brain);
+            if (brain) brain.visionRange = Math.max(0, Math.round(endValue));
+        }
+    }
+}
