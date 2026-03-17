@@ -382,6 +382,7 @@ JSHack/
 - ❌ TypeScript (just JavaScript)
 - ❌ Node (we use Deno for tests)
 - ❌ Backwards compatibility hacks (just rework it)
+- ❌ Art assets (every glyph is Unicode — zero sprites, zero images, zero textures)
 
 **If you can't `console.log` it and understand it immediately, we're doing it wrong.**
 
