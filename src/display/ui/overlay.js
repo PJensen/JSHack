@@ -2714,52 +2714,6 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
   });
   content.appendChild(petBtn);
 
-  // --- Submit Bug Report button ---
-  const bugBtn = document.createElement('button');
-  bugBtn.textContent = '\u{1F47E} Submit Bug Report';
-  decorateButton(bugBtn);
-  bugBtn.style.minHeight = '44px';
-  bugBtn.addEventListener('click', () => {
-    const version = /** @type {any} */ (window).VERSION || 'unknown';
-    const ua = navigator.userAgent;
-    function openWithData(d) {
-      const gearLines = (d?.gear || []).map(g => `  - ${g.slot}: ${g.name}`).join('\n') || '  (none)';
-      const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
-      const effectsLine = (d?.effects || []).join(', ') || 'none';
-      const s = d?.stats || {};
-      const snapshot = d
-        ? [
-          `**Character:** ${d.playerName} (${d.playerClass})`,
-          `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
-          `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
-          `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,
-          `**Gold:** ${s.gold}  |  **Hunger:** ${s.hungerLevel}`,
-          `**Active effects:** ${effectsLine}`,
-          `**Gear:**\n${gearLines}`,
-          `**Inventory:**\n${invLines}`,
-        ].join('\n')
-        : '(no game state available)';
-      const body = encodeURIComponent(
-        `**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**\n\n---\n\n<details>\n<summary>Game state snapshot</summary>\n\n**Version:** ${version}\n**Browser:** ${ua}\n\n${snapshot}\n</details>`
-      );
-      const title = encodeURIComponent('[Bug] ');
-      window.open(
-        `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
-        '_blank', 'noopener'
-      );
-    }
-    const onData = (ev) => {
-      window.removeEventListener('ui:bugReportData', onData);
-      openWithData(ev?.detail);
-    };
-    window.addEventListener('ui:bugReportData', onData);
-    try { window.dispatchEvent(new CustomEvent('ui:requestBugReportData')); } catch (e) {
-      window.removeEventListener('ui:bugReportData', onData);
-      openWithData(null);
-    }
-  });
-  content.appendChild(bugBtn);
-
   // --- Version + Subscribe row ---
   const versionRow = document.createElement('div');
   Object.assign(versionRow.style, {
@@ -3161,6 +3115,63 @@ function renderCharacterSheet(panel, data) {
     window.dispatchEvent(new CustomEvent('ui:engrave'));
   });
   actions.appendChild(engraveBtn);
+
+  const spellBtn = document.createElement('button');
+  spellBtn.textContent = '\u{1F9E0} Select Spell';
+  decorateButton(spellBtn);
+  spellBtn.style.minHeight = '44px';
+  spellBtn.style.padding = '8px 12px';
+  spellBtn.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('ui:openSpellPicker'));
+  });
+  actions.appendChild(spellBtn);
+
+  const bugBtn = document.createElement('button');
+  bugBtn.textContent = '\u{1F47E} Bug Report';
+  decorateButton(bugBtn);
+  bugBtn.style.minHeight = '44px';
+  bugBtn.style.padding = '8px 12px';
+  bugBtn.addEventListener('click', () => {
+    const version = /** @type {any} */ (window).VERSION || 'unknown';
+    const ua = navigator.userAgent;
+    function openWithData(d) {
+      const gearLines = (d?.gear || []).map(g => `  - ${g.slot}: ${g.name}`).join('\n') || '  (none)';
+      const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
+      const effectsLine = (d?.effects || []).join(', ') || 'none';
+      const s = d?.stats || {};
+      const snapshot = d
+        ? [
+          `**Character:** ${d.playerName} (${d.playerClass})`,
+          `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
+          `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
+          `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,
+          `**Gold:** ${s.gold}  |  **Hunger:** ${s.hungerLevel}`,
+          `**Active effects:** ${effectsLine}`,
+          `**Gear:**\n${gearLines}`,
+          `**Inventory:**\n${invLines}`,
+        ].join('\n')
+        : '(no game state available)';
+      const body = encodeURIComponent(
+        `**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**\n\n---\n\n<details>\n<summary>Game state snapshot</summary>\n\n**Version:** ${version}\n**Browser:** ${ua}\n\n${snapshot}\n</details>`
+      );
+      const title = encodeURIComponent('[Bug] ');
+      window.open(
+        `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
+        '_blank', 'noopener'
+      );
+    }
+    const onData = (ev) => {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(ev?.detail);
+    };
+    window.addEventListener('ui:bugReportData', onData);
+    try { window.dispatchEvent(new CustomEvent('ui:requestBugReportData')); } catch (e) {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(null);
+    }
+  });
+  actions.appendChild(bugBtn);
+
   el.appendChild(actions);
 
   const hint = document.createElement('div');
