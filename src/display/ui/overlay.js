@@ -1462,7 +1462,7 @@ function renderDevNoticeTooltip(tip, detail) {
 
   const body = document.createElement('div');
   body.textContent = detail?.body
-    || 'JSHack is under very active development. Use the Bug button in the action bar to request features or report bugs!';
+    || 'JSHack is under very active development. Use the Bug Report button in Settings to request features or report bugs!';
   Object.assign(body.style, {
     fontSize: '12px',
     lineHeight: '1.45',
@@ -2714,6 +2714,52 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
   });
   content.appendChild(petBtn);
 
+  // --- Submit Bug Report button ---
+  const bugBtn = document.createElement('button');
+  bugBtn.textContent = '\u{1F47E} Submit Bug Report';
+  decorateButton(bugBtn);
+  bugBtn.style.minHeight = '44px';
+  bugBtn.addEventListener('click', () => {
+    const version = /** @type {any} */ (window).VERSION || 'unknown';
+    const ua = navigator.userAgent;
+    function openWithData(d) {
+      const gearLines = (d?.gear || []).map(g => `  - ${g.slot}: ${g.name}`).join('\n') || '  (none)';
+      const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
+      const effectsLine = (d?.effects || []).join(', ') || 'none';
+      const s = d?.stats || {};
+      const snapshot = d
+        ? [
+          `**Character:** ${d.playerName} (${d.playerClass})`,
+          `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
+          `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
+          `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,
+          `**Gold:** ${s.gold}  |  **Hunger:** ${s.hungerLevel}`,
+          `**Active effects:** ${effectsLine}`,
+          `**Gear:**\n${gearLines}`,
+          `**Inventory:**\n${invLines}`,
+        ].join('\n')
+        : '(no game state available)';
+      const body = encodeURIComponent(
+        `**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**\n\n---\n\n<details>\n<summary>Game state snapshot</summary>\n\n**Version:** ${version}\n**Browser:** ${ua}\n\n${snapshot}\n</details>`
+      );
+      const title = encodeURIComponent('[Bug] ');
+      window.open(
+        `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
+        '_blank', 'noopener'
+      );
+    }
+    const onData = (ev) => {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(ev?.detail);
+    };
+    window.addEventListener('ui:bugReportData', onData);
+    try { window.dispatchEvent(new CustomEvent('ui:requestBugReportData')); } catch (e) {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(null);
+    }
+  });
+  content.appendChild(bugBtn);
+
   // --- Version + Subscribe row ---
   const versionRow = document.createElement('div');
   Object.assign(versionRow.style, {
@@ -3176,6 +3222,21 @@ function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId =
   title.style.marginBottom = '8px';
   el.appendChild(title);
 
+  const _hideVal = (/** @type {any} */ (panel))._hideEmptySlots;
+  let hideEmpty = _hideVal !== undefined ? _hideVal : true;
+  const cbWrap = document.createElement('label');
+  Object.assign(cbWrap.style, {
+    display: 'flex', alignItems: 'center', gap: '6px',
+    marginBottom: '8px', cursor: 'pointer', opacity: '0.85',
+  });
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = hideEmpty;
+  cb.style.cursor = 'pointer';
+  cbWrap.appendChild(cb);
+  cbWrap.appendChild(document.createTextNode('Hide Empty Slots'));
+  el.appendChild(cbWrap);
+
   const rowsData = CHARACTER_SLOT_ORDER.map((slot) => {
     const state = (equippedBySlot && typeof equippedBySlot === 'object') ? (equippedBySlot[slot] || {}) : {};
     const item = state?.item && typeof state.item === 'object' ? state.item : null;
@@ -3295,10 +3356,42 @@ function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId =
     return row;
   });
 
+  function applyFilter() {
+    rowsData.forEach((rd, i) => {
+      const empty = !rd.item && !rd.blocked;
+      rows[i].style.display = (hideEmpty && empty) ? 'none' : 'flex';
+    });
+  }
+
+  function findNextVisible(from, dir) {
+    let i = from + dir;
+    while (i >= 0 && i < rows.length) {
+      if (rows[i].style.display !== 'none') return i;
+      i += dir;
+    }
+    return null;
+  }
+
+  applyFilter();
+
+  cb.addEventListener('change', () => {
+    hideEmpty = cb.checked;
+    (/** @type {any} */ (panel))._hideEmptySlots = hideEmpty;
+    applyFilter();
+    if (rows[sel]?.style.display === 'none') {
+      const next = findNextVisible(sel, 1) ?? findNextVisible(sel, -1);
+      if (next !== null) setSel(next);
+    }
+  });
+
   let sel = 0;
   const savedSlot = String((/** @type {any} */ (panel))._equipmentSelectionSlot || '');
   const savedIdx = rowsData.findIndex((row) => row.slot === savedSlot);
   if (savedIdx >= 0) sel = savedIdx;
+  if (rows[sel]?.style.display === 'none') {
+    const vis = findNextVisible(sel, 1) ?? findNextVisible(sel, -1);
+    if (vis !== null) sel = vis;
+  }
 
   function createActionButton(label, onClick, disabled = false) {
     const btn = document.createElement('button');
@@ -3399,11 +3492,12 @@ function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId =
 
   function onKey(e) {
     if (panel.style.display !== 'block') return;
+    if (e.target === cb) return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
-    else if (k === 'Home') { setSel(0); e.preventDefault(); }
-    else if (k === 'End') { setSel(rowsData.length - 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { const n = findNextVisible(sel, -1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'ArrowDown') { const n = findNextVisible(sel, 1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'Home') { const n = findNextVisible(-1, 1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'End') { const n = findNextVisible(rowsData.length, -1); if (n !== null) setSel(n); e.preventDefault(); }
     else if (k === 'Enter' || k === 'e' || k === 'E') {
       const row = rowsData[sel];
       if (row?.slot === 'brain') {

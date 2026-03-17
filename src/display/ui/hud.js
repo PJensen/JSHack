@@ -159,55 +159,6 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:wait')); } catch (e) { console.debug('[hud] dispatch ui:wait:', e); }
   });
 
-  // Submit bug report button
-  const bugBtn = document.createElement('button');
-  bugBtn.id = 'btn-bug-report';
-  bugBtn.textContent = 'Submit Bug Report';
-  Object.assign(bugBtn.style, {
-    padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
-    cursor: 'pointer'
-  });
-  bugBtn.addEventListener('click', () => {
-    const version = window.VERSION || 'unknown';
-    const ua = navigator.userAgent;
-    function openWithData(d) {
-      const gearLines = (d?.gear || []).map(g => `  - ${g.slot}: ${g.name}`).join('\n') || '  (none)';
-      const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
-      const effectsLine = (d?.effects || []).join(', ') || 'none';
-      const s = d?.stats || {};
-      const snapshot = d
-        ? [
-          `**Character:** ${d.playerName} (${d.playerClass})`,
-          `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
-          `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
-          `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,
-          `**Gold:** ${s.gold}  |  **Hunger:** ${s.hungerLevel}`,
-          `**Active effects:** ${effectsLine}`,
-          `**Gear:**\n${gearLines}`,
-          `**Inventory:**\n${invLines}`,
-        ].join('\n')
-        : '(no game state available)';
-      const body = encodeURIComponent(
-        `**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**\n\n---\n\n<details>\n<summary>Game state snapshot</summary>\n\n**Version:** ${version}\n**Browser:** ${ua}\n\n${snapshot}\n</details>`
-      );
-      const title = encodeURIComponent('[Bug] ');
-      window.open(
-        `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
-        '_blank', 'noopener'
-      );
-    }
-    const onData = (ev) => {
-      window.removeEventListener('ui:bugReportData', onData);
-      openWithData(ev?.detail);
-    };
-    window.addEventListener('ui:bugReportData', onData);
-    try { window.dispatchEvent(new CustomEvent('ui:requestBugReportData')); } catch (e) {
-      window.removeEventListener('ui:bugReportData', onData);
-      openWithData(null);
-    }
-  });
-
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
   petBtn.id = 'btn-pet';
@@ -325,7 +276,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, prayBtn, waitBtn, bugBtn];
+  const commandButtons = [charBtn, petBtn, castBtn, shootBtn, prayBtn, waitBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -404,21 +355,18 @@ export function initHUD() {
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopLabel(waitBtn, 'Wait'); setMobileLabel(waitBtn, 'Wait');
-  setDesktopLabel(bugBtn, 'Submit Bug Report'); setMobileLabel(bugBtn, 'Submit Bug Report');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
   setDesktopIcon(waitBtn, ACTION_ICONS.wait); setMobileIcon(waitBtn, ACTION_ICONS.wait);
-  setDesktopIcon(bugBtn, ACTION_ICONS.bug); setMobileIcon(bugBtn, ACTION_ICONS.bug);
   setBarLabel(charBtn, 'Char');
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
   setBarLabel(waitBtn, 'Wait');
-  setBarLabel(bugBtn, 'Bug');
   charBtn.dataset.keyHint = 'c';
   petBtn.dataset.keyHint = 'p';
   castBtn.dataset.keyHint = 'f';
@@ -648,7 +596,6 @@ export function initHUD() {
   bar.appendChild(shootBtn);
   bar.appendChild(prayBtn);
   bar.appendChild(waitBtn);
-  bar.appendChild(bugBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
 
@@ -676,7 +623,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, charBtn, shootBtn, prayBtn, waitBtn, petBtn, bugBtn };
+  return { castBtn, charBtn, shootBtn, prayBtn, waitBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
