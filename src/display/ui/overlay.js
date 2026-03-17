@@ -9,6 +9,7 @@ import { renderAnvil } from './anvilOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { versionLoaded } from '../../shared/version.js';
+import { playDeathJingle } from '../fx/deathJingle.js';
 
 const PANEL_Z_BASE = 1200;
 let _panelZCounter = PANEL_Z_BASE;
@@ -954,6 +955,7 @@ export function initOverlays() {
     const showDeathScreen = () => {
       renderDeathScreen(deathScreen, d);
       deathScreen.style.display = 'block';
+      // LOL playDeathJingle();
     };
 
     if (deathScreenShowTimer) {
