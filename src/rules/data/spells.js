@@ -39,7 +39,7 @@ export const SPELL_DEFS = {
     id: 'lightning',
     name: 'Lightning',
     symbol: '\u26A1',       // ⚡
-    schools: ['destruction'],
+    schools: ['destruction', 'electric', 'nature'],
     manaCost: 7,
     minIntelligence: 8,
     range: 12,
@@ -56,7 +56,7 @@ export const SPELL_DEFS = {
     id: 'meteor',
     name: 'Meteor',
     symbol: '\u2604',       // ☄
-    schools: ['destruction'],
+    schools: ['destruction', 'fire'],
     manaCost: 12,
     minIntelligence: 0,
     range: 12,
@@ -73,7 +73,7 @@ export const SPELL_DEFS = {
     id: 'blastwave',
     name: 'Blast Wave',
     symbol: '\u25CE',       // ◎
-    schools: ['destruction'],
+    schools: ['destruction', 'force'],
     manaCost: 7,
     minIntelligence: 0,
     script: 'blastwave',
@@ -89,7 +89,7 @@ export const SPELL_DEFS = {
     id: 'blink',
     name: 'Blink',
     symbol: '\u{1F3C3}',   // 🏃
-    schools: ['trickery'],
+    schools: ['trickery', 'illusion', 'alteration'],
     clearMindedCasting: true,
     manaCost: 6,
     minIntelligence: 0,
@@ -149,7 +149,7 @@ export const SPELL_DEFS = {
   blizzard: {
     id: 'blizzard',
     name: 'Blizzard',
-    symbol: '\u2744',
+    symbol: '\u2744', // ❄
     schools: ['destruction'],
     manaCost: 3,
     manaPerTick: 3,
@@ -170,8 +170,8 @@ export const SPELL_DEFS = {
   firestorm: {
     id: 'firestorm',
     name: 'Firestorm',
-    symbol: '\u{1F525}',
-    schools: ['destruction'],
+    symbol: '\u{1F525}', // 🔥
+    schools: ['destruction', 'fire'],
     manaCost: 4,
     manaPerTick: 4,
     channeling: true,
@@ -192,7 +192,7 @@ export const SPELL_DEFS = {
     id: 'heal',
     name: 'Heal',
     symbol: '\u2764',       // ❤
-    schools: ['healing'],
+    schools: ['healing','restoration'],
     manaCost: 8,
     minIntelligence: 0,
     range: 6,
@@ -208,7 +208,7 @@ export const SPELL_DEFS = {
     id: 'flash_heal',
     name: 'Flash Heal',
     symbol: '\u2728',       // ✨
-    schools: ['healing'],
+    schools: ['healing', 'holy', 'restoration'],
     clearMindedCasting: true,
     manaCost: 14,
     minIntelligence: 0,
@@ -225,7 +225,7 @@ export const SPELL_DEFS = {
   smite: {
     id: 'smite',
     name: 'Smite',
-    symbol: '\u2726',
+    symbol: '\u2726', // ✦
     schools: ['holy', 'destruction'],
     manaCost: 6,
     minIntelligence: 0,
@@ -272,6 +272,7 @@ export const SPELL_DEFS = {
     id: 'agony',
     name: 'Agony',
     symbol: '\u2620',       // ☠
+    schools: ['destruction', 'darkness'],
     manaCost: 8,
     minIntelligence: 8,
     range: 8,
