@@ -81,6 +81,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'starving',
 	'wasting',
 	'agony',
+	'blinded',
 ]);
 // Proc state effect keys that should be projected onto enemy entity views for glyph fx.
 const ENTITY_PROC_STATE_KEYS = new Set(['doom_clock', 'cataclysm_mark']);
