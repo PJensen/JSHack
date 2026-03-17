@@ -513,12 +513,25 @@ function layoutBubbleDialog() {
 }
 
 // Post-mortem: keep the simulation ticking after the player dies so the world
-// continues to evolve (fires spread, monsters roam, etc.).
+// continues to evolve (fires spread, monsters roam, etc.) for a fixed number
+// of ticks, then stop and signal that the post-mortem phase is complete.
+const POST_MORTEM_TICKS = 6;
+const POST_MORTEM_INTERVAL_MS = 500;
 let _postMortemInterval = 0;
+let _postMortemTicksLeft = 0;
 world.on("died", ({ id }) => {
   if (!world.has(id, Player)) return;
   if (_postMortemInterval) return;
-  _postMortemInterval = setInterval(() => { world.tick(1); }, 500);
+  _postMortemTicksLeft = POST_MORTEM_TICKS;
+  _postMortemInterval = setInterval(() => {
+    world.tick(1);
+    _postMortemTicksLeft--;
+    if (_postMortemTicksLeft <= 0) {
+      clearInterval(_postMortemInterval);
+      _postMortemInterval = 0;
+      world.emit("postMortemComplete");
+    }
+  }, POST_MORTEM_INTERVAL_MS);
 });
 
 // --- Active spell selection (app-side state) ---------------------------------
