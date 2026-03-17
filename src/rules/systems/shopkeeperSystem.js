@@ -60,8 +60,9 @@ export function shopkeeperSystem(world) {
       const bill = calculateBill(world, playerId, currentlyInShop.shopkeeperId);
 
       if (bill > 0) {
-        // Block exit and trigger payment interaction
-        world.remove(playerId, MoveIntent);
+        // Block exit within the current tick so movementSystem cannot still
+        // consume the pending move intent later in the same phase.
+        world.removeImmediate(playerId, MoveIntent);
         try {
           world.emit('shop:exit-blocked', {
             actor: playerId,

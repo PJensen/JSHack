@@ -1,6 +1,8 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { configureWorld } from "../src/main/scheduler.js";
 import { generateFloor } from "../src/rules/environment/dungeon/index.js";
+import { initDungeon } from "../src/rules/environment/dungeon/index.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_DOOR, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { Collider } from "../src/rules/components/Collider.js";
@@ -15,6 +17,7 @@ import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.j
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
+import { PickupIntent } from "../src/rules/components/Intents/PickupIntent.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -369,11 +372,14 @@ Deno.test("overworld book vendor gets a keyed locked shop door and owned stock a
 Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
-  generateFloor(world, world.seed >>> 0, 0);
+  configureWorld(world);
+  initDungeon(world, { startDepth: 0 });
 
   let bookVendorId = 0;
   let shopRoom = null;
   let stolenItemId = 0;
+  let stolenItemPos = null;
+  let doorId = 0;
   for (const [id, named] of world.query(NamedIdentity)) {
     if (named.identity === "townfolk_book_vendor") {
       bookVendorId = id;
@@ -396,25 +402,53 @@ Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
     const kind = String(info.type || "");
     if (kind !== "book" && kind !== "learn" && kind !== "scroll") continue;
     stolenItemId = itemId;
+    stolenItemPos = { x: pos.x, y: pos.y };
     break;
   }
   assert(stolenItemId > 0, "expected unpaid bookseller stock");
+  assert(stolenItemPos, "expected bookseller stock position");
+
+  for (const [id, pos, , lock] of world.query(Position, DoorState, DoorLock)) {
+    if (String(lock?.lockId || "").includes("book_vendor")) {
+      doorId = id;
+      break;
+    }
+  }
+  assert(doorId > 0, "expected a physical book shop door");
+  world.set(doorId, DoorState, { open: true, locked: false });
+  world.set(doorId, Collider, { solid: false, blocksSight: false });
 
   const playerId = world.create();
   world.add(playerId, Player, {});
   world.add(playerId, Inventory, { capacity: 20 });
-  world.add(playerId, Position, { x: shopRoom.x + 1, y: shopRoom.y + 1 });
-  addToInventory(world, playerId, stolenItemId);
-  try { world.remove(stolenItemId, Position); } catch {}
+  world.add(playerId, Position, stolenItemPos);
 
   const blocked = [];
   world.on("shop:exit-blocked", (ev) => blocked.push(ev));
 
-  world.add(playerId, MoveIntent, { dx: 0, dy: shopRoom.h });
-  shopkeeperSystem(world);
+  world.add(playerId, PickupIntent, { targetId: stolenItemId });
+  world.tick(1);
+
+  const doorPos = world.get(doorId, Position);
+  assert(doorPos, "expected book shop door position");
+
+  while (true) {
+    const pos = world.get(playerId, Position);
+    assert(pos, "expected player position during theft path");
+    if (pos.x === doorPos.x && pos.y === doorPos.y) break;
+    const dx = Math.sign(doorPos.x - pos.x);
+    const dy = Math.sign(doorPos.y - pos.y);
+    world.add(playerId, MoveIntent, { dx, dy });
+    world.tick(1);
+  }
+
+  const insideDoorPos = world.get(playerId, Position);
+  world.add(playerId, MoveIntent, { dx: 0, dy: 1 });
+  world.tick(1);
 
   assertEquals(blocked.length, 1, "bookseller should block leaving with unpaid stock");
   assertEquals(blocked[0].shopkeeperId, bookVendorId);
+  assertEquals(world.get(playerId, Position), insideDoorPos, "blocked exit should keep the player on the interior door tile");
 });
 
 Deno.test("overworld herbalist does not get the apothecary key", () => {
