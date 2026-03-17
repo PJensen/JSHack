@@ -62,7 +62,7 @@ See [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) for the philosophy.
 
 ### 🔧 Built to be hacked
 
-This isn't "shipping a product" — it's **exploiting JavaScript for fun**. Clever tricks encouraged. Weird experiments welcome. Open your console, poke around, break things, fix them. This is a playground.
+We're not "shipping a product" — we're **exploiting JavaScript for fun**. Clever tricks encouraged. Weird experiments welcome. Open your console, poke around, break things, fix them. This is a playground.
 
 Every decision prioritizes hackability:
 - No transpilation (edit and refresh)
@@ -365,28 +365,28 @@ JSHack/
 
 ## Philosophy
 
-### This project values:
+### We believe in:
 
 - **Zero build steps** — pure ES modules, instant feedback
 - **Determinism** — seeded RNG, reproducible runs, testable logic
 - **Transparency** — no frameworks, no magic, just readable code
 - **Hackability** — one file = one idea, easy to modify
 - **Mobile-first** — touch is primary, phones are the platform
-- **Fun** — hacking and exploring JavaScript, not shipping enterprise software
+- **Fun** — we're hacking and exploring JavaScript, not shipping enterprise software
 
-### This project avoids:
+### We avoid:
 
 - ❌ Build tools (webpack, babel, rollup)
 - ❌ Frameworks (React, Vue, Angular)
 - ❌ Dependencies (zero npm packages)
 - ❌ TypeScript (just JavaScript)
-- ❌ Node (Deno is used for tests)
+- ❌ Node (we use Deno for tests)
 - ❌ Backwards compatibility hacks (just rework it)
 - ❌ Art assets (every glyph is Unicode — zero sprites, zero images, zero textures)
 
-**If it can't be `console.log`'d and understood immediately, something is wrong.**
+**If you can't `console.log` it and understand it immediately, we're doing it wrong.**
 
-For more on why the modern web toolchain is rejected here, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project is proof of what native browser tooling can do without the bullshit — and a major proof of what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
+For more on why we reject the modern web toolchain, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project is proof of what native browser tooling can do without the bullshit — and a major proof of what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
 
 ---
 
