@@ -1294,6 +1294,9 @@ addEventListener('ui:castActiveSpell', () => {
 
     /** @type {Array<{id:number,x:number,y:number}>} */
     const enemies = [];
+    if (enemySpellDef.selfTargetable) {
+      enemies.push({ id: _pe.id, x: px, y: py });
+    }
     forEachInRadius(world, px, py, range, (eid, pos) => {
       if (eid === _pe.id) return;
       const fac = world.get(eid, Faction);
