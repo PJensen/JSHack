@@ -45,6 +45,7 @@ import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { hasOverworldAerialLOS } from "../utils/flyingEligibility.js";
 import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
+import { getEffectiveVisionRange } from "../utils/blind.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
@@ -158,7 +159,8 @@ export function aiChaseSystem(world) {
     const hasQueuedAction = world.has(id, MoveIntent) || world.has(id, FlyIntent);
 
     // Perception is driven by Brain data rather than action cadence.
-    const sightRange = Math.max(0, Math.trunc(Number(brain?.visionRange ?? def?.visionRange ?? 8)));
+    // Use getEffectiveVisionRange so that stat envelope effects (e.g. blindness) apply.
+    const sightRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, id)));
     const withinSightRange = chebyshevDistance(pos.x, pos.y, playerPos.x, playerPos.y) <= sightRange;
     const canSee = withinSightRange && (
       hasOverworldAerialLOS(world, {

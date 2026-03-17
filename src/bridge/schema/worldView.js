@@ -12,7 +12,6 @@ import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { ObjectState } from "../../rules/components/ObjectState.js";
 import { getTile, forEachTileInRect, forEachLoadedTile, isRoofed } from '../../rules/environment/dungeon/tileMap.js';
 import { TILE_DOOR, TILE_FLOOR, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
-import { Brain } from '../../rules/components/Brain.js';
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
 import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
 import { forEachInRect, ensureSpatialIndex } from '../../rules/utils/spatialIndex.js';
@@ -33,7 +32,7 @@ import { QuestState } from "../../rules/components/QuestState.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Burned } from "../../rules/components/Burned.js";
 import { getDestroyedTileLedger } from "../../rules/utils/destroyedTiles.js";
-import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
+import { getEffectiveVisionRange } from "../../rules/utils/blind.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { DistrictProfile } from "../../rules/components/DistrictProfile.js";
 import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
@@ -82,6 +81,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'starving',
 	'wasting',
 	'agony',
+	'blinded',
 ]);
 // Proc state effect keys that should be projected onto enemy entity views for glyph fx.
 const ENTITY_PROC_STATE_KEYS = new Set(['doom_clock', 'cataclysm_mark']);
@@ -418,9 +418,7 @@ export function buildWorldView(world) {
 
 	// Compute FOV (once per turn, idempotent via step check in updateFOV)
 	if (_view.player) {
-		const brain = world.get(_view.player.id, Brain);
-		const passive = getPassiveBonuses(world, _view.player.id);
-		const radius = (brain?.visionRange ?? 8) + (passive?.visionRangeDerived ?? 0);
+		const radius = getEffectiveVisionRange(world, _view.player.id);
 		playerVisionRadius = radius;
 		const pad = 2;
 		const bounds = {
@@ -441,9 +439,7 @@ export function buildWorldView(world) {
 	// Collect entity records near the player (or all if no player).
 	if (_view.player) {
 		ensureSpatialIndex(world);
-		const brain = world.get(_view.player.id, Brain);
-		const passive = getPassiveBonuses(world, _view.player.id);
-		const radius = (brain?.visionRange ?? 8) + (passive?.visionRangeDerived ?? 0);
+		const radius = getEffectiveVisionRange(world, _view.player.id);
 		playerVisionRadius = radius;
 		const viewR = (radius | 0) + 4;
 		const x0 = _view.player.pos.x - viewR;

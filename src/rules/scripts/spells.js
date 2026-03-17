@@ -33,6 +33,7 @@ import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
+import { blind, getEffectiveVisionRange } from "../utils/blind.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -1487,6 +1488,90 @@ REGISTRY['rampage'] = function rampageScript(world, actor, _spell, _intent) {
   });
 
   world.emit('spell:rampage', { actor, at: { x: pos.x, y: pos.y } });
+};
+
+REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const MAX_R = Math.max(1, Number(spell.range || 8));
+  const isBlocked = createLOSBlocker(world);
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Resolve target from intent or auto-target nearest hostile
+  let targetId = intent?.targetId || 0;
+  let tpos = targetId ? /** @type any */ (world.get(targetId, Position)) : null;
+
+  if (!targetId || !tpos) {
+    /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+    const candidates = [];
+    for (const [id, p] of world.query(Position)) {
+      if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      const dist2v = d2(apos.x, apos.y, p.x, p.y);
+      if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
+    }
+    candidates.sort((a, b) => a.dist2 - b.dist2);
+    let found = null;
+    for (const c of candidates) {
+      if (hasSpellLineOfSight(world, {
+        sourceId: actor,
+        targetId: c.id,
+        sourcePos: apos,
+        targetPos: c,
+        range: MAX_R,
+        isBlocked,
+      })) { found = c; break; }
+    }
+    if (!found) {
+      try { world.emit && world.emit('spell:blind', { actor, targetId: actor, fizzle: true, from: { x: apos.x, y: apos.y }, at: { x: apos.x, y: apos.y } }); } catch (e) { console.debug('[spells] emit spell:blind fizzle failed:', e); }
+      return;
+    }
+    targetId = found.id;
+    tpos = { x: found.x, y: found.y };
+  }
+
+  // Validate target alive
+  const vit = /** @type any */ (world.get(targetId, Vitality));
+  if (!vit || (vit.hp | 0) <= 0) {
+    try { world.emit && world.emit('spell:blind', { actor, targetId, fizzle: true, from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } }); } catch (e) { console.debug('[spells] emit spell:blind fizzle failed:', e); }
+    return;
+  }
+
+  // LOS check
+  if (!hasSpellLineOfSight(world, {
+    sourceId: actor, targetId,
+    sourcePos: apos, targetPos: tpos, range: MAX_R, isBlocked,
+  })) {
+    try { world.emit && world.emit('spell:blind', { actor, targetId, fizzle: true, reason: 'no_los', from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } }); } catch (e) { console.debug('[spells] emit spell:blind fizzle failed:', e); }
+    return;
+  }
+
+  // Range check
+  const dist = chebyshev(apos, tpos);
+  if (dist > MAX_R) {
+    try { world.emit && world.emit('spell:blind', { actor, targetId, fizzle: true, reason: 'out_of_range', from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } }); } catch (e) { console.debug('[spells] emit spell:blind fizzle failed:', e); }
+    return;
+  }
+
+  // Apply the vision envelope: ramp-in 3, hold 4, ramp-out 3, recover to original
+  // toValue is 20% of current effective vision (significant impairment, not total blackout)
+  const currentVision = getEffectiveVisionRange(world, targetId);
+  const toValue = Math.max(1, Math.round(currentVision * 0.2));
+  blind(world, targetId, toValue, 3, 4, 3);
+
+  try {
+    world.emit && world.emit('spell:blind', {
+      actor,
+      targetId,
+      from: { x: apos.x, y: apos.y },
+      at: { x: tpos.x, y: tpos.y },
+    });
+  } catch (e) { console.debug('[spells] emit spell:blind failed:', e); }
 };
 
 /**

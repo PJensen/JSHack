@@ -2493,6 +2493,23 @@ export const ITEM_CATALOG = {
       }),
     },
   },
+  book_blind: {
+    id: "book_blind",
+    catalogKind: "magic",
+    name: "Spellbook of Blindness",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "rare",
+    description: "Grants the ability to cast a blinding spell.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
   book_dead: {
     id: "book_dead",
     catalogKind: "magic",
