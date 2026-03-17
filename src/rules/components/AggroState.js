@@ -20,8 +20,10 @@ export const SEARCH_TURNS_CURIOUS       = 6;    // turns curious → unaware dow
  * searchTurnsLeft: countdown before downgrading to the next lower tier.
  * retreating: true while the creature is below its retreat HP threshold and
  *             actively fleeing rather than chasing. Cleared when HP recovers.
+ * patrolDx/patrolDy: current patrol heading used when unaware and intelligence > 3.
+ *   0,0 means "not yet assigned" — aiScurrySystem picks a direction on first use.
  *
- * Managed by aiChaseSystem and soundPropagationSystem.
+ * Managed by aiChaseSystem, aiScurrySystem, and soundPropagationSystem.
  */
 export const AggroState = defineComponent("AggroState", {
   alertLevel:      AGGRO_LEVELS.unaware,
@@ -29,4 +31,6 @@ export const AggroState = defineComponent("AggroState", {
   lastKnownY:      0,
   searchTurnsLeft: 0,
   retreating:      false,
+  patrolDx:        0,
+  patrolDy:        0,
 });
