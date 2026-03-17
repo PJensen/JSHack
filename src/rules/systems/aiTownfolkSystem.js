@@ -406,6 +406,15 @@ function findOwnedShopRoomByActor(world, actorId) {
   return null;
 }
 
+/** Open (and unlock) any shop door the vendor owns a key for. */
+function openOwnedShopDoors(world, actorId) {
+  for (const [doorId, , doorState] of world.query(Position, DoorState)) {
+    if (doorState.open) continue;
+    if (!actorHasDoorKey(world, actorId, doorId)) continue;
+    setDoorState(world, doorId, { open: true, locked: false }, actorId);
+  }
+}
+
 function shopHasCustomer(world, actorId) {
   const room = findOwnedShopRoomByActor(world, actorId);
   if (!room) return false;
@@ -1316,6 +1325,11 @@ function handleScheduledTownfolk(world, id, pos, job) {
       job.carryCount = 0;
     }
     emitSafe(world, "townfolk:routine", { actor: id, phase: target.phase, kind: target.kind });
+
+    // Shop vendors open their door when the work phase starts.
+    if (target.phase === "work" && findOwnedShopRoomByActor(world, id)) {
+      openOwnedShopDoors(world, id);
+    }
   }
 
   job.targetX = target.x;
