@@ -34,20 +34,22 @@ import { getPassiveBonuses } from './passiveBonuses.js';
  */
 export function computeEnvelopeValue(startValue, toValue, endValue, rampIn, hold, rampOut, elapsed) {
   if (elapsed <= 0) return startValue;
+  const total = (Number(rampIn) || 0) + (Number(hold) || 0) + (Number(rampOut) || 0);
+  if (elapsed > total) return endValue;
 
   // Ramp-in phase
-  if (rampIn > 0 && elapsed < rampIn) {
+  if (rampIn > 0 && elapsed <= rampIn) {
     const t = elapsed / rampIn;
     return startValue + (toValue - startValue) * t;
   }
 
-  // Hold phase: elapsed is in [rampIn, rampIn + hold)
-  if (hold > 0 && elapsed < rampIn + hold) {
+  // Hold phase: elapsed is in [rampIn, rampIn + hold]
+  if (elapsed <= rampIn + hold) {
     return toValue;
   }
 
   // Ramp-out phase (or instant jump when rampOut === 0)
-  if (rampOut <= 0) return endValue;
+  if (rampOut <= 0) return toValue;
   const t = (elapsed - rampIn - hold) / rampOut;
   return toValue + (endValue - toValue) * Math.min(1, t);
 }
