@@ -1,13 +1,13 @@
 // src/rules/utils/electrocute.js
 // Canonical sensory-overload effect for any lightning/electric hit.
 //
-// All shock/lightning sources (weather strikes, shock traps, deity wrath, spells)
-// MUST call applyElectrocuted() instead of hand-rolling stun + blind + deafen.
-// This ensures tuning is done in one place (CANNON rule).
+// installElectrocuteOnDamage(world) hooks into the 'damaged' event so that ANY
+// electric/lightning damage automatically triggers applyElectrocuted(). No caller
+// needs to import or invoke it directly — just deal electric damage via dealDamage.
 //
 // Effect profile (all values recoverable — no permanent damage):
 //   Stun:      2 turns
-//   Blindness: instant, hold 2 turns, recover over 4 turns
+//   Blindness: instant, vision → 0, hold 2 turns, recover over 4 turns
 //   Deafness:  instant, full impairment, hold 2 turns, recover over 6 turns
 //
 // Optional shock DoT (follow-on jolt) is driven by the caller's potency
@@ -22,7 +22,7 @@ import { deafen } from './deafen.js';
  *
  * Applies:
  *  - 2-turn stun
- *  - Instant blindness (vision → 1, hold 2 turns, recover over 4 turns)
+ *  - Instant blindness (vision → 0, hold 2 turns, recover over 4 turns)
  *  - Instant full deafness (hold 2 turns, recover over 6 turns)
  *
  * Returns false if the target is invalid or has no ActiveEffects component and
@@ -53,11 +53,33 @@ export function applyElectrocuted(world, targetId) {
     ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
   }
 
-  // Instant blindness: vision collapses to 1, holds 2 turns, recovers over 4 turns
-  blind(world, id, 1, 0, 2, 4);
+  // Instant blindness: vision collapses to 0, holds 2 turns, recovers over 4 turns
+  blind(world, id, 0, 0, 2, 4);
 
   // Instant deafness: full impairment, holds 2 turns, recovers over 6 turns
   deafen(world, id, 1.0, 0, 2, 6);
 
+  // Notify display layer for flashbang VFX
+  world.emit?.('electrocute:flash', { target: id });
+
   return true;
+}
+
+const INSTALLED = Symbol.for('jshack:electrocute:installed');
+
+/**
+ * Install a one-time 'damaged' event listener that auto-applies electrocution
+ * whenever an entity takes electric or lightning damage.
+ *
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ */
+export function installElectrocuteOnDamage(world) {
+  if (world[INSTALLED]) return;
+  world[INSTALLED] = true;
+
+  world.on('damaged', ({ target, type, amount }) => {
+    if (type !== 'electric' && type !== 'lightning') return;
+    if (!(amount > 0)) return;
+    applyElectrocuted(world, Number(target || 0) | 0);
+  });
 }

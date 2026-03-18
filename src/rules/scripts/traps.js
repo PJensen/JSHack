@@ -7,7 +7,7 @@ import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
-import { applyElectrocuted } from "../utils/electrocute.js";
+
 
 // Spike trap: deals percentage of max HP as damage.
 // Params: { percent?: number } // 0..1
@@ -58,8 +58,8 @@ registerScript('trap_shock', {
       // ~8% maxHp per tick for 2 ticks — follow-on jolt
       _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: Math.max(3, Math.floor(vit.maxHp * 0.08)) });
     }
-    // Apply canonical electrocuted bundle: 2-turn stun + instant blindness + instant deafness
-    applyElectrocuted(world, target);
+    // Electrocution (stun + blind + deafen) is auto-applied by the damaged-event
+    // listener in electrocute.js — no explicit call needed here.
     // Emit event for display layer (flash, ringing messages)
     world.emit?.('shock_trap:sensory', {
       target,

@@ -14,7 +14,6 @@ import { setTile, getTile } from "../environment/dungeon/tileMap.js";
 import { TILE_TREE, TILE_WATER, TILE_SHALLOW_WATER, TILE_WATER_DEEP } from "../environment/dungeon/constants.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { dealDamage } from "../utils/dealDamage.js";
-import { applyElectrocuted } from "../utils/electrocute.js";
 
 // Weather durations (in turns)
 const CLEAR_MIN = 80;
@@ -231,8 +230,7 @@ function _rollLightning(world) {
       at: pos ? { x: pos.x, y: pos.y } : undefined,
     });
 
-    // Apply sensory overload via canonical electrocuted path
-    applyElectrocuted(world, id);
+    // Electrocution (stun + blind + deafen) auto-applied by damaged-event listener.
   }
 
   // Check if the player was among the hit entities
