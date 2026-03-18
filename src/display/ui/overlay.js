@@ -5348,9 +5348,9 @@ function renderDeathScreen(panel, detail) {
   const spellCount = detail?.spellCount ?? 0;
   if (spellCount > 0) stats.appendChild(_deathStatLine('Spells learned', spellCount, '#b388ff'));
 
-  // Most valuable item
-  if (detail?.bestItemName) {
-    stats.appendChild(_deathStatLine('Prized possession', detail.bestItemName, '#4fc3f7'));
+  // Equipped weapon
+  if (detail?.weaponName) {
+    stats.appendChild(_deathStatLine('Weapon', detail.weaponName, '#4fc3f7'));
   }
 
   // Deity
