@@ -206,4 +206,10 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["blinded"],
   },
+  {
+    id: "deafened",
+    keys: ["deafened", "deaf"],
+    operation: "none",
+    statuses: ["deafened"],
+  },
 ];
