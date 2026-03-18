@@ -432,15 +432,8 @@ Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
   const doorPos = world.get(doorId, Position);
   assert(doorPos, "expected book shop door position");
 
-  while (true) {
-    const pos = world.get(playerId, Position);
-    assert(pos, "expected player position during theft path");
-    if (pos.x === doorPos.x && pos.y === doorPos.y) break;
-    const dx = Math.sign(doorPos.x - pos.x);
-    const dy = Math.sign(doorPos.y - pos.y);
-    world.add(playerId, MoveIntent, { dx, dy });
-    world.tick(1);
-  }
+  // Teleport player to door tile — pathfinding is not the point of this test.
+  world.set(playerId, Position, { x: doorPos.x, y: doorPos.y });
 
   const insideDoorPos = world.get(playerId, Position);
   world.add(playerId, MoveIntent, { dx: 0, dy: 1 });

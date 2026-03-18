@@ -130,6 +130,7 @@ import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
+import { pickRandomSeed } from "./shared/utils/funSeeds.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
 
@@ -233,7 +234,7 @@ updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" :
 installPluralizationExtensions();
 
 // ---- App wires rules/ (no display logic here) ------------------------------
-const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xC0FFEE;
+const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? pickRandomSeed();
 const world = new World({ seed: _bootSeed });
 configureWorld(world);
 import { installChannelingController } from "./main/channelingController.js";
