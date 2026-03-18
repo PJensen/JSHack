@@ -7,8 +7,8 @@ import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { Devotion } from "../../rules/components/Devotion.js";
-import { CalendarState } from "../../rules/components/CalendarState.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
+import { TURNS_PER_DAY } from "../../rules/data/calendar.js";
 import { getClass } from "../../rules/data/classes.js";
 import { getDeity } from "../../rules/data/deities.js";
 
@@ -27,33 +27,12 @@ function gatherDeathStats(world, playerId) {
     }
   }
 
-  // Most valuable item (by value, non-gold)
-  let bestItemName = null;
-  let bestItemValue = 0;
-  for (const itemId of inventoryItems(world, playerId)) {
-    const ni = world.get(itemId, NamedIdentity);
-    if (ni?.identity === "gold") continue;
-    const info = world.get(itemId, ItemInfo);
-    const v = Number(info?.value || 0);
-    if (v > bestItemValue) {
-      bestItemValue = v;
-      bestItemName = ni?.name || null;
-    }
-  }
-  // Also check equipped gear
+  // Equipped weapon name
+  let weaponName = null;
   const eq = world.get(playerId, Equipment);
-  if (eq) {
-    for (const slot of GEAR_SLOTS) {
-      const eid = eq[slot];
-      if (!(eid > 0) || !world.isAlive(eid)) continue;
-      const ni = world.get(eid, NamedIdentity);
-      const info = world.get(eid, ItemInfo);
-      const v = Number(info?.value || 0);
-      if (v > bestItemValue) {
-        bestItemValue = v;
-        bestItemName = ni?.name || null;
-      }
-    }
+  if (eq && eq.weapon > 0 && world.isAlive(eq.weapon)) {
+    const ni = world.get(eq.weapon, NamedIdentity);
+    if (ni) weaponName = ni.name;
   }
 
   // Spells learned
@@ -84,14 +63,10 @@ function gatherDeathStats(world, playerId) {
   // Turns survived
   const turns = world.step || 0;
 
-  // Days survived
-  let days = 0;
-  for (const [, cs] of world.query(CalendarState)) {
-    days = cs.dayTotal || 0;
-    break;
-  }
+  // Days survived (from turns, not calendar dayTotal which includes startDay offset)
+  const days = Math.floor(turns / TURNS_PER_DAY);
 
-  return { gold, bestItemName, bestItemValue, spellCount, traitList, deityId, deityName, className, turns, days };
+  return { gold, weaponName, spellCount, traitList, deityId, deityName, className, turns, days };
 }
 
 /**
@@ -99,7 +74,7 @@ function gatherDeathStats(world, playerId) {
  * @param {object} info
  * @returns {string}
  */
-export function makeDeathShareLink({ depth, score, killerName, cause, gold, turns, bestItemName, spellCount, deityName, className, traitList }) {
+export function makeDeathShareLink({ depth, score, killerName, cause, gold, turns, weaponName, spellCount, deityName, className, traitList }) {
   const GAME_URL = "https://pjensen.github.io/JSHack/";
   // X counts URLs as 23 chars. "\n\n#JSHack" = 10 chars. Total overhead = 33.
   // Budget: 280 - 33 = 247 chars for body text.
@@ -121,7 +96,7 @@ export function makeDeathShareLink({ depth, score, killerName, cause, gold, turn
   const flavor = [];
   if (spellCount > 0) flavor.push(`${spellCount} spell${spellCount === 1 ? "" : "s"} learned`);
   if (deityName) flavor.push(`Follower of ${deityName}`);
-  if (bestItemName) flavor.push(`Best item: ${bestItemName}`);
+  if (weaponName) flavor.push(`Wielding: ${weaponName}`);
   if (traitList && traitList.length > 0) {
     for (const t of traitList) flavor.push(t);
   }
