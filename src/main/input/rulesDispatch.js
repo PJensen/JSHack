@@ -7,6 +7,7 @@ import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
 import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js";
+import { SearchIntent } from "../../rules/components/Intents/SearchIntent.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 import { statusStrength } from "../../rules/utils/statusFacade.js";
 
@@ -66,6 +67,11 @@ export function makeRulesDispatcher(world, getActorId) {
       }
       case "rules.wait": {
         world?.add?.(actorId, WaitIntent, {});
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.search": {
+        world?.add?.(actorId, SearchIntent, {});
         world?.tick?.(1);
         break;
       }

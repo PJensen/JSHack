@@ -24,6 +24,7 @@ import { EngraveIntent } from "../components/Intents/EngraveIntent.js";
 import { PrayIntent } from "../components/Intents/PrayIntent.js";
 import { DisarmIntent } from "../components/Intents/DisarmIntent.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
+import { SearchIntent } from "../components/Intents/SearchIntent.js";
 import { Channeling } from "../components/Channeling.js";
 import { statusStrength } from "../utils/statusFacade.js";
 
@@ -32,7 +33,7 @@ const ALL_INTENTS = [
   MoveIntent, FlyIntent, AttackIntent, WaitIntent, DrinkIntent, UseIntent,
   ThrowIntent, ApplyIntent, EquipIntent, DropIntent, PickupIntent,
   CastSpellIntent, RangedAttackIntent, EngraveIntent, PrayIntent,
-  DisarmIntent, InteractIntent,
+  DisarmIntent, InteractIntent, SearchIntent,
 ];
 
 /** Intents stripped while stunned (WaitIntent is allowed to burn the turn). */
