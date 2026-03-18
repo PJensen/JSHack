@@ -4,6 +4,7 @@
 
 import { Actions, defaultActionSinks, Sinks } from "./actions.js";
 import { InputManager } from "./InputManager.js";
+import { readInputMode, readWalkInterval } from "./inputSettings.js";
 
 /**
  * setupInput wires listeners and routing.
@@ -24,7 +25,12 @@ export function setupInput(opts = {}) {
     touchFeedback = true,
   } = opts;
 
-  const mgr = new InputManager(window, { canvas, touchFeedback });
+  const mgr = new InputManager(window, {
+    canvas,
+    touchFeedback,
+    inputMode: readInputMode(),
+    walkInterval: readWalkInterval(),
+  });
 
   const off = mgr.onAction((action) => {
     const sink = actionSinks[action.type] || null;

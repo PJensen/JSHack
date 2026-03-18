@@ -299,3 +299,124 @@ Deno.test("InputManager: keyboard e emits open equipment action", () => {
     mgr.dispose();
   }
 });
+
+// ─── Walk-repeat mode tests ───────────────────────────────────────────────
+
+Deno.test("InputManager walk mode: pointerdown emits immediate move", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'walk', walkInterval: 10000 });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    emitPointer(canvas, "pointerdown", 170, 98);
+    // Immediate step: should emit one move right (170 > center 100, horizontal dominant)
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.Move);
+    assertEquals(actions[0]?.payload, { dx: 1, dy: 0 });
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager walk mode: pointerup stops repeat without extra step", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'walk', walkInterval: 10000 });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    emitPointer(canvas, "pointerdown", 170, 98);
+    emitPointer(canvas, "pointerup", 170, 98);
+    // Only the initial step; no extra step on pointer up
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.Move);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager walk mode: pointermove updates direction for next repeat", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'walk', walkInterval: 10000 });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    emitPointer(canvas, "pointerdown", 170, 98); // right → step emitted
+    emitPointer(canvas, "pointermove", 30, 98);  // drag toward left side
+    // Move should NOT emit a second action (direction update deferred to next tick).
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.payload, { dx: 1, dy: 0 });
+    // In walk mode, pointerup does NOT emit an extra step (differs from gesture mode).
+    emitPointer(canvas, "pointerup", 30, 98);
+    assertEquals(actions.length, 1, "no extra step emitted on pointer-up in walk mode");
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager walk mode: setMode switches to gesture mode — tap emits on pointer-up", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'walk', walkInterval: 10000 });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    // Switch to gesture mode at runtime.
+    mgr.setMode('gesture');
+    // In gesture mode a tap should emit the move on pointer-up (not on pointer-down).
+    emitPointer(canvas, "pointerdown", 170, 98);
+    assertEquals(actions.length, 0, "gesture mode: no immediate step on pointerdown");
+    emitPointer(canvas, "pointerup", 170, 98);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.Move);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager walk mode: ui:inputSettingsChanged event switches to walk mode", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  // Start in gesture mode.
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'gesture', walkInterval: 555 });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    // Switch to walk mode via event.
+    target.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
+      detail: { inputMode: 'walk', walkInterval: 333 },
+    }));
+    // Now pointer-down should emit an immediate step (walk mode behaviour).
+    emitPointer(canvas, "pointerdown", 170, 98);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.Move);
+    assertEquals(actions[0]?.payload, { dx: 1, dy: 0 });
+    emitPointer(canvas, "pointerup", 170, 98);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager walk mode: pointercancel stops repeat", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'walk', walkInterval: 10000 });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    emitPointer(canvas, "pointerdown", 170, 98);
+    emitPointer(canvas, "pointercancel", 170, 98);
+    assertEquals(mgr._walkRepeatTimer, 0);
+    assertEquals(mgr._gesture.active, false);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
