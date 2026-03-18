@@ -183,6 +183,8 @@ Deno.test("townfolk (humanoid) is NOT intercepted by enemyDoorOpen — uses own 
 
   assertEquals(world.get(door, DoorState).open, false, 'townfolk should NOT be intercepted by enemyDoorOpen');
 });
+
+Deno.test("player bumps door via bump:interact, not enemyDoorOpen", () => {
   const world = new World({ seed: 8 });
   const player = world.create();
   world.add(player, Player);
