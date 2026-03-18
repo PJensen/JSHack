@@ -33,14 +33,15 @@ export const SnakeTrap = defineArchetype(
     [NamedIdentity, () => ({ name: 'Snake Trap', identity: 'trap_snake' })],
 );
 
-// Shock trap — electric damage + shocked status on trigger
+// Shock trap — electric damage + sensory overload (stun, blindness, deafness) on trigger
+// Damage is 15% of max HP (down from 30%) because sensory impairment is now a real penalty.
 export const ShockTrap = defineArchetype(
     "ShockTrap",
     [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
     [Trap, (p) => ({
         type: 'shock',
         script: 'trap_shock',
-        params: p.trapParams ?? { percent: 0.30 },
+        params: p.trapParams ?? { percent: 0.15 },
         revealed: false,
         armed: true,
         difficulty: p.difficulty ?? 15,

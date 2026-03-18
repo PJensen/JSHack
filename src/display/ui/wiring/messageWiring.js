@@ -47,6 +47,7 @@ const BULLETIN_RUMOR_LABELS = Object.freeze({
  *   components: {
  *     Equipment?: any, ItemInfo?: any, NamedIdentity?: any, Owner?: any, Pet?: any,
  *     Player?: any, Position?: any, Devotion?: any, Anatomy?: any, DungeonState?: any,
+ *     Status?: any,
  *   },
  *   soundApi: {
  *     evaluateSound: Function,
@@ -80,6 +81,7 @@ export function installMessageWiring({
     Devotion,
     Anatomy,
     DungeonState,
+    Status,
   } = components || {};
   const evaluateSound = typeof soundApi.evaluateSound === "function" ? soundApi.evaluateSound : () => ({ audible: false, clarity: "barely", perceivedDb: -Infinity });
   const thresholdForTier = typeof soundApi.thresholdForTier === "function" ? soundApi.thresholdForTier : () => Number.POSITIVE_INFINITY;
@@ -230,6 +232,13 @@ export function installMessageWiring({
   function currentHearingThreshold() {
     const pe = playerEntity(world);
     if (!pe?.id) return thresholdForTier(HEARING_TIERS.super);
+    // Deafened status (from lightning or shock trap) overrides anatomy hearing
+    const status = compGet(pe.id, Status);
+    const deafened = status?.statuses?.find((s) => s.type === 'deafened');
+    if (deafened) {
+      // Treat the player as deaf — suppresses all hearing-dependent messages
+      try { return thresholdForTier(HEARING_TIERS.deaf || 'deaf'); } catch { return Number.POSITIVE_INFINITY; }
+    }
     const anatomy = compGet(pe.id, Anatomy);
     const tier = String(anatomy?.hearing || HEARING_TIERS.super).toLowerCase();
     try {
@@ -1377,7 +1386,7 @@ export function installMessageWiring({
       log('The rain puts out a fire.', 'ambient');
     }
   });
-  world.on('weather:lightning', ({ x, y, hitTree, hitWater, hitCount }) => {
+  world.on('weather:lightning', ({ x, y, hitTree, hitWater, hitCount, hitPlayer }) => {
     if ((hitCount | 0) > 0) {
       log('A bolt of lightning strikes!', 'danger');
     } else if (hitTree) {
@@ -1387,6 +1396,20 @@ export function installMessageWiring({
     } else {
       log('Lightning strikes the ground nearby!', 'system');
     }
+    // Sensory overload messages when the player is directly hit
+    if (hitPlayer) {
+      log('*** a flash of light! ***', 'danger');
+      log('*** ringing fills your ears! ***', 'danger');
+    }
+  });
+
+  // Sensory overload messages for shock trap
+  world.on('shock_trap:sensory', ({ target }) => {
+    const pe = playerEntity(world);
+    const playerId = Number(pe?.id || 0) | 0;
+    if (!(playerId > 0) || (Number(target || 0) | 0) !== playerId) return;
+    log('*** a flash of light! ***', 'danger');
+    log('*** ringing fills your ears! ***', 'danger');
   });
 
   // === Calendar events ===
