@@ -6,7 +6,7 @@
 import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
-import { getEffectiveVisionRange } from "./rules/utils/blind.js";
+import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
@@ -233,7 +233,7 @@ updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" :
 installPluralizationExtensions();
 
 // ---- App wires rules/ (no display logic here) ------------------------------
-const _bootSeed = (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xC0FFEE;
+const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? 0xC0FFEE;
 const world = new World({ seed: _bootSeed });
 configureWorld(world);
 import { installChannelingController } from "./main/channelingController.js";
@@ -522,6 +522,8 @@ let _postMortemTicksLeft = 0;
 world.on("died", ({ id }) => {
   if (!world.has(id, Player)) return;
   if (_postMortemInterval) return;
+  // Dim the lights: ramp vision to 0 over the post-mortem ticks
+  blind(world, id, 0, POST_MORTEM_TICKS, 0, 0);
   _postMortemTicksLeft = POST_MORTEM_TICKS;
   _postMortemInterval = setInterval(() => {
     world.tick(1);
@@ -1415,6 +1417,14 @@ addEventListener('keydown', (ev) => {
         y: enemy.y,
       },
     });
+    return;
+  }
+
+  // Swallow direction keys so they don't become movement while targeting
+  const _DIR_KEYS = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s','h','j','k','l','y','u','b','n'];
+  if (_DIR_KEYS.includes(ev.key)) {
+    ev.preventDefault();
+    ev.stopPropagation();
     return;
   }
 }, { capture: true });

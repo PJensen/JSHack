@@ -59,6 +59,14 @@ export function buildPerfConfig(params) {
   };
 }
 
+function parseSeedParam(raw) {
+  if (raw == null) return null;
+  const s = raw.trim();
+  if (/^0x[0-9a-f]+$/i.test(s)) return parseInt(s, 16) >>> 0;
+  if (/^[0-9]+$/.test(s)) return parseInt(s, 10) >>> 0;
+  return null;
+}
+
 export function readRuntimeConfig() {
   const params = new URLSearchParams(window.location.search || "");
   return {
@@ -68,6 +76,7 @@ export function readRuntimeConfig() {
     dungeonScale: parsePositiveFloat(params.get("dungeonScale"), null),
     sparsity: parseUnitFloat(params.get("sparsity"), null),
     chosenDeityId: params.get("deity") || "molkhar",
+    seed:         parseSeedParam(params.get("seed")),
     giveParam:    params.get("give")    || "",
     effectsParam: params.get("effects") || "",
     debug:        params.has("debug"),
