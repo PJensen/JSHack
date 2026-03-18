@@ -66,6 +66,7 @@ export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';
 export { ObjectState } from './ObjectState.js';
 export { DisarmIntent } from './Intents/DisarmIntent.js';
+export { SearchIntent } from './Intents/SearchIntent.js';
 export { Polymorph } from './Polymorph.js';
 export { Channeling } from './Channeling.js';
 export { Collider } from './Collider.js';

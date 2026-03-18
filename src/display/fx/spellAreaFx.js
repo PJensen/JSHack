@@ -4,7 +4,7 @@
 import { startShake } from "../camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
-import { RadialFx, BlinkFx, PhaseStrikeFx } from "./fxEntries.js";
+import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx } from "./fxEntries.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, ftext?: { addDamage: Function, addStatus?: Function } }} deps
@@ -62,6 +62,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
   // --- Rampage state ---
   /** @type {RadialFx[]} */
   const _rampageFx = [];
+
+  // --- Search pulse state ---
+  /** @type {SearchPulseFx[]} */
+  const _searchPulseFx = [];
 
   const STORM_VOLLEY_SWAY_MAX_RAD = Math.PI / 36; // +/- 5deg
   const STORM_LOCAL_SWAY_MAX_RAD = Math.PI / 60; // +/- 3deg
@@ -139,6 +143,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
     for (let i = _rampageFx.length - 1; i >= 0; i--) {
       _rampageFx[i].tick(dt);
       if (_rampageFx[i].expired) _rampageFx.splice(i, 1);
+    }
+    for (let i = _searchPulseFx.length - 1; i >= 0; i--) {
+      _searchPulseFx[i].tick(dt);
+      if (_searchPulseFx[i].expired) _searchPulseFx.splice(i, 1);
     }
   }
 
@@ -502,6 +510,26 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       const glowR = 0.3 + t * 0.8;
       ctx.fillStyle = `rgba(255,100,20,${(0.2 * alpha * pulse).toFixed(3)})`;
       ctx.beginPath(); ctx.arc(eff.x, eff.y, glowR, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Search Pulse ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawSearchPulse(ctx) {
+    if (!_searchPulseFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    for (const eff of _searchPulseFx) {
+      const t = eff.progress; // 0→1
+      const alpha = eff.alpha;
+      // Thin off-white expanding ring: grows from origin to full radius
+      const ringR = t * eff.radius;
+      const ringA = 0.55 * alpha;          // peak opacity ≈0.55, fades with alpha
+      ctx.strokeStyle = `rgba(230,245,255,${ringA.toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.02, 0.035 * (1 - t * 0.7)); // starts thin, narrows as it expands
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, 0, TAU); ctx.stroke();
     }
     ctx.restore();
   }
@@ -920,7 +948,13 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       }
       startShake(cam, 4, 0.16);
     });
+
+    world.on('search:pulse', ({ at, radius }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const r = Math.max(1, Number(radius || 6));
+      _searchPulseFx.push(new SearchPulseFx({ x: at.x, y: at.y, radius: r, ttl: 0.38 }));
+    });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, installListeners };
 }

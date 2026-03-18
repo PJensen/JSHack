@@ -75,6 +75,7 @@ export const CLASS_DEFS = {
       intelligence: 10,
       dexterity: 16,
       visionRange: 8,
+      perception: 7,
     },
     equipment: {
       weapon: 'dagger_quick',
