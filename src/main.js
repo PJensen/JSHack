@@ -92,6 +92,7 @@ import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
 import { Devotion } from "./rules/components/Devotion.js";
 import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
+import { Status } from "./rules/components/Status.js";
 import { initDeity, getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { getTownEconomyData } from "./rules/systems/townSimulationSystem.js";
@@ -1755,6 +1756,7 @@ installMessageWiring({
     Devotion,
     Anatomy,
     DungeonState,
+    Status,
   },
   soundApi: {
     evaluateSound,

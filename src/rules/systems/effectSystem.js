@@ -293,5 +293,17 @@ function processStatEnvelopeEffect(world, entityId, e, nextStatuses) {
             const brain = world.get(entityId, Brain);
             if (brain) brain.visionRange = Math.max(0, Math.round(endValue));
         }
+    } else if (e.stat === 'hearingImpairment') {
+        // Report deafened status whenever impairment > 0
+        // potency reflects severity (0–1); 0 = no impairment, 1 = completely deaf
+        if (currentValue > 0) {
+            upsertStatus(nextStatuses, {
+                type: 'deafened',
+                duration: turnsLeft,
+                potency: Math.max(0, currentValue),
+                stacks: 1,
+            });
+        }
+        // No permanent hearing injury applied per design.
     }
 }
