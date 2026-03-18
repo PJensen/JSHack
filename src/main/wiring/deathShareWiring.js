@@ -7,6 +7,7 @@ import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { Devotion } from "../../rules/components/Devotion.js";
+import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { TURNS_PER_DAY } from "../../rules/data/calendar.js";
 import { getClass } from "../../rules/data/classes.js";
@@ -66,7 +67,16 @@ function gatherDeathStats(world, playerId) {
   // Days survived (from turns, not calendar dayTotal which includes startDay offset)
   const days = Math.floor(turns / TURNS_PER_DAY);
 
-  return { gold, weaponName, spellCount, traitList, deityId, deityName, className, turns, days };
+  // Player name
+  const playerName = playerNi?.name || null;
+
+  // Active status effects at time of death
+  const ae = world.get(playerId, ActiveEffects);
+  const statusList = ae?.effects?.length > 0
+    ? ae.effects.map(e => e.key).filter(Boolean)
+    : [];
+
+  return { gold, weaponName, spellCount, traitList, statusList, deityId, deityName, className, playerName, turns, days };
 }
 
 /**
@@ -74,43 +84,46 @@ function gatherDeathStats(world, playerId) {
  * @param {object} info
  * @returns {string}
  */
-export function makeDeathShareLink({ depth, score, killerName, cause, gold, turns, weaponName, spellCount, deityName, className, traitList }) {
+export function makeDeathShareLink({ depth, score, seed, killerName, cause, gold, turns, weaponName, spellCount, deityName, className, playerName, statusList, traitList }) {
   const GAME_URL = "https://pjensen.github.io/JSHack/";
-  // X counts URLs as 23 chars. "\n\n#JSHack" = 10 chars. Total overhead = 33.
-  // Budget: 280 - 33 = 247 chars for body text.
-  const MAX_BODY = 247;
+  const seedHex = seed ? seed.toString(16).toUpperCase() : "???";
+
+  // X always counts a URL as 23 chars. The URL is ALWAYS included.
+  // Suffix: "\n\n#JSHack" (10 chars) + URL placeholder (23 chars) + "\n" (1 char) = 34
+  // Budget for body text: 280 - 34 = 246 chars.
+  const MAX_BODY = 246;
 
   // Line 1: who died and how
-  const classTag = className ? ` ${className}` : "";
+  const who = playerName && playerName !== "Unnamed"
+    ? `${playerName}${className ? ` the ${className}` : ""}`
+    : className || "adventurer";
   const slainBy = killerName ? ` by ${killerName}` : cause && cause !== "unknown" ? ` (${cause})` : "";
-  let body = `\u2620\uFE0F My${classTag} died${slainBy} on depth ${depth}`;
+  let body = `\u2620\uFE0F ${who} died${slainBy} on depth ${depth}`;
 
-  // Line 2: score + gold + turns on same line, separated by pipes
+  // Line 2: score + gold + turns
   const statBits = [];
   statBits.push(`${score} pts`);
   if (gold > 0) statBits.push(`${gold} gold`);
   statBits.push(`${turns} turns`);
   body += `\n${statBits.join(" | ")}`;
 
-  // Line 3: flavor details, greedily appended
+  // Flavor details, greedily appended line by line (most interesting first)
   const flavor = [];
-  if (spellCount > 0) flavor.push(`${spellCount} spell${spellCount === 1 ? "" : "s"} learned`);
-  if (deityName) flavor.push(`Follower of ${deityName}`);
+  if (traitList && traitList.length > 0) flavor.push(traitList.join(", "));
   if (weaponName) flavor.push(`Wielding: ${weaponName}`);
-  if (traitList && traitList.length > 0) {
-    for (const t of traitList) flavor.push(t);
-  }
+  if (deityName) flavor.push(`Follower of ${deityName}`);
+  if (spellCount > 0) flavor.push(`${spellCount} spell${spellCount === 1 ? "" : "s"} learned`);
+  if (statusList && statusList.length > 0) flavor.push(`Status: ${statusList.join(", ")}`);
 
-  if (flavor.length > 0) {
-    for (const f of flavor) {
-      const next = body + `\n${f}`;
-      if (next.length > MAX_BODY) break;
-      body = next;
-    }
+  for (const f of flavor) {
+    const next = body + `\n${f}`;
+    if (next.length > MAX_BODY) break;
+    body = next;
   }
 
   const text = encodeURIComponent(`${body}\n\n#JSHack`);
-  const url = encodeURIComponent(GAME_URL);
+  const qs = new URLSearchParams({ seed: seedHex });
+  const url = encodeURIComponent(`${GAME_URL}?${qs}`);
   return `https://x.com/intent/tweet?text=${text}&url=${url}`;
 }
 
