@@ -5299,9 +5299,10 @@ function renderDeathScreen(panel, detail) {
   skull.style.marginBottom = '8px';
   box.appendChild(skull);
 
-  // Title
+  // Title — include player name if available
+  const pName = detail?.playerName && detail.playerName !== 'Unnamed' ? detail.playerName : null;
   const title = document.createElement('div');
-  title.textContent = 'You Have Perished';
+  title.textContent = pName ? `${pName} Has Perished` : 'You Have Perished';
   Object.assign(title.style, {
     fontSize: '22px', fontWeight: 'bold', color: '#ff6b6b',
     textShadow: '0 0 12px rgba(255,60,60,0.4)', marginBottom: '16px',
@@ -5356,6 +5357,12 @@ function renderDeathScreen(panel, detail) {
   // Deity
   if (detail?.deityName) {
     stats.appendChild(_deathStatLine('Devoted to', detail.deityName, '#ce93d8'));
+  }
+
+  // Status effects at death
+  const statusList = detail?.statusList;
+  if (statusList && statusList.length > 0) {
+    stats.appendChild(_deathStatLine('Status', statusList.join(', '), '#ff8a65'));
   }
 
   box.appendChild(stats);
