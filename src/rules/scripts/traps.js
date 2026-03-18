@@ -7,6 +7,7 @@ import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
+import { applyElectrocuted } from "../utils/electrocute.js";
 
 // Spike trap: deals percentage of max HP as damage.
 // Params: { percent?: number } // 0..1
@@ -31,6 +32,8 @@ registerScript('trap_spike', {
 });
 
 // Shock trap: deals electric damage and applies the 'shocked' status for 2 turns.
+// Damage reduced to 15% of max HP (down from 30%) because the sensory overload
+// (stun, blindness, deafness) is now a significant additional gameplay penalty.
 // Params: { percent?: number } // 0..1 fraction of max HP
 registerScript('trap_shock', {
   [ScriptVerb.TrapTrigger]: (world, ctx) => {
@@ -39,7 +42,7 @@ registerScript('trap_shock', {
     const vit = world.get(target, Vitality);
     if (!vit) return;
     const pos = world.get(target, Position);
-    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.30)));
+    const pct = Math.max(0, Math.min(1, Number(ctx?.params?.percent ?? 0.15)));
     const amount = Math.max(1, Math.floor(vit.maxHp * pct));
     dealDamage(world, {
       target,
@@ -52,9 +55,16 @@ registerScript('trap_shock', {
     // Apply shocked via ActiveEffects so effectSystem picks it up
     const _ae = world.get(target, ActiveEffects);
     if (_ae && Array.isArray(_ae.effects)) {
-      // ~8% maxHp per tick for 3 ticks — brutal follow-on jolt
-      _ae.effects.push({ key: 'shock', turnsLeft: 3, potency: Math.max(3, Math.floor(vit.maxHp * 0.08)) });
+      // ~8% maxHp per tick for 2 ticks — follow-on jolt
+      _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: Math.max(3, Math.floor(vit.maxHp * 0.08)) });
     }
+    // Apply canonical electrocuted bundle: 2-turn stun + instant blindness + instant deafness
+    applyElectrocuted(world, target);
+    // Emit event for display layer (flash, ringing messages)
+    world.emit?.('shock_trap:sensory', {
+      target,
+      at: pos ? { x: pos.x, y: pos.y } : undefined,
+    });
   }
 });
 
