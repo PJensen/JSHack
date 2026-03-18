@@ -11,6 +11,7 @@ import { Brain } from "../src/rules/components/Brain.js";
 import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { blind, getEffectiveVisionRange } from "../src/rules/utils/blind.js";
 import { deafen } from "../src/rules/utils/deafen.js";
+import { applyElectrocuted } from "../src/rules/utils/electrocute.js";
 
 function scheduler(world) {
   try { effectSystem(world); } catch (e) { console.error("effectSystem error:", e); }
@@ -143,56 +144,51 @@ Deno.test("blind: vision fully recovers after ramp-out (lightning profile)", () 
 
 // ─── Stun on lightning-style hit ─────────────────────────────────────────────
 
-Deno.test("lightning sensory: stun effect is applied correctly", () => {
+Deno.test("applyElectrocuted: returns false for invalid target", () => {
+  const world = new World({ seed: 9 });
+  assert(!applyElectrocuted(world, 0), "should return false for entityId=0");
+});
+
+Deno.test("applyElectrocuted: pushes stun, visionRange envelope, and hearingImpairment envelope", () => {
   const world = new World({ seed: 9 });
   const player = createPlayer(world, { name: "Hero" });
 
-  // Simulate what weatherSystem._rollLightning does
-  let ae = world.get(player, ActiveEffects);
-  if (!ae) {
-    world.add(player, ActiveEffects, { effects: [] });
-    ae = world.get(player, ActiveEffects);
-  }
-  ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
+  const result = applyElectrocuted(world, player);
+  assert(result, "applyElectrocuted should return true");
 
-  const stun = ae.effects.find((e) => e.key === 'stun');
-  assert(stun, "stun effect should be in ActiveEffects");
-  assertEquals(stun.turnsLeft, 2, "stun should last 2 turns");
+  const ae = world.get(player, ActiveEffects);
+  assert(ae, "player should have ActiveEffects");
+  assert(ae.effects.some((e) => e.key === 'stun' && e.turnsLeft === 2), "stun effect should be present with turnsLeft=2");
+  assert(ae.effects.some((e) => e.key === 'stat_envelope' && e.stat === 'visionRange'), "vision envelope should be present");
+  assert(ae.effects.some((e) => e.key === 'stat_envelope' && e.stat === 'hearingImpairment'), "hearing envelope should be present");
 });
 
-// ─── Combined sensory overload (lightning profile) ────────────────────────────
+// ─── Combined sensory overload (canonical applyElectrocuted) ─────────────────
 
-Deno.test("lightning sensory overload: blind + deafen + stun all applied together", () => {
+Deno.test("applyElectrocuted: blind + deafen + stun all reported after first tick", () => {
   const world = new World({ seed: 10 });
   world.setScheduler((w) => scheduler(w));
   const player = createPlayer(world, { name: "Hero" });
   const brain = world.get(player, Brain);
   brain.visionRange = 8;
 
-  // Apply all three effects as weatherSystem does
-  let ae = world.get(player, ActiveEffects);
-  if (!ae) {
-    world.add(player, ActiveEffects, { effects: [] });
-    ae = world.get(player, ActiveEffects);
-  }
-  ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
-  blind(world, player, 1, 0, 2, 4);
-  deafen(world, player, 1.0, 0, 2, 6);
+  // Canonical electrocution path used by weather and shock trap
+  applyElectrocuted(world, player);
 
   world.tick(1);
 
   const st = world.get(player, Status);
   assert(
     st?.statuses?.some((s) => s.type === 'blinded'),
-    "should be blinded after lightning hit"
+    "should be blinded after electrocution"
   );
   assert(
     st?.statuses?.some((s) => s.type === 'deafened'),
-    "should be deafened after lightning hit"
+    "should be deafened after electrocution"
   );
   assert(
     st?.statuses?.some((s) => s.type === 'stunned'),
-    "should be stunned after lightning hit"
+    "should be stunned after electrocution"
   );
 
   // Vision is reduced
@@ -207,11 +203,10 @@ Deno.test("sensory overload: no permanent vision or hearing damage after recover
   const brain = world.get(player, Brain);
   brain.visionRange = 8;
 
-  // Apply sensory effects with full recovery (endValue defaults)
-  blind(world, player, 1, 0, 2, 4);   // 6 total ticks
-  deafen(world, player, 1.0, 0, 2, 6); // 8 total ticks
+  // Apply via canonical path
+  applyElectrocuted(world, player);
 
-  // Tick past the longest effect (8 ticks) + 2 extra
+  // Tick past the longest effect (hearingImpairment: 8 ticks) + 2 extra
   for (let i = 0; i < 10; i++) world.tick(1);
 
   // Vision should be fully recovered — no permanent damage
