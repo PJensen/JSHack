@@ -150,8 +150,17 @@ export class ArrowSparkFx extends FxEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Poison bubble pop — rises, oscillates, interpolates radius.
+// Search pulse — expanding off-white ring from the searcher's position.
 // ---------------------------------------------------------------------------
+export class SearchPulseFx extends FxEntry {
+  constructor({ x, y, radius, ttl }) {
+    super(ttl);
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+  }
+}
+
 export class BubblePopFx extends FxEntry {
   constructor({ x, y, ttl, r0, r1, rise, phase }) {
     super(ttl);

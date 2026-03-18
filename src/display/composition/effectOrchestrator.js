@@ -32,6 +32,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   if (typeof spellAreaFx.drawRampage === "function") {
     spellAreaFx.drawRampage(bctx);
   }
+  if (typeof spellAreaFx.drawSearchPulse === "function") {
+    spellAreaFx.drawSearchPulse(bctx);
+  }
   projectileFx.draw(bctx);
   if (typeof cloudFx.drawFire === "function") {
     cloudFx.drawFire(bctx);
