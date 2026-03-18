@@ -127,6 +127,12 @@ export class InputManager {
     const { key, code } = e;
     const lowerKey = key?.toLowerCase?.();
 
+    // Never intercept game keys when the user is typing in a text field (e.g. name input)
+    const target = /** @type {any} */ (e.target);
+    const tag = String(target?.tagName || "").toLowerCase();
+    const isTextEntry = !!target?.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
+    if (isTextEntry) return;
+
     // Cheat code detection (IDDQD → god mode)
     if (lowerKey && lowerKey.length === 1) {
       this._cheatBuffer = (this._cheatBuffer + lowerKey).slice(-5);
@@ -138,12 +144,7 @@ export class InputManager {
     }
 
     // Cast active spell: 'f' should be reliable even if a stale UI panel is left open.
-    // Keep text-entry fields safe so typing never triggers a cast.
     if (lowerKey === "f") {
-      const target = /** @type {any} */ (e.target);
-      const tag = String(target?.tagName || "").toLowerCase();
-      const isTextEntry = !!target?.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
-      if (isTextEntry) return;
       e.preventDefault();
       this._emit(makeAction(Actions.CastActiveSpell));
       return;
