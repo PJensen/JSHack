@@ -19,6 +19,10 @@ import {
   KitchenKnife,
   TownStew,
 } from '../archetypes/TownGoods.js';
+import {
+  Ration, IronRation, WildBerries, WildHerbs,
+  DungeonMushrooms, Wheat, Carrot, Corn,
+} from '../archetypes/Food.js';
 
 /**
  * Centralized item creation registry.
@@ -39,6 +43,14 @@ const SIMPLE_ITEM_ARCHETYPES = {
   'tool_kitchen_knife': KitchenKnife,
   'scroll_mapping': ScrollOfMapping,
   'bone': Bone,
+  'food_ration': Ration,
+  'food_iron_ration': IronRation,
+  'food_wild_berries': WildBerries,
+  'food_wild_herbs': WildHerbs,
+  'food_mushrooms': DungeonMushrooms,
+  'food_wheat': Wheat,
+  'food_carrot': Carrot,
+  'food_corn': Corn,
 };
 
 /**
