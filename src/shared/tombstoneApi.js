@@ -18,9 +18,7 @@ async function postToWorker(path, payload) {
     keepalive: true,
   });
 
-  if (!res.ok) {
-    throw new Error(`POST ${url} failed: ${res.status} ${res.statusText}`);
-  }
+  // Non-2xx responses are silently ignored — telemetry must never break gameplay.
 }
 
 /**
