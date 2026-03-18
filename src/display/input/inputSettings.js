@@ -24,7 +24,7 @@ function lsSet(key, val) {
  * @returns {'walk'|'gesture'}
  */
 export function readInputMode() {
-  return lsGet(LS_INPUT_MODE) === 'walk' ? 'walk' : 'gesture';
+  return lsGet(LS_INPUT_MODE) === 'gesture' ? 'gesture' : 'walk';
 }
 
 /**

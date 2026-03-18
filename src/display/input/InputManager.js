@@ -33,7 +33,7 @@ export class InputManager {
     };
 
     // Walk-repeat state ('walk' input mode).
-    this._mode = options.inputMode === 'walk' ? 'walk' : 'gesture';
+    this._mode = options.inputMode === 'gesture' ? 'gesture' : 'walk';
     this._walkInterval = Number.isFinite(options.walkInterval) && options.walkInterval > 0
       ? options.walkInterval : 555;
     this._walkRepeatTimer = 0;
