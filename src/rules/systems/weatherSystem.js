@@ -14,8 +14,7 @@ import { setTile, getTile } from "../environment/dungeon/tileMap.js";
 import { TILE_TREE, TILE_WATER, TILE_SHALLOW_WATER, TILE_WATER_DEEP } from "../environment/dungeon/constants.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { dealDamage } from "../utils/dealDamage.js";
-import { blind } from "../utils/blind.js";
-import { deafen } from "../utils/deafen.js";
+import { applyElectrocuted } from "../utils/electrocute.js";
 
 // Weather durations (in turns)
 const CLEAR_MIN = 80;
@@ -232,25 +231,8 @@ function _rollLightning(world) {
       at: pos ? { x: pos.x, y: pos.y } : undefined,
     });
 
-    // Apply sensory overload: 2-turn stun, instant blindness, instant deafness
-    let ae = world.get(id, ActiveEffects);
-    if (!ae) {
-      try { world.add(id, ActiveEffects, { effects: [] }); } catch {}
-      ae = world.get(id, ActiveEffects);
-    }
-    if (ae && Array.isArray(ae.effects)) {
-      // 2-turn stun
-      const existingStun = ae.effects.find((e) => e.key === 'stun');
-      if (existingStun) {
-        existingStun.turnsLeft = Math.max(existingStun.turnsLeft, 2);
-      } else {
-        ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
-      }
-    }
-    // Instant blindness: vision collapses to 1, holds 2 turns, recovers over 4 turns
-    blind(world, id, 1, 0, 2, 4);
-    // Instant deafness: full impairment, holds 2 turns, recovers over 6 turns
-    deafen(world, id, 1.0, 0, 2, 6);
+    // Apply sensory overload via canonical electrocuted path
+    applyElectrocuted(world, id);
   }
 
   // Check if the player was among the hit entities

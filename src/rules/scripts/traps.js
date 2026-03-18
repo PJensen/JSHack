@@ -7,8 +7,7 @@ import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
-import { blind } from "../utils/blind.js";
-import { deafen } from "../utils/deafen.js";
+import { applyElectrocuted } from "../utils/electrocute.js";
 
 // Spike trap: deals percentage of max HP as damage.
 // Params: { percent?: number } // 0..1
@@ -58,18 +57,9 @@ registerScript('trap_shock', {
     if (_ae && Array.isArray(_ae.effects)) {
       // ~8% maxHp per tick for 2 ticks — follow-on jolt
       _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: Math.max(3, Math.floor(vit.maxHp * 0.08)) });
-      // 2-turn stun
-      const existingStun = _ae.effects.find((e) => e.key === 'stun');
-      if (existingStun) {
-        existingStun.turnsLeft = Math.max(existingStun.turnsLeft, 2);
-      } else {
-        _ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
-      }
     }
-    // Instant blindness: vision collapses to 1, holds 2 turns, recovers over 4 turns
-    blind(world, target, 1, 0, 2, 4);
-    // Instant deafness: full impairment, holds 2 turns, recovers over 6 turns
-    deafen(world, target, 1.0, 0, 2, 6);
+    // Apply canonical electrocuted bundle: 2-turn stun + instant blindness + instant deafness
+    applyElectrocuted(world, target);
     // Emit event for display layer (flash, ringing messages)
     world.emit?.('shock_trap:sensory', {
       target,
