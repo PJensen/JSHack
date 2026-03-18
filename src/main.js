@@ -881,12 +881,13 @@ function _finalizeNewGame(classData) {
         if (stats.visionRange != null) brain.visionRange = stats.visionRange;
       }
 
-      // Base stats from class (strength, dexterity, vitality, intelligence)
+      // Base stats from class (strength, dexterity, vitality, intelligence, perception)
       world.add(pe.id, BaseStats, {
         strength: stats.strength ?? 10,
         intelligence: stats.intelligence ?? 10,
         dexterity: stats.dexterity ?? 10,
         vitality: stats.vitality ?? 10,
+        perception: stats.perception ?? 5,
       });
 
       // Class-driven loadout
@@ -1669,6 +1670,15 @@ addEventListener('ui:wait', () => {
   if (!pe) return;
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({ type: 'rules.wait', payload: {} });
+});
+
+// Search button → dispatch search action
+addEventListener('ui:search', () => {
+  if (isSimUiBlocked()) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.search', payload: {} });
 });
 
 // Pray button → dispatch pray action

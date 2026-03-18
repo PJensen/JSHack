@@ -172,18 +172,63 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch (e) { console.debug('[hud] dispatch ui:pray:', e); }
   });
 
-  // Wait button
+  // Search/Wait button
+  // Short tap → search action (reveals hidden traps, etc.)
+  // Long hold (≥500ms) → continuously emit wait at 222ms intervals while held
   const waitBtn = document.createElement('button');
   waitBtn.id = 'btn-wait';
-  waitBtn.textContent = 'Wait';
+  waitBtn.textContent = 'Search';
   Object.assign(waitBtn.style, {
     padding: '8px 12px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
     cursor: 'pointer'
   });
-  waitBtn.addEventListener('click', () => {
-    try { window.dispatchEvent(new CustomEvent('ui:wait')); } catch (e) { console.debug('[hud] dispatch ui:wait:', e); }
-  });
+
+  {
+    const SEARCH_LONG_PRESS_MS = 500;
+    const WAIT_REPEAT_MS = 222;
+    let searchPressTimer = null;
+    let searchRepeatTimer = null;
+    let searchIsLongPress = false;
+
+    function searchStartPress() {
+      searchIsLongPress = false;
+      searchPressTimer = setTimeout(() => {
+        searchIsLongPress = true;
+        waitBtn.style.background = '#0a1120';
+        // Immediately emit one wait, then repeat
+        try { window.dispatchEvent(new CustomEvent('ui:wait')); } catch (e) { console.debug('[hud] dispatch ui:wait:', e); }
+        searchRepeatTimer = setInterval(() => {
+          try { window.dispatchEvent(new CustomEvent('ui:wait')); } catch (e) { console.debug('[hud] dispatch ui:wait:', e); }
+        }, WAIT_REPEAT_MS);
+      }, SEARCH_LONG_PRESS_MS);
+    }
+
+    function searchEndPress() {
+      if (searchPressTimer) { clearTimeout(searchPressTimer); searchPressTimer = null; }
+      if (searchRepeatTimer) { clearInterval(searchRepeatTimer); searchRepeatTimer = null; }
+      waitBtn.style.background = '#101626';
+      if (!searchIsLongPress) {
+        // Short tap → search
+        try { window.dispatchEvent(new CustomEvent('ui:search')); } catch (e) { console.debug('[hud] dispatch ui:search:', e); }
+      }
+      searchIsLongPress = false;
+    }
+
+    function searchCancelPress() {
+      if (searchPressTimer) { clearTimeout(searchPressTimer); searchPressTimer = null; }
+      if (searchRepeatTimer) { clearInterval(searchRepeatTimer); searchRepeatTimer = null; }
+      waitBtn.style.background = '#101626';
+      searchIsLongPress = false;
+    }
+
+    waitBtn.addEventListener('touchstart', () => searchStartPress(), { passive: true });
+    waitBtn.addEventListener('touchend', () => searchEndPress(), { passive: true });
+    waitBtn.addEventListener('touchcancel', () => searchCancelPress(), { passive: true });
+    waitBtn.addEventListener('mousedown', (e) => { if (e.button === 0) searchStartPress(); });
+    waitBtn.addEventListener('mouseup', (e) => { if (e.button === 0) searchEndPress(); });
+    waitBtn.addEventListener('mouseleave', () => searchCancelPress());
+  }
 
   // Pet control button (touch/press interface)
   const petBtn = document.createElement('button');
@@ -204,7 +249,8 @@ export function initHUD() {
     shoot: '\u{1F3F9}',       // 🏹
     zap: '\u26A1',            // ⚡
     pray: '\u{1F64F}',        // 🙏
-    wait: '\u23F3',           // ⏳
+    wait: '\u23F3',           // ⏳ (kept for backward compat; button now uses 'search')
+    search: '\u{1F50D}',      // 🔍
     bug: '\u{1F47E}',         // 👾
     petDefault: '\u{1F43E}',  // 🐾
   });
@@ -384,7 +430,7 @@ export function initHUD() {
   setDesktopLabel(spellSelectBtn, 'Spells'); setMobileLabel(spellSelectBtn, 'Spells');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
-  setDesktopLabel(waitBtn, 'Wait'); setMobileLabel(waitBtn, 'Wait');
+  setDesktopLabel(waitBtn, 'Search'); setMobileLabel(waitBtn, 'Search');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(bagBtn, ACTION_ICONS.bag); setMobileIcon(bagBtn, ACTION_ICONS.bag);
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
@@ -392,7 +438,7 @@ export function initHUD() {
   setDesktopIcon(spellSelectBtn, ACTION_ICONS.spells); setMobileIcon(spellSelectBtn, ACTION_ICONS.spells);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
-  setDesktopIcon(waitBtn, ACTION_ICONS.wait); setMobileIcon(waitBtn, ACTION_ICONS.wait);
+  setDesktopIcon(waitBtn, ACTION_ICONS.search); setMobileIcon(waitBtn, ACTION_ICONS.search);
   setBarLabel(charBtn, 'Char');
   setBarLabel(bagBtn, 'Bag');
   setBarLabel(petBtn, 'Pet');
@@ -400,7 +446,7 @@ export function initHUD() {
   setBarLabel(spellSelectBtn, 'Spells');
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
-  setBarLabel(waitBtn, 'Wait');
+  setBarLabel(waitBtn, 'Search');
   charBtn.dataset.keyHint = 'c';
   bagBtn.dataset.keyHint = 'i';
   petBtn.dataset.keyHint = 'p';

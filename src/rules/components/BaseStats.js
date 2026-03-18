@@ -10,4 +10,5 @@ export const BaseStats = defineComponent("BaseStats", {
   critMultiplier: 1.5,
   baseDamageMin: 0,
   baseDamageMax: 0,
+  perception: 5,
 });

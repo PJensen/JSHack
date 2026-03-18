@@ -14,6 +14,7 @@ import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
+import { searchSystem } from "../rules/systems/searchSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
@@ -148,6 +149,7 @@ export function configureWorld(world) {
   registerSystem(knockbackSystem, 'intents', { before: [movementSystem] });
   registerSystem(flyIntentSystem, 'intents');
   registerSystem(waitSystem, 'intents');
+  registerSystem(searchSystem, 'intents');
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
