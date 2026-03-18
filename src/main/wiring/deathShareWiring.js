@@ -1,5 +1,6 @@
 import { Player } from "../../rules/components/Player.js";
 import { Score } from "../../rules/components/Score.js";
+import { postDeathTombstone } from "../../shared/tombstoneApi.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
@@ -167,6 +168,8 @@ export function installDeathShareWiring({ world }) {
       depth, score: scoreVal, seed, killerName, cause, shareUrl,
       ...stats,
     };
+
+    postDeathTombstone({ ..._pendingDeathDetail, timestamp: Date.now() }).catch(() => {});
   });
 
   world.on("postMortemComplete", () => {
