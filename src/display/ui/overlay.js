@@ -5379,9 +5379,11 @@ function renderDeathScreen(panel, detail) {
     box.appendChild(traitBox);
   }
 
-  // Seed
+  // Seed + Version
+  const version = String((/** @type {any} */ (globalThis)).VERSION || '').trim();
+  const metaText = version ? `Seed: ${seedHex}  |  v${version}` : `Seed: ${seedHex}`;
   const seedLine = document.createElement('div');
-  seedLine.textContent = `Seed: ${seedHex}`;
+  seedLine.textContent = metaText;
   Object.assign(seedLine.style, { opacity: '0.5', fontSize: '12px', marginBottom: '14px' });
   box.appendChild(seedLine);
 

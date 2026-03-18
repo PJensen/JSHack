@@ -73,7 +73,7 @@ function gatherDeathStats(world, playerId) {
   // Active status effects at time of death
   const ae = world.get(playerId, ActiveEffects);
   const statusList = ae?.effects?.length > 0
-    ? ae.effects.map(e => e.key).filter(Boolean)
+    ? ae.effects.filter(e => e && e.key && e.key !== 'stat_envelope').map(e => e.key)
     : [];
 
   return { gold, weaponName, spellCount, traitList, statusList, deityId, deityName, className, playerName, turns, days };
