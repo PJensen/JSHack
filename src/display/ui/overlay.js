@@ -10,6 +10,10 @@ import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { versionLoaded } from '../../shared/version.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
+import {
+  readInputMode, readWalkSpeed, writeInputMode, writeWalkSpeed,
+  WALK_SPEED_PRESETS,
+} from '../input/inputSettings.js';
 
 const PANEL_Z_BASE = 1200;
 let _panelZCounter = PANEL_Z_BASE;
@@ -2568,6 +2572,95 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
   content.appendChild(makeCheckbox('Identification', !!data.identificationEnabled, (on) => {
     window.dispatchEvent(new CustomEvent('ui:setIdentification', { detail: { enabled: on } }));
   }));
+
+  // --- Input section ---
+  const inputHead = document.createElement('div');
+  inputHead.textContent = 'Input';
+  Object.assign(inputHead.style, {
+    fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
+    borderBottom: '1px solid #2d3b52', paddingBottom: '4px', marginTop: '4px',
+  });
+  content.appendChild(inputHead);
+
+  // Radio: Continuous Walking vs Spell Gestures
+  const currentMode = readInputMode();
+  const modeRow = document.createElement('div');
+  Object.assign(modeRow.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
+
+  function makeRadio(labelText, value, checked) {
+    const lbl = document.createElement('label');
+    Object.assign(lbl.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      cursor: 'pointer', fontSize: '13px', minHeight: '32px',
+    });
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'jshack-input-mode';
+    radio.value = value;
+    radio.checked = checked;
+    Object.assign(radio.style, { width: '16px', height: '16px', accentColor: '#5fb3ff', cursor: 'pointer' });
+    const txt = document.createElement('span');
+    txt.textContent = labelText;
+    lbl.appendChild(radio);
+    lbl.appendChild(txt);
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      writeInputMode(/** @type {'walk'|'gesture'} */ (value));
+      window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
+        detail: { inputMode: value, walkInterval: WALK_SPEED_PRESETS[readWalkSpeed()] },
+      }));
+      // Show/hide walk speed row.
+      speedRow.style.display = value === 'walk' ? 'flex' : 'none';
+    });
+    return lbl;
+  }
+
+  modeRow.appendChild(makeRadio('Continuous Walking', 'walk', currentMode === 'walk'));
+  modeRow.appendChild(makeRadio('Spell Gestures', 'gesture', currentMode === 'gesture'));
+  content.appendChild(modeRow);
+
+  // Segmented control: Walk Speed (Slow / Normal / Fast)
+  const speedRow = document.createElement('div');
+  Object.assign(speedRow.style, {
+    display: currentMode === 'walk' ? 'flex' : 'none',
+    alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+  });
+  const speedLabel = document.createElement('span');
+  speedLabel.textContent = 'Walk Speed';
+  Object.assign(speedLabel.style, { fontSize: '13px', color: '#aac8e8', minWidth: '80px' });
+  speedRow.appendChild(speedLabel);
+
+  const speedBtnWrap = document.createElement('div');
+  Object.assign(speedBtnWrap.style, { display: 'flex', gap: '4px' });
+
+  const currentSpeed = readWalkSpeed();
+  let selectedSpeedPreset = currentSpeed;
+  for (const [preset, ms] of /** @type {[string, number][]} */ (Object.entries(WALK_SPEED_PRESETS))) {
+    const btn = document.createElement('button');
+    btn.textContent = preset.charAt(0).toUpperCase() + preset.slice(1);
+    btn.dataset.preset = preset;
+    Object.assign(btn.style, {
+      padding: '5px 12px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
+      border: '1px solid #2d3b52', background: preset === currentSpeed ? '#173458' : '#0b1626',
+      color: preset === currentSpeed ? '#cfe8ff' : '#7aacdf', fontFamily: 'inherit',
+      minHeight: '34px',
+    });
+    btn.addEventListener('click', () => {
+      const prev = selectedSpeedPreset;
+      selectedSpeedPreset = preset;
+      writeWalkSpeed(/** @type {'slow'|'normal'|'fast'} */ (preset));
+      window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
+        detail: { inputMode: readInputMode(), walkInterval: ms },
+      }));
+      // Update only the previously-selected and newly-selected buttons.
+      const prevBtn = /** @type {HTMLButtonElement|null} */ (speedBtnWrap.querySelector(`[data-preset="${prev}"]`));
+      if (prevBtn) Object.assign(prevBtn.style, { background: '#0b1626', color: '#7aacdf' });
+      Object.assign(btn.style, { background: '#173458', color: '#cfe8ff' });
+    });
+    speedBtnWrap.appendChild(btn);
+  }
+  speedRow.appendChild(speedBtnWrap);
+  content.appendChild(speedRow);
 
   // --- Debugging section ---
   const dbHead = document.createElement('div');

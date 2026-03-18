@@ -32,12 +32,26 @@ export class InputManager {
       moved: false,
     };
 
+    // Walk-repeat state ('walk' input mode).
+    this._mode = options.inputMode === 'walk' ? 'walk' : 'gesture';
+    this._walkInterval = Number.isFinite(options.walkInterval) && options.walkInterval > 0
+      ? options.walkInterval : 555;
+    this._walkRepeatTimer = 0;
+    this._repeatPoint = null;
+
     this._cheatBuffer = "";
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
     this._onPointerMove = (e) => this._handlePointerMove(e);
     this._onPointerUp = (e) => this._handlePointerUp(e);
     this._onPointerCancel = (e) => this._handlePointerCancel(e);
+    this._onSettingsChanged = (e) => {
+      const { inputMode, walkInterval } = /** @type {any} */ (e).detail || {};
+      if (inputMode === 'walk' || inputMode === 'gesture') this._mode = inputMode;
+      if (Number.isFinite(walkInterval) && walkInterval > 0) this._walkInterval = walkInterval;
+      // Cancel any active walk repeat when settings change.
+      this._cancelWalkRepeat();
+    };
 
     this._bind();
   }
@@ -48,9 +62,21 @@ export class InputManager {
       clearTimeout(this._gestureClearTimer);
       this._gestureClearTimer = 0;
     }
+    this._cancelWalkRepeat();
     this._resetGestureState();
     this.handlers.clear();
     this.hotspots.clear();
+  }
+
+  /**
+   * Dynamically update the input mode and walk interval (called when settings change).
+   * @param {'walk'|'gesture'} mode
+   * @param {number} [walkInterval]
+   */
+  setMode(mode, walkInterval) {
+    if (mode === 'walk' || mode === 'gesture') this._mode = mode;
+    if (Number.isFinite(walkInterval) && walkInterval > 0) this._walkInterval = walkInterval;
+    this._cancelWalkRepeat();
   }
 
   onAction(handler) {
@@ -79,6 +105,7 @@ export class InputManager {
 
   _bind() {
     this.target.addEventListener("keydown", this._onKeyDown);
+    this.target.addEventListener("ui:inputSettingsChanged", this._onSettingsChanged);
     const el = this._canvas || this.target;
     el.addEventListener("pointerdown", this._onPointerDown, { passive: false });
     el.addEventListener("pointermove", this._onPointerMove, { passive: false });
@@ -88,6 +115,7 @@ export class InputManager {
 
   _unbind() {
     this.target.removeEventListener("keydown", this._onKeyDown);
+    this.target.removeEventListener("ui:inputSettingsChanged", this._onSettingsChanged);
     const el = this._canvas || this.target;
     el.removeEventListener("pointerdown", this._onPointerDown);
     el.removeEventListener("pointermove", this._onPointerMove);
@@ -265,6 +293,30 @@ export class InputManager {
     if (typeof e.isPrimary === "boolean" && !e.isPrimary) return;
 
     e.preventDefault();
+
+    if (this._mode === 'walk') {
+      // Walk-repeat mode: emit one step immediately, then repeat at _walkInterval.
+      const rect = canvas.getBoundingClientRect();
+      const localX = Number(e.clientX) - rect.left;
+      const localY = Number(e.clientY) - rect.top;
+      if (!Number.isFinite(localX) || !Number.isFinite(localY)) return;
+
+      this._gesture.active = true;
+      this._gesture.pointerId = Number(e.pointerId);
+      this._gesture.rect = rect;
+      this._repeatPoint = { x: localX, y: localY };
+
+      // Immediate first step.
+      this._emitMoveFromLocalPoint(this._repeatPoint, rect);
+
+      // Start repeat timer.
+      this._startWalkRepeat();
+      try {
+        if (typeof canvas.setPointerCapture === "function") canvas.setPointerCapture(e.pointerId);
+      } catch {}
+      return;
+    }
+
     if (this._gestureClearTimer) {
       clearTimeout(this._gestureClearTimer);
       this._gestureClearTimer = 0;
@@ -288,6 +340,20 @@ export class InputManager {
     if (Number(e.pointerId) !== this._gesture.pointerId) return;
 
     e.preventDefault();
+
+    if (this._mode === 'walk') {
+      // Update the current repeat point so the next tick walks in the new direction.
+      const rect = this._gesture.rect;
+      if (rect) {
+        const localX = Number(e.clientX) - rect.left;
+        const localY = Number(e.clientY) - rect.top;
+        if (Number.isFinite(localX) && Number.isFinite(localY)) {
+          this._repeatPoint = { x: localX, y: localY };
+        }
+      }
+      return;
+    }
+
     this._appendGesturePoint(e);
     this._emitGestureProgress(true, null);
   }
@@ -297,6 +363,14 @@ export class InputManager {
     if (Number(e.pointerId) !== this._gesture.pointerId) return;
 
     e.preventDefault();
+
+    if (this._mode === 'walk') {
+      this._cancelWalkRepeat();
+      this._repeatPoint = null;
+      this._resetGestureState();
+      return;
+    }
+
     this._appendGesturePoint(e);
 
     let recognized = null;
@@ -332,7 +406,12 @@ export class InputManager {
     if (!this._gesture.active) return;
     if (Number(e.pointerId) !== this._gesture.pointerId) return;
     e.preventDefault();
-    this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
+    if (this._mode === 'walk') {
+      this._cancelWalkRepeat();
+      this._repeatPoint = null;
+    } else {
+      this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
+    }
     this._resetGestureState();
   }
 
@@ -380,6 +459,43 @@ export class InputManager {
     if (!first) return;
     const distFromStart = Math.hypot(localX - first.x, localY - first.y);
     this._gesture.moved = this._gesture.moved || distFromStart >= TAP_SLOP_PX;
+  }
+
+  _startWalkRepeat() {
+    this._cancelWalkRepeat();
+    this._walkRepeatTimer = setInterval(() => {
+      // Stop if a UI panel is open (modal interruption).
+      if (this._isUiBlocked()) {
+        this._cancelWalkRepeat();
+        this._repeatPoint = null;
+        this._resetGestureState();
+        return;
+      }
+      if (!this._gesture.active || !this._repeatPoint || !this._gesture.rect) {
+        this._cancelWalkRepeat();
+        return;
+      }
+      this._emitMoveFromLocalPoint(this._repeatPoint, this._gesture.rect);
+    }, this._walkInterval);
+  }
+
+  _cancelWalkRepeat() {
+    if (this._walkRepeatTimer) {
+      clearInterval(this._walkRepeatTimer);
+      this._walkRepeatTimer = 0;
+    }
+  }
+
+  _isUiBlocked() {
+    try {
+      if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+        const panels = document.querySelectorAll('.ui-panel');
+        for (let i = 0; i < panels.length; i++) {
+          if (panels[i] && /** @type {any} */ (panels[i]).style.display === 'block') return true;
+        }
+      }
+    } catch {}
+    return false;
   }
 
   _emitGestureProgress(active, recognized) {
