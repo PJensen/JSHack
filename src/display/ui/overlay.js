@@ -5271,17 +5271,25 @@ function ensureDeathScreen(root) {
   return panel;
 }
 
-/** @param {HTMLDivElement} panel @param {{depth?:number, score?:number, seed?:number, killerName?:string|null, cause?:string, shareUrl?:string}} detail */
+/** Helper: create a styled stat line for the death screen. */
+function _deathStatLine(label, value, color) {
+  const el = document.createElement('div');
+  el.textContent = `${label}: ${value}`;
+  if (color) el.style.color = color;
+  return el;
+}
+
+/** @param {HTMLDivElement} panel @param {object} detail */
 function renderDeathScreen(panel, detail) {
   panel.innerHTML = '';
 
   const box = document.createElement('div');
   Object.assign(box.style, {
     position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-    width: 'min(420px, 88vw)', textAlign: 'center',
+    width: 'min(460px, 90vw)', textAlign: 'center',
     background: '#0b0e16', border: '1px solid #3a1c1c', borderRadius: '10px',
     padding: '28px 24px', boxShadow: '0 0 60px rgba(180,40,40,0.35)',
-    color: '#cfe8ff',
+    color: '#cfe8ff', maxHeight: '90vh', overflowY: 'auto',
   });
 
   // Skull
@@ -5300,7 +5308,7 @@ function renderDeathScreen(panel, detail) {
   });
   box.appendChild(title);
 
-  // Stats
+  // --- Primary stats ---
   const depth = detail?.depth ?? 1;
   const score = detail?.score ?? 0;
   const seed = detail?.seed ?? 0;
@@ -5309,34 +5317,66 @@ function renderDeathScreen(panel, detail) {
   const cause = detail?.cause;
 
   const stats = document.createElement('div');
-  Object.assign(stats.style, { marginBottom: '18px', lineHeight: '1.8', fontSize: '14px' });
+  Object.assign(stats.style, { marginBottom: '14px', lineHeight: '1.8', fontSize: '14px' });
 
-  if (killerName) {
-    const line = document.createElement('div');
-    line.textContent = `Slain by ${killerName}`;
-    line.style.color = '#ff9999';
-    stats.appendChild(line);
-  } else if (cause && cause !== 'unknown') {
-    const line = document.createElement('div');
-    line.textContent = `Cause: ${cause}`;
-    line.style.color = '#ff9999';
-    stats.appendChild(line);
+  if (detail?.className) {
+    stats.appendChild(_deathStatLine('Class', detail.className, '#90caf9'));
   }
 
-  const depthLine = document.createElement('div');
-  depthLine.textContent = `Depth reached: ${depth}`;
-  stats.appendChild(depthLine);
+  if (killerName) {
+    stats.appendChild(_deathStatLine('Slain by', killerName, '#ff9999'));
+  } else if (cause && cause !== 'unknown') {
+    stats.appendChild(_deathStatLine('Cause', cause, '#ff9999'));
+  }
 
-  const scoreLine = document.createElement('div');
-  scoreLine.textContent = `Score: ${score}`;
-  stats.appendChild(scoreLine);
+  stats.appendChild(_deathStatLine('Depth reached', depth));
+  stats.appendChild(_deathStatLine('Score', score));
 
-  const seedLine = document.createElement('div');
-  seedLine.textContent = `Seed: ${seedHex}`;
-  seedLine.style.opacity = '0.7';
-  stats.appendChild(seedLine);
+  // Gold
+  const gold = detail?.gold ?? 0;
+  if (gold > 0) stats.appendChild(_deathStatLine('Gold', `${gold}g`, '#ffd700'));
+
+  // Turns / days survived
+  const turns = detail?.turns ?? 0;
+  const days = detail?.days ?? 0;
+  if (turns > 0) {
+    const timeStr = days > 0 ? `${turns} (${days} day${days === 1 ? '' : 's'})` : String(turns);
+    stats.appendChild(_deathStatLine('Turns survived', timeStr));
+  }
+
+  // Spells learned
+  const spellCount = detail?.spellCount ?? 0;
+  if (spellCount > 0) stats.appendChild(_deathStatLine('Spells learned', spellCount, '#b388ff'));
+
+  // Most valuable item
+  if (detail?.bestItemName) {
+    stats.appendChild(_deathStatLine('Prized possession', detail.bestItemName, '#4fc3f7'));
+  }
+
+  // Deity
+  if (detail?.deityName) {
+    stats.appendChild(_deathStatLine('Devoted to', detail.deityName, '#ce93d8'));
+  }
 
   box.appendChild(stats);
+
+  // --- Traits ---
+  const traitList = detail?.traitList;
+  if (traitList && traitList.length > 0) {
+    const traitBox = document.createElement('div');
+    Object.assign(traitBox.style, {
+      marginBottom: '14px', fontSize: '12px', color: '#a0c4ff',
+      fontStyle: 'italic', lineHeight: '1.6',
+    });
+    traitBox.textContent = traitList.join(' \u00B7 ');
+    box.appendChild(traitBox);
+  }
+
+  // Seed
+  const seedLine = document.createElement('div');
+  seedLine.textContent = `Seed: ${seedHex}`;
+  Object.assign(seedLine.style, { opacity: '0.5', fontSize: '12px', marginBottom: '14px' });
+  box.appendChild(seedLine);
 
   // Share button
   if (detail?.shareUrl) {
@@ -5344,7 +5384,7 @@ function renderDeathScreen(panel, detail) {
     shareBtn.href = detail.shareUrl;
     shareBtn.target = '_blank';
     shareBtn.rel = 'noopener';
-    shareBtn.textContent = 'Share on X';
+    shareBtn.textContent = '\u2620\uFE0F Share Your Death';
     Object.assign(shareBtn.style, {
       display: 'inline-block', padding: '10px 22px',
       background: '#1a1a2e', color: '#cfe8ff', fontFamily: 'monospace',
