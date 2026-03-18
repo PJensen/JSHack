@@ -81,6 +81,7 @@ import "../rules/scripts/monsters.js";
 import "../rules/data/procPackages.js";
 import "../rules/dialogues/townfolkDialogs.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
+import { installElectrocuteOnDamage } from "../rules/utils/electrocute.js";
 
 /**
  * @param {World} world
@@ -126,6 +127,8 @@ export function configureWorld(world) {
   installGenocideListener(world);
   // Elevate enemy AggroState when they take damage (even off-screen).
   installAggroFromDamageListener(world);
+  // Auto-apply electrocution (stun + blind + deafen) on any electric/lightning damage.
+  installElectrocuteOnDamage(world);
 
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)

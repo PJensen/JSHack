@@ -92,7 +92,7 @@ Deno.test("effectSystem: deafened status clears after full recovery", () => {
 
 // ─── Blindness on lightning-style hit ────────────────────────────────────────
 
-Deno.test("blind: instant hit collapses vision to 1 on first tick", () => {
+Deno.test("blind: instant hit collapses vision to 0 on first tick", () => {
   const world = new World({ seed: 6 });
   world.setScheduler((w) => scheduler(w));
   const player = createPlayer(world, { name: "Hero" });
@@ -100,12 +100,12 @@ Deno.test("blind: instant hit collapses vision to 1 on first tick", () => {
   brain.visionRange = 8;
 
   // Instant blindness as applied on lightning hit
-  blind(world, player, 1, 0, 2, 4);
+  blind(world, player, 0, 0, 2, 4);
 
-  // After first tick, vision should be 1 (hold phase)
+  // After first tick, vision should be 0 (hold phase — fully blind)
   world.tick(1);
   const v = getEffectiveVisionRange(world, player);
-  assertEquals(v, 1, `vision should be 1 immediately after lightning hit; got ${v}`);
+  assertEquals(v, 0, `vision should be 0 immediately after lightning hit; got ${v}`);
 });
 
 Deno.test("blind: blinded status is present during impairment", () => {
@@ -191,9 +191,9 @@ Deno.test("applyElectrocuted: blind + deafen + stun all reported after first tic
     "should be stunned after electrocution"
   );
 
-  // Vision is reduced
+  // Vision is fully collapsed to 0
   const v = getEffectiveVisionRange(world, player);
-  assert(v < 8, `vision should be reduced from 8; got ${v}`);
+  assertEquals(v, 0, `vision should be 0 after electrocution; got ${v}`);
 });
 
 Deno.test("sensory overload: no permanent vision or hearing damage after recovery", () => {

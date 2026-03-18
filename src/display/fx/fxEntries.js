@@ -99,9 +99,10 @@ export class PulseFx extends FxEntry {
 // Screen flash — no position, just color + lifetime.
 // ---------------------------------------------------------------------------
 export class ScreenFlashFx extends FxEntry {
-  constructor({ ttl, color }) {
+  constructor({ ttl, color, peak }) {
     super(ttl);
     this.color = color;
+    this.peak = peak; // undefined = legacy additive; number = source-over peak opacity
   }
 }
 

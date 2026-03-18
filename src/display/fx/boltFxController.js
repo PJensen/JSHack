@@ -7,6 +7,7 @@ import { clamp01, rgba, pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { dragonBreath as drawDragonBreathGlyphFx } from "../passes/vfx/glyph/effects/dragonBreath.js";
 import { ArrowFx, LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
+import { Player } from "../../rules/components/Player.js";
 
 const FIRE_BREATH_SPEED_TILES_PER_SEC = 5.25;
 const FIRE_BREATH_MIN_TRAVEL_SEC = 0.36;
@@ -336,6 +337,12 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         _spawnStormLightning({ x: Number(x), y: Number(y) });
       }
     });
+    world.on('electrocute:flash', ({ target }) => {
+      const id = Number(target || 0) | 0;
+      if (!(id > 0) || !world.has(id, Player)) return;
+      _screenFlash.push(new ScreenFlashFx({ ttl: 0.18, color: [255, 255, 255], peak: 0.9 }));
+      startShake(cam, 3, 0.12);
+    });
     world.on('monster:firebreath', ({ from, to, tiles, hitIds }) => {
       if (!from || !to) return;
       const lineTiles = Array.isArray(tiles)
@@ -592,11 +599,19 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     if (!strongest) return;
     const a = strongest.alpha;
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = rgba(strongest.color, 0.18 * a);
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = `rgba(255,255,255,${(0.05 * a).toFixed(3)})`;
-    ctx.fillRect(0, 0, width, height);
+    if (strongest.peak != null) {
+      // High-intensity flash (flashbang): opaque white overlay that fades fast
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(255,255,255,${(strongest.peak * a).toFixed(3)})`;
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      // Subtle additive flash (spells, storm lightning)
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = rgba(strongest.color, 0.18 * a);
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = `rgba(255,255,255,${(0.05 * a).toFixed(3)})`;
+      ctx.fillRect(0, 0, width, height);
+    }
     ctx.restore();
   }
 
