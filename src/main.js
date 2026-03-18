@@ -133,6 +133,7 @@ import { installPluralizationExtensions } from "./shared/utils/pluralization.js"
 import { pickRandomSeed } from "./shared/utils/funSeeds.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
+import { postCharacterCreated } from "./shared/tombstoneApi.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -976,6 +977,16 @@ function _finalizeNewGame(classData) {
     }
 
     applyDebugCommands({ world, runtimeConfig });
+
+    // Capture character creation entry conditions for telemetry.
+    postCharacterCreated({
+      playerName: classData?.name ?? "Hero",
+      classId: classDef?.id ?? null,
+      className: classDef?.name ?? null,
+      seed: (world.seed >>> 0).toString(16),
+      startDepth: _startDepth,
+      timestamp: Date.now(),
+    }).catch(() => {});
   }
 
   // Ensure deity state is initialized for current player (new game or loaded save).
