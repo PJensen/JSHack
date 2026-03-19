@@ -325,7 +325,46 @@ function countRoomEntrances(room, chunk) {
   return entrances;
 }
 
-Deno.test("shopkeeper spawns only in dead-end rooms with one perimeter entrance", () => {
+function countRoomOpeningTiles(room, chunk) {
+  const rx = room.x - chunk.chunkX * CHUNK_SIZE;
+  const ry = room.y - chunk.chunkY * CHUNK_SIZE;
+  const rw = room.w;
+  const rh = room.h;
+  const tiles = chunk.tiles;
+  function getTile(x, y) {
+    if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
+    return tiles[y * CHUNK_SIZE + x];
+  }
+  function isPassable(tile) {
+    return tile === TILE_FLOOR || tile === TILE_DOOR || tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP;
+  }
+  function roomHas(x, y) {
+    return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+  }
+
+  let openings = 0;
+  for (let y = ry; y < ry + rh; y++) {
+    for (let x = rx; x < rx + rw; x++) {
+      const isPerimeter = (x === rx || x === rx + rw - 1 || y === ry || y === ry + rh - 1);
+      if (!isPerimeter) continue;
+      if (!isPassable(getTile(x, y))) continue;
+      const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+      let opensOut = false;
+      for (const [nx, ny] of neighbors) {
+        if (roomHas(nx, ny)) continue;
+        if (isPassable(getTile(nx, ny))) {
+          opensOut = true;
+          break;
+        }
+      }
+      if (opensOut) openings++;
+    }
+  }
+
+  return openings;
+}
+
+Deno.test("shopkeeper spawns only in small dead-end rooms with exactly one opening", () => {
   for (let seed = 1; seed <= 30; seed++) {
     const chunk = generateChunk(seed, 1, 0, 0);
     const rng = createRng(seed * 1337);
@@ -338,6 +377,9 @@ Deno.test("shopkeeper spawns only in dead-end rooms with one perimeter entrance"
       assert(room, "shopkeeper spawn should include room metadata");
       const entrances = countRoomEntrances(room, chunk);
       assert(entrances === 1, `shop room must have exactly one perimeter entrance, got ${entrances}`);
+      const openings = countRoomOpeningTiles(room, chunk);
+      assert(openings === 1, `shop room must have exactly one opening tile, got ${openings}`);
+      assert(room.w <= 6 && room.h <= 6, `shop room must be small (<=6x6), got ${room.w}x${room.h}`);
     }
   }
 });
@@ -390,7 +432,7 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
   for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
   tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
   // Room 1 (eligible shop room).
-  for (let y = 14; y < 21; y++) for (let x = 14; x < 21; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  for (let y = 14; y < 20; y++) for (let x = 14; x < 20; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
   tiles[17 * CHUNK_SIZE + 13] = TILE_FLOOR;
 
   const chunk = {
@@ -399,7 +441,7 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
     tiles,
     rooms: [
       { x: 1, y: 1, w: 6, h: 6 },
-      { x: 14, y: 14, w: 7, h: 7 },
+      { x: 14, y: 14, w: 6, h: 6 },
     ],
     doors: [],
   };
