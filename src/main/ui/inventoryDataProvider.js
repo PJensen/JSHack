@@ -172,6 +172,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const statusComp = world.get(playerId, Status);
     if (Array.isArray(effectComp?.effects)) {
       for (const entry of effectComp.effects) {
+        if (entry?.key === 'stat_envelope') continue; // displayed via Status as blinded/deafened
         const key = canonicalStatusKey(String(entry?.key || ""));
         if (!key) continue;
         const turns = Math.max(0, Number(entry?.turnsLeft || 0) | 0);
