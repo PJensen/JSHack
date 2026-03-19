@@ -835,9 +835,10 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
   for (const [id, pos] of world.query(Position)) {
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
-    const dist = Math.max(Math.abs((pos.x | 0) - ox), Math.abs((pos.y | 0) - oy));
+    const ddx = (pos.x | 0) - ox, ddy = (pos.y | 0) - oy;
+    const dist = Math.sqrt(ddx * ddx + ddy * ddy);
     if (dist > RADIUS) continue;
-    const dmg = dist <= 1 ? BASE_DMG : Math.max(1, Math.floor(BASE_DMG / 2));
+    const dmg = dist <= 1.5 ? BASE_DMG : Math.max(1, Math.floor(BASE_DMG / 2));
     const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
       spell,
       baseAmount: dmg,
@@ -867,7 +868,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
 
   for (let dy = -RADIUS; dy <= RADIUS; dy++) {
     for (let dx = -RADIUS; dx <= RADIUS; dx++) {
-      const dist = Math.max(Math.abs(dx), Math.abs(dy));
+      const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist > RADIUS) continue;
       try {
         spawnHazard(world, {
