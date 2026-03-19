@@ -35,6 +35,7 @@ import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { blind, getEffectiveVisionRange } from "../utils/blind.js";
+import { Player } from "../components/Player.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -1224,6 +1225,26 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
       missed: result.reason === 'missed',
     });
   } catch (e) { console.debug('[spells] emit spell:smite failed:', e); }
+
+  // Dazzle: anyone with LOS to the impact gets a brief vision reduction (the flash).
+  {
+    const SCAN = 12;
+    let playerDazzled = false;
+    for (const [eid, epos] of world.query(Position)) {
+      if (!world.get(eid, Brain)) continue;
+      const dx = (epos.x | 0) - (target.x | 0);
+      const dy = (epos.y | 0) - (target.y | 0);
+      if (Math.abs(dx) > SCAN || Math.abs(dy) > SCAN) continue;
+      if (!hasLOS(epos.x | 0, epos.y | 0, target.x | 0, target.y | 0, isBlocked)) continue;
+      const curVision = getEffectiveVisionRange(world, eid);
+      const rampOut = (world.rand() < 0.5) ? 2 : 3;
+      blind(world, eid, Math.max(1, curVision - 2), 0, 0, rampOut);
+      if (world.has(eid, Player)) playerDazzled = true;
+    }
+    if (playerDazzled) {
+      try { world.emit && world.emit('spell:smite:dazzle'); } catch (e) { console.debug('[spells] smite:dazzle failed:', e); }
+    }
+  }
 };
 
 // Summon Skeleton — spawn a friendly skeleton near the caster.
