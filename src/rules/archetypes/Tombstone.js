@@ -35,7 +35,29 @@ export const Tombstone = defineArchetype(
  * @returns {string} Formatted epitaph
  */
 export function generateEpitaph(data) {
-  const { playerName, depth, cause, killerName } = data;
+  const { playerName, depth, cause, killerName, className, score } = data;
+
+  if (cause === 'highscore') {
+    const cls = String(className || '').trim();
+    const s = Math.max(0, Number(score || 0) | 0);
+    const dc = data.deathCause || null;
+    const dk = data.killerName || null;
+    let message = `Champion: ${playerName}\n`;
+    if (cls) message += `Class: ${cls}\n`;
+    message += `Highscore: ${s}`;
+    if (dc === 'combat') {
+      message += dk ? `\nSlain by ${dk}` : `\nFell in combat`;
+    } else if (dc === 'starvation') {
+      message += `\nDied of starvation`;
+    } else if (dc === 'trap') {
+      message += `\nFell victim to a trap`;
+    } else if (dc === 'spell') {
+      message += `\nKilled by magic`;
+    } else if (dc) {
+      message += `\n${dc}`;
+    }
+    return message;
+  }
 
   let message = `Here lies ${playerName}\n`;
   message += `Depth: ${depth}\n`;

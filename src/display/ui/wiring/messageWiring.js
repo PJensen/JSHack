@@ -139,6 +139,21 @@ export function installMessageWiring({
     return label ? bracketizeName(label) : `Entity ${n}`;
   }
 
+  function favoredDeityIdForPlayer(playerId) {
+    const actorId = Number(playerId || 0) | 0;
+    if (!(actorId > 0) || !Devotion) return "";
+    const dev = compGet(actorId, Devotion);
+    return String(dev?.deityId || "");
+  }
+
+  function isFavoredDeityForPlayer(playerId, deityId) {
+    const did = String(deityId || "");
+    if (!did) return true;
+    const favored = favoredDeityIdForPlayer(playerId);
+    if (!favored) return true;
+    return favored === did;
+  }
+
   function hasNamedEntity(id) {
     const n = Number(id || 0);
     if (!(n > 0)) return false;
@@ -717,6 +732,72 @@ export function installMessageWiring({
     }
   });
 
+  world.on('prayer:insight', ({ actor, deityName, pantheon, desperate, troubled, needs }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const mode = pantheon ? 'pantheon' : 'single deity';
+    const urgency = desperate ? 'desperate' : (troubled ? 'urgent' : 'steady');
+    const needText = Array.isArray(needs) && needs.length ? ` Need: ${needs.join(', ')}.` : '';
+    log(`${deityName || 'A deity'} hears your ${urgency} prayer (${mode}).${needText}`, 'deity');
+  });
+
+  world.on('prayer:curse-removed', ({ actor, name }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = bracketizeName(String(name || 'item'));
+    log(`Divine grace lifts a curse from ${label}.`, 'deity');
+  });
+
+  world.on('deity:patronShift', ({ playerId, deityName }) => {
+    if (nameOfEntity(playerId) !== 'You') return;
+    log(`The pantheon shifts — ${deityName || 'a new patron'} now answers you most strongly.`, 'deity');
+  });
+
+  world.on('deity:intervention', ({ playerId, deityId, deityName, kind, effect, itemName }) => {
+    if (nameOfEntity(playerId) !== 'You') return;
+    if (!isFavoredDeityForPlayer(playerId, deityId)) return;
+    const k = String(kind || 'intervention');
+    if (k === 'miracle') return;
+    if (k === 'shrine_blessing') {
+      log(`${deityName || 'A deity'} answers from the shrine.`, 'deity');
+      return;
+    }
+    if (k === 'prayer_uncurse') {
+      log(`${deityName || 'A deity'} lifts the curse from ${bracketizeName(String(itemName || 'your gear'))}.`, 'deity');
+      return;
+    }
+    if (k === 'patron_shift') {
+      log(`Divine currents realign around ${deityName || 'a new patron'}.`, 'deity');
+      return;
+    }
+    if (k === 'boon') return;
+    if (k === 'wrath') {
+      log(`${deityName || 'A deity'}'s intervention is wrathful.`, 'deity');
+    }
+  });
+
+  world.on('deity:boon', ({ actor, deityId, message, boon, amount, removed, uncursed }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (!isFavoredDeityForPlayer(actor, deityId)) return;
+    const text = String(message || '').trim();
+    if (text) {
+      log(text, 'deity');
+      return;
+    }
+    const b = String(boon || 'blessing');
+    if (b === 'renewal') {
+      log(`Divine renewal restores you (+${Math.max(0, Number(amount || 0) | 0)} HP).`, 'deity');
+      return;
+    }
+    if (b === 'mana_surge') {
+      log(`A mana surge fills you (+${Math.max(0, Number(amount || 0) | 0)} MP).`, 'deity');
+      return;
+    }
+    if (b === 'cleanse') {
+      log(`You are cleansed (${Math.max(0, Number(removed || 0) | 0)} afflictions, ${Math.max(0, Number(uncursed || 0) | 0)} curses removed).`, 'deity');
+      return;
+    }
+    log('A divine blessing takes hold.', 'deity');
+  });
+
   // === Pet events ===
   world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
     const petName = nameOfEntity(petId);
@@ -851,8 +932,23 @@ export function installMessageWiring({
     }
   });
 
-  world.on('town:bulletinBoard', ({ actor, districts, opportunityView }) => {
+  world.on('town:bulletinBoard', ({ actor, districts, opportunityView, questBoard }) => {
     if (nameOfEntity(actor) !== 'You') return;
+    const payload = {
+      districts: Array.isArray(districts) ? districts : [],
+      opportunityView: opportunityView && typeof opportunityView === 'object' ? opportunityView : null,
+      questBoard: questBoard && typeof questBoard === 'object'
+        ? questBoard
+        : null,
+    };
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      try {
+        window.dispatchEvent(new CustomEvent('ui:openTownBoard'));
+        window.dispatchEvent(new CustomEvent('ui:townBoardData', { detail: payload }));
+      } catch (e) {
+        console.debug('[messageWiring] dispatch town board overlay events:', e);
+      }
+    }
     log('--- TOWN BOARD ---', 'system');
     const bulletins = Array.isArray(districts) ? districts : [];
     if (!bulletins.length) {

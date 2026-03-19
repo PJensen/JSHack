@@ -467,7 +467,7 @@ Deno.test("scheduled townfolk sleeps at home before dawn", () => {
 
 Deno.test("scheduled farmer alternates between field and mill during work hours", () => {
   const world = makeWorld(15);
-  world.step = 34;
+  world.step = 222; // work phase (210-509), workBeat=1 → mill
 
   const farmer = addTownfolk(world, 8, 8, "farmer", {
     scheduleEnabled: true,
@@ -492,7 +492,7 @@ Deno.test("scheduled farmer alternates between field and mill during work hours"
 
 Deno.test("scheduled farmer can work a solid millstone from an adjacent tile", () => {
   const world = makeWorld(115);
-  world.step = 34;
+  world.step = 222; // work phase (210-509), workBeat=1 → mill
 
   const millstone = world.create();
   world.add(millstone, Position, { x: 4, y: 4 });
@@ -528,7 +528,7 @@ Deno.test("scheduled farmer can work a solid millstone from an adjacent tile", (
 
 Deno.test("scheduled townfolk heads to the pub after work", () => {
   const world = makeWorld(16);
-  world.step = 106;
+  world.step = 516; // pub phase (510-579)
 
   const npc = addTownfolk(world, 6, 5, "smith", {
     scheduleEnabled: true,
@@ -547,7 +547,7 @@ Deno.test("scheduled townfolk heads to the pub after work", () => {
 
 Deno.test("scheduled miner keeps the work routine during a long outbound trip", () => {
   const world = makeWorld(116);
-  world.step = 80;
+  world.step = 222; // work phase (210-509)
 
   const miner = addTownfolk(world, 5, 5, "miner", {
     scheduleEnabled: true,
@@ -569,7 +569,7 @@ Deno.test("scheduled miner keeps the work routine during a long outbound trip", 
 
 Deno.test("scheduled townfolk opens a closed door on its route and closes it after passing", () => {
   const world = makeWorld(17);
-  world.step = 30;
+  world.step = 222; // work phase (210-509)
   installTownfolkDoorListener(world);
 
   const npc = addTownfolk(world, 5, 5, "villager", {
@@ -675,7 +675,7 @@ Deno.test("alchemist brew consumes herbs and reagents from the herb chest", () =
 
 Deno.test("scheduled herbalist leaves the hut for ready herbs even on the indoor sorting beat", () => {
   const world = makeWorld(191);
-  world.step = 30;
+  world.step = 222; // work phase (210-509), workBeat=1 (indoor sorting beat)
 
   const herbNode = world.create();
   world.add(herbNode, Position, { x: 12, y: 5 });
@@ -828,7 +828,7 @@ Deno.test("barkeep cooks stew from tavern chest ingredients", () => {
 
 Deno.test("scheduled barkeep can cook beside a solid cooking fire", () => {
   const world = makeWorld(121);
-  world.step = 26;
+  world.step = 216; // work phase (210-509), workBeat=0 → cook
 
   const fire = world.create();
   world.add(fire, Position, { x: 8, y: 5 });

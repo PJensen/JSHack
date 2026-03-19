@@ -50,7 +50,7 @@ Deno.test("frost can auto-target an overworld flyer through wall cover", () => {
   const world = new World({ seed: 101 });
   addDungeonState(world, 0, "overworld");
 
-  const caster = makeActor(world, 0, 0, "player");
+  const caster = makeActor(world, 0, 0, "stone_taunter");
   const target = makeFlyingTarget(world, 4, 0);
   const events = [];
   world.on("spell:frost", (event) => events.push(event));

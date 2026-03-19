@@ -73,6 +73,19 @@ Deno.test("getEffectiveVisionRange: returns base vision when no envelope active"
   assertEquals(getEffectiveVisionRange(world, player), 8);
 });
 
+Deno.test("getEffectiveVisionRange: applies blindness immediately on read after application", () => {
+  const world = new World({ seed: 101 });
+  const player = createPlayer(world, { name: "Hero" });
+  const brain = world.get(player, Brain);
+  brain.visionRange = 8;
+
+  blind(world, player, 2, 3, 4, 3);
+
+  const vNow = getEffectiveVisionRange(world, player);
+  assert(vNow < 8, `vision should be reduced immediately after blind() application; got ${vNow}`);
+  assert(vNow >= 2, `vision should not drop below toValue immediately after blind() application; got ${vNow}`);
+});
+
 Deno.test("getEffectiveVisionRange: reflects envelope modifier mid-effect", () => {
   const world = new World({ seed: 2 });
   world.setScheduler((w) => scheduler(w));

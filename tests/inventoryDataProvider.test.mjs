@@ -34,6 +34,27 @@ function makeEquipItem(world, identity, name, slot) {
   return id;
 }
 
+function makeItem(world, { identity, name, type = "misc", count = 1, x = null, y = null }) {
+  const id = world.create();
+  world.add(id, NamedIdentity, { identity, name });
+  world.add(id, ItemInfo, {
+    type,
+    slot: "",
+    weight: 1,
+    value: 0,
+    description: name,
+    count,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  if (x != null && y != null) {
+    world.add(id, Position, { x, y });
+  }
+  return id;
+}
+
 Deno.test("inventory data provider hides equipped gear from bag and exposes character slots", () => {
   const world = new World({ seed: 1234 });
   const player = world.create();
@@ -244,4 +265,65 @@ Deno.test("settings debug spawn spawns the selected monster near the player", ()
   } finally {
     clearAll();
   }
+});
+
+Deno.test("ground pickup detail uses stack mode and exposes top-most floor item first", () => {
+  const world = new World({ seed: 555 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 4, y: 7 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+
+  const first = makeItem(world, { identity: "torch", name: "Torch", x: 4, y: 7 });
+  const second = makeItem(world, { identity: "ration", name: "Ration", x: 4, y: 7 });
+
+  const { buildGroundPickupDetailAt } = installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  const detail = buildGroundPickupDetailAt(player, 4, 7);
+  assert(detail, "expected ground pickup detail");
+  assertEquals(detail.mode, "stack");
+  assertEquals(detail.stackIndex, 0);
+  assertEquals(Array.isArray(detail.items) ? detail.items.length : 0, 2);
+  assertEquals(detail.items.map((it) => Number(it?.id || 0)), [first, second]);
+});
+
+Deno.test("ground pickup detail keeps chest tooltip in multi mode", () => {
+  const world = new World({ seed: 556 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 9, y: 3 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+
+  const chest = world.create();
+  world.add(chest, NamedIdentity, { identity: "chest", name: "Chest" });
+  world.add(chest, Position, { x: 9, y: 3 });
+  world.add(chest, Inventory, { items: [], capacity: 10 });
+
+  const chestItem = makeItem(world, { identity: "potion_heal", name: "Healing Potion", type: "potion" });
+  world.get(chest, Inventory).items.push(chestItem);
+
+  const floorItem = makeItem(world, { identity: "rope", name: "Rope", x: 9, y: 3 });
+  assert(floorItem > 0);
+
+  const { buildGroundPickupDetailAt } = installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  const detail = buildGroundPickupDetailAt(player, 9, 3);
+  assert(detail, "expected ground pickup detail");
+  assertEquals(detail.mode, "multi");
+  assertEquals(detail.fromChest, true);
+  assertEquals(Number(detail.chestId || 0), chest);
 });

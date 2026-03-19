@@ -94,7 +94,7 @@ Deno.test("InputManager: touch tap emits tap-move action", () => {
 Deno.test("InputManager: Z gesture emits active-spell cast action", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
-  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'gesture' });
   const actions = [];
   const hints = [];
   const off = mgr.onAction((a) => actions.push(a));
@@ -127,7 +127,7 @@ Deno.test("InputManager: Z gesture emits active-spell cast action", () => {
 Deno.test("InputManager: Z gesture stays generic cast regardless of active spell label", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
-  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'gesture' });
   const actions = [];
   const off = mgr.onAction((a) => actions.push(a));
   try {

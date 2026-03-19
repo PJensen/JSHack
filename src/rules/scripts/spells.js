@@ -1238,7 +1238,7 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
       if (!hasLOS(epos.x | 0, epos.y | 0, target.x | 0, target.y | 0, isBlocked)) continue;
       const curVision = getEffectiveVisionRange(world, eid);
       const rampOut = (world.rand() < 0.5) ? 2 : 3;
-      blind(world, eid, Math.max(1, curVision - 2), 0, 0, rampOut);
+      blind(world, eid, Math.max(1, curVision - 2), 0, 0, rampOut, undefined, eid === target.id ? { stack: true } : {});
       if (world.has(eid, Player)) playerDazzled = true;
     }
     if (playerDazzled) {

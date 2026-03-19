@@ -3,6 +3,19 @@ const DEITY_UI_WIRING_INSTALLED = Symbol.for("jshack:display:deityUiWiring:insta
 export function installDeityUiWiring(world, { log }) {
   if (!world || typeof log !== "function" || world[DEITY_UI_WIRING_INSTALLED]) return;
   world[DEITY_UI_WIRING_INSTALLED] = true;
+  let favoredDeityId = "";
+
+  const syncFavoredFromPayload = (payload) => {
+    const did = String(payload?.deityId || "");
+    if (did) favoredDeityId = did;
+  };
+
+  const shouldShow = (payload) => {
+    const did = String(payload?.deityId || "");
+    if (!did) return true;
+    if (!favoredDeityId) return true;
+    return did === favoredDeityId;
+  };
 
   /** Helper to log deity messages with type */
   const logDeity = (text) => {
@@ -16,11 +29,23 @@ export function installDeityUiWiring(world, { log }) {
     }
   };
 
-  world.on("deity:miracle", ({ message }) => {
+  world.on("prayer:insight", (payload) => {
+    syncFavoredFromPayload(payload);
+  });
+
+  world.on("deity:patronShift", (payload) => {
+    syncFavoredFromPayload(payload);
+  });
+
+  world.on("deity:miracle", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { message } = payload || {};
     if (message) logDeity(message);
   });
 
-  world.on("deity:wrath", ({ deityName, damage, cursed, severityScale }) => {
+  world.on("deity:wrath", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { deityName, damage, cursed, severityScale } = payload || {};
     const scale = Number(severityScale || 1);
     if (scale > 1.05) {
       logDeity(`${deityName}'s WRATH crashes down with amplified fury! (-${damage} HP)`);
@@ -30,7 +55,9 @@ export function installDeityUiWiring(world, { log }) {
     if (cursed) logDeity(`You feel ${deityName}'s curse upon you!`);
   });
 
-  world.on("deity:offense", ({ deityName, offense, victimName, corpseName }) => {
+  world.on("deity:offense", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { deityName, offense, victimName, corpseName } = payload || {};
     if (offense === "pet_murder") {
       logDeity(`${deityName} is horrified that you slew ${victimName || "your companion"}.`);
       return;
@@ -42,15 +69,21 @@ export function installDeityUiWiring(world, { log }) {
     logDeity(`${deityName} condemns your sacrilege.`);
   });
 
-  world.on("deity:demand", ({ deityName }) => {
+  world.on("deity:demand", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { deityName } = payload || {};
     logDeity(`${deityName} hungers for an offering!`);
   });
 
-  world.on("deity:omen", ({ deityName }) => {
+  world.on("deity:omen", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { deityName } = payload || {};
     logDeity(`The air around ${deityName}'s altar shimmers with foreboding.`);
   });
 
-  world.on("deity:moodShift", ({ deityName, to }) => {
+  world.on("deity:moodShift", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { deityName, to } = payload || {};
     const labels = {
       wrath: "wrathful",
       serenity: "serene",
@@ -62,7 +95,9 @@ export function installDeityUiWiring(world, { log }) {
     logDeity(`${deityName} grows ${labels[to] || to}.`);
   });
 
-  world.on("deity:utterance", ({ deityName, dominant }) => {
+  world.on("deity:utterance", (payload) => {
+    if (!shouldShow(payload)) return;
+    const { deityName, dominant } = payload || {};
     const lines = {
       wrath: `"More blood!" bellows ${deityName}.`,
       serenity: `"You serve well," whispers ${deityName}.`,

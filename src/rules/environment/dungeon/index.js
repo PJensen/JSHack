@@ -42,6 +42,7 @@ import { ensureCalendarState } from '../../utils/calendarState.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { generateOverworldChunks } from './overworld.js';
 import { WeatherState } from '../../components/WeatherState.js';
+import { getCachedHighscores } from '../../../shared/tombstoneApi.js';
 
 /**
  * Generate all chunks for a floor and materialize everything at once.
@@ -60,6 +61,78 @@ import { WeatherState } from '../../components/WeatherState.js';
 export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null) {
   if (depth === 0) {
     const ow = generateOverworldChunks(worldSeed);
+
+    // Church graveyard epitaph source priority:
+    // 1) Pin top 5 global highscores in rank order to the five church graves.
+    // 2) If globals are shallow/missing, top up remaining graves from local tombstones.
+    if (tombstoneRepo) {
+      const graveSpawns = [];
+      for (const chunkData of ow.chunks) {
+        const chunkSpawns = Array.isArray(chunkData?.spawns) ? chunkData.spawns : [];
+        for (const spawn of chunkSpawns) {
+          if (spawn?.kind === 'grave_tombstone') graveSpawns.push(spawn);
+        }
+      }
+
+      if (graveSpawns.length > 0) {
+        // Deterministic slot order: south row left→right, then north row left→right.
+        graveSpawns.sort((a, b) => {
+          const ay = Number(a?.y || 0) | 0;
+          const by = Number(b?.y || 0) | 0;
+          if (ay !== by) return by - ay;
+          const ax = Number(a?.x || 0) | 0;
+          const bx = Number(b?.x || 0) | 0;
+          return ax - bx;
+        });
+
+        const graveRng = createRng(((worldSeed >>> 0) ^ 0x47524156) >>> 0);
+        const records = [];
+
+        const highscores = getCachedHighscores();
+        const maxGlobalPinned = Math.min(5, graveSpawns.length);
+        if (Array.isArray(highscores) && highscores.length > 0) {
+          const top = highscores.slice(0, maxGlobalPinned);
+          for (let i = 0; i < top.length; i++) {
+            const entry = top[i];
+            records.push({
+              id: `church_global_rank_${i + 1}`,
+              depth: 0,
+              cause: 'highscore',
+              killerName: null,
+              killerIdentity: null,
+              timestamp: 0,
+              turn: 0,
+              playerName: String(entry?.playerName || 'Hero'),
+              className: String(entry?.className || ''),
+              score: Math.max(0, Number(entry?.score || 0) | 0),
+              rank: i + 1,
+            });
+          }
+        }
+
+        if (records.length < graveSpawns.length) {
+          const fallbackPool = Array.isArray(tombstoneRepo.getAll?.()) ? tombstoneRepo.getAll() : [];
+          const shuffled = [...fallbackPool];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(graveRng.next() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          for (const rec of shuffled) {
+            if (records.length >= graveSpawns.length) break;
+            const duplicate = records.some((r) => String(r?.id || '') === String(rec?.id || ''));
+            if (!duplicate) records.push(rec);
+          }
+        }
+
+        for (let i = 0; i < graveSpawns.length; i++) {
+          const data = records[i] || null;
+          const spawn = graveSpawns[i];
+          spawn.params = { ...(spawn.params || {}) };
+          if (data) spawn.params.tombstoneData = data;
+        }
+      }
+    }
+
     const totalChunks = ow.chunks.length;
     let processedChunks = 0;
 

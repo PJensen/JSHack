@@ -35,6 +35,7 @@ Deno.test("death share wiring dispatches ui:playerDied with share URL", () => {
   globalThis.addEventListener("ui:playerDied", onDied);
   try {
     world.emit("died", { id: playerId, killer: killerId, cause: "melee" });
+    world.emit("postMortemComplete");
   } finally {
     globalThis.removeEventListener("ui:playerDied", onDied);
   }
@@ -73,6 +74,7 @@ Deno.test("death share wiring installs once per world", () => {
   globalThis.addEventListener("ui:playerDied", onDied);
   try {
     world.emit("died", { id: playerId, cause: "trap" });
+    world.emit("postMortemComplete");
   } finally {
     globalThis.removeEventListener("ui:playerDied", onDied);
   }

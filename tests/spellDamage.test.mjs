@@ -35,7 +35,7 @@ function makeCaster(world, {
   world.add(id, Position, { x, y });
   world.add(id, Brain, { learnedSpellIds: [], intelligence });
   world.add(id, Equipment, { critChanceDerived, critMultDerived, spellHitDerived });
-  world.add(id, Faction, { key: "player" });
+  world.add(id, Faction, { key: "stone_taunter" });
   world.add(id, Vitality, { hp: 30, maxHp: 30 });
   return id;
 }

@@ -4,13 +4,13 @@ import { Player } from '../src/rules/components/Player.js';
 import { Position } from '../src/rules/components/Position.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
-import { Inventory } from '../src/rules/components/Inventory.js';
 import { PickupIntent } from '../src/rules/components/Intents/PickupIntent.js';
 import { DropIntent } from '../src/rules/components/Intents/DropIntent.js';
 import { itemPickupSystem } from '../src/rules/systems/itemPickupSystem.js';
 import { itemDropSystem } from '../src/rules/systems/itemDropSystem.js';
 import { createPlayer } from '../src/rules/archetypes/Player.js';
-import { inventoryItems } from '../src/rules/utils/inventoryFacade.js';
+import { addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
+import { itemsAt } from '../src/rules/utils/queries.js';
 
 function scheduler(world) {
   try { itemPickupSystem(world); } catch (e) { console.error('pickup system error', e); }
@@ -73,4 +73,26 @@ Deno.test("inventory: pickup, virtual stacking, capacity denial, and drop", () =
   world.add(player, PickupIntent, { targetId: c });
   world.tick(1);
   assert(inventoryItems(world, player).length === 2, 'mismatch no-op');
+});
+
+Deno.test("inventory: dropped item becomes top of ground stack", () => {
+  const world = new World({ seed: 84 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { x: 5, y: 6, capacity: 10, weightLimit: 99 });
+  const pos = world.get(player, Position);
+
+  const existingGround = makeItem(world, { name: 'Old Rock', identity: 'old_rock', weight: 1, count: 1, x: pos.x, y: pos.y });
+  const invItem = world.create();
+  world.add(invItem, NamedIdentity, { name: 'Health Potion', identity: 'potion_health' });
+  world.add(invItem, ItemInfo, { type: 'potion', slot: '', weight: 1, value: 0, description: '', count: 1 });
+  addToInventory(world, player, invItem);
+
+  world.add(player, DropIntent, { itemId: invItem, count: 1 });
+  world.tick(1);
+
+  const onTile = itemsAt(world, pos.x, pos.y);
+  assert(onTile.length >= 2, 'expected at least two items on ground tile');
+  assert(onTile[0] === invItem, 'most recently dropped item should be on top of ground stack');
+  assert(onTile.includes(existingGround), 'existing ground item should remain on tile');
 });

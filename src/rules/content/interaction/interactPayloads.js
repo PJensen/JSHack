@@ -31,15 +31,13 @@ import { ShopInventory } from "../../components/ShopInventory.js";
 import { HarvestNode } from "../../components/HarvestNode.js";
 import { GrowthStage } from "../../components/GrowthStage.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
-import { Equipment } from "../../components/Equipment.js";
+import { Equipment, GEAR_SLOTS } from "../../components/Equipment.js";
 import { Position } from "../../components/Position.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { Beatitude } from "../../components/Beatitude.js";
 import { Owner } from "../../components/Owner.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
-import { DistrictProfile } from "../../components/DistrictProfile.js";
-import { DistrictState } from "../../components/DistrictState.js";
 import { DungeonState } from "../../components/DungeonState.js";
 import TombstoneComponent from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
@@ -75,10 +73,7 @@ import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
-import {
-  getDistrictBulletinVirtual,
-  getPlayerOpportunityViewVirtual,
-} from "../../utils/townInterpretationVirtuals.js";
+import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -417,26 +412,13 @@ export const INTERACT_PAYLOADS = {
   readTownBulletin: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
-      const districtBulletinVirtual = getDistrictBulletinVirtual(world);
-      const playerOpportunityVirtual = getPlayerOpportunityViewVirtual(world);
-      const districts = [];
-      for (const [districtId] of world.query(DistrictProfile, DistrictState)) {
-        const bulletin = districtBulletinVirtual
-          ? world.vget(districtId, districtBulletinVirtual)
-          : null;
-        if (bulletin) districts.push(bulletin);
-      }
-      districts.sort((a, b) =>
-        String(a?.label || "").localeCompare(String(b?.label || ""))
-      );
-      const opportunityView = playerOpportunityVirtual
-        ? world.vget(actor, playerOpportunityVirtual)
-        : null;
+      const board = buildNoticeBoardPayload(world, actor);
       world.emit?.("town:bulletinBoard", {
         actor,
         targetId,
-        districts,
-        opportunityView,
+        districts: board.districts,
+        opportunityView: board.opportunityView,
+        questBoard: board.questBoard,
       });
     },
   },
@@ -891,9 +873,12 @@ export const INTERACT_PAYLOADS = {
 
       // Phase 1 — collect offerable items and prompt the UI.
       const offerableItems = [];
+      const eq = world.get(actor, Equipment);
       for (const iid of inventoryItems(world, actor)) {
         if (!world.isAlive(iid)) continue;
         if (!world.get(iid, ItemInfo)) continue;
+        // Skip equipped items — player must unequip first.
+        if (eq && GEAR_SLOTS.some(s => eq[s] === iid)) continue;
         offerableItems.push(iid);
       }
       world.emit?.("altar:offerPrompt", {
@@ -1211,7 +1196,24 @@ export const INTERACT_PAYLOADS = {
   clearWeb: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
+      const targetPos = world.get(targetId, Position);
       world.emit?.("web:cleared", { actor, targetId });
+
+      if (targetPos) {
+        const toDestroy = [];
+        for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
+          if (ni?.identity !== "web") continue;
+          if (pos.x !== targetPos.x || pos.y !== targetPos.y) continue;
+          toDestroy.push(id);
+        }
+        for (let i = 0; i < toDestroy.length; i++) {
+          try {
+            world.destroy(toDestroy[i]);
+          } catch {}
+        }
+        return;
+      }
+
       try {
         world.destroy(targetId);
       } catch {}
@@ -1344,6 +1346,16 @@ function _altarExecuteOffer(world, actor, targetId, itemId) {
       targetId,
       itemId,
       reason: "not_owned",
+    });
+    return;
+  }
+  const eq = world.get(actor, Equipment);
+  if (eq && GEAR_SLOTS.some(s => eq[s] === itemId)) {
+    world.emit?.("altar:offerFailed", {
+      actor,
+      targetId,
+      itemId,
+      reason: "equipped",
     });
     return;
   }

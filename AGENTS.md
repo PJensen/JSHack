@@ -652,6 +652,75 @@ This creates a permanent guard against regression.
 
 ---
 
+## ⚠️ Agentic test gravity wells (read before fixing red tests)
+
+Tests are not purely protective in an agentic loop.
+
+When a test fails, an agent does **not** automatically understand the product intent behind recent feature changes. It only sees a red suite and a reward signal for green. That creates a dangerous failure mode:
+
+- The agent can "fix" failures by restoring old behavior.
+- The suite goes green.
+- The project silently moves backward.
+
+In plain English: an agent can unmake the future to satisfy the past.
+
+### Why this matters in JSHack
+
+JSHack evolves quickly. Content, schedules, spawn rules, and interaction contracts move often. Old tests can become stale while still looking authoritative. If an agent treats stale tests as ground truth, it may:
+
+- Revert intentional gameplay changes.
+- Reintroduce older constants/positions just to satisfy brittle assertions.
+- Strip new pathways because they are not represented in legacy tests.
+
+### Non-negotiable policy
+
+When test failures appear after feature work:
+
+1. **Treat intent as source of truth, not prior assertions.**
+2. **Do not revert feature semantics without explicit human instruction.**
+3. **Update tests to current intended behavior when intent changed.**
+4. **Only then fix code defects relative to that updated intent.**
+
+### Required red-suite triage workflow (agents must follow)
+
+1. **Classify each failure**
+  - A) stale test expectation
+  - B) real implementation bug
+  - C) ambiguous (needs human decision)
+
+2. **State intended behavior first**
+  - Write 1-2 sentences describing what should happen now.
+  - If unclear, ask before editing runtime logic.
+
+3. **Prefer invariant tests over snapshot tests**
+  - Good: reachability, bounded counts, canonical-path parity, determinism, layer boundaries.
+  - Weak: decorative exact coordinates, tautologies (`>= 0`), trivial existence-only checks with no behavioral consequence.
+
+4. **Protect newness explicitly**
+  - Add/update tests that encode the new feature contract.
+  - Remove or rewrite tests that enforce superseded behavior.
+
+5. **Audit for backwards fixes before concluding**
+  - If a change made tests green by narrowing capability, rolling back data, or removing pathways, stop and flag it.
+
+### PR/commit review trigger words
+
+If a commit message or diff indicates "fix failing tests," reviewers must check for semantic regression, not just pass/fail:
+
+- Did runtime change to old constants/positions/weights solely to satisfy tests?
+- Were assertions weakened instead of clarified?
+- Were new feature pathways removed without product decision?
+
+Green is not success unless intent is preserved.
+
+### Fast rule for future agents
+
+Use this exact heuristic:
+
+> "When tests fail after feature changes, do not drag runtime behavior backward to satisfy legacy tests. First align tests with intended behavior, then fix true defects against that intent."
+
+---
+
 ## Performance & profiling
 
 ### Rules profiling
@@ -1139,6 +1208,7 @@ if (!world[INSTALLED]) {
 - [ ] No DOM/window/rAF references in `rules/`
 - [ ] Canonical-path parity preserved (no one-off spawn/cast/apply bypasses)
 - [ ] Alternate entry points delegate to canonical utilities or have parity tests
+- [ ] Red-suite triage completed: stale tests updated to current intent; no runtime rollback made only to satisfy legacy assertions
 - [ ] Works on mobile with touch (test on phone or DevTools mobile sim)
 - [ ] All new systems have tests (Deno tests, not Node)
 - [ ] Commit messages are descriptive
@@ -1210,6 +1280,7 @@ if (!world[INSTALLED]) {
 11. **One system per session.** Small, tested, incremental commits.
 12. **Commit messages matter.** Single letters are a warning sign.
 13. **Remember the history.** This project has burned twice. Learn from it.
+14. **Red tests are not automatic truth.** Do not regress runtime behavior to satisfy stale tests; align tests to current intent first.
 
 ### Decision checklist
 

@@ -85,6 +85,39 @@ Deno.test("inventory survives TWO round-trips (the zombie hierarchy bug)", () =>
   assert(inv.length === 3, `after 2nd ascent: expected 3 items, got ${inv.length}`);
 });
 
+Deno.test("floor-picked items survive transition (not destroyed with floor entities)", () => {
+  const { world, pid, items } = setup();
+
+  // Descend to dungeon depth 1
+  transitionToDepth(world, 1, { x: 5, y: 5 });
+
+  // Simulate picking up a floor item: create an item, register it in floorEntityIds,
+  // then add it to the player's inventory (same as itemPickupSystem does).
+  const floorItemId = world.create();
+  world.add(floorItemId, ItemInfo, { count: 1, weight: 1 });
+  world.add(floorItemId, NamedIdentity, { name: 'cave_mushroom', identity: 'cave_mushroom' });
+  world.add(floorItemId, Position, { x: 5, y: 5 });
+  // Register in floorEntityIds as the real system would
+  const [, ds] = [...world.query(DungeonState)][0];
+  ds.floorEntityIds.push(floorItemId);
+  // Pick it up (removes Position, re-parents to inventory)
+  addToInventory(world, pid, floorItemId, { silent: true });
+
+  // Transition to depth 2 — this destroys depth 1 floor, including floorItemId
+  transitionToDepth(world, 2, { x: 5, y: 5 });
+
+  assert(world.isAlive(floorItemId), `floor-picked item should survive transition to depth 2`);
+  const inv = inventoryItems(world, pid);
+  assert(inv.length === 4, `expected 4 items after picking up floor item, got ${inv.length}`);
+
+  // Ascend back — this is the exact scenario the user reported
+  transitionToDepth(world, 1, { x: 5, y: 5 });
+
+  assert(world.isAlive(floorItemId), `floor-picked item should survive return to depth 1`);
+  const inv2 = inventoryItems(world, pid);
+  assert(inv2.length === 4, `inventory should still have 4 items on return, got ${inv2.length}`);
+});
+
 Deno.test("equipment references survive two round-trips", () => {
   const { world, pid, items } = setup();
 

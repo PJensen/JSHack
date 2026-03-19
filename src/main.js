@@ -135,7 +135,12 @@ import { installPluralizationExtensions } from "./shared/utils/pluralization.js"
 import { pickRandomSeed } from "./shared/utils/funSeeds.js";
 import { ensureStarterQuests } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
-import { postCharacterCreated } from "./shared/tombstoneApi.js";
+import {
+  acceptNoticeBoardOffer,
+  buildNoticeBoardPayload,
+  ensureLocalGeneratedQuest,
+} from "./rules/quests/localGenerator.js";
+import { postCharacterCreated, getHighscores } from "./shared/tombstoneApi.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -263,6 +268,9 @@ if (_pendingSavegame) {
 const tombstoneRepo = new TombstoneRepository();
 installTombstoneDeathListener(world, tombstoneRepo);
 installDeathShareWiring({ world });
+// Fire-and-forget: warm the highscores cache as early as possible so dungeon
+// generation (synchronous, below) has the best chance of finding it populated.
+getHighscores().catch(() => {});
 bootAdvance("Installed run listeners");
 
 // Warm data registries with per-dataset progress callbacks.
@@ -1001,13 +1009,15 @@ function _finalizeNewGame(classData) {
       const dev = world.get(pe.id, Devotion);
       const deityId = String(dev?.deityId || classDef?.deityId || chosenDeityId || "");
       if (deityId) {
-        if (!dev) world.add(pe.id, Devotion, { deityId });
+        if (!dev) world.add(pe.id, Devotion, { deityId, pantheon: true });
+        else if (dev?.pantheon == null) dev.pantheon = true;
         initDeity(deityId, world);
       }
     }
   }
 
   ensureStarterQuests(world);
+  ensureLocalGeneratedQuest(world);
   ensureStarterFetchQuestItem(world);
 
   bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
@@ -1115,26 +1125,29 @@ const inputDisposers = [];
           break;
         }
 
-        // Gather items at player's position. Open chooser only when there are >1 items.
+        // Gather items at player's position and pick the top-most item.
         const ids = itemsAt(world, p.pos.x, p.pos.y);
         if (ids.length === 0) {
           break;
         }
-        if (ids.length === 1) {
-          const only = ids[0];
-          rulesHandler({ type: 'rules.pickupItem', payload: { itemId: only } });
-        } else {
-          const items = ids.map((id) => {
-            const info = world.get(id, ItemInfo);
-            return { id, type: info?.type || 'item', name: resolveItemDisplayName(world, id), count: info?.count || 1 };
-          });
-          window.dispatchEvent(new CustomEvent('ui:openPickupChooser', { detail: { items } }));
+        const top = ids[0];
+        if (top > 0) {
+          rulesHandler({ type: 'rules.pickupItem', payload: { itemId: top } });
         }
         break;
       }
       case "display.traverseStairs": {
         const p = playerEntity(world);
         if (!p) break;
+
+        // Contextual Enter behavior: pick up first (classic convenience),
+        // then traverse stairs when nothing is available to pick up.
+        const underfoot = itemsAt(world, p.pos.x, p.pos.y);
+        if (Array.isArray(underfoot) && underfoot.length > 0) {
+          rulesHandler({ type: 'rules.pickupItem', payload: {} });
+          break;
+        }
+
         const target = findNearestTraversalTarget(world, p.pos.x, p.pos.y);
         if (!target) break;
         if (target.identity === 'return_portal') {
@@ -2258,6 +2271,25 @@ addEventListener('ui:requestStairTraverse', (ev) => {
       targetId: stairId,
       direction
     });
+  }
+});
+
+addEventListener('ui:requestTownBoardAccept', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const offer = e?.detail?.offer;
+  const qid = acceptNoticeBoardOffer(world, pe.id, offer);
+  if (!(qid > 0)) return;
+
+  const payload = buildNoticeBoardPayload(world, pe.id);
+  try {
+    window.dispatchEvent(new CustomEvent('ui:townBoardData', { detail: payload }));
+  } catch (err) {
+    console.debug('[main] dispatch ui:townBoardData:', err);
   }
 });
 

@@ -54,7 +54,7 @@ Deno.test("frost: emits projectile delay matching travel time", () => {
   const events = [];
   world.on("spell:frost", (ev) => events.push(ev));
 
-  const caster = makeEntity(world, 2, 2, 20, "player");
+  const caster = makeEntity(world, 2, 2, 20, "stone_taunter");
   makeEntity(world, 6, 2, 20, "enemy");
 
   runSpellScript(world, caster, SPELL, {});
@@ -72,7 +72,7 @@ Deno.test("frost: publishes VFX event on miss and does not apply frost", () => {
   world.on("spell:frost", (ev) => frostEvents.push(ev));
   world.on("spell:miss", (ev) => missEvents.push(ev));
 
-  const caster = makeEntity(world, 2, 2, 20, "player");
+  const caster = makeEntity(world, 2, 2, 20, "stone_taunter");
   const target = makeEntity(world, 6, 2, 20, "enemy");
   world.get(target, Equipment).spellAvoidDerived = 200;
 

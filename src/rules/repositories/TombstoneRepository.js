@@ -1,4 +1,5 @@
 import { createStorageAdapter } from './storage/storageFactory.js';
+import { getCachedHighscores } from '../../shared/tombstoneApi.js';
 
 const STORAGE_PREFIX = 'jshack.tombstones.depth.';
 const MAX_TOMBSTONES_PER_DEPTH = 20; // Prevent unbounded growth
@@ -66,7 +67,81 @@ export class TombstoneRepository {
    * @returns {TombstoneRecord[]}
    */
   getRandomForDepth(depth, count, rng) {
-    const all = this.getByDepth(depth);
+    const targetCount = Math.max(0, Number(count || 0) | 0);
+    const highscores = getCachedHighscores();
+    if (Array.isArray(highscores) && highscores.length > 0) {
+      // Partition: depth-matching first (when API returns depth), then rest
+      const depthMatch = [];
+      const depthOther = [];
+      for (const entry of highscores) {
+        if (typeof entry?.depth === 'number' && entry.depth === depth) {
+          depthMatch.push(entry);
+        } else {
+          depthOther.push(entry);
+        }
+      }
+      // Shuffle each partition independently
+      for (const arr of [depthMatch, depthOther]) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(rng.next() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      }
+      // Depth-matching highscores first, then others as filler
+      const ordered = depthMatch.concat(depthOther);
+      const resolved = ordered.slice(0, targetCount).map((entry, idx) => ({
+        id: `global_${depth}_${idx}_${Math.max(0, Number(entry?.score || 0) | 0)}`,
+        depth,
+        cause: 'highscore',
+        deathCause: entry?.deathCause || null,
+        killerName: null,
+        killerIdentity: null,
+        timestamp: 0,
+        turn: 0,
+        playerName: String(entry?.playerName || 'Hero'),
+        className: String(entry?.className || ''),
+        score: Math.max(0, Number(entry?.score || 0) | 0),
+      }));
+
+      if (resolved.length >= targetCount) return resolved;
+
+      // Supplement with local tombstones (depth-specific, then cross-depth)
+      let localFallback = this.getByDepth(depth);
+      if (localFallback.length < (targetCount - resolved.length)) {
+        const crossDepth = this.getAll();
+        const seen = new Set(localFallback.map(r => r.id));
+        for (const rec of crossDepth) {
+          if (!seen.has(rec.id)) { localFallback.push(rec); seen.add(rec.id); }
+        }
+      }
+      if (localFallback.length <= 0) return resolved;
+      const shuffledLocal = [...localFallback];
+      for (let i = shuffledLocal.length - 1; i > 0; i--) {
+        const j = Math.floor(rng.next() * (i + 1));
+        [shuffledLocal[i], shuffledLocal[j]] = [shuffledLocal[j], shuffledLocal[i]];
+      }
+      for (const rec of shuffledLocal) {
+        if (resolved.length >= targetCount) break;
+        resolved.push(rec);
+      }
+      return resolved;
+    }
+
+    // Try depth-specific local tombstones first, then fall back to cross-depth pool
+    let all = this.getByDepth(depth);
+    if (all.length < targetCount) {
+      const crossDepth = this.getAll();
+      if (crossDepth.length > all.length) {
+        // Merge: depth-specific first, then others (deduped by id)
+        const seen = new Set(all.map(r => r.id));
+        for (const rec of crossDepth) {
+          if (!seen.has(rec.id)) {
+            all.push(rec);
+            seen.add(rec.id);
+          }
+        }
+      }
+    }
     if (all.length === 0) return [];
 
     // Fisher-Yates shuffle using provided RNG
@@ -76,7 +151,8 @@ export class TombstoneRepository {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
-    return shuffled.slice(0, count);
+    // Never return more unique records than exist — prevents duplicates across chunks
+    return shuffled.slice(0, Math.min(targetCount, shuffled.length));
   }
 
   /**

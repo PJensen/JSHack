@@ -1,6 +1,31 @@
 // display/ui/hud.js
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
+import { SPELL_DEFS } from '../../rules/data/spells.js';
+
+/**
+ * @template T
+ * @param {T[]} stack
+ * @returns {T|undefined}
+ */
+export function peekStackTop(stack) {
+  if (!Array.isArray(stack) || stack.length <= 0) return undefined;
+  return stack[stack.length - 1];
+}
+
+/**
+ * @template T
+ * @param {T[]} stack
+ * @param {(entry: T) => boolean} isActionable
+ */
+export function popUntilActionableTop(stack, isActionable) {
+  if (!Array.isArray(stack)) return;
+  while (stack.length > 0) {
+    const top = stack[stack.length - 1];
+    if (isActionable(top)) break;
+    stack.pop();
+  }
+}
 
 export function initHUD() {
   const root = ensureRoot();
@@ -824,7 +849,8 @@ function ensureEffectsStack(container) {
       const turns = Math.max(0, Number(s.turns || 0));
       const stacks = Math.max(1, Number(s.stacks || 1));
       const masked = !!s.masked;
-      const spec = masked ? MASKED_SPEC : (VIS[key] || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
+      const _spell = !masked && !VIS[key] ? SPELL_DEFS[key] : null;
+      const spec = masked ? MASKED_SPEC : (VIS[key] || (_spell?.symbol ? { name: _spell.name, glyph: _spell.symbol, hue: 210 } : null) || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
       let rec = byKey.get(key);
       if (!rec) {
         const { el, overlay, ticksEl, stacksEl } = createBadge(spec, turns || 1);
@@ -867,7 +893,7 @@ function ensureRoot() {
   return root;
 }
 
-// --- Singular Quick Slot (most recent pickup) -----------------------------
+// --- Singular Quick Slot (LIFO, most recent pickup first) -----------------
 function createQuickSlot() {
   const el = document.createElement('div');
   Object.assign(el.style, {
@@ -899,7 +925,7 @@ function createQuickSlot() {
     if (dismissTimer) clearTimeout(dismissTimer);
     if (stack.length === 0) return;
     dismissTimer = setTimeout(() => {
-      stack.shift();
+      stack.pop();
       renderStack();
       resetDismissTimer();
     }, AUTO_DISMISS_MS);
@@ -907,9 +933,8 @@ function createQuickSlot() {
 
   function renderStack() {
     el.innerHTML = '';
-    // Drain non-actionable items from the front, then peek at the top
-    while (stack.length > 0 && !actionable(stack[0])) stack.shift();
-    const it = stack[0];
+    popUntilActionableTop(stack, actionable);
+    const it = peekStackTop(stack);
     if (!it) return;
     const chip = renderQuickChip(it, {
       onUse: () => dispatchAction(it),
@@ -936,7 +961,7 @@ function createQuickSlot() {
   }
 
   function dismissTop() {
-    stack.shift();
+    stack.pop();
     renderStack();
     resetDismissTimer();
   }
@@ -961,7 +986,8 @@ function createQuickSlot() {
       glyphColor: String(item.glyphColor || ''),
       addedAt: Date.now()
     });
-    console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[0]:', stack[0] ? actionable(stack[0]) : 'empty');
+    const top = peekStackTop(stack);
+    console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[top]:', top ? actionable(top) : 'empty');
     renderStack();
     resetDismissTimer();
   });

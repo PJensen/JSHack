@@ -3,7 +3,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getMonster } from "../data/monsters.js";
 import { CombatCallbackContext } from "../data/callbacks/combat.js";
 import { runCallbackList } from "../interaction/dispatch.js";
-import { degradeFloorMemory } from "../environment/dungeon/transition.js";
+import { degradeFloorMemory } from "../environment/dungeon/floorMemory.js";
 
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world

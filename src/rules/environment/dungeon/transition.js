@@ -10,7 +10,8 @@ import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Flying } from '../../components/Flying.js';
 import { clearAll as clearTileMap, setTile } from './tileMap.js';
-import { clearExplored, saveExplored, restoreExplored, degradeExplored } from './exploredMap.js';
+import { clearExplored, saveExplored, restoreExplored } from './exploredMap.js';
+import { _exploredCache } from './floorMemory.js';
 import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
@@ -18,8 +19,6 @@ import { normalizeInventorySnapshot } from '../../utils/inventorySnapshotMigrati
 import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
 import { destroySubtree, Parent, Sibling, children } from '../../../lib/ecs-js/hierarchy.js';
 
-/** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
-const _exploredCache = new Map();
 /** @type {Map<number, { snapshot: any, order: number[] }>} floor entity snapshots keyed by depth */
 const _floorEntityCache = new Map();
 
@@ -119,27 +118,30 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   // Save explored map for the current floor before clearing
   const currentDepth = ds ? ds.currentDepth : 0;
+
+  // Build the permanent-entity set once and reuse it for both snapshot saving
+  // and the destroy phase. This prevents picked-up floor items (whose entity IDs
+  // remain in floorEntityIds after pickup) from being destroyed on transition.
+  const _permanentIds = new Set();
+  for (const [id] of world.query(Player)) _permanentIds.add(id);
+  for (const [id] of world.query(Pet)) _permanentIds.add(id);
+  for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
+  // Walk full hierarchy: InventoryRoot, inventory items, equipment, etc.
+  for (const root of [..._permanentIds]) {
+    const stack = [root];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const cid of children(world, cur)) {
+        if (!_permanentIds.has(cid)) { _permanentIds.add(cid); stack.push(cid); }
+      }
+    }
+  }
+
   if (ds && Array.isArray(ds.floorEntityIds)) {
     if (currentDepth > 0) _exploredCache.set(currentDepth, saveExplored());
     // Capture ALL non-permanent alive entities so that chest inventory items
     // (no Position, not in floorEntityIds) and runtime-spawned monsters are
     // included in the snapshot.
-    const _permanentIds = new Set();
-    for (const [id] of world.query(Player)) _permanentIds.add(id);
-    for (const [id] of world.query(Pet)) _permanentIds.add(id);
-    for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
-    // Also exclude hierarchy descendants (InventoryRoot, inventory items, etc.)
-    // so they are never included in the floor snapshot. Without this, restored
-    // zombie copies corrupt the player's Parent linked-list on later transitions.
-    for (const root of [..._permanentIds]) {
-      const stack = [root];
-      while (stack.length) {
-        const cur = stack.pop();
-        for (const cid of children(world, cur)) {
-          if (!_permanentIds.has(cid)) { _permanentIds.add(cid); stack.push(cid); }
-        }
-      }
-    }
     const floorIds = Array.from(world.alive)
       .filter(id => Number.isInteger(id) && id > 0 && !_permanentIds.has(id));
     const entry = {
@@ -153,8 +155,11 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
 
   // Destroy all entities from the current floor (destroySubtree cascades to
   // hierarchy children, e.g. monsters spawned at runtime by spawner nests).
+  // Skip any entity that is now part of the player's permanent hierarchy
+  // (e.g. floor items that were picked up — their IDs remain in floorEntityIds).
   if (ds && Array.isArray(ds.floorEntityIds)) {
     for (const eid of ds.floorEntityIds) {
+      if (_permanentIds.has(eid)) continue;
       try { destroySubtree(world, eid); } catch (_) { /* already gone */ }
     }
   }
@@ -164,7 +169,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // sarcophagus skeletons, loot drops, etc. The player, DungeonState,
   // and pet entities are permanent and must be preserved.
   for (const [eid] of world.query(Position)) {
-    if (world.has(eid, Player) || world.has(eid, DungeonState) || world.has(eid, Pet)) continue;
+    if (_permanentIds.has(eid)) continue;
     try { if (world.isAlive(eid)) destroySubtree(world, eid); } catch (_) {}
   }
 
@@ -351,37 +356,5 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   }
 }
 
-/**
- * Degrade explored memory on a random floor (current or any cached).
- * Each explored tile on the chosen floor has `fraction` chance of being forgotten.
- *
- * @param {() => number} rngFn - returns float in [0,1)
- * @param {{fraction?: number}} [opts]
- * @returns {{depth: number, fraction: number}} which floor was hit
- */
-export function degradeFloorMemory(rngFn, opts = {}) {
-  const fraction = Math.max(0, Math.min(1, opts.fraction ?? 0.3));
-
-  // Candidates: every cached depth + 0 as sentinel for "current floor"
-  const candidates = [..._exploredCache.keys(), 0];
-  const pick = candidates[Math.floor(rngFn() * candidates.length)];
-
-  if (pick === 0) {
-    // Degrade the live explored map (current floor)
-    degradeExplored(fraction, rngFn);
-    return { depth: 0, fraction };
-  }
-
-  // Degrade a cached floor's snapshot in place
-  const snap = _exploredCache.get(pick);
-  if (snap) {
-    for (const chunk of snap.values()) {
-      for (let i = 0; i < chunk.length; i++) {
-        if (chunk[i] && rngFn() < fraction) {
-          chunk[i] = 0;
-        }
-      }
-    }
-  }
-  return { depth: pick, fraction };
-}
+// degradeFloorMemory moved to floorMemory.js to avoid circular imports.
+export { degradeFloorMemory } from './floorMemory.js';
