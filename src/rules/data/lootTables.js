@@ -432,18 +432,19 @@ export const LOOT_TABLES = {
   // 1-3 items; "nothing" entries model empty slots on the rack.
 
   "rack:weapons": {
-    rolls: { min: 1, max: 3 },
-    entries: [
-      { type: "nothing", weight: 20 },
-      { type: "equip",   weight: 25, pool: ["sword_plain"],   affixChance: 0 },
-      { type: "equip",   weight: 25, pool: ["dagger_quick"],  affixChance: 0 },
-      { type: "equip",   weight: 20, pool: ["axe_heavy"],     affixChance: 0 },
-      { type: "equip",   weight: 20, pool: ["bow_short"],     affixChance: 0 },
-      { type: "equip",   weight: 18, pool: ["iron_mace"],     affixChance: 0 },
-      { type: "equip",   weight: 15, pool: ["longsword"],     affixChance: 0 },
-      { type: "equip",   weight: 10, pool: ["iron_pickaxe"],  affixChance: 0 },
-    ],
-  },
+  rolls: { min: 1, max: 3 },
+  entries: [
+    { type: "nothing", weight: 15 },
+    { type: "equip",   weight: 25, pool: ["sword_plain"],   affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",   weight: 25, pool: ["dagger_quick"],  affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",   weight: 20, pool: ["axe_heavy"],     affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",   weight: 20, pool: ["bow_short"],     affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",   weight: 18, pool: ["iron_mace"],     affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",   weight: 15, pool: ["longsword"],     affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",   weight: 10, pool: ["iron_pickaxe"],  affixChance: 0.25, affixCountMax: 1 },
+    { type: "table",   weight: 5,  tableId: "sub:equip_magic" },
+  ],
+},
 
   "rack:weapons:magic": {
     rolls: { min: 1, max: 3 },
