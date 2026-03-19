@@ -336,22 +336,24 @@ export const LOOT_TABLES = {
   // ── Chest tables ──────────────────────────────────────────────────
   // Max 1 weapon per chest - equipment split into weapon vs armor/jewelry
 
-  "chest:basic": {
-    rolls: { min: 1, max: 2 },
-    entries: [
-      { type: "gold",      weight: 30, count: { base: 8, perDepth: 3 } },
-      { type: "table",     weight: 25, tableId: "sub:potions" },
-      { type: "equip",     weight: 12, pool: ["sword_plain", "dagger_quick", "bow_short"], affixChance: 0 },
-      { type: "equip",     weight: 12, pool: ["leather_armor", "helm_iron", "amulet_guarded", "belt_leather", "gloves_leather", "leggings_leather", "shield_wood"], affixChance: 0 },
-      { type: "equip",     weight: 6,  pool: ["sparking_knife", "smoldering_club", "chipped_fang"], affixChance: 0 },
-      { type: "archetype", weight: 12, archetype: "ArrowsStack" },
-      { type: "table",     weight: 15, tableId: "sub:scrolls" },
-      { type: "table",     weight: 18, tableId: "sub:spellbooks" },
-      { type: "table",     weight: 8,  tableId: "sub:wands" },
-      { type: "archetype", weight: 10, archetype: "Ration" },
-      { type: "gem",       weight: 5,  materials: ["gemstone", "glass"] },
-    ],
-  },
+"chest:basic": {
+  rolls: { min: 2, max: 3 },
+  entries: [
+    { type: "gold",      weight: 35, count: { base: 12, perDepth: 4 } },
+    { type: "table",     weight: 24, tableId: "sub:potions" },
+    { type: "equip",     weight: 14, pool: ["sword_plain", "dagger_quick", "bow_short"], affixChance: 0.25, affixCountMax: 1 },
+    { type: "equip",     weight: 12, pool: ["leather_armor", "helm_iron", "amulet_guarded", "belt_leather", "gloves_leather", "leggings_leather", "shield_wood"], affixChance: 0 },
+    { type: "table",     weight: 10, tableId: "sub:equip_early_proc" },
+    { type: "table",     weight: 10, tableId: "sub:equip_magic" },
+    { type: "table",     weight: 4,  tableId: "sub:equip_rare" },
+    { type: "archetype", weight: 12, archetype: "ArrowsStack" },
+    { type: "table",     weight: 16, tableId: "sub:scrolls" },
+    { type: "table",     weight: 8, tableId: "sub:spellbooks" },
+    { type: "table",     weight: 10, tableId: "sub:wands" },
+    { type: "archetype", weight: 10, archetype: "Ration" },
+    { type: "gem",       weight: 15,  materials: ["gemstone", "glass"] },
+  ],
+},
 
   "chest:magic": {
     rolls: { min: 2, max: 3 },
