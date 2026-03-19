@@ -140,7 +140,10 @@ export const basePalette = {
   townfolk_book_vendor: { glyph: "@", fg: "#d4a76a", glow: "#8b6914" },
 
   // Containers
-  chest: { glyph: "]", fg: "#c8a050", glow: "#a07830" },
+  chest:            { glyph: "]", fg: "#c8a050", glow: "#a07830" },
+  basic_chest:      { glyph: "]", fg: "#c8a050", glow: "#a07830" },
+  magic_chest:      { glyph: "]", fg: "#b070e8", glow: "#7030c0" },
+  legendary_chest:  { glyph: "]", fg: "#ffd040", glow: "#e08010" },
   mill_chest:      { glyph: "]", fg: "#d9b55a", glow: "#9f6c1d" },
   smithy_chest:    { glyph: "]", fg: "#caa27a", glow: "#8a5e34" },
   lumber_chest:    { glyph: "]", fg: "#b88752", glow: "#7c4f22" },

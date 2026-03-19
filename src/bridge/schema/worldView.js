@@ -537,6 +537,8 @@ export function buildWorldView(world) {
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
+			if (kind === 'legendary_chest') rec.tags.push('legendary_glowing');
+			if (kind === 'magic_chest') rec.tags.push('epic_glowing');
 
 			_allEntities.push(rec);
 
@@ -608,6 +610,8 @@ export function buildWorldView(world) {
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
+			if (kind === 'legendary_chest') rec.tags.push('legendary_glowing');
+			if (kind === 'magic_chest') rec.tags.push('epic_glowing');
 
 			_allEntities.push(rec);
 			if (isPlayer) {
