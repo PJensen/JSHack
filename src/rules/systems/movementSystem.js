@@ -30,6 +30,7 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { DoorState } from "../components/DoorState.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
+import { DungeonState } from "../components/DungeonState.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
@@ -40,6 +41,24 @@ function key(x, y) { return `${x},${y}`; }
 function hasIdentity(world, id, identity) {
   const ni = world.get(id, NamedIdentity);
   return String(ni?.identity || "").toLowerCase() === identity;
+}
+
+/** @param {any} world @param {number} x @param {number} y */
+function hasWebAt(world, x, y) {
+  for (const [, ni, pos] of world.query(NamedIdentity, Position)) {
+    if (ni?.identity === "web" && pos?.x === x && pos?.y === y) return true;
+  }
+  return false;
+}
+
+/** @param {any} world @param {number} entityId */
+function attachToCurrentFloor(world, entityId) {
+  if (!(entityId > 0)) return;
+  for (const [, ds] of world.query(DungeonState)) {
+    if (!ds || !Array.isArray(ds.floorEntityIds)) break;
+    if (!ds.floorEntityIds.includes(entityId)) ds.floorEntityIds.push(entityId);
+    break;
+  }
 }
 
 /** @param {any} world @param {import('../utils/tileQueryCache.js').TileQueryState} tiles @param {number} x @param {number} y */
@@ -90,7 +109,9 @@ export function installSpiderWebListener(world) {
           if (world.has(eid, DoorState)) { hasDoor = true; break; }
         }
         if (hasDoor) return;
-        createFrom(world, Web, { x: from.x, y: from.y });
+        if (hasWebAt(world, from.x, from.y)) return;
+        const webId = createFrom(world, Web, { x: from.x, y: from.y });
+        attachToCurrentFloor(world, webId);
       }
     } catch (e) {
       console.debug("[movementSystem] spider web spawn failed:", e);

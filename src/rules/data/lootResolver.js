@@ -9,6 +9,7 @@ import { getGem, pickGem, buildGemItemParams } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from './itemCatalogLoader.js';
 import { GoldStack, HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
+import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Brain } from '../components/Brain.js';
@@ -24,14 +25,11 @@ const ARCHETYPE_MAP = {
   GoldStack,
   ArrowsStack,
   ScrollOfMapping,
+  Ration,
+  IronRation,
+  WildBerries,
+  WildHerbs,
 };
-
-const CATALOG_ARCHETYPE_MAP = Object.freeze({
-  Ration: "food_ration",
-  IronRation: "food_iron_ration",
-  WildBerries: "food_wild_berries",
-  WildHerbs: "food_wild_herbs",
-});
 
 // ── Resolution ──────────────────────────────────────────────────────
 
@@ -53,9 +51,11 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
   const results = [];
   const rollCount = rng.int(table.rolls.min, table.rolls.max);
   
-  // Chest tables enforce max 1 weapon rule
+  // Chest tables enforce max 1 weapon rule globally (including nested table calls)
   const isChest = tableId.startsWith("chest:");
-  let weaponCount = 0;
+  // Share a mutable counter object across nested resolveLootTable calls so the
+  // weapon cap is respected even when the weapon comes from a sub-table.
+  const weaponRef = isChest ? { count: 0 } : (opts?._weaponRef || null);
 
   for (let r = 0; r < rollCount; r++) {
     const entry = weightedPick(table.entries, rng, opts);
@@ -80,12 +80,12 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
         const equipId = rng.choice(entry.pool);
         if (!equipId) break;
         
-        // Check weapon limit for chests
-        if (isChest) {
+        // Check weapon limit for chests (including when called from a nested table)
+        if (weaponRef) {
           const def = getCatalogItem(equipId);
           if (def && def.slot === "weapon") {
-            if (weaponCount >= 1) break; // Skip this weapon
-            weaponCount++;
+            if (weaponRef.count >= 1) break; // Skip this weapon
+            weaponRef.count++;
           }
         }
         
@@ -105,7 +105,8 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
       }
 
       case "table": {
-        const nested = resolveLootTable(entry.tableId, rng, depth, nest + 1, opts);
+        const nestedOpts = weaponRef ? { ...(opts || {}), _weaponRef: weaponRef } : opts;
+        const nested = resolveLootTable(entry.tableId, rng, depth, nest + 1, nestedOpts);
         results.push(...nested);
         break;
       }
@@ -234,14 +235,8 @@ export function materializeDrop(world, drop, pos) {
 
     case "archetype": {
       const arch = ARCHETYPE_MAP[drop.params.archetype];
-      let id = null;
-      if (arch) {
-        id = createFrom(world, arch, {});
-      } else {
-        const catalogId = CATALOG_ARCHETYPE_MAP[drop.params.archetype];
-        if (!catalogId) return null;
-        try { id = buildCatalogItem(world, catalogId); } catch { return null; }
-      }
+      if (!arch) return null;
+      const id = createFrom(world, arch, {});
       if (!(id > 0)) return null;
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;

@@ -14,6 +14,7 @@
 // since it depends on the entity's max HP.
 
 import { ActiveEffects } from '../components/ActiveEffects.js';
+import { Player } from '../components/Player.js';
 import { blind } from './blind.js';
 import { deafen } from './deafen.js';
 
@@ -59,8 +60,8 @@ export function applyElectrocuted(world, targetId) {
   // Instant deafness: full impairment, holds 2 turns, recovers over 6 turns
   deafen(world, id, 1.0, 0, 2, 6);
 
-  // Notify display layer for flashbang VFX
-  world.emit?.('electrocute:flash', { target: id });
+  // Notify display layer for flashbang VFX (include isPlayer so display doesn't need to import Player)
+  world.emit?.('electrocute:flash', { target: id, isPlayer: world.has(id, Player) });
 
   return true;
 }

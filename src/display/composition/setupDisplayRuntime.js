@@ -40,7 +40,7 @@ export function setupDisplayRuntime({
   const boltFx = createBoltFxController({ world, cam, fx, getPosition });
   boltFx.installListeners();
 
-  const delayedDeathFx = createDelayedDeathFxController({ world, getFxTime });
+  const delayedDeathFx = createDelayedDeathFxController({ world, getFxTime, getPosition });
   delayedDeathFx.installListeners();
 
   const projectileFx = createProjectileFxController({ world, cam, fx, getPosition });

@@ -10,7 +10,9 @@ export const Settings = defineComponent('Settings', {
   // Mobile-friendly default allows picking up adjacent tiles as well.
   pickupRange: 1,
   // When false, hunger counter freezes and no hunger effects apply.
-  hungerEnabled: true
+  hungerEnabled: true,
+  // When true, deity debug graph remains visible until changed in Settings UI.
+  deityDebugPinned: false
 }, {
   validate(rec) {
     /** @type {any} */
@@ -18,6 +20,8 @@ export const Settings = defineComponent('Settings', {
     if (typeof r.autoPickup !== 'boolean') throw new Error('Settings.autoPickup must be boolean');
     if (!Array.isArray(r.autoPickupKinds)) throw new Error('Settings.autoPickupKinds must be an array');
     if (!Number.isFinite(r.pickupRange) || r.pickupRange < 0) throw new Error('Settings.pickupRange must be a non-negative number');
+    if (typeof r.hungerEnabled !== 'boolean') throw new Error('Settings.hungerEnabled must be boolean');
+    if (typeof r.deityDebugPinned !== 'boolean') throw new Error('Settings.deityDebugPinned must be boolean');
     return true;
   }
 });

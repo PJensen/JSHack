@@ -143,6 +143,7 @@ export const basePalette = {
   chest:            { glyph: "]", fg: "#c8a050", glow: "#a07830" },
   basic_chest:      { glyph: "]", fg: "#c8a050", glow: "#a07830" },
   magic_chest:      { glyph: "]", fg: "#b070e8", glow: "#7030c0" },
+  epic_chest:       { glyph: "]", fg: "#d672ff", glow: "#9a42c7" },
   legendary_chest:  { glyph: "]", fg: "#ffd040", glow: "#e08010" },
   mill_chest:      { glyph: "]", fg: "#d9b55a", glow: "#9f6c1d" },
   smithy_chest:    { glyph: "]", fg: "#caa27a", glow: "#8a5e34" },

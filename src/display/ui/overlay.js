@@ -9,6 +9,7 @@ import { renderAnvil } from './anvilOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { versionLoaded } from '../../shared/version.js';
+import { getHighscores } from '../../shared/tombstoneApi.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import {
   readInputMode, readWalkSpeed, writeInputMode, writeWalkSpeed,
@@ -119,6 +120,7 @@ export function initOverlays() {
   const equip = ensurePanel('equipment');
   const settingsPanel = ensurePanel('settings');
   const questJournal = ensurePanel('quests');
+  const townBoard = ensurePanel('townBoard');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const usePanel = ensurePanel('use');
@@ -175,6 +177,25 @@ export function initOverlays() {
     unavailableMessage: 'No deity data',
   });
   debugGraphStack.appendChild(deityGraph.canvas);
+  let deityDebugPinned = false;
+
+  function showDeityGraph() {
+    hideTileInspector();
+    deityGraph.show();
+    deityGraph.startSampling();
+  }
+
+  function hideDeityGraph() {
+    deityGraph.hide();
+    deityGraph.stopSampling();
+  }
+
+  function applyDeityDebugPinned(enabled) {
+    deityDebugPinned = !!enabled;
+    if (deityDebugPinned) showDeityGraph();
+    else hideDeityGraph();
+  }
+
   const economyGraph = createDebugGraph({
     id: 'economy-graph-layer',
     title: 'Town Economy',
@@ -214,6 +235,7 @@ export function initOverlays() {
     hide(equip);
     hide(settingsPanel);
     hide(questJournal);
+    hide(townBoard);
     show(inv);
     // Request data from app; app will respond with ui:inventoryData
     window.dispatchEvent(new CustomEvent('ui:requestInventoryData', { detail: { slotFilter } }));
@@ -223,6 +245,7 @@ export function initOverlays() {
     hide(equip);
     hide(settingsPanel);
     hide(questJournal);
+    hide(townBoard);
     show(char);
     window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
   });
@@ -231,6 +254,7 @@ export function initOverlays() {
     hide(char);
     hide(settingsPanel);
     hide(questJournal);
+    hide(townBoard);
     show(equip);
     window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
   });
@@ -239,6 +263,7 @@ export function initOverlays() {
     hide(char);
     hide(equip);
     hide(questJournal);
+    hide(townBoard);
     show(settingsPanel);
     window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
   });
@@ -247,8 +272,17 @@ export function initOverlays() {
     hide(char);
     hide(equip);
     hide(settingsPanel);
+    hide(townBoard);
     show(questJournal);
     window.dispatchEvent(new CustomEvent('ui:requestQuestJournalData'));
+  });
+  window.addEventListener('ui:openTownBoard', () => {
+    hide(inv);
+    hide(char);
+    hide(equip);
+    hide(settingsPanel);
+    hide(questJournal);
+    show(townBoard);
   });
   // Toggle inventory panel open/close
   window.addEventListener('ui:toggleInventory', () => {
@@ -259,6 +293,7 @@ export function initOverlays() {
       hide(equip);
       hide(settingsPanel);
       hide(questJournal);
+      hide(townBoard);
       show(inv);
       (/** @type {any} */ (inv))._inventorySlotFilter = '';
       window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
@@ -272,6 +307,7 @@ export function initOverlays() {
       hide(equip);
       hide(settingsPanel);
       hide(questJournal);
+      hide(townBoard);
       show(char);
       window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
     }
@@ -284,6 +320,7 @@ export function initOverlays() {
       hide(char);
       hide(settingsPanel);
       hide(questJournal);
+      hide(townBoard);
       show(equip);
       window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
     }
@@ -296,12 +333,14 @@ export function initOverlays() {
       hide(char);
       hide(equip);
       hide(questJournal);
+      hide(townBoard);
       show(settingsPanel);
       window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
     }
   });
   window.addEventListener('ui:settingsData', (ev) => {
     const data = /** @type {CustomEvent} */ (ev).detail || {};
+    applyDeityDebugPinned(data.deityDebugPinned === true);
     renderSettings(settingsPanel, data, memoryGraph, deityGraph, economyGraph, tileInspector);
   });
   // Helper: hide tile inspector (mutual exclusivity with debug graphs)
@@ -322,14 +361,19 @@ export function initOverlays() {
   });
   // Toggle deity mood graph
   window.addEventListener('ui:toggleDeityMoodGraph', () => {
-    if (deityGraph.canvas.style.display === 'block') {
-      deityGraph.hide();
-      deityGraph.stopSampling();
-    } else {
-      hideTileInspector();
-      deityGraph.show();
-      deityGraph.startSampling();
+    if (deityDebugPinned) {
+      showDeityGraph();
+      return;
     }
+    if (deityGraph.canvas.style.display === 'block') hideDeityGraph();
+    else showDeityGraph();
+  });
+  window.addEventListener('ui:showDeityMoodGraph', () => {
+    showDeityGraph();
+  });
+  window.addEventListener('ui:setDeityDebugPinned', (ev) => {
+    const enabled = !!(/** @type {CustomEvent} */ (ev)).detail?.enabled;
+    applyDeityDebugPinned(enabled);
   });
   // Late-bind deity mood sampler from main.js
   window.addEventListener('debug:registerDeityMoodSampler', (ev) => {
@@ -359,7 +403,7 @@ export function initOverlays() {
     } else {
       // Hide all debug graphs
       memoryGraph.hide(); memoryGraph.stopSampling();
-      deityGraph.hide(); deityGraph.stopSampling();
+      if (!deityDebugPinned) hideDeityGraph();
       economyGraph.hide(); economyGraph.stopSampling();
       tileInspector.show();
       tileInspector.startPolling();
@@ -401,9 +445,10 @@ export function initOverlays() {
         closed = true;
       }
       if (deityGraph.canvas.style.display === 'block') {
-        deityGraph.hide();
-        deityGraph.stopSampling();
-        closed = true;
+        if (!deityDebugPinned) {
+          hideDeityGraph();
+          closed = true;
+        }
       }
       if (economyGraph.canvas.style.display === 'block') {
         economyGraph.hide();
@@ -458,6 +503,12 @@ export function initOverlays() {
     const e = ev;
     const quests = Array.isArray(e?.detail?.quests) ? e.detail.quests : [];
     if (questJournal.style.display === 'block') renderQuestJournal(questJournal, quests);
+  });
+  window.addEventListener('ui:townBoardData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderTownBoard(townBoard, d);
   });
   window.addEventListener('ui:messageLogData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -1561,10 +1612,88 @@ function buildFlameShadow(intensity) {
   return `0 0 ${outer}px rgba(255,160,80,0.55), 0 0 ${inner}px rgba(255,200,120,0.7), 0 0 ${core}px rgba(255,255,200,0.9)`;
 }
 
-/** @param {HTMLDivElement} tip @param {{mode?:'single'|'multi', item?:any, items?:any[], count?:number, pickupRange?:number}} detail */
+/** @param {HTMLDivElement} tip @param {{mode?:'single'|'stack'|'multi', item?:any, items?:any[], count?:number, pickupRange?:number, stackIndex?:number}} detail */
 function renderGroundTooltip(tip, detail) {
   tip.innerHTML = '';
   const mode = detail?.mode || 'single';
+  if (mode === 'stack') {
+    const stackItems = Array.isArray(detail?.items) ? detail.items.slice() : [];
+    if (!stackItems.length) {
+      tip.style.display = 'none';
+      return;
+    }
+
+    let stackIndex = Math.max(0, Math.min(stackItems.length - 1, Number(detail?.stackIndex || 0) | 0));
+
+    const renderStackAt = () => {
+      const it = stackItems[stackIndex];
+      tip.innerHTML = '';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.alignItems = 'center';
+      header.style.gap = '8px';
+
+      const title = document.createElement('div');
+      title.textContent = `${stackItems.length} items nearby`;
+      title.style.fontWeight = 'bold';
+
+      const index = document.createElement('div');
+      index.textContent = `${stackIndex + 1}/${stackItems.length}`;
+      index.style.marginLeft = 'auto';
+      index.style.opacity = '0.8';
+      index.style.fontSize = '12px';
+
+      header.appendChild(title);
+      header.appendChild(index);
+      tip.appendChild(header);
+
+      renderItemDetails(tip, it);
+
+      const controls = document.createElement('div');
+      controls.style.display = 'flex';
+      controls.style.justifyContent = 'flex-end';
+      controls.style.marginTop = '8px';
+
+      const dismissBtn = document.createElement('button');
+      dismissBtn.textContent = '×';
+      decorateButton(dismissBtn);
+      dismissBtn.title = 'Dismiss this item';
+      dismissBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        stackItems.splice(stackIndex, 1);
+        if (!stackItems.length) {
+          tip.style.display = 'none';
+          return;
+        }
+        if (stackIndex >= stackItems.length) stackIndex = stackItems.length - 1;
+        renderStackAt();
+      });
+
+      controls.appendChild(dismissBtn);
+      tip.appendChild(controls);
+
+      const foot = document.createElement('div');
+      foot.style.marginTop = '6px';
+      foot.style.opacity = '0.8';
+      foot.style.fontSize = '12px';
+      foot.textContent = 'Tap tooltip to pick up';
+      tip.appendChild(foot);
+    };
+
+    renderStackAt();
+
+    tip.onclick = () => {
+      const ids = getUiItemEntityIds(stackItems[stackIndex]);
+      const firstId = Number(ids[0] || 0) | 0;
+      if (firstId > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: [firstId] } }));
+      }
+      tip.style.display = 'none';
+    };
+    return;
+  }
   if (mode === 'multi') {
     const fromChest = !!detail?.fromChest;
     const row = document.createElement('div');
@@ -2424,6 +2553,19 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
         },
       };
     }
+    if (mode === 'stack') {
+      const stackItems = Array.isArray(ground.items) ? ground.items : [];
+      const stackIndex = Math.max(0, Math.min(stackItems.length - 1, Number(ground.stackIndex || 0) | 0));
+      const topItem = stackItems[stackIndex];
+      const itemId = Number(topItem?.id || 0) | 0;
+      if (!(itemId > 0)) return null;
+      return {
+        label: 'Pickup',
+        run: () => {
+          window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: [itemId] } }));
+        },
+      };
+    }
     const fromChest = ground.fromChest === true;
     const groundChestId = Number(ground.chestId || 0) | 0;
     if (fromChest && groundChestId > 0) {
@@ -2543,7 +2685,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
 
 /**
  * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
- * @param {{ identificationEnabled?: boolean, allItemIds?: string[], allMonsterIds?: string[], hasPet?: boolean, petAlive?: boolean }} data
+ * @param {{ identificationEnabled?: boolean, deityDebugPinned?: boolean, allItemIds?: string[], allMonsterIds?: string[], hasPet?: boolean, petAlive?: boolean }} data
  * @param {{ canvas: HTMLCanvasElement }} memGraph
  * @param {{ canvas: HTMLCanvasElement }} dtyGraph
  */
@@ -2671,8 +2813,8 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
   });
   content.appendChild(dbHead);
 
-  content.appendChild(makeCheckbox('Deity debugging', dtyGraph.canvas.style.display === 'block', () => {
-    window.dispatchEvent(new CustomEvent('ui:toggleDeityMoodGraph'));
+  content.appendChild(makeCheckbox('Deity debugging', data.deityDebugPinned === true, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setDeityDebugPinned', { detail: { enabled: on } }));
   }));
 
   content.appendChild(makeCheckbox('Economy graph', econGraph.canvas.style.display === 'block', () => {
@@ -2964,6 +3106,173 @@ function renderQuestJournal(panel, quests) {
 
   appendSection('Active', active);
   appendSection('Completed', done);
+}
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{
+ *   districts?: Array<{label?:string, opportunities?:string[], shortages?:string[]}>,
+ *   questBoard?: {
+ *     generatedAt?: number,
+ *     active?: Array<{title?:string, status?:string, progress?:number, target?:number}>,
+ *     offers?: Array<{title?:string, objective?:string, sourceLabel?:string, urgency?:string, accepted?:boolean}>,
+ *     sectors?: string[],
+ *   }
+ * }} data
+ */
+function renderTownBoard(panel, data) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+  el.style.overflowX = 'hidden';
+
+  const heading = document.createElement('div');
+  heading.textContent = 'Town Notice Board';
+  heading.style.fontWeight = 'bold';
+  heading.style.marginBottom = '10px';
+  el.appendChild(heading);
+
+  const questBoard = (data && typeof data.questBoard === 'object') ? data.questBoard : {};
+  const active = Array.isArray(questBoard.active) ? questBoard.active : [];
+  const offers = Array.isArray(questBoard.offers) ? questBoard.offers : [];
+  const sectors = Array.isArray(questBoard.sectors) ? questBoard.sectors : [];
+
+  const summary = document.createElement('div');
+  Object.assign(summary.style, {
+    fontSize: '12px',
+    opacity: '0.85',
+    marginBottom: '10px',
+  });
+  summary.textContent = `${active.length} active quest${active.length === 1 ? '' : 's'} · ${offers.length} posted contract${offers.length === 1 ? '' : 's'}`;
+  el.appendChild(summary);
+
+  const activeLabel = document.createElement('div');
+  activeLabel.textContent = 'Active Quests';
+  Object.assign(activeLabel.style, {
+    fontSize: '11px',
+    color: '#7ba7cc',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '4px',
+  });
+  el.appendChild(activeLabel);
+
+  if (!active.length) {
+    const empty = document.createElement('div');
+    empty.textContent = 'No active quests yet.';
+    Object.assign(empty.style, { opacity: '0.55', fontStyle: 'italic', fontSize: '12px', marginBottom: '8px' });
+    el.appendChild(empty);
+  } else {
+    for (const quest of active) {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        padding: '7px 10px',
+        marginBottom: '4px',
+        background: '#0a111f',
+        border: '1px solid #1e2d45',
+        borderRadius: '6px',
+      });
+      const title = document.createElement('div');
+      title.textContent = String(quest?.title || 'Quest');
+      title.style.fontSize = '13px';
+      row.appendChild(title);
+      if (Number(quest?.target || 0) > 0) {
+        const progress = document.createElement('div');
+        progress.textContent = `Progress: ${Number(quest?.progress || 0)}/${Number(quest?.target || 0)}`;
+        Object.assign(progress.style, { fontSize: '11px', opacity: '0.8', marginTop: '2px' });
+        row.appendChild(progress);
+      }
+      el.appendChild(row);
+    }
+  }
+
+  const offerLabel = document.createElement('div');
+  offerLabel.textContent = 'Posted Contracts';
+  Object.assign(offerLabel.style, {
+    fontSize: '11px',
+    color: '#7ba7cc',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginTop: '10px',
+    marginBottom: '4px',
+  });
+  el.appendChild(offerLabel);
+
+  if (!offers.length) {
+    const empty = document.createElement('div');
+    empty.textContent = 'No contracts are currently posted.';
+    Object.assign(empty.style, { opacity: '0.55', fontStyle: 'italic', fontSize: '12px', marginBottom: '8px' });
+    el.appendChild(empty);
+  } else {
+    for (const offer of offers) {
+      const isAccepted = !!offer?.accepted;
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        padding: '7px 10px',
+        marginBottom: '5px',
+        background: isAccepted ? '#0f1a12' : '#0a111f',
+        border: isAccepted ? '1px solid #2a6e38' : '1px solid #1e2d45',
+        borderRadius: '6px',
+      });
+      const title = document.createElement('div');
+      title.textContent = String(offer?.title || 'Town Contract');
+      Object.assign(title.style, { fontSize: '13px', marginBottom: '2px' });
+      row.appendChild(title);
+
+      const objective = document.createElement('div');
+      objective.textContent = String(offer?.objective || 'Investigate local demand.');
+      Object.assign(objective.style, { fontSize: '11px', opacity: '0.85' });
+      row.appendChild(objective);
+
+      const meta = document.createElement('div');
+      const urgency = String(offer?.urgency || 'low').toUpperCase();
+      const district = String(offer?.sourceLabel || 'Town');
+      meta.textContent = `${district} · ${urgency}${isAccepted ? ' · CLAIMED' : ''}`;
+      Object.assign(meta.style, { fontSize: '10px', opacity: '0.7', marginTop: '2px' });
+      row.appendChild(meta);
+
+      const actions = document.createElement('div');
+      Object.assign(actions.style, {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginTop: '6px',
+      });
+      const acceptBtn = document.createElement('button');
+      decorateButton(acceptBtn);
+      acceptBtn.textContent = isAccepted ? 'Accepted' : 'Accept';
+      Object.assign(acceptBtn.style, {
+        minHeight: '32px',
+        minWidth: '82px',
+        padding: '0 10px',
+        fontSize: '12px',
+      });
+      if (isAccepted) {
+        acceptBtn.disabled = true;
+        acceptBtn.style.opacity = '0.6';
+      } else {
+        acceptBtn.addEventListener('click', () => {
+          window.dispatchEvent(new CustomEvent('ui:requestTownBoardAccept', {
+            detail: { offer },
+          }));
+        });
+      }
+      actions.appendChild(acceptBtn);
+      row.appendChild(actions);
+
+      el.appendChild(row);
+    }
+  }
+
+  if (sectors.length) {
+    const sectorsEl = document.createElement('div');
+    sectorsEl.textContent = `Profitable sectors: ${sectors.join(', ')}`;
+    Object.assign(sectorsEl.style, {
+      marginTop: '8px',
+      fontSize: '11px',
+      color: '#c0def8',
+      opacity: '0.9',
+    });
+    el.appendChild(sectorsEl);
+  }
 }
 
 /**
@@ -5480,6 +5789,62 @@ function renderDeathScreen(panel, detail) {
   seedLine.textContent = metaText;
   Object.assign(seedLine.style, { opacity: '0.5', fontSize: '12px', marginBottom: '14px' });
   box.appendChild(seedLine);
+
+  // --- Global Highscores ---
+  {
+    const hsSection = document.createElement('div');
+    Object.assign(hsSection.style, {
+      marginBottom: '16px', borderTop: '1px solid #1e2a3e', paddingTop: '14px',
+    });
+    const hsHeading = document.createElement('div');
+    hsHeading.textContent = 'Global Highscores';
+    Object.assign(hsHeading.style, {
+      fontSize: '11px', color: '#3a5070', textTransform: 'uppercase',
+      letterSpacing: '0.1em', marginBottom: '8px',
+    });
+    hsSection.appendChild(hsHeading);
+    const hsList = document.createElement('div');
+    hsList.textContent = 'Loading\u2026';
+    Object.assign(hsList.style, { fontSize: '12px', color: '#3a5070' });
+    hsSection.appendChild(hsList);
+    box.appendChild(hsSection);
+    getHighscores().then(scores => {
+      hsList.textContent = '';
+      if (!scores || scores.length === 0) return;
+      const top = scores.slice(0, 10);
+      for (let i = 0; i < top.length; i++) {
+        const entry = top[i];
+        const isPlayer = detail?.playerName && entry.playerName === detail.playerName;
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+          display: 'flex', gap: '8px', lineHeight: '1.7',
+          fontSize: '12px', fontFamily: 'monospace',
+          color: isPlayer ? '#ffd700' : '#7a9ab0',
+          fontWeight: isPlayer ? 'bold' : 'normal',
+        });
+        const rankEl = document.createElement('span');
+        rankEl.textContent = `#${i + 1}`;
+        rankEl.style.cssText = 'width:2.2em;text-align:right;flex-shrink:0;color:#3a5878';
+        if (isPlayer) rankEl.style.color = '#ffd700';
+        const nameEl = document.createElement('span');
+        nameEl.textContent = entry.playerName || '???';
+        nameEl.style.cssText = 'flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        const scoreEl = document.createElement('span');
+        scoreEl.textContent = String(entry.score ?? 0);
+        scoreEl.style.cssText = 'text-align:right;flex-shrink:0;color:#90c89a';
+        if (isPlayer) scoreEl.style.color = '#ffd700';
+        const clsEl = document.createElement('span');
+        clsEl.textContent = entry.className || '';
+        clsEl.style.cssText = 'width:5.5em;text-align:left;flex-shrink:0;color:#7090b0;opacity:0.8';
+        if (isPlayer) { clsEl.style.color = '#ffd700'; clsEl.style.opacity = '1'; }
+        row.appendChild(rankEl);
+        row.appendChild(nameEl);
+        row.appendChild(scoreEl);
+        row.appendChild(clsEl);
+        hsList.appendChild(row);
+      }
+    }).catch(() => { hsList.textContent = ''; });
+  }
 
   // Share button
   if (detail?.shareUrl) {

@@ -1,18 +1,26 @@
 import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import { GroundStackOrder } from "../components/GroundStackOrder.js";
 import { Player } from "../components/Player.js";
 import { Collider } from "../components/Collider.js";
 import { Vitality } from "../components/Vitality.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 
 export function itemsAt(world, x, y) {
-  const ids = [];
+  const rows = [];
   // Mirror rendering access pattern: scan all Position holders, then filter by ItemInfo
+  let idx = 0;
   for (const [id, pos] of world.query(Position)) {
     if (!pos || pos.x !== x || pos.y !== y) continue;
-    if (world.has(id, ItemInfo)) ids.push(id);
+    if (!world.has(id, ItemInfo)) continue;
+    const seq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
+    rows.push({ id, seq, idx: idx++ });
   }
-  return ids;
+  rows.sort((a, b) => {
+    if (a.seq !== b.seq) return b.seq - a.seq;
+    return a.idx - b.idx;
+  });
+  return rows.map((row) => row.id);
 }
 
 export function playerEntity(world) {

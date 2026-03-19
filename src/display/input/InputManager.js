@@ -239,10 +239,10 @@ export class InputManager {
       return;
     }
 
-    // Deity mood graph toggle: '7'
+    // Deity mood graph show: '7'
     if (key === '7') {
       e.preventDefault();
-      window.dispatchEvent(new CustomEvent('ui:toggleDeityMoodGraph'));
+      window.dispatchEvent(new CustomEvent('ui:showDeityMoodGraph'));
       return;
     }
 

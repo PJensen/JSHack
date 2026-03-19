@@ -359,11 +359,13 @@ export function generateOverworldChunks(worldSeed) {
   const halfW = 4;
   const halfH = 2;
   const doorX = homeX;
-  const doorY = homeY + halfH;
-  const spawnX = doorX;
-  const spawnY = doorY + 1;
+  const doorY = homeY - halfH;
+  const fountainCX = homeX;
+  const fountainCY = homeY - 6;
+  const spawnX = fountainCX;
+  const spawnY = fountainCY + 2;
   const northWalkY = homeY - halfH - 1;
-  const southWalkY = spawnY;
+  const southWalkY = homeY + halfH + 1;
   const westWalkX = homeX - halfW - 1;
   const eastWalkX = homeX + halfW + 1;
   const fenceY = homeY + 5;
@@ -749,8 +751,6 @@ export function generateOverworldChunks(worldSeed) {
 
   // ── Fountain plaza — cobblestone square with fountain ────────
   // Placed on the church-to-walkway path, north of house
-  const fountainCX = homeX;
-  const fountainCY = homeY - 6;
   for (let fy = fountainCY - 2; fy <= fountainCY + 2; fy++) {
     for (let fx = fountainCX - 2; fx <= fountainCX + 2; fx++) {
       setWorldTile(chunks, fx, fy, TILE_COBBLESTONE);

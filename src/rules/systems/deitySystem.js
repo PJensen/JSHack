@@ -10,7 +10,7 @@
 
 import { Devotion } from "../components/Devotion.js";
 import { Deity } from "../../lib/deity-js/deity.js";
-import { getDeity } from "../data/deities.js";
+import { DEITY_DEFS, getDeity } from "../data/deities.js";
 import { monsterHasTag } from "../data/monsters.js";
 import { Player } from "../components/Player.js";
 import { Pet } from "../components/Pet.js";
@@ -79,6 +79,24 @@ const OFFENSE_SEVERITY_WEIGHTS = Object.freeze({
   horrifying: 0.9,
 });
 
+function listPantheonDeityIds() {
+  return Object.keys(DEITY_DEFS);
+}
+
+function devotionUsesPantheon(devotion) {
+  return devotion?.pantheon === true;
+}
+
+function scoreDeityStanding(deity) {
+  const mood = deity?._queryPrecise?.();
+  if (!mood) return -999;
+  const serenity = Number(mood.serenity || 0);
+  const wrath = Number(mood.wrath || 0);
+  const hunger = Number(mood.hunger || 0);
+  const sorrow = Number(mood.sorrow || 0);
+  return (serenity * 1.7) - (wrath * 2.2) - (hunger * 0.25) - (sorrow * 0.1);
+}
+
 /** Get (or lazily create) a Deity instance for a given deityId. */
 function ensureDeity(deityId, world = null) {
   let deity = _deities.get(deityId) || null;
@@ -105,21 +123,129 @@ function ensureDeity(deityId, world = null) {
 }
 
 /**
- * Resolve a player's deity instance from Devotion.
- * Creates the deity lazily if needed so event handling never drops first-use signals.
+ * Resolve all deity contexts relevant to the player.
+ * In pantheon mode this returns all known deities so favor can shift with playstyle.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @returns {Array<{ deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }>}
+ */
+function resolvePlayerDeities(world, playerId) {
+  const actor = Number(playerId || 0) | 0;
+  if (!(actor > 0) || !world.has(actor, Player)) return [];
+  const dev = world.get(actor, Devotion);
+  if (!dev) return [];
+
+  const preferred = String(dev?.deityId || "");
+  const pantheon = devotionUsesPantheon(dev);
+  const ids = pantheon
+    ? listPantheonDeityIds()
+    : (preferred ? [preferred] : []);
+
+  if (!ids.length) return [];
+
+  /** @type {Array<{ deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }> } */
+  const resolved = [];
+  for (const deityId of ids) {
+    const deity = ensureDeity(deityId, world);
+    if (!deity) continue;
+    resolved.push({ deityId, deity });
+  }
+  if (!resolved.length) return [];
+
+  // Keep preferred deity first to preserve stable tie-breaking.
+  if (preferred) {
+    resolved.sort((a, b) => {
+      if (a.deityId === preferred) return -1;
+      if (b.deityId === preferred) return 1;
+      return 0;
+    });
+  }
+  return resolved;
+}
+
+/**
+ * Resolve a player's active deity from devotion/pantheon state.
+ * In pantheon mode, patron can shift based on current divine standing.
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {number} playerId
  * @returns {{ deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }|null}
  */
 function resolvePlayerDeity(world, playerId) {
   const actor = Number(playerId || 0) | 0;
-  if (!(actor > 0) || !world.has(actor, Player)) return null;
+  const all = resolvePlayerDeities(world, actor);
+  if (!all.length) return null;
+  if (all.length === 1) return all[0];
+
   const dev = world.get(actor, Devotion);
-  const deityId = String(dev?.deityId || "");
-  if (!deityId) return null;
-  const deity = ensureDeity(deityId, world);
-  if (!deity) return null;
-  return { deityId, deity };
+  const currentId = String(dev?.deityId || "");
+  let best = all[0];
+  let bestScore = scoreDeityStanding(best.deity);
+
+  for (let i = 1; i < all.length; i++) {
+    const candidate = all[i];
+    const score = scoreDeityStanding(candidate.deity);
+    if (score > bestScore + 0.0001) {
+      best = candidate;
+      bestScore = score;
+      continue;
+    }
+    const nearTie = Math.abs(score - bestScore) <= 0.0001;
+    if (nearTie && candidate.deityId === currentId) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+
+  if (dev && devotionUsesPantheon(dev) && best.deityId && currentId !== best.deityId) {
+    dev.deityId = best.deityId;
+    world.emit?.("deity:patronShift", {
+      playerId: actor,
+      deityId: best.deityId,
+      deityName: best.deity.name,
+    });
+    world.emit?.("deity:intervention", {
+      playerId: actor,
+      deityId: best.deityId,
+      deityName: best.deity.name,
+      kind: "patron_shift",
+    });
+  }
+  return best;
+}
+
+/**
+ * Apply callback to all relevant deity contexts for a player.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @param {(resolved: { deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }) => void} fn
+ */
+function forEachPlayerDeity(world, playerId, fn) {
+  const all = resolvePlayerDeities(world, playerId);
+  for (const resolved of all) fn(resolved);
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @param {string} type
+ * @param {object} meta
+ */
+function applyActionToPlayerDeities(world, playerId, type, meta = {}) {
+  forEachPlayerDeity(world, playerId, ({ deity }) => {
+    deity.action(type, meta);
+  });
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @param {string} type
+ * @param {object} meta
+ */
+function applyOfferToPlayerDeities(world, playerId, type, meta = {}) {
+  forEachPlayerDeity(world, playerId, ({ deity }) => {
+    deity.offer(type, meta);
+  });
 }
 
 /**
@@ -456,7 +582,7 @@ function wireWorldEvents(world) {
     if (!killer) return;
     const resolved = resolvePlayerDeity(world, killer);
     if (!resolved) return;
-    const { deityId, deity } = resolved;
+    const { deityId } = resolved;
 
     const victim = Number(id || 0) | 0;
     const owner = world.get(victim, Owner);
@@ -467,12 +593,14 @@ function wireWorldEvents(world) {
       const victimName = String(
         world.get(victim, NamedIdentity)?.name || "companion",
       );
-      deity.action("betray", { magnitude: 1.0, target: victimName });
-      stackDesecration(deity, PET_KILL_DESECRATE_STACKS, "pet_murder");
+      forEachPlayerDeity(world, killer, ({ deity }) => {
+        deity.action("betray", { magnitude: 1.0, target: victimName });
+        stackDesecration(deity, PET_KILL_DESECRATE_STACKS, "pet_murder");
+      });
       world.emit("deity:offense", {
         playerId: Number(killer || 0) | 0,
         deityId,
-        deityName: deity.name,
+        deityName: resolved.deity.name,
         offense: "pet_murder",
         severity: "grave",
         victimId: victim,
@@ -488,33 +616,40 @@ function wireWorldEvents(world) {
       const victimName = String(
         world.get(victim, NamedIdentity)?.name || "merchant",
       );
-      deity.action("betray", { magnitude: 0.8, target: victimName });
+      applyActionToPlayerDeities(world, killer, "betray", {
+        magnitude: 0.8,
+        target: victimName,
+      });
     } else if (victimFaction === "neutral") {
       const victimName = String(
         world.get(victim, NamedIdentity)?.name || "innocent",
       );
-      deity.action("betray", { magnitude: 0.5, target: victimName });
-    }
-
-    const def = getDeity(deityId);
-    deity.action("kill", { magnitude: 0.5, target: String(victim) });
-    // War gods treat kills as implicit blood offerings (resets neglect clock)
-    if (def?.killsAreOfferings) {
-      deity.offer("blood", {
-        value: 0.3,
-        alignment: def.alignment ?? "neutral",
+      applyActionToPlayerDeities(world, killer, "betray", {
+        magnitude: 0.5,
+        target: victimName,
       });
     }
+
+    forEachPlayerDeity(world, killer, ({ deityId: did, deity }) => {
+      const def = getDeity(did);
+      deity.action("kill", { magnitude: 0.5, target: String(victim) });
+      if (def?.killsAreOfferings) {
+        deity.offer("blood", {
+          value: 0.3,
+          alignment: def.alignment ?? "neutral",
+        });
+      }
+    });
   });
 
   // Heal events → deity.action('heal')
   // Skip divine-source heals so miracles don't feed back into the mood ledger.
   world.on("healed", ({ id, source }) => {
     if (source === "divine") return;
-    const resolved = resolvePlayerDeity(world, id);
-    if (!resolved) return;
-    const { deity } = resolved;
-    deity.action("heal", { magnitude: 0.3, target: "self" });
+    applyActionToPlayerDeities(world, id, "heal", {
+      magnitude: 0.3,
+      target: "self",
+    });
   });
 
   // Eating pet corpse → deity.desecrate(), with heavy escalation for your own companion.
@@ -527,14 +662,16 @@ function wireWorldEvents(world) {
     const label = String(corpseName || "pet_corpse");
     const stacks = ownPetCorpse ? PET_CORPSE_DESECRATE_STACKS : 1;
 
-    if (ownPetCorpse) {
-      deity.action("betray", { magnitude: 1.0, target: label });
-    }
-    stackDesecration(
-      deity,
-      stacks,
-      ownPetCorpse ? "pet_corpse_desecration" : label,
-    );
+    forEachPlayerDeity(world, actorId, ({ deity }) => {
+      if (ownPetCorpse) {
+        deity.action("betray", { magnitude: 1.0, target: label });
+      }
+      stackDesecration(
+        deity,
+        stacks,
+        ownPetCorpse ? "pet_corpse_desecration" : label,
+      );
+    });
 
     if (ownPetCorpse) {
       world.emit("deity:offense", {
@@ -559,13 +696,12 @@ function wireWorldEvents(world) {
     const owner = world.get(target, Owner);
     if (!owner || owner.ownerId !== source) return;
 
-    const resolved = resolvePlayerDeity(world, source);
-    if (!resolved) return;
-    const { deity } = resolved;
-
     // Lesser betrayal than killing — scale by damage dealt
     const magnitude = Math.min(0.3, (amount || 1) * 0.05);
-    deity.action("betray", { magnitude, target: "companion" });
+    applyActionToPlayerDeities(world, source, "betray", {
+      magnitude,
+      target: "companion",
+    });
   });
 
   // Altar offerings → deity.offer()
@@ -575,7 +711,7 @@ function wireWorldEvents(world) {
       const resolved = resolvePlayerDeity(world, actor);
       if (!resolved) return;
       const { deity } = resolved;
-      deity.offer("item", {
+      applyOfferToPlayerDeities(world, actor, "item", {
         value: value || 0.3,
         alignment: "neutral",
         itemName,
@@ -611,8 +747,14 @@ function wireWorldEvents(world) {
       });
       if (!restored) return;
 
-      deity.action("protect", { magnitude: 0.45, target: "pet_resurrection" });
-      deity.offer("mercy", { value: 0.35, alignment: "neutral" });
+      applyActionToPlayerDeities(world, actor, "protect", {
+        magnitude: 0.45,
+        target: "pet_resurrection",
+      });
+      applyOfferToPlayerDeities(world, actor, "mercy", {
+        value: 0.35,
+        alignment: "neutral",
+      });
       world.emit?.("pet:resurrected", {
         actor: Number(actor || 0) | 0,
         targetId: Number(targetId || 0) | 0,
@@ -663,14 +805,16 @@ function wireWorldEvents(world) {
     }
 
     cooldowns.set(slot, now);
-    deity.pray();
-    deity.action("protect", {
+    applyOfferToPlayerDeities(world, actorId, "plea", {
+      value: SHRINE_TOUCH_PLEA_VALUE,
+      alignment: "neutral",
+    });
+    applyActionToPlayerDeities(world, actorId, "protect", {
       magnitude: SHRINE_TOUCH_PROTECT_MAGNITUDE,
       target: "shrine",
     });
-    deity.offer("plea", {
-      value: SHRINE_TOUCH_PLEA_VALUE,
-      alignment: "neutral",
+    forEachPlayerDeity(world, actorId, ({ deity: candidate }) => {
+      candidate.pray();
     });
     world.emit?.("shrine:communion", {
       actor: actorId,
@@ -680,81 +824,94 @@ function wireWorldEvents(world) {
       effect: "blessing",
       cooldownRemaining: 0,
     });
+    world.emit?.("deity:intervention", {
+      playerId: actorId,
+      deityId,
+      deityName: deity.name,
+      kind: "shrine_blessing",
+    });
   });
 
   // ── Steal ─────────────────────────────────────────────────────────────────
   // Attempted shoplifting — tried to leave with unpaid goods.
   world.on("shop:exit-blocked", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    const { deity } = resolved;
-    deity.action("steal", { magnitude: 0.6, target: "shopkeeper" });
-    // Shoplifting is also a minor breach of the merchant's trust.
-    deity.action("betray", { magnitude: 0.3, target: "shopkeeper" });
+    applyActionToPlayerDeities(world, actor, "steal", {
+      magnitude: 0.6,
+      target: "shopkeeper",
+    });
+    applyActionToPlayerDeities(world, actor, "betray", {
+      magnitude: 0.3,
+      target: "shopkeeper",
+    });
   });
 
   // ── Destroy ───────────────────────────────────────────────────────────────
   // Chopping through terrain (trees, vegetation).
   world.on("tile:chopped", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("destroy", { magnitude: 0.4, target: "terrain" });
+    applyActionToPlayerDeities(world, actor, "destroy", {
+      magnitude: 0.4,
+      target: "terrain",
+    });
   });
 
   // Digging through walls and ground.
   world.on("tile:dug", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("destroy", { magnitude: 0.4, target: "terrain" });
+    applyActionToPlayerDeities(world, actor, "destroy", {
+      magnitude: 0.4,
+      target: "terrain",
+    });
   });
 
   world.on("tile:burned", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("destroy", { magnitude: 0.4, target: "terrain" });
+    applyActionToPlayerDeities(world, actor, "destroy", {
+      magnitude: 0.4,
+      target: "terrain",
+    });
   });
 
   // Clearing webs.
   world.on("web:cleared", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("destroy", { magnitude: 0.15, target: "web" });
+    applyActionToPlayerDeities(world, actor, "destroy", {
+      magnitude: 0.15,
+      target: "web",
+    });
   });
 
   // ── Create ────────────────────────────────────────────────────────────────
   // Alchemy — crafting potions and reagents.
   world.on("alchemy:crafted", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("create", { magnitude: 0.6, target: "potion" });
+    applyActionToPlayerDeities(world, actor, "create", {
+      magnitude: 0.6,
+      target: "potion",
+    });
   });
 
   // Cooking — transforming corpses into sustenance.
   world.on("cooking:cooked", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    const { deityId, deity } = resolved;
-    deity.action("create", { magnitude: 0.4, target: "food" });
-    const bonusHook = getDeity(deityId)?.specialHooks?.["cooking:cooked:bonus"];
-    if (bonusHook) applyDeityReaction(deity, bonusHook);
+    forEachPlayerDeity(world, actor, ({ deityId, deity }) => {
+      deity.action("create", { magnitude: 0.4, target: "food" });
+      const bonusHook = getDeity(deityId)?.specialHooks?.["cooking:cooked:bonus"];
+      if (bonusHook) applyDeityReaction(deity, bonusHook);
+    });
   });
 
   // Engraving — leaving a mark on the world.
   // Profane graffiti is vandalism: fires destroy alongside create.
   world.on("engrave", ({ actor, text }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("create", { magnitude: 0.15, target: "engraving" });
-    if (_isProfane(text)) {
-      resolved.deity.action("destroy", { magnitude: 0.3, target: "graffiti" });
-    }
+    forEachPlayerDeity(world, actor, ({ deity }) => {
+      deity.action("create", { magnitude: 0.15, target: "engraving" });
+      if (_isProfane(text)) {
+        deity.action("destroy", { magnitude: 0.3, target: "graffiti" });
+      }
+    });
   });
 
   // Harvesting — gathering from nature.
   world.on("harvest:picked", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("create", { magnitude: 0.2, target: "harvest" });
+    applyActionToPlayerDeities(world, actor, "create", {
+      magnitude: 0.2,
+      target: "harvest",
+    });
   });
 
   // Eating food is a small positive "create/life" signal.
@@ -769,7 +926,10 @@ function wireWorldEvents(world) {
     const magnitude = gluttonous
       ? Math.min(1, baseMagnitude * GLUTTONOUS_FOOD_REACTION_MULT)
       : baseMagnitude;
-    resolved.deity.action("create", { magnitude, target: "food" });
+    applyActionToPlayerDeities(world, actor, "create", {
+      magnitude,
+      target: "food",
+    });
 
     const asceticStore = ensureAsceticStateStore(world);
     const now = Number(world.step || 0) | 0;
@@ -825,7 +985,7 @@ function wireWorldEvents(world) {
     const magnitude = gluttonous
       ? Math.min(1, baseMagnitude * GLUTTONOUS_FOOD_REACTION_MULT)
       : baseMagnitude;
-    resolved.deity.action("betray", {
+    applyActionToPlayerDeities(world, actor, "betray", {
       magnitude,
       target: `food_${String(type || "tainted")}`,
     });
@@ -851,9 +1011,10 @@ function wireWorldEvents(world) {
   // ── Protect ───────────────────────────────────────────────────────────────
   // Disarming traps — making the dungeon safer.
   world.on("trap:disarmed", ({ actor }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    resolved.deity.action("protect", { magnitude: 0.5, target: "self" });
+    applyActionToPlayerDeities(world, actor, "protect", {
+      magnitude: 0.5,
+      target: "self",
+    });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -865,15 +1026,14 @@ function wireWorldEvents(world) {
   // kills a monster with a matching tag (undead, demon, beast, etc.).
   world.on("died", ({ id, killer }) => {
     if (!killer) return;
-    const resolved = resolvePlayerDeity(world, killer);
-    if (!resolved) return;
-    const { deityId, deity } = resolved;
     const victimIdentity =
       world.get(Number(id || 0) | 0, NamedIdentity)?.identity || "";
-    const def = getDeity(deityId);
-    for (const r of (def?.tagKillReactions ?? [])) {
-      if (monsterHasTag(victimIdentity, r.tag)) applyDeityReaction(deity, r);
-    }
+    forEachPlayerDeity(world, killer, ({ deityId, deity }) => {
+      const def = getDeity(deityId);
+      for (const r of (def?.tagKillReactions ?? [])) {
+        if (monsterHasTag(victimIdentity, r.tag)) applyDeityReaction(deity, r);
+      }
+    });
   });
 
   // ── 2. Trap reactions ───────────────────────────────────────────────
@@ -886,14 +1046,14 @@ function wireWorldEvents(world) {
     if (!(victim > 0)) return;
     if (world.has(victim, Player)) return; // player ate the trap — handle below
     for (const [playerId] of world.query(Player, Devotion)) {
-      const dev = world.get(playerId, Devotion);
-      const deityId = String(dev?.deityId || "");
-      if (!deityId) continue;
-      const hook = getDeity(deityId)?.specialHooks?.["trap:triggered:enemy"];
-      if (!hook) continue;
-      const deity = ensureDeity(deityId, world);
-      if (!deity) continue;
-      applyDeityReaction(deity, hook);
+      let applied = false;
+      forEachPlayerDeity(world, playerId, ({ deityId, deity }) => {
+        const hook = getDeity(deityId)?.specialHooks?.["trap:triggered:enemy"];
+        if (!hook) return;
+        applyDeityReaction(deity, hook);
+        applied = true;
+      });
+      if (!applied) continue;
       break;
     }
   });
@@ -901,12 +1061,12 @@ function wireWorldEvents(world) {
   world.on("trap:triggered", ({ victimId }) => {
     const victim = Number(victimId || 0) | 0;
     if (!(victim > 0) || !world.has(victim, Player)) return;
-    const resolved = resolvePlayerDeity(world, victim);
-    if (!resolved) return;
-    const hook = getDeity(resolved.deityId)?.specialHooks
-      ?.["trap:triggered:self"];
-    if (!hook) return;
-    applyDeityReaction(resolved.deity, hook);
+    forEachPlayerDeity(world, victim, ({ deityId, deity }) => {
+      const hook = getDeity(deityId)?.specialHooks
+        ?.["trap:triggered:self"];
+      if (!hook) return;
+      applyDeityReaction(deity, hook);
+    });
   });
 
   // ── 3. Kill streaks ──────────────────────────────────────────────────
@@ -915,32 +1075,32 @@ function wireWorldEvents(world) {
   world.on("died", ({ killer }) => {
     if (!killer) return;
     const killerId = Number(killer || 0) | 0;
-    const resolved = resolvePlayerDeity(world, killerId);
-    if (!resolved) return;
-    const ksCfg = getDeity(resolved.deityId)?.killStreakConfig;
-    if (!ksCfg) return;
 
     const store = world[KILL_STREAK_KEY] ||
       (world[KILL_STREAK_KEY] = new Map());
     const now = Number(world.step || 0) | 0;
-    const prev = store.get(killerId);
-    const lastTurn = Number(prev?.turn || 0);
-    const streak = (now - lastTurn <= ksCfg.window)
-      ? (Number(prev?.count || 0) + 1)
-      : 1;
-    store.set(killerId, { turn: now, count: streak });
 
-    if (streak >= ksCfg.minStreak) {
+    forEachPlayerDeity(world, killerId, ({ deityId, deity }) => {
+      const ksCfg = getDeity(deityId)?.killStreakConfig;
+      if (!ksCfg) return;
+      const slot = `${deityId}:${killerId}`;
+      const prev = store.get(slot);
+      const lastTurn = Number(prev?.turn || 0);
+      const streak = (now - lastTurn <= ksCfg.window)
+        ? (Number(prev?.count || 0) + 1)
+        : 1;
+      store.set(slot, { turn: now, count: streak });
+      if (streak < ksCfg.minStreak) return;
       const bonus = Math.min(ksCfg.maxBonus, streak * ksCfg.bonusPerKill);
-      resolved.deity.action(ksCfg.killAction, {
+      deity.action(ksCfg.killAction, {
         magnitude: bonus,
         target: "streak_" + streak,
       });
-      resolved.deity.offer(ksCfg.offerType, {
+      deity.offer(ksCfg.offerType, {
         value: bonus * ksCfg.offerFactor,
         alignment: ksCfg.offerAlignment,
       });
-    }
+    });
   });
 
   // ── 4. Cooking bonus ────────────────────────────────────────────────
@@ -952,26 +1112,28 @@ function wireWorldEvents(world) {
   // All deities react to spell schools universally (healing → heal action,
   // destruction → destroy action). Per-deity extras come from spellSchoolReactions.
   world.on("castSpell", ({ actor, spellId }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    const { deityId, deity } = resolved;
     const spell = String(spellId || "");
     const spellDef = getSpell(spell);
     const schools = Array.isArray(spellDef?.schools) ? spellDef.schools : [];
-    const def = getDeity(deityId);
 
-    if (schools.includes("healing")) {
-      deity.action("heal", { magnitude: 0.2, target: "spell_heal" });
-    }
-    if (schools.includes("destruction")) {
-      deity.action("destroy", { magnitude: 0.2, target: "spell_destruction" });
-    }
+    forEachPlayerDeity(world, actor, ({ deityId, deity }) => {
+      const def = getDeity(deityId);
+      if (schools.includes("healing")) {
+        deity.action("heal", { magnitude: 0.2, target: "spell_heal" });
+      }
+      if (schools.includes("destruction")) {
+        deity.action("destroy", {
+          magnitude: 0.2,
+          target: "spell_destruction",
+        });
+      }
 
-    for (const r of (def?.spellSchoolReactions ?? [])) {
-      if (!schools.includes(r.school)) continue;
-      if (r.spellId && r.spellId !== spell) continue;
-      applyDeityReaction(deity, r);
-    }
+      for (const r of (def?.spellSchoolReactions ?? [])) {
+        if (!schools.includes(r.school)) continue;
+        if (r.spellId && r.spellId !== spell) continue;
+        applyDeityReaction(deity, r);
+      }
+    });
   });
 
   // ── 6. Blessed/Cursed Offering Resonance ────────────────────────────────
@@ -980,52 +1142,48 @@ function wireWorldEvents(world) {
   // Cursed items carry corruption — negative value (angers deity).
   // Exception: Loki finds cursed offerings amusing rather than offensive.
   world.on("altar:offer", ({ actor, itemId, beatitudeState }) => {
-    const resolved = resolvePlayerDeity(world, actor);
-    if (!resolved) return;
-    const { deityId, deity } = resolved;
-
     const offeredItemId = Number(itemId || 0) | 0;
     const beat = offeredItemId > 0 ? world.get(offeredItemId, Beatitude) : null;
     const state = String(beatitudeState || beat?.state || "").toLowerCase();
 
-    if (state === "blessed") {
-      // Blessed items carry accumulated holiness — bonus offering
-      deity.offer("blessed_gift", { value: 0.4, alignment: "lawful" });
-      world.emit?.("deity:nicheEvent", {
-        playerId: Number(actor || 0) | 0,
-        deityId,
-        deityName: deity.name,
-        event: "blessed_offering",
-        message: `${deity.name} is pleased by the sanctified offering!`,
-      });
-    } else if (state === "cursed") {
-      const cursedHook = getDeity(deityId)?.specialHooks
-        ?.["altar:offer:cursed"];
-      if (cursedHook) {
-        applyDeityReaction(deity, cursedHook);
-        const msg = String(cursedHook.message || "").replace(
-          "{deity}",
-          deity.name,
-        );
+    forEachPlayerDeity(world, actor, ({ deityId, deity }) => {
+      if (state === "blessed") {
+        deity.offer("blessed_gift", { value: 0.4, alignment: "lawful" });
         world.emit?.("deity:nicheEvent", {
           playerId: Number(actor || 0) | 0,
           deityId,
           deityName: deity.name,
-          event: "cursed_offering_amused",
-          message: msg,
+          event: "blessed_offering",
+          message: `${deity.name} is pleased by the sanctified offering!`,
         });
-      } else {
-        // Deities without a cursed-offering hook are offended by corruption
-        deity.action("betray", { magnitude: 0.25, target: "cursed_offering" });
-        world.emit?.("deity:nicheEvent", {
-          playerId: Number(actor || 0) | 0,
-          deityId,
-          deityName: deity.name,
-          event: "cursed_offering_angered",
-          message: `${deity.name} recoils from the tainted offering!`,
-        });
+      } else if (state === "cursed") {
+        const cursedHook = getDeity(deityId)?.specialHooks
+          ?.["altar:offer:cursed"];
+        if (cursedHook) {
+          applyDeityReaction(deity, cursedHook);
+          const msg = String(cursedHook.message || "").replace(
+            "{deity}",
+            deity.name,
+          );
+          world.emit?.("deity:nicheEvent", {
+            playerId: Number(actor || 0) | 0,
+            deityId,
+            deityName: deity.name,
+            event: "cursed_offering_amused",
+            message: msg,
+          });
+        } else {
+          deity.action("betray", { magnitude: 0.25, target: "cursed_offering" });
+          world.emit?.("deity:nicheEvent", {
+            playerId: Number(actor || 0) | 0,
+            deityId,
+            deityName: deity.name,
+            event: "cursed_offering_angered",
+            message: `${deity.name} recoils from the tainted offering!`,
+          });
+        }
       }
-    }
+    });
   });
 }
 
@@ -1138,6 +1296,13 @@ function wireDeityMiracles(deity, deityId, world) {
         wrathDebt,
         tick,
       });
+      world.emit("deity:intervention", {
+        playerId,
+        deityId,
+        deityName: deity.name,
+        kind: "wrath",
+        damage: actualDamage,
+      });
     }
 
     if (appliedAny) {
@@ -1177,7 +1342,20 @@ function wireDeityMiracles(deity, deityId, world) {
     // Find the player who worships this deity
     for (const [playerId] of world.query(Player, Devotion)) {
       const dev = world.get(playerId, Devotion);
-      if (dev?.deityId !== deityId) continue;
+      if (!dev) continue;
+      if (!devotionUsesPantheon(dev) && dev?.deityId !== deityId) continue;
+
+      const emitMiracle = (payload) => {
+        world.emit("deity:miracle", payload);
+        world.emit("deity:intervention", {
+          playerId,
+          deityId,
+          deityName: deity.name,
+          kind: "miracle",
+          effect: String(payload?.effect || ""),
+          message: String(payload?.message || ""),
+        });
+      };
 
       // Determine what the player needs most
       const needs = assessPlayerNeeds(world, playerId);
@@ -1196,7 +1374,7 @@ function wireDeityMiracles(deity, deityId, world) {
             info.affixes.push("lucky1");
             grantedAffix = true;
             const itemName = world.get(itemId, NamedIdentity)?.name || "item";
-            world.emit("deity:miracle", {
+            emitMiracle({
               playerId,
               deityId,
               effect: "lucky_affix",
@@ -1211,7 +1389,7 @@ function wireDeityMiracles(deity, deityId, world) {
           if (ae && Array.isArray(ae.effects)) {
             ae.effects.push({ key: "lucky", turnsLeft: 200, potency: 3 });
           }
-          world.emit("deity:miracle", {
+          emitMiracle({
             playerId,
             deityId,
             effect: "lucky_buff",
@@ -1232,7 +1410,7 @@ function wireDeityMiracles(deity, deityId, world) {
           vit.maxHp * (deityDef?.alignment === "lawful" ? 0.6 : 0.4),
         );
         vit.hp = Math.min(vit.maxHp, vit.hp + healAmount);
-        world.emit("deity:miracle", {
+        emitMiracle({
           playerId,
           deityId,
           effect: "heal",
@@ -1253,7 +1431,7 @@ function wireDeityMiracles(deity, deityId, world) {
           (gluttonous ? GLUTTONOUS_MIRACLE_FEED_BONUS : 0);
         hunger.hunger = Math.max(0, hunger.hunger - feedAmount);
         hunger.satiation = (hunger.satiation || 0) + 50;
-        world.emit("deity:miracle", {
+        emitMiracle({
           playerId,
           deityId,
           effect: "satiate",
@@ -1279,7 +1457,7 @@ function wireDeityMiracles(deity, deityId, world) {
         const cured = before - status.statuses.length;
 
         if (cured > 0) {
-          world.emit("deity:miracle", {
+          emitMiracle({
             playerId,
             deityId,
             effect: "cure",
@@ -1300,7 +1478,7 @@ function wireDeityMiracles(deity, deityId, world) {
                 beat.state = "uncursed";
                 const itemName = world.get(itemId, NamedIdentity)?.name ||
                   "item";
-                world.emit("deity:miracle", {
+                emitMiracle({
                   playerId,
                   deityId,
                   effect: "uncurse_equipment",
@@ -1424,15 +1602,37 @@ function assessPlayerNeeds(world, playerId) {
 export function deitySystem(world) {
   wireWorldEvents(world);
 
+  const tickSet = new Set();
   for (const [entity, devotion] of world.query(Devotion)) {
-    if (!devotion?.deityId) continue;
-    const deity = ensureDeity(devotion.deityId, world);
-    if (!deity) continue;
+    const pantheon = devotionUsesPantheon(devotion);
+    const ids = pantheon
+      ? listPantheonDeityIds()
+      : [String(devotion?.deityId || "")].filter(Boolean);
+    for (const deityId of ids) {
+      const deity = ensureDeity(deityId, world);
+      if (!deity) continue;
+      tickSet.add(deityId);
+    }
+    // Keep active patron synchronized during regular ticks.
+    resolvePlayerDeity(world, entity);
+  }
 
-    // Tick the deity once per world step.
-    // Deity events are forwarded to the world bus.
+  for (const deityId of tickSet) {
+    const deity = ensureDeity(deityId, world);
+    if (!deity) continue;
     deity.tick(1);
   }
+}
+
+/**
+ * Resolve the current active deity for a specific player.
+ * Useful for systems like prayer that should respect pantheon patron shifts.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} playerId
+ * @returns {{ deityId: string, deity: import('../../lib/deity-js/deity.js').Deity }|null}
+ */
+export function resolvePlayerActiveDeity(world, playerId) {
+  return resolvePlayerDeity(world, playerId);
 }
 
 /**

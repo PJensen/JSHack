@@ -1,4 +1,4 @@
-import { ScriptRef as EcsScriptRef, installScriptsAPI, makeScriptRouter } from "../../lib/ecs-js/index.js";
+import { ScriptRef as EcsScriptRef, installScriptsAPI } from "../../lib/ecs-js/index.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Player } from "../components/Player.js";
 import { Position } from "../components/Position.js";
@@ -10,6 +10,7 @@ import { QuestVars } from "../components/QuestVars.js";
 import { compileQuest, listQuestEventNames } from "./registry.js";
 
 const QUEST_RUNTIME_KEY = Symbol.for("jshack:quests:runtime:installed");
+const QUEST_EVENT_ROUTES_KEY = Symbol.for("jshack:quests:runtime:eventRoutes");
 const QUEST_SCRIPT_ID = "quest.runtime";
 export const STARTER_PRIEST_FETCH_QUEST_ID = "starter.priest_fetch";
 export const STARTER_GRAVEYARD_QUEST_ID = STARTER_PRIEST_FETCH_QUEST_ID;
@@ -97,20 +98,26 @@ function buildQuestHandlers(world, qid, args) {
   return handlers;
 }
 
-function buildQuestRoutes() {
-  const routes = {};
-  for (const eventName of listQuestEventNames()) {
-    routes[eventName] = (_payload, world) => {
-      const ids = [];
-      for (const [id, state, ref] of world.query(QuestState, EcsScriptRef)) {
-        if (String(ref.id || "") !== QUEST_SCRIPT_ID) continue;
-        if (String(state.status || "active") !== "active") continue;
-        ids.push(id);
-      }
-      return ids;
-    };
+function routeQuestEvent(world, eventName, payload) {
+  for (const [id, state, ref, def] of world.query(QuestState, EcsScriptRef, QuestDefRef)) {
+    if (String(ref.id || "") !== QUEST_SCRIPT_ID) continue;
+    if (String(state.status || "active") !== "active") continue;
+    const compiled = compileQuest(def.id);
+    if (!compiled.edgesByEvent.has(eventName)) continue;
+    handleQuestEvent(world, id, eventName, payload, compiled);
   }
-  return routes;
+}
+
+export function ensureQuestRuntimeEventRoutes(world, eventNames = null) {
+  if (!world[QUEST_EVENT_ROUTES_KEY]) world[QUEST_EVENT_ROUTES_KEY] = new Set();
+  const routes = world[QUEST_EVENT_ROUTES_KEY];
+  const names = Array.isArray(eventNames) ? eventNames : listQuestEventNames();
+  for (const eventName of names) {
+    const key = String(eventName || "");
+    if (!key || routes.has(key)) continue;
+    routes.add(key);
+    world.on(key, (payload) => routeQuestEvent(world, key, payload));
+  }
 }
 
 export function installQuestRuntime(world) {
@@ -119,7 +126,7 @@ export function installQuestRuntime(world) {
 
   if (!world.scripts) installScriptsAPI(world);
   world.scripts.register(QUEST_SCRIPT_ID, buildQuestHandlers);
-  makeScriptRouter(buildQuestRoutes())(world);
+  ensureQuestRuntimeEventRoutes(world);
 }
 
 function findQuestInstance(world, questId, bindings = {}) {

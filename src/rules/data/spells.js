@@ -321,7 +321,7 @@ export const SPELL_DEFS = {
     id: 'blind',
     name: 'Blind',
     symbol: '\u{1F441}\u{FE0F}',   // 👁️
-    schools: ['illusion', 'darkness', 'alteration'],
+    schools: ['trickery', 'illusion', 'darkness', 'alteration'],
     manaCost: 12,
     minIntelligence: 8,
     range: 8,

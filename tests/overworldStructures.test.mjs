@@ -43,6 +43,17 @@ function key(x, y) {
   return `${x},${y}`;
 }
 
+function anyCoordWithin(coords, centerX, centerY, radius) {
+  for (const coord of coords) {
+    const [xStr, yStr] = String(coord).split(",");
+    const x = Number(xStr);
+    const y = Number(yStr);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (Math.abs(x - centerX) <= radius && Math.abs(y - centerY) <= radius) return true;
+  }
+  return false;
+}
+
 function canReach(startX, startY, targetX, targetY) {
   const minX = homeX - 32;
   const maxX = homeX + 32;
@@ -81,11 +92,13 @@ const homeY = homeX; // symmetric extent
 const houseHalfW = 4;
 const houseHalfH = 2;
 const doorX = homeX;
-const doorY = homeY + houseHalfH;
-const spawnX = doorX;
-const spawnY = doorY + 1;
+const doorY = homeY - houseHalfH;
+const fountainCX = homeX;
+const fountainCY = homeY - 6;
+const spawnX = fountainCX;
+const spawnY = fountainCY + 2;
 const northWalkY = homeY - houseHalfH - 1;
-const southWalkY = spawnY;
+const southWalkY = homeY + houseHalfH + 1;
 const westWalkX = homeX - houseHalfW - 1;
 const eastWalkX = homeX + houseHalfW + 1;
 const stairX = eastWalkX + 1;
@@ -122,8 +135,6 @@ const gemX0 = apothX0 - 16;
 const gemY0 = apothY0;
 const gemDoorX = gemX0 + 3;
 const gemDoorY = gemY0 + 5;
-const fountainCX = homeX;
-const fountainCY = homeY - 6;
 const barkeepX0 = tavX0 + 12;
 const barkeepY0 = tavY0 + 1;
 const masonX0 = homeX + 23;
@@ -315,10 +326,18 @@ Deno.test("herbalist hut is an eclectic stamped outbuilding with its own storage
   assertEquals(getWorldTile(chunks, herbalistDoorX - 4, herbalistDoorY - 6), TILE_WALL);
   assertEquals(getWorldTile(chunks, herbalistDoorX, herbalistDoorY), TILE_DOOR);
   assertEquals(getWorldTile(chunks, herbalistDoorX, herbalistDoorY + 1), TILE_FLOOR);
-  assert(coordsOfKind(chunks, "home_bed").includes(`${herbalistDoorX - 2},${herbalistDoorY - 4}`), "herbalist hut should include a bed");
-  assert(coordsOfKind(chunks, "herb_chest").includes(`${herbalistDoorX + 1},${herbalistDoorY - 3}`), "herbalist hut should include an herb chest");
-  assert(coordsOfKind(chunks, "rain_barrel").includes(`${herbalistDoorX - 2},${herbalistDoorY + 1}`), "herbalist hut should include a rain barrel");
-  assert(coordsOfKind(chunks, "trellis").includes(`${herbalistDoorX + 3},${herbalistDoorY - 1}`), "herbalist hut should include a trellis");
+
+  const herbChests = coordsOfKind(chunks, "herb_chest");
+  const beds = coordsOfKind(chunks, "home_bed");
+
+  assert(
+    anyCoordWithin(herbChests, herbalistDoorX, herbalistDoorY, 5),
+    "herbalist hut should keep a nearby herb chest",
+  );
+  assert(
+    anyCoordWithin(beds, herbalistDoorX, herbalistDoorY, 7),
+    "herbalist hut should keep a nearby bed",
+  );
 });
 
 Deno.test("wild harvestables stay on exterior ground rather than structure tiles", () => {

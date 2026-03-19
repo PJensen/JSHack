@@ -7,7 +7,6 @@ import { clamp01, rgba, pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { dragonBreath as drawDragonBreathGlyphFx } from "../passes/vfx/glyph/effects/dragonBreath.js";
 import { ArrowFx, LineFx, PulseFx, DeityBoltFx, ScreenFlashFx, ScreenBoltFx } from "./fxEntries.js";
-import { Player } from "../../rules/components/Player.js";
 
 const FIRE_BREATH_SPEED_TILES_PER_SEC = 5.25;
 const FIRE_BREATH_MIN_TRAVEL_SEC = 0.36;
@@ -239,6 +238,57 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     }
   }
 
+  function _spawnDivineIntervention(payload) {
+    const playerId = Number(payload?.playerId || 0) | 0;
+    if (!(playerId > 0)) return;
+    const pos = getPosition(playerId);
+    if (!pos) return;
+
+    const profile = getWrathVfxProfile(String(payload?.deityId || ''));
+    const kind = String(payload?.kind || '');
+    const boonBoost = (kind === 'boon' || kind === 'miracle') ? 1.45 : 1.0;
+    _deityPulses.push(new PulseFx({
+      x: Number(pos.x),
+      y: Number(pos.y),
+      ttl: 0.42,
+      color: profile.pulse,
+      max: 0.52,
+    }));
+    _deityPulses.push(new PulseFx({
+      x: Number(pos.x),
+      y: Number(pos.y),
+      ttl: 0.28,
+      color: profile.core,
+      max: 0.32,
+    }));
+
+    if (fx?.pool) {
+      const count = Math.max(18, Math.floor(26 * boonBoost));
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count;
+        const speed = (0.38 + Math.random() * 0.42) * boonBoost;
+        fx.pool.spawn(new Particle({
+          x: Number(pos.x) + (Math.random() - 0.5) * 0.15,
+          y: Number(pos.y) + (Math.random() - 0.5) * 0.15,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.12,
+          ay: 0.28,
+          life: 0.32 + Math.random() * 0.36,
+          size0: 0.05 + Math.random() * 0.07,
+          size1: 0.01,
+          r: profile.spark[0],
+          g: profile.spark[1],
+          b: profile.spark[2],
+          a0: 0.86,
+          rotVel: (Math.random() - 0.5) * 2.0,
+        }));
+      }
+    }
+
+    _screenFlash.push(new ScreenFlashFx({ ttl: 0.10, color: profile.pulse }));
+    startShake(cam, kind === 'boon' ? 3 : 2, 0.10);
+  }
+
   function _spawnFireBreathImpactParticles(entry) {
     const impacts = Array.isArray(entry.impactPositions) && entry.impactPositions.length
       ? entry.impactPositions
@@ -332,14 +382,20 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         wrathDebt: Number(wrathDebt || 0),
       });
     });
+    world.on('deity:intervention', (payload) => {
+      const kind = String(payload?.kind || '');
+      if (kind === 'miracle' || kind === 'boon' || kind === 'shrine_blessing' || kind === 'patron_shift' || kind === 'prayer_uncurse') {
+        _spawnDivineIntervention(payload);
+      }
+    });
     world.on('weather:lightning', ({ x, y }) => {
       if (Number.isFinite(x) && Number.isFinite(y)) {
         _spawnStormLightning({ x: Number(x), y: Number(y) });
       }
     });
-    world.on('electrocute:flash', ({ target }) => {
+    world.on('electrocute:flash', ({ target, isPlayer }) => {
       const id = Number(target || 0) | 0;
-      if (!(id > 0) || !world.has(id, Player)) return;
+      if (!(id > 0) || !isPlayer) return;
       _screenFlash.push(new ScreenFlashFx({ ttl: 0.18, color: [255, 255, 255], peak: 0.9 }));
       startShake(cam, 3, 0.12);
     });

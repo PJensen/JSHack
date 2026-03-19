@@ -211,6 +211,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const tx = Number.isFinite(x) ? (x | 0) : 0;
     const ty = Number.isFinite(y) ? (y | 0) : 0;
     const ids = [...itemsAt(world, tx, ty)];
+    const groundIds = [...ids];
     // Include chest contents on the tile.
     let chestId = 0;
     for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
@@ -240,16 +241,24 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         chestId,
       };
     }
-    if (groupedItems.length > 1) {
+
+    const floorStackItems = [];
+    for (const itemId of groundIds) {
+      const info = world.get(itemId, ItemInfo);
+      if (!info || info.type === 'currency') continue;
+      floorStackItems.push(buildItemDisplayData(info, itemId));
+    }
+
+    if (floorStackItems.length > 1) {
       return {
-        mode: 'multi',
-        count: totalCount,
-        items: groupedItems,
-        fromChest: false,
+        mode: 'stack',
+        count: floorStackItems.reduce((sum, item) => sum + Math.max(1, Number(item?.count || 0) | 0), 0),
+        items: floorStackItems,
+        stackIndex: 0,
       };
     }
 
-    const single = groupedItems[0];
+    const single = floorStackItems[0] || groupedItems[0];
     const set = world.get(actorId, Settings);
     const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
     return {
@@ -684,6 +693,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       detail: {
         identificationEnabled: isIdentificationEnabled(),
         hungerEnabled: set ? set.hungerEnabled !== false : true,
+        deityDebugPinned: set ? set.deityDebugPinned === true : false,
         allItemIds: listAllItemIds(),
         allMonsterIds: listAllMonsterIds(),
         hasPet,
@@ -705,6 +715,15 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     if (cur) {
       cur.hungerEnabled = enabled;
     }
+  });
+
+  addEventListener('ui:setDeityDebugPinned', (ev) => {
+    const enabled = !!ev?.detail?.enabled;
+    const p = playerEntity(world);
+    if (!p) return;
+    const cur = world.get(p.id, Settings);
+    if (!cur) return;
+    cur.deityDebugPinned = enabled;
   });
 
   addEventListener('ui:debugGiveItem', (ev) => {

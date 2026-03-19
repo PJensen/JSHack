@@ -1,8 +1,6 @@
 // src/display/fx/delayedDeathFxController.js
 // Display-only suppression for corpse/loot spawned by delayed-impact kills.
 
-import { Position } from "../../rules/components/Position.js";
-
 const DELAYED_DEATH_FX_INSTALLED = Symbol.for("jshack:display:delayedDeathFx:installed");
 
 function cellKey(x, y) {
@@ -13,9 +11,10 @@ function cellKey(x, y) {
  * @param {{
  *   world: import('../../lib/ecs-js/index.js').World,
  *   getFxTime?: () => number,
+ *   getPosition?: (id: number) => ({x:number,y:number}|null),
  * }} deps
  */
-export function createDelayedDeathFxController({ world, getFxTime }) {
+export function createDelayedDeathFxController({ world, getFxTime, getPosition }) {
   /** @type {Map<number, number>} */
   const delayedImpactUntilByTarget = new Map();
   /** @type {Map<string, { until:number, startedAt:number }>} */
@@ -69,7 +68,7 @@ export function createDelayedDeathFxController({ world, getFxTime }) {
       if (!(targetId > 0)) return;
       const until = Number(delayedImpactUntilByTarget.get(targetId) || 0);
       if (!(until > now())) return;
-      const pos = world.get(targetId, Position);
+      const pos = getPosition ? getPosition(targetId) : null;
       if (!pos) return;
       delayedDeathCells.set(cellKey(pos.x, pos.y), { until, startedAt: now() });
       const snap = entitySnapshots.get(targetId);

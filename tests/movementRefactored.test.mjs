@@ -12,7 +12,9 @@ import { Stamina } from "../src/rules/components/Stamina.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Collider } from "../src/rules/components/Collider.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { movementSystem, installSpiderWebListener } from "../src/rules/systems/movementSystem.js";
+import { installBumpInteractListener } from "../src/rules/systems/interactionSystem.js";
 import { loadChunk, clearAll, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_TREE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 
@@ -300,6 +302,96 @@ Deno.test("movementSystem: spider web listener spawns web on departure", () => {
       }
     }
     assert(webFound, "spider should leave a web at its departure tile");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: spider web listener tracks spawned webs on current floor", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    installSpiderWebListener(world);
+
+    const spider = world.create();
+    world.add(spider, Position, { x: 5, y: 5 });
+    world.add(spider, NamedIdentity, { name: "Spider", identity: "spider" });
+
+    const dungeon = world.create();
+    world.add(dungeon, DungeonState, {
+      worldSeed: world.seed >>> 0,
+      currentDepth: 1,
+      floorEntityIds: [spider],
+      downStairPositions: [],
+      destroyedTiles: {},
+    });
+
+    world.add(spider, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+
+    let webId = 0;
+    for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
+      if (ni.identity === "web" && pos.x === 5 && pos.y === 5) {
+        webId = id;
+        break;
+      }
+    }
+    assert(webId > 0, "spider should leave a web at its departure tile");
+    const ds = world.get(dungeon, DungeonState);
+    assert(ds.floorEntityIds.includes(webId), "spawned web should be tracked in floorEntityIds");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: player bump clears runtime-spawned spider web", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    installSpiderWebListener(world);
+    installBumpInteractListener(world);
+
+    const spider = world.create();
+    world.add(spider, Position, { x: 5, y: 5 });
+    world.add(spider, NamedIdentity, { name: "Spider", identity: "spider" });
+
+    const player = world.create();
+    world.add(player, Position, { x: 4, y: 5 });
+    world.add(player, NamedIdentity, { name: "Player", identity: "player" });
+    world.add(player, Player);
+
+    const dungeon = world.create();
+    world.add(dungeon, DungeonState, {
+      worldSeed: world.seed >>> 0,
+      currentDepth: 1,
+      floorEntityIds: [spider, player],
+      downStairPositions: [],
+      destroyedTiles: {},
+    });
+
+    world.add(spider, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+
+    // Advance world step so tile query snapshots refresh for next action.
+    world.setScheduler(() => {});
+    world.tick(0);
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+
+    // world.destroy() is deferred; flush command queue to apply web removal.
+    world.tick(0);
+
+    let webStillAtTile = false;
+    for (const [, ni, pos] of world.query(NamedIdentity, Position)) {
+      if (ni.identity === "web" && pos.x === 5 && pos.y === 5) {
+        webStillAtTile = true;
+        break;
+      }
+    }
+    assertEquals(webStillAtTile, false, "bumping spawned web should clear it");
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+    const p = world.get(player, Position);
+    assertEquals(p.x, 5, "after clear, player should be able to step onto former web tile");
+    assertEquals(p.y, 5, "after clear, player should keep y position");
   } finally { clearAll(); }
 });
 

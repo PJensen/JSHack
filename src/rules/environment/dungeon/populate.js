@@ -8,6 +8,7 @@ import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Collider } from '../../components/Collider.js';
+import TombstoneComponent from '../../components/Tombstone.js';
 import { Material } from '../../components/Material.js';
 import { Polymorph } from '../../components/Polymorph.js';
 import { DoorKey } from '../../components/DoorKey.js';
@@ -457,7 +458,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         for (let wx = room.x + 1; wx < room.x + room.w - 1; wx++) {
           if (rng.next() < 0.30) {
             const spawnerHere = roomSpawners.find(s => s.x === wx && s.y === wy);
-            if (!spawnerHere || spawnerHere.isSpider) {
+            if ((!spawnerHere || spawnerHere.isSpider) && !isSolid(wx, wy)) {
               spawns.push({ x: wx, y: wy, kind: 'web', params: {} });
             }
           }
@@ -507,7 +508,11 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       if (!isSolid(chx, chy)) {
         markSolid(chx, chy);
         const d = floorPlan.depth;
-        const tableId = d >= 14 ? 'chest:legendary' : d >= 8 ? 'chest:magic' : 'chest:basic';
+        const cr = rng.next();
+        const tableId = (d >= 14 || cr < 0.02) ? 'chest:legendary'
+                      : (d >= 10 || cr < 0.08) ? 'chest:epic'
+                      : (d >= 8  || cr < 0.15) ? 'chest:magic'
+                      : 'chest:basic';
         spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
       }
     }
@@ -593,7 +598,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
           if (verminId === 'cave_spider') {
             for (let wy = vRoom.y + 1; wy < vRoom.y + vRoom.h - 1; wy++) {
               for (let wx = vRoom.x + 1; wx < vRoom.x + vRoom.w - 1; wx++) {
-                if (rng.next() < 0.30) {
+                if (rng.next() < 0.30 && !isSolid(wx, wy)) {
                   spawns.push({ x: wx, y: wy, kind: 'web', params: {} });
                 }
               }
@@ -1035,6 +1040,7 @@ export function materializeSpawn(world, spawn) {
       const ni = world.get(id, NamedIdentity);
       if (ni) {
         if (lootTable === 'chest:legendary') { ni.identity = 'legendary_chest'; ni.name = 'Legendary Chest'; }
+        else if (lootTable === 'chest:epic') { ni.identity = 'epic_chest'; ni.name = 'Epic Chest'; }
         else if (lootTable === 'chest:magic') { ni.identity = 'magic_chest'; ni.name = 'Magic Chest'; }
         else { ni.identity = 'basic_chest'; }
       }
@@ -1307,7 +1313,23 @@ export function materializeSpawn(world, spawn) {
     case 'message_board':
       return createFrom(world, MessageBoard, { x: spawn.x, y: spawn.y });
     case 'grave_tombstone':
-      return createFrom(world, GraveTombstone, { x: spawn.x, y: spawn.y });
+      {
+        const id = createFrom(world, GraveTombstone, { x: spawn.x, y: spawn.y });
+        const data = spawn?.params?.tombstoneData || null;
+        if (id > 0 && data) {
+          const epitaph = generateEpitaph(data);
+          world.add(id, TombstoneComponent, {
+            playerName: data.playerName || 'Hero',
+            depth: Number.isFinite(data.depth) ? (data.depth | 0) : 0,
+            cause: data.cause || 'unknown',
+            killerName: data.killerName || null,
+            turn: Number.isFinite(data.turn) ? (data.turn | 0) : 0,
+            epitaph,
+          });
+          world.set(id, Interactable, { action: 'readTombstone', params: null });
+        }
+        return id;
+      }
     case 'tombstone': {
       const data = spawn.params;
       const epitaph = generateEpitaph(data);

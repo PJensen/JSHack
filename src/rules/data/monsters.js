@@ -894,7 +894,14 @@ export function listAllMonsterIds() {
 
 /** @param {MonsterDef} def @returns {string} loot table ID */
 export function getMonsterLootTable(def) {
-  return def.lootTable || `drop:tier${def.tier}`;
+  if (def.lootTable) return def.lootTable;
+  const tags = def.tags || [];
+  // Tag priority: caster > beast > humanoid > undead > tier fallback
+  if (tags.includes('caster'))   return 'drop:caster';
+  if (tags.includes('beast'))    return 'drop:beast';
+  if (tags.includes('humanoid')) return 'drop:humanoid';
+  if (tags.includes('undead'))   return 'drop:undead';
+  return `drop:tier${def.tier}`;
 }
 
 /**

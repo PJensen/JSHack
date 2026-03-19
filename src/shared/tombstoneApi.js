@@ -3,6 +3,15 @@
 // Calls are fire-and-forget; callers should .catch() any errors they wish to log.
 
 const TOMBSTONE_ENDPOINT = "https://tombstone.jensen-petej.workers.dev";
+/** @type {Array<{playerName: string, score: number, className: string, depth?: number}>|null} */
+let _cachedHighscores = null;
+
+/**
+ * @returns {Array<{playerName: string, score: number, className: string, depth?: number}>|null}
+ */
+export function getCachedHighscores() {
+  return Array.isArray(_cachedHighscores) ? _cachedHighscores.slice() : null;
+}
 
 /**
  * @param {string} path - Endpoint path (e.g. "/tombstone" or "/created")
@@ -37,4 +46,21 @@ export function postDeathTombstone(tombstone) {
  */
 export function postCharacterCreated(created) {
   return postToWorker("/created", created);
+}
+
+/**
+ * Fetch the global highscores leaderboard.
+ * @returns {Promise<Array<{playerName: string, score: number, className: string}>|null>}
+ */
+export async function getHighscores() {
+  try {
+    const res = await fetch(`${TOMBSTONE_ENDPOINT}/highscores`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const scores = Array.isArray(data?.highscores) ? data.highscores : null;
+    _cachedHighscores = Array.isArray(scores) ? scores.slice() : null;
+    return scores;
+  } catch {
+    return null;
+  }
 }

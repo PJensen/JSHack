@@ -103,15 +103,14 @@ Deno.test("populateChunk generates spawns in rooms", () => {
 
 Deno.test("populateChunk scales monster count with depth", () => {
   const chunk = generateChunk(42, 1, 0, 0);
-  const rng1 = createRng(123);
-  const rng5 = createRng(123);
-  const spawns1 = populateChunk(chunk, { depth: 1, difficultyMult: 1.0 }, rng1);
-  const spawns5 = populateChunk(chunk, { depth: 5, difficultyMult: 1.6 }, rng5);
-
-  const monsters1 = spawns1.filter(s => s.kind === 'monster').length;
-  const monsters5 = spawns5.filter(s => s.kind === 'monster').length;
-  // Higher difficulty should yield more monsters (or equal due to rng variance)
-  assert(monsters5 >= monsters1, `depth 5 (${monsters5}) >= depth 1 (${monsters1})`);
+  // Use independent seeds so conditional rng branches in one run don't corrupt the other.
+  // Sum across multiple seeds to smooth out per-seed variance.
+  let total1 = 0, total5 = 0;
+  for (let s = 1; s <= 20; s++) {
+    total1 += populateChunk(chunk, { depth: 1, difficultyMult: 1.0 }, createRng(s * 7)).filter(sp => sp.kind === 'monster').length;
+    total5 += populateChunk(chunk, { depth: 5, difficultyMult: 1.6 }, createRng(s * 7 + 1)).filter(sp => sp.kind === 'monster').length;
+  }
+  assert(total5 >= total1, `depth 5 total (${total5}) >= depth 1 total (${total1}) across 20 seeds`);
 });
 
 Deno.test("populateChunk can generate a shallow spawner", () => {

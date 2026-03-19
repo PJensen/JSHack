@@ -53,5 +53,5 @@ Deno.test("stampBuilding resolves shop metadata from authored building JSON", ()
   assertEquals(hut.waypoints.front_door, { x: 18, y: 28 });
   assertEquals(hut.waypoints.resident_home, { x: 18, y: 26 });
   assertEquals(hut.waypoints.herb_work, { x: 19, y: 25 });
-  assertEquals(hut.spawns.home_bed, { x: 16, y: 24 });
+  assertEquals(hut.spawns.home_bed, { x: 15, y: 23 });
 });

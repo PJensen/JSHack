@@ -85,7 +85,10 @@ export function computeVisionEnvelopeModifier(world, entityId) {
     const hold    = Number(e.hold    || 0);
     const rampOut = Number(e.rampOut || 0);
     const totalTicks = rampIn + hold + rampOut;
-    const elapsed = totalTicks - (Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0);
+    // Use elapsed+1 so a newly applied envelope is visible immediately on read.
+    // This mirrors effectSystem's processing semantics and avoids a one-turn
+    // perceived delay between application and gameplay/UI impact.
+    const elapsed = totalTicks - (Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0) + 1;
     const envelopeValue = computeEnvelopeValue(
       Number(e.startValue ?? 0),
       Number(e.toValue    ?? 0),
@@ -136,9 +139,10 @@ export function getEffectiveVisionRange(world, entityId) {
  * @param {number} holdFor    ticks to hold at toValue
  * @param {number} rampOut    ticks to recover from toValue to endValue
  * @param {number} [endValue] final value after recovery; defaults to captured startValue
+ * @param {{ stack?: boolean }} [opts]  stack:true updates an existing visionRange envelope (deepens toValue, resets duration) instead of pushing a new one
  * @returns {boolean} false if the target has no ActiveEffects component and one could not be added
  */
-export function blind(world, targetId, toValue, rampIn, holdFor, rampOut, endValue = undefined) {
+export function blind(world, targetId, toValue, rampIn, holdFor, rampOut, endValue = undefined, opts = {}) {
   const id = Number(targetId || 0) | 0;
   if (!(id > 0)) return false;
 
@@ -155,6 +159,20 @@ export function blind(world, targetId, toValue, rampIn, holdFor, rampOut, endVal
     ae = world.get(id, ActiveEffects);
   }
   if (!ae || !Array.isArray(ae.effects)) return false;
+
+  if (opts.stack) {
+    const existing = ae.effects.find(e => e && e.key === 'stat_envelope' && e.stat === 'visionRange');
+    if (existing) {
+      existing.startValue = startValue;
+      existing.toValue    = Math.min(Number(existing.toValue), Number(toValue));
+      existing.endValue   = resolvedEndValue;
+      existing.rampIn     = rampIn  | 0;
+      existing.hold       = holdFor | 0;
+      existing.rampOut    = rampOut | 0;
+      existing.turnsLeft  = totalTicks;
+      return true;
+    }
+  }
 
   ae.effects.push({
     key: 'stat_envelope',

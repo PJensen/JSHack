@@ -3,6 +3,8 @@
 // Data is passed in by main.js via showCharCreation(opts).
 import { versionLoaded, getVersionState } from '../../shared/version.js';
 import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
+import { getHighscores } from '../../shared/tombstoneApi.js';
+import { HINTS } from '../../shared/data/hints.js';
 
 /**
  * @param {{
@@ -22,6 +24,7 @@ function writeSavedName(name) {
 
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
   let selectedClassId = null;
+  let hintIntervalId = null;
   const savedName = readSavedName();
   const fallbackName = savedName || pickRandomCharacterName();
 
@@ -236,14 +239,22 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   box.appendChild(musicNudge);
 
-  // ---- name input ----
+  // ---- name + seed row ----
+  const nameSeadRow = document.createElement('div');
+  Object.assign(nameSeadRow.style, {
+    display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'flex-end',
+  });
+
+  // name column
+  const nameCol = document.createElement('div');
+  Object.assign(nameCol.style, { flex: '1', minWidth: '0' });
+
   const nameLabel = document.createElement('label');
   nameLabel.textContent = 'Name';
   Object.assign(nameLabel.style, {
     display: 'block', fontSize: '13px', color: '#6a8ab0',
     marginBottom: '4px', textAlign: 'left',
   });
-  box.appendChild(nameLabel);
 
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
@@ -257,20 +268,32 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     fontSize: '18px', fontFamily: 'monospace',
     background: '#111827', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px',
-    outline: 'none', marginBottom: '20px',
+    outline: 'none',
   });
   nameInput.addEventListener('focus', () => { nameInput.style.borderColor = '#4a6a9a'; });
   nameInput.addEventListener('blur', () => { nameInput.style.borderColor = '#2d3b52'; });
-  box.appendChild(nameInput);
 
-  // ---- seed input ----
+  const nameRemembered = document.createElement('div');
+  nameRemembered.textContent = 'Your name will be remembered.';
+  Object.assign(nameRemembered.style, {
+    fontSize: '11px', color: '#4a6080', fontStyle: 'italic',
+    marginBottom: '4px', textAlign: 'left',
+  });
+
+  nameCol.appendChild(nameLabel);
+  nameCol.appendChild(nameInput);
+  nameCol.appendChild(nameRemembered);
+
+  // seed column
+  const seedCol = document.createElement('div');
+  Object.assign(seedCol.style, { width: '140px', flexShrink: '0' });
+
   const seedLabel = document.createElement('label');
   seedLabel.textContent = 'Seed';
   Object.assign(seedLabel.style, {
     display: 'block', fontSize: '13px', color: '#6a8ab0',
     marginBottom: '4px', textAlign: 'left',
   });
-  box.appendChild(seedLabel);
 
   const seedInput = document.createElement('input');
   seedInput.type = 'text';
@@ -281,22 +304,28 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   Object.assign(seedInput.style, {
     display: 'block', width: '100%', boxSizing: 'border-box',
     minHeight: '44px', padding: '8px 12px',
-    fontSize: '18px', fontFamily: 'monospace',
+    fontSize: '14px', fontFamily: 'monospace',
     background: '#111827', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px',
-    outline: 'none', marginBottom: '4px',
+    outline: 'none',
   });
   seedInput.addEventListener('focus', () => { seedInput.style.borderColor = '#4a6a9a'; });
   seedInput.addEventListener('blur', () => { seedInput.style.borderColor = '#2d3b52'; });
-  box.appendChild(seedInput);
 
   const seedHint = document.createElement('div');
   seedHint.textContent = 'Hex or number';
   Object.assign(seedHint.style, {
     fontSize: '11px', color: '#4a6080',
-    marginBottom: '20px', textAlign: 'left',
+    marginTop: '3px', textAlign: 'left',
   });
-  box.appendChild(seedHint);
+
+  seedCol.appendChild(seedLabel);
+  seedCol.appendChild(seedInput);
+  seedCol.appendChild(seedHint);
+
+  nameSeadRow.appendChild(nameCol);
+  nameSeadRow.appendChild(seedCol);
+  box.appendChild(nameSeadRow);
 
   /** Parse the seed input — accepts hex (0x...) or plain integers. Returns null if invalid. */
   function parseSeed(raw) {
@@ -307,45 +336,32 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     return null;
   }
 
-  // ---- class section ----
-  const classLabel = document.createElement('div');
-  classLabel.textContent = 'Choose your path';
-  Object.assign(classLabel.style, {
-    fontSize: '13px', color: '#6a8ab0',
-    marginBottom: '10px', textAlign: 'left',
-  });
-  box.appendChild(classLabel);
+  // ---- class icon row ----
+  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨', archeologist: '⛏️', warlock: '🔮' };
 
-  // ---- class grid (2x3) ----
   const grid = document.createElement('div');
   Object.assign(grid.style, {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '10px',
-    marginBottom: '10px',
+    display: 'flex', justifyContent: 'space-between',
+    gap: '8px', marginBottom: '10px',
   });
-
-  const CLASS_ICONS = { druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨', archeologist: '⛏️', warlock: '🔮' };
 
   const cards = [];
   for (const cls of classes) {
     const card = document.createElement('div');
     card.dataset.classId = cls.id;
+    card.title = cls.name;
     Object.assign(card.style, {
-      padding: '10px 10px',
+      flex: '1',
+      padding: '10px 4px',
       background: '#111827', border: '2px solid #1e2a3e',
       borderRadius: '8px', cursor: 'pointer',
-      textAlign: 'center',
+      textAlign: 'center', fontSize: '22px',
       transition: 'border-color 120ms, background 120ms',
+      userSelect: 'none',
     });
 
-    const cName = document.createElement('div');
     const icon = /** @type {any} */ (CLASS_ICONS)[cls.id];
-    cName.textContent = icon ? `${icon} ${cls.name}` : cls.name;
-    Object.assign(cName.style, {
-      fontSize: '14px', fontWeight: 'bold', color: '#cfe8ff',
-    });
-    card.appendChild(cName);
+    card.textContent = icon ?? cls.name[0];
 
     card.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -362,6 +378,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       confirmBtn.disabled = false;
       confirmBtn.style.opacity = '1';
       confirmBtn.style.cursor = 'pointer';
+      confirmBtn.textContent = `Begin as a ${cls.name}`;
     });
 
     grid.appendChild(card);
@@ -396,7 +413,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   // ---- confirm button ----
   const confirmBtn = document.createElement('button');
-  confirmBtn.textContent = 'Begin';
+  confirmBtn.textContent = 'Choose a class';
   confirmBtn.disabled = true;
   Object.assign(confirmBtn.style, {
     display: 'block', width: '100%',
@@ -417,6 +434,90 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     dispose();
   });
   box.appendChild(confirmBtn);
+
+  // ---- "Did you know?" hint strip ----
+  {
+    let hintIndex = Math.floor(Math.random() * HINTS.length);
+
+    const hintStrip = document.createElement('div');
+    Object.assign(hintStrip.style, {
+      marginTop: '20px', borderTop: '1px solid #1e2a3e', paddingTop: '12px',
+      fontSize: '11px', color: '#5a7a9a', fontStyle: 'italic',
+      textAlign: 'center', lineHeight: '1.5',
+      transition: 'opacity 400ms',
+      opacity: '1',
+    });
+
+    const hintIcon = document.createElement('span');
+    hintIcon.textContent = '💡 ';
+    Object.assign(hintIcon.style, { fontStyle: 'normal' });
+
+    const hintText = document.createElement('span');
+    hintText.textContent = HINTS[hintIndex];
+
+    hintStrip.appendChild(hintIcon);
+    hintStrip.appendChild(hintText);
+    box.appendChild(hintStrip);
+
+    hintIntervalId = setInterval(() => {
+      hintStrip.style.opacity = '0';
+      setTimeout(() => {
+        hintIndex = (hintIndex + 1) % HINTS.length;
+        hintText.textContent = HINTS[hintIndex];
+        hintStrip.style.opacity = '1';
+      }, 400);
+    }, 7000);
+  }
+
+  // ---- global highscores ----
+  {
+    const hsSection = document.createElement('div');
+    Object.assign(hsSection.style, {
+      marginTop: '20px', borderTop: '1px solid #1e2a3e', paddingTop: '14px',
+    });
+    const hsHeading = document.createElement('div');
+    hsHeading.textContent = 'Global Highscores';
+    Object.assign(hsHeading.style, {
+      fontSize: '11px', color: '#3a5070', textTransform: 'uppercase',
+      letterSpacing: '0.1em', marginBottom: '8px',
+    });
+    hsSection.appendChild(hsHeading);
+    const hsList = document.createElement('div');
+    hsList.textContent = 'Loading\u2026';
+    Object.assign(hsList.style, { fontSize: '12px', color: '#3a5070' });
+    hsSection.appendChild(hsList);
+    box.appendChild(hsSection);
+    getHighscores().then(scores => {
+      hsList.textContent = '';
+      if (!scores || scores.length === 0) return;
+      const top = scores.slice(0, 5);
+      for (let i = 0; i < top.length; i++) {
+        const entry = top[i];
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+          display: 'flex', gap: '8px', lineHeight: '1.7',
+          fontSize: '12px', fontFamily: 'monospace', color: '#7a9ab0',
+        });
+        const rankEl = document.createElement('span');
+        rankEl.textContent = `#${i + 1}`;
+        rankEl.style.cssText = 'width:2.2em;text-align:right;flex-shrink:0;color:#3a5878';
+        const nameEl = document.createElement('span');
+        nameEl.textContent = entry.playerName || '???';
+        nameEl.style.cssText = 'flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        const scoreEl = document.createElement('span');
+        scoreEl.textContent = String(entry.score ?? 0);
+        scoreEl.style.cssText = 'text-align:right;flex-shrink:0;color:#90c89a';
+        const clsEl = document.createElement('span');
+        clsEl.textContent = entry.className || '';
+        clsEl.style.cssText = 'width:5.5em;text-align:left;flex-shrink:0;color:#7090b0;opacity:0.8';
+        row.appendChild(rankEl);
+        row.appendChild(nameEl);
+        row.appendChild(scoreEl);
+        row.appendChild(clsEl);
+        hsList.appendChild(row);
+      }
+    }).catch(() => { hsList.textContent = ''; });
+  }
 
   panel.appendChild(bgCanvas);
   panel.appendChild(box);
@@ -439,6 +540,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   function dispose() {
     if (bgRafId !== null) cancelAnimationFrame(bgRafId);
+    if (hintIntervalId !== null) clearInterval(hintIntervalId);
     window.removeEventListener('resize', resizeBgCanvas);
     if (panel.parentNode) panel.parentNode.removeChild(panel);
   }
