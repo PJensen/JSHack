@@ -12,9 +12,18 @@ import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
  * }} opts
  * @returns {{ dispose: () => void }}
  */
+const SAVED_NAME_KEY = 'jshack.playerName';
+function readSavedName() {
+  try { return localStorage.getItem(SAVED_NAME_KEY) || ''; } catch { return ''; }
+}
+function writeSavedName(name) {
+  try { localStorage.setItem(SAVED_NAME_KEY, name); } catch {}
+}
+
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
   let selectedClassId = null;
-  const fallbackName = pickRandomCharacterName();
+  const savedName = readSavedName();
+  const fallbackName = savedName || pickRandomCharacterName();
 
   // ---- backdrop (full-viewport, blocks all input) ----
   const panel = document.createElement('div');
@@ -403,6 +412,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     if (confirmBtn.disabled) return;
     const name = (nameInput.value || '').trim() || fallbackName;
     const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
+    writeSavedName(name);
     onConfirm({ name, classId: selectedClassId, seed });
     dispose();
   });
@@ -421,6 +431,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       e.preventDefault();
       const name = (nameInput.value || '').trim() || fallbackName;
       const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
+      writeSavedName(name);
       onConfirm({ name, classId: selectedClassId, seed });
       dispose();
     }

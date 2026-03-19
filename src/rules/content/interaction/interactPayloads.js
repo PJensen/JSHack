@@ -1153,8 +1153,8 @@ export const INTERACT_PAYLOADS = {
         }
       }
 
-      // Chopped trees become walkable stumps.
-      if (node.kind === "tree") {
+      // Chopped trees and picked mushrooms become walkable.
+      if (node.kind === "tree" || node.kind === "mushrooms") {
         const col = world.get(targetId, Collider);
         if (col) {
           world.set(targetId, Collider, { solid: false, blocksSight: false });

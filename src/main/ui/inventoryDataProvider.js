@@ -614,6 +614,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     let playerName = 'Hero';
     let playerClass = 'unknown';
+    let seed = 0;
     const stats = {};
     const gear = [];
     const inv = [];
@@ -643,6 +644,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       stats.turn = Math.max(0, Number(world.step || 0) | 0);
       for (const [, ds] of world.query(DungeonState)) {
         stats.depth = Math.max(0, Number(ds?.currentDepth || 0) | 0);
+        seed = ds?.worldSeed ?? 0;
         break;
       }
       if (eq) {
@@ -664,7 +666,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       }
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:bugReportData', {
-      detail: { playerName, playerClass, stats, gear, inv, effects },
+      detail: { playerName, playerClass, stats, gear, inv, effects, seed },
     }));
   });
 
