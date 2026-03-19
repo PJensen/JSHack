@@ -407,13 +407,12 @@ export function buildWorldView(world) {
 		break;
 	}
 
-	// Compute night darkness (overworld only, aligned to NPC phase schedule)
+	// Compute night darkness (overworld only, derived from PHASE_BOUNDS)
 	// sleep→dark, breakfast→dawn, work→bright, pub→dusk, home→dark
 	_view.nightAlpha = 0;
 	if (_isOverworld) {
 		const turnInDay = world.step % TURNS_PER_DAY;
 		const breakfast = PHASE_BOUNDS[1]; // dawn transition
-		const work      = PHASE_BOUNDS[2]; // daytime
 		const pub       = PHASE_BOUNDS[3]; // dusk transition
 		if (turnInDay < breakfast.start || turnInDay >= pub.end) {
 			_view.nightAlpha = 1;
