@@ -5501,6 +5501,25 @@ function renderDeathScreen(panel, detail) {
     box.appendChild(document.createElement('br'));
   }
 
+  // New Game button
+  {
+    const newGameBtn = document.createElement('a');
+    newGameBtn.href = location.origin + location.pathname;
+    newGameBtn.textContent = '\u2694 New Game';
+    Object.assign(newGameBtn.style, {
+      display: 'inline-block', padding: '10px 22px',
+      background: '#1a2e1a', color: '#b4ffb4', fontFamily: 'monospace',
+      border: '1px solid #2d523b', borderRadius: '6px',
+      cursor: 'pointer', textDecoration: 'none', fontSize: '14px',
+      marginBottom: '12px',
+      transition: 'background 120ms',
+    });
+    newGameBtn.addEventListener('mouseenter', () => { newGameBtn.style.background = '#244824'; });
+    newGameBtn.addEventListener('mouseleave', () => { newGameBtn.style.background = '#1a2e1a'; });
+    box.appendChild(newGameBtn);
+    box.appendChild(document.createElement('br'));
+  }
+
   // JS-Hack link
   const jshackLink = document.createElement('a');
   jshackLink.href = 'https://pjensen.github.io/JSHack/';
