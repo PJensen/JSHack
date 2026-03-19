@@ -4193,6 +4193,16 @@ function render(worldView) {
   // Heavy rain dark tint overlay (also suppressed indoors)
   weatherFx.drawScreenTint(ctx, W, H, effectiveWeather);
 
+  // Night darkness tint (overworld only, smooth dawn/dusk transitions)
+  if (worldView.nightAlpha > 0.01) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = `rgba(8, 12, 28, ${(worldView.nightAlpha * 0.38).toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
   sceneRuntime.drawSpeechBubble(ctx);

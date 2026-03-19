@@ -422,7 +422,7 @@ export const MONSTERS = [
     id: 'skeletal_agony_warlock',
     name: 'Skeletal Agony Warlock',
     tags: ['undead', 'skeletal', 'caster', 'warlock'],
-    tier: 2,
+    tier: 0,
     intelligence: 10,
     visionRange: 9,
     retreatHpPct: 0.25,
