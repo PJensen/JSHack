@@ -29,6 +29,7 @@ import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
+import { isVisible as isTileVisible } from "../environment/dungeon/exploredMap.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
@@ -345,6 +346,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp|0) <= 0) continue;
+    if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
     // within max radius (LOS is checked per-hop, not globally)
     if (d2(apos.x, apos.y, p.x, p.y) <= MAX_R*MAX_R) {
       candidates.push({ id, x: p.x, y: p.y });
@@ -905,6 +907,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
 REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const isBlocked = createLOSBlocker(world);
 
   const MAX_R = 10;
@@ -921,6 +924,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
     if (!fac || fac.key !== 'enemy') continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
+    if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
     const dist2 = d2(apos.x, apos.y, p.x, p.y);
     if (dist2 <= MAX_R * MAX_R) {
       candidates.push({ id, x: p.x, y: p.y, dist2 });
@@ -1292,6 +1296,7 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
     if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
+    if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
     const dist2 = d2(apos.x, apos.y, p.x, p.y);
     if (dist2 <= MAX_R * MAX_R) {
       candidates.push({ id, x: p.x, y: p.y, dist2 });

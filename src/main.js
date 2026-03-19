@@ -1320,6 +1320,7 @@ addEventListener('ui:castActiveSpell', () => {
       const vit = /** @type any */ (world.get(eid, Vitality));
       if (!vit || (vit.hp | 0) <= 0) return;
       if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
+      if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
       enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
     });
 
@@ -1618,6 +1619,7 @@ addEventListener('ui:shootRanged', () => {
     if (!vit || (vit.hp | 0) <= 0) return;
     const tx = pos.x | 0, ty = pos.y | 0;
     if (!hasLOS(px, py, tx, ty, isBlocked)) return;
+    if (!isTileVisible(tx, ty)) return;
     const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
     if (dist < bestDist) { bestDist = dist; bestId = id; }
   });

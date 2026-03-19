@@ -21,6 +21,7 @@ export const basePalette = {
   floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
   pit_viper: { glyph: "S", fg: "#44dd44", glow: "#22aa22" },
   dragon_whelp: { glyph: "D", fg: "#ff8a2b", glow: "#ff5a12" },
+  cave_bear: { glyph: "B", fg: "#8b6040", glow: "#5a3a20" },
   skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   kobold_shaman: { glyph: "k", fg: "#ffdd44", glow: "#ccaa22" },
   // Tier 1
