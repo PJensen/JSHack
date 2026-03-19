@@ -3237,6 +3237,7 @@ function renderCharacterSheet(panel, data) {
       const snapshot = d
         ? [
           `**Character:** ${d.playerName} (${d.playerClass})`,
+          `**Seed:** ${d.seed ? (d.seed >>> 0).toString(16).toUpperCase() : '???'}`,
           `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
           `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
           `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,

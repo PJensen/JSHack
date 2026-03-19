@@ -32,6 +32,7 @@ export function pickProfile(rng, depth) {
 }
 
 function _pickType(rng, depth) {
+  if (depth === 2) return 'caves'; // special: depth 2 is always caves
   if (depth <= 3) return rng.next() < 0.7 ? 'catacombs' : 'default';
   if (depth <= 8) {
     const r = rng.next();

@@ -168,11 +168,18 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   // At shallow depths (stairOffset = 0) they share chunk (0,0) and land in different rooms.
   const count = rng.int(dungeonConfig.minDownStairs, dungeonConfig.maxDownStairs);
   const downStairs = [];
+  const _usedChunks = new Set();
   for (let i = 0; i < count; i++) {
     let cX = 0, cY = 0;
     if (stairOffset > 0) {
-      cX = rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
-      cY = rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+      // Retry up to 8 times to avoid placing two down-stairs in the same chunk.
+      let attempts = 0;
+      do {
+        cX = rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+        cY = rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+        attempts++;
+      } while (_usedChunks.has(`${cX},${cY}`) && attempts < 8);
+      _usedChunks.add(`${cX},${cY}`);
     }
     downStairs.push({
       chunkX: cX,
