@@ -27,7 +27,7 @@ import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
-import { TURNS_PER_DAY } from "../../rules/data/calendar.js";
+import { TURNS_PER_DAY, PHASE_BOUNDS } from "../../rules/data/calendar.js";
 import { QuestBindings } from "../../rules/components/QuestBindings.js";
 import { QuestState } from "../../rules/components/QuestState.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
@@ -407,23 +407,22 @@ export function buildWorldView(world) {
 		break;
 	}
 
-	// Compute night darkness (overworld only, smooth day-night cycle)
+	// Compute night darkness (overworld only, aligned to NPC phase schedule)
+	// sleep→dark, breakfast→dawn, work→bright, pub→dusk, home→dark
 	_view.nightAlpha = 0;
 	if (_isOverworld) {
-		const t = (world.step % TURNS_PER_DAY) / TURNS_PER_DAY; // 0→1 within day
-		// Dawn/dusk fractions (auto-scale with TURNS_PER_DAY)
-		const DAWN_START = 0.208; // ~150/720  (5:00 AM)
-		const DAWN_END   = 0.292; // ~210/720  (7:00 AM)
-		const DUSK_START = 0.708; // ~510/720  (5:00 PM)
-		const DUSK_END   = 0.806; // ~580/720  (7:20 PM)
-		if (t < DAWN_START || t >= DUSK_END) {
+		const turnInDay = world.step % TURNS_PER_DAY;
+		const breakfast = PHASE_BOUNDS[1]; // dawn transition
+		const work      = PHASE_BOUNDS[2]; // daytime
+		const pub       = PHASE_BOUNDS[3]; // dusk transition
+		if (turnInDay < breakfast.start || turnInDay >= pub.end) {
 			_view.nightAlpha = 1;
-		} else if (t < DAWN_END) {
-			_view.nightAlpha = 1 - (t - DAWN_START) / (DAWN_END - DAWN_START);
-		} else if (t < DUSK_START) {
+		} else if (turnInDay < breakfast.end) {
+			_view.nightAlpha = 1 - (turnInDay - breakfast.start) / (breakfast.end - breakfast.start);
+		} else if (turnInDay < pub.start) {
 			_view.nightAlpha = 0;
 		} else {
-			_view.nightAlpha = (t - DUSK_START) / (DUSK_END - DUSK_START);
+			_view.nightAlpha = (turnInDay - pub.start) / (pub.end - pub.start);
 		}
 	}
 
