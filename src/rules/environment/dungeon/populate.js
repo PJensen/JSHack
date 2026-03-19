@@ -143,6 +143,8 @@ const DEAD_END_ROOM_THEMES = [
 ];
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
 const SHOP_MIMIC_CHANCE = 0.08;
+const SHOP_MAX_ROOM_WIDTH = 6;
+const SHOP_MAX_ROOM_HEIGHT = 6;
 const DEAD_END_CONTENT_CHANCE = 1.0;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
 
@@ -352,6 +354,11 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       room.h === entryRoom.h;
     return isDeadEnd && !isEntryRoom;
   });
+  const eligibleShopRooms = eligibleDeadEndRooms.filter((room) => (
+    room.w <= SHOP_MAX_ROOM_WIDTH
+    && room.h <= SHOP_MAX_ROOM_HEIGHT
+    && countRoomOpeningTiles(room, chunk) === 1
+  ));
 
   // Solid spawn kinds that should be marked solid in the solidPositions set.
   const SOLID_PREFAB_KINDS = new Set([
@@ -609,12 +616,12 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
-  // Shopkeeper: one per chunk, only in dead-end rooms (exactly one perimeter entrance), ~30% chance.
+  // Shopkeeper: one per chunk, only in small dead-end rooms (exactly one perimeter entrance), ~30% chance.
   // Extra rule: never use the origin chunk's spawn room (rooms[0] in chunk 0,0).
   const shopChance = floorPlan.profile?.shopChance ?? 0.30;
   let shopRoom = null;
-  if (eligibleDeadEndRooms.length > 0 && rng.next() < shopChance) {
-    shopRoom = eligibleDeadEndRooms[rng.int(0, eligibleDeadEndRooms.length - 1)];
+  if (eligibleShopRooms.length > 0 && rng.next() < shopChance) {
+    shopRoom = eligibleShopRooms[rng.int(0, eligibleShopRooms.length - 1)];
   }
   if (shopRoom) {
     const room = shopRoom;
@@ -800,6 +807,64 @@ function countRoomEntrances(room, chunk) {
     }
   }
   return entrances;
+}
+
+/**
+ * Count perimeter floor tiles in a room that open directly into passable non-room space.
+ * Shops require exactly one opening tile to guarantee a true single-entry dead end.
+ * @param {{x:number,y:number,w:number,h:number}} room
+ * @param {{chunkX:number,chunkY:number,tiles:Uint8Array}} chunk
+ * @returns {number}
+ */
+function countRoomOpeningTiles(room, chunk) {
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  const rw = room.w;
+  const rh = room.h;
+  const tiles = chunk.tiles;
+
+  function getTile(x, y) {
+    if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
+    return tiles[y * CHUNK_SIZE + x];
+  }
+
+  function isPassable(tile) {
+    return tile === TILE_FLOOR || tile === TILE_DOOR || tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP;
+  }
+
+  function roomHas(x, y) {
+    return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+  }
+
+  let openings = 0;
+  for (let y = ry; y < ry + rh; y++) {
+    for (let x = rx; x < rx + rw; x++) {
+      const isPerimeter = (x === rx || x === rx + rw - 1 || y === ry || y === ry + rh - 1);
+      if (!isPerimeter) continue;
+      if (!isPassable(getTile(x, y))) continue;
+
+      const neighbors = [
+        [x - 1, y],
+        [x + 1, y],
+        [x, y - 1],
+        [x, y + 1],
+      ];
+
+      let opensOut = false;
+      for (const [nx, ny] of neighbors) {
+        if (roomHas(nx, ny)) continue;
+        if (isPassable(getTile(nx, ny))) {
+          opensOut = true;
+          break;
+        }
+      }
+      if (opensOut) openings++;
+    }
+  }
+
+  return openings;
 }
 
 function isPointInRoom(x, y, room) {

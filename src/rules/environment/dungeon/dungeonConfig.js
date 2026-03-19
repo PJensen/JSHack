@@ -10,7 +10,7 @@ export const dungeonConfig = {
    * Fraction of BSP leaf rooms to omit during chunk generation.
    * 0 = every eligible leaf gets a room; 0.4 = noticeably airier chunks.
    */
-  roomSparsity: 0.35,
+  roomSparsity: 0.32,
   /** Min/max number of down-stairs generated per floor (inclusive). Tune after playtesting. */
   minDownStairs: 2,
   maxDownStairs: 3,
