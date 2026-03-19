@@ -6,7 +6,7 @@
 export const WALK_SPEED_PRESETS = Object.freeze({
   slow:   1000,
   normal: 555,
-  fast:   333,
+  fast:   222,
 });
 
 const LS_INPUT_MODE = 'jshack:inputMode';

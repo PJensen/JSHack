@@ -519,7 +519,7 @@ function layoutBubbleDialog() {
 // continues to evolve (fires spread, monsters roam, etc.) for a fixed number
 // of ticks, then stop and signal that the post-mortem phase is complete.
 const POST_MORTEM_TICKS = 6;
-const POST_MORTEM_INTERVAL_MS = 500;
+const POST_MORTEM_INTERVAL_MS = 111;
 let _postMortemInterval = 0;
 let _postMortemTicksLeft = 0;
 world.on("died", ({ id }) => {
