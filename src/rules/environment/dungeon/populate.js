@@ -1031,6 +1031,13 @@ export function materializeSpawn(world, spawn) {
       const id = createFrom(world, Chest, { x: spawn.x, y: spawn.y });
       // Pre-populate chest inventory from loot table
       const lootTable = spawn.params.lootTable || 'chest:basic';
+      // Set identity to reflect rarity tier so palette and glow effects can key off it
+      const ni = world.get(id, NamedIdentity);
+      if (ni) {
+        if (lootTable === 'chest:legendary') { ni.identity = 'legendary_chest'; ni.name = 'Legendary Chest'; }
+        else if (lootTable === 'chest:magic') { ni.identity = 'magic_chest'; ni.name = 'Magic Chest'; }
+        else { ni.identity = 'basic_chest'; }
+      }
       const chestSeed = ((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0xCE57) >>> 0;
       const chestRng = createRng(chestSeed);
       const depth = spawn.params.depth || 1;

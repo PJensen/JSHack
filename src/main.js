@@ -3114,6 +3114,80 @@ function drawGlowingTagAura(ctx, e, fxTime) {
 }
 
 /**
+ * Draw a golden legendary glow for `legendary_chest` entities.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawLegendaryChestAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.8 + e.id * 1.3);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.62 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.30 + 0.15 * pulse;
+  outerGrad.addColorStop(0,   `rgba(255,190,20,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(220,140,10,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(160,80,0,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.30 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.35 + 0.20 * pulse;
+  innerGrad.addColorStop(0, `rgba(255,230,100,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(255,180,30,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draw a purple epic glow for `magic_chest` entities.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawEpicChestAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.0 + e.id * 1.3);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.62 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.28 + 0.14 * pulse;
+  outerGrad.addColorStop(0,   `rgba(180,60,255,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(140,40,220,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(80,20,160,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.30 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.32 + 0.18 * pulse;
+  innerGrad.addColorStop(0, `rgba(210,120,255,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(160,60,230,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * Draw a poison-green glow for entities tagged with `venom_glowing`.
  * Matches the poisoned-item glow style to convey venomous nature.
  * @param {CanvasRenderingContext2D} ctx
@@ -3737,6 +3811,12 @@ function render(worldView) {
       if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
         drawVenomTagAura(bctx, e, _fxTime);
       }
+      if (Array.isArray(e.tags) && e.tags.includes('legendary_glowing')) {
+        drawLegendaryChestAura(bctx, e, _fxTime);
+      }
+      if (Array.isArray(e.tags) && e.tags.includes('epic_glowing')) {
+        drawEpicChestAura(bctx, e, _fxTime);
+      }
       if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
         drawPotionGlyphAura(bctx, e, _fxTime);
       }
@@ -3776,6 +3856,12 @@ function render(worldView) {
     }
     if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('venom_glowing')) {
       drawVenomTagAura(bctx, renderEntity, _fxTime);
+    }
+    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('legendary_glowing')) {
+      drawLegendaryChestAura(bctx, renderEntity, _fxTime);
+    }
+    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('epic_glowing')) {
+      drawEpicChestAura(bctx, renderEntity, _fxTime);
     }
     if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('potion_glow')) {
       drawPotionGlyphAura(bctx, renderEntity, _fxTime);
