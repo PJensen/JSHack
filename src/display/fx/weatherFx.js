@@ -142,7 +142,9 @@ export function createWeatherFxController() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "rgba(10, 15, 30, 0.12)";
-    ctx.fillRect(0, 0, W, H);
+    // Use physical canvas dimensions so the tint covers the full canvas on
+    // high-DPR (mobile) screens where canvas.width = cssW * dpr > W.
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.restore();
   }
 

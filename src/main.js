@@ -4199,7 +4199,9 @@ function render(worldView) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = `rgba(8, 12, 28, ${(worldView.nightAlpha * 0.38).toFixed(3)})`;
-    ctx.fillRect(0, 0, W, H);
+    // Use physical canvas dimensions so the tint covers the full canvas on
+    // high-DPR (mobile) screens where canvas.width = cssW * dpr > W.
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
   }
 
