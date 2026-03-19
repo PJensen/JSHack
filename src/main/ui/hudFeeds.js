@@ -117,6 +117,7 @@ export function createHudFeeds(world, deps) {
     const statusMap = new Map();
     if (Array.isArray(st?.effects)) {
       for (const e of st.effects) {
+        if (e?.key === 'stat_envelope') continue; // displayed via Status as blinded/deafened
         const key = canonicalStatusKey(String(e?.key || e?.type || ""));
         if (!key) continue;
         const turns = Math.max(0, Number(e?.turnsLeft || e?.duration || 0));
