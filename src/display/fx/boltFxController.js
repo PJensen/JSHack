@@ -343,6 +343,9 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
       _screenFlash.push(new ScreenFlashFx({ ttl: 0.18, color: [255, 255, 255], peak: 0.9 }));
       startShake(cam, 3, 0.12);
     });
+    world.on('spell:smite:dazzle', () => {
+      _screenFlash.push(new ScreenFlashFx({ ttl: 0.07, color: [255, 245, 180] }));
+    });
     world.on('monster:firebreath', ({ from, to, tiles, hitIds }) => {
       if (!from || !to) return;
       const lineTiles = Array.isArray(tiles)
