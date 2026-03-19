@@ -66,11 +66,11 @@ export const MOON_PHASES = Object.freeze([
 // Expressed as fractions of TURNS_PER_DAY so a single constant change
 // rescales the whole schedule.  Fractions must sum to 1.
 const PHASE_FRACTIONS = Object.freeze({
-  sleep:     18 / TURNS_PER_DAY,
-  breakfast:  8 / TURNS_PER_DAY,
-  work:      72 / TURNS_PER_DAY,
-  pub:       22 / TURNS_PER_DAY,
-  home:      12 / TURNS_PER_DAY,
+  sleep:     150 / TURNS_PER_DAY,  // midnight → 5 AM
+  breakfast:  60 / TURNS_PER_DAY,  // 5 AM → 7 AM  (dawn)
+  work:      300 / TURNS_PER_DAY,  // 7 AM → 5 PM  (daylight)
+  pub:        70 / TURNS_PER_DAY,  // 5 PM → 7:20 PM (dusk)
+  home:      140 / TURNS_PER_DAY,  // 7:20 PM → midnight
 });
 
 // Absolute turn counts (derived from TURNS_PER_DAY × fraction).
