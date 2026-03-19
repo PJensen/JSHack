@@ -208,7 +208,6 @@ export const MONSTERS = [
     name: 'Cave Bear',
     tags: ['beast', 'rare'],
     tier: 0,
-    rare: true,
     intelligence: 3,   // predatory instinct
     baseHp: 28,
     hpPerLevel: 2,
@@ -294,7 +293,7 @@ export const MONSTERS = [
     id: 'skeletal_shadow_caster',
     name: 'Skeletal Shadow Caster',
     tags: ['undead', 'skeletal', 'caster'],
-    tier: 1,
+    tier: 0,
     intelligence: 9,
     visionRange: 9,
     packSense: true, packRadius: 8,
