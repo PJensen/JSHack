@@ -4207,6 +4207,24 @@ function render(worldView) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
   }
+  // Dawn warm tint — golden-amber, bell-curve peak at mid-dawn
+  if (worldView.dawnAlpha > 0.01) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = `rgba(255, 150, 40, ${(worldView.dawnAlpha * 0.16).toFixed(3)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+  // Dusk warm tint — orange-red, bell-curve peak at mid-dusk
+  if (worldView.duskAlpha > 0.01) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = `rgba(210, 70, 20, ${(worldView.duskAlpha * 0.16).toFixed(3)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });

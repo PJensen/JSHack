@@ -47,7 +47,7 @@ import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0 };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0 };
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 const _questGiverIds = new Set(); // entity IDs that are active quest givers
@@ -410,6 +410,8 @@ export function buildWorldView(world) {
 	// Compute night darkness (overworld only, derived from PHASE_BOUNDS)
 	// sleep→dark, breakfast→dawn, work→bright, pub→dusk, home→dark
 	_view.nightAlpha = 0;
+	_view.dawnAlpha  = 0;
+	_view.duskAlpha  = 0;
 	if (_isOverworld) {
 		const turnInDay = world.step % TURNS_PER_DAY;
 		const breakfast = PHASE_BOUNDS[1]; // dawn transition
@@ -418,10 +420,16 @@ export function buildWorldView(world) {
 			_view.nightAlpha = 1;
 		} else if (turnInDay < breakfast.end) {
 			_view.nightAlpha = 1 - (turnInDay - breakfast.start) / (breakfast.end - breakfast.start);
+			// Warm golden tint peaks at mid-dawn
+			const t = (turnInDay - breakfast.start) / (breakfast.end - breakfast.start);
+			_view.dawnAlpha = Math.sin(Math.PI * t);
 		} else if (turnInDay < pub.start) {
 			_view.nightAlpha = 0;
 		} else {
 			_view.nightAlpha = (turnInDay - pub.start) / (pub.end - pub.start);
+			// Warm orange-red tint peaks at mid-dusk
+			const t = (turnInDay - pub.start) / (pub.end - pub.start);
+			_view.duskAlpha = Math.sin(Math.PI * t);
 		}
 	}
 
