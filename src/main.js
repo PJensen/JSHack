@@ -69,6 +69,7 @@ import {
   restoreSnapshotFromSavegame,
 } from "./main/wiring/savegameLoad.js";
 import { loadGameData } from "./main/bootstrap/loadGameData.js";
+import { PHASE_TURNS } from "./rules/data/calendar.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -848,6 +849,8 @@ function _finalizeNewGame(classData) {
   }
 
   if (!_savegameLoaded) {
+    // Start new games at dawn (start of "work" phase, ~7 AM)
+    world.step = PHASE_TURNS.sleep + PHASE_TURNS.breakfast;
     clearFloorCache();
     const stats = classDef?.stats ?? {};
 
