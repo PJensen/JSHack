@@ -28,13 +28,10 @@ function resolveFloorProfile(profile, depth) {
   if (profile.roomSparsity != null) return profile;
 
   const base = clamp(Number(dungeonConfig.roomSparsity) || 0, 0, 1);
-  const depthT = clamp((Math.max(1, depth) - 1) / 12, 0, 1);
-  const airyEarlyBias = (1 - depthT) * 0.18;
-  const compactLateBias = depthT * 0.12;
 
   return {
     ...profile,
-    roomSparsity: clamp(base + airyEarlyBias - compactLateBias, 0.05, 0.75),
+    roomSparsity: clamp(base, 0.05, 0.75),
   };
 }
 
