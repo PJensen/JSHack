@@ -21,7 +21,7 @@ import * as shopStock from '../../data/shopStock.js';
 import { Unpaid } from '../../components/Unpaid.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
-import { pickMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner } from './tables.js';
+import { pickMonster, pickSentinelMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner, pickEncounterGroup } from './tables.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap, ShockTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
@@ -479,8 +479,34 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       }
     }
 
-    // Place individual monsters — avoid solid features (decorations, chests, spawners)
-    for (let i = 0; i < monsterBudget; i++) {
+    // Encounter group: ~20% chance to spawn a themed group instead of random individuals
+    let groupBudgetUsed = 0;
+    if (monsterBudget >= 2 && rng.next() < 0.20) {
+      const group = pickEncounterGroup(rng, floorPlan.depth, monsterBudget);
+      if (group) {
+        const placeGroupMember = (params) => {
+          if (groupBudgetUsed >= monsterBudget) return;
+          let mx, my, att = 0;
+          do {
+            mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+            my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+            att++;
+          } while (isSolid(mx, my) && att < 10);
+          if (!isSolid(mx, my)) {
+            spawns.push({ x: mx, y: my, kind: 'monster', params });
+            const id = params.identity;
+            if (id === 'spider' || id === 'cave_spider' || id === 'phase_spider') roomHasSpider = true;
+            groupBudgetUsed++;
+          }
+        };
+        if (group.leader) placeGroupMember(group.leader);
+        for (const follower of group.followers) placeGroupMember(follower);
+      }
+    }
+
+    // Place remaining individual monsters — avoid solid features
+    const remainingBudget = Math.max(0, monsterBudget - groupBudgetUsed);
+    for (let i = 0; i < remainingBudget; i++) {
       let mx, my, attempts = 0;
       do {
         mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
@@ -488,7 +514,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         attempts++;
       } while (isSolid(mx, my) && attempts < 10);
       if (isSolid(mx, my)) continue;
-      const mp = pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+      const mp = pickSentinelMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
       spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
       if (mp.identity === 'spider' || mp.identity === 'cave_spider') roomHasSpider = true;
     }
@@ -595,6 +621,39 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
           spawns.push({ x: 0, y: 0, kind: 'tile_paint', params: { tiles: painted } });
         }
       }
+    }
+  }
+
+  // Hallway monsters: lone wanderers in corridors (floor tiles outside any room).
+  // ~8% of corridor tiles are candidates; place 1-3 per chunk.
+  {
+    const ox = chunk.chunkX * CHUNK_SIZE;
+    const oy = chunk.chunkY * CHUNK_SIZE;
+    const corridorCandidates = [];
+    for (let ly = 1; ly < CHUNK_SIZE - 1; ly++) {
+      for (let lx = 1; lx < CHUNK_SIZE - 1; lx++) {
+        const t = chunk.tiles[ly * CHUNK_SIZE + lx];
+        if (t !== TILE_FLOOR) continue;
+        const wx = ox + lx;
+        const wy = oy + ly;
+        if (isSolid(wx, wy)) continue;
+        // Skip tiles inside any room
+        let inRoom = false;
+        for (const room of chunk.rooms) {
+          if (wx >= room.x && wx < room.x + room.w && wy >= room.y && wy < room.y + room.h) {
+            inRoom = true;
+            break;
+          }
+        }
+        if (!inRoom) corridorCandidates.push({ x: wx, y: wy });
+      }
+    }
+    const hallwayBudget = Math.min(3, Math.floor(corridorCandidates.length * 0.08));
+    for (let i = 0; i < hallwayBudget && corridorCandidates.length > 0; i++) {
+      const idx = rng.int(0, corridorCandidates.length - 1);
+      const pos = corridorCandidates.splice(idx, 1)[0];
+      const mp = pickSentinelMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+      spawns.push({ x: pos.x, y: pos.y, kind: 'monster', params: mp });
     }
   }
 
