@@ -1158,15 +1158,6 @@ function renderQuickChip(it, h) {
     alignItems: 'flex-start',
     gap: '8px',
   });
-  if (it.glyph) {
-    const gl = document.createElement('div');
-    gl.textContent = it.glyph;
-    gl.style.color = it.glyphColor || '#cfe8ff';
-    gl.style.fontSize = '16px';
-    gl.style.lineHeight = '1';
-    gl.style.marginTop = '2px';
-    content.appendChild(gl);
-  }
   const detailPanel = document.createElement('div');
   Object.assign(detailPanel.style, {
     minWidth: '180px',
@@ -1189,6 +1180,8 @@ function renderQuickChip(it, h) {
         name: it.name,
         count: it.count,
         rarityName: it.rarityName,
+        glyph: it.glyph,
+        glyphColor: it.glyphColor,
       };
   renderItemDetails(detailPanel, detailItem);
   content.appendChild(detailPanel);
