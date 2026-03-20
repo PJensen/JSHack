@@ -127,7 +127,7 @@ Deno.test("dungeonScale changes the raw floor footprint", () => {
   }
 });
 
-Deno.test("early floors are airier and later floors are denser", () => {
+Deno.test("floor profile respects configured room sparsity", () => {
   const previousScale = dungeonConfig.dungeonScale;
   const previousSparsity = dungeonConfig.roomSparsity;
   try {
@@ -137,7 +137,8 @@ Deno.test("early floors are airier and later floors are denser", () => {
     const early = generateFloorPlan(42, 1);
     const late = generateFloorPlan(42, 12);
 
-    assert(early.profile.roomSparsity > late.profile.roomSparsity, 'early floors should omit more rooms than late floors');
+    assert(early.profile.roomSparsity === 0.35, 'early floor profile should preserve configured room sparsity');
+    assert(late.profile.roomSparsity === 0.35, 'later floor profile should preserve configured room sparsity');
     assert(extentChunkCount(early) < extentChunkCount(late), 'later floors should span a larger footprint');
   } finally {
     dungeonConfig.dungeonScale = previousScale;

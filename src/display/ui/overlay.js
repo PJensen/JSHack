@@ -1133,10 +1133,10 @@ function ensureGroundTooltip(root) {
     left: '50%',
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 52px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
-    minWidth: '220px', maxWidth: '70vw', pointerEvents: 'auto', display: 'none',
+    minWidth: '150px', maxWidth: '58vw', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace', padding: '10px 12px', zIndex: 850
+    fontFamily: 'monospace', padding: '8px 10px', zIndex: 850
   });
   root.appendChild(tip);
   return tip;
@@ -1343,10 +1343,10 @@ function ensureStairTooltip(root) {
     left: '50%',
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 116px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
-    minWidth: '180px', pointerEvents: 'auto', display: 'none',
-    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
+    minWidth: '128px', maxWidth: '56vw', pointerEvents: 'none', display: 'none',
+    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '8px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace', padding: '10px 16px', zIndex: 850,
+    fontFamily: 'monospace', padding: '7px 9px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -1364,23 +1364,44 @@ function renderStairTooltip(tip, detail) {
 
   const title = document.createElement('div');
   title.textContent = label;
-  Object.assign(title.style, { fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' });
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '13px', marginBottom: '3px' });
   tip.appendChild(title);
 
   const hint = document.createElement('div');
   hint.style.opacity = '0.8';
-  hint.style.fontSize = '12px';
+  hint.style.fontSize = '11px';
   hint.textContent = isReturn
     ? 'Tap to return'
     : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
   tip.appendChild(hint);
 
-  tip.onclick = () => {
+  const action = document.createElement('button');
+  action.type = 'button';
+  action.textContent = isReturn
+    ? 'Return'
+    : (dir === 'down' ? 'Descend' : 'Ascend');
+  Object.assign(action.style, {
+    marginTop: '6px',
+    minHeight: '36px',
+    minWidth: '88px',
+    borderRadius: '8px',
+    border: '1px solid #6aa7da',
+    background: '#234463',
+    color: '#e9f7ff',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0 12px',
+    pointerEvents: 'auto',
+  });
+  action.onclick = () => {
     window.dispatchEvent(new CustomEvent('ui:requestStairTraverse', {
       detail: { stairId: detail?.stairId, direction: dir }
     }));
     tip.style.display = 'none';
   };
+  tip.appendChild(action);
 }
 
 // --- Trap tooltip (tap to disarm) ------------------------------------------
@@ -1393,10 +1414,10 @@ function ensureTrapTooltip(root) {
     left: '50%',
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 116px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
-    minWidth: '180px', pointerEvents: 'auto', display: 'none',
-    background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '10px',
+    minWidth: '128px', maxWidth: '56vw', pointerEvents: 'none', display: 'none',
+    background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '8px',
     border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace', padding: '10px 16px', zIndex: 850,
+    fontFamily: 'monospace', padding: '7px 9px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -1410,21 +1431,40 @@ function renderTrapTooltip(tip, detail) {
 
   const title = document.createElement('div');
   title.textContent = trapType;
-  Object.assign(title.style, { fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' });
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '13px', marginBottom: '3px' });
   tip.appendChild(title);
 
   const hint = document.createElement('div');
   hint.style.opacity = '0.8';
-  hint.style.fontSize = '12px';
+  hint.style.fontSize = '11px';
   hint.textContent = 'Tap to disarm';
   tip.appendChild(hint);
 
-  tip.onclick = () => {
+  const action = document.createElement('button');
+  action.type = 'button';
+  action.textContent = 'Disarm';
+  Object.assign(action.style, {
+    marginTop: '6px',
+    minHeight: '36px',
+    minWidth: '88px',
+    borderRadius: '8px',
+    border: '1px solid #c78c8c',
+    background: '#4b2323',
+    color: '#ffe4df',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0 12px',
+    pointerEvents: 'auto',
+  });
+  action.onclick = () => {
     window.dispatchEvent(new CustomEvent('ui:requestDisarmTrap', {
       detail: { trapId: detail?.trapId }
     }));
     tip.style.display = 'none';
   };
+  tip.appendChild(action);
 }
 
 // --- Tombstone tooltip (epitaph sign at top of screen) ---------------------
