@@ -2,6 +2,7 @@
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
 import { SPELL_DEFS } from '../../rules/data/spells.js';
+import { renderItemDetails } from './overlay.js';
 
 /**
  * @template T
@@ -908,7 +909,7 @@ function createQuickSlot() {
     zIndex: 901,
   });
 
-  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, addedAt:number}>} */
+  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, details?:any, addedAt:number}>} */
   const stack = [];
   const AUTO_DISMISS_MS = 12000;
 
@@ -984,6 +985,7 @@ function createQuickSlot() {
       rarityName: String(item.rarityName || 'common'),
       glyph: String(item.glyph || ''),
       glyphColor: String(item.glyphColor || ''),
+      details: item,
       addedAt: Date.now()
     });
     const top = peekStackTop(stack);
@@ -1143,9 +1145,18 @@ function createChannelingOverlay() {
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
-    display: 'flex', alignItems: 'center', gap: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: '8px',
     padding: '6px 8px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
+  });
+  const content = document.createElement('div');
+  Object.assign(content.style, {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
   });
   if (it.glyph) {
     const gl = document.createElement('div');
@@ -1153,21 +1164,34 @@ function renderQuickChip(it, h) {
     gl.style.color = it.glyphColor || '#cfe8ff';
     gl.style.fontSize = '16px';
     gl.style.lineHeight = '1';
-    chip.appendChild(gl);
+    gl.style.marginTop = '2px';
+    content.appendChild(gl);
   }
-  const name = document.createElement('div');
-  name.textContent = `[${String(it.name||'item')}]`;
-  const rn = String(it.rarityName || 'common').toLowerCase();
-  if (rn === 'rare' || rn === 'magic') { name.style.color = '#55aaff'; name.style.fontWeight = 'bold'; }
-  else if (rn === 'epic') { name.style.color = '#c47bff'; name.style.fontWeight = 'bold'; }
-  else if (rn === 'legendary') { name.style.color = '#ff9f3b'; name.style.fontWeight = 'bold'; }
-  else name.style.color = '#9cf';
-  const count = document.createElement('div');
-  count.dataset.role = 'count';
-  count.style.opacity = '0.8';
-  count.style.fontSize = '12px';
-  if (it.type === 'wand') count.textContent = `${it.count || 1} ch`;
-  else count.textContent = (it.type === 'potion' || it.type === 'scroll' || it.type === 'food') ? `x${it.count || 1}` : '';
+  const detailPanel = document.createElement('div');
+  Object.assign(detailPanel.style, {
+    minWidth: '180px',
+    maxWidth: '260px',
+    maxHeight: '30vh',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    padding: '6px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+  });
+  const detailItem = it.details && typeof it.details === 'object'
+    ? it.details
+    : {
+        id: it.id,
+        identity: it.identity,
+        type: it.type,
+        slot: it.slot,
+        name: it.name,
+        count: it.count,
+        rarityName: it.rarityName,
+      };
+  renderItemDetails(detailPanel, detailItem);
+  content.appendChild(detailPanel);
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
@@ -1198,10 +1222,17 @@ function renderQuickChip(it, h) {
   x.title = 'Dismiss';
   x.addEventListener('click', () => h.onDismiss && h.onDismiss());
 
-  chip.appendChild(name);
-  chip.appendChild(count);
-  chip.appendChild(btn);
-  if (throwBtn) chip.appendChild(throwBtn);
-  chip.appendChild(x);
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '6px',
+  });
+  actions.appendChild(btn);
+  if (throwBtn) actions.appendChild(throwBtn);
+  actions.appendChild(x);
+
+  chip.appendChild(content);
+  chip.appendChild(actions);
   return chip;
 }

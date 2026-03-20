@@ -1816,10 +1816,12 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   if (!pe || pe.id !== ownerId) return;
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
+  const displayItem = buildItemDisplayData(world, itemId);
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
         item: {
+          ...(displayItem && typeof displayItem === 'object' ? displayItem : {}),
           id: Number(itemId),
           identity: world.get(itemId, NamedIdentity)?.identity || '',
           type: info.type || 'item',
