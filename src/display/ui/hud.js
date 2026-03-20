@@ -966,6 +966,7 @@ function createQuickSlot() {
   function dispatchDrop(it) {
     if (!(Number(it?.id || 0) > 0)) return;
     window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } }));
+    dismissTop();
   }
 
   function dismissTop() {
