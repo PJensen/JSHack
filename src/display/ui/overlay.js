@@ -1130,9 +1130,9 @@ function ensureGroundTooltip(root) {
   tip.id = 'ground-item-tooltip';
   Object.assign(tip.style, {
     position: 'fixed',
-    left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 34px + env(safe-area-inset-bottom, 0px))',
-    transform: 'translateX(-50%)',
+    left: '8px',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
+    transform: 'none',
     minWidth: '132px', maxWidth: '54vw', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -1340,9 +1340,9 @@ function ensureStairTooltip(root) {
   tip.id = 'stair-tooltip';
   Object.assign(tip.style, {
     position: 'fixed',
-    left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 34px + env(safe-area-inset-bottom, 0px))',
-    transform: 'translateX(-50%)',
+    left: '8px',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
+    transform: 'none',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -1411,9 +1411,9 @@ function ensureTrapTooltip(root) {
   tip.id = 'trap-tooltip';
   Object.assign(tip.style, {
     position: 'fixed',
-    left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 34px + env(safe-area-inset-bottom, 0px))',
-    transform: 'translateX(-50%)',
+    left: '8px',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
+    transform: 'none',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '7px',
     border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
