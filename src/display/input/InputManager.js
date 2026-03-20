@@ -355,8 +355,6 @@ export class InputManager {
         this._joystick.knobY = localY;
         this._joystick.moved = false;
         this._repeatPoint = { x: localX, y: localY };
-
-        this._emitUi("ui:joystickProgress", this._buildJoystickUiPayload());
         this._emitMoveFromJoystick();
         this._startWalkRepeat();
         try {
@@ -419,7 +417,7 @@ export class InputManager {
       this._joystick.knobX = this._joystick.baseX + dx * scale;
       this._joystick.knobY = this._joystick.baseY + dy * scale;
       this._repeatPoint = { x: this._joystick.knobX, y: this._joystick.knobY };
-      this._emitUi("ui:joystickProgress", this._buildJoystickUiPayload());
+      if (this._joystick.moved) this._emitUi("ui:joystickProgress", this._buildJoystickUiPayload());
       return;
     }
 
