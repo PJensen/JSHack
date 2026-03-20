@@ -18,7 +18,6 @@ import { FoodDecay } from "../components/FoodDecay.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
-import { MeleeAttackIntent } from "../components/Intents/MeleeAttackIntent.js";
 import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
@@ -42,6 +41,7 @@ import {
   TELEPORT_DISTANCE,
 } from "./petConstants.js";
 
+const AGGRESSIVE_RADIUS = 8;
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
 const FAMILIAR_FIRE_RANGE = 8;
 const FAMILIAR_FIRE_COOLDOWN = 10;
@@ -134,6 +134,10 @@ export function petBehaviorSystem(world) {
 
       case "guarding":
         behaviorGuarding(world, id, petState, pos, playerPos);
+        break;
+
+      case "aggressive":
+        behaviorAggressive(world, id, pos, playerPos, playerId);
         break;
 
       case "staying":
@@ -711,23 +715,51 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
     }
   }
 
-  // Attack closest enemy if adjacent
-  if (closestEnemy && closestDist === 1) {
-    if (!world.has(petId, MeleeAttackIntent)) {
-      try {
-        world.add(petId, MeleeAttackIntent, {
-          sourceId: petId,
-          targetId: closestEnemy,
-        });
-      } catch {} // ECS: may already exist
-    }
-  } else if (closestEnemy && closestDist > 1) {
-    // Chase enemy if within guard radius
+  // Move toward closest enemy (bump resolution handles melee attack when adjacent)
+  if (closestEnemy) {
     const enemyPos = world.get(closestEnemy, Position);
     if (enemyPos) {
       moveToward(world, petId, enemyPos.x, enemyPos.y);
     }
   }
+}
+
+/**
+ * Aggressive behavior: follow player but actively seek and attack nearby enemies.
+ * Prioritises attacking over following — only follows when no enemies in range.
+ */
+function behaviorAggressive(world, petId, petPos, playerPos, playerId) {
+  const petFaction = world.get(petId, Faction)?.key || "";
+
+  // Find nearest hostile within radius
+  let closestEnemy = 0;
+  let closestDist = AGGRESSIVE_RADIUS + 1;
+
+  for (const [enemyId, fac, enemyPos, evit] of world.query(Faction, Position, Vitality)) {
+    if (!evit || (evit.hp | 0) <= 0) continue;
+    if (!areFactionsHostile(petFaction, fac?.key)) continue;
+
+    const edx = (enemyPos.x | 0) - (petPos.x | 0);
+    const edy = (enemyPos.y | 0) - (petPos.y | 0);
+    const edist = Math.abs(edx) + Math.abs(edy);
+
+    if (edist < closestDist) {
+      closestEnemy = enemyId;
+      closestDist = edist;
+    }
+  }
+
+  // If enemy found, move toward it (bump handles melee)
+  if (closestEnemy) {
+    const enemyPos = world.get(closestEnemy, Position);
+    if (enemyPos) {
+      moveToward(world, petId, enemyPos.x, enemyPos.y);
+      return;
+    }
+  }
+
+  // No enemy — fall back to following the player
+  behaviorFollowing(world, petId, petPos, playerPos, playerId);
 }
 
 /**

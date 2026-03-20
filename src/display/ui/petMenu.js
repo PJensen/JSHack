@@ -37,6 +37,7 @@ export function initPetMenu() {
       { cmd: 'follow', label: 'Follow Me', desc: 'Autonomous mode' },
       { cmd: 'stay', label: 'Stay Here', desc: 'Hold position' },
       { cmd: 'guard', label: 'Guard Position', desc: 'Attack nearby enemies' },
+      { cmd: 'aggressive', label: 'Aggressive', desc: 'Follow and attack enemies' },
       { cmd: 'fetch', label: 'Fetch Item', desc: 'Retrieve item' },
       { cmd: 'idle', label: 'Wait', desc: 'Do nothing' }
     ];

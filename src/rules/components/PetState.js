@@ -9,6 +9,7 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * - 'fetching': Moving toward a specific item to pick up
  * - 'returning': Has fetched item, returning to player
  * - 'guarding': Stays at a specific position, attacks nearby enemies
+ * - 'aggressive': Follows player but actively seeks and attacks nearby enemies
  * - 'staying': Commanded to stay at current location
  * - 'fleeing': Low health, moving away from danger
  *
@@ -36,7 +37,7 @@ export const PetState = defineComponent(
   },
   {
     validate(rec) {
-      const validStates = ['following', 'idle', 'fetching', 'returning', 'guarding', 'staying', 'fleeing'];
+      const validStates = ['following', 'idle', 'fetching', 'returning', 'guarding', 'aggressive', 'staying', 'fleeing'];
       if (!validStates.includes(rec.state)) {
         throw new Error(`PetState: state must be one of ${validStates.join(', ')}`);
       }

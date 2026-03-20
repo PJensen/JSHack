@@ -811,6 +811,7 @@ export function installMessageWiring({
       following: 'following you',
       staying: 'staying put',
       guarding: 'guarding',
+      aggressive: 'aggressive',
       fetching: 'fetching an item',
       returning: 'returning',
       fleeing: 'fleeing',

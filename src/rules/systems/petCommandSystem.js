@@ -117,6 +117,13 @@ export function petCommandSystem(world) {
         }
         break;
 
+      case 'aggressive':
+        petState.state = 'aggressive';
+        petState.targetX = null;
+        petState.targetY = null;
+        petState.targetItemId = 0;
+        break;
+
       case 'idle':
         petState.state = 'idle';
         petState.targetX = null;
