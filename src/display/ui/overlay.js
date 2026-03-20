@@ -1904,6 +1904,23 @@ export function renderItemDetails(container, it) {
 
   // --- Item name + slot on one line: [Oak Staff] weapon ---
   const title = document.createElement('div');
+  Object.assign(title.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginBottom: '4px',
+  });
+  const glyphText = String(it.glyph || '').trim();
+  if (glyphText) {
+    const glyphSpan = document.createElement('span');
+    glyphSpan.textContent = glyphText;
+    Object.assign(glyphSpan.style, {
+      color: String(it.glyphColor || '#cfe8ff'),
+      fontSize: '14px',
+      lineHeight: '1',
+    });
+    title.appendChild(glyphSpan);
+  }
   const nameSpan = document.createElement('span');
   nameSpan.textContent = bracketize(sanitize(it.name || 'item'));
   Object.assign(nameSpan.style, rarityStyle(it.rarityName));
@@ -1916,7 +1933,6 @@ export function renderItemDetails(container, it) {
     slotSpan.style.fontSize = '12px';
     title.appendChild(slotSpan);
   }
-  title.style.marginBottom = '4px';
   container.appendChild(title);
 
   // --- Item weight ---
