@@ -427,7 +427,9 @@ Deno.test("InputManager joystick mode: short left-zone tap emits movement on poi
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
   const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'joystick' });
   const actions = [];
+  const ui = [];
   const off = mgr.onAction((a) => actions.push(a));
+  target.addEventListener('ui:joystickProgress', (e) => ui.push(e.detail));
   try {
     emitPointer(canvas, 'pointerdown', 40, 100); // left zone joystick touch
     assertEquals(actions.length, 0, 'no immediate move on pointerdown in joystick mode');
@@ -435,6 +437,7 @@ Deno.test("InputManager joystick mode: short left-zone tap emits movement on poi
     assertEquals(actions.length, 1);
     assertEquals(actions[0]?.type, Actions.Move);
     assertEquals(actions[0]?.payload, { dx: -1, dy: 0 });
+    assertEquals(ui.some((d) => !!d?.active), false);
   } finally {
     off();
     mgr.dispose();
