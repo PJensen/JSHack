@@ -105,6 +105,7 @@ import { TOWNFOLK } from '../../data/townfolk.js';
 import { TownfolkJob } from '../../components/TownfolkJob.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
+import { getMonster } from '../../data/monsters.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { addToInventory, inventoryItems } from '../../utils/inventoryFacade.js';
 import { createItemById } from '../../utils/itemFactory.js';
@@ -1115,6 +1116,9 @@ function applyDeadEndTheme(ctx) {
 export function equipMonster(world, entityId, equipment) {
   const eq = world.get(entityId, Equipment);
   if (!eq) return;
+  const identity = String(world.get(entityId, NamedIdentity)?.identity || '');
+  const def = identity ? getMonster(identity) : null;
+  if (def && (!Array.isArray(def.tags) || !def.tags.includes('humanoid'))) return;
   if (equipment.ranged) {
     const bowId = buildCatalogItem(world, equipment.ranged);
     eq.ranged = bowId;
