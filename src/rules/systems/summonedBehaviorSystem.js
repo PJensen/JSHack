@@ -7,7 +7,6 @@ import { Faction } from '../components/Faction.js';
 import { Vitality } from '../components/Vitality.js';
 import { Speed } from '../components/Speed.js';
 import { MoveIntent } from '../components/Intents/MoveIntent.js';
-import { MeleeAttackIntent } from '../components/Intents/MeleeAttackIntent.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { statusStrength } from '../utils/statusFacade.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
@@ -27,7 +26,7 @@ export function summonedBehaviorSystem(world) {
     if (frostStacks > 0) actEvery = actEvery * (1 + frostStacks);
     if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) continue;
 
-    if (world.has(id, MoveIntent) || world.has(id, MeleeAttackIntent)) continue;
+    if (world.has(id, MoveIntent)) continue;
 
     // Find nearest hostile enemy
     let bestTarget = 0;
@@ -50,13 +49,7 @@ export function summonedBehaviorSystem(world) {
 
     if (!bestTarget || !bestPos) continue;
 
-    // Adjacent: attack
-    if (bestDist === 1) {
-      try { world.add(id, MeleeAttackIntent, { sourceId: id, targetId: bestTarget }); } catch {}
-      continue;
-    }
-
-    // Otherwise move toward target
+    // Move toward target (bump resolution handles melee attack when adjacent)
     const dx = bestPos.x - (pos.x | 0);
     const dy = bestPos.y - (pos.y | 0);
     const ax = Math.abs(dx);

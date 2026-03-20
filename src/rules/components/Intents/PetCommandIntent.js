@@ -8,6 +8,7 @@ import { defineComponent } from "../../../lib/ecs-js/index.js";
  * - 'stay': Stay at current position
  * - 'fetch': Fetch a specific item (requires targetItemId)
  * - 'guard': Guard a specific position (requires targetX, targetY)
+ * - 'aggressive': Follow player but actively attack nearby enemies
  * - 'idle': Stop all activity
  *
  * Fields:
@@ -27,7 +28,7 @@ export const PetCommandIntent = defineComponent(
   },
   {
     validate(rec) {
-      const validCommands = ['follow', 'stay', 'fetch', 'guard', 'idle'];
+      const validCommands = ['follow', 'stay', 'fetch', 'guard', 'aggressive', 'idle'];
       if (!validCommands.includes(rec.command)) {
         throw new Error(`PetCommandIntent: command must be one of ${validCommands.join(', ')}`);
       }

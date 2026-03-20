@@ -1914,6 +1914,13 @@ window.addEventListener('ui:petCommand', (ev) => {
         petState.targetItemId = 0;
         break;
 
+      case 'aggressive':
+        petState.state = 'aggressive';
+        petState.targetX = null;
+        petState.targetY = null;
+        petState.targetItemId = 0;
+        break;
+
       case 'idle':
         petState.state = 'idle';
         petState.targetX = null;
@@ -1946,8 +1953,8 @@ window.addEventListener('ui:petCommand', (ev) => {
 
 // Rotate pet state through common commands (instant, no tick)
 window.addEventListener('ui:rotatePetState', () => {
-  // State rotation cycle: following → staying → guarding → idle → following
-  const stateOrder = ['following', 'staying', 'guarding', 'idle'];
+  // State rotation cycle: following → staying → guarding → aggressive → idle → following
+  const stateOrder = ['following', 'staying', 'guarding', 'aggressive', 'idle'];
 
   for (const [petId, _pet, vit] of world.query(Pet, Vitality)) {
     if (!vit || vit.hp <= 0) continue;
@@ -2005,6 +2012,7 @@ window.addEventListener('ui:rotatePetState', () => {
       petState.commandCooldown = 0;
       const command = nextState === 'staying' ? 'stay' :
                      nextState === 'guarding' ? 'guard' :
+                     nextState === 'aggressive' ? 'aggressive' :
                      nextState === 'idle' ? 'idle' : 'follow';
       try {
         world.emit?.('pet:state:changed', {

@@ -287,6 +287,7 @@ export function initHUD() {
     fetching: '\u{1F9B4}',     // 🦴
     returning: '\u21A9',       // ↩
     guarding: '\u{1F6E1}\uFE0F', // 🛡️
+    aggressive: '\u2694\uFE0F', // ⚔️
     fleeing: '\u{1F4A8}',      // 💨
     idle: '\u{1F4A4}',         // 💤
   });
@@ -302,6 +303,8 @@ export function initHUD() {
       petBtn.style.background = '#3d1616';
     } else if (currentState === 'guarding') {
       petBtn.style.background = '#16263d';
+    } else if (currentState === 'aggressive') {
+      petBtn.style.background = '#3d2616';
     } else {
       petBtn.style.background = '#101626';
     }
@@ -551,6 +554,7 @@ export function initHUD() {
       fetching: 'Fetching',
       returning: 'Returning',
       guarding: 'Guarding',
+      aggressive: 'Aggressive',
       fleeing: 'Fleeing!',
       idle: 'Idle'
     };
@@ -567,6 +571,8 @@ export function initHUD() {
       petBtn.style.background = '#3d1616'; // Red tint for danger
     } else if (state === 'guarding') {
       petBtn.style.background = '#16263d'; // Blue tint for combat
+    } else if (state === 'aggressive') {
+      petBtn.style.background = '#3d2616'; // Orange tint for aggro
     } else {
       petBtn.style.background = '#101626'; // Default
     }
