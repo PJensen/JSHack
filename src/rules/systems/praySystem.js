@@ -6,7 +6,6 @@ import { Hunger } from "../components/Hunger.js";
 import { Mana } from "../components/Mana.js";
 import { Status } from "../components/Status.js";
 import { Position } from "../components/Position.js";
-import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -15,6 +14,7 @@ import { hasStatus } from "../utils/statusFacade.js";
 import { getHungerLevel } from "../data/food.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 
 const PRAYER_STREAK_KEY = Symbol.for('jshack:prayer:boonStreak');
 const PRAYER_LAST_BOON_KEY = Symbol.for('jshack:prayer:lastBoonTurn');
@@ -39,12 +39,8 @@ function deterministicRoll(world, actorId, salt = 0) {
 }
 
 function pushEffect(world, actorId, effect) {
-  let ae = world.get(actorId, ActiveEffects);
-  if (!ae) {
-    try { world.add(actorId, ActiveEffects, { effects: [] }); } catch {}
-    ae = world.get(actorId, ActiveEffects);
-  }
-  if (!ae || !Array.isArray(ae.effects)) return false;
+  const ae = ensureActiveEffects(world, actorId);
+  if (!ae) return false;
   ae.effects.push(effect);
   return true;
 }
@@ -237,9 +233,9 @@ function applyPrayerBoon(world, actorId, context) {
 }
 
 /**
- * praySystem — processes PrayIntent by calling deity.pray()
+ * praySystem --- processes PrayIntent by calling deity.pray()
  * Detects player distress and boosts prayer effectiveness when in need.
- * (Spam is handled by deity's Supplicant system — predictability angers gods)
+ * (Spam is handled by deity's Supplicant system --- predictability angers gods)
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function praySystem(world) {
@@ -262,13 +258,13 @@ export function praySystem(world) {
 
           // If player is suffering, boost serenity to increase miracle chance
           if (distress.desperate) {
-            // Desperate plea — offer suffering as devotion, which pleases healing deities
+            // Desperate plea --- offer suffering as devotion, which pleases healing deities
             deity.offer('suffering', {
               value: distress.severity,
               alignment: 'lawful' // Suffering offerings appeal to order/healing deities
             });
           } else if (distress.troubled) {
-            // Moderate need — small serenity boost via lesser offering
+            // Moderate need --- small serenity boost via lesser offering
             deity.offer('plea', {
               value: distress.severity * 0.5,
               alignment: 'neutral'

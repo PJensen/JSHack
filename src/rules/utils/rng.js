@@ -181,3 +181,18 @@ export function rne(rng, x) {
   while (Math.floor(rng() * x) === 0 && result < 100) result++;
   return result;
 }
+
+/**
+ * FNV-1a 32-bit hash of a string.
+ * Used to derive deterministic seeds from spell IDs, item names, etc.
+ * @param {string} value
+ * @returns {number}
+ */
+export function hashString32(value) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i) & 0xff;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}

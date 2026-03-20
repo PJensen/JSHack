@@ -8,8 +8,9 @@ import { Resistances } from "../../components/Resistences.js";
 import { Traits } from "../../components/Traits.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
+import { ensureActiveEffects } from "../../utils/effects.js";
 
-// ── EatCallbackContext ─────────────────────────────────────────────
+// -- EatCallbackContext --
 
 /**
  * Context passed to corpse eat hook callbacks.
@@ -82,7 +83,7 @@ export class EatCallbackContext {
 
   /**
    * Deterministic RNG chance check.
-   * @param {number} prob - 0.0–1.0
+   * @param {number} prob - 0.0-1.0
    * @returns {boolean}
    */
   chance(prob) {
@@ -137,12 +138,8 @@ export class EatCallbackContext {
   }
 
   _applyPushEffect(op) {
-    let ae = this.world.get(op.entityId, ActiveEffects);
-    if (!ae || !Array.isArray(ae.effects)) {
-      try { this.world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {}
-      ae = this.world.get(op.entityId, ActiveEffects);
-    }
-    if (!ae || !Array.isArray(ae.effects)) return;
+    const ae = ensureActiveEffects(this.world, op.entityId);
+    if (!ae) return;
     upsertTimedEffect(ae.effects, { stacks: 1, ...(op.effect || {}) });
   }
 
@@ -225,10 +222,10 @@ export class EatCallbackContext {
   }
 }
 
-// ── Factory functions ──────────────────────────────────────────────
+// -- Factory functions --
 
 /**
- * Push a status effect on eat → emit "hunger:sickened".
+ * Push a status effect on eat -> emit "hunger:sickened".
  * Used by rat/bat (disease), snake/spider (poison), wraith/lich (mindwipe), etc.
  * @param {string} effectKey
  * @param {number} turnsLeft
@@ -275,7 +272,7 @@ export function cancelEat(code, message, consumesTurn = true) {
   };
 }
 
-// ── Trait progression factories ──────────────────────────────────
+// -- Trait progression factories --
 
 const IRON_STOMACH_THRESHOLD = 3;
 

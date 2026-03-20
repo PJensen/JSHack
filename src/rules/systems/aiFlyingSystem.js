@@ -13,10 +13,7 @@ import { Vitality } from "../components/Vitality.js";
 import { FlyIntent } from "../components/Intents/FlyIntent.js";
 import { getMonster } from "../data/monsters.js";
 import { canFlyOnFloor } from "../utils/flyingEligibility.js";
-
-function chebyshevDistance(ax, ay, bx, by) {
-  return Math.max(Math.abs((ax | 0) - (bx | 0)), Math.abs((ay | 0) - (by | 0)));
-}
+import { chebyshevScalar } from "../utils/distance.js";
 
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -51,7 +48,7 @@ export function aiFlyingSystem(world) {
 
     const alert = aggro.alertLevel;
     const isAware = alert !== AGGRO_LEVELS.unaware;
-    const isAdjacent = hasPlayer && chebyshevDistance(pos.x, pos.y, playerX, playerY) <= 1;
+    const isAdjacent = hasPlayer && chebyshevScalar(pos.x, pos.y, playerX, playerY) <= 1;
     const vit = world.get(id, Vitality);
     const retreatThreshold = Number(def.retreatHpPct || 0);
     const hpFraction = vit ? (vit.hp / Math.max(1, vit.maxHp)) : 1;

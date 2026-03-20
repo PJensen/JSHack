@@ -8,6 +8,8 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 
 Deno.test("death share wiring dispatches ui:playerDied with share URL", () => {
   const world = new World({ seed: 42 });
+  const prevVersion = globalThis.VERSION;
+  globalThis.VERSION = "1.9.3";
   installDeathShareWiring({ world });
 
   const playerId = world.create();
@@ -38,6 +40,7 @@ Deno.test("death share wiring dispatches ui:playerDied with share URL", () => {
     world.emit("postMortemComplete");
   } finally {
     globalThis.removeEventListener("ui:playerDied", onDied);
+    globalThis.VERSION = prevVersion;
   }
 
   assert(detail, "expected ui:playerDied detail");
@@ -45,7 +48,11 @@ Deno.test("death share wiring dispatches ui:playerDied with share URL", () => {
   assertEquals(detail.score, 123);
   assertEquals(detail.seed, 0xC0FFEE);
   assertEquals(detail.killerName, "Goblin Archer");
+  assertEquals(detail.killedBy, "Goblin Archer");
   assertEquals(detail.cause, "melee");
+  assertEquals(detail.versionText, "1.9.3");
+  assertEquals(detail.versionNumber, 193);
+  assertEquals(detail.version, 193);
   assert(String(detail.shareUrl || "").startsWith("https://x.com/intent/tweet?"), "share URL should be X intent");
 });
 

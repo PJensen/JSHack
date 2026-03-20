@@ -192,6 +192,28 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "sub:jewelry": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 30, pool: ["ring_health", "ring_precision", "ring_arcana"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "equip", weight: 25, pool: ["amulet_guarded", "amulet_vigor"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "equip", weight: 15, pool: ["ring_fire_resist", "ring_poison_resist", "ring_endurance"], affixChance: 0.10, affixCountMax: 1 },
+      { type: "equip", weight: 10, pool: ["pendant_soulkeeper", "pendant_stormward"], affixChance: 0 },
+      { type: "equip", weight: 8,  pool: ["serpent_ring", "ring_of_fury"], affixChance: 0 },
+    ],
+  },
+
+  "sub:jewelry_cursed": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 25, pool: ["ring_hunger"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["ring_fumbling"], affixChance: 0 },
+      { type: "equip", weight: 20, pool: ["ring_weakness"], affixChance: 0 },
+      { type: "equip", weight: 15, pool: ["ring_blindness"], affixChance: 0 },
+      { type: "equip", weight: 10, pool: ["ring_teleportation"], affixChance: 0 },
+    ],
+  },
+
   "sub:melee_weapons": {
     rolls: { min: 1, max: 1 },
     entries: [
@@ -436,7 +458,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 18, tableId: "sub:spellbooks" },
       { type: "table",     weight: 12, tableId: "sub:wands" },
       { type: "archetype", weight: 10, archetype: "Ration" },
-      { type: "gem",       weight: 8,  materials: ["gemstone", "glass"] },
+      { type: "gem",       weight: 3,  materials: ["gemstone", "glass"] },
     ],
   },
 
@@ -452,7 +474,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 18, tableId: "sub:scrolls" },
       { type: "table",     weight: 12, tableId: "sub:wands" },
       { type: "archetype", weight: 8,  archetype: "IronRation" },
-      { type: "gem",       weight: 8,  materials: ["gemstone", "glass"] },
+      { type: "gem",       weight: 3,  materials: ["gemstone", "glass"] },
     ],
   },
 
@@ -467,7 +489,7 @@ export const LOOT_TABLES = {
       { type: "archetype", weight: 16, archetype: "HealthPotion" },
       { type: "table",     weight: 14, tableId: "sub:wands" },
       { type: "table",     weight: 8,  tableId: "sub:equip_legendary" },
-      { type: "gem",       weight: 10, materials: ["gemstone"] },
+      { type: "gem",       weight: 4,  materials: ["gemstone"] },
     ],
   },
 
@@ -481,7 +503,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 20, tableId: "sub:scrolls" },
       { type: "archetype", weight: 18, archetype: "HealthPotion" },
       { type: "table",     weight: 15, tableId: "sub:wands" },
-      { type: "gem",       weight: 10, materials: ["gemstone"] },
+      { type: "gem",       weight: 4,  materials: ["gemstone"] },
     ],
   },
 
@@ -518,7 +540,8 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 8,  tableId: "sub:scrolls" },
       { type: "table",     weight: 6,  tableId: "sub:wands" },
       { type: "archetype", weight: 8,  archetype: "Ration" },
-      { type: "gem",       weight: 6,  materials: ["gemstone", "glass"] },
+      { type: "gem",       weight: 2,  materials: ["gemstone", "glass"] },
+      { type: "table",     weight: 4,  tableId: "sub:jewelry_cursed" },
     ],
   },
 
@@ -530,10 +553,52 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 25, tableId: "sub:equip_magic" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 10, tableId: "sub:spellbooks" },
-      { type: "gem",       weight: 5,  materials: ["gemstone", "glass"] },
+      { type: "gem",       weight: 2,  materials: ["gemstone", "glass"] },
+      { type: "table",     weight: 3,  tableId: "sub:jewelry_cursed" },
       { type: "table",     weight: 4,  tableId: "sub:equip_rare" },
       { type: "table",     weight: 2,  tableId: "sub:equip_epic" },
       { type: "table",     weight: 1,  tableId: "sub:equip_legendary" },
+    ],
+  },
+
+  // ── Urn contents ─────────────────────────────────────────────────
+  // Breaking an urn scatters someone's ashes. Occasionally jewelry was
+  // interred with the deceased; rarely a gemstone settled to the bottom.
+
+  "urn:contents": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",  weight: 10 },
+      { type: "table",    weight: 18, tableId: "sub:jewelry" },
+      { type: "gem",      weight: 7,  materials: ["gemstone"] },
+    ],
+  },
+
+  // ── Sarcophagus contents ─────────────────────────────────────────
+  // Burial goods interred with the deceased. Richer than urns:
+  // bones, a burial weapon, jewelry, and a generous helping of gems.
+  // No worthless glass — that would be an affront to the dead.
+
+  "sub:sarc_weapon": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 25, pool: ["sword_plain", "dagger_quick"], affixChance: 0.30, affixCountMax: 1 },
+      { type: "equip", weight: 20, pool: ["longsword", "axe_heavy"],     affixChance: 0.35, affixCountMax: 1 },
+      { type: "equip", weight: 15, pool: ["warhammer"],                  affixChance: 0.35, affixCountMax: 1 },
+      { type: "equip", weight: 10, pool: ["nightfang_dagger", "flametongue"], affixChance: 0 },
+      { type: "equip", weight: 5,  pool: ["pyreheart_mace", "glacial_edge"], affixChance: 0 },
+    ],
+  },
+
+  "sarcophagus:contents": {
+    rolls: { min: 2, max: 4 },
+    entries: [
+      { type: "archetype", weight: 30, archetype: "Bone" },
+      { type: "table",     weight: 22, tableId: "sub:sarc_weapon" },
+      { type: "table",     weight: 25, tableId: "sub:jewelry" },
+      { type: "table",     weight: 8,  tableId: "sub:jewelry_cursed" },
+      { type: "gem",       weight: 20, materials: ["gemstone"] },
+      { type: "gold",      weight: 15, count: { base: 10, perDepth: 5 } },
     ],
   },
 

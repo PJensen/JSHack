@@ -5,7 +5,8 @@ import { EntranceProfile } from "../components/EntranceProfile.js";
 import { EntranceState } from "../components/EntranceState.js";
 import { Position } from "../components/Position.js";
 import { TownState } from "../components/TownState.js";
-import { clamp01, chebyshev, ensureTownInterpretationEntities } from "../utils/townInterpretation.js";
+import { clamp01, ensureTownInterpretationEntities } from "../utils/townInterpretation.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 const SHORTAGE_ORDER = Object.freeze(["stable", "tight", "strained", "scarce", "panic"]);
 const DANGER_ORDER = Object.freeze(["safe", "uneasy", "dangerous", "closed"]);
@@ -61,7 +62,7 @@ const PRESSURE_BANDS = Object.freeze([
 
 function influenceFor(districtPos, districtRadius, entrancePos, entranceState, entranceProfile) {
   const reach = Math.max(Number(districtRadius || 0), Number(entranceProfile?.radius || 0), 1);
-  const dist = chebyshev(districtPos.x, districtPos.y, entrancePos.x, entrancePos.y);
+  const dist = chebyshevScalar(districtPos.x, districtPos.y, entrancePos.x, entrancePos.y);
   const falloff = clamp01(1 - (dist / reach));
   return falloff * Number(entranceState?.pressure || 0);
 }

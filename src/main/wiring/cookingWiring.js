@@ -1,8 +1,8 @@
 // main/wiring/cookingWiring.js
 // Event bridge between cooking fire rules events and the display layer.
 
-import { Position } from "../../rules/components/Position.js";
 import { resolveItemDisplayName } from "./itemName.js";
+import { isPlayerAdjacentTo } from "./wiringUtils.js";
 
 const INSTALLED = Symbol.for("jshack:main:cookingWiring:installed");
 
@@ -21,16 +21,6 @@ export function installCookingWiring({ world, playerEntity, dispatchRules, log }
 
   const writeLog = typeof log === "function" ? log : () => {};
   let activeFireId = 0;
-
-  function isPlayerAdjacentTo(fireId) {
-    const pe = playerEntity(world);
-    if (!pe || !(fireId > 0)) return false;
-    const ppos = world.get(pe.id, Position);
-    const fpos = world.get(fireId, Position);
-    if (!ppos || !fpos) return false;
-    const dist = Math.max(Math.abs(ppos.x - fpos.x), Math.abs(ppos.y - fpos.y));
-    return dist <= 1;
-  }
 
   world.on("cooking:open", ({ actor, targetId, corpses, herbs }) => {
     const pe = playerEntity(world);
@@ -62,7 +52,7 @@ export function installCookingWiring({ world, playerEntity, dispatchRules, log }
     const pe = playerEntity(world);
     if (!pe || Number(id || 0) !== pe.id) return;
     if (!(activeFireId > 0)) return;
-    if (isPlayerAdjacentTo(activeFireId)) return;
+    if (isPlayerAdjacentTo(world, activeFireId)) return;
     activeFireId = 0;
     try { window.dispatchEvent(new CustomEvent("ui:closeCookingFire")); } catch (e) { console.debug('[cookingWiring] dispatch ui:closeCookingFire:', e); }
   });
@@ -73,7 +63,7 @@ export function installCookingWiring({ world, playerEntity, dispatchRules, log }
     const fireId = Number(e?.detail?.fireId || activeFireId || 0) | 0;
     const itemId = Number(e?.detail?.itemId || 0) | 0;
     if (!(fireId > 0) || !(itemId > 0)) return;
-    if (!isPlayerAdjacentTo(fireId)) {
+    if (!isPlayerAdjacentTo(world, fireId)) {
       writeLog("You need to stand next to the cooking fire.");
       activeFireId = 0;
       try { window.dispatchEvent(new CustomEvent("ui:closeCookingFire")); } catch (e) { console.debug('[cookingWiring] dispatch ui:closeCookingFire:', e); }

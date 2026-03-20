@@ -18,6 +18,7 @@ import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Faction } from "../../rules/components/Faction.js";
 import { attachProcPackage, listProcPackageIds } from "../../rules/data/procPackages.js";
+import { ensureActiveEffects } from "../../rules/utils/effects.js";
 
 function describeItem(world, itemId) {
   const info = world.get(itemId, ItemInfo);
@@ -62,11 +63,8 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
 
     const pe = playerEntity(world);
     if (!pe) return 'No player entity found.';
-    let ae = world.get(pe.id, ActiveEffects);
-    if (!ae) {
-      world.add(pe.id, ActiveEffects, { effects: [] });
-      ae = world.get(pe.id, ActiveEffects);
-    }
+    const ae = ensureActiveEffects(world, pe.id);
+    if (!ae) return 'Could not create ActiveEffects component.';
     ae.effects.push({ key, turnsLeft, potency: 1, stacks: 1 });
     return `Applied ${key} for ${turnsLeft} turn(s)`;
   });
@@ -104,16 +102,13 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
     world[GOD_SYM] = !world[GOD_SYM];
     const pe = playerEntity(world);
     if (!pe) return 'No player entity found.';
-    let ae = world.get(pe.id, ActiveEffects);
     if (world[GOD_SYM]) {
-      if (!ae) {
-        world.add(pe.id, ActiveEffects, { effects: [] });
-        ae = world.get(pe.id, ActiveEffects);
-      }
-      if (!ae.effects.some(e => e.key === 'invulnerable')) {
+      const ae = ensureActiveEffects(world, pe.id);
+      if (ae && !ae.effects.some(e => e.key === 'invulnerable')) {
         ae.effects.push({ key: 'invulnerable', turnsLeft: 999999, potency: 1, stacks: 1 });
       }
     } else {
+      const ae = world.get(pe.id, ActiveEffects);
       if (ae) ae.effects = ae.effects.filter(e => e.key !== 'invulnerable');
     }
     const msg = `God mode ${world[GOD_SYM] ? 'ON' : 'OFF'}`;

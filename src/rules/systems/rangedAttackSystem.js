@@ -18,8 +18,8 @@ import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
 import { runAmmoScripts } from '../utils/projectileScriptDispatch.js';
-import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from '../utils/affixTopology.js';
-import { applyProcAccumulator, rollBonusDamage } from '../utils/procApplication.js';
+import { ensureEquippedAffixTopology } from '../utils/affixTopology.js';
+import { buildProcContext, applyPendingDamageProcPhase, applyReactionProcPhase } from '../utils/procPhases.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -33,44 +33,6 @@ function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
   const raw = dist / speed;
   return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
 }
-
-function buildProcContext(kind, {
-  source,
-  target,
-  item,
-  damage,
-  crit,
-  scratch,
-  tags,
-}) {
-  return {
-    kind,
-    source: Number(source || 0) | 0,
-    target: Number(target || 0) | 0,
-    item: Number(item || 0) | 0,
-    damage: {
-      amount: Math.max(0, Math.floor(Number(damage || 0))),
-      type: 'pierce',
-      crit: !!crit,
-      blocked: false,
-    },
-    tags: new Set(Array.isArray(tags) ? tags : []),
-    scratch: scratch || {},
-  };
-}
-
-function applyPendingDamageProcPhase(world, actorId, ctx, rng, options = {}) {
-  const out = evaluateEquippedAffixProcs(world, actorId, ctx, options);
-  const bonusDamage = out.cancelled ? 0 : rollBonusDamage(world, out.bonusDamage, rng);
-  applyProcAccumulator(world, out, { applyDamage: dealDamage });
-  return Math.max(0, Math.floor(Number(ctx?.damage?.amount || 0) + bonusDamage));
-}
-
-function applyReactionProcPhase(world, actorId, ctx, options = {}) {
-  const out = evaluateEquippedAffixProcs(world, actorId, ctx, options);
-  applyProcAccumulator(world, out, { applyDamage: dealDamage });
-}
-
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
@@ -228,6 +190,7 @@ export function rangedAttackSystem(world) {
       target: defender,
       item: weaponId,
       damage: dmg,
+      damageType: 'pierce',
       crit: isCrit,
       scratch: procScratch,
       tags: ['ranged', 'projectile'],
@@ -257,6 +220,7 @@ export function rangedAttackSystem(world) {
       target: defender,
       item: weaponId,
       damage: dmg,
+      damageType: 'pierce',
       crit: isCrit,
       scratch: procScratch,
       tags: ['ranged', 'projectile'],
@@ -266,6 +230,7 @@ export function rangedAttackSystem(world) {
       target: defender,
       item: weaponId,
       damage: dmg,
+      damageType: 'pierce',
       crit: isCrit,
       scratch: procScratch,
       tags: ['ranged', 'projectile'],

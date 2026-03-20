@@ -9,7 +9,7 @@ import { renderAnvil } from './anvilOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { versionLoaded } from '../../shared/version.js';
-import { getHighscores } from '../../shared/tombstoneApi.js';
+import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import {
   readInputMode, readWalkInterval, writeInputMode, writeWalkInterval,
@@ -107,7 +107,6 @@ function markScrollable(el) {
   el.dataset.allowScroll = 'true';
   el.style.touchAction = 'pan-y';
   el.style.overscrollBehavior = 'contain';
-  el.style.webkitOverflowScrolling = 'touch';
 }
 
 import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
@@ -227,62 +226,43 @@ export function initOverlays() {
   const ticker = ensureMessageTicker(root);
   let spellGestureTimer = 0;
 
+  /** Hide all character-menu panels (mutual exclusivity). */
+  function hideCharMenuPanels() {
+    hide(inv); hide(char); hide(equip);
+    hide(settingsPanel); hide(questJournal); hide(townBoard);
+  }
+
   window.addEventListener('ui:openInventory', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
     (/** @type {any} */ (inv))._inventorySlotFilter = slotFilter || '';
-    hide(char);
-    hide(equip);
-    hide(settingsPanel);
-    hide(questJournal);
-    hide(townBoard);
+    hideCharMenuPanels();
     show(inv);
-    // Request data from app; app will respond with ui:inventoryData
     window.dispatchEvent(new CustomEvent('ui:requestInventoryData', { detail: { slotFilter } }));
   });
   window.addEventListener('ui:openCharacter', () => {
-    hide(inv);
-    hide(equip);
-    hide(settingsPanel);
-    hide(questJournal);
-    hide(townBoard);
+    hideCharMenuPanels();
     show(char);
     window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
   });
   window.addEventListener('ui:openEquipment', () => {
-    hide(inv);
-    hide(char);
-    hide(settingsPanel);
-    hide(questJournal);
-    hide(townBoard);
+    hideCharMenuPanels();
     show(equip);
     window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
   });
   window.addEventListener('ui:openSettings', () => {
-    hide(inv);
-    hide(char);
-    hide(equip);
-    hide(questJournal);
-    hide(townBoard);
+    hideCharMenuPanels();
     show(settingsPanel);
     window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
   });
   window.addEventListener('ui:openQuests', () => {
-    hide(inv);
-    hide(char);
-    hide(equip);
-    hide(settingsPanel);
-    hide(townBoard);
+    hideCharMenuPanels();
     show(questJournal);
     window.dispatchEvent(new CustomEvent('ui:requestQuestJournalData'));
   });
   window.addEventListener('ui:openTownBoard', () => {
-    hide(inv);
-    hide(char);
-    hide(equip);
-    hide(settingsPanel);
-    hide(questJournal);
+    hideCharMenuPanels();
     show(townBoard);
   });
   // Toggle inventory panel open/close
@@ -290,11 +270,7 @@ export function initOverlays() {
     if (inv.style.display === 'block') {
       hide(inv);
     } else {
-      hide(char);
-      hide(equip);
-      hide(settingsPanel);
-      hide(questJournal);
-      hide(townBoard);
+      hideCharMenuPanels();
       show(inv);
       (/** @type {any} */ (inv))._inventorySlotFilter = '';
       window.dispatchEvent(new CustomEvent('ui:requestInventoryData'));
@@ -304,11 +280,7 @@ export function initOverlays() {
     if (char.style.display === 'block') {
       hide(char);
     } else {
-      hide(inv);
-      hide(equip);
-      hide(settingsPanel);
-      hide(questJournal);
-      hide(townBoard);
+      hideCharMenuPanels();
       show(char);
       window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
     }
@@ -317,11 +289,7 @@ export function initOverlays() {
     if (equip.style.display === 'block') {
       hide(equip);
     } else {
-      hide(inv);
-      hide(char);
-      hide(settingsPanel);
-      hide(questJournal);
-      hide(townBoard);
+      hideCharMenuPanels();
       show(equip);
       window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
     }
@@ -330,11 +298,7 @@ export function initOverlays() {
     if (settingsPanel.style.display === 'block') {
       hide(settingsPanel);
     } else {
-      hide(inv);
-      hide(char);
-      hide(equip);
-      hide(questJournal);
-      hide(townBoard);
+      hideCharMenuPanels();
       show(settingsPanel);
       window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
     }
@@ -846,12 +810,13 @@ export function initOverlays() {
   });
 
   // Chest overlay
-  let _chestState = { chestId: 0 };
+  let _chestState = { chestId: 0, label: 'Chest' };
   window.addEventListener('ui:openChest', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const d = e?.detail || {};
     _chestState.chestId = d.chestId || 0;
+    _chestState.label = d.label || 'Chest';
     show(chest);
   });
   window.addEventListener('ui:chestData', (ev) => {
@@ -1825,7 +1790,8 @@ function renderGroundTooltip(tip, detail) {
     const row = document.createElement('div');
     row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
     const lbl = document.createElement('div');
-    lbl.textContent = fromChest ? 'Open Chest' : `${detail?.count || (detail?.items?.length || 0)} items nearby`;
+    const chestLabel = (fromChest && detail?.chestName) ? `Open ${detail.chestName}` : 'Open Chest';
+    lbl.textContent = fromChest ? chestLabel : `${detail?.count || (detail?.items?.length || 0)} items nearby`;
     lbl.style.fontWeight = 'bold';
     const hint = document.createElement('div');
     hint.textContent = fromChest ? 'Tap to open' : 'Tap to choose'; hint.style.marginLeft = 'auto'; hint.style.opacity = '0.8';
@@ -2675,8 +2641,9 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     const fromChest = ground.fromChest === true;
     const groundChestId = Number(ground.chestId || 0) | 0;
     if (fromChest && groundChestId > 0) {
+      const actionLabel = ground.chestName ? `Open ${ground.chestName}` : 'Open Chest';
       return {
-        label: 'Open Chest',
+        label: actionLabel,
         run: () => {
           window.dispatchEvent(new CustomEvent('ui:tapOpenChest', { detail: { chestId: groundChestId } }));
         },
@@ -5206,19 +5173,20 @@ function renderShop(panel, data, state) {
   renderList();
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{chestId:number}} state */
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{chestId:number, label?:string}} state */
 function renderChest(panel, data, state) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
   const chestItems = data?.chestItems || [];
   const playerItems = data?.playerItems || [];
+  const containerLabel = state?.label || 'Chest';
 
   // Header
   const header = document.createElement('div');
   Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' });
   const title = document.createElement('div');
-  title.textContent = 'Chest';
+  title.textContent = containerLabel;
   title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
   header.appendChild(title);
   el.appendChild(header);
@@ -5265,7 +5233,7 @@ function renderChest(panel, data, state) {
 
     if (!currentItems.length) {
       const empty = document.createElement('div');
-      empty.textContent = activeTab === 'take' ? '(chest is empty)' : '(nothing to store)';
+      empty.textContent = activeTab === 'take' ? `(${containerLabel.toLowerCase()} is empty)` : '(nothing to store)';
       listContainer.appendChild(empty);
       hint.textContent = 'Tab=Switch \u00b7 Esc=Close';
       hideItemTooltip();
@@ -5955,6 +5923,10 @@ function renderDeathScreen(panel, detail) {
         rankEl.textContent = `#${i + 1}`;
         rankEl.style.cssText = 'width:2.2em;text-align:right;flex-shrink:0;color:#3a5878';
         if (isPlayer) rankEl.style.color = '#ffd700';
+        const versionEl = document.createElement('span');
+        versionEl.textContent = getHighscoreVersionLabel(entry);
+        versionEl.style.cssText = 'width:5.4em;text-align:left;flex-shrink:0;color:#6a84a2;opacity:0.9';
+        if (isPlayer) { versionEl.style.color = '#ffd700'; versionEl.style.opacity = '1'; }
         const nameEl = document.createElement('span');
         nameEl.textContent = entry.playerName || '???';
         nameEl.style.cssText = 'flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
@@ -5967,6 +5939,7 @@ function renderDeathScreen(panel, detail) {
         clsEl.style.cssText = 'width:5.5em;text-align:left;flex-shrink:0;color:#7090b0;opacity:0.8';
         if (isPlayer) { clsEl.style.color = '#ffd700'; clsEl.style.opacity = '1'; }
         row.appendChild(rankEl);
+        row.appendChild(versionEl);
         row.appendChild(nameEl);
         row.appendChild(scoreEl);
         row.appendChild(clsEl);

@@ -1,4 +1,4 @@
-import { Position } from "../../rules/components/Position.js";
+import { isPlayerAdjacentTo } from "./wiringUtils.js";
 
 const INSTALLED = Symbol.for("jshack:main:alchemyWiring:installed");
 const EMPTY_INGREDIENTS = Object.freeze({
@@ -26,16 +26,6 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
   const writeLog = typeof log === "function" ? log : () => {};
   let activeBenchId = 0;
 
-  function isPlayerAdjacentTo(benchId) {
-    const pe = playerEntity(world);
-    if (!pe || !(benchId > 0)) return false;
-    const ppos = world.get(pe.id, Position);
-    const bpos = world.get(benchId, Position);
-    if (!ppos || !bpos) return false;
-    const dist = Math.max(Math.abs(ppos.x - bpos.x), Math.abs(ppos.y - bpos.y));
-    return dist <= 1;
-  }
-
   world.on("alchemy:open", ({ actor, targetId, ingredients, recipes }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
@@ -58,7 +48,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
     const pe = playerEntity(world);
     if (!pe || Number(id || 0) !== pe.id) return;
     if (!(activeBenchId > 0)) return;
-    if (isPlayerAdjacentTo(activeBenchId)) return;
+    if (isPlayerAdjacentTo(world, activeBenchId)) return;
     activeBenchId = 0;
     try { window.dispatchEvent(new CustomEvent("ui:closeAlchemyBench")); } catch (e) { console.debug('[alchemyWiring] dispatch ui:closeAlchemyBench:', e); }
   });
@@ -69,7 +59,7 @@ export function installAlchemyWiring({ world, playerEntity, dispatchRules, log }
     const benchId = Number(e?.detail?.benchId || activeBenchId || 0) | 0;
     const recipe = String(e?.detail?.recipe || "").trim().toLowerCase();
     if (!(benchId > 0) || !recipe) return;
-    if (!isPlayerAdjacentTo(benchId)) {
+    if (!isPlayerAdjacentTo(world, benchId)) {
       writeLog("You need to stand next to the alchemy bench.");
       activeBenchId = 0;
       try { window.dispatchEvent(new CustomEvent("ui:closeAlchemyBench")); } catch (e) { console.debug('[alchemyWiring] dispatch ui:closeAlchemyBench:', e); }

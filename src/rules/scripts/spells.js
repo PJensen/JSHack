@@ -23,10 +23,11 @@ import { hasLOS } from "../../shared/math/gridLOS.js";
 import { bresenhamLine } from "../../shared/math/bresenham.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
-import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { combatSeed, hashString32, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { chebyshev } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
 import { isVisible as isTileVisible } from "../environment/dungeon/exploredMap.js";
@@ -56,15 +57,6 @@ const FLASH_HEAL_TUNING = Object.freeze({
 });
 
 /**
- * @param {{x:number,y:number}} a
- * @param {{x:number,y:number}} b
- * @returns {number}
- */
-function chebyshev(a, b) {
-  return Math.max(Math.abs((a.x | 0) - (b.x | 0)), Math.abs((a.y | 0) - (b.y | 0)));
-}
-
-/**
  * Placeholder for upcoming spell-rank progression.
  * @param {World} world
  * @param {number} actor
@@ -75,19 +67,6 @@ function chebyshev(a, b) {
 function getFlashHealSpellLevel(world, actor, spell, intent) {
   void world; void actor; void spell; void intent;
   return 1;
-}
-
-/**
- * @param {string} value
- * @returns {number}
- */
-function hashString32(value) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < value.length; i++) {
-    h ^= value.charCodeAt(i) & 0xff;
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
 }
 
 /**

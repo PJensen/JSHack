@@ -1,6 +1,6 @@
 import { Player } from "../../rules/components/Player.js";
 import { Score } from "../../rules/components/Score.js";
-import { postDeathTombstone } from "../../shared/tombstoneApi.js";
+import { getRuntimeVersionMeta, postDeathTombstone } from "../../shared/tombstoneApi.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
@@ -158,6 +158,7 @@ export function installDeathShareWiring({ world }) {
 
     const stats = gatherDeathStats(world, id);
     const scoreVal = score?.current ?? 0;
+    const { versionText, versionNumber } = getRuntimeVersionMeta();
 
     const shareUrl = makeDeathShareLink({
       depth, score: scoreVal, seed, killerName, cause,
@@ -166,6 +167,10 @@ export function installDeathShareWiring({ world }) {
 
     _pendingDeathDetail = {
       depth, score: scoreVal, seed, killerName, cause, shareUrl,
+      killedBy: killerName,
+      version: versionNumber,
+      versionText,
+      versionNumber,
       ...stats,
     };
 

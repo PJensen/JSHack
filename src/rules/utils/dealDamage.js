@@ -14,6 +14,7 @@ import { resolveCanonicalStats } from "./canonicalStats.js";
 import { createLegacyCombatFrame, runLegacyMonsterHook } from "./legacyAffixDispatch.js";
 import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from "./affixTopology.js";
 import { applyProcAccumulator } from "./procApplication.js";
+import { clamp } from "../../shared/math/math.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -28,10 +29,6 @@ const SLOT_WEIGHT_TABLE = Object.entries(ELECTRIC_DAMAGE_TUNING.slotWeights || {
 const MATERIAL_CONDUCTIVITY = new Map(
   MATERIAL_CATALOG.map((row) => [String(row?.id || ""), Number(row?.Material?.conductivity ?? BASE_BODY_CONDUCTIVITY)]),
 );
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
 
 // ── Electric resistance helpers (moved from typedDamage.js) ─────────
 

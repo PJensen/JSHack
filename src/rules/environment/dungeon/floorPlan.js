@@ -7,10 +7,7 @@ import { CHUNK_SIZE } from './constants.js';
 import { dungeonConfig } from './dungeonConfig.js';
 import { OVERWORLD_EXTENT } from './overworld.js';
 import { pickProfile } from './profiles/index.js';
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+import { clamp } from '../../../shared/math/math.js';
 
 function resolveBaseFootprintRadius(scale) {
   if (scale <= 0.15) return 0;

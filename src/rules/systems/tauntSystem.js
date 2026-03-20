@@ -5,6 +5,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 
 const TAUNT_INSTALLED_KEY = Symbol.for("jshack:taunt:installed");
 const TAUNT_EFFECT_KEYS = Object.freeze(new Set(["taunt", "taunted"]));
@@ -25,21 +26,6 @@ function readPoint(raw, fallback) {
     return { x: x | 0, y: y | 0 };
   }
   return { x: fallback.x | 0, y: fallback.y | 0 };
-}
-
-/**
- * @param {import("../../lib/ecs-js/index.js").World} world
- * @param {number} entityId
- * @returns {{ effects: Array<any> } | null}
- */
-function ensureActiveEffects(world, entityId) {
-  let ae = world.get(entityId, ActiveEffects);
-  if (!ae || !Array.isArray(ae.effects)) {
-    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
-    ae = world.get(entityId, ActiveEffects);
-  }
-  if (!ae || !Array.isArray(ae.effects)) return null;
-  return ae;
 }
 
 /**
