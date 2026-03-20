@@ -1,25 +1,12 @@
 import { Brain } from "../components/Brain.js";
 import { Faction } from "../components/Faction.js";
-import { combatSeed, mulberry32 } from "./rng.js";
+import { combatSeed, hashString32, mulberry32 } from "./rng.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { areFactionsHostile } from "./factionHostility.js";
 import { resolveCanonicalStats } from "./canonicalStats.js";
 import { resolveDerivedStats } from "./derivedStats.js";
 import { resolveCombatSnapshot } from "./resolveCombatSnapshot.js";
 import { statusStrength } from "./statusFacade.js";
-
-/**
- * @param {string} value
- * @returns {number}
- */
-function hashString32(value) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < value.length; i++) {
-    h ^= value.charCodeAt(i) & 0xff;
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
 
 /**
  * Positive-only spell scaling. Baseline INT 10 preserves current damage;

@@ -16,6 +16,7 @@ import { TILE_ICE } from "../environment/dungeon/constants.js";
 import { getTile, isWalkable } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 
 const INSTALLED = Symbol.for("jshack:tileStepEffect:installed");
@@ -106,14 +107,12 @@ function _scorch(world, id, effect) {
     cause: "lava",
   });
 
-  // Apply burn to survivors (pattern from spells.js)
+  // Apply burn to survivors
   if (result.applied && !result.killed && effect.status) {
-    const ae = /** @type {any} */ (world.get(id, ActiveEffects));
     const status = { ...effect.status };
-    if (ae && Array.isArray(ae.effects)) {
+    const ae = ensureActiveEffects(world, id);
+    if (ae) {
       upsertTimedEffect(ae.effects, { stacks: 1, ...status });
-    } else {
-      try { world.add(id, ActiveEffects, { effects: [status] }); } catch {}
     }
   }
 
@@ -145,7 +144,7 @@ function _slide(world, id, from, to, effect) {
       const slideFrom = { x: cx, y: cy };
       const slideTo = { x: nx, y: ny };
       world.set(id, Position, slideTo);
-      // Emit "moved" for each step — triggers scorch/extinguish if
+      // Emit "moved" for each step --- triggers scorch/extinguish if
       // the actor slides off ice onto lava/water, but not nested slides
       try { world.emit?.("moved", { id, from: slideFrom, to: slideTo }); } catch {}
       steps++;

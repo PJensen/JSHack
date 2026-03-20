@@ -1,14 +1,12 @@
 // display/ui/concentricGauge.js
 // Frameworkless concentric resource gauge: health (outer), mana (middle), stamina (inner).
 
+import { lerp } from '../../shared/math/math.js';
+
 function clamp01(x) {
   const n = Number(x);
   if (!Number.isFinite(n)) return 0;
   return Math.min(1, Math.max(0, n));
-}
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
 }
 
 function easeInOutCubic(t) {

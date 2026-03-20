@@ -13,6 +13,7 @@
 import { Brain } from '../components/Brain.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { getPassiveBonuses } from './passiveBonuses.js';
+import { ensureActiveEffects } from './effects.js';
 
 function durationTicks(value) {
   return Math.max(0, Number(value) | 0);
@@ -153,12 +154,8 @@ export function blind(world, targetId, toValue, rampIn, holdFor, rampOut, endVal
   const startValue = getEffectiveVisionRange(world, id);
   const resolvedEndValue = (endValue !== undefined) ? endValue : startValue;
 
-  let ae = world.get(id, ActiveEffects);
-  if (!ae) {
-    try { world.add(id, ActiveEffects, { effects: [] }); } catch { /* already exists */ }
-    ae = world.get(id, ActiveEffects);
-  }
-  if (!ae || !Array.isArray(ae.effects)) return false;
+  let ae = ensureActiveEffects(world, id);
+  if (!ae) return false;
 
   if (opts.stack) {
     const existing = ae.effects.find(e => e && e.key === 'stat_envelope' && e.stat === 'visionRange');

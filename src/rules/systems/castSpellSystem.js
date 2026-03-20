@@ -5,7 +5,7 @@ import { Channeling } from "../components/Channeling.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
-import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { combatSeed, hashString32, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { resolveDerivedStats } from "../utils/derivedStats.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
@@ -37,19 +37,6 @@ function normalizedLearnedSpellIds(brain) {
     out.push(id);
   }
   return out;
-}
-
-/**
- * @param {string} value
- * @returns {number}
- */
-function hashString32(value) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < value.length; i++) {
-    h ^= value.charCodeAt(i) & 0xff;
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
 }
 
 /**

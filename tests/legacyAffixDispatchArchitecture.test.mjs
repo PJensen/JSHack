@@ -8,8 +8,8 @@ Deno.test("combat runtime routes affix behavior through proc topology instead of
     "combatSystem should use affix topology helpers",
   );
   assert(
-    combatText.includes("procApplication.js"),
-    "combatSystem should apply proc accumulator outputs",
+    combatText.includes("procApplication.js") || combatText.includes("procPhases.js"),
+    "combatSystem should apply proc accumulator outputs (directly or via procPhases)",
   );
   assert(
     !combatText.includes("runLegacyAffixScripts"),

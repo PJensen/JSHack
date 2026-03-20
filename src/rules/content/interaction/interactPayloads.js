@@ -60,6 +60,8 @@ import { LumberBundle } from "../../archetypes/TownGoods.js";
 import { Monster } from "../../archetypes/Creatures.js";
 import { equipMonster } from "../../environment/dungeon/populate.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
+import { createRng } from "../../../lib/ecs-js/rng.js";
+import { resolveLootTable, materializeDrop } from "../../data/lootResolver.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
@@ -1181,8 +1183,24 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const pos = world.get(targetId, Position);
       if (pos) {
+        // Resolve bonus loot from the urn table (jewelry / gem).
+        const urnSeed = ((world.seed >>> 0) ^ (((targetId | 0) * 0x9e3779b9) >>> 0) ^ 0xA5E5) >>> 0;
+        const rng = createRng(urnSeed);
+        let depth = 1;
+        for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
+        const drops = resolveLootTable("urn:contents", rng, depth);
+
+        // Stacking order (creation order = visual bottom→top):
+        //   1. gems   (bottom — settled to the bottom of the urn)
+        //   2. ashes  (middle — always present)
+        //   3. jewelry (top — placed atop the ashes)
+        const gems = drops.filter(d => d.kind === "gem");
+        const jewelry = drops.filter(d => d.kind !== "gem");
+
+        for (const drop of gems) materializeDrop(world, drop, pos);
         const ashId = createFrom(world, Ashes, {});
         world.add(ashId, Position, { x: pos.x, y: pos.y });
+        for (const drop of jewelry) materializeDrop(world, drop, pos);
       }
       world.emit?.("urn:broken", { actor, targetId });
       try {
@@ -1294,15 +1312,21 @@ export const INTERACT_PAYLOADS = {
         }
       }
 
+      // Build list of adjacent offsets, excluding the player's tile.
+      const actorPos = world.get(actor, Position);
+      const ADJACENT = [
+        { dx: 1, dy: 0 },
+        { dx: -1, dy: 0 },
+        { dx: 0, dy: 1 },
+        { dx: 0, dy: -1 },
+      ];
+      const safeSlots = actorPos
+        ? ADJACENT.filter(o => pos.x + o.dx !== actorPos.x || pos.y + o.dy !== actorPos.y)
+        : ADJACENT;
+
       for (let i = 0; i < count; i++) {
-        // Spawn adjacent to the sarcophagus, never on top of it.
-        const ADJACENT = [
-          { dx: 1, dy: 0 },
-          { dx: -1, dy: 0 },
-          { dx: 0, dy: 1 },
-          { dx: 0, dy: -1 },
-        ];
-        const { dx, dy } = ADJACENT[i % ADJACENT.length];
+        const pool = safeSlots.length > 0 ? safeSlots : ADJACENT;
+        const { dx, dy } = pool[i % pool.length];
         const eid = createFrom(world, Monster, {
           x: pos.x + dx,
           y: pos.y + dy,
@@ -1329,10 +1353,33 @@ export const INTERACT_PAYLOADS = {
       });
     },
     afterInteract(ctx) {
-      // One-time use — the sarcophagus can never be disturbed again.
+      const { world, targetId, params } = ctx;
+      const depth = ((params?.depth) | 0) || 1;
+
+      // Make the sarcophagus walkable so the player can step onto it.
       try {
-        ctx.world.remove(ctx.targetId, Interactable);
+        world.mutate(targetId, Collider, c => { c.solid = false; });
       } catch {}
+
+      // Convert to a lootable container — stock burial goods inside.
+      try { world.remove(targetId, Interactable); } catch {}
+      if (!world.has(targetId, Inventory)) {
+        world.add(targetId, Inventory, { capacity: 20 });
+      }
+      const pos = world.get(targetId, Position);
+      if (pos) {
+        const sarcSeed = ((world.seed >>> 0) ^ (((targetId | 0) * 0x9e3779b9) >>> 0) ^ 0x5A5C) >>> 0;
+        const rng = createRng(sarcSeed);
+        const drops = resolveLootTable("sarcophagus:contents", rng, depth);
+        const dummyPos = { x: 0, y: 0 };
+        for (const drop of drops) {
+          const eid = materializeDrop(world, drop, dummyPos);
+          if (eid != null) {
+            try { world.remove(eid, Position); } catch {}
+            addToInventory(world, targetId, eid);
+          }
+        }
+      }
     },
   },
 };

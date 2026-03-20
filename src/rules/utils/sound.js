@@ -1,4 +1,5 @@
 import { HEARING_HL_THRESHOLD, HEARING_TIERS } from "../components/Anatomy.js";
+import { chebyshev } from "./distance.js";
 
 export const HEARING_TIER_THRESHOLDS = Object.freeze({
   [HEARING_TIERS.super]: HEARING_HL_THRESHOLD.super,
@@ -14,12 +15,6 @@ function log2(x) {
 
 function toInt(n) {
   return Number(n) | 0;
-}
-
-function chebyshevDistance(a, b) {
-  const dx = Math.abs(toInt(a?.x) - toInt(b?.x));
-  const dy = Math.abs(toInt(a?.y) - toInt(b?.y));
-  return Math.max(1, Math.max(dx, dy));
 }
 
 function countWallsOnLine(x0, y0, x1, y1, getTile, isWall) {
@@ -86,7 +81,7 @@ export function evaluateSound(payload) {
   if (!Number.isFinite(sourceDbAt1Tile)) throw new Error("evaluateSound: sourceDbAt1Tile must be finite");
   if (!Number.isFinite(hearingThresholdDbHL)) throw new Error("evaluateSound: hearingThresholdDbHL must be finite");
 
-  const distance = chebyshevDistance(origin, source);
+  const distance = Math.max(1, chebyshev(origin, source));
   const distanceDb = 6 * log2(distance);
 
   const occlusionDb = (

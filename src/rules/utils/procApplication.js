@@ -1,21 +1,8 @@
-import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import { Vitality } from "../components/Vitality.js";
 import { upsertTimedEffect } from "./effectSemantics.js";
-
-function ensureActiveEffects(world, entityId) {
-  const resolvedEntityId = Number(entityId || 0) | 0;
-  if (!(resolvedEntityId > 0) || !world?.isAlive?.(resolvedEntityId)) return null;
-  let activeEffects = world.get(resolvedEntityId, ActiveEffects);
-  if (activeEffects && Array.isArray(activeEffects.effects)) return activeEffects;
-  try {
-    world.add(resolvedEntityId, ActiveEffects, { effects: [] });
-  } catch {
-    activeEffects = world.get(resolvedEntityId, ActiveEffects);
-  }
-  return world.get(resolvedEntityId, ActiveEffects) || null;
-}
+import { ensureActiveEffects } from "./effects.js";
 
 function applyStatusEffects(world, out) {
   for (let i = 0; i < out.statusesToApply.length; i++) {

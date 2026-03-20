@@ -47,12 +47,9 @@ import { hasOverworldAerialLOS } from "../utils/flyingEligibility.js";
 import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 import { getEffectiveVisionRange } from "../utils/blind.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
-
-function chebyshevDistance(ax, ay, bx, by) {
-  return Math.max(Math.abs((ax | 0) - (bx | 0)), Math.abs((ay | 0) - (by | 0)));
-}
 
 function isSmartPathingMonster(brain, def) {
   return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
@@ -174,7 +171,7 @@ export function aiChaseSystem(world) {
     // Perception is driven by Brain data rather than action cadence.
     // Use getEffectiveVisionRange so that stat envelope effects (e.g. blindness) apply.
     const sightRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, id)));
-    const withinSightRange = chebyshevDistance(pos.x, pos.y, playerPos.x, playerPos.y) <= sightRange;
+    const withinSightRange = chebyshevScalar(pos.x, pos.y, playerPos.x, playerPos.y) <= sightRange;
     const canSee = withinSightRange && (
       hasOverworldAerialLOS(world, {
         sourceId: id,
@@ -320,10 +317,7 @@ export function aiChaseSystem(world) {
     // Ambushers (floating eye, carrion shade, mimic) stay still until the
     // player walks into melee range, then strike.
     if (def?.ambush && aggro.alertLevel === AGGRO_LEVELS.hunting) {
-      const dxa = (playerPos.x | 0) - (pos.x | 0);
-      const dya = (playerPos.y | 0) - (pos.y | 0);
-      const chebDist = Math.max(Math.abs(dxa), Math.abs(dya));
-      if (chebDist > 1) return; // hold position — don't move yet
+      if (chebyshevScalar(pos.x, pos.y, playerPos.x, playerPos.y) > 1) return; // hold position — don't move yet
       // Player is adjacent; fall through to normal attack/move logic.
     }
 

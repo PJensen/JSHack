@@ -3287,6 +3287,197 @@ function drawVenomTagAura(ctx, e, fxTime) {
 }
 
 /**
+ * Draw an icy cyan-blue glow for entities tagged with `frost_glowing`.
+ * Slow crystalline pulse for frostbite weapons.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawFrostTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.5 + e.id * 1.3);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.62 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.26 + 0.14 * pulse;
+  outerGrad.addColorStop(0,   `rgba(100,190,255,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(70,150,230,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(40,100,180,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.30 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.32 + 0.20 * pulse;
+  innerGrad.addColorStop(0, `rgba(180,230,255,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(120,200,255,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draw a crackling electric blue-white glow for entities tagged with `storm_glowing`.
+ * Fast pulse for lightning/capacitive weapons.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawStormTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 5.0 + e.id * 0.91);
+  // Flicker: occasional sharp brightness spikes
+  const flicker = Math.sin(fxTime * 13.7 + e.id * 2.3) > 0.7 ? 0.3 : 0;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.60 + 0.10 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.22 + 0.16 * pulse + flicker;
+  outerGrad.addColorStop(0,   `rgba(120,170,255,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(80,130,240,${(outerA * 0.45).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(40,70,200,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.28 + 0.06 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.30 + 0.25 * pulse + flicker;
+  innerGrad.addColorStop(0, `rgba(210,230,255,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(140,180,255,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draw a dark crimson-purple glow for entities tagged with `soul_glowing`.
+ * Vampiric pulse for soul drain weapons.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawSoulTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.0 + e.id * 1.7);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.60 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.24 + 0.14 * pulse;
+  outerGrad.addColorStop(0,   `rgba(180,40,110,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(140,25,85,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(80,10,50,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.28 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.30 + 0.20 * pulse;
+  innerGrad.addColorStop(0, `rgba(220,80,170,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(170,50,120,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draw a deep crimson glow for entities tagged with `blood_glowing`.
+ * Slow throb for hemorrhage / berserk weapons.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawBloodTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.2 + e.id * 1.1);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.60 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.24 + 0.14 * pulse;
+  outerGrad.addColorStop(0,   `rgba(200,30,30,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(160,20,20,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(100,10,10,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.28 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.30 + 0.20 * pulse;
+  innerGrad.addColorStop(0, `rgba(255,80,60,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(220,40,30,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draw an acid yellow-green glow for entities tagged with `caustic_glowing`.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawCausticTagAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.2 + e.id * 1.5);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.60 + 0.08 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.26 + 0.14 * pulse;
+  outerGrad.addColorStop(0,   `rgba(190,210,30,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(150,180,20,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(100,130,10,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.28 + 0.05 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.30 + 0.20 * pulse;
+  innerGrad.addColorStop(0, `rgba(230,250,80,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(190,220,40,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * Draw a potion-shaped glow keyed off the "!" silhouette.
  * The disabled-kind set lives in worldView so enabling/disabling stays trivial.
  * @param {CanvasRenderingContext2D} ctx
@@ -3870,6 +4061,21 @@ function render(worldView) {
       if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
         drawVenomTagAura(bctx, e, _fxTime);
       }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('frost_glowing')) {
+        drawFrostTagAura(bctx, e, _fxTime);
+      }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('storm_glowing')) {
+        drawStormTagAura(bctx, e, _fxTime);
+      }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('soul_glowing')) {
+        drawSoulTagAura(bctx, e, _fxTime);
+      }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('blood_glowing')) {
+        drawBloodTagAura(bctx, e, _fxTime);
+      }
+      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('caustic_glowing')) {
+        drawCausticTagAura(bctx, e, _fxTime);
+      }
       if (Array.isArray(e.tags) && e.tags.includes('legendary_glowing')) {
         drawLegendaryChestAura(bctx, e, _fxTime);
       }
@@ -3915,6 +4121,21 @@ function render(worldView) {
     }
     if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('venom_glowing')) {
       drawVenomTagAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('frost_glowing')) {
+      drawFrostTagAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('storm_glowing')) {
+      drawStormTagAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('soul_glowing')) {
+      drawSoulTagAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('blood_glowing')) {
+      drawBloodTagAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('caustic_glowing')) {
+      drawCausticTagAura(bctx, renderEntity, _fxTime);
     }
     if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('legendary_glowing')) {
       drawLegendaryChestAura(bctx, renderEntity, _fxTime);

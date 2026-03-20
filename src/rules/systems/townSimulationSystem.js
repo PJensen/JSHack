@@ -13,15 +13,12 @@ import {
   findTownContainers,
 } from "../utils/townEconomy.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
+import { clamp } from "../../shared/math/math.js";
 
 const PULSE_BASE = 12;
 const LOW_FOOD_THRESHOLD = 4;
 const LOW_MATERIAL_THRESHOLD = 3;
 const LOW_MEDICINE_THRESHOLD = 3;
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
 
 function getDepth(world) {
   for (const [, ds] of world.query(DungeonState)) return ds.currentDepth ?? 1;

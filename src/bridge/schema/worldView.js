@@ -326,11 +326,26 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 	const affixes = itemInfo.affixes;
 	const hasAffix = (key) => affixes.includes(key) || affixes.includes(`affix:${key}`);
 
-	if (hasAffix('flaming') && !rec.tags.includes('glowing')) {
+	if ((hasAffix('flaming') || hasAffix('firestorm1')) && !rec.tags.includes('glowing')) {
 		rec.tags.push('glowing');
 	}
 	if (hasAffix('venomous1') || VENOM_GLOW_ITEM_KINDS.has(String(kind || ''))) {
 		if (!rec.tags.includes('venom_glowing')) rec.tags.push('venom_glowing');
+	}
+	if ((hasAffix('chainLightning1') || hasAffix('capacitive1')) && !rec.tags.includes('storm_glowing')) {
+		rec.tags.push('storm_glowing');
+	}
+	if (hasAffix('frostbite1') && !rec.tags.includes('frost_glowing')) {
+		rec.tags.push('frost_glowing');
+	}
+	if (hasAffix('soulDrain1') && !rec.tags.includes('soul_glowing')) {
+		rec.tags.push('soul_glowing');
+	}
+	if ((hasAffix('hemorrhage1') || hasAffix('berserk1')) && !rec.tags.includes('blood_glowing')) {
+		rec.tags.push('blood_glowing');
+	}
+	if (hasAffix('caustic1') && !rec.tags.includes('caustic_glowing')) {
+		rec.tags.push('caustic_glowing');
 	}
 }
 

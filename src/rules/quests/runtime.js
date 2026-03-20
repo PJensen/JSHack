@@ -16,7 +16,11 @@ export const STARTER_PRIEST_FETCH_QUEST_ID = "starter.priest_fetch";
 export const STARTER_GRAVEYARD_QUEST_ID = STARTER_PRIEST_FETCH_QUEST_ID;
 
 function cloneVars(data) {
-  return structuredClone(data || {});
+  const v = data || {};
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(v); } catch {}
+  }
+  return JSON.parse(JSON.stringify(v));
 }
 
 function buildContext(world, qid, compiled, state, bindings, vars, payload, eventName) {

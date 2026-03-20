@@ -120,6 +120,41 @@ import {
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
 } from '../../archetypes/RoomFeatures.js';
 
+// Simple spawn kinds: just `createFrom(world, Archetype, { x, y })` with no extra logic.
+const SIMPLE_SPAWN_TABLE = {
+  home_bed: HomeBed, home_chest: HomeChest, home_sign: HomeSign,
+  harvest_berries: BerryBush, harvest_herbs: HerbPatch,
+  harvest_thorn_bramble: ThornBramble, harvest_venom_fern: VenomFern,
+  harvest_moonleaf: MoonleafCluster, harvest_ember_root: EmberRootPatch,
+  harvest_iron_ore: OreVeinIron, harvest_coal_ore: OreVeinCoal,
+  harvest_stone: OreVeinStone, tree_node: TreeNode,
+  alchemy_bench: AlchemyBench, anvil: Anvil, furnace: Furnace,
+  cooking_fire: CookingFire,
+  crop_wheat: CropWheat, crop_carrot: CropCarrot, crop_corn: CropCorn,
+  well: Well, scarecrow: Scarecrow,
+  tavern_keg: TavernKeg, tavern_table: TavernTable, tavern_bench: TavernBench,
+  tavern_pillar: TavernPillar, tavern_sign: TavernSign,
+  millstone: Millstone,
+  church_altar: ChurchAltar, church_pew: ChurchPew, church_sign: ChurchSign,
+  church_font: ChurchFont, church_window: ChurchWindow,
+  window_arched: WindowArched, window_iron_grate: WindowIronGrate,
+  window_shuttered: WindowShuttered, window_round: WindowRound, window_rect: WindowRect,
+  town_bell: TownBell,
+  flower_rose: FlowerRose, flower_sunflower: FlowerSunflower,
+  flower_tulip: FlowerTulip, flower_daisy: FlowerDaisy, flower_bluebell: FlowerBluebell,
+  smithy_chest: SmithyChest, mill_chest: MillChest, lumber_chest: LumberChest,
+  smithy_sign: SmithySign, herb_chest: HerbChest, tavern_chest: TavernChest,
+  apothecary_sign: ApothecarySign, gem_shop_sign: GemShopSign, book_shop_sign: BookShopSign,
+  message_board: MessageBoard,
+  barrel: Barrel, crate: Crate, woodpile: Woodpile, hay_bale: HayBale,
+  lantern_post: LanternPost, rain_barrel: RainBarrel, wheelbarrow: Wheelbarrow,
+  market_stall: MarketStall, bench: Bench,
+  boulder: Boulder, fallen_log: FallenLog, lily_pad: LilyPad, cattail: Cattail,
+  birdbath: Birdbath, trellis: Trellis,
+  fountain: Fountain, altar: Altar, shrine: Shrine, statue: Statue, pillar: Pillar,
+  mushrooms: Mushrooms, web: Web, torch: Torch, urn: Urn,
+};
+
 // Weighted room feature table. Weight determines relative likelihood.
 const ROOM_FEATURES = [
   { kind: 'fountain',    weight: 8 },
@@ -1038,6 +1073,10 @@ export function equipMonster(world, entityId, equipment) {
  * @returns {number|null} entity ID
  */
 export function materializeSpawn(world, spawn) {
+  // Fast path: trivial spawn kinds that are just createFrom(arch, { x, y }).
+  const simpleArch = SIMPLE_SPAWN_TABLE[spawn.kind];
+  if (simpleArch) return createFrom(world, simpleArch, { x: spawn.x, y: spawn.y });
+
   switch (spawn.kind) {
     case 'monster': {
       const p = spawn.params;
@@ -1249,116 +1288,10 @@ export function materializeSpawn(world, spawn) {
       world.add(id, Position, { x: spawn.x, y: spawn.y });
       return id;
     }
-    case 'home_bed':
-      return createFrom(world, HomeBed, { x: spawn.x, y: spawn.y });
-    case 'home_chest':
-      return createFrom(world, HomeChest, { x: spawn.x, y: spawn.y });
-    case 'home_sign':
-      return createFrom(world, HomeSign, { x: spawn.x, y: spawn.y });
-    case 'harvest_berries':
-      return createFrom(world, BerryBush, { x: spawn.x, y: spawn.y });
-    case 'harvest_herbs':
-      return createFrom(world, HerbPatch, { x: spawn.x, y: spawn.y });
-    case 'harvest_thorn_bramble':
-      return createFrom(world, ThornBramble, { x: spawn.x, y: spawn.y });
-    case 'harvest_venom_fern':
-      return createFrom(world, VenomFern, { x: spawn.x, y: spawn.y });
-    case 'harvest_moonleaf':
-      return createFrom(world, MoonleafCluster, { x: spawn.x, y: spawn.y });
-    case 'harvest_ember_root':
-      return createFrom(world, EmberRootPatch, { x: spawn.x, y: spawn.y });
-    case 'harvest_iron_ore':
-      return createFrom(world, OreVeinIron, { x: spawn.x, y: spawn.y });
-    case 'harvest_coal_ore':
-      return createFrom(world, OreVeinCoal, { x: spawn.x, y: spawn.y });
-    case 'harvest_stone':
-      return createFrom(world, OreVeinStone, { x: spawn.x, y: spawn.y });
-    case 'tree_node':
-      return createFrom(world, TreeNode, { x: spawn.x, y: spawn.y });
-    case 'alchemy_bench':
-      return createFrom(world, AlchemyBench, { x: spawn.x, y: spawn.y });
-    case 'anvil':
-      return createFrom(world, Anvil, { x: spawn.x, y: spawn.y });
-    case 'furnace':
-      return createFrom(world, Furnace, { x: spawn.x, y: spawn.y });
-    case 'cooking_fire':
-      return createFrom(world, CookingFire, { x: spawn.x, y: spawn.y });
-    case 'crop_wheat':
-      return createFrom(world, CropWheat, { x: spawn.x, y: spawn.y });
-    case 'crop_carrot':
-      return createFrom(world, CropCarrot, { x: spawn.x, y: spawn.y });
-    case 'crop_corn':
-      return createFrom(world, CropCorn, { x: spawn.x, y: spawn.y });
-    case 'well':
-      return createFrom(world, Well, { x: spawn.x, y: spawn.y });
-    case 'scarecrow':
-      return createFrom(world, Scarecrow, { x: spawn.x, y: spawn.y });
-    case 'tavern_keg':
-      return createFrom(world, TavernKeg, { x: spawn.x, y: spawn.y });
-    case 'tavern_table':
-      return createFrom(world, TavernTable, { x: spawn.x, y: spawn.y });
-    case 'tavern_bench':
-      return createFrom(world, TavernBench, { x: spawn.x, y: spawn.y });
-    case 'tavern_pillar':
-      return createFrom(world, TavernPillar, { x: spawn.x, y: spawn.y });
-    case 'tavern_sign':
-      return createFrom(world, TavernSign, { x: spawn.x, y: spawn.y });
-    case 'millstone':
-      return createFrom(world, Millstone, { x: spawn.x, y: spawn.y });
-    case 'church_altar':
-      return createFrom(world, ChurchAltar, { x: spawn.x, y: spawn.y });
-    case 'church_pew':
-      return createFrom(world, ChurchPew, { x: spawn.x, y: spawn.y });
-    case 'church_sign':
-      return createFrom(world, ChurchSign, { x: spawn.x, y: spawn.y });
-    case 'church_font':
-      return createFrom(world, ChurchFont, { x: spawn.x, y: spawn.y });
-    case 'church_window':
-      return createFrom(world, ChurchWindow, { x: spawn.x, y: spawn.y });
-    case 'window_arched':
-      return createFrom(world, WindowArched, { x: spawn.x, y: spawn.y });
-    case 'window_iron_grate':
-      return createFrom(world, WindowIronGrate, { x: spawn.x, y: spawn.y });
-    case 'window_shuttered':
-      return createFrom(world, WindowShuttered, { x: spawn.x, y: spawn.y });
-    case 'window_round':
-      return createFrom(world, WindowRound, { x: spawn.x, y: spawn.y });
-    case 'window_rect':
-      return createFrom(world, WindowRect, { x: spawn.x, y: spawn.y });
-    case 'town_bell':
-      return createFrom(world, TownBell, { x: spawn.x, y: spawn.y });
-    case 'flower_rose':
-      return createFrom(world, FlowerRose, { x: spawn.x, y: spawn.y });
-    case 'flower_sunflower':
-      return createFrom(world, FlowerSunflower, { x: spawn.x, y: spawn.y });
-    case 'flower_tulip':
-      return createFrom(world, FlowerTulip, { x: spawn.x, y: spawn.y });
-    case 'flower_daisy':
-      return createFrom(world, FlowerDaisy, { x: spawn.x, y: spawn.y });
-    case 'flower_bluebell':
-      return createFrom(world, FlowerBluebell, { x: spawn.x, y: spawn.y });
-    case 'smithy_chest':
-      return createFrom(world, SmithyChest, { x: spawn.x, y: spawn.y });
-    case 'mill_chest':
-      return createFrom(world, MillChest, { x: spawn.x, y: spawn.y });
-    case 'lumber_chest':
-      return createFrom(world, LumberChest, { x: spawn.x, y: spawn.y });
-    case 'smithy_sign':
-      return createFrom(world, SmithySign, { x: spawn.x, y: spawn.y });
     case 'potion_shelf':
       return stockDisplayContainer(world, createFrom(world, PotionShelf, { x: spawn.x, y: spawn.y }), spawn, "alchemy");
-    case 'herb_chest':
-      return createFrom(world, HerbChest, { x: spawn.x, y: spawn.y });
-    case 'tavern_chest':
-      return createFrom(world, TavernChest, { x: spawn.x, y: spawn.y });
-    case 'apothecary_sign':
-      return createFrom(world, ApothecarySign, { x: spawn.x, y: spawn.y });
-    case 'gem_shop_sign':
-      return createFrom(world, GemShopSign, { x: spawn.x, y: spawn.y });
     case 'gem_display_case':
       return stockDisplayContainer(world, createFrom(world, GemDisplayCase, { x: spawn.x, y: spawn.y }), spawn, "gem");
-    case 'book_shop_sign':
-      return createFrom(world, BookShopSign, { x: spawn.x, y: spawn.y });
     case 'book_shop_item': {
       const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0xB00C) >>> 0);
       const itemId = shopStock.generateBookShopItem(world, shopRng);
@@ -1375,8 +1308,6 @@ export function materializeSpawn(world, spawn) {
       }
       return itemId;
     }
-    case 'message_board':
-      return createFrom(world, MessageBoard, { x: spawn.x, y: spawn.y });
     case 'grave_tombstone':
       {
         const id = createFrom(world, GraveTombstone, { x: spawn.x, y: spawn.y });
@@ -1410,52 +1341,8 @@ export function materializeSpawn(world, spawn) {
         epitaph: epitaph,
       });
     }
-    // Town decorations
-    case 'barrel':
-      return createFrom(world, Barrel, { x: spawn.x, y: spawn.y });
-    case 'crate':
-      return createFrom(world, Crate, { x: spawn.x, y: spawn.y });
-    case 'woodpile':
-      return createFrom(world, Woodpile, { x: spawn.x, y: spawn.y });
-    case 'hay_bale':
-      return createFrom(world, HayBale, { x: spawn.x, y: spawn.y });
-    case 'lantern_post':
-      return createFrom(world, LanternPost, { x: spawn.x, y: spawn.y });
-    case 'rain_barrel':
-      return createFrom(world, RainBarrel, { x: spawn.x, y: spawn.y });
-    case 'wheelbarrow':
-      return createFrom(world, Wheelbarrow, { x: spawn.x, y: spawn.y });
-    case 'market_stall':
-      return createFrom(world, MarketStall, { x: spawn.x, y: spawn.y });
-    case 'bench':
-      return createFrom(world, Bench, { x: spawn.x, y: spawn.y });
-    // Natural features
-    case 'boulder':
-      return createFrom(world, Boulder, { x: spawn.x, y: spawn.y });
-    case 'fallen_log':
-      return createFrom(world, FallenLog, { x: spawn.x, y: spawn.y });
-    case 'lily_pad':
-      return createFrom(world, LilyPad, { x: spawn.x, y: spawn.y });
-    case 'cattail':
-      return createFrom(world, Cattail, { x: spawn.x, y: spawn.y });
-    // Garden features
-    case 'birdbath':
-      return createFrom(world, Birdbath, { x: spawn.x, y: spawn.y });
-    case 'trellis':
-      return createFrom(world, Trellis, { x: spawn.x, y: spawn.y });
-    // Room features
-    case 'fountain':
-      return createFrom(world, Fountain, { x: spawn.x, y: spawn.y });
-    case 'altar':
-      return createFrom(world, Altar, { x: spawn.x, y: spawn.y });
-    case 'shrine':
-      return createFrom(world, Shrine, { x: spawn.x, y: spawn.y });
-    case 'statue':
-      return createFrom(world, Statue, { x: spawn.x, y: spawn.y });
     case 'sarcophagus':
       return createFrom(world, Sarcophagus, { x: spawn.x, y: spawn.y, depth: /** @type {any} */ (spawn.params)?.depth || 1 });
-    case 'pillar':
-      return createFrom(world, Pillar, { x: spawn.x, y: spawn.y });
     case 'weapon_rack': {
       const id = createFrom(world, WeaponRack, { x: spawn.x, y: spawn.y });
       const d = /** @type {any} */ (spawn.params)?.depth || 1;
@@ -1475,14 +1362,6 @@ export function materializeSpawn(world, spawn) {
       }
       return id;
     }
-    case 'mushrooms':
-      return createFrom(world, Mushrooms, { x: spawn.x, y: spawn.y });
-    case 'web':
-      return createFrom(world, Web, { x: spawn.x, y: spawn.y });
-    case 'torch':
-      return createFrom(world, Torch, { x: spawn.x, y: spawn.y });
-    case 'urn':
-      return createFrom(world, Urn, { x: spawn.x, y: spawn.y });
     case 'tile_paint': {
       const tiles = /** @type {any} */ (spawn.params)?.tiles;
       if (Array.isArray(tiles)) {

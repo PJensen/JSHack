@@ -233,12 +233,15 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     if (!groupedItems.length && !chestId) return null;
 
     if (chestId) {
+      const chestNi = world.get(chestId, NamedIdentity);
+      const chestName = (chestNi && chestNi.name) || "Chest";
       return {
         mode: 'multi',
         count: totalCount,
         items: groupedItems,
         fromChest: true,
         chestId,
+        chestName,
       };
     }
 

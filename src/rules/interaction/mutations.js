@@ -27,6 +27,7 @@ import { markExplored } from "../environment/dungeon/exploredMap.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { Traits } from "../components/Traits.js";
@@ -72,24 +73,16 @@ export function applyMutation(world, op, resolvers = {}) {
     }
     case "pushEffect": {
       if (isEffectImmune(world, op.entityId, op.effect?.key)) break;
-      let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
-      if (!ae || !Array.isArray(ae.effects)) {
-        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
-        ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
-      }
-      if (ae && Array.isArray(ae.effects)) {
+      const ae = ensureActiveEffects(world, op.entityId);
+      if (ae) {
         upsertTimedEffect(ae.effects, { stacks: 1, ...(op.effect || {}) });
       }
       break;
     }
     case "upsertTimedEffect": {
       if (isEffectImmune(world, op.entityId, op.effect?.key)) break;
-      let ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
-      if (!ae || !Array.isArray(ae.effects)) {
-        try { world.add(op.entityId, ActiveEffects, { effects: [] }); } catch {} // ECS: may already exist
-        ae = /** @type any */ (world.get(op.entityId, ActiveEffects));
-      }
-      if (!ae || !Array.isArray(ae.effects)) break;
+      const ae = ensureActiveEffects(world, op.entityId);
+      if (!ae) break;
 
       const input = op.effect && typeof op.effect === "object" ? op.effect : {};
       const key = String(input.key || "");

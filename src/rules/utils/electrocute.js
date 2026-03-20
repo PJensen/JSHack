@@ -13,10 +13,10 @@
 // Optional shock DoT (follow-on jolt) is driven by the caller's potency
 // since it depends on the entity's max HP.
 
-import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Player } from '../components/Player.js';
 import { blind } from './blind.js';
 import { deafen } from './deafen.js';
+import { ensureActiveEffects } from './effects.js';
 
 /**
  * Apply the canonical electrocuted sensory-overload bundle to a target entity.
@@ -39,12 +39,8 @@ export function applyElectrocuted(world, targetId) {
   if (!world.isAlive?.(id)) return false;
 
   // Ensure ActiveEffects exists
-  let ae = world.get(id, ActiveEffects);
-  if (!ae) {
-    try { world.add(id, ActiveEffects, { effects: [] }); } catch { /* already exists */ }
-    ae = world.get(id, ActiveEffects);
-  }
-  if (!ae || !Array.isArray(ae.effects)) return false;
+  const ae = ensureActiveEffects(world, id);
+  if (!ae) return false;
 
   // 2-turn stun (extend if already stunned)
   const existingStun = ae.effects.find((e) => e.key === 'stun');

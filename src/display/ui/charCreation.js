@@ -3,7 +3,7 @@
 // Data is passed in by main.js via showCharCreation(opts).
 import { versionLoaded, getVersionState } from '../../shared/version.js';
 import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
-import { getHighscores } from '../../shared/tombstoneApi.js';
+import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
 import { HINTS } from '../../shared/data/hints.js';
 
 /**
@@ -501,6 +501,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         const rankEl = document.createElement('span');
         rankEl.textContent = `#${i + 1}`;
         rankEl.style.cssText = 'width:2.2em;text-align:right;flex-shrink:0;color:#3a5878';
+        const versionEl = document.createElement('span');
+        versionEl.textContent = getHighscoreVersionLabel(entry);
+        versionEl.style.cssText = 'width:5.4em;text-align:left;flex-shrink:0;color:#6a84a2;opacity:0.9';
         const nameEl = document.createElement('span');
         nameEl.textContent = entry.playerName || '???';
         nameEl.style.cssText = 'flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
@@ -511,6 +514,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         clsEl.textContent = entry.className || '';
         clsEl.style.cssText = 'width:5.5em;text-align:left;flex-shrink:0;color:#7090b0;opacity:0.8';
         row.appendChild(rankEl);
+        row.appendChild(versionEl);
         row.appendChild(nameEl);
         row.appendChild(scoreEl);
         row.appendChild(clsEl);

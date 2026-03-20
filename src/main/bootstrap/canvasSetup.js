@@ -45,15 +45,10 @@ export function createCanvasSetup({ canvasId, TILE_PX, dprCap }) {
 
     canvas.style.width = cssW + "px";
     canvas.style.height = cssH + "px";
-
-    // Counter-scale for page zoom so the game fills the same physical area
-    // regardless of browser-stored zoom (PWA mode always starts at 1x).
-    if (Math.abs(pageZoom - 1) > 0.01) {
-      canvas.style.transformOrigin = "center";
-      canvas.style.transform = `scale(${1 / pageZoom})`;
-    } else {
-      canvas.style.transform = "";
-    }
+    // Clear any stale CSS transform — sizing already accounts for pageZoom
+    // via visualViewport (CSS transforms break getBoundingClientRect on iOS
+    // Safari and corrupt touch coordinates).
+    canvas.style.transform = "";
 
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;

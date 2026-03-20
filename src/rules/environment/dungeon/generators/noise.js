@@ -3,6 +3,7 @@
 // Exported so both overworld and dungeon generators share one implementation.
 
 import { createRng } from '../../../../lib/ecs-js/rng.js';
+import { lerp } from '../../../../shared/math/math.js';
 
 const TILE_WALL  = 2;
 const TILE_FLOOR = 1;
@@ -10,7 +11,6 @@ const TILE_FLOOR = 1;
 // --- core Perlin helpers ---
 
 function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-function lerp(a, b, t) { return a + t * (b - a); }
 
 function grad(hash, x, y) {
   const h = hash & 7;

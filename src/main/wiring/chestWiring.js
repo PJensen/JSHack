@@ -61,8 +61,10 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
   world.on("chest:open", ({ targetId }) => {
     const chestId = Number(targetId || 0) | 0;
     if (!(chestId > 0)) return;
-    log("You open the chest.");
-    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId } })); } catch (e) { console.debug('[chestWiring] dispatch ui:openChest:', e); }
+    const ni = world.get(chestId, NamedIdentity);
+    const name = (ni && ni.name) || "Chest";
+    log(`You open the ${name.toLowerCase()}.`);
+    try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId, label: name } })); } catch (e) { console.debug('[chestWiring] dispatch ui:openChest:', e); }
     dispatchChestData(chestId);
   });
 
@@ -85,7 +87,9 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
 
     transferItem(world, itemId, chestId, pe.id);
 
-    log(`You take ${bracketizeName(itemName)} from the chest.`);
+    const cni = world.get(chestId, NamedIdentity);
+    const cLabel = (cni && cni.name) ? cni.name.toLowerCase() : "chest";
+    log(`You take ${bracketizeName(itemName)} from the ${cLabel}.`);
 
     dispatchChestData(chestId);
     refreshInventoryUi();
@@ -103,7 +107,9 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     if (!info || !world.isAlive(itemId)) return;
 
     if (!hasCapacityForItem(world, chestId, itemId)) {
-      log("The chest is full.");
+      const fni = world.get(chestId, NamedIdentity);
+      const fLabel = (fni && fni.name) ? fni.name.toLowerCase() : "chest";
+      log(`The ${fLabel} is full.`);
       return;
     }
 
@@ -124,7 +130,9 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
 
     const itemName = world.get(itemId, NamedIdentity)?.name || "item";
     transferItem(world, itemId, pe.id, chestId);
-    log(`You put ${bracketizeName(itemName)} in the chest.`);
+    const pni = world.get(chestId, NamedIdentity);
+    const pLabel = (pni && pni.name) ? pni.name.toLowerCase() : "chest";
+    log(`You put ${bracketizeName(itemName)} in the ${pLabel}.`);
 
     dispatchChestData(chestId);
     refreshInventoryUi();

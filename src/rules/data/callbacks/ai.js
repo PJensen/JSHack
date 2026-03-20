@@ -15,9 +15,11 @@ import { getSpell } from "../../data/spells.js";
 import { bresenhamLine } from "../../../shared/math/bresenham.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
+import { ensureActiveEffects } from "../../utils/effects.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
+import { chebyshev } from "../../utils/distance.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
@@ -25,13 +27,6 @@ const SPELL_CAST_COOLDOWN_KEY = Symbol.for("jshack:ai:castSpellOnLOS:cooldown");
 
 function manhattan(a, b) {
   return Math.abs((a.x | 0) - (b.x | 0)) + Math.abs((a.y | 0) - (b.y | 0));
-}
-
-function chebyshev(a, b) {
-  return Math.max(
-    Math.abs((a.x | 0) - (b.x | 0)),
-    Math.abs((a.y | 0) - (b.y | 0)),
-  );
 }
 
 /**
@@ -193,7 +188,7 @@ function markSpellCastUsed(world, actor, spellId) {
   store.set(spellCastCooldownSlot(actor, spellId), Number(world.step || 0) | 0);
 }
 
-// ── SeenCallbackContext ───────────────────────────────────────────
+// -- SeenCallbackContext --
 
 /**
  * Context passed to monster AI sight callbacks.
@@ -261,7 +256,7 @@ export class SeenCallbackContext {
   }
 }
 
-// ── Gaze exposure tracking ────────────────────────────────────────
+// -- Gaze exposure tracking --
 
 const GAZE_EXPOSURE_KEY = Symbol.for('jshack:ai:gazeExposure');
 
@@ -273,21 +268,7 @@ function ensureGazeExposureState(world) {
   return m;
 }
 
-/**
- * @param {any} world
- * @param {number} entityId
- * @returns {{ effects: any[] } | null}
- */
-function ensureActiveEffects(world, entityId) {
-  let ae = world.get(entityId, ActiveEffects);
-  if (ae && Array.isArray(ae.effects)) return ae;
-
-  try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
-  ae = world.get(entityId, ActiveEffects);
-  return (ae && Array.isArray(ae.effects)) ? ae : null;
-}
-
-// ── Factory functions ─────────────────────────────────────────────
+// -- Factory functions --
 
 /**
  * Teleport-throw the monster near the seen target and optionally collide.
@@ -542,7 +523,7 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
   const stunDuration = Math.max(1, Math.trunc(stunTurns));
   const stunTurnsLeft = stunDuration + 1;
 
-  /** Escalating messages: indices 0…threshold-2 are warnings; index threshold-1 triggers the proc. */
+  /** Escalating messages: indices 0...threshold-2 are warnings; index threshold-1 triggers the proc. */
   const MESSAGES = [
     "The Floating Eye's unblinking gaze washes over you.",
     "Your thoughts feel sluggish under its stare...",

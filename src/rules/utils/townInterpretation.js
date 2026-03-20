@@ -7,6 +7,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { TOWN_DISTRICT_DEFS } from "../data/townDistricts.js";
 import { TOWN_ENTRANCE_DEFS } from "../data/townEntrances.js";
+import { chebyshev } from "./distance.js";
 
 function keyOf(identity) {
   return `jshack:${identity}`;
@@ -32,7 +33,7 @@ function nearestStairTo(world, anchor) {
   let bestDist = Infinity;
   for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
     if (String(ni.identity || "") !== "stair_down") continue;
-    const dist = Math.max(Math.abs(pos.x - anchor.x), Math.abs(pos.y - anchor.y));
+    const dist = chebyshev(pos, anchor);
     if (dist < bestDist) {
       bestDist = dist;
       best = { id, x: pos.x, y: pos.y };
@@ -130,10 +131,6 @@ export function getDistrictEntityByKey(world, key) {
 
 export function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value || 0)));
-}
-
-export function chebyshev(ax, ay, bx, by) {
-  return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 }
 
 export function namedLookupKey(identity) {

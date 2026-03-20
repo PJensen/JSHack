@@ -12,7 +12,7 @@
 //
 // hearingImpairment scale: 0 = normal hearing, 1 = completely deaf.
 
-import { ActiveEffects } from '../components/ActiveEffects.js';
+import { ensureActiveEffects } from './effects.js';
 
 /**
  * Apply a temporal hearing-impairment effect to a target entity.
@@ -39,12 +39,8 @@ export function deafen(world, targetId, toValue, rampIn, holdFor, rampOut, endVa
   const totalTicks = (rampIn | 0) + (holdFor | 0) + (rampOut | 0);
   if (!(totalTicks > 0)) return false;
 
-  let ae = world.get(id, ActiveEffects);
-  if (!ae) {
-    try { world.add(id, ActiveEffects, { effects: [] }); } catch { /* already exists */ }
-    ae = world.get(id, ActiveEffects);
-  }
-  if (!ae || !Array.isArray(ae.effects)) return false;
+  const ae = ensureActiveEffects(world, id);
+  if (!ae) return false;
 
   ae.effects.push({
     key: 'stat_envelope',
