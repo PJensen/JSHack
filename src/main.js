@@ -2031,12 +2031,23 @@ const RETURN_PORTAL_IDENTITY = 'return_portal';
  *   returnTicket?: { depth: number, x: number, y: number } | null,
  * } | null} */
 let _pendingStairTransition = null;
+const STAIR_TRANSITION_COOLDOWN_MS = 220;
+let _stairTransitionInFlight = false;
+let _stairTransitionLockUntilMs = 0;
+
+function isStairTransitionLocked() {
+  return _stairTransitionInFlight || Date.now() < _stairTransitionLockUntilMs;
+}
+
+function armStairTransitionCooldown() {
+  _stairTransitionLockUntilMs = Date.now() + STAIR_TRANSITION_COOLDOWN_MS;
+}
 
 function queueStairTransition(direction, stairX = null, stairY = null) {
   const dir = direction === 'up' ? 'up' : (direction === 'down' ? 'down' : null);
   if (!dir) return;
   // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
-  if (_pendingStairTransition) return;
+  if (_pendingStairTransition || isStairTransitionLocked()) return;
   const stairPos = (stairX != null && stairY != null) ? { x: stairX, y: stairY } : null;
   _pendingStairTransition = { direction: dir, stairPos };
 }
@@ -2045,7 +2056,7 @@ function queueDepthTransition(targetDepth, opts = {}) {
   const depth = Number(targetDepth);
   if (!Number.isFinite(depth)) return;
   // Keep transitions at the app loop boundary so we never mutate floors mid-tick.
-  if (_pendingStairTransition) return;
+  if (_pendingStairTransition || isStairTransitionLocked()) return;
   const x = Number(opts?.targetPos?.x);
   const y = Number(opts?.targetPos?.y);
   const targetPos = (Number.isFinite(x) && Number.isFinite(y))
@@ -2168,60 +2179,74 @@ function fragActorsAt(worldRef, x, y, excludeId = 0) {
 function flushPendingStairTransition() {
   const pending = _pendingStairTransition;
   if (!pending) return;
+  if (isStairTransitionLocked()) return;
+  _stairTransitionInFlight = true;
   _pendingStairTransition = null;
 
-  let currentDepth = 1;
-  for (const [, state] of world.query(DungeonState)) {
-    currentDepth = state.currentDepth;
-    break;
-  }
-
-  let newDepth = currentDepth;
-  if (Number.isFinite(pending.targetDepth)) {
-    newDepth = Math.max(0, Math.floor(Number(pending.targetDepth)));
-  } else if (pending.direction === 'down') {
-    newDepth = currentDepth + 1;
-  } else if (pending.direction === 'up') {
-    newDepth = currentDepth - 1;
-  }
-  if (newDepth < 0 || newDepth === currentDepth) return;
-
-  const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
-  if (hasTargetPos) {
-    transitionToDepth(
-      world,
-      newDepth,
-      { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 },
-      { tombstoneRepo },
-    );
-    if (pending.fragActorsAtTarget) {
-      const pe = playerEntity(world);
-      const playerId = pe?.id || 0;
-      fragActorsAt(world, pending.targetPos.x, pending.targetPos.y, playerId);
-      if (playerId > 0) {
-        world.set(playerId, Position, { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 });
-      }
+  try {
+    let currentDepth = 1;
+    for (const [, state] of world.query(DungeonState)) {
+      currentDepth = state.currentDepth;
+      break;
     }
-  } else {
-    const direction = newDepth > currentDepth ? 'down' : 'up';
-    transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
-  }
 
-  if (newDepth === 0 && pending.returnTicket && pending.returnTicket.depth > 0) {
-    spawnReturnPortal(pending.returnTicket);
-  }
+    let newDepth = currentDepth;
+    if (Number.isFinite(pending.targetDepth)) {
+      newDepth = Math.max(0, Math.floor(Number(pending.targetDepth)));
+    } else if (pending.direction === 'down') {
+      newDepth = currentDepth + 1;
+    } else if (pending.direction === 'up') {
+      newDepth = currentDepth - 1;
+    }
+    if (newDepth < 0 || newDepth === currentDepth) return;
 
-  // Invalidate cached world view
-  _cachedView = null;
-  _cachedStep = -1;
+    const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
+    if (hasTargetPos) {
+      transitionToDepth(
+        world,
+        newDepth,
+        { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 },
+        { tombstoneRepo },
+      );
+      if (pending.fragActorsAtTarget) {
+        const pe = playerEntity(world);
+        const playerId = pe?.id || 0;
+        fragActorsAt(world, pending.targetPos.x, pending.targetPos.y, playerId);
+        if (playerId > 0) {
+          world.set(playerId, Position, { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 });
+        }
+      }
+    } else {
+      const direction = newDepth > currentDepth ? 'down' : 'up';
+      transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
+    }
+
+    if (newDepth === 0 && pending.returnTicket && pending.returnTicket.depth > 0) {
+      spawnReturnPortal(pending.returnTicket);
+    }
+
+    // Invalidate cached world view
+    _cachedView = null;
+    _cachedStep = -1;
+  } finally {
+    _stairTransitionInFlight = false;
+    armStairTransitionCooldown();
+  }
 }
 
-world.on('stair:traverse', ({ direction, targetId }) => {
-  let stairX = null, stairY = null;
-  if (targetId > 0) {
-    const pos = world.get(targetId, Position);
-    if (pos) { stairX = pos.x | 0; stairY = pos.y | 0; }
-  }
+world.on('stair:traverse', ({ actor, direction, targetId }) => {
+  const sid = Number(targetId) | 0;
+  if (!(sid > 0)) return;
+  const stairPos = world.get(sid, Position);
+  if (!stairPos) return;
+
+  const actorId = Number(actor) | 0;
+  const actorPos = actorId > 0 ? world.get(actorId, Position) : null;
+  if (!actorPos) return;
+  if ((actorPos.x | 0) !== (stairPos.x | 0) || (actorPos.y | 0) !== (stairPos.y | 0)) return;
+
+  const stairX = stairPos.x | 0;
+  const stairY = stairPos.y | 0;
   queueStairTransition(direction, stairX, stairY);
 });
 
