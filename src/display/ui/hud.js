@@ -939,7 +939,8 @@ function createQuickSlot() {
     if (!it) return;
     const chip = renderQuickChip(it, {
       onUse: () => dispatchAction(it),
-      onThrow: String(it.identity || '') === 'torch' ? () => dispatchThrow(it) : null,
+      onThrow: Number(it?.id || 0) > 0 ? () => dispatchThrow(it) : null,
+      onDrop: Number(it?.id || 0) > 0 ? () => dispatchDrop(it) : null,
       onDismiss: () => dismissTop()
     });
     el.appendChild(chip);
@@ -959,6 +960,11 @@ function createQuickSlot() {
   function dispatchThrow(it) {
     if (!(Number(it?.id || 0) > 0)) return;
     window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
+  }
+
+  function dispatchDrop(it) {
+    if (!(Number(it?.id || 0) > 0)) return;
+    window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } }));
   }
 
   function dismissTop() {
@@ -1141,7 +1147,7 @@ function createChannelingOverlay() {
   return { el };
 }
 
-/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null}} h */
+/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null,onDrop?:Function|null}} h */
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
@@ -1206,6 +1212,17 @@ function renderQuickChip(it, h) {
     throwBtn.addEventListener('click', () => h.onThrow && h.onThrow());
   }
 
+  let dropBtn = null;
+  if (typeof h.onDrop === 'function') {
+    dropBtn = document.createElement('button');
+    Object.assign(dropBtn.style, {
+      padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+    });
+    dropBtn.textContent = 'Drop';
+    dropBtn.addEventListener('click', () => h.onDrop && h.onDrop());
+  }
+
   const x = document.createElement('button');
   Object.assign(x.style, {
     padding: '6px 8px', background: '#101626', color: '#cfe8ff',
@@ -1223,6 +1240,7 @@ function renderQuickChip(it, h) {
   });
   actions.appendChild(btn);
   if (throwBtn) actions.appendChild(throwBtn);
+  if (dropBtn) actions.appendChild(dropBtn);
   actions.appendChild(x);
 
   chip.appendChild(content);

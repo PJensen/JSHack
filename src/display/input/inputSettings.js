@@ -31,6 +31,11 @@ function clampWalkInterval(ms) {
 export function readInputMode() {
   const mode = lsGet(LS_INPUT_MODE);
   if (mode === 'gesture' || mode === 'joystick') return mode;
+  try {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) {
+      return 'joystick';
+    }
+  } catch {}
   return 'walk';
 }
 
