@@ -1714,12 +1714,6 @@ function renderGroundTooltip(tip, detail) {
       controls.appendChild(dismissBtn);
       tip.appendChild(controls);
 
-      const foot = document.createElement('div');
-      foot.style.marginTop = '6px';
-      foot.style.opacity = '0.8';
-      foot.style.fontSize = '12px';
-      foot.textContent = 'Tap tooltip to pick up';
-      tip.appendChild(foot);
     };
 
     renderStackAt();
@@ -1806,12 +1800,6 @@ function renderGroundTooltip(tip, detail) {
 
   const it = detail?.item || {};
   renderItemDetails(tip, it);
-
-  // Footer hint
-  const foot = document.createElement('div');
-  foot.style.marginTop = '6px'; foot.style.opacity = '0.8'; foot.style.fontSize = '12px';
-  foot.textContent = 'Tap to pick up';
-  tip.appendChild(foot);
 
   // Click behavior: attempt pickup via shared flow
   tip.onclick = () => {

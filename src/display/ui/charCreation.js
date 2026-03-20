@@ -274,7 +274,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   nameInput.addEventListener('blur', () => { nameInput.style.borderColor = '#2d3b52'; });
 
   const nameRemembered = document.createElement('div');
-  nameRemembered.textContent = 'Saved name';
+          nameRemembered.textContent = 'Saved name';
   Object.assign(nameRemembered.style, {
     fontSize: '11px', color: '#4a6080', fontStyle: 'italic',
     marginBottom: '4px', textAlign: 'left',
