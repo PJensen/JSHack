@@ -422,6 +422,25 @@ Deno.test("InputManager joystick mode: left-zone press shows joystick and moveme
   }
 });
 
+Deno.test("InputManager joystick mode: short left-zone tap emits movement on pointer-up", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'joystick' });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    emitPointer(canvas, 'pointerdown', 40, 100); // left zone joystick touch
+    assertEquals(actions.length, 0, 'no immediate move on pointerdown in joystick mode');
+    emitPointer(canvas, 'pointerup', 40, 100);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.Move);
+    assertEquals(actions[0]?.payload, { dx: -1, dy: 0 });
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
 Deno.test("InputManager walk mode: ui:inputSettingsChanged event switches to walk mode", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
