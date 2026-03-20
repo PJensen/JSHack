@@ -68,6 +68,25 @@ export function pickMonster(rng, depth, monsterFilter = null) {
 }
 
 /**
+ * Pick a monster with a chance to draw from the next tier up (sentinel).
+ * The sentinel roll is always consumed to keep the RNG sequence stable.
+ * @param {Object} rng
+ * @param {number} depth
+ * @param {Function|null} monsterFilter
+ * @returns {Object}
+ */
+export function pickSentinelMonster(rng, depth, monsterFilter = null) {
+  const sentinelRoll = rng.next();
+  const tier = Math.min(Math.floor((depth - 1) / 5), 3);
+  if (tier < 3 && sentinelRoll < 0.10) {
+    // Bump to next tier boundary for the pick, keeping original depth for HP calc
+    const sentinelDepth = (tier + 1) * 5 + 1;
+    return pickMonster(rng, sentinelDepth, monsterFilter);
+  }
+  return pickMonster(rng, depth, monsterFilter);
+}
+
+/**
  * Pick an item spawn descriptor via the loot table system.
  * Returns a materializeSpawn-compatible descriptor: {kind, count?, equipId?}
  * @param {Object} rng
@@ -193,4 +212,68 @@ export function pickSpawner(rng, depth, monsterFilter = null) {
     packSize: packSize,
     depth: depth,
   };
+}
+
+// ── Encounter Groups ────────────────────────────────────────────────
+// Themed monster compositions that replace random individual picks.
+// Each template defines a leader + followers drawn from the room's budget.
+
+const ENCOUNTER_GROUPS = [
+  // Tier 0
+  { tier: 0, leader: 'kobold_shaman', followers: [{ id: 'goblin', count: 2 }], minBudget: 3 },
+  { tier: 0, leader: 'skeleton_archer', followers: [{ id: 'rat', count: 2 }], minBudget: 3 },
+  { tier: 0, leader: 'goblin_archer', followers: [{ id: 'goblin', count: 2 }], minBudget: 3 },
+  { tier: 0, leader: 'skeletal_shadow_caster', followers: [{ id: 'skeleton_archer', count: 1 }], minBudget: 2 },
+  { tier: 0, leader: null, followers: [{ id: 'cave_spider', count: 3 }], minBudget: 3 },
+
+  // Tier 1
+  { tier: 1, leader: 'orc_shaman', followers: [{ id: 'orc', count: 2 }], minBudget: 3 },
+  { tier: 1, leader: 'wight', followers: [{ id: 'skeleton', count: 2 }], minBudget: 3 },
+  { tier: 1, leader: 'hobgoblin', followers: [{ id: 'orc', count: 1 }, { id: 'bone_bowman', count: 1 }], minBudget: 3 },
+  { tier: 1, leader: 'orc_shaman', followers: [{ id: 'hobgoblin', count: 1 }], minBudget: 2 },
+  { tier: 1, leader: null, followers: [{ id: 'phase_spider', count: 2 }], minBudget: 2 },
+
+  // Tier 2
+  { tier: 2, leader: 'orc_warchief', followers: [{ id: 'orc', count: 2 }], minBudget: 3 },
+  { tier: 2, leader: 'dark_acolyte', followers: [{ id: 'wraith', count: 1 }], minBudget: 2 },
+  { tier: 2, leader: 'dark_acolyte', followers: [{ id: 'skeleton', count: 2 }], minBudget: 3 },
+  { tier: 2, leader: 'troll', followers: [{ id: 'ogre', count: 1 }], minBudget: 2 },
+
+  // Tier 3
+  { tier: 3, leader: 'lich', followers: [{ id: 'wraith', count: 1 }, { id: 'skeleton', count: 1 }], minBudget: 3 },
+  { tier: 3, leader: 'demon', followers: [{ id: 'death_archer', count: 1 }], minBudget: 2 },
+];
+
+/**
+ * Try to pick an encounter group for the given depth and budget.
+ * Returns null if no group fits or the roll doesn't fire.
+ * @param {Object} rng
+ * @param {number} depth
+ * @param {number} budget
+ * @returns {{ leader: Object|null, followers: Object[] } | null}
+ */
+export function pickEncounterGroup(rng, depth, budget) {
+  const tier = Math.min(Math.floor((depth - 1) / 5), 3);
+  const eligible = ENCOUNTER_GROUPS.filter(g =>
+    g.tier === tier && budget >= g.minBudget
+  );
+  if (eligible.length === 0) return null;
+
+  const group = rng.choice(eligible);
+  const result = { leader: null, followers: [] };
+
+  if (group.leader) {
+    const leaderParams = pickSpecificMonster(group.leader, depth);
+    if (!leaderParams) return null; // genocided
+    result.leader = leaderParams;
+  }
+
+  for (const f of group.followers) {
+    for (let i = 0; i < f.count; i++) {
+      const params = pickSpecificMonster(f.id, depth);
+      if (params) result.followers.push(params);
+    }
+  }
+
+  return result;
 }

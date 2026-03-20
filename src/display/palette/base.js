@@ -14,6 +14,7 @@ export const basePalette = {
   // Tier 0
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" }, // 🐀
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
+  goblin_archer: { glyph: "g", fg: "#5eaa3a", glow: "#3a7020" },
   bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" }, // 🦇
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
   cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
@@ -27,9 +28,17 @@ export const basePalette = {
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },
   orc:      { glyph: "o", fg: "#cc6644", glow: "#993320" },
+  orc_shaman: { glyph: "o", fg: "#88bbdd", glow: "#557799" },
+  hobgoblin: { glyph: "H", fg: "#cc8844", glow: "#995522" },
+  phase_spider: { glyph: "x", fg: "#aa66dd", glow: "#7733aa" },
+  wight:    { glyph: "w", fg: "#88aacc", glow: "#557799" },
   skeleton: { glyph: "s", fg: "#ddd8c8", glow: "#aaa590" }, // 💀
   spider:   { glyph: "x", fg: "#55bb55", glow: "#338833" }, // 🕷
   // Tier 2
+  dark_acolyte: { glyph: "p", fg: "#9966cc", glow: "#663399" },
+  orc_warchief: { glyph: "O", fg: "#dd6644", glow: "#aa3322" },
+  skeletal_shadow_caster: { glyph: "s", fg: "#a088c8", glow: "#6a5098" },
+  carrion_shade: { glyph: "C", fg: "#886688", glow: "#553355" },
   skeletal_marksman: { glyph: "s", fg: "#e0c8a0", glow: "#b89060" },
   skeletal_agony_warlock: { glyph: "s", fg: "#b88ccf", glow: "#7a4f9a" },
   skeleton_sharpshooter: { glyph: "s", fg: "#c0bca8", glow: "#807c68" },
@@ -42,6 +51,7 @@ export const basePalette = {
   dragon:   { glyph: "D", fg: "#ffcc33", glow: "#dd9900" },
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
   mimic:    { glyph: "M", fg: "#b07a3f", glow: "#7a4d1f" },
+  stone_taunter: { glyph: "G", fg: "#aaa8a0", glow: "#706e66" },
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224", bg: "#1a1c28" },
   grass_a:  { glyph: "'", fg: "#cce07a", glow: "#8ab850", bg: "#2a3a1a" },  // sparse/bare
