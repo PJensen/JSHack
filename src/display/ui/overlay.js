@@ -1131,12 +1131,12 @@ function ensureGroundTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 52px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 34px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
-    minWidth: '150px', maxWidth: '58vw', pointerEvents: 'auto', display: 'none',
+    minWidth: '132px', maxWidth: '54vw', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace', padding: '8px 10px', zIndex: 850
+    fontFamily: 'monospace', padding: '7px 8px', zIndex: 850
   });
   root.appendChild(tip);
   return tip;
@@ -1341,12 +1341,12 @@ function ensureStairTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 116px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 34px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
-    minWidth: '128px', maxWidth: '56vw', pointerEvents: 'none', display: 'none',
-    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '8px',
+    minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
+    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace', padding: '7px 9px', zIndex: 850,
+    fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -1364,12 +1364,12 @@ function renderStairTooltip(tip, detail) {
 
   const title = document.createElement('div');
   title.textContent = label;
-  Object.assign(title.style, { fontWeight: 'bold', fontSize: '13px', marginBottom: '3px' });
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '12px', marginBottom: '2px' });
   tip.appendChild(title);
 
   const hint = document.createElement('div');
   hint.style.opacity = '0.8';
-  hint.style.fontSize = '11px';
+  hint.style.fontSize = '10px';
   hint.textContent = isReturn
     ? 'Tap to return'
     : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
@@ -1381,18 +1381,18 @@ function renderStairTooltip(tip, detail) {
     ? 'Return'
     : (dir === 'down' ? 'Descend' : 'Ascend');
   Object.assign(action.style, {
-    marginTop: '6px',
-    minHeight: '36px',
-    minWidth: '88px',
-    borderRadius: '8px',
+    marginTop: '5px',
+    minHeight: '34px',
+    minWidth: '80px',
+    borderRadius: '7px',
     border: '1px solid #6aa7da',
     background: '#234463',
     color: '#e9f7ff',
     fontFamily: 'monospace',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    padding: '0 12px',
+    padding: '0 10px',
     pointerEvents: 'auto',
   });
   action.onclick = () => {
@@ -1412,12 +1412,12 @@ function ensureTrapTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 116px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 34px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
-    minWidth: '128px', maxWidth: '56vw', pointerEvents: 'none', display: 'none',
-    background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '8px',
+    minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
+    background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '7px',
     border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace', padding: '7px 9px', zIndex: 850,
+    fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -1431,12 +1431,12 @@ function renderTrapTooltip(tip, detail) {
 
   const title = document.createElement('div');
   title.textContent = trapType;
-  Object.assign(title.style, { fontWeight: 'bold', fontSize: '13px', marginBottom: '3px' });
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '12px', marginBottom: '2px' });
   tip.appendChild(title);
 
   const hint = document.createElement('div');
   hint.style.opacity = '0.8';
-  hint.style.fontSize = '11px';
+  hint.style.fontSize = '10px';
   hint.textContent = 'Tap to disarm';
   tip.appendChild(hint);
 
@@ -1444,18 +1444,18 @@ function renderTrapTooltip(tip, detail) {
   action.type = 'button';
   action.textContent = 'Disarm';
   Object.assign(action.style, {
-    marginTop: '6px',
-    minHeight: '36px',
-    minWidth: '88px',
-    borderRadius: '8px',
+    marginTop: '5px',
+    minHeight: '34px',
+    minWidth: '80px',
+    borderRadius: '7px',
     border: '1px solid #c78c8c',
     background: '#4b2323',
     color: '#ffe4df',
     fontFamily: 'monospace',
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    padding: '0 12px',
+    padding: '0 10px',
     pointerEvents: 'auto',
   });
   action.onclick = () => {
