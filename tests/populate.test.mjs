@@ -10,6 +10,7 @@ import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { Equipment } from '../src/rules/components/Equipment.js';
 import { MonsterSpawner } from '../src/rules/components/MonsterSpawner.js';
 import { Player } from '../src/rules/components/Player.js';
 import { buildWorldView } from '../src/bridge/schema/worldView.js';
@@ -26,6 +27,50 @@ Deno.test("pickMonster returns valid params", () => {
     assert(m.maxHp > 0, 'has positive HP');
     assert(m.faction === 'enemy', 'is enemy');
   }
+});
+
+Deno.test("materializeSpawn equips humanoid monster ranged loadout", () => {
+  const world = new World({ seed: 42 });
+  const archerDef = getMonster('goblin_archer');
+  const id = materializeSpawn(world, {
+    x: 5,
+    y: 5,
+    kind: 'monster',
+    params: {
+      name: archerDef.name,
+      identity: archerDef.id,
+      maxHp: archerDef.baseHp,
+      faction: 'enemy',
+      equipment: { ranged: 'bow_short', ammo: 'arrows' },
+    },
+  });
+
+  const eq = world.get(id, Equipment);
+  assert(eq, 'monster should have equipment component');
+  assert(eq.ranged !== null, 'humanoid archer should receive ranged weapon');
+  assert(eq.ammo !== null, 'humanoid archer should receive ammo');
+});
+
+Deno.test("materializeSpawn does not equip non-humanoid monster loadout", () => {
+  const world = new World({ seed: 42 });
+  const batDef = getMonster('bat');
+  const id = materializeSpawn(world, {
+    x: 6,
+    y: 6,
+    kind: 'monster',
+    params: {
+      name: batDef.name,
+      identity: batDef.id,
+      maxHp: batDef.baseHp,
+      faction: 'enemy',
+      equipment: { ranged: 'bow_short', ammo: 'arrows' },
+    },
+  });
+
+  const eq = world.get(id, Equipment);
+  assert(eq, 'monster should have equipment component');
+  assertEquals(eq.ranged, null, 'non-humanoid should not receive ranged weapon');
+  assertEquals(eq.ammo, null, 'non-humanoid should not receive ammo');
 });
 
 Deno.test("pickMonster scales HP with depth", () => {
