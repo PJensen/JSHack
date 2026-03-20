@@ -380,6 +380,48 @@ Deno.test("InputManager walk mode: setMode switches to gesture mode — tap emit
   }
 });
 
+Deno.test("InputManager joystick mode: tap emits on pointer-up (gesture-style)", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'joystick' });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    emitPointer(canvas, "pointerdown", 170, 98);
+    assertEquals(actions.length, 0, "joystick mode: no immediate step on pointerdown");
+    emitPointer(canvas, "pointerup", 170, 98);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.Move);
+    assertEquals(actions[0]?.payload, { dx: 1, dy: 0 });
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager joystick mode: left-zone press shows joystick and movement is not pointermove-flooded", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false, inputMode: 'joystick', walkInterval: 10000 });
+  const actions = [];
+  const ui = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  target.addEventListener('ui:joystickProgress', (e) => ui.push(e.detail));
+  try {
+    emitPointer(canvas, 'pointerdown', 40, 100); // left zone
+    emitPointer(canvas, 'pointermove', 90, 100); // drag right beyond deadzone
+    assertEquals(actions.length, 0);
+    assertEquals(ui.length > 0, true);
+    assertEquals(!!ui[0]?.active, true);
+
+    emitPointer(canvas, 'pointerup', 40, 100);
+    assertEquals(!!ui[ui.length - 1]?.active, false);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
 Deno.test("InputManager walk mode: ui:inputSettingsChanged event switches to walk mode", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });

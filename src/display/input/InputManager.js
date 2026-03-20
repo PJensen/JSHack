@@ -13,6 +13,9 @@ const MAX_GESTURE_POINTS = 64;
 const MIN_GESTURE_POINTS = 6;
 const CAST_MIN_QUALITY = 0.42;
 const GESTURE_CLEAR_DELAY_MS = 180;
+const JOYSTICK_LEFT_ZONE_RATIO = 0.5;
+const JOYSTICK_DEADZONE_PX = 12;
+const JOYSTICK_MAX_RADIUS_PX = 46;
 
 export class InputManager {
   constructor(targetEl, options = {}) {
@@ -31,9 +34,20 @@ export class InputManager {
       viewPoints: [],
       moved: false,
     };
+    this._pointerInteraction = 'none'; // 'none' | 'walk' | 'gesture' | 'joystick'
+    this._joystick = {
+      active: false,
+      baseX: 0,
+      baseY: 0,
+      knobX: 0,
+      knobY: 0,
+      radius: JOYSTICK_MAX_RADIUS_PX,
+    };
 
     // Walk-repeat state ('walk' input mode).
-    this._mode = options.inputMode === 'gesture' ? 'gesture' : 'walk';
+    this._mode = (options.inputMode === 'gesture' || options.inputMode === 'joystick')
+      ? options.inputMode
+      : 'walk';
     this._walkInterval = Number.isFinite(options.walkInterval) && options.walkInterval > 0
       ? options.walkInterval : 555;
     this._walkRepeatTimer = 0;
@@ -47,7 +61,7 @@ export class InputManager {
     this._onPointerCancel = (e) => this._handlePointerCancel(e);
     this._onSettingsChanged = (e) => {
       const { inputMode, walkInterval } = /** @type {any} */ (e).detail || {};
-      if (inputMode === 'walk' || inputMode === 'gesture') this._mode = inputMode;
+      if (inputMode === 'walk' || inputMode === 'gesture' || inputMode === 'joystick') this._mode = inputMode;
       if (Number.isFinite(walkInterval) && walkInterval > 0) this._walkInterval = walkInterval;
       // Cancel any active walk repeat when settings change.
       this._cancelWalkRepeat();
@@ -63,6 +77,7 @@ export class InputManager {
       this._gestureClearTimer = 0;
     }
     this._cancelWalkRepeat();
+    this._emitUi("ui:joystickProgress", { active: false });
     this._resetGestureState();
     this.handlers.clear();
     this.hotspots.clear();
@@ -70,13 +85,14 @@ export class InputManager {
 
   /**
    * Dynamically update the input mode and walk interval (called when settings change).
-   * @param {'walk'|'gesture'} mode
+   * @param {'walk'|'gesture'|'joystick'} mode
    * @param {number} [walkInterval]
    */
   setMode(mode, walkInterval) {
-    if (mode === 'walk' || mode === 'gesture') this._mode = mode;
+    if (mode === 'walk' || mode === 'gesture' || mode === 'joystick') this._mode = mode;
     if (Number.isFinite(walkInterval) && walkInterval > 0) this._walkInterval = walkInterval;
     this._cancelWalkRepeat();
+    this._emitUi("ui:joystickProgress", { active: false });
   }
 
   onAction(handler) {
@@ -305,6 +321,7 @@ export class InputManager {
       this._gesture.active = true;
       this._gesture.pointerId = Number(e.pointerId);
       this._gesture.rect = rect;
+      this._pointerInteraction = 'walk';
       this._repeatPoint = { x: localX, y: localY };
 
       // Immediate first step.
@@ -318,6 +335,35 @@ export class InputManager {
       return;
     }
 
+    if (this._mode === 'joystick') {
+      const rect = canvas.getBoundingClientRect();
+      const localX = Number(e.clientX) - rect.left;
+      const localY = Number(e.clientY) - rect.top;
+      if (!Number.isFinite(localX) || !Number.isFinite(localY)) return;
+
+      if (localX <= rect.width * JOYSTICK_LEFT_ZONE_RATIO) {
+        this._gesture.active = true;
+        this._gesture.pointerId = Number(e.pointerId);
+        this._gesture.rect = rect;
+        this._pointerInteraction = 'joystick';
+
+        this._joystick.active = true;
+        this._joystick.baseX = localX;
+        this._joystick.baseY = localY;
+        this._joystick.knobX = localX;
+        this._joystick.knobY = localY;
+        this._repeatPoint = { x: localX, y: localY };
+
+        this._emitUi("ui:joystickProgress", this._buildJoystickUiPayload());
+        this._emitMoveFromJoystick();
+        this._startWalkRepeat();
+        try {
+          if (typeof canvas.setPointerCapture === "function") canvas.setPointerCapture(e.pointerId);
+        } catch {}
+        return;
+      }
+    }
+
     if (this._gestureClearTimer) {
       clearTimeout(this._gestureClearTimer);
       this._gestureClearTimer = 0;
@@ -329,6 +375,7 @@ export class InputManager {
     this._gesture.localPoints = [];
     this._gesture.viewPoints = [];
     this._gesture.moved = false;
+    this._pointerInteraction = 'gesture';
     this._appendGesturePoint(e);
     this._emitGestureProgress(true, null);
     try {
@@ -342,7 +389,7 @@ export class InputManager {
 
     e.preventDefault();
 
-    if (this._mode === 'walk') {
+    if (this._pointerInteraction === 'walk') {
       // Update the current repeat point so the next tick walks in the new direction.
       const rect = this._gesture.rect;
       if (rect) {
@@ -352,6 +399,24 @@ export class InputManager {
           this._repeatPoint = { x: localX, y: localY };
         }
       }
+      return;
+    }
+
+    if (this._pointerInteraction === 'joystick') {
+      const rect = this._gesture.rect;
+      if (!rect) return;
+      const localX = Number(e.clientX) - rect.left;
+      const localY = Number(e.clientY) - rect.top;
+      if (!Number.isFinite(localX) || !Number.isFinite(localY)) return;
+
+      const dx = localX - this._joystick.baseX;
+      const dy = localY - this._joystick.baseY;
+      const mag = Math.hypot(dx, dy);
+      const scale = mag > JOYSTICK_MAX_RADIUS_PX ? (JOYSTICK_MAX_RADIUS_PX / mag) : 1;
+      this._joystick.knobX = this._joystick.baseX + dx * scale;
+      this._joystick.knobY = this._joystick.baseY + dy * scale;
+      this._repeatPoint = { x: this._joystick.knobX, y: this._joystick.knobY };
+      this._emitUi("ui:joystickProgress", this._buildJoystickUiPayload());
       return;
     }
 
@@ -365,9 +430,17 @@ export class InputManager {
 
     e.preventDefault();
 
-    if (this._mode === 'walk') {
+    if (this._pointerInteraction === 'walk') {
       this._cancelWalkRepeat();
       this._repeatPoint = null;
+      this._resetGestureState();
+      return;
+    }
+
+    if (this._pointerInteraction === 'joystick') {
+      this._cancelWalkRepeat();
+      this._repeatPoint = null;
+      this._emitUi("ui:joystickProgress", { active: false });
       this._resetGestureState();
       return;
     }
@@ -407,9 +480,13 @@ export class InputManager {
     if (!this._gesture.active) return;
     if (Number(e.pointerId) !== this._gesture.pointerId) return;
     e.preventDefault();
-    if (this._mode === 'walk') {
+    if (this._pointerInteraction === 'walk') {
       this._cancelWalkRepeat();
       this._repeatPoint = null;
+    } else if (this._pointerInteraction === 'joystick') {
+      this._cancelWalkRepeat();
+      this._repeatPoint = null;
+      this._emitUi("ui:joystickProgress", { active: false });
     } else {
       this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
     }
@@ -426,6 +503,8 @@ export class InputManager {
     this._gesture.localPoints = [];
     this._gesture.viewPoints = [];
     this._gesture.moved = false;
+    this._pointerInteraction = 'none';
+    this._joystick.active = false;
     try {
       if (canvas && pointerId >= 0 && typeof canvas.releasePointerCapture === "function") {
         canvas.releasePointerCapture(pointerId);
@@ -474,6 +553,10 @@ export class InputManager {
       }
       if (!this._gesture.active || !this._repeatPoint || !this._gesture.rect) {
         this._cancelWalkRepeat();
+        return;
+      }
+      if (this._pointerInteraction === 'joystick') {
+        this._emitMoveFromJoystick();
         return;
       }
       this._emitMoveFromLocalPoint(this._repeatPoint, this._gesture.rect);
@@ -551,6 +634,35 @@ export class InputManager {
       return;
     }
     this._emit(makeAction(Actions.Move, { dx: 0, dy: dy > 0 ? 1 : -1 }));
+  }
+
+  _emitMoveFromJoystick() {
+    const dx = this._joystick.knobX - this._joystick.baseX;
+    const dy = this._joystick.knobY - this._joystick.baseY;
+    const mag = Math.hypot(dx, dy);
+    if (!(mag >= JOYSTICK_DEADZONE_PX)) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      this._emit(makeAction(Actions.Move, { dx: dx > 0 ? 1 : -1, dy: 0 }));
+      return;
+    }
+    this._emit(makeAction(Actions.Move, { dx: 0, dy: dy > 0 ? 1 : -1 }));
+  }
+
+  _buildJoystickUiPayload() {
+    const rect = this._gesture.rect;
+    if (!rect) return { active: false };
+    return {
+      active: true,
+      base: {
+        x: rect.left + this._joystick.baseX,
+        y: rect.top + this._joystick.baseY,
+      },
+      knob: {
+        x: rect.left + this._joystick.knobX,
+        y: rect.top + this._joystick.knobY,
+      },
+      radius: this._joystick.radius,
+    };
   }
 
   _emitUi(name, detail) {

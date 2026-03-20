@@ -12,8 +12,8 @@ import { versionLoaded } from '../../shared/version.js';
 import { getHighscores } from '../../shared/tombstoneApi.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import {
-  readInputMode, readWalkSpeed, writeInputMode, writeWalkSpeed,
-  WALK_SPEED_PRESETS,
+  readInputMode, readWalkInterval, writeInputMode, writeWalkInterval,
+  WALK_INTERVAL_MIN, WALK_INTERVAL_MAX,
 } from '../input/inputSettings.js';
 
 const PANEL_Z_BASE = 1200;
@@ -140,6 +140,7 @@ export function initOverlays() {
   const tombstoneTip = ensureTombstoneTooltip(root);
   const devNoticeTip = ensureDevNoticeTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
+  const virtualJoystick = ensureVirtualJoystick(root);
   const gestureDebug = ensureGestureDebugLayer(root);
   // Flex container for debug graph overlays — graphs stack bottom-up
   const debugGraphStack = document.createElement('div');
@@ -954,9 +955,51 @@ export function initOverlays() {
     drawGestureDebug(gestureDebug, pts, active, rec);
   });
 
+  // Virtual joystick overlay
+  window.addEventListener('ui:joystickProgress', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    const active = !!d.active;
+    if (!active) {
+      virtualJoystick.wrap.style.display = 'none';
+      return;
+    }
+    const baseX = Number(d?.base?.x);
+    const baseY = Number(d?.base?.y);
+    const knobX = Number(d?.knob?.x);
+    const knobY = Number(d?.knob?.y);
+    const radius = Number(d?.radius);
+    if (!Number.isFinite(baseX) || !Number.isFinite(baseY) || !Number.isFinite(knobX) || !Number.isFinite(knobY)) {
+      virtualJoystick.wrap.style.display = 'none';
+      return;
+    }
+    const outerPx = Number.isFinite(radius) ? Math.max(34, radius) : 46;
+    const innerPx = Math.max(16, outerPx * 0.45);
+
+    virtualJoystick.wrap.style.display = 'block';
+    virtualJoystick.outer.style.width = `${outerPx * 2}px`;
+    virtualJoystick.outer.style.height = `${outerPx * 2}px`;
+    virtualJoystick.outer.style.left = `${baseX - outerPx}px`;
+    virtualJoystick.outer.style.top = `${baseY - outerPx}px`;
+    virtualJoystick.inner.style.width = `${innerPx * 2}px`;
+    virtualJoystick.inner.style.height = `${innerPx * 2}px`;
+    virtualJoystick.inner.style.left = `${knobX - innerPx}px`;
+    virtualJoystick.inner.style.top = `${knobY - innerPx}px`;
+  });
+
   window.addEventListener('ui:showSpellGestureHint', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
+    const inputMode = readInputMode();
+    if (inputMode === 'walk') {
+      if (spellGestureTimer) {
+        window.clearTimeout(spellGestureTimer);
+        spellGestureTimer = 0;
+      }
+      spellGestureHint.wrap.style.display = 'none';
+      return;
+    }
     const id = String(e?.detail?.id || '');
     if (id !== 'lightning') return;
     const mode = String(e?.detail?.mode || 'cast');
@@ -1130,9 +1173,9 @@ function ensureGroundTooltip(root) {
   tip.id = 'ground-item-tooltip';
   Object.assign(tip.style, {
     position: 'fixed',
-    left: '8px',
+    left: '50%',
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
-    transform: 'none',
+    transform: 'translateX(-50%)',
     minWidth: '132px', maxWidth: '54vw', pointerEvents: 'auto', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -1340,9 +1383,9 @@ function ensureStairTooltip(root) {
   tip.id = 'stair-tooltip';
   Object.assign(tip.style, {
     position: 'fixed',
-    left: '8px',
+    left: '50%',
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
-    transform: 'none',
+    transform: 'translateX(-50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -1411,9 +1454,9 @@ function ensureTrapTooltip(root) {
   tip.id = 'trap-tooltip';
   Object.assign(tip.style, {
     position: 'fixed',
-    left: '8px',
+    left: '50%',
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
-    transform: 'none',
+    transform: 'translateX(-50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '7px',
     border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -1636,6 +1679,46 @@ function ensureSpellGestureHint(root) {
   return { wrap, glyph, caption };
 }
 
+function ensureVirtualJoystick(root) {
+  const wrap = document.createElement('div');
+  Object.assign(wrap.style, {
+    position: 'fixed',
+    inset: '0',
+    display: 'none',
+    pointerEvents: 'none',
+    zIndex: 915,
+  });
+
+  const outer = document.createElement('div');
+  Object.assign(outer.style, {
+    position: 'fixed',
+    width: '92px',
+    height: '92px',
+    borderRadius: '999px',
+    border: '2px solid rgba(170,220,255,0.62)',
+    background: 'rgba(46,88,132,0.46)',
+    boxShadow: '0 0 18px rgba(80,150,220,0.32), inset 0 0 12px rgba(150,220,255,0.2)',
+    backdropFilter: 'blur(1px)',
+  });
+
+  const inner = document.createElement('div');
+  Object.assign(inner.style, {
+    position: 'fixed',
+    width: '40px',
+    height: '40px',
+    borderRadius: '999px',
+    border: '1px solid rgba(195,235,255,0.76)',
+    background: 'rgba(120,190,245,0.74)',
+    boxShadow: '0 0 10px rgba(140,210,255,0.4), inset 0 0 6px rgba(255,255,255,0.3)',
+  });
+
+  wrap.appendChild(outer);
+  wrap.appendChild(inner);
+  root.appendChild(wrap);
+
+  return { wrap, outer, inner };
+}
+
 function buildLightningShadow(intensity) {
   const base = Math.max(0.2, Math.min(1, intensity));
   const outer = (12 + base * 32).toFixed(1);
@@ -1656,6 +1739,52 @@ function buildFlameShadow(intensity) {
 function renderGroundTooltip(tip, detail) {
   tip.innerHTML = '';
   const mode = detail?.mode || 'single';
+  const renderCompactPickup = (it, subtext, onDismiss) => {
+    tip.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.gap = '8px';
+
+    const title = document.createElement('div');
+    const rarity = String(it?.rarityName || 'common').toLowerCase();
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = bracketize(sanitize(it?.name || it?.type || 'item'));
+    Object.assign(nameSpan.style, rarityStyle(rarity));
+    title.appendChild(nameSpan);
+
+    const raritySpan = document.createElement('span');
+    raritySpan.textContent = ` ${rarity}`;
+    raritySpan.style.opacity = '0.75';
+    raritySpan.style.fontSize = '11px';
+    title.appendChild(raritySpan);
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.textContent = '×';
+    decorateButton(dismissBtn);
+    dismissBtn.title = 'Dismiss';
+    dismissBtn.style.marginLeft = 'auto';
+    dismissBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof onDismiss === 'function') onDismiss();
+    });
+
+    header.appendChild(title);
+    header.appendChild(dismissBtn);
+    tip.appendChild(header);
+
+    if (subtext) {
+      const hint = document.createElement('div');
+      hint.textContent = String(subtext);
+      hint.style.marginTop = '4px';
+      hint.style.opacity = '0.75';
+      hint.style.fontSize = '11px';
+      tip.appendChild(hint);
+    }
+  };
+
   if (mode === 'stack') {
     const stackItems = Array.isArray(detail?.items) ? detail.items.slice() : [];
     if (!stackItems.length) {
@@ -1667,41 +1796,7 @@ function renderGroundTooltip(tip, detail) {
 
     const renderStackAt = () => {
       const it = stackItems[stackIndex];
-      tip.innerHTML = '';
-
-      const header = document.createElement('div');
-      header.style.display = 'flex';
-      header.style.alignItems = 'center';
-      header.style.gap = '8px';
-
-      const title = document.createElement('div');
-      title.textContent = `${stackItems.length} items nearby`;
-      title.style.fontWeight = 'bold';
-
-      const index = document.createElement('div');
-      index.textContent = `${stackIndex + 1}/${stackItems.length}`;
-      index.style.marginLeft = 'auto';
-      index.style.opacity = '0.8';
-      index.style.fontSize = '12px';
-
-      header.appendChild(title);
-      header.appendChild(index);
-      tip.appendChild(header);
-
-      renderItemDetails(tip, it);
-
-      const controls = document.createElement('div');
-      controls.style.display = 'flex';
-      controls.style.justifyContent = 'flex-end';
-      controls.style.marginTop = '8px';
-
-      const dismissBtn = document.createElement('button');
-      dismissBtn.textContent = '×';
-      decorateButton(dismissBtn);
-      dismissBtn.title = 'Dismiss this item';
-      dismissBtn.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
+      renderCompactPickup(it, `${stackIndex + 1}/${stackItems.length} • Tap to pick up`, () => {
         stackItems.splice(stackIndex, 1);
         if (!stackItems.length) {
           tip.style.display = 'none';
@@ -1710,10 +1805,6 @@ function renderGroundTooltip(tip, detail) {
         if (stackIndex >= stackItems.length) stackIndex = stackItems.length - 1;
         renderStackAt();
       });
-
-      controls.appendChild(dismissBtn);
-      tip.appendChild(controls);
-
     };
 
     renderStackAt();
@@ -1730,6 +1821,7 @@ function renderGroundTooltip(tip, detail) {
   }
   if (mode === 'multi') {
     const fromChest = !!detail?.fromChest;
+    tip.innerHTML = '';
     const row = document.createElement('div');
     row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
     const lbl = document.createElement('div');
@@ -1737,52 +1829,20 @@ function renderGroundTooltip(tip, detail) {
     lbl.style.fontWeight = 'bold';
     const hint = document.createElement('div');
     hint.textContent = fromChest ? 'Tap to open' : 'Tap to choose'; hint.style.marginLeft = 'auto'; hint.style.opacity = '0.8';
+    const dismissBtn = document.createElement('button');
+    dismissBtn.textContent = '×';
+    decorateButton(dismissBtn);
+    dismissBtn.title = 'Dismiss';
+    dismissBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      tip.style.display = 'none';
+    });
     row.appendChild(lbl); row.appendChild(hint);
+    row.appendChild(dismissBtn);
     tip.appendChild(row);
 
     const items = Array.isArray(detail?.items) ? detail.items : [];
-    // Only show item preview for ground items, not chests
-    if (!fromChest && items.length) {
-      const itemList = document.createElement('div');
-      itemList.style.marginTop = '6px';
-      itemList.style.display = 'flex';
-      itemList.style.flexDirection = 'column';
-      itemList.style.gap = '2px';
-      const maxPreview = 5;
-      const shown = items.slice(0, maxPreview);
-      for (const it of shown) {
-        const line = document.createElement('div');
-        const rarity = String(it.rarityName || 'common').toLowerCase();
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = bracketize(sanitize(it.name || it.type || 'item'));
-        Object.assign(nameSpan.style, rarityStyle(rarity));
-        line.appendChild(nameSpan);
-        if (Number(it.count || 1) > 1) {
-          const qty = document.createElement('span');
-          qty.textContent = ` x${Number(it.count || 1) | 0}`;
-          qty.style.opacity = '0.7';
-          line.appendChild(qty);
-        }
-        const aff = Array.isArray(it.affixes) ? it.affixes : [];
-        if (aff.length) {
-          const affSpan = document.createElement('span');
-          affSpan.textContent = ' \u2014 ' + aff.map(a => typeof a === 'object' ? a.name : humanize(String(a))).join(', ');
-          affSpan.style.color = '#8ab8d8';
-          affSpan.style.fontStyle = 'italic';
-          affSpan.style.fontSize = '12px';
-          line.appendChild(affSpan);
-        }
-        itemList.appendChild(line);
-      }
-      if (items.length > maxPreview) {
-        const more = document.createElement('div');
-        more.textContent = `...and ${items.length - maxPreview} more`;
-        more.style.opacity = '0.6';
-        more.style.fontSize = '12px';
-        itemList.appendChild(more);
-      }
-      tip.appendChild(itemList);
-    }
 
     tip.onclick = () => {
       if (fromChest) {
@@ -1799,7 +1859,9 @@ function renderGroundTooltip(tip, detail) {
   }
 
   const it = detail?.item || {};
-  renderItemDetails(tip, it);
+  renderCompactPickup(it, 'Tap to pick up', () => {
+    tip.style.display = 'none';
+  });
 
   // Click behavior: attempt pickup via shared flow
   tip.onclick = () => {
@@ -1833,7 +1895,7 @@ function getUiItemEntityIds(it) {
  * @param {HTMLElement} container
  * @param {any} it  item data from inventoryDataProvider
  */
-function renderItemDetails(container, it) {
+export function renderItemDetails(container, it) {
   container.innerHTML = '';
   if (!it) {
     container.textContent = '(no description)';
@@ -2752,7 +2814,7 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
   });
   content.appendChild(inputHead);
 
-  // Radio: Continuous Walking vs Spell Gestures
+  // Radio: input scheme selection
   const currentMode = readInputMode();
   const modeRow = document.createElement('div');
   Object.assign(modeRow.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
@@ -2775,61 +2837,84 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
     lbl.appendChild(txt);
     radio.addEventListener('change', () => {
       if (!radio.checked) return;
-      writeInputMode(/** @type {'walk'|'gesture'} */ (value));
+      writeInputMode(/** @type {'walk'|'gesture'|'joystick'} */ (value));
       window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
-        detail: { inputMode: value, walkInterval: WALK_SPEED_PRESETS[readWalkSpeed()] },
+        detail: { inputMode: value, walkInterval: readWalkInterval() },
       }));
-      // Show/hide walk speed row.
-      speedRow.style.display = value === 'walk' ? 'flex' : 'none';
+      // Show/hide movement speed row.
+      speedRow.style.display = (value === 'walk' || value === 'joystick') ? 'flex' : 'none';
     });
     return lbl;
   }
 
-  modeRow.appendChild(makeRadio('Continuous Walking', 'walk', currentMode === 'walk'));
+  modeRow.appendChild(makeRadio('Tap and Hold', 'walk', currentMode === 'walk'));
   modeRow.appendChild(makeRadio('Spell Gestures', 'gesture', currentMode === 'gesture'));
+  modeRow.appendChild(makeRadio('Joystick & Spell Gestures', 'joystick', currentMode === 'joystick'));
   content.appendChild(modeRow);
 
-  // Segmented control: Walk Speed (Slow / Normal / Fast)
+  // Trackbar: movement repeat interval (ms)
   const speedRow = document.createElement('div');
   Object.assign(speedRow.style, {
-    display: currentMode === 'walk' ? 'flex' : 'none',
-    alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+    display: (currentMode === 'walk' || currentMode === 'joystick') ? 'flex' : 'none',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: '6px',
   });
   const speedLabel = document.createElement('span');
-  speedLabel.textContent = 'Walk Speed';
-  Object.assign(speedLabel.style, { fontSize: '13px', color: '#aac8e8', minWidth: '80px' });
+  speedLabel.textContent = 'Movement Speed';
+  Object.assign(speedLabel.style, { fontSize: '13px', color: '#aac8e8' });
   speedRow.appendChild(speedLabel);
 
-  const speedBtnWrap = document.createElement('div');
-  Object.assign(speedBtnWrap.style, { display: 'flex', gap: '4px' });
+  const sliderWrap = document.createElement('div');
+  Object.assign(sliderWrap.style, {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr auto',
+    alignItems: 'center',
+    gap: '8px',
+  });
 
-  const currentSpeed = readWalkSpeed();
-  let selectedSpeedPreset = currentSpeed;
-  for (const [preset, ms] of /** @type {[string, number][]} */ (Object.entries(WALK_SPEED_PRESETS))) {
-    const btn = document.createElement('button');
-    btn.textContent = preset.charAt(0).toUpperCase() + preset.slice(1);
-    btn.dataset.preset = preset;
-    Object.assign(btn.style, {
-      padding: '5px 12px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
-      border: '1px solid #2d3b52', background: preset === currentSpeed ? '#173458' : '#0b1626',
-      color: preset === currentSpeed ? '#cfe8ff' : '#7aacdf', fontFamily: 'inherit',
-      minHeight: '34px',
-    });
-    btn.addEventListener('click', () => {
-      const prev = selectedSpeedPreset;
-      selectedSpeedPreset = preset;
-      writeWalkSpeed(/** @type {'slow'|'normal'|'fast'} */ (preset));
-      window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
-        detail: { inputMode: readInputMode(), walkInterval: ms },
-      }));
-      // Update only the previously-selected and newly-selected buttons.
-      const prevBtn = /** @type {HTMLButtonElement|null} */ (speedBtnWrap.querySelector(`[data-preset="${prev}"]`));
-      if (prevBtn) Object.assign(prevBtn.style, { background: '#0b1626', color: '#7aacdf' });
-      Object.assign(btn.style, { background: '#173458', color: '#cfe8ff' });
-    });
-    speedBtnWrap.appendChild(btn);
+  const minEl = document.createElement('span');
+  minEl.textContent = 'Slow';
+  Object.assign(minEl.style, { fontSize: '11px', color: '#6f8fb2', minWidth: '44px', textAlign: 'left' });
+
+  const speedSlider = document.createElement('input');
+  speedSlider.type = 'range';
+  speedSlider.min = '0';
+  speedSlider.max = String(WALK_INTERVAL_MAX - WALK_INTERVAL_MIN);
+  speedSlider.step = '1';
+  speedSlider.value = String(WALK_INTERVAL_MAX - readWalkInterval());
+  Object.assign(speedSlider.style, {
+    width: '100%',
+    minHeight: '34px',
+    accentColor: '#5fb3ff',
+  });
+
+  const maxEl = document.createElement('span');
+  maxEl.textContent = 'Fast';
+  Object.assign(maxEl.style, { fontSize: '11px', color: '#6f8fb2', minWidth: '50px', textAlign: 'right' });
+
+  sliderWrap.appendChild(minEl);
+  sliderWrap.appendChild(speedSlider);
+  sliderWrap.appendChild(maxEl);
+  speedRow.appendChild(sliderWrap);
+
+  function syncMovementSpeed(interval) {
+    const ms = Math.max(WALK_INTERVAL_MIN, Math.min(WALK_INTERVAL_MAX, Number(interval) | 0));
+    writeWalkInterval(ms);
+    window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
+      detail: { inputMode: readInputMode(), walkInterval: ms },
+    }));
   }
-  speedRow.appendChild(speedBtnWrap);
+
+  speedSlider.addEventListener('input', () => {
+    const ms = WALK_INTERVAL_MAX - (Number(speedSlider.value) | 0);
+    syncMovementSpeed(ms);
+  });
+  speedSlider.addEventListener('change', () => {
+    const ms = WALK_INTERVAL_MAX - (Number(speedSlider.value) | 0);
+    syncMovementSpeed(ms);
+  });
+
   content.appendChild(speedRow);
 
   // --- Debugging section ---
