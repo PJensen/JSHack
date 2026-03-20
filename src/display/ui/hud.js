@@ -960,6 +960,7 @@ function createQuickSlot() {
   function dispatchThrow(it) {
     if (!(Number(it?.id || 0) > 0)) return;
     window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
+    dismissTop();
   }
 
   function dispatchDrop(it) {
