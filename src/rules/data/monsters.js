@@ -1064,7 +1064,7 @@ export const MONSTERS = [
   {
     id: 'centipede',
     name: 'Giant Centipede',
-    tags: ['beast', 'vermin'],
+    tags: ['beast', 'vermin', 'long-creature'],
     tier: 0,
     intelligence: 2,
     baseHp: 4,

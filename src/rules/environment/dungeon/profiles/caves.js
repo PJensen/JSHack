@@ -21,5 +21,5 @@ export const CAVE_PROFILE = {
   doorChance:    0.0,     // no doors in a cave
   postProcess:   cornerErosion,
   hazardBias:    'water',
-  monsterFilter: def => (def.tags ?? []).some(t => ['beast', 'vermin', 'giant'].includes(t)),
+  monsterFilter: def => (def.tags ?? []).some(t => ['beast', 'vermin', 'giant', 'long-creature'].includes(t)),
 };
