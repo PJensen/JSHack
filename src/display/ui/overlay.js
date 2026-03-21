@@ -1438,7 +1438,7 @@ function renderTrapTooltip(tip, detail) {
   const trapType = detail?.trapType || 'Trap';
 
   const title = document.createElement('div');
-  title.textContent = trapType;
+  title.textContent = `${trapType} 🎲`;
   Object.assign(title.style, { fontWeight: 'bold', fontSize: '12px', marginBottom: '2px' });
   tip.appendChild(title);
 
