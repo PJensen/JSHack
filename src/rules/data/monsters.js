@@ -244,7 +244,7 @@ export const MONSTERS = [
     damageDice: '2d6',
     sizeClass: 'L',
     massKg: 350,
-    resistances: { kinetic: { DR: 8 } },
+    resistances: { kinetic: { DR: 3 } },
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0200, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
@@ -270,7 +270,7 @@ export const MONSTERS = [
     sizeClass: 'L',
     massKg: 240,
     resistances: {
-      kinetic: { DR: 10, pierceMult: 0.85 },
+      kinetic: { DR: 5, pierceMult: 0.85 },
       thermal: { igniteC: Infinity, burnMult: 0 },
     },
     speed: 2,
@@ -461,7 +461,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 26,
     resistances: {
-      kinetic: { DR: 4, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 2, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
       chemical: { toxMult: 0 },
       electric: { ohms: 60 },
     },
@@ -512,7 +512,7 @@ export const MONSTERS = [
     damageDice: '1d8',
     sizeClass: 'M',
     massKg: 95,
-    resistances: { kinetic: { DR: 6 } },
+    resistances: { kinetic: { DR: 3 } },
     speed: 2,
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(25, 0xdead0007, 2, "proc:rage")],
@@ -601,7 +601,7 @@ export const MONSTERS = [
     damageDice: '1d8',
     sizeClass: 'M',
     massKg: 100,
-    resistances: { kinetic: { DR: 8 } },
+    resistances: { kinetic: { DR: 4 } },
     speed: 2,
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(20, 0xdead0402, 3, "proc:rage")],
@@ -649,7 +649,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 60,
     resistances: {
-      kinetic: { DR: 6, bluntMult: 1.3, pierceMult: 0.6, slashMult: 0.7 },
+      kinetic: { DR: 3, bluntMult: 1.3, pierceMult: 0.6, slashMult: 0.7 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
@@ -801,7 +801,7 @@ export const MONSTERS = [
     damageDice: '2d8',
     sizeClass: 'L',
     massKg: 250,
-    resistances: { kinetic: { DR: 12 } },
+    resistances: { kinetic: { DR: 6 } },
     speed: 2,
     hooks: {
       onHit: [statusEffectOnHit(25, 0xdead000a, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],

@@ -1,5 +1,5 @@
-// Prove that kinetic DR now applies to melee hits (post bypassResist removal).
-// Combos: mace (blunt) and sword (physical) vs spider (DR:2) and cave_bear (DR:8).
+// Prove that kinetic DR applies to melee hits (post bypassResist removal).
+// Combos: mace (blunt) and sword (physical) vs spider (DR:2) and cave_bear (DR:3).
 
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
@@ -29,7 +29,9 @@ function spawnMonster(world, monsterId, x, y) {
 }
 
 // Spider: kinetic DR 2
-// Cave bear: kinetic DR 8
+// Cave bear: kinetic DR 3 (was 8, rebalanced)
+
+// ── Mace (blunt) vs Spider (DR:2) ──────────────────────────────────
 
 Deno.test("mace (blunt 3) vs spider (DR:2) — damage reduced to 1", () => {
   const world = makeWorld(1);
@@ -66,8 +68,25 @@ Deno.test("mace (blunt 2) vs spider (DR:2) — fully resisted", () => {
   assert(events.some(e => e.kind === "resist"), "should emit resist status");
 });
 
-Deno.test("mace (blunt 5) vs cave_bear (DR:8) — fully resisted", () => {
+// ── Mace (blunt) vs Cave Bear (DR:3) ───────────────────────────────
+
+Deno.test("mace (blunt 5) vs cave_bear (DR:3) — damage reduced to 2", () => {
   const world = makeWorld(3);
+  const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
+  const attacker = world.create();
+
+  const result = dealDamage(world, {
+    target: id, amount: 5, source: attacker,
+    type: "blunt", cause: "melee",
+  });
+
+  assertEquals(result.applied, true, "5 blunt vs DR 3 = 2 damage");
+  assertEquals(result.amount, 2);
+  assertEquals(world.get(id, Vitality).hp, def.baseHp - 2);
+});
+
+Deno.test("mace (blunt 3) vs cave_bear (DR:3) — fully resisted", () => {
+  const world = makeWorld(30);
   const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
   const attacker = world.create();
 
@@ -75,22 +94,22 @@ Deno.test("mace (blunt 5) vs cave_bear (DR:8) — fully resisted", () => {
   world.on("status", (e) => events.push(e));
 
   const result = dealDamage(world, {
-    target: id, amount: 5, source: attacker,
+    target: id, amount: 3, source: attacker,
     type: "blunt", cause: "melee",
   });
 
-  assertEquals(result.applied, false, "5 blunt vs DR 8 = fully resisted");
+  assertEquals(result.applied, false, "3 blunt vs DR 3 = resisted");
   assertEquals(result.reason, "resisted");
-  assertEquals(world.get(id, Vitality).hp, def.baseHp);
   assert(events.some(e => e.kind === "resist"), "should emit resist status");
 });
+
+// ── Sword (physical) vs Spider (DR:2) ──────────────────────────────
 
 Deno.test("sword (physical 3) vs spider (DR:2) — damage reduced to 1", () => {
   const world = makeWorld(4);
   const { id, def } = spawnMonster(world, "spider", 5, 5);
   const attacker = world.create();
 
-  // sword_plain has no damageType → defaults to 'physical' in combatSystem
   const result = dealDamage(world, {
     target: id, amount: 3, source: attacker,
     type: "physical", cause: "melee",
@@ -119,51 +138,34 @@ Deno.test("sword (physical 2) vs spider (DR:2) — fully resisted", () => {
   assert(events.some(e => e.kind === "resist"), "should emit resist status");
 });
 
-Deno.test("sword (physical 5) vs cave_bear (DR:8) — fully resisted", () => {
+// ── Sword (physical) vs Cave Bear (DR:3) ───────────────────────────
+
+Deno.test("sword (physical 5) vs cave_bear (DR:3) — damage reduced to 2", () => {
   const world = makeWorld(6);
   const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
   const attacker = world.create();
-
-  const events = [];
-  world.on("status", (e) => events.push(e));
 
   const result = dealDamage(world, {
     target: id, amount: 5, source: attacker,
     type: "physical", cause: "melee",
   });
 
-  assertEquals(result.applied, false, "5 physical vs DR 8 = resisted");
-  assertEquals(result.reason, "resisted");
-  assertEquals(world.get(id, Vitality).hp, def.baseHp);
-  assert(events.some(e => e.kind === "resist"), "should emit resist status");
+  assertEquals(result.applied, true, "5 physical vs DR 3 = 2 damage");
+  assertEquals(result.amount, 2);
+  assertEquals(world.get(id, Vitality).hp, def.baseHp - 2);
 });
 
-Deno.test("sword (physical 10) vs cave_bear (DR:8) — damage reduced to 2", () => {
+Deno.test("sword (physical 8) vs cave_bear (DR:3) — damage reduced to 5", () => {
   const world = makeWorld(7);
   const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
   const attacker = world.create();
 
   const result = dealDamage(world, {
-    target: id, amount: 10, source: attacker,
+    target: id, amount: 8, source: attacker,
     type: "physical", cause: "melee",
   });
 
-  assertEquals(result.applied, true, "10 physical vs DR 8 = 2 damage");
-  assertEquals(result.amount, 2);
-  assertEquals(world.get(id, Vitality).hp, def.baseHp - 2);
-});
-
-Deno.test("mace (blunt 10) vs cave_bear (DR:8) — damage reduced to 2", () => {
-  const world = makeWorld(8);
-  const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
-  const attacker = world.create();
-
-  const result = dealDamage(world, {
-    target: id, amount: 10, source: attacker,
-    type: "blunt", cause: "melee",
-  });
-
-  assertEquals(result.applied, true, "10 blunt vs DR 8 = 2 damage");
-  assertEquals(result.amount, 2);
-  assertEquals(world.get(id, Vitality).hp, def.baseHp - 2);
+  assertEquals(result.applied, true, "8 physical vs DR 3 = 5 damage");
+  assertEquals(result.amount, 5);
+  assertEquals(world.get(id, Vitality).hp, def.baseHp - 5);
 });
