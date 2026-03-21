@@ -42,6 +42,7 @@ export const MONSTERS = [
     },
     specials: ["Disease 25%"],
     description: 'A mangy rodent with beady eyes.',
+    corpseEat: { behavior: "scavenge", hpThreshold: 0.60, cooldownTurns: 5 },
   },
   {
     id: 'goblin',
@@ -65,6 +66,7 @@ export const MONSTERS = [
     specials: ["Bleed 20%"],
     description: 'A sneering green-skinned runt armed with a rusty shiv.',
     lootTable: 'drop:goblin',
+    corpseEat: { behavior: "scavenge", hpThreshold: 0.70, cooldownTurns: 5 },
   },
   {
     id: 'goblin_archer',
@@ -757,6 +759,7 @@ export const MONSTERS = [
     },
     specials: ["Regen buff on hit", "Self-heal 1 HP (30%)"],
     description: 'A hulking regenerator. Weak to fire.',
+    corpseEat: { behavior: "devour", cooldownTurns: 10 },
   },
   {
     id: 'wraith',
@@ -836,6 +839,7 @@ export const MONSTERS = [
     specials: ["+dmg vs afflicted", "Weaken 30%", "Bleed 20%", "Phase out 25%"],
     description: 'A shadow that coalesces around old blood. It lurks in darkness and strikes harder against the wounded.',
     lootTable: 'drop:tier2',
+    corpseEat: { behavior: "devour", cooldownTurns: 8 },
   },
   {
     id: 'dark_acolyte',

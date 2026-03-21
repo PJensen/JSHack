@@ -22,6 +22,7 @@ import { aiChaseSystem, installAggroFromDamageListener } from "../rules/systems/
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
+import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
 import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
 import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
@@ -146,6 +147,8 @@ export function configureWorld(world) {
   registerSystem(aiChaseSystem, 'ai');
   // Weapon pickup after chase so the monster's hunt state is settled first.
   registerSystem(aiWeaponPickupSystem, 'ai');
+  // Corpse eating after weapon pickup — idle scavengers and tactical devourers.
+  registerSystem(aiCorpseEatSystem, 'ai');
   registerSystem(summonedBehaviorSystem, 'ai');
   registerSystem(petCommandSystem, 'ai');
   registerSystem(petBehaviorSystem, 'ai');
