@@ -9,7 +9,8 @@ import {
   corpseGamble,
   corpseBonusNutrition,
   corpseHeal,
-  corpseGrantResistance,
+  corpseDiminishResist,
+  corpseDiminishDR,
   corpseProgression,
   grantElectricResist,
 } from "./callbacks/eat.js";
@@ -88,12 +89,13 @@ export const CORPSE_DEFS = Object.freeze({
     ]),
   }),
 
-  // Cave Snake: harmless + bonus nutrition + serpent blood progression
+  // Cave Snake: harmless + bonus nutrition + builds poison resistance
+  // Each eat: toxMult * 0.85 decay toward floor 0.4
+  // eat 1: 1.0→0.91, eat 3: →0.77, eat 5: →0.65, eat 10: →0.49
   corpse_cave_snake: Object.freeze({
     onEat: Object.freeze([
       corpseBonusNutrition(50),
-      corpseProgression("snakesEaten", 3, "serpent_blood", "Serpent Blood",
-        (ctx) => ctx.grantResistance("chemical", "toxMult", 0.5)),
+      corpseDiminishResist("chemical", "toxMult", 0.85, 0.4, "poison"),
     ]),
   }),
 
@@ -107,12 +109,12 @@ export const CORPSE_DEFS = Object.freeze({
     ]),
   }),
 
-  // Snake: poison + venom tolerance progression
+  // Snake: poison + builds poison resistance (risk/reward: you get poisoned but build tolerance)
+  // Each eat: toxMult * 0.88 decay toward floor 0.4
   corpse_snake: Object.freeze({
     onEat: Object.freeze([
       corpseStatusEffect("poison", 8, 2),
-      corpseProgression("venomCorpsesEaten", 2, "venom_tolerance", "Venom Tolerance",
-        (ctx) => ctx.grantResistance("chemical", "toxMult", 0.5)),
+      corpseDiminishResist("chemical", "toxMult", 0.88, 0.4, "poison"),
     ]),
   }),
 
@@ -137,12 +139,13 @@ export const CORPSE_DEFS = Object.freeze({
     ]),
   }),
 
-  // Cave Bear: +2 maxHp timed buff + thick hide progression
+  // Cave Bear: +2 maxHp timed buff + builds kinetic DR
+  // Each eat: DR += 1.5 * (1 - DR/6), ceiling 6
+  // eat 1: 0→1.5, eat 2: →2.63, eat 3: →3.47, eat 5: →4.56
   corpse_cave_bear: Object.freeze({
     onEat: Object.freeze([
       corpseTimedBuff("bear_vigor", 150, 2, "corpse:buff-gained", "primal strength surges through your limbs"),
-      corpseProgression("bearCorpsesEaten", 2, "thick_hide", "Thick Hide",
-        (ctx) => ctx.grantResistance("kinetic", "DR", 2)),
+      corpseDiminishDR("kinetic", "DR", 1.5, 6, "toughness"),
     ]),
   }),
 
@@ -321,20 +324,22 @@ export const CORPSE_DEFS = Object.freeze({
     ]),
   }),
 
-  // Dragon: dragonheart (permanent fire immunity + attack) — always costs fire damage
+  // Dragon: dragonheart trait + massive burn resist nudge — always costs fire damage
+  // burnMult: decay 0.3 toward floor 0.1 (eat 1: 1.0→0.37, eat 2: →0.18)
   corpse_dragon: Object.freeze({
     onEat: Object.freeze([
       (ctx) => {
         ctx.damage(10, "dragonfire");
         ctx.pushEffect({ key: "burn", turnsLeft: 4, potency: 3, stacks: 1, sourceId: ctx.itemId });
         ctx.setTrait("dragonheart", true);
-        ctx.grantResistance("thermal", "burnMult", 0);
         ctx.emit("corpse:trait-gained", {
           actor: ctx.actor,
           trait: "dragonheart",
           name: "Dragonheart",
         });
       },
+      // Big nudge — dragon is legendary. Floor 0.1 so never full immunity.
+      corpseDiminishResist("thermal", "burnMult", 0.3, 0.1, "fire"),
     ]),
   }),
 

@@ -901,6 +901,18 @@ export function installMessageWiring({
     log(`Your body adapts \u2014 ${String(type || 'unknown')} resistance gained.`, 'legendary');
   });
 
+  world.on('corpse:resist-building', ({ actor, type, pct }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = String(type || 'unknown');
+    const p = Number(pct || 0);
+    if (p > 0) {
+      log(`Your ${label} resistance hardens \u2014 ${p}% resilient.`, 'system');
+    } else {
+      log(`Your body toughens against ${label}.`, 'system');
+    }
+  });
+
   world.on('corpse:progression', ({ actor, name, count, threshold }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;

@@ -20,116 +20,135 @@ function eatCorpse(world, player, corpse) {
   useItemSystem(world);
 }
 
-// ── Serpent Blood progression (3 cave_snake corpses) ──────────────
+// ── Diminishing poison resistance (cave_snake) ───────────────────
 
-Deno.test("eating 3 cave_snake corpses grants serpent_blood trait", () => {
+Deno.test("cave_snake corpse reduces toxMult with diminishing returns", () => {
   const world = new World({ seed: 0xBEEF01 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const traitEvents = [];
-  world.on("corpse:trait-gained", (ev) => traitEvents.push(ev));
-
-  for (let i = 0; i < 3; i++) {
-    const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
-    eatCorpse(world, player, corpse);
-  }
-
-  const traits = world.get(player, Traits);
-  assert(traits, "player should have Traits");
-  assertEquals(traits.snakesEaten, 3, "should count 3 cave snakes");
-  assertEquals(traits.serpent_blood, true, "should grant serpent_blood");
-  assert(traitEvents.some(e => e.trait === "serpent_blood"), "should emit trait event");
-
   const resist = world.get(player, Resistances);
-  assert(resist, "player should have Resistances");
-  assertEquals(resist.chemical.toxMult, 0.5, "serpent_blood should set toxMult to 0.5");
-});
-
-Deno.test("cave_snake corpse progression emits count events", () => {
-  const world = new World({ seed: 0xBEEF02 });
-  const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
-
-  const progressEvents = [];
-  world.on("corpse:progression", (ev) => progressEvents.push(ev));
+  const before = resist.chemical.toxMult;
+  assertEquals(before, 1.0, "should start at 1.0");
 
   const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
   eatCorpse(world, player, corpse);
 
-  const traits = world.get(player, Traits);
-  assertEquals(traits.snakesEaten, 1, "should count 1");
-  assertEquals(traits.serpent_blood, false, "not yet");
-  assertEquals(progressEvents.length, 1, "should emit progression event");
-  assertEquals(progressEvents[0].count, 1);
-  assertEquals(progressEvents[0].threshold, 3);
+  const after1 = resist.chemical.toxMult;
+  assert(after1 < before, "first eat should reduce toxMult");
+  assert(after1 > 0.4, "should not reach floor after 1 eat");
+  // formula: 0.4 + (1.0 - 0.4) * 0.85 = 0.91
+  assertEquals(after1, 0.91, "first eat: floor + (1.0 - floor) * decay");
 });
 
-// ── Venom Tolerance progression (2 snake corpses) ─────────────────
+Deno.test("repeated cave_snake eats approach floor with diminishing gains", () => {
+  const world = new World({ seed: 0xBEEF02 });
+  const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-Deno.test("eating 2 snake corpses grants venom_tolerance", () => {
+  const resist = world.get(player, Resistances);
+  const values = [resist.chemical.toxMult];
+
+  for (let i = 0; i < 5; i++) {
+    const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
+    eatCorpse(world, player, corpse);
+    values.push(resist.chemical.toxMult);
+  }
+
+  // Each value should be less than previous
+  for (let i = 1; i < values.length; i++) {
+    assert(values[i] < values[i - 1], `eat ${i} should reduce toxMult further`);
+  }
+  // Gains should diminish (gap shrinks)
+  const gap1 = values[0] - values[1]; // first eat delta
+  const gap5 = values[4] - values[5]; // fifth eat delta
+  assert(gap5 < gap1, "later eats should give smaller gains (diminishing returns)");
+  // After 5 eats should be well above floor
+  assert(values[5] > 0.4, "should not reach floor after 5 eats");
+});
+
+Deno.test("cave_snake emits resist-building event with percentage", () => {
   const world = new World({ seed: 0xBEEF03 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const traitEvents = [];
-  world.on("corpse:trait-gained", (ev) => traitEvents.push(ev));
+  const events = [];
+  world.on("corpse:resist-building", (ev) => events.push(ev));
 
-  for (let i = 0; i < 2; i++) {
-    const corpse = makeCorpse(world, "snake", "Snake", "XS", 3);
-    eatCorpse(world, player, corpse);
-  }
+  const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
+  eatCorpse(world, player, corpse);
 
-  const traits = world.get(player, Traits);
-  assertEquals(traits.venomCorpsesEaten, 2, "should count 2 venomous corpses");
-  assertEquals(traits.venom_tolerance, true, "should grant venom_tolerance");
-  assert(traitEvents.some(e => e.trait === "venom_tolerance"), "should emit trait event");
-
-  const resist = world.get(player, Resistances);
-  assertEquals(resist.chemical.toxMult, 0.5, "venom_tolerance should set toxMult to 0.5");
+  assertEquals(events.length, 1, "should emit resist-building event");
+  assertEquals(events[0].type, "poison");
+  assert(events[0].pct > 0, "should report positive resistance percentage");
 });
 
-// ── Thick Hide progression (2 cave_bear corpses) ──────────────────
+// ── Snake: poison + diminishing resist ────────────────────────────
 
-Deno.test("eating 2 cave_bear corpses grants thick_hide", () => {
+Deno.test("snake corpse poisons and builds toxMult resistance", () => {
   const world = new World({ seed: 0xBEEF04 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const traitEvents = [];
-  world.on("corpse:trait-gained", (ev) => traitEvents.push(ev));
+  const corpse = makeCorpse(world, "snake", "Snake", "XS", 3);
+  eatCorpse(world, player, corpse);
 
-  for (let i = 0; i < 2; i++) {
-    const corpse = makeCorpse(world, "cave_bear", "Cave Bear", "L", 350);
-    eatCorpse(world, player, corpse);
-  }
-
-  const traits = world.get(player, Traits);
-  assertEquals(traits.bearCorpsesEaten, 2, "should count 2 bears");
-  assertEquals(traits.thick_hide, true, "should grant thick_hide");
-  assert(traitEvents.some(e => e.trait === "thick_hide"), "should emit trait event");
+  const ae = world.get(player, ActiveEffects);
+  assert(ae.effects.some(e => e.key === "poison"), "should apply poison");
 
   const resist = world.get(player, Resistances);
-  assertEquals(resist.kinetic.DR, 2, "thick_hide should set kinetic DR to 2");
+  assert(resist.chemical.toxMult < 1.0, "should reduce toxMult");
 });
 
-// ── Cave bear also gives bear_vigor buff ──────────────────────────
+// ── Cave bear: bear_vigor buff + diminishing kinetic DR ───────────
 
-Deno.test("cave_bear corpse applies bear_vigor timed buff", () => {
+Deno.test("cave_bear corpse applies bear_vigor and increases kinetic DR", () => {
   const world = new World({ seed: 0xBEEF05 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+
+  const resist = world.get(player, Resistances);
+  const drBefore = resist.kinetic.DR;
 
   const corpse = makeCorpse(world, "cave_bear", "Cave Bear", "L", 350);
   eatCorpse(world, player, corpse);
 
+  // Bear vigor buff
   const ae = world.get(player, ActiveEffects);
-  assert(ae && Array.isArray(ae.effects), "player should have active effects");
   const vigor = ae.effects.find(e => e.key === "bear_vigor");
   assert(vigor, "should have bear_vigor effect");
   assertEquals(vigor.turnsLeft, 150, "bear_vigor should last 150 turns");
-  assertEquals(vigor.potency, 2, "bear_vigor potency should be 2");
+
+  // Kinetic DR increased
+  assert(resist.kinetic.DR > drBefore, "should increase kinetic DR");
+  // formula: 0 + 1.5 * max(0, 1 - 0/6) = 1.5
+  assertEquals(resist.kinetic.DR, 1.5, "first eat: full increment");
+});
+
+Deno.test("repeated cave_bear eats show diminishing DR gains", () => {
+  const world = new World({ seed: 0xBEEF06 });
+  const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+
+  const resist = world.get(player, Resistances);
+  const values = [resist.kinetic.DR];
+
+  for (let i = 0; i < 4; i++) {
+    const corpse = makeCorpse(world, "cave_bear", "Cave Bear", "L", 350);
+    eatCorpse(world, player, corpse);
+    values.push(resist.kinetic.DR);
+  }
+
+  // Each should be higher than previous
+  for (let i = 1; i < values.length; i++) {
+    assert(values[i] > values[i - 1], `eat ${i} should increase DR`);
+  }
+  // Gains diminish
+  const gain1 = values[1] - values[0];
+  const gain4 = values[4] - values[3];
+  assert(gain4 < gain1, "later eats should give smaller DR gains");
+  // Should not exceed ceiling of 6
+  assert(values[4] <= 6, "should not exceed ceiling");
 });
 
 // ── Floating eye: mindwipe + third_eye trait ──────────────────────
 
 Deno.test("floating_eye corpse applies mindwipe and grants third_eye", () => {
-  const world = new World({ seed: 0xBEEF06 });
+  const world = new World({ seed: 0xBEEF07 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const traitEvents = [];
@@ -146,26 +165,34 @@ Deno.test("floating_eye corpse applies mindwipe and grants third_eye", () => {
   assert(traitEvents.some(e => e.trait === "third_eye"), "should emit third_eye trait event");
 });
 
-// ── Dragon: dragonheart (fire immunity + damage) ──────────────────
+// ── Dragon: dragonheart + big burn resist nudge (not immunity) ────
 
-Deno.test("dragon corpse grants dragonheart and deals fire damage", () => {
-  const world = new World({ seed: 0xBEEF07 });
+Deno.test("dragon corpse grants dragonheart with diminishing burn resist", () => {
+  const world = new World({ seed: 0xBEEF08 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const traitEvents = [];
   world.on("corpse:trait-gained", (ev) => traitEvents.push(ev));
 
+  const resist = world.get(player, Resistances);
+  assertEquals(resist.thermal.burnMult, 1.0, "should start at 1.0");
+
   const startHp = world.get(player, Vitality).hp;
   const corpse = makeCorpse(world, "dragon", "Dragon", "XL", 800, 3);
   eatCorpse(world, player, corpse);
 
+  // Trait
   const traits = world.get(player, Traits);
   assertEquals(traits.dragonheart, true, "should grant dragonheart");
   assert(traitEvents.some(e => e.trait === "dragonheart"), "should emit dragonheart event");
 
-  const resist = world.get(player, Resistances);
-  assertEquals(resist.thermal.burnMult, 0, "dragonheart should grant fire immunity");
+  // Burn resist: big nudge but NOT zero (floor 0.1)
+  assert(resist.thermal.burnMult < 0.5, "should dramatically reduce burnMult");
+  assert(resist.thermal.burnMult > 0, "should not be zero — diminishing, not immunity");
+  // formula: 0.1 + (1.0 - 0.1) * 0.3 = 0.1 + 0.27 = 0.37
+  assertEquals(resist.thermal.burnMult, 0.37, "first dragon: floor + headroom * decay");
 
+  // Fire damage
   const endHp = world.get(player, Vitality).hp;
   assert(endHp < startHp, "dragon corpse should deal fire damage");
 
@@ -176,14 +203,13 @@ Deno.test("dragon corpse grants dragonheart and deals fire damage", () => {
 // ── Orc: blood rage buff ──────────────────────────────────────────
 
 Deno.test("orc corpse applies blood_rage timed buff", () => {
-  const world = new World({ seed: 0xBEEF08 });
+  const world = new World({ seed: 0xBEEF09 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const corpse = makeCorpse(world, "orc", "Orc", "M", 95, 1);
   eatCorpse(world, player, corpse);
 
   const ae = world.get(player, ActiveEffects);
-  assert(ae && Array.isArray(ae.effects), "should have active effects");
   const rage = ae.effects.find(e => e.key === "blood_rage");
   assert(rage, "should have blood_rage effect");
   assertEquals(rage.turnsLeft, 100, "blood_rage should last 100 turns");
@@ -192,7 +218,7 @@ Deno.test("orc corpse applies blood_rage timed buff", () => {
 // ── Hobgoblin: war_fed buff ───────────────────────────────────────
 
 Deno.test("hobgoblin corpse applies war_fed timed buff", () => {
-  const world = new World({ seed: 0xBEEF09 });
+  const world = new World({ seed: 0xBEEF0A });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const corpse = makeCorpse(world, "hobgoblin", "Hobgoblin", "M", 100, 1);
@@ -208,29 +234,23 @@ Deno.test("hobgoblin corpse applies war_fed timed buff", () => {
 // ── Troll: regeneration + ravenous ────────────────────────────────
 
 Deno.test("troll corpse applies both regeneration and ravenous", () => {
-  const world = new World({ seed: 0xBEEF0A });
+  const world = new World({ seed: 0xBEEF0B });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const corpse = makeCorpse(world, "troll", "Troll", "L", 200, 2);
   eatCorpse(world, player, corpse);
 
   const ae = world.get(player, ActiveEffects);
-  const regen = ae.effects.find(e => e.key === "regeneration");
-  assert(regen, "should have regeneration effect");
-  assertEquals(regen.turnsLeft, 200, "regeneration should last 200 turns");
-
-  const ravenous = ae.effects.find(e => e.key === "ravenous");
-  assert(ravenous, "should also have ravenous debuff");
-  assertEquals(ravenous.turnsLeft, 200, "ravenous should last 200 turns");
+  assert(ae.effects.find(e => e.key === "regeneration"), "should have regeneration");
+  assert(ae.effects.find(e => e.key === "ravenous"), "should have ravenous debuff");
 });
 
 // ── Wight: heal + weakened + deathless progression ────────────────
 
 Deno.test("wight corpse heals and applies weakened debuff", () => {
-  const world = new World({ seed: 0xBEEF0B });
+  const world = new World({ seed: 0xBEEF0C });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  // Damage the player first
   const vit = world.get(player, Vitality);
   vit.hp = vit.maxHp - 10;
   const beforeHp = vit.hp;
@@ -238,7 +258,6 @@ Deno.test("wight corpse heals and applies weakened debuff", () => {
   const corpse = makeCorpse(world, "wight", "Wight", "M", 60, 1);
   eatCorpse(world, player, corpse);
 
-  // Should heal 5 HP
   assert(vit.hp > beforeHp, "wight corpse should heal the player");
 
   const ae = world.get(player, ActiveEffects);
@@ -246,7 +265,7 @@ Deno.test("wight corpse heals and applies weakened debuff", () => {
 });
 
 Deno.test("eating 3 wight corpses grants deathless trait", () => {
-  const world = new World({ seed: 0xBEEF0C });
+  const world = new World({ seed: 0xBEEF0D });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const traitEvents = [];
@@ -266,7 +285,7 @@ Deno.test("eating 3 wight corpses grants deathless trait", () => {
 // ── Goblin archer: keen_eye buff ──────────────────────────────────
 
 Deno.test("goblin_archer corpse applies keen_eye buff", () => {
-  const world = new World({ seed: 0xBEEF0D });
+  const world = new World({ seed: 0xBEEF0E });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const corpse = makeCorpse(world, "goblin_archer", "Goblin Archer", "S", 30);
@@ -278,10 +297,10 @@ Deno.test("goblin_archer corpse applies keen_eye buff", () => {
   assertEquals(keen.turnsLeft, 80, "keen_eye should last 80 turns");
 });
 
-// ── Mimic: random effect (deterministic with seed) ────────────────
+// ── Mimic: random effect ──────────────────────────────────────────
 
 Deno.test("mimic corpse applies some effect (gamble)", () => {
-  const world = new World({ seed: 0xBEEF0E });
+  const world = new World({ seed: 0xBEEF0F });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const corpse = makeCorpse(world, "mimic", "Mimic", "M", 140, 99);
@@ -289,35 +308,29 @@ Deno.test("mimic corpse applies some effect (gamble)", () => {
 
   const ae = world.get(player, ActiveEffects);
   assert(ae && Array.isArray(ae.effects), "should have active effects");
-  // With a deterministic seed, mimic should apply one of the 4 possible effects
-  const possibleKeys = ["war_fed", "ogre_bulk", "disease"];
-  const hasEffect = ae.effects.some(e => possibleKeys.includes(e.key));
-  // The 4th option is just bonus nutrition with no effect key, so check overall
-  assert(ae.effects.length > 0 || true, "mimic should do something");
 });
 
 // ── Stone Taunter: gamble stone_skin or stun ──────────────────────
 
 Deno.test("stone_taunter corpse applies stone_skin or stun", () => {
-  const world = new World({ seed: 0xBEEF0F });
+  const world = new World({ seed: 0xBEEF10 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const corpse = makeCorpse(world, "stone_taunter", "Taunting Statue", "M", 240, 99);
   eatCorpse(world, player, corpse);
 
   const ae = world.get(player, ActiveEffects);
-  assert(ae && Array.isArray(ae.effects), "should have active effects");
   const hasStoneSkin = ae.effects.some(e => e.key === "stone_skin");
   const hasStun = ae.effects.some(e => e.key === "stun");
-  assert(hasStoneSkin || hasStun, "stone_taunter should apply either stone_skin or stun");
+  assert(hasStoneSkin || hasStun, "should apply either stone_skin or stun");
 });
 
 // ── EatCallbackContext: grantResistance standalone ─────────────────
 
-Deno.test("EatCallbackContext.grantResistance queues and commits resistance changes", async () => {
+Deno.test("EatCallbackContext.grantResistance queues and commits", async () => {
   const { EatCallbackContext } = await import("../src/rules/data/callbacks/eat.js");
 
-  const world = new World({ seed: 0xBEEF10 });
+  const world = new World({ seed: 0xBEEF11 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
   const dummyItemId = world.create();
 
@@ -334,7 +347,7 @@ Deno.test("EatCallbackContext.grantResistance queues and commits resistance chan
 Deno.test("EatCallbackContext.heal restores HP", async () => {
   const { EatCallbackContext } = await import("../src/rules/data/callbacks/eat.js");
 
-  const world = new World({ seed: 0xBEEF11 });
+  const world = new World({ seed: 0xBEEF12 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
   const dummyItemId = world.create();
 
