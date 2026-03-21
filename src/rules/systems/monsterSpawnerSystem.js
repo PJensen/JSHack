@@ -8,12 +8,20 @@ import { isGenocided } from "../data/monsters.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
+import { isExplored } from "../environment/dungeon/exploredMap.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function monsterSpawnerSystem(world) {
   for (const [id, sp] of world.query(MonsterSpawner)) {
     try {
-      if (!sp?.isActive) continue;
+      // Dormant spawners activate once the player has explored their tile.
+      if (!sp.isActive) {
+        const pos = world.get(id, Position);
+        if (pos && isExplored(pos.x, pos.y)) {
+          world.mutate(id, MonsterSpawner, (r) => { r.isActive = true; });
+        }
+        continue;
+      }
       if (isGenocided(sp.spawnParams?.identity)) continue;
       const pos = world.get(id, Position);
       if (!pos) continue;
