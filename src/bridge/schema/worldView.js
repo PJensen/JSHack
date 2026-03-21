@@ -605,10 +605,11 @@ export function buildWorldView(world) {
 			else if (door) layer = 200; // doors/walls-like entities
 			else if (isPlayer) layer = 400; // player on top
 
+			const stackSeq2 = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2 };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -616,6 +617,7 @@ export function buildWorldView(world) {
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 				rec.procStates = null;
+				rec.stackSeq = stackSeq2;
 			}
 
 			// Project select status types into tags for display-only logic.

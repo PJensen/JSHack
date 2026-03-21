@@ -76,6 +76,7 @@ import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
+import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -1190,17 +1191,25 @@ export const INTERACT_PAYLOADS = {
         for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
         const drops = resolveLootTable("urn:contents", rng, depth);
 
-        // Stacking order (creation order = visual bottom→top):
-        //   1. gems   (bottom — settled to the bottom of the urn)
-        //   2. ashes  (middle — always present)
-        //   3. jewelry (top — placed atop the ashes)
-        const gems = drops.filter(d => d.kind === "gem");
-        const jewelry = drops.filter(d => d.kind !== "gem");
-
-        for (const drop of gems) materializeDrop(world, drop, pos);
+        // Ashes always present at stack bottom.
         const ashId = createFrom(world, Ashes, {});
         world.add(ashId, Position, { x: pos.x, y: pos.y });
-        for (const drop of jewelry) materializeDrop(world, drop, pos);
+
+        // Materialize all drops, then stamp GroundStackOrder sorted by value
+        // so the most valuable item renders on top and appears first in pickup.
+        const dropEntities = [];
+        for (const drop of drops) {
+          const eid = materializeDrop(world, drop, pos);
+          if (eid != null) dropEntities.push(eid);
+        }
+        dropEntities.sort((a, b) => {
+          const va = Number(world.get(a, ItemInfo)?.value || 0);
+          const vb = Number(world.get(b, ItemInfo)?.value || 0);
+          return va - vb; // ascending: least valuable first, most valuable last
+        });
+        for (let i = 0; i < dropEntities.length; i++) {
+          world.add(dropEntities[i], GroundStackOrder, { seq: i + 1 });
+        }
       }
       world.emit?.("urn:broken", { actor, targetId });
       try {
