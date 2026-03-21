@@ -7,7 +7,10 @@
 // - This module only provides all-or-nothing mutation commits for one action context.
 // - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
+import { attach } from "../../lib/ecs-js/index.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { CorpseAdaptation } from "../components/CorpseAdaptation.js";
+import { DerivedExpression } from "../components/DerivedExpression.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
 import { EffectImmunities } from "../components/EffectImmunities.js";
 import { Equipment } from "../components/Equipment.js";
@@ -448,18 +451,22 @@ export function applyMutation(world, op, resolvers = {}) {
       if (tr) tr[key] = op.value;
       break;
     }
-    case "grantResistance": {
-      const channel = String(op.channel || "");
-      const field = String(op.field || "");
-      if (!channel || !field) break;
-      let resist = /** @type any */ (world.get(op.entityId, Resistances));
-      if (!resist) {
-        try { world.add(op.entityId, Resistances, {}); } catch {} // ECS: may already exist
-        resist = /** @type any */ (world.get(op.entityId, Resistances));
-      }
-      if (!resist) break;
-      if (!resist[channel] || typeof resist[channel] !== "object") resist[channel] = {};
-      resist[channel][field] = Number(op.value);
+    case "addCorpseAdaptation": {
+      const statKey = String(op.statKey || "");
+      const value = Number(op.value || 0);
+      if (!statKey || !Number.isFinite(value) || value === 0) break;
+      const childId = world.create();
+      world.add(childId, DerivedExpression, {
+        target: statKey, kind: "addConst", value,
+        stage: "base", priority: 100, enabled: true,
+        source: "", factor: 0,
+      });
+      world.add(childId, CorpseAdaptation, {
+        source: String(op.source || ""),
+        label: String(op.label || ""),
+        statKey,
+      });
+      attach(world, childId, op.entityId);
       break;
     }
     case "revealLoadedMap": {
@@ -511,12 +518,12 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
- * @typedef {{ type: 'grantResistance', entityId: number, channel: string, field: string, value: number }} GrantResistanceOp
+ * @typedef {{ type: 'addCorpseAdaptation', entityId: number, statKey: string, value: number, source: string, label: string }} AddCorpseAdaptationOp
  * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | GrantResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {
