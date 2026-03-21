@@ -428,8 +428,28 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
+
+      // For noise-generated floors, solid features must not block narrow passages.
+      let skipFeature = false;
+      if (floorPlan.profile?.generator && SOLID_PREFAB_KINDS.has(featureKind)) {
+        const lx = cx - chunk.chunkX * CHUNK_SIZE;
+        const ly = cy - chunk.chunkY * CHUNK_SIZE;
+        const inBounds = lx >= 0 && ly >= 0 && lx < CHUNK_SIZE && ly < CHUNK_SIZE;
+        if (!inBounds || chunk.tiles[ly * CHUNK_SIZE + lx] !== TILE_FLOOR) {
+          skipFeature = true;
+        } else {
+          let floorN = 0;
+          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nx = lx + dx, ny = ly + dy;
+            if (nx >= 0 && ny >= 0 && nx < CHUNK_SIZE && ny < CHUNK_SIZE
+                && chunk.tiles[ny * CHUNK_SIZE + nx] === TILE_FLOOR) floorN++;
+          }
+          if (floorN < 3) skipFeature = true;
+        }
+      }
+
       // Don't place a feature on a stair (or any other already-solid tile).
-      if (!isSolid(cx, cy)) {
+      if (!skipFeature && !isSolid(cx, cy)) {
         spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
         if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
         markSolid(cx, cy);
@@ -649,12 +669,26 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         if (!inRoom) corridorCandidates.push({ x: wx, y: wy });
       }
     }
-    const hallwayBudget = Math.min(3, Math.floor(corridorCandidates.length * 0.08));
+    const hallwayCap = floorPlan.profile?.hallwayMonsterCap ?? 3;
+    const hallwayBudget = Math.min(hallwayCap, Math.floor(corridorCandidates.length * 0.08));
     for (let i = 0; i < hallwayBudget && corridorCandidates.length > 0; i++) {
       const idx = rng.int(0, corridorCandidates.length - 1);
       const pos = corridorCandidates.splice(idx, 1)[0];
       const mp = pickSentinelMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
       spawns.push({ x: pos.x, y: pos.y, kind: 'monster', params: mp });
+    }
+
+    // Grotto trap scatter: noise-generated floors have tiny synthetic rooms, so
+    // the per-room trap logic barely places any. Scatter traps across the open
+    // cave floor using leftover corridor candidates.
+    if (floorPlan.profile?.generator && corridorCandidates.length > 0) {
+      const trapScatterBudget = Math.floor(corridorCandidates.length * 0.012);
+      for (let i = 0; i < trapScatterBudget && corridorCandidates.length > 0; i++) {
+        const idx = rng.int(0, corridorCandidates.length - 1);
+        const pos = corridorCandidates.splice(idx, 1)[0];
+        const trap = pickTrap(rng, floorPlan.depth);
+        spawns.push({ x: pos.x, y: pos.y, kind: 'trap', params: trap });
+      }
     }
   }
 

@@ -120,9 +120,10 @@ function ensurePrefabCandidates(candidates, needed) {
  *   Actual world positions of down-stairs on the floor above.
  *   When provided, up-stairs are placed at those exact positions (positional-identity
  *   contract) rather than being independently computed.
+ * @param {{dungeonType?: string|null}} [opts]
  * @returns {FloorPlan}
  */
-export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = null) {
+export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = null, opts = {}) {
   if (depth === 0) {
     return {
       depth,
@@ -220,7 +221,7 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
   let extent = expandExtentToInclude(buildSymmetricExtent(paddingX, paddingY), allChunkPositions);
 
-  const profile = resolveFloorProfile(pickProfile(rng, depth), depth);
+  const profile = resolveFloorProfile(pickProfile(rng, depth, opts.dungeonType ?? null), depth);
 
   // Prefab rooms: hand-authored set pieces placed in non-origin chunks.
   const prefabRooms = [];
