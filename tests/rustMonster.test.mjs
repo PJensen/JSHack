@@ -21,6 +21,9 @@ function makeWorld(seed = 1) {
   return new World({ seed });
 }
 
+// corrosionResist values from MATERIAL_CATALOG
+const MATERIAL_CR = { steel: 0.7, mithril: 1.0, iron: 0.3 };
+
 /** Create a player entity with an equipped armor item that has bonuses. */
 function spawnEquippedPlayer(world, bonuses = { defense: 5 }, materialKind = "steel") {
   const player = world.create();
@@ -33,7 +36,7 @@ function spawnEquippedPlayer(world, bonuses = { defense: 5 }, materialKind = "st
   world.add(armor, ItemInfo, { type: "armor", slot: "armor", bonuses: { ...bonuses } });
   world.add(armor, NamedIdentity, { name: "Iron Plate", identity: "iron_plate" });
   if (materialKind) {
-    world.add(armor, Material, { kind: materialKind });
+    world.add(armor, Material, { kind: materialKind, corrosionResist: MATERIAL_CR[materialKind] ?? 0.5 });
   }
 
   const eq = world.get(player, Equipment);
