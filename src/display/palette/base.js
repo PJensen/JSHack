@@ -20,6 +20,7 @@ export const basePalette = {
   cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
   cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
   floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
+  centipede: { glyph: "c", fg: "#cc7744", glow: "#884422" },
   pit_viper: { glyph: "S", fg: "#44dd44", glow: "#22aa22" },
   dragon_whelp: { glyph: "D", fg: "#ff8a2b", glow: "#ff5a12" },
   cave_bear: { glyph: "B", fg: "#8b6040", glow: "#5a3a20" },

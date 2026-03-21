@@ -48,6 +48,7 @@ import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.j
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 import { getEffectiveVisionRange } from "../utils/blind.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { CentipedeSegment } from "../components/CentipedeSegment.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
@@ -73,10 +74,19 @@ function isStepTraversable(world, actorId, x, y, targetX, targetY, canTraverseTi
   const tile = getTile(x, y);
   if (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP) return false;
 
+  // If the actor belongs to a centipede chain, skip same-chain segments
+  const actorSeg = world.get(actorId, CentipedeSegment);
+  const actorChainId = actorSeg ? actorSeg.chainId : 0;
+
   for (const [id, pos] of world.query(Position)) {
     if (id === actorId) continue;
     if (!pos || pos.x !== x || pos.y !== y) continue;
     if (x === targetX && y === targetY) continue;
+
+    if (actorChainId) {
+      const otherSeg = world.get(id, CentipedeSegment);
+      if (otherSeg && otherSeg.chainId === actorChainId) continue;
+    }
 
     const col = world.get(id, Collider);
     const vit = world.get(id, Vitality);

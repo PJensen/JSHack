@@ -116,6 +116,7 @@ import {
 import { setTile, getTile } from './tileMap.js';
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shopAppraisal.js';
 import { spawnMonsterEntity } from '../../utils/spawnMonsterEntity.js';
+import { spawnCentipede } from '../../utils/spawnCentipede.js';
 import {
   Fountain, Altar, Shrine, Statue,
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
@@ -536,7 +537,12 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       } while (isSolid(mx, my) && attempts < 10);
       if (isSolid(mx, my)) continue;
       const mp = pickSentinelMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
-      spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
+      if (mp.identity === 'centipede') {
+        const segCount = rng.int(4, 7);
+        spawns.push({ x: mx, y: my, kind: 'centipede', params: { ...mp, segmentCount: segCount } });
+      } else {
+        spawns.push({ x: mx, y: my, kind: 'monster', params: mp });
+      }
       if (mp.identity === 'spider' || mp.identity === 'cave_spider') roomHasSpider = true;
     }
 
@@ -675,7 +681,12 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const idx = rng.int(0, corridorCandidates.length - 1);
       const pos = corridorCandidates.splice(idx, 1)[0];
       const mp = pickSentinelMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
-      spawns.push({ x: pos.x, y: pos.y, kind: 'monster', params: mp });
+      if (mp.identity === 'centipede') {
+        const segCount = rng.int(4, 7);
+        spawns.push({ x: pos.x, y: pos.y, kind: 'centipede', params: { ...mp, segmentCount: segCount } });
+      } else {
+        spawns.push({ x: pos.x, y: pos.y, kind: 'monster', params: mp });
+      }
     }
 
     // Grotto trap scatter: noise-generated floors have tiny synthetic rooms, so
@@ -1129,12 +1140,13 @@ function applyDeadEndTheme(ctx) {
       }
       const monsterPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (monsterPos) {
-        spawns.push({
-          x: monsterPos.x,
-          y: monsterPos.y,
-          kind: 'monster',
-          params: pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null),
-        });
+        const gmp = pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+        if (gmp.identity === 'centipede') {
+          const segCount = rng.int(4, 7);
+          spawns.push({ x: monsterPos.x, y: monsterPos.y, kind: 'centipede', params: { ...gmp, segmentCount: segCount } });
+        } else {
+          spawns.push({ x: monsterPos.x, y: monsterPos.y, kind: 'monster', params: gmp });
+        }
       }
       break;
     }
@@ -1199,6 +1211,13 @@ export function materializeSpawn(world, spawn) {
       });
       if (p.equipment) equipMonster(world, id, p.equipment);
       return id;
+    }
+    case 'centipede': {
+      const p = spawn.params;
+      const seed = ((world.seed >>> 0) ^ ((spawn.x * 0x45d9f3b) >>> 0) ^ ((spawn.y * 0x119de1f3) >>> 0)) >>> 0;
+      const cRng = createRng(seed);
+      const ids = spawnCentipede(world, p, spawn.x, spawn.y, p.segmentCount || 5, cRng);
+      return ids[0];
     }
     case 'gold': {
       const id = createFrom(world, GoldStack, {});

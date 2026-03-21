@@ -287,6 +287,50 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Corpse buff gained float text
+  world.on('corpse:buff-gained', ({ actor, effect }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const label = String(effect || 'BUFF').toUpperCase().replace(/_/g, ' ');
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.4, label, {
+        color: '#7bed9f',
+        life: 1.2,
+        scaleStart: 1.2,
+        scaleEnd: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] corpse buff ftext failed:', e); }
+  });
+
+  // Corpse debuff gained float text
+  world.on('corpse:debuff-gained', ({ actor, effect }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const label = String(effect || 'DEBUFF').toUpperCase().replace(/_/g, ' ');
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.4, label, {
+        color: '#ff6b6b',
+        life: 1.2,
+        scaleStart: 1.2,
+        scaleEnd: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] corpse debuff ftext failed:', e); }
+  });
+
+  // Corpse progression float text
+  world.on('corpse:progression', ({ actor, name, count, threshold }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.4, `${count}/${threshold}`, {
+        color: '#dfe6e9',
+        life: 1.0,
+        scaleStart: 1.0,
+        scaleEnd: 0.8,
+      });
+    } catch (e) { console.debug('[floatTextWiring] corpse progression ftext failed:', e); }
+  });
+
   // Storm lightning strike
   world.on('weather:lightning', ({ x, y, hitCount }) => {
     if (!canShowAt(x, y)) return;

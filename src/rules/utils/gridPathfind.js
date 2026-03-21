@@ -2,6 +2,7 @@ import { Collider } from "../components/Collider.js";
 import { DoorState } from "../components/DoorState.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
+import { CentipedeSegment } from "../components/CentipedeSegment.js";
 import { getTile, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 
@@ -24,10 +25,20 @@ function buildBlockedSet(world, actorId, targetX, targetY, options = {}) {
   const passThroughDoors = options.passThroughDoors === true;
   const blocked = new Set();
 
+  // If the actor belongs to a centipede chain, exclude same-chain segments
+  const actorSeg = world.get(actorId, CentipedeSegment);
+  const actorChainId = actorSeg ? actorSeg.chainId : 0;
+
   for (const [id, pos] of world.query(Position)) {
     if (id === actorId) continue;
     if (!pos) continue;
     if (passThroughDoors && world.has(id, DoorState)) continue;
+
+    // Skip same-chain centipede segments so the head can pathfind through body
+    if (actorChainId) {
+      const otherSeg = world.get(id, CentipedeSegment);
+      if (otherSeg && otherSeg.chainId === actorChainId) continue;
+    }
 
     const col = world.get(id, Collider);
     const vit = world.get(id, Vitality);

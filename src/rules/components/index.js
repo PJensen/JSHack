@@ -93,3 +93,4 @@ export { QuestBindings } from './QuestBindings.js';
 export { QuestLog } from './QuestLog.js';
 export { CalendarState } from './CalendarState.js';
 export { GroundStackOrder } from './GroundStackOrder.js';
+export { CentipedeSegment } from './CentipedeSegment.js';

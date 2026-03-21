@@ -120,6 +120,21 @@ function runCorpseEatHooks(ctx, state) {
       setTrait(key, value) {
         ctx.mutate.queue({ type: "setTrait", entityId: actor, key: String(key || ""), value });
       },
+      grantResistance(channel, field, value) {
+        ctx.mutate.queue({
+          type: "grantResistance",
+          entityId: actor,
+          channel: String(channel || ""),
+          field: String(field || ""),
+          value: Number(value),
+        });
+      },
+      heal(amount) {
+        const value = Math.max(0, Number(amount) | 0);
+        if (value <= 0) return 0;
+        ctx.mutate.queue({ type: "heal", entityId: actor, amount: value });
+        return value;
+      },
       cancel(reason) {
         this.cancelled = true;
         this.cancelReason = typeof reason === "string"

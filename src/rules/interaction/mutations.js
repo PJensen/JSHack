@@ -448,6 +448,20 @@ export function applyMutation(world, op, resolvers = {}) {
       if (tr) tr[key] = op.value;
       break;
     }
+    case "grantResistance": {
+      const channel = String(op.channel || "");
+      const field = String(op.field || "");
+      if (!channel || !field) break;
+      let resist = /** @type any */ (world.get(op.entityId, Resistances));
+      if (!resist) {
+        try { world.add(op.entityId, Resistances, {}); } catch {} // ECS: may already exist
+        resist = /** @type any */ (world.get(op.entityId, Resistances));
+      }
+      if (!resist) break;
+      if (!resist[channel] || typeof resist[channel] !== "object") resist[channel] = {};
+      resist[channel][field] = Number(op.value);
+      break;
+    }
     case "revealLoadedMap": {
       forEachLoadedTile((x, y) => markExplored(x, y));
       break;
@@ -497,11 +511,12 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
  * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
+ * @typedef {{ type: 'grantResistance', entityId: number, channel: string, field: string, value: number }} GrantResistanceOp
  * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | GrantResistanceOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {

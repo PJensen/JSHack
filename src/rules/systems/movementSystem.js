@@ -28,6 +28,7 @@ import { resolveBump } from "../data/bumpResolvers.js";
 import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { DoorState } from "../components/DoorState.js";
+import { CentipedeSegment } from "../components/CentipedeSegment.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
@@ -236,11 +237,36 @@ export function movementSystem(world) {
         && blocking.has(k)
         && tiles.blockedByCell.has(k)
         && isBlockedOnlyByWebs(world, tiles, nx, ny);
+
+      // Centipede heads can step into tiles occupied by their own body segments.
+      // The body cascade listener will shift the segment out after the move.
+      let centipedeCanPassOwnBody = false;
+      if (blocking.has(k) && !spiderCanTraverseWeb) {
+        const actorSeg = world.get(actor, CentipedeSegment);
+        if (actorSeg) {
+          const chainId = actorSeg.chainId;
+          const ids = tiles.byCell.get(k);
+          if (ids) {
+            centipedeCanPassOwnBody = true;
+            for (let i = 0; i < ids.length; i++) {
+              const eid = ids[i];
+              if (eid === actor) continue;
+              const col = world.get(eid, Collider);
+              const evit = world.get(eid, Vitality);
+              const isBlocking = !!(col?.solid) || Number(evit?.hp || 0) > 0;
+              if (!isBlocking) continue;
+              const eSeg = world.get(eid, CentipedeSegment);
+              if (!eSeg || eSeg.chainId !== chainId) { centipedeCanPassOwnBody = false; break; }
+            }
+          }
+        }
+      }
+
       const flyingOccupant = target > 0 && target !== actor && world.has(target, Flying);
 
       const noclip = world[NOCLIP_SYM] && world.has(actor, Player);
 
-      if (!noclip && (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb) || flyingOccupant)) {
+      if (!noclip && (terrainBlocked || (blocking.has(k) && !spiderCanTraverseWeb && !centipedeCanPassOwnBody) || flyingOccupant)) {
         // Blocked — delegate to bump resolver dispatch table
         resolveBump(world, actor, { nx, ny, mdx, mdy, target, tiles });
       } else {

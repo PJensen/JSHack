@@ -83,6 +83,7 @@ import "../rules/data/procPackages.js";
 import "../rules/dialogues/townfolkDialogs.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 import { installElectrocuteOnDamage } from "../rules/utils/electrocute.js";
+import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
 
 /**
  * @param {World} world
@@ -130,6 +131,8 @@ export function configureWorld(world) {
   installAggroFromDamageListener(world);
   // Auto-apply electrocution (stun + blind + deafen) on any electric/lightning damage.
   installElectrocuteOnDamage(world);
+  // Centipede body segments cascade position when the head moves.
+  installCentipedeBodyCascade(world);
 
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)
