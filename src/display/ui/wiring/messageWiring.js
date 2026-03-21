@@ -1487,6 +1487,26 @@ export function installMessageWiring({
     log('The Floating Eye\'s gaze locks your mind — you are stunned!', 'danger');
   });
 
+  // === Mimic events ===
+  world.on('mimic:revealed', ({ fromIdentity }) => {
+    const label = String(fromIdentity || 'chest').replace(/_/g, ' ');
+    log(`The ${label} lurches — it's a Mimic!`, 'danger');
+  });
+
+  // === Nymph events ===
+  world.on('nymph:stole', ({ itemName }) => {
+    log(`The Nymph snatched your ${bracketizeName(String(itemName || 'item'))}!`, 'danger');
+  });
+  world.on('nymph:blinked', () => {
+    log('The Nymph vanishes in a shimmer of light!', 'warning');
+  });
+
+  // === Rust Monster events ===
+  world.on('proc:corroded', ({ itemName, stacks }) => {
+    const severity = (stacks | 0) >= 3 ? 'badly corroded' : 'corroded';
+    log(`The Rust Monster's touch has ${severity} your ${bracketizeName(String(itemName || 'equipment'))}!`, 'danger');
+  });
+
   // === Centipede events ===
   world.on('centipede:split', () => {
     log('The centipede splits in two!', 'warning');

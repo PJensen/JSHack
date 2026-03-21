@@ -52,6 +52,9 @@ export const basePalette = {
   dragon:   { glyph: "D", fg: "#ffcc33", glow: "#dd9900" },
   lich:     { glyph: "L", fg: "#cc88ff", glow: "#9955cc" },
   mimic:    { glyph: "M", fg: "#b07a3f", glow: "#7a4d1f" },
+  lichen:       { glyph: "F", fg: "#88aa66", glow: "#557744" },
+  nymph:        { glyph: "n", fg: "#88ddaa", glow: "#55aa77" },
+  rust_monster: { glyph: "R", fg: "#cc7744", glow: "#884422" },
   stone_taunter: { glyph: "G", fg: "#aaa8a0", glow: "#706e66" },
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224", bg: "#1a1c28" },
