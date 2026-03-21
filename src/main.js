@@ -2413,6 +2413,15 @@ world.on('moved', ({ id, to }) => {
   try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
 });
 
+// When a rack/shelf/case drops an item at the player's feet, refresh ground tooltip
+world.on('rack:looted', ({ actor }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== actor) return;
+  const detail = buildGroundPickupDetailAt(pe.id, pe.pos.x, pe.pos.y);
+  if (!detail) return;
+  try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
+});
+
 // When player moves, show stair tooltip if standing on stairs
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
