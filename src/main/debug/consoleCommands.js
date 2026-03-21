@@ -22,6 +22,8 @@ import { ensureActiveEffects } from "../../rules/utils/effects.js";
 import { explainDerivedStats } from "../../rules/utils/derivedStats.js";
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { CorpseAdaptation } from "../../rules/components/CorpseAdaptation.js";
+import { ProcPackageNode } from "../../rules/components/ProcPackageNode.js";
+import { getParent } from "../../lib/ecs-js/hierarchy.js";
 
 function describeItem(world, itemId) {
   const info = world.get(itemId, ItemInfo);
@@ -350,16 +352,7 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
       lines.push(`\n${stat}: ${fmtNum(final)}`);
       for (const e of entries) {
         let label = `  #${e.entityId}`;
-        // Try to label corpse adaptations
-        const ca = world.has(e.entityId, CorpseAdaptation)
-          ? world.get(e.entityId, CorpseAdaptation) : null;
-        if (ca) {
-          label += ` [corpse:${ca.source}]`;
-        } else {
-          const named = world.get(e.entityId, NamedIdentity);
-          if (named?.name) label += ` [${named.name}]`;
-          else if (named?.identity) label += ` [${named.identity}]`;
-        }
+        label += ` ${describeStatSource(world, e.entityId)}`;
         const delta = e.after - e.before;
         label += ` ${e.kind} ${delta >= 0 ? '+' : ''}${fmtNum(delta)}`;
         label += ` (${fmtNum(e.before)} → ${fmtNum(e.after)})`;
@@ -389,4 +382,38 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
 
 function fmtNum(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(3);
+}
+
+function describeStatSource(world, entityId) {
+  // Corpse adaptation — co-located on the expression entity
+  const ca = world.has(entityId, CorpseAdaptation)
+    ? world.get(entityId, CorpseAdaptation) : null;
+  if (ca) return `[corpse:${ca.source}]`;
+
+  // Walk ancestors looking for proc package or named item
+  const parts = [];
+  let cursor = entityId;
+  for (let depth = 0; depth < 8; depth++) {
+    const parentId = getParent(world, cursor);
+    if (!parentId) break;
+
+    const pkg = world.has(parentId, ProcPackageNode)
+      ? world.get(parentId, ProcPackageNode) : null;
+    if (pkg?.packageId) parts.unshift(`proc:${pkg.packageId}`);
+
+    const named = world.get(parentId, NamedIdentity);
+    if (named?.name || named?.identity) {
+      parts.unshift(named.name || named.identity);
+    }
+
+    cursor = parentId;
+  }
+
+  if (parts.length) return `[${parts.join(' > ')}]`;
+
+  // Fallback: check the entity itself
+  const named = world.get(entityId, NamedIdentity);
+  if (named?.name) return `[${named.name}]`;
+  if (named?.identity) return `[${named.identity}]`;
+  return '';
 }
