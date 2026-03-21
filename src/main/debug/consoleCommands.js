@@ -19,6 +19,9 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Faction } from "../../rules/components/Faction.js";
 import { attachProcPackage, listProcPackageIds } from "../../rules/data/procPackages.js";
 import { ensureActiveEffects } from "../../rules/utils/effects.js";
+import { explainDerivedStats } from "../../rules/utils/derivedStats.js";
+import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
+import { CorpseAdaptation } from "../../rules/components/CorpseAdaptation.js";
 
 function describeItem(world, itemId) {
   const info = world.get(itemId, ItemInfo);
@@ -319,4 +322,71 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
     world.emit?.("weather:changed", { weather: arg, prev });
     return `Weather set to ${arg} (100 turns)`;
   });
+
+  // ---- stats [filter] ----
+  console.registerCommand('stats', 'stats [filter] — show stat tree with sources', (argsStr) => {
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+
+    const filter = argsStr.trim().toLowerCase();
+    const { sheet, trace } = explainDerivedStats(world, pe.id);
+    const canonical = resolveCanonicalStats(world, pe.id);
+
+    // Group trace entries by target stat
+    const grouped = new Map();
+    for (const entry of trace) {
+      const key = entry.target;
+      if (filter && !key.toLowerCase().includes(filter)) continue;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(entry);
+    }
+
+    const lines = [];
+    lines.push('=== Stat Tree ===');
+
+    // Show grouped trace entries
+    for (const [stat, entries] of grouped) {
+      const final = Number(canonical[stat] ?? sheet[stat] ?? 0);
+      lines.push(`\n${stat}: ${fmtNum(final)}`);
+      for (const e of entries) {
+        let label = `  #${e.entityId}`;
+        // Try to label corpse adaptations
+        const ca = world.has(e.entityId, CorpseAdaptation)
+          ? world.get(e.entityId, CorpseAdaptation) : null;
+        if (ca) {
+          label += ` [corpse:${ca.source}]`;
+        } else {
+          const named = world.get(e.entityId, NamedIdentity);
+          if (named?.name) label += ` [${named.name}]`;
+          else if (named?.identity) label += ` [${named.identity}]`;
+        }
+        const delta = e.after - e.before;
+        label += ` ${e.kind} ${delta >= 0 ? '+' : ''}${fmtNum(delta)}`;
+        label += ` (${fmtNum(e.before)} → ${fmtNum(e.after)})`;
+        lines.push(label);
+      }
+    }
+
+    // Show stats with no trace entries but non-zero canonical values
+    if (!filter) {
+      const shownKeys = new Set(grouped.keys());
+      const extraLines = [];
+      for (const [key, val] of Object.entries(canonical)) {
+        if (shownKeys.has(key)) continue;
+        const n = Number(val || 0);
+        if (n === 0) continue;
+        extraLines.push(`${key}: ${fmtNum(n)}`);
+      }
+      if (extraLines.length) {
+        lines.push('\n--- Passive / Equipment ---');
+        lines.push(...extraLines);
+      }
+    }
+
+    return lines.join('\n');
+  });
+}
+
+function fmtNum(n) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(3);
 }
