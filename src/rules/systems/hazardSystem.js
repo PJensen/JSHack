@@ -33,6 +33,7 @@ const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
 const DEFAULT_FIRE_SPREAD_CHANCE = 0.25;
+const WEB_FIRE_SPREAD_CHANCE = 0.65;
 const DEFAULT_FIRE_SPREAD_TURNS = 2;
 const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -86,6 +87,17 @@ function isFlammableFireSpreadTile(world, x, y, tile, overworld) {
   return tile === TILE_FENCE || tile === TILE_DOOR || tile === TILE_WALL;
 }
 
+function isWebAt(world, x, y) {
+  for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
+    if (!pos || !ni) continue;
+    if ((pos.x | 0) !== (x | 0) || (pos.y | 0) !== (y | 0)) continue;
+    if (String(ni.identity || "").toLowerCase() !== "web") continue;
+    if (world.has(id, Burned)) continue;
+    return true;
+  }
+  return false;
+}
+
 function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId, sourceKind) {
   for (const [id, pos, mat] of world.query(Position, Material)) {
     if (!pos || !mat) continue;
@@ -93,8 +105,9 @@ function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId,
     if (world.has(id, Vitality)) continue;
     if (world.has(id, Burned)) continue;
     const flammability = Number(FLAMMABILITY_BY_MATERIAL.get(String(mat.kind || "")) || 0);
-    if (!(flammability > 0)) continue;
     const ident = world.get(id, NamedIdentity);
+    const isWeb = String(ident?.identity || "").toLowerCase() === "web";
+    if (!isWeb && !(flammability > 0)) continue;
     try {
       world.emit?.("entity:burned", {
         actor: source,
@@ -255,8 +268,13 @@ export function hazardSystem(world) {
           const ny = (pos.y | 0) + dy;
           const key = `${nx},${ny}`;
           if (fireHazardCells.has(key)) continue;
-          if (!isFlammableFireSpreadTile(world, nx, ny, getTile(nx, ny), overworld)) continue;
-          if ((world.rand?.() ?? 0) >= spreadChance) continue;
+          const targetIsWeb = isWebAt(world, nx, ny);
+          const targetIsFlammableTile = isFlammableFireSpreadTile(world, nx, ny, getTile(nx, ny), overworld);
+          if (!targetIsWeb && !targetIsFlammableTile) continue;
+          const effectiveSpreadChance = targetIsWeb
+            ? Math.max(spreadChance, WEB_FIRE_SPREAD_CHANCE)
+            : spreadChance;
+          if ((world.rand?.() ?? 0) >= effectiveSpreadChance) continue;
 
           pendingFireSpreads.push({
             x: nx,
