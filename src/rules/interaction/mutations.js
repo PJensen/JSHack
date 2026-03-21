@@ -20,7 +20,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { Position } from "../components/Position.js";
 import { Potion } from "../components/Potion.js";
-import { Resistances } from "../components/Resistences.js";
+
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
@@ -423,23 +423,6 @@ export function applyMutation(world, op, resolvers = {}) {
       }
       break;
     }
-    case "grantElectricResistance": {
-      let resist = /** @type any */ (world.get(op.entityId, Resistances));
-      if (!resist) {
-        try { world.add(op.entityId, Resistances, {}); } catch {} // ECS: may already exist
-        resist = /** @type any */ (world.get(op.entityId, Resistances));
-      }
-      if (!resist) return;
-      const minOhms = Number.isFinite(op.minOhms) ? Number(op.minOhms) : 2400;
-      const current = Number(resist?.electric?.ohms);
-      const nextOhms = Number.isFinite(current) ? Math.max(current, minOhms) : minOhms;
-      if (!resist.electric || typeof resist.electric !== "object") resist.electric = {};
-      resist.electric.ohms = nextOhms;
-      if (!Number.isFinite(resist.electric.fibrillationA)) {
-        resist.electric.fibrillationA = Number.isFinite(op.fibrillationA) ? Number(op.fibrillationA) : 0.03;
-      }
-      break;
-    }
     case "setTrait": {
       const key = String(op.key || "");
       if (!key) break;
@@ -517,13 +500,12 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
- * @typedef {{ type: 'grantElectricResistance', entityId: number, minOhms?: number, fibrillationA?: number }} GrantElectricResistanceOp
  * @typedef {{ type: 'addCorpseAdaptation', entityId: number, statKey: string, value: number, source: string, label: string }} AddCorpseAdaptationOp
  * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | GrantElectricResistanceOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {

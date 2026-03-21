@@ -106,20 +106,6 @@ export class EatCallbackContext {
   }
 
   /**
-   * Queue electric resistance grant on the eating actor.
-   * @param {number} [minOhms]
-   * @param {number} [fibrillationA]
-   */
-  grantElectricResistance(minOhms = 2400, fibrillationA = 0.03) {
-    return this.queueMutation({
-      type: "grantElectricResistance",
-      entityId: this.actor,
-      minOhms,
-      fibrillationA,
-    });
-  }
-
-  /**
    * Queue a corpse adaptation child entity (DerivedExpression + CorpseAdaptation marker).
    * @param {string} statKey - canonical stat key (e.g. "poisonResist", "kineticDR")
    * @param {number} value - addConst bonus value
@@ -228,24 +214,6 @@ export class EatCallbackContext {
     vit.hp = Math.min(vit.maxHp, vit.hp + amount);
   }
 
-  _applyElectricResistance(op) {
-    let resist = this.world.get(op.entityId, Resistances);
-    if (!resist) {
-      try { this.world.add(op.entityId, Resistances, {}); } catch {}
-      resist = this.world.get(op.entityId, Resistances);
-    }
-    if (!resist) return;
-    if (!resist.electric || typeof resist.electric !== "object") resist.electric = {};
-    const currentOhms = Number(resist.electric.ohms);
-    const nextOhms = Number(op.minOhms || 2400);
-    resist.electric.ohms = Number.isFinite(currentOhms)
-      ? Math.max(currentOhms, nextOhms)
-      : nextOhms;
-    if (!Number.isFinite(Number(resist.electric.fibrillationA))) {
-      resist.electric.fibrillationA = Number(op.fibrillationA || 0.03);
-    }
-  }
-
   commit() {
     if (this.cancelled) {
       this._mutations.length = 0;
@@ -268,9 +236,6 @@ export class EatCallbackContext {
             amount: op.amount,
             cause: String(op.source || "corpse"),
           });
-          break;
-        case "grantElectricResistance":
-          this._applyElectricResistance(op);
           break;
         case "setTrait":
           this._applySetTrait(op);

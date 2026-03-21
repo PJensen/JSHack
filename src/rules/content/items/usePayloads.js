@@ -109,14 +109,6 @@ function runCorpseEatHooks(ctx, state) {
         ctx.mutate.damage(actor, value | 0, String(source || "corpse"));
         return value | 0;
       },
-      grantElectricResistance(minOhms = 2400, fibrillationA = 0.03) {
-        ctx.mutate.queue({
-          type: "grantElectricResistance",
-          entityId: actor,
-          minOhms: Number(minOhms),
-          fibrillationA: Number(fibrillationA),
-        });
-      },
       chance(prob) {
         return ctx.helpers.chance(prob);
       },

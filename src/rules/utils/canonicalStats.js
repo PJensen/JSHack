@@ -17,7 +17,7 @@ export function resolveCanonicalStats(world, entityId) {
   const accuracyDerived = Number(passive?.accuracyDerived || 0);
   const damagePowerDerived = Number(passive?.damagePowerDerived || 0);
   const evadeDerived = Number(passive?.evadeDerived || 0);
-  const mitigationDerived = Number(passive?.mitigationDerived || passive?.kineticDRDerived || 0);
+  const mitigationDerived = Number(passive?.mitigationDerived || 0);
   const critChanceDerived = Number(passive?.critChanceDerived || 0);
   const critMultDerived = Number(passive?.critMultDerived || 0);
 

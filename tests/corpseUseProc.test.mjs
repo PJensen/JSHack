@@ -5,7 +5,7 @@ import { createCorpse } from "../src/rules/archetypes/Food.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { Consumable } from "../src/rules/components/Consumable.js";
-import { Resistances } from "../src/rules/components/Resistences.js";
+import { resolveCanonicalStats } from "../src/rules/utils/canonicalStats.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Hunger } from "../src/rules/components/Hunger.js";
 import { Owner } from "../src/rules/components/Owner.js";
@@ -32,13 +32,15 @@ Deno.test("eating eel corpse grants electric resistance", () => {
   assertEquals(eelConsumable?.effectParams?.corpseIdentity, "corpse_eel", "corpse identity should follow corpse_<monsterId> convention");
   addToInventory(world, player, eelCorpse);
 
-  const beforeOhms = Number(world.get(player, Resistances)?.electric?.ohms || 0);
+  const beforeStats = resolveCanonicalStats(world, player);
+  const beforeOhms = Number(beforeStats.electricOhms || 0);
   world.add(player, UseIntent, { itemId: eelCorpse, targetId: player });
   useItemSystem(world);
 
-  const afterOhms = Number(world.get(player, Resistances)?.electric?.ohms || 0);
-  assert(afterOhms >= 2400, "eel corpse should grant high electric resistance");
-  assert(afterOhms >= beforeOhms, "electric resistance should not decrease");
+  const afterStats = resolveCanonicalStats(world, player);
+  const afterOhms = Number(afterStats.electricOhms || 0);
+  assert(afterOhms > beforeOhms, "eel corpse should increase electricOhms via stat tree");
+  assert(afterOhms >= 600, "eel corpse should grant substantial electric resistance");
   assertEquals(world.isAlive(eelCorpse), false);
 });
 
