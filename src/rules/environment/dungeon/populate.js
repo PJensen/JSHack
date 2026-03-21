@@ -1308,7 +1308,7 @@ export function materializeSpawn(world, spawn) {
     case 'mimic': {
       // Resolve disguise archetype — defaults to Chest (shop mimics)
       const disguise = String(spawn.params?.disguiseIdentity || 'chest');
-      const DisguiseArch = ARCHETYPE_BY_KIND[disguise] || Chest;
+      const DisguiseArch = SIMPLE_SPAWN_TABLE[disguise] || Chest;
       const id = createFrom(world, DisguiseArch, { x: spawn.x, y: spawn.y });
       world.add(id, Collider, { solid: true, blocksSight: false });
       world.add(id, Interactable, { action: 'touchMimic', params: null });
