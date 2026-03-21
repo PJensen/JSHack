@@ -474,30 +474,6 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       }
     }
 
-    // Rare room mimic: 5% chance per non-entry room to place a mimic disguised
-    // as a common dungeon decoration. Uses a separate spawn point (not the feature).
-    const ROOM_MIMIC_CHANCE = 0.05;
-    const MIMIC_DISGUISE_POOL = ['chest', 'barrel', 'urn', 'crate', 'sarcophagus'];
-    if (!isEntryRoom && rng.next() < ROOM_MIMIC_CHANCE) {
-      let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-      let attempts = 0;
-      while (isSolid(mx, my) && attempts < 8) {
-        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-        attempts++;
-      }
-      if (!isSolid(mx, my)) {
-        const disguise = MIMIC_DISGUISE_POOL[rng.int(0, MIMIC_DISGUISE_POOL.length - 1)];
-        spawns.push({
-          x: mx, y: my,
-          kind: 'mimic',
-          params: { depth: floorPlan.depth, disguiseIdentity: disguise },
-        });
-        markSolid(mx, my);
-      }
-    }
-
     // Monster density: ~1 per 12-18 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
     const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
@@ -633,6 +609,30 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
                       : (d >= 8  || cr < 0.15) ? 'chest:magic'
                       : 'chest:basic';
         spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
+      }
+    }
+
+    // Rare room mimic: 5% chance per non-entry room to place a mimic disguised
+    // as a common dungeon decoration. Placed after monsters/chests to avoid blocking them.
+    const ROOM_MIMIC_CHANCE = 0.05;
+    const MIMIC_DISGUISE_POOL = ['chest', 'barrel', 'urn', 'crate', 'sarcophagus'];
+    if (!isEntryRoom && rng.next() < ROOM_MIMIC_CHANCE) {
+      let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      let attempts = 0;
+      while (isSolid(mx, my) && attempts < 8) {
+        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+        attempts++;
+      }
+      if (!isSolid(mx, my)) {
+        const disguise = MIMIC_DISGUISE_POOL[rng.int(0, MIMIC_DISGUISE_POOL.length - 1)];
+        spawns.push({
+          x: mx, y: my,
+          kind: 'mimic',
+          params: { depth: floorPlan.depth, disguiseIdentity: disguise },
+        });
+        markSolid(mx, my);
       }
     }
 
@@ -794,7 +794,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     for (let i = spawns.length - 1; i >= 0; i--) {
       const sp = spawns[i];
       if (!isPointInRoom(sp.x, sp.y, room)) continue;
-      if (sp.kind === 'monster' || sp.kind === 'spawner' || sp.kind === 'trap') {
+      if (sp.kind === 'monster' || sp.kind === 'spawner' || sp.kind === 'trap' || sp.kind === 'mimic') {
         spawns.splice(i, 1);
       }
     }
