@@ -1,3 +1,5 @@
+![JSHack logo](https://raw.githubusercontent.com/PJensen/JSHack/refs/heads/master/logo.jpg)
+
 # JSHack ⚡
 
 [🎮 Play JSHack](https://pjensen.github.io/JSHack/)
