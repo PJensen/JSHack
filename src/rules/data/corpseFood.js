@@ -5,6 +5,12 @@ import {
   corpseIronStomachProgress,
   corpseStatusEffect,
   corpseDamage,
+  corpseTimedBuff,
+  corpseGamble,
+  corpseBonusNutrition,
+  corpseHeal,
+  corpseGrantResistance,
+  corpseProgression,
   grantElectricResist,
 } from "./callbacks/eat.js";
 
@@ -36,35 +42,364 @@ const EMPTY_HOOKS = Object.freeze([]);
 /**
  * Corpse item definitions keyed by corpse identity.
  * The identity convention is `corpse_${monsterId}`.
+ *
+ * Skeletal/undead without flesh (skeleton, bone_bowman, skeletal_marksman, etc.)
+ * drop bones instead of corpses — no entry needed here.
  */
 export const CORPSE_DEFS = Object.freeze({
+
+  // ── Tier 0 ──────────────────────────────────────────────────────────
+
+  // Rat: disease + iron stomach progression (existing)
   corpse_rat: Object.freeze({
     onEat: Object.freeze([corpseStatusEffect("disease", 20, 1), corpseIronStomachProgress]),
   }),
+
+  // Bat: disease + iron stomach progression (existing)
   corpse_bat: Object.freeze({
     onEat: Object.freeze([corpseStatusEffect("disease", 20, 1), corpseIronStomachProgress]),
   }),
+
+  // Goblin: 50% cunning reflex (+evasion), 50% disease — foul meat
+  corpse_goblin: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.5,
+        corpseTimedBuff("cunning_reflex", 60, 1, "corpse:buff-gained", "a jittery cunning sharpens your reflexes"),
+        corpseStatusEffect("disease", 10, 1),
+      ),
+    ]),
+  }),
+
+  // Goblin Archer: keen eyes — perception buff
+  corpse_goblin_archer: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("keen_eye", 80, 1, "corpse:buff-gained", "your vision sharpens to a predatory focus"),
+    ]),
+  }),
+
+  // Grid Bug: shock damage + 30% electric affinity
   corpse_grid_bug: Object.freeze({
-    onEat: Object.freeze([corpseDamage(3)]),
+    onEat: Object.freeze([
+      corpseDamage(3),
+      corpseGamble(0.3,
+        corpseTimedBuff("resist_shock", 120, 1, "corpse:buff-gained", "the current hums through you — your body adapts"),
+        (ctx) => { /* no additional bad effect — the 3 damage is enough */ },
+      ),
+    ]),
   }),
+
+  // Cave Snake: harmless + bonus nutrition + serpent blood progression
+  corpse_cave_snake: Object.freeze({
+    onEat: Object.freeze([
+      corpseBonusNutrition(50),
+      corpseProgression("snakesEaten", 3, "serpent_blood", "Serpent Blood",
+        (ctx) => ctx.grantResistance("chemical", "toxMult", 0.5)),
+    ]),
+  }),
+
+  // Cave Spider: 40% web immunity, otherwise nothing special
+  corpse_cave_spider: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.4,
+        corpseTimedBuff("web_immune", 100, 1, "corpse:buff-gained", "silk threads dissolve on contact — webs cannot bind you"),
+        (ctx) => {},
+      ),
+    ]),
+  }),
+
+  // Snake: poison + venom tolerance progression
   corpse_snake: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("poison", 8, 2)]),
+    onEat: Object.freeze([
+      corpseStatusEffect("poison", 8, 2),
+      corpseProgression("venomCorpsesEaten", 2, "venom_tolerance", "Venom Tolerance",
+        (ctx) => ctx.grantResistance("chemical", "toxMult", 0.5)),
+    ]),
   }),
+
+  // Spider: poison + 25% spider sense (trap detection buff)
   corpse_spider: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("poison", 8, 2)]),
+    onEat: Object.freeze([
+      corpseStatusEffect("poison", 8, 2),
+      corpseGamble(0.25,
+        corpseTimedBuff("spider_sense", 80, 1, "corpse:buff-gained", "alien instincts tingle — you sense hidden dangers"),
+        (ctx) => {},
+      ),
+    ]),
   }),
-  corpse_wraith: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("mindwipe", 15, 1)]),
+
+  // Pit Viper: 40% thermal sense, 60% nasty poison
+  corpse_pit_viper: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.4,
+        corpseTimedBuff("thermal_sense", 200, 1, "corpse:buff-gained", "heat signatures bloom in your mind's eye"),
+        corpseStatusEffect("poison", 6, 3),
+      ),
+    ]),
   }),
+
+  // Cave Bear: +2 maxHp timed buff + thick hide progression
+  corpse_cave_bear: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("bear_vigor", 150, 2, "corpse:buff-gained", "primal strength surges through your limbs"),
+      corpseProgression("bearCorpsesEaten", 2, "thick_hide", "Thick Hide",
+        (ctx) => ctx.grantResistance("kinetic", "DR", 2)),
+    ]),
+  }),
+
+  // Dragon Whelp: 30% fire blood (burn immunity), 70% fire damage + burn
+  corpse_dragon_whelp: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.3,
+        corpseTimedBuff("fire_blood", 200, 1, "corpse:buff-gained", "liquid fire fills your veins — flames cannot touch you"),
+        (ctx) => {
+          ctx.damage(5, "dragonblood");
+          ctx.pushEffect({ key: "burn", turnsLeft: 3, potency: 2, stacks: 1, sourceId: ctx.itemId });
+          ctx.emit("hunger:sickened", { actor: ctx.actor, type: "burn" });
+        },
+      ),
+    ]),
+  }),
+
+  // Floating Eye: mindwipe (hallucination) + third_eye trait on survival
   corpse_floating_eye: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("mindwipe", 30, 2, "hallucination")]),
+    onEat: Object.freeze([
+      corpseStatusEffect("mindwipe", 30, 2, "hallucination"),
+      (ctx) => {
+        ctx.setTrait("third_eye", true);
+        ctx.emit("corpse:trait-gained", {
+          actor: ctx.actor,
+          trait: "third_eye",
+          name: "Third Eye",
+        });
+      },
+    ]),
   }),
+
+  // Kobold Shaman: 50% mana surge, 50% shock
+  corpse_kobold_shaman: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.5,
+        corpseTimedBuff("mana_surge", 100, 1, "corpse:buff-gained", "stolen thunder crackles behind your eyes"),
+        corpseStatusEffect("shock", 3, 1),
+      ),
+    ]),
+  }),
+
+  // ── Tier 1 ──────────────────────────────────────────────────────────
+
+  // Orc: blood rage — +attack, -defense
+  corpse_orc: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("blood_rage", 100, 1, "corpse:buff-gained", "orcish fury floods your muscles — you feel reckless and strong"),
+    ]),
+  }),
+
+  // Orc Shaman: 40% frost blood (burn resist), 60% frost
+  corpse_orc_shaman: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.4,
+        corpseTimedBuff("frost_blood", 150, 1, "corpse:buff-gained", "frost crystallizes in your veins — fire barely stings"),
+        corpseStatusEffect("frost", 4, 1),
+      ),
+    ]),
+  }),
+
+  // Hobgoblin: war-fed — strong attack buff
+  corpse_hobgoblin: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("war_fed", 120, 2, "corpse:buff-gained", "iron-bred muscle hardens your strikes"),
+    ]),
+  }),
+
+  // Phase Spider: 25% phase shift (dodge buff), 75% poison
+  corpse_phase_spider: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.25,
+        corpseTimedBuff("phase_shift", 80, 1, "corpse:buff-gained", "reality shimmers — you flicker between planes"),
+        corpseStatusEffect("poison", 6, 2),
+      ),
+    ]),
+  }),
+
+  // Wight: heal 5 HP + weakened debuff + deathless progression
+  corpse_wight: Object.freeze({
+    onEat: Object.freeze([
+      corpseHeal(5),
+      corpseStatusEffect("weakened", 8, 1),
+      corpseProgression("wightCorpsesEaten", 3, "deathless", "Deathless",
+        (ctx) => {
+          ctx.pushEffect({ key: "regen", turnsLeft: 9999, potency: 1, stacks: 1, sourceId: ctx.itemId });
+          ctx.emit("corpse:buff-gained", {
+            actor: ctx.actor,
+            effect: "deathless_regen",
+            description: "undeath seeps into your bones — your wounds slowly knit themselves",
+          });
+        }),
+    ]),
+  }),
+
+  // ── Tier 2 ──────────────────────────────────────────────────────────
+
+  // Troll: regeneration + ravenous hunger debuff
+  corpse_troll: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("regeneration", 200, 2, "corpse:buff-gained", "troll blood knits your wounds — but the hunger is monstrous"),
+      corpseTimedBuff("ravenous", 200, 1, "corpse:debuff-gained", "insatiable hunger gnaws at your belly"),
+    ]),
+  }),
+
+  // Wraith: mindwipe + 30% spectral form (kinetic resist)
+  corpse_wraith: Object.freeze({
+    onEat: Object.freeze([
+      corpseStatusEffect("mindwipe", 15, 1),
+      corpseGamble(0.3,
+        corpseTimedBuff("spectral_form", 60, 1, "corpse:buff-gained", "your flesh turns translucent — blades pass through you"),
+        (ctx) => {},
+      ),
+    ]),
+  }),
+
+  // Ogre: bulk up — maxHp, DR, but slower
+  corpse_ogre: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("ogre_bulk", 150, 1, "corpse:buff-gained", "your frame swells with brutish mass — you lumber forward"),
+    ]),
+  }),
+
+  // Carrion Shade: 50% shadow cloak (ambush damage), 50% afflictions
+  corpse_carrion_shade: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.5,
+        corpseTimedBuff("shadow_cloak", 100, 3, "corpse:buff-gained", "shadows coil around you — your first strike will be devastating"),
+        (ctx) => {
+          ctx.pushEffect({ key: "weakened", turnsLeft: 10, potency: 2, stacks: 1, sourceId: ctx.itemId });
+          ctx.pushEffect({ key: "bleed", turnsLeft: 5, potency: 1, stacks: 1, sourceId: ctx.itemId });
+          ctx.emit("hunger:sickened", { actor: ctx.actor, type: "shade_taint" });
+        },
+      ),
+    ]),
+  }),
+
+  // Dark Acolyte: dark sight (vision range) + 30% agony curse
+  corpse_dark_acolyte: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("dark_sight", 200, 2, "corpse:buff-gained", "forbidden knowledge floods in — you see further into the dark"),
+      corpseGamble(0.3,
+        (ctx) => {},
+        corpseStatusEffect("agony", 10, 2),
+      ),
+    ]),
+  }),
+
+  // Orc Warchief: battle fury — on-kill heal buff
+  corpse_orc_warchief: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("battle_fury", 150, 2, "corpse:buff-gained", "the warchief's fury ignites — each kill will restore you"),
+    ]),
+  }),
+
+  // ── Tier 3 ──────────────────────────────────────────────────────────
+
+  // Demon: 40% demon fire (permanent +1 fire damage trait), 60% hellfire
+  corpse_demon: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.4,
+        (ctx) => {
+          ctx.setTrait("demon_fire", true);
+          ctx.emit("corpse:trait-gained", {
+            actor: ctx.actor,
+            trait: "demon_fire",
+            name: "Demonic Ichor",
+          });
+        },
+        (ctx) => {
+          ctx.damage(8, "hellfire");
+          ctx.pushEffect({ key: "burn", turnsLeft: 6, potency: 4, stacks: 1, sourceId: ctx.itemId });
+          ctx.emit("hunger:sickened", { actor: ctx.actor, type: "hellfire" });
+        },
+      ),
+    ]),
+  }),
+
+  // Dragon: dragonheart (permanent fire immunity + attack) — always costs fire damage
+  corpse_dragon: Object.freeze({
+    onEat: Object.freeze([
+      (ctx) => {
+        ctx.damage(10, "dragonfire");
+        ctx.pushEffect({ key: "burn", turnsLeft: 4, potency: 3, stacks: 1, sourceId: ctx.itemId });
+        ctx.setTrait("dragonheart", true);
+        ctx.grantResistance("thermal", "burnMult", 0);
+        ctx.emit("corpse:trait-gained", {
+          actor: ctx.actor,
+          trait: "dragonheart",
+          name: "Dragonheart",
+        });
+      },
+    ]),
+  }),
+
+  // Lich: mindwipe + 20% lichdom echo (cheat death once)
   corpse_lich: Object.freeze({
-    onEat: Object.freeze([corpseStatusEffect("mindwipe", 15, 1)]),
+    onEat: Object.freeze([
+      corpseStatusEffect("mindwipe", 15, 1),
+      corpseGamble(0.2,
+        corpseTimedBuff("lichdom_echo", 300, 1, "corpse:buff-gained", "a cold phylactery pulse echoes in your chest — death may spare you once"),
+        (ctx) => {},
+      ),
+    ]),
   }),
+
+  // ── Special ─────────────────────────────────────────────────────────
+
+  // Mimic: random effect — the protean flesh is unpredictable
+  corpse_mimic: Object.freeze({
+    onEat: Object.freeze([
+      (ctx) => {
+        const roll = ctx.chance(0.25) ? 0
+          : ctx.chance(0.33) ? 1
+          : ctx.chance(0.5) ? 2
+          : 3;
+        switch (roll) {
+          case 0:
+            ctx.pushEffect({ key: "war_fed", turnsLeft: 100, potency: 2, stacks: 1, sourceId: ctx.itemId });
+            ctx.emit("corpse:buff-gained", { actor: ctx.actor, effect: "war_fed", description: "the mimic's flesh reshapes into raw strength" });
+            break;
+          case 1:
+            ctx.pushEffect({ key: "ogre_bulk", turnsLeft: 100, potency: 1, stacks: 1, sourceId: ctx.itemId });
+            ctx.emit("corpse:buff-gained", { actor: ctx.actor, effect: "ogre_bulk", description: "the mimic's mass thickens your hide" });
+            break;
+          case 2:
+            ctx.applyNutrition(200);
+            ctx.emit("corpse:buff-gained", { actor: ctx.actor, effect: "nutrition", description: "surprisingly delicious" });
+            break;
+          case 3:
+            ctx.pushEffect({ key: "disease", turnsLeft: 15, potency: 1, stacks: 1, sourceId: ctx.itemId });
+            ctx.emit("hunger:sickened", { actor: ctx.actor, type: "mimic_disease" });
+            break;
+        }
+      },
+    ]),
+  }),
+
+  // Stone Taunter: 50% stone skin (kinetic DR), 50% petrify (stun)
+  corpse_stone_taunter: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.5,
+        corpseTimedBuff("stone_skin", 120, 4, "corpse:buff-gained", "your skin hardens to living granite"),
+        (ctx) => {
+          ctx.pushEffect({ key: "stun", turnsLeft: 8, potency: 1, stacks: 1, sourceId: ctx.itemId });
+          ctx.emit("hunger:sickened", { actor: ctx.actor, type: "petrify" });
+        },
+      ),
+    ]),
+  }),
+
+  // Eel: electric resistance (existing)
   corpse_eel: Object.freeze({
     onEat: Object.freeze([grantElectricResist]),
   }),
+
+  // Test hook
   corpse_test_cancel: Object.freeze({
     onEat: Object.freeze([cancelEat("FAIL", "You cannot stomach that.", true)]),
   }),

@@ -4,6 +4,7 @@
 
 import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { Hunger } from "../../components/Hunger.js";
+import { Vitality } from "../../components/Vitality.js";
 import { Resistances } from "../../components/Resistences.js";
 import { Traits } from "../../components/Traits.js";
 import { dealDamage } from "../../utils/dealDamage.js";
@@ -116,6 +117,33 @@ export class EatCallbackContext {
   }
 
   /**
+   * Queue a generic resistance field update on the eating actor.
+   * @param {string} channel - e.g. "kinetic", "thermal", "chemical", "electric"
+   * @param {string} field - e.g. "DR", "toxMult", "burnMult", "ohms"
+   * @param {number} value
+   */
+  grantResistance(channel, field, value) {
+    return this.queueMutation({
+      type: "grantResistance",
+      entityId: this.actor,
+      channel: String(channel || ""),
+      field: String(field || ""),
+      value: Number(value),
+    });
+  }
+
+  /**
+   * Heal HP on the eating actor.
+   * @param {number} amount
+   */
+  heal(amount) {
+    const value = Math.max(0, amount | 0);
+    if (value <= 0) return 0;
+    this.queueMutation({ type: "heal", entityId: this.actor, amount: value });
+    return value;
+  }
+
+  /**
    * @param {any} op
    */
   queueMutation(op) {
@@ -152,6 +180,27 @@ export class EatCallbackContext {
       tr = this.world.get(op.entityId, Traits);
     }
     if (tr) tr[key] = op.value;
+  }
+
+  _applyResistance(op) {
+    const channel = String(op.channel || "");
+    const field = String(op.field || "");
+    if (!channel || !field) return;
+    let resist = this.world.get(op.entityId, Resistances);
+    if (!resist) {
+      try { this.world.add(op.entityId, Resistances, {}); } catch {}
+      resist = this.world.get(op.entityId, Resistances);
+    }
+    if (!resist) return;
+    if (!resist[channel] || typeof resist[channel] !== "object") resist[channel] = {};
+    resist[channel][field] = Number(op.value);
+  }
+
+  _applyHeal(op) {
+    const vit = this.world.get(op.entityId, Vitality);
+    if (!vit) return;
+    const amount = Math.max(0, Number(op.amount) | 0);
+    vit.hp = Math.min(vit.maxHp, vit.hp + amount);
   }
 
   _applyElectricResistance(op) {
@@ -200,6 +249,12 @@ export class EatCallbackContext {
           break;
         case "setTrait":
           this._applySetTrait(op);
+          break;
+        case "grantResistance":
+          this._applyResistance(op);
+          break;
+        case "heal":
+          this._applyHeal(op);
           break;
         default:
           break;
@@ -272,6 +327,86 @@ export function cancelEat(code, message, consumesTurn = true) {
   };
 }
 
+// -- Generic factory functions --
+
+/**
+ * Apply a timed buff/debuff on eat.
+ * @param {string} effectKey
+ * @param {number} turnsLeft
+ * @param {number} potency
+ * @param {string} [emitEvent] - event name to emit (defaults to "corpse:buff-gained")
+ * @param {string} [description] - flavor text for emit payload
+ */
+export function corpseTimedBuff(effectKey, turnsLeft, potency, emitEvent, description) {
+  return (ctx) => {
+    ctx.pushEffect({ key: effectKey, turnsLeft, potency, stacks: 1, sourceId: ctx.itemId });
+    ctx.emit(emitEvent || "corpse:buff-gained", {
+      actor: ctx.actor,
+      effect: effectKey,
+      turnsLeft,
+      description: description || effectKey,
+    });
+  };
+}
+
+/**
+ * Chance-gated dual outcome: roll once, apply good OR bad callback.
+ * @param {number} goodChance - 0.0-1.0 probability of the good outcome
+ * @param {Function} goodCb - callback if lucky
+ * @param {Function} badCb - callback if unlucky
+ */
+export function corpseGamble(goodChance, goodCb, badCb) {
+  return (ctx) => {
+    if (ctx.chance(goodChance)) {
+      goodCb(ctx);
+    } else {
+      badCb(ctx);
+    }
+  };
+}
+
+/**
+ * Grant bonus nutrition on eat.
+ * @param {number} amount
+ */
+export function corpseBonusNutrition(amount) {
+  return (ctx) => {
+    ctx.applyNutrition(amount);
+  };
+}
+
+/**
+ * Heal HP on eat.
+ * @param {number} amount
+ */
+export function corpseHeal(amount) {
+  return (ctx) => {
+    ctx.heal(amount);
+    ctx.emit("corpse:buff-gained", {
+      actor: ctx.actor,
+      effect: "heal",
+      description: "vitality surges through you",
+    });
+  };
+}
+
+/**
+ * Grant a permanent resistance field change on eat.
+ * @param {string} channel - e.g. "chemical"
+ * @param {string} field - e.g. "toxMult"
+ * @param {number} value
+ * @param {string} [emitType] - label for the resistance gained event
+ */
+export function corpseGrantResistance(channel, field, value, emitType) {
+  return (ctx) => {
+    ctx.grantResistance(channel, field, value);
+    ctx.emit("corpse:resistance-gained", {
+      actor: ctx.actor,
+      type: emitType || `${channel}.${field}`,
+    });
+  };
+}
+
 // -- Trait progression factories --
 
 const IRON_STOMACH_THRESHOLD = 3;
@@ -293,4 +428,39 @@ export function corpseIronStomachProgress(ctx) {
       name: "Iron Stomach",
     });
   }
+}
+
+/**
+ * Generic trait progression factory. Eat N corpses of a type to gain a permanent trait.
+ * @param {string} counterKey - Traits field for the counter (e.g. "snakesEaten")
+ * @param {number} threshold - how many corpses needed
+ * @param {string} traitKey - Traits field for the boolean (e.g. "serpent_blood")
+ * @param {string} traitName - display name (e.g. "Serpent Blood")
+ * @param {Function} [onGrantCb] - optional callback invoked on trait grant (receives ctx)
+ */
+export function corpseProgression(counterKey, threshold, traitKey, traitName, onGrantCb) {
+  return (ctx) => {
+    const traits = ctx.world.get(ctx.actor, Traits);
+    if (traits?.[traitKey]) return;
+    const count = (Number(traits?.[counterKey]) || 0) + 1;
+    ctx.setTrait(counterKey, count);
+    if (count < threshold) {
+      ctx.emit("corpse:progression", {
+        actor: ctx.actor,
+        trait: traitKey,
+        name: traitName,
+        count,
+        threshold,
+      });
+    }
+    if (count >= threshold) {
+      ctx.setTrait(traitKey, true);
+      if (onGrantCb) onGrantCb(ctx);
+      ctx.emit("corpse:trait-gained", {
+        actor: ctx.actor,
+        trait: traitKey,
+        name: traitName,
+      });
+    }
+  };
 }
