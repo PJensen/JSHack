@@ -1,14 +1,17 @@
 import { assert, assertEquals } from "jsr:@std/assert";
-import { World } from "../src/lib/ecs-js/index.js";
+import { World, children } from "../src/lib/ecs-js/index.js";
 import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { createCorpse } from "../src/rules/archetypes/Food.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { CorpseAdaptation } from "../src/rules/components/CorpseAdaptation.js";
+import { DerivedExpression } from "../src/rules/components/DerivedExpression.js";
 import { Traits } from "../src/rules/components/Traits.js";
-import { Resistances } from "../src/rules/components/Resistences.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
+import { resolveCanonicalStats } from "../src/rules/utils/canonicalStats.js";
+import { explainDerivedStats } from "../src/rules/utils/derivedStats.js";
 
 function makeCorpse(world, id, name, sizeClass = "M", massKg = 40, tier = 0) {
   return createCorpse(world, { id, name, sizeClass, massKg, tier }, { x: 0, y: 0 });
@@ -20,49 +23,70 @@ function eatCorpse(world, player, corpse) {
   useItemSystem(world);
 }
 
+function countAdaptations(world, player, statKey) {
+  let count = 0;
+  for (const childId of children(world, player)) {
+    const ca = world.get(childId, CorpseAdaptation);
+    if (ca && ca.statKey === statKey) count++;
+  }
+  return count;
+}
+
+function sumAdaptations(world, player, statKey) {
+  let total = 0;
+  for (const childId of children(world, player)) {
+    const ca = world.get(childId, CorpseAdaptation);
+    if (!ca || ca.statKey !== statKey) continue;
+    const expr = world.get(childId, DerivedExpression);
+    if (expr) total += Number(expr.value || 0);
+  }
+  return total;
+}
+
 // ── Diminishing poison resistance (cave_snake) ───────────────────
 
-Deno.test("cave_snake corpse reduces toxMult with diminishing returns", () => {
+Deno.test("cave_snake corpse creates poisonResist adaptation via stat tree", () => {
   const world = new World({ seed: 0xBEEF01 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const resist = world.get(player, Resistances);
-  const before = resist.chemical.toxMult;
-  assertEquals(before, 1.0, "should start at 1.0");
+  const statsBefore = resolveCanonicalStats(world, player);
+  assertEquals(statsBefore.poisonResist, 0, "should start with 0 poisonResist");
 
   const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
   eatCorpse(world, player, corpse);
 
-  const after1 = resist.chemical.toxMult;
-  assert(after1 < before, "first eat should reduce toxMult");
-  assert(after1 > 0.4, "should not reach floor after 1 eat");
-  // formula: 0.4 + (1.0 - 0.4) * 0.85 = 0.91
-  assertEquals(after1, 0.91, "first eat: floor + (1.0 - floor) * decay");
+  // Should have created a CorpseAdaptation child entity
+  assertEquals(countAdaptations(world, player, "poisonResist"), 1, "should have 1 adaptation");
+
+  const statsAfter = resolveCanonicalStats(world, player);
+  assert(statsAfter.poisonResist > 0, "poisonResist should be positive after first eat");
+  // formula: maxBonus=0.6, remaining=0.6, delta = 0.6 * (1-0.85) = 0.6*0.15 = 0.09
+  assertEquals(statsAfter.poisonResist, 0.09, "first eat: delta = maxBonus * (1-decay)");
 });
 
-Deno.test("repeated cave_snake eats approach floor with diminishing gains", () => {
+Deno.test("repeated cave_snake eats create multiple adaptations with diminishing deltas", () => {
   const world = new World({ seed: 0xBEEF02 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const resist = world.get(player, Resistances);
-  const values = [resist.chemical.toxMult];
-
+  const bonuses = [0];
   for (let i = 0; i < 5; i++) {
     const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
     eatCorpse(world, player, corpse);
-    values.push(resist.chemical.toxMult);
+    bonuses.push(sumAdaptations(world, player, "poisonResist"));
   }
 
-  // Each value should be less than previous
-  for (let i = 1; i < values.length; i++) {
-    assert(values[i] < values[i - 1], `eat ${i} should reduce toxMult further`);
+  // Each total should be higher than previous
+  for (let i = 1; i < bonuses.length; i++) {
+    assert(bonuses[i] > bonuses[i - 1], `eat ${i} should increase poisonResist`);
   }
-  // Gains should diminish (gap shrinks)
-  const gap1 = values[0] - values[1]; // first eat delta
-  const gap5 = values[4] - values[5]; // fifth eat delta
-  assert(gap5 < gap1, "later eats should give smaller gains (diminishing returns)");
-  // After 5 eats should be well above floor
-  assert(values[5] > 0.4, "should not reach floor after 5 eats");
+  // Gains should diminish
+  const gain1 = bonuses[1] - bonuses[0];
+  const gain5 = bonuses[5] - bonuses[4];
+  assert(gain5 < gain1, "later eats should give smaller gains (diminishing returns)");
+  // Total should stay below maxBonus of 0.6
+  assert(bonuses[5] < 0.6, "should not exceed max bonus");
+  // Should have 5 separate child entities
+  assertEquals(countAdaptations(world, player, "poisonResist"), 5, "should have 5 adaptations");
 });
 
 Deno.test("cave_snake emits resist-building event with percentage", () => {
@@ -82,7 +106,7 @@ Deno.test("cave_snake emits resist-building event with percentage", () => {
 
 // ── Snake: poison + diminishing resist ────────────────────────────
 
-Deno.test("snake corpse poisons and builds toxMult resistance", () => {
+Deno.test("snake corpse poisons and builds poisonResist adaptation", () => {
   const world = new World({ seed: 0xBEEF04 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
@@ -92,18 +116,17 @@ Deno.test("snake corpse poisons and builds toxMult resistance", () => {
   const ae = world.get(player, ActiveEffects);
   assert(ae.effects.some(e => e.key === "poison"), "should apply poison");
 
-  const resist = world.get(player, Resistances);
-  assert(resist.chemical.toxMult < 1.0, "should reduce toxMult");
+  const stats = resolveCanonicalStats(world, player);
+  assert(stats.poisonResist > 0, "should have positive poisonResist");
 });
 
 // ── Cave bear: bear_vigor buff + diminishing kinetic DR ───────────
 
-Deno.test("cave_bear corpse applies bear_vigor and increases kinetic DR", () => {
+Deno.test("cave_bear corpse applies bear_vigor and creates kineticDR adaptation", () => {
   const world = new World({ seed: 0xBEEF05 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const resist = world.get(player, Resistances);
-  const drBefore = resist.kinetic.DR;
+  const statsBefore = resolveCanonicalStats(world, player);
 
   const corpse = makeCorpse(world, "cave_bear", "Cave Bear", "L", 350);
   eatCorpse(world, player, corpse);
@@ -114,35 +137,33 @@ Deno.test("cave_bear corpse applies bear_vigor and increases kinetic DR", () => 
   assert(vigor, "should have bear_vigor effect");
   assertEquals(vigor.turnsLeft, 150, "bear_vigor should last 150 turns");
 
-  // Kinetic DR increased
-  assert(resist.kinetic.DR > drBefore, "should increase kinetic DR");
-  // formula: 4 + 1.5 * max(0, 1 - 4/6) = 4 + 1.5*0.333 = 4.5
-  assertEquals(resist.kinetic.DR, 4.5, "first eat: diminished by existing DR");
+  // Kinetic DR adaptation created
+  assertEquals(countAdaptations(world, player, "kineticDR"), 1, "should have 1 kineticDR adaptation");
+  const statsAfter = resolveCanonicalStats(world, player);
+  assert(statsAfter.kineticDR > statsBefore.kineticDR, "kineticDR should increase via stat tree");
 });
 
-Deno.test("repeated cave_bear eats show diminishing DR gains", () => {
+Deno.test("repeated cave_bear eats show diminishing kineticDR gains", () => {
   const world = new World({ seed: 0xBEEF06 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
-  const resist = world.get(player, Resistances);
-  const values = [resist.kinetic.DR];
-
+  const bonuses = [0];
   for (let i = 0; i < 4; i++) {
     const corpse = makeCorpse(world, "cave_bear", "Cave Bear", "L", 350);
     eatCorpse(world, player, corpse);
-    values.push(resist.kinetic.DR);
+    bonuses.push(sumAdaptations(world, player, "kineticDR"));
   }
 
   // Each should be higher than previous
-  for (let i = 1; i < values.length; i++) {
-    assert(values[i] > values[i - 1], `eat ${i} should increase DR`);
+  for (let i = 1; i < bonuses.length; i++) {
+    assert(bonuses[i] > bonuses[i - 1], `eat ${i} should increase kineticDR bonus`);
   }
   // Gains diminish
-  const gain1 = values[1] - values[0];
-  const gain4 = values[4] - values[3];
-  assert(gain4 < gain1, "later eats should give smaller DR gains");
-  // Should not exceed ceiling of 6
-  assert(values[4] <= 6, "should not exceed ceiling");
+  const gain1 = bonuses[1] - bonuses[0];
+  const gain4 = bonuses[4] - bonuses[3];
+  assert(gain4 < gain1, "later eats should give smaller kineticDR gains");
+  // Should have 4 separate child entities
+  assertEquals(countAdaptations(world, player, "kineticDR"), 4, "should have 4 adaptations");
 });
 
 // ── Floating eye: mindwipe + third_eye trait ──────────────────────
@@ -165,17 +186,17 @@ Deno.test("floating_eye corpse applies mindwipe and grants third_eye", () => {
   assert(traitEvents.some(e => e.trait === "third_eye"), "should emit third_eye trait event");
 });
 
-// ── Dragon: dragonheart + big burn resist nudge (not immunity) ────
+// ── Dragon: dragonheart + big fire resist via stat tree ─────────
 
-Deno.test("dragon corpse grants dragonheart with diminishing burn resist", () => {
+Deno.test("dragon corpse grants dragonheart with fireResist adaptation", () => {
   const world = new World({ seed: 0xBEEF08 });
   const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
 
   const traitEvents = [];
   world.on("corpse:trait-gained", (ev) => traitEvents.push(ev));
 
-  const resist = world.get(player, Resistances);
-  assertEquals(resist.thermal.burnMult, 1.0, "should start at 1.0");
+  const statsBefore = resolveCanonicalStats(world, player);
+  assertEquals(statsBefore.fireResist, 0, "should start with 0 fireResist");
 
   const startHp = world.get(player, Vitality).hp;
   const corpse = makeCorpse(world, "dragon", "Dragon", "XL", 800, 3);
@@ -186,11 +207,12 @@ Deno.test("dragon corpse grants dragonheart with diminishing burn resist", () =>
   assertEquals(traits.dragonheart, true, "should grant dragonheart");
   assert(traitEvents.some(e => e.trait === "dragonheart"), "should emit dragonheart event");
 
-  // Burn resist: big nudge but NOT zero (floor 0.1)
-  assert(resist.thermal.burnMult < 0.5, "should dramatically reduce burnMult");
-  assert(resist.thermal.burnMult > 0, "should not be zero — diminishing, not immunity");
-  // formula: 0.1 + (1.0 - 0.1) * 0.3 = 0.1 + 0.27 = 0.37
-  assertEquals(resist.thermal.burnMult, 0.37, "first dragon: floor + headroom * decay");
+  // Fire resist via stat tree: big nudge
+  const statsAfter = resolveCanonicalStats(world, player);
+  assert(statsAfter.fireResist > 0.5, "should have substantial fireResist");
+  assert(statsAfter.fireResist < 0.9, "should not reach max bonus (floor 0.1 → max 0.9)");
+  // formula: maxBonus=0.9, remaining=0.9, delta = 0.9 * (1-0.3) = 0.9*0.7 = 0.63
+  assertEquals(statsAfter.fireResist, 0.63, "dragon: delta = maxBonus * (1-decay)");
 
   // Fire damage
   const endHp = world.get(player, Vitality).hp;
@@ -325,9 +347,9 @@ Deno.test("stone_taunter corpse applies stone_skin or stun", () => {
   assert(hasStoneSkin || hasStun, "should apply either stone_skin or stun");
 });
 
-// ── EatCallbackContext: grantResistance standalone ─────────────────
+// ── EatCallbackContext: addCorpseAdaptation standalone ─────────────
 
-Deno.test("EatCallbackContext.grantResistance queues and commits", async () => {
+Deno.test("EatCallbackContext.addCorpseAdaptation creates child entity", async () => {
   const { EatCallbackContext } = await import("../src/rules/data/callbacks/eat.js");
 
   const world = new World({ seed: 0xBEEF11 });
@@ -335,11 +357,17 @@ Deno.test("EatCallbackContext.grantResistance queues and commits", async () => {
   const dummyItemId = world.create();
 
   const ctx = new EatCallbackContext(world, player, dummyItemId);
-  ctx.grantResistance("chemical", "toxMult", 0.5);
+  ctx.addCorpseAdaptation("poisonResist", 0.15, "test_snake", "poison");
   ctx.commit();
 
-  const resist = world.get(player, Resistances);
-  assertEquals(resist.chemical.toxMult, 0.5, "should set toxMult to 0.5");
+  // Should create a child entity with CorpseAdaptation + DerivedExpression
+  assertEquals(countAdaptations(world, player, "poisonResist"), 1, "should have 1 adaptation");
+  const bonus = sumAdaptations(world, player, "poisonResist");
+  assertEquals(bonus, 0.15, "adaptation value should be 0.15");
+
+  // Should show up in canonical stats
+  const stats = resolveCanonicalStats(world, player);
+  assertEquals(stats.poisonResist, 0.15, "canonical stats should include adaptation");
 });
 
 // ── EatCallbackContext: heal standalone ────────────────────────────
@@ -360,4 +388,31 @@ Deno.test("EatCallbackContext.heal restores HP", async () => {
   ctx.commit();
 
   assertEquals(vit.hp, before + 5, "should heal 5 HP");
+});
+
+// ── Stat tree attribution: explainDerivedStats shows corpse adaptations ──
+
+Deno.test("explainDerivedStats traces corpse adaptation entries", () => {
+  const world = new World({ seed: 0xBEEF13 });
+  const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+
+  // Eat two cave snakes
+  for (let i = 0; i < 2; i++) {
+    const corpse = makeCorpse(world, "cave_snake", "Cave Snake", "XS", 2);
+    eatCorpse(world, player, corpse);
+  }
+
+  const { trace } = explainDerivedStats(world, player);
+  const poisonEntries = trace.filter(t => t.target === "poisonResist");
+  assertEquals(poisonEntries.length, 2, "trace should show 2 poisonResist entries");
+
+  // Each entry should be an addConst with positive value
+  for (const entry of poisonEntries) {
+    assertEquals(entry.kind, "addConst", "should be addConst");
+    assert(entry.value > 0, "should have positive value");
+  }
+
+  // Second delta should be smaller than first (diminishing)
+  assert(poisonEntries[1].value < poisonEntries[0].value,
+    "second adaptation delta should be smaller (diminishing returns)");
 });
