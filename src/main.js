@@ -3143,6 +3143,7 @@ let _dtSec = 0;  // frame delta for render-internal use
 
 // Reusable render buffers — hoisted out of hot functions to avoid per-frame GC
 const _stackMeta = new Map();
+const _stackSeqMeta = new Map();
 /** @type {number[]} flat buffer [tile, x, y, ...] for explored-not-visible tiles */
 const _exploredTileBuffer = [];
 /** @type {Map<number, { hp:number, ratio:number, showUntil:number }>} */
@@ -4051,11 +4052,13 @@ function render(worldView) {
   // Pass 2: entities (doors, stairs, monsters, items, player)
   // Keep only the top-most ground item glyph per tile.
   _stackMeta.clear(); // "x,y" -> topItemId
+  _stackSeqMeta.clear(); // "x,y" -> best stackSeq seen
   _healthBarsToDraw.length = 0;
   flyingFx.syncWorldView(worldView);
   delayedDeathFx.syncWorldView(worldView);
   const renderEntities = delayedDeathFx.getRenderableEntities(worldView.entities);
   const stackMeta = _stackMeta;
+  const stackSeqMeta = _stackSeqMeta;
   for (let i = 0; i < renderEntities.length; i++) {
     const e = renderEntities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
@@ -4063,8 +4066,14 @@ function render(worldView) {
     if (layer !== 100) continue;
     if (throwFx.isItemHidden(e.id)) continue;
     if (delayedDeathFx.isItemHidden(e.id)) continue;
-    // worldView.entities is sorted by id within a tile/layer; later ids are drawn on top.
-    stackMeta.set(`${e.pos.x},${e.pos.y}`, e.id);
+    const tileKey = `${e.pos.x},${e.pos.y}`;
+    const seq = (e.stackSeq | 0) || 0;
+    const prevSeq = stackSeqMeta.get(tileKey) ?? -1;
+    // Higher stackSeq wins; if tied, later id (higher entity ID) wins.
+    if (seq > prevSeq || (seq === prevSeq)) {
+      stackMeta.set(tileKey, e.id);
+      stackSeqMeta.set(tileKey, seq);
+    }
   }
 
   // Draw order: items (layer 100) → doors (200) → actors (300) → player (400)
