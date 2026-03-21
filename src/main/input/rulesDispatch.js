@@ -15,9 +15,11 @@ import { statusStrength } from "../../rules/utils/statusFacade.js";
  * Create a rules dispatcher bound to a world and an actor resolver.
  * @param {World} world - ECS world
  * @param {() => number} getActorId - Returns the current controlled actor id
+ * @param {{ onAction?: (turn:number, type:string, payload:object) => void }} [opts]
  * @returns {(action:{type:string,payload?:object})=>void}
  */
-export function makeRulesDispatcher(world, getActorId) {
+export function makeRulesDispatcher(world, getActorId, opts = {}) {
+  const _onAction = typeof opts.onAction === "function" ? opts.onAction : null;
   const uiTarget = /** @type {any} */ ((typeof window !== "undefined") ? window : globalThis);
   const dispatchUiEvent = (name, detail = undefined) => {
     try {
@@ -53,9 +55,15 @@ export function makeRulesDispatcher(world, getActorId) {
       && action.type.startsWith("rules.")
       && statusStrength(world, actorId, "stunned") > 0
     ) {
+      if (_onAction) { try { _onAction(world?.step ?? 0, "rules.wait", {}); } catch {} }
       try { world?.add?.(actorId, WaitIntent, {}); } catch {}
       world?.tick?.(1);
       return;
+    }
+
+    // Record the player action for proof chain before processing.
+    if (_onAction && typeof action?.type === "string" && action.type.startsWith("rules.")) {
+      try { _onAction(world?.step ?? 0, action.type, action.payload || {}); } catch {}
     }
 
     switch (action.type) {

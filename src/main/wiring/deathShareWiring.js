@@ -177,6 +177,13 @@ export function installDeathShareWiring({ world }) {
     postDeathTombstone({ ..._pendingDeathDetail, timestamp: Date.now() }).catch(() => {});
   });
 
+  // Attach proof bundle to death detail when available.
+  world.on("proof:ready", ({ bundle }) => {
+    if (_pendingDeathDetail && bundle) {
+      _pendingDeathDetail.proofBundle = bundle;
+    }
+  });
+
   world.on("postMortemComplete", () => {
     if (!_pendingDeathDetail) return;
     EVENT_TARGET.dispatchEvent(new CustomEvent("ui:playerDied", {

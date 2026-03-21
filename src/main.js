@@ -105,6 +105,8 @@ import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import TombstoneComponent from "./rules/components/Tombstone.js";
 import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
+import { installProofWiring } from "./main/proof/proofWiring.js";
+import { postVerifiedScore } from "./shared/tombstoneApi.js";
 import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
@@ -268,6 +270,10 @@ if (_pendingSavegame) {
 const tombstoneRepo = new TombstoneRepository();
 installTombstoneDeathListener(world, tombstoneRepo);
 installDeathShareWiring({ world });
+const _proofWiring = installProofWiring({ world });
+world.on("proof:ready", ({ bundle }) => {
+  postVerifiedScore(bundle).catch(() => {});
+});
 // Fire-and-forget: warm the highscores cache as early as possible so dungeon
 // generation (synchronous, below) has the best chance of finding it populated.
 getHighscores().catch(() => {});
@@ -811,6 +817,7 @@ if (_pendingSavegame) {
     const savedSpell = _pendingSavegame?.app?.activeSpellId;
     if (typeof savedSpell === "string" && savedSpell.length > 0) { _activeSpellId = savedSpell; spellCtrl.setActiveSpell(savedSpell); }
     _savegameLoaded = true;
+    _proofWiring.resetForLoad();
     updateBootProgress("Loaded save snapshot", _bootDoneUnits);
   } catch (err) {
     console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
@@ -1072,7 +1079,8 @@ const inputDisposers = [];
 {
   const rulesHandler = makeRulesDispatcher(
     /** @type any */(world),
-    () => (playerEntity(world)?.id || 0)
+    () => (playerEntity(world)?.id || 0),
+    { onAction: _proofWiring.recordAction }
   );
 
   const displayHandler = (action) => {
