@@ -12,6 +12,6 @@ export const GROTTO_PROFILE = {
   generator:   noiseGenerator,  // bypasses BSP; returns { tiles, rooms }
   doorChance:  0.0,             // no doorways in open cave spaces
   hazardBias:  'water',
-  monsterFilter: def => (def.tags ?? []).some(t => ['beast', 'vermin', 'giant'].includes(t)),
+  monsterFilter: def => (def.tags ?? []).some(t => ['beast', 'vermin', 'giant', 'long-creature'].includes(t)),
   hallwayMonsterCap: 6,
 };
