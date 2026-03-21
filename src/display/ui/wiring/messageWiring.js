@@ -868,7 +868,58 @@ export function installMessageWiring({
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
     const label = String(name || trait || 'unknown');
-    log(`Your stomach hardens \u2014 you've developed an ${label}!`, 'legendary');
+    const TRAIT_MESSAGES = {
+      iron_stomach: `Your stomach hardens \u2014 you've developed an ${label}!`,
+      serpent_blood: `Venom runs cold through your veins \u2014 you've gained ${label}!`,
+      venom_tolerance: `Your body shrugs off toxins \u2014 you've gained ${label}!`,
+      thick_hide: `Your skin toughens like bark \u2014 you've gained ${label}!`,
+      deathless: `Undeath whispers through your bones \u2014 you are ${label}.`,
+      third_eye: `A third eye opens in your mind \u2014 you sense life beyond walls.`,
+      demon_fire: `Hellfire smolders in your fists \u2014 ${label} is yours.`,
+      dragonheart: `Scales shimmer beneath your skin \u2014 the ${label} beats within you!`,
+    };
+    log(TRAIT_MESSAGES[trait] || `Something fundamental shifts \u2014 you've gained ${label}!`, 'legendary');
+  });
+
+  world.on('corpse:buff-gained', ({ actor, effect, description }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const desc = String(description || effect || 'something stirs within you');
+    log(`You feel ${desc}.`, 'system');
+  });
+
+  world.on('corpse:debuff-gained', ({ actor, effect, description }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const desc = String(description || effect || 'something is wrong');
+    log(`You feel ${desc}.`, 'danger');
+  });
+
+  world.on('corpse:resistance-gained', ({ actor, type }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    log(`Your body adapts \u2014 ${String(type || 'unknown')} resistance gained.`, 'legendary');
+  });
+
+  world.on('corpse:resist-building', ({ actor, type, pct }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = String(type || 'unknown');
+    const p = Number(pct || 0);
+    if (p > 0) {
+      log(`Your ${label} resistance hardens \u2014 ${p}% resilient.`, 'system');
+    } else {
+      log(`Your body toughens against ${label}.`, 'system');
+    }
+  });
+
+  world.on('corpse:progression', ({ actor, name, count, threshold }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = String(name || 'unknown');
+    const c = Number(count || 0);
+    const t = Number(threshold || 0);
+    log(`Your body adapts... (${label}: ${c}/${t})`, 'system');
   });
 
   // === Environment events ===
@@ -1434,6 +1485,11 @@ export function installMessageWiring({
   });
   world.on('proc:gaze:stun', () => {
     log('The Floating Eye\'s gaze locks your mind — you are stunned!', 'danger');
+  });
+
+  // === Centipede events ===
+  world.on('centipede:split', () => {
+    log('The centipede splits in two!', 'warning');
   });
 
   // === Flying events ===
