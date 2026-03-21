@@ -1492,6 +1492,18 @@ export function installMessageWiring({
     log('The centipede splits in two!', 'warning');
   });
 
+  // === Monster corpse eating ===
+  world.on('monster:corpse-eat', ({ monsterName, behavior, corpseName, at }) => {
+    if (!canSeeAt(at?.x, at?.y)) return;
+    const name = bracketizeName(String(monsterName || 'creature'));
+    const label = bracketizeName(String(corpseName || 'corpse'));
+    if (behavior === 'devour') {
+      log(`${name} devours ${label} and swells with stolen vitality!`, 'warning');
+    } else {
+      log(`${name} gnaws on ${label}.`, 'info');
+    }
+  });
+
   // === Flying events ===
   world.on('proc:fly:takeoff', ({ name, x, y }) => {
     if (!canSeeAt(x, y)) return;
