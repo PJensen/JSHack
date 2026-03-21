@@ -49,7 +49,7 @@ Deno.test("mace (blunt 3) vs spider (DR:2) — damage reduced to 1", () => {
   assertEquals(world.get(id, Vitality).hp, def.baseHp - 1);
 });
 
-Deno.test("mace (blunt 2) vs spider (DR:2) — fully resisted", () => {
+Deno.test("mace (blunt 2) vs spider (DR:2) — reduced to chip damage", () => {
   const world = makeWorld(2);
   const { id, def } = spawnMonster(world, "spider", 5, 5);
   const attacker = world.create();
@@ -62,10 +62,10 @@ Deno.test("mace (blunt 2) vs spider (DR:2) — fully resisted", () => {
     type: "blunt", cause: "melee",
   });
 
-  assertEquals(result.applied, false, "should be fully resisted");
-  assertEquals(result.reason, "resisted");
-  assertEquals(world.get(id, Vitality).hp, def.baseHp, "no HP lost");
-  assert(events.some(e => e.kind === "resist"), "should emit resist status");
+  assertEquals(result.applied, true, "should deal chip damage");
+  assertEquals(result.amount, 1, "2 blunt vs DR 2 should chip for 1");
+  assertEquals(world.get(id, Vitality).hp, def.baseHp - 1, "chip damage should lower HP by 1");
+  assertEquals(events.some(e => e.kind === "resist"), false, "chip damage should not emit resist status");
 });
 
 // ── Mace (blunt) vs Cave Bear (DR:3) ───────────────────────────────
@@ -85,7 +85,7 @@ Deno.test("mace (blunt 5) vs cave_bear (DR:3) — damage reduced to 2", () => {
   assertEquals(world.get(id, Vitality).hp, def.baseHp - 2);
 });
 
-Deno.test("mace (blunt 3) vs cave_bear (DR:3) — fully resisted", () => {
+Deno.test("mace (blunt 3) vs cave_bear (DR:3) — reduced to chip damage", () => {
   const world = makeWorld(30);
   const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
   const attacker = world.create();
@@ -98,9 +98,9 @@ Deno.test("mace (blunt 3) vs cave_bear (DR:3) — fully resisted", () => {
     type: "blunt", cause: "melee",
   });
 
-  assertEquals(result.applied, false, "3 blunt vs DR 3 = resisted");
-  assertEquals(result.reason, "resisted");
-  assert(events.some(e => e.kind === "resist"), "should emit resist status");
+  assertEquals(result.applied, true, "3 blunt vs DR 3 should chip for 1");
+  assertEquals(result.amount, 1);
+  assertEquals(events.some(e => e.kind === "resist"), false, "chip damage should not emit resist status");
 });
 
 // ── Sword (physical) vs Spider (DR:2) ──────────────────────────────
@@ -120,7 +120,7 @@ Deno.test("sword (physical 3) vs spider (DR:2) — damage reduced to 1", () => {
   assertEquals(world.get(id, Vitality).hp, def.baseHp - 1);
 });
 
-Deno.test("sword (physical 2) vs spider (DR:2) — fully resisted", () => {
+Deno.test("sword (physical 2) vs spider (DR:2) — reduced to chip damage", () => {
   const world = makeWorld(5);
   const { id, def } = spawnMonster(world, "spider", 5, 5);
   const attacker = world.create();
@@ -133,9 +133,9 @@ Deno.test("sword (physical 2) vs spider (DR:2) — fully resisted", () => {
     type: "physical", cause: "melee",
   });
 
-  assertEquals(result.applied, false, "2 physical vs DR 2 = resisted");
-  assertEquals(result.reason, "resisted");
-  assert(events.some(e => e.kind === "resist"), "should emit resist status");
+  assertEquals(result.applied, true, "2 physical vs DR 2 should chip for 1");
+  assertEquals(result.amount, 1);
+  assertEquals(events.some(e => e.kind === "resist"), false, "chip damage should not emit resist status");
 });
 
 // ── Sword (physical) vs Cave Bear (DR:3) ───────────────────────────
