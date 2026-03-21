@@ -33,6 +33,8 @@ const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
 const DEFAULT_FIRE_SPREAD_CHANCE = 0.25;
+const WEB_FIRE_SPREAD_CHANCE = 0.65;
+const WEB_IDENTITY = "web";
 const DEFAULT_FIRE_SPREAD_TURNS = 2;
 const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -93,8 +95,9 @@ function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId,
     if (world.has(id, Vitality)) continue;
     if (world.has(id, Burned)) continue;
     const flammability = Number(FLAMMABILITY_BY_MATERIAL.get(String(mat.kind || "")) || 0);
-    if (!(flammability > 0)) continue;
     const ident = world.get(id, NamedIdentity);
+    const isWeb = String(ident?.identity || "").toLowerCase() === WEB_IDENTITY;
+    if (!isWeb && !(flammability > 0)) continue;
     try {
       world.emit?.("entity:burned", {
         actor: source,
@@ -155,6 +158,8 @@ function getFireSpreadTurns(hazard, turnsBefore) {
 export function hazardSystem(world) {
   const overworld = isOverworld(world);
   tickDestroyedTileLedger(world);
+  /** @type {Set<string>|null} */
+  let unburnedWebCells = null;
   const fireHazardCells = new Set();
   for (const [, pos, hazard] of world.query(Position, HazardArea)) {
     if (!pos || !hazard) continue;
@@ -249,14 +254,28 @@ export function hazardSystem(world) {
     if (kind === "fire" && medium === "floor") {
       const spreadChance = getFireSpreadChance(hazard);
       if (spreadChance > 0) {
+        if (!unburnedWebCells) {
+          unburnedWebCells = new Set();
+          for (const [id, ni, webPos] of world.query(NamedIdentity, Position)) {
+            if (!ni || !webPos) continue;
+            if (world.has(id, Burned)) continue;
+            if (String(ni.identity || "").toLowerCase() !== WEB_IDENTITY) continue;
+            unburnedWebCells.add(`${webPos.x | 0},${webPos.y | 0}`);
+          }
+        }
         const spreadTurns = getFireSpreadTurns(hazard, turnsBefore);
         for (const [dx, dy] of NEIGHBOR_OFFSETS) {
           const nx = (pos.x | 0) + dx;
           const ny = (pos.y | 0) + dy;
           const key = `${nx},${ny}`;
           if (fireHazardCells.has(key)) continue;
-          if (!isFlammableFireSpreadTile(world, nx, ny, getTile(nx, ny), overworld)) continue;
-          if ((world.rand?.() ?? 0) >= spreadChance) continue;
+          const targetIsWeb = unburnedWebCells.has(key);
+          const targetIsFlammableTile = isFlammableFireSpreadTile(world, nx, ny, getTile(nx, ny), overworld);
+          if (!targetIsWeb && !targetIsFlammableTile) continue;
+          const effectiveSpreadChance = targetIsWeb
+            ? Math.max(spreadChance, WEB_FIRE_SPREAD_CHANCE)
+            : spreadChance;
+          if ((world.rand?.() ?? 0) >= effectiveSpreadChance) continue;
 
           pendingFireSpreads.push({
             x: nx,

@@ -2,6 +2,8 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Burned } from "../src/rules/components/Burned.js";
+import { Collider } from "../src/rules/components/Collider.js";
+import { Interactable } from "../src/rules/components/Interactable.js";
 import { Material } from "../src/rules/components/Material.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
@@ -414,4 +416,58 @@ Deno.test("fire floor hazards burn away flammable overworld props on their tile"
   } finally {
     clearAll();
   }
+});
+
+Deno.test("fire floor hazards burn web entities and spread aggressively between webs", () => {
+  const world = new World({ seed: 9211 });
+  const spawned = [];
+  const burned = [];
+  world.on("hazard:spawned", (event) => spawned.push(event));
+  world.on("entity:burned", (event) => burned.push(event));
+
+  const webA = world.create();
+  world.add(webA, Position, { x: 5, y: 5 });
+  world.add(webA, NamedIdentity, { name: "Web", identity: "web" });
+  world.add(webA, Material, { kind: "organic" });
+  world.add(webA, Collider, { solid: true, blocksSight: false });
+  world.add(webA, Interactable, { action: "clearWeb", params: null });
+
+  const webB = world.create();
+  world.add(webB, Position, { x: 6, y: 5 });
+  world.add(webB, NamedIdentity, { name: "Web", identity: "web" });
+  world.add(webB, Material, { kind: "organic" });
+  world.add(webB, Collider, { solid: true, blocksSight: false });
+  world.add(webB, Interactable, { action: "clearWeb", params: null });
+
+  spawnHazard(world, {
+    x: 5,
+    y: 5,
+    kind: "fire",
+    medium: "floor",
+    turnsLeft: 2,
+    radius: 0,
+    tickDamage: 0,
+    damageType: "fire",
+    cause: "thrown_torch",
+  });
+
+  hazardSystem(world);
+
+  assert(world.has(webA, Burned), "web at fire origin should burn on first pulse");
+  assert(
+    burned.some((event) => event.entityId === webA && event.identity === "web"),
+    "burning a web should emit entity:burned",
+  );
+  assert(
+    spawned.some((event) => event.kind === "fire" && event.at?.x === 6 && event.at?.y === 5),
+    "fire should spread from one web tile to an adjacent web tile",
+  );
+
+  hazardSystem(world);
+
+  assert(world.has(webB, Burned), "adjacent web should burn after spread pulse");
+  assert(
+    burned.some((event) => event.entityId === webB && event.identity === "web"),
+    "spread fire should burn the neighboring web entity",
+  );
 });
