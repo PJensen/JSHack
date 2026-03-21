@@ -175,11 +175,10 @@ function resolveHitRoll(world, {
     }), { excludeSlots: ['weapon'] });
 
     if (finalDmg > 0) {
-        const bypassResist = damageType === 'physical';
         const result = dealDamage(world, {
             target, amount: finalDmg, source,
             type: damageType, cause: 'melee',
-            critical: isCrit, bypassResist,
+            critical: isCrit,
             ...(offhand ? { offhand: true } : {}),
         });
         if (!result.applied && result.reason !== 'invulnerable') {
