@@ -181,7 +181,7 @@ function resolveHitRoll(world, {
             critical: isCrit,
             ...(offhand ? { offhand: true } : {}),
         });
-        if (!result.applied && result.reason !== 'invulnerable') {
+        if (!result.applied && result.reason !== 'invulnerable' && result.reason !== 'resisted') {
             world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
         }
     } else {
