@@ -249,6 +249,66 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Mimic revealed: warning burst at mimic position.
+  world.on('mimic:revealed', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    try {
+      ftext.addStatus(at.x, at.y - 0.45, 'MIMIC!', {
+        color: '#ff8844',
+        life: 1.4,
+        scaleStart: 1.6,
+        scaleEnd: 1.0,
+      });
+    } catch (e) { console.debug('[floatTextWiring] mimic reveal ftext failed:', e); }
+  });
+
+  // Nymph stole item: float at player position.
+  world.on('nymph:stole', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    try {
+      ftext.addStatus(at.x, at.y - 0.45, 'STOLEN!', {
+        color: '#88ddaa',
+        life: 1.3,
+        scaleStart: 1.5,
+        scaleEnd: 1.0,
+      });
+    } catch (e) { console.debug('[floatTextWiring] nymph stole ftext failed:', e); }
+  });
+
+  // Nymph blinked away: shimmer at landing.
+  world.on('nymph:blinked', ({ to }) => {
+    if (!to || !canShowAt(to.x, to.y)) return;
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.2 + Math.random() * 0.4;
+      try {
+        fx.pool.spawn(new Particle({
+          x: to.x, y: to.y - 0.1,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.1,
+          life: 0.3 + Math.random() * 0.2,
+          size0: 0.1, size1: 0.02,
+          r: 136, g: 221, b: 170,
+          a0: 0.8, a1: 0.0,
+        }));
+      } catch (e) { console.debug('[floatTextWiring] nymph blink fx failed:', e); }
+    }
+  });
+
+  // Rust monster corroded equipment: float at defender.
+  world.on('proc:corroded', ({ target }) => {
+    const pos = getPosition(Number(target || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'CORRODED!', {
+        color: '#cc7744',
+        life: 1.2,
+        scaleStart: 1.4,
+        scaleEnd: 1.0,
+      });
+    } catch (e) { console.debug('[floatTextWiring] corroded ftext failed:', e); }
+  });
+
   // Permanent trait gained from corpse eating
   world.on('corpse:trait-gained', ({ actor, name }) => {
     const pos = getPosition(Number(actor || 0));

@@ -15,6 +15,8 @@ import {
   statusEffectOnDamaged,
   phaseOutOnDamaged,
   mindflayerBlastOnHit,
+  corrodeEquipmentOnHit,
+  stealAndBlinkOnHit,
 } from "./callbacks/combat.js";
 import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath } from "./callbacks/death.js";
@@ -1034,8 +1036,10 @@ export const MONSTERS = [
     massKg: 140,
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
-    hooks: null,
-    specials: [],
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0020, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
+    },
+    specials: ["Adhesive grip (stun 30%)"],
     description: 'A predatory chest-creature that waits for curious hands.',
     lootTable: 'drop:tier1',
   },
@@ -1063,6 +1067,75 @@ export const MONSTERS = [
     hooks: null,
     specials: [],
     description: 'An animated stone idol that heckles anything that breathes.',
+  },
+  // ── Lichen (tier 0) — sessile food source ────────────────────────────
+  {
+    id: 'lichen',
+    name: 'Lichen',
+    tags: ['plant'],
+    tier: 0,
+    intelligence: 1,   // mindless growth — scurries randomly
+    ambush: true,      // sessile; doesn't move until bumped
+    baseHp: 6,
+    hpPerLevel: 0.5,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d2',
+    sizeClass: 'XS',
+    massKg: 5,
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0.5 } },
+    speed: 1,          // very slow (actEvery = 3)
+    hooks: null,
+    specials: [],
+    description: 'A crusty growth clinging to the dungeon stone. Edible, if desperate.',
+  },
+  // ── Nymph (tier 1) — item thief ────────────────────────────────────
+  {
+    id: 'nymph',
+    name: 'Nymph',
+    tags: ['fey', 'humanoid'],
+    tier: 1,
+    intelligence: 7,   // smart enough to steal tactically
+    aggro: 'passive',  // approaches to steal, not attack
+    baseHp: 12,
+    hpPerLevel: 1,
+    attack: 1,
+    defense: 3,        // elusive
+    damageDice: '1d4',
+    sizeClass: 'S',
+    massKg: 45,
+    resistances: { kinetic: { DR: 0 } },
+    speed: 3,          // fast (actEvery = 1)
+    retreatHpPct: 0.40,
+    hooks: {
+      onHit: [stealAndBlinkOnHit({ chancePct: 50, seedSalt: 0xdead0030, cooldownTurns: 8, blinkDistance: 10 })],
+    },
+    specials: ["Steals items", "Teleports away"],
+    description: 'A mischievous forest spirit with light fingers and lighter feet.',
+    lootTable: 'drop:nymph',
+  },
+  // ── Rust Monster (tier 1) — equipment corroder ─────────────────────
+  {
+    id: 'rust_monster',
+    name: 'Rust Monster',
+    tags: ['beast', 'aberration'],
+    tier: 1,
+    intelligence: 3,   // dumb beast — scurries
+    aggro: 'passive',  // only attacks when provoked
+    baseHp: 14,
+    hpPerLevel: 1.5,
+    attack: 1,
+    defense: 1,
+    damageDice: '1d4',
+    sizeClass: 'M',
+    massKg: 100,
+    resistances: { kinetic: { DR: 4 }, chemical: { toxMult: 0 } },
+    speed: 2,
+    hooks: {
+      onHit: [corrodeEquipmentOnHit(40, 0xdead0040)],
+    },
+    specials: ["Corrodes metal equipment"],
+    description: 'A rust-brown beetle whose feathery antennae dissolve metal on contact.',
   },
   // ── Multi-segment centipede (tier 0) ─────────────────────────────────
   {

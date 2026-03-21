@@ -304,6 +304,19 @@ export const LOOT_TABLES = {
     ],
   },
 
+  // ── Monster-specific tables ─────────────────────────────────────────
+
+  "drop:nymph": {
+    rolls: { min: 1, max: 2 },
+    entries: [
+      { type: "nothing",   weight: 30 },
+      { type: "gold",      weight: 40, count: { base: 8, perDepth: 4 } },
+      { type: "table",     weight: 20, tableId: "sub:potions" },
+      { type: "table",     weight: 15, tableId: "sub:jewelry" },
+      { type: "table",     weight: 10, tableId: "sub:scrolls" },
+    ],
+  },
+
   // ── Tag-based drop tables ──────────────────────────────────────────
   // getMonsterLootTable() routes here by tag priority:
   //   caster > beast > humanoid > undead > tier fallback

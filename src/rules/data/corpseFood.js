@@ -402,6 +402,32 @@ export const CORPSE_DEFS = Object.freeze({
     onEat: Object.freeze([grantElectricResist]),
   }),
 
+  // ── New monsters ────────────────────────────────────────────────────
+
+  // Lichen: completely safe, bonus nutrition — the best early food source.
+  // Never rots (handled by foodDecaySystem exception).
+  corpse_lichen: Object.freeze({
+    onEat: Object.freeze([corpseBonusNutrition(110)]),
+  }),
+
+  // Nymph: 40% fey grace (evasion buff), 60% confusion
+  corpse_nymph: Object.freeze({
+    onEat: Object.freeze([
+      corpseGamble(0.4,
+        corpseTimedBuff("fey_grace", 80, 1, "corpse:buff-gained", "fey lightness fills your step — you weave like wind"),
+        corpseStatusEffect("confused", 10, 1),
+      ),
+    ]),
+  }),
+
+  // Rust Monster: safe, builds acid resist over repeated meals
+  corpse_rust_monster: Object.freeze({
+    onEat: Object.freeze([
+      corpseTimedBuff("resist_acid", 100, 1, "corpse:buff-gained", "the beetle's ichor coats your innards — acid cannot touch you"),
+      corpseDiminishResist("acidResist", 0.85, 0.4, "acid", "rust_monster"),
+    ]),
+  }),
+
   // Test hook
   corpse_test_cancel: Object.freeze({
     onEat: Object.freeze([cancelEat("FAIL", "You cannot stomach that.", true)]),

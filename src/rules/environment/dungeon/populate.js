@@ -474,6 +474,30 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       }
     }
 
+    // Rare room mimic: 5% chance per non-entry room to place a mimic disguised
+    // as a common dungeon decoration. Uses a separate spawn point (not the feature).
+    const ROOM_MIMIC_CHANCE = 0.05;
+    const MIMIC_DISGUISE_POOL = ['chest', 'barrel', 'urn', 'crate', 'sarcophagus'];
+    if (!isEntryRoom && rng.next() < ROOM_MIMIC_CHANCE) {
+      let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+      let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      let attempts = 0;
+      while (isSolid(mx, my) && attempts < 8) {
+        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
+        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+        attempts++;
+      }
+      if (!isSolid(mx, my)) {
+        const disguise = MIMIC_DISGUISE_POOL[rng.int(0, MIMIC_DISGUISE_POOL.length - 1)];
+        spawns.push({
+          x: mx, y: my,
+          kind: 'mimic',
+          params: { depth: floorPlan.depth, disguiseIdentity: disguise },
+        });
+        markSolid(mx, my);
+      }
+    }
+
     // Monster density: ~1 per 12-18 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
     const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
@@ -1282,7 +1306,10 @@ export function materializeSpawn(world, spawn) {
       return id;
     }
     case 'mimic': {
-      const id = createFrom(world, Chest, { x: spawn.x, y: spawn.y });
+      // Resolve disguise archetype — defaults to Chest (shop mimics)
+      const disguise = String(spawn.params?.disguiseIdentity || 'chest');
+      const DisguiseArch = ARCHETYPE_BY_KIND[disguise] || Chest;
+      const id = createFrom(world, DisguiseArch, { x: spawn.x, y: spawn.y });
       world.add(id, Collider, { solid: true, blocksSight: false });
       world.add(id, Interactable, { action: 'touchMimic', params: null });
       world.add(id, Polymorph, {

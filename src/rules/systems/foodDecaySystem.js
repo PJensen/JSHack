@@ -11,6 +11,9 @@ import { NamedIdentity } from '../components/NamedIdentity.js';
 import { getDecayStage } from '../data/food.js';
 import { inventoryItems } from '../utils/inventoryFacade.js';
 
+/** Corpse identities that never decay. */
+const NEVER_DECAY_CORPSES = new Set(['corpse_lichen']);
+
 /**
  * foodDecaySystem — advances food rot for items held in inventories.
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -23,6 +26,10 @@ export function foodDecaySystem(world) {
 
       const info = world.get(itemId, ItemInfo);
       if (!info || info.type !== 'food') continue;
+
+      // Some corpses never rot (e.g. lichen)
+      const ni = world.get(itemId, NamedIdentity);
+      if (ni && NEVER_DECAY_CORPSES.has(ni.identity)) continue;
 
       // Snapshot previous stage before incrementing
       const prevStage = getDecayStage(decay.turnsHeld, decay.shelfLife).stage;
