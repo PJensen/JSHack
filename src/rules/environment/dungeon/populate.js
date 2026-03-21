@@ -1253,7 +1253,8 @@ export function materializeSpawn(world, spawn) {
     case 'spawner': {
       const p = spawn.params;
       const monsterParams = p.monsterType;
-      // Create spawner with specific identity for display palette lookup
+      // Create spawner with specific identity for display palette lookup.
+      // Starts dormant — monsterSpawnerSystem activates once area is explored.
       return createFrom(world, Spawner, {
         x: spawn.x,
         y: spawn.y,
@@ -1261,9 +1262,10 @@ export function materializeSpawn(world, spawn) {
         identity: 'spawner',  // Used by display layer to lookup glyph/color
         spawnParams: monsterParams,
         totalToSpawn: p.packSize,
-        cooldownTicks: 15,
-        maxConcurrent: 3,
+        cooldownTicks: p.cooldownTicks ?? 15,
+        maxConcurrent: p.maxConcurrent ?? 3,
         spawnRadius: 2,
+        isActive: false,       // dormant until explored
         maxHp: 50,  // Make spawners destructible but not too fragile
       });
     }

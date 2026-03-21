@@ -148,6 +148,17 @@ const PACK_SIZE_BY_CLASS = {
   'XL': { min: 1, max: 1 },   // gigantic creatures - never pack
 };
 
+// Spawner profiles by size class — controls concurrent/total/cooldown variety.
+// XS: lone trickle nests that keep producing over time (1 concurrent, high total)
+// S:  swarm nests that burst several at once but exhaust faster (2-3 concurrent, lower total)
+const SPAWNER_PROFILE_BY_CLASS = {
+  'XS': { concurrent: { min: 1, max: 2 }, total: { min: 6, max: 10 }, cooldown: 12 },
+  'S':  { concurrent: { min: 2, max: 3 }, total: { min: 3, max: 5 },  cooldown: 15 },
+  'M':  { concurrent: { min: 1, max: 2 }, total: { min: 4, max: 6 },  cooldown: 20 },
+  'L':  { concurrent: { min: 1, max: 1 }, total: { min: 2, max: 3 },  cooldown: 25 },
+  'XL': { concurrent: { min: 1, max: 1 }, total: { min: 1, max: 2 },  cooldown: 80 },
+};
+
 const SPAWNER_WHITELIST_MONSTER_IDS = new Set([
   'rat',
   'bat',
@@ -155,6 +166,7 @@ const SPAWNER_WHITELIST_MONSTER_IDS = new Set([
   'spider',
   'cave_snake',
   'snake',
+  'cave_bear',
 ]);
 
 function isSpawnerEligibleMonster(def) {
@@ -183,9 +195,10 @@ export function pickSpecificMonster(monsterId, depth) {
 export function pickSpecificSpawner(rng, monsterId, depth) {
   const params = pickSpecificMonster(monsterId, depth);
   if (!params || !isSpawnerEligibleMonster({ id: params.identity })) return null;
-  const packRange = PACK_SIZE_BY_CLASS[params.sizeClass] || PACK_SIZE_BY_CLASS['M'];
-  const packSize = rng.int(packRange.min, packRange.max);
-  return { monsterType: params, packSize, depth };
+  const profile = SPAWNER_PROFILE_BY_CLASS[params.sizeClass] || SPAWNER_PROFILE_BY_CLASS['M'];
+  const totalToSpawn = rng.int(profile.total.min, profile.total.max);
+  const maxConcurrent = rng.int(profile.concurrent.min, profile.concurrent.max);
+  return { monsterType: params, packSize: totalToSpawn, maxConcurrent, cooldownTicks: profile.cooldown, depth };
 }
 
 /**
@@ -203,13 +216,16 @@ export function pickSpawner(rng, depth, monsterFilter = null) {
   };
   const monsterParams = pickMonster(rng, depth, spawnerFilter);
 
-  // Look up pack size based on monster's size class
-  const packRange = PACK_SIZE_BY_CLASS[monsterParams.sizeClass] || PACK_SIZE_BY_CLASS['M'];
-  const packSize = rng.int(packRange.min, packRange.max);
+  // Look up spawner profile based on monster's size class
+  const profile = SPAWNER_PROFILE_BY_CLASS[monsterParams.sizeClass] || SPAWNER_PROFILE_BY_CLASS['M'];
+  const totalToSpawn = rng.int(profile.total.min, profile.total.max);
+  const maxConcurrent = rng.int(profile.concurrent.min, profile.concurrent.max);
 
   return {
     monsterType: monsterParams,
-    packSize: packSize,
+    packSize: totalToSpawn,
+    maxConcurrent,
+    cooldownTicks: profile.cooldown,
     depth: depth,
   };
 }
