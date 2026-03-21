@@ -116,8 +116,8 @@ Deno.test("cave_bear corpse applies bear_vigor and increases kinetic DR", () => 
 
   // Kinetic DR increased
   assert(resist.kinetic.DR > drBefore, "should increase kinetic DR");
-  // formula: 0 + 1.5 * max(0, 1 - 0/6) = 1.5
-  assertEquals(resist.kinetic.DR, 1.5, "first eat: full increment");
+  // formula: 4 + 1.5 * max(0, 1 - 4/6) = 4 + 1.5*0.333 = 4.5
+  assertEquals(resist.kinetic.DR, 4.5, "first eat: diminished by existing DR");
 });
 
 Deno.test("repeated cave_bear eats show diminishing DR gains", () => {
