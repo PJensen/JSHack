@@ -1,3 +1,6 @@
+import { children } from "../../../lib/ecs-js/index.js";
+import { CorpseAdaptation } from "../../components/CorpseAdaptation.js";
+import { DerivedExpression } from "../../components/DerivedExpression.js";
 import { getItemHooksByIdentity } from "./itemHooks.js";
 import { FoodDecay } from "../../components/FoodDecay.js";
 import { Hunger } from "../../components/Hunger.js";
@@ -120,14 +123,25 @@ function runCorpseEatHooks(ctx, state) {
       setTrait(key, value) {
         ctx.mutate.queue({ type: "setTrait", entityId: actor, key: String(key || ""), value });
       },
-      grantResistance(channel, field, value) {
+      addCorpseAdaptation(statKey, value, source, label) {
         ctx.mutate.queue({
-          type: "grantResistance",
+          type: "addCorpseAdaptation",
           entityId: actor,
-          channel: String(channel || ""),
-          field: String(field || ""),
+          statKey: String(statKey || ""),
           value: Number(value),
+          source: String(source || ""),
+          label: String(label || ""),
         });
+      },
+      sumCorpseAdaptations(statKey) {
+        let total = 0;
+        for (const childId of children({ get: (id, C) => ctx.query.get(id | 0, C) }, actor)) {
+          const ca = ctx.query.get(childId | 0, CorpseAdaptation);
+          if (!ca || ca.statKey !== statKey) continue;
+          const expr = ctx.query.get(childId | 0, DerivedExpression);
+          if (expr) total += Number(expr.value || 0);
+        }
+        return total;
       },
       heal(amount) {
         const value = Math.max(0, Number(amount) | 0);

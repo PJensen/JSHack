@@ -2,10 +2,13 @@
 // Eat callback context and shared factory functions for corpse eating hooks.
 // Callbacks are plain (ctx) => void functions invoked via runCallbackList.
 
+import { attach, children } from "../../../lib/ecs-js/index.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { CorpseAdaptation } from "../../components/CorpseAdaptation.js";
+import { DerivedExpression } from "../../components/DerivedExpression.js";
 import { Hunger } from "../../components/Hunger.js";
-import { Vitality } from "../../components/Vitality.js";
 import { Resistances } from "../../components/Resistences.js";
+import { Vitality } from "../../components/Vitality.js";
 import { Traits } from "../../components/Traits.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
@@ -117,19 +120,37 @@ export class EatCallbackContext {
   }
 
   /**
-   * Queue a generic resistance field update on the eating actor.
-   * @param {string} channel - e.g. "kinetic", "thermal", "chemical", "electric"
-   * @param {string} field - e.g. "DR", "toxMult", "burnMult", "ohms"
-   * @param {number} value
+   * Queue a corpse adaptation child entity (DerivedExpression + CorpseAdaptation marker).
+   * @param {string} statKey - canonical stat key (e.g. "poisonResist", "kineticDR")
+   * @param {number} value - addConst bonus value
+   * @param {string} source - monster id (e.g. "cave_snake")
+   * @param {string} label - display label (e.g. "poison")
    */
-  grantResistance(channel, field, value) {
+  addCorpseAdaptation(statKey, value, source, label) {
     return this.queueMutation({
-      type: "grantResistance",
+      type: "addCorpseAdaptation",
       entityId: this.actor,
-      channel: String(channel || ""),
-      field: String(field || ""),
+      statKey: String(statKey || ""),
       value: Number(value),
+      source: String(source || ""),
+      label: String(label || ""),
     });
+  }
+
+  /**
+   * Sum all existing CorpseAdaptation DerivedExpression values for a given stat key.
+   * @param {string} statKey - canonical stat key to sum
+   * @returns {number}
+   */
+  sumCorpseAdaptations(statKey) {
+    let total = 0;
+    for (const childId of children(this.world, this.actor)) {
+      const ca = this.world.get(childId, CorpseAdaptation);
+      if (!ca || ca.statKey !== statKey) continue;
+      const expr = this.world.get(childId, DerivedExpression);
+      if (expr) total += Number(expr.value || 0);
+    }
+    return total;
   }
 
   /**
@@ -182,18 +203,22 @@ export class EatCallbackContext {
     if (tr) tr[key] = op.value;
   }
 
-  _applyResistance(op) {
-    const channel = String(op.channel || "");
-    const field = String(op.field || "");
-    if (!channel || !field) return;
-    let resist = this.world.get(op.entityId, Resistances);
-    if (!resist) {
-      try { this.world.add(op.entityId, Resistances, {}); } catch {}
-      resist = this.world.get(op.entityId, Resistances);
-    }
-    if (!resist) return;
-    if (!resist[channel] || typeof resist[channel] !== "object") resist[channel] = {};
-    resist[channel][field] = Number(op.value);
+  _applyCorpseAdaptation(op) {
+    const statKey = String(op.statKey || "");
+    const value = Number(op.value || 0);
+    if (!statKey || !Number.isFinite(value) || value === 0) return;
+    const childId = this.world.create();
+    this.world.add(childId, DerivedExpression, {
+      target: statKey, kind: "addConst", value,
+      stage: "base", priority: 100, enabled: true,
+      source: "", factor: 0,
+    });
+    this.world.add(childId, CorpseAdaptation, {
+      source: String(op.source || ""),
+      label: String(op.label || ""),
+      statKey,
+    });
+    attach(this.world, childId, op.entityId);
   }
 
   _applyHeal(op) {
@@ -250,8 +275,8 @@ export class EatCallbackContext {
         case "setTrait":
           this._applySetTrait(op);
           break;
-        case "grantResistance":
-          this._applyResistance(op);
+        case "addCorpseAdaptation":
+          this._applyCorpseAdaptation(op);
           break;
         case "heal":
           this._applyHeal(op);
@@ -305,14 +330,18 @@ export function corpseDamage(amount) {
 }
 
 /**
- * Grant electric resistance on eat.
- * Used by eel corpse.
+ * Grant electric resistance on eat via stat tree.
+ * Used by eel corpse. Adds electricOhms bonus (diminishing, cap ~2400 total bonus).
  */
 export function grantElectricResist(ctx) {
-  const current = Number(ctx.world.get(ctx.actor, Resistances)?.electric?.ohms);
-  const nextOhms = Number.isFinite(current) ? Math.max(current, 2400) : 2400;
-  ctx.grantElectricResistance(2400, 0.03);
-  ctx.emit("hunger:resistance-gained", { actor: ctx.actor, type: "electric", ohms: nextOhms });
+  const currentBonus = ctx.sumCorpseAdaptations("electricOhms");
+  const ceiling = 2400;
+  const increment = 600;
+  const headroom = Math.max(0, 1 - currentBonus / ceiling);
+  const delta = Math.round(increment * headroom);
+  if (delta <= 0) return;
+  ctx.addCorpseAdaptation("electricOhms", delta, "eel", "electric");
+  ctx.emit("hunger:resistance-gained", { actor: ctx.actor, type: "electric", ohms: currentBonus + delta });
 }
 
 /**
@@ -391,64 +420,74 @@ export function corpseHeal(amount) {
 }
 
 /**
- * Diminishing-returns resistance builder for damage multipliers (lower = better).
- * Each eat: newMult = floor + (current - floor) * decay
- * Asymptotically approaches `floor` but never reaches it.
+ * Diminishing-returns resistance via DerivedExpression stat tree.
+ * Each eat creates a child entity with a smaller addConst bonus.
+ * For multiplier resists (poisonResist, fireResist): higher bonus = more resist.
  *
- * Example (toxMult, decay 0.85, floor 0.4):
- *   eat 1: 1.0 → 0.91,  eat 2: → 0.83,  eat 3: → 0.77,  eat 5: → 0.65,  eat 10: → 0.49
+ * Formula: delta = (1 - floor - currentBonus) * (1 - decay)
+ * The max total bonus is capped at (1 - floor), so the effective mult never
+ * drops below floor.
  *
- * @param {string} channel - e.g. "chemical", "thermal"
- * @param {string} field   - e.g. "toxMult", "burnMult"
- * @param {number} decay   - 0–1 multiplier applied to headroom each eat (lower = faster)
- * @param {number} floor   - asymptotic minimum the mult can reach
- * @param {string} [label] - display name for the resistance type
+ * Example (poisonResist, decay 0.85, floor 0.4, maxBonus 0.6):
+ *   eat 1: delta=0.09, total=0.09
+ *   eat 2: delta=0.077, total=0.167
+ *   eat 5: total≈0.35
+ *
+ * @param {string} statKey  - canonical stat key (e.g. "poisonResist", "fireResist")
+ * @param {number} decay    - 0–1, higher = slower convergence
+ * @param {number} floor    - minimum multiplier (max bonus = 1 - floor)
+ * @param {string} [label]  - display name for the resistance type
+ * @param {string} [source] - monster id for attribution
  */
-export function corpseDiminishResist(channel, field, decay, floor, label) {
+export function corpseDiminishResist(statKey, decay, floor, label, source) {
+  const maxBonus = 1.0 - floor;
   return (ctx) => {
-    const resist = ctx.world.get(ctx.actor, Resistances);
-    const current = Number(resist?.[channel]?.[field]);
-    const cur = Number.isFinite(current) ? current : 1.0;
-    const next = floor + (cur - floor) * decay;
-    const clamped = Math.round(Math.max(floor, next) * 100) / 100;
-    ctx.grantResistance(channel, field, clamped);
-    const pct = Math.round((1 - clamped) * 100);
+    const currentBonus = ctx.sumCorpseAdaptations(statKey);
+    const remaining = Math.max(0, maxBonus - currentBonus);
+    const delta = Math.round(remaining * (1 - decay) * 100) / 100;
+    if (delta <= 0) return;
+    ctx.addCorpseAdaptation(statKey, delta, source || "", label || statKey);
+    const totalBonus = currentBonus + delta;
+    const pct = Math.round(totalBonus * 100);
     ctx.emit("corpse:resist-building", {
       actor: ctx.actor,
-      type: label || `${channel} ${field}`,
-      value: clamped,
+      type: label || statKey,
+      value: 1.0 - totalBonus,
       pct,
     });
   };
 }
 
 /**
- * Diminishing-returns resistance builder for flat DR values (higher = better).
- * Each eat: newDR = current + increment * max(0, 1 - current/ceiling)
- * Asymptotically approaches `ceiling`.
+ * Diminishing-returns flat DR via DerivedExpression stat tree.
+ * Each eat creates a child entity with a smaller addConst bonus.
  *
- * Example (kinetic DR, increment 1.5, ceiling 6):
- *   eat 1: 0 → 1.5,  eat 2: → 2.63,  eat 3: → 3.47,  eat 5: → 4.56
+ * Formula: delta = increment * max(0, 1 - (baseDR + currentBonus) / ceiling)
+ * Reads the Resistances component for baseDR so the ceiling accounts for
+ * both innate DR and corpse-sourced DR.
  *
- * @param {string} channel   - e.g. "kinetic"
- * @param {string} field     - e.g. "DR"
- * @param {number} increment - base amount added per eat (before diminishing)
- * @param {number} ceiling   - max DR reachable
- * @param {string} [label]   - display name for the resistance type
+ * @param {string} statKey    - canonical stat key (e.g. "kineticDR")
+ * @param {string} baseChannel - Resistances channel (e.g. "kinetic")
+ * @param {string} baseField   - Resistances field (e.g. "DR")
+ * @param {number} increment  - base amount added per eat (before diminishing)
+ * @param {number} ceiling    - max total DR reachable (base + corpse bonuses)
+ * @param {string} [label]    - display name
+ * @param {string} [source]   - monster id for attribution
  */
-export function corpseDiminishDR(channel, field, increment, ceiling, label) {
+export function corpseDiminishDR(statKey, baseChannel, baseField, increment, ceiling, label, source) {
   return (ctx) => {
     const resist = ctx.world.get(ctx.actor, Resistances);
-    const current = Number(resist?.[channel]?.[field]);
-    const cur = Number.isFinite(current) ? current : 0;
-    const headroom = Math.max(0, 1 - cur / ceiling);
-    const next = cur + increment * headroom;
-    const clamped = Math.round(Math.min(ceiling, next) * 100) / 100;
-    ctx.grantResistance(channel, field, clamped);
+    const baseDR = Number(resist?.[baseChannel]?.[baseField]) || 0;
+    const currentBonus = ctx.sumCorpseAdaptations(statKey);
+    const effectiveDR = baseDR + currentBonus;
+    const headroom = Math.max(0, 1 - effectiveDR / ceiling);
+    const delta = Math.round(increment * headroom * 100) / 100;
+    if (delta <= 0) return;
+    ctx.addCorpseAdaptation(statKey, delta, source || "", label || statKey);
     ctx.emit("corpse:resist-building", {
       actor: ctx.actor,
-      type: label || `${channel} ${field}`,
-      value: clamped,
+      type: label || statKey,
+      value: effectiveDR + delta,
     });
   };
 }

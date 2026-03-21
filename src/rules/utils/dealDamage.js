@@ -122,28 +122,28 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       return Math.max(0, Math.floor(rawAmount * rMult * gMult));
     }
     case 'blunt': {
-      const drBonus = Number(resolved?.mitigation ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.bluntResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'slash': {
-      const drBonus = Number(resolved?.mitigation ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.slashResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'pierce': {
-      const drBonus = Number(resolved?.mitigation ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.pierceResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
       return Math.max(0, Math.floor(afterDR * effectiveMult));
     }
     case 'physical': {
-      const drBonus = Number(resolved?.mitigation ?? 0);
+      const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       return Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
     }
     case 'fire': {

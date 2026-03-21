@@ -90,12 +90,11 @@ export const CORPSE_DEFS = Object.freeze({
   }),
 
   // Cave Snake: harmless + bonus nutrition + builds poison resistance
-  // Each eat: toxMult * 0.85 decay toward floor 0.4
-  // eat 1: 1.0→0.91, eat 3: →0.77, eat 5: →0.65, eat 10: →0.49
+  // Each eat adds diminishing poisonResist bonus (decay 0.85, max bonus 0.6)
   corpse_cave_snake: Object.freeze({
     onEat: Object.freeze([
       corpseBonusNutrition(50),
-      corpseDiminishResist("chemical", "toxMult", 0.85, 0.4, "poison"),
+      corpseDiminishResist("poisonResist", 0.85, 0.4, "poison", "cave_snake"),
     ]),
   }),
 
@@ -110,11 +109,11 @@ export const CORPSE_DEFS = Object.freeze({
   }),
 
   // Snake: poison + builds poison resistance (risk/reward: you get poisoned but build tolerance)
-  // Each eat: toxMult * 0.88 decay toward floor 0.4
+  // Each eat adds diminishing poisonResist bonus (decay 0.88, max bonus 0.6)
   corpse_snake: Object.freeze({
     onEat: Object.freeze([
       corpseStatusEffect("poison", 8, 2),
-      corpseDiminishResist("chemical", "toxMult", 0.88, 0.4, "poison"),
+      corpseDiminishResist("poisonResist", 0.88, 0.4, "poison", "snake"),
     ]),
   }),
 
@@ -139,13 +138,12 @@ export const CORPSE_DEFS = Object.freeze({
     ]),
   }),
 
-  // Cave Bear: +2 maxHp timed buff + builds kinetic DR
-  // Each eat: DR += 1.5 * (1 - DR/6), ceiling 6
-  // eat 1: 0→1.5, eat 2: →2.63, eat 3: →3.47, eat 5: →4.56
+  // Cave Bear: +2 maxHp timed buff + builds kinetic DR via stat tree
+  // Each eat adds diminishing kineticDR bonus (increment 1.5, ceiling 6 total including base)
   corpse_cave_bear: Object.freeze({
     onEat: Object.freeze([
       corpseTimedBuff("bear_vigor", 150, 2, "corpse:buff-gained", "primal strength surges through your limbs"),
-      corpseDiminishDR("kinetic", "DR", 1.5, 6, "toughness"),
+      corpseDiminishDR("kineticDR", "kinetic", "DR", 1.5, 6, "toughness", "cave_bear"),
     ]),
   }),
 
@@ -339,7 +337,7 @@ export const CORPSE_DEFS = Object.freeze({
         });
       },
       // Big nudge — dragon is legendary. Floor 0.1 so never full immunity.
-      corpseDiminishResist("thermal", "burnMult", 0.3, 0.1, "fire"),
+      corpseDiminishResist("fireResist", 0.3, 0.1, "fire", "dragon"),
     ]),
   }),
 
