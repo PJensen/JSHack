@@ -1,6 +1,10 @@
 import { getMonster } from "../../rules/data/monsters.js";
+import { creatureTypeFromTags } from "../../rules/components/CreatureType.js";
 import { applyMutation } from "../../rules/interaction/mutations.js";
 import { findNearestValidTileAround, playerEntity } from "../../rules/utils/queries.js";
+import { spawnCentipede } from "../../rules/utils/spawnCentipede.js";
+import { createRng } from "../../rules/utils/rng.js";
+import { DungeonState } from "../../rules/components/DungeonState.js";
 
 /**
  * Spawn a debug monster on the nearest open tile around the player.
@@ -24,6 +28,43 @@ export function spawnDebugMonsterNearPlayer(world, monsterId) {
     exclude: [pe.pos],
   });
   if (!spawnAt) return { ok: false, error: "No open tile near player." };
+
+  // Multi-segment centipede needs its own spawn path
+  if (id === 'centipede') {
+    let depth = 1;
+    for (const [, ds] of world.query(DungeonState)) {
+      depth = ds.depth || 1;
+      break;
+    }
+    const params = {
+      name: def.name,
+      identity: def.id,
+      maxHp: Math.floor(def.baseHp + depth * def.hpPerLevel),
+      faction: 'enemy',
+      accuracyDerived: def.attack,
+      damagePowerDerived: def.attack,
+      evadeDerived: def.defense,
+      naturalDamageDice: def.damageDice,
+      sizeClass: def.sizeClass,
+      massKg: def.massKg,
+      resistances: def.resistances,
+      speed: def.speed,
+      creatureType: creatureTypeFromTags(def.tags || []),
+    };
+    const segMin = def.segmentCount?.min ?? 4;
+    const segMax = def.segmentCount?.max ?? 7;
+    const seed = ((world.seed >>> 0) ^ ((spawnAt.x * 0x45d9f3b) >>> 0) ^ ((spawnAt.y * 0x119de1f3) >>> 0)) >>> 0;
+    const rng = createRng(seed);
+    const segCount = segMin + Math.floor(rng.next() * (segMax - segMin + 1));
+    spawnCentipede(world, params, spawnAt.x, spawnAt.y, segCount, rng);
+    return {
+      ok: true,
+      monsterId: id,
+      name: String(def.name || id),
+      x: spawnAt.x,
+      y: spawnAt.y,
+    };
+  }
 
   applyMutation(world, {
     type: "spawnMonster",

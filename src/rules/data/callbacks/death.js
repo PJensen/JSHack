@@ -2,6 +2,12 @@
 // Death callback context and shared factory functions for monster death hooks.
 
 import { spawnPlasmaCloud } from "../../utils/spawnPlasmaCloud.js";
+import { CentipedeSegment } from "../../components/CentipedeSegment.js";
+import { Brain } from "../../components/Brain.js";
+import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "../../components/AggroState.js";
+import { SoundEmitter } from "../../components/SoundEmitter.js";
+import { Wounds } from "../../components/Wounds.js";
+import { Position } from "../../components/Position.js";
 
 /**
  * Context passed to monster death hook callbacks.
@@ -80,5 +86,101 @@ export function spawnPlasmaCloudOnDeath(params = {}) {
   return (ctx) => {
     if (!ctx || typeof ctx.spawnPlasmaCloud !== "function") return;
     ctx.spawnPlasmaCloud(config);
+  };
+}
+
+// ── Centipede split-on-death ──────────────────────────────────────────
+
+/**
+ * Promote a body segment to a new centipede head.
+ * Adds Brain + AggroState (hunting, pointed at killer) + SoundEmitter + Wounds.
+ * Re-indexes the remaining tail-side chain.
+ */
+function promoteToHead(world, newHeadId, killerId) {
+  const seg = world.get(newHeadId, CentipedeSegment);
+  if (!seg) return;
+
+  // Update segment metadata
+  seg.index = 0;
+  seg.headId = 0;  // self is head
+  seg.prevId = 0;  // no predecessor
+
+  // New chain ID
+  const newChainId = ((world.step * 0x9e3779b9) ^ (newHeadId * 0x517cc1b7)) >>> 0;
+  seg.chainId = newChainId;
+
+  // Re-index tail-side chain
+  let cursor = seg.nextId;
+  let idx = 1;
+  while (cursor && world.isAlive(cursor)) {
+    const cSeg = world.get(cursor, CentipedeSegment);
+    if (!cSeg) break;
+    cSeg.headId = newHeadId;
+    cSeg.index = idx++;
+    cSeg.chainId = newChainId;
+    cursor = cSeg.nextId;
+  }
+
+  // Grant full AI components to the new head
+  if (!world.has(newHeadId, Brain)) {
+    try { world.add(newHeadId, Brain, {
+      learnedSpellIds: [], itemKnowledgeIdentities: [],
+      seenTiles: new Uint8Array(), intelligence: 2, visionRange: 8,
+    }); } catch { /* already present */ }
+  }
+
+  // Start hunting, pointed toward the killer
+  let lkx = 0, lky = 0;
+  if (killerId && world.isAlive(killerId)) {
+    const kp = world.get(killerId, Position);
+    if (kp) { lkx = kp.x | 0; lky = kp.y | 0; }
+  }
+  if (!world.has(newHeadId, AggroState)) {
+    try { world.add(newHeadId, AggroState, {
+      alertLevel: AGGRO_LEVELS.hunting,
+      lastKnownX: lkx, lastKnownY: lky,
+      searchTurnsLeft: SEARCH_TURNS_HUNTING_GRACE,
+      retreating: false, patrolDx: 0, patrolDy: 0,
+    }); } catch { /* already present */ }
+  }
+
+  if (!world.has(newHeadId, SoundEmitter)) {
+    try { world.add(newHeadId, SoundEmitter, { ambient: 30, lastActionNoise: 0 }); } catch {}
+  }
+  if (!world.has(newHeadId, Wounds)) {
+    try { world.add(newHeadId, Wounds, { list: [] }); } catch {}
+  }
+
+  try { world.emit("centipede:split", { newHeadId }); } catch {}
+}
+
+/**
+ * When any centipede segment dies, unlink it and promote the tail-side
+ * to an independent centipede.
+ */
+export function centipedeSplitOnDeath() {
+  return (ctx) => {
+    const world = ctx.world;
+    const deadId = ctx.deadId;
+    const seg = world.get(deadId, CentipedeSegment);
+    if (!seg) return;
+
+    const prevId = seg.prevId;
+    const nextId = seg.nextId;
+
+    // Unlink dead segment from its neighbors
+    if (prevId && world.isAlive(prevId)) {
+      const prevSeg = world.get(prevId, CentipedeSegment);
+      if (prevSeg) prevSeg.nextId = 0;
+    }
+    if (nextId && world.isAlive(nextId)) {
+      const nextSeg = world.get(nextId, CentipedeSegment);
+      if (nextSeg) nextSeg.prevId = 0;
+    }
+
+    // Promote tail-side to a new independent centipede
+    if (nextId && world.isAlive(nextId)) {
+      promoteToHead(world, nextId, ctx.killer);
+    }
   };
 }
