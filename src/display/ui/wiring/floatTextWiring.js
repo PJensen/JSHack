@@ -158,12 +158,13 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   });
 
   // Floating text hooks: damage (messages handled in messageWiring)
-  world.on('damaged', ({ target, amount, critical, crit, at, offhand, projectileDelay }) => {
+  world.on('damaged', ({ target, amount, rawAmount, critical, crit, at, offhand, projectileDelay }) => {
     const t = Number(target || 0) || 0;
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(t);
     const hitIsPlayer = isPlayer(t);
     if (pos && canShowAt(pos.x, pos.y) && Number.isFinite(amount)) {
-      const col = hitIsPlayer ? '#ff6060' : '#ffd966';
+      const resisted = Number.isFinite(rawAmount) && rawAmount > amount;
+      const col = hitIsPlayer ? '#ff6060' : (resisted ? '#b0a060' : '#ffd966');
       const delay = Number(projectileDelay) || (offhand ? 0.15 : 0);
       ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
     }
