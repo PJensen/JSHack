@@ -3,12 +3,12 @@
 
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
 import { stampBuilding } from "./stampBuilding.js";
-import smithyDef from "../../data/buildings/smithy.json" with { type: "json" };
-import churchDef from "../../data/buildings/church.json" with { type: "json" };
-import apothecaryDef from "../../data/buildings/apothecary.json" with { type: "json" };
-import gemStoreDef from "../../data/buildings/gem_store.json" with { type: "json" };
-import herbalistHutDef from "../../data/buildings/herbalist_hut.json" with { type: "json" };
-import bookShopDef from "../../data/buildings/book_shop.json" with { type: "json" };
+import smithyDef from "../../data/buildings/smithy.js";
+import churchDef from "../../data/buildings/church.js";
+import apothecaryDef from "../../data/buildings/apothecary.js";
+import gemStoreDef from "../../data/buildings/gem_store.js";
+import herbalistHutDef from "../../data/buildings/herbalist_hut.js";
+import bookShopDef from "../../data/buildings/book_shop.js";
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
