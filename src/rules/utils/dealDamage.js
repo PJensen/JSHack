@@ -107,6 +107,12 @@ export function resolveResistance(world, targetId, rawAmount, type) {
 
   const resolved = resolveCanonicalStats(world, targetId);
 
+  const applyKineticChip = (value, multiplier = 1) => {
+    if (!(rawAmount > 0)) return 0;
+    if (!(multiplier > 0)) return 0;
+    return Math.max(1, Math.max(0, Math.floor(Number(value) || 0)));
+  };
+
   switch (type) {
     case 'electric':
     case 'plasma':
@@ -126,25 +132,26 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       const multBonus = Number(resolved?.bluntResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
-      return Math.max(0, Math.floor(afterDR * effectiveMult));
+      return applyKineticChip(afterDR * effectiveMult, effectiveMult);
     }
     case 'slash': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.slashResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
-      return Math.max(0, Math.floor(afterDR * effectiveMult));
+      return applyKineticChip(afterDR * effectiveMult, effectiveMult);
     }
     case 'pierce': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.pierceResist ?? 0);
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
-      return Math.max(0, Math.floor(afterDR * effectiveMult));
+      return applyKineticChip(afterDR * effectiveMult, effectiveMult);
     }
     case 'physical': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
-      return Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const afterDR = rawAmount - ((resist.kinetic?.DR || 0) + drBonus);
+      return applyKineticChip(afterDR, 1);
     }
     case 'fire': {
       const bonus = Number(resolved?.fireResist ?? 0) + activeResistBonus(world, targetId, "resist_fire");
