@@ -129,6 +129,15 @@ export function postCharacterCreated(created) {
 }
 
 /**
+ * POST a verified score proof bundle to the remote worker.
+ * @param {object} bundle - A ProofBundle object with chainHash and actions.
+ * @returns {Promise<void>}
+ */
+export function postVerifiedScore(bundle) {
+  return postToWorker("/verified-score", bundle);
+}
+
+/**
  * Fetch the global highscores leaderboard.
  * @returns {Promise<Array<{playerName: string, score: number, className: string}>|null>}
  */

@@ -5969,6 +5969,34 @@ function renderDeathScreen(panel, detail) {
     box.appendChild(document.createElement('br'));
   }
 
+  // Copy Score Proof button
+  if (detail?.proofBundle) {
+    const proofBtn = document.createElement('button');
+    proofBtn.textContent = '\uD83D\uDD12 Copy Score Proof';
+    Object.assign(proofBtn.style, {
+      display: 'inline-block', padding: '10px 22px',
+      background: '#1a1a2e', color: '#cfe8ff', fontFamily: 'monospace',
+      border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: 'pointer', fontSize: '14px',
+      marginBottom: '12px',
+      transition: 'background 120ms',
+    });
+    proofBtn.addEventListener('mouseenter', () => { proofBtn.style.background = '#242448'; });
+    proofBtn.addEventListener('mouseleave', () => { proofBtn.style.background = '#1a1a2e'; });
+    proofBtn.addEventListener('click', () => {
+      const json = JSON.stringify(detail.proofBundle, null, 2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json)
+          .then(() => { proofBtn.textContent = '\u2705 Copied!'; })
+          .catch(() => { proofBtn.textContent = '\u274C Copy failed'; });
+      } else {
+        proofBtn.textContent = '\u274C Clipboard unavailable';
+      }
+    });
+    box.appendChild(proofBtn);
+    box.appendChild(document.createElement('br'));
+  }
+
   // New Game button
   {
     const newGameBtn = document.createElement('a');
