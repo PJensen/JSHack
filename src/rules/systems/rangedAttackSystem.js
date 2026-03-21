@@ -244,7 +244,6 @@ export function rangedAttackSystem(world) {
       type: 'pierce',
       cause: 'ranged',
       critical: isCrit,
-      bypassResist: true,
       projectileDelay: computeProjectileDelay(
         { x: ax, y: ay },
         { x: tx, y: ty },
