@@ -23,6 +23,7 @@
  * @property {string[]|null} featurePool    - override room feature kinds; null = default pool
  * @property {number}        doorFeatureRate - fraction of non-entry rooms that get a central feature
  * @property {number}        shopChance     - probability a dead-end room becomes a shop
+ * @property {number}        hallwayMonsterCap - max hallway (corridor) monsters per chunk
  */
 
 /** @type {DungeonProfile} */
@@ -46,4 +47,5 @@ export const DEFAULT_PROFILE = {
   featurePool:    null,
   doorFeatureRate: 0.5,
   shopChance:     0.3,
+  hallwayMonsterCap: 3,
 };

@@ -621,10 +621,10 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 40,
     resistances: { kinetic: { DR: 4 }, chemical: { toxMult: 0 } },
-    speed: 3,
+    speed: 2,
     hooks: {
-      onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 3, cooldownTurns: 2, chance: 0.50 })],
-      onHit: [statusEffectOnHit(30, 0xdead0404, { key: "poison", turnsLeft: 4, potency: 2 }, "proc:poisoned")],
+      onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 5, cooldownTurns: 4, chance: 0.2 })],
+      onHit: [statusEffectOnHit(30, 0xdead0404, { key: "poison", turnsLeft: 1, potency: 1 }, "proc:poisoned")],
       onDamaged: [phaseOutOnDamaged(20, 0xdead0405)],
     },
     specials: ["Phase teleport (50%)", "Poison 30%", "Phase out 20%"],

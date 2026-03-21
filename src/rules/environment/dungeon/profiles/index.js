@@ -19,10 +19,13 @@ export { GROTTO_PROFILE } from './grottos.js';
  * Consumes RNG to choose the type and, for the default profile, the visual theme.
  * @param {Object} rng - createRng() instance
  * @param {number} depth
+ * @param {string|null} [typeOverride] - force a specific profile type (e.g. from ?dungeonType)
  * @returns {import('./default.js').DungeonProfile}
  */
-export function pickProfile(rng, depth) {
-  const type = _pickType(rng, depth);
+export function pickProfile(rng, depth, typeOverride = null) {
+  // Always consume the type RNG roll to keep downstream sequence stable.
+  const picked = _pickType(rng, depth);
+  const type = typeOverride || picked;
   if (type === 'catacombs') return CATACOMB_PROFILE;
   if (type === 'arenas')    return ARENA_PROFILE;
   if (type === 'caves')     return CAVE_PROFILE;
