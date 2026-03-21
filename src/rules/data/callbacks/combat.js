@@ -4,11 +4,20 @@
 
 import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { Brain } from "../../components/Brain.js";
+import { Equipment, GEAR_SLOTS } from "../../components/Equipment.js";
+import { Inventory } from "../../components/Inventory.js";
+import { ItemInfo } from "../../components/ItemInfo.js";
+import { Material } from "../../components/Material.js";
+import { NamedIdentity } from "../../components/NamedIdentity.js";
+import { Player } from "../../components/Player.js";
+import { Position } from "../../components/Position.js";
 import { degradeExplored } from "../../environment/dungeon/exploredMap.js";
 import { combatSeed, mulberry32, rngInt } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
+import { findNearestValidTileAround } from "../../utils/queries.js";
+import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
 
@@ -270,5 +279,178 @@ export function mindflayerBlastOnHit(chancePct, seedSalt) {
     if (brain) brain.learnedSpellIds = [];
     ctx.pushEffect(ctx.defender, { key: "mindwipe", turnsLeft: 2, potency: 1, stacks: 1 });
     ctx.emit("proc:mindwipe", { actor: ctx.attacker, target: ctx.defender, affectedDepth: depth });
+  };
+}
+
+// ── Corrode equipment (rust monster) ────────────────────────────────
+
+/** Slots eligible for corrosion (metal gear). */
+const CORRODE_SLOTS = ["weapon", "armor", "head", "gloves", "feet", "legs", "offhand"];
+
+/** Max corrosion stacks per item. */
+const MAX_CORROSION_STACKS = 3;
+
+/**
+ * Roll → pick a random metal-eligible equipped slot on the defender →
+ * decrement its primary stat bonus and track corrosion stacks.
+ * At max stacks the item name is prefixed with "Corroded".
+ * @param {number} chancePct
+ * @param {number} seedSalt
+ */
+export function corrodeEquipmentOnHit(chancePct, seedSalt) {
+  return (ctx) => {
+    if (!ctx.roll(chancePct, seedSalt)) return;
+
+    const equip = ctx.world.get(ctx.defender, Equipment);
+    if (!equip) return;
+
+    // Gather equipped items in corrode-eligible slots
+    const rng = ctx.rng(seedSalt + 1);
+    const candidates = [];
+    for (const slot of CORRODE_SLOTS) {
+      const itemId = equip[slot];
+      if (!(itemId > 0) || !ctx.world.isAlive(itemId)) continue;
+      const info = ctx.world.get(itemId, ItemInfo);
+      if (!info) continue;
+      // Skip items with no bonuses at all (natural/bare)
+      if (!info.bonuses || typeof info.bonuses !== 'object') continue;
+      // Skip corrosion-resistant materials (stainless steel, mithril, etc.)
+      const mat = ctx.world.get(itemId, Material);
+      if (mat && typeof mat.corrosionResist === 'number' && mat.corrosionResist >= 0.95) continue;
+      const stacks = Number(info.corrosionStacks || 0) | 0;
+      if (stacks >= MAX_CORROSION_STACKS) continue;
+      candidates.push({ slot, itemId, info });
+    }
+    if (candidates.length === 0) return;
+
+    // Pick one at random
+    const pick = candidates[rngInt(rng, 0, candidates.length - 1)];
+    const { itemId, info } = pick;
+
+    // Increment corrosion stacks
+    const newStacks = (Number(info.corrosionStacks || 0) | 0) + 1;
+    info.corrosionStacks = newStacks;
+
+    // Apply stat penalty: reduce the largest positive bonus by 1
+    const bonuses = info.bonuses;
+    let bestKey = null;
+    let bestVal = 0;
+    for (const [k, v] of Object.entries(bonuses)) {
+      if (typeof v === 'number' && v > bestVal) { bestKey = k; bestVal = v; }
+    }
+    if (bestKey) bonuses[bestKey] = Math.max(0, bonuses[bestKey] - 1);
+
+    // At max stacks, prefix the item name
+    if (newStacks >= MAX_CORROSION_STACKS) {
+      const ni = ctx.world.get(itemId, NamedIdentity);
+      if (ni && ni.name && !ni.name.startsWith('Corroded ')) {
+        ni.name = `Corroded ${ni.name}`;
+      }
+    }
+
+    const ni = ctx.world.get(itemId, NamedIdentity);
+    const itemName = ni?.name || 'equipment';
+    ctx.emit("proc:corroded", {
+      actor: ctx.attacker,
+      target: ctx.defender,
+      itemId,
+      itemName,
+      stacks: newStacks,
+    });
+  };
+}
+
+// ── Steal and blink (nymph) ─────────────────────────────────────────
+
+const STEAL_COOLDOWN_KEY = Symbol.for("jshack:ai:stealAndBlink:cooldown");
+
+/**
+ * On hit: steal a random item from the defender's inventory or equipment,
+ * then blink the attacker away. Used by nymphs.
+ * @param {{ chancePct?: number, seedSalt?: number, cooldownTurns?: number, blinkDistance?: number }} [opts]
+ */
+export function stealAndBlinkOnHit(opts = {}) {
+  const chancePct = Math.max(0, Math.min(100, Number(opts.chancePct) || 50));
+  const seedSalt = Number(opts.seedSalt) || 0xdead0030;
+  const cooldownTurns = Math.max(0, Number(opts.cooldownTurns) || 8);
+  const blinkDistance = Math.max(3, Number(opts.blinkDistance) || 10);
+
+  return (ctx) => {
+    if (!ctx.roll(chancePct, seedSalt)) return;
+
+    // Only steal from players
+    if (!ctx.world.has(ctx.defender, Player)) return;
+
+    // Per-attacker cooldown
+    if (!ctx.world[STEAL_COOLDOWN_KEY]) ctx.world[STEAL_COOLDOWN_KEY] = new Map();
+    const cdMap = ctx.world[STEAL_COOLDOWN_KEY];
+    const lastUsed = cdMap.get(ctx.attacker | 0) || 0;
+    if (((ctx.world.step | 0) - lastUsed) < cooldownTurns) return;
+
+    const rng = ctx.rng(seedSalt + 1);
+
+    // Build candidate list: non-weapon equipped items + inventory items
+    const equip = ctx.world.get(ctx.defender, Equipment);
+    const candidates = [];
+    if (equip) {
+      for (const slot of GEAR_SLOTS) {
+        if (slot === 'weapon') continue; // don't steal the weapon from their hands
+        const itemId = equip[slot];
+        if (!(itemId > 0) || !ctx.world.isAlive(itemId)) continue;
+        candidates.push({ itemId, source: 'equip', slot });
+      }
+    }
+    for (const itemId of inventoryItems(ctx.world, ctx.defender)) {
+      if (!ctx.world.isAlive(itemId)) continue;
+      candidates.push({ itemId, source: 'inventory', slot: null });
+    }
+    if (candidates.length === 0) return;
+
+    // Pick random item
+    const pick = candidates[rngInt(rng, 0, candidates.length - 1)];
+
+    // Remove from defender
+    if (pick.source === 'equip' && equip) {
+      equip[pick.slot] = null;
+    } else {
+      removeFromInventory(ctx.world, ctx.defender, pick.itemId);
+    }
+
+    // Add to attacker inventory (nymph carries it)
+    if (ctx.world.has(ctx.attacker, Inventory)) {
+      addToInventory(ctx.world, ctx.attacker, pick.itemId);
+    }
+
+    cdMap.set(ctx.attacker | 0, ctx.world.step | 0);
+
+    const stolenNi = ctx.world.get(pick.itemId, NamedIdentity);
+    const itemName = stolenNi?.name || 'item';
+    const defPos = ctx.world.get(ctx.defender, Position);
+    ctx.emit("nymph:stole", {
+      actor: ctx.attacker,
+      target: ctx.defender,
+      itemId: pick.itemId,
+      itemName,
+      at: defPos ? { x: defPos.x | 0, y: defPos.y | 0 } : null,
+    });
+
+    // Blink away
+    const atkPos = ctx.world.get(ctx.attacker, Position);
+    if (atkPos) {
+      const exclude = [
+        { x: atkPos.x | 0, y: atkPos.y | 0 },
+      ];
+      if (defPos) exclude.push({ x: defPos.x | 0, y: defPos.y | 0 });
+      const landing = findNearestValidTileAround(ctx.world, atkPos, { maxDistance: blinkDistance, exclude, preferFar: true });
+      if (landing) {
+        const from = { x: atkPos.x | 0, y: atkPos.y | 0 };
+        ctx.world.set(ctx.attacker, Position, { x: landing.x | 0, y: landing.y | 0 });
+        ctx.emit("nymph:blinked", {
+          actor: ctx.attacker,
+          from,
+          to: { x: landing.x | 0, y: landing.y | 0 },
+        });
+      }
+    }
   };
 }

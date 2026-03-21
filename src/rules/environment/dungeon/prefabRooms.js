@@ -1,8 +1,8 @@
 // rules/environment/dungeon/prefabRooms.js
 // Load prefab room definitions and stamp them into dungeon chunks.
 
-import boulderPuzzleDef from "../../data/rooms/room_boulder_puzzle.json" with { type: "json" };
-import lavaDeadEndDef from "../../data/rooms/room_lava_puzzle_dead_end.json" with { type: "json" };
+import boulderPuzzleDef from "../../data/rooms/room_boulder_puzzle.js";
+import lavaDeadEndDef from "../../data/rooms/room_lava_puzzle_dead_end.js";
 import {
   TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_LAVA,
 } from './constants.js';

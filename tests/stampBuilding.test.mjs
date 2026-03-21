@@ -2,9 +2,9 @@ import { assertEquals } from "jsr:@std/assert";
 
 import { CHUNK_SIZE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 import { stampBuilding } from "../src/rules/environment/dungeon/stampBuilding.js";
-import apothecaryDef from "../src/rules/data/buildings/apothecary.json" with { type: "json" };
-import gemStoreDef from "../src/rules/data/buildings/gem_store.json" with { type: "json" };
-import herbalistHutDef from "../src/rules/data/buildings/herbalist_hut.json" with { type: "json" };
+import apothecaryDef from "../src/rules/data/buildings/apothecary.js";
+import gemStoreDef from "../src/rules/data/buildings/gem_store.js";
+import herbalistHutDef from "../src/rules/data/buildings/herbalist_hut.js";
 
 function makeChunks() {
   return new Map([
