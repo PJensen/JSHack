@@ -108,7 +108,14 @@ Deno.test("resolveResistance: kinetic DR cannot go below 0", () => {
   const world = new World({ seed: 1 });
   const id = makeTarget(world);
   world.add(id, Resistances, { kinetic: { DR: 50 } });
-  assertEquals(resolveResistance(world, id, 10, 'physical'), 0);
+  assertEquals(resolveResistance(world, id, 10, 'physical'), 1);
+});
+
+Deno.test("resolveResistance: kinetic channels preserve minimum chip damage", () => {
+  const world = new World({ seed: 1 });
+  const id = makeTarget(world);
+  world.add(id, Resistances, { kinetic: { DR: 1, bluntMult: 0.95 } });
+  assertEquals(resolveResistance(world, id, 2, 'blunt'), 1);
 });
 
 Deno.test("resolveResistance: slash uses DR then slashMult", () => {
@@ -144,13 +151,13 @@ Deno.test("dealDamage: resistance reduces final damage", () => {
   assertEquals(world.get(id, Vitality).hp, 14);
 });
 
-Deno.test("dealDamage: full resist emits RESIST status and returns resisted", () => {
+Deno.test("dealDamage: true immunity emits RESIST status and returns resisted", () => {
   const world = new World({ seed: 1 });
   const id = makeTarget(world);
-  world.add(id, Resistances, { kinetic: { DR: 20 } });
+  world.add(id, Resistances, { chemical: { toxMult: 0 } });
   const events = [];
   world.on('status', (e) => events.push(e));
-  const result = dealDamage(world, { target: id, amount: 5, type: 'physical' });
+  const result = dealDamage(world, { target: id, amount: 5, type: 'poison' });
   assertEquals(result.applied, false);
   assertEquals(result.reason, 'resisted');
   assertEquals(world.get(id, Vitality).hp, 20);
