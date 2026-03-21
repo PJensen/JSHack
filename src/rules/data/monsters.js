@@ -1089,12 +1089,13 @@ export const MONSTERS = [
     specials: [],
     description: 'A crusty growth clinging to the dungeon stone. Edible, if desperate.',
   },
-  // ── Nymph (tier 1) — item thief ────────────────────────────────────
+  // ── Nymph (tier 0, minDepth 3) — item thief ───────────────────────
   {
     id: 'nymph',
     name: 'Nymph',
     tags: ['fey', 'humanoid'],
-    tier: 1,
+    tier: 0,
+    minDepth: 3,
     intelligence: 7,   // smart enough to steal tactically
     aggro: 'passive',  // approaches to steal, not attack
     baseHp: 12,
@@ -1114,12 +1115,13 @@ export const MONSTERS = [
     description: 'A mischievous forest spirit with light fingers and lighter feet.',
     lootTable: 'drop:nymph',
   },
-  // ── Rust Monster (tier 1) — equipment corroder ─────────────────────
+  // ── Rust Monster (tier 0, minDepth 4) — equipment corroder ─────────
   {
     id: 'rust_monster',
     name: 'Rust Monster',
     tags: ['beast', 'aberration'],
-    tier: 1,
+    tier: 0,
+    minDepth: 4,
     intelligence: 3,   // dumb beast — scurries
     aggro: 'passive',  // only attacks when provoked
     baseHp: 14,

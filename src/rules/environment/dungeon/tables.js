@@ -39,7 +39,8 @@ function toMonsterSpawnParams(def, depth) {
  */
 export function pickMonster(rng, depth, monsterFilter = null) {
   const tier = Math.min(Math.floor((depth - 1) / 5), 3);
-  let pool = getMonstersByTier(tier);
+  let pool = getMonstersByTier(tier).filter(m => !m.minDepth || depth >= m.minDepth);
+  if (pool.length === 0) pool = getMonstersByTier(tier); // fallback
   if (monsterFilter) {
     const filtered = pool.filter(monsterFilter);
     if (filtered.length > 0) pool = filtered;
