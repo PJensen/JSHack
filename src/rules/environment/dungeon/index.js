@@ -58,7 +58,7 @@ import { getCachedHighscores } from '../../../shared/tombstoneApi.js';
  *   generateFloorPlan so up-stairs inherit those exact positions.
  * @returns {{ spawnX: number, spawnY: number, entityIds: number[], downStairPositions: {x:number,y:number}[], profileType: string }}
  */
-export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null) {
+export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null, opts = {}) {
   if (depth === 0) {
     const ow = generateOverworldChunks(worldSeed);
 
@@ -177,7 +177,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
     return { spawnX: ow.spawnX, spawnY: ow.spawnY, entityIds: allEntityIds, downStairPositions, profileType: 'overworld' };
   }
 
-  const floorPlan = generateFloorPlan(worldSeed, depth, priorDownStairPositions);
+  const floorPlan = generateFloorPlan(worldSeed, depth, priorDownStairPositions, opts);
   const { extent } = floorPlan;
   const allEntityIds = [];
   const downStairPositions = [];
@@ -335,7 +335,7 @@ export function initDungeon(world, opts = {}) {
   clearExplored();
   clearSpatialIndex(world);
 
-  const { spawnX, spawnY, entityIds, downStairPositions, profileType } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress);
+  const { spawnX, spawnY, entityIds, downStairPositions, profileType } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress, null, { dungeonType: opts.dungeonType ?? null });
 
   // Create dungeon state singleton
   const dsId = world.create();

@@ -773,7 +773,7 @@ const _startDepth = _hasFloorOverride
   ? runtimeConfig.startDepth
   : (readSavedDepth(_pendingSavegame) ?? runtimeConfig.startDepth);
 const _initialDepth = (Number.isFinite(_startDepth) && _startDepth >= 0) ? _startDepth : 0;
-const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth);
+const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth, null, { dungeonType: runtimeConfig.dungeonType });
 const _bootChunkTotal = Math.max(
   1,
   (_bootFloorPlan.extent.maxCX - _bootFloorPlan.extent.minCX + 1)
@@ -788,6 +788,7 @@ updateBootProgress(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeo
 let spawnPos = initDungeon(world, {
   startDepth: _startDepth,
   tombstoneRepo,
+  dungeonType: runtimeConfig.dungeonType,
   onProgress: (progress) => {
     if (!progress || progress.phase !== 'chunks') return;
     const total = Math.max(1, Number(progress.total) || _bootChunkTotal);
