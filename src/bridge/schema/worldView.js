@@ -37,6 +37,7 @@ import { getEffectiveVisionRange } from "../../rules/utils/blind.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { DistrictProfile } from "../../rules/components/DistrictProfile.js";
 import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
+import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -530,9 +531,10 @@ export function buildWorldView(world) {
 			else if (isPlayer) layer = 400; // player on top
 
 			/** @type {EntityView|null} */
+			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -540,6 +542,7 @@ export function buildWorldView(world) {
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 				rec.procStates = null;
+				rec.stackSeq = stackSeq;
 			}
 
 			// Project select status types into tags for display-only logic.

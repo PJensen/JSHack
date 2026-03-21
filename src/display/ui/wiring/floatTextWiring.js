@@ -331,6 +331,21 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     } catch (e) { console.debug('[floatTextWiring] corpse progression ftext failed:', e); }
   });
 
+  // Monster corpse eating
+  world.on('monster:corpse-eat', ({ monsterId, behavior, at }) => {
+    if (!canShowAt(at?.x, at?.y)) return;
+    const label = behavior === 'devour' ? 'DEVOUR!' : 'SCAVENGE';
+    const color = behavior === 'devour' ? '#9370db' : '#8fbc8f';
+    try {
+      ftext.addStatus(at.x, at.y - 0.3, label, {
+        color,
+        life: behavior === 'devour' ? 1.2 : 0.8,
+        scaleStart: behavior === 'devour' ? 1.4 : 1.0,
+        scaleEnd: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] monster corpse-eat ftext failed:', e); }
+  });
+
   // Storm lightning strike
   world.on('weather:lightning', ({ x, y, hitCount }) => {
     if (!canShowAt(x, y)) return;
