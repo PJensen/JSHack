@@ -13,4 +13,5 @@ export const GROTTO_PROFILE = {
   doorChance:  0.0,             // no doorways in open cave spaces
   hazardBias:  'water',
   monsterFilter: def => (def.tags ?? []).some(t => ['beast', 'vermin', 'giant'].includes(t)),
+  hallwayMonsterCap: 6,
 };
