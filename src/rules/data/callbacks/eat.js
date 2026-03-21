@@ -391,18 +391,64 @@ export function corpseHeal(amount) {
 }
 
 /**
- * Grant a permanent resistance field change on eat.
- * @param {string} channel - e.g. "chemical"
- * @param {string} field - e.g. "toxMult"
- * @param {number} value
- * @param {string} [emitType] - label for the resistance gained event
+ * Diminishing-returns resistance builder for damage multipliers (lower = better).
+ * Each eat: newMult = floor + (current - floor) * decay
+ * Asymptotically approaches `floor` but never reaches it.
+ *
+ * Example (toxMult, decay 0.85, floor 0.4):
+ *   eat 1: 1.0 → 0.91,  eat 2: → 0.83,  eat 3: → 0.77,  eat 5: → 0.65,  eat 10: → 0.49
+ *
+ * @param {string} channel - e.g. "chemical", "thermal"
+ * @param {string} field   - e.g. "toxMult", "burnMult"
+ * @param {number} decay   - 0–1 multiplier applied to headroom each eat (lower = faster)
+ * @param {number} floor   - asymptotic minimum the mult can reach
+ * @param {string} [label] - display name for the resistance type
  */
-export function corpseGrantResistance(channel, field, value, emitType) {
+export function corpseDiminishResist(channel, field, decay, floor, label) {
   return (ctx) => {
-    ctx.grantResistance(channel, field, value);
-    ctx.emit("corpse:resistance-gained", {
+    const resist = ctx.world.get(ctx.actor, Resistances);
+    const current = Number(resist?.[channel]?.[field]);
+    const cur = Number.isFinite(current) ? current : 1.0;
+    const next = floor + (cur - floor) * decay;
+    const clamped = Math.round(Math.max(floor, next) * 100) / 100;
+    ctx.grantResistance(channel, field, clamped);
+    const pct = Math.round((1 - clamped) * 100);
+    ctx.emit("corpse:resist-building", {
       actor: ctx.actor,
-      type: emitType || `${channel}.${field}`,
+      type: label || `${channel} ${field}`,
+      value: clamped,
+      pct,
+    });
+  };
+}
+
+/**
+ * Diminishing-returns resistance builder for flat DR values (higher = better).
+ * Each eat: newDR = current + increment * max(0, 1 - current/ceiling)
+ * Asymptotically approaches `ceiling`.
+ *
+ * Example (kinetic DR, increment 1.5, ceiling 6):
+ *   eat 1: 0 → 1.5,  eat 2: → 2.63,  eat 3: → 3.47,  eat 5: → 4.56
+ *
+ * @param {string} channel   - e.g. "kinetic"
+ * @param {string} field     - e.g. "DR"
+ * @param {number} increment - base amount added per eat (before diminishing)
+ * @param {number} ceiling   - max DR reachable
+ * @param {string} [label]   - display name for the resistance type
+ */
+export function corpseDiminishDR(channel, field, increment, ceiling, label) {
+  return (ctx) => {
+    const resist = ctx.world.get(ctx.actor, Resistances);
+    const current = Number(resist?.[channel]?.[field]);
+    const cur = Number.isFinite(current) ? current : 0;
+    const headroom = Math.max(0, 1 - cur / ceiling);
+    const next = cur + increment * headroom;
+    const clamped = Math.round(Math.min(ceiling, next) * 100) / 100;
+    ctx.grantResistance(channel, field, clamped);
+    ctx.emit("corpse:resist-building", {
+      actor: ctx.actor,
+      type: label || `${channel} ${field}`,
+      value: clamped,
     });
   };
 }
