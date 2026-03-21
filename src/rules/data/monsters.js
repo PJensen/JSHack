@@ -17,7 +17,7 @@ import {
   mindflayerBlastOnHit,
 } from "./callbacks/combat.js";
 import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
-import { spawnPlasmaCloudOnDeath } from "./callbacks/death.js";
+import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath } from "./callbacks/death.js";
 
 export const MONSTERS = [
   // ── Tier 0 (floors 1-5) ────────────────────────────────────────────
@@ -1059,6 +1059,30 @@ export const MONSTERS = [
     hooks: null,
     specials: [],
     description: 'An animated stone idol that heckles anything that breathes.',
+  },
+  // ── Multi-segment centipede (tier 0) ─────────────────────────────────
+  {
+    id: 'centipede',
+    name: 'Giant Centipede',
+    tags: ['beast', 'vermin'],
+    tier: 0,
+    intelligence: 2,
+    baseHp: 4,
+    hpPerLevel: 0.5,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d3',
+    sizeClass: 'S',
+    massKg: 5,
+    resistances: { kinetic: { DR: 1 } },
+    speed: 3,
+    segmentCount: { min: 4, max: 7 },
+    hooks: {
+      onHit: [statusEffectOnHit(20, 0xdead0500, { key: "poison", turnsLeft: 3, potency: 1 }, "proc:poisoned")],
+      onDeath: [centipedeSplitOnDeath()],
+    },
+    specials: ["Poison 20%", "Multi-segment"],
+    description: 'A writhing arthropod that moves as one. Cut it and both halves keep going.',
   },
 ];
 

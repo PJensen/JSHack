@@ -1475,6 +1475,11 @@ export function installMessageWiring({
     log('The Floating Eye\'s gaze locks your mind — you are stunned!', 'danger');
   });
 
+  // === Centipede events ===
+  world.on('centipede:split', () => {
+    log('The centipede splits in two!', 'warning');
+  });
+
   // === Flying events ===
   world.on('proc:fly:takeoff', ({ name, x, y }) => {
     if (!canSeeAt(x, y)) return;

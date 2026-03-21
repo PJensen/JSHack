@@ -241,6 +241,7 @@ const ENCOUNTER_GROUPS = [
   { tier: 0, leader: 'goblin_archer', followers: [{ id: 'goblin', count: 2 }], minBudget: 3 },
   { tier: 0, leader: 'skeletal_shadow_caster', followers: [{ id: 'skeleton_archer', count: 1 }], minBudget: 2 },
   { tier: 0, leader: null, followers: [{ id: 'cave_spider', count: 3 }], minBudget: 3 },
+  { tier: 0, leader: null, followers: [{ id: 'centipede', count: 2 }], minBudget: 2 },
 
   // Tier 1
   { tier: 1, leader: 'orc_shaman', followers: [{ id: 'orc', count: 2 }], minBudget: 3 },
