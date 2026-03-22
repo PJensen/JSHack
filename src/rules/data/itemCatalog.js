@@ -3859,14 +3859,28 @@ export const ITEM_CATALOG = {
       route: "oral",
       doses: 1,
       channels: [],
-      effects: [
-        { key: "blinded", potency: 1, onset: 0, peak: 0, duration: 20, stack: "refresh", maxStacks: 1, meta: { source: "potion_blindness" } },
-      ],
+      effects: [],
       feel: "Everything goes dark.",
     },
     hooks: {
       on_drink: (ctx, state) => {
         const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const startValue = Number(ctx.query.effectiveVisionRange(actor) || 0);
+        ctx.mutate.pushEffect(actor, {
+          key: "stat_envelope",
+          stat: "visionRange",
+          turnsLeft: 20,
+          potency: 1,
+          startValue,
+          toValue: 0,
+          endValue: startValue,
+          rampIn: 0,
+          hold: 20,
+          rampOut: 0,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          startedAtTurn: Number(ctx.params?.stepHint || 0) | 0,
+          stack: "refresh",
+        });
         ctx.io.emit("potion:blindness", { actor });
         return { consumed: true };
       },

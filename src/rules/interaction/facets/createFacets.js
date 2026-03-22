@@ -10,6 +10,7 @@ import { runScript } from "../../scripting.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
+import { getEffectiveVisionRange } from "../../utils/blind.js";
 import { isIdentified } from "../../data/identification.js";
 import { inventoryContains } from "../../utils/inventoryFacade.js";
 
@@ -148,6 +149,9 @@ export function createFacets(init) {
     },
     brain(entityId) {
       return /** @type any */ (world.get(entityId | 0, Brain));
+    },
+    effectiveVisionRange(entityId) {
+      return getEffectiveVisionRange(world, entityId | 0);
     },
     combatSnapshot(entityId, mode = "melee") {
       return stats.snapshot(entityId | 0, mode);
