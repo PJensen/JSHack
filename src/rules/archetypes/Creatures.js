@@ -36,7 +36,7 @@ const defaultResist = {
   kinetic:   { DR: 0,  bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0 },
   thermal:   { igniteC: Infinity, burnMult: 1.0 },
   chemical:  { acidMult: 1.0, baseMult: 1.0, solventMult: 1.0, toxMult: 1.0 },
-  electric:  { ohms: Infinity, fibrillationA: 0.03 },
+  electric:  { ohms: 0, fibrillationA: 0.03 },
   radiation: { alpha: 1.0, beta: 1.0, gamma: 1.0, neutron: 1.0 },
 };
 
