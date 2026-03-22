@@ -2064,6 +2064,13 @@ export function renderItemDetails(container, it) {
   nameSpan.textContent = bracketize(sanitize(it.name || 'item'));
   Object.assign(nameSpan.style, rarityStyle(it.rarityName));
   title.appendChild(nameSpan);
+  const rn = String(it?.rarityName || 'common').toLowerCase();
+  if (rn !== 'common') {
+    const raritySpan = document.createElement('span');
+    raritySpan.textContent = ` ${rn}`;
+    Object.assign(raritySpan.style, { opacity: '0.75', fontSize: '11px' });
+    title.appendChild(raritySpan);
+  }
   if (it.slot) {
     const slotSpan = document.createElement('span');
     const slotLabel = humanize(it.slot);
