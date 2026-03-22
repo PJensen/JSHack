@@ -283,3 +283,117 @@ Deno.test("agony effect expires after turnsLeft reaches 0", () => {
   const remaining = aeAfter?.effects?.filter(e => e.key === 'agony') ?? [];
   assertEquals(remaining.length, 0, 'agony should be removed after expiry');
 });
+
+// ── Auto-rotation tests ──────────────────────────────────────────────────
+
+Deno.test("agony auto-targets enemy missing agony over one that has it", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 50 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Warlock' });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ['agony'];
+  brain.intelligence = 10;
+  const pos = world.get(player, Position);
+  pos.x = 5; pos.y = 5;
+  const mana = world.get(player, Mana);
+  mana.mana = 100; mana.maxMana = 100;
+
+  const enemyA = createEnemy(world, 7, 5, 100);
+  const enemyB = createEnemy(world, 8, 5, 100);
+
+  // First cast — should hit nearest (enemyA at dist 2)
+  world.add(player, CastSpellIntent, { spellId: 'agony' });
+  world.tick(1);
+
+  const aeA1 = world.get(enemyA, ActiveEffects);
+  assert(aeA1?.effects?.some(e => e.key === 'agony'), 'first cast should hit nearest enemy');
+
+  // Second cast — enemyA already has agony, enemyB does not → pick enemyB
+  world.add(player, CastSpellIntent, { spellId: 'agony' });
+  world.tick(1);
+
+  const aeB = world.get(enemyB, ActiveEffects);
+  assert(aeB?.effects?.some(e => e.key === 'agony'), 'second cast should rotate to enemy missing agony');
+});
+
+Deno.test("agony refreshes lowest-duration agony when all enemies have it", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 51 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Warlock' });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ['agony'];
+  brain.intelligence = 10;
+  const pos = world.get(player, Position);
+  pos.x = 5; pos.y = 5;
+  const mana = world.get(player, Mana);
+  mana.mana = 200; mana.maxMana = 200;
+
+  const enemyA = createEnemy(world, 7, 5, 100);
+  const enemyB = createEnemy(world, 8, 5, 100);
+
+  // Apply agony to both enemies
+  world.add(player, CastSpellIntent, { spellId: 'agony' });
+  world.tick(1);
+  world.add(player, CastSpellIntent, { spellId: 'agony' });
+  world.tick(1);
+
+  // Tick down enemyA's agony (applied first, so lower turnsLeft)
+  effectSystem(world);
+  effectSystem(world);
+
+  const aeA = world.get(enemyA, ActiveEffects);
+  const agonyA = aeA.effects.find(e => e.key === 'agony');
+  const turnsBeforeA = agonyA.turnsLeft;
+
+  const aeB = world.get(enemyB, ActiveEffects);
+  const agonyB = aeB.effects.find(e => e.key === 'agony');
+  const turnsBeforeB = agonyB.turnsLeft;
+
+  // Third cast — should refresh the one with lowest turnsLeft
+  world.add(player, CastSpellIntent, { spellId: 'agony' });
+  world.tick(1);
+
+  const agonyAAfter = world.get(enemyA, ActiveEffects).effects.find(e => e.key === 'agony');
+  const agonyBAfter = world.get(enemyB, ActiveEffects).effects.find(e => e.key === 'agony');
+
+  // The one with lower turnsLeft should have been refreshed
+  if (turnsBeforeA <= turnsBeforeB) {
+    assert(agonyAAfter.turnsLeft >= turnsBeforeA, 'should refresh enemy with lowest agony duration');
+  } else {
+    assert(agonyBAfter.turnsLeft >= turnsBeforeB, 'should refresh enemy with lowest agony duration');
+  }
+});
+
+Deno.test("agony auto-targets nearest when no targetId provided", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 52 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Warlock' });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ['agony'];
+  brain.intelligence = 10;
+  const pos = world.get(player, Position);
+  pos.x = 5; pos.y = 5;
+  const mana = world.get(player, Mana);
+  mana.mana = 50; mana.maxMana = 50;
+
+  // Near enemy at distance 3
+  const nearEnemy = createEnemy(world, 8, 5, 100);
+  // Far enemy at distance 6
+  const farEnemy = createEnemy(world, 5, 11, 100);
+
+  // Cast with no targetId
+  world.add(player, CastSpellIntent, { spellId: 'agony' });
+  world.tick(1);
+
+  const nearAe = world.get(nearEnemy, ActiveEffects);
+  assert(nearAe?.effects?.some(e => e.key === 'agony'), 'nearest enemy should get agony');
+
+  const farAe = world.get(farEnemy, ActiveEffects);
+  assert(!farAe?.effects?.some(e => e.key === 'agony'), 'far enemy should not get agony yet');
+});
