@@ -2381,8 +2381,8 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 4,
+    rarityName: "epic",
     description: "Grants the ability to cast a meteor spell.",
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
@@ -2398,8 +2398,8 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Grants the ability to cast a blast wave spell.",
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
@@ -2415,8 +2415,8 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Grants the ability to cast Blink.",
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
@@ -2432,8 +2432,8 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Grants the ability to cast Frost.",
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
@@ -2449,7 +2449,7 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
+    rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Blizzard.",
     hooks: {
@@ -2466,7 +2466,7 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
+    rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Firestorm.",
     hooks: {
@@ -2483,8 +2483,8 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Grants the ability to cast a healing spell.",
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
@@ -2500,7 +2500,7 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
+    rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast a blinding spell.",
     hooks: {
@@ -2643,8 +2643,8 @@ export const ITEM_CATALOG = {
     type: "scroll",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Casts Blast Wave without learning it.",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
@@ -2694,8 +2694,8 @@ export const ITEM_CATALOG = {
     type: "scroll",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Returns you to the surface (dungeon level 0).",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
@@ -2717,7 +2717,7 @@ export const ITEM_CATALOG = {
     slot: "bag",
     material: "paper",
     rarity: 1,
-    rarityName: "rare",
+    rarityName: "common",
     description: "Casts a healing spell on yourself or an ally.",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
@@ -2734,8 +2734,8 @@ export const ITEM_CATALOG = {
     type: "scroll",
     slot: "bag",
     material: "paper",
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Rip a skeleton from the earth to fight at your side.",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
@@ -2769,7 +2769,7 @@ export const ITEM_CATALOG = {
     slot: "ranged",
     material: "wood",
     charges: 3,
-    rarity: 1,
+    rarity: 3,
     rarityName: "rare",
     description: "Zaps a bolt of chain lightning. 3 charges.",
     hooks: {
@@ -2789,8 +2789,8 @@ export const ITEM_CATALOG = {
     slot: "ranged",
     material: "wood",
     charges: 2,
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 4,
+    rarityName: "epic",
     description: "Calls down a meteor. 2 charges.",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
@@ -2809,8 +2809,8 @@ export const ITEM_CATALOG = {
     slot: "ranged",
     material: "wood",
     charges: 10,
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Encases an enemy in frost, slowing them. Lighter foes freeze longer. 10 charges.",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
@@ -2829,8 +2829,8 @@ export const ITEM_CATALOG = {
     slot: "ranged",
     material: "wood",
     charges: 8,
-    rarity: 1,
-    rarityName: "rare",
+    rarity: 2,
+    rarityName: "magic",
     description: "Restores health to yourself or an ally. 8 charges.",
     hooks: {
       on_use: createCastSpellFromIdentityHook({
