@@ -17,7 +17,7 @@ import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
-import { getPassiveBonuses, effectiveMaxHp } from "../../rules/utils/passiveBonuses.js";
+import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../../rules/utils/passiveBonuses.js";
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";

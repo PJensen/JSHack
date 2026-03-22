@@ -3,6 +3,7 @@ import { Stamina } from "../components/Stamina.js";
 import { Vitality } from "../components/Vitality.js";
 import { upsertTimedEffect } from "./effectSemantics.js";
 import { ensureActiveEffects } from "./effects.js";
+import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "./passiveBonuses.js";
 
 function applyStatusEffects(world, out) {
   for (let i = 0; i < out.statusesToApply.length; i++) {
@@ -28,7 +29,7 @@ function applyResourceRestore(world, out) {
       if (!stamina) continue;
       world.set(entityId, Stamina, {
         ...stamina,
-        stamina: Math.min(Number(stamina.maxStamina || 0), Number(stamina.stamina || 0) + amount),
+        stamina: Math.min(effectiveMaxStamina(world, entityId, stamina), Number(stamina.stamina || 0) + amount),
       });
       continue;
     }
@@ -38,7 +39,7 @@ function applyResourceRestore(world, out) {
       if (!mana) continue;
       world.set(entityId, Mana, {
         ...mana,
-        mana: Math.min(Number(mana.maxMana || 0), Number(mana.mana || 0) + amount),
+        mana: Math.min(effectiveMaxMana(world, entityId, mana), Number(mana.mana || 0) + amount),
       });
     }
   }
@@ -54,7 +55,7 @@ function applyVitalityRestore(world, out) {
     if (!vitality) continue;
     world.set(entityId, Vitality, {
       ...vitality,
-      hp: Math.min(Number(vitality.maxHp || 0), Number(vitality.hp || 0) + amount),
+      hp: Math.min(effectiveMaxHp(world, entityId, vitality), Number(vitality.hp || 0) + amount),
     });
   }
 }

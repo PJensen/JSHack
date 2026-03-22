@@ -75,7 +75,7 @@ import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
-import { effectiveMaxHp } from "../../utils/passiveBonuses.js";
+import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../../utils/passiveBonuses.js";
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 
@@ -630,14 +630,14 @@ export const INTERACT_PAYLOADS = {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
       const vit = world.get(actor, Vitality);
-      if (vit) world.set(actor, Vitality, { maxHp: vit.maxHp, hp: vit.maxHp });
+      if (vit) world.set(actor, Vitality, { maxHp: vit.maxHp, hp: effectiveMaxHp(world, actor, vit) });
       const mana = world.get(actor, Mana);
-      if (mana) world.set(actor, Mana, { ...mana, mana: mana.maxMana });
+      if (mana) world.set(actor, Mana, { ...mana, mana: effectiveMaxMana(world, actor, mana) });
       const stamina = world.get(actor, Stamina);
       if (stamina) {
         world.set(actor, Stamina, {
           ...stamina,
-          stamina: stamina.maxStamina,
+          stamina: effectiveMaxStamina(world, actor, stamina),
           regenCooldown: 0,
         });
       }
@@ -709,9 +709,10 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const stamina = world.get(actor, Stamina);
       if (stamina) {
-        const restoreAmt = Math.floor(stamina.maxStamina * 0.3);
+        const maxStam = effectiveMaxStamina(world, actor, stamina);
+        const restoreAmt = Math.floor(maxStam * 0.3);
         const prev = stamina.stamina;
-        const next = Math.min(stamina.maxStamina, prev + restoreAmt);
+        const next = Math.min(maxStam, prev + restoreAmt);
         world.set(actor, Stamina, {
           ...stamina,
           stamina: next,
@@ -785,10 +786,11 @@ export const INTERACT_PAYLOADS = {
         } else {
           const mana = world.get(actor, Mana);
           if (mana && mana.maxMana > 0) {
-            const amt = Math.max(1, Math.floor(mana.maxMana * 0.3));
+            const maxM = effectiveMaxMana(world, actor, mana);
+            const amt = Math.max(1, Math.floor(maxM * 0.3));
             world.set(actor, Mana, {
               ...mana,
-              mana: Math.min(mana.maxMana, mana.mana + amt),
+              mana: Math.min(maxM, mana.mana + amt),
             });
             world.emit?.("fountain:drink", {
               actor,

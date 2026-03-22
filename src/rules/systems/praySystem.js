@@ -15,7 +15,7 @@ import { getHungerLevel } from "../data/food.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
 import { ensureActiveEffects } from "../utils/effects.js";
-import { effectiveMaxHp } from "../utils/passiveBonuses.js";
+import { effectiveMaxHp, effectiveMaxMana } from "../utils/passiveBonuses.js";
 
 const PRAYER_STREAK_KEY = Symbol.for('jshack:prayer:boonStreak');
 const PRAYER_LAST_BOON_KEY = Symbol.for('jshack:prayer:lastBoonTurn');
@@ -146,9 +146,10 @@ function applyPrayerBoon(world, actorId, context) {
   }
 
   if (boon === 'mana_surge' && mana) {
-    const restore = Math.max(6, Math.floor(mana.maxMana * (desperate ? 0.5 : 0.34) * Math.max(0.75, prayerPower)));
+    const maxM = effectiveMaxMana(world, actorId, mana);
+    const restore = Math.max(6, Math.floor(maxM * (desperate ? 0.5 : 0.34) * Math.max(0.75, prayerPower)));
     const before = mana.mana;
-    mana.mana = Math.min(mana.maxMana, mana.mana + restore);
+    mana.mana = Math.min(maxM, mana.mana + restore);
     mana.regenCooldown = 0;
     mana.manaRegen = Math.min(2.0, Number(mana.manaRegen || 0) + 0.08);
     pushEffect(world, actorId, { key: 'mana_regen_boost', turnsLeft: 20, potency: 2, stacks: 1 });
