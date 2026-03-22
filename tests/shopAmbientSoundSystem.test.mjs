@@ -84,3 +84,83 @@ Deno.test("shopAmbientSoundSystem respects per-location cooldown across turns", 
   shopAmbientSoundSystem(world);
   assertEquals(events.length, 2, "notification should resume after cooldown window");
 });
+
+Deno.test("shopAmbientSoundSystem emits npc:dialogue greeting when entering a shop room", () => {
+  const world = new World({ seed: 9001 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { worldSeed: 9001, currentDepth: 2, floorEntityIds: [] });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 0, y: 0 });
+
+  const shopkeeperId = world.create();
+  const shop = world.create();
+  world.add(shop, RoomMetadata, {
+    roomType: "shop",
+    x: 3,
+    y: 3,
+    w: 4,
+    h: 4,
+    shopkeeperId,
+  });
+
+  const speech = [];
+  world.on("npc:dialogue", (ev) => speech.push(ev));
+
+  world.step = 1;
+  shopAmbientSoundSystem(world);
+  assertEquals(speech.length, 0, "no greeting while player is outside room");
+
+  world.set(player, Position, { x: 4, y: 4 });
+  world.step = 2;
+  shopAmbientSoundSystem(world);
+
+  assertEquals(speech.length, 1, "entering the room should emit one greeting");
+  assertEquals(speech[0].actor, shopkeeperId, "greeting should come from shopkeeper entity");
+  assertEquals(typeof speech[0].text, "string");
+  assert(String(speech[0].text).trim().length > 0, "greeting text should be non-empty");
+});
+
+Deno.test("shopAmbientSoundSystem does not spam greetings without re-entry", () => {
+  const world = new World({ seed: 9002 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { worldSeed: 9002, currentDepth: 2, floorEntityIds: [] });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 4, y: 4 });
+
+  const shopkeeperId = world.create();
+  const shop = world.create();
+  world.add(shop, RoomMetadata, {
+    roomType: "shop",
+    x: 3,
+    y: 3,
+    w: 4,
+    h: 4,
+    shopkeeperId,
+  });
+
+  const speech = [];
+  world.on("npc:dialogue", (ev) => speech.push(ev));
+
+  world.step = 5;
+  shopAmbientSoundSystem(world);
+  world.step = 6;
+  shopAmbientSoundSystem(world);
+  world.step = 7;
+  shopAmbientSoundSystem(world);
+
+  assertEquals(speech.length, 1, "remaining inside should not retrigger greeting");
+
+  world.set(player, Position, { x: 0, y: 0 });
+  world.step = 8;
+  shopAmbientSoundSystem(world);
+
+  world.set(player, Position, { x: 4, y: 4 });
+  world.step = 15;
+  shopAmbientSoundSystem(world);
+
+  assertEquals(speech.length, 2, "leaving and re-entering should trigger a new greeting");
+});
