@@ -53,8 +53,8 @@ export function applyElectrocuted(world, targetId) {
   // Instant blindness: vision collapses to 0, holds 2 turns, recovers over 4 turns
   blind(world, id, 0, 0, 2, 4);
 
-  // Instant deafness: full impairment, holds 2 turns, recovers over 6 turns
-  deafen(world, id, 1.0, 0, 2, 6);
+  // Instant deafness: full impairment, holds 2 turns, recovers over 16 turns (3x blindness)
+  deafen(world, id, 1.0, 0, 2, 16);
 
   // Notify display layer for flashbang VFX (include isPlayer so display doesn't need to import Player)
   world.emit?.('electrocute:flash', { target: id, isPlayer: world.has(id, Player) });
