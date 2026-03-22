@@ -113,3 +113,168 @@ Deno.test("summoned creature picks closest enemy", () => {
   assertEquals(intent.dx, 1, "should move toward nearer enemy");
   assertEquals(intent.dy, 0);
 });
+
+// Helpers for command tests ─────────────────────────────────────────────────
+
+function makePlayer(world, x, y) {
+  const id = world.create();
+  world.add(id, Position, { x, y });
+  world.add(id, Player, {});
+  return id;
+}
+
+function makeSummonedWithState(world, x, y, state, targetX, targetY) {
+  const id = makeSummoned(world, x, y);
+  world.add(id, PetState, {
+    state,
+    targetX: targetX ?? null,
+    targetY: targetY ?? null,
+    targetItemId: 0,
+    stateEnteredTurn: 0,
+    lastPlayerX: null,
+    lastPlayerY: null,
+    commandCooldown: 0,
+    rangedCooldown: 0,
+  });
+  return id;
+}
+
+// Command behavior tests ───────────────────────────────────────────────────
+
+Deno.test("summoned with aggressive PetState still chases enemies", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'aggressive');
+  makeEnemy(world, 8, 5);
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(intent, "aggressive summoned should chase enemy");
+  assertEquals(intent.dx, 1);
+  assertEquals(intent.dy, 0);
+});
+
+Deno.test("summoned with following PetState moves toward player", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'following');
+  // Enemy is nearby but summoned should follow player instead
+  makeEnemy(world, 7, 5);
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(intent, "following summoned should move toward player");
+  assertEquals(intent.dx, -1, "should move west toward player");
+  assertEquals(intent.dy, 0);
+});
+
+Deno.test("summoned with following PetState stays put when close to player", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 4, 5);
+
+  // Within FOLLOW_DISTANCE (2)
+  const skel = makeSummonedWithState(world, 5, 5, 'following');
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(!intent, "following summoned should not move when close to player");
+});
+
+Deno.test("summoned with staying PetState holds position", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'staying', 5, 5);
+  makeEnemy(world, 6, 5);
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(!intent, "staying summoned should hold position");
+});
+
+Deno.test("summoned with idle PetState does nothing", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'idle');
+  makeEnemy(world, 6, 5);
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(!intent, "idle summoned should do nothing");
+});
+
+Deno.test("summoned with guarding PetState attacks enemies within radius", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'guarding', 5, 5);
+  makeEnemy(world, 7, 5); // distance 2, within GUARD_RADIUS (5)
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(intent, "guarding summoned should move toward nearby enemy");
+  assertEquals(intent.dx, 1, "should move east toward enemy");
+  assertEquals(intent.dy, 0);
+});
+
+Deno.test("summoned with guarding PetState ignores distant enemies", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'guarding', 5, 5);
+  makeEnemy(world, 15, 5); // distance 10, outside GUARD_RADIUS (5)
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(!intent, "guarding summoned should ignore enemies outside guard radius");
+});
+
+Deno.test("summoned auto-transitions to fleeing on low HP", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  const skel = makeSummonedWithState(world, 5, 5, 'aggressive');
+  // Set HP below FLEE_THRESHOLD (50%)
+  const vit = world.get(skel, Vitality);
+  vit.hp = 4; // 40% of 10
+
+  summonedBehaviorSystem(world);
+
+  const petState = world.get(skel, PetState);
+  assertEquals(petState.state, 'fleeing', "should auto-transition to fleeing");
+});
+
+Deno.test("summoned without PetState falls back to original chase", () => {
+  const world = new World({ seed: 1 });
+  world.step = 0;
+  makePlayer(world, 0, 0);
+
+  // No PetState — backward compat
+  const skel = makeSummoned(world, 5, 5);
+  makeEnemy(world, 8, 5);
+
+  summonedBehaviorSystem(world);
+
+  const intent = world.get(skel, MoveIntent);
+  assert(intent, "summoned without PetState should still chase enemies");
+  assertEquals(intent.dx, 1);
+  assertEquals(intent.dy, 0);
+});
