@@ -944,6 +944,26 @@ function ensureEffectsStack(container) {
     resist_poison: { name: 'Poison Res', glyph: '\u{1F9EA}',     hue: 130 },
     resist_electric: { name: 'Elec Res', glyph: '\u{1F50C}',     hue: 50  },
     resist_acid:  { name: 'Acid Res',  glyph: '\u{1F9F4}',       hue: 80  },
+    // Corpse-eat timed buffs
+    cunning_reflex:   { name: 'Reflexes',     glyph: '\u{1F4A8}',       hue: 45  },  // 💨 jittery dodge
+    keen_eye:         { name: 'Keen Eye',      glyph: '\u{1F441}\uFE0F', hue: 50  },  // 👁️ predator focus
+    web_immune:       { name: 'Web Immune',    glyph: '\u{1F578}\uFE0F', hue: 170 },  // 🕸️ dissolves webs
+    spider_sense:     { name: 'Spider Sense',  glyph: '\u{1F577}\uFE0F', hue: 290 },  // 🕷️ danger sense
+    thermal_sense:    { name: 'Heat Sight',    glyph: '\u{1F321}\uFE0F', hue: 15  },  // 🌡️ thermal vision
+    bear_vigor:       { name: 'Bear Vigor',    glyph: '\u{1F43B}',       hue: 30  },  // 🐻 primal regen
+    fire_blood:       { name: 'Fire Blood',    glyph: '\u{1F9E8}',       hue: 10  },  // 🧨 fire immunity
+    blood_rage:       { name: 'Blood Rage',    glyph: '\u{1FA78}',       hue: 0   },  // 🩸 orcish fury
+    frost_blood:      { name: 'Frost Blood',   glyph: '\u2744\uFE0F',    hue: 195 },  // ❄️ frost veins
+    war_fed:          { name: 'War Fed',       glyph: '\u{1F5E1}\uFE0F', hue: 35  },  // 🗡️ iron strikes
+    phase_shift:      { name: 'Phase Shift',   glyph: '\u{1F300}',       hue: 260 },  // 🌀 phasing
+    ravenous:         { name: 'Ravenous',      glyph: '\u{1F924}',       hue: 25  },  // 🤤 insatiable hunger
+    spectral_form:    { name: 'Spectral',      glyph: '\u{1F47B}',       hue: 210 },  // 👻 translucent
+    ogre_bulk:        { name: 'Ogre Bulk',     glyph: '\u{1F9CC}',       hue: 90  },  // 🧌 brutish mass
+    shadow_cloak:     { name: 'Shadow Cloak',  glyph: '\u{1F311}',       hue: 270 },  // 🌑 devastating strike
+    dark_sight:       { name: 'Dark Sight',    glyph: '\u{1F440}',       hue: 280 },  // 👀 dark vision
+    battle_fury:      { name: 'Battle Fury',   glyph: '\u{1F525}',       hue: 5   },  // 🔥 kill = heal
+    lichdom_echo:     { name: 'Lichdom',       glyph: '\u{1F480}',       hue: 310 },  // 💀 death save
+    fey_grace:        { name: 'Fey Grace',     glyph: '\u{1FAB6}',       hue: 150 },  // 🪶 wind-weave
     // Proc states (player-side)
     echo_strike_memory: { name: 'Echo',      glyph: '\u{1F47B}',    hue: 200 },  // 👻 spectral echo stored
     soul_mortgage_debt: { name: 'Soul Debt', glyph: '\u2696\uFE0F', hue: 350 },  // ⚖️ debt accruing
