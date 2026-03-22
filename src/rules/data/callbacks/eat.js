@@ -350,7 +350,7 @@ function applyEatProcEffect(ctx, effect) {
       ctx.pushEffect({
         key: String(effect?.a || ""),
         turnsLeft: Math.max(0, Number(effect?.b || 0)),
-        potency: 1,
+        potency: Number(effect?.c || 1),
         stacks: 1,
         sourceId: ctx.itemId,
       });
@@ -460,10 +460,13 @@ export function corpseProcNode(spec = {}) {
  * @param {string} [emitType] - defaults to effectKey
  */
 export function corpseStatusEffect(effectKey, turnsLeft, potency, emitType) {
-  return (ctx) => {
-    ctx.pushEffect({ key: effectKey, turnsLeft, potency, stacks: 1, sourceId: ctx.itemId });
-    ctx.emit("hunger:sickened", { actor: ctx.actor, type: emitType || effectKey });
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    effects: [{ kind: "applyStatus", a: effectKey, b: turnsLeft, c: potency }],
+    script: (ctx, proc) => {
+      proc.emit("hunger:sickened", { actor: ctx.actor, type: emitType || effectKey });
+    },
+  });
 }
 
 /**
@@ -471,9 +474,10 @@ export function corpseStatusEffect(effectKey, turnsLeft, potency, emitType) {
  * Used by grid_bug (shock).
  */
 export function corpseDamage(amount) {
-  return (ctx) => {
-    ctx.damage(amount, "corpse");
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    effects: [{ kind: "dealDamage", a: amount, c: "corpse" }],
+  });
 }
 
 /**
@@ -481,14 +485,24 @@ export function corpseDamage(amount) {
  * Used by eel corpse. Adds electricOhms bonus (diminishing, cap ~2400 total bonus).
  */
 export function grantElectricResist(ctx) {
-  const currentBonus = ctx.sumCorpseAdaptations("electricOhms");
-  const ceiling = 2400;
-  const increment = 600;
-  const headroom = Math.max(0, 1 - currentBonus / ceiling);
-  const delta = Math.round(increment * headroom);
-  if (delta <= 0) return;
-  ctx.addCorpseAdaptation("electricOhms", delta, "eel", "electric");
-  ctx.emit("hunger:resistance-gained", { actor: ctx.actor, type: "electric", ohms: currentBonus + delta });
+  const run = corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    script: (innerCtx, proc) => {
+      const currentBonus = innerCtx.sumCorpseAdaptations("electricOhms");
+      const ceiling = 2400;
+      const increment = 600;
+      const headroom = Math.max(0, 1 - currentBonus / ceiling);
+      const delta = Math.round(increment * headroom);
+      if (delta <= 0) return;
+      proc.addCorpseAdaptation("electricOhms", delta, "eel", "electric");
+      proc.emit("hunger:resistance-gained", {
+        actor: innerCtx.actor,
+        type: "electric",
+        ohms: currentBonus + delta,
+      });
+    },
+  });
+  run(ctx);
 }
 
 /**
@@ -498,9 +512,12 @@ export function grantElectricResist(ctx) {
 export function cancelEat(code, message, consumesTurn = true) {
   const reasonCode = String(code || "FAIL");
   const reasonMessage = String(message || "You cannot do that.");
-  return (ctx) => {
-    ctx.cancel({ code: reasonCode, message: reasonMessage, consumesTurn });
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    script: (_ctx, proc) => {
+      proc.cancel({ code: reasonCode, message: reasonMessage, consumesTurn });
+    },
+  });
 }
 
 // -- Generic factory functions --
@@ -514,15 +531,18 @@ export function cancelEat(code, message, consumesTurn = true) {
  * @param {string} [description] - flavor text for emit payload
  */
 export function corpseTimedBuff(effectKey, turnsLeft, potency, emitEvent, description) {
-  return (ctx) => {
-    ctx.pushEffect({ key: effectKey, turnsLeft, potency, stacks: 1, sourceId: ctx.itemId });
-    ctx.emit(emitEvent || "corpse:buff-gained", {
-      actor: ctx.actor,
-      effect: effectKey,
-      turnsLeft,
-      description: description || effectKey,
-    });
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    effects: [{ kind: "attachTimedBuff", a: effectKey, b: turnsLeft, c: potency }],
+    script: (ctx, proc) => {
+      proc.emit(emitEvent || "corpse:buff-gained", {
+        actor: ctx.actor,
+        effect: effectKey,
+        turnsLeft,
+        description: description || effectKey,
+      });
+    },
+  });
 }
 
 /**
@@ -532,13 +552,16 @@ export function corpseTimedBuff(effectKey, turnsLeft, potency, emitEvent, descri
  * @param {Function} badCb - callback if unlucky
  */
 export function corpseGamble(goodChance, goodCb, badCb) {
-  return (ctx) => {
-    if (ctx.chance(goodChance)) {
-      goodCb(ctx);
-    } else {
-      badCb(ctx);
-    }
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    script: (ctx) => {
+      if (ctx.chance(goodChance)) {
+        if (typeof goodCb === "function") goodCb(ctx);
+      } else {
+        if (typeof badCb === "function") badCb(ctx);
+      }
+    },
+  });
 }
 
 /**
@@ -546,9 +569,10 @@ export function corpseGamble(goodChance, goodCb, badCb) {
  * @param {number} amount
  */
 export function corpseBonusNutrition(amount) {
-  return (ctx) => {
-    ctx.applyNutrition(amount);
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    effects: [{ kind: "nutrition", a: amount }],
+  });
 }
 
 /**
@@ -556,14 +580,17 @@ export function corpseBonusNutrition(amount) {
  * @param {number} amount
  */
 export function corpseHeal(amount) {
-  return (ctx) => {
-    ctx.heal(amount);
-    ctx.emit("corpse:buff-gained", {
-      actor: ctx.actor,
-      effect: "heal",
-      description: "vitality surges through you",
-    });
-  };
+  return corpseProcNode({
+    gates: [{ kind: "eventKind", a: "eat" }],
+    effects: [{ kind: "heal", a: amount }],
+    script: (ctx, proc) => {
+      proc.emit("corpse:buff-gained", {
+        actor: ctx.actor,
+        effect: "heal",
+        description: "vitality surges through you",
+      });
+    },
+  });
 }
 
 /**
