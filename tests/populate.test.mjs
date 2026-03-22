@@ -433,6 +433,35 @@ Deno.test("shopkeeper spawns only in small dead-end rooms with exactly one openi
   }
 });
 
+Deno.test("3x3 dead-end rooms are not eligible shop rooms", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+
+  // Tiny room with only one interior tile.
+  for (let y = 2; y < 5; y++) for (let x = 2; x < 5; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  // One opening from the tiny room.
+  tiles[3 * CHUNK_SIZE + 5] = TILE_FLOOR;
+
+  const chunk = {
+    chunkX: 1,
+    chunkY: 1,
+    tiles,
+    rooms: [{ x: CHUNK_SIZE + 2, y: CHUNK_SIZE + 2, w: 3, h: 3 }],
+    doors: [],
+  };
+  const floorPlan = { depth: 2, difficultyMult: 1.0, profile: { shopChance: 1.0 } };
+  const rng = {
+    next: () => 0,
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const shopkeeper = spawns.find((s) => s.kind === "shopkeeper");
+  assertEquals(shopkeeper, undefined, "tiny 3x3 room should never be selected as a shop room");
+});
+
 Deno.test("origin chunk spawn room is never selected as a shop room", () => {
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_WALL);
