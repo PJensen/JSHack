@@ -3437,6 +3437,43 @@ function drawEpicChestAura(ctx, e, fxTime) {
 }
 
 /**
+ * Draw a blue glow for rare-rarity items tagged with `rare_glowing`.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawRareGlowAura(ctx, e, fxTime) {
+  const cx = e.pos.x, cy = e.pos.y;
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.6 + e.id * 1.3);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const rOuter = 0.58 + 0.07 * pulse;
+  const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  const outerA = 0.22 + 0.12 * pulse;
+  outerGrad.addColorStop(0,   `rgba(85,170,255,${outerA.toFixed(3)})`);
+  outerGrad.addColorStop(0.5, `rgba(60,130,220,${(outerA * 0.5).toFixed(3)})`);
+  outerGrad.addColorStop(1,   'rgba(30,80,160,0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rInner = 0.28 + 0.04 * pulse;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
+  const innerA = 0.28 + 0.16 * pulse;
+  innerGrad.addColorStop(0, `rgba(140,200,255,${innerA.toFixed(3)})`);
+  innerGrad.addColorStop(1, 'rgba(85,170,255,0)');
+  ctx.fillStyle = innerGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * Draw a poison-green glow for entities tagged with `venom_glowing`.
  * Matches the poisoned-item glow style to convey venomous nature.
  * @param {CanvasRenderingContext2D} ctx
@@ -4280,6 +4317,9 @@ function render(worldView) {
       if (Array.isArray(e.tags) && e.tags.includes('epic_glowing')) {
         drawEpicChestAura(bctx, e, _fxTime);
       }
+      if (Array.isArray(e.tags) && e.tags.includes('rare_glowing')) {
+        drawRareGlowAura(bctx, e, _fxTime);
+      }
       if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
         drawPotionGlyphAura(bctx, e, _fxTime);
       }
@@ -4340,6 +4380,9 @@ function render(worldView) {
     }
     if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('epic_glowing')) {
       drawEpicChestAura(bctx, renderEntity, _fxTime);
+    }
+    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rare_glowing')) {
+      drawRareGlowAura(bctx, renderEntity, _fxTime);
     }
     if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('potion_glow')) {
       drawPotionGlyphAura(bctx, renderEntity, _fxTime);
