@@ -36,7 +36,7 @@ export function pickProfile(rng, depth, typeOverride = null) {
 
 function _pickType(rng, depth) {
   if (depth === 1) return 'default'; // special: depth 1 is always default (perlin noise)
-  if (depth === 2) return 'caves'; // special: depth 2 is always grottos (perlin noise)
+  if (depth === 2) return 'default'; // special: depth 2 is always default
   if (depth <= 3) return rng.next() < 0.7 ? 'catacombs' : 'default';
   if (depth <= 8) {
     const r = rng.next();
