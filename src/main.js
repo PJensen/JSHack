@@ -179,6 +179,7 @@ function hasValidFloorOverride() {
 const _hasFloorOverride = hasValidFloorOverride();
 const _pendingSavegame = _hasFloorOverride ? null : readSavegamePayload();
 const FIRST_RUN_DEV_NOTICE_KEY = "jshack:firstRunDevNoticeSeen:v1";
+const FIRST_RUN_TILE_KEY_KEY = "jshack:firstRunTileKeySeen:v1";
 const _shouldShowFirstRunDevNotice = consumeFirstRunDevNoticeFlag();
 let _didShowFirstRunDevNotice = false;
 
@@ -1044,6 +1045,21 @@ function _finalizeNewGame(classData) {
   // Initial world tick — runs all systems once so status effects, equipment stats,
   // and other derived state are fully resolved before the first frame renders.
   stepSim(1);
+
+  // Show tile key overlay on very first run so new players learn the glyphs.
+  if (!_savegameLoaded) {
+    try {
+      const seen = typeof localStorage !== "undefined" && localStorage.getItem(FIRST_RUN_TILE_KEY_KEY) === "1";
+      if (!seen) {
+        if (typeof localStorage !== "undefined") localStorage.setItem(FIRST_RUN_TILE_KEY_KEY, "1");
+        window.setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent("ui:showTileKeyTooltip"));
+          } catch (e) { console.debug('[main] dispatch ui:showTileKeyTooltip:', e); }
+        }, 400);
+      }
+    } catch (e) { console.debug('[main] tile key:', e); }
+  }
 
   bootAdvance("Starting render loop");
   requestAnimationFrame((now) => {
