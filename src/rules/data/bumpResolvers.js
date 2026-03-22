@@ -130,14 +130,16 @@ const hostileMelee = {
   },
 };
 
-/** Pet swap: player walks into own pet, swap positions (classic roguelike behavior). */
+/** Ally swap: player walks into pet or summoned ally, swap positions. */
 const petSwap = {
   name: "pet-swap",
   test(world, actor, ctx) {
     if (!world.has(actor, Player)) return false;
     if (!isManhattan1(ctx.mdx, ctx.mdy)) return false;
     if (!(ctx.target > 0) || ctx.target === actor) return false;
-    return world.has(ctx.target, Pet);
+    if (world.has(ctx.target, Pet)) return true;
+    const fac = world.get(ctx.target, Faction);
+    return fac?.key === 'summoned';
   },
   resolve(world, actor, ctx) {
     const actorPos = world.get(actor, Position);
