@@ -2364,7 +2364,7 @@ export const ITEM_CATALOG = {
     type: "learn",
     slot: "bag",
     material: "paper",
-    rarity: 1,
+    rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast a lightning spell.",
     hooks: {

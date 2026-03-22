@@ -213,6 +213,19 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Earthshatter: "EARTHQUAKE!" float text at origin.
+  world.on('spell:earthshatter', ({ origin, enhanced }) => {
+    if (!origin || !canShowAt(origin.x, origin.y)) return;
+    try {
+      ftext.addStatus(origin.x, origin.y - 0.45, 'EARTHQUAKE!', {
+        color: enhanced ? '#ff5500' : '#8b7355',
+        life: 1.3,
+        scaleStart: 1.5,
+        scaleEnd: 1.0,
+      });
+    } catch (e) { console.debug('[floatTextWiring] earthshatter ftext failed:', e); }
+  });
+
   // Gaze stun: strong psychic lock burst on the player.
   world.on('proc:gaze:stun', ({ target }) => {
     const pos = getPosition(Number(target || 0));

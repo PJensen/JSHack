@@ -37,6 +37,8 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { blind, getEffectiveVisionRange } from "../utils/blind.js";
 import { Player } from "../components/Player.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -1578,6 +1580,62 @@ REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
       at: { x: tpos.x, y: tpos.y },
     });
   } catch (e) { console.debug('[spells] emit spell:blind failed:', e); }
+};
+
+// Earthshatter — self-centered AoE that spawns a 3-tick earthquake hazard.
+// Stuns and deals minor physical damage to enemies in radius 1.
+// Enhanced (volcanic) variant when caster has the earthshaker affix.
+REGISTRY['earthshatter'] = function earthshatterScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const RADIUS = 1;
+  const BASE_DMG = 3;
+  const QUAKE_TURNS = 3;
+  const STUN_TURNS = 2;
+
+  // Check equipped gear for earthshaker affix → enhanced (volcanic) variant.
+  let enhanced = false;
+  const equip = /** @type any */ (world.get(actor, Equipment));
+  if (equip) {
+    for (const slot of NON_AMMO_GEAR_SLOTS) {
+      const itemId = equip[slot];
+      if (!itemId || itemId <= 0) continue;
+      const info = /** @type any */ (world.get(itemId, ItemInfo));
+      if (info && Array.isArray(info.affixes) && info.affixes.includes("earthshaker")) {
+        enhanced = true;
+        break;
+      }
+    }
+  }
+
+  const scaledDmg = scaleSpellDamage(world, actor, BASE_DMG);
+
+  spawnHazard(world, {
+    x: apos.x,
+    y: apos.y,
+    kind: "quake",
+    medium: "floor",
+    turnsLeft: QUAKE_TURNS,
+    radius: RADIUS,
+    tickDamage: scaledDmg,
+    damageType: "physical",
+    cause: "spell:earthshatter",
+    sourceId: actor,
+    sourceKind: "earthshatter",
+    identity: enhanced ? "quake_volcanic" : "quake_earth",
+    name: enhanced ? "Volcanic Fissure" : "Earthshatter",
+    meta: { stunTurns: STUN_TURNS, enhanced },
+  });
+
+  try {
+    world.emit?.('spell:earthshatter', {
+      actor,
+      origin: { x: apos.x, y: apos.y },
+      radius: RADIUS,
+      enhanced,
+    });
+  } catch (e) { console.debug('[spells] emit spell:earthshatter failed:', e); }
 };
 
 /**
