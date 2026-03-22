@@ -34,6 +34,7 @@ import { ensureActiveEffects } from "../utils/effects.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { Traits } from "../components/Traits.js";
+import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 
 /**
  * @param {any} world
@@ -71,7 +72,7 @@ export function applyMutation(world, op, resolvers = {}) {
       if (!vit) return;
       const delta = Math.max(0, op.amount | 0);
       if (delta <= 0) return;
-      vit.hp = Math.min(vit.maxHp | 0, (vit.hp | 0) + delta);
+      vit.hp = Math.min(effectiveMaxHp(world, op.entityId, vit), (vit.hp | 0) + delta);
       break;
     }
     case "pushEffect": {

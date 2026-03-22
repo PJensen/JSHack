@@ -126,9 +126,10 @@ function applyPrayerBoon(world, actorId, context) {
   const boon = candidates[Math.max(0, Math.min(candidates.length - 1, pickIndex))] || 'fortune';
 
   if (boon === 'renewal' && vit) {
-    const heal = Math.max(4, Math.floor(vit.maxHp * (desperate ? 0.45 : 0.28) * Math.max(0.75, prayerPower)));
+    const renewalCap = effectiveMaxHp(world, actorId, vit);
+    const heal = Math.max(4, Math.floor(renewalCap * (desperate ? 0.45 : 0.28) * Math.max(0.75, prayerPower)));
     const before = vit.hp;
-    vit.hp = Math.min(vit.maxHp, vit.hp + heal);
+    vit.hp = Math.min(renewalCap, vit.hp + heal);
     const applied = Math.max(0, vit.hp - before);
     if (applied > 0) {
       try { world.emit && world.emit('healed', { id: actorId, amount: applied, source: 'divine' }); } catch {}

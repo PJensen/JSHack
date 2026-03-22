@@ -75,6 +75,7 @@ import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
+import { effectiveMaxHp } from "../../utils/passiveBonuses.js";
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 
@@ -768,11 +769,12 @@ export const INTERACT_PAYLOADS = {
 
       if (roll < 0.75) {
         if (primaryEffect === "heal") {
+          const fountainCap = effectiveMaxHp(world, actor, vit);
           const healAmt = Math.max(
             1,
-            Math.floor(vit.maxHp * (0.2 + r() * 0.2)),
+            Math.floor(fountainCap * (0.2 + r() * 0.2)),
           );
-          const newHp = Math.min(vit.maxHp, vit.hp + healAmt);
+          const newHp = Math.min(fountainCap, vit.hp + healAmt);
           world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
           world.emit?.("fountain:drink", {
             actor,
