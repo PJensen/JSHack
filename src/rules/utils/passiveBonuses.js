@@ -171,3 +171,17 @@ export function getPassiveBonuses(world, entityId) {
   if (Virtual && typeof world?.vget === "function") return world.vget(entityId, Virtual);
   return resolvePassiveBonuses(world, entityId);
 }
+
+/**
+ * Effective maximum HP = base Vitality.maxHp + equipment maxHpDerived bonus.
+ * Mirrors how maxMana/maxStamina are handled in regen systems.
+ * @param {any} world
+ * @param {number} entityId
+ * @param {{ maxHp: number }} [vit] - pre-fetched Vitality (avoids double-lookup when caller already has it)
+ * @returns {number}
+ */
+export function effectiveMaxHp(world, entityId, vit) {
+  const baseMax = vit ? (vit.maxHp | 0) : 0;
+  const passive = getPassiveBonuses(world, entityId);
+  return baseMax + Number(passive?.maxHpDerived ?? 0);
+}

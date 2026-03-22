@@ -31,7 +31,7 @@ import { chebyshev } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
 import { isVisible as isTileVisible } from "../environment/dungeon/exploredMap.js";
-import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+import { getPassiveBonuses, effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
@@ -1040,7 +1040,8 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
 
   // Check if target needs healing
   const vit = /** @type any */ (world.get(targetId, Vitality));
-  if (!vit || (vit.hp | 0) >= (vit.maxHp | 0)) {
+  const hpCap = effectiveMaxHp(world, targetId, vit);
+  if (!vit || (vit.hp | 0) >= hpCap) {
     // No healing needed
     try { world.emit && world.emit('spell:heal', { actor, targetId, at: targetPos, amount: 0, reason: 'full_health' }); } catch (e) { console.debug('[spells] emit spell:heal failed:', e); }
     return;
@@ -1056,7 +1057,7 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
 
   // Apply healing
   const oldHp = vit.hp | 0;
-  vit.hp = Math.min(vit.maxHp | 0, oldHp + amount);
+  vit.hp = Math.min(hpCap, oldHp + amount);
   const actualHeal = vit.hp - oldHp;
 
   // Emit events
@@ -1070,12 +1071,13 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
   if (!apos) return;
 
   const vit = /** @type any */ (world.get(actor, Vitality));
-  if (!vit || (vit.hp | 0) >= (vit.maxHp | 0)) {
+  const flashHpCap = effectiveMaxHp(world, actor, vit);
+  if (!vit || (vit.hp | 0) >= flashHpCap) {
     try { world.emit && world.emit('spell:flash_heal', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, amount: 0, reason: 'full_health' }); } catch (e) { console.debug('[spells] emit spell:flash_heal failed:', e); }
     return;
   }
 
-  const maxHp = vit.maxHp | 0;
+  const maxHp = flashHpCap;
   const spellLevel = getFlashHealSpellLevel(world, actor, spell, intent);
   const amount = Math.max(FLASH_HEAL_TUNING.minimumHeal, Math.floor(maxHp * FLASH_HEAL_TUNING.healFraction));
 

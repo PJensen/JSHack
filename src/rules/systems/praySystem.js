@@ -15,6 +15,7 @@ import { getHungerLevel } from "../data/food.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
 import { ensureActiveEffects } from "../utils/effects.js";
+import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 
 const PRAYER_STREAK_KEY = Symbol.for('jshack:prayer:boonStreak');
 const PRAYER_LAST_BOON_KEY = Symbol.for('jshack:prayer:lastBoonTurn');
