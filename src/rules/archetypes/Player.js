@@ -24,7 +24,7 @@ export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
   [Player],
   [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
-  [Inventory, (p) => ({ capacity: p.capacity ?? 100 })],
+  [Inventory, (p) => ({ capacity: p.capacity ?? 150 })],
   [NamedIdentity, (p) => ({ name: p.name ?? "Player", identity: p.identity ?? "player" })],
   [Physiology, (p) => ({ sizeClass: p.sizeClass ?? "M", massKg: p.massKg ?? 80 })],
   [Resistances, (p) => ({
