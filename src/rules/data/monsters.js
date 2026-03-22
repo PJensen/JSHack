@@ -1142,6 +1142,7 @@ export const MONSTERS = [
   // ── Multi-segment centipede (tier 0) ─────────────────────────────────
   {
     id: 'centipede',
+    disabled: true,
     name: 'Giant Centipede',
     tags: ['beast', 'vermin', 'long-creature'],
     tier: 0,
@@ -1169,7 +1170,7 @@ export const MONSTERS = [
 const _byId = new Map(MONSTERS.map(m => [m.id, m]));
 const _byTier = [];
 for (const m of MONSTERS) {
-  if (!m.rare) (_byTier[m.tier] ??= []).push(m);
+  if (!m.rare && !m.disabled) (_byTier[m.tier] ??= []).push(m);
 }
 
 /** Genocide registry — tracks monster IDs permanently removed from the game. */
