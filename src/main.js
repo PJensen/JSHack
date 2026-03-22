@@ -144,6 +144,10 @@ import {
   ensureLocalGeneratedQuest,
 } from "./rules/quests/localGenerator.js";
 import { postCharacterCreated, getHighscores } from "./shared/tombstoneApi.js";
+import { Traits } from "./rules/components/Traits.js";
+import { Polymorph } from "./rules/components/Polymorph.js";
+import { resolvePolymorph } from "./rules/systems/polymorphSystem.js";
+import { listAllMonsterIds, MONSTERS, getMonster } from "./rules/data/monsters.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -1710,6 +1714,111 @@ world.on('scroll:genocide', ({ actor }) => {
     return;
   }
   world.emit?.('scroll:genocide:request', { actor, query: input.trim() });
+});
+
+// Scroll of Polymorph → enemy targeting reticle, then transform
+world.on('scroll:polymorph', ({ actor }) => {
+  const _pe = playerEntity(world);
+  if (!_pe) return;
+  const px = _pe.pos.x | 0;
+  const py = _pe.pos.y | 0;
+  const range = 8;
+  const blocked = buildBlocksVisionMap(world);
+  const isBlocked = blockedCallback(blocked);
+
+  /** @type {Array<{id:number,x:number,y:number}>} */
+  const enemies = [];
+  forEachInRadius(world, px, py, range, (eid, pos) => {
+    if (eid === _pe.id) return;
+    const fac = world.get(eid, Faction);
+    if (!fac || fac.key !== 'enemy') return;
+    const vit = /** @type any */ (world.get(eid, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) return;
+    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
+    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
+    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
+  });
+
+  if (enemies.length === 0) {
+    try { messageLog.log({ text: 'No visible enemies to polymorph.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
+
+  enemies.sort((a, b) => {
+    const da = Math.max(Math.abs(a.x - px), Math.abs(a.y - py));
+    const db = Math.max(Math.abs(b.x - px), Math.abs(b.y - py));
+    return da - db;
+  });
+
+  _pendingEnemyTargeting = {
+    spellId: '__scroll_polymorph__',
+    spellName: 'Scroll of Polymorph',
+    range,
+    enemies,
+    index: 0,
+    onConfirm: (enemyId) => {
+      let targetIdentity;
+      const traits = world.get(actor, Traits);
+      if (traits?.polymorph_control) {
+        const input = prompt('Polymorph into which creature?');
+        if (!input || !input.trim()) {
+          world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
+          return;
+        }
+        const query = input.trim().toLowerCase();
+        let best = null;
+        let bestScore = Infinity;
+        for (const monster of MONSTERS) {
+          const name = monster.name.toLowerCase();
+          if (name === query) { best = monster; bestScore = 0; break; }
+          const score = name.startsWith(query) ? 1
+            : name.includes(query) ? 2
+            : query.startsWith(name) ? 3
+            : Infinity;
+          if (score < bestScore) { bestScore = score; best = monster; }
+        }
+        if (!best || bestScore > 4) {
+          world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
+          return;
+        }
+        targetIdentity = best.id;
+      } else {
+        const allIds = listAllMonsterIds();
+        targetIdentity = allIds[Math.floor(world.rand() * allIds.length)];
+      }
+
+      let depth = 1;
+      for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; }
+
+      const fromIdent = world.get(enemyId, NamedIdentity);
+      const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
+
+      try {
+        world.add(enemyId, Polymorph, { targetIdentity, depth, trigger: 'scroll', once: true, revealed: false, hookKey: '' });
+      } catch {
+        world.mutate(enemyId, Polymorph, (r) => { r.targetIdentity = targetIdentity; r.depth = depth; r.revealed = false; });
+      }
+
+      const spawnedId = resolvePolymorph(world, { entityId: enemyId, targetIdentity, depth, actorId: actor, trigger: 'scroll', reason: 'scroll_polymorph' });
+      const toName = getMonster(targetIdentity)?.name || targetIdentity;
+      if (spawnedId > 0) {
+        world.emit?.('message', { text: `The ${fromName} shudders and transforms into a ${toName}!`, type: 'system' });
+        const pos = world.get(spawnedId, Position);
+        if (pos) world.emit?.('scroll:polymorph:vfx', { x: pos.x | 0, y: pos.y | 0 });
+      } else {
+        world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
+      }
+    },
+  };
+  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
+  _pendingSpellTargeting = null;
+  _pendingThrowTargeting = null;
+  try {
+    messageLog.log({
+      text: 'Choose target for Scroll of Polymorph. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
+      type: 'system',
+    });
+  } catch (e) { console.debug('[main] messageLog failed:', e); }
 });
 
 // Wait button → dispatch wait action
