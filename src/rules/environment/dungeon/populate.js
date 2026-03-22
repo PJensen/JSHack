@@ -790,6 +790,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   if (shopRoom) {
     const room = shopRoom;
 
+    // Pick a shop archetype: general, book, jewelry, potion
+    const SHOP_ARCHETYPES = ["general", "book", "jewelry", "potion"];
+    const shopType = SHOP_ARCHETYPES[rng.int(0, SHOP_ARCHETYPES.length - 1)];
+
     // Shop rooms must not start with regular dungeon enemies, spawners, or traps.
     for (let i = spawns.length - 1; i >= 0; i--) {
       const sp = spawns[i];
@@ -809,7 +813,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       kind: 'shopkeeper',
       params: {
         depth: floorPlan.depth,
-        room: { x: room.x, y: room.y, w: room.w, h: room.h }
+        room: { x: room.x, y: room.y, w: room.w, h: room.h },
+        shopType,
       }
     });
 
@@ -831,8 +836,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       });
     }
 
-    // Scatter shop items on the floor throughout the room (5-12 items)
-    const itemCount = rng.int(5, 12);
+    // Scatter shop items on the floor throughout the room
+    const SHOP_ITEM_COUNTS = { general: [5, 12], book: [4, 8], jewelry: [4, 8], potion: [5, 10] };
+    const [minItems, maxItems] = SHOP_ITEM_COUNTS[shopType] || [5, 12];
+    const itemCount = rng.int(minItems, maxItems);
     for (let i = 0; i < itemCount; i++) {
       const ix = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const iy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
@@ -840,7 +847,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         x: ix,
         y: iy,
         kind: 'shop_item',
-        params: { depth: floorPlan.depth }
+        params: { depth: floorPlan.depth, shopType }
       });
     }
   }
@@ -1353,6 +1360,13 @@ export function materializeSpawn(world, spawn) {
       const id = createFrom(world, Shopkeeper, { x: spawn.x, y: spawn.y });
       const depth = spawn.params.depth || 1;
 
+      // Name the shopkeeper based on shop archetype
+      const SHOP_NAMES = { book: "Bookseller", jewelry: "Jeweler", potion: "Apothecary", general: "Shopkeeper" };
+      const shopName = SHOP_NAMES[spawn.params.shopType] || "Shopkeeper";
+      if (shopName !== "Shopkeeper") {
+        world.mutate(id, NamedIdentity, r => { r.name = shopName; });
+      }
+
       // Create a room metadata entity to mark this as a shop
       if (spawn.params.room) {
         const roomEntity = world.create();
@@ -1372,8 +1386,14 @@ export function materializeSpawn(world, spawn) {
       const depth = spawn.params.depth || 1;
       const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0x5470) >>> 0);
 
-      // Generate exactly one item for this floor spawn (no orphan stock entities).
-      const itemId = shopStock.generateShopItem(world, depth, shopRng);
+      // Generate exactly one item for this floor spawn, chosen by shop archetype.
+      let itemId;
+      switch (spawn.params.shopType) {
+        case 'book':    itemId = shopStock.generateBookShopItem(world, shopRng); break;
+        case 'jewelry': itemId = shopStock.generateGemDisplayItem(world, shopRng); break;
+        case 'potion':  itemId = shopStock.generateAlchemyShopItem(world, shopRng); break;
+        default:        itemId = shopStock.generateShopItem(world, depth, shopRng); break;
+      }
       if (itemId == null) return null;
 
       // Place it on the floor

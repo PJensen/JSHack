@@ -418,7 +418,7 @@ registerScript(AFFIX_VENOMOUS, {
 
 registerScript(AFFIX_CHAIN_LIGHTNING, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
-    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee10, 15)) return;
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee10, 30)) return;
     const targetVit = world.get(ctx.target, Vitality);
     if (!targetVit || (targetVit.hp | 0) <= 1) return;
     ctx.proc.dealDamage(ctx.target, 2, "electric", {
