@@ -553,7 +553,7 @@ export const LOOT_TABLES = {
     rolls: { min: 2, max: 4 },
     entries: [
       { type: "gold",      weight: 25, count: { base: 40, perDepth: 8 } },
-      { type: "equip",     weight: 18, pool: ["nightfang_dagger", "pyreheart_mace", "glacial_edge", "witchfire_sword", "howling_maul", "stormcaller_blade", "soulreaver_axe"], affixChance: 0.70, affixCountMax: 2 },
+      { type: "equip",     weight: 18, pool: ["nightfang_dagger", "pyreheart_mace", "glacial_edge", "witchfire_sword", "howling_maul", "stormcaller_blade", "soulreaver_axe", "bow_shadow"], affixChance: 0.70, affixCountMax: 2 },
       { type: "equip",     weight: 18, pool: ["helm_warhelm", "helm_visionary", "pendant_soulkeeper", "pendant_stormward", "belt_ironhide", "belt_vitality", "gauntlets_spiked", "gloves_arcane", "amulet_vigor", "belt_girded", "gauntlets_iron", "greaves_steel", "ring_health", "ring_precision", "ring_arcana", "ring_endurance", "ring_of_fury", "serpent_ring", "wardkeeper_shield", "aegis_of_the_ancient", "armor_bulwark", "armor_phantom", "legguards_colossus", "leggings_wraith", "boots_earthbound", "boots_phantomstride", "ring_ironwill", "ring_fateweaver", "ring_voidchannel"], affixChance: 0.70, affixCountMax: 2 },
       { type: "table",     weight: 25, tableId: "sub:spellbooks" },
       { type: "table",     weight: 20, tableId: "sub:scrolls" },
@@ -670,6 +670,7 @@ export const LOOT_TABLES = {
       { type: "equip",   weight: 25, pool: ["dagger_quick"],  affixChance: 0.25, affixCountMax: 1 },
       { type: "equip",   weight: 20, pool: ["axe_heavy"],     affixChance: 0.30, affixCountMax: 1 },
       { type: "equip",   weight: 20, pool: ["bow_short"],     affixChance: 0.25, affixCountMax: 1 },
+      { type: "equip",   weight: 12, pool: ["bow_long"],      affixChance: 0.30, affixCountMax: 1 },
       { type: "equip",   weight: 18, pool: ["iron_mace"],     affixChance: 0.30, affixCountMax: 1 },
       { type: "equip",   weight: 15, pool: ["longsword"],     affixChance: 0.30, affixCountMax: 1 },
       { type: "equip",   weight: 10, pool: ["iron_pickaxe"],  affixChance: 0.25, affixCountMax: 1 },
