@@ -5558,6 +5558,8 @@ function ensureMessageTicker(root) {
     overflow: 'hidden',
     cursor: 'pointer',
     userSelect: 'none',
+    webkitTextSizeAdjust: '100%',
+    textSizeAdjust: '100%',
     transition: 'width 140ms ease-out, max-height 140ms ease-out, background 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out',
   });
   (/** @type {any} */ (box))._entries = [];

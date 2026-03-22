@@ -451,9 +451,14 @@ export function corpseProcNode(spec = {}) {
   };
 }
 
+// -- Legacy convenience wrappers (delegate to corpseProcNode) --
+// These exist for readability and gradual migration; prefer explicit
+// corpseProcNode(...) specs in content files for maximum composability.
+
 /**
  * Push a status effect on eat -> emit "hunger:sickened".
  * Used by rat/bat (disease), snake/spider (poison), wraith/lich (mindwipe), etc.
+ * @deprecated Prefer explicit corpseProcNode({ effects, script }) in data files.
  * @param {string} effectKey
  * @param {number} turnsLeft
  * @param {number} potency
@@ -472,6 +477,7 @@ export function corpseStatusEffect(effectKey, turnsLeft, potency, emitType) {
 /**
  * Deal flat damage on eat.
  * Used by grid_bug (shock).
+ * @deprecated Prefer explicit corpseProcNode({ effects }) in data files.
  */
 export function corpseDamage(amount) {
   return corpseProcNode({
@@ -483,6 +489,7 @@ export function corpseDamage(amount) {
 /**
  * Grant electric resistance on eat via stat tree.
  * Used by eel corpse. Adds electricOhms bonus (diminishing, cap ~2400 total bonus).
+ * Canonical special-case helper retained for concise diminishing adaptation logic.
  */
 export function grantElectricResist(ctx) {
   const run = corpseProcNode({
@@ -508,6 +515,7 @@ export function grantElectricResist(ctx) {
 /**
  * Cancel the eat action with a structured reason.
  * Useful for hard-gated corpse interactions.
+ * @deprecated Prefer explicit corpseProcNode({ script }) in data files.
  */
 export function cancelEat(code, message, consumesTurn = true) {
   const reasonCode = String(code || "FAIL");
@@ -520,10 +528,11 @@ export function cancelEat(code, message, consumesTurn = true) {
   });
 }
 
-// -- Generic factory functions --
+// -- Legacy generic wrappers (delegate to corpseProcNode) --
 
 /**
  * Apply a timed buff/debuff on eat.
+ * @deprecated Prefer explicit corpseProcNode({ effects, script }) in data files.
  * @param {string} effectKey
  * @param {number} turnsLeft
  * @param {number} potency
@@ -547,6 +556,7 @@ export function corpseTimedBuff(effectKey, turnsLeft, potency, emitEvent, descri
 
 /**
  * Chance-gated dual outcome: roll once, apply good OR bad callback.
+ * @deprecated Prefer explicit corpseProcNode({ gates/effects/script }) in data files.
  * @param {number} goodChance - 0.0-1.0 probability of the good outcome
  * @param {Function} goodCb - callback if lucky
  * @param {Function} badCb - callback if unlucky
@@ -566,6 +576,7 @@ export function corpseGamble(goodChance, goodCb, badCb) {
 
 /**
  * Grant bonus nutrition on eat.
+ * @deprecated Prefer explicit corpseProcNode({ effects }) in data files.
  * @param {number} amount
  */
 export function corpseBonusNutrition(amount) {
@@ -577,6 +588,7 @@ export function corpseBonusNutrition(amount) {
 
 /**
  * Heal HP on eat.
+ * @deprecated Prefer explicit corpseProcNode({ effects, script }) in data files.
  * @param {number} amount
  */
 export function corpseHeal(amount) {
@@ -606,6 +618,8 @@ export function corpseHeal(amount) {
  *   eat 1: delta=0.09, total=0.09
  *   eat 2: delta=0.077, total=0.167
  *   eat 5: total≈0.35
+ *
+ * Canonical special-case helper retained to keep diminishing formulas centralized.
  *
  * @param {string} statKey  - canonical stat key (e.g. "poisonResist", "fireResist")
  * @param {number} decay    - 0–1, higher = slower convergence
@@ -647,6 +661,8 @@ export function corpseDiminishResist(statKey, decay, floor, label, source) {
  * @param {number} ceiling    - max total DR reachable (base + corpse bonuses)
  * @param {string} [label]    - display name
  * @param {string} [source]   - monster id for attribution
+ *
+ * Canonical special-case helper retained to keep diminishing formulas centralized.
  */
 export function corpseDiminishDR(statKey, baseChannel, baseField, increment, ceiling, label, source) {
   return (ctx) => {
