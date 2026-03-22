@@ -1455,23 +1455,22 @@ function createMobileSpellRadial(mobileLayoutMq) {
     const count = spells.length;
     if (count === 0) return;
 
-    // Arc from ~200° (lower-left) to ~90° (straight up), origin at trigger center
+    // Quarter-circle arc from 90° (up) to 180° (left), facing into the game field
     const RADIUS = 90;
-    const ARC_START = 200;
-    const ARC_END = 90;
-    const ARC_SPAN = ARC_START - ARC_END;
-    // Trigger center offset (trigger is 56px, so center at 28,28 from el origin)
-    const CX = 28;
-    const CY = 28;
+    const ARC_START = 90;
+    const ARC_END = 180;
+    const ARC_SPAN = ARC_END - ARC_START;
+    const HALF_ITEM = 22; // half of 44px item
 
     for (let i = 0; i < count; i++) {
       const spell = spells[i];
       const angle = count === 1
         ? (ARC_START + ARC_END) / 2
-        : ARC_START - (ARC_SPAN * i / (count - 1));
+        : ARC_START + (ARC_SPAN * i / (count - 1));
       const rad = angle * Math.PI / 180;
-      const x = Math.cos(rad) * RADIUS;
-      const y = -Math.sin(rad) * RADIUS;
+      // Position from bottom-right of trigger: right increases leftward, bottom increases upward
+      const r = 28 - Math.cos(rad) * RADIUS - HALF_ITEM;
+      const b = 28 + Math.sin(rad) * RADIUS - HALF_ITEM;
 
       const isActive = spell.id === activeId;
       const item = document.createElement('div');
@@ -1483,8 +1482,8 @@ function createMobileSpellRadial(mobileLayoutMq) {
         background: isActive ? '#152035' : '#101626',
         color: '#cfe8ff', fontSize: '20px',
         display: 'grid', placeItems: 'center',
-        left: (CX + x - 22) + 'px',
-        bottom: (-CY - y - 22) + 'px',
+        right: r + 'px',
+        bottom: b + 'px',
         cursor: 'pointer',
         pointerEvents: 'auto',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
