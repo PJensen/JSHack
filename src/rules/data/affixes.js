@@ -223,7 +223,7 @@ registerScript(AFFIX_VENOMOUS, {
 
 registerScript(AFFIX_CHAIN_LIGHTNING, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
-    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee10, 15)) return;
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee10, 30)) return;
     const dealt = applyNonLethalTypedChip(world, ctx, "electric", 2, "affix:chainLightning");
     if (dealt <= 0) return;
     const defPos = world.get(ctx.defender, Position);

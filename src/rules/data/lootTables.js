@@ -285,7 +285,7 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 25, tableId: "sub:potions" },
       { type: "item",      weight: 12, itemId: "potion_mana" },
       { type: "table",     weight: 20, tableId: "sub:scrolls" },
-      { type: "archetype", weight: 8,  archetype: "ArrowsStack" },
+      { type: "archetype", weight: 14, archetype: "ArrowsStack" },
       { type: "table",     weight: 8,  tableId: "sub:equip_common" },
       { type: "table",     weight: 10, tableId: "sub:equip_magic" },
       { type: "table",     weight: 12, tableId: "sub:spellbooks" },
