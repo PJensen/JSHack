@@ -180,7 +180,9 @@ const DEAD_END_ROOM_THEMES = [
   { kind: 'lair', weight: 5 },
 ];
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
-const SHOP_MIMIC_CHANCE = 0.08;
+// Mimics should be encountered mostly in shops; wild dungeon mimics stay uncommon.
+const SHOP_MIMIC_CHANCE = 0.12;
+const ROOM_MIMIC_CHANCE = 0.003;
 const SHOP_MAX_ROOM_WIDTH = 6;
 const SHOP_MAX_ROOM_HEIGHT = 6;
 const DEAD_END_CONTENT_CHANCE = 1.0;
@@ -645,9 +647,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       }
     }
 
-    // Rare room mimic: 5% chance per non-entry room to place a mimic disguised
+    // Rare room mimic: very low chance per non-entry room to keep wild mimics uncommon.
     // as a common dungeon decoration. Placed after monsters/chests to avoid blocking them.
-    const ROOM_MIMIC_CHANCE = 0.05;
     if (!isEntryRoom && rng.next() < ROOM_MIMIC_CHANCE) {
       let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
