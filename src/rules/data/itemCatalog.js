@@ -3741,6 +3741,293 @@ export const ITEM_CATALOG = {
     },
   },
 
+  // ── Bad Potions ───────────────────────────────────────────────────
+
+  potion_paralysis: {
+    id: "potion_paralysis",
+    catalogKind: "magic",
+    name: "Potion of Paralysis",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A thick, syrupy liquid that locks every muscle in place.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "stun", potency: 1, onset: 0, peak: 0, duration: 10, stack: "refresh", maxStacks: 1, meta: { source: "potion_paralysis" } },
+      ],
+      feel: "Your body goes rigid. You can't move!",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:paralysis", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_hallucination: {
+    id: "potion_hallucination",
+    catalogKind: "magic",
+    name: "Potion of Hallucination",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A swirling iridescent brew. The walls are breathing.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "hallucinating", potency: 1, onset: 0, peak: 0, duration: 35, stack: "refresh", maxStacks: 1, meta: { source: "potion_hallucination" } },
+      ],
+      feel: "The colours... they're singing.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:hallucination", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_blindness: {
+    id: "potion_blindness",
+    catalogKind: "magic",
+    name: "Potion of Blindness",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A pitch-black draught that steals the light from your eyes.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "blinded", potency: 1, onset: 0, peak: 0, duration: 20, stack: "refresh", maxStacks: 1, meta: { source: "potion_blindness" } },
+      ],
+      feel: "Everything goes dark.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:blindness", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_weakness: {
+    id: "potion_weakness",
+    catalogKind: "magic",
+    name: "Potion of Weakness",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 5,
+    description: "A thin grey liquid that drains your life force.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "weakened", potency: 1, onset: 0, peak: 0, duration: 40, stack: "refresh", maxStacks: 1, meta: { source: "potion_weakness" } },
+      ],
+      feel: "Your strength fades. Everything feels heavier.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const vit = ctx.query.get(actor, Vitality);
+        if (vit) {
+          vit.maxHp = Math.max(1, (vit.maxHp | 0) - 8);
+          if (vit.hp > vit.maxHp) vit.hp = vit.maxHp;
+        }
+        const stam = ctx.query.get(actor, Stamina);
+        if (stam) {
+          stam.max = Math.max(1, (stam.max | 0) - 8);
+          if (stam.current > stam.max) stam.current = stam.max;
+        }
+        ctx.io.emit("potion:weakness", { actor, hpLost: 8, staminaLost: 8 });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_confusion: {
+    id: "potion_confusion",
+    catalogKind: "magic",
+    name: "Potion of Confusion",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A fizzing, disorienting concoction.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "confused", potency: 1, onset: 0, peak: 0, duration: 15, stack: "refresh", maxStacks: 1, meta: { source: "potion_confusion" } },
+      ],
+      feel: "Which way is up? You can't tell anymore.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:confusion", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Bad Scrolls (new) ──────────────────────────────────────────────
+
+  scroll_cursing: {
+    id: "scroll_cursing",
+    catalogKind: "magic",
+    name: "Scroll of Cursing",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 5,
+    description: "Dark words slither off the page and weld your gear to your body.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const equip = ctx.query.get(actor, Equipment);
+        let cursed = 0;
+        if (equip) {
+          for (const slot of GEAR_SLOTS) {
+            const itemId = equip[slot];
+            if (!(itemId > 0)) continue;
+            const beat = ctx.query.get(itemId, Beatitude);
+            if (beat && beat.state === 'cursed') continue;
+            cursed++;
+            ctx.io.emit("curse:equipment", { actor, itemId, source: "scroll_cursing" });
+            if (cursed >= 3) break;
+          }
+        }
+        ctx.io.emit("scroll:cursing", { actor, count: cursed });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_summoning: {
+    id: "scroll_summoning",
+    catalogKind: "magic",
+    name: "Scroll of Summoning",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 5,
+    description: "The words screech and claw shapes pour from the parchment.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:summoning", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_decay: {
+    id: "scroll_decay",
+    catalogKind: "magic",
+    name: "Scroll of Decay",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "The scroll crumbles and a wave of rot spreads through your pack.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:decay", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Cursed Amulets ─────────────────────────────────────────────────
+
+  amulet_strangulation: {
+    id: "amulet_strangulation",
+    catalogKind: "equipment",
+    name: "Amulet of Strangulation",
+    type: "equip",
+    slot: "neck",
+    material: "iron",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { maxHp: -3 },
+    beatitude: "cursed",
+    description: "The chain tightens around your throat. You can feel it constricting.",
+  },
+  amulet_aggravation: {
+    id: "amulet_aggravation",
+    catalogKind: "equipment",
+    name: "Amulet of Aggravation",
+    type: "equip",
+    slot: "neck",
+    material: "bone",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { defense: -1 },
+    beatitude: "cursed",
+    description: "A crude fetish of yellowed bone. Everything in the dungeon knows exactly where you are.",
+  },
+
+  // ── Cursed Rings (new) ─────────────────────────────────────────────
+
+  ring_fragility: {
+    id: "ring_fragility",
+    catalogKind: "equipment",
+    name: "Ring of Fragility",
+    type: "equip",
+    slot: "ring",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { defense: -3, bluntResist: -0.15, slashResist: -0.15 },
+    beatitude: "cursed",
+    description: "A brittle glass ring. Your skin feels paper-thin.",
+  },
+  ring_mana_drain: {
+    id: "ring_mana_drain",
+    catalogKind: "equipment",
+    name: "Ring of Mana Drain",
+    type: "equip",
+    slot: "ring",
+    material: "lead",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { manaRegen: -1.0, maxMana: -10 },
+    beatitude: "cursed",
+    description: "A dull leaden band that devours arcane energy. Your spells wither on your tongue.",
+  },
+
   food_mushrooms: {
     id: "food_mushrooms",
     catalogKind: "food",

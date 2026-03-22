@@ -1113,6 +1113,46 @@ export function installMessageWiring({
     log('The mushrooms make your head swim. The walls begin to shift... and a furious rage surges through you!', 'system');
   });
 
+  // ── Bad potion messages ──────────────────────────────────────────────
+  world.on('potion:paralysis', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your body goes rigid. You can\'t move!', 'danger');
+  });
+  world.on('potion:hallucination', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The world dissolves into swirling colours. Nothing looks real anymore.', 'danger');
+  });
+  world.on('potion:blindness', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Everything goes dark. You can\'t see a thing!', 'danger');
+  });
+  world.on('potion:weakness', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A wave of lethargy washes over you. You feel permanently diminished.', 'danger');
+  });
+  world.on('potion:confusion', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your head spins. Which way is which?', 'danger');
+  });
+
+  // ── Bad scroll messages ──────────────────────────────────────────────
+  world.on('scroll:cursing', ({ actor, count }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (count > 0) {
+      log(`Dark words slither off the page. ${count} piece${count > 1 ? 's' : ''} of your equipment turn${count === 1 ? 's' : ''} black!`, 'danger');
+    } else {
+      log('Dark words slither off the page, but find nothing to corrupt.', 'system');
+    }
+  });
+  world.on('scroll:summoning', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Shapes claw their way out of the parchment! Hostile creatures surround you!', 'danger');
+  });
+  world.on('scroll:decay', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The scroll crumbles and a wave of rot spreads through your pack!', 'danger');
+  });
+
   world.on('harvest:picked', ({ actor, kind, count, itemId }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const yieldLabel = harvestYieldLabel(kind);

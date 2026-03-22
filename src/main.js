@@ -1473,6 +1473,10 @@ addEventListener('keydown', (ev) => {
     const enemy = targeting.enemies[targeting.index];
     _pendingEnemyTargeting = null;
     _targetCursor = null;
+    if (typeof targeting.onConfirm === 'function') {
+      targeting.onConfirm(enemy.id);
+      return;
+    }
     const rulesHandler = makeRulesDispatcher(world, () => pe.id);
     rulesHandler({
       type: 'rules.castActiveSpell',
@@ -2897,6 +2901,10 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (targeting.index === bestIdx) {
     _pendingEnemyTargeting = null;
     _targetCursor = null;
+    if (typeof targeting.onConfirm === 'function') {
+      targeting.onConfirm(selected.id);
+      return;
+    }
     const rulesHandler = makeRulesDispatcher(world, () => pe.id);
     rulesHandler({
       type: 'rules.castActiveSpell',
