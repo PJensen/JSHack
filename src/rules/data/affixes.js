@@ -426,11 +426,12 @@ registerScript(AFFIX_CHAIN_LIGHTNING, {
       noTrigger: true,
       nonLethal: true,
     });
+    const atkPos = world.get(ctx.source, Position);
     const defPos = world.get(ctx.target, Position);
+    let chainTarget = null;
     if (defPos) {
-      let chained = false;
       forEachInRadius(world, defPos.x, defPos.y, 2, (nearId) => {
-        if (chained || nearId === ctx.target || nearId === ctx.source) return;
+        if (chainTarget || nearId === ctx.target || nearId === ctx.source) return;
         if (!world.isAlive(nearId)) return;
         const nearFac = world.get(nearId, Faction)?.key || "";
         const atkFac = world.get(ctx.source, Faction)?.key || "";
@@ -441,10 +442,17 @@ registerScript(AFFIX_CHAIN_LIGHTNING, {
           noTrigger: true,
           nonLethal: true,
         });
-        chained = true;
+        const nearPos = world.get(nearId, Position);
+        if (nearPos) chainTarget = { x: nearPos.x, y: nearPos.y };
       });
     }
-    emitProc(ctx, "proc:chainLightning", { actor: ctx.source, target: ctx.target });
+    emitProc(ctx, "proc:chainLightning", {
+      actor: ctx.source,
+      target: ctx.target,
+      from: atkPos ? { x: atkPos.x, y: atkPos.y } : null,
+      to: defPos ? { x: defPos.x, y: defPos.y } : null,
+      chainTo: chainTarget,
+    });
   },
 });
 
