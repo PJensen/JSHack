@@ -20,6 +20,7 @@ import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
+import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -289,13 +290,25 @@ export function createHudFeeds(world, deps) {
     // Dispatch spell bar state for desktop HUD
     if (typeof deps.getActionBarSlots === 'function') {
       const slots = deps.getActionBarSlots();
-      const sig = slots.join(',') + '|' + (activeId || '') + '|' + mana;
+      // Build cooldown suffix so sig changes each tick while any CD is active
+      const cdParts = [];
+      for (let i = 0; i < slots.length; i++) {
+        const cd = slots[i] ? getSpellCooldown(world, slots[i]) : null;
+        cdParts.push(cd ? cd.remaining : 0);
+      }
+      const sig = slots.join(',') + '|' + (activeId || '') + '|' + mana + '|' + cdParts.join(',');
       if (sig !== _lastSpellBarSig) {
         _lastSpellBarSig = sig;
         const resolved = slots.map(id => {
           if (!id) return null;
           const def = getSpell(id);
-          return def ? { id, name: def.name, symbol: def.symbol, cost: def.manaCost } : null;
+          if (!def) return null;
+          const cd = getSpellCooldown(world, id);
+          return {
+            id, name: def.name, symbol: def.symbol, cost: def.manaCost,
+            cdRemaining: cd ? cd.remaining : 0,
+            cdMax: cd ? cd.max : 0,
+          };
         });
         try {
           window.dispatchEvent(new CustomEvent('ui:updateSpellBar', {
