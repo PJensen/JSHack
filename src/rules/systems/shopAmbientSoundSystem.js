@@ -112,7 +112,7 @@ export function shopAmbientSoundSystem(world) {
   for (const [entityId, metadata] of world.query(RoomMetadata)) {
     if (metadata.roomType !== "shop") continue;
 
-    const locationKey = `shop_${metadata.x}_${metadata.y}`;
+    const locationKey = `shop_${currentDepth}_${metadata.x}_${metadata.y}`;
     const roomState = getOrCreateRoomState(state, locationKey);
     const insideNow = isInsideRoom(metadata, playerPos);
     const enteredNow = insideNow && !roomState.wasInside;

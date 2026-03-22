@@ -185,6 +185,7 @@ const SHOP_MIMIC_CHANCE = 0.12;
 const ROOM_MIMIC_CHANCE = 0.003;
 const SHOP_MAX_ROOM_WIDTH = 6;
 const SHOP_MAX_ROOM_HEIGHT = 6;
+const SHOP_MIN_INTERIOR_TILES = 2;
 const DEAD_END_CONTENT_CHANCE = 1.0;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
 const DECOR_MIMIC_DISGUISE_POOL = Object.freeze(['chest', 'barrel', 'urn', 'crate', 'sarcophagus']);
@@ -430,6 +431,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     room.w <= SHOP_MAX_ROOM_WIDTH
     && room.h <= SHOP_MAX_ROOM_HEIGHT
     && countRoomOpeningTiles(room, chunk) === 1
+    && (Math.max(1, room.w - 2) * Math.max(1, room.h - 2)) >= SHOP_MIN_INTERIOR_TILES
   ));
 
   // Solid spawn kinds that should be marked solid in the solidPositions set.

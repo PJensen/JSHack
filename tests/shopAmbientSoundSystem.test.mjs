@@ -164,3 +164,43 @@ Deno.test("shopAmbientSoundSystem does not spam greetings without re-entry", () 
 
   assertEquals(speech.length, 2, "leaving and re-entering should trigger a new greeting");
 });
+
+Deno.test("shopAmbientSoundSystem greeting state is isolated per depth", () => {
+  const world = new World({ seed: 9003 });
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { worldSeed: 9003, currentDepth: 1, floorEntityIds: [] });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 0, y: 0 });
+
+  const shopkeeperId = world.create();
+  const shop = world.create();
+  world.add(shop, RoomMetadata, {
+    roomType: "shop",
+    x: 3,
+    y: 3,
+    w: 4,
+    h: 4,
+    shopkeeperId,
+  });
+
+  const speech = [];
+  world.on("npc:dialogue", (ev) => speech.push(ev));
+
+  world.set(player, Position, { x: 4, y: 4 });
+  world.step = 1;
+  shopAmbientSoundSystem(world);
+  assertEquals(speech.length, 1, "depth 1 entry should greet");
+
+  world.set(player, Position, { x: 0, y: 0 });
+  world.step = 2;
+  shopAmbientSoundSystem(world);
+
+  world.set(dungeonId, DungeonState, { worldSeed: 9003, currentDepth: 2, floorEntityIds: [] });
+  world.set(player, Position, { x: 4, y: 4 });
+  world.step = 3;
+  shopAmbientSoundSystem(world);
+
+  assertEquals(speech.length, 2, "same coordinates on a new depth should greet independently");
+});
