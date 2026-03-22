@@ -349,6 +349,20 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 	if (hasAffix('caustic1') && !rec.tags.includes('caustic_glowing')) {
 		rec.tags.push('caustic_glowing');
 	}
+
+	// Rarity-based glow fallback — only if no specialized glow already present
+	const rn = String(itemInfo.rarityName || '').toLowerCase();
+	if (rn === 'legendary' || rn === 'epic' || rn === 'rare') {
+		const hasSpecialGlow = rec.tags.includes('glowing') || rec.tags.includes('venom_glowing') ||
+			rec.tags.includes('frost_glowing') || rec.tags.includes('storm_glowing') ||
+			rec.tags.includes('soul_glowing') || rec.tags.includes('blood_glowing') ||
+			rec.tags.includes('caustic_glowing') || rec.tags.includes('potion_glow');
+		if (!hasSpecialGlow) {
+			if (rn === 'legendary' && !rec.tags.includes('legendary_glowing')) rec.tags.push('legendary_glowing');
+			else if (rn === 'epic' && !rec.tags.includes('epic_glowing')) rec.tags.push('epic_glowing');
+			else if (rn === 'rare' && !rec.tags.includes('rare_glowing')) rec.tags.push('rare_glowing');
+		}
+	}
 }
 
 /**
