@@ -393,6 +393,17 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         _spawnStormLightning({ x: Number(x), y: Number(y) });
       }
     });
+    world.on('proc:chainLightning', ({ from, to, chainTo }) => {
+      if (from && to) {
+        _boltFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.12 }));
+        _lightPulses.push(new PulseFx({ x: to.x, y: to.y, ttl: 0.10 }));
+      }
+      if (to && chainTo) {
+        _boltFx.push(new LineFx({ from: { x: to.x, y: to.y }, to: { x: chainTo.x, y: chainTo.y }, ttl: 0.12, chainIndex: 1 }));
+        _lightPulses.push(new PulseFx({ x: chainTo.x, y: chainTo.y, ttl: 0.10 }));
+      }
+      if (from && to) startShake(cam, 2, 0.10);
+    });
     world.on('electrocute:flash', ({ target, isPlayer }) => {
       const id = Number(target || 0) | 0;
       if (!(id > 0) || !isPlayer) return;
