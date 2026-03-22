@@ -4323,10 +4323,12 @@ function renderSpellPicker(panel, spells, activeId, bindSlot) {
 function renderMessageLog(panel, entries) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
+  el.style.fontSize = '15px';
   const title = document.createElement('div');
   title.textContent = 'Message Log';
   title.style.fontWeight = 'bold';
   title.style.marginBottom = '8px';
+  title.style.fontSize = '17px';
   el.appendChild(title);
   const box = document.createElement('div');
   Object.assign(box.style, {
