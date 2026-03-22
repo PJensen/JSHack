@@ -8,6 +8,7 @@ import { CorpseAdaptation } from "../../components/CorpseAdaptation.js";
 import { DerivedExpression } from "../../components/DerivedExpression.js";
 import { Hunger } from "../../components/Hunger.js";
 import { Resistances } from "../../components/Resistences.js";
+import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Vitality } from "../../components/Vitality.js";
 import { Traits } from "../../components/Traits.js";
 import { dealDamage } from "../../utils/dealDamage.js";
@@ -269,6 +270,186 @@ export class EatCallbackContext {
 }
 
 // -- Factory functions --
+
+function readEatHealthPct(ctx, subject = "target") {
+  const who = String(subject || "target") === "source" ? ctx.actor : ctx.actor;
+  const vit = ctx?.world?.get?.(who, Vitality);
+  const maxHp = Number(vit?.maxHp || 0);
+  if (!(maxHp > 0)) return 1;
+  return Number(vit?.hp || 0) / maxHp;
+}
+
+function readEatSourceStat(ctx, statKey) {
+  const key = String(statKey || "");
+  if (!key) return 0;
+  if (typeof ctx?.stats?.value === "function") {
+    const direct = ctx.stats.value(ctx.actor, key, "melee");
+    if (Number.isFinite(direct)) return Number(direct);
+  }
+  if (typeof ctx?.stats?.actor === "function") {
+    const snap = ctx.stats.actor("melee") || ctx.stats.actor();
+    const fromSnap = Number(snap?.[key]);
+    if (Number.isFinite(fromSnap)) return fromSnap;
+  }
+  return 0;
+}
+
+function hasEatTag(ctx, tag) {
+  const wanted = String(tag || "");
+  if (!wanted) return false;
+
+  if (wanted === "eat" || wanted === "consume" || wanted === "corpse") return true;
+
+  const status = ctx?.world?.get?.(ctx.actor, ActiveEffects);
+  if (Array.isArray(status?.effects) && status.effects.some((entry) => String(entry?.key || "") === wanted)) {
+    return true;
+  }
+
+  const traits = ctx?.world?.get?.(ctx.actor, Traits);
+  if (traits && traits[wanted] === true) return true;
+
+  const identity = ctx?.world?.get?.(ctx.actor, NamedIdentity);
+  if (String(identity?.identity || "") === wanted) return true;
+
+  return false;
+}
+
+function evalEatProcGate(ctx, gate) {
+  const kind = String(gate?.kind || "");
+  switch (kind) {
+    case "eventKind":
+      return String(gate?.a || "") === "eat";
+    case "chance":
+      return ctx.chance(Number(gate?.b || 0));
+    case "sourceStatAtLeast":
+      return readEatSourceStat(ctx, gate?.a) >= Number(gate?.b || 0);
+    case "healthBelowPct":
+      return readEatHealthPct(ctx, gate?.c || "target") < Number(gate?.b || 0);
+    case "targetTag":
+      return hasEatTag(ctx, gate?.a);
+    case "hasActionTag":
+      return String(gate?.a || "") === "eat";
+    default:
+      return false;
+  }
+}
+
+function applyEatProcEffect(ctx, effect) {
+  const kind = String(effect?.kind || "");
+  switch (kind) {
+    case "applyStatus":
+      ctx.pushEffect({
+        key: String(effect?.a || ""),
+        turnsLeft: Math.max(0, Number(effect?.b || 0)),
+        potency: Number(effect?.c || 1),
+        stacks: 1,
+        sourceId: ctx.itemId,
+      });
+      return;
+    case "attachTimedBuff":
+      ctx.pushEffect({
+        key: String(effect?.a || ""),
+        turnsLeft: Math.max(0, Number(effect?.b || 0)),
+        potency: 1,
+        stacks: 1,
+        sourceId: ctx.itemId,
+      });
+      return;
+    case "heal":
+      ctx.heal(Number(effect?.a || effect?.b || 0));
+      return;
+    case "dealDamage":
+      ctx.damage(Number(effect?.a || effect?.b || 0), String(effect?.c || "corpse"));
+      return;
+    case "nutrition":
+      ctx.applyNutrition(Number(effect?.a || effect?.b || 0));
+      return;
+    case "setTrait":
+      ctx.setTrait(String(effect?.a || ""), effect?.b);
+      return;
+    case "addCorpseAdaptation":
+      ctx.addCorpseAdaptation(
+        String(effect?.a || ""),
+        Number(effect?.b || 0),
+        String(effect?.c || ""),
+        String(effect?.d || effect?.a || "")
+      );
+      return;
+    case "emitEvent":
+      ctx.emit(
+        String(effect?.a || ""),
+        effect?.b && typeof effect.b === "object" ? { ...effect.b } : effect?.b
+      );
+      return;
+    default:
+      return;
+  }
+}
+
+function createEatProcApi(ctx) {
+  return Object.freeze({
+    applyStatus(key, turnsLeft, potency = 1) {
+      ctx.pushEffect({ key: String(key || ""), turnsLeft: Math.max(0, Number(turnsLeft || 0)), potency: Number(potency || 1), stacks: 1, sourceId: ctx.itemId });
+    },
+    attachTimedBuff(key, duration, potency = 1) {
+      ctx.pushEffect({ key: String(key || ""), turnsLeft: Math.max(0, Number(duration || 0)), potency: Number(potency || 1), stacks: 1, sourceId: ctx.itemId });
+    },
+    heal(amount) {
+      ctx.heal(Number(amount || 0));
+    },
+    dealDamage(amount, source = "corpse") {
+      ctx.damage(Number(amount || 0), String(source || "corpse"));
+    },
+    addNutrition(amount) {
+      ctx.applyNutrition(Number(amount || 0));
+    },
+    setTrait(key, value) {
+      ctx.setTrait(String(key || ""), value);
+    },
+    addCorpseAdaptation(statKey, value, source, label) {
+      ctx.addCorpseAdaptation(String(statKey || ""), Number(value || 0), String(source || ""), String(label || ""));
+    },
+    emit(eventName, payload) {
+      ctx.emit(String(eventName || ""), payload && typeof payload === "object" ? { ...payload } : payload);
+    },
+    cancel(reason) {
+      ctx.cancel(reason);
+    },
+  });
+}
+
+/**
+ * ProcNode-style corpse-eat hook.
+ * Supports a compact gates/effects/script shape inspired by ProcNode authoring.
+ *
+ * @param {{
+ *   gates?: Array<{kind:string,a?:any,b?:any,c?:any,d?:any}>,
+ *   effects?: Array<any>,
+ *   script?: (ctx:any, api:any) => void,
+ * }} spec
+ */
+export function corpseProcNode(spec = {}) {
+  const gates = Array.isArray(spec?.gates) ? spec.gates : [];
+  const effects = Array.isArray(spec?.effects) ? spec.effects : [];
+  const script = typeof spec?.script === "function" ? spec.script : null;
+
+  return (ctx) => {
+    for (let i = 0; i < gates.length; i++) {
+      if (!evalEatProcGate(ctx, gates[i])) return;
+    }
+
+    for (let i = 0; i < effects.length; i++) {
+      const effect = effects[i];
+      if (typeof effect === "function") {
+        effect(ctx, createEatProcApi(ctx));
+        continue;
+      }
+      applyEatProcEffect(ctx, effect);
+    }
+
+    if (script) script(ctx, createEatProcApi(ctx));
+  };
+}
 
 /**
  * Push a status effect on eat -> emit "hunger:sickened".

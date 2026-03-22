@@ -13,6 +13,7 @@ import {
   corpseDiminishDR,
   corpseProgression,
   grantElectricResist,
+  corpseProcNode,
 } from "./callbacks/eat.js";
 
 /**
@@ -74,7 +75,18 @@ export const CORPSE_DEFS = Object.freeze({
   // Goblin Archer: keen eyes — perception buff
   corpse_goblin_archer: Object.freeze({
     onEat: Object.freeze([
-      corpseTimedBuff("keen_eye", 80, 1, "corpse:buff-gained", "your vision sharpens to a predatory focus"),
+      corpseProcNode({
+        gates: [{ kind: "eventKind", a: "eat" }],
+        effects: [{ kind: "attachTimedBuff", a: "keen_eye", b: 80 }],
+        script: (ctx, proc) => {
+          proc.emit("corpse:buff-gained", {
+            actor: ctx.actor,
+            effect: "keen_eye",
+            turnsLeft: 80,
+            description: "your vision sharpens to a predatory focus",
+          });
+        },
+      }),
     ]),
   }),
 
@@ -82,10 +94,18 @@ export const CORPSE_DEFS = Object.freeze({
   corpse_grid_bug: Object.freeze({
     onEat: Object.freeze([
       corpseDamage(3),
-      corpseGamble(0.3,
-        corpseTimedBuff("resist_electric", 120, 1, "corpse:buff-gained", "the current hums through you — your body adapts"),
-        (ctx) => { /* no additional bad effect — the 3 damage is enough */ },
-      ),
+      corpseProcNode({
+        gates: [{ kind: "chance", b: 0.3 }],
+        effects: [{ kind: "attachTimedBuff", a: "resist_electric", b: 120 }],
+        script: (ctx, proc) => {
+          proc.emit("corpse:buff-gained", {
+            actor: ctx.actor,
+            effect: "resist_electric",
+            turnsLeft: 120,
+            description: "the current hums through you — your body adapts",
+          });
+        },
+      }),
     ]),
   }),
 
