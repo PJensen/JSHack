@@ -35,6 +35,7 @@ import { getPassiveBonuses, effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
+import { PetState } from "../components/PetState.js";
 import { blind, getEffectiveVisionRange } from "../utils/blind.js";
 import { Player } from "../components/Player.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
@@ -1269,6 +1270,21 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
       chemical: { toxMult: 0 },
     },
   });
+
+  // Make skeleton commandable via pet commands (default: aggressive)
+  try {
+    world.add(skeletonId, PetState, {
+      state: 'aggressive',
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: world.step,
+      lastPlayerX: apos.x,
+      lastPlayerY: apos.y,
+      commandCooldown: 0,
+      rangedCooldown: 0,
+    });
+  } catch {}
 
   try {
     world.emit && world.emit('spell:summon_skeleton', {

@@ -873,6 +873,34 @@ export function installMessageWiring({
     log(msg, 'system');
   });
 
+  // === Summoned creature command events ===
+  world.on('summon:state:changed', ({ id, prevState, newState, command }) => {
+    const name = nameOfEntity(id);
+    const stateNames = {
+      following: 'following you',
+      staying: 'staying put',
+      guarding: 'guarding',
+      aggressive: 'aggressive',
+      fleeing: 'fleeing',
+      idle: 'idle'
+    };
+    log(`${name} is now ${stateNames[newState] || newState}.`, 'system');
+  });
+
+  world.on('summon:state:auto', ({ id, newState, reason }) => {
+    const name = nameOfEntity(id);
+    if (reason === 'low_health') {
+      log(`${name} retreats!`, 'system');
+    } else if (reason === 'health_restored') {
+      log(`${name} returns to the fight.`, 'system');
+    }
+  });
+
+  world.on('summon:teleported', ({ id }) => {
+    const name = nameOfEntity(id);
+    log(`${name} reappears near you.`, 'system');
+  });
+
   world.on('corpse:desecrated', ({ actor, ownerId, corpseName }) => {
     const pe = playerEntity(world);
     const playerId = Number(pe?.id || 0) | 0;

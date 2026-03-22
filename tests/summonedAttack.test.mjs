@@ -6,6 +6,8 @@ import { Vitality } from '../src/rules/components/Vitality.js';
 import { Speed } from '../src/rules/components/Speed.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { PetState } from '../src/rules/components/PetState.js';
+import { Player } from '../src/rules/components/Player.js';
 import { summonedBehaviorSystem } from '../src/rules/systems/summonedBehaviorSystem.js';
 
 // Helpers ──────────────────────────────────────────────────────────────────

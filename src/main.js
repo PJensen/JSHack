@@ -2114,6 +2114,65 @@ window.addEventListener('ui:petCommand', (ev) => {
 
     break; // Only one pet for now
   }
+
+  // Broadcast same command to all summoned creatures with PetState
+  for (const [sumId, fac, vit] of world.query(Faction, Vitality)) {
+    if (!fac || fac.key !== 'summoned') continue;
+    if (!vit || vit.hp <= 0) continue;
+    const sumPos = world.get(sumId, Position);
+    if (!sumPos) continue;
+    const sumState = world.get(sumId, PetState);
+    if (!sumState) continue;
+
+    const prevState = sumState.state;
+    switch (command) {
+      case 'follow':
+        sumState.state = 'following';
+        sumState.targetX = null;
+        sumState.targetY = null;
+        sumState.targetItemId = 0;
+        break;
+      case 'stay':
+        sumState.state = 'staying';
+        sumState.targetX = sumPos.x;
+        sumState.targetY = sumPos.y;
+        sumState.targetItemId = 0;
+        break;
+      case 'guard':
+        sumState.state = 'guarding';
+        sumState.targetX = sumPos.x;
+        sumState.targetY = sumPos.y;
+        sumState.targetItemId = 0;
+        break;
+      case 'aggressive':
+        sumState.state = 'aggressive';
+        sumState.targetX = null;
+        sumState.targetY = null;
+        sumState.targetItemId = 0;
+        break;
+      case 'idle':
+        sumState.state = 'idle';
+        sumState.targetX = null;
+        sumState.targetY = null;
+        sumState.targetItemId = 0;
+        break;
+      case 'fetch':
+        break; // No fetch for summons (no inventory)
+    }
+
+    if (prevState !== sumState.state) {
+      sumState.stateEnteredTurn = world.step;
+      sumState.commandCooldown = 0;
+      try {
+        world.emit?.('summon:state:changed', {
+          id: sumId,
+          prevState,
+          newState: sumState.state,
+          command
+        });
+      } catch (e) { console.debug('[main] emit summon:state:changed failed:', e); }
+    }
+  }
 });
 
 // Rotate pet state through common commands (instant, no tick)
@@ -2190,6 +2249,50 @@ window.addEventListener('ui:rotatePetState', () => {
     }
 
     break; // Only one pet for now
+  }
+
+  // Broadcast same rotation to all summoned creatures with PetState
+  for (const [sumId, fac, vit] of world.query(Faction, Vitality)) {
+    if (!fac || fac.key !== 'summoned') continue;
+    if (!vit || vit.hp <= 0) continue;
+    const sumPos = world.get(sumId, Position);
+    if (!sumPos) continue;
+    const sumState = world.get(sumId, PetState);
+    if (!sumState) continue;
+
+    const prevSumState = sumState.state;
+    const curIdx = stateOrder.indexOf(sumState.state);
+    const nextSumState = curIdx >= 0
+      ? stateOrder[(curIdx + 1) % stateOrder.length]
+      : 'following';
+
+    sumState.state = nextSumState;
+    if (nextSumState === 'staying' || nextSumState === 'guarding') {
+      sumState.targetX = sumPos.x;
+      sumState.targetY = sumPos.y;
+      sumState.targetItemId = 0;
+    } else {
+      sumState.targetX = null;
+      sumState.targetY = null;
+      sumState.targetItemId = 0;
+    }
+
+    if (prevSumState !== sumState.state) {
+      sumState.stateEnteredTurn = world.step;
+      sumState.commandCooldown = 0;
+      const cmd = nextSumState === 'staying' ? 'stay' :
+                  nextSumState === 'guarding' ? 'guard' :
+                  nextSumState === 'aggressive' ? 'aggressive' :
+                  nextSumState === 'idle' ? 'idle' : 'follow';
+      try {
+        world.emit?.('summon:state:changed', {
+          id: sumId,
+          prevState: prevSumState,
+          newState: sumState.state,
+          command: cmd
+        });
+      } catch (e) { console.debug('[main] emit summon:state:changed failed:', e); }
+    }
   }
 });
 
