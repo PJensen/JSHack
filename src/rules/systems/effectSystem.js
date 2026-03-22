@@ -9,7 +9,7 @@ import { Brain } from '../components/Brain.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
-import { getPassiveBonuses } from '../utils/passiveBonuses.js';
+import { getPassiveBonuses, effectiveMaxHp } from '../utils/passiveBonuses.js';
 import { buildSpellDamageSpecFromContext } from '../utils/spellDamage.js';
 import { computeEnvelopeValue } from '../utils/blind.js';
 
@@ -73,7 +73,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
 
     if (operation === 'heal') {
         const before = vit.hp;
-        vit.hp = Math.min(vit.maxHp, vit.hp + amount);
+        vit.hp = Math.min(effectiveMaxHp(world, id, vit), vit.hp + amount);
         const delta = vit.hp - before;
         if (delta > 0) { try { world.emit && world.emit('healed', { id, amount: delta }); } catch {} }
         return;

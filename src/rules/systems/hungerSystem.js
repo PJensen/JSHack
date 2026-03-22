@@ -11,7 +11,7 @@ import { Settings } from '../components/Settings.js';
 import { HUNGER_STATUS_TYPES, HUNGER_POTENCY, getHungerLevel } from '../data/food.js';
 import { TURNS_PER_DAY } from '../data/calendar.js';
 import { dealDamage } from '../utils/dealDamage.js';
-import { getPassiveBonuses } from '../utils/passiveBonuses.js';
+import { getPassiveBonuses, effectiveMaxHp } from '../utils/passiveBonuses.js';
 import { Traits } from '../components/Traits.js';
 
 const STARVING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 8));
@@ -63,7 +63,7 @@ export function hungerSystem(world) {
       // Satiated bonus: heal 1 HP every 5 turns
       if (hc.satiation > 0 && turn % 5 === 0) {
         const before = vit.hp;
-        vit.hp = Math.min(vit.maxHp, vit.hp + 1);
+        vit.hp = Math.min(effectiveMaxHp(world, id, vit), vit.hp + 1);
         if (vit.hp > before) {
           try { world.emit && world.emit('healed', { id, amount: 1 }); } catch { /* */ }
         }

@@ -30,6 +30,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { PetState } from "../components/PetState.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { hasStatus } from "../utils/statusFacade.js";
 import { getSpell } from "../data/spells.js";
 import { getHungerLevel } from "../data/food.js";
@@ -1406,10 +1407,11 @@ function wireDeityMiracles(deity, deityId, world) {
       if (primaryNeed === "healing" && world.has(playerId, Vitality)) {
         // Heal the player
         const vit = world.get(playerId, Vitality);
+        const deityCap = effectiveMaxHp(world, playerId, vit);
         const healAmount = Math.floor(
-          vit.maxHp * (deityDef?.alignment === "lawful" ? 0.6 : 0.4),
+          deityCap * (deityDef?.alignment === "lawful" ? 0.6 : 0.4),
         );
-        vit.hp = Math.min(vit.maxHp, vit.hp + healAmount);
+        vit.hp = Math.min(deityCap, vit.hp + healAmount);
         emitMiracle({
           playerId,
           deityId,
