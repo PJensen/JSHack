@@ -3,6 +3,8 @@ import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Flying } from "../components/Flying.js";
+import { Pet } from "../components/Pet.js";
+import { Player } from "../components/Player.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Burned } from "../components/Burned.js";
 import { Collider } from "../components/Collider.js";
@@ -305,6 +307,7 @@ export function hazardSystem(world) {
         if (id === hazardId || id === sourceId) continue;
         if ((vit.hp | 0) <= 0) continue;
         if (world.has(id, Flying)) continue;
+        if (world.has(id, Pet) && world.has(sourceId, Player)) continue;
         const ddx = Math.abs((tpos.x | 0) - (pos.x | 0));
         const ddy = Math.abs((tpos.y | 0) - (pos.y | 0));
         if (Math.max(ddx, ddy) > radius) continue;
@@ -330,8 +333,9 @@ export function hazardSystem(world) {
         if (id === hazardId) continue;
         if ((vit.hp | 0) <= 0) continue;
         if (medium === "floor" && world.has(id, Flying)) continue;
-        // Quake hazards skip caster for damage.
+        // Quake hazards skip caster and their pet for damage.
         if (kind === "quake" && id === sourceId) continue;
+        if (kind === "quake" && world.has(id, Pet) && world.has(sourceId, Player)) continue;
 
         const dx = Math.abs((tpos.x | 0) - (pos.x | 0));
         const dy = Math.abs((tpos.y | 0) - (pos.y | 0));
