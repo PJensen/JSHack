@@ -290,6 +290,38 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     } catch (e) { console.debug('[floatTextWiring] mimic reveal ftext failed:', e); }
   });
 
+  // Scroll of Polymorph: burst at transformed enemy position.
+  world.on('scroll:polymorph:vfx', ({ x, y }) => {
+    if (!canShowAt(x, y)) return;
+    try {
+      ftext.addStatus(x, y - 0.45, 'POLYMORPH!', {
+        color: '#dd77ff',
+        life: 1.4,
+        scaleStart: 1.5,
+        scaleEnd: 1.0,
+      });
+    } catch (e) { console.debug('[floatTextWiring] polymorph ftext failed:', e); }
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.3 + Math.random() * 0.5;
+      try {
+        fx.pool.spawn(new Particle({
+          x,
+          y: y - 0.1,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.1,
+          life: 0.3 + Math.random() * 0.2,
+          size0: 0.10,
+          size1: 0.02,
+          r: 221,
+          g: 119,
+          b: 255,
+          a0: 0.85,
+        }));
+      } catch (e) { console.debug('[floatTextWiring] polymorph fx failed:', e); }
+    }
+  });
+
   // Nymph stole item: float at player position.
   world.on('nymph:stole', ({ at }) => {
     if (!at || !canShowAt(at.x, at.y)) return;
