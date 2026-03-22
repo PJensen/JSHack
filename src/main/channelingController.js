@@ -11,6 +11,7 @@ import { Channeling } from "../rules/components/Channeling.js";
 import { Mana } from "../rules/components/Mana.js";
 import { getSpell } from "../rules/data/spells.js";
 import { setInputLock } from "../display/input/inputLock.js";
+import { effectiveMaxMana } from "../rules/utils/passiveBonuses.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:channelingController:installed');
 const TICK_INTERVAL_MS = 500;
@@ -115,7 +116,7 @@ export function installChannelingController(world, getActorId) {
       mode,
       manaPerTick: Number(ch?.manaPerTick ?? manaPerTick ?? 0),
       manaRemaining: Number(mana?.mana ?? 0),
-      manaMax: Number(mana?.maxMana ?? 0),
+      manaMax: effectiveMaxMana(world, actorId, mana),
     });
 
     // Install ESC handler for cancellation

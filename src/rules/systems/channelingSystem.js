@@ -10,6 +10,7 @@ import { Vitality } from "../components/Vitality.js";
 import { getSpell } from "../data/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { runSpellScript } from "../scripts/spells.js";
+import { effectiveMaxMana } from "../utils/passiveBonuses.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function channelingSystem(world) {
@@ -62,7 +63,7 @@ export function channelingSystem(world) {
           mode: "sustain",
           manaPerTick,
           manaRemaining: Number(mana?.mana ?? have - manaPerTick),
-          manaMax: Number(mana?.maxMana ?? 0),
+          manaMax: effectiveMaxMana(world, id, mana),
         });
       } catch {}
       continue;

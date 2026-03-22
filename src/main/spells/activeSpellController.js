@@ -2,6 +2,7 @@ import { playerEntity } from "../../rules/utils/queries.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Mana } from "../../rules/components/Mana.js";
 import { getSpell } from "../../rules/data/spells.js";
+import { effectiveMaxMana } from "../../rules/utils/passiveBonuses.js";
 
 /**
  * Controls the currently selected active spell and related metadata.
@@ -43,7 +44,7 @@ export function createActiveSpellController(world) {
     if (!pe) return { mana: 0, maxMana: 0 };
     /** @type {{ mana?:number, maxMana?:number }|null} */
     const m = /** @type any */ (world.get(pe.id, Mana));
-    return { mana: Number(m?.mana || 0), maxMana: Number(m?.maxMana || 0) };
+    return { mana: Number(m?.mana || 0), maxMana: effectiveMaxMana(world, pe.id, m) };
   }
 
   function updateActiveSpellLabel() {

@@ -12,6 +12,7 @@ import { dealDamage } from "../utils/dealDamage.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
+import { effectiveMaxMana, effectiveMaxStamina } from "../utils/passiveBonuses.js";
 
 const AFFIX_THORNS = "affix:thorns1";
 const AFFIX_VAMP = "affix:vamp1";
@@ -280,7 +281,7 @@ registerScript(AFFIX_MANA_SURGE, {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee15, 20)) return;
     const mana = world.get(ctx.attacker, Mana);
     if (!mana) return;
-    const maxMana = Number(mana.maxMana || 50);
+    const maxMana = effectiveMaxMana(world, ctx.attacker, mana);
     mana.mana = Math.min(maxMana, (Number(mana.mana) || 0) + 3);
     try { world.emit && world.emit("proc:manaSurge", { actor: ctx.attacker, amount: 3 }); } catch (e) { console.debug("[affixes] emit proc:manaSurge failed:", e); }
   },
@@ -334,7 +335,7 @@ registerScript(AFFIX_SECOND_WIND, {
     upsertEffect(world, ctx.defender, { key: "regen", turnsLeft: 5, potency: 1, stacks: 1 });
     const stam = world.get(ctx.defender, Stamina);
     if (stam) {
-      const maxStam = Number(stam.maxStamina || 100);
+      const maxStam = effectiveMaxStamina(world, ctx.defender, stam);
       stam.stamina = Math.min(maxStam, (Number(stam.stamina) || 0) + 5);
     }
     try { world.emit && world.emit("proc:secondWind", { actor: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:secondWind failed:", e); }
