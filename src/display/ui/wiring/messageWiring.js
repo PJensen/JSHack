@@ -588,6 +588,15 @@ export function installMessageWiring({
     log('You enter a blood rage!', 'combat');
   });
 
+  world.on('spell:earthshatter', ({ actor, enhanced }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (enhanced) {
+      log('You slam the ground \u2014 magma seethes through the cracks!', 'danger');
+    } else {
+      log('You slam the ground \u2014 the earth cracks!', 'system');
+    }
+  });
+
   world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {

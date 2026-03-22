@@ -334,6 +334,22 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Reduces effective vision range; graded by remaining vision threshold' },
     ],
   },
+  earthshatter: {
+    id: 'earthshatter',
+    name: 'Earthshatter',
+    symbol: '\u{1F30B}',   // 🌋
+    schools: ['destruction', 'earth'],
+    manaCost: 8,
+    minIntelligence: 0,
+    script: 'earthshatter',
+    targeting: 'self',
+    radius: 1,
+    description: 'Slam the ground with devastating force, cracking the earth and stunning nearby foes.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: '3 base, INT-scaled per tick' },
+      { kind: 'status', status: 'stun', duration: '3 ticks (refreshed each earthquake tick)' },
+    ],
+  },
 };
 
 /**

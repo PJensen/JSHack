@@ -19,11 +19,14 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   const _poisonBubblePops = [];
   /** @type {Array<{ x:number, y:number, ttl:number, max:number, strength:number, phase:number, embers:boolean }>} */
   const _burnPlumes = [];
+  /** @type {Map<number, { x:number, y:number, radius:number, turnsLeft:number, maxTurns:number, pulseFlash:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, enhanced:boolean }>} */
+  const _quakeCloudFx = new Map();
 
   function clearTransientCloudState() {
     _fireCloudFx.clear();
     _plasmaCloudFx.clear();
     _poisonCloudFx.clear();
+    _quakeCloudFx.clear();
     _poisonBubblePops.length = 0;
     _burnPlumes.length = 0;
   }
@@ -108,6 +111,49 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
     if (_burnPlumes.length > 48) {
       _burnPlumes.splice(0, _burnPlumes.length - 48);
+    }
+  }
+
+  function spawnQuakeDust(x, y, count = 6, enhanced = false) {
+    if (!fx?.pool) return;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.10 + Math.random() * 0.35;
+      const r = enhanced ? (200 + ((Math.random() * 55) | 0)) : (140 + ((Math.random() * 60) | 0));
+      const g = enhanced ? (100 + ((Math.random() * 50) | 0)) : (120 + ((Math.random() * 50) | 0));
+      const b = enhanced ? (20 + ((Math.random() * 30) | 0)) : (80 + ((Math.random() * 40) | 0));
+      fx.pool.spawn(new Particle({
+        x: x + (Math.random() - 0.5) * 0.30,
+        y: y + (Math.random() - 0.5) * 0.20,
+        vx: Math.cos(angle) * speed * 0.4,
+        vy: Math.sin(angle) * speed - 0.20 - Math.random() * 0.15,
+        ay: -0.06,
+        life: 0.35 + Math.random() * 0.30,
+        size0: 0.07 + Math.random() * 0.05,
+        size1: 0.02,
+        r, g, b,
+        a0: enhanced ? 0.80 : 0.55,
+        rotVel: (Math.random() - 0.5) * 1.0,
+      }));
+    }
+    if (enhanced) {
+      for (let i = 0; i < Math.max(2, count >> 1); i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.20 + Math.random() * 0.50;
+        fx.pool.spawn(new Particle({
+          x: x + (Math.random() - 0.5) * 0.20,
+          y: y + (Math.random() - 0.5) * 0.15,
+          vx: Math.cos(angle) * speed * 0.5,
+          vy: Math.sin(angle) * speed - 0.25,
+          ay: 0.06,
+          life: 0.22 + Math.random() * 0.18,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 255, g: 140 + ((Math.random() * 80) | 0), b: 20 + ((Math.random() * 30) | 0),
+          a0: 0.85,
+          rotVel: (Math.random() - 0.5) * 1.8,
+        }));
+      }
     }
   }
 
@@ -238,6 +284,24 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         cloud.fadeMax = 0.45;
         cloud.fadeLeft = Math.max(cloud.fadeLeft, cloud.fadeMax);
         cloud.pulseFlash = Math.max(cloud.pulseFlash, 0.10);
+      }
+    }
+
+    // Quake hazards
+    for (const [hazardId, cloud] of _quakeCloudFx) {
+      cloud.pulseFlash = Math.max(0, cloud.pulseFlash - dt);
+      cloud.phase += dt * 12.0;
+      if (cloud.fading) {
+        cloud.fadeLeft = Math.max(0, cloud.fadeLeft - dt);
+        if (cloud.fadeLeft <= 0) {
+          _quakeCloudFx.delete(hazardId);
+        }
+        continue;
+      }
+      if (!world.isAlive(hazardId)) {
+        cloud.fading = true;
+        cloud.fadeMax = 0.40;
+        cloud.fadeLeft = Math.max(cloud.fadeLeft, cloud.fadeMax);
       }
     }
 
@@ -605,6 +669,96 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     ctx.restore();
   }
 
+  // --- Draw: Quake (earthquake cracks) ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawQuake(ctx) {
+    if (!_quakeCloudFx.size) return;
+    ctx.save();
+    const _fxTime = getFxTime();
+    const TAU = Math.PI * 2;
+
+    for (const cloud of _quakeCloudFx.values()) {
+      const cx = cloud.x;
+      const cy = cloud.y;
+      const r = Math.max(0, cloud.radius | 0);
+      const enhanced = !!cloud.enhanced;
+      const lifeFactor = Math.max(0.25, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+      const fadeFactor = cloud.fading
+        ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+        : 1;
+      const flashBoost = cloud.pulseFlash > 0 ? (cloud.pulseFlash / 0.20) : 0;
+      const alphaScale = lifeFactor * fadeFactor;
+      const tremor = Math.sin(_fxTime * 18.0 + cloud.phase) * 0.015 * alphaScale;
+
+      // Per-tile darkened ground + crack lines.
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const dist = Math.max(Math.abs(dx), Math.abs(dy));
+          if (dist > r) continue;
+
+          const tx = cx + dx + tremor;
+          const ty = cy + dy;
+
+          // Darkened ground tint.
+          ctx.globalCompositeOperation = 'source-over';
+          const groundA = (enhanced ? 0.14 : 0.10) * alphaScale;
+          ctx.fillStyle = enhanced
+            ? `rgba(60,20,5,${groundA.toFixed(3)})`
+            : `rgba(50,35,20,${groundA.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(tx, ty, 0.55, 0, TAU);
+          ctx.fill();
+
+          // Crack lines radiating outward from tile center.
+          ctx.globalCompositeOperation = enhanced ? 'lighter' : 'source-over';
+          const crackA = (enhanced ? (0.40 + flashBoost * 0.20) : (0.30 + flashBoost * 0.12)) * alphaScale;
+          ctx.strokeStyle = enhanced
+            ? `rgba(255,100,20,${crackA.toFixed(3)})`
+            : `rgba(139,115,85,${crackA.toFixed(3)})`;
+          ctx.lineWidth = enhanced ? 0.05 : 0.04;
+
+          // Deterministic crack pattern per tile.
+          const seed = (dx + 5) * 17 + (dy + 5) * 31;
+          const crackCount = 3 + (seed & 1);
+          for (let c = 0; c < crackCount; c++) {
+            const baseAngle = (c / crackCount) * TAU + (seed * 0.37 + c * 1.1);
+            const jitter = Math.sin(seed * 2.3 + c * 5.7) * 0.35;
+            const angle = baseAngle + jitter;
+            const len = 0.22 + (((seed + c * 7) % 13) / 13) * 0.20;
+            const midAngle = angle + Math.sin(seed * 1.7 + c * 3.1) * 0.6;
+            const midLen = len * 0.55;
+
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.quadraticCurveTo(
+              tx + Math.cos(midAngle) * midLen,
+              ty + Math.sin(midAngle) * midLen,
+              tx + Math.cos(angle) * len,
+              ty + Math.sin(angle) * len,
+            );
+            ctx.stroke();
+          }
+
+          // Enhanced: magma glow through cracks.
+          if (enhanced) {
+            const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 6.0 + cloud.phase + dx * 0.9 + dy * 0.7);
+            const glowA = (0.10 + pulse * 0.08 + flashBoost * 0.10) * alphaScale;
+            const grad = ctx.createRadialGradient(tx, ty, 0.02, tx, ty, 0.32);
+            grad.addColorStop(0, `rgba(255,160,40,${glowA.toFixed(3)})`);
+            grad.addColorStop(0.6, `rgba(200,60,10,${(glowA * 0.5).toFixed(3)})`);
+            grad.addColorStop(1, 'rgba(120,20,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(tx, ty, 0.32, 0, TAU);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
   // --- Listeners ---
   function installListeners() {
     world.on('dungeon:transitioned', () => {
@@ -693,7 +847,33 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       cloud.flash = Math.max(cloud.flash, 0.16);
     });
 
-    world.on('hazard:spawned', ({ hazardId, kind, at, radius, turnsLeft, medium }) => {
+    world.on('hazard:spawned', (evt) => {
+      const { hazardId, kind, at, radius, turnsLeft, medium } = evt;
+      if (String(kind || '').toLowerCase() === 'quake') {
+        if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+        const id = Number(hazardId || 0) | 0;
+        if (!(id > 0)) return;
+        const r = Math.max(0, Number(radius || 0) | 0);
+        const ttl = Math.max(1, Number(turnsLeft || 1) | 0);
+        const identity = String(evt.identity || '');
+        const enhanced = identity === 'quake_volcanic';
+        _quakeCloudFx.set(id, {
+          x: at.x, y: at.y, radius: r,
+          turnsLeft: ttl, maxTurns: ttl,
+          pulseFlash: 0.20,
+          phase: Math.random() * Math.PI * 2,
+          fading: false, fadeLeft: 0, fadeMax: 0,
+          enhanced,
+        });
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+            spawnQuakeDust(at.x + dx, at.y + dy, 4, enhanced);
+          }
+        }
+        startShake(cam, enhanced ? 4 : 2, 0.14);
+        return;
+      }
       if (String(kind || '').toLowerCase() === 'fire') {
         if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
         const id = Number(hazardId || 0) | 0;
@@ -756,6 +936,41 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
 
     world.on('hazard:pulse', ({ hazardId, kind, at, radius, turnsLeft, affectedIds, medium }) => {
+      if (String(kind || '').toLowerCase() === 'quake') {
+        const id = Number(hazardId || 0) | 0;
+        if (!(id > 0)) return;
+        const r = Math.max(0, Number(radius || 0) | 0);
+        const ttl = Math.max(0, Number(turnsLeft || 0) | 0);
+        const prev = _quakeCloudFx.get(id);
+        const enhanced = prev?.enhanced ?? false;
+        const next = {
+          x: (at && Number.isFinite(at.x)) ? at.x : (prev?.x ?? 0),
+          y: (at && Number.isFinite(at.y)) ? at.y : (prev?.y ?? 0),
+          radius: r, turnsLeft: ttl,
+          maxTurns: Math.max(prev?.maxTurns ?? 0, ttl),
+          pulseFlash: 0.22,
+          phase: prev?.phase ?? (Math.random() * Math.PI * 2),
+          fading: false, fadeLeft: 0, fadeMax: 0,
+          enhanced,
+        };
+        _quakeCloudFx.set(id, next);
+        if (Array.isArray(affectedIds)) {
+          for (let i = 0; i < affectedIds.length; i++) {
+            const tpos = getPosition(Number(affectedIds[i] || 0));
+            if (!tpos) continue;
+            spawnQuakeDust(tpos.x, tpos.y, 5, enhanced);
+          }
+        } else {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+              if (Math.random() < 0.5) spawnQuakeDust(next.x + dx, next.y + dy, 3, enhanced);
+            }
+          }
+        }
+        startShake(cam, enhanced ? 3 : 2, 0.10);
+        return;
+      }
       if (String(kind || '').toLowerCase() === 'fire') {
         const id = Number(hazardId || 0) | 0;
         if (!(id > 0)) return;
@@ -845,6 +1060,22 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
 
     world.on('hazard:expired', ({ hazardId, kind, at, radius }) => {
+      if (String(kind || '').toLowerCase() === 'quake') {
+        const id = Number(hazardId || 0) | 0;
+        if (!(id > 0)) return;
+        const cloud = _quakeCloudFx.get(id);
+        if (!cloud) return;
+        if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) {
+          cloud.x = at.x;
+          cloud.y = at.y;
+        }
+        if (Number.isFinite(radius)) cloud.radius = Math.max(0, Number(radius) | 0);
+        cloud.fading = true;
+        cloud.fadeMax = 0.40;
+        cloud.fadeLeft = cloud.fadeMax;
+        spawnQuakeDust(cloud.x, cloud.y, 6, cloud.enhanced);
+        return;
+      }
       if (String(kind || '').toLowerCase() === 'fire') {
         const id = Number(hazardId || 0) | 0;
         if (!(id > 0)) return;
@@ -896,5 +1127,5 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
   }
 
-  return { tick, drawFire, drawPoison, drawPlasma, drawBurnPlumes, installListeners };
+  return { tick, drawFire, drawPoison, drawPlasma, drawQuake, drawBurnPlumes, installListeners };
 }

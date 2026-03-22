@@ -129,6 +129,16 @@ export const basePalette = {
   spellbook_healing: { glyph: "📒", fg: "#66ff99", glow: "#66ff99" },
   spellbook_summoning: { glyph: "📓", fg: "#ff66ff", glow: "#ff66ff" },
   spellbook_earth: { glyph: "📔", fg: "#cc9966", glow: "#cc9966" },
+  book_blink: { glyph: "📘", fg: "#66eeff", glow: "#33bbcc" },
+  book_heal: { glyph: "📒", fg: "#66ff99", glow: "#44bb66" },
+  book_blind: { glyph: "📙", fg: "#9966cc", glow: "#663399" },
+  book_dead: { glyph: "📕", fg: "#888888", glow: "#555555" },
+
+  // Wands
+  wand_lightning: { glyph: "/", fg: "#ffff66", glow: "#cccc33" },
+  wand_meteor: { glyph: "/", fg: "#ff704d", glow: "#cc3322" },
+  wand_frost: { glyph: "/", fg: "#4da6ff", glow: "#2277cc" },
+  wand_heal: { glyph: "/", fg: "#66ff99", glow: "#44bb66" },
 
   // Ammo
   ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },

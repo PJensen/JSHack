@@ -41,6 +41,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   }
   cloudFx.drawPoison(bctx);
   cloudFx.drawPlasma(bctx);
+  if (typeof cloudFx.drawQuake === "function") {
+    cloudFx.drawQuake(bctx);
+  }
   fx.render({
     mode: (PERF.quality === "low" ? "source-over" : "lighter"),
     alphaScale: 0.9,

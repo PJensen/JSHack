@@ -949,6 +949,48 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       startShake(cam, 4, 0.16);
     });
 
+    world.on('spell:earthshatter', ({ origin, radius, enhanced }) => {
+      if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return;
+      const r = Math.max(1, Number(radius || 1));
+      // Radial dust/rock particle burst.
+      const N = enhanced ? 28 : 20;
+      for (let i = 0; i < N; i++) {
+        const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+        const spd = 1.2 + Math.random() * Math.max(0.8, r * 0.4);
+        const rr = enhanced ? 200 + ((Math.random() * 55) | 0) : 140 + ((Math.random() * 60) | 0);
+        const gg = enhanced ? 90 + ((Math.random() * 60) | 0) : 115 + ((Math.random() * 50) | 0);
+        const bb = enhanced ? 15 + ((Math.random() * 20) | 0) : 70 + ((Math.random() * 40) | 0);
+        fx.pool.spawn(new Particle({
+          x: origin.x, y: origin.y,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 0.28 + Math.random() * 0.22,
+          size0: 0.14 + Math.random() * 0.06, size1: 0.03,
+          r: rr, g: gg, b: bb,
+          a0: 0.82,
+        }));
+      }
+      if (enhanced) {
+        // Extra ember burst for volcanic variant.
+        for (let i = 0; i < 12; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 0.6 + Math.random() * 1.0;
+          fx.pool.spawn(new Particle({
+            x: origin.x + (Math.random() - 0.5) * 0.3,
+            y: origin.y + (Math.random() - 0.5) * 0.3,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - 0.3,
+            ay: 0.10,
+            life: 0.20 + Math.random() * 0.16,
+            size0: 0.08 + Math.random() * 0.04, size1: 0.02,
+            r: 255, g: 150 + ((Math.random() * 80) | 0), b: 20 + ((Math.random() * 30) | 0),
+            a0: 0.90,
+          }));
+        }
+      }
+      startShake(cam, enhanced ? 6 : 4, enhanced ? 0.20 : 0.14);
+    });
+
     world.on('search:pulse', ({ at, radius }) => {
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       const r = Math.max(1, Number(radius || 6));

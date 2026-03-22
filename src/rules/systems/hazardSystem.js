@@ -3,6 +3,7 @@ import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Flying } from "../components/Flying.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Burned } from "../components/Burned.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
@@ -295,12 +296,42 @@ export function hazardSystem(world) {
       }
     }
 
+    // Quake hazards: apply stun to non-caster entities each tick.
+    if (kind === "quake") {
+      const stunTurns = (hazard.meta && Number.isFinite(hazard.meta.stunTurns))
+        ? (hazard.meta.stunTurns | 0) : 2;
+      for (const [id, tpos, vit] of world.query(Position, Vitality)) {
+        if (!tpos || !vit) continue;
+        if (id === hazardId || id === sourceId) continue;
+        if ((vit.hp | 0) <= 0) continue;
+        if (world.has(id, Flying)) continue;
+        const ddx = Math.abs((tpos.x | 0) - (pos.x | 0));
+        const ddy = Math.abs((tpos.y | 0) - (pos.y | 0));
+        if (Math.max(ddx, ddy) > radius) continue;
+        let ae = /** @type any */ (world.get(id, ActiveEffects));
+        if (!ae) {
+          try { world.add(id, ActiveEffects, { effects: [] }); } catch { /* */ }
+          ae = /** @type any */ (world.get(id, ActiveEffects));
+        }
+        if (ae && Array.isArray(ae.effects)) {
+          const existing = ae.effects.find(/** @param {any} e */ (e) => e.key === 'stun');
+          if (existing) {
+            existing.turnsLeft = Math.max(existing.turnsLeft, stunTurns);
+          } else {
+            ae.effects.push({ key: 'stun', turnsLeft: stunTurns, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId });
+          }
+        }
+      }
+    }
+
     if (tickDamage > 0) {
       for (const [id, tpos, vit] of world.query(Position, Vitality)) {
         if (!tpos || !vit) continue;
         if (id === hazardId) continue;
         if ((vit.hp | 0) <= 0) continue;
         if (medium === "floor" && world.has(id, Flying)) continue;
+        // Quake hazards skip caster for damage.
+        if (kind === "quake" && id === sourceId) continue;
 
         const dx = Math.abs((tpos.x | 0) - (pos.x | 0));
         const dy = Math.abs((tpos.y | 0) - (pos.y | 0));

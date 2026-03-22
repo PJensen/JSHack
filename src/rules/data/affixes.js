@@ -641,6 +641,7 @@ export function unregisterAffixDefinition(id) {
   ["secondWind1", { name: "Second Wind", slots: ["armor", "offhand"], weight: 8, triggerScripts: { onDamaged: [AFFIX_SECOND_WIND] } }],
   ["flaming", { name: "Flaming", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_FLAMING] } }],
   ["stunning1", { name: "Stunning", slots: ["weapon"], weight: 0, triggerScripts: { onHit: [AFFIX_STUNNING] } }],
+  ["earthshaker", { name: "Earthshaker", slots: ["weapon", "gloves", "feet"], weight: 6, description: "Earthshatter erupts with volcanic fury" }],
 ].forEach(([id, spec]) => {
   registerAffixDefinition(id, spec);
 });
