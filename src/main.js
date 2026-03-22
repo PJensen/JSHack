@@ -85,6 +85,7 @@ import { Brain } from "./rules/components/Brain.js";
 import { BaseStats } from "./rules/components/BaseStats.js";
 import { Mana } from "./rules/components/Mana.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
+import { getSpellCooldown } from "./rules/utils/spellCooldowns.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
@@ -1766,11 +1767,16 @@ addEventListener("keydown", (ev) => {
 
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
-  const spells = spellCtrl.learnedSpells().map((spell) => ({
-    ...spell,
-    detailLines: describeSpellDetailLines(spell),
-    targetEffects: describeSpellTargetEffects(spell),
-  }));
+  const spells = spellCtrl.learnedSpells().map((spell) => {
+    const cd = getSpellCooldown(world, spell.id);
+    return {
+      ...spell,
+      detailLines: describeSpellDetailLines(spell),
+      targetEffects: describeSpellTargetEffects(spell),
+      cdRemaining: cd ? cd.remaining : 0,
+      cdMax: cd ? cd.max : 0,
+    };
+  });
   const activeSpellId = ensureActiveSpell();
   try { window.dispatchEvent(new CustomEvent('ui:spellData', { detail: { spells, activeSpellId } })); } catch (e) { console.debug('[main] dispatch ui:spellData:', e); }
 });

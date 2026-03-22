@@ -281,8 +281,8 @@ export const SPELL_DEFS = {
     minIntelligence: 8,
     range: 8,
     script: 'agony',
-    targeting: 'enemy',
-    description: 'Weave shadow into a curse that gnaws at the target\'s life force, dealing damage each turn.',
+    targeting: 'auto',
+    description: 'Weave shadow into a curse that gnaws at life force. Auto-targets the visible enemy that needs agony most — missing it entirely, or closest to expiring.',
     effects: [
       { kind: 'damage', element: 'shadow', amount: 'Shadow DOT; cast-time damage scales with INT and each tick can crit' },
       { kind: 'status', status: 'agony', duration: '6-10 turns, snapshotted from cast-time INT' },
@@ -354,6 +354,22 @@ export const SPELL_DEFS = {
     effects: [
       { kind: 'damage', element: 'physical', amount: '3 base, INT-scaled per tick' },
       { kind: 'status', status: 'stun', duration: '3 ticks (refreshed each earthquake tick)' },
+    ],
+  },
+  scorch: {
+    id: 'scorch',
+    name: 'Scorch',
+    symbol: '\u{1F525}',    // 🔥
+    schools: ['destruction'],
+    manaCost: 6,
+    minIntelligence: 6,
+    range: 8,
+    script: 'scorch',
+    targeting: 'enemy',
+    description: 'Sear the target with a precise flame. Low damage but high critical chance, and leaves the target vulnerable to fire for 15 turns.',
+    effects: [
+      { kind: 'damage', element: 'fire', amount: 'Low base (4), INT-scaled, high crit chance' },
+      { kind: 'status', status: 'scorched', duration: '15 turns, target takes 30% more fire damage' },
     ],
   },
 };
