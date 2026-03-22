@@ -13,6 +13,7 @@ import { TURNS_PER_DAY } from '../data/calendar.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { getPassiveBonuses, effectiveMaxHp } from '../utils/passiveBonuses.js';
 import { Traits } from '../components/Traits.js';
+import { statusStrength } from '../utils/statusFacade.js';
 
 const STARVING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 8));
 const WASTING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 16));
@@ -39,7 +40,8 @@ export function hungerSystem(world) {
     // 1) Tick satiation or hunger (equipment hungerRate adds extra ticks)
     const passive = getPassiveBonuses(world, id);
     const extraHunger = Math.max(0, Number(passive?.hungerRateDerived || 0) | 0);
-    const hungerTicks = 1 + extraHunger;
+    const ravenousPot = statusStrength(world, id, "ravenous");
+    const hungerTicks = 1 + extraHunger + (ravenousPot > 0 ? ravenousPot : 0);
     if (hc.satiation > 0) {
       hc.satiation = Math.max(0, hc.satiation - hungerTicks);
     } else {

@@ -946,6 +946,18 @@ export function installMessageWiring({
     log(`Your body adapts... (${label}: ${c}/${t})`, 'system');
   });
 
+  world.on('battle_fury:heal', ({ id, amount }) => {
+    const pe = playerEntity(world);
+    if (!pe || id !== pe.id) return;
+    log(`Warchief fury surges — you recover ${amount} HP!`, 'system');
+  });
+
+  world.on('lichdom_echo:saved', ({ id }) => {
+    const pe = playerEntity(world);
+    if (!pe || id !== pe.id) return;
+    log('The phylactery pulse shatters — death is cheated!', 'legendary');
+  });
+
   // === Environment events ===
   world.on('engrave', ({ actor, text, x, y }) => {
     const who = nameOfEntity(actor);

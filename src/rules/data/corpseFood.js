@@ -83,7 +83,7 @@ export const CORPSE_DEFS = Object.freeze({
     onEat: Object.freeze([
       corpseDamage(3),
       corpseGamble(0.3,
-        corpseTimedBuff("resist_shock", 120, 1, "corpse:buff-gained", "the current hums through you — your body adapts"),
+        corpseTimedBuff("resist_electric", 120, 1, "corpse:buff-gained", "the current hums through you — your body adapts"),
         (ctx) => { /* no additional bad effect — the 3 damage is enough */ },
       ),
     ]),

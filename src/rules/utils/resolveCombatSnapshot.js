@@ -75,6 +75,19 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     blessed: statusStrength(world, id, "blessed"),
     stoneskin: statusStrength(world, id, "stoneskin"),
     berserk: statusStrength(world, id, "berserk"),
+    // Corpse-eat timed buffs
+    cunning_reflex: statusStrength(world, id, "cunning_reflex"),
+    keen_eye: statusStrength(world, id, "keen_eye"),
+    spider_sense: statusStrength(world, id, "spider_sense"),
+    thermal_sense: statusStrength(world, id, "thermal_sense"),
+    blood_rage: statusStrength(world, id, "blood_rage"),
+    war_fed: statusStrength(world, id, "war_fed"),
+    phase_shift: statusStrength(world, id, "phase_shift"),
+    ogre_bulk: statusStrength(world, id, "ogre_bulk"),
+    shadow_cloak: statusStrength(world, id, "shadow_cloak"),
+    dark_sight: statusStrength(world, id, "dark_sight"),
+    battle_fury: statusStrength(world, id, "battle_fury"),
+    fey_grace: statusStrength(world, id, "fey_grace"),
   };
 
   /** @type {Array<{stat:'attack'|'defense', source:string, value:number, reason:string}>} */
@@ -91,6 +104,12 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "attack", "status:cursed", -statusTotals.cursed, "cursed-penalty");
     pushModifier(modifiers, "attack", "status:blessed", statusTotals.blessed, "blessed-bonus");
     pushModifier(modifiers, "attack", "status:berserk", statusTotals.berserk > 0 ? 3 : 0, "berserk-bonus");
+    pushModifier(modifiers, "attack", "status:keen_eye", statusTotals.keen_eye * 2, "keen-eye-bonus");
+    pushModifier(modifiers, "attack", "status:thermal_sense", statusTotals.thermal_sense * 2, "thermal-sense-bonus");
+    pushModifier(modifiers, "attack", "status:blood_rage", statusTotals.blood_rage * 3, "blood-rage-bonus");
+    pushModifier(modifiers, "attack", "status:war_fed", statusTotals.war_fed * 2, "war-fed-bonus");
+    pushModifier(modifiers, "attack", "status:dark_sight", statusTotals.dark_sight * 2, "dark-sight-bonus");
+    pushModifier(modifiers, "attack", "status:battle_fury", statusTotals.battle_fury * 2, "battle-fury-bonus");
 
     attackBonus += (
       -statusTotals.disease
@@ -99,6 +118,12 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
       -statusTotals.cursed
       +statusTotals.blessed
       +(statusTotals.berserk > 0 ? 3 : 0)
+      +(statusTotals.keen_eye * 2)
+      +(statusTotals.thermal_sense * 2)
+      +(statusTotals.blood_rage * 3)
+      +(statusTotals.war_fed * 2)
+      +(statusTotals.dark_sight * 2)
+      +(statusTotals.battle_fury * 2)
     );
   }
 
@@ -118,18 +143,28 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "defense", "status:cursed", -statusTotals.cursed, "cursed-penalty");
     pushModifier(modifiers, "defense", "status:blessed", statusTotals.blessed, "blessed-bonus");
 
+    pushModifier(modifiers, "defense", "status:cunning_reflex", statusTotals.cunning_reflex * 2, "cunning-reflex-bonus");
+    pushModifier(modifiers, "defense", "status:phase_shift", statusTotals.phase_shift * 4, "phase-shift-bonus");
+    pushModifier(modifiers, "defense", "status:fey_grace", statusTotals.fey_grace * 3, "fey-grace-bonus");
+    pushModifier(modifiers, "defense", "status:spider_sense", statusTotals.spider_sense * 2, "spider-sense-bonus");
+
     defenseContribution += (
       -statusTotals.disease
       -statusTotals.hunger
       -statusTotals.weakened
       -statusTotals.cursed
       +statusTotals.blessed
+      +(statusTotals.cunning_reflex * 2)
+      +(statusTotals.phase_shift * 4)
+      +(statusTotals.fey_grace * 3)
+      +(statusTotals.spider_sense * 2)
     );
   }
 
   if (rules.includeStoneskin) {
     pushModifier(modifiers, "defense", "status:stoneskin", statusTotals.stoneskin, "stoneskin-bonus");
-    defenseContribution += statusTotals.stoneskin;
+    pushModifier(modifiers, "defense", "status:ogre_bulk", statusTotals.ogre_bulk * 3, "ogre-bulk-bonus");
+    defenseContribution += statusTotals.stoneskin + (statusTotals.ogre_bulk * 3);
   }
 
   if (rules.clampDefenseAtZero && defenseContribution < 0) {
@@ -142,15 +177,15 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     mode,
     attackBonus,
     armorClass: 10 + defenseContribution,
-    damageFlatBonus: Math.max(0, Math.floor(damagePower / 2)),
-    damageMult: statusTotals.berserk > 0 ? 1.5 : 1,
+    damageFlatBonus: Math.max(0, Math.floor(damagePower / 2)) + (statusTotals.war_fed > 0 ? statusTotals.war_fed * 2 : 0),
+    damageMult: (statusTotals.berserk > 0 ? 1.5 : 1) * (statusTotals.blood_rage > 0 ? 1.25 : 1),
     accuracy,
     damagePower,
     evade,
     mitigation: Number(resolvedStats?.mitigation || 0),
     luck,
-    critChance,
-    critMult,
+    critChance: critChance + (statusTotals.shadow_cloak > 0 ? 0.15 * statusTotals.shadow_cloak : 0),
+    critMult: critMult + (statusTotals.shadow_cloak > 0 ? 0.5 * statusTotals.shadow_cloak : 0),
     status: Object.freeze({ ...statusTotals }),
     modifiers: Object.freeze(modifiers),
   };

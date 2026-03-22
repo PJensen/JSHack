@@ -130,31 +130,42 @@ export function resolveResistance(world, targetId, rawAmount, type) {
     case 'blunt': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.bluntResist ?? 0);
+      const spectral = activeResistBonus(world, targetId, "spectral_form");
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
-      return applyKineticChip(afterDR * effectiveMult, effectiveMult);
+      const afterMult = afterDR * effectiveMult;
+      return applyKineticChip(spectral > 0 ? Math.floor(afterMult * 0.5) : afterMult, effectiveMult);
     }
     case 'slash': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.slashResist ?? 0);
+      const spectral = activeResistBonus(world, targetId, "spectral_form");
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
-      return applyKineticChip(afterDR * effectiveMult, effectiveMult);
+      const afterMult = afterDR * effectiveMult;
+      return applyKineticChip(spectral > 0 ? Math.floor(afterMult * 0.5) : afterMult, effectiveMult);
     }
     case 'pierce': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.pierceResist ?? 0);
+      const spectral = activeResistBonus(world, targetId, "spectral_form");
       const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
       const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
-      return applyKineticChip(afterDR * effectiveMult, effectiveMult);
+      const afterMult = afterDR * effectiveMult;
+      return applyKineticChip(spectral > 0 ? Math.floor(afterMult * 0.5) : afterMult, effectiveMult);
     }
     case 'physical': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
+      const spectral = activeResistBonus(world, targetId, "spectral_form");
       const afterDR = rawAmount - ((resist.kinetic?.DR || 0) + drBonus);
-      return applyKineticChip(afterDR, 1);
+      const afterSpectral = spectral > 0 ? Math.floor(afterDR * 0.5) : afterDR;
+      return applyKineticChip(afterSpectral, 1);
     }
     case 'fire': {
-      const bonus = Number(resolved?.fireResist ?? 0) + activeResistBonus(world, targetId, "resist_fire");
+      const bonus = Number(resolved?.fireResist ?? 0)
+        + activeResistBonus(world, targetId, "resist_fire")
+        + activeResistBonus(world, targetId, "fire_blood")
+        + activeResistBonus(world, targetId, "frost_blood");
       const effectiveMult = Math.max(0, (resist.thermal?.burnMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
@@ -350,9 +361,38 @@ export function dealDamage(world, spec) {
   }
 
   // Step 6: Death check
-  const killed = (vit.hp | 0) <= 0;
+  let killed = (vit.hp | 0) <= 0;
+
+  // Lichdom echo: one-time death save from lich corpse buff
+  if (killed) {
+    const lichdoomPot = activeResistBonus(world, target, "lichdom_echo");
+    if (lichdoomPot > 0) {
+      vit.hp = 1;
+      killed = false;
+      // Consume the effect (one-time save)
+      const lichAe = world.get(target, ActiveEffects);
+      if (lichAe && Array.isArray(lichAe.effects)) {
+        lichAe.effects = lichAe.effects.filter(e => e.key !== "lichdom_echo");
+      }
+      try { world.emit?.('lichdom_echo:saved', { id: target, source }); } catch { /* */ }
+    }
+  }
+
   if (killed) {
     try { world.emit?.('died', { id: target, killer: source, cause }); } catch { /* */ }
+    // Battle fury: on-kill heal for the killer
+    if (source > 0 && world.isAlive(source)) {
+      const furyPot = activeResistBonus(world, source, "battle_fury");
+      if (furyPot > 0) {
+        const sourceVit = world.get(source, Vitality);
+        if (sourceVit && (sourceVit.hp | 0) > 0) {
+          const healAmt = 5 * furyPot;
+          const before = sourceVit.hp | 0;
+          sourceVit.hp = Math.min(sourceVit.maxHp | 0, before + healAmt);
+          try { world.emit?.('battle_fury:heal', { id: source, amount: sourceVit.hp - before }); } catch { /* */ }
+        }
+      }
+    }
   }
 
   return { applied: true, killed, amount: finalAmount, rawAmount, reason: 'applied' };

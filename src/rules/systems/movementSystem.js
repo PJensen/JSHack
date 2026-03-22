@@ -231,8 +231,10 @@ export function movementSystem(world) {
       const actorFlying = world.has(actor, Flying);
       const terrainBlocked = actorFlying ? !isFlyable(nx, ny) : !isWalkable(nx, ny);
 
+      const canTraverseWebs = hasIdentity(world, actor, "spider")
+        || statusStrength(world, actor, "web_immune") > 0;
       const spiderCanTraverseWeb =
-        hasIdentity(world, actor, "spider")
+        canTraverseWebs
         && isWalkable(nx, ny)
         && blocking.has(k)
         && tiles.blockedByCell.has(k)
