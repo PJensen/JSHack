@@ -201,6 +201,7 @@ export function generateBookShopItem(world, rng) {
         { id: "book_lightning", weight: 10 },
         { id: "book_meteor", weight: 10 },
         { id: "book_blastwave", weight: 12 },
+        { id: "book_earthshatter", weight: 12 },
         { id: "book_blink", weight: 10 },
         { id: "book_frost", weight: 14 },
         { id: "book_blizzard", weight: 8 },
