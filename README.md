@@ -386,7 +386,7 @@ JSHack/
 
 **If you can't `console.log` it and understand it immediately, something's wrong.**
 
-For more on why we reject the modern web toolchain, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project is proof of what native browser tooling can do without the bullshit — and a major proof of what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
+For more on why we reject the modern web toolchain, read [The Modern Web is a UX Crime Scene](https://pjensen.substack.com/p/the-modern-web-is-a-ux-crime-scene). This project shows what native browser tooling can do on its own — and what agentic AI development looks like when the codebase is simple enough for both humans and agents to reason about.
 
 ---
 
@@ -551,7 +551,7 @@ Now go build something weird. ⚡
 
 ---
 
-**Every line of code in this project was written by AI agents. Not one line was typed by a human. The human directed; the agents built. This is what agentic development looks like when the codebase is simple enough to reason about. Directed, not easy — agentic development demands architecture, judgment, and relentless iteration.**
+**Every line of code in this project was written by AI agents. A human directed; agents built. Agentic development demands architecture, judgment, and relentless iteration — but when the codebase is simple enough for both humans and agents to reason about, it works.**
 
 **Follow development:** [hackjs.substack.com](http://hackjs.substack.com/)
 
