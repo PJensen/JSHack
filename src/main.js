@@ -1135,10 +1135,20 @@ const inputDisposers = [];
       }
       case "display.openPickupChooser": {
         // Contextual get/interact key:
-        // 1) If standing on a chest, open chest UI.
-        // 2) Otherwise run normal pickup flow.
+        // 1) Pick up floor items first (even on a chest tile).
+        // 2) If no floor items and standing on a chest, open chest UI.
         const p = playerEntity(world);
         if (!p) break;
+
+        // Gather items at player's position and pick the top-most item.
+        const ids = itemsAt(world, p.pos.x, p.pos.y);
+        if (ids.length > 0) {
+          const top = ids[0];
+          if (top > 0) {
+            rulesHandler({ type: 'rules.pickupItem', payload: { itemId: top } });
+          }
+          break;
+        }
 
         let chestId = 0;
         for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
@@ -1149,7 +1159,6 @@ const inputDisposers = [];
           }
         }
         if (chestId) {
-          const chestInv = world.get(chestId, Inventory);
           try {
             world.emit?.('chest:open', {
               actor: p.id,
@@ -1157,17 +1166,6 @@ const inputDisposers = [];
               chestItems: inventoryItems(world, chestId),
             });
           } catch (e) { console.debug('[main] emit chest:open failed:', e); }
-          break;
-        }
-
-        // Gather items at player's position and pick the top-most item.
-        const ids = itemsAt(world, p.pos.x, p.pos.y);
-        if (ids.length === 0) {
-          break;
-        }
-        const top = ids[0];
-        if (top > 0) {
-          rulesHandler({ type: 'rules.pickupItem', payload: { itemId: top } });
         }
         break;
       }
