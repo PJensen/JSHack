@@ -206,8 +206,8 @@ Deno.test("sensory overload: no permanent vision or hearing damage after recover
   // Apply via canonical path
   applyElectrocuted(world, player);
 
-  // Tick past the longest effect (hearingImpairment: 8 ticks) + 2 extra
-  for (let i = 0; i < 10; i++) world.tick(1);
+  // Tick past the longest effect (hearingImpairment: 18 ticks) + 2 extra
+  for (let i = 0; i < 20; i++) world.tick(1);
 
   // Vision should be fully recovered — no permanent damage
   const v = getEffectiveVisionRange(world, player);
