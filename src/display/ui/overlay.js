@@ -848,13 +848,29 @@ export function initOverlays() {
     renderRack(rack, d, _rackState);
   });
 
+  const TOOLTIP_BASE_Z = 850;
+  const TOOLTIP_FOCUS_Z = 860;
+  /** @param {HTMLDivElement} active */
+  function focusGameplayTooltip(active) {
+    const tooltips = [groundTip, stairTip, trapTip];
+    for (const tip of tooltips) {
+      if (tip === active) {
+        tip.style.display = 'block';
+        tip.style.zIndex = String(TOOLTIP_FOCUS_Z);
+      } else {
+        tip.style.display = 'none';
+        tip.style.zIndex = String(TOOLTIP_BASE_Z);
+      }
+    }
+  }
+
   // Ground item tooltip lifecycle
   window.addEventListener('ui:showGroundItem', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const d = e?.detail || {};
     renderGroundTooltip(groundTip, d);
-    groundTip.style.display = 'block';
+    focusGameplayTooltip(groundTip);
   });
   window.addEventListener('ui:hideGroundItem', () => {
     groundTip.style.display = 'none';
@@ -866,7 +882,7 @@ export function initOverlays() {
     const e = ev;
     const d = e?.detail || {};
     renderStairTooltip(stairTip, d);
-    stairTip.style.display = 'block';
+    focusGameplayTooltip(stairTip);
   });
   window.addEventListener('ui:hideStairTooltip', () => {
     stairTip.style.display = 'none';
@@ -878,7 +894,7 @@ export function initOverlays() {
     const e = ev;
     const d = e?.detail || {};
     renderTrapTooltip(trapTip, d);
-    trapTip.style.display = 'block';
+    focusGameplayTooltip(trapTip);
   });
   window.addEventListener('ui:hideTrapTooltip', () => {
     trapTip.style.display = 'none';

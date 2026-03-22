@@ -2408,6 +2408,23 @@ export const ITEM_CATALOG = {
       }),
     },
   },
+  book_earthshatter: {
+    id: "book_earthshatter",
+    catalogKind: "magic",
+    name: "Spellbook of Earthshatter",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to cast Earthshatter, cracking the ground to stun nearby foes.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
   book_blink: {
     id: "book_blink",
     catalogKind: "magic",

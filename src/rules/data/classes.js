@@ -28,7 +28,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 1 },
       { itemId: 'scroll_identify', count: 1 },
     ],
-    startingSpell: 'rampage',
+    startingSpells: ['rampage', 'earthshatter'],
   },
 
   druid: {

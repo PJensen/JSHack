@@ -1,7 +1,6 @@
 // display/ui/hud.js
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
-import { SPELL_DEFS } from '../../rules/data/spells.js';
 import { renderItemDetails } from './overlay.js';
 
 /**
@@ -1013,8 +1012,8 @@ function ensureEffectsStack(container) {
       const turns = Math.max(0, Number(s.turns || 0));
       const stacks = Math.max(1, Number(s.stacks || 1));
       const masked = !!s.masked;
-      const _spell = !masked && !VIS[key] ? SPELL_DEFS[key] : null;
-      const spec = masked ? MASKED_SPEC : (VIS[key] || (_spell?.symbol ? { name: _spell.name, glyph: _spell.symbol, hue: 210 } : null) || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
+      const spellFallback = !masked && !VIS[key] && s.spellGlyph ? { name: s.spellName || key, glyph: s.spellGlyph, hue: 210 } : null;
+      const spec = masked ? MASKED_SPEC : (VIS[key] || spellFallback || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
       let rec = byKey.get(key);
       if (!rec) {
         const { el, overlay, ticksEl, stacksEl } = createBadge(spec, turns || 1);
