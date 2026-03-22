@@ -185,3 +185,15 @@ export function effectiveMaxHp(world, entityId, vit) {
   const passive = getPassiveBonuses(world, entityId);
   return baseMax + Number(passive?.maxHpDerived ?? 0);
 }
+
+export function effectiveMaxMana(world, entityId, mana) {
+  const baseMax = mana ? (Number(mana.maxMana) | 0) : 0;
+  const passive = getPassiveBonuses(world, entityId);
+  return baseMax + Number(passive?.maxManaDerived ?? 0);
+}
+
+export function effectiveMaxStamina(world, entityId, stamina) {
+  const baseMax = stamina ? (Number(stamina.maxStamina) | 0) : 0;
+  const passive = getPassiveBonuses(world, entityId);
+  return baseMax + Number(passive?.maxStaminaDerived ?? 0);
+}
