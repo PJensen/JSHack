@@ -5,6 +5,7 @@ import { createCorpse } from "../src/rules/archetypes/Food.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Hunger } from "../src/rules/components/Hunger.js";
 import { Traits } from "../src/rules/components/Traits.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
@@ -140,4 +141,42 @@ Deno.test("EatCallbackContext.setTrait queues and commits trait changes", async 
   assertEquals(traits.ratCorpsesEaten, 3, "standalone context should track count");
   assertEquals(traits.iron_stomach, true, "standalone context should grant iron_stomach");
   assert(events.some((e) => e.name === "corpse:trait-gained"), "should emit trait-gained");
+});
+
+Deno.test("corpseProcNode supports gate/effect/script composition", async () => {
+  const { EatCallbackContext, corpseProcNode } = await import("../src/rules/data/callbacks/eat.js");
+
+  const world = new World({ seed: 0xFEED07 });
+  const player = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+  const dummyItemId = world.create();
+  if (!world.get(player, Hunger)) world.add(player, Hunger, { hunger: 120, satiation: 0 });
+
+  const events = [];
+  world.emit = (name, payload) => { events.push({ name, payload }); };
+
+  const hook = corpseProcNode({
+    gates: [{ kind: "chance", b: 1 }],
+    effects: [
+      { kind: "attachTimedBuff", a: "keen_eye", b: 12 },
+      { kind: "nutrition", a: 25 },
+    ],
+    script: (ctx, proc) => {
+      proc.emit("corpse:buff-gained", {
+        actor: ctx.actor,
+        effect: "keen_eye",
+        turnsLeft: 12,
+        description: "proc-node eat test",
+      });
+    },
+  });
+
+  const beforeHunger = world.get(player, Hunger).hunger;
+  const ctx = new EatCallbackContext(world, player, dummyItemId);
+  hook(ctx);
+  ctx.commit();
+
+  const ae = world.get(player, ActiveEffects);
+  assert(ae?.effects?.some((e) => e.key === "keen_eye" && e.turnsLeft === 12), "should apply attachTimedBuff as active effect");
+  assert(world.get(player, Hunger).hunger < beforeHunger, "nutrition effect should reduce hunger");
+  assert(events.some((e) => e.name === "corpse:buff-gained"), "script should emit event");
 });
