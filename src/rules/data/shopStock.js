@@ -44,7 +44,7 @@ export function generateShopStock(world, depth, rng) {
         items.push(id);
     }
 
-    const arrowCount = rng.int(1, 2);
+    const arrowCount = rng.int(2, 3);
     for (let i = 0; i < arrowCount; i++) {
         const id = createFrom(world, ArrowsStack, {});
         try { world.remove(id, Position); } catch {} // ECS: may not exist
