@@ -7,6 +7,7 @@ import { createEatOnUseHook, createMappingOnUseHook } from "../content/items/use
 import { requiresIdentification } from "./itemAppearances.js";
 import { isIdentified } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
+import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
