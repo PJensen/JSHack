@@ -60,7 +60,7 @@ export const MONSTERS = [
     damageDice: '1d4',
     sizeClass: 'S',
     massKg: 30,
-    resistances: { kinetic: { DR: 2 } },
+    resistances: { kinetic: { DR: 1 } },
     speed: 2,
     hooks: {
       onHit: [statusEffectOnHit(20, 0xdead0005, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
@@ -84,7 +84,7 @@ export const MONSTERS = [
     damageDice: '1d4',
     sizeClass: 'S',
     massKg: 30,
-    resistances: { kinetic: { DR: 1 } },
+    resistances: { kinetic: { DR: 0 } },
     speed: 2,
     hooks: {
       onHit: [statusEffectOnHit(15, 0xdead0400, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
@@ -105,7 +105,7 @@ export const MONSTERS = [
     baseHp: 3,
     hpPerLevel: 0.5,
     attack: 0,
-    defense: 2,
+    defense: 0,
     damageDice: '1d2',
     sizeClass: 'XS',
     massKg: 1,
@@ -175,7 +175,7 @@ export const MONSTERS = [
     damageDice: '1d3',
     sizeClass: 'S',
     massKg: 8,
-    resistances: { kinetic: { DR: 1 } },
+    resistances: { kinetic: { DR: 0 } },
     speed: 2,
     hooks: {
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
@@ -397,7 +397,7 @@ export const MONSTERS = [
     damageDice: '1d3',
     sizeClass: 'S',
     massKg: 25,
-    resistances: { kinetic: { DR: 1 } },
+    resistances: { kinetic: { DR: 0 } },
     speed: 2,
     learnedSpellIds: ['lightning'],
     maxMana: 21,
@@ -677,7 +677,7 @@ export const MONSTERS = [
     damageDice: '1d4',
     sizeClass: 'S',
     massKg: 15,
-    resistances: { kinetic: { DR: 2 }, chemical: { toxMult: 0 } },
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
     speed: 3,
     hooks: {
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
@@ -1101,7 +1101,7 @@ export const MONSTERS = [
     baseHp: 12,
     hpPerLevel: 1,
     attack: 1,
-    defense: 3,        // elusive
+    defense: 1,        // elusive
     damageDice: '1d4',
     sizeClass: 'S',
     massKg: 45,
