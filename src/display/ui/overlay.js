@@ -5587,8 +5587,8 @@ function renderMessageTicker(container, entries) {
       width: 'min(86vw, 760px)',
       maxHeight: 'min(50vh, 430px)',
       gap: '6px',
-      fontSize: 'min(15px, 3.4vw)',
-      lineHeight: '1.35',
+      fontSize: 'min(13px, 3.1vw)',
+      lineHeight: '1.45',
       padding: '10px 12px',
       background: 'rgba(8,12,18,0.92)',
       border: '1px solid rgba(80,120,170,0.82)',
@@ -5638,7 +5638,7 @@ function renderMessageTicker(container, entries) {
     Object.assign(list.style, {
       display: 'flex',
       flexDirection: 'column',
-      gap: '4px',
+      gap: '6px',
       overflowY: 'auto',
       maxHeight: 'min(40vh, 320px)',
       paddingRight: '2px',
@@ -5667,9 +5667,10 @@ function renderMessageTicker(container, entries) {
         }
         row.style.opacity = i === 0 ? '1' : '0.9';
         row.style.textShadow = '0 1px 0 rgba(0,0,0,0.42)';
-        row.style.whiteSpace = 'nowrap';
-        row.style.overflow = 'hidden';
-        row.style.textOverflow = 'ellipsis';
+        row.style.whiteSpace = 'normal';
+        row.style.overflowWrap = 'anywhere';
+        row.style.wordBreak = 'break-word';
+        row.style.lineHeight = '1.45';
         list.appendChild(row);
       }
     }
