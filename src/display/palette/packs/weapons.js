@@ -6,6 +6,7 @@ export const weapons = {
   bow_long:           { glyph:"}",  fg:"#b09060", glow:"#887050" },
   bow_composite:      { glyph:"}",  fg:"#d4a8e0", glow:"#a070b8" },
   bow_shadow:         { glyph:"}",  fg:"#7088cc", glow:"#4060a8" },
+  bow_mirror:         { glyph:"}",  fg:"#d0d8e8", glow:"#a0a8b8" },
   longsword:          { glyph:"/",  fg:"#c8cce0", glow:"#9098b8" },
   iron_mace:          { glyph:")",  fg:"#9090a0", glow:"#707080" },
   warhammer:          { glyph:"T",  fg:"#a8a0b8", glow:"#706880" },

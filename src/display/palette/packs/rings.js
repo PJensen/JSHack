@@ -17,5 +17,21 @@ export const rings = {
   pendant_soulkeeper:  { glyph:"\"", fg:"#f2a96f", glow:"#c57844" },
   pendant_stormward:   { glyph:"\"", fg:"#8fd0f2", glow:"#5d97b7" },
   amulet_lifeblood:    { glyph:"\"", fg:"#ff8a83", glow:"#c95a54" },
-  amulet_arcanum:      { glyph:"\"", fg:"#b08fff", glow:"#7d62c9" }
+  amulet_arcanum:      { glyph:"\"", fg:"#b08fff", glow:"#7d62c9" },
+  // Cursed rings
+  ring_copper:      { glyph:"◌", fg:"#c87a3a", glow:"#8a5020" },
+  ring_bone:        { glyph:"◌", fg:"#d8d0c0", glow:"#a8a090" },
+  ring_hunger:      { glyph:"◌", fg:"#aa8844", glow:"#775522" },
+  ring_fumbling:    { glyph:"◌", fg:"#bb9966", glow:"#886633" },
+  ring_weakness:    { glyph:"◌", fg:"#99887a", glow:"#665544" },
+  ring_blindness:   { glyph:"◌", fg:"#555566", glow:"#333344" },
+  ring_teleportation: { glyph:"◌", fg:"#66eeff", glow:"#33bbcc" },
+  ring_fragility:   { glyph:"◌", fg:"#cc9999", glow:"#996666" },
+  ring_mana_drain:  { glyph:"◌", fg:"#7766aa", glow:"#4a3a77" },
+  ring_ironwill:    { glyph:"◌", fg:"#b0bcc8", glow:"#7a8694" },
+  ring_fateweaver:  { glyph:"◌", fg:"#d4a8e0", glow:"#a070b8" },
+  ring_voidchannel: { glyph:"◌", fg:"#6a5a8a", glow:"#3a2a5a" },
+  // Cursed amulets
+  amulet_strangulation: { glyph:"\"", fg:"#aa4444", glow:"#772222" },
+  amulet_aggravation:   { glyph:"\"", fg:"#dd6644", glow:"#aa3322" },
 };
