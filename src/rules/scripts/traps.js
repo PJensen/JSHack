@@ -1,7 +1,6 @@
 import { registerScript, ScriptVerb } from "../scripting.js";
 import { Vitality } from "../components/Vitality.js";
 import { Position } from "../components/Position.js";
-import { ActiveEffects } from "../components/ActiveEffects.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
@@ -52,12 +51,6 @@ registerScript('trap_shock', {
       cause: 'shock_trap',
       at: pos ? { x: pos.x, y: pos.y } : undefined,
     });
-    // Apply shocked via ActiveEffects so effectSystem picks it up
-    const _ae = world.get(target, ActiveEffects);
-    if (_ae && Array.isArray(_ae.effects)) {
-      // ~8% maxHp per tick for 2 ticks — follow-on jolt
-      _ae.effects.push({ key: 'shock', turnsLeft: 2, potency: Math.max(3, Math.floor(vit.maxHp * 0.08)) });
-    }
     // Electrocution (stun + blind + deafen) is auto-applied by the damaged-event
     // listener in electrocute.js — no explicit call needed here.
     // Emit event for display layer (flash, ringing messages)
