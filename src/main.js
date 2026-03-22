@@ -680,6 +680,9 @@ const hudFeeds = createHudFeeds(world, {
   getPlayerMana: spellCtrl.getPlayerMana,
   ensureActiveSpell: () => ensureActiveSpell(),
   updateActiveSpellLabel: () => spellCtrl.updateActiveSpellLabel(),
+  knownSpellIds: () => spellCtrl.knownSpellIds(),
+  getActionBarSlots: () => spellCtrl.getActionBarSlots(),
+  autoAssignSlot: (id) => spellCtrl.autoAssignSlot(id),
 });
 
 function ensureActiveSpell() {
@@ -817,13 +820,15 @@ if (_pendingSavegame) {
     restoreSnapshotFromSavegame(world, _pendingSavegame);
     const savedSpell = _pendingSavegame?.app?.activeSpellId;
     if (typeof savedSpell === "string" && savedSpell.length > 0) { _activeSpellId = savedSpell; spellCtrl.setActiveSpell(savedSpell); }
+    const savedSlots = _pendingSavegame?.app?.actionBarSlots;
+    if (Array.isArray(savedSlots)) spellCtrl.restoreSlots(savedSlots);
     _savegameLoaded = true;
     _proofWiring.resetForLoad();
     updateBootProgress("Loaded save snapshot", _bootDoneUnits);
   } catch (err) {
     console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
     clearSavegamePayload();
-    _activeSpellId = null; spellCtrl.setActiveSpell(null);
+    _activeSpellId = null; spellCtrl.setActiveSpell(null); spellCtrl.restoreSlots([]);
     resetIdentification();
     identify('stone_touchstone');
     initGemPricing(createRng(world.seed ^ 0x6E45));
@@ -1773,11 +1778,29 @@ addEventListener('ui:selectActiveSpell', (ev) => {
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const spellId = e?.detail?.spellId;
+  const bindSlot = e?.detail?.bindSlot;
   if (typeof spellId === 'string' && spellId.length) {
+    // If binding to a specific action bar slot, assign it there
+    if (typeof bindSlot === 'number' && bindSlot >= 0 && bindSlot < 6) {
+      spellCtrl.setSlot(bindSlot, spellId);
+    }
     setActiveSpell(spellId);
     // Refresh inventory so the brain-slot active marker updates
     try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
   }
+});
+
+// Action bar spell slot quick-cast (1-6 keys or click)
+addEventListener('ui:castSpellSlot', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const slot = Number(e?.detail?.slot);
+  if (!(slot >= 0 && slot < 6)) return;
+  const slots = spellCtrl.getActionBarSlots();
+  const spellId = slots[slot];
+  if (!spellId) return;
+  setActiveSpell(spellId);
+  window.dispatchEvent(new CustomEvent('ui:castActiveSpell'));
 });
 
 // Basic app-side message log collector (bridge-free for now)
@@ -2399,6 +2422,7 @@ installSavegameWiring({
   world,
   playerEntity,
   getActiveSpellId: () => _activeSpellId,
+  getActionBarSlots: () => spellCtrl.getActionBarSlots(),
   log: (msg) => messageLog.log({ text: msg, type: 'system' }),
 });
 bootAdvance("Installed world/UI wiring");

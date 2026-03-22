@@ -167,6 +167,17 @@ export class InputManager {
       return;
     }
 
+    // Action bar spell slots 1-6 (WoW-style quick-cast)
+    if (key >= '1' && key <= '6' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      try {
+        this.target?.dispatchEvent?.(new CustomEvent('ui:castSpellSlot', {
+          detail: { slot: Number(key) - 1 }
+        }));
+      } catch {}
+      return;
+    }
+
     // If any UI panel is open, ignore movement/consumable bindings to let UI handle keys
     if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
       const openPanels = Array.from(document.querySelectorAll('.ui-panel')).filter((p) => p && p.style.display === 'block');
@@ -249,22 +260,22 @@ export class InputManager {
       return;
     }
 
-    // Memory graph toggle: '8'
-    if (key === '8') {
+    // Memory graph toggle: Shift+8
+    if (key === '*' || (key === '8' && e.shiftKey)) {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
       return;
     }
 
-    // Deity mood graph show: '7'
-    if (key === '7') {
+    // Deity mood graph show: Shift+7
+    if (key === '&' || (key === '7' && e.shiftKey)) {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('ui:showDeityMoodGraph'));
       return;
     }
 
-    // Economy graph toggle: '6'
-    if (key === '6') {
+    // Economy graph toggle: Shift+6
+    if (key === '^' || (key === '6' && e.shiftKey)) {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('ui:toggleEconomyGraph'));
       return;

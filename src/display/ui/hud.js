@@ -493,6 +493,9 @@ export function initHUD() {
     const gaugeSize = isMobile ? 'min(110px, 26vw)' : 'min(188px, 22vw)';
     vitals.style.width = gaugeSize;
     vitals.style.height = gaugeSize;
+    // Hide spell slots on mobile, show on desktop
+    spellSlotsContainer.style.display = isMobile ? 'none' : 'flex';
+
     if (isMobile) {
       Object.assign(bar.style, {
         display: 'grid',
@@ -702,11 +705,130 @@ export function initHUD() {
     }
   });
 
+  // --- Action bar spell slots (WoW-style, desktop only) ---
+  const spellSlotsContainer = document.createElement('div');
+  Object.assign(spellSlotsContainer.style, {
+    display: 'flex', gap: '4px', alignItems: 'center',
+  });
+  const SPELL_SLOT_COUNT = 6;
+  /** @type {HTMLButtonElement[]} */
+  const _slotBtns = [];
+  /** @type {string} */
+  let _lastSlotFingerprint = '';
+
+  function buildSlotButton(index) {
+    const btn = document.createElement('button');
+    btn.dataset.slotIndex = String(index);
+    Object.assign(btn.style, {
+      position: 'relative',
+      minHeight: '44px', minWidth: '44px',
+      padding: '8px 10px', borderRadius: '6px',
+      border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+      cursor: 'pointer', fontSize: '22px', lineHeight: '1',
+      display: 'grid', placeItems: 'center', whiteSpace: 'nowrap',
+      touchAction: 'manipulation', opacity: '0.4',
+    });
+    btn.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('ui:castSpellSlot', { detail: { slot: index } }));
+    });
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:openSpellPicker', { detail: { bindSlot: index } }));
+    });
+    btn.addEventListener('mousedown', (e) => {
+      if (e.shiftKey && e.button === 0) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('ui:openSpellPicker', { detail: { bindSlot: index } }));
+      }
+    });
+    return btn;
+  }
+
+  for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
+    const btn = buildSlotButton(i);
+    _slotBtns.push(btn);
+    spellSlotsContainer.appendChild(btn);
+  }
+
+  function refreshSpellSlots(detail) {
+    const slots = Array.isArray(detail?.slots) ? detail.slots : [];
+    const activeId = detail?.activeSpellId || null;
+    const mana = Number(detail?.mana || 0);
+
+    // Fingerprint to skip redundant DOM updates
+    const fp = JSON.stringify(slots.map(s => s?.id || '')) + '|' + (activeId || '') + '|' + mana;
+    if (fp === _lastSlotFingerprint) return;
+    _lastSlotFingerprint = fp;
+
+    for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
+      const btn = _slotBtns[i];
+      const spell = (i < slots.length) ? slots[i] : null;
+      btn.textContent = '';
+
+      const iconSpan = document.createElement('span');
+      iconSpan.style.lineHeight = '1';
+
+      if (spell && spell.id) {
+        iconSpan.textContent = spell.symbol || ACTION_ICONS.cast;
+        btn.style.opacity = (mana >= Number(spell.cost || 0)) ? '1' : '0.5';
+        const isActive = spell.id === activeId;
+        btn.style.borderColor = isActive ? '#6b8fbf' : '#2d3b52';
+        btn.style.background = isActive ? '#152035' : '#101626';
+        btn.title = `${spell.name || spell.id} (${spell.cost || 0} mana)`;
+        btn.setAttribute('aria-label', btn.title);
+        btn.disabled = false;
+      } else {
+        iconSpan.textContent = String(i + 1);
+        iconSpan.style.fontSize = '14px';
+        iconSpan.style.opacity = '0.4';
+        btn.style.opacity = '0.3';
+        btn.style.borderColor = '#2d3b52';
+        btn.style.background = '#101626';
+        btn.title = `Slot ${i + 1} (empty)`;
+        btn.setAttribute('aria-label', btn.title);
+        btn.disabled = true;
+      }
+
+      btn.appendChild(iconSpan);
+
+      // Bar label (spell name)
+      if (spell && spell.name) {
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = spell.name.length > 6 ? spell.name.slice(0, 5) + '\u2026' : spell.name;
+        Object.assign(labelSpan.style, {
+          position: 'absolute', bottom: '2px', left: '0', right: '0',
+          textAlign: 'center', fontSize: '9px', lineHeight: '1',
+          opacity: '0.7', letterSpacing: '0.3px', pointerEvents: 'none',
+        });
+        btn.appendChild(labelSpan);
+      }
+
+      // Key hint
+      const keySpan = document.createElement('span');
+      keySpan.textContent = String(i + 1);
+      Object.assign(keySpan.style, {
+        position: 'absolute', top: '2px', right: '4px',
+        fontSize: '9px', lineHeight: '1', opacity: '0.8',
+        pointerEvents: 'none', fontFamily: 'monospace',
+      });
+      btn.appendChild(keySpan);
+    }
+  }
+
+  window.addEventListener('ui:updateSpellBar', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    if (mobileLayoutMq.matches) return;
+    refreshSpellSlots(e?.detail);
+    syncActionBarHeight();
+  });
+
   // Right-aligned bar: compact core actions only.
   const quick = createQuickSlot();
   bar.appendChild(charBtn);
   bar.appendChild(bagBtn);
   bar.appendChild(petBtn);
+  bar.appendChild(spellSlotsContainer);
   bar.appendChild(castBtn);
   bar.appendChild(spellSelectBtn);
   bar.appendChild(shootBtn);

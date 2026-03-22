@@ -12,10 +12,11 @@ const INSTALLED = Symbol.for("jshack:main:savegameWiring:installed");
  *   world: import("../../lib/ecs-js/index.js").World,
  *   playerEntity: (world: import("../../lib/ecs-js/index.js").World) => ({id:number,pos:{x:number,y:number}}|null),
  *   getActiveSpellId?: () => (string|null),
+ *   getActionBarSlots?: () => (string|null)[],
  *   log?: (msg: string) => void,
  * }} opts
  */
-export function installSavegameWiring({ world, playerEntity, getActiveSpellId, log }) {
+export function installSavegameWiring({ world, playerEntity, getActiveSpellId, getActionBarSlots, log }) {
   if (!world || typeof playerEntity !== "function") return;
   if (world[INSTALLED]) return;
   world[INSTALLED] = true;
@@ -35,6 +36,7 @@ export function installSavegameWiring({ world, playerEntity, getActiveSpellId, l
       gemPricing: getGemPricingSnapshot(),
       app: {
         activeSpellId: typeof getActiveSpellId === "function" ? (getActiveSpellId() || null) : null,
+        actionBarSlots: typeof getActionBarSlots === "function" ? getActionBarSlots() : null,
       },
     };
 

@@ -484,7 +484,12 @@ export function initOverlays() {
   });
 
   // Spell picker overlay
-  window.addEventListener('ui:openSpellPicker', () => {
+  /** @type {number|null} Track which action bar slot is being rebound, if any */
+  let _spellPickerBindSlot = null;
+  window.addEventListener('ui:openSpellPicker', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    _spellPickerBindSlot = (typeof e?.detail?.bindSlot === 'number') ? e.detail.bindSlot : null;
     show(spells);
     window.dispatchEvent(new CustomEvent('ui:requestSpellData'));
   });
@@ -493,7 +498,7 @@ export function initOverlays() {
     const e = ev;
     const items = (e?.detail?.spells) || [];
     const activeId = e?.detail?.activeSpellId || null;
-    renderSpellPicker(spells, items, activeId);
+    renderSpellPicker(spells, items, activeId, _spellPickerBindSlot);
   });
 
   // Open pickup chooser: expects items array [{ id, name, type, count }]
@@ -4208,11 +4213,13 @@ function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId =
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,symbol?:string,cost?:number,description?:string,targetEffects?:string[]}>} spells @param {string|null} activeId */
-function renderSpellPicker(panel, spells, activeId) {
+function renderSpellPicker(panel, spells, activeId, bindSlot) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
   const title = document.createElement('div');
-  title.textContent = 'Select Active Spell';
+  title.textContent = typeof bindSlot === 'number'
+    ? `Bind Spell to Slot ${bindSlot + 1}`
+    : 'Select Active Spell';
   title.style.fontWeight = 'bold';
   title.style.marginBottom = '8px';
   el.appendChild(title);
@@ -4280,7 +4287,9 @@ function renderSpellPicker(panel, spells, activeId) {
     }
 
     row.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId: sp.id } }));
+      const detail = { spellId: sp.id };
+      if (typeof bindSlot === 'number') detail.bindSlot = bindSlot;
+      window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail }));
       hide(panel);
     });
     list.appendChild(row);
