@@ -182,7 +182,7 @@ function isSpawnerEligibleMonster(def) {
  */
 export function pickSpecificMonster(monsterId, depth) {
   const def = getMonster(monsterId);
-  if (!def || isGenocided(monsterId)) return null;
+  if (!def || def.disabled || isGenocided(monsterId)) return null;
   return toMonsterSpawnParams(def, depth);
 }
 
