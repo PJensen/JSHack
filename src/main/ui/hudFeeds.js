@@ -17,7 +17,7 @@ import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
-import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
+import { getPassiveBonuses, effectiveMaxHp } from "../../rules/utils/passiveBonuses.js";
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
@@ -78,7 +78,7 @@ export function createHudFeeds(world, deps) {
     const passive = getPassiveBonuses(world, pe.id);
 
     const hp = Number(vit?.hp ?? 0);
-    const maxHp = Number(vit?.maxHp ?? 0);
+    const maxHp = vit ? effectiveMaxHp(world, pe.id, vit) : 0;
     const stamina = Number(stam?.stamina ?? 0);
     const maxStaminaBonus = Number(passive?.maxStaminaDerived ?? 0);
     const maxStamina = Number(stam?.maxStamina ?? 100) + maxStaminaBonus;

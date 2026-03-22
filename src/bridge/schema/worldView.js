@@ -23,6 +23,7 @@ import { Vitality } from '../../rules/components/Vitality.js';
 import { Faction } from '../../rules/components/Faction.js';
 import { Pet } from '../../rules/components/Pet.js';
 import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
+import { effectiveMaxHp } from '../../rules/utils/passiveBonuses.js';
 import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
@@ -366,7 +367,7 @@ function projectCombatUi(world, id, rec, playerFactionKey) {
 	/** @type {any} */ const vit = /** @type any */ (world.get(id, Vitality));
 	if (!vit) return;
 
-	const maxHp = Math.max(1, vit.maxHp | 0);
+	const maxHp = Math.max(1, effectiveMaxHp(world, id, vit));
 	const hp = Math.max(0, Math.min(maxHp, vit.hp | 0));
 	rec.hp = hp;
 	rec.maxHp = maxHp;
