@@ -688,6 +688,7 @@ export const LOOT_TABLES = {
       { type: "equip",   weight: 22, pool: ["longsword"],         affixChance: 0.50, affixCountMax: 1 },
       { type: "equip",   weight: 20, pool: ["axe_heavy"],         affixChance: 0.45, affixCountMax: 1 },
       { type: "equip",   weight: 18, pool: ["warhammer"],         affixChance: 0.45, affixCountMax: 1 },
+      { type: "equip",   weight: 14, pool: ["bow_long"],          affixChance: 0.45, affixCountMax: 1 },
       { type: "equip",   weight: 16, pool: ["venomfang_dagger"],  affixChance: 0.35, affixCountMax: 1 },
       { type: "equip",   weight: 14, pool: ["caustic_stiletto"],  affixChance: 0 },
       { type: "equip",   weight: 12, pool: ["stormtouched_mace"], affixChance: 0 },
