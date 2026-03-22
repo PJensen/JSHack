@@ -408,6 +408,13 @@ export function installMessageWiring({
     log(`${who} lacks mana to cast.`, 'system');
   });
 
+  world.on('spell:on-cooldown', ({ actor, spellId }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const s = getSpell ? getSpell(String(spellId || '')) : null;
+    const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
+    log(`${label} is not ready yet.`, 'system');
+  });
+
   world.on('spell:fizzle', ({ actor, spellId, confused }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const s = getSpell ? getSpell(String(spellId || '')) : null;

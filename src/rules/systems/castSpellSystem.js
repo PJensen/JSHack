@@ -8,6 +8,8 @@ import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { combatSeed, hashString32, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { resolveDerivedStats } from "../utils/derivedStats.js";
+import { Player } from "../components/Player.js";
+import { isSpellOnCooldown, setSpellCooldown } from "../utils/spellCooldowns.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -137,6 +139,16 @@ export function castSpellSystem(world) {
       }
     }
 
+    // Cooldown gate (player only)
+    if (!fromChanneling && world.has(actor, Player)) {
+      const cdTurns = Number(spell.cooldown || 0) | 0;
+      if (cdTurns > 0 && isSpellOnCooldown(world, spell.id)) {
+        try { world.emit?.('spell:on-cooldown', { actor, spellId: spell.id }); } catch (e) { console.debug('[castSpellSystem] emit spell:on-cooldown:', e); }
+        world.remove(actor, CastSpellIntent);
+        continue;
+      }
+    }
+
     /** @type {{ mana?: number, maxMana?:number }|null} */
     const mana = /** @type any */ (world.get(actor, Mana));
 
@@ -230,6 +242,13 @@ export function castSpellSystem(world) {
 
     // Run scripted behavior (pure rules)
     try { runSpellScript(world, actor, resolvedSpell, intent); } catch (e) { console.error('[castSpellSystem] runSpellScript failed for "' + (resolvedSpell?.id || '?') + '":', e); }
+
+    // Start cooldown (player only)
+    if (world.has(actor, Player)) {
+      const cdTurns = Number(resolvedSpell.cooldown || 0) | 0;
+      if (cdTurns > 0) setSpellCooldown(world, resolvedSpell.id, cdTurns, cdTurns);
+    }
+
     // Emit semantic cast event that bridge/display can turn into effects
     try {
       world.emit && world.emit('castSpell', {

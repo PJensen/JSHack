@@ -55,6 +55,7 @@ import { installScoreListener } from "../rules/systems/scoreSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
+import { spellCooldownSystem } from "../rules/systems/spellCooldownSystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
 import { plantGrowthSystem } from "../rules/systems/plantGrowthSystem.js";
 import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.js";
@@ -207,6 +208,7 @@ export function configureWorld(world) {
   // Food decay ticks after hunger (rot inventory food each turn)
   registerSystem(foodDecaySystem, 'effects');
   registerSystem(itemCooldownSystem, 'effects');
+  registerSystem(spellCooldownSystem, 'effects');
   registerSystem(hazardSystem, 'effects');
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');

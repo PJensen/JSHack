@@ -755,8 +755,11 @@ export function initHUD() {
     const activeId = detail?.activeSpellId || null;
     const mana = Number(detail?.mana || 0);
 
-    // Fingerprint to skip redundant DOM updates
-    const fp = JSON.stringify(slots.map(s => s?.id || '')) + '|' + (activeId || '') + '|' + mana;
+    // Fingerprint includes cooldown state so UI updates each tick while any CD is active
+    const fp = JSON.stringify(slots.map(s => {
+      if (!s) return '';
+      return s.id + ':' + (s.cdRemaining || 0);
+    })) + '|' + (activeId || '') + '|' + mana;
     if (fp === _lastSlotFingerprint) return;
     _lastSlotFingerprint = fp;
 
@@ -768,13 +771,19 @@ export function initHUD() {
       const iconSpan = document.createElement('span');
       iconSpan.style.lineHeight = '1';
 
+      const cdRemaining = Number(spell?.cdRemaining || 0);
+      const cdMax = Number(spell?.cdMax || 0);
+      const onCooldown = cdRemaining > 0 && cdMax > 0;
+
       if (spell && spell.id) {
         iconSpan.textContent = spell.symbol || ACTION_ICONS.cast;
-        btn.style.opacity = (mana >= Number(spell.cost || 0)) ? '1' : '0.5';
+        const canAfford = mana >= Number(spell.cost || 0);
+        btn.style.opacity = (canAfford && !onCooldown) ? '1' : '0.5';
         const isActive = spell.id === activeId;
         btn.style.borderColor = isActive ? '#6b8fbf' : '#2d3b52';
         btn.style.background = isActive ? '#152035' : '#101626';
-        btn.title = `${spell.name || spell.id} (${spell.cost || 0} mana)`;
+        const cdTip = onCooldown ? ` [${cdRemaining} turns]` : '';
+        btn.title = `${spell.name || spell.id} (${spell.cost || 0} mana)${cdTip}`;
         btn.setAttribute('aria-label', btn.title);
         btn.disabled = false;
       } else {
@@ -791,6 +800,30 @@ export function initHUD() {
 
       btn.appendChild(iconSpan);
 
+      // Cooldown clock-sweep overlay
+      if (onCooldown) {
+        const pct = (1 - cdRemaining / cdMax) * 100;
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+          position: 'absolute', inset: '0', borderRadius: '6px',
+          background: `conic-gradient(from 0deg, transparent ${pct}%, rgba(0,0,0,0.65) ${pct}%)`,
+          pointerEvents: 'none', zIndex: '1',
+        });
+        btn.appendChild(overlay);
+
+        // Turns remaining number
+        const cdLabel = document.createElement('span');
+        cdLabel.textContent = String(cdRemaining);
+        Object.assign(cdLabel.style, {
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: '15px', fontWeight: 'bold', lineHeight: '1',
+          color: '#ff9999', textShadow: '0 0 4px #000, 0 0 2px #000',
+          pointerEvents: 'none', zIndex: '2',
+        });
+        btn.appendChild(cdLabel);
+      }
+
       // Bar label (spell name)
       if (spell && spell.name) {
         const labelSpan = document.createElement('span');
@@ -799,6 +832,7 @@ export function initHUD() {
           position: 'absolute', bottom: '2px', left: '0', right: '0',
           textAlign: 'center', fontSize: '9px', lineHeight: '1',
           opacity: '0.7', letterSpacing: '0.3px', pointerEvents: 'none',
+          zIndex: '3',
         });
         btn.appendChild(labelSpan);
       }
@@ -810,6 +844,7 @@ export function initHUD() {
         position: 'absolute', top: '2px', right: '4px',
         fontSize: '9px', lineHeight: '1', opacity: '0.8',
         pointerEvents: 'none', fontFamily: 'monospace',
+        zIndex: '3',
       });
       btn.appendChild(keySpan);
     }

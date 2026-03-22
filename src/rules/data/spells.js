@@ -31,6 +31,7 @@
  * @property {SpellEffectDef[]} [effects]
  * @property {string[]} [schools]           // spell schools, e.g. ['destruction'], ['destruction','trickery']
  * @property {boolean}  [clearMindedCasting] // true = resolves normally even when caster is confused
+ * @property {number}   [cooldown]           // turns before the spell can be cast again (0 or omitted = no cooldown)
  */
 
 /** @type {Record<string, SpellDef>} */
@@ -60,6 +61,7 @@ export const SPELL_DEFS = {
     manaCost: 12,
     minIntelligence: 0,
     range: 12,
+    cooldown: 10,
     script: 'meteor',
     targeting: 'target',
     radius: 2,
@@ -94,6 +96,7 @@ export const SPELL_DEFS = {
     manaCost: 6,
     minIntelligence: 0,
     range: 10,
+    cooldown: 8,
     script: 'blink',
     targeting: 'target',
     description: 'Fold space like cloth and step out where the seam opens.',
@@ -108,6 +111,7 @@ export const SPELL_DEFS = {
     symbol: '\u{1F3E0}',   // 🏠
     manaCost: 1,
     minIntelligence: 0,
+    cooldown: 20,
     script: 'homecoming',
     targeting: 'self',
     description: 'A homesick charm that yanks your soul toward the first stair.',
@@ -291,6 +295,7 @@ export const SPELL_DEFS = {
     schools: ['alteration'],
     manaCost: 20,
     minIntelligence: 0,
+    cooldown: 20,
     script: 'rampage',
     targeting: 'self',
     description: 'Spend every drop of mana to fuel a long, savage battle fury.',
@@ -308,6 +313,7 @@ export const SPELL_DEFS = {
     manaCost: 10,
     minIntelligence: 0,
     range: 4,
+    cooldown: 6,
     script: 'phase_strike',
     targeting: 'path',
     description: 'Slip between moments and cut everything standing on your line.',
@@ -382,6 +388,9 @@ export function describeSpellDetailLines(spell) {
       ? `Cast ${Number(spell.castTime) | 0} turns`
       : "",
     spell.channeling ? "Channel: Sustained" : "",
+    Number.isFinite(spell.cooldown) && Number(spell.cooldown) > 0
+      ? `Cooldown ${Number(spell.cooldown) | 0} turns`
+      : "",
   ].filter(Boolean);
 }
 
