@@ -394,17 +394,22 @@ registerScript(AFFIX_CAUSTIC, {
 
 registerScript(AFFIX_CAPACITIVE, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const actor = Number(ctx?.actor || 0) | 0;
+    if (!(source > 0) || !(target > 0) || source === target) return;
+    if (actor > 0 && actor !== source) return;
     if (procDamageAmount(ctx) <= 0) return;
-    ctx.proc.dealDamage(ctx.target, 1, "electric", {
-      source: ctx.source,
+    ctx.proc.dealDamage(target, 1, "electric", {
+      source,
       cause: "affix:capacitive",
       noTrigger: true,
       nonLethal: true,
     });
-    emitProc(ctx, "proc:capacitive", { actor: ctx.source, target: ctx.target, amount: 1 });
-    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee03, 35)) return;
-    ctx.proc.applyStatus(ctx.target, "shock", 2, 1);
-    emitProc(ctx, "proc:shocked", { actor: ctx.source, target: ctx.target });
+    emitProc(ctx, "proc:capacitive", { actor: source, target, amount: 1 });
+    if (!procRoll(world, source, target, 0xc0ffee03, 35)) return;
+    ctx.proc.applyStatus(target, "shock", 2, 1);
+    emitProc(ctx, "proc:shocked", { actor: source, target });
   },
 });
 
