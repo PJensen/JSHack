@@ -230,9 +230,17 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const groupedItems = groupDisplayItems(nonCurrencyItems);
     const totalCount = groupedItems.reduce((sum, item) => sum + Math.max(1, Number(item?.count || 0) | 0), 0);
 
+    const floorStackItems = [];
+    for (const itemId of groundIds) {
+      const info = world.get(itemId, ItemInfo);
+      if (!info || info.type === 'currency') continue;
+      floorStackItems.push(buildItemDisplayData(info, itemId));
+    }
+
     if (!groupedItems.length && !chestId) return null;
 
-    if (chestId) {
+    // Only show chest UI when there are no floor items to pick up first.
+    if (chestId && !floorStackItems.length) {
       const chestNi = world.get(chestId, NamedIdentity);
       const chestName = (chestNi && chestNi.name) || "Chest";
       return {
@@ -243,13 +251,6 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         chestId,
         chestName,
       };
-    }
-
-    const floorStackItems = [];
-    for (const itemId of groundIds) {
-      const info = world.get(itemId, ItemInfo);
-      if (!info || info.type === 'currency') continue;
-      floorStackItems.push(buildItemDisplayData(info, itemId));
     }
 
     if (floorStackItems.length > 1) {
