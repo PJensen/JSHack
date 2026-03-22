@@ -1610,7 +1610,8 @@ const TILE_KEY_ENTRIES = [
   { glyph: '@', color: '#e8f7ff', label: 'You' },
   { glyph: '#', color: '#99a', label: 'Wall' },
   { glyph: '.', color: '#7788aa', label: 'Floor' },
-  { glyph: '+', color: '#cc9', label: 'Door' },
+  { glyph: '+', color: '#cc9', label: 'Door (closed)' },
+  { glyph: '/', color: '#cc9', label: 'Door (open)' },
   { glyph: '>', color: '#ccc', label: 'Stairs down' },
   { glyph: '<', color: '#ccc', label: 'Stairs up' },
   { glyph: '~', color: '#5ea8d4', label: 'Water' },
@@ -1624,6 +1625,10 @@ const TILE_KEY_ENTRIES = [
   { glyph: '%', color: '#b89070', label: 'Corpse / Food' },
   { glyph: '*', color: '#ffffff', label: 'Gem' },
   { glyph: '^', color: '#a84000', label: 'Trap' },
+  // Monsters (colored letters)
+  { glyph: 'g', color: '#7ecc5a', label: 'Goblin' },
+  { glyph: 'r', color: '#b89070', label: 'Rat' },
+  { glyph: 'b', color: '#9080b0', label: 'Bat' },
 ];
 
 function ensureTileKeyTooltip(root) {
