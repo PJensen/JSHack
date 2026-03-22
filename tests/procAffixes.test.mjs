@@ -15,6 +15,8 @@ import { resolveMeleeAttack } from '../src/rules/systems/combatSystem.js';
 import { rebuildSpatialIndex } from '../src/rules/utils/spatialIndex.js';
 import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
 import { dealDamage } from '../src/rules/utils/dealDamage.js';
+import { evaluateEquippedAffixProcs } from '../src/rules/utils/affixTopology.js';
+import { applyProcAccumulator } from '../src/rules/utils/procApplication.js';
 import { registerAffixDefinition, unregisterAffixDefinition } from '../src/rules/data/affixes.js';
 
 // Force affix registration
@@ -317,6 +319,29 @@ Deno.test("chainLightning1 affix chains to nearby hostile", () => {
     }
   }
   assert(false, 'chainLightning never procced in 200 seeds');
+});
+
+Deno.test("capacitive1 does not self-damage on mismatched source context", () => {
+  const world = new World({ seed: 77 });
+  const weapon = makeEquip(world, { slot: 'weapon', bonuses: { attack: 10 }, affixes: ['capacitive1'], damageDice: '1d8' });
+  const hero = makeActor(world, { x: 2, y: 2, hp: 20, faction: 'player' });
+  const foe = makeActor(world, { x: 2, y: 3, hp: 20, faction: 'enemy' });
+  world.get(hero, Equipment).weapon = weapon;
+  equipmentSystem(world);
+
+  const heroHpBefore = world.get(hero, Vitality).hp;
+  const out = evaluateEquippedAffixProcs(world, hero, {
+    kind: 'onHit',
+    source: foe,
+    target: hero,
+    damage: { amount: 5, type: 'blunt', crit: false, blocked: false },
+    tags: new Set(['melee']),
+    scratch: {},
+  });
+  applyProcAccumulator(world, out, { applyDamage: dealDamage });
+
+  const heroHpAfter = world.get(hero, Vitality).hp;
+  assert(heroHpAfter === heroHpBefore, `capacitive proc should not damage proc owner on mismatched context (before=${heroHpBefore}, after=${heroHpAfter})`);
 });
 
 // ── Inherent affix merge ───────────────────────────────────────────
