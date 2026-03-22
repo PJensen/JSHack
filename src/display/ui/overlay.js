@@ -138,6 +138,7 @@ export function initOverlays() {
   const trapTip = ensureTrapTooltip(root);
   const tombstoneTip = ensureTombstoneTooltip(root);
   const devNoticeTip = ensureDevNoticeTooltip(root);
+  const tileKeyTip = ensureTileKeyTooltip(root);
   const spellGestureHint = ensureSpellGestureHint(root);
   const virtualJoystick = ensureVirtualJoystick(root);
   const gestureDebug = ensureGestureDebugLayer(root);
@@ -902,6 +903,12 @@ export function initOverlays() {
     devNoticeTip.style.display = 'none';
   });
 
+  // First-run tile key overlay
+  window.addEventListener('ui:showTileKeyTooltip', () => {
+    renderTileKeyTooltip(tileKeyTip);
+    tileKeyTip.style.display = 'flex';
+  });
+
   // Passive updates to the always-on ticker
   window.addEventListener('ui:updateMessageTicker', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -1591,6 +1598,146 @@ function renderDevNoticeTooltip(tip, detail) {
     fontWeight: 'bold',
     cursor: 'pointer',
     padding: '0 14px',
+  });
+  closeBtn.onclick = () => { tip.style.display = 'none'; };
+  tip.appendChild(closeBtn);
+}
+
+// ---- First-run tile key overlay ----
+
+const TILE_KEY_ENTRIES = [
+  // Terrain
+  { glyph: '@', color: '#e8f7ff', label: 'You' },
+  { glyph: '#', color: '#99a', label: 'Wall' },
+  { glyph: '.', color: '#7788aa', label: 'Floor' },
+  { glyph: '+', color: '#cc9', label: 'Door' },
+  { glyph: '>', color: '#ccc', label: 'Stairs down' },
+  { glyph: '<', color: '#ccc', label: 'Stairs up' },
+  { glyph: '~', color: '#5ea8d4', label: 'Water' },
+  // Items
+  { glyph: '!', color: '#66ff99', label: 'Potion' },
+  { glyph: '?', color: '#eeddaa', label: 'Scroll' },
+  { glyph: ')', color: '#e8e2b0', label: 'Weapon' },
+  { glyph: '[', color: '#c49c66', label: 'Armor' },
+  { glyph: ']', color: '#c8a050', label: 'Chest' },
+  { glyph: '$', color: '#ffde5a', label: 'Gold' },
+  { glyph: '%', color: '#b89070', label: 'Corpse / Food' },
+  { glyph: '*', color: '#ffffff', label: 'Gem' },
+  { glyph: '^', color: '#a84000', label: 'Trap' },
+];
+
+function ensureTileKeyTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'tile-key-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 'min(94vw, 480px)',
+    pointerEvents: 'auto',
+    display: 'none',
+    flexDirection: 'column',
+    alignItems: 'center',
+    background: 'rgba(8,12,22,0.96)',
+    color: '#dbeaff',
+    borderRadius: '14px',
+    border: '1px solid #3a5a80',
+    boxShadow: '0 0 60px rgba(30,90,160,0.25), 0 12px 40px rgba(0,0,0,0.6)',
+    fontFamily: 'monospace',
+    padding: '18px 20px 14px',
+    zIndex: 930,
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+function renderTileKeyTooltip(tip) {
+  tip.innerHTML = '';
+
+  // Title
+  const title = document.createElement('div');
+  title.textContent = 'Map Key';
+  Object.assign(title.style, {
+    fontWeight: 'bold',
+    fontSize: '15px',
+    color: '#9ed2ff',
+    marginBottom: '12px',
+    letterSpacing: '0.06em',
+    textAlign: 'center',
+  });
+  tip.appendChild(title);
+
+  // Grid of glyph entries
+  const grid = document.createElement('div');
+  Object.assign(grid.style, {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    gap: '6px 12px',
+    width: '100%',
+    marginBottom: '14px',
+  });
+
+  for (const entry of TILE_KEY_ENTRIES) {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+    });
+
+    const glyphEl = document.createElement('span');
+    glyphEl.textContent = entry.glyph;
+    Object.assign(glyphEl.style, {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: entry.color,
+      textShadow: `0 0 6px ${entry.color}66`,
+      width: '22px',
+      textAlign: 'center',
+      flexShrink: '0',
+    });
+
+    const labelEl = document.createElement('span');
+    labelEl.textContent = entry.label;
+    Object.assign(labelEl.style, {
+      fontSize: '12px',
+      color: '#bcd2e8',
+    });
+
+    row.appendChild(glyphEl);
+    row.appendChild(labelEl);
+    grid.appendChild(row);
+  }
+  tip.appendChild(grid);
+
+  // Hint line
+  const hint = document.createElement('div');
+  hint.textContent = 'Bump doors to open \u00b7 Step on stairs to traverse';
+  Object.assign(hint.style, {
+    fontSize: '11px',
+    color: '#7a9ab8',
+    textAlign: 'center',
+    marginBottom: '12px',
+  });
+  tip.appendChild(hint);
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = 'Got it';
+  Object.assign(closeBtn.style, {
+    minHeight: '44px',
+    minWidth: '100px',
+    borderRadius: '10px',
+    border: '1px solid #6aa7da',
+    background: '#234463',
+    color: '#e9f7ff',
+    fontFamily: 'monospace',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0 18px',
   });
   closeBtn.onclick = () => { tip.style.display = 'none'; };
   tip.appendChild(closeBtn);
