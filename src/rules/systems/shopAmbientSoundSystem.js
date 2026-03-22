@@ -6,6 +6,7 @@ import { createRng } from "../../lib/ecs-js/rng.js";
 
 const SHOP_AMBIENT_STATE_KEY = Symbol.for("jshack:shopAmbientSoundSystem:state");
 const COOLDOWN_TURNS = 10;
+const GREETING_COOLDOWN_TURNS = 6;
 const SHOP_SOURCE_DB_AT_1_TILE = 60;
 
 const SHOP_CLARITY_LINES = Object.freeze([
@@ -25,6 +26,43 @@ const SHOP_CLARITY_LINES = Object.freeze([
     near: "you hear loud bargaining from the shop",
   }),
 ]);
+
+const SHOP_GREETING_LINES = Object.freeze([
+  "Welcome in — take your time browsing.",
+  "Fine wares for careful delvers.",
+  "No touching the cursed stock without coin.",
+  "See something you like? It's priced to survive the dungeon.",
+  "Fresh goods on the floor, no haggling today.",
+  "Step lively, and mind the fragile bottles.",
+]);
+
+/**
+ * @param {{x:number,y:number,w:number,h:number}} room
+ * @param {{x:number,y:number}} pos
+ */
+function isInsideRoom(room, pos) {
+  return pos.x >= room.x && pos.x < (room.x + room.w)
+    && pos.y >= room.y && pos.y < (room.y + room.h);
+}
+
+/**
+ * @param {Map<string, any>} stateMap
+ * @param {string} key
+ */
+function getOrCreateRoomState(stateMap, key) {
+  const prev = stateMap.get(key);
+  if (prev && typeof prev === 'object') {
+    return {
+      lastSoundTurn: Number.isFinite(prev.lastSoundTurn) ? (prev.lastSoundTurn | 0) : null,
+      lastGreetingTurn: Number.isFinite(prev.lastGreetingTurn) ? (prev.lastGreetingTurn | 0) : null,
+      wasInside: !!prev.wasInside,
+    };
+  }
+  if (Number.isFinite(prev)) {
+    return { lastSoundTurn: prev | 0, lastGreetingTurn: null, wasInside: false };
+  }
+  return { lastSoundTurn: null, lastGreetingTurn: null, wasInside: false };
+}
 
 /**
  * @param {number} worldSeed
@@ -74,14 +112,35 @@ export function shopAmbientSoundSystem(world) {
   for (const [entityId, metadata] of world.query(RoomMetadata)) {
     if (metadata.roomType !== "shop") continue;
 
+    const locationKey = `shop_${metadata.x}_${metadata.y}`;
+    const roomState = getOrCreateRoomState(state, locationKey);
+    const insideNow = isInsideRoom(metadata, playerPos);
+    const enteredNow = insideNow && !roomState.wasInside;
+    const canGreet = roomState.lastGreetingTurn == null || (currentTurn - roomState.lastGreetingTurn) >= GREETING_COOLDOWN_TURNS;
+
+    if (enteredNow && canGreet) {
+      const speakerId = Number(metadata.shopkeeperId || 0) | 0;
+      if (speakerId > 0) {
+        const greetRng = createShopSoundRng(world.seed >>> 0, currentTurn, metadata.x, metadata.y);
+        const line = SHOP_GREETING_LINES[greetRng.int(0, SHOP_GREETING_LINES.length - 1)] || SHOP_GREETING_LINES[0];
+        world.emit?.("npc:dialogue", {
+          actor: speakerId,
+          targetId: 0,
+          text: line,
+          source: "shop:ambientGreeting",
+        });
+        roomState.lastGreetingTurn = currentTurn;
+      }
+    }
+    roomState.wasInside = insideNow;
+    state.set(locationKey, roomState);
+
     const centerX = metadata.x + Math.floor(metadata.w / 2);
     const centerY = metadata.y + Math.floor(metadata.h / 2);
     const distance = Math.max(Math.abs(playerPos.x - centerX), Math.abs(playerPos.y - centerY));
     if (distance > 12) continue;
 
-    const locationKey = `shop_${metadata.x}_${metadata.y}`;
-    const lastTurn = state.get(locationKey);
-    const canNotify = lastTurn == null || (currentTurn - lastTurn) >= COOLDOWN_TURNS;
+    const canNotify = roomState.lastSoundTurn == null || (currentTurn - roomState.lastSoundTurn) >= COOLDOWN_TURNS;
     if (!canNotify) continue;
 
     const rng = createShopSoundRng(world.seed >>> 0, currentTurn, metadata.x, metadata.y);
@@ -97,7 +156,8 @@ export function shopAmbientSoundSystem(world) {
       targetId: entityId,
     });
 
-    state.set(locationKey, currentTurn);
+    roomState.lastSoundTurn = currentTurn;
+    state.set(locationKey, roomState);
     break;
   }
 }
