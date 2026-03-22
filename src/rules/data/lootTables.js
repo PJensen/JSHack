@@ -27,6 +27,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 20, pool: ["shield_wood"], affixChance: 0 },
       { type: "equip", weight: 20, pool: ["bow_short"], affixChance: 0.25, affixCountMax: 1 },
       { type: "equip", weight: 10, pool: ["iron_pickaxe"], affixChance: 0.25, affixCountMax: 1 },
+      { type: "equip", weight: 15, pool: ["ring_copper", "ring_bone"], affixChance: 0 },
     ],
   },
 
@@ -89,6 +90,8 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 14, pool: ["amulet_warding", "amulet_focus"], affixChance: 0 },
       { type: "equip", weight: 14, pool: ["belt_chain", "belt_ranger"], affixChance: 0 },
       { type: "equip", weight: 14, pool: ["gauntlets_steel", "gloves_thieves"], affixChance: 0 },
+      { type: "equip", weight: 14, pool: ["legguards_plated", "leggings_scout"], affixChance: 0 },
+      { type: "equip", weight: 14, pool: ["boots_ironshod", "boots_strider"], affixChance: 0 },
     ],
   },
 
@@ -107,6 +110,9 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 12, pool: ["pendant_soulkeeper", "pendant_stormward"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["belt_ironhide", "belt_vitality"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["gauntlets_spiked", "gloves_arcane"], affixChance: 0 },
+      { type: "equip", weight: 12, pool: ["armor_warden", "armor_nightstalker", "armor_arcanist"], affixChance: 0 },
+      { type: "equip", weight: 12, pool: ["legguards_fortress", "leggings_prowler", "leggings_mystic"], affixChance: 0 },
+      { type: "equip", weight: 12, pool: ["boots_sentinel", "boots_shadowstep", "boots_conduit"], affixChance: 0 },
     ],
   },
 
@@ -120,6 +126,10 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 25, pool: ["amulet_lifeblood", "amulet_arcanum"], affixChance: 0 },
       { type: "equip", weight: 25, pool: ["belt_titan", "belt_serpent"], affixChance: 0 },
       { type: "equip", weight: 25, pool: ["gauntlets_dragonscale", "gloves_shadow"], affixChance: 0 },
+      { type: "equip", weight: 25, pool: ["armor_bulwark", "armor_phantom"], affixChance: 0 },
+      { type: "equip", weight: 25, pool: ["legguards_colossus", "leggings_wraith"], affixChance: 0 },
+      { type: "equip", weight: 25, pool: ["boots_earthbound", "boots_phantomstride"], affixChance: 0 },
+      { type: "equip", weight: 25, pool: ["ring_ironwill", "ring_fateweaver", "ring_voidchannel"], affixChance: 0 },
     ],
   },
 
@@ -471,7 +481,7 @@ export const LOOT_TABLES = {
       { type: "gold",      weight: 35, count: { base: 12, perDepth: 4 } },
       { type: "table",     weight: 26, tableId: "sub:potions" },
       { type: "equip",     weight: 16, pool: ["sword_plain", "dagger_quick", "bow_short"], affixChance: 0.25, affixCountMax: 1 },
-      { type: "equip",     weight: 14, pool: ["leather_armor", "helm_iron", "amulet_guarded", "belt_leather", "gloves_leather", "leggings_leather", "shield_wood"], affixChance: 0 },
+      { type: "equip",     weight: 14, pool: ["leather_armor", "helm_iron", "amulet_guarded", "belt_leather", "gloves_leather", "leggings_leather", "shield_wood", "ring_copper", "ring_bone"], affixChance: 0 },
       { type: "table",     weight: 12, tableId: "sub:equip_early_proc" },
       { type: "table",     weight: 12, tableId: "sub:equip_magic" },
       { type: "table",     weight: 6,  tableId: "sub:equip_rare" },
@@ -507,7 +517,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "gold",      weight: 30, count: { base: 28, perDepth: 6 } },
       { type: "equip",     weight: 20, pool: ["nightfang_dagger", "pyreheart_mace", "glacial_edge", "witchfire_sword", "howling_maul", "ashen_reaver"], affixChance: 0.50, affixCountMax: 2 },
-      { type: "equip",     weight: 20, pool: ["helm_warhelm", "helm_visionary", "pendant_soulkeeper", "pendant_stormward", "belt_ironhide", "belt_vitality", "gauntlets_spiked", "gloves_arcane", "ring_of_fury", "serpent_ring", "wardkeeper_shield"], affixChance: 0.50, affixCountMax: 2 },
+      { type: "equip",     weight: 20, pool: ["helm_warhelm", "helm_visionary", "pendant_soulkeeper", "pendant_stormward", "belt_ironhide", "belt_vitality", "gauntlets_spiked", "gloves_arcane", "ring_of_fury", "serpent_ring", "wardkeeper_shield", "armor_warden", "armor_nightstalker", "armor_arcanist", "legguards_fortress", "leggings_prowler", "leggings_mystic", "boots_sentinel", "boots_shadowstep", "boots_conduit"], affixChance: 0.50, affixCountMax: 2 },
       { type: "table",     weight: 22, tableId: "sub:spellbooks" },
       { type: "table",     weight: 18, tableId: "sub:scrolls" },
       { type: "archetype", weight: 16, archetype: "HealthPotion" },
@@ -522,7 +532,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "gold",      weight: 25, count: { base: 40, perDepth: 8 } },
       { type: "equip",     weight: 18, pool: ["nightfang_dagger", "pyreheart_mace", "glacial_edge", "witchfire_sword", "howling_maul", "stormcaller_blade", "soulreaver_axe"], affixChance: 0.70, affixCountMax: 2 },
-      { type: "equip",     weight: 18, pool: ["helm_warhelm", "helm_visionary", "pendant_soulkeeper", "pendant_stormward", "belt_ironhide", "belt_vitality", "gauntlets_spiked", "gloves_arcane", "amulet_vigor", "belt_girded", "gauntlets_iron", "greaves_steel", "ring_health", "ring_precision", "ring_arcana", "ring_endurance", "ring_of_fury", "serpent_ring", "wardkeeper_shield", "aegis_of_the_ancient"], affixChance: 0.70, affixCountMax: 2 },
+      { type: "equip",     weight: 18, pool: ["helm_warhelm", "helm_visionary", "pendant_soulkeeper", "pendant_stormward", "belt_ironhide", "belt_vitality", "gauntlets_spiked", "gloves_arcane", "amulet_vigor", "belt_girded", "gauntlets_iron", "greaves_steel", "ring_health", "ring_precision", "ring_arcana", "ring_endurance", "ring_of_fury", "serpent_ring", "wardkeeper_shield", "aegis_of_the_ancient", "armor_bulwark", "armor_phantom", "legguards_colossus", "leggings_wraith", "boots_earthbound", "boots_phantomstride", "ring_ironwill", "ring_fateweaver", "ring_voidchannel"], affixChance: 0.70, affixCountMax: 2 },
       { type: "table",     weight: 25, tableId: "sub:spellbooks" },
       { type: "table",     weight: 20, tableId: "sub:scrolls" },
       { type: "archetype", weight: 18, archetype: "HealthPotion" },
