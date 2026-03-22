@@ -38,7 +38,7 @@ function _pickType(rng, depth) {
   if (depth === 1) return 'default'; // special: depth 1 is always default (perlin noise)
   if (depth === 2) return 'default'; // special: depth 2 is always default
   if (depth <= 3) return rng.next() < 0.7 ? 'catacombs' : 'default';
-  if (depth <= 8) {
+  if (depth > 4) {
     const r = rng.next();
     if (r < 0.30) return 'caves';
     if (r < 0.60) return 'catacombs';
