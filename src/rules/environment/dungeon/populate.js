@@ -21,6 +21,7 @@ import * as shopStock from '../../data/shopStock.js';
 import { Unpaid } from '../../components/Unpaid.js';
 import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
+import { getCatalogItem, listCatalogItems } from '../../data/itemCatalog.js';
 import { pickMonster, pickSentinelMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner, pickEncounterGroup } from './tables.js';
 import { Chest } from '../../archetypes/Chest.js';
 import { SpikeTrap, SnakeTrap, ShockTrap } from '../../archetypes/Traps.js';
@@ -184,6 +185,38 @@ const SHOP_MAX_ROOM_WIDTH = 6;
 const SHOP_MAX_ROOM_HEIGHT = 6;
 const DEAD_END_CONTENT_CHANCE = 1.0;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
+const DECOR_MIMIC_DISGUISE_POOL = Object.freeze(['chest', 'barrel', 'urn', 'crate', 'sarcophagus']);
+const CATALOG_ITEM_DEFS = Object.freeze(
+  listCatalogItems().filter((def) => typeof def?.id === 'string' && def.id.length > 0)
+);
+const CATALOG_MIMIC_ITEM_IDS = Object.freeze(
+  CATALOG_ITEM_DEFS.map((def) => def.id)
+);
+const PREMIUM_CATALOG_MIMIC_ITEM_IDS = Object.freeze(
+  CATALOG_ITEM_DEFS
+    .filter((def) => {
+      const rarity = Number(def?.rarity || 1);
+      const rarityName = String(def?.rarityName || '').toLowerCase();
+      return rarity >= 2 || /rare|epic|legendary|magic/.test(rarityName);
+    })
+    .map((def) => def.id)
+);
+
+function pickMimicDisguiseIdentity(rng, { preferPremium = false } = {}) {
+  const hasCatalogItems = CATALOG_MIMIC_ITEM_IDS.length > 0;
+  const hasPremiumCatalogItems = PREMIUM_CATALOG_MIMIC_ITEM_IDS.length > 0;
+
+  if (hasCatalogItems) {
+    const allowDecorFallback = !preferPremium && rng.next() < 0.10;
+    if (!allowDecorFallback) {
+      const usePremiumPool = hasPremiumCatalogItems && (preferPremium || rng.next() < 0.45);
+      const pool = usePremiumPool ? PREMIUM_CATALOG_MIMIC_ITEM_IDS : CATALOG_MIMIC_ITEM_IDS;
+      return pool[rng.int(0, pool.length - 1)];
+    }
+  }
+
+  return DECOR_MIMIC_DISGUISE_POOL[rng.int(0, DECOR_MIMIC_DISGUISE_POOL.length - 1)];
+}
 
 function findDoorEntityAt(world, x, y) {
   for (const [id, pos] of world.query(Position, DoorState)) {
@@ -615,7 +648,6 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Rare room mimic: 5% chance per non-entry room to place a mimic disguised
     // as a common dungeon decoration. Placed after monsters/chests to avoid blocking them.
     const ROOM_MIMIC_CHANCE = 0.05;
-    const MIMIC_DISGUISE_POOL = ['chest', 'barrel', 'urn', 'crate', 'sarcophagus'];
     if (!isEntryRoom && rng.next() < ROOM_MIMIC_CHANCE) {
       let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
@@ -626,7 +658,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         attempts++;
       }
       if (!isSolid(mx, my)) {
-        const disguise = MIMIC_DISGUISE_POOL[rng.int(0, MIMIC_DISGUISE_POOL.length - 1)];
+        const disguise = pickMimicDisguiseIdentity(rng);
         spawns.push({
           x: mx, y: my,
           kind: 'mimic',
@@ -803,9 +835,31 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       }
     }
 
-    // Place shopkeeper near the room entrance (prefer near doors)
-    const sx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-    const sy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+    const minX = room.x + 1;
+    const maxX = room.x + Math.max(1, room.w - 2);
+    const minY = room.y + 1;
+    const maxY = room.y + Math.max(1, room.h - 2);
+    const shopTiles = [];
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        shopTiles.push({ x, y });
+      }
+    }
+
+    for (let i = shopTiles.length - 1; i > 0; i--) {
+      const j = rng.int(0, i);
+      const tmp = shopTiles[i];
+      shopTiles[i] = shopTiles[j];
+      shopTiles[j] = tmp;
+    }
+    const takeShopTile = () => shopTiles.pop() || null;
+
+    const shopkeeperTile = takeShopTile();
+    if (!shopkeeperTile) {
+      return spawns;
+    }
+    const sx = shopkeeperTile.x;
+    const sy = shopkeeperTile.y;
 
     spawns.push({
       x: sx,
@@ -820,32 +874,31 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
 
     // Rare trap-chest in shops: looks like a chest until touched.
     if (rng.next() < SHOP_MIMIC_CHANCE) {
-      let mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      let my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-      let attempts = 0;
-      while (mx === sx && my === sy && attempts < 8) {
-        mx = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-        my = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
-        attempts++;
+      const mimicTile = takeShopTile();
+      if (mimicTile) {
+        spawns.push({
+          x: mimicTile.x,
+          y: mimicTile.y,
+          kind: 'mimic',
+          params: {
+            depth: floorPlan.depth,
+            disguiseIdentity: pickMimicDisguiseIdentity(rng, { preferPremium: true }),
+          },
+        });
       }
-      spawns.push({
-        x: mx,
-        y: my,
-        kind: 'mimic',
-        params: { depth: floorPlan.depth },
-      });
     }
 
     // Scatter shop items on the floor throughout the room
     const SHOP_ITEM_COUNTS = { general: [5, 12], book: [4, 8], jewelry: [4, 8], potion: [5, 10] };
     const [minItems, maxItems] = SHOP_ITEM_COUNTS[shopType] || [5, 12];
-    const itemCount = rng.int(minItems, maxItems);
+    const requestedItemCount = rng.int(minItems, maxItems);
+    const itemCount = Math.min(requestedItemCount, shopTiles.length);
     for (let i = 0; i < itemCount; i++) {
-      const ix = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
-      const iy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));
+      const tile = takeShopTile();
+      if (!tile) break;
       spawns.push({
-        x: ix,
-        y: iy,
+        x: tile.x,
+        y: tile.y,
         kind: 'shop_item',
         params: { depth: floorPlan.depth, shopType }
       });
@@ -1315,8 +1368,15 @@ export function materializeSpawn(world, spawn) {
     case 'mimic': {
       // Resolve disguise archetype — defaults to Chest (shop mimics)
       const disguise = String(spawn.params?.disguiseIdentity || 'chest');
-      const DisguiseArch = SIMPLE_SPAWN_TABLE[disguise] || Chest;
-      const id = createFrom(world, DisguiseArch, { x: spawn.x, y: spawn.y });
+      const catalogDef = getCatalogItem(disguise);
+      let id;
+      if (catalogDef) {
+        id = buildCatalogItem(world, disguise, { count: 1 });
+        world.add(id, Position, { x: spawn.x, y: spawn.y });
+      } else {
+        const DisguiseArch = SIMPLE_SPAWN_TABLE[disguise] || Chest;
+        id = createFrom(world, DisguiseArch, { x: spawn.x, y: spawn.y });
+      }
       world.add(id, Collider, { solid: true, blocksSight: false });
       world.add(id, Interactable, { action: 'touchMimic', params: null });
       world.add(id, Polymorph, {

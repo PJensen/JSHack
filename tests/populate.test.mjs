@@ -13,10 +13,14 @@ import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
 import { MonsterSpawner } from '../src/rules/components/MonsterSpawner.js';
 import { Player } from '../src/rules/components/Player.js';
+import { Collider } from '../src/rules/components/Collider.js';
+import { Interactable } from '../src/rules/components/Interactable.js';
+import { Polymorph } from '../src/rules/components/Polymorph.js';
 import { buildWorldView } from '../src/bridge/schema/worldView.js';
 import { buildPalette } from '../src/display/palette/index.js';
 import { clearAll as clearTileMap } from '../src/rules/environment/dungeon/tileMap.js';
 import { clearExplored } from '../src/rules/environment/dungeon/exploredMap.js';
+import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
 
 Deno.test("pickMonster returns valid params", () => {
   const rng = createRng(42);
@@ -513,6 +517,90 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
 
   const mimics = spawns.filter((s) => inShopRoom(s) && s.kind === "mimic");
   assert(mimics.length === 1, "shop room should allow a rare mimic spawn");
+  const disguiseId = String(mimics[0].params?.disguiseIdentity || '');
+  const disguiseDef = getCatalogItem(disguiseId);
+  assert(disguiseDef, `shop mimic should disguise as a catalog item, got ${disguiseId || '(empty)'}`);
+  const rarity = Number(disguiseDef.rarity || 1);
+  const rarityName = String(disguiseDef.rarityName || '').toLowerCase();
+  assert(
+    rarity >= 2 || /rare|epic|legendary|magic/.test(rarityName),
+    `shop mimic should prefer premium-looking items, got rarity=${rarity}, rarityName=${rarityName}`,
+  );
+});
+
+Deno.test("shopkeeper, mimic, and shop items never overlap in shop room", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  // Room 0 (origin spawn room; excluded from shop selection).
+  for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
+  // Room 1 (eligible shop room).
+  for (let y = 14; y < 20; y++) for (let x = 14; x < 20; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[17 * CHUNK_SIZE + 13] = TILE_FLOOR;
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    tiles,
+    rooms: [
+      { x: 1, y: 1, w: 6, h: 6 },
+      { x: 14, y: 14, w: 6, h: 6 },
+    ],
+    doors: [],
+  };
+  const floorPlan = { depth: 3, difficultyMult: 1.2 };
+  const rng = {
+    next: () => 0,
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const shopkeeper = spawns.find((s) => s.kind === 'shopkeeper');
+  assert(shopkeeper, 'expected a shopkeeper in deterministic shop setup');
+  const shopRoom = shopkeeper.params?.room;
+  assert(shopRoom, 'shopkeeper should include room metadata');
+
+  const inShopRoom = (s) =>
+    s.x >= shopRoom.x && s.x < shopRoom.x + shopRoom.w
+    && s.y >= shopRoom.y && s.y < shopRoom.y + shopRoom.h;
+
+  const shopItems = spawns.filter((s) => inShopRoom(s) && s.kind === 'shop_item');
+  const mimics = spawns.filter((s) => inShopRoom(s) && s.kind === 'mimic');
+  assert(shopItems.length > 0, 'shop should still place shop_item spawns');
+  assert(mimics.length === 1, 'deterministic shop setup should include one mimic');
+
+  const occupied = new Set();
+  const mark = (s, label) => {
+    const key = `${s.x},${s.y}`;
+    assert(!occupied.has(key), `${label} overlaps on ${key}`);
+    occupied.add(key);
+  };
+
+  mark(shopkeeper, 'shopkeeper');
+  mark(mimics[0], 'mimic');
+  for (const item of shopItems) mark(item, 'shop_item');
+});
+
+Deno.test("materializeSpawn supports mimic disguised as catalog item", () => {
+  const world = new World({ seed: 2026 });
+  const id = materializeSpawn(world, {
+    x: 12,
+    y: 9,
+    kind: 'mimic',
+    params: { depth: 4, disguiseIdentity: 'axe_heavy' },
+  });
+
+  assert(id > 0, 'mimic spawn should materialize an entity');
+  const ni = world.get(id, NamedIdentity);
+  assertEquals(ni?.identity, 'axe_heavy', 'mimic should use catalog disguise identity');
+  const pos = world.get(id, Position);
+  assertEquals(pos?.x, 12);
+  assertEquals(pos?.y, 9);
+  assert(world.has(id, Collider), 'mimic should remain solid while disguised');
+  assert(world.has(id, Interactable), 'mimic disguise should be touch-interactable');
+  assert(world.has(id, Polymorph), 'mimic disguise should carry polymorph reveal data');
 });
 
 Deno.test("dead-end rooms always receive reward content", () => {
