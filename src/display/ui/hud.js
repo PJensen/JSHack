@@ -394,6 +394,7 @@ export function initHUD() {
   }
 
   const mobileLayoutMq = window.matchMedia('(max-width: 760px)');
+  let _mobileRadialEl = null;
   const setDesktopLabel = (btn, text) => { btn.dataset.desktopLabel = String(text || ''); };
   const setMobileLabel = (btn, text) => { btn.dataset.mobileLabel = String(text || ''); };
   const setDesktopIcon = (btn, text) => { btn.dataset.desktopIcon = String(text || ''); };
@@ -494,6 +495,8 @@ export function initHUD() {
     vitals.style.height = gaugeSize;
     // Hide spell slots on mobile, show on desktop
     spellSlotsContainer.style.display = isMobile ? 'none' : 'flex';
+    // Show mobile radial on mobile, hide on desktop
+    if (_mobileRadialEl) _mobileRadialEl.style.display = isMobile ? 'block' : 'none';
 
     if (isMobile) {
       Object.assign(bar.style, {
@@ -874,6 +877,11 @@ export function initHUD() {
   // --- Channeling overlay (progress bar + cancel button) ---
   const channelingOverlay = createChannelingOverlay();
   root.appendChild(channelingOverlay.el);
+
+  // --- Mobile radial spell button ---
+  const mobileRadial = createMobileSpellRadial(mobileLayoutMq);
+  _mobileRadialEl = mobileRadial.el;
+  root.appendChild(mobileRadial.el);
 
   applyCommandBarLayout();
   syncActionBarHeight();
@@ -1307,6 +1315,283 @@ function createChannelingOverlay() {
   window.addEventListener('ui:channeling:end', () => {
     el.style.display = 'none';
   });
+
+  return { el };
+}
+
+// --- Mobile radial spell selector (bottom-right floating button) ----------
+function createMobileSpellRadial(mobileLayoutMq) {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    position: 'fixed',
+    right: 'calc(12px + env(safe-area-inset-right, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 16px + env(safe-area-inset-bottom, 0px))',
+    display: 'none',
+    pointerEvents: 'auto',
+    zIndex: '920',
+  });
+
+  // --- Trigger button (always-visible circle) ---
+  const trigger = document.createElement('button');
+  Object.assign(trigger.style, {
+    width: '56px', height: '56px', borderRadius: '50%',
+    border: '2px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    fontSize: '26px', lineHeight: '1',
+    display: 'grid', placeItems: 'center',
+    cursor: 'pointer', touchAction: 'manipulation',
+    position: 'relative',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+    transition: 'transform 0.15s ease, border-color 0.15s ease',
+  });
+
+  const glyphSpan = document.createElement('span');
+  glyphSpan.textContent = '\u2726'; // default ✦
+  glyphSpan.style.lineHeight = '1';
+  trigger.appendChild(glyphSpan);
+
+  // Mana cost badge (top-right corner of trigger)
+  const manaBadge = document.createElement('span');
+  Object.assign(manaBadge.style, {
+    position: 'absolute', top: '-4px', right: '-4px',
+    fontSize: '10px', fontWeight: 'bold',
+    background: '#1a2a4a', border: '1px solid #2d3b52',
+    borderRadius: '8px', padding: '1px 4px',
+    color: '#88bbff', pointerEvents: 'none', display: 'none',
+  });
+  trigger.appendChild(manaBadge);
+
+  el.appendChild(trigger);
+
+  // --- State ---
+  let _activeSpellId = null;
+  let _canCast = false;
+  let _fanOpen = false;
+  let _holdTimer = null;
+  let _isHold = false;
+  const HOLD_THRESHOLD_MS = 350;
+
+  // --- Fan-out container ---
+  const fan = document.createElement('div');
+  Object.assign(fan.style, {
+    position: 'absolute',
+    bottom: '0', right: '0',
+    display: 'none',
+    pointerEvents: 'none',
+  });
+  el.appendChild(fan);
+
+  // --- Gesture handling (tap vs hold) ---
+  function onPressStart() {
+    _isHold = false;
+    _holdTimer = setTimeout(() => {
+      _isHold = true;
+      openFan();
+    }, HOLD_THRESHOLD_MS);
+  }
+
+  function onPressEnd(e) {
+    if (_holdTimer) { clearTimeout(_holdTimer); _holdTimer = null; }
+    if (_isHold) {
+      // Hold release — check if finger is over a fan item
+      if (e && e.changedTouches && e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const item = target?.closest?.('[data-spell-id]');
+        if (item) {
+          window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', {
+            detail: { spellId: item.dataset.spellId }
+          }));
+        }
+      }
+      closeFan();
+    } else {
+      // Short tap — cast active spell
+      window.dispatchEvent(new CustomEvent('ui:castActiveSpell'));
+    }
+    _isHold = false;
+  }
+
+  function onPressCancel() {
+    if (_holdTimer) { clearTimeout(_holdTimer); _holdTimer = null; }
+    _isHold = false;
+    closeFan();
+  }
+
+  trigger.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    onPressStart();
+  }, { passive: false });
+  trigger.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    onPressEnd(e);
+  }, { passive: false });
+  trigger.addEventListener('touchcancel', () => onPressCancel(), { passive: true });
+
+  // Mouse fallback for desktop mobile emulation
+  trigger.addEventListener('mousedown', (e) => { if (e.button === 0) onPressStart(); });
+  trigger.addEventListener('mouseup', (e) => { if (e.button === 0) onPressEnd(e); });
+  trigger.addEventListener('mouseleave', () => onPressCancel());
+
+  // --- Fan open/close ---
+  function openFan() {
+    _fanOpen = true;
+    trigger.style.transform = 'scale(1.1)';
+    trigger.style.borderColor = '#6b8fbf';
+    fan.style.display = 'block';
+    window.dispatchEvent(new CustomEvent('ui:requestSpellData'));
+  }
+
+  function closeFan() {
+    _fanOpen = false;
+    trigger.style.transform = '';
+    trigger.style.borderColor = '#2d3b52';
+    fan.style.display = 'none';
+    fan.innerHTML = '';
+  }
+
+  // --- Fan item rendering ---
+  function renderFanItems(spells, activeId) {
+    fan.innerHTML = '';
+    const count = spells.length;
+    if (count === 0) return;
+
+    // Arc from ~200° (lower-left) to ~90° (straight up), origin at trigger center
+    const RADIUS = 90;
+    const ARC_START = 200;
+    const ARC_END = 90;
+    const ARC_SPAN = ARC_START - ARC_END;
+    // Trigger center offset (trigger is 56px, so center at 28,28 from el origin)
+    const CX = 28;
+    const CY = 28;
+
+    for (let i = 0; i < count; i++) {
+      const spell = spells[i];
+      const angle = count === 1
+        ? (ARC_START + ARC_END) / 2
+        : ARC_START - (ARC_SPAN * i / (count - 1));
+      const rad = angle * Math.PI / 180;
+      const x = Math.cos(rad) * RADIUS;
+      const y = -Math.sin(rad) * RADIUS;
+
+      const isActive = spell.id === activeId;
+      const item = document.createElement('div');
+      item.dataset.spellId = spell.id;
+      Object.assign(item.style, {
+        position: 'absolute',
+        width: '44px', height: '44px', borderRadius: '50%',
+        border: isActive ? '2px solid #6b8fbf' : '1px solid #2d3b52',
+        background: isActive ? '#152035' : '#101626',
+        color: '#cfe8ff', fontSize: '20px',
+        display: 'grid', placeItems: 'center',
+        left: (CX + x - 22) + 'px',
+        bottom: (-CY - y - 22) + 'px',
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+        transition: 'opacity 0.15s ease',
+        opacity: '0',
+      });
+
+      const sym = document.createElement('span');
+      sym.textContent = spell.symbol || '\u2726';
+      sym.style.lineHeight = '1';
+      sym.style.pointerEvents = 'none';
+      item.appendChild(sym);
+
+      // Spell name label
+      const label = document.createElement('span');
+      const name = spell.name || spell.id;
+      label.textContent = name.length > 6 ? name.slice(0, 5) + '\u2026' : name;
+      Object.assign(label.style, {
+        position: 'absolute', bottom: '-13px', left: '-8px', right: '-8px',
+        textAlign: 'center', fontSize: '9px', opacity: '0.8',
+        pointerEvents: 'none', whiteSpace: 'nowrap',
+        textShadow: '0 0 4px #000, 0 0 2px #000',
+      });
+      item.appendChild(label);
+
+      // Cooldown overlay
+      const cdRemaining = Number(spell.cdRemaining || 0);
+      const cdMax = Number(spell.cdMax || 0);
+      if (cdRemaining > 0 && cdMax > 0) {
+        const pct = (1 - cdRemaining / cdMax) * 100;
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+          position: 'absolute', inset: '0', borderRadius: '50%',
+          background: `conic-gradient(from 0deg, transparent ${pct}%, rgba(0,0,0,0.65) ${pct}%)`,
+          pointerEvents: 'none', zIndex: '1',
+        });
+        item.appendChild(overlay);
+
+        const cdLabel = document.createElement('span');
+        cdLabel.textContent = String(cdRemaining);
+        Object.assign(cdLabel.style, {
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: '13px', fontWeight: 'bold', color: '#ff9999',
+          textShadow: '0 0 4px #000', pointerEvents: 'none', zIndex: '2',
+        });
+        item.appendChild(cdLabel);
+        item.style.opacity = '0.5';
+      }
+
+      fan.appendChild(item);
+
+      // Stagger fade-in
+      const idx = i;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (fan.contains(item)) {
+            item.style.opacity = (cdRemaining > 0 && cdMax > 0) ? '0.5' : '1';
+          }
+        });
+      });
+
+      // Click selection (for non-hold taps on fan items when fan is already open)
+      item.addEventListener('click', () => {
+        window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', {
+          detail: { spellId: spell.id }
+        }));
+        closeFan();
+      });
+    }
+  }
+
+  // --- Event listeners ---
+  window.addEventListener('ui:updateActiveSpellLabel', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const symbol = String(e?.detail?.symbol || '').trim();
+    const name = String(e?.detail?.name || '').trim();
+    const canCast = Boolean(e?.detail?.canCast ?? true);
+    const cost = Number(e?.detail?.cost || 0);
+    _activeSpellId = e?.detail?.id || null;
+    _canCast = canCast;
+
+    glyphSpan.textContent = symbol || '\u2726';
+    trigger.title = name || 'Cast';
+    trigger.style.opacity = _activeSpellId ? (canCast ? '1' : '0.6') : '0.4';
+
+    manaBadge.textContent = cost > 0 ? String(cost) : '';
+    manaBadge.style.display = cost > 0 ? 'block' : 'none';
+  });
+
+  window.addEventListener('ui:spellData', (ev) => {
+    if (!_fanOpen) return;
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const spells = e?.detail?.spells || [];
+    const activeId = e?.detail?.activeSpellId || null;
+    renderFanItems(spells, activeId);
+  });
+
+  // Close fan when a spell overlay opens or a spell is cast
+  window.addEventListener('ui:castActiveSpell', () => { if (_fanOpen) closeFan(); });
+
+  // Close fan on outside touch
+  document.addEventListener('touchstart', (e) => {
+    if (_fanOpen && !el.contains(/** @type {Node} */ (e.target))) closeFan();
+  }, { passive: true });
 
   return { el };
 }

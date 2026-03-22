@@ -1350,8 +1350,9 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   } catch (e) { console.debug('[spells] emit spell:shadow_bolt failed:', e); }
 };
 
-// Agony — shadow DOT curse, intelligence-scaled potency and duration.
-REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
+// Agony — auto-rotating shadow DOT.  Each cast picks the visible enemy that
+// needs agony most: missing it entirely → lowest remaining turnsLeft → nearest.
+REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
   const actorFaction = String(world.get(actor, Faction)?.key || 'player');
@@ -1360,85 +1361,65 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   const isBlocked = createLOSBlocker(world);
   const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
 
-  // Resolve target: prefer intent.targetId, fallback to auto-target nearest hostile
-  let targetId = intent?.targetId || 0;
-  let tpos = targetId ? /** @type any */ (world.get(targetId, Position)) : null;
-
-  if (!targetId || !tpos) {
-    // Auto-target fallback (confused casts, AI casters)
-    /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
-    const candidates = [];
-    for (const [id, p] of world.query(Position)) {
-      if (id === actor) continue;
-      const fac = /** @type any */ (world.get(id, Faction));
-      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
-      const vit = /** @type any */ (world.get(id, Vitality));
-      if (!vit || (vit.hp | 0) <= 0) continue;
-      const dist2v = d2(apos.x, apos.y, p.x, p.y);
-      if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
-    }
-    candidates.sort((a, b) => a.dist2 - b.dist2);
-    let found = null;
-    for (const c of candidates) {
-      if (hasSpellLineOfSight(world, {
-        sourceId: actor,
-        targetId: c.id,
-        sourcePos: apos,
-        targetPos: c,
-        range: MAX_R,
-        isBlocked,
-      })) { found = c; break; }
-    }
-    if (!found) {
-      try { world.emit && world.emit('spell:agony', { actor, targetId: actor, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
-      return;
-    }
-    targetId = found.id;
-    tpos = { x: found.x, y: found.y };
+  // Collect all hostile candidates in range with LOS
+  /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+  const candidates = [];
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist2v = d2(apos.x, apos.y, p.x, p.y);
+    if (dist2v > MAX_R * MAX_R) continue;
+    if (!hasSpellLineOfSight(world, {
+      sourceId: actor, targetId: id,
+      sourcePos: apos, targetPos: p,
+      range: MAX_R, isBlocked,
+    })) continue;
+    candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
   }
 
-  // Validate target alive
-  const vit = /** @type any */ (world.get(targetId, Vitality));
-  if (!vit || (vit.hp | 0) <= 0) {
-    try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
+  if (candidates.length === 0) {
+    try { world.emit && world.emit('spell:agony', { actor, targetId: actor, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
     return;
   }
 
-  // LOS check
-  if (!hasSpellLineOfSight(world, {
-    sourceId: actor,
-    targetId,
-    sourcePos: apos,
-    targetPos: tpos,
-    range: MAX_R,
-    isBlocked,
-  })) {
-    try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true, reason: 'no_los' }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
-    return;
-  }
+  // Pick the enemy that needs agony most:
+  //   1. missing agony entirely  2. lowest turnsLeft  3. nearest
+  /** @param {{id:number}} c */
+  const agonyTurnsLeft = (c) => {
+    const ae = /** @type any */ (world.get(c.id, ActiveEffects));
+    if (!ae || !Array.isArray(ae.effects)) return -1;           // no effects → missing
+    const eff = ae.effects.find(e => e && e.key === 'agony' && (e.turnsLeft | 0) > 0);
+    return eff ? (eff.turnsLeft | 0) : -1;                     // -1 = missing
+  };
+  candidates.sort((a, b) => {
+    const aLeft = agonyTurnsLeft(a);
+    const bLeft = agonyTurnsLeft(b);
+    // Missing agony first (−1 sorts before any positive turnsLeft)
+    if (aLeft !== bLeft) return aLeft - bLeft;
+    // Tiebreak: nearest
+    return a.dist2 - b.dist2;
+  });
 
-  // Range check
-  const dist = chebyshev(apos, tpos);
-  if (dist > MAX_R) {
-    try { world.emit && world.emit('spell:agony', { actor, targetId, fizzle: true, reason: 'out_of_range' }); } catch (e) { console.debug('[spells] emit spell:agony fizzle failed:', e); }
-    return;
-  }
+  const best = candidates[0];
+  const targetId = best.id;
+  const tpos = { x: best.x, y: best.y };
 
+  // Hit roll
   const hitChancePct = getSpellHitChancePct(world, actor, targetId);
   if (!rollSpellHit(world, actor, targetId, spell)) {
     emitSpellMiss(world, actor, targetId, spell, {
       cause: 'spell:agony',
       hitChancePct,
-      at: { x: tpos.x, y: tpos.y },
+      at: tpos,
     });
     try {
       world.emit && world.emit('spell:agony', {
-        actor,
-        targetId,
-        from: { x: apos.x, y: apos.y },
-        at: { x: tpos.x, y: tpos.y },
-        missed: true,
-        hitChancePct,
+        actor, targetId,
+        from: { x: apos.x, y: apos.y }, at: tpos,
+        missed: true, hitChancePct,
       });
     } catch (e) { console.debug('[spells] emit spell:agony miss failed:', e); }
     return;
@@ -1468,14 +1449,158 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, intent) {
   // Emit VFX event
   try {
     world.emit && world.emit('spell:agony', {
-      actor,
-      targetId,
-      from: { x: apos.x, y: apos.y },
-      at: { x: tpos.x, y: tpos.y },
-      potency: basePotency,
-      duration: baseDuration,
+      actor, targetId,
+      from: { x: apos.x, y: apos.y }, at: tpos,
+      potency: basePotency, duration: baseDuration,
     });
   } catch (e) { console.debug('[spells] emit spell:agony failed:', e); }
+};
+
+// Scorch — low fire damage, high crit, applies 15-turn fire vulnerability.
+// Uses old Agony targeting: prefer intent.targetId, fallback auto-target nearest.
+REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+
+  const MAX_R = Math.max(1, Number(spell.range || 8));
+  const isBlocked = createLOSBlocker(world);
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Resolve target: prefer intent.targetId, fallback to auto-target nearest hostile
+  let targetId = intent?.targetId || 0;
+  let tpos = targetId ? /** @type any */ (world.get(targetId, Position)) : null;
+
+  if (!targetId || !tpos) {
+    /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+    const candidates = [];
+    for (const [id, p] of world.query(Position)) {
+      if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      const dist2v = d2(apos.x, apos.y, p.x, p.y);
+      if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
+    }
+    candidates.sort((a, b) => a.dist2 - b.dist2);
+    let found = null;
+    for (const c of candidates) {
+      if (hasSpellLineOfSight(world, {
+        sourceId: actor, targetId: c.id,
+        sourcePos: apos, targetPos: c,
+        range: MAX_R, isBlocked,
+      })) { found = c; break; }
+    }
+    if (!found) {
+      try { world.emit && world.emit('spell:scorch', { actor, targetId: actor, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:scorch fizzle failed:', e); }
+      return;
+    }
+    targetId = found.id;
+    tpos = { x: found.x, y: found.y };
+  }
+
+  // Validate target alive
+  const vit = /** @type any */ (world.get(targetId, Vitality));
+  if (!vit || (vit.hp | 0) <= 0) {
+    try { world.emit && world.emit('spell:scorch', { actor, targetId, fizzle: true }); } catch (e) { console.debug('[spells] emit spell:scorch fizzle failed:', e); }
+    return;
+  }
+
+  // LOS check
+  if (!hasSpellLineOfSight(world, {
+    sourceId: actor, targetId,
+    sourcePos: apos, targetPos: tpos,
+    range: MAX_R, isBlocked,
+  })) {
+    try { world.emit && world.emit('spell:scorch', { actor, targetId, fizzle: true, reason: 'no_los' }); } catch (e) { console.debug('[spells] emit spell:scorch fizzle failed:', e); }
+    return;
+  }
+
+  // Range check
+  const dist = chebyshev(apos, tpos);
+  if (dist > MAX_R) {
+    try { world.emit && world.emit('spell:scorch', { actor, targetId, fizzle: true, reason: 'out_of_range' }); } catch (e) { console.debug('[spells] emit spell:scorch fizzle failed:', e); }
+    return;
+  }
+
+  // Hit roll — high crit: boost crit chance by 25 percentage points
+  const hitChancePct = getSpellHitChancePct(world, actor, targetId);
+  if (!rollSpellHit(world, actor, targetId, spell)) {
+    emitSpellMiss(world, actor, targetId, spell, {
+      cause: 'spell:scorch',
+      hitChancePct,
+      at: { x: tpos.x, y: tpos.y },
+    });
+    try {
+      world.emit && world.emit('spell:scorch', {
+        actor, targetId,
+        from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y },
+        missed: true, hitChancePct,
+      });
+    } catch (e) { console.debug('[spells] emit spell:scorch miss failed:', e); }
+    return;
+  }
+
+  // Build damage spec with boosted crit chance
+  const ctx = createSpellDamageContext(world, actor, spell, {
+    cause: 'spell:scorch',
+    type: 'fire',
+  });
+  ctx.critChancePct = Math.min(95, ctx.critChancePct + 25);
+
+  const baseAmount = scaleSpellDamage(world, actor, 4);
+  const salt = world.step ^ 0x5C08;
+  // Manual crit roll using boosted context
+  const critSeed = combatSeed(world, actor, targetId, salt);
+  const critRng = mulberry32(critSeed);
+  const critical = (critRng() * 100) < ctx.critChancePct;
+  let amount = baseAmount;
+  if (critical) amount = Math.max(1, Math.floor(amount * ctx.critMult));
+
+  const result = dealDamage(world, {
+    target: targetId,
+    amount,
+    source: actor,
+    type: 'fire',
+    cause: 'spell:scorch',
+    at: { x: tpos.x, y: tpos.y },
+    critical,
+    hitChancePct,
+    spellId: 'scorch',
+  });
+
+  // Apply fire vulnerability (negative resist_fire) for 15 turns
+  if (result.applied && !result.killed) {
+    const ae = /** @type any */ (world.get(targetId, ActiveEffects));
+    const scorchEffect = {
+      key: 'resist_fire',
+      turnsLeft: 15,
+      potency: -0.3,
+      stacks: 1,
+      sourceId: actor,
+      spellId: 'scorch',
+      meta: { source: 'spell:scorch' },
+    };
+    if (ae && Array.isArray(ae.effects)) {
+      // Remove any prior scorch-sourced resist_fire before applying fresh
+      ae.effects = ae.effects.filter(e => !(e && e.key === 'resist_fire' && e.meta?.source === 'spell:scorch'));
+      ae.effects.push(scorchEffect);
+    } else {
+      try { world.add(targetId, ActiveEffects, { effects: [scorchEffect] }); } catch {}
+    }
+  }
+
+  // Emit VFX event
+  try {
+    world.emit && world.emit('spell:scorch', {
+      actor, targetId,
+      from: { x: apos.x, y: apos.y },
+      at: { x: tpos.x, y: tpos.y },
+      amount: result.amount,
+      critical,
+    });
+  } catch (e) { console.debug('[spells] emit spell:scorch failed:', e); }
 };
 
 REGISTRY['rampage'] = function rampageScript(world, actor, _spell, _intent) {

@@ -213,6 +213,20 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // Scorch: "SCORCHED" float text at target.
+  world.on('spell:scorch', ({ at, fizzle, missed }) => {
+    if (fizzle || missed) return;
+    if (!at || !canShowAt(at.x, at.y)) return;
+    try {
+      ftext.addStatus(at.x, at.y - 0.3, 'SCORCHED', {
+        color: '#ff6600',
+        life: 1.2,
+        scaleStart: 1.2,
+        scaleEnd: 0.9,
+      });
+    } catch (e) { console.debug('[floatTextWiring] scorch ftext failed:', e); }
+  });
+
   // Earthshatter: "EARTHQUAKE!" float text at origin.
   world.on('spell:earthshatter', ({ origin, enhanced }) => {
     if (!origin || !canShowAt(origin.x, origin.y)) return;

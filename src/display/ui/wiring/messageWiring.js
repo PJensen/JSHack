@@ -604,6 +604,14 @@ export function installMessageWiring({
     }
   });
 
+  world.on('spell:scorch', ({ actor, fizzle, missed, critical }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (fizzle) { log('Scorch finds no target.', 'system'); return; }
+    if (missed) { log('Your scorch misses!', 'system'); return; }
+    if (critical) { log('Your scorch sears the target!', 'combat'); return; }
+    log('You scorch the target.', 'combat');
+  });
+
   world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {
