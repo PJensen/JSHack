@@ -12,6 +12,11 @@ export function createActiveSpellController(world) {
   let activeSpellId = null;
   const uiTarget = /** @type {any} */ ((typeof window !== "undefined") ? window : globalThis);
 
+  // Action bar slots (WoW-style bindable spell/ability slots, keys 1-6)
+  const MAX_SLOTS = 6;
+  /** @type {(string|null)[]} */
+  const _actionBarSlots = new Array(MAX_SLOTS).fill(null);
+
   function knownSpellIds() {
     const spells = learnedSpells();
     const ids = [];
@@ -83,12 +88,61 @@ export function createActiveSpellController(world) {
     return activeSpellId;
   }
 
+  function getActionBarSlots() {
+    return _actionBarSlots.slice();
+  }
+
+  function setSlot(index, spellId) {
+    if (index < 0 || index >= MAX_SLOTS) return;
+    if (spellId && !getSpell(spellId)) return;
+    _actionBarSlots[index] = spellId || null;
+  }
+
+  function clearSlot(index) {
+    if (index < 0 || index >= MAX_SLOTS) return;
+    _actionBarSlots[index] = null;
+  }
+
+  /** Auto-assign a spell to the first empty slot. Returns the slot index or -1. */
+  function autoAssignSlot(spellId) {
+    if (!spellId || !getSpell(spellId)) return -1;
+    // Already in a slot? Skip.
+    if (_actionBarSlots.includes(spellId)) return _actionBarSlots.indexOf(spellId);
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      if (_actionBarSlots[i] === null) {
+        _actionBarSlots[i] = spellId;
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /** Restore slots from savegame data. */
+  function restoreSlots(savedSlots) {
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      _actionBarSlots[i] = null;
+    }
+    if (!Array.isArray(savedSlots)) return;
+    for (let i = 0; i < Math.min(savedSlots.length, MAX_SLOTS); i++) {
+      const id = savedSlots[i];
+      if (typeof id === "string" && id.length && getSpell(id)) {
+        _actionBarSlots[i] = id;
+      }
+    }
+  }
+
   return {
     learnedSpells,
+    knownSpellIds,
     getPlayerMana,
     ensureActiveSpell,
     setActiveSpell,
     updateActiveSpellLabel,
     getActiveSpellId,
+    getActionBarSlots,
+    setSlot,
+    clearSlot,
+    autoAssignSlot,
+    restoreSlots,
   };
 }

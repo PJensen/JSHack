@@ -19,11 +19,12 @@ import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.j
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
+import { getSpell } from "../../rules/data/spells.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
  * @param {import('../../lib/ecs-js/index.js').World} world
- * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void }} deps
+ * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number }} deps
  */
 export function createHudFeeds(world, deps) {
   const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel } = deps;
@@ -50,6 +51,9 @@ export function createHudFeeds(world, deps) {
   let lastPetState = "";
   let lastSpellMana = -1;
   let lastCalendarDay = -1;
+  let _lastSpellBarSig = '';
+  /** @type {Set<string>} */
+  let _prevKnownSpells = new Set();
 
   function sumPlayerGold(playerId) {
     const items = inventoryItems(world, playerId);
@@ -266,11 +270,39 @@ export function createHudFeeds(world, deps) {
   }
 
   function updateActiveSpellHUD() {
-    ensureActiveSpell();
+    const activeId = ensureActiveSpell();
     const { mana } = getPlayerMana();
     if (mana !== lastSpellMana) {
       lastSpellMana = mana;
       updateActiveSpellLabel();
+    }
+
+    // Auto-assign newly learned spells to empty action bar slots
+    if (typeof deps.knownSpellIds === 'function' && typeof deps.autoAssignSlot === 'function') {
+      const ids = deps.knownSpellIds();
+      for (const id of ids) {
+        if (!_prevKnownSpells.has(id)) deps.autoAssignSlot(id);
+      }
+      _prevKnownSpells = new Set(ids);
+    }
+
+    // Dispatch spell bar state for desktop HUD
+    if (typeof deps.getActionBarSlots === 'function') {
+      const slots = deps.getActionBarSlots();
+      const sig = slots.join(',') + '|' + (activeId || '') + '|' + mana;
+      if (sig !== _lastSpellBarSig) {
+        _lastSpellBarSig = sig;
+        const resolved = slots.map(id => {
+          if (!id) return null;
+          const def = getSpell(id);
+          return def ? { id, name: def.name, symbol: def.symbol, cost: def.manaCost } : null;
+        });
+        try {
+          window.dispatchEvent(new CustomEvent('ui:updateSpellBar', {
+            detail: { slots: resolved, activeSpellId: activeId, mana }
+          }));
+        } catch (e) { console.debug('[hudFeeds] dispatch ui:updateSpellBar:', e); }
+      }
     }
   }
 
