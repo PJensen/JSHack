@@ -157,6 +157,12 @@ export function createHudFeeds(world, deps) {
       }
     }
     const statuses = Array.from(statusMap.values());
+    // Enrich statuses with spell glyph/name so display layer never imports rules
+    for (const s of statuses) {
+      if (s.masked) continue;
+      const spDef = getSpell(s.key);
+      if (spDef?.symbol) { s.spellGlyph = spDef.symbol; s.spellName = spDef.name; }
+    }
     const statusSig = statuses.map((s) => `${s.key}:${s.turns}:${s.stacks}:${s.masked ? 1 : 0}`).join("|");
 
     const affixIds = [];
