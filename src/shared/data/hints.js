@@ -94,6 +94,27 @@ export const HINTS = [
   "The spike trap deals 35% of max HP. You can see it — right before it is too late.",
   "Snake traps release several serpents when triggered. Nobody is sure where they were hiding.",
 
+  // -- Polymorph --
+  "The Polymorph scroll transforms a visible enemy into a random creature. It takes three turns to channel.",
+  "With the Polymorph Control trait, you choose what the target becomes. Partial names work.",
+  "If your polymorph target name does not match any creature, the spell fizzles.",
+
+  // -- Traps & Electrocution --
+  "Shock traps deal all their damage up front in one jolt. There is no lingering shock.",
+  "Electrocution blinds you briefly but deafens you for much longer. Your ears recover slower than your eyes.",
+
+  // -- Bad Consumables --
+  "Not every potion is helpful. Paralysis, hallucination, blindness, weakness, and confusion all come in bottles.",
+  "A Potion of Weakness reduces both your max HP and max stamina. The debuff lingers.",
+
+  // -- Survivability & Gear --
+  "Gear with max HP bonuses raises your effective maximum. Healing spells respect the new cap.",
+  "Heavy armor favors defense and health. Leather favors attack and stamina. Cloth favors mana and spellcasting.",
+  "The Voidmind Athame is a caster's best friend — light damage, but enormous mana and spell hit bonuses.",
+
+  // -- Pets & Hazards --
+  "Your own area-of-effect hazards will not harm your pet. Cast freely near allies.",
+
   // -- Status Effects --
   "Stun blocks all actions for its duration.",
   "Burning deals damage each turn and can spread to nearby tiles.",
