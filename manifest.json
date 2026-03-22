@@ -1,4 +1,5 @@
 {
+  "id": "https://jshack.net/",
   "name": "JS-Hack",
   "short_name": "JS-Hack",
   "description": "A browser roguelike. Descend the dungeon. Die heroically. Share the shame.",
@@ -14,6 +15,12 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }
