@@ -144,6 +144,16 @@ export const basePalette = {
   book_verdant_ward: { glyph: "⁂", fg: "#9ee486", glow: "#5ca94a" },
   book_harmony_ward: { glyph: "☯", fg: "#d8d38a", glow: "#7aa8e0" },
   book_shadow_veil: { glyph: "⌇", fg: "#b78cff", glow: "#6b4ab2" },
+  book_flash_heal:      { glyph: "?", fg: "#ffffff", glow: "#cceecc" },
+  book_smite:           { glyph: "?", fg: "#ffe080", glow: "#ccaa40" },
+  book_summon_skeleton: { glyph: "?", fg: "#c8c8ff", glow: "#8888cc" },
+  book_shadow_bolt:     { glyph: "?", fg: "#cc66ff", glow: "#8833cc" },
+  book_agony:           { glyph: "?", fg: "#aa33cc", glow: "#660088" },
+  book_rampage:         { glyph: "?", fg: "#ff4444", glow: "#cc2222" },
+  book_phase_strike:    { glyph: "?", fg: "#66ccff", glow: "#2299cc" },
+  book_scorch:          { glyph: "?", fg: "#ff7700", glow: "#cc4400" },
+  book_homecoming:      { glyph: "?", fg: "#88aaff", glow: "#4466cc" },
+  book_hearthstone:     { glyph: "?", fg: "#bb8855", glow: "#885522" },
   book_dead: { glyph: "?", fg: "#888888", glow: "#555555" },
 
   // Wands
