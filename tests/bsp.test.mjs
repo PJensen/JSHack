@@ -86,6 +86,50 @@ Deno.test("all rooms meet minimum size", () => {
   }
 });
 
+Deno.test("square room shape forces equal width and height", () => {
+  const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, createRng(456));
+  placeRooms(tree, createRng(456), {
+    minRoomSize: 3,
+    maxRoomSize: 9,
+    roomMargin: 1,
+    roomSparsity: 0,
+    roomShapeWeights: { rect: 0, square: 1, jagged: 0 },
+  });
+  const rooms = collectLeafRooms(tree);
+  assert(rooms.length > 0, "expected at least one room");
+  for (const room of rooms) {
+    assert(room.w === room.h, `expected square room, got ${room.w}x${room.h}`);
+  }
+});
+
+Deno.test("jagged room shape carves edge notches while preserving center lines", () => {
+  const tiles = makeTiles();
+  const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, createRng(789));
+  placeRooms(tree, createRng(789), {
+    minRoomSize: 3,
+    maxRoomSize: 8,
+    roomMargin: 1,
+    roomSparsity: 0,
+    roomShapeWeights: { rect: 0, square: 0, jagged: 1 },
+  });
+  carveRooms(tree, tiles, CHUNK_SIZE);
+
+  const rooms = collectLeafRooms(tree);
+  assert(rooms.length > 0, "expected at least one room");
+  let foundNotch = false;
+  for (const room of rooms) {
+    const cx = room.x + Math.floor(room.w / 2);
+    const cy = room.y + Math.floor(room.h / 2);
+    assert(tiles[cy * CHUNK_SIZE + cx] === TILE_FLOOR, "room center should remain floor");
+    for (let x = room.x; x < room.x + room.w; x++) {
+      const top = room.y * CHUNK_SIZE + x;
+      const bot = (room.y + room.h - 1) * CHUNK_SIZE + x;
+      if (tiles[top] === TILE_WALL || tiles[bot] === TILE_WALL) foundNotch = true;
+    }
+  }
+  assert(foundNotch, "expected at least one jagged edge notch");
+});
+
 Deno.test("carved rooms produce floor tiles with wall perimeters", () => {
   const tiles = makeTiles();
   const tree = buildBSP(0, 0, CHUNK_SIZE, CHUNK_SIZE, createRng(42));

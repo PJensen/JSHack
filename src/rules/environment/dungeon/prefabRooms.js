@@ -98,7 +98,7 @@ export function stampPrefabInChunk(tiles, localRooms, roomDef, stride) {
       if (!_isConnectorWaypoint(wp)) continue;
       const wx = anchorX + wp.dx;
       const wy = anchorY + wp.dy;
-      _connectWaypoint(tiles, wx, wy, wp.dx, wp.dy, stride);
+      _connectWaypoint(tiles, wx, wy, wp.dx, wp.dy, stride, bounds);
     }
   }
 
@@ -124,28 +124,49 @@ export function stampPrefabInChunk(tiles, localRooms, roomDef, stride) {
 }
 
 /**
+ * BFS from (sx, sy) — returns true if a chunk-edge floor tile is reachable.
+ */
+function _reachesChunkEdge(tiles, stride, sx, sy) {
+  const start = sy * stride + sx;
+  if (tiles[start] !== TILE_FLOOR) return false;
+  const visited = new Set([start]);
+  const queue = [start];
+  for (let i = 0; i < queue.length; i++) {
+    const idx = queue[i];
+    const x = idx % stride, y = (idx - x) / stride;
+    if (x === 0 || y === 0 || x === stride - 1 || y === stride - 1) return true;
+    for (const [ddx, ddy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + ddx, ny = y + ddy;
+      if (nx < 0 || ny < 0 || nx >= stride || ny >= stride) continue;
+      const ni = ny * stride + nx;
+      if (!visited.has(ni) && tiles[ni] === TILE_FLOOR) { visited.add(ni); queue.push(ni); }
+    }
+  }
+  return false;
+}
+
+/**
  * Connect a waypoint opening to the nearest existing floor tile by scanning
  * outward in the facing direction, then carving a corridor.
  */
-function _connectWaypoint(tiles, wx, wy, dx, dy, stride) {
+function _connectWaypoint(tiles, wx, wy, dx, dy, stride, bounds) {
   // Determine facing direction from the waypoint's position on the prefab boundary.
   let dirX = 0, dirY = 0;
-  if (dx === 0)  dirX = 1;   // rightmost column → face east
-  if (dx === -(/* roomDef.width - 1 */ 5)) dirX = -1; // leftmost → face west
-  if (dy === 0)  dirY = 1;   // bottom row → face south
-  if (dy === -5) dirY = -1;  // top row → face north
+  if (dx === bounds.maxDx) dirX = 1;    // east edge → face east
+  if (dx === bounds.minDx) dirX = -1;   // west edge → face west
+  if (dy === bounds.maxDy) dirY = 1;    // south edge → face south
+  if (dy === bounds.minDy) dirY = -1;   // north edge → face north
 
   // If facing direction couldn't be determined, skip
   if (dirX === 0 && dirY === 0) return;
 
-  // Scan outward for existing TILE_FLOOR
+  // Scan outward for existing TILE_FLOOR that is connected to a chunk edge
   let found = false;
   for (let dist = 1; dist <= 12; dist++) {
     const sx = wx + dirX * dist;
     const sy = wy + dirY * dist;
     if (sx < 0 || sy < 0 || sx >= stride || sy >= stride) break;
-    if (tiles[sy * stride + sx] === TILE_FLOOR) {
-      // Carve corridor from waypoint to this tile
+    if (tiles[sy * stride + sx] === TILE_FLOOR && _reachesChunkEdge(tiles, stride, sx, sy)) {
       _carveLinear(tiles, stride, wx, wy, sx, sy);
       found = true;
       break;
@@ -153,7 +174,25 @@ function _connectWaypoint(tiles, wx, wy, dx, dy, stride) {
   }
 
   if (!found) {
-    // No floor found — carve straight to chunk edge so edge gates can connect.
+    // No connected floor found — also scan perpendicular directions.
+    const perpDirs = dirX !== 0 ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]];
+    for (const [pdx, pdy] of perpDirs) {
+      if (found) break;
+      for (let dist = 1; dist <= 12; dist++) {
+        const sx = wx + pdx * dist;
+        const sy = wy + pdy * dist;
+        if (sx < 0 || sy < 0 || sx >= stride || sy >= stride) break;
+        if (tiles[sy * stride + sx] === TILE_FLOOR && _reachesChunkEdge(tiles, stride, sx, sy)) {
+          _carveLinear(tiles, stride, wx, wy, sx, sy);
+          found = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!found) {
+    // Last resort — carve straight to chunk edge so edge gates can connect.
     const edgeX = dirX > 0 ? stride - 1 : dirX < 0 ? 0 : wx;
     const edgeY = dirY > 0 ? stride - 1 : dirY < 0 ? 0 : wy;
     _carveLinear(tiles, stride, wx, wy, edgeX, edgeY);

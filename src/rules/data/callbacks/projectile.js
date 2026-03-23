@@ -31,9 +31,11 @@ export class ProjectileImpactCallbackContext {
    *   d20?: number,
    *   totalToHit?: number,
    *   armorClass?: number,
-   *   critical?: boolean,
-   *   rng?: () => number,
-   * }} frame
+ *   critical?: boolean,
+ *   damageType?: string,
+ *   armorPenetration?: number,
+ *   rng?: () => number,
+ * }} frame
    */
   constructor(world, frame) {
     this.world = world;
@@ -72,6 +74,19 @@ export class ProjectileImpactCallbackContext {
   get totalToHit() { return Number(this._frame.totalToHit || 0) | 0; }
   get armorClass() { return Number(this._frame.armorClass || 0) | 0; }
   get critical() { return !!this._frame.critical; }
+  get damageType() { return String(this._frame.damageType || "pierce"); }
+  set damageType(value) {
+    const next = String(value || "").toLowerCase();
+    if (next === "blunt" || next === "slash" || next === "pierce" || next === "physical") {
+      this._frame.damageType = next;
+    }
+  }
+  get armorPenetration() {
+    return Math.max(0, Number(this._frame.armorPenetration || 0) | 0);
+  }
+  set armorPenetration(value) {
+    this._frame.armorPenetration = Math.max(0, Number(value || 0) | 0);
+  }
 
   get damage() {
     return Math.max(0, Number(this._frame.damage || 0) | 0);
@@ -103,6 +118,14 @@ export class ProjectileImpactCallbackContext {
   addDamage(amount) {
     this.damage = this.damage + Math.max(0, Number(amount || 0) | 0);
     return this.damage;
+  }
+
+  /**
+   * @param {number} amount
+   */
+  addArmorPenetration(amount) {
+    this.armorPenetration = this.armorPenetration + Math.max(0, Number(amount || 0) | 0);
+    return this.armorPenetration;
   }
 
   /**

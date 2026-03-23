@@ -3,7 +3,7 @@
 
 import { assert, assertEquals } from "jsr:@std/assert";
 import { getMonstersByTier, getMonster, addGenocide, clearGenocides } from '../src/rules/data/monsters.js';
-import { pickMonster, pickSentinelMonster, pickSpecificMonster, pickEncounterGroup } from '../src/rules/environment/dungeon/tables.js';
+import { pickMonster, pickSentinelMonster, pickSpecificMonster, pickSpecificSpawner, pickEncounterGroup } from '../src/rules/environment/dungeon/tables.js';
 import { createRng } from '../src/lib/ecs-js/rng.js';
 
 // ── Tier pool size checks ───────────────────────────────────────────
@@ -44,11 +44,39 @@ for (const id of NEW_MONSTERS) {
   });
 }
 
-Deno.test("goblin_archer has ranged equipment", () => {
+Deno.test("goblin_archer has ranged loadout options", () => {
   const def = getMonster('goblin_archer');
-  assert(def.equipment, 'should have equipment');
-  assertEquals(def.equipment.ranged, 'bow_short');
-  assertEquals(def.equipment.ammo, 'arrows');
+  assert(Array.isArray(def.equipped), "should define equipped loadout");
+  const ranged = def.equipped.filter((entry) => String(entry?.slot || "") === "ranged");
+  const ammo = def.equipped.filter((entry) => String(entry?.slot || "") === "ammo");
+  assert(ranged.length > 0, "should include ranged slot options");
+  assert(ammo.length > 0, "should include ammo slot");
+  assert(ranged.some((entry) => entry.itemId === "goblin_barbed_shortbow"), "should include barbed bow option");
+  assert(ranged.some((entry) => entry.itemId === "bow_short"), "should include plain bow option");
+});
+
+Deno.test("goblin uses dedicated shiv loadout instead of direct onHit bleed hook", () => {
+  const def = getMonster("goblin");
+  assert(def, "goblin should exist");
+  assert(Array.isArray(def.wielding) && def.wielding.length >= 2, "goblin should define wielding options");
+  assert(def.wielding.includes("goblin_jagged_shiv"), "goblin should include jagged shiv option");
+  assert(def.wielding.includes("goblin_shiv"), "goblin should include plain shiv option");
+  assert(!def.hooks || !Array.isArray(def.hooks.onHit) || def.hooks.onHit.length === 0, "goblin should not carry a direct onHit bleed hook");
+});
+
+Deno.test("humanoid elites use authored loadout weapons instead of direct onHit hooks", () => {
+  const hobgoblin = getMonster("hobgoblin");
+  assert(Array.isArray(hobgoblin?.wielding) && hobgoblin.wielding.includes("hobgoblin_serrated_warblade"));
+  assert(!Array.isArray(hobgoblin?.hooks?.onHit) || hobgoblin.hooks.onHit.length === 0, "hobgoblin onHit should be weaponized");
+
+  const ogre = getMonster("ogre");
+  assert(Array.isArray(ogre?.wielding) && ogre.wielding.includes("ogre_crushing_club"));
+  assert(!Array.isArray(ogre?.hooks?.onHit) || ogre.hooks.onHit.length === 0, "ogre onHit should be weaponized");
+
+  const warchief = getMonster("orc_warchief");
+  assert(Array.isArray(warchief?.wielding) && warchief.wielding.includes("orc_warchief_maul"));
+  assert(Array.isArray(warchief?.equipped) && warchief.equipped.includes("chain_armor"), "warchief should carry armor loadout");
+  assert(!Array.isArray(warchief?.hooks?.onHit) || warchief.hooks.onHit.length === 0, "warchief onHit should be weaponized");
 });
 
 Deno.test("orc_shaman has frost and heal spells", () => {
@@ -97,6 +125,22 @@ Deno.test("sentinel can produce tier-1 monsters on depth 1 (10% chance)", () => 
     }
   }
   assert(gotSentinel, 'expected at least one sentinel upgrade in 500 seeds');
+});
+
+Deno.test("bat is eligible in dungeon level 1 monster pool", () => {
+  const rng = createRng(12345);
+  const bat = pickMonster(rng, 1, (def) => def.id === "bat");
+  assertEquals(bat.identity, "bat");
+});
+
+Deno.test("bat spawner uses high concurrency and medium total profile", () => {
+  for (let seed = 1; seed <= 25; seed++) {
+    const rng = createRng(seed);
+    const spawner = pickSpecificSpawner(rng, "bat", 1);
+    assert(spawner, "bat spawner should be created");
+    assert(spawner.maxConcurrent >= 3 && spawner.maxConcurrent <= 4, `maxConcurrent=${spawner.maxConcurrent}`);
+    assert(spawner.packSize >= 4 && spawner.packSize <= 6, `packSize=${spawner.packSize}`);
+  }
 });
 
 // ── Encounter groups ────────────────────────────────────────────────

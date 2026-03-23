@@ -10,6 +10,10 @@ export const RESOLVED_STAT_DEFAULTS = Object.freeze({
   vitality: 0,
   accuracy: 0,
   damagePower: 0,
+  physicalPenetration: 0,
+  bluntPenetration: 0,
+  slashPenetration: 0,
+  piercePenetration: 0,
   evade: 0,
   mitigation: 0,
   critChancePhysical: 0,
@@ -188,6 +192,10 @@ export function evalDerivedExpression(sheet, expr) {
 function applyFinalHygiene(sheet) {
   sheet.accuracy = Number(sheet.accuracy || 0);
   sheet.damagePower = Number(sheet.damagePower || 0);
+  sheet.physicalPenetration = Math.max(0, Number(sheet.physicalPenetration || 0));
+  sheet.bluntPenetration = Math.max(0, Number(sheet.bluntPenetration || 0));
+  sheet.slashPenetration = Math.max(0, Number(sheet.slashPenetration || 0));
+  sheet.piercePenetration = Math.max(0, Number(sheet.piercePenetration || 0));
   sheet.evade = Number(sheet.evade || 0);
   sheet.mitigation = Math.max(0, Number(sheet.mitigation || 0));
   sheet.critChancePhysical = Math.max(0, Math.min(0.95, Number(sheet.critChancePhysical || 0)));

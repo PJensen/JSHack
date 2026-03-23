@@ -944,6 +944,7 @@ function ensureEffectsStack(container) {
   // Keyed by canonical Status.type strings from effectDefs statuses[]
   const VIS = {
     invulnerable: { name: 'Aegis',     glyph: '\u{1F6E1}\uFE0F', hue: 190 },
+    invisible:    { name: 'Invisible', glyph: '\u2307',          hue: 265 },
     burning:      { name: 'Burning',   glyph: '\u{1F525}',       hue: 20  },
     poisoned:     { name: 'Poison',    glyph: '\u2620\uFE0F',    hue: 120 },
     regen:        { name: 'Regen',     glyph: '\u{1F49A}',       hue: 140 },
@@ -1242,6 +1243,35 @@ function createQuickSlot() {
     const idx = stack.findIndex((x) => x && x.id === id);
     if (idx >= 0) {
       stack.splice(idx, 1);
+      renderStack();
+      resetDismissTimer();
+    }
+  });
+
+  window.addEventListener('ui:itemIdentified', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const item = e?.detail?.item;
+    if (!item) return;
+    const id = Number(item.id || 0);
+    if (!id) return;
+    const idx = stack.findIndex((x) => x && x.id === id);
+    if (idx >= 0) {
+      stack.splice(idx, 1);
+      stack.push({
+        id,
+        identity: String(item.identity || ''),
+        type: String(item.type || ''),
+        slot: String(item.slot || ''),
+        name: String(item.name || 'item'),
+        count: Number(item.count || 1),
+        rarityName: String(item.rarityName || 'common'),
+        glyph: String(item.glyph || ''),
+        glyphColor: String(item.glyphColor || ''),
+        hasScrollOfIdentify: !!item.hasScrollOfIdentify,
+        details: item,
+        addedAt: Date.now(),
+      });
       renderStack();
       resetDismissTimer();
     }

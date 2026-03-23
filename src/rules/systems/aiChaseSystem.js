@@ -101,6 +101,7 @@ function isStepTraversable(world, actorId, x, y, targetX, targetY, canTraverseTi
 // ── Damage-triggered aggro listener ──────────────────────────────────
 
 const AGGRO_DAMAGE_INSTALLED = Symbol.for("jshack:aggroFromDamage:installed");
+const AGGRO_STEALTH_OFFENSE_INSTALLED = Symbol.for("jshack:aggroFromStealthOffense:installed");
 
 /**
  * When an enemy takes damage it immediately becomes alerted (if not already
@@ -132,6 +133,59 @@ export function installAggroFromDamageListener(world) {
 
     const tPos = world.get(target, Position);
     if (tPos) world.emit('status', { id: target, kind: 'alert', at: { x: tPos.x | 0, y: tPos.y | 0 } });
+  });
+}
+
+/**
+ * Witness-based aggro for hidden attacks:
+ * enemies that have LOS to the attacker at the moment of stealth offense
+ * enter hunting and track attacker last-known position.
+ *
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ */
+export function installAggroFromStealthOffenseListener(world) {
+  if (world[AGGRO_STEALTH_OFFENSE_INSTALLED]) return;
+  world[AGGRO_STEALTH_OFFENSE_INSTALLED] = true;
+
+  world.on("stealth:offense", ({ entityId, at }) => {
+    const attackerId = Number(entityId || 0) | 0;
+    if (!(attackerId > 0)) return;
+    const attackerPos = at && Number.isFinite(at.x) && Number.isFinite(at.y)
+      ? { x: at.x | 0, y: at.y | 0 }
+      : world.get(attackerId, Position);
+    if (!attackerPos) return;
+
+    const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+    forEachInRadius(world, attackerPos.x, attackerPos.y, ACTIVE_RADIUS, (id, pos) => {
+      if (id === attackerId) return;
+      const fac = world.get(id, Faction);
+      if (!fac || fac.key !== "enemy") return;
+      const aggro = world.get(id, AggroState);
+      if (!aggro) return;
+
+      const sightRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, id)));
+      if (chebyshevScalar(pos.x, pos.y, attackerPos.x, attackerPos.y) > sightRange) return;
+      const canWitness = (
+        hasOverworldAerialLOS(world, {
+          sourceId: id,
+          targetId: attackerId,
+          sourcePos: pos,
+          targetPos: attackerPos,
+          range: sightRange,
+        }) || hasLOS(
+          pos.x | 0, pos.y | 0,
+          attackerPos.x | 0, attackerPos.y | 0,
+          isBlocked,
+        )
+      );
+      if (!canWitness) return;
+
+      aggro.alertLevel = AGGRO_LEVELS.hunting;
+      aggro.lastKnownX = attackerPos.x | 0;
+      aggro.lastKnownY = attackerPos.y | 0;
+      aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
+      world.emit?.("status", { id, kind: "alert", at: { x: pos.x | 0, y: pos.y | 0 } });
+    });
   });
 }
 
@@ -182,7 +236,9 @@ export function aiChaseSystem(world) {
     // Use getEffectiveVisionRange so that stat envelope effects (e.g. blindness) apply.
     const sightRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, id)));
     const withinSightRange = chebyshevScalar(pos.x, pos.y, playerPos.x, playerPos.y) <= sightRange;
-    const canSee = withinSightRange && (
+    const invisibleTarget = statusStrength(world, playerId, "invisible") > 0;
+    const adjacentToTarget = chebyshevScalar(pos.x, pos.y, playerPos.x, playerPos.y) <= 1;
+    const canSeeNormally = withinSightRange && (
       hasOverworldAerialLOS(world, {
         sourceId: id,
         targetId: playerId,
@@ -195,6 +251,17 @@ export function aiChaseSystem(world) {
         ensureBlockedMap(),
       )
     );
+    // Stealth rule: non-adjacent invisible targets should not keep enemies in chase mode.
+    // They fall back to unaware state so idle movement (scurry/patrol) takes over.
+    if (invisibleTarget && !adjacentToTarget) {
+      if (aggro.alertLevel !== AGGRO_LEVELS.unaware) {
+        aggro.alertLevel = AGGRO_LEVELS.unaware;
+        aggro.searchTurnsLeft = 0;
+        aggro.retreating = false;
+      }
+      return;
+    }
+    const canSee = canSeeNormally;
 
     // ── Alert level transitions ─────────────────────────────────────
     if (canSee) {

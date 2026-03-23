@@ -12,9 +12,13 @@ import { Stamina } from "../src/rules/components/Stamina.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Collider } from "../src/rules/components/Collider.js";
+import { Material } from "../src/rules/components/Material.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { Burned } from "../src/rules/components/Burned.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { movementSystem, installSpiderWebListener } from "../src/rules/systems/movementSystem.js";
 import { installBumpInteractListener } from "../src/rules/systems/interactionSystem.js";
+import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { loadChunk, clearAll, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_TREE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 
@@ -392,6 +396,83 @@ Deno.test("movementSystem: player bump clears runtime-spawned spider web", () =>
     const p = world.get(player, Position);
     assertEquals(p.x, 5, "after clear, player should be able to step onto former web tile");
     assertEquals(p.y, 5, "after clear, player should keep y position");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: fiery weapon bump ignites web and burns it away", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    installBumpInteractListener(world);
+
+    const fieryWeapon = world.create();
+    world.add(fieryWeapon, NamedIdentity, { name: "Flaming Test Blade", identity: "flaming_test_blade" });
+    world.add(fieryWeapon, ItemInfo, {
+      type: "equip",
+      slot: "weapon",
+      weight: 1,
+      value: 0,
+      description: "",
+      count: 1,
+      bonuses: {},
+      rarity: 1,
+      rarityName: "common",
+      affixes: ["flaming"],
+    });
+
+    const player = world.create();
+    world.add(player, Position, { x: 4, y: 5 });
+    world.add(player, NamedIdentity, { name: "Player", identity: "player" });
+    world.add(player, Player);
+    world.add(player, Equipment, { weapon: fieryWeapon });
+
+    const web = world.create();
+    world.add(web, Position, { x: 5, y: 5 });
+    world.add(web, NamedIdentity, { name: "Web", identity: "web" });
+    world.add(web, Material, { kind: "organic" });
+    world.add(web, Collider, { solid: true, blocksSight: false });
+    world.add(web, Interactable, { action: "clearWeb", params: null });
+
+    const dungeon = world.create();
+    world.add(dungeon, DungeonState, {
+      worldSeed: world.seed >>> 0,
+      currentDepth: 1,
+      floorEntityIds: [player, web, fieryWeapon],
+      downStairPositions: [],
+      destroyedTiles: {},
+    });
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+
+    let fireHazardId = 0;
+    for (const [id, pos, hazard] of world.query(Position, HazardArea)) {
+      if ((pos.x | 0) !== 5 || (pos.y | 0) !== 5) continue;
+      if (String(hazard.kind || "") !== "fire") continue;
+      if (String(hazard.medium || "") !== "floor") continue;
+      assertEquals(
+        Number(hazard?.meta?.fireSpreadChance),
+        0.45,
+        "web-ignite fire hazards should use reduced spread chance",
+      );
+      fireHazardId = id;
+      break;
+    }
+    assert(fireHazardId > 0, "fiery web bump should create a floor fire hazard");
+
+    hazardSystem(world);
+    assert(world.has(web, Burned), "web should be marked burned after fire hazard pulse");
+    assertEquals(world.has(web, Collider), false, "burned web should stop blocking movement");
+
+    // Refresh tile-query snapshots before the follow-up move attempt.
+    world.setScheduler(() => {});
+    world.tick(0);
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+    const p = world.get(player, Position);
+    assertEquals(p.x, 5, "player should move onto tile after web burns");
+    assertEquals(p.y, 5, "player should move onto tile after web burns");
   } finally { clearAll(); }
 });
 

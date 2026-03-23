@@ -326,6 +326,9 @@ export function applyMutation(world, op, resolvers = {}) {
         resistances,
         speed,
         equipment: op.equipment || def.equipment || null,
+        wielding: Array.isArray(op.wielding) ? op.wielding.slice() : (Array.isArray(def.wielding) ? def.wielding.slice() : []),
+        equipped: Array.isArray(op.equipped) ? op.equipped.slice() : (Array.isArray(def.equipped) ? def.equipped.slice() : []),
+        inventory: Array.isArray(op.inventory) ? op.inventory.slice() : (Array.isArray(def.inventory) ? def.inventory.slice() : []),
         learnedSpellIds: Array.isArray(op.learnedSpellIds)
           ? op.learnedSpellIds.slice()
           : (Array.isArray(def.learnedSpellIds) ? def.learnedSpellIds.slice() : []),
@@ -496,7 +499,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'removeTimedEffectsByKey', entityId: number, keys: string[] }} RemoveTimedEffectsByKeyOp
  * @typedef {{ type: 'setMaterial', entityId: number, kind: string }} SetMaterialOp
  * @typedef {{ type: 'spawnItem', itemId: string, x?: number, y?: number, count?: number, affixes?: string[], ownerId?: number, material?: string, patchItemInfo?: Record<string, unknown>, emitEvent?: boolean }} SpawnItemOp
- * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, accuracyDerived?: number, damagePowerDerived?: number, evadeDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean }} SpawnMonsterOp
+ * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, accuracyDerived?: number, damagePowerDerived?: number, evadeDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean, equipment?: Record<string, unknown>|null, wielding?: Array<unknown>, equipped?: Array<unknown>, inventory?: Array<unknown> }} SpawnMonsterOp
  * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp

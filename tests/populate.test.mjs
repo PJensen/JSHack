@@ -21,6 +21,7 @@ import { buildPalette } from '../src/display/palette/index.js';
 import { clearAll as clearTileMap } from '../src/rules/environment/dungeon/tileMap.js';
 import { clearExplored } from '../src/rules/environment/dungeon/exploredMap.js';
 import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
+import { inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 
 Deno.test("pickMonster returns valid params", () => {
   const rng = createRng(42);
@@ -77,6 +78,73 @@ Deno.test("materializeSpawn does not equip non-humanoid monster loadout", () => 
   assertEquals(eq.ammo, null, 'non-humanoid should not receive ammo');
 });
 
+Deno.test("materializeSpawn goblin wielding picks authored shiv variants", () => {
+  const seen = new Set();
+  const goblinDef = getMonster("goblin");
+  assert(goblinDef, "goblin definition should exist");
+
+  for (let seed = 1; seed <= 80; seed++) {
+    const world = new World({ seed });
+    const id = materializeSpawn(world, {
+      x: 5,
+      y: 5,
+      kind: "monster",
+      params: {
+        name: goblinDef.name,
+        identity: goblinDef.id,
+        maxHp: goblinDef.baseHp,
+        faction: "enemy",
+        wielding: goblinDef.wielding,
+      },
+    });
+
+    const eq = world.get(id, Equipment);
+    assert(eq, "goblin should have equipment");
+    assert(eq.weapon > 0, "goblin should wield a weapon");
+    assertEquals(eq.armor, null, "goblin should not auto-equip armor");
+
+    const ni = world.get(eq.weapon, NamedIdentity);
+    const weaponIdentity = String(ni?.identity || "");
+    assert(weaponIdentity === "goblin_shiv" || weaponIdentity === "goblin_jagged_shiv");
+    seen.add(weaponIdentity);
+  }
+
+  assert(seen.has("goblin_shiv"), "expected plain shiv variant");
+  assert(seen.has("goblin_jagged_shiv"), "expected jagged shiv variant");
+});
+
+Deno.test("materializeSpawn equipped duplicates roll one item per slot", () => {
+  const seenArmor = new Set();
+
+  for (let seed = 1; seed <= 80; seed++) {
+    const world = new World({ seed });
+    const id = materializeSpawn(world, {
+      x: 6,
+      y: 6,
+      kind: "monster",
+      params: {
+        name: "Goblin Tester",
+        identity: "goblin",
+        maxHp: 8,
+        faction: "enemy",
+        equipped: [
+          { slot: "armor", itemId: "leather_armor" },
+          { slot: "armor", itemId: "chain_armor" },
+        ],
+      },
+    });
+
+    const eq = world.get(id, Equipment);
+    assert(eq, "monster should have equipment");
+    assert(eq.armor > 0, "one armor should be equipped");
+    const armorIdentity = String(world.get(eq.armor, NamedIdentity)?.identity || "");
+    seenArmor.add(armorIdentity);
+  }
+
+  assert(seenArmor.has("leather_armor"), "should sometimes pick leather armor");
+  assert(seenArmor.has("chain_armor"), "should sometimes pick chain armor");
+});
+
 Deno.test("pickMonster scales HP with depth", () => {
   const rng1 = createRng(42);
   const rng2 = createRng(42);
@@ -127,7 +195,10 @@ Deno.test("pickSpawner uses nesting whitelist", () => {
 
 Deno.test("pickItem returns valid kinds", () => {
   const rng = createRng(42);
-  const validKinds = new Set(['gold', 'potion', 'equipment', 'arrows', 'fire_arrows', 'scroll', 'book']);
+  const validKinds = new Set([
+    'gold', 'potion', 'equipment', 'scroll', 'book',
+    'arrows', 'fire_arrows', 'piercing_arrows', 'bodkin_arrows', 'blunt_arrows',
+  ]);
   for (let i = 0; i < 20; i++) {
     const item = pickItem(rng, 5);
     assert(validKinds.has(item.kind), `valid kind: ${item.kind}`);
@@ -557,6 +628,60 @@ Deno.test("shop rooms never keep normal monster/spawner spawns, but can host a m
   );
 });
 
+Deno.test("shop rooms are scrubbed of dead-end feature clutter before shop layout", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  // Room 0 (origin spawn room; excluded from shop selection).
+  for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
+  // Room 1 (eligible shop room).
+  for (let y = 14; y < 20; y++) for (let x = 14; x < 20; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[17 * CHUNK_SIZE + 13] = TILE_FLOOR;
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    tiles,
+    rooms: [
+      { x: 1, y: 1, w: 6, h: 6 },
+      { x: 14, y: 14, w: 6, h: 6 },
+    ],
+    doors: [],
+  };
+  const floorPlan = { depth: 3, difficultyMult: 1.2 };
+  const rng = {
+    next: () => 0, // force feature placement before shop sanitation
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const shopkeeper = spawns.find((s) => s.kind === "shopkeeper");
+  assert(shopkeeper, "expected a shopkeeper in deterministic shop test");
+  const shopRoom = shopkeeper.params?.room;
+  assert(shopRoom, "shopkeeper should include room metadata");
+
+  const inShopRoom = (s) =>
+    s.x >= shopRoom.x && s.x < shopRoom.x + shopRoom.w
+    && s.y >= shopRoom.y && s.y < shopRoom.y + shopRoom.h;
+
+  const forbiddenKinds = new Set([
+    "fountain",
+    "altar",
+    "shrine",
+    "sarcophagus",
+    "statue",
+    "pillar",
+    "weapon_rack",
+    "mushrooms",
+    "torch",
+    "urn",
+  ]);
+  const clutter = spawns.filter((s) => inShopRoom(s) && forbiddenKinds.has(s.kind));
+  assertEquals(clutter.length, 0, "shop room should not keep dead-end room feature clutter");
+});
+
 Deno.test("shopkeeper, mimic, and shop items never overlap in shop room", () => {
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_WALL);
@@ -667,7 +792,10 @@ Deno.test("dead-end rooms always receive reward content", () => {
 
   const spawns = populateChunk(chunk, floorPlan, rng);
   const deadEndRoom = chunk.rooms[1];
-  const rewardKinds = new Set(['chest', 'gold', 'book', 'potion', 'equipment', 'arrows', 'fire_arrows', 'scroll']);
+  const rewardKinds = new Set([
+    'chest', 'gold', 'book', 'potion', 'equipment', 'scroll',
+    'arrows', 'fire_arrows', 'piercing_arrows', 'bodkin_arrows', 'blunt_arrows',
+  ]);
   const roomRewards = spawns.filter((spawn) =>
     spawn.x >= deadEndRoom.x && spawn.x < deadEndRoom.x + deadEndRoom.w
     && spawn.y >= deadEndRoom.y && spawn.y < deadEndRoom.y + deadEndRoom.h
@@ -707,4 +835,203 @@ Deno.test("dead-end rooms can receive curated treasure content", () => {
     chest.x >= room.x && chest.x < room.x + room.w && chest.y >= room.y && chest.y < room.y + room.h,
     "dead-end chest should be placed inside the terminal room",
   );
+});
+
+Deno.test("obliiette dead-end rooms place flayed man and hanging chains decorations", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 10; y < 16; y++) for (let x = 10; x < 16; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[12 * CHUNK_SIZE + 9] = TILE_FLOOR; // one west entrance
+
+  const room = { x: CHUNK_SIZE + 10, y: 10, w: 6, h: 6 };
+  const chunk = {
+    chunkX: 1,
+    chunkY: 0,
+    tiles,
+    rooms: [room],
+    doors: [],
+  };
+  const floorPlan = {
+    depth: 4,
+    difficultyMult: 1.2,
+    profile: { shopChance: 0, doorFeatureRate: 0, featurePool: null, monsterFilter: null },
+  };
+  const rng = {
+    next: () => 0.85, // picks obliiette in DEAD_END_ROOM_THEMES
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const inRoom = (s) =>
+    s.x >= room.x && s.x < room.x + room.w
+    && s.y >= room.y && s.y < room.y + room.h;
+
+  const flayed = spawns.filter((s) => inRoom(s) && s.kind === "flayed_man");
+  const chains = spawns.filter((s) => inRoom(s) && s.kind === "hanging_chains");
+  const shopkeepers = spawns.filter((s) => inRoom(s) && s.kind === "shopkeeper");
+
+  assertEquals(flayed.length, 1, "obliiette should place one flayed man decoration");
+  assert(chains.length >= 1, "obliiette should place hanging chains");
+  assertEquals(shopkeepers.length, 0, "obliiette should not place shopkeepers");
+});
+
+Deno.test("kitchen dead-end rooms place cooking fire, food chest, and pantry food clutter", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 10; y < 18; y++) for (let x = 10; x < 18; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[13 * CHUNK_SIZE + 9] = TILE_FLOOR; // one west entrance
+
+  const room = { x: CHUNK_SIZE + 10, y: 10, w: 8, h: 8 };
+  const chunk = {
+    chunkX: 1,
+    chunkY: 0,
+    tiles,
+    rooms: [room],
+    doors: [],
+  };
+  const floorPlan = {
+    depth: 4,
+    difficultyMult: 1.2,
+    profile: { shopChance: 0, doorFeatureRate: 0, featurePool: null, monsterFilter: null },
+  };
+  const rng = {
+    next: () => 0.9, // picks kitchen in DEAD_END_ROOM_THEMES
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const inRoom = (s) =>
+    s.x >= room.x && s.x < room.x + room.w
+    && s.y >= room.y && s.y < room.y + room.h;
+
+  const fire = spawns.find((s) => inRoom(s) && s.kind === "cooking_fire");
+  const chest = spawns.find((s) => inRoom(s) && s.kind === "chest");
+  const pantry = spawns.filter((s) => inRoom(s) && s.kind === "catalog_item" && String(s.params?.itemId || "").startsWith("food_"));
+  const shopkeepers = spawns.filter((s) => inRoom(s) && s.kind === "shopkeeper");
+
+  assert(fire, "kitchen should include a working cooking fire");
+  assert(chest, "kitchen should include a chest");
+  assert(pantry.length >= 2, "kitchen should include multiple food pantry items");
+  assertEquals(shopkeepers.length, 0, "kitchen should not place shopkeepers");
+});
+
+Deno.test("materializeSpawn chest fixedDrops includes requested ration/food items", () => {
+  const world = new World({ seed: 4242 });
+  const chestId = materializeSpawn(world, {
+    x: 11,
+    y: 9,
+    kind: "chest",
+    params: {
+      depth: 3,
+      lootTable: "chest:basic",
+      fixedDrops: ["food_ration", "food_iron_ration"],
+    },
+  });
+
+  assert(chestId > 0, "chest should materialize");
+  const itemIds = inventoryItems(world, chestId);
+  const identities = new Set(itemIds.map((id) => String(world.get(id, NamedIdentity)?.identity || "")));
+  assert(identities.has("food_ration"), "fixedDrops should include food_ration");
+  assert(identities.has("food_iron_ration"), "fixedDrops should include food_iron_ration");
+});
+
+Deno.test("dead-end rooms with stairs are excluded from dead-end themes", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+
+  for (let y = 1; y < 7; y++) for (let x = 1; x < 7; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  for (let y = 14; y < 20; y++) for (let x = 14; x < 20; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+
+  // One opening out of the spawn room and one opening out of the dead-end room.
+  tiles[3 * CHUNK_SIZE + 7] = TILE_FLOOR;
+  tiles[16 * CHUNK_SIZE + 13] = TILE_FLOOR;
+
+  // Stair inside the dead-end room: this room must not receive dead-end themes.
+  tiles[16 * CHUNK_SIZE + 16] = TILE_STAIR_DOWN;
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    tiles,
+    rooms: [
+      { x: 1, y: 1, w: 6, h: 6 },
+      { x: 14, y: 14, w: 6, h: 6 },
+    ],
+    doors: [],
+  };
+  const floorPlan = {
+    depth: 4,
+    difficultyMult: 1.2,
+    profile: { doorFeatureRate: 0, shopChance: 0, featurePool: null, monsterFilter: null },
+  };
+  const rng = {
+    next: () => 0.99,
+    int: (min) => min,
+    choice: (arr) => arr[arr.length - 1],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const stairRoom = chunk.rooms[1];
+  const inStairRoom = (spawn) =>
+    spawn.x >= stairRoom.x && spawn.x < stairRoom.x + stairRoom.w
+    && spawn.y >= stairRoom.y && spawn.y < stairRoom.y + stairRoom.h;
+
+  const themedContent = spawns.filter((spawn) =>
+    inStairRoom(spawn)
+    && (
+      spawn.kind === "alchemy_bench"
+      || spawn.kind === "chest"
+      || spawn.kind === "gold"
+      || spawn.kind === "book"
+      || spawn.kind === "flayed_man"
+      || spawn.kind === "hanging_chains"
+      || spawn.kind === "cooking_fire"
+      || spawn.kind === "catalog_item"
+    )
+  );
+
+  assertEquals(themedContent.length, 0, "stair room should be excluded from dead-end themed content");
+});
+
+Deno.test("dragon hoard dead-end rooms only keep the lair guardian as a monster spawn", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 10; y < 16; y++) for (let x = 10; x < 16; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[12 * CHUNK_SIZE + 9] = TILE_FLOOR; // one west entrance
+
+  const room = { x: CHUNK_SIZE + 10, y: 10, w: 6, h: 6 };
+  const chunk = {
+    chunkX: 1,
+    chunkY: 0,
+    tiles,
+    rooms: [room],
+    doors: [],
+  };
+  const floorPlan = {
+    depth: 5,
+    difficultyMult: 1.3,
+    profile: { shopChance: 0, doorFeatureRate: 0, featurePool: null, monsterFilter: null },
+  };
+  const rng = {
+    next: () => 0.99, // pick dragon_hoard theme while still spawning baseline room monsters first
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const inRoom = (s) =>
+    s.x >= room.x && s.x < room.x + room.w
+    && s.y >= room.y && s.y < room.y + room.h;
+  const roomHostiles = spawns.filter((s) =>
+    inRoom(s)
+    && (s.kind === "monster" || s.kind === "centipede" || s.kind === "spawner" || s.kind === "mimic")
+  );
+
+  assertEquals(roomHostiles.length, 1, "dragon hoard room should have exactly one hostile spawn");
 });

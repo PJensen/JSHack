@@ -8,6 +8,7 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { Resistances } from '../src/rules/components/Resistences.js';
 import { ProcPackageNode } from '../src/rules/components/ProcPackageNode.js';
 import { AttackIntent } from '../src/rules/components/Intents/AttackIntent.js';
 import { RangedAttackIntent } from '../src/rules/components/Intents/RangedAttackIntent.js';
@@ -100,7 +101,7 @@ function setup(opts = {}) {
 
 function trackEvents(world, events) {
   events.length = 0;
-  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'damaged', 'died', 'proc:burning']) {
+  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'damaged', 'died', 'proc:burning', 'proc:stunned']) {
     world.on(ev, (data) => events.push({ _event: ev, ...data }));
   }
 }
@@ -195,6 +196,36 @@ Deno.test("ranged: last ammo → entity destroyed", () => {
   assert(!inventoryContains(world, archer, ammoId), 'ammo removed from inventory');
 });
 
+Deno.test("ranged: successful hits can occasionally embed ammo into the monster inventory", () => {
+  let recoveredCount = 0;
+  const trials = 64;
+
+  for (let seed = 1; seed <= trials; seed++) {
+    const { world, archer, target } = setup({
+      seed,
+      ammoIdentity: 'ammo_fire_arrows',
+      ammoSubtype: 'fire',
+      ammoName: 'Fire Arrows',
+    });
+    world.add(target, Inventory, { capacity: 20 });
+    world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+    rangedAttackSystem(world);
+
+    const recoveredAmmo = inventoryItems(world, target).filter((id) => {
+      const info = world.get(id, ItemInfo);
+      return info && info.type === 'ammo';
+    });
+    if (recoveredAmmo.length <= 0) continue;
+
+    recoveredCount += 1;
+    const ni = world.get(recoveredAmmo[0], NamedIdentity);
+    assertEquals(ni?.identity, 'ammo_fire_arrows', 'recovered ammo should match fired ammo type');
+  }
+
+  assert(recoveredCount > 0, "expected at least one recovered arrow across deterministic trials");
+  assert(recoveredCount < trials, "ammo recovery should be occasional, not guaranteed");
+});
+
 Deno.test("ranged: kill target → died emitted", () => {
   const events = [];
   const { world, archer, target } = setup({ seed: 42, targetHp: 1 });
@@ -226,6 +257,34 @@ Deno.test("ranged: player to pet faction is non-hostile", () => {
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'pet faction undamaged');
   assert(!events.some(e => e._event === 'damaged'), 'no damage event');
+});
+
+Deno.test("ranged: non-adjacent invisible target is untargetable", () => {
+  const events = [];
+  const { world, archer, target } = setup({ seed: 142, tx: 5, ty: 0 });
+  world.add(target, ActiveEffects, {
+    effects: [{ key: 'invisible', turnsLeft: 10, potency: 1, stacks: 1 }],
+  });
+  trackEvents(world, events);
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+  rangedAttackSystem(world);
+  assert(!world.has(archer, RangedAttackIntent), 'intent removed');
+  const tv = world.get(target, Vitality);
+  assertEquals(tv.hp, 10, 'invisible target should not take ranged damage at range');
+  assert(events.some(e => e._event === 'ranged:blocked' && e.reason === 'invisible'), 'blocked due to invisibility');
+});
+
+Deno.test("ranged: adjacent invisible target remains targetable", () => {
+  const events = [];
+  const { world, archer, target } = setup({ seed: 143, tx: 1, ty: 0 });
+  world.add(target, ActiveEffects, {
+    effects: [{ key: 'invisible', turnsLeft: 10, potency: 1, stacks: 1 }],
+  });
+  trackEvents(world, events);
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 1, toY: 0 });
+  rangedAttackSystem(world);
+  assert(!world.has(archer, RangedAttackIntent), 'intent removed');
+  assert(!events.some(e => e._event === 'ranged:blocked' && e.reason === 'invisible'), 'adjacent invisible target should not be invis-blocked');
 });
 
 Deno.test("buildCatalogItem attaches proc packages for mirror bow", () => {
@@ -323,6 +382,40 @@ Deno.test("combat: mirror bow proc does not fire on melee hits", () => {
   assertEquals(world.get(spectator, Vitality).hp, 20, "melee should not trigger bow ricochet");
 });
 
+Deno.test("ranged: held ember knife flaming affix does not proc on bow shots", () => {
+  let sawLandedShot = false;
+
+  for (let seed = 1; seed <= 96; seed++) {
+    const { world, archer, target, bowId, ammoId } = setup({ seed, targetHp: 40 });
+    const emberKnife = buildCatalogItem(world, "ember_knife");
+    world.set(archer, Equipment, {
+      weapon: emberKnife,
+      ranged: bowId,
+      ammo: ammoId,
+      accuracyDerived: 12,
+      damagePowerDerived: 4,
+    });
+    world.add(target, ActiveEffects, { effects: [] });
+
+    let flamingEvents = 0;
+    world.on("proc:flaming", () => {
+      flamingEvents += 1;
+    });
+
+    world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+    rangedAttackSystem(world);
+
+    const hp = world.get(target, Vitality)?.hp || 0;
+    if (hp < 40) sawLandedShot = true;
+    const effects = world.get(target, ActiveEffects)?.effects || [];
+    const burning = effects.some((e) => e.key === "burn" || e.key === "burning");
+    assert(!burning, `seed ${seed}: ranged shot should not apply ember_knife burning to target`);
+    assertEquals(flamingEvents, 0, `seed ${seed}: proc:flaming should not fire from held melee weapon`);
+  }
+
+  assert(sawLandedShot, "expected at least one deterministic seed with a landed ranged hit");
+});
+
 Deno.test("ranged: fire ammo actor-impact hooks add damage and burning", () => {
   const baseline = setup({ seed: 42, targetHp: 30 });
   baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
@@ -348,4 +441,293 @@ Deno.test("ranged: fire ammo actor-impact hooks add damage and burning", () => {
   assert(fireHp <= baselineHp - 1, `fire ammo should add at least +1 damage (baselineHp=${baselineHp}, fireHp=${fireHp})`);
   assert(hasBurn, 'fire ammo should apply burn via actor-impact hook');
   assert(events.some((e) => e._event === 'proc:burning'), 'fire ammo should emit proc:burning');
+});
+
+Deno.test("ranged: attacker pierce penetration increases damage against DR", () => {
+  const baseline = setup({ seed: 42, targetHp: 30 });
+  baseline.world.set(baseline.archer, Equipment, {
+    ranged: baseline.bowId,
+    ammo: baseline.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+    piercePenetrationDerived: 0,
+  });
+  baseline.world.add(baseline.target, Resistances, { kinetic: { DR: 6, bluntMult: 1, slashMult: 1, pierceMult: 1 } });
+  baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+  rangedAttackSystem(baseline.world);
+  const baselineDamage = 30 - baseline.world.get(baseline.target, Vitality).hp;
+
+  const piercing = setup({ seed: 42, targetHp: 30 });
+  piercing.world.set(piercing.archer, Equipment, {
+    ranged: piercing.bowId,
+    ammo: piercing.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+    piercePenetrationDerived: 3,
+  });
+  piercing.world.add(piercing.target, Resistances, { kinetic: { DR: 6, bluntMult: 1, slashMult: 1, pierceMult: 1 } });
+  piercing.world.add(piercing.archer, RangedAttackIntent, { targetId: piercing.target, toX: 5, toY: 0 });
+  rangedAttackSystem(piercing.world);
+  const piercingDamage = 30 - piercing.world.get(piercing.target, Vitality).hp;
+
+  assert(
+    piercingDamage > baselineDamage,
+    `pierce penetration should improve ranged damage vs DR (baseline=${baselineDamage}, piercing=${piercingDamage})`,
+  );
+});
+
+Deno.test("ranged: piercing arrows add armor penetration on hit", () => {
+  const baseline = setup({ seed: 42, targetHp: 30 });
+  baseline.world.set(baseline.archer, Equipment, {
+    ranged: baseline.bowId,
+    ammo: baseline.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+  });
+  baseline.world.add(baseline.target, Resistances, { kinetic: { DR: 6, bluntMult: 1, slashMult: 1, pierceMult: 1 } });
+  baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+  rangedAttackSystem(baseline.world);
+  const baselineDamage = 30 - baseline.world.get(baseline.target, Vitality).hp;
+
+  const piercingAmmo = setup({
+    seed: 42,
+    targetHp: 30,
+    ammoSubtype: 'piercing',
+    ammoIdentity: 'ammo_piercing_arrows',
+    ammoName: 'Piercing Arrows',
+  });
+  piercingAmmo.world.set(piercingAmmo.archer, Equipment, {
+    ranged: piercingAmmo.bowId,
+    ammo: piercingAmmo.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+  });
+  piercingAmmo.world.add(piercingAmmo.target, Resistances, { kinetic: { DR: 6, bluntMult: 1, slashMult: 1, pierceMult: 1 } });
+  piercingAmmo.world.add(piercingAmmo.archer, RangedAttackIntent, { targetId: piercingAmmo.target, toX: 5, toY: 0 });
+  rangedAttackSystem(piercingAmmo.world);
+  const piercingAmmoDamage = 30 - piercingAmmo.world.get(piercingAmmo.target, Vitality).hp;
+
+  assert(
+    piercingAmmoDamage > baselineDamage,
+    `piercing arrows should improve ranged damage vs DR (baseline=${baselineDamage}, piercingAmmo=${piercingAmmoDamage})`,
+  );
+});
+
+Deno.test("ranged: bodkin arrows trade base damage for stronger armor punch", () => {
+  let sawImprovement = false;
+  let compared = false;
+  for (let seed = 1; seed <= 96; seed++) {
+    const baseline = setup({ seed, targetHp: 30 });
+    baseline.world.set(baseline.archer, Equipment, {
+      ranged: baseline.bowId,
+      ammo: baseline.ammoId,
+      accuracyDerived: 8,
+      damagePowerDerived: 4,
+    });
+    baseline.world.add(baseline.target, Resistances, { kinetic: { DR: 8, bluntMult: 1, slashMult: 1, pierceMult: 1 } });
+    baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+    rangedAttackSystem(baseline.world);
+    const baselineDamage = 30 - baseline.world.get(baseline.target, Vitality).hp;
+
+    const bodkin = setup({
+      seed,
+      targetHp: 30,
+      ammoSubtype: 'bodkin',
+      ammoIdentity: 'ammo_bodkin_arrows',
+      ammoName: 'Bodkin Arrows',
+    });
+    bodkin.world.set(bodkin.archer, Equipment, {
+      ranged: bodkin.bowId,
+      ammo: bodkin.ammoId,
+      accuracyDerived: 8,
+      damagePowerDerived: 4,
+    });
+    bodkin.world.add(bodkin.target, Resistances, { kinetic: { DR: 8, bluntMult: 1, slashMult: 1, pierceMult: 1 } });
+    bodkin.world.add(bodkin.archer, RangedAttackIntent, { targetId: bodkin.target, toX: 5, toY: 0 });
+    rangedAttackSystem(bodkin.world);
+    const bodkinDamage = 30 - bodkin.world.get(bodkin.target, Vitality).hp;
+
+    if (baselineDamage === 0 && bodkinDamage === 0) continue;
+    compared = true;
+    assert(
+      bodkinDamage >= baselineDamage,
+      `bodkin arrows should not underperform baseline ammo into high DR (seed=${seed}, baseline=${baselineDamage}, bodkin=${bodkinDamage})`,
+    );
+    if (bodkinDamage > baselineDamage) sawImprovement = true;
+  }
+  assert(compared, "expected at least one deterministic seed with a landed ranged hit");
+  assert(sawImprovement, "expected at least one deterministic seed where bodkin arrows improve damage");
+});
+
+Deno.test("ranged: blunt-head arrows can apply stun and emit proc:stunned", () => {
+  let sawProc = false;
+  let sawNoProc = false;
+
+  for (let seed = 1; seed <= 128; seed++) {
+    const events = [];
+    const blunt = setup({
+      seed,
+      targetHp: 30,
+      ammoSubtype: 'blunt',
+      ammoIdentity: 'ammo_blunt_arrows',
+      ammoName: 'Blunt-Head Arrows',
+    });
+    trackEvents(blunt.world, events);
+    blunt.world.set(blunt.archer, Equipment, {
+      ranged: blunt.bowId,
+      ammo: blunt.ammoId,
+      accuracyDerived: 8,
+      damagePowerDerived: 4,
+    });
+    blunt.world.add(blunt.target, ActiveEffects, { effects: [] });
+    blunt.world.add(blunt.archer, RangedAttackIntent, { targetId: blunt.target, toX: 5, toY: 0 });
+    rangedAttackSystem(blunt.world);
+
+    const ae = blunt.world.get(blunt.target, ActiveEffects);
+    const hasStun = !!(ae && Array.isArray(ae.effects) && ae.effects.some((e) => e.key === 'stun'));
+    if (hasStun) {
+      sawProc = true;
+      assert(events.some((e) => e._event === 'proc:stunned'), 'stun proc should emit proc:stunned');
+    } else {
+      sawNoProc = true;
+    }
+    if (sawProc && sawNoProc) break;
+  }
+
+  assert(sawProc, 'expected at least one deterministic seed with blunt-head stun proc');
+  assert(sawNoProc, 'expected at least one deterministic seed without blunt-head stun proc');
+});
+
+Deno.test("ranged: blunt-head arrows resolve as blunt damage against skeleton resistance profiles", () => {
+  let compared = false;
+  let sawImprovement = false;
+
+  for (let seed = 1; seed <= 96; seed++) {
+    const baseline = setup({ seed, targetHp: 30 });
+    baseline.world.set(baseline.archer, Equipment, {
+      ranged: baseline.bowId,
+      ammo: baseline.ammoId,
+      accuracyDerived: 8,
+      damagePowerDerived: 4,
+    });
+    baseline.world.add(baseline.target, Resistances, {
+      kinetic: { DR: 4, bluntMult: 1.5, slashMult: 0.7, pierceMult: 0.5 },
+    });
+    baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+    rangedAttackSystem(baseline.world);
+    const baselineDamage = 30 - baseline.world.get(baseline.target, Vitality).hp;
+
+    const blunt = setup({
+      seed,
+      targetHp: 30,
+      ammoSubtype: 'blunt',
+      ammoIdentity: 'ammo_blunt_arrows',
+      ammoName: 'Blunt-Head Arrows',
+    });
+    blunt.world.set(blunt.archer, Equipment, {
+      ranged: blunt.bowId,
+      ammo: blunt.ammoId,
+      accuracyDerived: 8,
+      damagePowerDerived: 4,
+    });
+    blunt.world.add(blunt.target, Resistances, {
+      kinetic: { DR: 4, bluntMult: 1.5, slashMult: 0.7, pierceMult: 0.5 },
+    });
+    blunt.world.add(blunt.archer, RangedAttackIntent, { targetId: blunt.target, toX: 5, toY: 0 });
+    rangedAttackSystem(blunt.world);
+    const bluntDamage = 30 - blunt.world.get(blunt.target, Vitality).hp;
+
+    if (baselineDamage === 0 && bluntDamage === 0) continue;
+    compared = true;
+    assert(
+      bluntDamage >= baselineDamage,
+      `blunt-head arrows should not underperform baseline arrows vs skeleton profile (seed=${seed}, baseline=${baselineDamage}, blunt=${bluntDamage})`,
+    );
+    if (bluntDamage > baselineDamage) sawImprovement = true;
+  }
+
+  assert(compared, "expected at least one deterministic seed with a landed ranged hit");
+  assert(sawImprovement, "expected at least one deterministic seed where blunt-head arrows improve damage vs skeleton profile");
+});
+
+Deno.test("ranged: blunt-head arrows travel slower than plain arrows", () => {
+  const baselineEvents = [];
+  const baseline = setup({ seed: 42, targetHp: 30, tx: 5, ty: 0 });
+  trackEvents(baseline.world, baselineEvents);
+  baseline.world.set(baseline.archer, Equipment, {
+    ranged: baseline.bowId,
+    ammo: baseline.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+  });
+  baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+  rangedAttackSystem(baseline.world);
+
+  const bluntEvents = [];
+  const blunt = setup({
+    seed: 42,
+    targetHp: 30,
+    tx: 5,
+    ty: 0,
+    ammoSubtype: 'blunt',
+    ammoIdentity: 'ammo_blunt_arrows',
+    ammoName: 'Blunt-Head Arrows',
+  });
+  trackEvents(blunt.world, bluntEvents);
+  blunt.world.set(blunt.archer, Equipment, {
+    ranged: blunt.bowId,
+    ammo: blunt.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+  });
+  blunt.world.add(blunt.archer, RangedAttackIntent, { targetId: blunt.target, toX: 5, toY: 0 });
+  rangedAttackSystem(blunt.world);
+
+  const baselineDamaged = baselineEvents.find((e) => e._event === 'damaged');
+  const bluntDamaged = bluntEvents.find((e) => e._event === 'damaged');
+  const baselineDelay = Number(baselineDamaged?.projectileDelay || 0);
+  const bluntDelay = Number(bluntDamaged?.projectileDelay || 0);
+  assert(baselineDelay > 0, `baseline projectile delay should be positive, got ${baselineDelay}`);
+  assert(bluntDelay > baselineDelay, `blunt arrows should have longer projectile delay (baseline=${baselineDelay}, blunt=${bluntDelay})`);
+});
+
+Deno.test("ranged: piercing arrows travel faster than plain arrows", () => {
+  const baselineEvents = [];
+  const baseline = setup({ seed: 42, targetHp: 30, tx: 5, ty: 0 });
+  trackEvents(baseline.world, baselineEvents);
+  baseline.world.set(baseline.archer, Equipment, {
+    ranged: baseline.bowId,
+    ammo: baseline.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+  });
+  baseline.world.add(baseline.archer, RangedAttackIntent, { targetId: baseline.target, toX: 5, toY: 0 });
+  rangedAttackSystem(baseline.world);
+
+  const piercingEvents = [];
+  const piercing = setup({
+    seed: 42,
+    targetHp: 30,
+    tx: 5,
+    ty: 0,
+    ammoSubtype: 'piercing',
+    ammoIdentity: 'ammo_piercing_arrows',
+    ammoName: 'Piercing Arrows',
+  });
+  trackEvents(piercing.world, piercingEvents);
+  piercing.world.set(piercing.archer, Equipment, {
+    ranged: piercing.bowId,
+    ammo: piercing.ammoId,
+    accuracyDerived: 8,
+    damagePowerDerived: 4,
+  });
+  piercing.world.add(piercing.archer, RangedAttackIntent, { targetId: piercing.target, toX: 5, toY: 0 });
+  rangedAttackSystem(piercing.world);
+
+  const baselineDamaged = baselineEvents.find((e) => e._event === 'damaged');
+  const piercingDamaged = piercingEvents.find((e) => e._event === 'damaged');
+  const baselineDelay = Number(baselineDamaged?.projectileDelay || 0);
+  const piercingDelay = Number(piercingDamaged?.projectileDelay || 0);
+  assert(baselineDelay > 0, `baseline projectile delay should be positive, got ${baselineDelay}`);
+  assert(piercingDelay < baselineDelay, `piercing arrows should have shorter projectile delay (baseline=${baselineDelay}, piercing=${piercingDelay})`);
 });

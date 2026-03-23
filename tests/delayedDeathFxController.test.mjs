@@ -19,7 +19,11 @@ Deno.test("delayed death fx hides corpse/loot until projectile impact window clo
   world.add(victim, Position, { x: 4, y: 7 });
 
   const harness = createFxHarness();
-  const fx = createDelayedDeathFxController({ world, getFxTime: harness.getFxTime });
+  const fx = createDelayedDeathFxController({
+    world,
+    getFxTime: harness.getFxTime,
+    getPosition: (id) => { const p = world.get(id, Position); return p ? { x: p.x, y: p.y } : null; },
+  });
   fx.installListeners();
 
   world.emit("damaged", { target: victim, projectileDelay: 0.5 });
@@ -47,7 +51,11 @@ Deno.test("delayed death fx ignores immediate deaths without projectile delay", 
   world.add(victim, Position, { x: 1, y: 2 });
 
   const harness = createFxHarness();
-  const fx = createDelayedDeathFxController({ world, getFxTime: harness.getFxTime });
+  const fx = createDelayedDeathFxController({
+    world,
+    getFxTime: harness.getFxTime,
+    getPosition: (id) => { const p = world.get(id, Position); return p ? { x: p.x, y: p.y } : null; },
+  });
   fx.installListeners();
 
   world.emit("died", { id: victim });
@@ -62,7 +70,11 @@ Deno.test("delayed death fx preserves the victim render record until impact", ()
   world.add(victim, Position, { x: 9, y: 3 });
 
   const harness = createFxHarness();
-  const fx = createDelayedDeathFxController({ world, getFxTime: harness.getFxTime });
+  const fx = createDelayedDeathFxController({
+    world,
+    getFxTime: harness.getFxTime,
+    getPosition: (id) => { const p = world.get(id, Position); return p ? { x: p.x, y: p.y } : null; },
+  });
   fx.installListeners();
 
   const liveEntity = {

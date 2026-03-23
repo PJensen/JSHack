@@ -204,3 +204,23 @@ Deno.test("equip item system: selecting an already equipped starter item unequip
   assert(inventoryContains(world, actor, starterSword), 'unequipped item remains in inventory');
   assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
 });
+
+Deno.test("equip item system: equipping ammo removes it from inventory and keeps it in ammo slot", () => {
+  const world = new World({ seed: 3 });
+
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 100 });
+  world.add(actor, Equipment, {});
+
+  const ammo = makeItem(world, { id: 'ammo_blunt_arrows', name: 'Blunt-Head Arrows', slot: 'ammo', type: 'ammo', count: 6 });
+  addToInventory(world, actor, ammo);
+  assert(inventoryContains(world, actor, ammo), 'ammo should start in inventory');
+
+  world.add(actor, EquipIntent, { itemId: ammo });
+  equipItemSystem(world);
+
+  const eq = world.get(actor, Equipment);
+  assert(eq.ammo === ammo, 'ammo should equip to ammo slot');
+  assert(!inventoryContains(world, actor, ammo), 'equipped ammo should not remain in inventory');
+  assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
+});

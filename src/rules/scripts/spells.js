@@ -1621,6 +1621,177 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
   } catch (e) { console.debug('[spells] emit spell:scorch failed:', e); }
 };
 
+/**
+ * @param {World} world
+ * @param {number} entityId
+ * @returns {{ effects: any[] } | null}
+ */
+function ensureActiveEffectList(world, entityId) {
+  let ae = /** @type any */ (world.get(entityId, ActiveEffects));
+  if (!ae) {
+    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
+    ae = /** @type any */ (world.get(entityId, ActiveEffects));
+  }
+  if (!ae) return null;
+  if (!Array.isArray(ae.effects)) ae.effects = [];
+  return ae;
+}
+
+/**
+ * @param {any[]} effects
+ * @param {string} sourceKey
+ * @param {{
+ *   startValue:number,
+ *   toValue:number,
+ *   endValue:number,
+ *   rampIn:number,
+ *   hold:number,
+ *   rampOut:number,
+ *   turnsLeft:number,
+ * }} envelope
+ */
+function upsertVisionEnvelope(effects, sourceKey, envelope) {
+  const existing = effects.find((e) => (
+    e
+    && e.key === 'stat_envelope'
+    && e.stat === 'visionRange'
+    && String(e.meta?.source || '') === sourceKey
+  ));
+  const next = {
+    key: 'stat_envelope',
+    stat: 'visionRange',
+    turnsLeft: Math.max(1, Number(envelope.turnsLeft || 1) | 0),
+    potency: 1,
+    startValue: Number(envelope.startValue || 0),
+    toValue: Number(envelope.toValue || 0),
+    endValue: Number(envelope.endValue || 0),
+    rampIn: Math.max(0, Number(envelope.rampIn || 0) | 0),
+    hold: Math.max(0, Number(envelope.hold || 0) | 0),
+    rampOut: Math.max(0, Number(envelope.rampOut || 0) | 0),
+    meta: { source: sourceKey },
+  };
+  if (existing) Object.assign(existing, next);
+  else effects.push(next);
+}
+
+REGISTRY['verdant_ward'] = function verdantWardScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 60;
+  upsertTimedEffect(ae.effects, {
+    key: 'regen',
+    turnsLeft: DURATION,
+    potency: 1,
+    stacks: 1,
+    sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'stoneskin',
+    turnsLeft: DURATION,
+    potency: 2,
+    stacks: 1,
+    sourceId: actor,
+  });
+
+  const startVision = getEffectiveVisionRange(world, actor);
+  upsertVisionEnvelope(ae.effects, 'spell:verdant_ward', {
+    startValue: startVision,
+    toValue: startVision + 2,
+    endValue: startVision,
+    rampIn: 3,
+    hold: 48,
+    rampOut: 9,
+    turnsLeft: DURATION,
+  });
+
+  try {
+    world.emit?.('spell:verdant_ward', {
+      actor,
+      at: { x: pos.x, y: pos.y },
+      duration: DURATION,
+    });
+  } catch (e) { console.debug('[spells] emit spell:verdant_ward failed:', e); }
+};
+
+REGISTRY['harmony_ward'] = function harmonyWardScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 55;
+  const RESISTS = ['resist_fire', 'resist_poison', 'resist_electric', 'resist_acid'];
+  for (let i = 0; i < RESISTS.length; i++) {
+    upsertTimedEffect(ae.effects, {
+      key: RESISTS[i],
+      turnsLeft: DURATION,
+      potency: 1,
+      stacks: 1,
+      sourceId: actor,
+    });
+  }
+
+  try {
+    world.emit?.('spell:harmony_ward', {
+      actor,
+      at: { x: pos.x, y: pos.y },
+      duration: DURATION,
+    });
+  } catch (e) { console.debug('[spells] emit spell:harmony_ward failed:', e); }
+};
+
+REGISTRY['shadow_veil'] = function shadowVeilScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 45;
+  upsertTimedEffect(ae.effects, {
+    key: 'invisible',
+    turnsLeft: DURATION,
+    potency: 1,
+    stacks: 1,
+    sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'phase_shift',
+    turnsLeft: DURATION,
+    potency: 1,
+    stacks: 1,
+    sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'shadow_cloak',
+    turnsLeft: DURATION,
+    potency: 1,
+    stacks: 1,
+    sourceId: actor,
+  });
+
+  const startVision = getEffectiveVisionRange(world, actor);
+  upsertVisionEnvelope(ae.effects, 'spell:shadow_veil', {
+    startValue: startVision,
+    toValue: startVision + 3,
+    endValue: startVision,
+    rampIn: 2,
+    hold: 35,
+    rampOut: 8,
+    turnsLeft: DURATION,
+  });
+
+  try {
+    world.emit?.('spell:shadow_veil', {
+      actor,
+      at: { x: pos.x, y: pos.y },
+      duration: DURATION,
+    });
+  } catch (e) { console.debug('[spells] emit spell:shadow_veil failed:', e); }
+};
+
 REGISTRY['rampage'] = function rampageScript(world, actor, _spell, _intent) {
   const pos = world.get(actor, Position);
   if (!pos) return;
@@ -1709,11 +1880,8 @@ REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
     return;
   }
 
-  // Apply the vision envelope: ramp-in 4, hold 12, ramp-out 4, recover to original
-  // toValue is 20% of current effective vision (significant impairment, not total blackout)
-  const currentVision = getEffectiveVisionRange(world, targetId);
-  const toValue = Math.max(1, Math.round(currentVision * 0.2));
-  blind(world, targetId, toValue, 2, 16, 4);
+  // Apply instant blackout: immediate drop to 0, hold, then recover.
+  blind(world, targetId, 0, 0, 16, 4);
 
   try {
     world.emit && world.emit('spell:blind', {

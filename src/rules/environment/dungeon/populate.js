@@ -19,7 +19,7 @@ import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import * as shopStock from '../../data/shopStock.js';
 import { Unpaid } from '../../components/Unpaid.js';
-import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
+import { HealthPotion, GoldStack, ArrowsStack, FireArrowsStack, PiercingArrowsStack, BodkinArrowsStack, BluntHeadArrowsStack, ScrollOfMapping } from '../../archetypes/Items.js';
 import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
 import { getCatalogItem, listCatalogItems } from '../../data/itemCatalog.js';
 import { pickMonster, pickSentinelMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner, pickEncounterGroup } from './tables.js';
@@ -112,7 +112,7 @@ import { addToInventory, inventoryItems } from '../../utils/inventoryFacade.js';
 import { createItemById } from '../../utils/itemFactory.js';
 import {
   CHUNK_SIZE, TILE_FLOOR, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
-  TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
+  TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA, TILE_WALL,
 } from './constants.js';
 import { setTile, getTile } from './tileMap.js';
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shopAppraisal.js';
@@ -121,6 +121,7 @@ import { spawnCentipede } from '../../utils/spawnCentipede.js';
 import {
   Fountain, Altar, Shrine, Statue,
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
+  FlayedMan, HangingChains,
 } from '../../archetypes/RoomFeatures.js';
 
 // Simple spawn kinds: just `createFrom(world, Archetype, { x, y })` with no extra logic.
@@ -156,6 +157,7 @@ const SIMPLE_SPAWN_TABLE = {
   birdbath: Birdbath, trellis: Trellis,
   fountain: Fountain, altar: Altar, shrine: Shrine, statue: Statue, pillar: Pillar,
   mushrooms: Mushrooms, web: Web, torch: Torch, urn: Urn,
+  flayed_man: FlayedMan, hanging_chains: HangingChains,
 };
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -178,11 +180,19 @@ const DEAD_END_ROOM_THEMES = [
   { kind: 'sanctuary', weight: 6 },
   { kind: 'lore_nook', weight: 5 },
   { kind: 'lair', weight: 5 },
+  { kind: 'alchemist_den', weight: 4 },
+  { kind: 'crypt', weight: 6 },
+  { kind: 'armory', weight: 6 },
+  { kind: 'obliiette', weight: 4 },
+  { kind: 'kitchen', weight: 6 },
+  { kind: 'dragon_hoard', weight: 3 },
 ];
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
 // Mimics should be encountered mostly in shops; wild dungeon mimics stay uncommon.
 const SHOP_MIMIC_CHANCE = 0.12;
 const ROOM_MIMIC_CHANCE = 0.003;
+const CLOSET_SURPRISE_CHANCE = 0.35;
+const CLOSET_SURPRISE_MAX_PER_CHUNK = 1;
 const SHOP_MAX_ROOM_WIDTH = 6;
 const SHOP_MAX_ROOM_HEIGHT = 6;
 const SHOP_MIN_INTERIOR_TILES = 2;
@@ -377,6 +387,98 @@ function pickDeadEndTheme(rng) {
   return DEAD_END_ROOM_THEMES[DEAD_END_ROOM_THEMES.length - 1].kind;
 }
 
+function isWalkableDungeonTile(tile) {
+  return tile === TILE_FLOOR || tile === TILE_DOOR || tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP;
+}
+
+function isInBoundsLocal(x, y) {
+  return x >= 0 && y >= 0 && x < CHUNK_SIZE && y < CHUNK_SIZE;
+}
+
+function getClosetEndpoint(chunk, doorLocalX, doorLocalY, startX, startY) {
+  if (!isInBoundsLocal(startX, startY)) return null;
+  if (!isWalkableDungeonTile(chunk.tiles[startY * CHUNK_SIZE + startX])) return null;
+
+  let prevX = doorLocalX;
+  let prevY = doorLocalY;
+  let curX = startX;
+  let curY = startY;
+  let steps = 1;
+
+  while (true) {
+    const next = [];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = curX + dx;
+      const ny = curY + dy;
+      if (!isInBoundsLocal(nx, ny)) continue;
+      if (nx === prevX && ny === prevY) continue;
+      if (nx === doorLocalX && ny === doorLocalY) continue;
+      const t = chunk.tiles[ny * CHUNK_SIZE + nx];
+      if (isWalkableDungeonTile(t)) next.push([nx, ny]);
+    }
+
+    if (next.length === 0) return { x: curX, y: curY, steps };
+    if (next.length > 1) return null;
+    if (steps >= 2) return null;
+
+    prevX = curX; prevY = curY;
+    curX = next[0][0]; curY = next[0][1];
+    steps++;
+  }
+}
+
+function addClosetSurprises(chunk, floorPlan, rng, spawns, isSolid, markSolid) {
+  if (!Array.isArray(chunk.doors) || chunk.doors.length === 0) return;
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const candidates = [];
+
+  for (const d of chunk.doors) {
+    const lx = d.x - ox;
+    const ly = d.y - oy;
+    if (!isInBoundsLocal(lx, ly)) continue;
+
+    const n = chunk.tiles[(ly - 1) * CHUNK_SIZE + lx];
+    const s = chunk.tiles[(ly + 1) * CHUNK_SIZE + lx];
+    const e = chunk.tiles[ly * CHUNK_SIZE + (lx + 1)];
+    const w = chunk.tiles[ly * CHUNK_SIZE + (lx - 1)];
+    const nsWalls = (n === TILE_WALL) && (s === TILE_WALL);
+    const ewWalls = (e === TILE_WALL) && (w === TILE_WALL);
+
+    const sides = [];
+    if (nsWalls) sides.push([lx - 1, ly], [lx + 1, ly]);
+    else if (ewWalls) sides.push([lx, ly - 1], [lx, ly + 1]);
+    else continue;
+
+    for (const [sx, sy] of sides) {
+      const end = getClosetEndpoint(chunk, lx, ly, sx, sy);
+      if (!end || end.steps > 2) continue;
+      const wx = ox + end.x;
+      const wy = oy + end.y;
+      if (isSolid(wx, wy)) continue;
+      candidates.push({ x: wx, y: wy });
+    }
+  }
+
+  if (candidates.length === 0) return;
+  let placed = 0;
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    const tmp = candidates[i];
+    candidates[i] = candidates[j];
+    candidates[j] = tmp;
+  }
+
+  for (const c of candidates) {
+    if (placed >= CLOSET_SURPRISE_MAX_PER_CHUNK) break;
+    if (rng.next() >= CLOSET_SURPRISE_CHANCE) continue;
+    const monster = pickSentinelMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+    spawns.push({ x: c.x, y: c.y, kind: 'monster', params: monster });
+    markSolid(c.x, c.y);
+    placed++;
+  }
+}
+
 /**
  * @typedef {Object} SpawnPoint
  * @property {number} x - world X
@@ -414,18 +516,22 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
+  // Tiny door closets can hold an occasional deterministic "surprise" monster.
+  addClosetSurprises(chunk, floorPlan, rng, spawns, isSolid, markSolid);
+
   // Identify the player's entry room so we don't clutter it with a feature
   const entryRoom = (chunk.chunkX === 0 && chunk.chunkY === 0 && chunk.rooms.length > 0)
     ? chunk.rooms[0]
     : null;
   const eligibleDeadEndRooms = chunk.rooms.filter((room) => {
     const isDeadEnd = countRoomEntrances(room, chunk) === 1;
+    const hasStair = roomContainsStairTile(room, chunk);
     const isEntryRoom = !!entryRoom &&
       room.x === entryRoom.x &&
       room.y === entryRoom.y &&
       room.w === entryRoom.w &&
       room.h === entryRoom.h;
-    return isDeadEnd && !isEntryRoom;
+    return isDeadEnd && !isEntryRoom && !hasStair;
   });
   const eligibleShopRooms = eligibleDeadEndRooms.filter((room) => (
     room.w <= SHOP_MAX_ROOM_WIDTH
@@ -829,14 +935,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     const SHOP_ARCHETYPES = ["general", "book", "jewelry", "potion"];
     const shopType = SHOP_ARCHETYPES[rng.int(0, SHOP_ARCHETYPES.length - 1)];
 
-    // Shop rooms must not start with regular dungeon enemies, spawners, or traps.
-    for (let i = spawns.length - 1; i >= 0; i--) {
-      const sp = spawns[i];
-      if (!isPointInRoom(sp.x, sp.y, room)) continue;
-      if (sp.kind === 'monster' || sp.kind === 'spawner' || sp.kind === 'trap' || sp.kind === 'mimic') {
-        spawns.splice(i, 1);
-      }
-    }
+    // Shop rooms are curated spaces. Strip all pre-existing room content
+    // (monsters, traps, room features, random loot, etc.) before laying out
+    // canonical shop content so dead-end shops never inherit shrine/fountain/sarc clutter.
+    removeRoomSpawns(spawns, room, () => true);
 
     const minX = room.x + 1;
     const maxX = room.x + Math.max(1, room.w - 2);
@@ -1094,6 +1196,23 @@ function countRoomOpeningTiles(room, chunk) {
   return openings;
 }
 
+function roomContainsStairTile(room, chunk) {
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  const rw = room.w;
+  const rh = room.h;
+
+  for (let y = 0; y < rh; y++) {
+    for (let x = 0; x < rw; x++) {
+      const tile = chunk.tiles[(ry + y) * CHUNK_SIZE + (rx + x)];
+      if (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP) return true;
+    }
+  }
+  return false;
+}
+
 function isPointInRoom(x, y, room) {
   return x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
 }
@@ -1137,7 +1256,7 @@ function pickRoomInteriorSpot(room, rng, isBlocked, reserved = new Set(), tries 
 }
 
 function applyDeadEndTheme(ctx) {
-  const { room, rng, spawns, floorPlan, isSolid, markSolid, theme } = ctx;
+  const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme } = ctx;
   const reserved = new Set();
 
   switch (theme) {
@@ -1237,6 +1356,252 @@ function applyDeadEndTheme(ctx) {
       }
       break;
     }
+    case 'alchemist_den': {
+      removeRoomSpawns(spawns, room, (s) => s.kind === 'monster' || s.kind === 'spawner');
+      const benchPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (benchPos) {
+        markSolid(benchPos.x, benchPos.y);
+        spawns.push({ x: benchPos.x, y: benchPos.y, kind: 'alchemy_bench', params: { depth: floorPlan.depth } });
+      }
+      const potionPool = [
+        'potion_vigor', 'potion_mana', 'potion_endurance', 'potion_stoneskin',
+        'potion_resist_fire', 'potion_resist_poison',
+        'potion_sickness', 'potion_confusion', 'potion_paralysis',
+        'potion_weakness', 'potion_hallucination', 'potion_blindness',
+      ];
+      const potionCount = rng.int(3, 4);
+      for (let i = 0; i < potionCount; i++) {
+        const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (pos) {
+          spawns.push({ x: pos.x, y: pos.y, kind: 'catalog_item', params: { itemId: rng.choice(potionPool) } });
+        }
+      }
+      const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (trapPos) {
+        spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: pickTrap(rng, floorPlan.depth) });
+      }
+      break;
+    }
+    case 'crypt': {
+      const sarcPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (sarcPos) {
+        markSolid(sarcPos.x, sarcPos.y);
+        spawns.push({ x: sarcPos.x, y: sarcPos.y, kind: 'sarcophagus', params: { depth: floorPlan.depth } });
+      }
+      const urnCount = rng.int(1, 2);
+      for (let i = 0; i < urnCount; i++) {
+        const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (pos) {
+          markSolid(pos.x, pos.y);
+          spawns.push({ x: pos.x, y: pos.y, kind: 'urn', params: { depth: floorPlan.depth } });
+        }
+      }
+      // Mirror-image pillars
+      const p1 = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (p1) {
+        markSolid(p1.x, p1.y);
+        spawns.push({ x: p1.x, y: p1.y, kind: 'pillar', params: { depth: floorPlan.depth } });
+        const cx = room.x + Math.floor(room.w / 2);
+        const mirrorX = cx + (cx - p1.x);
+        const mirrorKey = `${mirrorX},${p1.y}`;
+        if (mirrorX > room.x && mirrorX < room.x + room.w - 1 && !isSolid(mirrorX, p1.y) && !reserved.has(mirrorKey)) {
+          reserved.add(mirrorKey);
+          markSolid(mirrorX, p1.y);
+          spawns.push({ x: mirrorX, y: p1.y, kind: 'pillar', params: { depth: floorPlan.depth } });
+        }
+      }
+      // Undead guardian
+      const monsterPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (monsterPos) {
+        const undeadId = floorPlan.depth >= 12 ? 'wraith' : 'wight';
+        let gmp = pickSpecificMonster(undeadId, floorPlan.depth);
+        if (!gmp) gmp = pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+        if (gmp) spawns.push({ x: monsterPos.x, y: monsterPos.y, kind: 'monster', params: gmp });
+      }
+      break;
+    }
+    case 'armory': {
+      const rackPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (rackPos) {
+        markSolid(rackPos.x, rackPos.y);
+        spawns.push({ x: rackPos.x, y: rackPos.y, kind: 'weapon_rack', params: { depth: floorPlan.depth } });
+      }
+      const equipCount = rng.int(1, 2);
+      for (let i = 0; i < equipCount; i++) {
+        const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (pos) {
+          const item = pickItem(rng, floorPlan.depth);
+          spawns.push({ x: pos.x, y: pos.y, kind: item.kind, params: item });
+        }
+      }
+      const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (trapPos) {
+        spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: pickTrap(rng, floorPlan.depth) });
+      }
+      break;
+    }
+    case 'dragon_hoard': {
+      // Dragon hoards should have one explicit guardian and treasure payload.
+      // Remove any room-populated hostiles so the lair doesn't double-stack monsters.
+      removeRoomSpawns(
+        spawns,
+        room,
+        (spawn) => (
+          spawn.kind === 'monster'
+          || spawn.kind === 'centipede'
+          || spawn.kind === 'spawner'
+          || spawn.kind === 'mimic'
+        ),
+      );
+      const monsterPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (monsterPos) {
+        let gmp = pickSpecificMonster('dragon_whelp', floorPlan.depth);
+        if (!gmp) gmp = pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+        if (gmp) spawns.push({ x: monsterPos.x, y: monsterPos.y, kind: 'monster', params: gmp });
+      }
+      const goldCount = rng.int(4, 6);
+      for (let i = 0; i < goldCount; i++) {
+        const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (pos) {
+          spawns.push({ x: pos.x, y: pos.y, kind: 'gold', params: { count: rng.int(20, 50) + floorPlan.depth * 5 } });
+        }
+      }
+      const chestPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (chestPos) {
+        markSolid(chestPos.x, chestPos.y);
+        spawns.push({
+          x: chestPos.x, y: chestPos.y, kind: 'chest',
+          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 8 ? 'chest:magic' : 'chest:basic' },
+        });
+      }
+      break;
+    }
+    case 'obliiette': {
+      if (roomContainsStairTile(room, chunk)) break;
+      // Bleak prison-cell dead-end: one centerpiece body with chained clutter.
+      removeRoomSpawns(
+        spawns,
+        room,
+        (spawn) => (
+          spawn.kind === 'monster'
+          || spawn.kind === 'centipede'
+          || spawn.kind === 'spawner'
+          || spawn.kind === 'shopkeeper'
+        ),
+      );
+
+      const flayedPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (flayedPos) {
+        markSolid(flayedPos.x, flayedPos.y);
+        spawns.push({ x: flayedPos.x, y: flayedPos.y, kind: 'flayed_man', params: { depth: floorPlan.depth } });
+      }
+
+      const chainCount = rng.int(2, 4);
+      for (let i = 0; i < chainCount; i++) {
+        const chainPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (!chainPos) break;
+        markSolid(chainPos.x, chainPos.y);
+        spawns.push({ x: chainPos.x, y: chainPos.y, kind: 'hanging_chains', params: { depth: floorPlan.depth } });
+      }
+
+      const bookPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (bookPos) {
+        const book = pickDungeonBook(rng);
+        spawns.push({ x: bookPos.x, y: bookPos.y, kind: 'book', params: { bookId: book.id } });
+      }
+      break;
+    }
+    case 'kitchen': {
+      if (roomContainsStairTile(room, chunk)) break;
+      // Kitchen dead end: food cache + active fire, inspired by tavern corner usage.
+      removeRoomSpawns(
+        spawns,
+        room,
+        (spawn) => (
+          spawn.kind === 'monster'
+          || spawn.kind === 'centipede'
+          || spawn.kind === 'spawner'
+          || spawn.kind === 'shopkeeper'
+        ),
+      );
+
+      const corners = [
+        { x: room.x + 1, y: room.y + 1 },
+        { x: room.x + room.w - 2, y: room.y + 1 },
+        { x: room.x + 1, y: room.y + room.h - 2 },
+        { x: room.x + room.w - 2, y: room.y + room.h - 2 },
+      ].filter((p) => p.x > room.x && p.x < room.x + room.w - 1 && p.y > room.y && p.y < room.y + room.h - 1);
+
+      const availableCorners = corners.filter((p) => !isSolid(p.x, p.y));
+      const fireCorner = availableCorners.length > 0 ? availableCorners[0] : null;
+      if (fireCorner) {
+        reserved.add(`${fireCorner.x},${fireCorner.y}`);
+        markSolid(fireCorner.x, fireCorner.y);
+        spawns.push({ x: fireCorner.x, y: fireCorner.y, kind: 'cooking_fire', params: { depth: floorPlan.depth } });
+      }
+
+      const chestCorner = availableCorners.find((p) => !fireCorner || p.x !== fireCorner.x || p.y !== fireCorner.y) || null;
+      const chestPos = chestCorner || pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (chestPos) {
+        reserved.add(`${chestPos.x},${chestPos.y}`);
+        markSolid(chestPos.x, chestPos.y);
+        spawns.push({
+          x: chestPos.x,
+          y: chestPos.y,
+          kind: 'chest',
+          params: {
+            depth: floorPlan.depth,
+            lootTable: 'chest:basic',
+            fixedDrops: [
+              'food_ration',
+              'food_ration',
+              'food_iron_ration',
+              'food_mushrooms',
+              'food_wild_berries',
+              'food_wild_herbs',
+            ],
+          },
+        });
+      }
+
+      const pantryPool = [
+        'food_ration',
+        'food_iron_ration',
+        'food_mushrooms',
+        'food_wild_berries',
+        'food_wild_herbs',
+        'food_wheat',
+        'food_carrot',
+        'food_corn',
+      ];
+
+      let pantryPlaced = 0;
+      for (const corner of availableCorners) {
+        const key = `${corner.x},${corner.y}`;
+        if (reserved.has(key) || isSolid(corner.x, corner.y)) continue;
+        reserved.add(key);
+        spawns.push({
+          x: corner.x,
+          y: corner.y,
+          kind: 'catalog_item',
+          params: { itemId: pantryPool[pantryPlaced % pantryPool.length] },
+        });
+        pantryPlaced++;
+      }
+
+      const extraPantry = rng.int(1, 3);
+      for (let i = 0; i < extraPantry; i++) {
+        const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (!pos) break;
+        spawns.push({
+          x: pos.x,
+          y: pos.y,
+          kind: 'catalog_item',
+          params: { itemId: pantryPool[rng.int(0, pantryPool.length - 1)] },
+        });
+      }
+      break;
+    }
   }
 }
 
@@ -1257,7 +1622,17 @@ export function equipMonster(world, entityId, equipment) {
     eq.ranged = bowId;
   }
   if (equipment.ammo) {
-    const arrowId = createFrom(world, ArrowsStack, {});
+    const ammoKey = String(equipment.ammo || '').toLowerCase();
+    let ammoArch = ArrowsStack;
+    if (ammoKey === 'fire_arrows' || ammoKey === 'ammo_fire_arrows') ammoArch = FireArrowsStack;
+    else if (ammoKey === 'piercing_arrows' || ammoKey === 'ammo_piercing_arrows') ammoArch = PiercingArrowsStack;
+    else if (ammoKey === 'bodkin_arrows' || ammoKey === 'ammo_bodkin_arrows') ammoArch = BodkinArrowsStack;
+    else if (
+      ammoKey === 'blunt_arrows'
+      || ammoKey === 'blunt_head_arrows'
+      || ammoKey === 'ammo_blunt_arrows'
+    ) ammoArch = BluntHeadArrowsStack;
+    const arrowId = createFrom(world, ammoArch, {});
     eq.ammo = arrowId;
   }
 }
@@ -1291,12 +1666,15 @@ export function materializeSpawn(world, spawn) {
         massKg: p.massKg,
         resistances: p.resistances,
         speed: p.speed,
+        equipment: p.equipment,
+        wielding: p.wielding,
+        equipped: p.equipped,
+        inventory: p.inventory,
         learnedSpellIds: p.learnedSpellIds,
         maxMana: p.maxMana,
         manaRegen: p.manaRegen,
         creatureType: p.creatureType,
       });
-      if (p.equipment) equipMonster(world, id, p.equipment);
       return id;
     }
     case 'centipede': {
@@ -1334,6 +1712,21 @@ export function materializeSpawn(world, spawn) {
       world.add(id, Position, { x: spawn.x, y: spawn.y });
       return id;
     }
+    case 'piercing_arrows': {
+      const id = createFrom(world, PiercingArrowsStack, {});
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'bodkin_arrows': {
+      const id = createFrom(world, BodkinArrowsStack, {});
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'blunt_arrows': {
+      const id = createFrom(world, BluntHeadArrowsStack, {});
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
     case 'scroll': {
       const id = createFrom(world, ScrollOfMapping, {});
       world.add(id, Position, { x: spawn.x, y: spawn.y });
@@ -1364,6 +1757,19 @@ export function materializeSpawn(world, spawn) {
             try { world.remove(eid, Position); } catch {} // ECS: may not exist
             addToInventory(world, id, eid);
           }
+        }
+        const fixedDrops = Array.isArray(spawn.params.fixedDrops) ? spawn.params.fixedDrops : [];
+        for (const itemId of fixedDrops) {
+          if (typeof itemId !== 'string' || !itemId) continue;
+          let eid = null;
+          try {
+            eid = buildCatalogItem(world, itemId, { count: 1 });
+          } catch {
+            eid = null;
+          }
+          if (!(eid > 0)) continue;
+          try { world.remove(eid, Position); } catch {}
+          addToInventory(world, id, eid);
         }
       }
       return id;
@@ -1509,6 +1915,17 @@ export function materializeSpawn(world, spawn) {
       let id = null;
       try {
         id = buildCatalogItem(world, spawn.params.bookId, { count: 1 });
+      } catch {
+        return null;
+      }
+      if (!(id > 0)) return null;
+      world.add(id, Position, { x: spawn.x, y: spawn.y });
+      return id;
+    }
+    case 'catalog_item': {
+      let id = null;
+      try {
+        id = buildCatalogItem(world, spawn.params.itemId, { count: 1 });
       } catch {
         return null;
       }

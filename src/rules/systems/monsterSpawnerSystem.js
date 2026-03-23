@@ -3,7 +3,6 @@ import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Owner } from "../components/Owner.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
-import { equipMonster } from "../environment/dungeon/populate.js";
 import { isGenocided } from "../data/monsters.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
@@ -62,7 +61,6 @@ export function monsterSpawnerSystem(world) {
 
       const params = Object.assign({ x: sx, y: sy }, sp.spawnParams || {});
       const child = spawnMonsterEntity(world, params);
-      if (params.equipment) equipMonster(world, child, params.equipment);
       try { world.add(child, Owner, { ownerId: id }); } catch {} // ECS: may already exist
 
       // Attach child to spawner via hierarchy so destroySubtree cleans it up on floor transition.

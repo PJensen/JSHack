@@ -10,6 +10,8 @@ import { statusStrength } from "../utils/statusFacade.js";
 import { resolveDerivedStats } from "../utils/derivedStats.js";
 import { Player } from "../components/Player.js";
 import { isSpellOnCooldown, setSpellCooldown } from "../utils/spellCooldowns.js";
+import { Position } from "../components/Position.js";
+import { isTargetHiddenByInvisibility } from "../utils/spellTargeting.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -100,6 +102,30 @@ export function castSpellSystem(world) {
       try { world.emit && world.emit('spell:unknown', { actor, spellId }); } catch (e) { console.debug('[castSpellSystem] emit spell:unknown failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
+    }
+
+    const targetId = Number(intent?.targetId || 0) | 0;
+    if (targetId > 0 && targetId !== actor) {
+      const sourcePos = world.get(actor, Position);
+      const targetPos = world.get(targetId, Position);
+      if (isTargetHiddenByInvisibility(world, {
+        sourceId: actor,
+        targetId,
+        sourcePos,
+        targetPos,
+        allowAdjacentInvisibleTarget: true,
+      })) {
+        try {
+          world.emit?.("spell:fizzle", {
+            actor,
+            spellId: spell.id,
+            reason: "target_invisible",
+            targetId,
+          });
+        } catch (e) { console.debug('[castSpellSystem] emit spell:fizzle(target_invisible) failed:', e); }
+        world.remove(actor, CastSpellIntent);
+        continue;
+      }
     }
 
     /** @type {{ learnedSpellIds?: string[] }|null} */

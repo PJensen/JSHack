@@ -14,6 +14,7 @@ import {
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
 import { identify, isIdentified } from "../../rules/data/identification.js";
+import { requiresIdentification, getUnidentifiedName } from "../../rules/data/itemAppearances.js";
 import { groupDisplayItems } from "../ui/itemGrouping.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
@@ -113,6 +114,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     // Collect unpaid items in player inventory (for bill/checkout)
     const pe = playerEntity(world);
     const playerItems = [];
+    const appraisableItems = [];
     if (pe) {
         for (const id of inventoryItems(world, pe.id)) {
           const info = world.get(id, ItemInfo);
@@ -134,6 +136,16 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
             detail.value = sellValue;
             detail.sellPrice = Math.floor(sellValue * sellDiscount);
             playerItems.push(detail);
+
+            // Also check if appraisable (unidentified, non-gem)
+            if (requiresIdentification(info)) {
+              const identity = world.get(id, NamedIdentity)?.identity;
+              if (identity && !isIdentified(identity)) {
+                const appDetail = buildItemDisplayData(world, id) || { id, name: resolveItemDisplayName(world, id) };
+                appDetail.appraiseFee = getAppraiseFee(info);
+                appraisableItems.push(appDetail);
+              }
+            }
           }
         }
     }
@@ -141,6 +153,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const groupedShopItems = groupDisplayItems(shopItems);
     const groupedPlayerItems = groupDisplayItems(playerItems);
     const groupedUnpaidItems = groupDisplayItems(unpaidItems);
+    const groupedAppraisableItems = groupDisplayItems(appraisableItems);
 
     try {
       window.dispatchEvent(new CustomEvent("ui:shopData", { detail: {
@@ -148,6 +161,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         shopItems: groupedShopItems,
         playerItems: groupedPlayerItems,
         unpaidItems: groupedUnpaidItems,
+        appraisableItems: groupedAppraisableItems,
         totalBill,
         gold: playerGoldCount(),
         buyMarkup,
@@ -183,6 +197,12 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     activeShopSession.shopkeeperId = 0;
     activeShopSession.mode = "browse";
     try { window.dispatchEvent(new CustomEvent("ui:closeShop")); } catch (e) { console.debug('[shopWiring] dispatch ui:closeShop:', e); }
+  }
+
+  function isActiveCheckoutSessionFor(shopkeeperId) {
+    const sid = Number(shopkeeperId) || 0;
+    if (sid <= 0) return false;
+    return activeShopSession.mode === "checkout" && activeShopSession.shopkeeperId === sid;
   }
 
   world.on("shop:open", ({ actor, targetId, buyMarkup, sellDiscount, vendorKind }) => {
@@ -348,9 +368,10 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const { shopkeeperId, itemId } = e?.detail || {};
+    const sid = Number(shopkeeperId) || 0;
     const pe = playerEntity(world);
     if (!pe) return;
-    if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+    if (!isActiveCheckoutSessionFor(sid) && !isPlayerAdjacentToEntity(sid)) {
       log("The shopkeeper is too far away.");
       closeShopUI();
       return;
@@ -359,7 +380,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!inventoryContains(world, pe.id, itemId)) return;
 
     const unpaid = world.get(itemId, Unpaid);
-    if (!unpaid || unpaid.shopkeeperId !== shopkeeperId) return;
+    if (!unpaid || unpaid.shopkeeperId !== sid) return;
 
     removeFromInventory(world, pe.id, itemId);
 
@@ -370,11 +391,11 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       }
     }
 
-    placeItemOnShopFloor(itemId, shopkeeperId);
+    placeItemOnShopFloor(itemId, sid);
     log(`You return ${bracketizeName(resolveItemDisplayName(world, itemId))} to the shop floor.`);
 
-    const shop = world.get(shopkeeperId, ShopInventory);
-    dispatchShopData(shopkeeperId, shop?.buyMarkup ?? 1.0, shop?.sellDiscount ?? 0.5, "checkout");
+    const shop = world.get(sid, ShopInventory);
+    dispatchShopData(sid, shop?.buyMarkup ?? 1.0, shop?.sellDiscount ?? 0.5, "checkout");
   });
 
   // Handle payment of bill
@@ -382,15 +403,16 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const { shopkeeperId } = e?.detail || {};
+    const sid = Number(shopkeeperId) || 0;
     const pe = playerEntity(world);
     if (!pe) return;
-    if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+    if (!isActiveCheckoutSessionFor(sid) && !isPlayerAdjacentToEntity(sid)) {
       log("The shopkeeper is too far away.");
       closeShopUI();
       return;
     }
 
-    const shop = world.get(shopkeeperId, ShopInventory);
+    const shop = world.get(sid, ShopInventory);
     if (!shop) return;
 
     // Calculate total bill
@@ -399,7 +421,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
 
     for (const itemId of inventoryItems(world, pe.id)) {
       const unpaid = world.get(itemId, Unpaid);
-      if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
+      if (unpaid && unpaid.shopkeeperId === sid) {
         totalBill += unpaid.price;
         unpaidItemIds.push(itemId);
       }
@@ -436,6 +458,14 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   });
 
   const GEM_APPRAISE_FEE = 10;
+
+  const APPRAISE_FEES = { scroll: 15, potion: 15, wand: 25, ring: 30, neck: 30 };
+  function getAppraiseFee(info) {
+    if (!info) return 0;
+    return APPRAISE_FEES[String(info.type || "").toLowerCase()]
+      || APPRAISE_FEES[String(info.slot || "").toLowerCase()]
+      || 20;
+  }
 
   addEventListener("ui:requestGemAppraise", (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -481,6 +511,61 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     log(`The merchant examines the stone. "Ah — ${bracketizeName(newName)}." (${GEM_APPRAISE_FEE} gold)`);
 
     dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.5, shop.sellDiscount ?? 0.5, activeShopSession.mode);
+  });
+
+  addEventListener("ui:requestAppraise", (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const { shopkeeperId, itemId } = e?.detail || {};
+    const pe = playerEntity(world);
+    if (!pe) return;
+    if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
+      log("The shopkeeper is too far away.");
+      closeShopUI();
+      return;
+    }
+
+    const shop = world.get(shopkeeperId, ShopInventory);
+    if (!shop) return;
+    if (!inventoryContains(world, pe.id, itemId)) return;
+
+    const info = world.get(itemId, ItemInfo);
+    if (!info || !requiresIdentification(info)) {
+      log("That item does not need identification.");
+      return;
+    }
+
+    const identity = world.get(itemId, NamedIdentity)?.identity;
+    if (!identity || isIdentified(identity)) {
+      log("You already know what that is.");
+      return;
+    }
+
+    const fee = getAppraiseFee(info);
+    const gold = playerGoldCount();
+    if (gold < fee) {
+      log(`The shopkeeper charges ${fee} gold to identify that. You cannot afford it.`);
+      return;
+    }
+
+    if (!spendGold(pe.id, fee)) {
+      log("You cannot afford the identification fee.");
+      return;
+    }
+
+    identify(identity);
+    const newName = resolveItemDisplayName(world, itemId);
+    log(`The shopkeeper examines the item carefully. "This is ${bracketizeName(newName)}." (${fee} gold)`);
+
+    world.emit("item:identified", {
+      actor: pe.id,
+      identity,
+      name: newName,
+      appearance: getUnidentifiedName(info) || "item",
+      category: String(info.type || info.slot || "item"),
+    });
+
+    dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5, activeShopSession.mode);
   });
 
   const api = Object.freeze({

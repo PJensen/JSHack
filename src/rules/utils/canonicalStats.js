@@ -16,6 +16,10 @@ export function resolveCanonicalStats(world, entityId) {
 
   const accuracyDerived = Number(passive?.accuracyDerived || 0);
   const damagePowerDerived = Number(passive?.damagePowerDerived || 0);
+  const physicalPenetrationDerived = Number(passive?.physicalPenetrationDerived || 0);
+  const bluntPenetrationDerived = Number(passive?.bluntPenetrationDerived || 0);
+  const slashPenetrationDerived = Number(passive?.slashPenetrationDerived || 0);
+  const piercePenetrationDerived = Number(passive?.piercePenetrationDerived || 0);
   const evadeDerived = Number(passive?.evadeDerived || 0);
   const mitigationDerived = Number(passive?.mitigationDerived || 0);
   const critChanceDerived = Number(passive?.critChanceDerived || 0);
@@ -25,6 +29,10 @@ export function resolveCanonicalStats(world, entityId) {
     ...resolved,
     accuracy: Number(resolved?.accuracy || 0) + accuracyDerived,
     damagePower: Number(resolved?.damagePower || 0) + damagePowerDerived,
+    physicalPenetration: Number(resolved?.physicalPenetration || 0) + physicalPenetrationDerived,
+    bluntPenetration: Number(resolved?.bluntPenetration || 0) + bluntPenetrationDerived,
+    slashPenetration: Number(resolved?.slashPenetration || 0) + slashPenetrationDerived,
+    piercePenetration: Number(resolved?.piercePenetration || 0) + piercePenetrationDerived,
     evade: Number(resolved?.evade || 0) + evadeDerived,
     mitigation: Number(resolved?.mitigation || 0) + mitigationDerived,
     critChancePhysical: Number(resolved?.critChancePhysical || 0) + critChanceDerived,

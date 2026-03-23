@@ -14,25 +14,60 @@ export function createGlyphAtlas(palette, opts = {}) {
   const atlas = new Map(); // kind -> { canvas }
 
   for (const [kind, look] of Object.entries(palette)) {
-    const glyph = look.glyph || '?';
-    const fg = look.fg || '#fff';
-    const glow = look.glow || 'rgba(102,204,255,0.6)';
-
     const cnv = document.createElement('canvas');
     cnv.width = sizePx; cnv.height = sizePx;
     const g = cnv.getContext('2d');
     g.imageSmoothingEnabled = false;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
+
+    // ── Multi-layer composite path ──
+    if (Array.isArray(look.layers) && look.layers.length > 0) {
+      const bgColor = look.layers[0].bg || look.bg;
+      if (bgColor) {
+        g.fillStyle = bgColor;
+        g.fillRect(0, 0, sizePx, sizePx);
+      }
+      for (const layer of look.layers) {
+        const lGlyph = layer.glyph || '?';
+        const lFg    = layer.fg || '#fff';
+        const lGlow  = layer.glow || lFg;
+        const lScale = (typeof layer.scale === 'number') ? layer.scale : 1;
+        const lFontPx = Math.round(fontPx * lScale);
+        const cx = sizePx * (0.5 + (layer.dx || 0));
+        const cy = sizePx * (0.5 + (layer.dy || 0));
+        g.font = `900 ${lFontPx}px monospace`;
+        if (glowLayers > 0) {
+          g.globalCompositeOperation = 'lighter';
+          g.shadowColor = lGlow;
+          for (let li = 0; li < glowLayers; li++) {
+            const t = glowLayers > 1 ? (li / (glowLayers - 1)) : 0;
+            const alpha = 0.08 * (1 - t);
+            g.shadowBlur = 8 + t * 10;
+            g.fillStyle = `rgba(102,204,255,${alpha.toFixed(3)})`;
+            g.fillText(lGlyph, cx, cy);
+          }
+        }
+        g.globalCompositeOperation = 'source-over';
+        g.shadowBlur = 0;
+        g.fillStyle = lFg;
+        g.fillText(lGlyph, cx, cy);
+      }
+      atlas.set(kind, { canvas: cnv });
+      continue;
+    }
+
+    // ── Single-glyph path (unchanged) ──
+    const glyph = look.glyph || '?';
+    const fg = look.fg || '#fff';
+    const glow = look.glow || 'rgba(102,204,255,0.6)';
     g.font = `900 ${fontPx}px monospace`;
 
-    // Bake background fill if palette entry has a bg colour
     if (look.bg) {
       g.fillStyle = look.bg;
       g.fillRect(0, 0, sizePx, sizePx);
     }
 
-    // Bake glow once, if enabled
     if (glowLayers > 0) {
       g.globalCompositeOperation = 'lighter';
       g.shadowColor = glow;
@@ -45,7 +80,6 @@ export function createGlyphAtlas(palette, opts = {}) {
       }
     }
 
-    // Core glyph on top
     g.globalCompositeOperation = 'source-over';
     g.shadowBlur = 0;
     g.fillStyle = fg;

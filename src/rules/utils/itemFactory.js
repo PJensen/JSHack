@@ -8,7 +8,7 @@ import * as gems from '../data/gems.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 
 // Archetypes
-import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, PiercingArrowsStack, BodkinArrowsStack, BluntHeadArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
 import {
   FlourSack,
   IronIngot,
@@ -33,6 +33,9 @@ const SIMPLE_ITEM_ARCHETYPES = {
   'potion_health': HealthPotion,
   'ammo_arrows': ArrowsStack,
   'ammo_fire_arrows': FireArrowsStack,
+  'ammo_piercing_arrows': PiercingArrowsStack,
+  'ammo_bodkin_arrows': BodkinArrowsStack,
+  'ammo_blunt_arrows': BluntHeadArrowsStack,
   'food_flour': FlourSack,
   'food_stew': TownStew,
   'water_bucket': WaterBucket,

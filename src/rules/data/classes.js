@@ -58,7 +58,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 1 },
     ],
-    startingSpells: ['frost', 'blizzard'],
+    startingSpells: ['frost', 'blizzard', 'harmony_ward'],
   },
 
   outlaw: {
@@ -82,7 +82,8 @@ export const CLASS_DEFS = {
       armor: null,
       offhand: null,
       feet: 'boots_leather',
-
+      ranged: 'bow_short',
+      ammo: 'ammo_arrows',
     },
     inventoryItems: [
       { itemId: 'hearthstone', count: 1 },
@@ -90,8 +91,11 @@ export const CLASS_DEFS = {
       { itemId: 'scroll_blastwave', count: 1 },
       { itemId: 'potion_poison', count: 2 },
       { itemId: 'scroll_identify', count: 1 },
+      { itemId: 'ammo_arrows', count: 1 },
+      { itemId: 'ammo_blunt_arrows', count: 1 },
+      { itemId: 'ammo_fire_arrows', count: 1 }
     ],
-    startingSpells: ['phase_strike', 'blind'],
+    startingSpells: ['phase_strike', 'blind', 'shadow_veil'],
   },
 
   archeologist: {

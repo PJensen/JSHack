@@ -5,6 +5,9 @@ import { Equipment } from '../src/rules/components/Equipment.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
+import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { Pet } from '../src/rules/components/Pet.js';
+import { Owner } from '../src/rules/components/Owner.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { cleanupSystem } from '../src/rules/systems/cleanupSystem.js';
@@ -51,4 +54,43 @@ Deno.test("dead entity is destroyed by cleanup system", () => {
 
   // Idempotent
   cleanupSystem(world);
+});
+
+Deno.test("burning dead creatures leave ashes and no corpse", () => {
+  const world = new World({ seed: 7 });
+  const pet = world.create();
+  world.add(pet, NamedIdentity, { name: 'Kitty', identity: 'kitty' });
+  world.add(pet, Position, { x: 3, y: 4 });
+  world.add(pet, Vitality, { maxHp: 10, hp: 0 });
+  world.add(pet, Pet);
+  world.add(pet, Owner, { ownerId: 123 });
+  world.add(pet, ActiveEffects, { effects: [{ key: 'burning', turnsLeft: 2, potency: 1 }] });
+
+  cleanupSystem(world);
+
+  assert(!world.isAlive(pet), 'dead pet should be destroyed');
+  const identities = [];
+  for (const [, ni] of world.query(NamedIdentity)) {
+    identities.push(String(ni?.identity || ''));
+  }
+  assert(identities.includes('ashes'), 'burning death should drop ashes');
+  assert(!identities.some((id) => id.startsWith('corpse_')), 'burning death should not drop a corpse');
+});
+
+Deno.test("non-burning dead pets still drop corpses", () => {
+  const world = new World({ seed: 8 });
+  const pet = world.create();
+  world.add(pet, NamedIdentity, { name: 'Kitty', identity: 'kitty' });
+  world.add(pet, Position, { x: 3, y: 4 });
+  world.add(pet, Vitality, { maxHp: 10, hp: 0 });
+  world.add(pet, Pet);
+  world.add(pet, Owner, { ownerId: 123 });
+
+  cleanupSystem(world);
+
+  const identities = [];
+  for (const [, ni] of world.query(NamedIdentity)) {
+    identities.push(String(ni?.identity || ''));
+  }
+  assert(identities.includes('corpse_kitty'), 'non-burning pet death should still drop corpse');
 });

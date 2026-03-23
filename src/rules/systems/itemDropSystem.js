@@ -2,6 +2,7 @@ import { Position } from "../components/Position.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { GroundStackOrder } from "../components/GroundStackOrder.js";
+import { Equipment, getEquippedSlot } from "../components/Equipment.js";
 import { DropIntent } from "../components/Intents/DropIntent.js";
 import {
   removeFromInventory,
@@ -23,18 +24,36 @@ function stampGroundTop(world, itemId) {
   world.add(itemId, GroundStackOrder, { seq: nextGroundStackSeq(world) });
 }
 
+function clearEquippedSlotIfNeeded(world, actorId, itemId) {
+  const eq = world.get(actorId, Equipment);
+  if (!eq) return;
+  const slot = getEquippedSlot(eq, Number(itemId) | 0);
+  if (!slot) return;
+  eq[slot] = null;
+}
+
 export function itemDropSystem(world) {
   for (const [actor, intent, pos] of world.query(DropIntent, Position, Inventory)) {
-    const itemId = intent.itemId;
-    if (!inventoryContains(world, actor, itemId)) { world.remove(actor, DropIntent); continue; }
+    const itemId = Number(intent.itemId) | 0;
+    const inInventory = inventoryContains(world, actor, itemId);
+    const eq = world.get(actor, Equipment);
+    const equippedSlot = eq ? getEquippedSlot(eq, itemId) : null;
+    const isEquipped = !!equippedSlot;
+    if (!inInventory && !isEquipped) { world.remove(actor, DropIntent); continue; }
     const info = world.get(itemId, ItemInfo);
-    if (!info) { removeFromInventory(world, actor, itemId); world.remove(actor, DropIntent); continue; }
+    if (!info) {
+      if (inInventory) removeFromInventory(world, actor, itemId);
+      if (isEquipped) clearEquippedSlotIfNeeded(world, actor, itemId);
+      world.remove(actor, DropIntent);
+      continue;
+    }
 
     const dropCount = Math.min(info.count || 1, intent.count || info.count || 1);
 
     if (dropCount >= (info.count || 1)) {
       // drop whole entity
-      removeFromInventory(world, actor, itemId);
+      if (inInventory) removeFromInventory(world, actor, itemId);
+      if (isEquipped) clearEquippedSlotIfNeeded(world, actor, itemId);
       world.add(itemId, Position, { x: pos.x, y: pos.y });
       stampGroundTop(world, itemId);
       try { world.emit && world.emit('item:dropped', { actor, itemId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }

@@ -27,6 +27,12 @@ export const EFFECT_DEFS = [
     statuses: ["invulnerable"],
   },
   {
+    id: "invisible",
+    keys: ["invisible", "invisibility"],
+    operation: "none",
+    statuses: ["invisible"],
+  },
+  {
     id: "poison",
     keys: ["poison", "poisoned"],
     operation: "damage",

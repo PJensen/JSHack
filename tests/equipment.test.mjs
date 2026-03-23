@@ -21,6 +21,6 @@ Deno.test("equipment data is available and buildEquipmentItem works", () => {
   assert(ident && ident.identity === 'sword_plain', 'identity set');
   assert(info && info.type === 'equip', 'type equip');
   assert(info.slot === 'weapon', 'slot weapon');
-  assert(info.bonuses && info.bonuses.attack === 2, 'bonuses propagated');
+  assert(info.bonuses && info.bonuses.accuracy === 2, 'bonuses propagated');
   assert(mat && mat.kind === 'steel', 'material propagated');
 });

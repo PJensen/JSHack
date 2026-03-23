@@ -6,13 +6,17 @@ import { resolveCombatSnapshot } from "../src/rules/utils/resolveCombatSnapshot.
 
 /**
  * @param {World} world
- * @param {{accuracyDerived?:number, damagePowerDerived?:number, evadeDerived?:number, statuses?:Array<any>}} [opts]
+ * @param {{accuracyDerived?:number, damagePowerDerived?:number, physicalPenetrationDerived?:number, bluntPenetrationDerived?:number, slashPenetrationDerived?:number, piercePenetrationDerived?:number, evadeDerived?:number, statuses?:Array<any>}} [opts]
  */
 function makeActor(world, opts = {}) {
   const id = world.create();
   world.add(id, Equipment, {
     accuracyDerived: Number(opts.accuracyDerived || 0),
     damagePowerDerived: Number(opts.damagePowerDerived || 0),
+    physicalPenetrationDerived: Number(opts.physicalPenetrationDerived || 0),
+    bluntPenetrationDerived: Number(opts.bluntPenetrationDerived || 0),
+    slashPenetrationDerived: Number(opts.slashPenetrationDerived || 0),
+    piercePenetrationDerived: Number(opts.piercePenetrationDerived || 0),
     evadeDerived: Number(opts.evadeDerived || 0),
   });
   if (Array.isArray(opts.statuses)) {
@@ -121,4 +125,22 @@ Deno.test("resolveCombatSnapshot: modifier ordering is deterministic", () => {
       "defense:status:stoneskin:2",
     ],
   );
+});
+
+Deno.test("resolveCombatSnapshot exposes physical penetration channels", () => {
+  const world = new World({ seed: 13 });
+  const actor = makeActor(world, {
+    accuracyDerived: 2,
+    damagePowerDerived: 3,
+    physicalPenetrationDerived: 1,
+    bluntPenetrationDerived: 2,
+    slashPenetrationDerived: 3,
+    piercePenetrationDerived: 4,
+  });
+
+  const snap = resolveCombatSnapshot(world, actor, { mode: "melee" });
+  assertEquals(snap.physicalPenetration, 1);
+  assertEquals(snap.bluntPenetration, 2);
+  assertEquals(snap.slashPenetration, 3);
+  assertEquals(snap.piercePenetration, 4);
 });

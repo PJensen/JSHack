@@ -25,6 +25,7 @@ import {
 } from '../utils/legacyAffixDispatch.js';
 import { ensureEquippedAffixTopology } from '../utils/affixTopology.js';
 import { buildProcContext, applyPendingDamageProcPhase, applyReactionProcPhase } from '../utils/procPhases.js';
+import { breakStealthOnOffense } from '../utils/stealthAmbush.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -95,6 +96,7 @@ function resolveHitRoll(world, {
 
     const atkSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });
     const defSnapshot = resolveCombatSnapshot(world, target, { mode: 'melee' });
+    breakStealthOnOffense(world, source, { reason: 'attack', mode: 'melee', targetId: target });
     const attackBonus = atkSnapshot.attackBonus + hitPenalty;
     const armorClass = defSnapshot.armorClass;
 
@@ -132,6 +134,10 @@ function resolveHitRoll(world, {
     const damageRoll = rollDice(baseDice, r);
     const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(0, Math.floor((damageRoll + flatBonus) * baseDamageMult));
+    let armorPenetration = Math.max(0, Number(atkSnapshot.physicalPenetration || 0));
+    if (damageType === 'blunt') armorPenetration += Math.max(0, Number(atkSnapshot.bluntPenetration || 0));
+    if (damageType === 'slash') armorPenetration += Math.max(0, Number(atkSnapshot.slashPenetration || 0));
+    if (damageType === 'pierce') armorPenetration += Math.max(0, Number(atkSnapshot.piercePenetration || 0));
 
     if (!isCrit) {
         const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0);
@@ -179,6 +185,7 @@ function resolveHitRoll(world, {
             target, amount: finalDmg, source,
             type: damageType, cause: 'melee',
             critical: isCrit,
+            armorPenetration,
             ...(offhand ? { offhand: true } : {}),
         });
         if (!result.applied && result.reason !== 'invulnerable' && result.reason !== 'resisted') {

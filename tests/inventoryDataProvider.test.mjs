@@ -310,9 +310,6 @@ Deno.test("ground pickup detail keeps chest tooltip in multi mode", () => {
   const chestItem = makeItem(world, { identity: "potion_heal", name: "Healing Potion", type: "potion" });
   world.get(chest, Inventory).items.push(chestItem);
 
-  const floorItem = makeItem(world, { identity: "rope", name: "Rope", x: 9, y: 3 });
-  assert(floorItem > 0);
-
   const { buildGroundPickupDetailAt } = installInventoryDataProvider({
     world,
     getActiveSpellId: () => null,

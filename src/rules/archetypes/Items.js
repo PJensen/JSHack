@@ -70,8 +70,58 @@ export const FireArrowsStack = defineArchetype(
         weight: 0.3,
         value: 5,
         count: 5,
+        rarity: 3,
+        rarityName: "rare",
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Fire Arrows", identity: "ammo_fire_arrows" })],
+    [Material, { kind: "wood" }],
+);
+
+// Piercing arrows — trade utility for armor penetration against high-DR targets.
+export const PiercingArrowsStack = defineArchetype(
+    "PiercingArrowsStack",
+    [ItemInfo, {
+        type: "ammo",
+        slot: "ammo",
+        subtype: "piercing",
+        description: "Narrow hardened heads designed to punch through armor.",
+        weight: 0.25,
+        value: 4,
+        count: 6,
+    }],
+    [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Piercing Arrows", identity: "ammo_piercing_arrows" })],
+    [Material, { kind: "wood" }],
+);
+
+// Bodkin arrows — narrow armor-piercing points.
+export const BodkinArrowsStack = defineArchetype(
+    "BodkinArrowsStack",
+    [ItemInfo, {
+        type: "ammo",
+        slot: "ammo",
+        subtype: "bodkin",
+        description: "Slim steel heads that pierce armor, but carry less mass.",
+        weight: 0.25,
+        value: 5,
+        count: 6,
+    }],
+    [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Bodkin Arrows", identity: "ammo_bodkin_arrows" })],
+    [Material, { kind: "wood" }],
+);
+
+// Blunt-head arrows — less lethal, better at disruption.
+export const BluntHeadArrowsStack = defineArchetype(
+    "BluntHeadArrowsStack",
+    [ItemInfo, {
+        type: "ammo",
+        slot: "ammo",
+        subtype: "blunt",
+        description: "Rounded heads that bruise and stagger instead of puncturing.",
+        weight: 0.25,
+        value: 4,
+        count: 6,
+    }],
+    [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Blunt-Head Arrows", identity: "ammo_blunt_arrows" })],
     [Material, { kind: "wood" }],
 );
 

@@ -15,6 +15,7 @@ Deno.test("palette includes shock trap and special weapon glyph keys", () => {
     "ember_knife",
     "flametongue",
     "ashen_reaver",
+    "bow_flaming",
     "nightfang_dagger",
     "venomfang_dagger",
     "nightfang",
@@ -24,6 +25,8 @@ Deno.test("palette includes shock trap and special weapon glyph keys", () => {
     "lumber_chest",
     "herb_chest",
     "tavern_chest",
+    "flayed_man",
+    "hanging_chains",
   ]) {
     assert(palette[key], `missing palette key: ${key}`);
   }

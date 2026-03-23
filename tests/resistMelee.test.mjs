@@ -96,3 +96,22 @@ Deno.test("sword (physical 8) vs cave_bear (DR:3) — damage reduced to 5", () =
   assertEquals(result.amount, 5);
   assertEquals(world.get(id, Vitality).hp, def.baseHp - 5);
 });
+
+Deno.test("pierce damage can punch through kinetic DR via armorPenetration", () => {
+  const world = makeWorld(8);
+  const { id, def } = spawnMonster(world, "cave_bear", 5, 5);
+  const attacker = world.create();
+
+  const result = dealDamage(world, {
+    target: id,
+    amount: 5,
+    source: attacker,
+    type: "pierce",
+    cause: "melee",
+    armorPenetration: 2,
+  });
+
+  assertEquals(result.applied, true, "5 pierce with 2 penetration vs DR 3 = 4 damage");
+  assertEquals(result.amount, 4);
+  assertEquals(world.get(id, Vitality).hp, def.baseHp - 4);
+});

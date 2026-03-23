@@ -37,6 +37,36 @@ Deno.test("equipment system derives stats from equipped items", () => {
   assert(eq.maxHpDerived >= 5, 'life1 passive applied');
 });
 
+Deno.test("equipment system derives physical penetration channels from equipped items", () => {
+  const world = new World({ seed: 12 });
+  const actor = world.create();
+  world.add(actor, Equipment, {});
+  const eq = world.get(actor, Equipment);
+
+  const weapon = makeEquip(world, {
+    name: 'Piercing Knife',
+    id: 'piercing_knife',
+    slot: 'weapon',
+    bonuses: { accuracy: 1, physicalPenetration: 1, piercePenetration: 2 },
+  });
+  const gloves = makeEquip(world, {
+    name: 'Brawler Gloves',
+    id: 'brawler_gloves',
+    slot: 'gloves',
+    bonuses: { bluntPenetration: 2 },
+  });
+
+  eq.weapon = weapon;
+  eq.gloves = gloves;
+
+  equipmentSystem(world);
+
+  assert(eq.accuracyDerived === 1, 'accuracy should still derive normally');
+  assert(eq.physicalPenetrationDerived === 1, 'generic physical penetration should derive from gear');
+  assert(eq.piercePenetrationDerived === 2, 'pierce penetration should derive from gear');
+  assert(eq.bluntPenetrationDerived === 2, 'blunt penetration should derive from gear');
+});
+
 Deno.test("equipment system applies head-specific affix passives", () => {
   const world = new World({ seed: 8 });
   const actor = world.create();

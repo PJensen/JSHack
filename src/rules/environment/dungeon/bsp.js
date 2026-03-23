@@ -117,7 +117,7 @@ export function placeRooms(node, rng, profile = null) {
 
   const chosenLeaves = _pickLeafSubset(eligibleLeaves, keepCount, rng);
   for (const leaf of chosenLeaves) {
-    _placeRoomInLeaf(leaf, rng, minRoomSize, maxRoomSize, roomMargin);
+    _placeRoomInLeaf(leaf, rng, minRoomSize, maxRoomSize, roomMargin, profile);
   }
 }
 
@@ -132,7 +132,7 @@ export function carveRooms(node, tiles, stride) {
   if (node.right) carveRooms(node.right, tiles, stride);
 
   if (!node.room) return;
-  const { x, y, w, h } = node.room;
+  const { x, y, w, h, shape } = node.room;
 
   // Perimeter walls (only if currently VOID — don't overwrite existing floors)
   for (let py = y - 1; py <= y + h; py++) {
@@ -143,7 +143,12 @@ export function carveRooms(node, tiles, stride) {
       if (isEdge) {
         if (tiles[idx] === TILE_VOID) tiles[idx] = TILE_WALL;
       } else {
-        tiles[idx] = TILE_FLOOR;
+        if (_shouldCarveRoomTile(px, py, { x, y, w, h, shape })) {
+          tiles[idx] = TILE_FLOOR;
+        } else if (tiles[idx] === TILE_VOID) {
+          // Seal jagged notches as walls so floor remains enclosed.
+          tiles[idx] = TILE_WALL;
+        }
       }
     }
   }
@@ -242,16 +247,75 @@ function _pickLeafSubset(leaves, keepCount, rng) {
   return pool.slice(0, keepCount);
 }
 
-function _placeRoomInLeaf(node, rng, minRoomSize, maxRoomSize, roomMargin) {
+function _weightedInt(rng, min, max, bias = 1) {
+  if (max <= min) return min;
+  const t = Math.pow(rng.next(), 1 / Math.max(0.1, bias));
+  return min + Math.floor(t * (max - min + 1));
+}
+
+function _pickRoomShape(profile, rng) {
+  const weights = profile?.roomShapeWeights;
+  if (!weights) return 'rect';
+
+  const rect = Math.max(0, Number(weights.rect ?? 0));
+  const square = Math.max(0, Number(weights.square ?? 0));
+  const jagged = Math.max(0, Number(weights.jagged ?? 0));
+  const total = rect + square + jagged;
+  if (total <= 0) return 'rect';
+
+  const pick = rng.next() * total;
+  if (pick < rect) return 'rect';
+  if (pick < rect + square) return 'square';
+  return 'jagged';
+}
+
+function _shouldCarveRoomTile(px, py, room) {
+  if (room.shape !== 'jagged') return true;
+  const edge = (px === room.x || px === room.x + room.w - 1 || py === room.y || py === room.y + room.h - 1);
+  if (!edge) return true;
+
+  const cx = room.x + Math.floor(room.w / 2);
+  const cy = room.y + Math.floor(room.h / 2);
+  if (px === cx || py === cy) return true;
+
+  const h = _hash2d(px, py, room.x, room.y, room.w, room.h);
+  return (h % 6) !== 0;
+}
+
+function _hash2d(a, b, c, d, e, f) {
+  let x = ((a | 0) * 1103515245) ^ ((b | 0) * 12345);
+  x ^= ((c | 0) * 2654435761) >>> 0;
+  x ^= ((d | 0) * 2246822519) >>> 0;
+  x ^= ((e | 0) * 3266489917) >>> 0;
+  x ^= ((f | 0) * 668265263) >>> 0;
+  return x >>> 0;
+}
+
+function _placeRoomInLeaf(node, rng, minRoomSize, maxRoomSize, roomMargin, profile = null) {
   const maxW = node.w - 2 * roomMargin;
   const maxH = node.h - 2 * roomMargin;
   if (maxW < minRoomSize || maxH < minRoomSize) return;
 
-  const rw = rng.int(minRoomSize, Math.min(maxW, maxRoomSize));
-  const rh = rng.int(minRoomSize, Math.min(maxH, maxRoomSize));
+  const roomSizeBias = Math.max(0.1, Number(profile?.roomSizeBias ?? 1));
+  const shape = _pickRoomShape(profile, rng);
+  const widthHi = Math.min(maxW, maxRoomSize);
+  const heightHi = Math.min(maxH, maxRoomSize);
+
+  let rw;
+  let rh;
+  if (shape === 'square') {
+    const sideHi = Math.min(widthHi, heightHi);
+    const side = _weightedInt(rng, minRoomSize, sideHi, roomSizeBias);
+    rw = side;
+    rh = side;
+  } else {
+    rw = _weightedInt(rng, minRoomSize, widthHi, roomSizeBias);
+    rh = _weightedInt(rng, minRoomSize, heightHi, roomSizeBias);
+  }
+
   const rx = node.x + roomMargin + (maxW > rw ? rng.int(0, maxW - rw) : 0);
   const ry = node.y + roomMargin + (maxH > rh ? rng.int(0, maxH - rh) : 0);
-  node.room = { x: rx, y: ry, w: rw, h: rh };
+  node.room = { x: rx, y: ry, w: rw, h: rh, shape };
 }
 
 /**

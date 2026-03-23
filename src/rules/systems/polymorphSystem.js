@@ -1,12 +1,10 @@
-import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { Monster } from "../archetypes/Creatures.js";
 import { creatureTypeFromTags } from "../components/CreatureType.js";
 import { Inventory } from "../components/Inventory.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Polymorph } from "../components/Polymorph.js";
 import { Position } from "../components/Position.js";
 import { getMonster } from "../data/monsters.js";
-import { equipMonster } from "../environment/dungeon/populate.js";
+import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 import { addToInventory, destroyInventoryRoot, inventoryItems } from "../utils/inventoryFacade.js";
 
@@ -58,6 +56,13 @@ function toMonsterSpawnParams(def, depth) {
     massKg: def.massKg,
     resistances: def.resistances,
     speed: def.speed,
+    equipment: def.equipment || null,
+    wielding: Array.isArray(def.wielding) ? def.wielding.slice() : [],
+    equipped: Array.isArray(def.equipped) ? def.equipped.slice() : [],
+    inventory: Array.isArray(def.inventory) ? def.inventory.slice() : [],
+    learnedSpellIds: Array.isArray(def.learnedSpellIds) ? def.learnedSpellIds.slice() : [],
+    maxMana: Number.isFinite(def.maxMana) ? Number(def.maxMana) : 0,
+    manaRegen: Number.isFinite(def.manaRegen) ? Number(def.manaRegen) : 0,
     creatureType: creatureTypeFromTags(def.tags || []),
   };
 }
@@ -107,12 +112,11 @@ export function resolvePolymorph(world, req = {}) {
   runPolymorphHooks("before", ctx);
   try { world.emit?.("polymorph:before", ctx); } catch {}
 
-  const spawnedId = createFrom(world, Monster, {
+  const spawnedId = spawnMonsterEntity(world, {
     x: pos.x,
     y: pos.y,
     ...toMonsterSpawnParams(def, depth),
   });
-  if (def.equipment) equipMonster(world, spawnedId, def.equipment);
 
   for (const itemId of inventoryItems(world, entityId)) {
     if (world.isAlive(itemId)) addToInventory(world, spawnedId, itemId);

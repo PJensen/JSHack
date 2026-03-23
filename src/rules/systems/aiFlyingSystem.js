@@ -12,7 +12,7 @@ import { Flying } from "../components/Flying.js";
 import { Vitality } from "../components/Vitality.js";
 import { FlyIntent } from "../components/Intents/FlyIntent.js";
 import { getMonster } from "../data/monsters.js";
-import { canFlyOnFloor } from "../utils/flyingEligibility.js";
+import { canMonsterFlyOnFloor } from "../utils/flyingEligibility.js";
 import { chebyshevScalar } from "../utils/distance.js";
 
 /**
@@ -29,8 +29,6 @@ export function aiFlyingSystem(world) {
     break;
   }
 
-  const floorAllowsFlight = canFlyOnFloor(world);
-
   for (const [id, aggro, pos] of world.query(AggroState, Position)) {
     if (world.has(id, Player)) continue;
 
@@ -42,12 +40,15 @@ export function aiFlyingSystem(world) {
     const identity = ni?.identity || "";
     const def = getMonster(identity);
     if (!def || !def.canFly) continue;
+    const floorAllowsFlight = canMonsterFlyOnFloor(world, def);
 
     const isFlying = world.has(id, Flying);
     if (world.has(id, FlyIntent)) continue;
 
     const alert = aggro.alertLevel;
     const isAware = alert !== AGGRO_LEVELS.unaware;
+    const sizeClass = String(def.sizeClass || "").toUpperCase();
+    const prefersAirborneWhenDisturbed = sizeClass === "XS";
     const isAdjacent = hasPlayer && chebyshevScalar(pos.x, pos.y, playerX, playerY) <= 1;
     const vit = world.get(id, Vitality);
     const retreatThreshold = Number(def.retreatHpPct || 0);
@@ -58,7 +59,7 @@ export function aiFlyingSystem(world) {
     // LOS creates a more committed escape profile instead of an instant landing.
     const shouldFly = floorAllowsFlight
       && isAware
-      && !isAdjacent
+      && (prefersAirborneWhenDisturbed || !isAdjacent)
       && (
         alert === AGGRO_LEVELS.hunting
         || alert === AGGRO_LEVELS.alerted

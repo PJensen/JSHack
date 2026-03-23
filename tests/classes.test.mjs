@@ -105,6 +105,24 @@ Deno.test("warlock starts with summon_skeleton and shadow_bolt", () => {
   assert(getSpell("shadow_bolt"), "shadow_bolt spell definition should exist");
 });
 
+Deno.test("outlaw starts with shadow_veil in addition to existing class spells", () => {
+  const outlaw = getClass('outlaw');
+  assert(Array.isArray(outlaw.startingSpells), 'outlaw should have startingSpells array');
+  assert(outlaw.startingSpells.includes('phase_strike'), 'outlaw should retain phase_strike');
+  assert(outlaw.startingSpells.includes('blind'), 'outlaw should retain blind');
+  assert(outlaw.startingSpells.includes('shadow_veil'), 'outlaw should start with shadow_veil');
+  assert(getSpell('shadow_veil'), 'shadow_veil spell definition should exist');
+});
+
+Deno.test("druid starts with harmony_ward in addition to existing class spells", () => {
+  const druid = getClass('druid');
+  assert(Array.isArray(druid.startingSpells), 'druid should have startingSpells array');
+  assert(druid.startingSpells.includes('frost'), 'druid should retain frost');
+  assert(druid.startingSpells.includes('blizzard'), 'druid should retain blizzard');
+  assert(druid.startingSpells.includes('harmony_ward'), 'druid should start with harmony_ward');
+  assert(getSpell('harmony_ward'), 'harmony_ward spell definition should exist');
+});
+
 Deno.test("warlock starts with arcane handwraps for spell hit", () => {
   const warlock = getClass("warlock");
   assertEquals(warlock.equipment.gloves, "gloves_arcane");

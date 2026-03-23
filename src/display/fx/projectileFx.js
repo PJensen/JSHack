@@ -392,11 +392,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (const a of _arrowFx) {
       const progress = a.progress;
       const isFire = a.style === 'fire';
+      const isBlunt = a.style === 'blunt';
       // Current head position (lerp from→to)
       const hx = a.from.x + (a.to.x - a.from.x) * progress;
       const hy = a.from.y + (a.to.y - a.from.y) * progress;
       // Tail trails behind the head
-      const tailLen = Math.min(isFire ? 0.8 : 0.6, a.len * progress);
+      const tailLen = Math.min(isFire ? 0.8 : (isBlunt ? 0.68 : 0.6), a.len * progress);
       const tx = hx - a.dx * tailLen;
       const ty = hy - a.dy * tailLen;
 
@@ -417,6 +418,14 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         // Fire arrowhead (hot white-yellow tip)
         ctx.fillStyle = 'rgba(255,240,180,1.0)';
         ctx.beginPath(); ctx.arc(hx, hy, 0.09, 0, Math.PI * 2); ctx.fill();
+      } else if (isBlunt) {
+        // Blunt arrow: heavier-looking shaft and tip.
+        ctx.strokeStyle = 'rgba(175,155,125,0.95)';
+        ctx.lineWidth = 0.085;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.fillStyle = 'rgba(215,215,225,0.98)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.09, 0, Math.PI * 2); ctx.fill();
       } else {
         // Normal arrow: warm wood shaft
         ctx.strokeStyle = 'rgba(210,180,110,0.9)';
@@ -433,6 +442,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (const s of _arrowSparks) {
       const alpha = s.alpha;
       const isFire = s.style === 'fire';
+      const isBlunt = s.style === 'blunt';
       if (isFire) {
         // Fire impact: orange-red burst
         ctx.save();
@@ -441,6 +451,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         ctx.beginPath(); ctx.arc(s.x, s.y, 0.3 * alpha, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = `rgba(255,200,80,${0.4 * alpha})`;
         ctx.beginPath(); ctx.arc(s.x, s.y, 0.15 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (isBlunt) {
+        // Blunt impact: brighter, wider hit flash for a more obvious impact read.
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(255,240,210,${0.72 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.34 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(220,200,170,${0.48 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.54 * alpha, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       } else {
         // Normal impact: small warm flash
@@ -698,20 +717,25 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   }
 
   function installListeners() {
-    world.on('ranged:shot', ({ attacker, target, hit, style }) => {
+    world.on('ranged:shot', ({ attacker, target, hit, style, projectileSpeed }) => {
       const apos = getPosition(Number(attacker || 0));
       const dpos = getPosition(Number(target || 0));
       if (!apos || !dpos) return;
       const s = String(style || 'plain');
+      const speed = Number(projectileSpeed || 18);
       spawnTransientProjectile({
         from: apos,
         to: dpos,
         style: s,
-        speed: 18,
+        speed,
         minDuration: 0.06,
         maxDuration: 0.4,
       });
-      startShake(cam, s === 'fire' ? 3 : 2, s === 'fire' ? 0.10 : 0.08);
+      startShake(
+        cam,
+        s === 'fire' ? 3 : (s === 'blunt' ? 4 : 2),
+        s === 'fire' ? 0.10 : (s === 'blunt' ? 0.12 : 0.08),
+      );
       // Fire arrow: spawn trailing embers
       if (s === 'fire' && fx?.pool) {
         const dx = dpos.x - apos.x;

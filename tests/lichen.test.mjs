@@ -6,9 +6,12 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { FoodDecay } from "../src/rules/components/FoodDecay.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
+import { Position } from "../src/rules/components/Position.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
 import { getMonster, getMonstersByTier } from "../src/rules/data/monsters.js";
 import { getCorpseDef } from "../src/rules/data/corpseFood.js";
 import { foodDecaySystem } from "../src/rules/systems/foodDecaySystem.js";
+import { cleanupSystem } from "../src/rules/systems/cleanupSystem.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
 function makeWorld(seed = 1) {
@@ -60,4 +63,35 @@ Deno.test("lichen: corpse never decays in inventory", () => {
   // Lichen corpse should not have decayed (turnsHeld stays at 0)
   const decay = world.get(corpse, FoodDecay);
   assertEquals(decay.turnsHeld, 0, "lichen corpse should never increment turnsHeld");
+});
+
+Deno.test("lichen: corpse drop chance is high", () => {
+  let drops = 0;
+  const trials = 200;
+
+  for (let seed = 1; seed <= trials; seed++) {
+    const world = makeWorld(seed);
+    world.step = 7;
+
+    const lichen = world.create();
+    world.add(lichen, NamedIdentity, { name: "Lichen", identity: "lichen" });
+    world.add(lichen, Position, { x: 3, y: 3 });
+    world.add(lichen, Vitality, { maxHp: 6, hp: 0 });
+
+    cleanupSystem(world);
+
+    let foundCorpse = false;
+    for (const [, ni] of world.query(NamedIdentity)) {
+      if (ni?.identity === "corpse_lichen") {
+        foundCorpse = true;
+        break;
+      }
+    }
+    if (foundCorpse) drops++;
+  }
+
+  assert(
+    drops >= 160,
+    `expected high lichen corpse yield; got ${drops}/${trials}`,
+  );
 });

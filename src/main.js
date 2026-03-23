@@ -1981,7 +1981,26 @@ world.on('item:identified', ({ actor, identity }) => {
   for (const itemId of inventoryItems(world, pe.id)) {
     const ni = world.get(itemId, NamedIdentity);
     if (!ni || String(ni.identity || '') !== ident) continue;
-    try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
+    const displayItem = buildItemDisplayData(world, itemId);
+    try {
+      window.dispatchEvent(new CustomEvent('ui:itemIdentified', {
+        detail: {
+          item: {
+            ...(displayItem && typeof displayItem === 'object' ? displayItem : {}),
+            id: Number(itemId),
+            identity: ident,
+            type: world.get(itemId, ItemInfo)?.type || 'item',
+            slot: world.get(itemId, ItemInfo)?.slot || '',
+            name: resolveItemDisplayName(world, itemId),
+            count: world.get(itemId, ItemInfo)?.count || 1,
+            rarityName: world.get(itemId, ItemInfo)?.rarityName || 'common',
+            glyph: palette?.[ident]?.glyph || '',
+            glyphColor: palette?.[ident]?.fg || '#cfe8ff',
+            hasScrollOfIdentify: false,
+          }
+        }
+      }));
+    } catch (e) { console.debug('[main] dispatch ui:itemIdentified:', e); }
     break;
   }
 });
@@ -3851,34 +3870,42 @@ function drawCausticTagAura(ctx, e, fxTime) {
  * @param {{ id:number, kind:string, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
+// --- Potion shimmer tuning ---
+const POTION_SHIMMER_SPEED = 2.6;   // pulse frequency (lower = lazier glow)
+const POTION_SHIMMER_DEPTH = 0.18;  // how much alpha swings (0 = static, 1 = full throb)
+
 function drawPotionGlyphAura(ctx, e, fxTime) {
   const cx = e.pos.x;
   const cy = e.pos.y;
-  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.1 + e.id * 0.83);
   const look = palette[e.kind] || palette.potion || palette.default;
-  const glowHex = look?.glow || "#6bc7ff";
   const fgHex = look?.fg || "#8fd7ff";
+
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * POTION_SHIMMER_SPEED + e.id * 0.83);
+  const baseA = 0.22 + POTION_SHIMMER_DEPTH * pulse;
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '900 0.92px monospace';
 
-  ctx.shadowColor = glowHex;
-  ctx.shadowBlur = 10 + 6 * pulse;
-  ctx.fillStyle = `${glowHex}22`;
-  ctx.fillText('!', cx, cy);
-
-  ctx.shadowBlur = 4 + 2 * pulse;
-  ctx.fillStyle = `${fgHex}88`;
-  ctx.fillText('!', cx, cy);
-
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = `${fgHex}55`;
+  const r = 0.42 + 0.06 * pulse;
+  const squeeze = 0.43; // sides 40% narrower than top/bottom — hugs the "!"
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0,   `${fgHex}${Math.round(baseA * 255).toString(16).padStart(2,'0')}`);
+  grad.addColorStop(0.6, `${fgHex}${Math.round(baseA * 0.35 * 255).toString(16).padStart(2,'0')}`);
+  grad.addColorStop(1,   `${fgHex}00`);
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(cx, cy + 0.23, 0.11 + 0.02 * pulse, 0, Math.PI * 2);
+  const steps = 16; // more steps = smoother glow outline but more CPU
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const s = Math.sin(a);
+    const rr = r * ((1 - squeeze) + squeeze * s * s);
+    const px = cx + rr * Math.cos(a);
+    const py = cy + rr * Math.sin(a);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
   ctx.fill();
+
   ctx.restore();
 }
 
@@ -3916,6 +3943,155 @@ function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
   ctx.translate(x, y);
   ctx.scale(s, s);
   drawKind(atlas, ctx, kind, 0, 0);
+  ctx.restore();
+}
+
+function hasTag(entity, tag) {
+  return Array.isArray(entity?.tags) && entity.tags.includes(tag);
+}
+
+function hasAnyTag(entity, tags) {
+  if (!Array.isArray(entity?.tags)) return false;
+  for (let i = 0; i < tags.length; i++) {
+    if (entity.tags.includes(tags[i])) return true;
+  }
+  return false;
+}
+
+function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
+  const kind = resolveRenderableKind(atlas, entity);
+  const invisible = hasTag(entity, 'invisible');
+  const shadowCloak = hasTag(entity, 'shadow_cloak');
+  const phaseShift = hasTag(entity, 'phase_shift');
+  if (!invisible && !shadowCloak && !phaseShift) {
+    drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+    return;
+  }
+  ctx.save();
+  if (invisible) {
+    ctx.filter = 'brightness(0.50) saturate(0.70)';
+    ctx.globalAlpha *= 0.82;
+  } else if (shadowCloak) {
+    ctx.filter = 'brightness(0.72) saturate(0.80)';
+    ctx.globalAlpha *= 0.90;
+  } else if (phaseShift) {
+    ctx.filter = 'brightness(0.86) saturate(0.95)';
+    ctx.globalAlpha *= 0.94;
+  }
+  drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+  ctx.restore();
+}
+
+function drawStoneskinWardAura(ctx, entity, fxTime) {
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.3 + (entity.id | 0) * 0.71);
+  const cx = entity.pos.x;
+  const cy = entity.pos.y;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const outerR = 0.74 + 0.06 * pulse;
+  const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerR);
+  outer.addColorStop(0, `rgba(150,225,135,${(0.18 + 0.08 * pulse).toFixed(3)})`);
+  outer.addColorStop(0.55, `rgba(95,170,90,${(0.14 + 0.06 * pulse).toFixed(3)})`);
+  outer.addColorStop(1, 'rgba(60,120,55,0)');
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.fill();
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 0.34 + 0.03 * pulse);
+  core.addColorStop(0, `rgba(210,255,195,${(0.22 + 0.10 * pulse).toFixed(3)})`);
+  core.addColorStop(1, 'rgba(120,190,105,0)');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 0.34 + 0.03 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHarmonyWardGlowAura(ctx, entity, fxTime) {
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.1 + (entity.id | 0) * 0.93);
+  const cx = entity.pos.x;
+  const cy = entity.pos.y;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const outerR = 0.78 + 0.07 * pulse;
+  const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerR);
+  outer.addColorStop(0, `rgba(170,220,255,${(0.20 + 0.08 * pulse).toFixed(3)})`);
+  outer.addColorStop(0.50, `rgba(255,220,135,${(0.16 + 0.07 * pulse).toFixed(3)})`);
+  outer.addColorStop(1, 'rgba(120,150,255,0)');
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.fill();
+  const innerR = 0.42 + 0.05 * pulse;
+  const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+  inner.addColorStop(0, `rgba(255,250,210,${(0.26 + 0.10 * pulse).toFixed(3)})`);
+  inner.addColorStop(1, 'rgba(210,225,255,0)');
+  ctx.fillStyle = inner;
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Reserved parked prototype.
+// Unused by gameplay right now; keep for future status/tag experiments.
+const WARD_BUBBLE_RESERVED_TAG = 'ward_bubble_preview';
+function drawWardBubbleAura(ctx, entity, fxTime) {
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.0 + (entity.id | 0) * 1.03);
+  const cx = entity.pos.x;
+  const cy = entity.pos.y;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 4; i++) {
+    const a = fxTime * 0.8 + i * (Math.PI / 2);
+    const ox = Math.cos(a) * 0.11;
+    const oy = Math.sin(a) * 0.11;
+    const g = ctx.createRadialGradient(cx + ox, cy + oy, 0, cx + ox, cy + oy, 0.42 + 0.05 * pulse);
+    if (i === 0) {
+      g.addColorStop(0, `rgba(255,140,80,${(0.24 + 0.08 * pulse).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255,100,60,0)');
+    } else if (i === 1) {
+      g.addColorStop(0, `rgba(120,255,120,${(0.24 + 0.08 * pulse).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(80,210,100,0)');
+    } else if (i === 2) {
+      g.addColorStop(0, `rgba(120,210,255,${(0.24 + 0.08 * pulse).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(70,160,255,0)');
+    } else {
+      g.addColorStop(0, `rgba(255,255,150,${(0.24 + 0.08 * pulse).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255,210,110,0)');
+    }
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx + ox, cy + oy, 0.42 + 0.05 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = `rgba(205,230,255,${(0.30 + 0.12 * pulse).toFixed(3)})`;
+  ctx.lineWidth = 0.045;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 0.62 + 0.05 * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawInvisibleVeil(ctx, entity, fxTime, hasAmbushOpener) {
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.0 + (entity.id | 0) * 0.67);
+  const cx = entity.pos.x;
+  const cy = entity.pos.y;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  const shellR = 0.64 + 0.05 * pulse;
+  const shell = ctx.createRadialGradient(cx, cy, 0, cx, cy, shellR);
+  if (hasAmbushOpener) {
+    shell.addColorStop(0, `rgba(70,45,110,${(0.16 + 0.08 * pulse).toFixed(3)})`);
+    shell.addColorStop(1, 'rgba(30,20,50,0)');
+  } else {
+    shell.addColorStop(0, `rgba(52,70,98,${(0.14 + 0.06 * pulse).toFixed(3)})`);
+    shell.addColorStop(1, 'rgba(22,30,45,0)');
+  }
+  ctx.fillStyle = shell;
+  ctx.beginPath();
+  ctx.arc(cx, cy, shellR, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -4403,7 +4579,7 @@ function render(worldView) {
     const e = renderEntities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
-    if (layer !== 100) continue;
+    if (layer !== 250) continue;
     if (throwFx.isItemHidden(e.id)) continue;
     if (delayedDeathFx.isItemHidden(e.id)) continue;
     const tileKey = `${e.pos.x},${e.pos.y}`;
@@ -4416,7 +4592,7 @@ function render(worldView) {
     }
   }
 
-  // Draw order: items (layer 100) → doors (200) → actors (300) → player (400)
+  // Draw order: doors/stairs (200) → items (250) → actors (300) → player (400)
   // Entities are sorted by layer, so drawing inline gives correct z-order.
 
   for (let i = 0; i < renderEntities.length; i++) {
@@ -4425,7 +4601,7 @@ function render(worldView) {
     const k = (typeof e.kind === 'string') ? e.kind : 'default';
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
 
-    if (layer === 100) {
+    if (layer === 250) {
       if (throwFx.isItemHidden(e.id) || delayedDeathFx.isItemHidden(e.id)) continue;
       const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
       if (topItemId !== e.id) continue;
@@ -4481,14 +4657,7 @@ function render(worldView) {
       : e;
 
     drawFlyingShadow(bctx, flyingPresentation);
-    drawKindScaled(
-      glyphAtlas,
-      bctx,
-      resolveRenderableKind(glyphAtlas, renderEntity),
-      renderEntity.pos.x,
-      renderEntity.pos.y,
-      flyingPresentation.glyphScale
-    );
+    drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale);
     if (shouldShowHealthBar(renderEntity, _fxTime)) {
       _healthBarsToDraw.push(renderEntity);
     }
@@ -4535,6 +4704,18 @@ function render(worldView) {
     }
     if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('blinded')) {
       drawBlindEye(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && hasTag(renderEntity, 'invisible')) {
+      drawInvisibleVeil(bctx, renderEntity, _fxTime, hasTag(renderEntity, 'shadow_cloak'));
+    }
+    if (PERF.quality !== 'low' && hasTag(renderEntity, 'stoneskin')) {
+      drawStoneskinWardAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && hasAnyTag(renderEntity, ['resist_fire', 'resist_poison', 'resist_electric', 'resist_acid'])) {
+      drawHarmonyWardGlowAura(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && hasTag(renderEntity, WARD_BUBBLE_RESERVED_TAG)) {
+      drawWardBubbleAura(bctx, renderEntity, _fxTime);
     }
 
     // Glyph-FX: grid bug multi-color cycle (purple ↔ cyan)
@@ -4903,19 +5084,12 @@ function render(worldView) {
           : e;
 
         drawFlyingShadow(bctx, flyingPresentation);
-        drawKindScaled(
-          glyphAtlas,
-          bctx,
-          resolveRenderableKind(glyphAtlas, renderEntity),
-          renderEntity.pos.x,
-          renderEntity.pos.y,
-          flyingPresentation.glyphScale
-        );
+        drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale);
         if (shouldShowHealthBar(renderEntity, _fxTime)) {
           drawEntityHealthBar(bctx, renderEntity);
         }
       } else if (e.tags.includes('above_roof')) {
-        drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
+        drawEntityGlyph(glyphAtlas, bctx, e);
       }
     }
   }

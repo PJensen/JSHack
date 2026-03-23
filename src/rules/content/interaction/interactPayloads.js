@@ -78,6 +78,7 @@ import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
 import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../../utils/passiveBonuses.js";
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
+import { HazardArea } from "../../components/HazardArea.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -206,6 +207,39 @@ function ensureFountainState(world, targetId) {
     cooldownTurns,
     dryUntilStep,
   };
+}
+
+const FIERY_WEAPON_AFFIXES = new Set(["flaming", "firestorm1"]);
+
+function actorHasFieryWieldedWeapon(world, actor) {
+  const eq = world.get(actor, Equipment);
+  if (!eq) return false;
+  const wieldedSlots = ["weapon", "offhand"];
+  for (let i = 0; i < wieldedSlots.length; i++) {
+    const slot = wieldedSlots[i];
+    const itemId = Number(eq[slot] || 0) | 0;
+    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
+    const info = world.get(itemId, ItemInfo);
+    if (!info) continue;
+    if (String(info.damageType || "").toLowerCase() === "fire") return true;
+    const affixes = Array.isArray(info.affixes) ? info.affixes : [];
+    if (affixes.some((id) => FIERY_WEAPON_AFFIXES.has(String(id || "").toLowerCase()))) return true;
+  }
+  return false;
+}
+
+function hasFloorFireHazardAt(world, x, y) {
+  const tx = x | 0;
+  const ty = y | 0;
+  for (const [, pos, hazard] of world.query(Position, HazardArea)) {
+    if (!pos || !hazard) continue;
+    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+    if (String(hazard.kind || "").toLowerCase() !== "fire") continue;
+    if (String(hazard.medium || "air").toLowerCase() !== "floor") continue;
+    if (Number(hazard.turnsLeft || 0) <= 0) continue;
+    return true;
+  }
+  return false;
 }
 
 function setFountainState(world, targetId, updates) {
@@ -1229,6 +1263,29 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const targetPos = world.get(targetId, Position);
       world.emit?.("web:cleared", { actor, targetId });
+
+      if (targetPos && actorHasFieryWieldedWeapon(world, actor)) {
+        if (!hasFloorFireHazardAt(world, targetPos.x, targetPos.y)) {
+          const hazardId = spawnHazard(world, {
+            x: targetPos.x,
+            y: targetPos.y,
+            kind: "fire",
+            medium: "floor",
+            turnsLeft: 2,
+            radius: 0,
+            tickDamage: 1,
+            damageType: "fire",
+            cause: "weapon_web_ignite",
+            sourceId: actor,
+            sourceKind: "weapon",
+            identity: "weapon_web_fire",
+            name: "Burning Web",
+            meta: { source: "weapon_web_ignite", fireSpreadChance: 0.45, fireSpreadTurns: 2 },
+          });
+          world.emit?.("web:ignited", { actor, targetId, hazardId, at: { x: targetPos.x, y: targetPos.y } });
+        }
+        return;
+      }
 
       if (targetPos) {
         const toDestroy = [];

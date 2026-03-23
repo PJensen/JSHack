@@ -6,6 +6,7 @@ import { Flying } from '../components/Flying.js';
 
 /** Profile types that permit flight (open / high-ceiling spaces). */
 const FLYABLE_PROFILES = new Set(['overworld', 'caves', 'grottos']);
+const ALWAYS_FLY_SIZE_CLASSES = new Set(['XS']);
 
 /**
  * Returns true if the current floor allows flight.
@@ -20,6 +21,19 @@ export function canFlyOnFloor(world) {
     return FLYABLE_PROFILES.has(ds.profileType);
   }
   return false;
+}
+
+/**
+ * Canonical per-monster flight eligibility.
+ * Small flyers (derived from size class) are always allowed to fly.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{ sizeClass?: string }|null|undefined} monsterDef
+ * @returns {boolean}
+ */
+export function canMonsterFlyOnFloor(world, monsterDef) {
+  const sizeClass = String(monsterDef?.sizeClass || '').toUpperCase();
+  if (ALWAYS_FLY_SIZE_CLASSES.has(sizeClass)) return true;
+  return canFlyOnFloor(world);
 }
 
 /**

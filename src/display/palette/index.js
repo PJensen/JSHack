@@ -35,6 +35,7 @@ export function buildPalette() {
   // that inherits its fg/glow. New monsters are handled automatically.
   for (const [k, v] of Object.entries(basePalette)) {
     if (_CORPSE_SKIP_KEYS.has(k)) continue;
+    if (!v.fg) continue; // skip composite-only (layers) entries
     if (_CORPSE_SKIP_PREFIXES.some(p => k.startsWith(p))) continue;
     if (!merged[`corpse_${k}`]) {
       merged[`corpse_${k}`] = { glyph: '%', fg: v.fg, glow: v.glow };

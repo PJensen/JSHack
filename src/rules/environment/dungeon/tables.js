@@ -25,6 +25,9 @@ function toMonsterSpawnParams(def, depth) {
     resistances: def.resistances,
     speed: def.speed,
     equipment: def.equipment || null,
+    wielding: Array.isArray(def.wielding) ? [...def.wielding] : [],
+    equipped: Array.isArray(def.equipped) ? [...def.equipped] : [],
+    inventory: Array.isArray(def.inventory) ? [...def.inventory] : [],
     learnedSpellIds: Array.isArray(def.learnedSpellIds) ? [...def.learnedSpellIds] : [],
     maxMana: Number.isFinite(def.maxMana) ? Number(def.maxMana) : 0,
     manaRegen: Number.isFinite(def.manaRegen) ? Number(def.manaRegen) : 0,
@@ -110,6 +113,9 @@ export function pickItem(rng, depth) {
       if (drop.params.archetype === 'HealthPotion') return { kind: 'potion' };
       if (drop.params.archetype === 'ArrowsStack') return { kind: 'arrows' };
       if (drop.params.archetype === 'FireArrowsStack') return { kind: 'fire_arrows' };
+      if (drop.params.archetype === 'PiercingArrowsStack') return { kind: 'piercing_arrows' };
+      if (drop.params.archetype === 'BodkinArrowsStack') return { kind: 'bodkin_arrows' };
+      if (drop.params.archetype === 'BluntHeadArrowsStack') return { kind: 'blunt_arrows' };
       if (drop.params.archetype === 'ScrollOfMapping') return { kind: 'scroll' };
       return { kind: 'potion' };
     case 'item':
@@ -160,6 +166,11 @@ const SPAWNER_PROFILE_BY_CLASS = {
   'XL': { concurrent: { min: 1, max: 1 }, total: { min: 1, max: 2 },  cooldown: 80 },
 };
 
+const SPAWNER_PROFILE_BY_MONSTER_ID = {
+  // Bats are swarmy fliers: higher concurrent pressure with a medium lifetime total.
+  bat: { concurrent: { min: 3, max: 4 }, total: { min: 4, max: 6 }, cooldown: 12 },
+};
+
 const SPAWNER_WHITELIST_MONSTER_IDS = new Set([
   'rat',
   'bat',
@@ -172,6 +183,13 @@ const SPAWNER_WHITELIST_MONSTER_IDS = new Set([
 
 function isSpawnerEligibleMonster(def) {
   return !!def && SPAWNER_WHITELIST_MONSTER_IDS.has(def.id);
+}
+
+function resolveSpawnerProfile(monsterIdentity, sizeClass) {
+  if (monsterIdentity && SPAWNER_PROFILE_BY_MONSTER_ID[monsterIdentity]) {
+    return SPAWNER_PROFILE_BY_MONSTER_ID[monsterIdentity];
+  }
+  return SPAWNER_PROFILE_BY_CLASS[sizeClass] || SPAWNER_PROFILE_BY_CLASS['M'];
 }
 
 /**
@@ -196,7 +214,7 @@ export function pickSpecificMonster(monsterId, depth) {
 export function pickSpecificSpawner(rng, monsterId, depth) {
   const params = pickSpecificMonster(monsterId, depth);
   if (!params || !isSpawnerEligibleMonster({ id: params.identity })) return null;
-  const profile = SPAWNER_PROFILE_BY_CLASS[params.sizeClass] || SPAWNER_PROFILE_BY_CLASS['M'];
+  const profile = resolveSpawnerProfile(params.identity, params.sizeClass);
   const totalToSpawn = rng.int(profile.total.min, profile.total.max);
   const maxConcurrent = rng.int(profile.concurrent.min, profile.concurrent.max);
   return { monsterType: params, packSize: totalToSpawn, maxConcurrent, cooldownTicks: profile.cooldown, depth };
@@ -218,7 +236,7 @@ export function pickSpawner(rng, depth, monsterFilter = null) {
   const monsterParams = pickMonster(rng, depth, spawnerFilter);
 
   // Look up spawner profile based on monster's size class
-  const profile = SPAWNER_PROFILE_BY_CLASS[monsterParams.sizeClass] || SPAWNER_PROFILE_BY_CLASS['M'];
+  const profile = resolveSpawnerProfile(monsterParams.identity, monsterParams.sizeClass);
   const totalToSpawn = rng.int(profile.total.min, profile.total.max);
   const maxConcurrent = rng.int(profile.concurrent.min, profile.concurrent.max);
 
