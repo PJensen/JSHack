@@ -5175,7 +5175,7 @@ function renderShop(panel, data, state) {
         listContainer.appendChild(row);
         rows.push(row);
       });
-      hint.textContent = 'Tap item to select · Tap Return button to return · Enter=Return selected · P=Pay bill · Esc=Close';
+      hint.textContent = 'Select item · Return button/Enter=Return · P=Pay · Esc=Close';
       setSel(0);
     }
 
