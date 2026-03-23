@@ -327,3 +327,35 @@ Deno.test("ground pickup detail keeps chest tooltip in multi mode", () => {
   assertEquals(detail.fromChest, true);
   assertEquals(Number(detail.chestId || 0), chest);
 });
+
+Deno.test("ground pickup detail includes chest metadata while showing floor stack", () => {
+  const world = new World({ seed: 557 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 2, y: 6 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+
+  const chest = world.create();
+  world.add(chest, NamedIdentity, { identity: "chest", name: "Stash Chest" });
+  world.add(chest, Position, { x: 2, y: 6 });
+  world.add(chest, Inventory, { items: [], capacity: 10 });
+
+  const first = makeItem(world, { identity: "torch", name: "Torch", x: 2, y: 6 });
+  const second = makeItem(world, { identity: "ration", name: "Ration", x: 2, y: 6 });
+  assert(first > 0 && second > 0);
+
+  const { buildGroundPickupDetailAt } = installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  const detail = buildGroundPickupDetailAt(player, 2, 6);
+  assert(detail, "expected ground pickup detail");
+  assertEquals(detail.mode, "stack");
+  assertEquals(Number(detail.chestId || 0), chest);
+  assertEquals(detail.chestName, "Stash Chest");
+});

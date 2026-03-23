@@ -1997,7 +1997,15 @@ function renderGroundTooltip(tip, detail) {
   }
 
   const it = detail?.item || {};
+  const openChestIfPresent = () => {
+    const chestId = Number(detail?.chestId || 0) | 0;
+    if (chestId > 0) {
+      // Keep chest interaction in the same tap flow after top floor-item action.
+      window.dispatchEvent(new CustomEvent('ui:tapOpenChest', { detail: { chestId } }));
+    }
+  };
   renderCompactPickup(it, 'Tap to pick up', () => {
+    openChestIfPresent();
     tip.style.display = 'none';
   });
 
@@ -2007,6 +2015,7 @@ function renderGroundTooltip(tip, detail) {
     if (ids.length > 0) {
       window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
     }
+    openChestIfPresent();
     tip.style.display = 'none';
   };
 }
