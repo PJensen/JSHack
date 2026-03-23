@@ -163,24 +163,30 @@ Deno.test("populateChunk scales monster count with depth", () => {
 });
 
 function buildTwoEntranceRoomChunk() {
+  const ROOM_MIN = 4;
+  const ROOM_MAX_EXCLUSIVE = 12;
+  const OPENING_Y = 7;
+  const WEST_OUTER_OPENING_X = 3;
+  const EAST_INNER_OPENING_X = 11;
+  const EAST_OUTER_OPENING_X = 12;
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_WALL);
   // Room interior
-  for (let y = 4; y < 12; y++) {
-    for (let x = 4; x < 12; x++) {
+  for (let y = ROOM_MIN; y < ROOM_MAX_EXCLUSIVE; y++) {
+    for (let x = ROOM_MIN; x < ROOM_MAX_EXCLUSIVE; x++) {
       tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
     }
   }
   // Two openings (west + east) so this is not a dead-end room.
-  tiles[7 * CHUNK_SIZE + 3] = TILE_FLOOR;
-  tiles[7 * CHUNK_SIZE + 4] = TILE_FLOOR;
-  tiles[7 * CHUNK_SIZE + 11] = TILE_FLOOR;
-  tiles[7 * CHUNK_SIZE + 12] = TILE_FLOOR;
+  tiles[OPENING_Y * CHUNK_SIZE + WEST_OUTER_OPENING_X] = TILE_FLOOR;
+  tiles[OPENING_Y * CHUNK_SIZE + ROOM_MIN] = TILE_FLOOR;
+  tiles[OPENING_Y * CHUNK_SIZE + EAST_INNER_OPENING_X] = TILE_FLOOR;
+  tiles[OPENING_Y * CHUNK_SIZE + EAST_OUTER_OPENING_X] = TILE_FLOOR;
   return {
     chunkX: 1,
     chunkY: 0,
     tiles,
-    rooms: [{ x: CHUNK_SIZE + 4, y: 4, w: 8, h: 8 }],
+    rooms: [{ x: CHUNK_SIZE + ROOM_MIN, y: ROOM_MIN, w: ROOM_MAX_EXCLUSIVE - ROOM_MIN, h: ROOM_MAX_EXCLUSIVE - ROOM_MIN }],
     doors: [],
   };
 }
@@ -206,6 +212,7 @@ Deno.test("room patterning keeps egress and entrances clear", () => {
   ]);
 
   let seenThematicPlacement = false;
+  // 220 seeds gives high confidence this 70% chance path is exercised repeatedly across RNG branches.
   for (let seed = 1; seed <= 220; seed++) {
     const spawns = populateChunk(chunk, { depth: 5, difficultyMult: 0, profile: {} }, createRng(seed * 37));
     for (const sp of spawns) {
@@ -222,8 +229,10 @@ Deno.test("room patterning keeps egress and entrances clear", () => {
 
 Deno.test("room patterning adds thematic dungeon decor variants", () => {
   const themedKinds = new Set();
+  // 260 seeds (with alternating cave/non-cave profiles) reliably samples each weighted room pattern family.
   for (let seed = 1; seed <= 260; seed++) {
     const chunk = buildTwoEntranceRoomChunk();
+    // Alternate profile shape so both cave-only and non-cave room-pattern themes are exercised.
     const floorPlan = {
       depth: 6,
       difficultyMult: 0,

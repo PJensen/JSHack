@@ -188,6 +188,8 @@ const ROOM_PATTERN_THEMES = [
   { kind: 'cave_garden', weight: 8, minArea: 20, caveOnly: true },
 ];
 const ROOM_PATTERN_CHANCE = 0.70;
+const ROOM_PATTERN_ENTRANCE_LANE_DEPTH = 2;
+const ROOM_PATTERN_INNER_EDGE_OFFSET = 1;
 const ROOM_PATTERN_SOLID_KINDS = new Set([
   'crate',
   'cooking_fire',
@@ -198,6 +200,7 @@ const ROOM_PATTERN_SOLID_KINDS = new Set([
   'harvest_stone',
   'harvest_thorn_bramble',
   'harvest_venom_fern',
+  // Intentionally excludes 'mushrooms': they are hazardous/harvestable dressing but should not hard-block paths.
 ]);
 // Mimics should be encountered mostly in shops; wild dungeon mimics stay uncommon.
 const SHOP_MIMIC_CHANCE = 0.12;
@@ -1200,6 +1203,15 @@ function getRoomOpeningTiles(room, chunk) {
 }
 
 function buildRoomEgressReserve(room, chunk) {
+  const reserveLane = (reserved, fromX, fromY, dx, dy, maxSteps) => {
+    for (let step = 1; step <= maxSteps; step++) {
+      const nx = fromX + dx * step;
+      const ny = fromY + dy * step;
+      if (nx < room.x || nx > room.x + room.w - 1 || ny < room.y || ny > room.y + room.h - 1) break;
+      reserved.add(`${nx},${ny}`);
+    }
+  };
+
   const reserved = new Set();
   const openings = getRoomOpeningTiles(room, chunk);
   for (const opening of openings) {
@@ -1207,33 +1219,37 @@ function buildRoomEgressReserve(room, chunk) {
     const y = opening.y;
     reserved.add(`${x},${y}`);
     if (x === room.x) {
-      reserved.add(`${x + 1},${y}`);
-      reserved.add(`${x + 2},${y}`);
-    } else if (x === room.x + room.w - 1) {
-      reserved.add(`${x - 1},${y}`);
-      reserved.add(`${x - 2},${y}`);
-    } else if (y === room.y) {
-      reserved.add(`${x},${y + 1}`);
-      reserved.add(`${x},${y + 2}`);
-    } else if (y === room.y + room.h - 1) {
-      reserved.add(`${x},${y - 1}`);
-      reserved.add(`${x},${y - 2}`);
+      reserveLane(reserved, x, y, 1, 0, ROOM_PATTERN_ENTRANCE_LANE_DEPTH);
+    }
+    if (x === room.x + room.w - 1) {
+      reserveLane(reserved, x, y, -1, 0, ROOM_PATTERN_ENTRANCE_LANE_DEPTH);
+    }
+    if (y === room.y) {
+      reserveLane(reserved, x, y, 0, 1, ROOM_PATTERN_ENTRANCE_LANE_DEPTH);
+    }
+    if (y === room.y + room.h - 1) {
+      reserveLane(reserved, x, y, 0, -1, ROOM_PATTERN_ENTRANCE_LANE_DEPTH);
     }
   }
   return reserved;
 }
 
 function pickWallDecorationSpot(room, rng, isBlocked, reserved = new Set()) {
+  if (room.w < 3 || room.h < 3) return null;
+  const minInnerX = room.x + ROOM_PATTERN_INNER_EDGE_OFFSET;
+  const maxInnerX = room.x + room.w - 1 - ROOM_PATTERN_INNER_EDGE_OFFSET;
+  const minInnerY = room.y + ROOM_PATTERN_INNER_EDGE_OFFSET;
+  const maxInnerY = room.y + room.h - 1 - ROOM_PATTERN_INNER_EDGE_OFFSET;
   const candidates = [];
-  for (let y = room.y + 1; y <= room.y + room.h - 2; y++) {
-    for (let x = room.x + 1; x <= room.x + room.w - 2; x++) {
+  for (let y = minInnerY; y <= maxInnerY; y++) {
+    for (let x = minInnerX; x <= maxInnerX; x++) {
       const key = `${x},${y}`;
       if (reserved.has(key) || isBlocked(x, y)) continue;
       const isInnerWall = (
-        x === room.x + 1
-        || x === room.x + room.w - 2
-        || y === room.y + 1
-        || y === room.y + room.h - 2
+        x === minInnerX
+        || x === maxInnerX
+        || y === minInnerY
+        || y === maxInnerY
       );
       if (!isInnerWall) continue;
       candidates.push({ x, y });
