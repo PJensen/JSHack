@@ -5158,12 +5158,24 @@ function renderShop(panel, data, state) {
           row.appendChild(qty);
         }
         row.appendChild(price);
+        const rowReturnBtn = document.createElement('button');
+        rowReturnBtn.textContent = 'Return';
+        decorateButton(rowReturnBtn);
+        rowReturnBtn.style.marginLeft = '8px';
+        rowReturnBtn.style.minHeight = '32px';
+        rowReturnBtn.style.padding = '0 10px';
+        row.appendChild(rowReturnBtn);
         row.addEventListener('mouseenter', () => setSel(idx));
-        row.addEventListener('click', () => returnSelected());
+        row.addEventListener('click', () => setSel(idx));
+        rowReturnBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          returnByIndex(idx);
+        });
         listContainer.appendChild(row);
         rows.push(row);
       });
-      hint.textContent = '↑/↓ select · Enter=Return item · P=Pay bill · Esc=Close';
+      hint.textContent = 'Tap item to select · Tap Return button to return · Enter=Return selected · P=Pay bill · Esc=Close';
       setSel(0);
     }
 
@@ -5183,7 +5195,14 @@ function renderShop(panel, data, state) {
     }
 
     function returnSelected() {
-      const it = unpaidItems[sel];
+      returnByIndex(sel);
+    }
+
+    /**
+     * @param {number} idx
+     */
+    function returnByIndex(idx) {
+      const it = unpaidItems[idx];
       if (!it) return;
       for (const itemId of getUiItemEntityIds(it)) {
         window.dispatchEvent(new CustomEvent('ui:removeFromInvoice', {
