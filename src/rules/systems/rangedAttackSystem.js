@@ -151,6 +151,7 @@ export function rangedAttackSystem(world) {
       sourcePos: apos,
       targetPos: dpos,
       allowAdjacentInvisibleTarget: true,
+      hostileOnly: true,
     })) {
       world.emit?.('ranged:blocked', { attacker, target: defender, reason: 'invisible' });
       world.remove(attacker, RangedAttackIntent);

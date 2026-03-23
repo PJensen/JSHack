@@ -1,9 +1,11 @@
 import { Position } from "../components/Position.js";
 import { Flying } from "../components/Flying.js";
 import { Vitality } from "../components/Vitality.js";
+import { Faction } from "../components/Faction.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { hasOverworldAerialLOS } from "./flyingEligibility.js";
 import { statusStrength } from "./statusFacade.js";
+import { areFactionsHostile } from "./factionHostility.js";
 
 /**
  * Find a living airborne entity on the specified tile.
@@ -49,34 +51,37 @@ export function hasSpellLineOfSight(world, spec) {
   const targetPos = spec?.targetPos;
   if (!sourcePos || !targetPos || typeof spec?.isBlocked !== "function") return false;
 
+  const sourceId = Number(spec?.sourceId || 0) | 0;
   const range = Math.max(0, Math.trunc(Number(spec?.range) || 0));
-  if (hasLOS(sourcePos.x | 0, sourcePos.y | 0, targetPos.x | 0, targetPos.y | 0, spec.isBlocked)) {
-    return true;
+  let targetId = Number(spec?.targetId || 0) | 0;
+  if (!(targetId > 0) && spec?.allowFlyingOccupantAtTarget) {
+    targetId = findLivingFlyingOccupantAt(world, targetPos.x, targetPos.y, {
+      excludeId: sourceId,
+    });
   }
 
-  let targetId = Number(spec?.targetId || 0) | 0;
   if (
     targetId > 0
     && isTargetHiddenByInvisibility(world, {
-      sourceId: Number(spec?.sourceId || 0) | 0,
+      sourceId,
       targetId,
       sourcePos,
       targetPos,
       allowAdjacentInvisibleTarget: true,
+      hostileOnly: true,
     })
   ) {
     return false;
   }
 
-  if (!(targetId > 0) && spec?.allowFlyingOccupantAtTarget) {
-    targetId = findLivingFlyingOccupantAt(world, targetPos.x, targetPos.y, {
-      excludeId: Number(spec?.sourceId || 0) | 0,
-    });
+  if (hasLOS(sourcePos.x | 0, sourcePos.y | 0, targetPos.x | 0, targetPos.y | 0, spec.isBlocked)) {
+    return true;
   }
+
   if (!(targetId > 0)) return false;
 
   return hasOverworldAerialLOS(world, {
-    sourceId: Number(spec?.sourceId || 0) | 0,
+    sourceId,
     targetId,
     sourcePos,
     targetPos,
@@ -95,6 +100,7 @@ export function hasSpellLineOfSight(world, spec) {
  *   sourcePos?: { x:number, y:number } | null,
  *   targetPos?: { x:number, y:number } | null,
  *   allowAdjacentInvisibleTarget?: boolean,
+ *   hostileOnly?: boolean,
  * }} spec
  * @returns {boolean} true when targeting should be blocked by invisibility
  */
@@ -102,6 +108,11 @@ export function isTargetHiddenByInvisibility(world, spec) {
   const sourceId = Number(spec?.sourceId || 0) | 0;
   const targetId = Number(spec?.targetId || 0) | 0;
   if (!(sourceId > 0) || !(targetId > 0) || sourceId === targetId) return false;
+  if (spec?.hostileOnly) {
+    const attackerFaction = world.get(sourceId, Faction)?.key || "";
+    const defenderFaction = world.get(targetId, Faction)?.key || "";
+    if (!areFactionsHostile(attackerFaction, defenderFaction)) return false;
+  }
   if (statusStrength(world, targetId, "invisible") <= 0) return false;
   if (!spec?.allowAdjacentInvisibleTarget) return true;
 

@@ -19,7 +19,7 @@ import { searchSystem } from "../rules/systems/searchSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
-import { aiChaseSystem, installAggroFromDamageListener } from "../rules/systems/aiChaseSystem.js";
+import { aiChaseSystem, installAggroFromDamageListener, installAggroFromStealthOffenseListener } from "../rules/systems/aiChaseSystem.js";
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
@@ -132,6 +132,8 @@ export function configureWorld(world) {
   installGenocideListener(world);
   // Elevate enemy AggroState when they take damage (even off-screen).
   installAggroFromDamageListener(world);
+  // Witnesses react to stealth offense and enter hunting with attacker last-known position.
+  installAggroFromStealthOffenseListener(world);
   // Auto-apply electrocution (stun + blind + deafen) on any electric/lightning damage.
   installElectrocuteOnDamage(world);
   // Centipede body segments cascade position when the head moves.

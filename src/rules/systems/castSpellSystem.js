@@ -114,6 +114,7 @@ export function castSpellSystem(world) {
         sourcePos,
         targetPos,
         allowAdjacentInvisibleTarget: true,
+        hostileOnly: true,
       })) {
         try {
           world.emit?.("spell:fizzle", {
