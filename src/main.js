@@ -1963,6 +1963,29 @@ world.on('drank', ({ itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
 });
 
+function findScrollOfIdentifyInPlayerInventory(playerId) {
+  for (const id of inventoryItems(world, playerId)) {
+    const ni = world.get(id, NamedIdentity);
+    if (ni && ni.identity === 'scroll_identify') return id;
+  }
+  return 0;
+}
+
+world.on('item:identified', ({ actor, identity }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== actor) return;
+  const ident = String(identity || '');
+  if (!ident) return;
+  const inv = world.get(pe.id, Inventory);
+  if (!inv) return;
+  for (const itemId of inventoryItems(world, pe.id)) {
+    const ni = world.get(itemId, NamedIdentity);
+    if (!ni || String(ni.identity || '') !== ident) continue;
+    try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
+    break;
+  }
+});
+
 throwFx.installListeners();
 
 world.on('item:pickup', ({ actor, itemId, count }) => {
@@ -1981,6 +2004,7 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   if (!pe || pe.id !== ownerId) return;
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
+  const hasScrollOfIdentify = findScrollOfIdentifyInPlayerInventory(pe.id) > 0;
   const displayItem = buildItemDisplayData(world, itemId);
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
@@ -1995,7 +2019,8 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
           count: info.count || 1,
           rarityName: info.rarityName || 'common',
           glyph: palette?.[world.get(itemId, NamedIdentity)?.identity]?.glyph || '',
-          glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff'
+          glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff',
+          hasScrollOfIdentify,
         }
       }
     }));
@@ -2851,6 +2876,20 @@ addEventListener('ui:requestUse', (ev) => {
   const action = { type: 'rules.useItem', payload: { itemId } };
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler(action);
+});
+
+addEventListener('ui:requestQuickChipIdentify', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const targetItemId = Number(e?.detail?.targetItemId || 0);
+  if (!Number.isInteger(targetItemId) || targetItemId <= 0) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const toolId = findScrollOfIdentifyInPlayerInventory(pe.id);
+  if (!toolId) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.applyItem', payload: { itemId: toolId, targetItemId } });
 });
 
 // When user offers an item at an altar from the altar-offering overlay
