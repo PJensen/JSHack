@@ -27,6 +27,34 @@ export function popUntilActionableTop(stack, isActionable) {
   }
 }
 
+/**
+ * @param {any} it
+ * @returns {"identify"|"apply"|"equip"|"drink"|"use"}
+ */
+export function getQuickChipPrimaryAction(it) {
+  const identity = String(it?.identity || it?.details?.identity || '');
+  const identified = it?.details?.identified ?? it?.identified;
+  if (identity === 'scroll_identify') return 'apply';
+  if (identified === false && !!it?.hasScrollOfIdentify) return 'identify';
+  const t = String(it?.type || '');
+  if (t === 'equip' || t === 'ammo' || t === 'wand') return 'equip';
+  if (t === 'potion') return 'drink';
+  return 'use';
+}
+
+/**
+ * @param {any} it
+ * @returns {string}
+ */
+export function getQuickChipPrimaryActionLabel(it) {
+  const action = getQuickChipPrimaryAction(it);
+  if (action === 'identify') return 'Identify';
+  if (action === 'apply') return 'Apply';
+  if (action === 'equip') return 'Equip';
+  if (action === 'drink') return 'Drink';
+  return 'Use';
+}
+
 export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
@@ -1099,7 +1127,7 @@ function createQuickSlot() {
     zIndex: 901,
   });
 
-  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, details?:any, addedAt:number}>} */
+  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, addedAt:number}>} */
   const stack = [];
   const AUTO_DISMISS_MS = 12000;
 
@@ -1137,10 +1165,14 @@ function createQuickSlot() {
   }
 
   function dispatchAction(it) {
-    const t = String(it.type||'');
-    if (t === 'equip' || t === 'ammo' || t === 'wand') {
+    const action = getQuickChipPrimaryAction(it);
+    if (action === 'identify') {
+      window.dispatchEvent(new CustomEvent('ui:requestQuickChipIdentify', { detail: { targetItemId: it.id } }));
+    } else if (action === 'apply') {
+      window.dispatchEvent(new CustomEvent('ui:openApplyForTool', { detail: { toolId: it.id } }));
+    } else if (action === 'equip') {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-    } else if (t === 'potion') {
+    } else if (action === 'drink') {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     } else {
       window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
@@ -1183,6 +1215,7 @@ function createQuickSlot() {
       rarityName: String(item.rarityName || 'common'),
       glyph: String(item.glyph || ''),
       glyphColor: String(item.glyphColor || ''),
+      hasScrollOfIdentify: !!item.hasScrollOfIdentify,
       details: item,
       addedAt: Date.now()
     });
@@ -1665,8 +1698,7 @@ function renderQuickChip(it, h) {
     padding: '6px 10px', background: '#101626', color: '#cfe8ff',
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
-  const ACTION_LABELS = { equip: 'Equip', ammo: 'Equip', wand: 'Equip', potion: 'Drink', food: 'Eat', scroll: 'Read', learn: 'Learn', book: 'Read', tool: 'Use' };
-  btn.textContent = ACTION_LABELS[it.type] || 'Use';
+  btn.textContent = getQuickChipPrimaryActionLabel(it);
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
   let throwBtn = null;
