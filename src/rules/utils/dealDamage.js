@@ -99,13 +99,15 @@ function activeResistBonus(world, targetId, effectKey) {
  * @param {number} targetId
  * @param {number} rawAmount
  * @param {string} type
+ * @param {number} [armorPenetration=0]
  * @returns {number}
  */
-export function resolveResistance(world, targetId, rawAmount, type) {
+export function resolveResistance(world, targetId, rawAmount, type, armorPenetration = 0) {
   const resist = world.get(targetId, Resistances);
   if (!resist) return rawAmount;
 
   const resolved = resolveCanonicalStats(world, targetId);
+  const penetration = Math.max(0, Number(armorPenetration || 0));
 
   const applyKineticChip = (value, multiplier = 1) => {
     if (!(rawAmount > 0)) return 0;
@@ -131,7 +133,8 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.bluntResist ?? 0);
       const spectral = activeResistBonus(world, targetId, "spectral_form");
-      const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const effectiveDR = Math.max(0, ((resist.kinetic?.DR || 0) + drBonus) - penetration);
+      const afterDR = Math.max(0, rawAmount - effectiveDR);
       const effectiveMult = Math.max(0, (resist.kinetic?.bluntMult ?? 1.0) - multBonus);
       const afterMult = afterDR * effectiveMult;
       return applyKineticChip(spectral > 0 ? Math.floor(afterMult * 0.5) : afterMult, effectiveMult);
@@ -140,7 +143,8 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.slashResist ?? 0);
       const spectral = activeResistBonus(world, targetId, "spectral_form");
-      const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const effectiveDR = Math.max(0, ((resist.kinetic?.DR || 0) + drBonus) - penetration);
+      const afterDR = Math.max(0, rawAmount - effectiveDR);
       const effectiveMult = Math.max(0, (resist.kinetic?.slashMult ?? 1.0) - multBonus);
       const afterMult = afterDR * effectiveMult;
       return applyKineticChip(spectral > 0 ? Math.floor(afterMult * 0.5) : afterMult, effectiveMult);
@@ -149,7 +153,8 @@ export function resolveResistance(world, targetId, rawAmount, type) {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const multBonus = Number(resolved?.pierceResist ?? 0);
       const spectral = activeResistBonus(world, targetId, "spectral_form");
-      const afterDR = Math.max(0, rawAmount - ((resist.kinetic?.DR || 0) + drBonus));
+      const effectiveDR = Math.max(0, ((resist.kinetic?.DR || 0) + drBonus) - penetration);
+      const afterDR = Math.max(0, rawAmount - effectiveDR);
       const effectiveMult = Math.max(0, (resist.kinetic?.pierceMult ?? 1.0) - multBonus);
       const afterMult = afterDR * effectiveMult;
       return applyKineticChip(spectral > 0 ? Math.floor(afterMult * 0.5) : afterMult, effectiveMult);
@@ -157,7 +162,8 @@ export function resolveResistance(world, targetId, rawAmount, type) {
     case 'physical': {
       const drBonus = Number(resolved?.mitigation ?? 0) + Number(resolved?.kineticDR ?? 0);
       const spectral = activeResistBonus(world, targetId, "spectral_form");
-      const afterDR = rawAmount - ((resist.kinetic?.DR || 0) + drBonus);
+      const effectiveDR = Math.max(0, ((resist.kinetic?.DR || 0) + drBonus) - penetration);
+      const afterDR = rawAmount - effectiveDR;
       const afterSpectral = spectral > 0 ? Math.floor(afterDR * 0.5) : afterDR;
       return applyKineticChip(afterSpectral, 1);
     }
@@ -209,6 +215,7 @@ export function resolveResistance(world, targetId, rawAmount, type) {
  * @property {{dx:number,dy:number,force:number}} [knockback] - Push target after damage is applied.
  * @property {boolean} [offhand=false]     - Mark as off-hand hit (for display layer)
  * @property {number}  [projectileDelay=0] - Seconds before float text appears (projectile travel time)
+ * @property {number}  [armorPenetration=0]- Reduces effective kinetic DR for this hit
  */
 
 /**
@@ -246,6 +253,7 @@ export function dealDamage(world, spec) {
 
   const source = Number(spec.source || 0) | 0;
   const type = String(spec.type || 'physical').toLowerCase();
+  const armorPenetration = Math.max(0, Number(spec.armorPenetration || 0));
   const cause = spec.cause || type;
   const critical = !!spec.critical;
 
@@ -280,7 +288,7 @@ export function dealDamage(world, spec) {
   // Step 3: Resistance resolution
   const finalAmount = spec.bypassResist
     ? rawAmount
-    : resolveResistance(world, target, rawAmount, type);
+    : resolveResistance(world, target, rawAmount, type, armorPenetration);
 
   if (finalAmount <= 0) {
     try {

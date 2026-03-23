@@ -344,6 +344,49 @@ Deno.test("capacitive1 does not self-damage on mismatched source context", () =>
   assert(heroHpAfter === heroHpBefore, `capacitive proc should not damage proc owner on mismatched context (before=${heroHpBefore}, after=${heroHpAfter})`);
 });
 
+Deno.test("flaming does not self-ignite on mismatched source context", () => {
+  const world = new World({ seed: 88 });
+  const weapon = makeEquip(world, { slot: 'weapon', bonuses: { attack: 10 }, affixes: ['flaming'], damageDice: '1d8' });
+  const hero = makeActor(world, { x: 2, y: 2, hp: 20, faction: 'player' });
+  const foe = makeActor(world, { x: 2, y: 3, hp: 20, faction: 'enemy' });
+  world.get(hero, Equipment).weapon = weapon;
+  equipmentSystem(world);
+
+  const before = world.get(hero, ActiveEffects)?.effects?.slice() || [];
+  const out = evaluateEquippedAffixProcs(world, hero, {
+    kind: 'onHit',
+    source: foe,
+    target: hero,
+    damage: { amount: 5, type: 'slash', crit: false, blocked: false },
+    tags: new Set(['melee']),
+    scratch: {},
+  });
+  applyProcAccumulator(world, out, { applyDamage: dealDamage });
+
+  const after = world.get(hero, ActiveEffects)?.effects || [];
+  const hasBurning = after.some((e) => e.key === 'burn' || e.key === 'burning');
+  assert(!hasBurning, `flaming proc should not ignite proc owner on mismatched context (before=${before.length}, after=${after.length})`);
+});
+
+Deno.test("ember_knife vs snake never ignites attacker", () => {
+  for (let seed = 1; seed <= 256; seed++) {
+    const world = new World({ seed });
+    installAffixTriggers(world);
+
+    const hero = makeActor(world, { x: 1, y: 1, hp: 50, faction: 'player' });
+    const snake = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
+    const emberKnife = buildCatalogItem(world, 'ember_knife');
+    world.get(hero, Equipment).weapon = emberKnife;
+
+    equipmentSystem(world);
+    resolveMeleeAttack(world, hero, snake);
+
+    const heroEffects = world.get(hero, ActiveEffects)?.effects || [];
+    const selfBurning = heroEffects.some((e) => e.key === 'burn' || e.key === 'burning');
+    assert(!selfBurning, `seed ${seed}: ember_knife attack should not ignite attacker`);
+  }
+});
+
 // ── Inherent affix merge ───────────────────────────────────────────
 
 Deno.test("buildCatalogItem merges inherent affixes with provided ones", () => {

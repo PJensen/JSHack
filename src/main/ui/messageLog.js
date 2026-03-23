@@ -8,6 +8,7 @@
  * @property {string} text - The message text
  * @property {MessageType} type - The message type
  * @property {number} [timestamp] - Optional timestamp
+ * @property {number} [repeat] - Number of consolidated consecutive duplicates
  */
 
 export function createMessageLog({ maxEntries = 50, onUpdate = null } = {}) {
@@ -33,8 +34,15 @@ export function createMessageLog({ maxEntries = 50, onUpdate = null } = {}) {
       entry = { text: String(msg), type: 'default' };
     }
 
-    entries.push(entry);
-    if (entries.length > maxEntries) entries.shift();
+    const prev = entries.length > 0 ? entries[entries.length - 1] : null;
+    if (prev && prev.text === entry.text && prev.type === entry.type) {
+      prev.repeat = Math.max(1, Number(prev.repeat || 1)) + 1;
+      prev.timestamp = entry.timestamp || Date.now();
+    } else {
+      entry.repeat = Math.max(1, Number(entry.repeat || 1));
+      entries.push(entry);
+      if (entries.length > maxEntries) entries.shift();
+    }
     if (typeof onUpdate === "function") onUpdate(entries.slice());
   }
 

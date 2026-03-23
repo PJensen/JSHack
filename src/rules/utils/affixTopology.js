@@ -94,8 +94,17 @@ export function evaluateEquippedAffixProcs(world, actorId, ctx, options = {}) {
   const sourceStats = options.sourceStats || resolveDerivedStats(world, Number(ctx?.source || resolvedActorId) | 0);
   const targetStats = options.targetStats
     || ((Number(ctx?.target || 0) > 0) ? resolveDerivedStats(world, Number(ctx.target) | 0) : {});
+  const ctxKind = String(ctx?.kind || "");
+  const ctxSource = Number(ctx?.source || 0) | 0;
+  const ctxTarget = Number(ctx?.target || 0) | 0;
   const includeSlots = Array.isArray(options.includeSlots) ? new Set(options.includeSlots) : null;
   const excludeSlots = new Set(Array.isArray(options.excludeSlots) ? options.excludeSlots : []);
+
+  // Defensive default: when evaluating on-hit reactions for the damaged actor,
+  // do not evaluate weapon procs unless caller explicitly requests includeSlots.
+  if (!includeSlots && ctxKind === "onHit" && resolvedActorId === ctxTarget && resolvedActorId !== ctxSource) {
+    excludeSlots.add("weapon");
+  }
 
   for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
     const slot = NON_AMMO_GEAR_SLOTS[i];

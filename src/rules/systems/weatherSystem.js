@@ -5,6 +5,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { GrowthStage } from "../components/GrowthStage.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 import { Burned } from "../components/Burned.js";
+import { HazardArea } from "../components/HazardArea.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import {
@@ -54,6 +55,7 @@ const HEAVY_RAIN_LINES = Object.freeze([
  * Transitions: clear ↔ rain ↔ heavy_rain using world.rand().
  * Gameplay effects during rain:
  *   - Extinguish player burning status
+ *   - Extinguish active floor fire hazards
  *   - Put out burning structures (restore tiles from destroyedTileLedger)
  *   - Water crops (extra regrow countdown decrement)
  *
@@ -103,6 +105,7 @@ export function weatherSystem(world) {
     const isRaining = current === "rain" || current === "heavy_rain";
     if (isRaining) {
       _extinguishPlayer(world);
+      _extinguishFloorFireHazards(world);
       _extinguishStructures(world);
       _waterCrops(world);
       _emitRainAmbient(world, current);
@@ -112,6 +115,25 @@ export function weatherSystem(world) {
     }
 
     break; // singleton
+  }
+}
+
+/**
+ * Rain removes active floor fire hazards before they can continue spreading.
+ */
+function _extinguishFloorFireHazards(world) {
+  const toDestroy = [];
+  for (const [hazardId, , hazard] of world.query(Position, HazardArea)) {
+    if (!hazard) continue;
+    if (String(hazard.kind || "").toLowerCase() !== "fire") continue;
+    if (String(hazard.medium || "air").toLowerCase() !== "floor") continue;
+    toDestroy.push(hazardId);
+  }
+  for (let i = 0; i < toDestroy.length; i++) {
+    try { world.destroy(toDestroy[i]); } catch {}
+  }
+  if (toDestroy.length > 0) {
+    world.emit?.("weather:extinguish", { kind: "hazard", hazardKind: "fire", medium: "floor", count: toDestroy.length });
   }
 }
 

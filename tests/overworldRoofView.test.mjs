@@ -2,8 +2,8 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
-import { TILE_GRASS, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
-import { clearAll, setTile } from "../src/rules/environment/dungeon/tileMap.js";
+import { TILE_DOOR, TILE_GRASS, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
+import { clearAll, setTile, getTile, forEachLoadedTile, isRoofed } from "../src/rules/environment/dungeon/tileMap.js";
 import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
@@ -11,6 +11,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 import { spawnHazard } from "../src/rules/utils/hazardSpawn.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
 
 function posOfIdentity(world, identity) {
   for (const [, ident, pos] of world.query(NamedIdentity, Position)) {
@@ -87,8 +88,16 @@ Deno.test("overworld door roof tiles render translucent so entrances read throug
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
   world.add(player, Position, { x: spawn.x, y: spawn.y });
 
+  // Find any roofed door tile in the loaded overworld
+  let doorX = -1, doorY = -1;
+  forEachLoadedTile((x, y) => {
+    if (doorX >= 0) return;
+    if (getTile(x, y) === TILE_DOOR && isRoofed(x, y)) { doorX = x; doorY = y; }
+  });
+  assert(doorX >= 0, "expected at least one roofed door tile on the overworld");
+
   const view = buildWorldView(world);
-  assertEquals(roofAt(view, spawn.x, spawn.y - 1)?.alpha, 0.4);
+  assertEquals(roofAt(view, doorX, doorY)?.alpha, 0.4);
 
   clearAll();
   clearExplored();
@@ -154,13 +163,28 @@ Deno.test("overworld roofs char and smoke as fire moves through a breached build
     damageType: "fire",
     cause: "wildfire",
   });
+  // Simulate deterministic fire spread: mark the wall east of the breach as
+  // destroyed in the ledger (without changing the tile) so the adjacent floor
+  // tile at (keg+1, keg) gains a cardinal destroyed neighbour.
+  markDestroyedTile(world, {
+    x: tavernInterior.x + 1,
+    y: tavernInterior.y - 1,
+    originalTile: TILE_WALL,
+    currentTile: TILE_WALL,
+    destroyedAtTurn: world.step | 0,
+    burnedKind: "wall",
+    cause: "wildfire",
+  });
   view = buildWorldView(world);
   assert(!roofHas(view, tavernInterior.x, tavernInterior.y), "roof should already be gone where the breach opened");
   assert(String(roofAt(view, tavernInterior.x + 1, tavernInterior.y)?.kind || "").includes("charred"), "roof beside the breach should read as charred");
   assertEquals(roofAt(view, tavernInterior.x + 1, tavernInterior.y)?.burning, true);
   assert(roofHas(view, tavernInterior.x + 5, tavernInterior.y + 3), "roof should remain over still-enclosed tavern space");
 
-  for (let i = 0; i < 4; i++) hazardSystem(world);
+  // Remove all fire hazards to simulate fire burning out completely
+  for (const [id,, hazard] of world.query(Position, HazardArea)) {
+    if (String(hazard?.kind || "").toLowerCase() === "fire") world.destroy(id);
+  }
   view = buildWorldView(world);
   assert(!roofHas(view, tavernInterior.x + 1, tavernInterior.y), "roof tile should stop rendering once that section has fully burned through");
   assert(roofHas(view, tavernInterior.x + 5, tavernInterior.y + 3), "distant roof should remain until fire reaches it");

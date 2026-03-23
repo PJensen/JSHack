@@ -949,6 +949,90 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       startShake(cam, 4, 0.16);
     });
 
+    world.on('spell:verdant_ward', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _flashHealFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.4, ttl: 0.5 }));
+      const count = PERF.quality === 'low' ? 12 : 20;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.2 + Math.random() * 0.7;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.2,
+          y: at.y + (Math.random() - 0.5) * 0.2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.18,
+          ay: -0.02,
+          life: 0.35 + Math.random() * 0.35,
+          size0: 0.08 + Math.random() * 0.05,
+          size1: 0.02,
+          r: 100 + ((Math.random() * 40) | 0),
+          g: 180 + ((Math.random() * 70) | 0),
+          b: 90 + ((Math.random() * 40) | 0),
+          a0: 0.85,
+          rotVel: (Math.random() - 0.5) * 1.2,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    world.on('spell:harmony_ward', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smiteFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.25, ttl: 0.46 }));
+      const count = PERF.quality === 'low' ? 14 : 24;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / Math.max(1, count)) + (Math.random() - 0.5) * 0.45;
+        const speed = 0.22 + Math.random() * 0.85;
+        const warm = (i % 2) === 0;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.18,
+          y: at.y + (Math.random() - 0.5) * 0.18,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          ay: 0.03,
+          life: 0.28 + Math.random() * 0.32,
+          size0: 0.08 + Math.random() * 0.04,
+          size1: 0.02,
+          r: warm ? 250 : 110,
+          g: warm ? 220 : 210,
+          b: warm ? 90 : 255,
+          a0: 0.82,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    world.on('spell:shadow_veil', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _blinkFx.push(new BlinkFx({
+        from: { x: at.x, y: at.y },
+        to: { x: at.x, y: at.y },
+        ttl: 0.34,
+        phase: Math.random() * Math.PI * 2,
+        randomized: false,
+      }));
+      const count = PERF.quality === 'low' ? 12 : 20;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.12 + Math.random() * 0.45;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.26,
+          y: at.y + (Math.random() - 0.5) * 0.26,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.06,
+          ay: -0.01,
+          life: 0.30 + Math.random() * 0.38,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 165 + ((Math.random() * 35) | 0),
+          g: 85 + ((Math.random() * 35) | 0),
+          b: 220 + ((Math.random() * 35) | 0),
+          a0: 0.72,
+          rotVel: (Math.random() - 0.5) * 1.6,
+        }));
+      }
+      startShake(cam, 1, 0.05);
+    });
+
     world.on('spell:earthshatter', ({ origin, radius, enhanced }) => {
       if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return;
       const r = Math.max(1, Number(radius || 1));

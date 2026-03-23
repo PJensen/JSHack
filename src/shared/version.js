@@ -94,4 +94,4 @@ export async function loadVersion() {
 
 // Start loading the version but do not use top-level await.
 // Export the promise so other modules can wait for it if they need to.
-export const versionLoaded = loadVersion();
+export const versionLoaded = loadVersion().catch(() => {});

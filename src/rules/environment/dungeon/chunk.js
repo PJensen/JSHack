@@ -113,6 +113,7 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null, 
   }
 
   _ensureConnectedWalkable(tiles, worldSeed, depth, chunkX, chunkY);
+  sanitizeDoorTiles(tiles, CHUNK_SIZE);
 
   // Detect door positions after the final floor geometry is settled so doors
   // cannot preserve stale metadata from pre-connectivity/pre-prefab layouts.
@@ -152,44 +153,165 @@ export function edgeGate(worldSeed, depth, cxA, cyA, cxB, cyB) {
  * @returns {Array<{x:number, y:number}>} chunk-local positions
  */
 export function findDoorPositions(tiles, stride, rng, doorChance) {
-  // Collect all valid candidates first
+  const isWalkable = t => t === TILE_FLOOR || t === TILE_DOOR;
+
+  /** @type {Array<Array<{x:number,y:number}>>} */
+  const groups = [];
+  const paired = new Set();
+
+  // Collect double-door candidates first so they win over single doors.
+  for (let y = 1; y < stride - 2; y++) {
+    for (let x = 1; x < stride - 1; x++) {
+      // Vertical pair: two stacked doors at (x,y) and (x,y+1)
+      if (
+        tiles[y * stride + x] === TILE_FLOOR &&
+        tiles[(y + 1) * stride + x] === TILE_FLOOR &&
+        tiles[(y - 1) * stride + x] === TILE_WALL &&
+        tiles[(y + 2) * stride + x] === TILE_WALL &&
+        isWalkable(tiles[y * stride + (x - 1)]) &&
+        isWalkable(tiles[y * stride + (x + 1)]) &&
+        isWalkable(tiles[(y + 1) * stride + (x - 1)]) &&
+        isWalkable(tiles[(y + 1) * stride + (x + 1)])
+      ) {
+        const k1 = `${x},${y}`;
+        const k2 = `${x},${y + 1}`;
+        if (!paired.has(k1) && !paired.has(k2) && rng.next() < doorChance) {
+          groups.push([{ x, y }, { x, y: y + 1 }]);
+          paired.add(k1);
+          paired.add(k2);
+        }
+      }
+    }
+  }
+
+  for (let y = 1; y < stride - 1; y++) {
+    for (let x = 1; x < stride - 2; x++) {
+      // Horizontal pair: two side-by-side doors at (x,y) and (x+1,y)
+      if (
+        tiles[y * stride + x] === TILE_FLOOR &&
+        tiles[y * stride + (x + 1)] === TILE_FLOOR &&
+        tiles[y * stride + (x - 1)] === TILE_WALL &&
+        tiles[y * stride + (x + 2)] === TILE_WALL &&
+        isWalkable(tiles[(y - 1) * stride + x]) &&
+        isWalkable(tiles[(y + 1) * stride + x]) &&
+        isWalkable(tiles[(y - 1) * stride + (x + 1)]) &&
+        isWalkable(tiles[(y + 1) * stride + (x + 1)])
+      ) {
+        const k1 = `${x},${y}`;
+        const k2 = `${x + 1},${y}`;
+        if (!paired.has(k1) && !paired.has(k2) && rng.next() < doorChance) {
+          groups.push([{ x, y }, { x: x + 1, y }]);
+          paired.add(k1);
+          paired.add(k2);
+        }
+      }
+    }
+  }
+
+  // Collect single-door candidates.
   const candidates = [];
   for (let y = 1; y < stride - 1; y++) {
     for (let x = 1; x < stride - 1; x++) {
       if (tiles[y * stride + x] !== TILE_FLOOR) continue;
+      if (paired.has(`${x},${y}`)) continue;
 
       const n = tiles[(y - 1) * stride + x];
       const s = tiles[(y + 1) * stride + x];
       const e = tiles[y * stride + (x + 1)];
       const w = tiles[y * stride + (x - 1)];
 
-      const isWallOrVoid = t => t === TILE_WALL || t === TILE_VOID;
-      const nsWalls = isWallOrVoid(n) && isWallOrVoid(s);
-      const ewWalls = isWallOrVoid(e) && isWallOrVoid(w);
+      const isWall = t => t === TILE_WALL;
+      const nsWalls = isWall(n) && isWall(s);
+      const ewWalls = isWall(e) && isWall(w);
+      const nsWalk = isWalkable(n) && isWalkable(s);
+      const ewWalk = isWalkable(e) && isWalkable(w);
 
-      // XOR: exactly one pair of opposing neighbors is wall
-      if ((nsWalls && !ewWalls) || (!nsWalls && ewWalls)) {
+      // Single-tile chokepoint only: one axis walls, opposite axis walkable.
+      // This avoids "floating" doors in wider hall geometry.
+      if ((nsWalls && ewWalk) || (ewWalls && nsWalk)) {
         if (rng.next() < doorChance) {
-          candidates.push({ x, y });
+          candidates.push([{ x, y }]);
         }
       }
     }
   }
+  groups.push(...candidates);
 
-  // Filter out consecutive doors: enforce minimum spacing of 3 tiles
+  // Filter out consecutive doors: enforce minimum spacing of 3 tiles.
+  // Double doors are treated as one group and accepted/rejected together.
   const MIN_DOOR_SPACING = 3;
   const doors = [];
-  for (const c of candidates) {
+  for (const group of groups) {
     let tooClose = false;
-    for (const d of doors) {
-      if (Math.abs(c.x - d.x) + Math.abs(c.y - d.y) < MIN_DOOR_SPACING) {
-        tooClose = true;
-        break;
+    for (const c of group) {
+      for (const d of doors) {
+        if (Math.abs(c.x - d.x) + Math.abs(c.y - d.y) < MIN_DOOR_SPACING) {
+          tooClose = true;
+          break;
+        }
       }
+      if (tooClose) break;
     }
-    if (!tooClose) doors.push(c);
+    if (!tooClose) doors.push(...group);
   }
   return doors;
+}
+
+/**
+ * Door frame validator shared by chunk post-processing and tests.
+ * Valid doors must be a single pinch-point frame or part of a proper
+ * two-tile double-door frame.
+ * @param {Uint8Array} tiles
+ * @param {number} stride
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function isDoorFrameAt(tiles, stride, x, y) {
+  if (x <= 0 || y <= 0 || x >= stride - 1 || y >= stride - 1) return false;
+  if (tiles[y * stride + x] !== TILE_DOOR) return false;
+
+  const n = tiles[(y - 1) * stride + x];
+  const s = tiles[(y + 1) * stride + x];
+  const e = tiles[y * stride + (x + 1)];
+  const w = tiles[y * stride + (x - 1)];
+  const nsWalls = (n === TILE_WALL) && (s === TILE_WALL);
+  const ewWalls = (e === TILE_WALL) && (w === TILE_WALL);
+  const singlePinch = nsWalls !== ewWalls;
+  if (singlePinch) return true;
+
+  const doorUp = n === TILE_DOOR;
+  const doorDown = s === TILE_DOOR;
+  const doorLeft = w === TILE_DOOR;
+  const doorRight = e === TILE_DOOR;
+
+  const verticalDouble = (doorUp || doorDown)
+    && tiles[Math.max(0, y - 2) * stride + x] === TILE_WALL
+    && tiles[Math.min(stride - 1, y + 2) * stride + x] === TILE_WALL;
+  if (verticalDouble) return true;
+
+  const horizontalDouble = (doorLeft || doorRight)
+    && tiles[y * stride + Math.max(0, x - 2)] === TILE_WALL
+    && tiles[y * stride + Math.min(stride - 1, x + 2)] === TILE_WALL;
+  if (horizontalDouble) return true;
+
+  return false;
+}
+
+/**
+ * Remove structurally invalid pre-authored doors (e.g. floating doors left by
+ * room overlays) so materialization cannot spawn door entities in open space.
+ * @param {Uint8Array} tiles
+ * @param {number} stride
+ */
+export function sanitizeDoorTiles(tiles, stride) {
+  for (let y = 0; y < stride; y++) {
+    for (let x = 0; x < stride; x++) {
+      if (tiles[y * stride + x] !== TILE_DOOR) continue;
+      if (isDoorFrameAt(tiles, stride, x, y)) continue;
+      tiles[y * stride + x] = TILE_FLOOR;
+    }
+  }
 }
 
 // --- Edge gate internals ---

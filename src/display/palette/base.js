@@ -141,6 +141,9 @@ export const basePalette = {
   book_earthshatter: { glyph: "?", fg: "#cc9966", glow: "#996633" },
   book_heal: { glyph: "?", fg: "#66ff99", glow: "#44bb66" },
   book_blind: { glyph: "?", fg: "#9966cc", glow: "#663399" },
+  book_verdant_ward: { glyph: "⁂", fg: "#9ee486", glow: "#5ca94a" },
+  book_harmony_ward: { glyph: "☯", fg: "#d8d38a", glow: "#7aa8e0" },
+  book_shadow_veil: { glyph: "⌇", fg: "#b78cff", glow: "#6b4ab2" },
   book_dead: { glyph: "?", fg: "#888888", glow: "#555555" },
 
   // Wands
@@ -152,6 +155,9 @@ export const basePalette = {
   // Ammo
   ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },
   ammo_fire_arrows: { glyph: "/", fg: "#ff6a33", glow: "#ff4400" },
+  ammo_piercing_arrows: { glyph: "/", fg: "#bfc8d6", glow: "#6d7685" },
+  ammo_bodkin_arrows: { glyph: "/", fg: "#d0d4db", glow: "#8b929d" },
+  ammo_blunt_arrows: { glyph: "/", fg: "#b89b72", glow: "#8f6f45" },
 
   // Pets
   kitty: { glyph: "f", fg: "#ffcc88", glow: "#cc9955" },
@@ -181,7 +187,12 @@ export const basePalette = {
   mill_chest:      { glyph: "]", fg: "#d9b55a", glow: "#9f6c1d" },
   smithy_chest:    { glyph: "]", fg: "#caa27a", glow: "#8a5e34" },
   lumber_chest:    { glyph: "]", fg: "#b88752", glow: "#7c4f22" },
-  bed_home: { glyph: "=", fg: "#9fc4d6", glow: "#5c7f90" },
+  bed_home: {
+    layers: [
+      { glyph: "▬", fg: "#7b6345", glow: "#5a4a3a" },                           // frame
+      { glyph: "▪", fg: "#d4c9b0", glow: "#a09080", dx: -0.14, dy: -0.06, scale: 0.5 }, // pillow
+    ]
+  },
   house_sign: { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
   alchemy_bench: { glyph: "⚗", fg: "#93def6", glow: "#4f7fa1" },
   potion_shelf:  { glyph: "=", fg: "#7986cb", glow: "#3949ab" },
@@ -196,7 +207,14 @@ export const basePalette = {
   herb_patch: { glyph: "✿", fg: "#63a85f", glow: "#3e6b3c" },
   thorn_bramble: { glyph: "☘", fg: "#7ea157", glow: "#415b2e" },
   venom_fern: { glyph: "☣", fg: "#a5d95c", glow: "#648431" },
-  moonleaf_cluster: { glyph: "✺", fg: "#d5e4ff", glow: "#8194c5" },
+  moonleaf_cluster: {
+    layers: [
+    { glyph: ")", fg: "#0f3e36", glow: "#aaaaaa", dx: 0.03, dy: 0.4, scale: 0.45 },
+    { glyph: "✺", fg: "#165f8d", glow: "#aaaaaa", dx: -0.01, dy: 0.05 },
+    { glyph: "●", fg: "#5b5393", glow: "#aaaaaa", dx: -0.01, dy: 0.03, scale: 0.2 },
+    ]
+  },
+
   ember_root_patch: { glyph: "♨", fg: "#d57b3a", glow: "#9a3f14" },
   venom_spores: { glyph: "◌", fg: "#9dd46f", glow: "#5f8d3c" },
   // Mining nodes
@@ -258,7 +276,15 @@ export const basePalette = {
   lantern_post:  { glyph: "♦", fg: "#ffcc55", glow: "#cc9922" },
   lantern_post_unlit: { glyph: "♦", fg: "#665533", glow: "#332211" },
   rain_barrel:   { glyph: "U", fg: "#7a8a94", glow: "#4a5a64" },
-  wheelbarrow:   { glyph: "⊂", fg: "#8a7a5a", glow: "#5a4a32" },
+  wheelbarrow: {
+    layers: [
+    { glyph: "-", fg: "#120707", glow: "#aaaaaa", dx: -0.27, scale: 0.96 },
+    { glyph: "-", fg: "#000000", glow: "#aaaaaa", dx: 0.35, dy: 0.23, scale: 0.6 },
+    { glyph: "-", fg: "#000000", glow: "#aaaaaa", dx: 0.34, dy: -0.24, scale: 0.6 },
+    { glyph: "■", fg: "#702929", glow: "#aaaaaa", dx: 0.01, dy: -0.03, scale: 0.72 },
+    { glyph: "⊂", fg: "#b84c4c", glow: "#aaaaaa", dx: 0.01, dy: 0.04, scale: 1.39 },
+    ]
+  },
   market_stall:  { glyph: "⌂", fg: "#c4a060", glow: "#8a6830" },
   bench:         { glyph: "▬", fg: "#9a7850", glow: "#6a5030" },
   // Natural features
@@ -276,12 +302,14 @@ export const basePalette = {
   shrine:      { glyph: "⛫", fg: "#ffdd66", glow: "#ccaa33" },
   statue:      { glyph: "🗿", fg: "#ccccdd", glow: "#9999ab" },
   sarcophagus: { glyph: "⚰", fg: "#aaa8a0", glow: "#777570" },
-  pillar:      { glyph: "╥", fg: "#99a",    glow: "#667"    },
+  pillar:      { glyph: "#", fg: "#b0a8c0",  glow: "#706880" },
   weapon_rack: { glyph: "⚔", fg: "#bbbbcc", glow: "#888899" },
   mushrooms:   { glyph: "🍄", fg: "#88cc88", glow: "#558855" },
   web:         { glyph: "🕸", fg: "#c8c8c8", glow: "#888888" },
   torch:       { glyph: "🕯", fg: "#ffaa44", glow: "#ff6600" },
   urn:         { glyph: "⚱", fg: "#c8a060", glow: "#8a6030" },
+  flayed_man:  { glyph: "╳", fg: "#3a2213", glow: "#aaaaaa" },
+  hanging_chains: { glyph: "⛓", fg: "#8f9299", glow: "#aaaaaa" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },

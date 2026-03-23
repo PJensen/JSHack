@@ -10,6 +10,7 @@ import { Inventory } from "../components/Inventory.js";
 import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import {
   destroyInventoryRoot,
   inventoryItems,
@@ -27,7 +28,26 @@ import {
 import { dropLoot } from "../data/lootResolver.js";
 import { createCorpse } from "../archetypes/Food.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { Bone } from "../archetypes/Items.js";
+import { Ashes, Bone } from "../archetypes/Items.js";
+
+function corpseDropChance(monsterDef, wasPet) {
+  if (wasPet) return 1.0;
+  if (!monsterDef) return 0;
+  if (Number.isFinite(monsterDef.corpseDropChance)) {
+    const v = Number(monsterDef.corpseDropChance);
+    return Math.max(0, Math.min(1, v));
+  }
+  return Math.min(1.0, 0.25 + (monsterDef.tier || 0) * 0.10);
+}
+
+function isBurningOnDeath(world, id) {
+  const ae = world.get(id, ActiveEffects);
+  if (!ae || !Array.isArray(ae.effects)) return false;
+  return ae.effects.some((effect) => {
+    const key = String(effect?.key || "").toLowerCase();
+    return key === "burn" || key === "burning";
+  });
+}
 
 /**
  * Collect all entities with Vitality and remove those whose hp <= 0.
@@ -99,15 +119,15 @@ export function cleanupSystem(world) {
             dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
           }
 
-          // Drop a corpse for the killed monster or pet
-          // Pets ALWAYS drop corpses (100% chance)
-          // Other monsters: Base 25% chance, +10% per tier (higher tier = more likely)
-          const corpseChance = wasPet
-            ? 1.0
-            : Math.min(1.0, 0.25 + (effectiveMonsterDef.tier || 0) * 0.10);
+          // Drop a corpse for the killed monster or pet.
+          // Use monster-authored corpseDropChance when present.
+          const corpseChance = corpseDropChance(effectiveMonsterDef, wasPet);
+          const burnedToDeath = isBurningOnDeath(world, id);
           // Use the RNG if available, otherwise just check corpseChance directly
           let shouldCreateCorpse = false;
-          if (monsterDef) {
+          if (burnedToDeath) {
+            shouldCreateCorpse = true;
+          } else if (monsterDef) {
             const step = world.step | 0;
             const lootSeed = ((world.seed >>> 0) ^ ((step * 0x9e3779b9) >>> 0) ^
               ((id * 0x517cc1b7) >>> 0)) >>> 0;
@@ -120,23 +140,27 @@ export function cleanupSystem(world) {
           }
 
           if (shouldCreateCorpse) {
-            // Skeletal monsters drop bones instead of corpses
-            const tags = getMonsterTags(effectiveMonsterDef.id);
-            const isSkeletal = tags.includes("skeletal");
-
             let droppedId;
-            if (isSkeletal && !wasPet) {
-              droppedId = createFrom(world, Bone, {});
+            if (burnedToDeath) {
+              droppedId = createFrom(world, Ashes, {});
               world.add(droppedId, Position, { x: pos.x, y: pos.y });
             } else {
-              droppedId = createCorpse(world, effectiveMonsterDef, {
-                x: pos.x,
-                y: pos.y,
-              });
+              // Skeletal monsters drop bones instead of corpses
+              const tags = getMonsterTags(effectiveMonsterDef.id);
+              const isSkeletal = tags.includes("skeletal");
+              if (isSkeletal && !wasPet) {
+                droppedId = createFrom(world, Bone, {});
+                world.add(droppedId, Position, { x: pos.x, y: pos.y });
+              } else {
+                droppedId = createCorpse(world, effectiveMonsterDef, {
+                  x: pos.x,
+                  y: pos.y,
+                });
+              }
             }
 
             // If this was a pet, mark the corpse with Pet tag and Owner
-            if (wasPet && petOwnerId) {
+            if (!burnedToDeath && wasPet && petOwnerId) {
               try {
                 world.add(droppedId, Pet);
                 world.add(droppedId, Owner, { ownerId: petOwnerId });

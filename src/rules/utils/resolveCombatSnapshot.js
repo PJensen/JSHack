@@ -57,6 +57,10 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
 
   const accuracy = Number(resolvedStats?.accuracy || 0);
   const damagePower = Number(resolvedStats?.damagePower || 0);
+  const physicalPenetration = Number(resolvedStats?.physicalPenetration || 0);
+  const bluntPenetration = Number(resolvedStats?.bluntPenetration || 0);
+  const slashPenetration = Number(resolvedStats?.slashPenetration || 0);
+  const piercePenetration = Number(resolvedStats?.piercePenetration || 0);
   const evade = Number(resolvedStats?.evade || 0);
   const luck = Number(resolvedStats?.luck || 0) + statusStrength(world, id, "lucky");
   const critChance = Number(resolvedStats?.critChancePhysical || 0);
@@ -82,6 +86,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     thermal_sense: statusStrength(world, id, "thermal_sense"),
     blood_rage: statusStrength(world, id, "blood_rage"),
     war_fed: statusStrength(world, id, "war_fed"),
+    invisible: statusStrength(world, id, "invisible"),
     phase_shift: statusStrength(world, id, "phase_shift"),
     ogre_bulk: statusStrength(world, id, "ogre_bulk"),
     shadow_cloak: statusStrength(world, id, "shadow_cloak"),
@@ -172,20 +177,27 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     defenseContribution = 0;
   }
 
+  const shadowAmbushActive = statusTotals.shadow_cloak > 0 && statusTotals.invisible > 0;
+  const shadowAmbushDamageMult = shadowAmbushActive ? 4 : 1;
+
   return {
     entityId: id,
     mode,
     attackBonus,
     armorClass: 10 + defenseContribution,
     damageFlatBonus: Math.max(0, Math.floor(damagePower / 2)) + (statusTotals.war_fed > 0 ? statusTotals.war_fed * 2 : 0),
-    damageMult: (statusTotals.berserk > 0 ? 1.5 : 1) * (statusTotals.blood_rage > 0 ? 1.25 : 1),
+    damageMult: (statusTotals.berserk > 0 ? 1.5 : 1) * (statusTotals.blood_rage > 0 ? 1.25 : 1) * shadowAmbushDamageMult,
     accuracy,
     damagePower,
+    physicalPenetration,
+    bluntPenetration,
+    slashPenetration,
+    piercePenetration,
     evade,
     mitigation: Number(resolvedStats?.mitigation || 0),
     luck,
-    critChance: critChance + (statusTotals.shadow_cloak > 0 ? 0.15 * statusTotals.shadow_cloak : 0),
-    critMult: critMult + (statusTotals.shadow_cloak > 0 ? 0.5 * statusTotals.shadow_cloak : 0),
+    critChance: critChance + (shadowAmbushActive ? 0.15 * statusTotals.shadow_cloak : 0),
+    critMult: critMult + (shadowAmbushActive ? 0.5 * statusTotals.shadow_cloak : 0),
     status: Object.freeze({ ...statusTotals }),
     modifiers: Object.freeze(modifiers),
   };

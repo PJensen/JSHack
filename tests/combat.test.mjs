@@ -108,6 +108,41 @@ Deno.test("blunt melee deals extra damage to skeleton-style resistance profile",
   assert(compared, 'expected at least one deterministic seed with a landed hit');
 });
 
+Deno.test("pierce melee penetration improves damage into heavy armor", () => {
+  const heavyResist = { kinetic: { DR: 6, bluntMult: 1.0, slashMult: 1.0, pierceMult: 1.0 } };
+
+  function runOne(seed, bonuses) {
+    const world = new World({ seed });
+    installAffixTriggers(world);
+    const weapon = makeEquip(world, {
+      id: 'test_pierce_weapon',
+      name: 'Test Piercer',
+      slot: 'weapon',
+      bonuses,
+      damageType: 'pierce',
+    });
+    const hero = makeActor(world, 'Hero', { weapon }, 30);
+    const foe = makeActor(world, 'Target', {}, 30, heavyResist);
+    world.add(hero, Position, { x: 1, y: 1 });
+    world.add(foe, Position, { x: 1, y: 2 });
+    equipmentSystem(world);
+    world.add(hero, AttackIntent, { targetId: foe });
+    combatSystem(world);
+    return 30 - world.get(foe, Vitality).hp;
+  }
+
+  let compared = false;
+  for (let seed = 1; seed <= 64; seed++) {
+    const base = runOne(seed, { accuracy: 12, damagePower: 6 });
+    const piercing = runOne(seed, { accuracy: 12, damagePower: 6, piercePenetration: 3 });
+    if (base === 0 && piercing === 0) continue;
+    assert(piercing > base, `expected pierce penetration to improve heavy-armor damage (base=${base}, piercing=${piercing}, seed=${seed})`);
+    compared = true;
+    break;
+  }
+  assert(compared, 'expected at least one deterministic seed with a landed hit');
+});
+
 Deno.test("caustic affix adds acid chip that is blocked by acid immunity", () => {
   const worldA = new World({ seed: 202 });
   installAffixTriggers(worldA);

@@ -1,0 +1,664 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>JS-Hack Composite Glyph Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+:root{--bg:#0b0f13;--panel:#07100d;--muted:#9fd7aa;--accent:#73c08a;--border:rgba(36,69,55,0.5)}
+html,body{height:100%;margin:0;background:var(--bg);color:#d8f6de;font:13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+*{box-sizing:border-box}
+.wrap{display:grid;grid-template-columns:220px 1fr 300px;gap:8px;height:100vh;padding:8px}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid var(--border);border-radius:8px;padding:8px;overflow-y:auto}
+.left{display:flex;flex-direction:column;gap:4px}
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.right{display:flex;flex-direction:column;gap:6px}
+h3{margin:0 0 4px;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px}
+button{background:#082214;border:1px solid #244537;color:var(--muted);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px}
+button:hover{background:#0d3020;border-color:var(--accent)}
+button.warn{background:#3b1b1b;border-color:#7b3b3b}
+button.warn:hover{background:#5b2b2b}
+button.primary{background:#0d4020;border-color:#2d8b5a}
+input[type=text],input[type=number]{width:100%;padding:5px 8px;border-radius:6px;border:1px solid #244537;background:rgba(0,0,0,0.3);color:var(--muted);font-size:12px}
+input[type=color]{width:36px;height:28px;border:1px solid #244537;border-radius:4px;background:rgba(0,0,0,0.3);cursor:pointer;padding:1px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+textarea{width:100%;background:#04120e;color:#d8f6de;border:1px solid #123826;padding:6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace;font-size:11px;resize:vertical}
+.line{height:1px;background:rgba(160,220,180,0.06);margin:6px 0}
+label.row{display:flex;gap:6px;align-items:center;font-size:12px}
+.slider-row{display:flex;align-items:center;gap:6px;font-size:11px}
+.slider-row label{min-width:36px;color:#7aa}
+.slider-row .val{min-width:44px;text-align:right;color:var(--muted);font-family:monospace}
+
+/* Layer list */
+.layer-item{display:flex;align-items:center;gap:6px;padding:5px 6px;border:1px solid transparent;border-radius:6px;cursor:pointer;font-size:12px;background:rgba(0,0,0,0.2)}
+.layer-item:hover{border-color:rgba(115,192,138,0.3)}
+.layer-item.active{border-color:#5cff9a;background:rgba(40,120,60,0.15);box-shadow:0 0 6px rgba(92,255,154,0.15)}
+.layer-glyph{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(0,0,0,0.3);border-radius:4px}
+.layer-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#7aa}
+.layer-btns{display:flex;gap:2px}
+.layer-btns button{padding:2px 5px;font-size:10px;line-height:1}
+
+/* Preview sizes row */
+.size-row{display:flex;gap:12px;align-items:end}
+.size-preview{display:flex;flex-direction:column;align-items:center;gap:2px}
+.size-preview span{font-size:10px;color:#7aa}
+
+/* Glyph picker grid */
+.glyph-section{margin-top:4px}
+.glyph-cat{font-size:10px;color:#7aa;margin:6px 0 2px;font-weight:600;border-bottom:1px solid rgba(100,200,150,0.1);padding-bottom:2px}
+.glyph-grid{display:flex;flex-wrap:wrap;gap:2px}
+.glyph-pick{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:3px;cursor:pointer;font-size:14px;background:rgba(0,0,0,0.3);position:relative}
+.glyph-pick:hover{border-color:var(--accent);background:rgba(40,80,60,0.3)}
+.glyph-pick .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#0a1a14;border:1px solid var(--border);padding:2px 5px;border-radius:3px;font-size:9px;white-space:nowrap;z-index:10;color:var(--muted)}
+.glyph-pick:hover .tip{display:block}
+</style>
+
+<div class="wrap">
+  <!-- LEFT: Layer List -->
+  <div class="panel left">
+    <h3>Layers</h3>
+    <button onclick="addLayer()" style="margin-bottom:6px">+ Add Layer</button>
+    <div id="layerList"></div>
+    <div class="line"></div>
+    <h3>Glyph Picker</h3>
+    <div id="glyphGrid"></div>
+  </div>
+
+  <!-- CENTER: Preview -->
+  <div class="center">
+    <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#7aa">
+      <label><input type="checkbox" id="chkGlow" checked onchange="render()"> Glow</label>
+      <label><input type="checkbox" id="chkGrid" onchange="render()"> Grid</label>
+    </div>
+    <canvas id="mainCanvas" width="320" height="320" style="background:#1a1c28;border-radius:8px;border:1px solid var(--border)"></canvas>
+    <fieldset style="width:320px;font-size:11px;color:#7aa;border:1px solid var(--border);border-radius:6px;padding:4px 8px;margin:4px 0">
+      <legend style="font-size:11px;color:#8cf;padding:0 4px">Root</legend>
+      <div class="slider-row"><label>dx</label><input type="range" id="rootDx" min="-0.5" max="0.5" step="0.01" value="0" oninput="onRootChange()"><span class="val" id="valRootDx">0.00</span></div>
+      <div class="slider-row"><label>dy</label><input type="range" id="rootDy" min="-0.5" max="0.5" step="0.01" value="0" oninput="onRootChange()"><span class="val" id="valRootDy">0.00</span></div>
+      <div class="slider-row"><label>scale</label><input type="range" id="rootScale" min="0.1" max="3.0" step="0.05" value="1.0" oninput="onRootChange()"><span class="val" id="valRootScale">1.00</span></div>
+      <div style="display:flex;gap:4px;margin-top:2px">
+        <button style="padding:2px 6px;font-size:10px" onclick="bakeRoot()">Bake</button>
+        <button style="padding:2px 6px;font-size:10px" onclick="resetRoot()">Reset</button>
+      </div>
+    </fieldset>
+    <div class="size-row">
+      <div class="size-preview"><canvas id="prev32" width="32" height="32" style="background:#1a1c28;border-radius:4px"></canvas><span>32</span></div>
+      <div class="size-preview"><canvas id="prev48" width="48" height="48" style="background:#1a1c28;border-radius:4px"></canvas><span>48</span></div>
+      <div class="size-preview"><canvas id="prev64" width="64" height="64" style="background:#1a1c28;border-radius:4px"></canvas><span>64</span></div>
+      <div class="size-preview"><canvas id="prev96" width="96" height="96" style="background:#1a1c28;border-radius:4px"></canvas><span>96</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Properties + Export -->
+  <div class="panel right">
+    <h3>Selected Layer</h3>
+    <div id="propsPanel" style="display:none">
+      <label class="row">Glyph <input type="text" id="propGlyph" maxlength="2" style="width:50px" oninput="onPropChange()"></label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <label class="row">fg <input type="color" id="propFg" oninput="onPropChange()"> <input type="text" id="propFgHex" style="width:70px" oninput="onHexChange('fg')"></label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <label class="row">glow <input type="color" id="propGlow" oninput="onPropChange()"> <input type="text" id="propGlowHex" style="width:70px" oninput="onHexChange('glow')"></label>
+      </div>
+      <div class="line"></div>
+      <div class="slider-row"><label>dx</label><input type="range" id="propDx" min="-0.5" max="0.5" step="0.01" value="0" oninput="onPropChange()"><span class="val" id="valDx">0.00</span></div>
+      <div class="slider-row"><label>dy</label><input type="range" id="propDy" min="-0.5" max="0.5" step="0.01" value="0" oninput="onPropChange()"><span class="val" id="valDy">0.00</span></div>
+      <div class="slider-row"><label>scale</label><input type="range" id="propScale" min="0.1" max="2.0" step="0.05" value="1.0" oninput="onPropChange()"><span class="val" id="valScale">1.00</span></div>
+      <div class="slider-row"><label>bg</label><input type="color" id="propBg" value="#1a1c28" oninput="onPropChange()"> <label><input type="checkbox" id="chkBg" onchange="onPropChange()"> enable</label></div>
+    </div>
+    <div id="propsEmpty" style="font-size:11px;color:#7aa">Select or add a layer</div>
+
+    <div class="line"></div>
+    <h3>Export</h3>
+    <label class="row">Identity <input type="text" id="exportName" value="my_composite" oninput="updateExport()"></label>
+    <textarea id="exportArea" rows="12"></textarea>
+    <div style="display:flex;gap:4px">
+      <button onclick="copyExport()">Copy</button>
+      <button onclick="applyExport()">Apply</button>
+      <button onclick="importJson()">Import JSON</button>
+    </div>
+
+    <div class="line"></div>
+    <h3>Save / Load</h3>
+    <div style="display:flex;gap:4px">
+      <button onclick="saveWip()">Save WIP</button>
+      <button onclick="loadWip()">Load WIP</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let layers = [];
+let selectedIdx = -1;
+let root = { dx: 0, dy: 0, scale: 1 };
+let _drag = null; // { startX, startY, origDx, origDy }
+
+function onRootChange() {
+  root.dx = parseFloat(document.getElementById('rootDx').value) || 0;
+  root.dy = parseFloat(document.getElementById('rootDy').value) || 0;
+  root.scale = parseFloat(document.getElementById('rootScale').value) || 1;
+  document.getElementById('valRootDx').textContent = root.dx.toFixed(2);
+  document.getElementById('valRootDy').textContent = root.dy.toFixed(2);
+  document.getElementById('valRootScale').textContent = root.scale.toFixed(2);
+  render();
+  updateExport();
+}
+
+function resetRoot() {
+  root = { dx: 0, dy: 0, scale: 1 };
+  document.getElementById('rootDx').value = 0;
+  document.getElementById('rootDy').value = 0;
+  document.getElementById('rootScale').value = 1;
+  document.getElementById('valRootDx').textContent = '0.00';
+  document.getElementById('valRootDy').textContent = '0.00';
+  document.getElementById('valRootScale').textContent = '1.00';
+  render();
+  updateExport();
+}
+
+function bakeRoot() {
+  for (const l of layers) {
+    l.dx = parseFloat(((l.dx || 0) + root.dx).toFixed(3));
+    l.dy = parseFloat(((l.dy || 0) + root.dy).toFixed(3));
+    l.scale = parseFloat(((l.scale || 1) * root.scale).toFixed(3));
+  }
+  resetRoot();
+  if (selectedIdx >= 0) loadProps();
+  refreshLayerList();
+}
+
+// ── Categorised glyph palette ──
+const GLYPH_CATEGORIES = [
+  { name: 'Rectangles', glyphs: '▬ ▭ ▮ ▯ ▰ ▱' },
+  { name: 'Blocks / Fill', glyphs: '█ ▉ ▊ ▋ ▌ ▍ ▎ ▏ ▐ ▄ ▀ ▖ ▗ ▘ ▙ ▚ ▛ ▜ ▝ ▞ ▟' },
+  { name: 'Squares', glyphs: '■ □ ▪ ▫ ◼ ◻ ◾ ◽ ▣ ▤ ▥ ▦ ▧ ▨ ▩ ▢' },
+  { name: 'Diamonds', glyphs: '◆ ◇ ◈ ❖ ⬖ ⬗ ⬘ ⬙' },
+  { name: 'Circles / Targets', glyphs: '● ○ ◉ ◎ ◌ ◍ ◐ ◑ ◒ ◓ ◔ ◕' },
+  { name: 'Triangles', glyphs: '▲ △ ▼ ▽ ▶ ▷ ◀ ◁ ◢ ◣ ◤ ◥ ▴ ▵ ▾ ▿' },
+  { name: 'Box Drawing', glyphs: '─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ ═ ║ ╔ ╗ ╚ ╝ ╠ ╣ ╦ ╩ ╬ ╭ ╮ ╯ ╰ ╴ ╵ ╶ ╷ ╸ ╹ ╺ ╻ ╱ ╲ ╳' },
+  { name: 'Dashed / Decorative', glyphs: '┄ ┅ ┆ ┇ ┈ ┉ ┊ ┋ ╌ ╍ ╎ ╏ · • ∙ ‧ ⋄ ⋅ ※ ⁂' },
+  { name: 'Sparkles / Runes', glyphs: '✦ ✧ ✶ ✷ ✹ ✺ ❖ ❋ ❀ ✿' },
+  { name: 'Brackets / Frames', glyphs: '⌜ ⌝ ⌞ ⌟ ⟦ ⟧ ⟨ ⟩ 〔 〕 【 】 〖 〗' },
+  { name: 'Progress / Shade', glyphs: '▁ ▂ ▃ ▄ ▅ ▆ ▇ █ ░ ▒ ▓' },
+  { name: 'Icons / Sigils', glyphs: '⚒ ⚔ ⛩ ⛲ ♨ ⚰ ⚗ ⚱ ⛫ ☘ ☤ ☣ ♢ ◌ † ⊞ ⊟ ⌐ ⊙ ⊂' },
+  { name: 'Emoji', glyphs: '🕯 🗿 🔔 🫕 🌱 🌿 🌾 🌲 🌳 🍄 🕸 🌹 🌻 🌷 🌼 🌸 💎 📖 🪧 🍺' },
+  { name: 'Roguelike ASCII', glyphs: '@ ! ? / ) ] $ % * # + = > < ~ ^ . , ; : ` \' " ≈ ∴' },
+  { name: 'Letters', glyphs: 'r g b s o T D L W B H M & f e x k n p w c S O R F C' },
+];
+
+function initGlyphGrid() {
+  const root = document.getElementById('glyphGrid');
+  for (const cat of GLYPH_CATEGORIES) {
+    const header = document.createElement('div');
+    header.className = 'glyph-cat';
+    header.textContent = cat.name;
+    root.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'glyph-grid';
+    const glyphs = cat.glyphs.split(' ').filter(Boolean);
+    for (const g of glyphs) {
+      const el = document.createElement('div');
+      el.className = 'glyph-pick';
+      el.textContent = g;
+      const tip = document.createElement('span');
+      tip.className = 'tip';
+      tip.textContent = `U+${g.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+      el.appendChild(tip);
+      el.onclick = () => {
+        if (selectedIdx < 0) return;
+        layers[selectedIdx].glyph = g;
+        document.getElementById('propGlyph').value = g;
+        render();
+        updateExport();
+        refreshLayerList();
+      };
+      grid.appendChild(el);
+    }
+    root.appendChild(grid);
+  }
+}
+
+// ── Layer management ──
+function addLayer() {
+  layers.push({ glyph: '?', fg: '#ffffff', glow: '#aaaaaa', dx: 0, dy: 0, scale: 1, bg: null });
+  selectedIdx = layers.length - 1;
+  refreshLayerList();
+  loadProps();
+  render();
+  updateExport();
+}
+
+function removeLayer(i) {
+  layers.splice(i, 1);
+  if (selectedIdx >= layers.length) selectedIdx = layers.length - 1;
+  refreshLayerList();
+  loadProps();
+  render();
+  updateExport();
+}
+
+function moveLayer(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= layers.length) return;
+  [layers[i], layers[j]] = [layers[j], layers[i]];
+  selectedIdx = j;
+  refreshLayerList();
+  loadProps();
+  render();
+  updateExport();
+}
+
+function selectLayer(i) {
+  selectedIdx = i;
+  refreshLayerList();
+  loadProps();
+}
+
+function refreshLayerList() {
+  const list = document.getElementById('layerList');
+  list.innerHTML = '';
+  for (let i = 0; i < layers.length; i++) {
+    const l = layers[i];
+    const div = document.createElement('div');
+    div.className = 'layer-item' + (i === selectedIdx ? ' active' : '');
+    div.innerHTML = `
+      <div class="layer-glyph" style="color:${l.fg}">${l.glyph}</div>
+      <div class="layer-label">${i}: ${l.glyph} (${l.scale.toFixed(2)}x)</div>
+      <div class="layer-btns">
+        <button onclick="event.stopPropagation();moveLayer(${i},-1)" title="Move up">&uarr;</button>
+        <button onclick="event.stopPropagation();moveLayer(${i},1)" title="Move down">&darr;</button>
+        <button class="warn" onclick="event.stopPropagation();removeLayer(${i})" title="Delete">&times;</button>
+      </div>
+    `;
+    div.onclick = () => selectLayer(i);
+    list.appendChild(div);
+  }
+}
+
+// ── Properties panel ──
+function loadProps() {
+  const panel = document.getElementById('propsPanel');
+  const empty = document.getElementById('propsEmpty');
+  if (selectedIdx < 0 || selectedIdx >= layers.length) {
+    panel.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  panel.style.display = '';
+  empty.style.display = 'none';
+  const l = layers[selectedIdx];
+  document.getElementById('propGlyph').value = l.glyph;
+  document.getElementById('propFg').value = l.fg;
+  document.getElementById('propFgHex').value = l.fg;
+  document.getElementById('propGlow').value = l.glow;
+  document.getElementById('propGlowHex').value = l.glow;
+  document.getElementById('propDx').value = l.dx;
+  document.getElementById('propDy').value = l.dy;
+  document.getElementById('propScale').value = l.scale;
+  document.getElementById('valDx').textContent = l.dx.toFixed(2);
+  document.getElementById('valDy').textContent = l.dy.toFixed(2);
+  document.getElementById('valScale').textContent = l.scale.toFixed(2);
+  document.getElementById('chkBg').checked = !!l.bg;
+  document.getElementById('propBg').value = l.bg || '#1a1c28';
+}
+
+function onPropChange() {
+  if (selectedIdx < 0) return;
+  const l = layers[selectedIdx];
+  l.glyph = document.getElementById('propGlyph').value || '?';
+  l.fg = document.getElementById('propFg').value;
+  l.glow = document.getElementById('propGlow').value;
+  l.dx = parseFloat(document.getElementById('propDx').value) || 0;
+  l.dy = parseFloat(document.getElementById('propDy').value) || 0;
+  l.scale = parseFloat(document.getElementById('propScale').value) || 1;
+  l.bg = document.getElementById('chkBg').checked ? document.getElementById('propBg').value : null;
+  document.getElementById('propFgHex').value = l.fg;
+  document.getElementById('propGlowHex').value = l.glow;
+  document.getElementById('valDx').textContent = l.dx.toFixed(2);
+  document.getElementById('valDy').textContent = l.dy.toFixed(2);
+  document.getElementById('valScale').textContent = l.scale.toFixed(2);
+  refreshLayerList();
+  render();
+  updateExport();
+}
+
+function onHexChange(which) {
+  if (selectedIdx < 0) return;
+  if (which === 'fg') {
+    const hex = document.getElementById('propFgHex').value;
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+      document.getElementById('propFg').value = hex;
+      onPropChange();
+    }
+  } else {
+    const hex = document.getElementById('propGlowHex').value;
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+      document.getElementById('propGlow').value = hex;
+      onPropChange();
+    }
+  }
+}
+
+// ── Render (mirrors atlas.js logic exactly) ──
+function renderComposite(ctx, layerData, sizePx, fontPx, glowLayerCount, rootXform) {
+  const r = rootXform || { dx: 0, dy: 0, scale: 1 };
+  ctx.clearRect(0, 0, sizePx, sizePx);
+  if (!layerData.length) return;
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Background from first layer
+  const bgColor = layerData[0].bg;
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, sizePx, sizePx);
+  }
+
+  for (const layer of layerData) {
+    const lGlyph = layer.glyph || '?';
+    const lFg    = layer.fg || '#fff';
+    const lGlow  = layer.glow || lFg;
+    const lScale = ((typeof layer.scale === 'number') ? layer.scale : 1) * r.scale;
+    const lFontPx = Math.round(fontPx * lScale);
+    const cx = sizePx * (0.5 + (layer.dx || 0) + r.dx);
+    const cy = sizePx * (0.5 + (layer.dy || 0) + r.dy);
+
+    ctx.font = `900 ${lFontPx}px monospace`;
+
+    // Glow pass
+    if (glowLayerCount > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowColor = lGlow;
+      for (let li = 0; li < glowLayerCount; li++) {
+        const t = glowLayerCount > 1 ? (li / (glowLayerCount - 1)) : 0;
+        const alpha = 0.08 * (1 - t);
+        ctx.shadowBlur = 8 + t * 10;
+        ctx.fillStyle = `rgba(102,204,255,${alpha.toFixed(3)})`;
+        ctx.fillText(lGlyph, cx, cy);
+      }
+    }
+
+    // Core glyph
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = lFg;
+    ctx.fillText(lGlyph, cx, cy);
+  }
+}
+
+function render() {
+  const glowCount = document.getElementById('chkGlow').checked ? 3 : 0;
+  const showGrid = document.getElementById('chkGrid').checked;
+
+  // Main large preview
+  const main = document.getElementById('mainCanvas');
+  const mctx = main.getContext('2d');
+  const mSize = 320;
+  renderComposite(mctx, layers, mSize, Math.round(56 * mSize / 64), glowCount, root);
+
+  if (showGrid) {
+    mctx.save();
+    mctx.strokeStyle = 'rgba(115,192,138,0.25)';
+    mctx.lineWidth = 1;
+    // Crosshair
+    mctx.beginPath();
+    mctx.moveTo(mSize / 2, 0); mctx.lineTo(mSize / 2, mSize);
+    mctx.moveTo(0, mSize / 2); mctx.lineTo(mSize, mSize / 2);
+    mctx.stroke();
+    // Border
+    mctx.strokeRect(0.5, 0.5, mSize - 1, mSize - 1);
+    mctx.restore();
+  }
+
+  // Selection indicator on main canvas
+  if (selectedIdx >= 0 && selectedIdx < layers.length) {
+    const sl = layers[selectedIdx];
+    const sx = mSize * (0.5 + (sl.dx || 0) + root.dx);
+    const sy = mSize * (0.5 + (sl.dy || 0) + root.dy);
+    mctx.save();
+    mctx.strokeStyle = 'rgba(136,204,255,0.6)';
+    mctx.lineWidth = 1.5;
+    mctx.setLineDash([4, 3]);
+    mctx.beginPath();
+    mctx.arc(sx, sy, 12, 0, Math.PI * 2);
+    mctx.stroke();
+    mctx.restore();
+  }
+
+  // Small previews
+  for (const size of [32, 48, 64, 96]) {
+    const cnv = document.getElementById(`prev${size}`);
+    const ctx = cnv.getContext('2d');
+    renderComposite(ctx, layers, size, Math.round(56 * size / 64), glowCount, root);
+  }
+}
+
+// ── Export ──
+function buildExportObj() {
+  const out = [];
+  for (const l of layers) {
+    const entry = { glyph: l.glyph, fg: l.fg, glow: l.glow };
+    if (l.bg) entry.bg = l.bg;
+    const effDx = (l.dx || 0) + root.dx;
+    const effDy = (l.dy || 0) + root.dy;
+    const effScale = (l.scale || 1) * root.scale;
+    if (effDx) entry.dx = parseFloat(effDx.toFixed(2));
+    if (effDy) entry.dy = parseFloat(effDy.toFixed(2));
+    if (parseFloat(effScale.toFixed(2)) !== 1) entry.scale = parseFloat(effScale.toFixed(2));
+    out.push(entry);
+  }
+  return out;
+}
+
+function updateExport() {
+  const name = document.getElementById('exportName').value || 'unnamed';
+  const layerObjs = buildExportObj();
+  // JS palette format
+  const layerStrs = layerObjs.map(o => {
+    const parts = [`glyph: "${o.glyph}"`, `fg: "${o.fg}"`, `glow: "${o.glow}"`];
+    if (o.bg) parts.push(`bg: "${o.bg}"`);
+    if (o.dx) parts.push(`dx: ${o.dx}`);
+    if (o.dy) parts.push(`dy: ${o.dy}`);
+    if (o.scale !== undefined) parts.push(`scale: ${o.scale}`);
+    return `    { ${parts.join(', ')} }`;
+  });
+  const js = `  ${name}: {\n    layers: [\n${layerStrs.join(',\n')},\n    ]\n  },`;
+  document.getElementById('exportArea').value = js;
+}
+
+function copyExport() {
+  const area = document.getElementById('exportArea');
+  navigator.clipboard.writeText(area.value).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+  });
+}
+
+function unwrapLayers(parsed) {
+  // Unwrap `name: { layers: [...] }` wrapper from export format
+  if (!Array.isArray(parsed) && !parsed.layers) {
+    const keys = Object.keys(parsed);
+    if (keys.length === 1 && parsed[keys[0]] && parsed[keys[0]].layers) {
+      document.getElementById('exportName').value = keys[0];
+      parsed = parsed[keys[0]];
+    }
+  }
+  if (parsed.layers && Array.isArray(parsed.layers)) parsed = parsed.layers;
+  return parsed;
+}
+
+function applyExport() {
+  const raw = document.getElementById('exportArea').value;
+  if (!raw.trim()) return;
+  try {
+    let parsed = unwrapLayers(parseLoose(raw));
+    if (!Array.isArray(parsed)) throw new Error('Expected array');
+    layers = parsed.map(l => ({
+      glyph: l.glyph || '?',
+      fg: l.fg || '#ffffff',
+      glow: l.glow || l.fg || '#aaaaaa',
+      dx: l.dx || 0,
+      dy: l.dy || 0,
+      scale: (typeof l.scale === 'number') ? l.scale : 1,
+      bg: l.bg || null,
+    }));
+    selectedIdx = layers.length > 0 ? 0 : -1;
+    refreshLayerList();
+    loadProps();
+    render();
+    updateExport();
+  } catch (e) {
+    alert('Parse error: ' + e.message);
+  }
+}
+
+// ── Import ──
+// Accepts strict JSON, JS object syntax (unquoted keys, trailing commas),
+// bare arrays, or `{ layers: [...] }` / `layers: [...]` wrappers.
+function parseLoose(raw) {
+  // Try strict JSON first
+  try { return JSON.parse(raw); } catch {}
+  // Normalise JS → JSON: quote unquoted keys, strip trailing commas
+  let s = raw.trim();
+  // Strip outer `layers:` wrapper if present (bare JS property)
+  s = s.replace(/^\s*layers\s*:\s*/, '');
+  // Wrap bare array in object so we can quote keys uniformly
+  const isArray = s.startsWith('[');
+  if (!isArray) s = `{${s}}`;
+  // Quote unquoted keys:  word-chars before a colon that aren't already quoted
+  s = s.replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
+  // Strip trailing commas before ] or }
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  const obj = JSON.parse(isArray ? s : s);
+  return isArray ? obj : obj;
+}
+
+function importJson() {
+  const raw = prompt('Paste layers — JS or JSON, array or { layers: [...] }:');
+  if (!raw) return;
+  try {
+    let parsed = unwrapLayers(parseLoose(raw));
+    if (!Array.isArray(parsed)) throw new Error('Expected array');
+    layers = parsed.map(l => ({
+      glyph: l.glyph || '?',
+      fg: l.fg || '#ffffff',
+      glow: l.glow || l.fg || '#aaaaaa',
+      dx: l.dx || 0,
+      dy: l.dy || 0,
+      scale: (typeof l.scale === 'number') ? l.scale : 1,
+      bg: l.bg || null,
+    }));
+    selectedIdx = layers.length > 0 ? 0 : -1;
+    refreshLayerList();
+    loadProps();
+    render();
+    updateExport();
+  } catch (e) {
+    alert('Parse error: ' + e.message);
+  }
+}
+
+// ── Save / Load WIP ──
+const WIP_KEY = 'jshack_composite_wip';
+
+function saveWip() {
+  const data = { name: document.getElementById('exportName').value, layers, root };
+  localStorage.setItem(WIP_KEY, JSON.stringify(data));
+  alert('Saved to localStorage');
+}
+
+function loadWip() {
+  const raw = localStorage.getItem(WIP_KEY);
+  if (!raw) { alert('No saved WIP found'); return; }
+  try {
+    const data = JSON.parse(raw);
+    if (data.name) document.getElementById('exportName').value = data.name;
+    if (data.root) {
+      root = { dx: data.root.dx || 0, dy: data.root.dy || 0, scale: data.root.scale || 1 };
+      document.getElementById('rootDx').value = root.dx;
+      document.getElementById('rootDy').value = root.dy;
+      document.getElementById('rootScale').value = root.scale;
+      document.getElementById('valRootDx').textContent = root.dx.toFixed(2);
+      document.getElementById('valRootDy').textContent = root.dy.toFixed(2);
+      document.getElementById('valRootScale').textContent = root.scale.toFixed(2);
+    } else {
+      resetRoot();
+    }
+    if (Array.isArray(data.layers)) {
+      layers = data.layers.map(l => ({
+        glyph: l.glyph || '?',
+        fg: l.fg || '#ffffff',
+        glow: l.glow || l.fg || '#aaaaaa',
+        dx: l.dx || 0,
+        dy: l.dy || 0,
+        scale: (typeof l.scale === 'number') ? l.scale : 1,
+        bg: l.bg || null,
+      }));
+      selectedIdx = layers.length > 0 ? 0 : -1;
+      refreshLayerList();
+      loadProps();
+      render();
+      updateExport();
+    }
+  } catch (e) {
+    alert('Load error: ' + e.message);
+  }
+}
+
+// ── Canvas drag & scroll ──
+const _mainCanvas = document.getElementById('mainCanvas');
+_mainCanvas.style.cursor = 'grab';
+
+_mainCanvas.addEventListener('mousedown', (e) => {
+  if (selectedIdx < 0 || selectedIdx >= layers.length) return;
+  const rect = _mainCanvas.getBoundingClientRect();
+  const l = layers[selectedIdx];
+  _drag = {
+    startX: e.clientX - rect.left,
+    startY: e.clientY - rect.top,
+    origDx: l.dx,
+    origDy: l.dy,
+  };
+  _mainCanvas.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!_drag) return;
+  const rect = _mainCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const l = layers[selectedIdx];
+  l.dx = parseFloat((_drag.origDx + (mx - _drag.startX) / 320).toFixed(3));
+  l.dy = parseFloat((_drag.origDy + (my - _drag.startY) / 320).toFixed(3));
+  loadProps();
+  render();
+  updateExport();
+});
+
+window.addEventListener('mouseup', () => {
+  if (_drag) {
+    _drag = null;
+    _mainCanvas.style.cursor = 'grab';
+  }
+});
+
+_mainCanvas.addEventListener('wheel', (e) => {
+  if (selectedIdx < 0 || selectedIdx >= layers.length) return;
+  e.preventDefault();
+  const l = layers[selectedIdx];
+  const delta = e.deltaY < 0 ? 0.05 : -0.05;
+  l.scale = parseFloat(Math.min(3.0, Math.max(0.1, l.scale + delta)).toFixed(3));
+  loadProps();
+  render();
+  updateExport();
+}, { passive: false });
+
+// ── Init ──
+initGlyphGrid();
+refreshLayerList();
+render();
+updateExport();
+</script>

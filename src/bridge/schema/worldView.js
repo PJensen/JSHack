@@ -39,6 +39,7 @@ import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { DistrictProfile } from "../../rules/components/DistrictProfile.js";
 import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
+import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
@@ -85,6 +86,13 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'wasting',
 	'agony',
 	'blinded',
+	'invisible',
+	'phase_shift',
+	'shadow_cloak',
+	'resist_fire',
+	'resist_poison',
+	'resist_electric',
+	'resist_acid',
 ]);
 // Proc state effect keys that should be projected onto enemy entity views for glyph fx.
 const ENTITY_PROC_STATE_KEYS = new Set(['doom_clock', 'cataclysm_mark']);
@@ -276,10 +284,22 @@ function normalizeDisplayStatusType(rawType) {
  */
 function projectDisplayTags(world, id, rec) {
 	/** @type {any} */ const stat = /** @type any */ (world.get(id, Status));
-	if (!stat || !Array.isArray(stat.statuses)) return;
-	for (let i = 0; i < stat.statuses.length; i++) {
-		const s = stat.statuses[i];
-		const t = normalizeDisplayStatusType(s?.type);
+	if (stat && Array.isArray(stat.statuses)) {
+		for (let i = 0; i < stat.statuses.length; i++) {
+			const s = stat.statuses[i];
+			const t = normalizeDisplayStatusType(s?.type);
+			if (!t || !DISPLAY_STATUS_TAGS.has(t)) continue;
+			if (!rec.tags.includes(t)) rec.tags.push(t);
+		}
+	}
+
+	/** @type {any} */ const ae = /** @type any */ (world.get(id, ActiveEffects));
+	if (!ae || !Array.isArray(ae.effects)) return;
+	for (let i = 0; i < ae.effects.length; i++) {
+		const e = ae.effects[i];
+		if (!e || (Number(e.turnsLeft || 0) | 0) <= 0) continue;
+		if ((Number(e.onsetLeft || 0) | 0) > 0) continue;
+		const t = normalizeDisplayStatusType(canonicalStatusKey(e.key));
 		if (!t || !DISPLAY_STATUS_TAGS.has(t)) continue;
 		if (!rec.tags.includes(t)) rec.tags.push(t);
 	}
@@ -541,7 +561,7 @@ export function buildWorldView(world) {
 			}
 
 			let layer = 300; // actors
-			if (itemInfo) layer = 100; // items/ground
+			if (itemInfo) layer = 250; // items/ground (above doors/stairs, below actors)
 			else if (door) layer = 200; // doors/walls-like entities
 			else if (isPlayer) layer = 400; // player on top
 
@@ -616,7 +636,7 @@ export function buildWorldView(world) {
 			}
 
 			let layer = 300; // actors
-			if (itemInfo) layer = 100; // items/ground
+			if (itemInfo) layer = 250; // items/ground (above doors/stairs, below actors)
 			else if (door) layer = 200; // doors/walls-like entities
 			else if (isPlayer) layer = 400; // player on top
 

@@ -3,6 +3,7 @@ import { Flying } from "../components/Flying.js";
 import { Vitality } from "../components/Vitality.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { hasOverworldAerialLOS } from "./flyingEligibility.js";
+import { statusStrength } from "./statusFacade.js";
 
 /**
  * Find a living airborne entity on the specified tile.
@@ -54,6 +55,19 @@ export function hasSpellLineOfSight(world, spec) {
   }
 
   let targetId = Number(spec?.targetId || 0) | 0;
+  if (
+    targetId > 0
+    && isTargetHiddenByInvisibility(world, {
+      sourceId: Number(spec?.sourceId || 0) | 0,
+      targetId,
+      sourcePos,
+      targetPos,
+      allowAdjacentInvisibleTarget: true,
+    })
+  ) {
+    return false;
+  }
+
   if (!(targetId > 0) && spec?.allowFlyingOccupantAtTarget) {
     targetId = findLivingFlyingOccupantAt(world, targetPos.x, targetPos.y, {
       excludeId: Number(spec?.sourceId || 0) | 0,
@@ -68,4 +82,35 @@ export function hasSpellLineOfSight(world, spec) {
     targetPos,
     range,
   });
+}
+
+/**
+ * Canonical invisibility targetability rule:
+ * non-adjacent invisible targets are untargetable; adjacent targets remain targetable.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {{
+ *   sourceId: number,
+ *   targetId: number,
+ *   sourcePos?: { x:number, y:number } | null,
+ *   targetPos?: { x:number, y:number } | null,
+ *   allowAdjacentInvisibleTarget?: boolean,
+ * }} spec
+ * @returns {boolean} true when targeting should be blocked by invisibility
+ */
+export function isTargetHiddenByInvisibility(world, spec) {
+  const sourceId = Number(spec?.sourceId || 0) | 0;
+  const targetId = Number(spec?.targetId || 0) | 0;
+  if (!(sourceId > 0) || !(targetId > 0) || sourceId === targetId) return false;
+  if (statusStrength(world, targetId, "invisible") <= 0) return false;
+  if (!spec?.allowAdjacentInvisibleTarget) return true;
+
+  const sourcePos = spec?.sourcePos || world.get(sourceId, Position);
+  const targetPos = spec?.targetPos || world.get(targetId, Position);
+  if (!sourcePos || !targetPos) return true;
+  const adjacent = Math.max(
+    Math.abs((sourcePos.x | 0) - (targetPos.x | 0)),
+    Math.abs((sourcePos.y | 0) - (targetPos.y | 0)),
+  ) <= 1;
+  return !adjacent;
 }

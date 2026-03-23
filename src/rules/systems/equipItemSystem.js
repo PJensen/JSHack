@@ -7,6 +7,7 @@ import { Beatitude } from "../components/Beatitude.js";
 import {
   inventoryContains,
   addToInventory,
+  removeFromInventory,
 } from "../utils/inventoryFacade.js";
 
 /**
@@ -139,6 +140,8 @@ export function equipItemSystem(world) {
       equipSingleSlot('offhand');
     } else if (slot === 'ammo' || info.type === 'ammo') {
       equipSingleSlot('ammo');
+      // Ammo should move out of carried inventory when equipped.
+      removeFromInventory(world, actor, itemId);
     } else if (!equipSingleSlot(slot)) {
       // Unknown or unsupported slot: ignore.
       world.remove(actor, EquipIntent);

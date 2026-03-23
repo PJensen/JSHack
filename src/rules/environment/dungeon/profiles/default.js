@@ -14,6 +14,9 @@
  * @property {number}        roomMargin     - gap between room edge and leaf boundary
  * @property {number}        splitRatioMin  - BSP split position lower bound (0–1)
  * @property {number}        splitRatioMax  - BSP split position upper bound (0–1)
+ * @property {number}        roomSizeBias   - >1 biases room size upward, 1 = uniform
+ * @property {{rect?:number,square?:number,jagged?:number}|null} roomShapeWeights
+ *   - optional weighted room shapes; null = all rect
  * @property {number|null}   roomSparsity   - null = use dungeonConfig.roomSparsity; 0–1 omits more leaf rooms
  * @property {number}        corridorWidth  - corridor tile width (1 = single, 2 = wide)
  * @property {number}        doorChance     - probability a valid doorway becomes a door (0–1)
@@ -32,12 +35,14 @@ export const DEFAULT_PROFILE = {
   theme:          null,   // resolved to a concrete string by pickProfile
   generator:      null,
   bspMaxDepth:    5,
-  minLeafSize:    5,
+  minLeafSize:    6,
   minRoomSize:    3,
-  maxRoomSize:    7,
+  maxRoomSize:    8,
   roomMargin:     1,
-  splitRatioMin:  0.40,
-  splitRatioMax:  0.60,
+  splitRatioMin:  0.35,
+  splitRatioMax:  0.65,
+  roomSizeBias:   1.25,
+  roomShapeWeights: { rect: 0.6, square: 0.25, jagged: 0.15 },
   roomSparsity:   null,
   corridorWidth:  1,
   doorChance:     0.6,

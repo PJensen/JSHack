@@ -6,6 +6,10 @@ import { runScript, ScriptVerb } from "../scripting.js";
 export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
   accuracyDerived: 0,
   damagePowerDerived: 0,
+  physicalPenetrationDerived: 0,
+  bluntPenetrationDerived: 0,
+  slashPenetrationDerived: 0,
+  piercePenetrationDerived: 0,
   evadeDerived: 0,
   mitigationDerived: 0,
   maxHpDerived: 0,
@@ -38,6 +42,10 @@ const PASSIVE_BONUSES_VIRTUAL = Symbol.for("jshack:passiveBonuses:PassiveBonuses
 const BONUS_KEY_MAP = Object.freeze({
   accuracy: "accuracyDerived",
   damagePower: "damagePowerDerived",
+  physicalPenetration: "physicalPenetrationDerived",
+  bluntPenetration: "bluntPenetrationDerived",
+  slashPenetration: "slashPenetrationDerived",
+  piercePenetration: "piercePenetrationDerived",
   evade: "evadeDerived",
   mitigation: "mitigationDerived",
   maxHp: "maxHpDerived",

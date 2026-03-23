@@ -5053,6 +5053,10 @@ function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number, mode:string, activeTab?:string}} state */
 function renderShop(panel, data, state) {
+  const prevDetach = /** @type {any} */ (panel)._shopDetach;
+  if (typeof prevDetach === 'function') { try { prevDetach(); } catch (_) {} }
+  /** @type {any} */ (panel)._shopDetach = null;
+
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
@@ -5060,6 +5064,7 @@ function renderShop(panel, data, state) {
   const vendorKind = String(data?.vendorKind || state?.vendorKind || '');
   const shopItems = data?.shopItems || [];
   const playerItems = data?.playerItems || [];
+  const appraisableItems = data?.appraisableItems || [];
   const unpaidItems = data?.unpaidItems || [];
   const totalBill = data?.totalBill || 0;
   const gold = data?.gold || 0;
@@ -5233,6 +5238,7 @@ function renderShop(panel, data, state) {
       }
     });
     obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+    /** @type {any} */ (panel)._shopDetach = () => { window.removeEventListener('keydown', onKey); obs.disconnect(); };
     return;
   }
 
@@ -5249,7 +5255,11 @@ function renderShop(panel, data, state) {
   sellTab.textContent = 'Sell';
   decorateButton(sellTab);
 
-  tabBar.appendChild(buyTab); tabBar.appendChild(sellTab);
+  const appraiseTab = document.createElement('button');
+  appraiseTab.textContent = 'Appraise';
+  decorateButton(appraiseTab);
+
+  tabBar.appendChild(buyTab); tabBar.appendChild(sellTab); tabBar.appendChild(appraiseTab);
   el.appendChild(tabBar);
 
   const listContainer = document.createElement('div');
@@ -5262,22 +5272,35 @@ function renderShop(panel, data, state) {
 
   let sel = 0;
   let currentItems = [];
+  let _listDetach = null;
 
   function updateTabStyle() {
     buyTab.style.background = activeTab === 'buy' ? '#1a2640' : '#101626';
     buyTab.style.borderColor = activeTab === 'buy' ? '#55aaff' : '#2d3b52';
     sellTab.style.background = activeTab === 'sell' ? '#1a2640' : '#101626';
     sellTab.style.borderColor = activeTab === 'sell' ? '#55aaff' : '#2d3b52';
+    appraiseTab.style.background = activeTab === 'appraise' ? '#1a2640' : '#101626';
+    appraiseTab.style.borderColor = activeTab === 'appraise' ? '#55aaff' : '#2d3b52';
   }
 
   function renderList() {
+    if (typeof _listDetach === 'function') { try { _listDetach(); } catch (_) {} }
+    _listDetach = null;
     listContainer.innerHTML = '';
     sel = 0;
-    currentItems = activeTab === 'buy' ? shopItems : playerItems;
+    currentItems = activeTab === 'buy'
+      ? shopItems
+      : activeTab === 'sell'
+        ? playerItems
+        : appraisableItems;
 
     if (!currentItems.length) {
       const empty = document.createElement('div');
-      empty.textContent = activeTab === 'buy' ? '(nothing for sale)' : '(nothing to sell)';
+      empty.textContent = activeTab === 'buy'
+        ? '(nothing for sale)'
+        : activeTab === 'sell'
+          ? '(nothing to sell)'
+          : '(nothing to appraise)';
       listContainer.appendChild(empty);
       hint.textContent = 'Tab=Switch · Esc=Close';
       return;
@@ -5302,7 +5325,11 @@ function renderShop(panel, data, state) {
       price.style.marginLeft = 'auto';
       price.style.color = '#ffde5a';
       price.style.fontWeight = 'bold';
-      const cost = activeTab === 'buy' ? (it.buyPrice || 0) : (it.sellPrice || 0);
+      const cost = activeTab === 'buy'
+        ? (it.buyPrice || 0)
+        : activeTab === 'sell'
+          ? (it.sellPrice || 0)
+          : (it.appraiseFee || 0);
       price.textContent = `${cost}g`;
 
       row.appendChild(name);
@@ -5331,7 +5358,9 @@ function renderShop(panel, data, state) {
     setSel(0);
     hint.textContent = activeTab === 'buy'
       ? '↑/↓ select · Enter=Buy · Tab=Sell tab · Esc=Close'
-      : '↑/↓ select · Enter=Sell · Tab=Buy tab · Esc=Close';
+      : activeTab === 'sell'
+        ? '↑/↓ select · Enter=Sell · Tab=Appraise tab · Esc=Close'
+        : '↑/↓ select · Enter=Appraise · Tab=Buy tab · Esc=Close';
 
     function doTransaction() {
       const it = currentItems[sel]; if (!it) return;
@@ -5343,12 +5372,16 @@ function renderShop(panel, data, state) {
             detail: { shopkeeperId: state.shopkeeperId, itemId }
           }));
         }
-      } else {
+      } else if (activeTab === 'sell') {
         for (const itemId of ids) {
           window.dispatchEvent(new CustomEvent('ui:requestSell', {
             detail: { shopkeeperId: state.shopkeeperId, itemId }
           }));
         }
+      } else {
+        window.dispatchEvent(new CustomEvent('ui:requestAppraise', {
+          detail: { shopkeeperId: state.shopkeeperId, itemId: ids[0] }
+        }));
       }
     }
 
@@ -5362,7 +5395,9 @@ function renderShop(panel, data, state) {
       else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
       else if (k === 'Tab') {
         e.preventDefault();
-        activeTab = activeTab === 'buy' ? 'sell' : 'buy';
+        if (activeTab === 'buy') activeTab = 'sell';
+        else if (activeTab === 'sell') activeTab = 'appraise';
+        else activeTab = 'buy';
         state.activeTab = activeTab;
         updateTabStyle();
         renderList();
@@ -5377,10 +5412,14 @@ function renderShop(panel, data, state) {
       }
     });
     obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+    _listDetach = () => { window.removeEventListener('keydown', onKey); obs.disconnect(); };
   }
+
+  /** @type {any} */ (panel)._shopDetach = () => { if (typeof _listDetach === 'function') _listDetach(); };
 
   buyTab.addEventListener('click', () => { activeTab = 'buy'; state.activeTab = activeTab; updateTabStyle(); renderList(); });
   sellTab.addEventListener('click', () => { activeTab = 'sell'; state.activeTab = activeTab; updateTabStyle(); renderList(); });
+  appraiseTab.addEventListener('click', () => { activeTab = 'appraise'; state.activeTab = activeTab; updateTabStyle(); renderList(); });
 
   updateTabStyle();
   renderList();
@@ -5686,7 +5725,7 @@ function renderMessageTicker(container, entries) {
           row.textContent = m;
           row.style.color = getMessageColor('default');
         } else if (m && typeof m === 'object') {
-          row.textContent = String(m.text || '');
+          row.textContent = formatMessageLine(m);
           row.style.color = getMessageColor(String(m.type || 'default'));
         } else {
           row.textContent = String(m ?? '');
@@ -5723,7 +5762,7 @@ function renderMessageTicker(container, entries) {
     if (typeof m === 'string') {
       row.textContent = m;
     } else if (m && typeof m === 'object') {
-      row.textContent = m.text || String(m);
+      row.textContent = formatMessageLine(m);
       row.style.color = getMessageColor(m.type);
     } else {
       row.textContent = String(m ?? '');
@@ -5738,6 +5777,17 @@ function renderMessageTicker(container, entries) {
     row.style.transform = i === 0 ? 'scale(1)' : (i === 1 ? 'scale(0.995)' : 'scale(0.99)');
     container.appendChild(row);
   }
+}
+
+/**
+ * @param {any} message
+ * @returns {string}
+ */
+function formatMessageLine(message) {
+  const text = String(message?.text || '');
+  const repeat = Math.max(1, Number(message?.repeat || 1));
+  if (repeat <= 1) return text;
+  return `${text} ×${repeat}`;
 }
 
 /**

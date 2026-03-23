@@ -1,5 +1,6 @@
 import { assert } from "jsr:@std/assert";
-import { generateChunk, edgeGate, findDoorPositions } from '../src/rules/environment/dungeon/chunk.js';
+import { createRng } from '../src/lib/ecs-js/rng.js';
+import { generateChunk, edgeGate, findDoorPositions, isDoorFrameAt, sanitizeDoorTiles } from '../src/rules/environment/dungeon/chunk.js';
 import { CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR } from '../src/rules/environment/dungeon/constants.js';
 import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
 
@@ -79,6 +80,30 @@ Deno.test("doors are placed at valid pinch points", () => {
     // The tile should be TILE_DOOR
     assert(chunk.tiles[ly * CHUNK_SIZE + lx] === TILE_DOOR,
       `door at (${lx},${ly}) is TILE_DOOR`);
+
+    const n = chunk.tiles[(ly - 1) * CHUNK_SIZE + lx];
+    const s = chunk.tiles[(ly + 1) * CHUNK_SIZE + lx];
+    const e = chunk.tiles[ly * CHUNK_SIZE + (lx + 1)];
+    const w = chunk.tiles[ly * CHUNK_SIZE + (lx - 1)];
+    const nsWalls = (n === TILE_WALL) && (s === TILE_WALL);
+    const ewWalls = (e === TILE_WALL) && (w === TILE_WALL);
+    const singlePinch = nsWalls !== ewWalls;
+
+    const doorUp = chunk.tiles[(ly - 1) * CHUNK_SIZE + lx] === TILE_DOOR;
+    const doorDown = chunk.tiles[(ly + 1) * CHUNK_SIZE + lx] === TILE_DOOR;
+    const doorLeft = chunk.tiles[ly * CHUNK_SIZE + (lx - 1)] === TILE_DOOR;
+    const doorRight = chunk.tiles[ly * CHUNK_SIZE + (lx + 1)] === TILE_DOOR;
+    const verticalDouble = (doorUp || doorDown)
+      && chunk.tiles[Math.max(0, ly - 2) * CHUNK_SIZE + lx] === TILE_WALL
+      && chunk.tiles[Math.min(CHUNK_SIZE - 1, ly + 2) * CHUNK_SIZE + lx] === TILE_WALL;
+    const horizontalDouble = (doorLeft || doorRight)
+      && chunk.tiles[ly * CHUNK_SIZE + Math.max(0, lx - 2)] === TILE_WALL
+      && chunk.tiles[ly * CHUNK_SIZE + Math.min(CHUNK_SIZE - 1, lx + 2)] === TILE_WALL;
+
+    assert(
+      singlePinch || verticalDouble || horizontalDouble,
+      `door at (${lx},${ly}) must be single pinch or part of a valid double-door frame`,
+    );
   }
 });
 
@@ -203,4 +228,46 @@ Deno.test("generated chunks do not leave interior floor tiles touching void", ()
       }
     }
   }
+});
+
+Deno.test("findDoorPositions places double doors across a 2-wide hallway opening", () => {
+  const stride = 12;
+  const tiles = new Uint8Array(stride * stride);
+  tiles.fill(TILE_WALL);
+
+  // 2-wide horizontal hall passing through a framed opening at x=6.
+  const y0 = 5;
+  const y1 = 6;
+  for (let x = 2; x <= 9; x++) {
+    tiles[y0 * stride + x] = TILE_FLOOR;
+    tiles[y1 * stride + x] = TILE_FLOOR;
+  }
+  // Keep walls above and below the pair to create a true two-door frame.
+  tiles[(y0 - 1) * stride + 6] = TILE_WALL;
+  tiles[(y1 + 1) * stride + 6] = TILE_WALL;
+
+  const doors = findDoorPositions(tiles, stride, createRng(123), 1.0);
+  const keys = new Set(doors.map((d) => `${d.x},${d.y}`));
+  assert(keys.has("6,5"), "expected top door tile in double-door frame");
+  assert(keys.has("6,6"), "expected bottom door tile in double-door frame");
+});
+
+Deno.test("sanitizeDoorTiles removes unframed doors in open rooms", () => {
+  const stride = 9;
+  const tiles = new Uint8Array(stride * stride);
+  tiles.fill(TILE_WALL);
+
+  // Carve a 5x5 room interior.
+  for (let y = 2; y <= 6; y++) {
+    for (let x = 2; x <= 6; x++) {
+      tiles[y * stride + x] = TILE_FLOOR;
+    }
+  }
+
+  // Invalid door in the center of open room.
+  tiles[4 * stride + 4] = TILE_DOOR;
+  assert(!isDoorFrameAt(tiles, stride, 4, 4), "door center should not be a valid frame");
+
+  sanitizeDoorTiles(tiles, stride);
+  assert(tiles[4 * stride + 4] === TILE_FLOOR, "unframed center door should be downgraded to floor");
 });

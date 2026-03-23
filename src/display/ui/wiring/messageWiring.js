@@ -595,6 +595,21 @@ export function installMessageWiring({
     log('You enter a blood rage!', 'combat');
   });
 
+  world.on('spell:verdant_ward', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Bark and sap spiral around you in a verdant ward.', 'system');
+  });
+
+  world.on('spell:harmony_ward', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A balanced ward settles over your skin.', 'system');
+  });
+
+  world.on('spell:shadow_veil', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your outline thins into shadow. You are invisible.', 'system');
+  });
+
   world.on('spell:earthshatter', ({ actor, enhanced }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (enhanced) {

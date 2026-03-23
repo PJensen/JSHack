@@ -1,15 +1,30 @@
 import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
+import { createFrom } from "../src/lib/ecs-js/archetype.js";
 import { Player } from '../src/rules/components/Player.js';
 import { Position } from '../src/rules/components/Position.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { Equipment } from "../src/rules/components/Equipment.js";
 import { PickupIntent } from '../src/rules/components/Intents/PickupIntent.js';
 import { DropIntent } from '../src/rules/components/Intents/DropIntent.js';
+import { EquipIntent } from '../src/rules/components/Intents/EquipIntent.js';
 import { itemPickupSystem } from '../src/rules/systems/itemPickupSystem.js';
 import { itemDropSystem } from '../src/rules/systems/itemDropSystem.js';
+import { equipItemSystem } from '../src/rules/systems/equipItemSystem.js';
 import { createPlayer } from '../src/rules/archetypes/Player.js';
-import { addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
+import {
+  addToInventory,
+  inventoryContains,
+  inventoryItems,
+} from '../src/rules/utils/inventoryFacade.js';
+import {
+  ArrowsStack,
+  FireArrowsStack,
+  PiercingArrowsStack,
+  BodkinArrowsStack,
+  BluntHeadArrowsStack,
+} from "../src/rules/archetypes/Items.js";
 import { itemsAt } from '../src/rules/utils/queries.js';
 
 function scheduler(world) {
@@ -95,4 +110,40 @@ Deno.test("inventory: dropped item becomes top of ground stack", () => {
   assert(onTile.length >= 2, 'expected at least two items on ground tile');
   assert(onTile[0] === invItem, 'most recently dropped item should be on top of ground stack');
   assert(onTile.includes(existingGround), 'existing ground item should remain on tile');
+});
+
+Deno.test("inventory: all arrow stack types can be dropped, including equipped ammo", () => {
+  const world = new World({ seed: 85 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { x: 5, y: 6, capacity: 20, weightLimit: 99 });
+  const pos = world.get(player, Position);
+  const eq = world.get(player, Equipment);
+  assert(eq, "player should have equipment");
+
+  const arrowArchetypes = [
+    ArrowsStack,
+    FireArrowsStack,
+    PiercingArrowsStack,
+    BodkinArrowsStack,
+    BluntHeadArrowsStack,
+  ];
+
+  for (const Arch of arrowArchetypes) {
+    const ammoId = createFrom(world, Arch, {});
+    addToInventory(world, player, ammoId);
+    world.add(player, EquipIntent, { itemId: ammoId });
+    equipItemSystem(world);
+
+    assert(eq.ammo === ammoId, "equipped ammo slot should point to ammo");
+    assert(!inventoryContains(world, player, ammoId), "equipped ammo should be removed from inventory");
+
+    world.add(player, DropIntent, { itemId: ammoId });
+    world.tick(1);
+
+    assert(!inventoryContains(world, player, ammoId), "dropped ammo should leave inventory");
+    const dropPos = world.get(ammoId, Position);
+    assert(dropPos && dropPos.x === pos.x && dropPos.y === pos.y, "dropped ammo should land at actor tile");
+    assert(eq.ammo === null, "dropping equipped ammo should clear ammo slot");
+  }
 });

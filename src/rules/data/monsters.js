@@ -60,13 +60,18 @@ export const MONSTERS = [
     damageDice: '1d4',
     sizeClass: 'S',
     massKg: 30,
-    resistances: { kinetic: { DR: 1 } },
+    resistances: { kinetic: { DR: 0 } },
     speed: 2,
-    hooks: {
-      onHit: [statusEffectOnHit(20, 0xdead0005, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
-    },
-    specials: ["Bleed 20%"],
-    description: 'A sneering green-skinned runt armed with a rusty shiv.',
+    wielding: [
+      "goblin_jagged_shiv",
+      "goblin_jagged_shiv",
+      "goblin_jagged_shiv",
+      "goblin_jagged_shiv",
+      "goblin_shiv",
+    ],
+    hooks: null,
+    specials: ["Wields a shiv (often jagged)"],
+    description: 'A sneering green-skinned runt armed with a rusty dagger.',
     lootTable: 'drop:goblin',
     corpseEat: { behavior: "scavenge", hpThreshold: 0.70, cooldownTurns: 5 },
   },
@@ -86,18 +91,21 @@ export const MONSTERS = [
     massKg: 30,
     resistances: { kinetic: { DR: 0 } },
     speed: 2,
-    hooks: {
-      onHit: [statusEffectOnHit(15, 0xdead0400, { key: "bleed", turnsLeft: 3, potency: 1 }, "proc:bleeding")],
-    },
-    specials: ["Bleed 15%"],
+    equipped: [
+      { slot: "ranged", itemId: "goblin_barbed_shortbow" },
+      { slot: "ranged", itemId: "bow_short" },
+      { slot: "ammo", itemId: "ammo_arrows" },
+    ],
+    hooks: null,
+    specials: ["May spawn with barbed bow"],
     description: 'A goblin with a crude shortbow and a quiver of bent arrows.',
-    equipment: { ranged: 'bow_short', ammo: 'arrows' },
     lootTable: 'drop:goblin',
   },
   {
     id: 'bat',
     name: 'Bat',
     tags: ['beast', 'vermin'],
+    lootTable: 'drop:bat',
     tier: 0,
     canFly: true,
     intelligence: 2,   // basic animal instinct
@@ -321,7 +329,7 @@ export const MONSTERS = [
     id: 'skeletal_shadow_caster',
     name: 'Skeletal Shadow Caster',
     tags: ['undead', 'skeletal', 'caster'],
-    tier: 0,
+    tier: 1,
     intelligence: 9,
     visionRange: 9,
     packSense: true, packRadius: 8,
@@ -434,7 +442,7 @@ export const MONSTERS = [
     sizeClass: 'M',
     massKg: 25,
     resistances: {
-      kinetic: { DR: 4, bluntMult: 1.5, pierceMult: 0.5, slashMult: 0.7 },
+      kinetic: { DR: 3, bluntMult: 1.6, pierceMult: 0.6, slashMult: 0.8 },
       chemical: { toxMult: 0 },
     },
     speed: 2,
@@ -561,7 +569,7 @@ export const MONSTERS = [
     damageDice: '1d4',
     sizeClass: 'M',
     massKg: 90,
-    resistances: { kinetic: { DR: 4 } },
+    resistances: { kinetic: { DR: 3 } },
     speed: 2,
     learnedSpellIds: ['frost', 'heal'],
     maxMana: 30,
@@ -597,17 +605,23 @@ export const MONSTERS = [
     baseHp: 18,
     hpPerLevel: 2,
     attack: 3,
-    defense: 2,
+    defense: 1,
     damageDice: '1d8',
     sizeClass: 'M',
     massKg: 100,
-    resistances: { kinetic: { DR: 4 } },
+    resistances: { kinetic: { DR: 3 } },
     speed: 2,
+    wielding: [
+      "hobgoblin_serrated_warblade",
+      "hobgoblin_serrated_warblade",
+      "hobgoblin_serrated_warblade",
+      "hobgoblin_serrated_warblade",
+      "hobgoblin_warblade",
+    ],
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(20, 0xdead0402, 3, "proc:rage")],
-      onHit: [statusEffectOnHit(20, 0xdead0403, { key: "bleed", turnsLeft: 4, potency: 1 }, "proc:bleeding")],
     },
-    specials: ["Rage +3 dmg (20%)", "Bleed 20%"],
+    specials: ["Rage +3 dmg (20%)", "Serrated warblade"],
     description: 'A tall, iron-jawed warrior bred for war. Stronger and meaner than any goblin.',
   },
   {
@@ -624,7 +638,7 @@ export const MONSTERS = [
     damageDice: '1d6',
     sizeClass: 'M',
     massKg: 40,
-    resistances: { kinetic: { DR: 4 }, chemical: { toxMult: 0 } },
+    resistances: { kinetic: { DR: 3 }, chemical: { toxMult: 0 } },
     speed: 2,
     hooks: {
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 5, cooldownTurns: 4, chance: 0.2 })],
@@ -803,10 +817,9 @@ export const MONSTERS = [
     massKg: 250,
     resistances: { kinetic: { DR: 6 } },
     speed: 2,
-    hooks: {
-      onHit: [statusEffectOnHit(25, 0xdead000a, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
-    },
-    specials: ["Stun 25%"],
+    wielding: ["ogre_crushing_club"],
+    hooks: null,
+    specials: ["Crushing club"],
     description: 'A lumbering slab of muscle and bad intentions.',
   },
 
@@ -902,12 +915,13 @@ export const MONSTERS = [
     massKg: 120,
     resistances: { kinetic: { DR: 10 } },
     speed: 2,
+    wielding: ["orc_warchief_maul"],
+    equipped: ["chain_armor", "helm_steel"],
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(30, 0xdead0409, 3, "proc:rage")],
-      onHit: [statusEffectOnHit(25, 0xdead040a, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
       onDamaged: [retaliateOnDamaged(2, "proc:warcry")],
     },
-    specials: ["Rage +3 dmg (30%)", "Stun 25%", "Warcry retaliation"],
+    specials: ["Rage +3 dmg (30%)", "Warcry retaliation", "Warchief maul"],
     description: 'A scarred orc captain in heavy plate. Its war-cry alone can stop a heart.',
   },
 
@@ -1073,6 +1087,7 @@ export const MONSTERS = [
     id: 'lichen',
     name: 'Lichen',
     tags: ['plant'],
+    corpseDropChance: 0.9,
     tier: 0,
     intelligence: 1,   // mindless growth — scurries randomly
     ambush: true,      // sessile; doesn't move until bumped
@@ -1238,4 +1253,4 @@ export function getMonsterTags(monsterId) {
   return Array.isArray(def?.tags) ? def.tags : [];
 }
 
-/** @typedef {{ id:string, name:string, tags?:string[], tier:number, intelligence?:number, visionRange?:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, equipment?:{ranged?:string, ammo?:string}|null, learnedSpellIds?:string[], maxMana?:number, manaRegen?:number }} MonsterDef */
+/** @typedef {{ id:string, name:string, tags?:string[], tier:number, intelligence?:number, visionRange?:number, baseHp:number, hpPerLevel:number, attack:number, defense:number, damageDice:string, sizeClass:string, massKg:number, resistances:Object, speed:number, hooks?:Record<string, Function[]>|null, specials?:string[], description:string, lootTable?:string, corpseDropChance?:number, equipment?:{ranged?:string, ammo?:string}|null, wielding?:Array<string|{itemId?:string,id?:string,affixes?:string[],count?:number,slot?:string}>, equipped?:Array<string|{itemId?:string,id?:string,affixes?:string[],count?:number,slot?:string}>, inventory?:Array<string|{itemId?:string,id?:string,affixes?:string[],count?:number,slot?:string}>, learnedSpellIds?:string[], maxMana?:number, manaRegen?:number }} MonsterDef */

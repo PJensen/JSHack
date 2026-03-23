@@ -57,6 +57,9 @@ Deno.test("simple archetype items carry baseline materials", () => {
     ["gold", "gold"],
     ["potion_health", "glass"],
     ["ammo_arrows", "wood"],
+    ["ammo_piercing_arrows", "wood"],
+    ["ammo_bodkin_arrows", "wood"],
+    ["ammo_blunt_arrows", "wood"],
     ["scroll_mapping", "paper"],
   ];
 

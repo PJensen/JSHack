@@ -203,6 +203,62 @@ Deno.test("agony respects LOS — blocked by wall", () => {
   assert(!ae || !ae.effects?.some(e => e.key === 'agony'), 'enemy should not have agony');
 });
 
+Deno.test("agony fizzles on non-adjacent invisible target", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 4601 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Warlock' });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ['agony'];
+  brain.intelligence = 10;
+  const pos = world.get(player, Position);
+  pos.x = 5; pos.y = 5;
+  const mana = world.get(player, Mana);
+  mana.mana = 50; mana.maxMana = 50;
+
+  const enemy = createEnemy(world, 8, 5, 100);
+  world.add(enemy, ActiveEffects, {
+    effects: [{ key: 'invisible', turnsLeft: 12, potency: 1, stacks: 1 }],
+  });
+
+  const fizzles = [];
+  world.on('spell:fizzle', (e) => { if (e?.reason === 'target_invisible') fizzles.push(e); });
+
+  world.add(player, CastSpellIntent, { spellId: 'agony', targetId: enemy, x: 8, y: 5 });
+  world.tick(1);
+
+  assert(fizzles.length > 0, 'should fizzle on non-adjacent invisible target');
+  const ae = world.get(enemy, ActiveEffects);
+  assert(!ae?.effects?.some(e => e.key === 'agony'), 'agony should not be applied through invisibility at range');
+});
+
+Deno.test("agony can hit adjacent invisible target (adjacency exception)", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 4602 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: 'Warlock' });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ['agony'];
+  brain.intelligence = 10;
+  const pos = world.get(player, Position);
+  pos.x = 5; pos.y = 5;
+  const mana = world.get(player, Mana);
+  mana.mana = 50; mana.maxMana = 50;
+
+  const enemy = createEnemy(world, 6, 5, 100); // adjacent
+  world.add(enemy, ActiveEffects, {
+    effects: [{ key: 'invisible', turnsLeft: 12, potency: 1, stacks: 1 }],
+  });
+
+  world.add(player, CastSpellIntent, { spellId: 'agony', targetId: enemy, x: 6, y: 5 });
+  world.tick(1);
+
+  const ae = world.get(enemy, ActiveEffects);
+  assert(ae?.effects?.some(e => e.key === 'agony'), 'adjacent invisible target should remain targetable');
+});
+
 Deno.test("agony scales with intelligence", () => {
   setupFloorTiles();
   const world = new World({ seed: 47 });

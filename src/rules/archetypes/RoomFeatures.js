@@ -115,3 +115,19 @@ export const Urn = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "breakUrn", params: null }],
 );
+
+export const FlayedMan = defineArchetype(
+  "FlayedMan",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Flayed Man", identity: "flayed_man" }],
+  [Material, { kind: "organic" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const HangingChains = defineArchetype(
+  "HangingChains",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Hanging Chains", identity: "hanging_chains" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: false }],
+);

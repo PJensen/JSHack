@@ -13,6 +13,7 @@ import { throwSystem } from "../rules/systems/throwSystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
+import { stealthAmbushSystem } from "../rules/systems/stealthAmbushSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { searchSystem } from "../rules/systems/searchSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
@@ -202,6 +203,9 @@ export function configureWorld(world) {
   registerSystem(encumbranceSystem, 'effects');
   // Sound propagation checks SoundEmitter vs Anatomy.hearing; updates AggroState.
   registerSystem(soundPropagationSystem, 'effects');
+  // Run stealth ambush rearm before effect aging so the cooldown tracker can
+  // complete cleanly and restore opener while invisibility remains active.
+  registerSystem(stealthAmbushSystem, 'effects');
   registerSystem(effectSystem, 'effects');
   registerSystem(materialReactionSystem, 'effects');
   registerSystem(hungerSystem, 'effects');

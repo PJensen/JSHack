@@ -350,8 +350,17 @@ function procDamageAmount(ctx) {
   return Math.max(0, Number(ctx?.damage?.amount ?? ctx?.damage ?? 0));
 }
 
+function actorMatchesProcRole(ctx, role) {
+  const actor = Number(ctx?.actor || 0) | 0;
+  if (!(actor > 0)) return true;
+  if (role === "source") return actor === (Number(ctx?.source || 0) | 0);
+  if (role === "target") return actor === (Number(ctx?.target || 0) | 0);
+  return true;
+}
+
 registerScript(AFFIX_THORNS, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "target")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee01, 20)) return;
     ctx.proc.dealDamage(ctx.source, 2, "physical", {
       source: ctx.target,
@@ -366,6 +375,7 @@ registerScript(AFFIX_THORNS, {
 
 registerScript(AFFIX_VAMP, {
   [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     const amount = Math.max(1, Math.floor(procDamageAmount(ctx) / 3));
     ctx.proc.heal(ctx.source, amount);
     emitProc(ctx, "proc:vampiric", { actor: ctx.source, target: ctx.target, amount });
@@ -374,6 +384,7 @@ registerScript(AFFIX_VAMP, {
 
 registerScript(AFFIX_FIERCE, {
   [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     ctx.proc.addBonusDamage(1);
     emitProc(ctx, "proc:fierce", { actor: ctx.source, target: ctx.target });
   },
@@ -381,6 +392,7 @@ registerScript(AFFIX_FIERCE, {
 
 registerScript(AFFIX_CAUSTIC, {
   [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (procDamageAmount(ctx) <= 0) return;
     ctx.proc.dealDamage(ctx.target, 1, "acid", {
       source: ctx.source,
@@ -394,11 +406,10 @@ registerScript(AFFIX_CAUSTIC, {
 
 registerScript(AFFIX_CAPACITIVE, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     const source = Number(ctx?.source || 0) | 0;
     const target = Number(ctx?.target || 0) | 0;
-    const actor = Number(ctx?.actor || 0) | 0;
     if (!(source > 0) || !(target > 0) || source === target) return;
-    if (actor > 0 && actor !== source) return;
     if (procDamageAmount(ctx) <= 0) return;
     ctx.proc.dealDamage(target, 1, "electric", {
       source,
@@ -415,6 +426,7 @@ registerScript(AFFIX_CAPACITIVE, {
 
 registerScript(AFFIX_VENOMOUS, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee04, 40)) return;
     ctx.proc.applyStatus(ctx.target, "poison", 4, 2);
     emitProc(ctx, "proc:poisoned", { actor: ctx.source, target: ctx.target });
@@ -423,6 +435,7 @@ registerScript(AFFIX_VENOMOUS, {
 
 registerScript(AFFIX_CHAIN_LIGHTNING, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee10, 30)) return;
     const targetVit = world.get(ctx.target, Vitality);
     if (!targetVit || (targetVit.hp | 0) <= 1) return;
@@ -464,6 +477,7 @@ registerScript(AFFIX_CHAIN_LIGHTNING, {
 
 registerScript(AFFIX_FIRESTORM, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee11, 12)) return;
     if (procDamageAmount(ctx) > 0) {
       ctx.proc.dealDamage(ctx.target, 1, "fire", {
@@ -480,6 +494,7 @@ registerScript(AFFIX_FIRESTORM, {
 
 registerScript(AFFIX_SOUL_DRAIN, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee12, 18)) return;
     const amount = Math.max(1, Math.floor(procDamageAmount(ctx) / 2));
     ctx.proc.heal(ctx.source, amount);
@@ -489,6 +504,7 @@ registerScript(AFFIX_SOUL_DRAIN, {
 
 registerScript(AFFIX_BERSERK, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee13, 10)) return;
     ctx.proc.applyStatus(ctx.source, "berserk", 5, 1);
     emitProc(ctx, "proc:berserking", { actor: ctx.source, target: ctx.target });
@@ -497,6 +513,7 @@ registerScript(AFFIX_BERSERK, {
 
 registerScript(AFFIX_SHIELD_WALL, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "target")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee14, 15)) return;
     ctx.proc.applyStatus(ctx.target, "stoneskin", 4, 2);
     emitProc(ctx, "proc:shieldWall", { actor: ctx.target, target: ctx.source });
@@ -505,6 +522,7 @@ registerScript(AFFIX_SHIELD_WALL, {
 
 registerScript(AFFIX_MANA_SURGE, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee15, 20)) return;
     ctx.proc.restoreResource(ctx.source, "mana", 3);
     emitProc(ctx, "proc:manaSurge", { actor: ctx.source, amount: 3 });
@@ -513,6 +531,7 @@ registerScript(AFFIX_MANA_SURGE, {
 
 registerScript(AFFIX_EXECUTIONER, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     const vit = world.get(ctx.target, Vitality);
     if (!vit || !(Number(vit.maxHp) > 0)) return;
     if (Number(vit.hp) / Number(vit.maxHp) >= 0.3) return;
@@ -523,6 +542,7 @@ registerScript(AFFIX_EXECUTIONER, {
 
 registerScript(AFFIX_FROSTBITE, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee16, 20)) return;
     ctx.proc.applyStatus(ctx.target, "frost", 3, 1);
     emitProc(ctx, "proc:frostbite", { actor: ctx.source, target: ctx.target });
@@ -531,6 +551,7 @@ registerScript(AFFIX_FROSTBITE, {
 
 registerScript(AFFIX_HEMORRHAGE, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee17, 25)) return;
     ctx.proc.applyStatus(ctx.target, "bleed", 4, 2);
     emitProc(ctx, "proc:hemorrhage", { actor: ctx.source, target: ctx.target });
@@ -539,6 +560,7 @@ registerScript(AFFIX_HEMORRHAGE, {
 
 registerScript(AFFIX_SECOND_WIND, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "target")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee18, 10)) return;
     ctx.proc.applyStatus(ctx.target, "regen", 5, 1);
     ctx.proc.restoreResource(ctx.target, "stamina", 5);
@@ -548,6 +570,7 @@ registerScript(AFFIX_SECOND_WIND, {
 
 registerScript(AFFIX_FLAMING, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee19, 50)) return;
     ctx.proc.applyStatus(ctx.target, "burning", 3, 2);
     emitProc(ctx, "proc:flaming", { actor: ctx.source, target: ctx.target });
@@ -556,6 +579,7 @@ registerScript(AFFIX_FLAMING, {
 
 registerScript(AFFIX_STUNNING, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
     if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1a, 25)) return;
     ctx.proc.applyStatus(ctx.target, "stun", 1, 1);
     emitProc(ctx, "proc:stunned", { actor: ctx.source, target: ctx.target });

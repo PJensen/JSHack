@@ -19,6 +19,9 @@ export const AMMO_HOOK_KEYS = Object.freeze([
 ]);
 
 const AMMO_FIRE_ARROW_ACTOR_IMPACT = "ammo:fireArrows:onProjectileActorImpact";
+const AMMO_PIERCING_ARROW_ACTOR_IMPACT = "ammo:piercingArrows:onProjectileActorImpact";
+const AMMO_BODKIN_ARROW_ACTOR_IMPACT = "ammo:bodkinArrows:onProjectileActorImpact";
+const AMMO_BLUNT_ARROW_ACTOR_IMPACT = "ammo:bluntArrows:onProjectileActorImpact";
 
 registerScript(AMMO_FIRE_ARROW_ACTOR_IMPACT, {
   [ScriptVerb.ProjectileActorImpact]: (_world, ctx) => {
@@ -33,6 +36,42 @@ registerScript(AMMO_FIRE_ARROW_ACTOR_IMPACT, {
         stacks: 1,
       });
       resolvedCtx.emit("proc:burning", {
+        actor: resolvedCtx.attacker,
+        target: resolvedCtx.defender,
+      });
+    });
+  },
+});
+
+registerScript(AMMO_PIERCING_ARROW_ACTOR_IMPACT, {
+  [ScriptVerb.ProjectileActorImpact]: (_world, ctx) => {
+    // Piercing arrows are a DR-answer lane for ranged builds.
+    ctx.addArmorPenetration(2);
+  },
+});
+
+registerScript(AMMO_BODKIN_ARROW_ACTOR_IMPACT, {
+  [ScriptVerb.ProjectileActorImpact]: (_world, ctx) => {
+    // Bodkins are the dedicated high-DR ranged answer.
+    ctx.addArmorPenetration(4);
+  },
+});
+
+registerScript(AMMO_BLUNT_ARROW_ACTOR_IMPACT, {
+  [ScriptVerb.ProjectileActorImpact]: (_world, ctx) => {
+    // Blunt heads trade damage for control.
+    ctx.damageType = "blunt";
+    ctx.damage = Math.max(1, ctx.damage - 1);
+    if (!ctx.chance(30)) return;
+    ctx.deferResolved((resolvedCtx) => {
+      if (!resolvedCtx.applied || resolvedCtx.killed) return;
+      resolvedCtx.pushEffect(resolvedCtx.defender, {
+        key: "stun",
+        turnsLeft: 1,
+        potency: 1,
+        stacks: 1,
+      });
+      resolvedCtx.emit("proc:stunned", {
         actor: resolvedCtx.attacker,
         target: resolvedCtx.defender,
       });
@@ -106,8 +145,15 @@ export function resolveAmmoHookScripts(def) {
 const AMMO_ID_ALIASES = Object.freeze({
   arrows: "ammo_arrows",
   fire_arrows: "ammo_fire_arrows",
+  piercing_arrows: "ammo_piercing_arrows",
+  bodkin_arrows: "ammo_bodkin_arrows",
+  blunt_arrows: "ammo_blunt_arrows",
+  blunt_head_arrows: "ammo_blunt_arrows",
   plain: "ammo_arrows",
   fire: "ammo_fire_arrows",
+  piercing: "ammo_piercing_arrows",
+  bodkin: "ammo_bodkin_arrows",
+  blunt: "ammo_blunt_arrows",
 });
 
 /**
@@ -137,6 +183,33 @@ export const AMMO_DEFS = Object.freeze({
     name: "Fire Arrows",
     scripts: Object.freeze({
       onProjectileActorImpact: Object.freeze([AMMO_FIRE_ARROW_ACTOR_IMPACT]),
+      onProjectileWallImpact: EMPTY_HOOK_SCRIPTS,
+      onProjectileMiss: EMPTY_HOOK_SCRIPTS,
+    }),
+  }),
+  ammo_piercing_arrows: Object.freeze({
+    id: "ammo_piercing_arrows",
+    name: "Piercing Arrows",
+    scripts: Object.freeze({
+      onProjectileActorImpact: Object.freeze([AMMO_PIERCING_ARROW_ACTOR_IMPACT]),
+      onProjectileWallImpact: EMPTY_HOOK_SCRIPTS,
+      onProjectileMiss: EMPTY_HOOK_SCRIPTS,
+    }),
+  }),
+  ammo_bodkin_arrows: Object.freeze({
+    id: "ammo_bodkin_arrows",
+    name: "Bodkin Arrows",
+    scripts: Object.freeze({
+      onProjectileActorImpact: Object.freeze([AMMO_BODKIN_ARROW_ACTOR_IMPACT]),
+      onProjectileWallImpact: EMPTY_HOOK_SCRIPTS,
+      onProjectileMiss: EMPTY_HOOK_SCRIPTS,
+    }),
+  }),
+  ammo_blunt_arrows: Object.freeze({
+    id: "ammo_blunt_arrows",
+    name: "Blunt-Head Arrows",
+    scripts: Object.freeze({
+      onProjectileActorImpact: Object.freeze([AMMO_BLUNT_ARROW_ACTOR_IMPACT]),
       onProjectileWallImpact: EMPTY_HOOK_SCRIPTS,
       onProjectileMiss: EMPTY_HOOK_SCRIPTS,
     }),

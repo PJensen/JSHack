@@ -2,7 +2,7 @@
 // Generate shop inventory items for a shopkeeper.
 
 import { createFrom } from '../../lib/ecs-js/archetype.js';
-import { HealthPotion, ArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
+import { HealthPotion, ArrowsStack, FireArrowsStack, PiercingArrowsStack, BodkinArrowsStack, BluntHeadArrowsStack, ScrollOfMapping, GemItem } from '../archetypes/Items.js';
 import { resolveLootTable, materializeDrop } from './lootResolver.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
@@ -26,6 +26,18 @@ function chooseWeighted(rng, entries) {
     return entries[entries.length - 1] || null;
 }
 
+function createArrowStock(world, rng) {
+    const pick = chooseWeighted(rng, [
+        { weight: 56, archetype: ArrowsStack },
+        { weight: 16, archetype: FireArrowsStack },
+        { weight: 12, archetype: PiercingArrowsStack },
+        { weight: 10, archetype: BodkinArrowsStack },
+        { weight: 6, archetype: BluntHeadArrowsStack },
+    ]);
+    const Arch = pick?.archetype || ArrowsStack;
+    return createFrom(world, Arch, {});
+}
+
 /**
  * Generate a shopkeeper's stock as entity IDs (no Position component).
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -46,7 +58,7 @@ export function generateShopStock(world, depth, rng) {
 
     const arrowCount = rng.int(2, 3);
     for (let i = 0; i < arrowCount; i++) {
-        const id = createFrom(world, ArrowsStack, {});
+        const id = createArrowStock(world, rng);
         try { world.remove(id, Position); } catch {} // ECS: may not exist
         items.push(id);
     }
@@ -94,7 +106,7 @@ export function generateShopItem(world, depth, rng) {
         return stripPosition(world, createFrom(world, HealthPotion, {}));
     }
     if (roll < 0.50) {
-        return stripPosition(world, createFrom(world, ArrowsStack, {}));
+        return stripPosition(world, createArrowStock(world, rng));
     }
     if (roll < 0.60) {
         return stripPosition(world, createFrom(world, ScrollOfMapping, {}));
