@@ -239,6 +239,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
 
     if (!groupedItems.length && !chestId) return null;
 
+    const withChestMeta = (detail) => {
+      if (!chestId || !detail || typeof detail !== "object") return detail;
+      const chestNi = world.get(chestId, NamedIdentity);
+      const chestName = (chestNi && chestNi.name) || "Chest";
+      return { ...detail, chestId, chestName };
+    };
+
     // Only show chest UI when there are no floor items to pick up first.
     if (chestId && !floorStackItems.length) {
       const chestNi = world.get(chestId, NamedIdentity);
@@ -254,22 +261,22 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     }
 
     if (floorStackItems.length > 1) {
-      return {
+      return withChestMeta({
         mode: 'stack',
         count: floorStackItems.reduce((sum, item) => sum + Math.max(1, Number(item?.count || 0) | 0), 0),
         items: floorStackItems,
         stackIndex: 0,
-      };
+      });
     }
 
     const single = floorStackItems[0] || groupedItems[0];
     const set = world.get(actorId, Settings);
     const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
-    return {
+    return withChestMeta({
       mode: 'single',
       item: single,
       pickupRange,
-    };
+    });
   }
 
   const SLOT_FILTER_MAP = Object.freeze({
