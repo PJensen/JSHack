@@ -1998,6 +1998,10 @@ function renderGroundTooltip(tip, detail) {
 
   const it = detail?.item || {};
   renderCompactPickup(it, 'Tap to pick up', () => {
+    const chestId = Number(detail?.chestId || 0) | 0;
+    if (chestId > 0) {
+      window.dispatchEvent(new CustomEvent('ui:tapOpenChest', { detail: { chestId } }));
+    }
     tip.style.display = 'none';
   });
 
@@ -2006,6 +2010,10 @@ function renderGroundTooltip(tip, detail) {
     const ids = getUiItemEntityIds(it);
     if (ids.length > 0) {
       window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: ids } }));
+    }
+    const chestId = Number(detail?.chestId || 0) | 0;
+    if (chestId > 0) {
+      window.dispatchEvent(new CustomEvent('ui:tapOpenChest', { detail: { chestId } }));
     }
     tip.style.display = 'none';
   };
