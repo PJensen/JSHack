@@ -1953,7 +1953,6 @@ function renderGroundTooltip(tip, detail) {
       if (firstId > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestPickup', { detail: { itemIds: [firstId] } }));
       }
-      tip.style.display = 'none';
     };
     return;
   }
