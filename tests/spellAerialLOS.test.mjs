@@ -10,6 +10,7 @@ import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
+import { hasSpellLineOfSight } from "../src/rules/utils/spellTargeting.js";
 
 function addDungeonState(world, depth, profileType) {
   const id = world.create();
@@ -106,4 +107,71 @@ Deno.test("meteor can target a tile occupied by an overworld flyer through wall 
 
   assertEquals(failures.length, 0);
   assert(world.get(target, Vitality).hp < 30, "meteor should damage the flyer on the chosen tile");
+});
+
+Deno.test("spell LOS blocks non-adjacent invisible hostile targets even with direct LOS", () => {
+  clearAll();
+  const world = new World({ seed: 105 });
+  const caster = makeActor(world, 0, 0, "player");
+  const target = makeActor(world, 4, 0, "enemy");
+  world.add(target, ActiveEffects, {
+    effects: [{ key: "invisible", turnsLeft: 12, potency: 1, stacks: 1 }],
+  });
+
+  const sourcePos = world.get(caster, Position);
+  const targetPos = world.get(target, Position);
+  const ok = hasSpellLineOfSight(world, {
+    sourceId: caster,
+    targetId: target,
+    sourcePos,
+    targetPos,
+    range: 10,
+    isBlocked: () => false,
+  });
+  assertEquals(ok, false);
+});
+
+Deno.test("spell LOS allows non-hostile invisible targets", () => {
+  clearAll();
+  const world = new World({ seed: 106 });
+  const caster = makeActor(world, 0, 0, "player");
+  const target = makeActor(world, 4, 0, "player");
+  world.add(target, ActiveEffects, {
+    effects: [{ key: "invisible", turnsLeft: 12, potency: 1, stacks: 1 }],
+  });
+
+  const sourcePos = world.get(caster, Position);
+  const targetPos = world.get(target, Position);
+  const ok = hasSpellLineOfSight(world, {
+    sourceId: caster,
+    targetId: target,
+    sourcePos,
+    targetPos,
+    range: 10,
+    isBlocked: () => false,
+  });
+  assertEquals(ok, true);
+});
+
+Deno.test("spell LOS blocks invisible flying hostile resolved from target tile fallback", () => {
+  clearAll();
+  const world = new World({ seed: 107 });
+  addDungeonState(world, 0, "overworld");
+  const caster = makeActor(world, 0, 0, "player");
+  const flyer = makeFlyingTarget(world, 4, 0, 20);
+  world.add(flyer, ActiveEffects, {
+    effects: [{ key: "invisible", turnsLeft: 12, potency: 1, stacks: 1 }],
+  });
+
+  const sourcePos = world.get(caster, Position);
+  const targetPos = { x: 4, y: 0 };
+  const ok = hasSpellLineOfSight(world, {
+    sourceId: caster,
+    sourcePos,
+    targetPos,
+    range: 10,
+    isBlocked: () => false,
+    allowFlyingOccupantAtTarget: true,
+  });
+  assertEquals(ok, false);
 });

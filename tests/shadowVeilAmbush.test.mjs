@@ -19,6 +19,7 @@ import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { stealthAmbushSystem } from "../src/rules/systems/stealthAmbushSystem.js";
 import { resolveCombatSnapshot } from "../src/rules/utils/resolveCombatSnapshot.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
+import { configureWorld } from "../src/main/scheduler.js";
 
 function createMeleePair(seed = 7) {
   const world = new World({ seed });
@@ -206,4 +207,33 @@ Deno.test("shadow cloak re-arms after quiet period while invisibility remains ac
   keys = effectKeys(world, attacker);
   assert(keys.includes("invisible"), "invisibility should still be active");
   assert(keys.includes("shadow_cloak"), "shadow cloak should re-arm after quiet period");
+});
+
+Deno.test("configureWorld installs stealth offense witness aggro listener", () => {
+  const world = new World({ seed: 41 });
+  configureWorld(world);
+
+  const attacker = world.create();
+  world.add(attacker, Position, { x: 4, y: 4 });
+  world.add(attacker, Faction, { key: "player" });
+
+  const enemy = world.create();
+  world.add(enemy, Position, { x: 4, y: 6 });
+  world.add(enemy, Faction, { key: "enemy" });
+  world.add(enemy, AggroState, {
+    alertLevel: AGGRO_LEVELS.unaware,
+    lastKnownX: 0,
+    lastKnownY: 0,
+    searchTurnsLeft: 0,
+    retreating: false,
+    patrolDx: 0,
+    patrolDy: 0,
+  });
+
+  world.emit("stealth:offense", { entityId: attacker, at: { x: 4, y: 4 } });
+  const aggro = world.get(enemy, AggroState);
+  assertEquals(aggro?.alertLevel, AGGRO_LEVELS.hunting);
+  assertEquals(aggro?.lastKnownX, 4);
+  assertEquals(aggro?.lastKnownY, 4);
+  assert((aggro?.searchTurnsLeft || 0) > 0);
 });
