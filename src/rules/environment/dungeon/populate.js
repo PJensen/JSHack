@@ -180,6 +180,25 @@ const DEAD_END_ROOM_THEMES = [
   { kind: 'lair', weight: 5 },
 ];
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
+const ROOM_PATTERN_THEMES = [
+  { kind: 'storage', weight: 14, minArea: 20 },
+  { kind: 'camp', weight: 12, minArea: 20 },
+  { kind: 'workshop', weight: 10, minArea: 24 },
+  { kind: 'mining', weight: 9, minArea: 24 },
+  { kind: 'cave_garden', weight: 8, minArea: 20, caveOnly: true },
+];
+const ROOM_PATTERN_CHANCE = 0.70;
+const ROOM_PATTERN_SOLID_KINDS = new Set([
+  'crate',
+  'cooking_fire',
+  'alchemy_bench',
+  'anvil',
+  'harvest_iron_ore',
+  'harvest_coal_ore',
+  'harvest_stone',
+  'harvest_thorn_bramble',
+  'harvest_venom_fern',
+]);
 // Mimics should be encountered mostly in shops; wild dungeon mimics stay uncommon.
 const SHOP_MIMIC_CHANCE = 0.12;
 const ROOM_MIMIC_CHANCE = 0.003;
@@ -375,6 +394,24 @@ function pickDeadEndTheme(rng) {
     if (roll <= 0) return theme.kind;
   }
   return DEAD_END_ROOM_THEMES[DEAD_END_ROOM_THEMES.length - 1].kind;
+}
+
+function pickRoomPatternTheme(rng, room, floorPlan) {
+  const area = room.w * room.h;
+  const isCave = !!floorPlan?.profile?.generator;
+  const candidates = ROOM_PATTERN_THEMES.filter((theme) => {
+    if (area < theme.minArea) return false;
+    if (theme.caveOnly && !isCave) return false;
+    return true;
+  });
+  if (candidates.length === 0) return null;
+  const total = candidates.reduce((sum, theme) => sum + theme.weight, 0);
+  let roll = rng.next() * total;
+  for (const theme of candidates) {
+    roll -= theme.weight;
+    if (roll <= 0) return theme.kind;
+  }
+  return candidates[candidates.length - 1].kind;
 }
 
 /**
@@ -908,6 +945,25 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
   }
 
+  const deadEndRoomKeySet = new Set(eligibleDeadEndRooms.map((room) => `${room.x},${room.y},${room.w},${room.h}`));
+  for (const room of chunk.rooms) {
+    const roomKey = `${room.x},${room.y},${room.w},${room.h}`;
+    const isEntryRoom = room === entryRoom;
+    if (isEntryRoom) continue;
+    if (deadEndRoomKeySet.has(roomKey)) continue;
+    if (shopRoom && roomKey === `${shopRoom.x},${shopRoom.y},${shopRoom.w},${shopRoom.h}`) continue;
+    if (room.prefab) continue;
+    applyRoomPatternTheme({
+      room,
+      chunk,
+      rng,
+      spawns,
+      floorPlan,
+      isSolid,
+      markSolid,
+    });
+  }
+
   for (const room of eligibleDeadEndRooms) {
     if (shopRoom && room.x === shopRoom.x && room.y === shopRoom.y && room.w === shopRoom.w && room.h === shopRoom.h) {
       continue;
@@ -1092,6 +1148,154 @@ function countRoomOpeningTiles(room, chunk) {
   }
 
   return openings;
+}
+
+function getRoomOpeningTiles(room, chunk) {
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  const rw = room.w;
+  const rh = room.h;
+  const tiles = chunk.tiles;
+
+  function getTile(x, y) {
+    if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
+    return tiles[y * CHUNK_SIZE + x];
+  }
+
+  function isPassable(tile) {
+    return tile === TILE_FLOOR || tile === TILE_DOOR || tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP;
+  }
+
+  function roomHas(x, y) {
+    return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+  }
+
+  const openings = [];
+  for (let y = ry; y < ry + rh; y++) {
+    for (let x = rx; x < rx + rw; x++) {
+      const isPerimeter = (x === rx || x === rx + rw - 1 || y === ry || y === ry + rh - 1);
+      if (!isPerimeter) continue;
+      if (!isPassable(getTile(x, y))) continue;
+
+      const neighbors = [
+        [x - 1, y],
+        [x + 1, y],
+        [x, y - 1],
+        [x, y + 1],
+      ];
+      let opensOut = false;
+      for (const [nx, ny] of neighbors) {
+        if (roomHas(nx, ny)) continue;
+        if (isPassable(getTile(nx, ny))) {
+          opensOut = true;
+          break;
+        }
+      }
+      if (opensOut) openings.push({ x: ox + x, y: oy + y });
+    }
+  }
+  return openings;
+}
+
+function buildRoomEgressReserve(room, chunk) {
+  const reserved = new Set();
+  const openings = getRoomOpeningTiles(room, chunk);
+  for (const opening of openings) {
+    const x = opening.x;
+    const y = opening.y;
+    reserved.add(`${x},${y}`);
+    if (x === room.x) {
+      reserved.add(`${x + 1},${y}`);
+      reserved.add(`${x + 2},${y}`);
+    } else if (x === room.x + room.w - 1) {
+      reserved.add(`${x - 1},${y}`);
+      reserved.add(`${x - 2},${y}`);
+    } else if (y === room.y) {
+      reserved.add(`${x},${y + 1}`);
+      reserved.add(`${x},${y + 2}`);
+    } else if (y === room.y + room.h - 1) {
+      reserved.add(`${x},${y - 1}`);
+      reserved.add(`${x},${y - 2}`);
+    }
+  }
+  return reserved;
+}
+
+function pickWallDecorationSpot(room, rng, isBlocked, reserved = new Set()) {
+  const candidates = [];
+  for (let y = room.y + 1; y <= room.y + room.h - 2; y++) {
+    for (let x = room.x + 1; x <= room.x + room.w - 2; x++) {
+      const key = `${x},${y}`;
+      if (reserved.has(key) || isBlocked(x, y)) continue;
+      const isInnerWall = (
+        x === room.x + 1
+        || x === room.x + room.w - 2
+        || y === room.y + 1
+        || y === room.y + room.h - 2
+      );
+      if (!isInnerWall) continue;
+      candidates.push({ x, y });
+    }
+  }
+  if (candidates.length === 0) return null;
+  const picked = candidates[rng.int(0, candidates.length - 1)];
+  reserved.add(`${picked.x},${picked.y}`);
+  return picked;
+}
+
+function applyRoomPatternTheme(ctx) {
+  const { room, chunk, rng, spawns, floorPlan, isSolid, markSolid } = ctx;
+  if (room.w < 5 || room.h < 5) return;
+  if (rng.next() >= ROOM_PATTERN_CHANCE) return;
+
+  const pattern = pickRoomPatternTheme(rng, room, floorPlan);
+  if (!pattern) return;
+  const reserved = buildRoomEgressReserve(room, chunk);
+
+  const place = (kind, countMin, countMax = countMin) => {
+    const count = rng.int(countMin, countMax);
+    for (let i = 0; i < count; i++) {
+      const pos = pickWallDecorationSpot(room, rng, isSolid, reserved);
+      if (!pos) break;
+      spawns.push({ x: pos.x, y: pos.y, kind, params: {} });
+      if (ROOM_PATTERN_SOLID_KINDS.has(kind)) markSolid(pos.x, pos.y);
+    }
+  };
+
+  switch (pattern) {
+    case 'storage':
+      place('crate', 2, 4);
+      place('torch', 1, 2);
+      break;
+    case 'camp':
+      place('cooking_fire', 1);
+      place('crate', 1, 2);
+      place('torch', 1, 2);
+      break;
+    case 'workshop':
+      place('anvil', 1);
+      place('alchemy_bench', 1);
+      place('crate', 1, 2);
+      place('torch', 1, 2);
+      break;
+    case 'mining': {
+      const oreKinds = ['harvest_iron_ore', 'harvest_coal_ore', 'harvest_stone'];
+      const oreCount = rng.int(2, 4);
+      for (let i = 0; i < oreCount; i++) {
+        place(oreKinds[rng.int(0, oreKinds.length - 1)], 1);
+      }
+      place('torch', 1, 2);
+      break;
+    }
+    case 'cave_garden':
+      place('harvest_thorn_bramble', 1, 2);
+      place('harvest_venom_fern', 1, 2);
+      place('mushrooms', 1, 2);
+      place('torch', 0, 1);
+      break;
+  }
 }
 
 function isPointInRoom(x, y, room) {

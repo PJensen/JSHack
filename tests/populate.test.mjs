@@ -162,6 +162,107 @@ Deno.test("populateChunk scales monster count with depth", () => {
   assert(total5 >= total1, `depth 5 total (${total5}) >= depth 1 total (${total1}) across 20 seeds`);
 });
 
+function buildTwoEntranceRoomChunk() {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  // Room interior
+  for (let y = 4; y < 12; y++) {
+    for (let x = 4; x < 12; x++) {
+      tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+    }
+  }
+  // Two openings (west + east) so this is not a dead-end room.
+  tiles[7 * CHUNK_SIZE + 3] = TILE_FLOOR;
+  tiles[7 * CHUNK_SIZE + 4] = TILE_FLOOR;
+  tiles[7 * CHUNK_SIZE + 11] = TILE_FLOOR;
+  tiles[7 * CHUNK_SIZE + 12] = TILE_FLOOR;
+  return {
+    chunkX: 1,
+    chunkY: 0,
+    tiles,
+    rooms: [{ x: CHUNK_SIZE + 4, y: 4, w: 8, h: 8 }],
+    doors: [],
+  };
+}
+
+Deno.test("room patterning keeps egress and entrances clear", () => {
+  const chunk = buildTwoEntranceRoomChunk();
+  const room = chunk.rooms[0];
+  const reserved = new Set([
+    `${room.x},7`, `${room.x + 1},7`, `${room.x + 2},7`, // west opening lane
+    `${room.x + room.w - 1},7`, `${room.x + room.w - 2},7`, `${room.x + room.w - 3},7`, // east opening lane
+  ]);
+  const thematicKinds = new Set([
+    'crate',
+    'cooking_fire',
+    'alchemy_bench',
+    'anvil',
+    'harvest_iron_ore',
+    'harvest_coal_ore',
+    'harvest_stone',
+    'harvest_thorn_bramble',
+    'harvest_venom_fern',
+    'torch',
+  ]);
+
+  let seenThematicPlacement = false;
+  for (let seed = 1; seed <= 220; seed++) {
+    const spawns = populateChunk(chunk, { depth: 5, difficultyMult: 0, profile: {} }, createRng(seed * 37));
+    for (const sp of spawns) {
+      if (!thematicKinds.has(sp.kind)) continue;
+      seenThematicPlacement = true;
+      assert(
+        !reserved.has(`${sp.x},${sp.y}`),
+        `thematic spawn ${sp.kind} must not block room egress at ${sp.x},${sp.y}`
+      );
+    }
+  }
+  assert(seenThematicPlacement, 'expected at least one thematic room-pattern placement');
+});
+
+Deno.test("room patterning adds thematic dungeon decor variants", () => {
+  const themedKinds = new Set();
+  for (let seed = 1; seed <= 260; seed++) {
+    const chunk = buildTwoEntranceRoomChunk();
+    const floorPlan = {
+      depth: 6,
+      difficultyMult: 0,
+      profile: seed % 2 === 0 ? {} : { generator: 'noise' },
+    };
+    const spawns = populateChunk(chunk, floorPlan, createRng(seed * 101));
+    for (const sp of spawns) {
+      if (
+        sp.kind === 'crate'
+        || sp.kind === 'cooking_fire'
+        || sp.kind === 'alchemy_bench'
+        || sp.kind === 'anvil'
+        || sp.kind === 'torch'
+        || sp.kind === 'harvest_iron_ore'
+        || sp.kind === 'harvest_coal_ore'
+        || sp.kind === 'harvest_stone'
+        || sp.kind === 'harvest_thorn_bramble'
+        || sp.kind === 'harvest_venom_fern'
+      ) {
+        themedKinds.add(sp.kind);
+      }
+    }
+  }
+
+  assert(themedKinds.has('crate'), 'expected storage pattern crate decor');
+  assert(themedKinds.has('cooking_fire'), 'expected camp cooking fire decor');
+  assert(themedKinds.has('alchemy_bench'), 'expected workshop alchemy station decor');
+  assert(themedKinds.has('anvil'), 'expected workshop anvil decor');
+  assert(themedKinds.has('torch'), 'expected wall torches in patterns');
+  assert(
+    themedKinds.has('harvest_iron_ore') || themedKinds.has('harvest_coal_ore') || themedKinds.has('harvest_stone'),
+    'expected mining node room decor'
+  );
+  assert(
+    themedKinds.has('harvest_thorn_bramble') || themedKinds.has('harvest_venom_fern'),
+    'expected dangerous cave plant room decor'
+  );
+});
+
 Deno.test("populateChunk can generate a shallow spawner", () => {
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_WALL);
