@@ -776,7 +776,7 @@ export function generateOverworldChunks(worldSeed) {
   }
   // Main non-crypt down stair: church square, right-side flower bed in front of the church.
   const stairX = bedX0 + 2;
-  const stairY = bedY0;
+  const stairY = bedY0 + 1;
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
   // ── Worker cottages — actual homes for the town to sleep in ─────────────
