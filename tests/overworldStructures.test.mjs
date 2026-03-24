@@ -101,10 +101,14 @@ const northWalkY = homeY - houseHalfH - 1;
 const southWalkY = homeY + houseHalfH + 1;
 const westWalkX = homeX - houseHalfW - 1;
 const eastWalkX = homeX + houseHalfW + 1;
-const stairX = eastWalkX + 1;
-const stairY = homeY + 2;
-const wellX = stairX + 5;
-const wellY = stairY;
+const houseStairAnchorX = eastWalkX + 1;
+const houseStairAnchorY = homeY + 2;
+const wellX = houseStairAnchorX + 5;
+const wellY = houseStairAnchorY;
+const bedX0 = fountainCX + 3;
+const bedY0 = fountainCY - 1;
+const stairX = bedX0 + 2;
+const stairY = bedY0;
 const gateX = homeX + 1;
 const gateY = homeY + 5;
 const farmX0 = homeX - 4;
@@ -165,12 +169,12 @@ Deno.test("overworld scales the player house down to a 9x5 footprint with a fron
   assertEquals(getWorldTile(chunks, eastWalkX, southWalkY), TILE_FLOOR);
 });
 
-Deno.test("overworld places the dungeon entrance on open ground beside the player house", () => {
+Deno.test("overworld places the non-crypt dungeon entrance in the church-square right flower bed", () => {
   const { chunks } = generateOverworldChunks(SEED);
 
   assertEquals(getWorldTile(chunks, stairX, stairY), TILE_STAIR_DOWN);
-  assertEquals(getWorldTile(chunks, stairX - 1, stairY), TILE_FLOOR);
-  assertEquals(getWorldTile(chunks, stairX, stairY + 1), TILE_FLOOR);
+  assertEquals(getWorldTile(chunks, stairX - 1, stairY), TILE_GRASS);
+  assertEquals(getWorldTile(chunks, stairX, stairY + 1), TILE_GRASS);
 });
 
 Deno.test("overworld farm keeps the full tilled plot and uses a real fence gate", () => {
