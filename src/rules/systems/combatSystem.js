@@ -26,6 +26,11 @@ import {
 import { ensureEquippedAffixTopology } from '../utils/affixTopology.js';
 import { buildProcContext, applyPendingDamageProcPhase, applyReactionProcPhase } from '../utils/procPhases.js';
 import { breakStealthOnOffense } from '../utils/stealthAmbush.js';
+import {
+    calculateBlindedPhysicalDamage,
+    getBlindedCritChanceBonusPct,
+    getBlindedCritMultBonus,
+} from '../utils/blindnessExposure.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -96,6 +101,7 @@ function resolveHitRoll(world, {
 
     const atkSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });
     const defSnapshot = resolveCombatSnapshot(world, target, { mode: 'melee' });
+    const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
     breakStealthOnOffense(world, source, { reason: 'attack', mode: 'melee', targetId: target });
     const attackBonus = atkSnapshot.attackBonus + hitPenalty;
     const armorClass = defSnapshot.armorClass;
@@ -140,11 +146,14 @@ function resolveHitRoll(world, {
     if (damageType === 'pierce') armorPenetration += Math.max(0, Number(atkSnapshot.piercePenetration || 0));
 
     if (!isCrit) {
-        const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0);
+        const blindCritBonusPct = getBlindedCritChanceBonusPct(blindExposure);
+        const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0) + blindCritBonusPct;
         if (critPct > 0) isCrit = pct(r, critPct);
     }
-    const critMult = 2 + (atkSnapshot.critMult || 0);
+    const blindCritMultBonus = getBlindedCritMultBonus(blindExposure);
+    const critMult = 2 + (atkSnapshot.critMult || 0) + blindCritMultBonus;
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
+    dmg = calculateBlindedPhysicalDamage(dmg, blindExposure);
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
     // Pre-hit hooks

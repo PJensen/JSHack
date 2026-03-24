@@ -2,6 +2,7 @@ import { HUNGER_COMBAT_LEVELS } from "../data/hungerCombatLevels.js";
 import { resolveResistance } from "./dealDamage.js";
 import { resolveCanonicalStats } from "./canonicalStats.js";
 import { statusStrength } from "./statusFacade.js";
+import { getBlindedDefensePenalty } from "./blindnessExposure.js";
 
 const MODE_RULES = Object.freeze({
   melee: Object.freeze({
@@ -93,6 +94,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     dark_sight: statusStrength(world, id, "dark_sight"),
     battle_fury: statusStrength(world, id, "battle_fury"),
     fey_grace: statusStrength(world, id, "fey_grace"),
+    blinded: statusStrength(world, id, "blinded"),
   };
 
   /** @type {Array<{stat:'attack'|'defense', source:string, value:number, reason:string}>} */
@@ -170,6 +172,12 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "defense", "status:stoneskin", statusTotals.stoneskin, "stoneskin-bonus");
     pushModifier(modifiers, "defense", "status:ogre_bulk", statusTotals.ogre_bulk * 3, "ogre-bulk-bonus");
     defenseContribution += statusTotals.stoneskin + (statusTotals.ogre_bulk * 3);
+  }
+
+  const blindedDefensePenalty = getBlindedDefensePenalty(statusTotals.blinded, mode);
+  if (blindedDefensePenalty > 0) {
+    pushModifier(modifiers, "defense", "status:blinded", -blindedDefensePenalty, "blinded-exposure-penalty");
+    defenseContribution -= blindedDefensePenalty;
   }
 
   if (rules.clampDefenseAtZero && defenseContribution < 0) {

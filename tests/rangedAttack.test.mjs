@@ -476,6 +476,70 @@ Deno.test("ranged: attacker pierce penetration increases damage against DR", () 
   );
 });
 
+Deno.test("ranged: blinded defenders are easier to hit based on blindness strength", () => {
+  function runOne(seed, blindPotency = 0) {
+    const { world, archer, target } = setup({ seed, targetHp: 20, tx: 5, ty: 0 });
+    world.set(archer, Equipment, {
+      ranged: world.get(archer, Equipment)?.ranged || null,
+      ammo: world.get(archer, Equipment)?.ammo || null,
+      accuracyDerived: 0,
+      damagePowerDerived: 4,
+    });
+    world.set(target, Equipment, { evadeDerived: 10 });
+    if (blindPotency > 0) {
+      world.add(target, ActiveEffects, {
+        effects: [{ key: 'blinded', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+      });
+    }
+    world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+    rangedAttackSystem(world);
+    return 20 - world.get(target, Vitality).hp;
+  }
+
+  let compared = false;
+  let scaled = false;
+  for (let seed = 1; seed <= 256; seed++) {
+    const baseline = runOne(seed, 0);
+    const blinded2 = runOne(seed, 2);
+    const blinded = runOne(seed, 4);
+    if (baseline === 0 && blinded > 0) {
+      compared = true;
+    }
+    if (blinded2 === 0 && blinded > 0) scaled = true;
+    if (compared && scaled) break;
+  }
+  assert(compared, "expected at least one deterministic seed where blinded defender is hit while baseline misses");
+  assert(scaled, "expected stronger blindness to create a ranged hit opportunity not present at lower blindness potency");
+});
+
+Deno.test("ranged: blinded defenders take more direct-hit physical projectile damage", () => {
+  function runOne(seed, blindPotency = 0) {
+    const { world, archer, target, bowId, ammoId } = setup({ seed, targetHp: 30, tx: 5, ty: 0 });
+    world.set(archer, Equipment, {
+      ranged: bowId,
+      ammo: ammoId,
+      accuracyDerived: 20,
+      damagePowerDerived: 12,
+    });
+    world.set(target, Equipment, { evadeDerived: 0 });
+    if (blindPotency > 0) {
+      world.add(target, ActiveEffects, {
+        effects: [{ key: 'blinded', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+      });
+    }
+    world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+    rangedAttackSystem(world);
+    return 30 - world.get(target, Vitality).hp;
+  }
+
+  const baseline = runOne(42, 0);
+  const blinded = runOne(42, 4);
+  assert(
+    blinded > baseline,
+    `blinded ranged target should take higher direct-hit physical damage (baseline=${baseline}, blinded=${blinded})`,
+  );
+});
+
 Deno.test("ranged: piercing arrows add armor penetration on hit", () => {
   const baseline = setup({ seed: 42, targetHp: 30 });
   baseline.world.set(baseline.archer, Equipment, {

@@ -25,6 +25,11 @@ import { getAmmoDef } from '../data/ammo.js';
 import { createItemById } from '../utils/itemFactory.js';
 import { breakStealthOnOffense } from '../utils/stealthAmbush.js';
 import { isTargetHiddenByInvisibility } from '../utils/spellTargeting.js';
+import {
+  calculateBlindedPhysicalDamage,
+  getBlindedCritChanceBonusPct,
+  getBlindedCritMultBonus,
+} from '../utils/blindnessExposure.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -161,6 +166,7 @@ export function rangedAttackSystem(world) {
     // d20 roll
     const atkSnapshot = resolveCombatSnapshot(world, attacker, { mode: 'ranged' });
     const defSnapshot = resolveCombatSnapshot(world, defender, { mode: 'ranged' });
+    const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
     breakStealthOnOffense(world, attacker, { reason: 'attack', mode: 'ranged', targetId: defender });
     const attackBonus = atkSnapshot.attackBonus;
     const armorClass = defSnapshot.armorClass;
@@ -208,11 +214,14 @@ export function rangedAttackSystem(world) {
 
     // Secondary crit check: critChanceDerived (decimal) + luck (integer %)
     if (!isCrit) {
-      const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0);
+      const blindCritBonusPct = getBlindedCritChanceBonusPct(blindExposure);
+      const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0) + blindCritBonusPct;
       if (critPct > 0) isCrit = pct(r, critPct);
     }
-    const critMult = 2 + (atkSnapshot.critMult || 0);
+    const blindCritMultBonus = getBlindedCritMultBonus(blindExposure);
+    const critMult = 2 + (atkSnapshot.critMult || 0) + blindCritMultBonus;
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
+    dmg = calculateBlindedPhysicalDamage(dmg, blindExposure);
     const procScratch = {};
     let damageType = 'pierce';
     dmg = applyPendingDamageProcPhase(world, attacker, buildProcContext('onBeforeHit', {
