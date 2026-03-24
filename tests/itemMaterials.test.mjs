@@ -50,6 +50,15 @@ Deno.test("createItemById keeps wand default charges when count is omitted", () 
   assert(info && info.count === 10, `wand should spawn with catalog charges, got ${info?.count}`);
 });
 
+Deno.test("createItemById propagates noQuickChip from catalog", () => {
+  const world = new World({ seed: 16 });
+  const id = createItemById(world, "scroll_identify");
+  assert(id != null, "scroll of identify should be creatable");
+  const info = world.get(id, ItemInfo);
+  assert(info, "scroll should have item info");
+  assertEquals(info.noQuickChip, true);
+});
+
 Deno.test("simple archetype items carry baseline materials", () => {
   const world = new World({ seed: 14 });
 
