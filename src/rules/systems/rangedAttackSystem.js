@@ -339,7 +339,7 @@ function tryRecoverEmbeddedArrow(world, { attacker, defender, ammoIdentity, rng 
 
   const recoveredId = createItemById(world, recoverIdentity, { count: 1 });
   if (!(recoveredId > 0)) return;
-  if (!addToInventory(world, defender, recoveredId, { silent: true })) {
+  if (!addToInventory(world, defender, recoveredId, { silent: true, mergeCompatible: true })) {
     world.destroy(recoveredId);
     return;
   }
