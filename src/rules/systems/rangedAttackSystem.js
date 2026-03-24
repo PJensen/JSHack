@@ -25,6 +25,11 @@ import { getAmmoDef } from '../data/ammo.js';
 import { createItemById } from '../utils/itemFactory.js';
 import { breakStealthOnOffense } from '../utils/stealthAmbush.js';
 import { isTargetHiddenByInvisibility } from '../utils/spellTargeting.js';
+import {
+  calculateBlindedPhysicalDamage,
+  getBlindedCritChanceBonusPct,
+  getBlindedCritMultBonus,
+} from '../utils/blindnessExposure.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -32,12 +37,6 @@ const RANGED_PROJECTILE_MAX_DURATION = 0.4;
 const EMBEDDED_ARROW_RECOVERY_CHANCE = 0.22;
 const BLUNT_ARROW_SPEED_MULT = 0.9;
 const PIERCING_ARROW_SPEED_MULT = 1.1;
-const BLINDED_CRIT_CHANCE_BONUS_PER_STACK_PCT = 4;
-const BLINDED_CRIT_CHANCE_BONUS_CAP_PCT = 40;
-const BLINDED_CRIT_MULT_BONUS_PER_STACK = 0.15;
-const BLINDED_CRIT_MULT_BONUS_CAP = 1.0;
-const BLINDED_PHYSICAL_DAMAGE_MULT_PER_STACK = 0.05;
-const BLINDED_PHYSICAL_DAMAGE_MULT_CAP = 0.5;
 
 function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
   const dx = Number(to?.x || 0) - Number(from?.x || 0);
@@ -215,26 +214,14 @@ export function rangedAttackSystem(world) {
 
     // Secondary crit check: critChanceDerived (decimal) + luck (integer %)
     if (!isCrit) {
-      const blindCritBonusPct = Math.min(
-        BLINDED_CRIT_CHANCE_BONUS_CAP_PCT,
-        blindExposure * BLINDED_CRIT_CHANCE_BONUS_PER_STACK_PCT,
-      );
+      const blindCritBonusPct = getBlindedCritChanceBonusPct(blindExposure);
       const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0) + blindCritBonusPct;
       if (critPct > 0) isCrit = pct(r, critPct);
     }
-    const blindCritMultBonus = Math.min(
-      BLINDED_CRIT_MULT_BONUS_CAP,
-      blindExposure * BLINDED_CRIT_MULT_BONUS_PER_STACK,
-    );
+    const blindCritMultBonus = getBlindedCritMultBonus(blindExposure);
     const critMult = 2 + (atkSnapshot.critMult || 0) + blindCritMultBonus;
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
-    if (blindExposure > 0) {
-      const blindDamageMult = 1 + Math.min(
-        BLINDED_PHYSICAL_DAMAGE_MULT_CAP,
-        blindExposure * BLINDED_PHYSICAL_DAMAGE_MULT_PER_STACK,
-      );
-      dmg = Math.max(1, Math.floor(dmg * blindDamageMult));
-    }
+    dmg = calculateBlindedPhysicalDamage(dmg, blindExposure);
     const procScratch = {};
     let damageType = 'pierce';
     dmg = applyPendingDamageProcPhase(world, attacker, buildProcContext('onBeforeHit', {

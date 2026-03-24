@@ -278,7 +278,7 @@ Deno.test("blinded defenders are easier to hit in melee based on blindness stren
     }) }, 20);
     if (blindPotency > 0) {
       world.add(defender, ActiveEffects, {
-        effects: [{ key: 'blind', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+        effects: [{ key: 'blinded', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
       });
     }
     world.add(attacker, Position, { x: 1, y: 1 });
@@ -290,15 +290,19 @@ Deno.test("blinded defenders are easier to hit in melee based on blindness stren
   }
 
   let compared = false;
+  let scaled = false;
   for (let seed = 1; seed <= 256; seed++) {
     const baseline = runOne(seed, 0);
+    const blinded2 = runOne(seed, 2);
     const blinded = runOne(seed, 4);
     if (baseline === 0 && blinded > 0) {
       compared = true;
-      break;
     }
+    if (blinded2 === 0 && blinded > 0) scaled = true;
+    if (compared && scaled) break;
   }
   assert(compared, "expected at least one deterministic seed where blinded defender takes a hit that baseline avoids");
+  assert(scaled, "expected higher blindness potency to create a hit opportunity not present at lower blindness potency");
 });
 
 Deno.test("blinded defenders take more melee direct-hit physical damage", () => {
@@ -320,7 +324,7 @@ Deno.test("blinded defenders take more melee direct-hit physical damage", () => 
     }) }, 30);
     if (blindPotency > 0) {
       world.add(defender, ActiveEffects, {
-        effects: [{ key: 'blind', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+        effects: [{ key: 'blinded', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
       });
     }
     world.add(attacker, Position, { x: 1, y: 1 });

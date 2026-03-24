@@ -2,6 +2,7 @@ import { HUNGER_COMBAT_LEVELS } from "../data/hungerCombatLevels.js";
 import { resolveResistance } from "./dealDamage.js";
 import { resolveCanonicalStats } from "./canonicalStats.js";
 import { statusStrength } from "./statusFacade.js";
+import { getBlindedDefensePenalty } from "./blindnessExposure.js";
 
 const MODE_RULES = Object.freeze({
   melee: Object.freeze({
@@ -19,10 +20,6 @@ const MODE_RULES = Object.freeze({
     clampDefenseAtZero: false,
   }),
 });
-
-const BLINDED_MELEE_DEFENSE_PENALTY_PER_STACK = 2;
-const BLINDED_RANGED_DEFENSE_PENALTY_PER_STACK = 3;
-const BLINDED_DEFENSE_PENALTY_CAP = 12;
 
 /**
  * @param {string} mode
@@ -177,13 +174,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     defenseContribution += statusTotals.stoneskin + (statusTotals.ogre_bulk * 3);
   }
 
-  const blindedDefensePenaltyPerStack = mode === "ranged"
-    ? BLINDED_RANGED_DEFENSE_PENALTY_PER_STACK
-    : BLINDED_MELEE_DEFENSE_PENALTY_PER_STACK;
-  const blindedDefensePenalty = Math.min(
-    BLINDED_DEFENSE_PENALTY_CAP,
-    Math.max(0, statusTotals.blinded * blindedDefensePenaltyPerStack),
-  );
+  const blindedDefensePenalty = getBlindedDefensePenalty(statusTotals.blinded, mode);
   if (blindedDefensePenalty > 0) {
     pushModifier(modifiers, "defense", "status:blinded", -blindedDefensePenalty, "blinded-exposure-penalty");
     defenseContribution -= blindedDefensePenalty;

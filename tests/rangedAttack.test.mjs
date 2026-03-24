@@ -488,7 +488,7 @@ Deno.test("ranged: blinded defenders are easier to hit based on blindness streng
     world.set(target, Equipment, { evadeDerived: 10 });
     if (blindPotency > 0) {
       world.add(target, ActiveEffects, {
-        effects: [{ key: 'blind', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+        effects: [{ key: 'blinded', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
       });
     }
     world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
@@ -497,15 +497,19 @@ Deno.test("ranged: blinded defenders are easier to hit based on blindness streng
   }
 
   let compared = false;
+  let scaled = false;
   for (let seed = 1; seed <= 256; seed++) {
     const baseline = runOne(seed, 0);
+    const blinded2 = runOne(seed, 2);
     const blinded = runOne(seed, 4);
     if (baseline === 0 && blinded > 0) {
       compared = true;
-      break;
     }
+    if (blinded2 === 0 && blinded > 0) scaled = true;
+    if (compared && scaled) break;
   }
   assert(compared, "expected at least one deterministic seed where blinded defender is hit while baseline misses");
+  assert(scaled, "expected stronger blindness to create a ranged hit opportunity not present at lower blindness potency");
 });
 
 Deno.test("ranged: blinded defenders take more direct-hit physical projectile damage", () => {
@@ -520,7 +524,7 @@ Deno.test("ranged: blinded defenders take more direct-hit physical projectile da
     world.set(target, Equipment, { evadeDerived: 0 });
     if (blindPotency > 0) {
       world.add(target, ActiveEffects, {
-        effects: [{ key: 'blind', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+        effects: [{ key: 'blinded', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
       });
     }
     world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
