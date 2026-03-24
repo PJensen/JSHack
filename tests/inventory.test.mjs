@@ -147,3 +147,36 @@ Deno.test("inventory: all arrow stack types can be dropped, including equipped a
     assert(eq.ammo === null, "dropping equipped ammo should clear ammo slot");
   }
 });
+
+Deno.test("inventory: dropping equipped ammo merges into matching ground ammo stack", () => {
+  const world = new World({ seed: 86 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { x: 5, y: 6, capacity: 20, weightLimit: 99 });
+  const pos = world.get(player, Position);
+  const eq = world.get(player, Equipment);
+  assert(eq, "player should have equipment");
+
+  const groundAmmo = createFrom(world, ArrowsStack, {});
+  world.add(groundAmmo, Position, { x: pos.x, y: pos.y });
+  const groundBefore = Math.max(1, Number(world.get(groundAmmo, ItemInfo)?.count || 0) | 0);
+
+  const equippedAmmo = createFrom(world, ArrowsStack, {});
+  addToInventory(world, player, equippedAmmo);
+  world.add(player, EquipIntent, { itemId: equippedAmmo });
+  equipItemSystem(world);
+  assert(eq.ammo === equippedAmmo, "ammo should be equipped before drop");
+
+  const equippedBefore = Math.max(1, Number(world.get(equippedAmmo, ItemInfo)?.count || 0) | 0);
+  world.add(player, DropIntent, { itemId: equippedAmmo });
+  world.tick(1);
+
+  assert(eq.ammo === null, "dropping equipped ammo should clear ammo slot");
+  assert(!world.isAlive(equippedAmmo), "dropped ammo entity should merge into existing ground stack");
+
+  const onTile = itemsAt(world, pos.x, pos.y);
+  const ammoOnTile = onTile.filter((id) => world.get(id, ItemInfo)?.type === "ammo");
+  assert(ammoOnTile.length === 1, "matching ground ammo should be represented by one entity");
+  assert(ammoOnTile[0] === groundAmmo, "existing ground ammo should remain as the merged stack carrier");
+  assert(world.get(groundAmmo, ItemInfo).count === (groundBefore + equippedBefore), "ground ammo count should increase by dropped count");
+});

@@ -14,6 +14,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import {
   destroyInventoryRoot,
   inventoryItems,
+  placeOnGround,
   removeFromInventory,
 } from "../utils/inventoryFacade.js";
 import { DungeonState } from "../components/DungeonState.js";
@@ -65,14 +66,12 @@ export function cleanupSystem(world) {
         for (const itemId of items) {
           const info = world.get(itemId, ItemInfo);
           removeFromInventory(world, id, itemId);
-          try {
-            world.add(itemId, Position, { x: pos.x, y: pos.y });
-          } catch { /* already had pos or deferred */ }
+          const placed = placeOnGround(world, itemId, pos.x, pos.y, { mergeCompatibleAmmo: true });
           try {
             world.emit &&
               world.emit("item:dropped", {
                 actor: id,
-                itemId,
+                itemId: placed.itemId || itemId,
                 count: info?.count || 1,
                 at: { x: pos.x, y: pos.y },
               });

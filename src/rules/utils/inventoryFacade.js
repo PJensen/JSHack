@@ -253,6 +253,50 @@ export function addToInventory(world, ownerId, itemId, opts) {
   return true;
 }
 
+function isAmmoEntity(world, itemId) {
+  const info = world.get(itemId, ItemInfo);
+  return !!info && info.type === "ammo";
+}
+
+/**
+ * Place an item on a ground tile, optionally merging compatible ammo stacks
+ * already at that tile.
+ *
+ * Returns the entity id present on the tile after placement.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} itemId
+ * @param {number} x
+ * @param {number} y
+ * @param {{ mergeCompatibleAmmo?: boolean }} [opts]
+ * @returns {{ itemId: number, merged: boolean, movedCount: number }}
+ */
+export function placeOnGround(world, itemId, x, y, opts = {}) {
+  if (!(itemId > 0) || !world.isAlive(itemId)) return { itemId: 0, merged: false, movedCount: 0 };
+  const info = world.get(itemId, ItemInfo);
+  const movedCount = Math.max(1, Number(info?.count || 0) | 0);
+
+  if (opts.mergeCompatibleAmmo !== false && isAmmoEntity(world, itemId)) {
+    for (const [existingId, pos] of world.query(Position)) {
+      if (existingId === itemId) continue;
+      if (!pos || pos.x !== x || pos.y !== y) continue;
+      if (!isAmmoEntity(world, existingId)) continue;
+      if (!capacityCompatible(world, existingId, itemId)) continue;
+
+      world.mutate(existingId, ItemInfo, (rec) => {
+        rec.count = Math.max(1, Number(rec.count || 0) | 0) + movedCount;
+      });
+      ensureWeightRecord(world, existingId);
+      world.destroy(itemId);
+      return { itemId: existingId, merged: true, movedCount };
+    }
+  }
+
+  if (world.has(itemId, Position)) setImmediate(world, itemId, Position, { x, y });
+  else addImmediate(world, itemId, Position, { x, y });
+  return { itemId, merged: false, movedCount };
+}
+
 /**
  * Remove an item entity from the owner's inventory without placing it.
  */
