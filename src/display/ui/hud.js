@@ -1693,8 +1693,8 @@ function renderQuickChip(it, h) {
     background: '#101626',
     color: '#cfe8ff'
   });
-  const x = document.createElement('button');
-  Object.assign(x.style, {
+  const dismissBtn = document.createElement('button');
+  Object.assign(dismissBtn.style, {
     position: 'absolute',
     right: '6px',
     top: '6px',
@@ -1709,9 +1709,9 @@ function renderQuickChip(it, h) {
     borderRadius: '6px',
     cursor: 'pointer',
   });
-  x.textContent = '\u00D7';
-  x.title = 'Dismiss';
-  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+  dismissBtn.textContent = '\u00D7';
+  dismissBtn.title = 'Dismiss';
+  dismissBtn.addEventListener('click', () => h.onDismiss && h.onDismiss());
 
   const summary = document.createElement('div');
   Object.assign(summary.style, {
@@ -1723,9 +1723,9 @@ function renderQuickChip(it, h) {
   });
 
   const glyph = document.createElement('span');
-  glyph.textContent = String(it?.glyph || '\u2022');
+  glyph.textContent = it?.glyph || '\u2022';
   Object.assign(glyph.style, {
-    color: String(it?.glyphColor || '#cfe8ff'),
+    color: it?.glyphColor || '#cfe8ff',
     minWidth: '16px',
     textAlign: 'center',
     fontWeight: '700',
@@ -1733,7 +1733,7 @@ function renderQuickChip(it, h) {
 
   const name = document.createElement('div');
   const count = Number(it?.count || 1);
-  name.textContent = count > 1 ? `${String(it?.name || 'Item')} x${count}` : String(it?.name || 'Item');
+  name.textContent = count > 1 ? `${it?.name || 'Item'} x${count}` : (it?.name || 'Item');
   Object.assign(name.style, {
     fontSize: '13px',
     fontWeight: '600',
@@ -1800,11 +1800,13 @@ function renderQuickChip(it, h) {
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
 
-  chip.appendChild(x);
+  chip.appendChild(dismissBtn);
   chip.appendChild(summary);
   chip.appendChild(actions);
   return chip;
 }
+
+const MAX_QUICK_CHIP_STAT_PARTS = 4;
 
 /**
  * @param {any} rarityName
@@ -1825,12 +1827,12 @@ function quickChipRarityColor(rarityName) {
  * @returns {string}
  */
 function buildQuickChipStatsText(it) {
-  const d = (it && typeof it.details === 'object' && it.details) ? it.details : it;
+  const d = (it?.details && typeof it.details === 'object') ? it.details : it;
   const parts = [];
 
   const dd = d?.damageDice;
-  const dc = Number(dd?.count || 0) | 0;
-  const ds = Number(dd?.sides || 0) | 0;
+  const dc = Number(dd?.count || 0);
+  const ds = Number(dd?.sides || 0);
   if (dc > 0 && ds > 0) parts.push(`DMG ${dc}d${ds}`);
 
   const staminaCost = Number(d?.staminaCost ?? 0);
@@ -1857,7 +1859,7 @@ function buildQuickChipStatsText(it) {
     }
   }
 
-  if (parts.length > 0) return parts.slice(0, 4).join(' · ');
+  if (parts.length > 0) return parts.slice(0, MAX_QUICK_CHIP_STAT_PARTS).join(' · ');
 
   const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
   for (const line of detailLines) {
