@@ -5456,7 +5456,11 @@ function renderChest(panel, data, state) {
   putTab.textContent = 'Put';
   decorateButton(putTab);
 
-  tabBar.appendChild(takeTab); tabBar.appendChild(putTab);
+  const takeAllBtn = document.createElement('button');
+  takeAllBtn.textContent = 'Take All';
+  decorateButton(takeAllBtn);
+
+  tabBar.appendChild(takeTab); tabBar.appendChild(putTab); tabBar.appendChild(takeAllBtn);
   el.appendChild(tabBar);
 
   const listContainer = document.createElement('div');
@@ -5476,7 +5480,16 @@ function renderChest(panel, data, state) {
     takeTab.style.borderColor = activeTab === 'take' ? '#55aaff' : '#2d3b52';
     putTab.style.background = activeTab === 'put' ? '#1a2640' : '#101626';
     putTab.style.borderColor = activeTab === 'put' ? '#55aaff' : '#2d3b52';
+    takeAllBtn.style.display = activeTab === 'take' ? '' : 'none';
   }
+
+  function doTakeAll() {
+    if (activeTab !== 'take') return;
+    const chestId = Number(state.chestId || 0) | 0;
+    if (!(chestId > 0)) return;
+    window.dispatchEvent(new CustomEvent('ui:requestChestTakeAll', { detail: { chestId } }));
+  }
+  takeAllBtn.addEventListener('click', doTakeAll);
 
   function renderList() {
     listContainer.innerHTML = '';
@@ -5538,7 +5551,7 @@ function renderChest(panel, data, state) {
 
     setSel(0);
     hint.textContent = activeTab === 'take'
-      ? '\u2191/\u2193 select \u00b7 Enter=Take \u00b7 Tab=Put tab \u00b7 Esc=Close'
+      ? '\u2191/\u2193 select \u00b7 Enter=Take \u00b7 a=Take All \u00b7 Tab=Put tab \u00b7 Esc=Close'
       : '\u2191/\u2193 select \u00b7 Enter=Put \u00b7 Tab=Take tab \u00b7 Esc=Close';
 
     function doTransaction() {
@@ -5565,6 +5578,7 @@ function renderChest(panel, data, state) {
       else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
       else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
+      else if (k === 'a' && activeTab === 'take') { doTakeAll(); e.preventDefault(); }
       else if (k === 'Tab') {
         e.preventDefault();
         activeTab = activeTab === 'take' ? 'put' : 'take';

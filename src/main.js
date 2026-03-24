@@ -116,7 +116,7 @@ import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
   inventoryItems, inventoryContains, addToInventory,
-  hasCapacityForItem, transferItem,
+  hasCapacityForItem, transferItem, removeFromInventory,
 } from "./rules/utils/inventoryFacade.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
@@ -128,7 +128,7 @@ import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored } from "./rules/environment/dungeon/exploredMap.js";
-import { getTile, isWalkable, isOpaque, isFlyable } from "./rules/environment/dungeon/tileMap.js";
+import { getTile, isWalkable, isOpaque, isFlyable, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
 import { resetIdentification, identify, restoreIdentification, setIdentificationEnabled } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
@@ -149,6 +149,9 @@ import { Traits } from "./rules/components/Traits.js";
 import { Polymorph } from "./rules/components/Polymorph.js";
 import { resolvePolymorph } from "./rules/systems/polymorphSystem.js";
 import { listAllMonsterIds, MONSTERS, getMonster } from "./rules/data/monsters.js";
+import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "./rules/components/AggroState.js";
+import { spawnMonsterEntity } from "./rules/utils/spawnMonsterEntity.js";
+import { pickMonster } from "./rules/environment/dungeon/tables.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -1822,6 +1825,98 @@ world.on('scroll:polymorph', ({ actor }) => {
       type: 'system',
     });
   } catch (e) { console.debug('[main] messageLog failed:', e); }
+});
+
+// Scroll of Aggravation → set all living enemies to hunting with player's position
+world.on('scroll:aggravation', ({ actor }) => {
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const px = pe.pos.x | 0;
+  const py = pe.pos.y | 0;
+  for (const [eid, aggro, fac] of world.query(AggroState, Faction)) {
+    if (fac.key !== 'enemy') continue;
+    const vit = world.get(eid, Vitality);
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    aggro.alertLevel = AGGRO_LEVELS.hunting;
+    aggro.lastKnownX = px;
+    aggro.lastKnownY = py;
+    aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
+  }
+  world.emit?.('scroll:aggravation', { actor });
+});
+
+// Scroll of Teleportation → move player to a random walkable tile on this floor
+world.on('scroll:teleportation', ({ actor }) => {
+  const pos = world.get(actor, Position);
+  if (!pos) return;
+  const from = { x: pos.x | 0, y: pos.y | 0 };
+  const candidates = [];
+  forEachLoadedTile((x, y) => {
+    if (!isWalkable(x, y)) return;
+    const dist = Math.max(Math.abs(x - from.x), Math.abs(y - from.y));
+    if (dist < 6) return;
+    candidates.push({ x, y });
+  });
+  if (candidates.length === 0) {
+    world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
+    return;
+  }
+  const to = candidates[Math.floor(world.rand() * candidates.length)];
+  world.set(actor, Position, { x: to.x, y: to.y });
+  try { world.emit?.('moved', { id: actor, from, to }); } catch {}
+  world.emit?.('scroll:teleportation', { actor });
+});
+
+// Scroll of Summoning → spawn hostile monsters near player
+world.on('scroll:summoning', ({ actor }) => {
+  const pos = world.get(actor, Position);
+  if (!pos) return;
+  let depth = 1;
+  for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; }
+  const rng = createRng(((world.seed ^ (world.step * 0x1337 + 0xDEAD)) >>> 0));
+  const count = 2 + (world.rand() * 3 | 0); // 2-4 monsters
+  for (let i = 0; i < count; i++) {
+    const params = pickMonster(rng, Math.max(1, depth));
+    const tile = findNearestValidTileAround(world, pos, { maxDistance: 5, exclude: [pos] });
+    if (!tile) continue;
+    const eid = spawnMonsterEntity(world, { ...params, x: tile.x, y: tile.y });
+    if (eid > 0) {
+      const aggro = world.get(eid, AggroState);
+      if (aggro) {
+        aggro.alertLevel = AGGRO_LEVELS.hunting;
+        aggro.lastKnownX = pos.x | 0;
+        aggro.lastKnownY = pos.y | 0;
+        aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
+      }
+    }
+  }
+  world.emit?.('scroll:summoning', { actor });
+});
+
+// Scroll of Decay → destroy organic items (scrolls, potions, food) in player's pack
+world.on('scroll:decay', ({ actor }) => {
+  const items = inventoryItems(world, actor);
+  const organic = [];
+  for (const itemId of items) {
+    const info = world.get(itemId, ItemInfo);
+    if (!info) continue;
+    if (info.type === 'scroll' || info.type === 'potion' || info.type === 'food') {
+      organic.push(itemId);
+    }
+  }
+  // Destroy 1-3 random organic items
+  const destroyCount = Math.min(organic.length, 1 + (world.rand() * 3 | 0));
+  // Shuffle selection using world.rand()
+  for (let i = organic.length - 1; i > 0; i--) {
+    const j = world.rand() * (i + 1) | 0;
+    [organic[i], organic[j]] = [organic[j], organic[i]];
+  }
+  const toDestroy = organic.slice(0, destroyCount);
+  for (const itemId of toDestroy) {
+    removeFromInventory(world, actor, itemId);
+    try { world.destroy(itemId); } catch {}
+  }
+  world.emit?.('scroll:decay', { actor, count: toDestroy.length });
 });
 
 // Wait button → dispatch wait action

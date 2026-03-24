@@ -1203,9 +1203,21 @@ export function installMessageWiring({
     if (nameOfEntity(actor) !== 'You') return;
     log('Shapes claw their way out of the parchment! Hostile creatures surround you!', 'danger');
   });
-  world.on('scroll:decay', ({ actor }) => {
+  world.on('scroll:decay', ({ actor, count }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The scroll crumbles and a wave of rot spreads through your pack!', 'danger');
+    if (count > 0) {
+      log(`The scroll crumbles and a wave of rot spreads through your pack! ${count} item${count > 1 ? 's' : ''} disintegrate${count === 1 ? 's' : ''}!`, 'danger');
+    } else {
+      log('The scroll crumbles, but the rot finds nothing organic to claim.', 'system');
+    }
+  });
+  world.on('scroll:aggravation', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A terrible shriek fills the dungeon! Every monster is now alert!', 'danger');
+  });
+  world.on('scroll:teleportation', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Reality lurches. You blink and find yourself somewhere else entirely.', 'system');
   });
 
   world.on('harvest:picked', ({ actor, kind, count, itemId }) => {
