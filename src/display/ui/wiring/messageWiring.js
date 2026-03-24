@@ -1189,6 +1189,10 @@ export function installMessageWiring({
     if (nameOfEntity(actor) !== 'You') return;
     log('Your head spins. Which way is which?', 'danger');
   });
+  world.on('potion:sickness', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your stomach lurches violently. You feel poisoned!', 'danger');
+  });
 
   // ── Bad scroll messages ──────────────────────────────────────────────
   world.on('scroll:cursing', ({ actor, count }) => {
