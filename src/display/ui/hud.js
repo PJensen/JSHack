@@ -1744,9 +1744,10 @@ function renderQuickChip(it, h) {
   summary.appendChild(glyph);
   summary.appendChild(name);
 
+  let stats = null;
   const statsText = buildQuickChipStatsText(it);
   if (statsText) {
-    const stats = document.createElement('div');
+    stats = document.createElement('div');
     stats.textContent = statsText;
     Object.assign(stats.style, {
       fontSize: '11px',
@@ -1756,7 +1757,6 @@ function renderQuickChip(it, h) {
       marginTop: '-2px',
       marginBottom: '2px',
     });
-    chip.appendChild(stats);
   }
 
   const btn = document.createElement('button');
@@ -1802,6 +1802,7 @@ function renderQuickChip(it, h) {
 
   chip.appendChild(dismissBtn);
   chip.appendChild(summary);
+  if (stats) chip.appendChild(stats);
   chip.appendChild(actions);
   return chip;
 }
