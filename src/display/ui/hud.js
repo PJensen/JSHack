@@ -1806,7 +1806,7 @@ function renderQuickChip(it, h) {
   return chip;
 }
 
-const MAX_QUICK_CHIP_STAT_PARTS = 4;
+const QUICK_CHIP_RARITY_TOKENS = new Set(['common', 'uncommon', 'magic', 'rare', 'epic', 'legendary']);
 
 /**
  * @param {any} rarityName
@@ -1823,10 +1823,36 @@ function quickChipRarityColor(rarityName) {
 }
 
 /**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function isQuickChipMetaToken(text) {
+  const norm = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!norm) return true;
+  if (norm === 'bag' || norm === 'in bag' || norm === 'slot: bag' || norm === 'slot bag') return true;
+  if (norm === 'rarity' || norm.startsWith('rarity:') || norm.startsWith('rarity ')) return true;
+  return QUICK_CHIP_RARITY_TOKENS.has(norm);
+}
+
+/**
+ * @param {string} raw
+ * @returns {string}
+ */
+function stripQuickChipMetaParts(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  const tokens = text.split(/\s*[|,·]\s*/g).map((token) => String(token || '').trim()).filter(Boolean);
+  if (tokens.length === 0) return '';
+  const kept = tokens.filter((token) => !isQuickChipMetaToken(token));
+  if (kept.length === 0) return '';
+  return kept.join(' · ');
+}
+
+/**
  * @param {any} it
  * @returns {string}
  */
-function buildQuickChipStatsText(it) {
+export function buildQuickChipStatsText(it) {
   const d = (it?.details && typeof it.details === 'object') ? it.details : it;
   const parts = [];
 
@@ -1859,12 +1885,31 @@ function buildQuickChipStatsText(it) {
     }
   }
 
-  if (parts.length > 0) return parts.slice(0, MAX_QUICK_CHIP_STAT_PARTS).join(' · ');
-
+  const extra = [];
   const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
   for (const line of detailLines) {
     const text = String(line || '').trim();
-    if (text) return text;
+    if (!text) continue;
+    const cleaned = stripQuickChipMetaParts(text);
+    if (cleaned) extra.push(cleaned);
   }
+
+  const description = stripQuickChipMetaParts(String(d?.description || ''));
+  if (description) extra.push(description);
+
+  const merged = [...parts, ...extra];
+  if (merged.length > 0) {
+    // Keep order while deduping repeated text segments.
+    const unique = [];
+    const seen = new Set();
+    for (const part of merged) {
+      const key = String(part || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(key);
+    }
+    return unique.join(' · ');
+  }
+
   return '';
 }

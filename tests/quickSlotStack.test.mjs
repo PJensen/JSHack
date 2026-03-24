@@ -1,5 +1,11 @@
 import { assertEquals } from "jsr:@std/assert";
-import { peekStackTop, popUntilActionableTop, getQuickChipPrimaryAction, getQuickChipPrimaryActionLabel } from "../src/display/ui/hud.js";
+import {
+  peekStackTop,
+  popUntilActionableTop,
+  getQuickChipPrimaryAction,
+  getQuickChipPrimaryActionLabel,
+  buildQuickChipStatsText,
+} from "../src/display/ui/hud.js";
 
 Deno.test("quick-slot stack peeks newest pickup first", () => {
   const stack = [];
@@ -46,4 +52,22 @@ Deno.test("quick-chip primary action uses apply for scroll of identify", () => {
   const item = { id: 31, type: "scroll", identity: "scroll_identify", details: { identified: true } };
   assertEquals(getQuickChipPrimaryAction(item), "apply");
   assertEquals(getQuickChipPrimaryActionLabel(item), "Apply");
+});
+
+Deno.test("quick-chip stats keep full item info but strip bag and rarity metadata", () => {
+  const text = buildQuickChipStatsText({
+    details: {
+      bonuses: { attackBonus: 2, defense: 1 },
+      detailLines: [
+        "bag · rarity: epic · On hit: Ignite 25%",
+        "magic · Socketed: +1 mana regeneration.",
+      ],
+      description: "bag · epic · A blade that sings.",
+    },
+  });
+
+  assertEquals(
+    text,
+    "ATK +2 · DEF +1 · On hit: Ignite 25% · Socketed: +1 mana regeneration. · A blade that sings.",
+  );
 });
