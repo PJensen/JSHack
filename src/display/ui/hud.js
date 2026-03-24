@@ -1,7 +1,6 @@
 // display/ui/hud.js
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
-import { renderItemDetails } from './overlay.js';
 
 /**
  * @template T
@@ -1682,46 +1681,67 @@ function createMobileSpellRadial(mobileLayoutMq) {
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: '8px',
-    padding: '6px 8px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
+    minWidth: '220px',
+    padding: '8px',
+    borderRadius: '6px',
+    border: '1px solid #2d3b52',
+    background: '#101626',
+    color: '#cfe8ff'
   });
-  const content = document.createElement('div');
-  Object.assign(content.style, {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '8px',
-  });
-  const detailPanel = document.createElement('div');
-  Object.assign(detailPanel.style, {
-    minWidth: '180px',
-    maxWidth: '260px',
-    maxHeight: '30vh',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    padding: '6px',
+  const x = document.createElement('button');
+  Object.assign(x.style, {
+    position: 'absolute',
+    right: '6px',
+    top: '6px',
+    width: '24px',
+    height: '24px',
+    lineHeight: '20px',
+    textAlign: 'center',
+    padding: '0',
+    background: '#101626',
+    color: '#cfe8ff',
     border: '1px solid #2d3b52',
     borderRadius: '6px',
-    background: '#0a111f',
+    cursor: 'pointer',
   });
-  const detailItem = it.details && typeof it.details === 'object'
-    ? it.details
-    : {
-        id: it.id,
-        identity: it.identity,
-        type: it.type,
-        slot: it.slot,
-        name: it.name,
-        count: it.count,
-        rarityName: it.rarityName,
-        glyph: it.glyph,
-        glyphColor: it.glyphColor,
-      };
-  renderItemDetails(detailPanel, detailItem);
-  content.appendChild(detailPanel);
+  x.textContent = '\u00D7';
+  x.title = 'Dismiss';
+  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+
+  const summary = document.createElement('div');
+  Object.assign(summary.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minHeight: '26px',
+    paddingRight: '28px',
+  });
+
+  const glyph = document.createElement('span');
+  glyph.textContent = String(it?.glyph || '\u2022');
+  Object.assign(glyph.style, {
+    color: String(it?.glyphColor || '#cfe8ff'),
+    minWidth: '16px',
+    textAlign: 'center',
+    fontWeight: '700',
+  });
+
+  const name = document.createElement('div');
+  const count = Number(it?.count || 1);
+  name.textContent = count > 1 ? `${String(it?.name || 'Item')} x${count}` : String(it?.name || 'Item');
+  Object.assign(name.style, {
+    fontSize: '13px',
+    fontWeight: '600',
+    lineHeight: '1.3',
+    wordBreak: 'break-word',
+  });
+  summary.appendChild(glyph);
+  summary.appendChild(name);
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
@@ -1753,27 +1773,19 @@ function renderQuickChip(it, h) {
     dropBtn.addEventListener('click', () => h.onDrop && h.onDrop());
   }
 
-  const x = document.createElement('button');
-  Object.assign(x.style, {
-    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
-    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer', minWidth: '28px'
-  });
-  x.textContent = '\u00D7';
-  x.title = 'Dismiss';
-  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
-
   const actions = document.createElement('div');
   Object.assign(actions.style, {
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: '6px',
+    flexWrap: 'wrap',
   });
   actions.appendChild(btn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
-  actions.appendChild(x);
 
-  chip.appendChild(content);
+  chip.appendChild(x);
+  chip.appendChild(summary);
   chip.appendChild(actions);
   return chip;
 }

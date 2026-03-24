@@ -25,6 +25,7 @@ export const HealthPotion = defineArchetype(
         weight: 0.5,
         value: 25,
         count: 1,
+        identified: true,
     }],
     [NamedIdentity, /** @param {any} p */ (p) => ({ name: (p && p.name) ?? "Health Potion", identity: 'potion_health' })],
     [Material, { kind: "glass" }],
