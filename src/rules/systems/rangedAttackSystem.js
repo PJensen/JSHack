@@ -328,6 +328,16 @@ function normalizeRecoverableAmmoIdentity(ammoIdentity) {
   return '';
 }
 
+function resolveAmmoEntityIdentity(world, ammoId) {
+  if (!(ammoId > 0) || !world.isAlive(ammoId)) return '';
+  const identity = String(
+    world.get(ammoId, NamedIdentity)?.identity
+    || world.get(ammoId, ItemInfo)?.subtype
+    || '',
+  ).trim().toLowerCase();
+  return normalizeRecoverableAmmoIdentity(identity);
+}
+
 function tryRecoverEmbeddedArrow(world, { attacker, defender, ammoIdentity, rng }) {
   if (!(defender > 0) || !world.isAlive(defender)) return;
   if (world.has(defender, Player)) return;
@@ -336,6 +346,14 @@ function tryRecoverEmbeddedArrow(world, { attacker, defender, ammoIdentity, rng 
 
   const recoverIdentity = normalizeRecoverableAmmoIdentity(ammoIdentity);
   if (!recoverIdentity) return;
+
+  const equippedAmmoId = Number(world.get(defender, Equipment)?.ammo || 0) | 0;
+  if (equippedAmmoId > 0 && resolveAmmoEntityIdentity(world, equippedAmmoId) === recoverIdentity) {
+    world.mutate(equippedAmmoId, ItemInfo, (rec) => {
+      rec.count = Math.max(1, Number(rec.count || 0) | 0) + 1;
+    });
+    return;
+  }
 
   const recoveredId = createItemById(world, recoverIdentity, { count: 1 });
   if (!(recoveredId > 0)) return;

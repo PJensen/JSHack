@@ -5,6 +5,7 @@ import { GroundStackOrder } from "../components/GroundStackOrder.js";
 import { Equipment, getEquippedSlot } from "../components/Equipment.js";
 import { DropIntent } from "../components/Intents/DropIntent.js";
 import {
+  placeOnGround,
   removeFromInventory,
   inventoryContains,
   splitItemStack,
@@ -54,9 +55,9 @@ export function itemDropSystem(world) {
       // drop whole entity
       if (inInventory) removeFromInventory(world, actor, itemId);
       if (isEquipped) clearEquippedSlotIfNeeded(world, actor, itemId);
-      world.add(itemId, Position, { x: pos.x, y: pos.y });
-      stampGroundTop(world, itemId);
-      try { world.emit && world.emit('item:dropped', { actor, itemId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
+      const placed = placeOnGround(world, itemId, pos.x, pos.y, { mergeCompatibleAmmo: true });
+      if (placed.itemId > 0) stampGroundTop(world, placed.itemId);
+      try { world.emit && world.emit('item:dropped', { actor, itemId: placed.itemId || itemId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
     } else {
       // split stack: keep the remainder in inventory, drop a cloned split-off item
       const newId = splitItemStack(world, itemId, dropCount);
@@ -64,9 +65,9 @@ export function itemDropSystem(world) {
         world.remove(actor, DropIntent);
         continue;
       }
-      world.add(newId, Position, { x: pos.x, y: pos.y });
-      stampGroundTop(world, newId);
-      try { world.emit && world.emit('item:dropped', { actor, itemId: newId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
+      const placed = placeOnGround(world, newId, pos.x, pos.y, { mergeCompatibleAmmo: true });
+      if (placed.itemId > 0) stampGroundTop(world, placed.itemId);
+      try { world.emit && world.emit('item:dropped', { actor, itemId: placed.itemId || newId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
     }
 
     world.remove(actor, DropIntent);
