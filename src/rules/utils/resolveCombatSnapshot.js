@@ -20,6 +20,10 @@ const MODE_RULES = Object.freeze({
   }),
 });
 
+const BLINDED_MELEE_DEFENSE_PENALTY_PER_STACK = 2;
+const BLINDED_RANGED_DEFENSE_PENALTY_PER_STACK = 3;
+const BLINDED_DEFENSE_PENALTY_CAP = 12;
+
 /**
  * @param {string} mode
  */
@@ -93,6 +97,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     dark_sight: statusStrength(world, id, "dark_sight"),
     battle_fury: statusStrength(world, id, "battle_fury"),
     fey_grace: statusStrength(world, id, "fey_grace"),
+    blinded: statusStrength(world, id, "blinded"),
   };
 
   /** @type {Array<{stat:'attack'|'defense', source:string, value:number, reason:string}>} */
@@ -170,6 +175,18 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "defense", "status:stoneskin", statusTotals.stoneskin, "stoneskin-bonus");
     pushModifier(modifiers, "defense", "status:ogre_bulk", statusTotals.ogre_bulk * 3, "ogre-bulk-bonus");
     defenseContribution += statusTotals.stoneskin + (statusTotals.ogre_bulk * 3);
+  }
+
+  const blindedDefensePenaltyPerStack = mode === "ranged"
+    ? BLINDED_RANGED_DEFENSE_PENALTY_PER_STACK
+    : BLINDED_MELEE_DEFENSE_PENALTY_PER_STACK;
+  const blindedDefensePenalty = Math.min(
+    BLINDED_DEFENSE_PENALTY_CAP,
+    Math.max(0, statusTotals.blinded * blindedDefensePenaltyPerStack),
+  );
+  if (blindedDefensePenalty > 0) {
+    pushModifier(modifiers, "defense", "status:blinded", -blindedDefensePenalty, "blinded-exposure-penalty");
+    defenseContribution -= blindedDefensePenalty;
   }
 
   if (rules.clampDefenseAtZero && defenseContribution < 0) {
