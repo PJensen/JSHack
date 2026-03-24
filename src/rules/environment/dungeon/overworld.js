@@ -396,11 +396,9 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, eastWalkX, northWalkY, eastWalkX, southWalkY);
   carvePath(chunks, doorX, southWalkY, gateX, gateY - 1);
 
-  // Keep the first dungeon entrance visibly beside the player house on open ground.
-  const stairX = eastWalkX + 1;
-  const stairY = homeY + 2;
-  carvePath(chunks, eastWalkX, southWalkY, stairX, stairY);
-  setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
+  // Keep the original east-side staircase anchor for nearby plaza layout.
+  const houseStairAnchorX = eastWalkX + 1;
+  const houseStairAnchorY = homeY + 2;
 
   // Pond — ellipse with Perlin wobble, northwest of the house
   const pondCX = homeX - 24;
@@ -554,10 +552,10 @@ export function generateOverworldChunks(worldSeed) {
 
   // ── Well plaza — east of the dungeon entrance ────────────────
   // A cobblestone courtyard with a walkable well and short path from staircase.
-  const wellX = stairX + 5;
-  const wellY = stairY;
+  const wellX = houseStairAnchorX + 5;
+  const wellY = houseStairAnchorY;
   // Cobblestone path from stair to plaza entrance
-  for (let wx = stairX + 1; wx <= wellX - 2; wx++) {
+  for (let wx = houseStairAnchorX + 1; wx <= wellX - 2; wx++) {
     setWorldTile(chunks, wx, wellY, TILE_COBBLESTONE);
   }
   // 3×3 cobblestone plaza centered on well
@@ -776,6 +774,10 @@ export function generateOverworldChunks(worldSeed) {
       }
     }
   }
+  // Main non-crypt down stair: church square, right-side flower bed in front of the church.
+  const stairX = bedX0 + 2;
+  const stairY = bedY0;
+  setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
   // ── Worker cottages — actual homes for the town to sleep in ─────────────
   const farmerHouse = buildCottage(chunks, homeX + 8, homeY + 10, "north");
