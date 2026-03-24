@@ -2062,6 +2062,20 @@ function findScrollOfIdentifyInPlayerInventory(playerId) {
   return 0;
 }
 
+function resolveQuickChipGlyphData(itemId, info = null, explicitIdentity = '') {
+  const identity = String(explicitIdentity || world.get(itemId, NamedIdentity)?.identity || '').trim();
+  const type = String(info?.type || world.get(itemId, ItemInfo)?.type || '').trim().toLowerCase();
+  const look = (identity && palette?.[identity])
+    || (type && palette?.[type])
+    || palette?.potion
+    || null;
+  return {
+    identity,
+    glyph: String(look?.glyph || '•'),
+    glyphColor: String(look?.fg || '#cfe8ff'),
+  };
+}
+
 function buildQuickChipEquippedComparison(ownerId, itemId, slot) {
   const eq = world.get(ownerId, Equipment);
   if (!eq) return null;
@@ -2100,20 +2114,21 @@ world.on('item:identified', ({ actor, identity }) => {
     const ni = world.get(itemId, NamedIdentity);
     if (!ni || String(ni.identity || '') !== ident) continue;
     const displayItem = buildItemDisplayData(world, itemId);
+    const glyphData = resolveQuickChipGlyphData(itemId, world.get(itemId, ItemInfo), ident);
     try {
       window.dispatchEvent(new CustomEvent('ui:itemIdentified', {
         detail: {
           item: {
             ...(displayItem && typeof displayItem === 'object' ? displayItem : {}),
             id: Number(itemId),
-            identity: ident,
+            identity: glyphData.identity,
             type: world.get(itemId, ItemInfo)?.type || 'item',
             slot: world.get(itemId, ItemInfo)?.slot || '',
             name: resolveItemDisplayName(world, itemId),
             count: world.get(itemId, ItemInfo)?.count || 1,
             rarityName: world.get(itemId, ItemInfo)?.rarityName || 'common',
-            glyph: palette?.[ident]?.glyph || '',
-            glyphColor: palette?.[ident]?.fg || '#cfe8ff',
+            glyph: glyphData.glyph,
+            glyphColor: glyphData.glyphColor,
             hasScrollOfIdentify: false,
           }
         }
@@ -2146,21 +2161,22 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   const hasScrollOfIdentify = findScrollOfIdentifyInPlayerInventory(pe.id) > 0;
   const displayItem = buildItemDisplayData(world, itemId);
   if (displayItem?.noQuickChip === true) return;
+  const glyphData = resolveQuickChipGlyphData(itemId, info);
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
         item: {
           ...(displayItem && typeof displayItem === 'object' ? displayItem : {}),
           id: Number(itemId),
-          identity: world.get(itemId, NamedIdentity)?.identity || '',
+          identity: glyphData.identity,
           type: info.type || 'item',
           slot: info.slot || '',
           name: resolveItemDisplayName(world, itemId),
           count: info.count || 1,
           rarityName: info.rarityName || 'common',
           equippedComparison: buildQuickChipEquippedComparison(ownerId, Number(itemId), info.slot),
-          glyph: palette?.[world.get(itemId, NamedIdentity)?.identity]?.glyph || '',
-          glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff',
+          glyph: glyphData.glyph,
+          glyphColor: glyphData.glyphColor,
           hasScrollOfIdentify,
         }
       }
