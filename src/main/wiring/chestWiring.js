@@ -137,4 +137,31 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     dispatchChestData(chestId);
     refreshInventoryUi();
   });
+
+  addEventListener("ui:requestChestTakeAll", (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const chestId = Number(e?.detail?.chestId || 0) | 0;
+    const pe = playerEntity(world);
+    if (!pe) return;
+
+    const ids = [...inventoryItems(world, chestId)];
+    let taken = 0;
+    let full = false;
+    const cni = world.get(chestId, NamedIdentity);
+    const cLabel = (cni && cni.name) ? cni.name.toLowerCase() : "chest";
+
+    for (const itemId of ids) {
+      if (!inventoryContains(world, chestId, itemId)) continue;
+      if (!hasCapacityForItem(world, pe.id, itemId)) { full = true; break; }
+      transferItem(world, itemId, chestId, pe.id);
+      taken++;
+    }
+
+    if (taken > 0) log(`You take everything from the ${cLabel}.`);
+    if (full) log("Your inventory is full.");
+
+    dispatchChestData(chestId);
+    refreshInventoryUi();
+  });
 }
