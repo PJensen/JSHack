@@ -258,3 +258,83 @@ Deno.test("poison weapon coating procs DOT at 25% and consumes one charge on pro
   assert(foundProc, 'expected at least one deterministic seed to trigger poison coating proc');
   assert(foundNoProc, 'expected at least one deterministic seed to not trigger poison coating proc');
 });
+
+Deno.test("blinded defenders are easier to hit in melee based on blindness strength", () => {
+  function runOne(seed, blindPotency = 0) {
+    const world = new World({ seed });
+    installAffixTriggers(world);
+    const weapon = makeEquip(world, {
+      id: 'test_blind_melee_weapon',
+      name: 'Blind Test Blade',
+      slot: 'weapon',
+      bonuses: { accuracy: 0, damagePower: 6 },
+    });
+    const attacker = makeActor(world, 'Attacker', { weapon }, 20);
+    const defender = makeActor(world, 'Defender', { armor: makeEquip(world, {
+      id: 'test_blind_melee_armor',
+      name: 'Blind Test Armor',
+      slot: 'armor',
+      bonuses: { evade: 12 },
+    }) }, 20);
+    if (blindPotency > 0) {
+      world.add(defender, ActiveEffects, {
+        effects: [{ key: 'blind', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+      });
+    }
+    world.add(attacker, Position, { x: 1, y: 1 });
+    world.add(defender, Position, { x: 1, y: 2 });
+    equipmentSystem(world);
+    world.add(attacker, AttackIntent, { targetId: defender });
+    combatSystem(world);
+    return 20 - world.get(defender, Vitality).hp;
+  }
+
+  let compared = false;
+  for (let seed = 1; seed <= 256; seed++) {
+    const baseline = runOne(seed, 0);
+    const blinded = runOne(seed, 4);
+    if (baseline === 0 && blinded > 0) {
+      compared = true;
+      break;
+    }
+  }
+  assert(compared, "expected at least one deterministic seed where blinded defender takes a hit that baseline avoids");
+});
+
+Deno.test("blinded defenders take more melee direct-hit physical damage", () => {
+  function runOne(seed, blindPotency = 0) {
+    const world = new World({ seed });
+    installAffixTriggers(world);
+    const weapon = makeEquip(world, {
+      id: 'test_blind_melee_damage_weapon',
+      name: 'Blind Damage Test Blade',
+      slot: 'weapon',
+      bonuses: { accuracy: 20, damagePower: 16 },
+    });
+    const attacker = makeActor(world, 'Attacker', { weapon }, 20);
+    const defender = makeActor(world, 'Defender', { armor: makeEquip(world, {
+      id: 'test_blind_melee_damage_armor',
+      name: 'Blind Damage Test Armor',
+      slot: 'armor',
+      bonuses: { evade: 0 },
+    }) }, 30);
+    if (blindPotency > 0) {
+      world.add(defender, ActiveEffects, {
+        effects: [{ key: 'blind', turnsLeft: 5, potency: blindPotency, stacks: 1 }],
+      });
+    }
+    world.add(attacker, Position, { x: 1, y: 1 });
+    world.add(defender, Position, { x: 1, y: 2 });
+    equipmentSystem(world);
+    world.add(attacker, AttackIntent, { targetId: defender });
+    combatSystem(world);
+    return 30 - world.get(defender, Vitality).hp;
+  }
+
+  const baseline = runOne(42, 0);
+  const blinded = runOne(42, 4);
+  assert(
+    blinded > baseline,
+    `blinded target should take higher direct-hit physical damage (baseline=${baseline}, blinded=${blinded})`,
+  );
+});

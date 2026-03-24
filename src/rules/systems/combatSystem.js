@@ -28,6 +28,12 @@ import { buildProcContext, applyPendingDamageProcPhase, applyReactionProcPhase }
 import { breakStealthOnOffense } from '../utils/stealthAmbush.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
+const BLINDED_CRIT_CHANCE_BONUS_PER_STACK_PCT = 4;
+const BLINDED_CRIT_CHANCE_BONUS_CAP_PCT = 40;
+const BLINDED_CRIT_MULT_BONUS_PER_STACK = 0.15;
+const BLINDED_CRIT_MULT_BONUS_CAP = 1.0;
+const BLINDED_PHYSICAL_DAMAGE_MULT_PER_STACK = 0.05;
+const BLINDED_PHYSICAL_DAMAGE_MULT_CAP = 0.5;
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
 function makeCombatFrame(world, base) {
@@ -96,6 +102,7 @@ function resolveHitRoll(world, {
 
     const atkSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });
     const defSnapshot = resolveCombatSnapshot(world, target, { mode: 'melee' });
+    const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
     breakStealthOnOffense(world, source, { reason: 'attack', mode: 'melee', targetId: target });
     const attackBonus = atkSnapshot.attackBonus + hitPenalty;
     const armorClass = defSnapshot.armorClass;
@@ -140,11 +147,26 @@ function resolveHitRoll(world, {
     if (damageType === 'pierce') armorPenetration += Math.max(0, Number(atkSnapshot.piercePenetration || 0));
 
     if (!isCrit) {
-        const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0);
+        const blindCritBonusPct = Math.min(
+            BLINDED_CRIT_CHANCE_BONUS_CAP_PCT,
+            blindExposure * BLINDED_CRIT_CHANCE_BONUS_PER_STACK_PCT,
+        );
+        const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0) + blindCritBonusPct;
         if (critPct > 0) isCrit = pct(r, critPct);
     }
-    const critMult = 2 + (atkSnapshot.critMult || 0);
+    const blindCritMultBonus = Math.min(
+        BLINDED_CRIT_MULT_BONUS_CAP,
+        blindExposure * BLINDED_CRIT_MULT_BONUS_PER_STACK,
+    );
+    const critMult = 2 + (atkSnapshot.critMult || 0) + blindCritMultBonus;
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
+    if (blindExposure > 0) {
+        const blindDamageMult = 1 + Math.min(
+            BLINDED_PHYSICAL_DAMAGE_MULT_CAP,
+            blindExposure * BLINDED_PHYSICAL_DAMAGE_MULT_PER_STACK,
+        );
+        dmg = Math.max(1, Math.floor(dmg * blindDamageMult));
+    }
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
     // Pre-hit hooks
