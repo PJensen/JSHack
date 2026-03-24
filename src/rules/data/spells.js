@@ -264,7 +264,7 @@ export const SPELL_DEFS = {
     manaCost: 15,
     minIntelligence: 8,
     range: 10,
-    castTime: 2,
+    castTime: 1,
     script: 'shadow_bolt',
     targeting: 'auto',
     description: 'A bolt of pure shadow that strikes with devastating force.',
