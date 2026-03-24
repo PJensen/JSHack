@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 import {
   peekStackTop,
   popUntilActionableTop,
@@ -68,6 +68,7 @@ Deno.test("quick-chip stats keep full item info but strip bag and rarity metadat
 
   assertEquals(
     text,
-    "ATK +2 · DEF +1 · On hit: Ignite 25% · Socketed: +1 mana regeneration. · A blade that sings.",
+    "On hit: Ignite 25%\nSocketed: +1 mana regeneration.\n+2 Attack Bonus\n+1 Defense",
   );
+  assert(!text.includes("A blade that sings."), "quick-chip should not include description text");
 });
