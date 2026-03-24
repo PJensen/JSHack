@@ -1718,7 +1718,7 @@ function renderQuickChip(it, h) {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    minHeight: '26px',
+    minHeight: '16px',
     paddingRight: '28px',
   });
 
@@ -1731,18 +1731,7 @@ function renderQuickChip(it, h) {
     fontWeight: '700',
   });
 
-  const name = document.createElement('div');
-  const count = Number(it?.count || 1);
-  name.textContent = count > 1 ? `${it?.name || 'Item'} x${count}` : (it?.name || 'Item');
-  Object.assign(name.style, {
-    fontSize: '13px',
-    fontWeight: '600',
-    lineHeight: '1.3',
-    wordBreak: 'break-word',
-    color: quickChipRarityColor(it?.rarityName),
-  });
   summary.appendChild(glyph);
-  summary.appendChild(name);
 
   let stats = null;
   const statsText = buildQuickChipStatsText(it);
@@ -1753,9 +1742,10 @@ function renderQuickChip(it, h) {
       fontSize: '11px',
       lineHeight: '1.2',
       opacity: '0.82',
-      paddingLeft: '24px',
+      paddingLeft: '0',
       marginTop: '-2px',
       marginBottom: '2px',
+      whiteSpace: 'pre-line',
     });
   }
 
@@ -1850,67 +1840,139 @@ function stripQuickChipMetaParts(raw) {
 }
 
 /**
- * @param {any} it
+ * @param {string} key
  * @returns {string}
  */
-export function buildQuickChipStatsText(it) {
+function humanizeQuickChipKey(key) {
+  return String(key || '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * @param {any} damageDice
+ * @returns {string}
+ */
+function formatQuickChipDamageDice(damageDice) {
+  if (!damageDice) return '';
+  if (typeof damageDice === 'string') return damageDice.trim();
+  const count = Number(damageDice?.count || 0);
+  const sides = Number(damageDice?.sides || 0);
+  if (count > 0 && sides > 0) return `${count}d${sides}`;
+  return String(damageDice || '').trim();
+}
+
+/**
+ * @param {any} it
+ * @returns {string[]}
+ */
+export function buildQuickChipInfoLines(it) {
   const d = (it?.details && typeof it.details === 'object') ? it.details : it;
-  const parts = [];
+  const lines = [];
 
-  const dd = d?.damageDice;
-  const dc = Number(dd?.count || 0);
-  const ds = Number(dd?.sides || 0);
-  if (dc > 0 && ds > 0) parts.push(`DMG ${dc}d${ds}`);
-
-  const staminaCost = Number(d?.staminaCost ?? 0);
-  if (Number.isFinite(staminaCost) && staminaCost > 0) parts.push(`STA ${staminaCost}`);
-
-  const bonuses = (d?.bonuses && typeof d.bonuses === 'object') ? d.bonuses : null;
-  if (bonuses) {
-    const labels = {
-      attackBonus: 'ATK',
-      armorClass: 'AC',
-      defense: 'DEF',
-      spellPower: 'SP',
-      damagePower: 'POW',
-      accuracy: 'ACC',
-      evade: 'EVA',
-      mitigation: 'MIT',
-      luck: 'LUK',
-    };
-    for (const [key, label] of Object.entries(labels)) {
-      const n = Number(bonuses[key] ?? 0);
-      if (!Number.isFinite(n) || n === 0) continue;
-      const sign = n > 0 ? '+' : '';
-      parts.push(`${label} ${sign}${n}`);
-    }
-  }
-
-  const extra = [];
   const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
   for (const line of detailLines) {
     const text = String(line || '').trim();
     if (!text) continue;
     const cleaned = stripQuickChipMetaParts(text);
-    if (cleaned) extra.push(cleaned);
+    if (cleaned) lines.push(cleaned);
   }
 
-  const description = stripQuickChipMetaParts(String(d?.description || ''));
-  if (description) extra.push(description);
+  const targetEffects = Array.isArray(d?.targetEffects) ? d.targetEffects : [];
+  for (const effect of targetEffects) {
+    const text = String(effect || '').trim();
+    if (text) lines.push(`• ${text}`);
+  }
 
-  const merged = [...parts, ...extra];
-  if (merged.length > 0) {
-    // Keep order while deduping repeated text segments.
-    const unique = [];
-    const seen = new Set();
-    for (const part of merged) {
-      const key = String(part || '').trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      unique.push(key);
+  const itemSlot = String(d?.slot || '').toLowerCase();
+  const isWeapon = itemSlot === 'weapon' || itemSlot === 'ranged';
+  if (isWeapon) {
+    const dmg = formatQuickChipDamageDice(d?.damageDice);
+    if (dmg) lines.push(`Damage: ${dmg}`);
+    if (d?.staminaCost != null) lines.push(`Stamina: ${d.staminaCost}`);
+    if (d?.twoHanded) lines.push('Two-Handed');
+  }
+
+  const coat = d?.coating;
+  if (coat && coat.kind) {
+    const charges = Number(coat.charges || 0);
+    lines.push(`${humanizeQuickChipKey(coat.kind)} coated${charges > 0 ? ` (${charges} charges)` : ''}`);
+  }
+
+  const bonuses = (d?.bonuses && typeof d.bonuses === 'object') ? d.bonuses : null;
+  if (bonuses) {
+    for (const key of Object.keys(bonuses)) {
+      const n = Number(bonuses[key] ?? 0);
+      if (!Number.isFinite(n) || n === 0) continue;
+      const sign = n > 0 ? '+' : '';
+      lines.push(`${sign}${n} ${humanizeQuickChipKey(key)}`);
     }
-    return unique.join(' · ');
   }
 
-  return '';
+  const affixes = Array.isArray(d?.affixes) ? d.affixes : [];
+  for (const affix of affixes) {
+    if (affix && typeof affix === 'object') {
+      const name = String(affix.name || '').trim();
+      const desc = String(affix.description || '').trim();
+      if (name && desc) lines.push(`${name} — ${desc}`);
+      else if (name) lines.push(name);
+      continue;
+    }
+    const aid = String(affix || '').trim();
+    if (aid) lines.push(humanizeQuickChipKey(aid));
+  }
+
+  const maxSockets = Number(d?.maxSockets || 0) | 0;
+  if (maxSockets > 0) {
+    const sockets = Array.isArray(d?.sockets) ? d.sockets : [];
+    let circles = '';
+    for (let i = 0; i < maxSockets; i++) circles += i < sockets.length ? '◈' : '○';
+    if (circles) lines.push(circles);
+  }
+
+  const cmp = d?.equippedComparison;
+  if (cmp) {
+    lines.push(`vs ${String(cmp.name || 'equipped')}`);
+    const cmpBonuses = (cmp.bonuses && typeof cmp.bonuses === 'object') ? cmp.bonuses : {};
+    const allKeys = new Set([...Object.keys(bonuses || {}), ...Object.keys(cmpBonuses)]);
+    for (const key of allKeys) {
+      const mine = Number((bonuses || {})[key]) || 0;
+      const theirs = Number(cmpBonuses[key]) || 0;
+      const delta = mine - theirs;
+      if (delta === 0) continue;
+      const sign = delta > 0 ? '+' : '';
+      lines.push(`${sign}${delta} ${humanizeQuickChipKey(key)}`);
+    }
+    const mineDmg = formatQuickChipDamageDice(d?.damageDice);
+    const theirDmg = formatQuickChipDamageDice(cmp.damageDice);
+    if ((mineDmg || theirDmg) && mineDmg !== theirDmg) {
+      lines.push(`Damage: ${mineDmg || 'none'} vs ${theirDmg || 'none'}`);
+    }
+    if (d?.staminaCost != null && cmp.staminaCost != null && d.staminaCost !== cmp.staminaCost) {
+      const delta = Number(d.staminaCost) - Number(cmp.staminaCost);
+      const sign = delta > 0 ? '+' : '';
+      lines.push(`${sign}${delta} stamina cost`);
+    }
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const line of lines) {
+    const key = String(line || '').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(key);
+  }
+  return unique;
+}
+
+/**
+ * @param {any} it
+ * @returns {string}
+ */
+export function buildQuickChipStatsText(it) {
+  return buildQuickChipInfoLines(it).join('\n');
 }

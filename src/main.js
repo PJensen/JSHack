@@ -72,7 +72,7 @@ import {
 import { loadGameData } from "./main/bootstrap/loadGameData.js";
 import { PHASE_TURNS } from "./rules/data/calendar.js";
 import { Inventory } from "./rules/components/Inventory.js";
-import { Equipment } from "./rules/components/Equipment.js";
+import { Equipment, GEAR_SLOTS } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
 import { Position } from "./rules/components/Position.js";
@@ -125,7 +125,7 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
-import { resolveItemDisplayName, buildItemDisplayData } from "./main/wiring/itemName.js";
+import { resolveItemDisplayName, buildItemDisplayData, resolveAffixes } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored } from "./rules/environment/dungeon/exploredMap.js";
 import { getTile, isWalkable, isOpaque, isFlyable, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
@@ -2062,6 +2062,33 @@ function findScrollOfIdentifyInPlayerInventory(playerId) {
   return 0;
 }
 
+function buildQuickChipEquippedComparison(ownerId, itemId, slot) {
+  const eq = world.get(ownerId, Equipment);
+  if (!eq) return null;
+
+  const normalized = String(slot || '').trim().toLowerCase();
+  if (!normalized) return null;
+  const candidateSlots = normalized === 'ring' ? ['ring1', 'ring2'] : [normalized];
+  const validSlots = candidateSlots.filter((name) => GEAR_SLOTS.includes(name));
+  if (!validSlots.length) return null;
+
+  for (const gearSlot of validSlots) {
+    const eqId = Number(eq[gearSlot] || 0) | 0;
+    if (!(eqId > 0) || eqId === itemId) continue;
+    const eqInfo = world.get(eqId, ItemInfo);
+    if (!eqInfo) continue;
+    return {
+      name: resolveItemDisplayName(world, eqId),
+      bonuses: eqInfo.bonuses || {},
+      damageDice: eqInfo.damageDice || null,
+      staminaCost: eqInfo.staminaCost ?? null,
+      twoHanded: !!eqInfo.twoHanded,
+      affixes: resolveAffixes(eqInfo.affixes),
+    };
+  }
+  return null;
+}
+
 world.on('item:identified', ({ actor, identity }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
@@ -2131,6 +2158,7 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
           name: resolveItemDisplayName(world, itemId),
           count: info.count || 1,
           rarityName: info.rarityName || 'common',
+          equippedComparison: buildQuickChipEquippedComparison(ownerId, Number(itemId), info.slot),
           glyph: palette?.[world.get(itemId, NamedIdentity)?.identity]?.glyph || '',
           glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff',
           hasScrollOfIdentify,
