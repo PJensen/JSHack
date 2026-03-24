@@ -49,6 +49,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     subtype: def.subtype || null,
     range: def.range || null,
     identified: def.identified === true,
+    noQuickChip: def.noQuickChip === true,
   };
   world.add(id, ItemInfo, info);
 
