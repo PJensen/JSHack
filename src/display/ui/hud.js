@@ -1739,9 +1739,25 @@ function renderQuickChip(it, h) {
     fontWeight: '600',
     lineHeight: '1.3',
     wordBreak: 'break-word',
+    color: quickChipRarityColor(it?.rarityName),
   });
   summary.appendChild(glyph);
   summary.appendChild(name);
+
+  const statsText = buildQuickChipStatsText(it);
+  if (statsText) {
+    const stats = document.createElement('div');
+    stats.textContent = statsText;
+    Object.assign(stats.style, {
+      fontSize: '11px',
+      lineHeight: '1.2',
+      opacity: '0.82',
+      paddingLeft: '24px',
+      marginTop: '-2px',
+      marginBottom: '2px',
+    });
+    chip.appendChild(stats);
+  }
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
@@ -1788,4 +1804,65 @@ function renderQuickChip(it, h) {
   chip.appendChild(summary);
   chip.appendChild(actions);
   return chip;
+}
+
+/**
+ * @param {any} rarityName
+ * @returns {string}
+ */
+function quickChipRarityColor(rarityName) {
+  const rn = String(rarityName || 'common').toLowerCase();
+  if (rn === 'common') return '#cfe8ff';
+  if (rn === 'uncommon') return '#7fe38f';
+  if (rn === 'rare') return '#6eb2ff';
+  if (rn === 'epic') return '#c18cff';
+  if (rn === 'legendary') return '#ffcf5a';
+  return '#cfe8ff';
+}
+
+/**
+ * @param {any} it
+ * @returns {string}
+ */
+function buildQuickChipStatsText(it) {
+  const d = (it && typeof it.details === 'object' && it.details) ? it.details : it;
+  const parts = [];
+
+  const dd = d?.damageDice;
+  const dc = Number(dd?.count || 0) | 0;
+  const ds = Number(dd?.sides || 0) | 0;
+  if (dc > 0 && ds > 0) parts.push(`DMG ${dc}d${ds}`);
+
+  const staminaCost = Number(d?.staminaCost ?? 0);
+  if (Number.isFinite(staminaCost) && staminaCost > 0) parts.push(`STA ${staminaCost}`);
+
+  const bonuses = (d?.bonuses && typeof d.bonuses === 'object') ? d.bonuses : null;
+  if (bonuses) {
+    const labels = {
+      attackBonus: 'ATK',
+      armorClass: 'AC',
+      defense: 'DEF',
+      spellPower: 'SP',
+      damagePower: 'POW',
+      accuracy: 'ACC',
+      evade: 'EVA',
+      mitigation: 'MIT',
+      luck: 'LUK',
+    };
+    for (const [key, label] of Object.entries(labels)) {
+      const n = Number(bonuses[key] ?? 0);
+      if (!Number.isFinite(n) || n === 0) continue;
+      const sign = n > 0 ? '+' : '';
+      parts.push(`${label} ${sign}${n}`);
+    }
+  }
+
+  if (parts.length > 0) return parts.slice(0, 4).join(' · ');
+
+  const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
+  for (const line of detailLines) {
+    const text = String(line || '').trim();
+    if (text) return text;
+  }
+  return '';
 }
