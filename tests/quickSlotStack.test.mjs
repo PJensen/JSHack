@@ -54,7 +54,7 @@ Deno.test("quick-chip primary action uses apply for scroll of identify", () => {
   assertEquals(getQuickChipPrimaryActionLabel(item), "Apply");
 });
 
-Deno.test("quick-chip stats keep detail lines exactly as provided in inventory data", () => {
+Deno.test("quick-chip stats keep full item info but strip bag and rarity metadata", () => {
   const text = buildQuickChipStatsText({
     details: {
       bonuses: { attackBonus: 2, defense: 1 },
@@ -68,7 +68,7 @@ Deno.test("quick-chip stats keep detail lines exactly as provided in inventory d
 
   assertEquals(
     text,
-    "bag · rarity: epic · On hit: Ignite 25%\nmagic · Socketed: +1 mana regeneration.\n+2 Attack Bonus\n+1 Defense",
+    "On hit: Ignite 25%\nSocketed: +1 mana regeneration.\n+2 Attack Bonus\n+1 Defense",
   );
   assert(!text.includes("A blade that sings."), "quick-chip should not include description text");
 });
