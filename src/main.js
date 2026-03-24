@@ -43,6 +43,7 @@ import { initDebugConsole } from "./display/ui/debugConsole.js";
 import { registerBuiltinCommands } from "./main/debug/consoleCommands.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
+import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { drawProcStateBadges } from "./display/fx/procStateGlyphs.js";
@@ -2023,6 +2024,7 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   if (!pe || pe.id !== ownerId) return;
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
+  if (shouldSuppressRecentPickupChipForEquippedDuplicate(world, ownerId, itemId)) return;
   const hasScrollOfIdentify = findScrollOfIdentifyInPlayerInventory(pe.id) > 0;
   const displayItem = buildItemDisplayData(world, itemId);
   try {
