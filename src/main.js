@@ -2062,17 +2062,21 @@ function findScrollOfIdentifyInPlayerInventory(playerId) {
   return 0;
 }
 
+const QUICK_CHIP_FALLBACK_GLYPH = '•';
+const QUICK_CHIP_FALLBACK_GLYPH_COLOR = '#cfe8ff';
+
 function resolveQuickChipGlyphData(itemId, info = null, explicitIdentity = '') {
-  const identity = String(explicitIdentity || world.get(itemId, NamedIdentity)?.identity || '').trim();
+  const namedIdentity = world.get(itemId, NamedIdentity);
+  const identity = String(explicitIdentity || namedIdentity?.identity || '').trim();
   const type = String(info?.type || world.get(itemId, ItemInfo)?.type || '').trim().toLowerCase();
-  const look = (identity && palette?.[identity])
+  const paletteEntry = (identity && palette?.[identity])
     || (type && palette?.[type])
-    || palette?.potion
+    || palette?.default
     || null;
   return {
     identity,
-    glyph: String(look?.glyph || '•'),
-    glyphColor: String(look?.fg || '#cfe8ff'),
+    glyph: String(paletteEntry?.glyph || QUICK_CHIP_FALLBACK_GLYPH),
+    glyphColor: String(paletteEntry?.fg || QUICK_CHIP_FALLBACK_GLYPH_COLOR),
   };
 }
 
