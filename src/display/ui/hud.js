@@ -1826,32 +1826,6 @@ function quickChipRarityColor(rarityName) {
 }
 
 /**
- * @param {string} text
- * @returns {boolean}
- */
-function isQuickChipMetaToken(text) {
-  const norm = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!norm) return true;
-  if (norm === 'bag' || norm === 'in bag' || norm === 'slot: bag' || norm === 'slot bag') return true;
-  if (norm === 'rarity' || norm.startsWith('rarity:') || norm.startsWith('rarity ')) return true;
-  return QUICK_CHIP_RARITY_TOKENS.has(norm);
-}
-
-/**
- * @param {string} raw
- * @returns {string}
- */
-function stripQuickChipMetaParts(raw) {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  const tokens = text.split(/\s*[|,·]\s*/g).map((token) => String(token || '').trim()).filter(Boolean);
-  if (tokens.length === 0) return '';
-  const kept = tokens.filter((token) => !isQuickChipMetaToken(token));
-  if (kept.length === 0) return '';
-  return kept.join(' · ');
-}
-
-/**
  * @param {string} key
  * @returns {string}
  */
@@ -1888,9 +1862,7 @@ export function buildQuickChipInfoLines(it) {
   const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
   for (const line of detailLines) {
     const text = String(line || '').trim();
-    if (!text) continue;
-    const cleaned = stripQuickChipMetaParts(text);
-    if (cleaned) lines.push(cleaned);
+    if (text) lines.push(text);
   }
 
   const targetEffects = Array.isArray(d?.targetEffects) ? d.targetEffects : [];
