@@ -1718,7 +1718,7 @@ function renderQuickChip(it, h) {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    minHeight: '16px',
+    minHeight: '26px',
     paddingRight: '28px',
   });
 
@@ -1731,7 +1731,19 @@ function renderQuickChip(it, h) {
     fontWeight: '700',
   });
 
+  const name = document.createElement('div');
+  const count = Number(it?.count || 1);
+  name.textContent = count > 1 ? `${it?.name || 'Item'} x${count}` : (it?.name || 'Item');
+  Object.assign(name.style, {
+    fontSize: '13px',
+    fontWeight: '600',
+    lineHeight: '1.3',
+    wordBreak: 'break-word',
+    color: quickChipRarityColor(it?.rarityName),
+  });
+
   summary.appendChild(glyph);
+  summary.appendChild(name);
 
   let stats = null;
   const statsText = buildQuickChipStatsText(it);
@@ -1742,7 +1754,7 @@ function renderQuickChip(it, h) {
       fontSize: '11px',
       lineHeight: '1.2',
       opacity: '0.82',
-      paddingLeft: '0',
+      paddingLeft: '24px',
       marginTop: '-2px',
       marginBottom: '2px',
       whiteSpace: 'pre-line',
@@ -1931,31 +1943,6 @@ export function buildQuickChipInfoLines(it) {
     let circles = '';
     for (let i = 0; i < maxSockets; i++) circles += i < sockets.length ? '◈' : '○';
     if (circles) lines.push(circles);
-  }
-
-  const cmp = d?.equippedComparison;
-  if (cmp) {
-    lines.push(`vs ${String(cmp.name || 'equipped')}`);
-    const cmpBonuses = (cmp.bonuses && typeof cmp.bonuses === 'object') ? cmp.bonuses : {};
-    const allKeys = new Set([...Object.keys(bonuses || {}), ...Object.keys(cmpBonuses)]);
-    for (const key of allKeys) {
-      const mine = Number((bonuses || {})[key]) || 0;
-      const theirs = Number(cmpBonuses[key]) || 0;
-      const delta = mine - theirs;
-      if (delta === 0) continue;
-      const sign = delta > 0 ? '+' : '';
-      lines.push(`${sign}${delta} ${humanizeQuickChipKey(key)}`);
-    }
-    const mineDmg = formatQuickChipDamageDice(d?.damageDice);
-    const theirDmg = formatQuickChipDamageDice(cmp.damageDice);
-    if ((mineDmg || theirDmg) && mineDmg !== theirDmg) {
-      lines.push(`Damage: ${mineDmg || 'none'} vs ${theirDmg || 'none'}`);
-    }
-    if (d?.staminaCost != null && cmp.staminaCost != null && d.staminaCost !== cmp.staminaCost) {
-      const delta = Number(d.staminaCost) - Number(cmp.staminaCost);
-      const sign = delta > 0 ? '+' : '';
-      lines.push(`${sign}${delta} stamina cost`);
-    }
   }
 
   const unique = [];
