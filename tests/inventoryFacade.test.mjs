@@ -198,6 +198,21 @@ Deno.test("facade: entities persist without merge on add", () => {
   assertEquals(inventoryStackCount(world, owner), 1, "one capacity stack");
 });
 
+Deno.test("facade: addToInventory can merge into compatible identity stack", () => {
+  const world = makeWorld();
+  const owner = makeOwner(world);
+  const a = makeItem(world, { identity: "ammo_fire_arrows", count: 3 });
+  const b = makeItem(world, { identity: "ammo_fire_arrows", count: 2 });
+
+  addToInventory(world, owner, a);
+  addToInventory(world, owner, b, { mergeCompatible: true });
+
+  assert(world.isAlive(a), "existing stack should remain");
+  assert(!world.isAlive(b), "merged entity should be consumed");
+  assertEquals(inventoryItems(world, owner).length, 1, "inventory should keep one entity after merge");
+  assertEquals(world.get(a, ItemInfo)?.count, 5, "counts should combine onto the existing stack");
+});
+
 Deno.test("facade: getStackView groups by capacity-compatible stack key", () => {
   const world = makeWorld();
   const owner = makeOwner(world);

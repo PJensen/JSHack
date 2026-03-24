@@ -221,11 +221,31 @@ export function forEachItem(world, ownerId, callback) {
  * Add an item entity to the owner's inventory root.
  * @param {object} [opts]
  * @param {boolean} [opts.silent] - suppress inventory:added event
+ * @param {boolean} [opts.mergeCompatible] - merge into an existing compatible stack instead of attaching a new entity
  */
 export function addToInventory(world, ownerId, itemId, opts) {
   if (!(itemId > 0) || !world.isAlive(itemId)) return false;
   const rootId = getOrCreateInventoryRoot(world, ownerId);
   if (!(rootId > 0)) return false;
+
+  if (opts?.mergeCompatible) {
+    const incomingInfo = world.get(itemId, ItemInfo);
+    if (incomingInfo) {
+      const incomingCount = Math.max(1, Number(incomingInfo.count || 0) | 0);
+      for (const existingId of inventoryItems(world, ownerId)) {
+        if (existingId === itemId || !world.isAlive(existingId)) continue;
+        if (!capacityCompatible(world, existingId, itemId)) continue;
+        world.mutate(existingId, ItemInfo, (rec) => {
+          rec.count = Math.max(1, Number(rec.count || 0) | 0) + incomingCount;
+        });
+        ensureWeightRecord(world, existingId);
+        world.destroy(itemId);
+        if (!opts?.silent) world.emit('inventory:added', { ownerId, itemId: existingId, merged: true, count: incomingCount });
+        return true;
+      }
+    }
+  }
+
   ensureWeightRecord(world, itemId);
   attach(world, itemId, rootId);
   removeImmediate(world, itemId, Position);
