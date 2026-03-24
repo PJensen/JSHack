@@ -2114,9 +2114,11 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   if (!pe || pe.id !== ownerId) return;
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type === 'currency') return;
+  if (info.noQuickChip === true) return;
   if (shouldSuppressRecentPickupChipForEquippedDuplicate(world, ownerId, itemId)) return;
   const hasScrollOfIdentify = findScrollOfIdentifyInPlayerInventory(pe.id) > 0;
   const displayItem = buildItemDisplayData(world, itemId);
+  if (displayItem?.noQuickChip === true) return;
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {

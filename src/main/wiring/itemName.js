@@ -157,6 +157,7 @@ export function buildItemDisplayData(world, itemId) {
     detailLines,
     targetEffects,
     identified,
+    noQuickChip: info.noQuickChip === true,
     beatitude: identified ? (world.get(itemId, Beatitude)?.state || null) : null,
     weight: Number(info.weight || 0),
   };

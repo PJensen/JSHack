@@ -3844,6 +3844,7 @@ export const ITEM_CATALOG = {
     id: "scroll_identify",
     catalogKind: "magic",
     name: "Scroll of Identify",
+    noQuickChip: true,
     type: "scroll",
     slot: "bag",
     material: "paper",
