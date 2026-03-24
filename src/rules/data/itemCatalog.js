@@ -2621,6 +2621,7 @@ export const ITEM_CATALOG = {
     material: "glass",
     rarity: 2,
     rarityName: "magic",
+    identified: true,
     value: 50,
     description: "A shimmering azure elixir that instantly restores all mana.",
     potion: {
@@ -3848,6 +3849,7 @@ export const ITEM_CATALOG = {
     material: "paper",
     rarity: 1,
     rarityName: "common",
+    identified: true,
     weight: 0.1,
     value: 30,
     description: "Reveals the true nature of an item.",

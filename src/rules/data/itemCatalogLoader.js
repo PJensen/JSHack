@@ -48,6 +48,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     staminaCost: def.staminaCost ?? null,
     subtype: def.subtype || null,
     range: def.range || null,
+    identified: def.identified === true,
   };
   world.add(id, ItemInfo, info);
 
