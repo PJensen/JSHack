@@ -1842,7 +1842,6 @@ world.on('scroll:aggravation', ({ actor }) => {
     aggro.lastKnownY = py;
     aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
   }
-  world.emit?.('scroll:aggravation', { actor });
 });
 
 // Scroll of Teleportation → move player to a random walkable tile on this floor
@@ -1864,7 +1863,6 @@ world.on('scroll:teleportation', ({ actor }) => {
   const to = candidates[Math.floor(world.rand() * candidates.length)];
   world.set(actor, Position, { x: to.x, y: to.y });
   try { world.emit?.('moved', { id: actor, from, to }); } catch {}
-  world.emit?.('scroll:teleportation', { actor });
 });
 
 // Scroll of Summoning → spawn hostile monsters near player
@@ -1890,7 +1888,6 @@ world.on('scroll:summoning', ({ actor }) => {
       }
     }
   }
-  world.emit?.('scroll:summoning', { actor });
 });
 
 // Scroll of Decay → destroy organic items (scrolls, potions, food) in player's pack
@@ -1904,19 +1901,17 @@ world.on('scroll:decay', ({ actor }) => {
       organic.push(itemId);
     }
   }
-  // Destroy 1-3 random organic items
-  const destroyCount = Math.min(organic.length, 1 + (world.rand() * 3 | 0));
-  // Shuffle selection using world.rand()
+  if (organic.length === 0) return;
+  // Destroy 1-3 random organic items using world.rand() shuffle
   for (let i = organic.length - 1; i > 0; i--) {
     const j = world.rand() * (i + 1) | 0;
     [organic[i], organic[j]] = [organic[j], organic[i]];
   }
-  const toDestroy = organic.slice(0, destroyCount);
-  for (const itemId of toDestroy) {
-    removeFromInventory(world, actor, itemId);
-    try { world.destroy(itemId); } catch {}
+  const destroyCount = Math.min(organic.length, 1 + (world.rand() * 3 | 0));
+  for (let i = 0; i < destroyCount; i++) {
+    removeFromInventory(world, actor, organic[i]);
+    try { world.destroy(organic[i]); } catch {}
   }
-  world.emit?.('scroll:decay', { actor, count: toDestroy.length });
 });
 
 // Wait button → dispatch wait action
