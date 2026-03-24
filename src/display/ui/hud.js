@@ -1,7 +1,6 @@
 // display/ui/hud.js
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
-import { renderItemDetails } from './overlay.js';
 
 /**
  * @template T
@@ -1682,46 +1681,83 @@ function createMobileSpellRadial(mobileLayoutMq) {
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: '8px',
-    padding: '6px 8px', borderRadius: '6px',
-    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
+    minWidth: '220px',
+    padding: '8px',
+    borderRadius: '6px',
+    border: '1px solid #2d3b52',
+    background: '#101626',
+    color: '#cfe8ff'
   });
-  const content = document.createElement('div');
-  Object.assign(content.style, {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '8px',
-  });
-  const detailPanel = document.createElement('div');
-  Object.assign(detailPanel.style, {
-    minWidth: '180px',
-    maxWidth: '260px',
-    maxHeight: '30vh',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    padding: '6px',
+  const dismissBtn = document.createElement('button');
+  Object.assign(dismissBtn.style, {
+    position: 'absolute',
+    right: '6px',
+    top: '6px',
+    width: '24px',
+    height: '24px',
+    lineHeight: '20px',
+    textAlign: 'center',
+    padding: '0',
+    background: '#101626',
+    color: '#cfe8ff',
     border: '1px solid #2d3b52',
     borderRadius: '6px',
-    background: '#0a111f',
+    cursor: 'pointer',
   });
-  const detailItem = it.details && typeof it.details === 'object'
-    ? it.details
-    : {
-        id: it.id,
-        identity: it.identity,
-        type: it.type,
-        slot: it.slot,
-        name: it.name,
-        count: it.count,
-        rarityName: it.rarityName,
-        glyph: it.glyph,
-        glyphColor: it.glyphColor,
-      };
-  renderItemDetails(detailPanel, detailItem);
-  content.appendChild(detailPanel);
+  dismissBtn.textContent = '\u00D7';
+  dismissBtn.title = 'Dismiss';
+  dismissBtn.addEventListener('click', () => h.onDismiss && h.onDismiss());
+
+  const summary = document.createElement('div');
+  Object.assign(summary.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minHeight: '26px',
+    paddingRight: '28px',
+  });
+
+  const glyph = document.createElement('span');
+  glyph.textContent = it?.glyph || '\u2022';
+  Object.assign(glyph.style, {
+    color: it?.glyphColor || '#cfe8ff',
+    minWidth: '16px',
+    textAlign: 'center',
+    fontWeight: '700',
+  });
+
+  const name = document.createElement('div');
+  const count = Number(it?.count || 1);
+  name.textContent = count > 1 ? `${it?.name || 'Item'} x${count}` : (it?.name || 'Item');
+  Object.assign(name.style, {
+    fontSize: '13px',
+    fontWeight: '600',
+    lineHeight: '1.3',
+    wordBreak: 'break-word',
+    color: quickChipRarityColor(it?.rarityName),
+  });
+  summary.appendChild(glyph);
+  summary.appendChild(name);
+
+  const statsText = buildQuickChipStatsText(it);
+  if (statsText) {
+    const stats = document.createElement('div');
+    stats.textContent = statsText;
+    Object.assign(stats.style, {
+      fontSize: '11px',
+      lineHeight: '1.2',
+      opacity: '0.82',
+      paddingLeft: '24px',
+      marginTop: '-2px',
+      marginBottom: '2px',
+    });
+    chip.appendChild(stats);
+  }
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
@@ -1753,27 +1789,82 @@ function renderQuickChip(it, h) {
     dropBtn.addEventListener('click', () => h.onDrop && h.onDrop());
   }
 
-  const x = document.createElement('button');
-  Object.assign(x.style, {
-    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
-    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer', minWidth: '28px'
-  });
-  x.textContent = '\u00D7';
-  x.title = 'Dismiss';
-  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
-
   const actions = document.createElement('div');
   Object.assign(actions.style, {
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: '6px',
+    flexWrap: 'wrap',
   });
   actions.appendChild(btn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
-  actions.appendChild(x);
 
-  chip.appendChild(content);
+  chip.appendChild(dismissBtn);
+  chip.appendChild(summary);
   chip.appendChild(actions);
   return chip;
+}
+
+const MAX_QUICK_CHIP_STAT_PARTS = 4;
+
+/**
+ * @param {any} rarityName
+ * @returns {string}
+ */
+function quickChipRarityColor(rarityName) {
+  const rn = String(rarityName || 'common').toLowerCase();
+  if (rn === 'common') return '#cfe8ff';
+  if (rn === 'uncommon') return '#7fe38f';
+  if (rn === 'rare') return '#6eb2ff';
+  if (rn === 'epic') return '#c18cff';
+  if (rn === 'legendary') return '#ffcf5a';
+  return '#cfe8ff';
+}
+
+/**
+ * @param {any} it
+ * @returns {string}
+ */
+function buildQuickChipStatsText(it) {
+  const d = (it?.details && typeof it.details === 'object') ? it.details : it;
+  const parts = [];
+
+  const dd = d?.damageDice;
+  const dc = Number(dd?.count || 0);
+  const ds = Number(dd?.sides || 0);
+  if (dc > 0 && ds > 0) parts.push(`DMG ${dc}d${ds}`);
+
+  const staminaCost = Number(d?.staminaCost ?? 0);
+  if (Number.isFinite(staminaCost) && staminaCost > 0) parts.push(`STA ${staminaCost}`);
+
+  const bonuses = (d?.bonuses && typeof d.bonuses === 'object') ? d.bonuses : null;
+  if (bonuses) {
+    const labels = {
+      attackBonus: 'ATK',
+      armorClass: 'AC',
+      defense: 'DEF',
+      spellPower: 'SP',
+      damagePower: 'POW',
+      accuracy: 'ACC',
+      evade: 'EVA',
+      mitigation: 'MIT',
+      luck: 'LUK',
+    };
+    for (const [key, label] of Object.entries(labels)) {
+      const n = Number(bonuses[key] ?? 0);
+      if (!Number.isFinite(n) || n === 0) continue;
+      const sign = n > 0 ? '+' : '';
+      parts.push(`${label} ${sign}${n}`);
+    }
+  }
+
+  if (parts.length > 0) return parts.slice(0, MAX_QUICK_CHIP_STAT_PARTS).join(' · ');
+
+  const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
+  for (const line of detailLines) {
+    const text = String(line || '').trim();
+    if (text) return text;
+  }
+  return '';
 }
