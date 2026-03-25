@@ -166,3 +166,11 @@ Deno.test("druid starts with at least +1 defense from equipped gear", () => {
   }, 0);
   assert(defenseTotal >= 1, `druid defense from starter gear should be >= 1, got ${defenseTotal}`);
 });
+
+Deno.test("non-outlaw classes have raised starter dexterity for steadier melee hit rates", () => {
+  for (const id of ["warden", "druid", "archeologist", "warlock", "cleric"]) {
+    const dexterity = Number(getClass(id)?.stats?.dexterity || 0);
+    assert(dexterity >= 12, `${id} should start at dexterity 12+ to avoid excessive early misses`);
+  }
+  assertEquals(Number(getClass("outlaw")?.stats?.dexterity || 0), 16, "outlaw dexterity should remain unchanged");
+});
