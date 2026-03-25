@@ -9,6 +9,7 @@ import {
   TILE_FARMLAND,
   TILE_FENCE,
   TILE_FLOOR,
+  TILE_COBBLESTONE,
   TILE_GRASS,
   TILE_SHALLOW_WATER,
   TILE_STAIR_DOWN,
@@ -170,11 +171,11 @@ Deno.test("overworld scales the player house down to a 9x5 footprint with a fron
   assertEquals(getWorldTile(chunks, eastWalkX, southWalkY), TILE_FLOOR);
 });
 
-Deno.test("overworld places the non-crypt dungeon entrance in the church-square right flower bed", () => {
+Deno.test("overworld places the non-crypt dungeon entrance in the church square approach", () => {
   const { chunks } = generateOverworldChunks(SEED);
 
   assertEquals(getWorldTile(chunks, stairX, stairY), TILE_STAIR_DOWN);
-  assertEquals(getWorldTile(chunks, stairX - 1, stairY), TILE_GRASS);
+  assertEquals(getWorldTile(chunks, stairX - 1, stairY), TILE_COBBLESTONE);
   assertEquals(getWorldTile(chunks, stairX, stairY + 1), TILE_GRASS);
 });
 
