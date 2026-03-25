@@ -111,6 +111,28 @@ export function reconcilePinnedQuickItemsWithInventory(pinned, inventoryItems) {
   return out;
 }
 
+/**
+ * @param {Array<any>} a
+ * @param {Array<any>} b
+ * @returns {boolean}
+ */
+function arePinnedArraysEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (Number(a[i]?.id || 0) !== Number(b[i]?.id || 0)) return false;
+    if (Number(a[i]?.count || 0) !== Number(b[i]?.count || 0)) return false;
+  }
+  return true;
+}
+
+/**
+ * @param {any} value
+ * @returns {number}
+ */
+function normalizePositiveCount(value) {
+  return Math.max(1, Number(value || 1) | 0);
+}
+
 export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
@@ -1207,13 +1229,12 @@ function createQuickSlot(opts = {}) {
       type: String(item?.type || ''),
       slot: String(item?.slot || ''),
       name: String(item?.name || 'item'),
-      count: Math.max(1, Number(item?.count || 1) | 0),
+      count: normalizePositiveCount(item?.count),
       rarityName: String(item?.rarityName || 'common'),
       glyph: String(item?.glyph || ''),
       glyphColor: String(item?.glyphColor || ''),
       hasScrollOfIdentify: !!item?.hasScrollOfIdentify,
       details: item?.details || item,
-      addedAt: Date.now(),
     };
   }
 
@@ -1399,7 +1420,7 @@ function createPinnedItemSlots() {
       btn.style.opacity = '1';
       btn.style.borderColor = '#4c647f';
       btn.style.background = '#101b2a';
-      btn.title = `${item.name || 'Item'} x${Math.max(1, Number(item.count || 1) | 0)}`;
+      btn.title = `${item.name || 'Item'} x${normalizePositiveCount(item.count)}`;
       btn.setAttribute('aria-label', btn.title);
       const icon = document.createElement('span');
       icon.textContent = item.glyph || '⬢';
@@ -1411,7 +1432,7 @@ function createPinnedItemSlots() {
       });
       btn.appendChild(icon);
       const countBadge = document.createElement('span');
-      countBadge.textContent = String(Math.max(1, Number(item.count || 1) | 0));
+      countBadge.textContent = String(normalizePositiveCount(item.count));
       Object.assign(countBadge.style, {
         position: 'absolute',
         right: '3px',
@@ -1430,6 +1451,10 @@ function createPinnedItemSlots() {
     }
   }
 
+  /**
+   * Add or refresh a pinned quick-use item, evicting the oldest entry when full.
+   * @param {{id:number,name?:string,count?:number,glyph?:string,glyphColor?:string}} item
+   */
   function pinItem(item) {
     pinned = upsertPinnedQuickItemLifo(pinned, item, SLOT_COUNT);
     render();
@@ -1494,7 +1519,7 @@ function createPinnedItemSlots() {
       ...pinned[idx],
       ...item,
       id,
-      count: Math.max(1, Number(item?.count || pinned[idx]?.count || 1) | 0),
+      count: normalizePositiveCount(item?.count || pinned[idx]?.count),
       details: item,
     };
     render();
@@ -1504,7 +1529,7 @@ function createPinnedItemSlots() {
     const e = ev;
     const bagItems = Array.isArray(e?.detail?.bagItems) ? e.detail.bagItems : [];
     const next = reconcilePinnedQuickItemsWithInventory(pinned, bagItems);
-    if (next.length === pinned.length && next.every((entry, idx) => Number(entry?.id || 0) === Number(pinned[idx]?.id || 0) && Number(entry?.count || 0) === Number(pinned[idx]?.count || 0))) return;
+    if (arePinnedArraysEqual(next, pinned)) return;
     pinned = next;
     render();
   });
