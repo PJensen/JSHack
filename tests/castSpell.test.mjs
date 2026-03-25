@@ -5,6 +5,7 @@ import { createPlayer } from '../src/rules/archetypes/Player.js';
 import { Brain } from '../src/rules/components/Brain.js';
 import { Mana } from '../src/rules/components/Mana.js';
 import { CastSpellIntent } from '../src/rules/components/Intents/CastSpellIntent.js';
+import { Status } from "../src/rules/components/Status.js";
 import { castSpellSystem } from '../src/rules/systems/castSpellSystem.js';
 
 function scheduler(world) {
@@ -61,4 +62,34 @@ Deno.test("castSpellSystem accepts legacy prefixed spell ids", () => {
   assert(manaAfter.mana === 16, "flash_heal mana cost should be applied from prefixed id");
   assert(castEvents.some((e) => e.spellId === "flash_heal"), "prefixed id should resolve to canonical spell id");
   assert(brain.learnedSpellIds[0] === "flash_heal", "learned spell ids should migrate to canonical ids");
+});
+
+Deno.test("casting is prevented by canonical interruption statuses", () => {
+  const cases = ["silenced", "asleep", "stunned", "mindlocked"];
+  for (let i = 0; i < cases.length; i++) {
+    const status = cases[i];
+    const world = new World({ seed: 100 + i });
+    world.setScheduler((w) => scheduler(w));
+
+    const player = createPlayer(world, { name: "Mage" });
+    const brain = world.get(player, Brain);
+    if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+    if (!brain.learnedSpellIds.includes("lightning")) brain.learnedSpellIds.push("lightning");
+    const mana = world.get(player, Mana);
+    mana.mana = 10;
+    mana.maxMana = 10;
+    world.add(player, Status, { statuses: [{ type: status, duration: 2, potency: 1, stacks: 1 }] });
+
+    const fizzles = [];
+    const casts = [];
+    world.on("spell:fizzle", (e) => fizzles.push(e));
+    world.on("castSpell", (e) => casts.push(e));
+
+    world.add(player, CastSpellIntent, { spellId: "lightning" });
+    world.tick(1);
+
+    assert(casts.length === 0, `${status} should block casting`);
+    assert(fizzles.some((e) => e.reason === status || (status === "stunned" && e.reason === "stunned")), `${status} should report spell:fizzle reason`);
+    assert(world.get(player, Mana).mana === 10, `${status} should block mana spend`);
+  }
 });
