@@ -16,7 +16,7 @@ import { Position } from '../src/rules/components/Position.js';
 function makeActor(world, name, eq, hp = 10, resistances = null) {
   const id = world.create();
   world.add(id, NamedIdentity, { name, identity: name.toLowerCase() });
-  world.add(id, Vitality, { maxHp: 10, hp });
+  world.add(id, Vitality, { maxHp: Math.max(10, hp), hp });
   world.add(id, Equipment, {});
   if (resistances) world.add(id, Resistances, resistances);
   const e = world.get(id, Equipment);

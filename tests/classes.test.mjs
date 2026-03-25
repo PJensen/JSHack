@@ -137,10 +137,10 @@ Deno.test("caster jewelry exposes spell hit bonuses", () => {
   assertEquals(Number(getCatalogItem("amulet_arcanum")?.bonuses?.spellHit || 0), 3);
 });
 
-Deno.test("shadow_bolt has 2-turn cast time and deals damage", () => {
+Deno.test("shadow_bolt has tuned cast time and deals damage", () => {
   const spell = getSpell("shadow_bolt");
   assert(spell, "shadow_bolt should exist");
-  assertEquals(spell.castTime, 2);
+  assertEquals(spell.castTime, 1);
   assert(spell.manaCost > 0, "shadow_bolt should cost mana");
   const dmgEffect = spell.effects.find(e => e.kind === 'damage');
   assert(dmgEffect, "shadow_bolt should have a damage effect");
