@@ -2049,9 +2049,21 @@ installMessageWiring({
   },
 });
 
-// Dismiss the quick-slot chip when item is used
-world.on('drank', ({ itemId }) => {
-  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
+function buildQuickItemPinDetailFromWorld(itemId) {
+  const id = Number(itemId || 0) | 0;
+  const identity = String(world.get(id, NamedIdentity)?.identity || '');
+  return {
+    itemId: id,
+    identity,
+    pinKey: identity || (id > 0 ? `id:${id}` : ''),
+  };
+}
+
+// Keep quick-slot and pinned chips in sync when items are consumed.
+world.on('item:used', ({ itemId }) => {
+  const detail = buildQuickItemPinDetailFromWorld(itemId);
+  try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
 function findScrollOfIdentifyInPlayerInventory(playerId) {
@@ -2815,7 +2827,8 @@ bootAdvance("Installed world/UI wiring");
 
 // Item equipped UI updates (message handled in messageWiring)
 world.on('item:equipped', ({ itemId }) => {
-  try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail: { itemId } })); } catch (e) { console.debug('[main] dispatch ui:itemEquipped:', e); }
+  const detail = buildQuickItemPinDetailFromWorld(itemId);
+  try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail })); } catch (e) { console.debug('[main] dispatch ui:itemEquipped:', e); }
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 world.on('item:unequipped', ({ itemId }) => {
