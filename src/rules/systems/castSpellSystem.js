@@ -12,6 +12,7 @@ import { Player } from "../components/Player.js";
 import { isSpellOnCooldown, setSpellCooldown } from "../utils/spellCooldowns.js";
 import { Position } from "../components/Position.js";
 import { isTargetHiddenByInvisibility } from "../utils/spellTargeting.js";
+import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -100,6 +101,19 @@ export function castSpellSystem(world) {
     const spell = getSpell(spellId);
     if (!spell) {
       try { world.emit && world.emit('spell:unknown', { actor, spellId }); } catch (e) { console.debug('[castSpellSystem] emit spell:unknown failed:', e); }
+      world.remove(actor, CastSpellIntent);
+      continue;
+    }
+
+    const interruption = getChannelInterruptionReason(world, actor);
+    if (interruption) {
+      try {
+        world.emit?.("spell:fizzle", {
+          actor,
+          spellId: spell.id,
+          reason: interruption,
+        });
+      } catch (e) { console.debug('[castSpellSystem] emit spell:fizzle(interruption) failed:', e); }
       world.remove(actor, CastSpellIntent);
       continue;
     }

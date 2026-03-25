@@ -11,6 +11,7 @@ import { getSpell } from "../data/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { effectiveMaxMana } from "../utils/passiveBonuses.js";
+import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function channelingSystem(world) {
@@ -20,6 +21,19 @@ export function channelingSystem(world) {
     if (vit && (vit.hp | 0) <= 0) {
       try { world.remove(id, Channeling); } catch {}
       try { world.emit?.('channeling:cancelled', { actor: id, spellId: ch.spellId, reason: 'dead' }); } catch {}
+      continue;
+    }
+
+    const interruption = getChannelInterruptionReason(world, id);
+    if (interruption) {
+      try { world.remove(id, Channeling); } catch {}
+      try {
+        world.emit?.('channeling:cancelled', {
+          actor: id,
+          spellId: ch.spellId,
+          reason: interruption,
+        });
+      } catch {}
       continue;
     }
 

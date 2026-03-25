@@ -10,6 +10,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Mana } from "../src/rules/components/Mana.js";
+import { Status } from "../src/rules/components/Status.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { castSpellSystem } from "../src/rules/systems/castSpellSystem.js";
@@ -152,6 +153,38 @@ Deno.test("firestorm applies burning and stops once mana can no longer pay the n
     if (effects?.effects?.some((effect) => effect?.key === "burn")) burnedTargets += 1;
   }
   assert(burnedTargets > 0, "firestorm should leave at least one burning survivor after two paid ticks");
+});
+
+Deno.test("sustained channels cancel immediately on canonical interruption statuses", () => {
+  loadFlatFloor();
+
+  const cases = [
+    { seed: 19, inject: (world, id) => world.add(id, ActiveEffects, { effects: [{ key: "stun", turnsLeft: 2, potency: 1, stacks: 1 }] }), reason: "stunned" },
+    { seed: 20, inject: (world, id) => world.add(id, Status, { statuses: [{ type: "mindlocked", duration: 2, potency: 1, stacks: 1 }] }), reason: "mindlocked" },
+    { seed: 21, inject: (world, id) => world.add(id, Status, { statuses: [{ type: "silenced", duration: 2, potency: 1, stacks: 1 }] }), reason: "silenced" },
+    { seed: 22, inject: (world, id) => world.add(id, Status, { statuses: [{ type: "asleep", duration: 2, potency: 1, stacks: 1 }] }), reason: "asleep" },
+  ];
+
+  for (const c of cases) {
+    const world = makeStormWorld(c.seed);
+    const player = createPlayer(world, { x: 0, y: 0, name: "Mage" });
+    const brain = world.get(player, Brain);
+    brain.learnedSpellIds = ["blizzard"];
+    const mana = world.get(player, Mana);
+    mana.mana = 10;
+    mana.maxMana = 10;
+    const cancelled = [];
+    world.on("channeling:cancelled", (event) => cancelled.push(event));
+
+    world.add(player, CastSpellIntent, { spellId: "blizzard", x: 4, y: 0 });
+    world.tick(1); // enter sustain channel
+    c.inject(world, player);
+    world.tick(1); // should cancel before spending mana
+
+    assert(!world.has(player, Channeling), `${c.reason} should immediately cancel sustained channel`);
+    assertEquals(world.get(player, Mana).mana, 10, `${c.reason} cancellation should happen before mana drain`);
+    assert(cancelled.some((event) => event.reason === c.reason), `should emit channeling:cancelled reason=${c.reason}`);
+  }
 });
 
 Deno.test("firestorm impacts stamp floor fire hazards that can burn overworld structures", () => {

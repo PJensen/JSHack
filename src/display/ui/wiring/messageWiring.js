@@ -415,12 +415,28 @@ export function installMessageWiring({
     log(`${label} is not ready yet.`, 'system');
   });
 
-  world.on('spell:fizzle', ({ actor, spellId, confused }) => {
+  world.on('spell:fizzle', ({ actor, spellId, confused, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
     if (confused) {
       log(`You lose focus and ${label} fizzles.`, 'system');
+      return;
+    }
+    if (reason === 'silenced') {
+      log(`You are silenced; ${label} cannot be cast.`, 'system');
+      return;
+    }
+    if (reason === 'asleep') {
+      log(`You are asleep; ${label} fizzles.`, 'system');
+      return;
+    }
+    if (reason === 'stunned') {
+      log(`You are stunned; ${label} fizzles.`, 'system');
+      return;
+    }
+    if (reason === 'mindlocked') {
+      log(`Your mind is locked; ${label} fizzles.`, 'system');
       return;
     }
     log(`${label} fizzles.`, 'system');
@@ -460,6 +476,14 @@ export function installMessageWiring({
       log('Channeling interrupted by death.', 'combat');
     } else if (reason === 'oom') {
       log('Your mana gives out and the channel collapses.', 'system');
+    } else if (reason === 'silenced') {
+      log('You are silenced and lose the channel.', 'system');
+    } else if (reason === 'asleep') {
+      log('You fall asleep and the channel breaks.', 'system');
+    } else if (reason === 'stunned') {
+      log('You are stunned and lose the channel.', 'system');
+    } else if (reason === 'mindlocked') {
+      log('Your mind locks and the channel breaks.', 'system');
     } else {
       log('Channeling interrupted.', 'system');
     }
