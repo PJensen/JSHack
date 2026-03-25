@@ -11,7 +11,7 @@ import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Flying } from '../../components/Flying.js';
 import { clearAll as clearTileMap, setTile } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored } from './exploredMap.js';
-import { _exploredCache } from './floorMemory.js';
+import { exploredFloorRepository } from './floorMemory.js';
 import { generateFloor } from './index.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
@@ -48,7 +48,7 @@ function _loadPersistedFloor(worldSeed, depth) {
 /** Clear all in-memory and localStorage floor caches (call on new game). */
 export function clearFloorCache() {
   _floorEntityCache.clear();
-  _exploredCache.clear();
+  exploredFloorRepository.clear();
   if (typeof localStorage === 'undefined') return;
   const keys = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -138,7 +138,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   }
 
   if (ds && Array.isArray(ds.floorEntityIds)) {
-    if (currentDepth > 0) _exploredCache.set(currentDepth, saveExplored());
+    if (currentDepth > 0) exploredFloorRepository.setSnapshot(currentDepth, saveExplored());
     // Capture ALL non-permanent alive entities so that chest inventory items
     // (no Position, not in floorEntityIds) and runtime-spawned monsters are
     // included in the snapshot.
@@ -284,7 +284,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   }
 
   // Restore explored state if this floor was previously visited
-  const savedExplored = _exploredCache.get(newDepth);
+  const savedExplored = exploredFloorRepository.getSnapshot(newDepth);
   if (savedExplored) {
     restoreExplored(savedExplored);
   }
