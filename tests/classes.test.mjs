@@ -174,3 +174,12 @@ Deno.test("non-outlaw classes have raised starter dexterity for steadier melee h
   }
   assertEquals(Number(getClass("outlaw")?.stats?.dexterity || 0), 16, "outlaw dexterity should remain unchanged");
 });
+
+Deno.test("all classes start with baseline utility consumables", () => {
+  for (const [classId, def] of Object.entries(CLASS_DEFS)) {
+    const byId = new Map(def.inventoryItems.map((entry) => [entry.itemId, Number(entry.count || 0)]));
+    assert((byId.get("scroll_identify") || 0) >= 4, `${classId} should start with at least 4 scroll_identify`);
+    assert((byId.get("potion_health") || 0) >= 2, `${classId} should start with at least 2 potion_health`);
+    assert((byId.get("potion_mana") || 0) >= 3, `${classId} should start with at least 3 potion_mana`);
+  }
+});
