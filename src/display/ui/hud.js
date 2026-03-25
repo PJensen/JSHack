@@ -33,9 +33,7 @@ export function popUntilActionableTop(stack, isActionable) {
  */
 export function getQuickChipPrimaryAction(it) {
   const identity = String(it?.identity || it?.details?.identity || '');
-  const identified = it?.details?.identified ?? it?.identified;
   if (identity === 'scroll_identify') return 'apply';
-  if (identified === false && !!it?.hasScrollOfIdentify) return 'identify';
   const t = String(it?.type || '');
   if (t === 'equip' || t === 'ammo' || t === 'wand') return 'equip';
   if (t === 'potion') return 'drink';
@@ -44,11 +42,21 @@ export function getQuickChipPrimaryAction(it) {
 
 /**
  * @param {any} it
+ * @returns {boolean}
+ */
+export function canQuickChipIdentify(it) {
+  const identity = String(it?.identity || it?.details?.identity || '');
+  if (identity === 'scroll_identify') return false;
+  const identified = it?.details?.identified ?? it?.identified;
+  return identified === false && !!it?.hasScrollOfIdentify;
+}
+
+/**
+ * @param {any} it
  * @returns {string}
  */
 export function getQuickChipPrimaryActionLabel(it) {
   const action = getQuickChipPrimaryAction(it);
-  if (action === 'identify') return 'Identify';
   if (action === 'apply') return 'Apply';
   if (action === 'equip') return 'Equip';
   if (action === 'drink') return 'Drink';
@@ -73,11 +81,13 @@ export function upsertPinnedQuickItemLifo(pinned, item, capacity = 3) {
   const source = Array.isArray(pinned) ? pinned : [];
   const next = source.slice();
   const id = Number(item?.id || 0) | 0;
-  if (!(id > 0)) return next;
-  const idx = next.findIndex((entry) => Number(entry?.id || 0) === id);
+  const identity = String(item?.identity || item?.details?.identity || '');
+  const pinKey = identity || (id > 0 ? `id:${id}` : '');
+  if (!pinKey) return next;
+  const idx = next.findIndex((entry) => String(entry?.pinKey || '') === pinKey);
   if (idx >= 0) next.splice(idx, 1);
   if (next.length >= max) next.shift();
-  next.push({ ...item, id });
+  next.push({ ...item, id, identity, pinKey });
   return next;
 }
 
@@ -89,24 +99,43 @@ export function upsertPinnedQuickItemLifo(pinned, item, capacity = 3) {
 export function reconcilePinnedQuickItemsWithInventory(pinned, inventoryItems) {
   const source = Array.isArray(pinned) ? pinned : [];
   const items = Array.isArray(inventoryItems) ? inventoryItems : [];
-  /** @type {Map<number, number>} */
-  const countsById = new Map();
+  /** @type {Map<string, { count:number, item:any }>} */
+  const byPinKey = new Map();
   for (const item of items) {
     const count = Math.max(0, Number(item?.count || 0) | 0);
+    const identity = String(item?.identity || item?.details?.identity || '');
+    if (identity) {
+      const key = identity;
+      const prev = byPinKey.get(key);
+      byPinKey.set(key, { count: (prev?.count || 0) + count, item: item });
+      continue;
+    }
     const rawIds = Array.isArray(item?.entityIds) ? item.entityIds : [item?.id];
     for (const rawId of rawIds) {
       const id = Number(rawId || 0) | 0;
       if (!(id > 0)) continue;
-      countsById.set(id, count);
+      byPinKey.set(`id:${id}`, { count, item });
     }
   }
   const out = [];
   for (const entry of source) {
-    const id = Number(entry?.id || 0) | 0;
-    if (!(id > 0)) continue;
-    const count = Number(countsById.get(id) || 0) | 0;
+    const entryId = Number(entry?.id || 0) | 0;
+    const entryIdentity = String(entry?.identity || entry?.details?.identity || '');
+    const key = String(entry?.pinKey || entryIdentity || (entryId > 0 ? `id:${entryId}` : ''));
+    if (!key) continue;
+    const rec = byPinKey.get(key);
+    const count = Number(rec?.count || 0) | 0;
     if (!(count > 0)) continue;
-    out.push({ ...entry, count });
+    const fresh = rec?.item && typeof rec.item === 'object' ? rec.item : null;
+    out.push({
+      ...entry,
+      ...(fresh || {}),
+      pinKey: key,
+      count,
+      id: Number(fresh?.id || entry?.id || 0) | 0,
+      identity: String(fresh?.identity || entry?.identity || ''),
+      details: fresh?.details || entry?.details,
+    });
   }
   return out;
 }
@@ -119,6 +148,7 @@ export function reconcilePinnedQuickItemsWithInventory(pinned, inventoryItems) {
 function arePinnedArraysEqual(a, b) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
+    if (String(a[i]?.pinKey || '') !== String(b[i]?.pinKey || '')) return false;
     if (Number(a[i]?.id || 0) !== Number(b[i]?.id || 0)) return false;
     if (Number(a[i]?.count || 0) !== Number(b[i]?.count || 0)) return false;
   }
@@ -1274,9 +1304,7 @@ function createQuickSlot(opts = {}) {
 
   function dispatchAction(it) {
     const action = getQuickChipPrimaryAction(it);
-    if (action === 'identify') {
-      window.dispatchEvent(new CustomEvent('ui:requestQuickChipIdentify', { detail: { targetItemId: it.id } }));
-    } else if (action === 'apply') {
+    if (action === 'apply') {
       window.dispatchEvent(new CustomEvent('ui:openApplyForTool', { detail: { toolId: it.id } }));
     } else if (action === 'equip') {
       window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
@@ -1378,7 +1406,7 @@ function createQuickSlot(opts = {}) {
 }
 
 function createPinnedItemSlots() {
-  const SLOT_COUNT = 3;
+  const SLOT_COUNT = 5;
   const el = document.createElement('div');
   Object.assign(el.style, {
     display: 'flex',
@@ -1386,7 +1414,7 @@ function createPinnedItemSlots() {
     alignItems: 'center',
   });
 
-  /** @type {Array<{id:number,identity?:string,type?:string,slot?:string,name:string,count:number,rarityName?:string,glyph?:string,glyphColor?:string,hasScrollOfIdentify?:boolean,details?:any}>} */
+  /** @type {Array<{id:number,pinKey?:string,identity?:string,type?:string,slot?:string,name:string,count:number,rarityName?:string,glyph?:string,glyphColor?:string,hasScrollOfIdentify?:boolean,details?:any}>} */
   let pinned = [];
   /** @type {((item:any) => void) | null} */
   let presenter = null;
@@ -1460,11 +1488,16 @@ function createPinnedItemSlots() {
     render();
   }
 
-  function removeById(itemId) {
-    const id = Number(itemId || 0) | 0;
-    if (!(id > 0)) return;
+  function removeByPinKeyOrId(pinKeyOrId) {
+    const key = String(pinKeyOrId || '');
+    const id = Number(pinKeyOrId || 0) | 0;
+    if (!key && !(id > 0)) return;
     const before = pinned.length;
-    pinned = pinned.filter((entry) => Number(entry?.id || 0) !== id);
+    pinned = pinned.filter((entry) => {
+      const entryKey = String(entry?.pinKey || '');
+      if (entryKey && key) return entryKey !== key;
+      return Number(entry?.id || 0) !== id;
+    });
     if (pinned.length !== before) render();
   }
 
@@ -1500,12 +1533,12 @@ function createPinnedItemSlots() {
   window.addEventListener('ui:itemUsed', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    removeById(e?.detail?.itemId);
+    removeByPinKeyOrId(e?.detail?.pinKey || e?.detail?.identity || e?.detail?.itemId);
   });
   window.addEventListener('ui:itemEquipped', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    removeById(e?.detail?.itemId);
+    removeByPinKeyOrId(e?.detail?.pinKey || e?.detail?.identity || e?.detail?.itemId);
   });
   window.addEventListener('ui:itemIdentified', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -1997,6 +2030,19 @@ function renderQuickChip(it, h) {
   btn.textContent = getQuickChipPrimaryActionLabel(it);
   btn.addEventListener('click', () => h.onUse && h.onUse());
 
+  let identifyBtn = null;
+  if (canQuickChipIdentify(it)) {
+    identifyBtn = document.createElement('button');
+    Object.assign(identifyBtn.style, {
+      padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+    });
+    identifyBtn.textContent = 'Identify';
+    identifyBtn.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('ui:requestQuickChipIdentify', { detail: { targetItemId: it.id } }));
+    });
+  }
+
   let throwBtn = null;
   if (typeof h.onThrow === 'function') {
     throwBtn = document.createElement('button');
@@ -2058,6 +2104,7 @@ function renderQuickChip(it, h) {
     gap: '6px',
   });
   actions.appendChild(btn);
+  if (identifyBtn) actions.appendChild(identifyBtn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
 
