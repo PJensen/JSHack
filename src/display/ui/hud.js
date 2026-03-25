@@ -1007,11 +1007,13 @@ function ensureEffectsStack(container) {
 
   const hsla = (h, a = 0.2) => `hsla(${h} 80% 50% / ${a})`;
   const shadowColor = (h) => `hsl(${h} 55% 35%)`;
+  const VIS_SCALE = 0.8;
+  const scaledPx = (px) => `${Math.max(1, Math.round(px * VIS_SCALE))}px`;
 
   function createBadge(spec, total) {
     const el = document.createElement('div');
     Object.assign(el.style, {
-      position: 'relative', width: '58px', height: '58px', borderRadius: '8px',
+      position: 'relative', width: scaledPx(58), height: scaledPx(58), borderRadius: scaledPx(8),
       display: 'grid', placeItems: 'center',
       boxShadow: '0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)',
       outline: `1px solid ${hsla(spec.hue, 0.28)}`,
@@ -1021,24 +1023,24 @@ function ensureEffectsStack(container) {
 
     const glyph = document.createElement('div');
     glyph.textContent = spec.glyph;
-    Object.assign(glyph.style, { fontSize: '28px', lineHeight: '1', filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))', color: shadowColor(spec.hue) });
+    Object.assign(glyph.style, { fontSize: scaledPx(28), lineHeight: '1', filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))', color: shadowColor(spec.hue) });
 
     const label = document.createElement('div');
-    Object.assign(label.style, { position: 'absolute', left: '6px', bottom: '2px', fontSize: '10px', color: 'rgba(255,255,255,.8)' });
+    Object.assign(label.style, { position: 'absolute', left: scaledPx(6), bottom: scaledPx(2), fontSize: scaledPx(10), color: 'rgba(255,255,255,.8)' });
     label.textContent = String(spec.name).split(' ')[0];
 
     const ticks = document.createElement('div');
-    Object.assign(ticks.style, { position: 'absolute', right: '4px', bottom: '2px', fontSize: '12px', fontWeight: '700', color: '#fff', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)' });
+    Object.assign(ticks.style, { position: 'absolute', right: scaledPx(4), bottom: scaledPx(2), fontSize: scaledPx(12), fontWeight: '700', color: '#fff', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)' });
     ticks.textContent = String(total);
 
     const overlay = document.createElement('div');
     Object.assign(overlay.style, {
-      position: 'absolute', left: '6px', top: '6px', right: '6px', bottom: '6px', borderRadius: '8px', pointerEvents: 'none',
+      position: 'absolute', left: scaledPx(6), top: scaledPx(6), right: scaledPx(6), bottom: scaledPx(6), borderRadius: scaledPx(8), pointerEvents: 'none',
       background: 'conic-gradient(rgba(180,190,200,.2) 0deg, transparent 0)'
     });
 
     const stacksEl = document.createElement('div');
-    Object.assign(stacksEl.style, { position: 'absolute', right: '4px', top: '2px', fontSize: '11px', fontWeight: '700', color: '#ffcc44', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)', zIndex: '2' });
+    Object.assign(stacksEl.style, { position: 'absolute', right: scaledPx(4), top: scaledPx(2), fontSize: scaledPx(11), fontWeight: '700', color: '#ffcc44', textShadow: '0 1px 0 #000, 0 0 4px rgba(0,0,0,.7)', zIndex: '2' });
     stacksEl.textContent = 'x1';
 
     el.appendChild(glyph);
