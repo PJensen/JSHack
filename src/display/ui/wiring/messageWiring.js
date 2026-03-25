@@ -1694,17 +1694,41 @@ export function installMessageWiring({
 
   // === Trap events ===
   world.on('trap:avoided', ({ victimId, trapId, type }) => {
-    const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+    const trapNames = {
+      spike: "Spike Trap",
+      snake: "Snake Trap",
+      shock: "Shock Trap",
+      pit: "Pit Trap",
+      siphon: "Siphon Trap",
+      rust: "Rust Trap",
+      swarm: "Swarm Trap",
+    };
     const name = trapNames[type] || 'trap';
     log(`You nimbly dodge the ${name}!`, 'info');
   });
   world.on('trap:disarmed', ({ actor, trapType }) => {
-    const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+    const trapNames = {
+      spike: "Spike Trap",
+      snake: "Snake Trap",
+      shock: "Shock Trap",
+      pit: "Pit Trap",
+      siphon: "Siphon Trap",
+      rust: "Rust Trap",
+      swarm: "Swarm Trap",
+    };
     const name = trapNames[trapType] || 'trap';
     log(`You carefully disarm the ${name}.`, 'info');
   });
   world.on('trap:disarm:failed', ({ actor, trapType }) => {
-    const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+    const trapNames = {
+      spike: "Spike Trap",
+      snake: "Snake Trap",
+      shock: "Shock Trap",
+      pit: "Pit Trap",
+      siphon: "Siphon Trap",
+      rust: "Rust Trap",
+      swarm: "Swarm Trap",
+    };
     const name = trapNames[trapType] || 'trap';
     log(`You fumble the ${name} — it triggers!`, 'danger');
   });

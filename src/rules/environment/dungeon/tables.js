@@ -133,16 +133,34 @@ export function pickItem(rng, depth) {
  */
 export function pickTrap(rng, depth) {
   const roll = rng.next();
-  // Snake traps: 25% chance, snake count scales with depth
-  if (roll < 0.25) {
+  // Swarm traps: 16% chance, count scales with depth.
+  if (roll < 0.16) {
+    const count = Math.min(8, 5 + Math.floor(depth / 5));
+    return { type: "swarm", script: "trap_swarm", params: { monsterId: "spider", count } };
+  }
+  // Snake traps: 14% chance, count scales with depth.
+  if (roll < 0.30) {
     const count = Math.min(6, 3 + Math.floor(depth / 4));
     return { type: 'snake', script: 'trap_snake', params: { count } };
   }
-  // Shock traps: 30% chance
-  if (roll < 0.55) {
-    return { type: 'shock', script: 'trap_shock', params: { percent: 0.30 } };
+  // Pit traps: 18% chance.
+  if (roll < 0.48) {
+    return { type: "pit", script: "trap_pit", params: { dropDepth: 1, percent: 0.08 } };
   }
-  // Spike traps: remaining 45%
+  // Siphon traps: 16% chance.
+  if (roll < 0.64) {
+    const resource = depth >= 6 ? (rng.next() < 0.5 ? "mana" : "stamina") : "hp";
+    return { type: "siphon", script: "trap_siphon", params: { resource, percent: 0.15, healNearestEnemy: true } };
+  }
+  // Rust traps: 12% chance.
+  if (roll < 0.76) {
+    return { type: "rust", script: "trap_rust", params: { stat: "armor", amount: 2, duration: 20 } };
+  }
+  // Shock traps: 12% chance.
+  if (roll < 0.88) {
+    return { type: 'shock', script: 'trap_shock', params: { percent: 0.15 } };
+  }
+  // Spike traps: remaining 12%
   return { type: 'spike', script: 'trap_spike', params: { percent: 0.50 } };
 }
 

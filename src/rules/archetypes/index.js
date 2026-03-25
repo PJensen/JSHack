@@ -31,7 +31,7 @@ export {
   KitchenKnife,
   TownStew,
 } from './TownGoods.js';
-export { SpikeTrap, SnakeTrap, ShockTrap } from './Traps.js';
+export { SpikeTrap, SnakeTrap, ShockTrap, PitTrap, SiphonTrap, RustTrap, SwarmTrap } from './Traps.js';
 export { MagicItem } from './Items.js';
 export {
   HomeBed,
