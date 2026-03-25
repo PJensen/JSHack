@@ -30,17 +30,8 @@ function clampWalkInterval(ms) {
  */
 export function readInputMode() {
   const mode = lsGet(LS_INPUT_MODE);
-  if (mode === 'gesture' || mode === 'joystick') return mode;
-  try {
-    if (typeof window !== 'undefined') {
-      const coarse = typeof window.matchMedia === 'function'
-        && window.matchMedia('(pointer: coarse)').matches;
-      // Fallback: iOS Safari sometimes fails to match (pointer: coarse)
-      const touchHw = typeof navigator !== 'undefined'
-        && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
-      if (coarse || touchHw) return 'joystick';
-    }
-  } catch {}
+  if (mode === 'walk' || mode === 'gesture' || mode === 'joystick') return mode;
+  // Default movement mode is tap-and-hold.
   return 'walk';
 }
 
