@@ -55,6 +55,13 @@ export function getQuickChipPrimaryActionLabel(it) {
   return 'Use';
 }
 
+export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
+  chipPosition: 'relative',
+  contentPaddingRight: '34px',
+  top: '6px',
+  right: '8px',
+});
+
 export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
@@ -1686,6 +1693,7 @@ function renderQuickChip(it, h) {
   Object.assign(chip.style, {
     display: 'flex',
     flexDirection: 'column',
+    position: QUICK_CHIP_DISMISS_LAYOUT.chipPosition,
     alignItems: 'stretch',
     gap: '8px',
     padding: '6px 8px', borderRadius: '6px',
@@ -1696,6 +1704,7 @@ function renderQuickChip(it, h) {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '8px',
+    paddingRight: QUICK_CHIP_DISMISS_LAYOUT.contentPaddingRight,
   });
   const detailPanel = document.createElement('div');
   Object.assign(detailPanel.style, {
@@ -1758,7 +1767,13 @@ function renderQuickChip(it, h) {
   const x = document.createElement('button');
   Object.assign(x.style, {
     padding: '6px 8px', background: '#101626', color: '#cfe8ff',
-    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer', minWidth: '28px'
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    minWidth: '28px',
+    position: 'absolute',
+    top: QUICK_CHIP_DISMISS_LAYOUT.top,
+    right: QUICK_CHIP_DISMISS_LAYOUT.right,
   });
   x.textContent = '\u00D7';
   x.title = 'Dismiss';
@@ -1773,8 +1788,8 @@ function renderQuickChip(it, h) {
   actions.appendChild(btn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
-  actions.appendChild(x);
 
+  chip.appendChild(x);
   chip.appendChild(content);
   chip.appendChild(actions);
   return chip;
