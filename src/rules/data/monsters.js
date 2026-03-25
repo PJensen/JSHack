@@ -10,6 +10,7 @@ import {
   drainOnHit,
   bonusDamageOnBeforeHit,
   bonusDamageIfTargetAfflicted,
+  drainAndWeakenOnHit,
   healOnDamaged,
   retaliateOnDamaged,
   statusEffectOnDamaged,
@@ -668,14 +669,18 @@ export const MONSTERS = [
     },
     speed: 2,
     hooks: {
-      onHit: [
-        drainOnHit(25, 0xdead0406, 3),
-        statusEffectOnHit(20, 0xdead0407, { key: "weakened", turnsLeft: 3, potency: 1 }, "proc:weakened"),
-      ],
+      onHit: [drainAndWeakenOnHit({
+        chancePct: 45,
+        seedSalt: 0xdead0406,
+        divisor: 2,
+        cooldownTurns: 3,
+        weakenedTurns: 4,
+        weakenedPotency: 1,
+      })],
     },
-    specials: ["Drain 3 HP (25%)", "Weaken 20%"],
-    description: 'A revenant in tarnished mail. Its grip saps the living of their strength.',
-    lootTable: 'drop:undead',
+    specials: ["Siphon strike (45%, 3-turn cooldown)", "On siphon: drain + weaken"],
+    description: 'A revenant in tarnished mail. Its hunger surges in windows, then lashes out with a soul-siphoning grip.',
+    lootTable: 'drop:wight',
   },
   {
     id: 'spider',
@@ -1243,8 +1248,9 @@ export function listAllMonsterIds() {
 export function getMonsterLootTable(def) {
   if (def.lootTable) return def.lootTable;
   const tags = def.tags || [];
-  // Tag priority: caster > beast > humanoid > undead > tier fallback
+  // Tag priority: caster > venomous > beast > humanoid > undead > tier fallback
   if (tags.includes('caster'))   return 'drop:caster';
+  if (tags.includes('venomous')) return 'drop:venomous';
   if (tags.includes('beast'))    return 'drop:beast';
   if (tags.includes('humanoid')) return 'drop:humanoid';
   if (tags.includes('undead'))   return 'drop:undead';

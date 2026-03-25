@@ -263,21 +263,21 @@ const ENCOUNTER_GROUPS = [
   { tier: 0, leader: null, followers: [{ id: 'centipede', count: 2 }], minBudget: 2 },
 
   // Tier 1
-  { tier: 1, leader: 'orc_shaman', followers: [{ id: 'orc', count: 2 }], minBudget: 3 },
-  { tier: 1, leader: 'wight', followers: [{ id: 'skeleton', count: 2 }], minBudget: 3 },
-  { tier: 1, leader: 'hobgoblin', followers: [{ id: 'orc', count: 1 }, { id: 'bone_bowman', count: 1 }], minBudget: 3 },
-  { tier: 1, leader: 'orc_shaman', followers: [{ id: 'hobgoblin', count: 1 }], minBudget: 2 },
-  { tier: 1, leader: null, followers: [{ id: 'phase_spider', count: 2 }], minBudget: 2 },
+  // Mixed-role squads: utility/control + pressure (ranged or brute) for tactical fights.
+  { tier: 1, leader: 'orc_shaman', followers: [{ id: 'orc', count: 1 }, { id: 'bone_bowman', count: 1 }], minBudget: 3 },
+  { tier: 1, leader: 'wight', followers: [{ id: 'skeleton', count: 1 }, { id: 'bone_bowman', count: 1 }], minBudget: 3 },
+  { tier: 1, leader: 'hobgoblin', followers: [{ id: 'orc_shaman', count: 1 }, { id: 'bone_bowman', count: 1 }], minBudget: 3 },
+  { tier: 1, leader: 'phase_spider', followers: [{ id: 'bone_bowman', count: 1 }, { id: 'orc', count: 1 }], minBudget: 3 },
 
   // Tier 2
-  { tier: 2, leader: 'orc_warchief', followers: [{ id: 'orc', count: 2 }], minBudget: 3 },
-  { tier: 2, leader: 'dark_acolyte', followers: [{ id: 'wraith', count: 1 }], minBudget: 2 },
-  { tier: 2, leader: 'dark_acolyte', followers: [{ id: 'skeleton', count: 2 }], minBudget: 3 },
-  { tier: 2, leader: 'troll', followers: [{ id: 'ogre', count: 1 }], minBudget: 2 },
+  { tier: 2, leader: 'orc_warchief', followers: [{ id: 'dark_acolyte', count: 1 }, { id: 'skeletal_marksman', count: 1 }], minBudget: 3 },
+  { tier: 2, leader: 'dark_acolyte', followers: [{ id: 'wraith', count: 1 }, { id: 'skeletal_marksman', count: 1 }], minBudget: 3 },
+  { tier: 2, leader: 'troll', followers: [{ id: 'dark_acolyte', count: 1 }, { id: 'ogre', count: 1 }], minBudget: 3 },
+  { tier: 2, leader: 'carrion_shade', followers: [{ id: 'skeletal_marksman', count: 1 }, { id: 'wight', count: 1 }], minBudget: 3 },
 
   // Tier 3
-  { tier: 3, leader: 'lich', followers: [{ id: 'wraith', count: 1 }, { id: 'skeleton', count: 1 }], minBudget: 3 },
-  { tier: 3, leader: 'demon', followers: [{ id: 'death_archer', count: 1 }], minBudget: 2 },
+  { tier: 3, leader: 'lich', followers: [{ id: 'wraith', count: 1 }, { id: 'death_archer', count: 1 }], minBudget: 3 },
+  { tier: 3, leader: 'demon', followers: [{ id: 'death_archer', count: 1 }, { id: 'lich', count: 1 }], minBudget: 3 },
 ];
 
 /**
