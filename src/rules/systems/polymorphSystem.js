@@ -3,7 +3,7 @@ import { Inventory } from "../components/Inventory.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Polymorph } from "../components/Polymorph.js";
 import { Position } from "../components/Position.js";
-import { getMonster } from "../data/monsters.js";
+import { getMonster, resolveMonsterMaxHp } from "../data/monsters.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 import { addToInventory, destroyInventoryRoot, inventoryItems } from "../utils/inventoryFacade.js";
@@ -46,7 +46,7 @@ function toMonsterSpawnParams(def, depth) {
   return {
     name: def.name,
     identity: def.id,
-    maxHp: Math.floor(def.baseHp + depth * def.hpPerLevel),
+    maxHp: resolveMonsterMaxHp(def, depth),
     faction: "enemy",
     accuracyDerived: def.attack,
     damagePowerDerived: def.attack,

@@ -1,4 +1,4 @@
-import { getMonster } from "../../rules/data/monsters.js";
+import { getMonster, resolveMonsterMaxHp } from "../../rules/data/monsters.js";
 import { creatureTypeFromTags } from "../../rules/components/CreatureType.js";
 import { applyMutation } from "../../rules/interaction/mutations.js";
 import { findNearestValidTileAround, playerEntity } from "../../rules/utils/queries.js";
@@ -39,7 +39,7 @@ export function spawnDebugMonsterNearPlayer(world, monsterId) {
     const params = {
       name: def.name,
       identity: def.id,
-      maxHp: Math.floor(def.baseHp + depth * def.hpPerLevel),
+      maxHp: resolveMonsterMaxHp(def, depth),
       faction: 'enemy',
       accuracyDerived: def.attack,
       damagePowerDerived: def.attack,

@@ -29,7 +29,7 @@ import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
 import { resolveCombatSnapshot } from '../src/rules/utils/resolveCombatSnapshot.js';
 
 // Data
-import { MONSTERS, getMonster } from '../src/rules/data/monsters.js';
+import { MONSTERS, getMonster, resolveMonsterMaxHp } from '../src/rules/data/monsters.js';
 import { CLASS_DEFS } from '../src/rules/data/classes.js';
 
 // ── Helper: convert MONSTERS def → spawnMonsterEntity params ────────────
@@ -37,7 +37,7 @@ import { CLASS_DEFS } from '../src/rules/data/classes.js';
 function monsterParams(monsterId, depth) {
   const def = getMonster(monsterId);
   if (!def) throw new Error(`Unknown monster: ${monsterId}`);
-  const hp = Math.floor(def.baseHp + depth * def.hpPerLevel);
+  const hp = resolveMonsterMaxHp(def, depth);
 
   // Same mapping as mutations.js / populate.js
   return {
