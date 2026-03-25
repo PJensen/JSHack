@@ -69,7 +69,7 @@ import { districtConditionSystem } from "../rules/systems/districtConditionSyste
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
-import { channelingSystem } from "../rules/systems/channelingSystem.js";
+import { channelingSystem, installDrainLifeDamageInterruptListener } from "../rules/systems/channelingSystem.js";
 import { installGenocideListener } from "../rules/systems/genocideSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
@@ -136,6 +136,8 @@ export function configureWorld(world) {
   installAggroFromStealthOffenseListener(world);
   // Auto-apply electrocution (stun + blind + deafen) on any electric/lightning damage.
   installElectrocuteOnDamage(world);
+  // Drain Life is uniquely interrupted by incoming damage.
+  installDrainLifeDamageInterruptListener(world);
   // Centipede body segments cascade position when the head moves.
   installCentipedeBodyCascade(world);
 

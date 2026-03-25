@@ -1257,6 +1257,32 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       current.fadeLeft = current.fadeMax;
       current.endFlash = 0.24;
     });
+
+    world.on("channeling:cancelled", ({ actor, spellId, reason }) => {
+      if (String(spellId || "") !== "drain_life") return;
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _drainLifeChannels.get(a);
+      if (!current) return;
+      current.breakReason = String(reason || "channel_cancelled");
+      current.fading = true;
+      current.fadeMax = 0.20;
+      current.fadeLeft = current.fadeMax;
+      current.endFlash = Math.max(Number(current.endFlash || 0), 0.18);
+    });
+
+    world.on("channeling:complete", ({ actor, spellId }) => {
+      if (String(spellId || "") !== "drain_life") return;
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _drainLifeChannels.get(a);
+      if (!current) return;
+      current.breakReason = "channel_complete";
+      current.fading = true;
+      current.fadeMax = 0.20;
+      current.fadeLeft = current.fadeMax;
+      current.endFlash = Math.max(Number(current.endFlash || 0), 0.16);
+    });
   }
 
   return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, installListeners };
