@@ -51,7 +51,15 @@ export function trapSystem(world) {
     // Reveal and name before triggering so logs show source
     const ident = world.get(tid, NamedIdentity);
     if (!ident) {
-      const trapNames = { spike: 'Spike Trap', snake: 'Snake Trap', shock: 'Shock Trap' };
+      const trapNames = {
+        spike: "Spike Trap",
+        snake: "Snake Trap",
+        shock: "Shock Trap",
+        pit: "Pit Trap",
+        siphon: "Siphon Trap",
+        rust: "Rust Trap",
+        swarm: "Swarm Trap",
+      };
       const name = trapNames[t.type] || 'Trap';
       const identity = 'trap_' + (t.type || 'spike');
       try { world.add(tid, NamedIdentity, { name, identity }); } catch {} // ECS: may already exist
@@ -61,7 +69,16 @@ export function trapSystem(world) {
     try { world.emit('trap:triggered', { trapId: tid, victimId, type: t.type }); } catch {}
 
     // Run scripted behavior
-    const scriptKey = t.script || (t.type === 'spike' ? 'trap_spike' : '');
+    const fallbackScripts = {
+      spike: "trap_spike",
+      snake: "trap_snake",
+      shock: "trap_shock",
+      pit: "trap_pit",
+      siphon: "trap_siphon",
+      rust: "trap_rust",
+      swarm: "trap_swarm",
+    };
+    const scriptKey = t.script || fallbackScripts[t.type] || "";
     if (scriptKey) {
       runScript(scriptKey, ScriptVerb.TrapTrigger, world, {
         trapId: tid,

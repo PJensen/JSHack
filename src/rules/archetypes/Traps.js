@@ -48,3 +48,63 @@ export const ShockTrap = defineArchetype(
     })],
     [NamedIdentity, () => ({ name: 'Shock Trap', identity: 'trap_shock' })],
 );
+
+// Pit trap — forced reposition plus minor impact damage
+export const PitTrap = defineArchetype(
+    "PitTrap",
+    [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+    [Trap, (p) => ({
+        type: "pit",
+        script: "trap_pit",
+        params: p.trapParams ?? { dropDepth: 1, percent: 0.08 },
+        revealed: false,
+        armed: true,
+        difficulty: p.difficulty ?? 14,
+    })],
+    [NamedIdentity, () => ({ name: "Pit Trap", identity: "trap_pit" })],
+);
+
+// Siphon trap — drains a resource and can transfer it to nearby hostiles
+export const SiphonTrap = defineArchetype(
+    "SiphonTrap",
+    [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+    [Trap, (p) => ({
+        type: "siphon",
+        script: "trap_siphon",
+        params: p.trapParams ?? { resource: "hp", percent: 0.15, healNearestEnemy: true },
+        revealed: false,
+        armed: true,
+        difficulty: p.difficulty ?? 13,
+    })],
+    [NamedIdentity, () => ({ name: "Siphon Trap", identity: "trap_siphon" })],
+);
+
+// Rust trap — anti-gear pressure through temporary stat suppression
+export const RustTrap = defineArchetype(
+    "RustTrap",
+    [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+    [Trap, (p) => ({
+        type: "rust",
+        script: "trap_rust",
+        params: p.trapParams ?? { stat: "armor", amount: 2, duration: 20 },
+        revealed: false,
+        armed: true,
+        difficulty: p.difficulty ?? 12,
+    })],
+    [NamedIdentity, () => ({ name: "Rust Trap", identity: "trap_rust" })],
+);
+
+// Swarm trap — many weak creatures instead of one elite threat
+export const SwarmTrap = defineArchetype(
+    "SwarmTrap",
+    [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+    [Trap, (p) => ({
+        type: "swarm",
+        script: "trap_swarm",
+        params: p.trapParams ?? { monsterId: "spider", count: 6 },
+        revealed: false,
+        armed: true,
+        difficulty: p.difficulty ?? 11,
+    })],
+    [NamedIdentity, () => ({ name: "Swarm Trap", identity: "trap_swarm" })],
+);

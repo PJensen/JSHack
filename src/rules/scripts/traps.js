@@ -6,6 +6,65 @@ import { Monster } from "../archetypes/Creatures.js";
 import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
+import { findNearestValidTileAround } from "../utils/queries.js";
+import { combatSeed, mulberry32, rngInt } from "../utils/rng.js";
+import { Mana } from "../components/Mana.js";
+import { Stamina } from "../components/Stamina.js";
+import { Faction } from "../components/Faction.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
+import { areFactionsHostile } from "../utils/factionHostility.js";
+import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
+
+function clamp01(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(1, n));
+}
+
+function clampInt(value, fallback, min = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, n | 0);
+}
+
+function pushTimedEffect(world, target, effect) {
+  if (!(target > 0) || !effect || typeof effect !== "object") return;
+  const existing = world.get(target, ActiveEffects);
+  const next = Array.isArray(existing?.effects) ? existing.effects.slice() : [];
+  next.push({
+    key: String(effect.key || ""),
+    turnsLeft: Math.max(1, Number(effect.turnsLeft || 1) | 0),
+    potency: Number.isFinite(effect.potency) ? Number(effect.potency) : 1,
+    stacks: Math.max(1, Number(effect.stacks || 1) | 0),
+    sourceId: Number(effect.sourceId || 0) | 0,
+    startedAtTurn: Number.isFinite(world?.step) ? Number(world.step) : 0,
+  });
+  if (existing) world.set(target, ActiveEffects, { effects: next });
+  else world.add(target, ActiveEffects, { effects: next });
+}
+
+function findNearestHostile(world, anchor, victimId, maxDistance = 6) {
+  const srcPos = world.get(victimId, Position);
+  const srcFaction = world.get(victimId, Faction)?.key || "";
+  if (!srcPos) return 0;
+  let bestId = 0;
+  let bestDist = Infinity;
+  for (const [id, pos, vit] of world.query(Position, Vitality)) {
+    if (!(id > 0) || id === victimId) continue;
+    if (!pos || !vit || Number(vit.hp || 0) <= 0) continue;
+    const faction = world.get(id, Faction)?.key || "";
+    if (!areFactionsHostile(srcFaction, faction)) continue;
+    const dx = Math.abs((pos.x | 0) - (srcPos.x | 0));
+    const dy = Math.abs((pos.y | 0) - (srcPos.y | 0));
+    const dist = Math.max(dx, dy);
+    if (dist > maxDistance) continue;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
 
 
 // Spike trap: deals percentage of max HP as damage.
@@ -97,4 +156,226 @@ registerScript('trap_snake', {
       try { attach(world, child, trapId); } catch (e) { console.error('[traps] hierarchy attach failed:', e); }
     }
   }
+});
+
+// Pit trap: floor collapse that primarily forces repositioning.
+// Params: { dropDepth?: number, percent?: number }
+registerScript("trap_pit", {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) | 0;
+    const target = Number(ctx?.targetId || 0) | 0;
+    if (!(trapId > 0) || !(target > 0) || !world.isAlive(target)) return;
+    const trapPos = world.get(trapId, Position);
+    const from = world.get(target, Position);
+    if (!trapPos || !from) return;
+
+    const dropDepth = clampInt(ctx?.params?.dropDepth, 1, 1);
+    const damagePct = clamp01(ctx?.params?.percent, 0.08);
+    const radius = Math.max(2, dropDepth * 3);
+
+    const candidate = findNearestValidTileAround(world, trapPos, {
+      maxDistance: radius,
+      exclude: [{ x: from.x, y: from.y }],
+    });
+
+    if (candidate) {
+      world.set(target, Position, { x: candidate.x | 0, y: candidate.y | 0 });
+      world.emit?.("moved", {
+        id: target,
+        from: { x: from.x | 0, y: from.y | 0 },
+        to: { x: candidate.x | 0, y: candidate.y | 0 },
+        cause: "trap_pit",
+      });
+      world.emit?.("trap:pit:drop", {
+        trapId,
+        targetId: target,
+        from: { x: from.x | 0, y: from.y | 0 },
+        to: { x: candidate.x | 0, y: candidate.y | 0 },
+        dropDepth,
+      });
+    }
+
+    const vit = world.get(target, Vitality);
+    if (!vit) return;
+    const amount = Math.max(1, Math.floor(Number(vit.maxHp || 0) * damagePct));
+    dealDamage(world, {
+      target,
+      amount,
+      source: trapId,
+      type: "blunt",
+      cause: "pit_trap",
+      at: candidate ? { x: candidate.x | 0, y: candidate.y | 0 } : { x: from.x | 0, y: from.y | 0 },
+    });
+  },
+});
+
+// Siphon trap: drains a resource and optionally transfers to a nearby hostile.
+// Params: { resource?: 'hp'|'mana'|'stamina', percent?: number, healNearestEnemy?: boolean }
+registerScript("trap_siphon", {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) | 0;
+    const target = Number(ctx?.targetId || 0) | 0;
+    if (!(trapId > 0) || !(target > 0) || !world.isAlive(target)) return;
+
+    const resource = String(ctx?.params?.resource || "hp").toLowerCase();
+    const pct = clamp01(ctx?.params?.percent, 0.15);
+    const healNearestEnemy = ctx?.params?.healNearestEnemy !== false;
+
+    let drained = 0;
+    if (resource === "mana") {
+      const mana = world.get(target, Mana);
+      if (mana) {
+        const cap = Math.max(0, Number(mana.maxMana || 0) | 0);
+        const amount = Math.max(1, Math.floor(cap * pct));
+        const before = Math.max(0, Number(mana.mana || 0));
+        const after = Math.max(0, before - amount);
+        drained = Math.max(0, before - after);
+        world.set(target, Mana, { ...mana, mana: after, regenCooldown: Math.max(Number(mana.regenCooldown || 0), 1) });
+      }
+    } else if (resource === "stamina") {
+      const stamina = world.get(target, Stamina);
+      if (stamina) {
+        const cap = Math.max(0, Number(stamina.maxStamina || 0) | 0);
+        const amount = Math.max(1, Math.floor(cap * pct));
+        const before = Math.max(0, Number(stamina.stamina || 0));
+        const after = Math.max(0, before - amount);
+        drained = Math.max(0, before - after);
+        world.set(target, Stamina, { ...stamina, stamina: after, regenCooldown: Math.max(Number(stamina.regenCooldown || 0), 1) });
+      }
+    } else {
+      const vit = world.get(target, Vitality);
+      if (vit) {
+        const cap = Math.max(1, Number(vit.maxHp || 1) | 0);
+        const amount = Math.max(1, Math.floor(cap * pct));
+        const pos = world.get(target, Position);
+        const out = dealDamage(world, {
+          target,
+          amount,
+          source: trapId,
+          type: "arcane",
+          cause: "siphon_trap",
+          at: pos ? { x: pos.x | 0, y: pos.y | 0 } : undefined,
+        });
+        drained = Math.max(0, Number(out?.amount || 0));
+      }
+    }
+
+    if (drained > 0 && healNearestEnemy) {
+      const enemyId = findNearestHostile(world, trapId, target, 6);
+      if (enemyId > 0) {
+        const vit = world.get(enemyId, Vitality);
+        if (vit && Number(vit.hp || 0) > 0) {
+          const before = Number(vit.hp || 0);
+          const maxHp = Math.max(1, Number(vit.maxHp || 1) | 0);
+          const after = Math.min(maxHp, before + drained);
+          const healed = Math.max(0, after - before);
+          if (healed > 0) {
+            world.set(enemyId, Vitality, { ...vit, hp: after });
+            world.emit?.("healed", { target: enemyId, amount: healed, source: trapId, cause: "trap_siphon" });
+          }
+        }
+      }
+    }
+
+    world.emit?.("trap:siphon", {
+      trapId,
+      targetId: target,
+      resource,
+      amount: drained,
+    });
+  },
+});
+
+// Rust trap: temporary anti-gear suppression via existing weakened status.
+// Params: { stat?: 'armor'|'attack', amount?: number, duration?: number }
+registerScript("trap_rust", {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) | 0;
+    const target = Number(ctx?.targetId || 0) | 0;
+    if (!(trapId > 0) || !(target > 0) || !world.isAlive(target)) return;
+    const stat = String(ctx?.params?.stat || "armor").toLowerCase();
+    const amount = clampInt(ctx?.params?.amount, 2, 1);
+    const duration = clampInt(ctx?.params?.duration, 20, 1);
+
+    pushTimedEffect(world, target, {
+      key: "weakened",
+      turnsLeft: duration,
+      potency: amount,
+      stacks: 1,
+      sourceId: trapId,
+    });
+
+    world.emit?.("trap:rust", {
+      trapId,
+      targetId: target,
+      stat,
+      amount,
+      duration,
+    });
+  },
+});
+
+// Swarm trap: releases many weak creatures around the trap.
+// Params: { monsterId?: string, count?: number }
+registerScript("trap_swarm", {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) | 0;
+    if (!(trapId > 0)) return;
+    const trapPos = world.get(trapId, Position);
+    if (!trapPos) return;
+
+    const monsterId = String(ctx?.params?.monsterId || "spider").trim().toLowerCase();
+    const def = getMonster(monsterId);
+    if (!def) return;
+    const count = clampInt(ctx?.params?.count, 6, 1);
+
+    const seed = combatSeed(world.seed, world.step, trapId, Number(ctx?.targetId || 0) | 0, 0x5A57);
+    const rand = mulberry32(seed);
+    const offsets = [
+      [-1, 0], [1, 0], [0, -1], [0, 1],
+      [-1, -1], [1, -1], [-1, 1], [1, 1],
+      [-2, 0], [2, 0], [0, -2], [0, 2],
+    ];
+
+    for (let i = offsets.length - 1; i > 0; i--) {
+      const j = rngInt(rand, 0, i);
+      const tmp = offsets[i];
+      offsets[i] = offsets[j];
+      offsets[j] = tmp;
+    }
+
+    let spawned = 0;
+    for (let i = 0; i < offsets.length && spawned < count; i++) {
+      const ox = offsets[i][0];
+      const oy = offsets[i][1];
+      const spot = findNearestValidTileAround(world, { x: trapPos.x + ox, y: trapPos.y + oy }, { maxDistance: 1 });
+      if (!spot) continue;
+      const child = spawnMonsterEntity(world, {
+        x: spot.x,
+        y: spot.y,
+        name: def.name,
+        identity: def.id,
+        maxHp: def.baseHp,
+        faction: "enemy",
+        accuracyDerived: def.attack,
+        damagePowerDerived: def.attack,
+        evadeDerived: def.defense,
+        naturalDamageDice: def.damageDice,
+        sizeClass: def.sizeClass,
+        massKg: def.massKg,
+        resistances: def.resistances,
+        speed: def.speed,
+        creatureType: def.creatureType,
+      });
+      try { attach(world, child, trapId); } catch {}
+      spawned++;
+    }
+
+    world.emit?.("trap:swarm", {
+      trapId,
+      monsterId,
+      count: spawned,
+      at: { x: trapPos.x | 0, y: trapPos.y | 0 },
+    });
+  },
 });

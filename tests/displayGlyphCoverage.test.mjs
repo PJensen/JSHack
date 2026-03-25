@@ -11,6 +11,10 @@ Deno.test("palette includes shock trap and special weapon glyph keys", () => {
   const palette = buildPalette();
   for (const key of [
     "trap_shock",
+    "trap_pit",
+    "trap_siphon",
+    "trap_rust",
+    "trap_swarm",
     "dragon_whelp",
     "ember_knife",
     "flametongue",

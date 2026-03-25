@@ -24,7 +24,7 @@ import { buildCatalogItem } from '../../data/itemCatalogLoader.js';
 import { getCatalogItem, listCatalogItems } from '../../data/itemCatalog.js';
 import { pickMonster, pickSentinelMonster, pickItem, pickTrap, pickSpawner, pickSpecificMonster, pickSpecificSpawner, pickEncounterGroup } from './tables.js';
 import { Chest } from '../../archetypes/Chest.js';
-import { SpikeTrap, SnakeTrap, ShockTrap } from '../../archetypes/Traps.js';
+import { SpikeTrap, SnakeTrap, ShockTrap, PitTrap, SiphonTrap, RustTrap, SwarmTrap } from '../../archetypes/Traps.js';
 import { Spawner } from '../../archetypes/Spawner.js';
 import { Tombstone, generateEpitaph } from '../../archetypes/Tombstone.js';
 import {
@@ -1800,7 +1800,19 @@ export function materializeSpawn(world, spawn) {
     }
     case 'trap': {
       const p = spawn.params;
-      const arch = p.type === 'snake' ? SnakeTrap : p.type === 'shock' ? ShockTrap : SpikeTrap;
+      const arch = p.type === "snake"
+        ? SnakeTrap
+        : p.type === "shock"
+          ? ShockTrap
+          : p.type === "pit"
+            ? PitTrap
+            : p.type === "siphon"
+              ? SiphonTrap
+              : p.type === "rust"
+                ? RustTrap
+                : p.type === "swarm"
+                  ? SwarmTrap
+                  : SpikeTrap;
       return createFrom(world, arch, {
         x: spawn.x, y: spawn.y,
         trapParams: p.params || {},

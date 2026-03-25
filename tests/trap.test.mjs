@@ -5,7 +5,13 @@ import { Player } from '../src/rules/components/Player.js';
 import { Trap } from '../src/rules/components/Trap.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { BaseStats } from '../src/rules/components/BaseStats.js';
+import { Mana } from '../src/rules/components/Mana.js';
+import { Stamina } from '../src/rules/components/Stamina.js';
+import { Faction } from '../src/rules/components/Faction.js';
+import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { trapSystem } from '../src/rules/systems/trapSystem.js';
+import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 // Side-effect import: registers trap_spike script
 import '../src/rules/scripts/traps.js';
 
@@ -235,4 +241,166 @@ Deno.test("trap:avoided event emitted on avoidance", () => {
   assert(emitted.victimId === player, `victimId should be ${player}, got ${emitted.victimId}`);
   assert(emitted.trapId === trap, `trapId should be ${trap}, got ${emitted.trapId}`);
   assert(emitted.type === 'spike', `type should be spike, got ${emitted.type}`);
+});
+
+Deno.test("pit trap forces reposition and applies minor damage", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+    const world = new World({ seed: 3 });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 10, y: 10 });
+    world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+    const trap = world.create();
+    world.add(trap, Position, { x: 10, y: 10 });
+    world.add(trap, Trap, {
+      type: "pit",
+      armed: true,
+      revealed: false,
+      script: "trap_pit",
+      params: { dropDepth: 1, percent: 0.08 },
+      difficulty: 21,
+    });
+
+    trapSystem(world);
+
+    const pos = world.get(player, Position);
+    const vit = world.get(player, Vitality);
+    assert(!(pos.x === 10 && pos.y === 10), "pit trap should move target off the trigger tile");
+    assert(vit.hp <= 92, `pit trap should deal minor damage, hp=${vit.hp}`);
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("siphon trap drains hp and heals nearest hostile", () => {
+  const world = new World({ seed: 4 });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 5, y: 5 });
+  world.add(player, Vitality, { maxHp: 100, hp: 100 });
+  world.add(player, Faction, { key: "player" });
+
+  const enemy = world.create();
+  world.add(enemy, Position, { x: 6, y: 5 });
+  world.add(enemy, Vitality, { maxHp: 40, hp: 20 });
+  world.add(enemy, Faction, { key: "enemy" });
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 5, y: 5 });
+  world.add(trap, Trap, {
+    type: "siphon",
+    armed: true,
+    revealed: false,
+    script: "trap_siphon",
+    params: { resource: "hp", percent: 0.15, healNearestEnemy: true },
+    difficulty: 21,
+  });
+
+  trapSystem(world);
+
+  assert(world.get(player, Vitality).hp < 100, "siphon trap should drain target hp");
+  assert(world.get(enemy, Vitality).hp > 20, "siphon trap should transfer drained hp to nearby hostile");
+});
+
+Deno.test("siphon trap can drain mana and stamina pools", () => {
+  const world = new World({ seed: 5 });
+  const actor = world.create();
+  world.add(actor, Position, { x: 2, y: 2 });
+  world.add(actor, Vitality, { maxHp: 30, hp: 30 });
+  world.add(actor, Mana, { maxMana: 50, mana: 50, manaRegen: 0.1, regenCooldown: 0 });
+  world.add(actor, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 3, regenCooldown: 0 });
+
+  const manaTrap = world.create();
+  world.add(manaTrap, Position, { x: 2, y: 2 });
+  world.add(manaTrap, Trap, {
+    type: "siphon",
+    armed: true,
+    revealed: false,
+    script: "trap_siphon",
+    params: { resource: "mana", percent: 0.2, healNearestEnemy: false },
+    difficulty: 21,
+  });
+  trapSystem(world);
+  assert(world.get(actor, Mana).mana < 50, "mana siphon should reduce mana");
+
+  world.set(actor, Position, { x: 3, y: 3 });
+  const stamTrap = world.create();
+  world.add(stamTrap, Position, { x: 3, y: 3 });
+  world.add(stamTrap, Trap, {
+    type: "siphon",
+    armed: true,
+    revealed: false,
+    script: "trap_siphon",
+    params: { resource: "stamina", percent: 0.2, healNearestEnemy: false },
+    difficulty: 21,
+  });
+  trapSystem(world);
+  assert(world.get(actor, Stamina).stamina < 100, "stamina siphon should reduce stamina");
+});
+
+Deno.test("rust trap applies weakened anti-gear effect", () => {
+  const world = new World({ seed: 6 });
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 7, y: 7 });
+  world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 7, y: 7 });
+  world.add(trap, Trap, {
+    type: "rust",
+    armed: true,
+    revealed: false,
+    script: "trap_rust",
+    params: { stat: "armor", amount: 2, duration: 20 },
+    difficulty: 21,
+  });
+
+  trapSystem(world);
+  const ae = world.get(player, ActiveEffects);
+  const weakened = Array.isArray(ae?.effects)
+    ? ae.effects.find((e) => String(e?.key || "").toLowerCase() === "weakened")
+    : null;
+  assert(!!weakened, "rust trap should apply weakened effect");
+  assert((weakened.turnsLeft | 0) === 20, `expected weakened duration 20, got ${weakened?.turnsLeft}`);
+  assert((weakened.potency | 0) === 2, `expected weakened potency 2, got ${weakened?.potency}`);
+});
+
+Deno.test("swarm trap spawns multiple creatures around the trigger", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+    const world = new World({ seed: 7 });
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 12, y: 12 });
+    world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+    const trap = world.create();
+    world.add(trap, Position, { x: 12, y: 12 });
+    world.add(trap, Trap, {
+      type: "swarm",
+      armed: true,
+      revealed: false,
+      script: "trap_swarm",
+      params: { monsterId: "spider", count: 6 },
+      difficulty: 21,
+    });
+
+    trapSystem(world);
+    let spiders = 0;
+    for (const [id, pos, vit] of world.query(Position, Vitality)) {
+      if (id === player) continue;
+      if (!pos || !vit || (vit.hp | 0) <= 0) continue;
+      spiders++;
+    }
+    assert(spiders >= 3, `swarm trap should spawn several monsters, got ${spiders}`);
+  } finally {
+    clearAll();
+  }
 });
