@@ -134,6 +134,48 @@ Deno.test("inventory data provider does not emit learned spells as bag items", (
   assert(!bagItems.some((it) => String(it?.id || "").startsWith("spell:")), "learned spells should not appear in bagItems");
 });
 
+Deno.test("inventory data provider keeps bagItems unfiltered when slot-filtering inventory view", () => {
+  const world = new World({ seed: 12345 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+
+  const weapon = makeEquipItem(world, "sword_plain", "Plain Sword", "weapon");
+  const feet = makeEquipItem(world, "boots_leather", "Leather Boots", "feet");
+  addToInventory(world, player, weapon);
+  addToInventory(world, player, feet);
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any[]} */
+  const payloads = [];
+  const onInventoryData = (ev) => {
+    payloads.push(ev?.detail || null);
+  };
+  addEventListener("ui:inventoryData", onInventoryData);
+  dispatchEvent(new CustomEvent("ui:requestInventoryData", { detail: { slotFilter: "weapon" } }));
+  removeEventListener("ui:inventoryData", onInventoryData);
+
+  const payload = payloads.find((detail) => {
+    const bag = Array.isArray(detail?.bagItems) ? detail.bagItems : [];
+    return bag.some((it) => it?.identity === "sword_plain")
+      && bag.some((it) => it?.identity === "boots_leather");
+  }) || null;
+  assert(payload, "expected ui:inventoryData payload");
+  assertEquals(Array.isArray(payload.items) ? payload.items.length : 0, 1, "filtered inventory items should include only weapon-slot entries");
+  assertEquals(String(payload?.items?.[0]?.identity || ""), "sword_plain");
+  const bagItems = Array.isArray(payload.bagItems) ? payload.bagItems : [];
+  assertEquals(bagItems.length, 2, "bagItems should remain full inventory payload for quick-slot reconciliation");
+});
+
 Deno.test("character data dedupes effect/status aliases into one active effect row", () => {
   const world = new World({ seed: 99 });
   const player = world.create();
