@@ -169,3 +169,31 @@ Deno.test("drain_life: incoming damage interrupts channel", () => {
   assert(!ae?.effects?.some((e) => e.key === "drain_life_channel"), "drain_life effect should be removed on damage interrupt");
   assert(cancelled.some((e) => e.reason === "damage_interrupt"), "should emit damage_interrupt cancellation reason");
 });
+
+Deno.test("drain_life: non-applied tick breaks channel instead of idling", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 7006 });
+  world.setScheduler((w) => scheduler(w));
+
+  const caster = createDrainLifeCaster(world, 5, 5);
+  const target = createEnemy(world, 7, 5, 60);
+  world.add(target, ActiveEffects, {
+    effects: [{ key: "invulnerable", turnsLeft: 10, potency: 1, stacks: 1 }],
+  });
+
+  const breakEvents = [];
+  const cancelled = [];
+  world.on("spell:drain_life:break", (e) => breakEvents.push(e));
+  world.on("channeling:cancelled", (e) => cancelled.push(e));
+
+  world.add(caster, CastSpellIntent, { spellId: "drain_life", targetId: target, x: 7, y: 5 });
+  world.tick(1);
+  world.tick(1);
+  world.tick(1);
+
+  assert(!world.has(caster, Channeling), "channel should stop when ticks cannot apply damage");
+  const ae = world.get(caster, ActiveEffects);
+  assert(!ae?.effects?.some((e) => e.key === "drain_life_channel"), "channel effect should be removed after non-applied tick");
+  assert(breakEvents.some((e) => e.reason === "invulnerable"), "should emit break with non-applied reason");
+  assert(cancelled.some((e) => e.reason === "channel_broken"), "should emit channeling:cancelled for broken channel");
+});
