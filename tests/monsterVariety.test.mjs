@@ -177,6 +177,40 @@ Deno.test("pickEncounterGroup works for each tier", () => {
   }
 });
 
+function hasUtilityThreat(params) {
+  const def = getMonster(String(params?.identity || ""));
+  if (!def) return false;
+  if (Array.isArray(def.tags) && def.tags.includes("caster")) return true;
+  if (Array.isArray(def.learnedSpellIds) && def.learnedSpellIds.length > 0) return true;
+  if (Array.isArray(def?.hooks?.whileLOS) && def.hooks.whileLOS.length > 0) return true;
+  if (Array.isArray(def?.hooks?.onSeen) && def.hooks.onSeen.length > 0) return true;
+  const id = String(def.id || "");
+  return id === "phase_spider" || id === "wight" || id === "wraith" || id === "carrion_shade";
+}
+
+function hasPressureRole(params) {
+  const def = getMonster(String(params?.identity || ""));
+  if (!def) return false;
+  const hasRangedKit = !!def.equipment?.ranged || (Array.isArray(def.equipped) && def.equipped.some((e) => String(e?.slot || "") === "ranged"));
+  if (hasRangedKit) return true;
+  return Number(def.attack || 0) >= 3;
+}
+
+Deno.test("tier 1+ encounter groups include both utility/control and pressure roles", () => {
+  for (const depth of [6, 11, 16]) {
+    for (let seed = 1; seed <= 120; seed++) {
+      const rng = createRng((depth * 1000) + seed);
+      const group = pickEncounterGroup(rng, depth, 5);
+      assert(group, `expected group at depth ${depth}, seed ${seed}`);
+      const members = [];
+      if (group.leader) members.push(group.leader);
+      for (const follower of group.followers) members.push(follower);
+      assert(members.some(hasUtilityThreat), `expected utility/control role at depth ${depth}, seed ${seed}`);
+      assert(members.some(hasPressureRole), `expected pressure role at depth ${depth}, seed ${seed}`);
+    }
+  }
+});
+
 Deno.test("encounter group respects genocide", () => {
   clearGenocides();
   addGenocide('goblin');

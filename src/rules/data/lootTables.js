@@ -391,6 +391,20 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "drop:venomous": {
+    rolls: { min: 1, max: 2 },
+    entries: [
+      { type: "nothing",   weight: 48 },
+      { type: "gold",      weight: 24, count: { base: 4, perDepth: 3 } },
+      { type: "item",      weight: 18, itemId: "potion_resist_poison" },
+      { type: "item",      weight: 12, itemId: "potion_anti_venom" },
+      { type: "table",     weight: 16, tableId: "sub:potions" },
+      { type: "table",     weight: 8,  tableId: "sub:equip_early_proc" },
+      { type: "archetype", weight: 10, archetype: "HealthPotion" },
+      { type: "archetype", weight: 8,  archetype: "Ration" },
+    ],
+  },
+
   "drop:humanoid": {
     rolls: { min: 1, max: 2 },
     entries: [
@@ -418,11 +432,13 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 50 },
       { type: "gold",      weight: 35, count: { base: 6, perDepth: 4 } },
+      { type: "item",      weight: 12, itemId: "potion_holy_water" },
       { type: "table",     weight: 22, tableId: "sub:scrolls" },
       { type: "table",     weight: 16, tableId: "sub:potions" },
       { type: "table",     weight: 12, tableId: "sub:melee_weapons" },
       { type: "table",     weight: 8,  tableId: "sub:equip_common" },
       { type: "archetype", weight: 8,  archetype: "HealthPotion" },
+      { type: "item",      weight: 7,  itemId: "scroll_remove_curse" },
       { type: "item",      weight: 5,  itemId: "scroll_identify" },
       { type: "archetype", weight: 6,  archetype: "ArrowsStack" },
       { type: "archetype", weight: 4,  archetype: "FireArrowsStack" },
@@ -444,6 +460,11 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 20, tableId: "sub:wands" },
       { type: "table",     weight: 18, tableId: "sub:potions" },
       { type: "item",      weight: 15, itemId: "potion_mana" },
+      { type: "item",      weight: 8,  itemId: "potion_anti_venom" },
+      { type: "item",      weight: 7,  itemId: "potion_resist_poison" },
+      { type: "item",      weight: 7,  itemId: "potion_resist_electric" },
+      { type: "item",      weight: 7,  itemId: "potion_resist_fire" },
+      { type: "item",      weight: 8,  itemId: "scroll_remove_curse" },
       { type: "equip",     weight: 8,  pool: ["ring_arcana", "ring_health", "amulet_vigor", "ring_fire_resist", "ring_poison_resist"], affixChance: 0.25, affixCountMax: 1 },
       { type: "table",     weight: 4,  tableId: "sub:equip_magic" },
       { type: "table",     weight: 2,  tableId: "sub:equip_rare" },
@@ -462,6 +483,22 @@ export const LOOT_TABLES = {
       { type: "archetype", weight: 5,  archetype: "WildHerbs" },
       { type: "table",     weight: 3,  tableId: "sub:potions" },
       { type: "archetype", weight: 2,  archetype: "HealthPotion" },
+    ],
+  },
+
+  "drop:wight": {
+    rolls: { min: 1, max: 2 },
+    entries: [
+      { type: "nothing",   weight: 28 },
+      { type: "gold",      weight: 28, count: { base: 10, perDepth: 4 } },
+      { type: "item",      weight: 18, itemId: "potion_holy_water" },
+      { type: "item",      weight: 14, itemId: "scroll_remove_curse" },
+      { type: "item",      weight: 10, itemId: "potion_anti_venom" },
+      { type: "table",     weight: 16, tableId: "sub:potions" },
+      { type: "table",     weight: 14, tableId: "sub:scrolls" },
+      { type: "table",     weight: 12, tableId: "sub:equip_magic" },
+      { type: "archetype", weight: 8,  archetype: "HealthPotion" },
+      { type: "archetype", weight: 6,  archetype: "ArrowsStack" },
     ],
   },
 

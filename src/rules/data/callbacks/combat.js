@@ -167,6 +167,71 @@ export function drainOnHit(chancePct, seedSalt, divisor) {
   };
 }
 
+const DRAIN_WEAKEN_COOLDOWN_KEY = Symbol.for("jshack:combat:drainWeakenOnHit:cooldown");
+
+/**
+ * Roll -> drain attacker + apply weakened to defender, gated by per-attacker cooldown.
+ * Emits optional windup when 1 turn from ready and proc event on successful siphon.
+ * Intended for tactical cadence fights where players can play around proc windows.
+ * @param {{
+ *   chancePct?: number,
+ *   seedSalt?: number,
+ *   divisor?: number,
+ *   cooldownTurns?: number,
+ *   weakenedTurns?: number,
+ *   weakenedPotency?: number,
+ *   procEvent?: string,
+ *   windupEvent?: string,
+ * }} [opts]
+ */
+export function drainAndWeakenOnHit(opts = {}) {
+  const chancePct = Math.max(0, Math.min(100, Number(opts.chancePct) || 30));
+  const seedSalt = Number(opts.seedSalt) || 0xdead0410;
+  const divisor = Math.max(1, Number(opts.divisor) || 2);
+  const cooldownTurns = Math.max(0, Number(opts.cooldownTurns) || 3);
+  const weakenedTurns = Math.max(1, Number(opts.weakenedTurns) || 4);
+  const weakenedPotency = Math.max(1, Number(opts.weakenedPotency) || 1);
+  const procEvent = String(opts.procEvent || "proc:wight:siphon");
+  const windupEvent = String(opts.windupEvent || "proc:wight:windup");
+
+  return (ctx) => {
+    if (!ctx.world[DRAIN_WEAKEN_COOLDOWN_KEY]) ctx.world[DRAIN_WEAKEN_COOLDOWN_KEY] = new Map();
+    const cdMap = ctx.world[DRAIN_WEAKEN_COOLDOWN_KEY];
+    const attacker = ctx.attacker | 0;
+    const now = ctx.world.step | 0;
+    const last = Number(cdMap.get(attacker) ?? -1e9);
+    const elapsed = now - last;
+    if (cooldownTurns > 0 && elapsed < cooldownTurns) {
+      const remaining = cooldownTurns - elapsed;
+      if (remaining === 1 && windupEvent) {
+        ctx.emit(windupEvent, { actor: attacker, target: ctx.defender, remaining });
+      }
+      return;
+    }
+
+    if (!ctx.roll(chancePct, seedSalt)) return;
+
+    const amount = Math.max(1, Math.floor(ctx.damage / divisor));
+    ctx.healAttacker(amount);
+    ctx.pushEffect(ctx.defender, {
+      key: "weakened",
+      turnsLeft: weakenedTurns,
+      potency: weakenedPotency,
+      stacks: 1,
+    });
+    cdMap.set(attacker, now);
+    if (procEvent) {
+      ctx.emit(procEvent, {
+        actor: attacker,
+        target: ctx.defender,
+        amount,
+        weakenedTurns,
+        weakenedPotency,
+      });
+    }
+  };
+}
+
 /**
  * Roll → increase damage → emit event.
  * Used by orc (rage).
