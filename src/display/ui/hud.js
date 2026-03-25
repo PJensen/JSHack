@@ -55,6 +55,13 @@ export function getQuickChipPrimaryActionLabel(it) {
   return 'Use';
 }
 
+export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
+  chipPosition: 'relative',
+  contentPaddingRight: '34px',
+  top: '6px',
+  right: '8px',
+});
+
 export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
@@ -1686,7 +1693,7 @@ function renderQuickChip(it, h) {
   Object.assign(chip.style, {
     display: 'flex',
     flexDirection: 'column',
-    position: 'relative',
+    position: QUICK_CHIP_DISMISS_LAYOUT.chipPosition,
     alignItems: 'stretch',
     gap: '8px',
     padding: '6px 8px', borderRadius: '6px',
@@ -1697,7 +1704,7 @@ function renderQuickChip(it, h) {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '8px',
-    paddingRight: '34px',
+    paddingRight: QUICK_CHIP_DISMISS_LAYOUT.contentPaddingRight,
   });
   const detailPanel = document.createElement('div');
   Object.assign(detailPanel.style, {
@@ -1765,8 +1772,8 @@ function renderQuickChip(it, h) {
     cursor: 'pointer',
     minWidth: '28px',
     position: 'absolute',
-    top: '6px',
-    right: '8px',
+    top: QUICK_CHIP_DISMISS_LAYOUT.top,
+    right: QUICK_CHIP_DISMISS_LAYOUT.right,
   });
   x.textContent = '\u00D7';
   x.title = 'Dismiss';
