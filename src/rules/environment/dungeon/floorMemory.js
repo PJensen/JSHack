@@ -4,9 +4,10 @@
 //   legacyAffixDispatch → transition → index → populate → itemFactory
 
 import { degradeExplored } from './exploredMap.js';
+import { ExploredFloorRepository } from '../../repositories/ExploredFloorRepository.js';
 
-/** @type {Map<number, Map<string, Uint8Array>>} explored snapshots keyed by depth */
-export const _exploredCache = new Map();
+/** Shared explored snapshot repository keyed by dungeon depth. */
+export const exploredFloorRepository = new ExploredFloorRepository();
 
 /**
  * Degrade the player's memory of one randomly-chosen floor by clearing a
@@ -20,7 +21,7 @@ export function degradeFloorMemory(rngFn, opts = {}) {
   const fraction = Math.max(0, Math.min(1, opts.fraction ?? 0.3));
 
   // Candidates: every cached depth + 0 as sentinel for "current floor"
-  const candidates = [..._exploredCache.keys(), 0];
+  const candidates = [...exploredFloorRepository.listDepths(), 0];
   const pick = candidates[Math.floor(rngFn() * candidates.length)];
 
   if (pick === 0) {
@@ -30,7 +31,7 @@ export function degradeFloorMemory(rngFn, opts = {}) {
   }
 
   // Degrade a cached floor's snapshot in place
-  const snap = _exploredCache.get(pick);
+  const snap = exploredFloorRepository.getSnapshot(pick);
   if (snap) {
     for (const chunk of snap.values()) {
       for (let i = 0; i < chunk.length; i++) {

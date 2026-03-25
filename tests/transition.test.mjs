@@ -5,12 +5,14 @@ import { Player } from '../src/rules/components/Player.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
-import { transitionToDepth } from '../src/rules/environment/dungeon/transition.js';
+import { transitionToDepth, clearFloorCache } from '../src/rules/environment/dungeon/transition.js';
 import { initDungeon, generateFloor } from '../src/rules/environment/dungeon/index.js';
 import { loadedChunkCount, clearAll, getTile, isWalkable, forEachLoadedTile } from '../src/rules/environment/dungeon/tileMap.js';
 import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
 import { TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
 import { spawnPlasmaCloud } from "../src/rules/utils/spawnPlasmaCloud.js";
+import { markExplored, isExplored, clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
+import { exploredFloorRepository } from "../src/rules/environment/dungeon/floorMemory.js";
 
 function makePlayerAt(world, x, y) {
   const id = world.create();
@@ -123,6 +125,36 @@ Deno.test("transitionToDepth destroys tracked hazards from prior floor", () => {
     if (kind === "plasma" || identity === "plasma_cloud") plasmaHazards++;
   }
   assert(plasmaHazards === 0, "tracked cloud hazards should not survive transition");
+});
+
+Deno.test("transition caches and restores explored tiles through repository", () => {
+  clearAll();
+  clearExplored();
+  clearFloorCache();
+  const world = new World({ seed: 42 });
+  const spawn = initDungeon(world);
+  makePlayerAt(world, spawn.x, spawn.y);
+
+  markExplored(spawn.x, spawn.y);
+  assert(isExplored(spawn.x, spawn.y), "tile should start explored");
+
+  transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
+  assert(exploredFloorRepository.getSnapshot(1) instanceof Map, "depth 1 explored snapshot should be cached");
+  assert(!isExplored(spawn.x, spawn.y), "depth 2 starts with different explored state");
+
+  transitionToDepth(world, 1, { x: spawn.x, y: spawn.y });
+  assert(isExplored(spawn.x, spawn.y), "returning restores explored tiles from repository cache");
+});
+
+Deno.test("clearFloorCache clears explored repository snapshots", () => {
+  clearAll();
+  clearFloorCache();
+
+  exploredFloorRepository.setSnapshot(3, new Map([["0,0", new Uint8Array([1])]]));
+  assert(exploredFloorRepository.listDepths().length === 1, "precondition: one cached explored depth");
+
+  clearFloorCache();
+  assert(exploredFloorRepository.listDepths().length === 0, "clearFloorCache should clear explored repository");
 });
 
 Deno.test("inherited up stairs preserve exact world coordinates across dungeon scales", () => {
