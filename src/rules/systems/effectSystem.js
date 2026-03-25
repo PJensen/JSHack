@@ -255,6 +255,18 @@ function tickDrainLifeChannel(world, casterId, effect) {
         } catch {}
     }
 
+    if (!result?.applied) {
+        try {
+            world.emit?.('spell:drain_life:break', {
+                actor: casterId,
+                targetId,
+                spellId: effect?.spellId,
+                reason: String(result?.reason || 'no_damage'),
+            });
+        } catch {}
+        return 'remove';
+    }
+
     return 'keep';
 }
 
