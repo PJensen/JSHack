@@ -57,10 +57,59 @@ export function getQuickChipPrimaryActionLabel(it) {
 
 export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
   chipPosition: 'relative',
-  contentPaddingRight: '34px',
+  contentPaddingRight: '66px',
   top: '6px',
   right: '8px',
 });
+
+/**
+ * @param {Array<any>} pinned
+ * @param {any} item
+ * @param {number} capacity
+ * @returns {Array<any>}
+ */
+export function upsertPinnedQuickItemLifo(pinned, item, capacity = 3) {
+  const max = Math.max(1, Number(capacity || 3) | 0);
+  const source = Array.isArray(pinned) ? pinned : [];
+  const next = source.slice();
+  const id = Number(item?.id || 0) | 0;
+  if (!(id > 0)) return next;
+  const idx = next.findIndex((entry) => Number(entry?.id || 0) === id);
+  if (idx >= 0) next.splice(idx, 1);
+  if (next.length >= max) next.shift();
+  next.push({ ...item, id });
+  return next;
+}
+
+/**
+ * @param {Array<any>} pinned
+ * @param {Array<any>} inventoryItems
+ * @returns {Array<any>}
+ */
+export function reconcilePinnedQuickItemsWithInventory(pinned, inventoryItems) {
+  const source = Array.isArray(pinned) ? pinned : [];
+  const items = Array.isArray(inventoryItems) ? inventoryItems : [];
+  /** @type {Map<number, number>} */
+  const countsById = new Map();
+  for (const item of items) {
+    const count = Math.max(0, Number(item?.count || 0) | 0);
+    const rawIds = Array.isArray(item?.entityIds) ? item.entityIds : [item?.id];
+    for (const rawId of rawIds) {
+      const id = Number(rawId || 0) | 0;
+      if (!(id > 0)) continue;
+      countsById.set(id, count);
+    }
+  }
+  const out = [];
+  for (const entry of source) {
+    const id = Number(entry?.id || 0) | 0;
+    if (!(id > 0)) continue;
+    const count = Number(countsById.get(id) || 0) | 0;
+    if (!(count > 0)) continue;
+    out.push({ ...entry, count });
+  }
+  return out;
+}
 
 export function initHUD() {
   const root = ensureRoot();
@@ -530,6 +579,9 @@ export function initHUD() {
     vitals.style.height = gaugeSize;
     // Hide spell slots on mobile, show on desktop
     spellSlotsContainer.style.display = isMobile ? 'none' : 'flex';
+    bagBtn.style.display = isMobile ? 'none' : 'grid';
+    castBtn.style.display = isMobile ? 'none' : 'grid';
+    spellSelectBtn.style.display = isMobile ? 'none' : 'grid';
     // Show mobile radial on mobile, hide on desktop
     if (_mobileRadialEl) _mobileRadialEl.style.display = isMobile ? 'block' : 'none';
 
@@ -896,10 +948,15 @@ export function initHUD() {
   });
 
   // Right-aligned bar: compact core actions only.
-  const quick = createQuickSlot();
+  const pinSlots = createPinnedItemSlots();
+  const quick = createQuickSlot({
+    onPinItem: (item) => pinSlots.pinItem(item),
+  });
+  pinSlots.setPresenter((item) => quick.presentItem(item));
   bar.appendChild(charBtn);
   bar.appendChild(bagBtn);
   bar.appendChild(petBtn);
+  bar.appendChild(pinSlots.el);
   bar.appendChild(spellSlotsContainer);
   bar.appendChild(castBtn);
   bar.appendChild(spellSelectBtn);
@@ -1123,7 +1180,8 @@ function ensureRoot() {
 }
 
 // --- Singular Quick Slot (LIFO, most recent pickup first) -----------------
-function createQuickSlot() {
+function createQuickSlot(opts = {}) {
+  const onPinItem = typeof opts?.onPinItem === 'function' ? opts.onPinItem : null;
   const el = document.createElement('div');
   Object.assign(el.style, {
     position: 'fixed',
@@ -1140,6 +1198,24 @@ function createQuickSlot() {
   /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, addedAt:number}>} */
   const stack = [];
   const AUTO_DISMISS_MS = 12000;
+
+  function normalizeQuickItem(item) {
+    const id = Number(item?.id || 0) | 0;
+    return {
+      id,
+      identity: String(item?.identity || ''),
+      type: String(item?.type || ''),
+      slot: String(item?.slot || ''),
+      name: String(item?.name || 'item'),
+      count: Math.max(1, Number(item?.count || 1) | 0),
+      rarityName: String(item?.rarityName || 'common'),
+      glyph: String(item?.glyph || ''),
+      glyphColor: String(item?.glyphColor || ''),
+      hasScrollOfIdentify: !!item?.hasScrollOfIdentify,
+      details: item?.details || item,
+      addedAt: Date.now(),
+    };
+  }
 
   function actionable(it) {
     const t = String(it.type||'');
@@ -1169,6 +1245,7 @@ function createQuickSlot() {
       onUse: () => dispatchAction(it),
       onThrow: Number(it?.id || 0) > 0 ? () => dispatchThrow(it) : null,
       onDrop: Number(it?.id || 0) > 0 ? () => dispatchDrop(it) : null,
+      onPin: Number(it?.id || 0) > 0 && onPinItem ? () => dispatchPin(it) : null,
       onDismiss: () => dismissTop()
     });
     el.appendChild(chip);
@@ -1201,8 +1278,24 @@ function createQuickSlot() {
     dismissTop();
   }
 
+  function dispatchPin(it) {
+    if (!(Number(it?.id || 0) > 0) || !onPinItem) return;
+    onPinItem(it);
+    dismissTop();
+  }
+
   function dismissTop() {
     stack.pop();
+    renderStack();
+    resetDismissTimer();
+  }
+
+  function presentItem(item) {
+    const normalized = normalizeQuickItem(item);
+    if (!(normalized.id > 0)) return;
+    const idx = stack.findIndex((x) => x && x.id === normalized.id);
+    if (idx >= 0) stack.splice(idx, 1);
+    stack.push(normalized);
     renderStack();
     resetDismissTimer();
   }
@@ -1215,20 +1308,7 @@ function createQuickSlot() {
     if (!item) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
-    stack.push({
-      id: Number(item.id||0),
-      identity: String(item.identity || ''),
-      type: String(item.type||''),
-      slot: String(item.slot||''),
-      name: String(item.name||'item'),
-      count: Number(item.count||1),
-      rarityName: String(item.rarityName || 'common'),
-      glyph: String(item.glyph || ''),
-      glyphColor: String(item.glyphColor || ''),
-      hasScrollOfIdentify: !!item.hasScrollOfIdentify,
-      details: item,
-      addedAt: Date.now()
-    });
+    stack.push(normalizeQuickItem(item));
     const top = peekStackTop(stack);
     console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[top]:', top ? actionable(top) : 'empty');
     renderStack();
@@ -1267,26 +1347,176 @@ function createQuickSlot() {
     const idx = stack.findIndex((x) => x && x.id === id);
     if (idx >= 0) {
       stack.splice(idx, 1);
-      stack.push({
-        id,
-        identity: String(item.identity || ''),
-        type: String(item.type || ''),
-        slot: String(item.slot || ''),
-        name: String(item.name || 'item'),
-        count: Number(item.count || 1),
-        rarityName: String(item.rarityName || 'common'),
-        glyph: String(item.glyph || ''),
-        glyphColor: String(item.glyphColor || ''),
-        hasScrollOfIdentify: !!item.hasScrollOfIdentify,
-        details: item,
-        addedAt: Date.now(),
-      });
+      stack.push(normalizeQuickItem(item));
       renderStack();
       resetDismissTimer();
     }
   });
 
-  return { el };
+  return { el, presentItem };
+}
+
+function createPinnedItemSlots() {
+  const SLOT_COUNT = 3;
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    display: 'flex',
+    gap: '4px',
+    alignItems: 'center',
+  });
+
+  /** @type {Array<{id:number,identity?:string,type?:string,slot?:string,name:string,count:number,rarityName?:string,glyph?:string,glyphColor?:string,hasScrollOfIdentify?:boolean,details?:any}>} */
+  let pinned = [];
+  /** @type {((item:any) => void) | null} */
+  let presenter = null;
+  /** @type {HTMLButtonElement[]} */
+  const buttons = [];
+
+  function render() {
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const btn = buttons[i];
+      const item = pinned[i] || null;
+      btn.textContent = '';
+      if (!item) {
+        btn.title = `Quick item slot ${i + 1} (empty)`;
+        btn.setAttribute('aria-label', btn.title);
+        btn.style.opacity = '0.35';
+        btn.style.borderColor = '#2d3b52';
+        btn.style.background = '#101626';
+        btn.disabled = true;
+        const key = document.createElement('span');
+        key.textContent = String(i + 1);
+        Object.assign(key.style, {
+          fontSize: '11px',
+          opacity: '0.55',
+          fontFamily: 'monospace',
+          pointerEvents: 'none',
+        });
+        btn.appendChild(key);
+        continue;
+      }
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.borderColor = '#4c647f';
+      btn.style.background = '#101b2a';
+      btn.title = `${item.name || 'Item'} x${Math.max(1, Number(item.count || 1) | 0)}`;
+      btn.setAttribute('aria-label', btn.title);
+      const icon = document.createElement('span');
+      icon.textContent = item.glyph || '⬢';
+      Object.assign(icon.style, {
+        lineHeight: '1',
+        fontSize: '20px',
+        color: item.glyphColor || '#cfe8ff',
+        pointerEvents: 'none',
+      });
+      btn.appendChild(icon);
+      const countBadge = document.createElement('span');
+      countBadge.textContent = String(Math.max(1, Number(item.count || 1) | 0));
+      Object.assign(countBadge.style, {
+        position: 'absolute',
+        right: '3px',
+        bottom: '2px',
+        fontSize: '10px',
+        lineHeight: '1',
+        minWidth: '10px',
+        textAlign: 'right',
+        color: '#cfe8ff',
+        background: 'rgba(16,22,38,0.8)',
+        borderRadius: '3px',
+        padding: '1px 2px',
+        pointerEvents: 'none',
+      });
+      btn.appendChild(countBadge);
+    }
+  }
+
+  function pinItem(item) {
+    pinned = upsertPinnedQuickItemLifo(pinned, item, SLOT_COUNT);
+    render();
+  }
+
+  function removeById(itemId) {
+    const id = Number(itemId || 0) | 0;
+    if (!(id > 0)) return;
+    const before = pinned.length;
+    pinned = pinned.filter((entry) => Number(entry?.id || 0) !== id);
+    if (pinned.length !== before) render();
+  }
+
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const btn = document.createElement('button');
+    btn.dataset.quickItemSlot = String(i);
+    Object.assign(btn.style, {
+      position: 'relative',
+      minHeight: '44px',
+      minWidth: '44px',
+      width: '44px',
+      padding: '8px 4px',
+      borderRadius: '6px',
+      border: '1px solid #2d3b52',
+      background: '#101626',
+      color: '#cfe8ff',
+      cursor: 'pointer',
+      fontSize: '22px',
+      lineHeight: '1',
+      display: 'grid',
+      placeItems: 'center',
+      touchAction: 'manipulation',
+    });
+    btn.addEventListener('click', () => {
+      const item = pinned[i];
+      if (!item || !presenter) return;
+      presenter({ ...item });
+    });
+    buttons.push(btn);
+    el.appendChild(btn);
+  }
+
+  window.addEventListener('ui:itemUsed', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    removeById(e?.detail?.itemId);
+  });
+  window.addEventListener('ui:itemEquipped', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    removeById(e?.detail?.itemId);
+  });
+  window.addEventListener('ui:itemIdentified', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const item = e?.detail?.item;
+    const id = Number(item?.id || 0) | 0;
+    if (!(id > 0)) return;
+    const idx = pinned.findIndex((entry) => Number(entry?.id || 0) === id);
+    if (idx < 0) return;
+    pinned[idx] = {
+      ...pinned[idx],
+      ...item,
+      id,
+      count: Math.max(1, Number(item?.count || pinned[idx]?.count || 1) | 0),
+      details: item,
+    };
+    render();
+  });
+  window.addEventListener('ui:inventoryData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const bagItems = Array.isArray(e?.detail?.bagItems) ? e.detail.bagItems : [];
+    const next = reconcilePinnedQuickItemsWithInventory(pinned, bagItems);
+    if (next.length === pinned.length && next.every((entry, idx) => Number(entry?.id || 0) === Number(pinned[idx]?.id || 0) && Number(entry?.count || 0) === Number(pinned[idx]?.count || 0))) return;
+    pinned = next;
+    render();
+  });
+
+  render();
+  return {
+    el,
+    pinItem,
+    setPresenter(fn) {
+      presenter = typeof fn === 'function' ? fn : null;
+    },
+  };
 }
 
 // --- Channeling Overlay (progress bar + cancel button) ---------------------
@@ -1687,7 +1917,7 @@ function createMobileSpellRadial(mobileLayoutMq) {
   return { el };
 }
 
-/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null,onDrop?:Function|null}} h */
+/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null,onDrop?:Function|null,onPin?:Function|null}} h */
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
@@ -1778,6 +2008,23 @@ function renderQuickChip(it, h) {
   x.textContent = '\u00D7';
   x.title = 'Dismiss';
   x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+  let pinBtn = null;
+  if (typeof h.onPin === 'function') {
+    pinBtn = document.createElement('button');
+    Object.assign(pinBtn.style, {
+      padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      minWidth: '28px',
+      position: 'absolute',
+      top: QUICK_CHIP_DISMISS_LAYOUT.top,
+      right: '38px',
+    });
+    pinBtn.textContent = '\uD83D\uDCCC';
+    pinBtn.title = 'Pin to quick slot';
+    pinBtn.addEventListener('click', () => h.onPin && h.onPin());
+  }
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
@@ -1790,6 +2037,7 @@ function renderQuickChip(it, h) {
   if (dropBtn) actions.appendChild(dropBtn);
 
   chip.appendChild(x);
+  if (pinBtn) chip.appendChild(pinBtn);
   chip.appendChild(content);
   chip.appendChild(actions);
   return chip;
