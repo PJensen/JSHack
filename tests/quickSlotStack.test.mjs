@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert";
-import { peekStackTop, popUntilActionableTop, getQuickChipPrimaryAction, getQuickChipPrimaryActionLabel } from "../src/display/ui/hud.js";
+import { canQuickChipIdentify, peekStackTop, popUntilActionableTop, getQuickChipPrimaryAction, getQuickChipPrimaryActionLabel } from "../src/display/ui/hud.js";
 
 Deno.test("quick-slot stack peeks newest pickup first", () => {
   const stack = [];
@@ -30,7 +30,7 @@ Deno.test("quick-slot stack pops non-actionable top before peek", () => {
   assertEquals(peekStackTop(stack)?.id, 20);
 });
 
-Deno.test("quick-chip primary action identifies unidentified pickup when player has identify scroll", () => {
+Deno.test("quick-chip unidentified pickup remains usable", () => {
   const item = {
     id: 30,
     type: "scroll",
@@ -38,8 +38,9 @@ Deno.test("quick-chip primary action identifies unidentified pickup when player 
     hasScrollOfIdentify: true,
     details: { identified: false },
   };
-  assertEquals(getQuickChipPrimaryAction(item), "identify");
-  assertEquals(getQuickChipPrimaryActionLabel(item), "Identify");
+  assertEquals(getQuickChipPrimaryAction(item), "use");
+  assertEquals(getQuickChipPrimaryActionLabel(item), "Use");
+  assertEquals(canQuickChipIdentify(item), true);
 });
 
 Deno.test("quick-chip primary action uses apply for scroll of identify", () => {
