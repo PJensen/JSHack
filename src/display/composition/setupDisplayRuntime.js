@@ -51,7 +51,7 @@ export function setupDisplayRuntime({
     /** @type any */ (window).float_text = (x, y, text, opts) => ftext.add(x, y, text, opts || {});
   } catch (e) { console.debug("[setupDisplayRuntime] float_text global setup failed:", e); }
 
-  const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, ftext });
+  const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, getPosition, ftext });
   spellAreaFx.installListeners();
 
   const cloudFx = createCloudFxController({ world, cam, fx, getFxTime, getPosition });

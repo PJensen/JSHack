@@ -7,9 +7,9 @@ import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx } from "./fxEntries.js";
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, ftext?: { addDamage: Function, addStatus?: Function } }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function } }} deps
  */
-export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, ftext }) {
+export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, getPosition, ftext }) {
   // --- Blink state ---
   /** @type {BlinkFx[]} */
   const _blinkFx = [];
@@ -66,6 +66,21 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
   // --- Search pulse state ---
   /** @type {SearchPulseFx[]} */
   const _searchPulseFx = [];
+  /** @type {Map<number, {
+   *   actor:number,
+   *   targetId:number,
+   *   expiresStep:number,
+   *   lastTickStep:number,
+   *   phase:number,
+   *   tickFlash:number,
+   *   endFlash:number,
+   *   moteClock:number,
+   *   breakReason:string,
+   *   fading:boolean,
+   *   fadeLeft:number,
+   *   fadeMax:number,
+   * }>} */
+  const _drainLifeChannels = new Map();
 
   const STORM_VOLLEY_SWAY_MAX_RAD = Math.PI / 36; // +/- 5deg
   const STORM_LOCAL_SWAY_MAX_RAD = Math.PI / 60; // +/- 3deg
@@ -147,6 +162,55 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
     for (let i = _searchPulseFx.length - 1; i >= 0; i--) {
       _searchPulseFx[i].tick(dt);
       if (_searchPulseFx[i].expired) _searchPulseFx.splice(i, 1);
+    }
+    for (const [actorId, channel] of _drainLifeChannels) {
+      channel.tickFlash = Math.max(0, Number(channel.tickFlash || 0) - dt);
+      channel.endFlash = Math.max(0, Number(channel.endFlash || 0) - dt);
+      channel.moteClock = Math.max(0, Number(channel.moteClock || 0) - dt);
+
+      const actorPos = typeof getPosition === "function" ? getPosition(actorId) : null;
+      const targetPos = typeof getPosition === "function" ? getPosition(channel.targetId) : null;
+      if (!actorPos || !targetPos) {
+        _drainLifeChannels.delete(actorId);
+        continue;
+      }
+
+      if (channel.fading) {
+        channel.fadeLeft = Math.max(0, Number(channel.fadeLeft || 0) - dt);
+        if (channel.fadeLeft <= 0) {
+          _drainLifeChannels.delete(actorId);
+        }
+        continue;
+      }
+
+      if (world.step > Number(channel.expiresStep || 0)) {
+        channel.fading = true;
+        channel.fadeMax = 0.22;
+        channel.fadeLeft = channel.fadeMax;
+      }
+
+      if (!fx?.pool || channel.moteClock > 0) continue;
+      channel.moteClock = 0.04 + Math.random() * 0.07;
+      const tx = Number(targetPos.x) - Number(actorPos.x);
+      const ty = Number(targetPos.y) - Number(actorPos.y);
+      const t = 0.15 + Math.random() * 0.7;
+      const px = Number(actorPos.x) + tx * t + (Math.random() - 0.5) * 0.10;
+      const py = Number(actorPos.y) + ty * t + (Math.random() - 0.5) * 0.10;
+      const towardCaster = -1;
+      fx.pool.spawn(new Particle({
+        x: px,
+        y: py,
+        vx: (tx || 0.001) * towardCaster * (0.25 + Math.random() * 0.25),
+        vy: (ty || 0.001) * towardCaster * (0.25 + Math.random() * 0.25),
+        ay: -0.03,
+        life: 0.12 + Math.random() * 0.14,
+        size0: 0.045 + Math.random() * 0.03,
+        size1: 0.01,
+        r: 190 + ((Math.random() * 35) | 0),
+        g: 40 + ((Math.random() * 25) | 0),
+        b: 70 + ((Math.random() * 35) | 0),
+        a0: 0.72,
+      }));
     }
   }
 
@@ -530,6 +594,74 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       ctx.strokeStyle = `rgba(230,245,255,${ringA.toFixed(3)})`;
       ctx.lineWidth = Math.max(0.02, 0.035 * (1 - t * 0.7)); // starts thin, narrows as it expands
       ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawDrainLife(ctx) {
+    if (!_drainLifeChannels.size || typeof getPosition !== "function") return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const now = getFxTime();
+    const TAU = Math.PI * 2;
+    for (const [actorId, channel] of _drainLifeChannels) {
+      const from = getPosition(actorId);
+      const to = getPosition(channel.targetId);
+      if (!from || !to) continue;
+      const dx = Number(to.x) - Number(from.x);
+      const dy = Number(to.y) - Number(from.y);
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 0.05) continue;
+
+      const baseAlpha = channel.fading
+        ? 0.65 * (Number(channel.fadeLeft || 0) / Math.max(0.001, Number(channel.fadeMax || 1)))
+        : 0.75;
+      const pulse = 0.55 + 0.45 * Math.sin(now * 16 + Number(channel.phase || 0));
+      const segments = Math.max(6, Math.min(20, Math.round(dist * 2.2)));
+      const amp = 0.015 + pulse * 0.05;
+      const arcA = jitterLine(from, to, segments, amp);
+      const arcB = jitterLine(from, to, segments + 2, amp * 0.6);
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.strokeStyle = `rgba(105,20,35,${(0.32 * baseAlpha).toFixed(3)})`;
+      ctx.lineWidth = 0.28;
+      pathPolyline(ctx, arcA);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(210,45,65,${(0.48 * baseAlpha + 0.20 * pulse).toFixed(3)})`;
+      ctx.lineWidth = 0.12;
+      pathPolyline(ctx, arcB);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(255,170,190,${(0.35 * baseAlpha + 0.20 * pulse).toFixed(3)})`;
+      ctx.lineWidth = 0.05;
+      pathPolyline(ctx, jitterLine(from, to, segments + 4, amp * 0.35));
+      ctx.stroke();
+
+      if (channel.tickFlash > 0) {
+        const tf = Math.min(1, Number(channel.tickFlash) / 0.10);
+        ctx.fillStyle = `rgba(255,90,120,${(0.30 * tf).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(Number(to.x), Number(to.y), 0.20 + tf * 0.22, 0, TAU);
+        ctx.fill();
+      }
+
+      if (channel.endFlash > 0) {
+        const ef = Math.min(1, Number(channel.endFlash) / 0.24);
+        ctx.fillStyle = `rgba(190,40,70,${(0.28 * ef).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(Number(to.x), Number(to.y), 0.30 + ef * 0.36, 0, TAU);
+        ctx.fill();
+      }
+
+      const casterGlow = 0.14 + pulse * 0.10;
+      ctx.fillStyle = `rgba(220,70,100,${(0.16 * baseAlpha + 0.10 * pulse).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(Number(from.x), Number(from.y), casterGlow, 0, TAU);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -1080,7 +1212,52 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, f
       const r = Math.max(1, Number(radius || 6));
       _searchPulseFx.push(new SearchPulseFx({ x: at.x, y: at.y, radius: r, ttl: 0.38 }));
     });
+
+    world.on("spell:drain_life:start", ({ actor, targetId, turnsLeft }) => {
+      const a = Number(actor || 0) | 0;
+      const t = Number(targetId || 0) | 0;
+      if (!(a > 0) || !(t > 0)) return;
+      const rawTurns = Number(turnsLeft);
+      const finiteTurns = Number.isFinite(rawTurns) && rawTurns > 0;
+      _drainLifeChannels.set(a, {
+        actor: a,
+        targetId: t,
+        expiresStep: finiteTurns ? (world.step + (rawTurns | 0) + 1) : Number.POSITIVE_INFINITY,
+        lastTickStep: world.step,
+        phase: Math.random() * Math.PI * 2,
+        tickFlash: 0.08,
+        endFlash: 0,
+        moteClock: 0,
+        breakReason: "",
+        fading: false,
+        fadeLeft: 0,
+        fadeMax: 0,
+      });
+    });
+
+    world.on("spell:drain_life:tick", ({ actor, targetId }) => {
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _drainLifeChannels.get(a);
+      if (!current) return;
+      current.targetId = Number(targetId || current.targetId) | 0;
+      current.lastTickStep = world.step;
+      current.tickFlash = Math.max(0.10, Number(current.tickFlash || 0));
+      current.expiresStep = Math.max(current.expiresStep, world.step + 2);
+    });
+
+    world.on("spell:drain_life:break", ({ actor, reason }) => {
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _drainLifeChannels.get(a);
+      if (!current) return;
+      current.breakReason = String(reason || "");
+      current.fading = true;
+      current.fadeMax = 0.24;
+      current.fadeLeft = current.fadeMax;
+      current.endFlash = 0.24;
+    });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, installListeners };
 }

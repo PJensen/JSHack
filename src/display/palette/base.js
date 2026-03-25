@@ -149,6 +149,7 @@ export const basePalette = {
   book_summon_skeleton: { glyph: "?", fg: "#c8c8ff", glow: "#8888cc" },
   book_shadow_bolt:     { glyph: "?", fg: "#cc66ff", glow: "#8833cc" },
   book_agony:           { glyph: "?", fg: "#aa33cc", glow: "#660088" },
+  book_drain_life:      { glyph: "?", fg: "#e05a76", glow: "#8b2538" },
   book_rampage:         { glyph: "?", fg: "#ff4444", glow: "#cc2222" },
   book_phase_strike:    { glyph: "?", fg: "#66ccff", glow: "#2299cc" },
   book_scorch:          { glyph: "?", fg: "#ff7700", glow: "#cc4400" },
