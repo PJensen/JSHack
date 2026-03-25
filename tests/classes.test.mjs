@@ -96,13 +96,15 @@ Deno.test("warlock maps to molkhar", () => {
   assertEquals(getClass('warlock').deityId, 'molkhar');
 });
 
-Deno.test("warlock starts with summon_skeleton and shadow_bolt", () => {
+Deno.test("warlock starts with summon_skeleton, shadow_bolt, and drain_life", () => {
   const warlock = getClass('warlock');
   assert(Array.isArray(warlock.startingSpells), 'warlock should have startingSpells array');
   assert(warlock.startingSpells.includes('summon_skeleton'), 'warlock should start with summon_skeleton');
   assert(warlock.startingSpells.includes('shadow_bolt'), 'warlock should start with shadow_bolt');
+  assert(warlock.startingSpells.includes('drain_life'), 'warlock should start with drain_life');
   assert(getSpell("summon_skeleton"), "summon_skeleton spell definition should exist");
   assert(getSpell("shadow_bolt"), "shadow_bolt spell definition should exist");
+  assert(getSpell("drain_life"), "drain_life spell definition should exist");
 });
 
 Deno.test("outlaw starts with shadow_veil in addition to existing class spells", () => {

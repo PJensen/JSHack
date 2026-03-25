@@ -3,15 +3,20 @@
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { Status } from '../components/Status.js';
 import { Vitality } from '../components/Vitality.js';
+import { Position } from '../components/Position.js';
 import { Stamina } from '../components/Stamina.js';
 import { Mana } from '../components/Mana.js';
 import { Brain } from '../components/Brain.js';
+import { Channeling } from '../components/Channeling.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
 import { getPassiveBonuses, effectiveMaxHp } from '../utils/passiveBonuses.js';
 import { buildSpellDamageSpecFromContext } from '../utils/spellDamage.js';
 import { computeEnvelopeValue } from '../utils/blind.js';
+import { chebyshev } from '../utils/distance.js';
+import { hasSpellLineOfSight } from '../utils/spellTargeting.js';
+import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -130,6 +135,157 @@ function applySpellEffectDamage(world, id, effect) {
 }
 
 /**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {(x:number, y:number) => boolean}
+ */
+function createLOSBlocker(world) {
+    return blockedCallback(buildBlocksVisionMap(world));
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} casterId
+ * @param {any} effect
+ * @returns {"keep"|"remove"}
+ */
+function tickDrainLifeChannel(world, casterId, effect) {
+    const ch = world.has(casterId, Channeling) ? world.get(casterId, Channeling) : null;
+    if (!ch || String(ch.spellId || '') !== String(effect?.spellId || 'drain_life')) return 'remove';
+
+    const casterPos = /** @type any */ (world.get(casterId, Position));
+    const casterVit = /** @type any */ (world.get(casterId, Vitality));
+    if (!casterPos || !casterVit || (casterVit.hp | 0) <= 0) return 'remove';
+
+    const channel = effect?.meta?.channel || {};
+    const targetId = Number(channel.targetId) | 0;
+    const targetPos = /** @type any */ (world.get(targetId, Position));
+    const targetVit = /** @type any */ (world.get(targetId, Vitality));
+    if (!targetId || !targetPos || !targetVit || (targetVit.hp | 0) <= 0) return 'remove';
+
+    const range = Math.max(1, Number(channel.range || 6) | 0);
+    const isBlocked = createLOSBlocker(world);
+
+    if (channel.breakOnMove) {
+        const anchorX = Number(channel.anchorX) | 0;
+        const anchorY = Number(channel.anchorY) | 0;
+        if ((casterPos.x | 0) !== anchorX || (casterPos.y | 0) !== anchorY) {
+            try {
+                world.emit?.('spell:drain_life:break', {
+                    actor: casterId,
+                    targetId,
+                    spellId: effect?.spellId,
+                    reason: 'caster_moved',
+                });
+            } catch {}
+            return 'remove';
+        }
+    }
+
+    if (channel.breakOnOutOfRange && chebyshev(casterPos, targetPos) > range) {
+        try {
+            world.emit?.('spell:drain_life:break', {
+                actor: casterId,
+                targetId,
+                spellId: effect?.spellId,
+                reason: 'out_of_range',
+            });
+        } catch {}
+        return 'remove';
+    }
+
+    if (channel.breakOnNoLos && !hasSpellLineOfSight(world, {
+        sourceId: casterId,
+        targetId,
+        sourcePos: casterPos,
+        targetPos,
+        range,
+        isBlocked,
+    })) {
+        try {
+            world.emit?.('spell:drain_life:break', {
+                actor: casterId,
+                targetId,
+                spellId: effect?.spellId,
+                reason: 'blocked_los',
+            });
+        } catch {}
+        return 'remove';
+    }
+
+    const spellDamage = (effect?.meta && typeof effect.meta === 'object') ? effect.meta.spellDamage : null;
+    const potency = Math.max(1, Number(effect?.potency || 1) | 0);
+    const result = spellDamage
+        ? dealDamage(world, buildSpellDamageSpecFromContext(world, targetId, {
+            ...spellDamage,
+            sourceId: Number(spellDamage?.sourceId ?? casterId) | 0,
+            spellId: String(spellDamage?.spellId || effect?.spellId || 'drain_life'),
+            cause: 'spell:drain_life:tick',
+            type: 'shadow',
+        }, {
+            baseAmount: potency,
+            salt: ((world.step | 0) ^ (casterId * 131) ^ (targetId * 977)) >>> 0,
+        }))
+        : dealDamage(world, {
+            target: targetId,
+            source: casterId,
+            amount: potency,
+            type: 'shadow',
+            cause: 'spell:drain_life:tick',
+        });
+
+    if (result?.applied) {
+        const healFraction = Math.max(0, Number(channel.healFraction || 0.75));
+        const drained = Math.max(1, Number(result.amount || potency) | 0);
+        const healAmount = Math.max(1, Math.floor(drained * healFraction));
+        const maxHp = effectiveMaxHp(world, casterId, casterVit);
+        const before = casterVit.hp | 0;
+        casterVit.hp = Math.min(maxHp, (casterVit.hp | 0) + healAmount);
+        const appliedHeal = Math.max(0, (casterVit.hp | 0) - before);
+
+        try {
+            world.emit?.('spell:drain_life:tick', {
+                actor: casterId,
+                targetId,
+                spellId: effect?.spellId,
+                amount: drained,
+                heal: appliedHeal,
+                from: { x: casterPos.x | 0, y: casterPos.y | 0 },
+                to: { x: targetPos.x | 0, y: targetPos.y | 0 },
+            });
+        } catch {}
+    }
+
+    return 'keep';
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} casterId
+ * @param {any} effect
+ * @param {string} [reason]
+ */
+function stopDrainLifeChannel(world, casterId, effect, reason = 'ended') {
+    if (!world.has(casterId, Channeling)) return;
+    const ch = world.get(casterId, Channeling);
+    if (String(ch?.spellId || '') !== String(effect?.spellId || 'drain_life')) return;
+    try { world.remove(casterId, Channeling); } catch {}
+    try {
+        if (reason === 'duration_complete') {
+            world.emit?.('channeling:complete', {
+                actor: casterId,
+                spellId: String(effect?.spellId || 'drain_life'),
+            });
+        } else {
+            world.emit?.('channeling:cancelled', {
+                actor: casterId,
+                spellId: String(effect?.spellId || 'drain_life'),
+                reason,
+            });
+        }
+    } catch {}
+}
+
+/**
  * effectSystem — per-tick effect resolver.
  * - Iterates entities with ActiveEffects
  * - Applies on-tick impacts (e.g., poison damage, regeneration)
@@ -174,6 +330,18 @@ export function effectSystem(world) {
             if (e.key === 'stat_envelope') {
                 if (!Number.isInteger(e.turnsLeft) || e.turnsLeft < 0) e.turnsLeft = 0;
                 processStatEnvelopeEffect(world, id, e, nextStatuses);
+                e.turnsLeft -= 1;
+                continue;
+            }
+
+            if (String(e.key || '').toLowerCase() === 'drain_life_channel') {
+                if (!Number.isInteger(e.turnsLeft) || e.turnsLeft < 0) e.turnsLeft = 0;
+                const mode = tickDrainLifeChannel(world, id, e);
+                if (mode === 'remove') {
+                    stopDrainLifeChannel(world, id, e, 'channel_broken');
+                    e.turnsLeft = 0;
+                    continue;
+                }
                 e.turnsLeft -= 1;
                 continue;
             }

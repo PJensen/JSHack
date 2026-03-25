@@ -40,6 +40,7 @@ import { blind, getEffectiveVisionRange } from "../utils/blind.js";
 import { Player } from "../components/Player.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import { Channeling } from "../components/Channeling.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -1472,6 +1473,164 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
       potency: basePotency, duration: baseDuration,
     });
   } catch (e) { console.debug('[spells] emit spell:agony failed:', e); }
+};
+
+// Drain Life — latch onto one hostile target and siphon each turn until broken.
+// This applies a timed channel effect to the caster; per-turn siphon happens in
+// effectSystem when the channel effect ticks.
+REGISTRY['drain_life'] = function drainLifeScript(world, actor, spell, intent) {
+  const isChannelTick = !!intent?._channelTick;
+  const apos = /** @type any */ (world.get(actor, Position));
+  const actorVit = /** @type any */ (world.get(actor, Vitality));
+  if (!apos || !actorVit || (actorVit.hp | 0) <= 0) return;
+
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const isBlocked = createLOSBlocker(world);
+
+  const RANGE = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 6);
+  const DURATION = Math.max(1, Number.isFinite(spell?.duration) ? (Number(spell.duration) | 0) : 4);
+  const BASE_TICK = Math.max(1, Number.isFinite(spell?.baseTickDamage) ? (Number(spell.baseTickDamage) | 0) : 2);
+  const HEAL_FRACTION = Math.max(
+    0,
+    Number.isFinite(spell?.healFraction) ? Number(spell.healFraction) : 0.75,
+  );
+
+  /**
+   * @param {number} id
+   * @param {{x:number,y:number}|null} pos
+   * @returns {boolean}
+   */
+  const isValidTarget = (id, pos) => {
+    if (!id || id === actor || !pos) return false;
+
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) return false;
+
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) return false;
+
+    if (chebyshev(apos, pos) > RANGE) return false;
+
+    if (!hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: id,
+      sourcePos: apos,
+      targetPos: pos,
+      range: RANGE,
+      isBlocked,
+    })) {
+      return false;
+    }
+
+    if (actorFaction === 'player' && !isTileVisible(pos.x | 0, pos.y | 0)) return false;
+    return true;
+  };
+
+  let targetId = Number(intent?.targetId) | 0;
+  let targetPos = targetId > 0 ? /** @type any */ (world.get(targetId, Position)) : null;
+
+  // If no explicit target, fall back to nearest valid hostile in LOS/range.
+  if (!isChannelTick && !isValidTarget(targetId, targetPos)) {
+    targetId = 0;
+    targetPos = null;
+    /** @type {Array<{ id:number, pos:{x:number,y:number}, dist:number }>} */
+    const candidates = [];
+    for (const [id, pos] of world.query(Position)) {
+      if (!isValidTarget(id, pos)) continue;
+      candidates.push({ id, pos, dist: chebyshev(apos, pos) });
+    }
+    candidates.sort((a, b) => a.dist - b.dist);
+    if (candidates.length > 0) {
+      targetId = candidates[0].id;
+      targetPos = candidates[0].pos;
+    }
+  }
+
+  if (!isValidTarget(targetId, targetPos)) {
+    try {
+      world.emit?.('spell:drain_life:failed', {
+        actor,
+        spellId: spell?.id,
+        reason: isChannelTick ? 'channel_lost_target' : 'no_valid_target',
+        range: RANGE,
+      });
+    } catch (e) { console.debug('[spells] emit spell:drain_life:failed failed:', e); }
+    if (isChannelTick && world.has(actor, Channeling)) {
+      try { world.remove(actor, Channeling); } catch {}
+      try { world.emit?.('channeling:cancelled', { actor, spellId: spell?.id || 'drain_life', reason: 'invalid_target' }); } catch {}
+    }
+    return;
+  }
+
+  let ae = /** @type any */ (world.get(actor, ActiveEffects));
+  if (!ae) {
+    try { world.add(actor, ActiveEffects, { effects: [] }); } catch {}
+    ae = /** @type any */ (world.get(actor, ActiveEffects));
+  }
+  if (!ae || !Array.isArray(ae.effects)) return;
+
+  const effect = createSpellDotEffect(world, actor, spell, {
+    key: 'drain_life_channel',
+    turnsLeft: DURATION,
+    potency: Math.max(1, scaleSpellDamage(world, actor, BASE_TICK)),
+    stacks: 1,
+    cause: 'spell:drain_life:tick',
+    type: 'shadow',
+  });
+
+  effect.meta = effect.meta || {};
+  effect.meta.channel = {
+    targetId,
+    range: RANGE,
+    healFraction: HEAL_FRACTION,
+    breakOnMove: Boolean(spell?.breakOnMove ?? true),
+    breakOnNoLos: true,
+    breakOnOutOfRange: true,
+    anchorX: apos.x | 0,
+    anchorY: apos.y | 0,
+  };
+
+  const prev = ae.effects.find((entry) => String(entry?.key || '').toLowerCase() === 'drain_life_channel') || null;
+  if (isChannelTick && prev) {
+    prev.turnsLeft = Math.max(1, DURATION);
+    prev.potency = effect.potency;
+    prev.spellId = effect.spellId;
+    prev.sourceId = effect.sourceId;
+    prev.meta = prev.meta || {};
+    prev.meta.spellDamage = effect.meta?.spellDamage;
+    prev.meta.channel = {
+      ...(prev.meta?.channel || {}),
+      ...(effect.meta?.channel || {}),
+      anchorX: Number(prev.meta?.channel?.anchorX ?? effect.meta?.channel?.anchorX ?? apos.x) | 0,
+      anchorY: Number(prev.meta?.channel?.anchorY ?? effect.meta?.channel?.anchorY ?? apos.y) | 0,
+    };
+    return;
+  }
+
+  const channel = upsertTimedEffect(ae.effects, effect);
+  if (channel) {
+    const prevChannel = prev?.meta?.channel;
+    channel.stacks = 1;
+    channel.potency = effect.potency;
+    channel.meta = effect.meta;
+    channel.sourceId = effect.sourceId;
+    channel.spellId = effect.spellId;
+    if (prevChannel && channel.meta?.channel) {
+      channel.meta.channel.anchorX = Number(prevChannel.anchorX) | 0;
+      channel.meta.channel.anchorY = Number(prevChannel.anchorY) | 0;
+    }
+  }
+
+  try {
+    world.emit?.('spell:drain_life:start', {
+      actor,
+      targetId,
+      spellId: spell?.id,
+      from: { x: apos.x | 0, y: apos.y | 0 },
+      to: { x: targetPos.x | 0, y: targetPos.y | 0 },
+      turnsLeft: null,
+    });
+  } catch (e) { console.debug('[spells] emit spell:drain_life:start failed:', e); }
 };
 
 // Scorch — low fire damage, high crit, applies 15-turn fire vulnerability.
