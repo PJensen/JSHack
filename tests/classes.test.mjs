@@ -122,7 +122,9 @@ Deno.test("druid starts with harmony_ward in addition to existing class spells",
   assert(druid.startingSpells.includes('frost'), 'druid should retain frost');
   assert(druid.startingSpells.includes('blizzard'), 'druid should retain blizzard');
   assert(druid.startingSpells.includes('harmony_ward'), 'druid should start with harmony_ward');
+  assert(druid.startingSpells.includes('firestorm'), 'druid should start with firestorm');
   assert(getSpell('harmony_ward'), 'harmony_ward spell definition should exist');
+  assert(getSpell('firestorm'), 'firestorm spell definition should exist');
 });
 
 Deno.test("warlock starts with arcane handwraps for spell hit", () => {
