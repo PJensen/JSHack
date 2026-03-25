@@ -1,7 +1,7 @@
 // rules/environment/dungeon/tables.js
 // Loot tables and monster pools for depth-scaled entity placement.
 
-import { getMonster, getMonstersByTier, isGenocided } from '../../data/monsters.js';
+import { getMonster, getMonstersByTier, isGenocided, resolveMonsterMaxHp } from '../../data/monsters.js';
 import { resolveLootTable } from '../../data/lootResolver.js';
 import { creatureTypeFromTags } from '../../components/CreatureType.js';
 
@@ -14,7 +14,7 @@ function toMonsterSpawnParams(def, depth) {
   return {
     name: def.name,
     identity: def.id,
-    maxHp: Math.floor(def.baseHp + depth * def.hpPerLevel),
+    maxHp: resolveMonsterMaxHp(def, depth),
     faction: 'enemy',
     accuracyDerived: def.attack,
     damagePowerDerived: def.attack,

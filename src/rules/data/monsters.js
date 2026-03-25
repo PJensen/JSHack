@@ -1181,6 +1181,10 @@ export const MONSTERS = [
   },
 ];
 
+// Global monster vitality scalar used by all depth-scaled spawn pathways.
+// Tune this to raise/lower overall monster durability without per-monster edits.
+export const MONSTER_HP_SCALAR = 1.2;
+
 /** Lookup helpers */
 const _byId = new Map(MONSTERS.map(m => [m.id, m]));
 const _byTier = [];
@@ -1212,6 +1216,22 @@ export function getMonstersByTier(tier) {
 /** @param {string} id @returns {MonsterDef|null} */
 export function getMonster(id) {
   return _byId.get(id) || null;
+}
+
+/**
+ * Resolve scaled monster max HP at a given dungeon depth.
+ * @param {string|MonsterDef|null|undefined} monster
+ * @param {number} depth
+ * @returns {number}
+ */
+export function resolveMonsterMaxHp(monster, depth = 1) {
+  const def = typeof monster === "string" ? getMonster(monster) : (monster || null);
+  if (!def) return 1;
+  const d = Math.max(1, Number(depth || 1) | 0);
+  const baseHp = Number(def.baseHp || 1);
+  const hpPerLevel = Number(def.hpPerLevel || 0);
+  const unscaled = baseHp + d * hpPerLevel;
+  return Math.max(1, Math.floor(unscaled * MONSTER_HP_SCALAR));
 }
 
 /** @returns {string[]} */

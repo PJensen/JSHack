@@ -14,7 +14,7 @@ import {
   installPolymorphListener,
   clearPolymorphHooks,
 } from "../src/rules/systems/polymorphSystem.js";
-import { getMonster, listAllMonsterIds } from "../src/rules/data/monsters.js";
+import { getMonster, listAllMonsterIds, resolveMonsterMaxHp } from "../src/rules/data/monsters.js";
 
 function makeMonster(world, x, y, identity) {
   const def = getMonster(identity);
@@ -23,7 +23,7 @@ function makeMonster(world, x, y, identity) {
     x, y,
     name: def.name,
     identity: def.id,
-    maxHp: Math.floor(def.baseHp + 1 * def.hpPerLevel),
+    maxHp: resolveMonsterMaxHp(def, 1),
     faction: "enemy",
     accuracyDerived: def.attack,
     damagePowerDerived: def.attack,
