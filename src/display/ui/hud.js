@@ -105,9 +105,8 @@ export function reconcilePinnedQuickItemsWithInventory(pinned, inventoryItems) {
     const count = Math.max(0, Number(item?.count || 0) | 0);
     const identity = String(item?.identity || item?.details?.identity || '');
     if (identity) {
-      const key = identity;
-      const prev = byPinKey.get(key);
-      byPinKey.set(key, { count: (prev?.count || 0) + count, item: item });
+      const prev = byPinKey.get(identity);
+      byPinKey.set(identity, { count: (prev?.count || 0) + count, item: item });
       continue;
     }
     const rawIds = Array.isArray(item?.entityIds) ? item.entityIds : [item?.id];
@@ -1495,7 +1494,7 @@ function createPinnedItemSlots() {
     const before = pinned.length;
     pinned = pinned.filter((entry) => {
       const entryKey = String(entry?.pinKey || '');
-      if (entryKey && key) return entryKey !== key;
+      if (entryKey && key && entryKey === key) return false;
       return Number(entry?.id || 0) !== id;
     });
     if (pinned.length !== before) render();

@@ -2049,7 +2049,7 @@ installMessageWiring({
   },
 });
 
-function buildQuickItemPinDetail(itemId) {
+function buildQuickItemPinDetailFromWorld(itemId) {
   const id = Number(itemId || 0) | 0;
   const identity = String(world.get(id, NamedIdentity)?.identity || '');
   return {
@@ -2061,7 +2061,7 @@ function buildQuickItemPinDetail(itemId) {
 
 // Keep quick-slot and pinned chips in sync when items are consumed.
 world.on('item:used', ({ itemId }) => {
-  const detail = buildQuickItemPinDetail(itemId);
+  const detail = buildQuickItemPinDetailFromWorld(itemId);
   try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail })); } catch (e) { console.debug('[main] dispatch ui:itemUsed:', e); }
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
@@ -2827,7 +2827,7 @@ bootAdvance("Installed world/UI wiring");
 
 // Item equipped UI updates (message handled in messageWiring)
 world.on('item:equipped', ({ itemId }) => {
-  const detail = buildQuickItemPinDetail(itemId);
+  const detail = buildQuickItemPinDetailFromWorld(itemId);
   try { window.dispatchEvent(new CustomEvent('ui:itemEquipped', { detail })); } catch (e) { console.debug('[main] dispatch ui:itemEquipped:', e); }
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
