@@ -14,7 +14,7 @@ export const CLASS_DEFS = {
       maxStamina: 130,
       staminaRegen: 3.75,
       intelligence: 6,
-      dexterity: 8,
+      dexterity: 12,
       visionRange: 8,
     },
     equipment: {
@@ -43,7 +43,7 @@ export const CLASS_DEFS = {
       maxStamina: 80,
       staminaRegen: 2.25,
       intelligence: 12,
-      dexterity: 12,
+      dexterity: 14,
       visionRange: 8,
     },
     equipment: {
@@ -110,7 +110,7 @@ export const CLASS_DEFS = {
       maxStamina: 100,
       staminaRegen: 3.0,
       intelligence: 11,
-      dexterity: 14,
+      dexterity: 16,
       visionRange: 8,
     },
     equipment: {
@@ -141,7 +141,7 @@ export const CLASS_DEFS = {
       maxStamina: 75,
       staminaRegen: 2.0,
       intelligence: 13,
-      dexterity: 8,
+      dexterity: 12,
       visionRange: 8,
     },
     equipment: {
@@ -172,7 +172,7 @@ export const CLASS_DEFS = {
       maxStamina: 90,
       staminaRegen: 2.7,
       intelligence: 10,
-      dexterity: 10,
+      dexterity: 12,
       visionRange: 8,
     },
     equipment: {
