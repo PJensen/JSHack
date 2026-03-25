@@ -1,14 +1,16 @@
-Deno.test("quick chip dismiss button is anchored to top-right corner", async () => {
-  const path = new URL("../src/display/ui/hud.js", import.meta.url);
-  const text = await Deno.readTextFile(path);
+import { QUICK_CHIP_DISMISS_LAYOUT } from "../src/display/ui/hud.js";
 
-  if (!(text.includes("position: 'absolute'") &&
-      text.includes("top: '6px'") &&
-      text.includes("right: '8px'"))) {
-    throw new Error("quick chip dismiss button should be absolutely positioned at the chip top-right");
+Deno.test("quick chip dismiss layout exports top-right placement contract", () => {
+  if (QUICK_CHIP_DISMISS_LAYOUT.chipPosition !== "relative") {
+    throw new Error("quick chip container should remain relative positioned");
   }
-
-  if (!text.includes("chip.appendChild(x);")) {
-    throw new Error("dismiss button should be attached directly to the quick chip container");
+  if (QUICK_CHIP_DISMISS_LAYOUT.contentPaddingRight !== "34px") {
+    throw new Error("quick chip content should reserve space for dismiss button");
+  }
+  if (QUICK_CHIP_DISMISS_LAYOUT.top !== "6px") {
+    throw new Error("quick chip dismiss button should be offset from top edge");
+  }
+  if (QUICK_CHIP_DISMISS_LAYOUT.right !== "8px") {
+    throw new Error("quick chip dismiss button should be offset from right edge");
   }
 });
