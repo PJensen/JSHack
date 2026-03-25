@@ -81,6 +81,28 @@ Deno.test("blizzard starts as a sustained channel and defers mana spend to chann
   assertEquals(world.get(player, Mana).mana, 12);
 });
 
+Deno.test("sustained channels require two ticks worth of mana to start", () => {
+  loadFlatFloor();
+  const world = makeStormWorld(23);
+  const player = createPlayer(world, { x: 0, y: 0, name: "Mage" });
+  const brain = world.get(player, Brain);
+  brain.learnedSpellIds = ["blizzard"];
+
+  const mana = world.get(player, Mana);
+  mana.mana = 5; // blizzard manaPerTick = 3, required start = 6
+  mana.maxMana = 10;
+
+  const ooms = [];
+  world.on("spell:oom", (event) => ooms.push(event));
+
+  world.add(player, CastSpellIntent, { spellId: "blizzard", x: 4, y: 0 });
+  world.tick(1);
+
+  assert(!world.has(player, Channeling), "blizzard should not start channel below 2x manaPerTick");
+  assertEquals(world.get(player, Mana).mana, 5, "mana should not be spent when start gate fails");
+  assert(ooms.some((event) => event.spellId === "blizzard" && Number(event.need) === 6), "oom event should report 2x tick requirement");
+});
+
 Deno.test("blizzard channel ticks drain mana, respect radius bonuses, and keep burst damage bounded", () => {
   loadFlatFloor();
   const world = makeStormWorld(9);

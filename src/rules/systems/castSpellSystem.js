@@ -199,13 +199,16 @@ export function castSpellSystem(world) {
     const manaCost = isSustainedChannel
       ? Number(resolvedSpell.manaPerTick ?? resolvedSpell.manaCost ?? 0)
       : Number(resolvedSpell.manaCost || 0);
+    const requiredToStart = isSustainedChannel
+      ? Math.max(0, manaCost) * 2
+      : manaCost;
 
     // Sustained channels gate on one tick of mana up front but spend it during the
     // realtime channel loop. Cast-time channels keep the existing upfront payment.
     if (!fromChanneling) {
       const have = Number(mana?.mana ?? 0);
-      if (have < manaCost) {
-        try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: manaCost, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
+      if (have < requiredToStart) {
+        try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: requiredToStart, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
         world.remove(actor, CastSpellIntent);
         continue;
       }

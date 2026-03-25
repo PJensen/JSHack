@@ -8,10 +8,13 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { Mana } from "../src/rules/components/Mana.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Channeling } from "../src/rules/components/Channeling.js";
 import { CastSpellIntent } from "../src/rules/components/Intents/CastSpellIntent.js";
 import { castSpellSystem } from "../src/rules/systems/castSpellSystem.js";
 import { channelingSystem } from "../src/rules/systems/channelingSystem.js";
 import { effectSystem } from "../src/rules/systems/effectSystem.js";
+import { installDrainLifeDamageInterruptListener } from "../src/rules/systems/channelingSystem.js";
+import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 
@@ -22,6 +25,7 @@ function setupFloorTiles() {
 }
 
 function scheduler(world) {
+  installDrainLifeDamageInterruptListener(world);
   try { channelingSystem(world); } catch (e) { console.error("channeling system error", e); }
   try { castSpellSystem(world); } catch (e) { console.error("cast system error", e); }
   try { effectSystem(world); } catch (e) { console.error("effect system error", e); }
@@ -141,4 +145,27 @@ Deno.test("drain_life: no valid target emits failed and does not apply effect", 
   const channel = ae?.effects?.find((e) => e.key === "drain_life_channel");
   assert(!channel, "channel effect should not be created without a valid target");
   assert(failedEvents.length > 0, "should emit drain_life:failed");
+});
+
+Deno.test("drain_life: incoming damage interrupts channel", () => {
+  setupFloorTiles();
+  const world = new World({ seed: 7005 });
+  world.setScheduler((w) => scheduler(w));
+
+  const caster = createDrainLifeCaster(world, 5, 5);
+  const enemy = createEnemy(world, 7, 5, 60);
+  const cancelled = [];
+  world.on("channeling:cancelled", (e) => cancelled.push(e));
+
+  world.add(caster, CastSpellIntent, { spellId: "drain_life", targetId: enemy, x: 7, y: 5 });
+  world.tick(1);
+  world.tick(1);
+  assert(world.has(caster, Channeling), "drain_life should be actively channeling");
+
+  dealDamage(world, { target: caster, source: enemy, amount: 1, type: "physical", cause: "melee" });
+
+  assert(!world.has(caster, Channeling), "incoming damage should cancel drain_life channel");
+  const ae = world.get(caster, ActiveEffects);
+  assert(!ae?.effects?.some((e) => e.key === "drain_life_channel"), "drain_life effect should be removed on damage interrupt");
+  assert(cancelled.some((e) => e.reason === "damage_interrupt"), "should emit damage_interrupt cancellation reason");
 });
