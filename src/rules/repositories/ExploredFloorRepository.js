@@ -8,11 +8,12 @@ export class ExploredFloorRepository {
     this._byDepth = new Map();
   }
 
-  /** @param {number} depth @param {Map<string, Uint8Array>} snapshot */
+  /** @param {number} depth @param {Map<string, Uint8Array>} snapshot @returns {boolean} */
   setSnapshot(depth, snapshot) {
     const d = Number(depth) | 0;
-    if (d <= 0 || !(snapshot instanceof Map)) return;
+    if (d <= 0 || !(snapshot instanceof Map)) return false;
     this._byDepth.set(d, snapshot);
+    return true;
   }
 
   /** @param {number} depth @returns {Map<string, Uint8Array>|undefined} */

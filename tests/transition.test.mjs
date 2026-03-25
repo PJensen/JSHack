@@ -148,9 +148,14 @@ Deno.test("transition caches and restores explored tiles through repository", ()
 
 Deno.test("clearFloorCache clears explored repository snapshots", () => {
   clearAll();
+  clearExplored();
   clearFloorCache();
+  const world = new World({ seed: 42 });
+  const spawn = initDungeon(world);
+  makePlayerAt(world, spawn.x, spawn.y);
 
-  exploredFloorRepository.setSnapshot(3, new Map([["0,0", new Uint8Array([1])]]));
+  markExplored(spawn.x, spawn.y);
+  transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
   assert(exploredFloorRepository.listDepths().length === 1, "precondition: one cached explored depth");
 
   clearFloorCache();
