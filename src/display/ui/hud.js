@@ -1,6 +1,7 @@
 // display/ui/hud.js
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
+import { renderItemDetails } from './overlay.js';
 
 /**
  * @template T
@@ -1681,85 +1682,46 @@ function createMobileSpellRadial(mobileLayoutMq) {
 function renderQuickChip(it, h) {
   const chip = document.createElement('div');
   Object.assign(chip.style, {
-    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: '8px',
-    minWidth: '220px',
-    padding: '8px',
-    borderRadius: '6px',
-    border: '1px solid #2d3b52',
-    background: '#101626',
-    color: '#cfe8ff'
+    padding: '6px 8px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
   });
-  const dismissBtn = document.createElement('button');
-  Object.assign(dismissBtn.style, {
-    position: 'absolute',
-    right: '6px',
-    top: '6px',
-    width: '24px',
-    height: '24px',
-    lineHeight: '20px',
-    textAlign: 'center',
-    padding: '0',
-    background: '#101626',
-    color: '#cfe8ff',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  });
-  dismissBtn.textContent = '\u00D7';
-  dismissBtn.title = 'Dismiss';
-  dismissBtn.addEventListener('click', () => h.onDismiss && h.onDismiss());
-
-  const summary = document.createElement('div');
-  Object.assign(summary.style, {
+  const content = document.createElement('div');
+  Object.assign(content.style, {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: '8px',
-    minHeight: '26px',
-    paddingRight: '28px',
   });
-
-  const glyph = document.createElement('span');
-  glyph.textContent = it?.glyph || '\u2022';
-  Object.assign(glyph.style, {
-    color: it?.glyphColor || '#cfe8ff',
-    minWidth: '16px',
-    textAlign: 'center',
-    fontWeight: '700',
+  const detailPanel = document.createElement('div');
+  Object.assign(detailPanel.style, {
+    minWidth: '180px',
+    maxWidth: '260px',
+    maxHeight: '30vh',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    padding: '6px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
   });
-
-  const name = document.createElement('div');
-  const count = Number(it?.count || 1);
-  name.textContent = count > 1 ? `${it?.name || 'Item'} x${count}` : (it?.name || 'Item');
-  Object.assign(name.style, {
-    fontSize: '13px',
-    fontWeight: '600',
-    lineHeight: '1.3',
-    wordBreak: 'break-word',
-    color: quickChipRarityColor(it?.rarityName),
-  });
-
-  summary.appendChild(glyph);
-  summary.appendChild(name);
-
-  let stats = null;
-  const statsText = buildQuickChipStatsText(it);
-  if (statsText) {
-    stats = document.createElement('div');
-    stats.textContent = statsText;
-    Object.assign(stats.style, {
-      fontSize: '11px',
-      lineHeight: '1.2',
-      opacity: '0.82',
-      paddingLeft: '24px',
-      marginTop: '-2px',
-      marginBottom: '2px',
-      whiteSpace: 'pre-line',
-    });
-  }
+  const detailItem = it.details && typeof it.details === 'object'
+    ? it.details
+    : {
+        id: it.id,
+        identity: it.identity,
+        type: it.type,
+        slot: it.slot,
+        name: it.name,
+        count: it.count,
+        rarityName: it.rarityName,
+        glyph: it.glyph,
+        glyphColor: it.glyphColor,
+      };
+  renderItemDetails(detailPanel, detailItem);
+  content.appendChild(detailPanel);
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
@@ -1791,175 +1753,27 @@ function renderQuickChip(it, h) {
     dropBtn.addEventListener('click', () => h.onDrop && h.onDrop());
   }
 
+  const x = document.createElement('button');
+  Object.assign(x.style, {
+    padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer', minWidth: '28px'
+  });
+  x.textContent = '\u00D7';
+  x.title = 'Dismiss';
+  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+
   const actions = document.createElement('div');
   Object.assign(actions.style, {
     display: 'flex',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
     gap: '6px',
-    flexWrap: 'wrap',
   });
   actions.appendChild(btn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
+  actions.appendChild(x);
 
-  chip.appendChild(dismissBtn);
-  chip.appendChild(summary);
-  if (stats) chip.appendChild(stats);
+  chip.appendChild(content);
   chip.appendChild(actions);
   return chip;
-}
-
-const QUICK_CHIP_RARITY_TOKENS = new Set(['common', 'uncommon', 'magic', 'rare', 'epic', 'legendary']);
-
-/**
- * @param {any} rarityName
- * @returns {string}
- */
-function quickChipRarityColor(rarityName) {
-  const rn = String(rarityName || 'common').toLowerCase();
-  if (rn === 'common') return '#cfe8ff';
-  if (rn === 'uncommon') return '#7fe38f';
-  if (rn === 'rare') return '#6eb2ff';
-  if (rn === 'epic') return '#c18cff';
-  if (rn === 'legendary') return '#ffcf5a';
-  return '#cfe8ff';
-}
-
-/**
- * @param {string} text
- * @returns {boolean}
- */
-function isQuickChipMetaToken(text) {
-  const norm = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!norm) return true;
-  if (norm === 'bag' || norm === 'in bag' || norm === 'slot: bag' || norm === 'slot bag') return true;
-  if (norm === 'rarity' || norm.startsWith('rarity:') || norm.startsWith('rarity ')) return true;
-  return QUICK_CHIP_RARITY_TOKENS.has(norm);
-}
-
-/**
- * @param {string} raw
- * @returns {string}
- */
-function stripQuickChipMetaParts(raw) {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  const tokens = text.split(/\s*[|,·]\s*/g).map((token) => String(token || '').trim()).filter(Boolean);
-  if (tokens.length === 0) return '';
-  const kept = tokens.filter((token) => !isQuickChipMetaToken(token));
-  if (kept.length === 0) return '';
-  return kept.join(' · ');
-}
-
-/**
- * @param {string} key
- * @returns {string}
- */
-function humanizeQuickChipKey(key) {
-  return String(key || '')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/**
- * @param {any} damageDice
- * @returns {string}
- */
-function formatQuickChipDamageDice(damageDice) {
-  if (!damageDice) return '';
-  if (typeof damageDice === 'string') return damageDice.trim();
-  const count = Number(damageDice?.count || 0);
-  const sides = Number(damageDice?.sides || 0);
-  if (count > 0 && sides > 0) return `${count}d${sides}`;
-  return String(damageDice || '').trim();
-}
-
-/**
- * @param {any} it
- * @returns {string[]}
- */
-export function buildQuickChipInfoLines(it) {
-  const d = (it?.details && typeof it.details === 'object') ? it.details : it;
-  const lines = [];
-
-  const detailLines = Array.isArray(d?.detailLines) ? d.detailLines : [];
-  for (const line of detailLines) {
-    const text = String(line || '').trim();
-    if (!text) continue;
-    const cleaned = stripQuickChipMetaParts(text);
-    if (cleaned) lines.push(cleaned);
-  }
-
-  const targetEffects = Array.isArray(d?.targetEffects) ? d.targetEffects : [];
-  for (const effect of targetEffects) {
-    const text = String(effect || '').trim();
-    if (text) lines.push(`• ${text}`);
-  }
-
-  const itemSlot = String(d?.slot || '').toLowerCase();
-  const isWeapon = itemSlot === 'weapon' || itemSlot === 'ranged';
-  if (isWeapon) {
-    const dmg = formatQuickChipDamageDice(d?.damageDice);
-    if (dmg) lines.push(`Damage: ${dmg}`);
-    if (d?.staminaCost != null) lines.push(`Stamina: ${d.staminaCost}`);
-    if (d?.twoHanded) lines.push('Two-Handed');
-  }
-
-  const coat = d?.coating;
-  if (coat && coat.kind) {
-    const charges = Number(coat.charges || 0);
-    lines.push(`${humanizeQuickChipKey(coat.kind)} coated${charges > 0 ? ` (${charges} charges)` : ''}`);
-  }
-
-  const bonuses = (d?.bonuses && typeof d.bonuses === 'object') ? d.bonuses : null;
-  if (bonuses) {
-    for (const key of Object.keys(bonuses)) {
-      const n = Number(bonuses[key] ?? 0);
-      if (!Number.isFinite(n) || n === 0) continue;
-      const sign = n > 0 ? '+' : '';
-      lines.push(`${sign}${n} ${humanizeQuickChipKey(key)}`);
-    }
-  }
-
-  const affixes = Array.isArray(d?.affixes) ? d.affixes : [];
-  for (const affix of affixes) {
-    if (affix && typeof affix === 'object') {
-      const name = String(affix.name || '').trim();
-      const desc = String(affix.description || '').trim();
-      if (name && desc) lines.push(`${name} — ${desc}`);
-      else if (name) lines.push(name);
-      continue;
-    }
-    const aid = String(affix || '').trim();
-    if (aid) lines.push(humanizeQuickChipKey(aid));
-  }
-
-  const maxSockets = Number(d?.maxSockets || 0) | 0;
-  if (maxSockets > 0) {
-    const sockets = Array.isArray(d?.sockets) ? d.sockets : [];
-    let circles = '';
-    for (let i = 0; i < maxSockets; i++) circles += i < sockets.length ? '◈' : '○';
-    if (circles) lines.push(circles);
-  }
-
-  const unique = [];
-  const seen = new Set();
-  for (const line of lines) {
-    const key = String(line || '').trim();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    unique.push(key);
-  }
-  return unique;
-}
-
-/**
- * @param {any} it
- * @returns {string}
- */
-export function buildQuickChipStatsText(it) {
-  return buildQuickChipInfoLines(it).join('\n');
 }
