@@ -368,7 +368,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:inventoryData', {
       detail: {
         items: filteredItems,
-        bagItems: filteredItems,
+        bagItems: groupedBagItems,
         equippedBySlot,
         ground,
         slotFilter,

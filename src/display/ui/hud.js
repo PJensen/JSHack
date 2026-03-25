@@ -1405,10 +1405,12 @@ function createQuickSlot(opts = {}) {
 }
 
 function createPinnedItemSlots() {
-  const SLOT_COUNT = 5;
+  const SLOT_COUNT = 4;
   const el = document.createElement('div');
   Object.assign(el.style, {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 44px)',
+    gridTemplateRows: 'repeat(2, 44px)',
     gap: '4px',
     alignItems: 'center',
   });
