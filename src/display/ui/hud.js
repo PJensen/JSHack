@@ -70,6 +70,15 @@ export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
   right: '8px',
 });
 
+export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
+  character: Object.freeze({ col: '1', row: '1' }),
+  pet: Object.freeze({ col: '2', row: '1' }),
+  pinnedQuickSlots: Object.freeze({ col: '4 / 6', row: '1 / 3' }),
+  pray: Object.freeze({ col: '1', row: '2' }),
+  wait: Object.freeze({ col: '2', row: '2' }),
+  shoot: Object.freeze({ col: '3', row: '2' }),
+});
+
 /**
  * @param {Array<any>} pinned
  * @param {any} item
@@ -398,7 +407,8 @@ export function initHUD() {
     padding: '8px 12px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
     cursor: 'pointer',
-    display: 'none' // Hidden by default, shown when pet exists
+    visibility: 'hidden',
+    pointerEvents: 'none',
   });
 
   const ACTION_ICONS = Object.freeze({
@@ -620,6 +630,13 @@ export function initHUD() {
   prayBtn.dataset.keyHint = 'P';
   waitBtn.dataset.keyHint = '.';
 
+  let pinSlots = null;
+  function setPinSlotsGridPlacement(col = '', row = '') {
+    if (!pinSlots?.el) return;
+    pinSlots.el.style.gridColumn = col;
+    pinSlots.el.style.gridRow = row;
+  }
+
   function applyCommandBarLayout() {
     const isMobile = mobileLayoutMq.matches;
     // Temporarily hidden per UX direction.
@@ -639,7 +656,8 @@ export function initHUD() {
     if (isMobile) {
       Object.assign(bar.style, {
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+        gridTemplateRows: 'repeat(2, 44px)',
         alignItems: 'stretch',
         justifyContent: 'stretch',
         gap: '6px'
@@ -652,6 +670,18 @@ export function initHUD() {
         btn.style.overflow = 'hidden';
         btn.style.textOverflow = 'ellipsis';
       }
+      const area = MOBILE_ACTION_BAR_GRID_AREAS;
+      charBtn.style.gridColumn = area.character.col;
+      charBtn.style.gridRow = area.character.row;
+      petBtn.style.gridColumn = area.pet.col;
+      petBtn.style.gridRow = area.pet.row;
+      prayBtn.style.gridColumn = area.pray.col;
+      prayBtn.style.gridRow = area.pray.row;
+      waitBtn.style.gridColumn = area.wait.col;
+      waitBtn.style.gridRow = area.wait.row;
+      shootBtn.style.gridColumn = area.shoot.col;
+      shootBtn.style.gridRow = area.shoot.row;
+      setPinSlotsGridPlacement(area.pinnedQuickSlots.col, area.pinnedQuickSlots.row);
       refreshCommandLabels();
       return;
     }
@@ -659,6 +689,7 @@ export function initHUD() {
     Object.assign(bar.style, {
       display: 'flex',
       gridTemplateColumns: '',
+      gridTemplateRows: '',
       alignItems: 'center',
       justifyContent: 'flex-end',
       gap: '8px'
@@ -670,7 +701,10 @@ export function initHUD() {
       btn.style.fontSize = '22px';
       btn.style.overflow = '';
       btn.style.textOverflow = '';
+      btn.style.gridColumn = '';
+      btn.style.gridRow = '';
     }
+    setPinSlotsGridPlacement('', '');
     refreshCommandLabels();
   }
 
@@ -684,7 +718,9 @@ export function initHUD() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const exists = Boolean(e?.detail?.exists);
-    petBtn.style.display = exists ? 'grid' : 'none';
+    petBtn.style.visibility = exists ? 'visible' : 'hidden';
+    petBtn.style.pointerEvents = exists ? 'auto' : 'none';
+    petBtn.setAttribute('aria-hidden', exists ? 'false' : 'true');
   });
   // Update button based on pet state
   window.addEventListener('ui:updatePetButton', (ev) => {
@@ -999,7 +1035,7 @@ export function initHUD() {
   });
 
   // Right-aligned bar: compact core actions only.
-  const pinSlots = createPinnedItemSlots();
+  pinSlots = createPinnedItemSlots();
   const quick = createQuickSlot({
     onPinItem: (item) => pinSlots.pinItem(item),
   });
