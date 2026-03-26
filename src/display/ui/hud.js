@@ -386,7 +386,6 @@ export function initHUD() {
 
   const quickInteractBtn = document.createElement('button');
   quickInteractBtn.id = 'btn-quick-interact';
-  quickInteractBtn.textContent = 'Door';
   Object.assign(quickInteractBtn.style, {
     padding: '8px 12px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',

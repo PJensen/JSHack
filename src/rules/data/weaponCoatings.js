@@ -5,6 +5,8 @@ import { ensureActiveEffects } from '../utils/effects.js';
 
 export const WEAPON_COATING_DEFS = Object.freeze({
   poison: Object.freeze({
+    // Higher proc rate to make applied poison meaningfully tactical while still
+    // allowing occasional non-proc hits for variability.
     chancePct: 75,
     consumeOnHit: true,
     seedSalt: 0xc0470001,
