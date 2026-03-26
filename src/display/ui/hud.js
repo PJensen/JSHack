@@ -2113,6 +2113,15 @@ function createPinnedItemSlots() {
     pinned = next;
     render();
   });
+  window.addEventListener('ui:itemThrown', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    hidePinnedTooltip();
+    const next = applyPinnedQuickItemUse(pinned, e?.detail);
+    if (arePinnedArraysEqual(next, pinned)) return;
+    pinned = next;
+    render();
+  });
   window.addEventListener('ui:itemEquipped', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;

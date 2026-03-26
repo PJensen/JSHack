@@ -69,3 +69,11 @@ Deno.test("quick pin slots decrement stack count on item use and keep pin until 
   const threeUses = applyPinnedQuickItemUse(twoUses, { pinKey: "potion_heal_minor", itemId: 70 });
   assertEquals(threeUses.length, 0);
 });
+
+Deno.test("quick pin slots decrement stack count on item thrown and remove at zero", () => {
+  const pinned = [{ id: 71, identity: "potion_heal_minor", pinKey: "potion_heal_minor", count: 2, name: "Potion" }];
+  const oneThrow = applyPinnedQuickItemUse(pinned, { pinKey: "potion_heal_minor", itemId: 71 });
+  assertEquals(oneThrow.map((it) => [it.pinKey, it.count]), [["potion_heal_minor", 1]]);
+  const twoThrows = applyPinnedQuickItemUse(oneThrow, { pinKey: "potion_heal_minor", itemId: 71 });
+  assertEquals(twoThrows.length, 0);
+});
