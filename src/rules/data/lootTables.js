@@ -167,7 +167,6 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "item",      weight: 50, itemId: "scroll_identify" },
-      { type: "item",      weight: 12, itemId: "stone_touchstone" },
       { type: "archetype", weight: 35, archetype: "ScrollOfMapping" },
       { type: "item",      weight: 25, itemId: "scroll_blastwave" },
       { type: "item",      weight: 20, itemId: "scroll_heal" },
@@ -636,6 +635,7 @@ export const LOOT_TABLES = {
       { type: "equip",     weight: 15, pool: ["helm_warhelm", "helm_visionary", "gauntlets_spiked", "ring_of_fury", "serpent_ring", "wardkeeper_shield", "armor_vanguard", "armor_nightstalker", "armor_arcanist", "legguards_fortress", "leggings_prowler", "leggings_mystic", "boots_sentinel", "boots_shadowstep", "boots_conduit"], affixChance: 0, affixCountMax: 0 },
       { type: "table",     weight: 22, tableId: "sub:spellbooks" },
       { type: "table",     weight: 18, tableId: "sub:scrolls" },
+      { type: "item",      weight: 2,  itemId: "stone_touchstone" },
       { type: "archetype", weight: 16, archetype: "HealthPotion" },
       { type: "item",      weight: 11, itemId: "scroll_identify" },
       { type: "table",     weight: 14, tableId: "sub:wands" },

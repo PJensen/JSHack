@@ -16,8 +16,11 @@ import { Brain } from '../components/Brain.js';
 import { Player } from '../components/Player.js';
 import { Inventory } from '../components/Inventory.js';
 import { inventoryItems } from '../utils/inventoryFacade.js';
+import { NamedIdentity } from '../components/NamedIdentity.js';
 
 const MAX_NESTING = 5;
+const TOUCHSTONE_IDENTITY = 'stone_touchstone';
+const TOUCHSTONE_OWNED_KEY = Symbol.for('jshack:touchstone:owned');
 
 // Archetype name -> archetype object
 const ARCHETYPE_MAP = {
@@ -266,6 +269,9 @@ export function materializeDrop(world, drop, pos) {
     }
 
     case "item": {
+      if (String(drop?.params?.itemId || '') === TOUCHSTONE_IDENTITY && shouldSuppressTouchstoneDrop(world)) {
+        return null;
+      }
       let id = null;
       try { id = buildCatalogItem(world, drop.params.itemId); } catch { return null; }
       if (!(id > 0)) return null;
@@ -276,6 +282,39 @@ export function materializeDrop(world, drop, pos) {
     default:
       return null;
   }
+}
+
+/**
+ * Touchstone uniqueness gate:
+ * - Once the player has had one, no future touchstones should materialize.
+ * - Also suppress if any touchstone entity currently exists in the world.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @returns {boolean}
+ */
+function shouldSuppressTouchstoneDrop(world) {
+  if (!world) return false;
+  if (world[TOUCHSTONE_OWNED_KEY] === true) return true;
+
+  let playerHasTouchstone = false;
+  for (const [id] of world.query(Player)) {
+    for (const itemEid of inventoryItems(world, id)) {
+      const ni = world.get(itemEid, NamedIdentity);
+      if (String(ni?.identity || '') === TOUCHSTONE_IDENTITY) {
+        playerHasTouchstone = true;
+        break;
+      }
+    }
+    if (playerHasTouchstone) break;
+  }
+  if (playerHasTouchstone) {
+    world[TOUCHSTONE_OWNED_KEY] = true;
+    return true;
+  }
+
+  for (const [, ni] of world.query(NamedIdentity)) {
+    if (String(ni?.identity || '') === TOUCHSTONE_IDENTITY) return true;
+  }
+  return false;
 }
 
 /**
