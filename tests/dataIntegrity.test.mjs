@@ -38,6 +38,8 @@ Deno.test("item catalog definitions are valid", () => {
 Deno.test("blunt weapon and skeleton vulnerability data are wired", () => {
   const bluntIds = [
     'iron_mace',
+    'morningstar',
+    'flail',
     'warhammer',
     'stormtouched_mace',
     'warhammer_of_fury',
