@@ -38,9 +38,10 @@ export function installEventUiWiring({
     try { ftext.addStatus(x, y - 0.3, `"${text}"`, { color, life: 1.2 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
   });
 
-  // Refresh inventory UI when any item is used (consumed/learned/etc.)
+  // Refresh inventory UI when any item is used (consumed/learned/etc.).
+  // ui:itemUsed is emitted centrally from main.js with pin metadata;
+  // avoid dispatching it here to prevent double-consumption in quick slots.
   world.on('item:used', ({ actor, itemId }) => {
-    try { window.dispatchEvent(new CustomEvent('ui:itemUsed', { detail: { itemId } })); } catch (e) { console.debug('[eventUiWiring] dispatch ui:itemUsed:', e); }
     try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[eventUiWiring] dispatch ui:requestInventoryData:', e); }
   });
 
