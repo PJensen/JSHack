@@ -4,6 +4,7 @@ import { getAffixPassiveRefs } from "../data/affixes.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
 export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
+  dexterityDerived: 0,
   accuracyDerived: 0,
   damagePowerDerived: 0,
   physicalPenetrationDerived: 0,
@@ -40,6 +41,7 @@ const PASSIVE_BONUSES_DEFINED = Symbol.for("jshack:passiveBonuses:virtuals:defin
 const PASSIVE_BONUSES_VIRTUAL = Symbol.for("jshack:passiveBonuses:PassiveBonuses");
 
 const BONUS_KEY_MAP = Object.freeze({
+  dexterity: "dexterityDerived",
   accuracy: "accuracyDerived",
   damagePower: "damagePowerDerived",
   physicalPenetration: "physicalPenetrationDerived",

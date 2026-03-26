@@ -1178,7 +1178,7 @@ export const ITEM_CATALOG = {
     material: "leather",
     rarity: 3,
     rarityName: "rare",
-    bonuses: { attack: 2, critChance: 0.05, luck: 1 },
+    bonuses: { attack: 2, dexterity: 2, critChance: 0.05, luck: 1 },
     description: "Supple black leather with grip-pads sewn into every finger.",
   },
   // ── Gloves: late-game ────────────────────────────────────────────
@@ -1276,7 +1276,7 @@ export const ITEM_CATALOG = {
     material: "leather",
     rarity: 3,
     rarityName: "rare",
-    bonuses: { defense: 1, attack: 1, maxStamina: 10, staminaRegen: 0.3 },
+    bonuses: { defense: 1, attack: 1, dexterity: 2, maxStamina: 10, staminaRegen: 0.3 },
     description: "Supple hide trousers with reinforced knees for long marches and quick sprints.",
   },
   // ── Legs: epic ──────────────────────────────────────────────────
@@ -1391,7 +1391,7 @@ export const ITEM_CATALOG = {
     material: "silver",
     rarity: 2,
     rarityName: "magic",
-    bonuses: { critChance: 0.08 },
+    bonuses: { dexterity: 1, critChance: 0.08 },
   },
   ring_arcana: {
     id: "ring_arcana",
@@ -1958,7 +1958,7 @@ export const ITEM_CATALOG = {
     material: "leather",
     rarity: 3,
     rarityName: "rare",
-    bonuses: { defense: 1, maxStamina: 8, staminaRegen: 0.5, luck: 1 },
+    bonuses: { defense: 1, dexterity: 2, maxStamina: 8, staminaRegen: 0.5, luck: 1 },
     description: "Soft-soled boots favored by rangers and thieves for their sure grip.",
   },
   // ── Feet: epic ──────────────────────────────────────────────────
