@@ -40,6 +40,11 @@ const AFFIX_HEMORRHAGE = "affix:hemorrhage1";
 const AFFIX_SECOND_WIND = "affix:secondWind1";
 const AFFIX_FLAMING = "affix:flaming";
 const AFFIX_STUNNING = "affix:stunning1";
+const AFFIX_WEAKEN = "affix:weaken1";
+const AFFIX_AGONY = "affix:agony1";
+const AFFIX_CRIPPLE = "affix:cripple1";
+const AFFIX_PLAGUE = "affix:plague1";
+const AFFIX_SOULFIRE = "affix:soulfire1";
 
 /**
  * Push or stack an active effect directly on an entity.
@@ -342,6 +347,49 @@ registerScript(AFFIX_SECOND_WIND, {
   },
 });
 
+registerScript(AFFIX_WEAKEN, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1b, 20)) return;
+    upsertEffect(world, ctx.defender, { key: "weaken", turnsLeft: 3, potency: 1, stacks: 1 });
+    try { world.emit && world.emit("proc:weaken", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:weaken failed:", e); }
+  },
+});
+
+registerScript(AFFIX_AGONY, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1c, 25)) return;
+    upsertEffect(world, ctx.defender, { key: "agony", turnsLeft: 4, potency: 2, stacks: 1 });
+    try { world.emit && world.emit("proc:agony", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:agony failed:", e); }
+  },
+});
+
+registerScript(AFFIX_CRIPPLE, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1d, 20)) return;
+    applyNonLethalTypedChip(world, ctx, "pierce", 1, "affix:cripple");
+    upsertEffect(world, ctx.defender, { key: "frost", turnsLeft: 2, potency: 1, stacks: 1 });
+    try { world.emit && world.emit("proc:cripple", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:cripple failed:", e); }
+  },
+});
+
+registerScript(AFFIX_PLAGUE, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1e, 20)) return;
+    upsertEffect(world, ctx.defender, { key: "poison", turnsLeft: 4, potency: 2, stacks: 1 });
+    upsertEffect(world, ctx.defender, { key: "disease", turnsLeft: 3, potency: 1, stacks: 1 });
+    try { world.emit && world.emit("proc:plague", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:plague failed:", e); }
+  },
+});
+
+registerScript(AFFIX_SOULFIRE, {
+  [ScriptVerb.AffixOnHit]: (world, ctx) => {
+    if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1f, 15)) return;
+    ctx.healAttacker(2);
+    upsertEffect(world, ctx.defender, { key: "burning", turnsLeft: 3, potency: 2, stacks: 1 });
+    try { world.emit && world.emit("proc:soulfire", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:soulfire failed:", e); }
+  },
+});
+
 function emitProc(ctx, name, payload) {
   ctx?.proc?.emit?.(name, payload);
 }
@@ -586,6 +634,59 @@ registerScript(AFFIX_STUNNING, {
   },
 });
 
+registerScript(AFFIX_WEAKEN, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1b, 20)) return;
+    ctx.proc.applyStatus(ctx.target, "weaken", 3, 1);
+    emitProc(ctx, "proc:weaken", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_AGONY, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1c, 25)) return;
+    ctx.proc.applyStatus(ctx.target, "agony", 4, 2);
+    emitProc(ctx, "proc:agony", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_CRIPPLE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1d, 20)) return;
+    ctx.proc.dealDamage(ctx.target, 1, "pierce", {
+      source: ctx.source,
+      cause: "affix:cripple",
+      noTrigger: true,
+      nonLethal: true,
+    });
+    ctx.proc.applyStatus(ctx.target, "frost", 2, 1);
+    emitProc(ctx, "proc:cripple", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_PLAGUE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1e, 20)) return;
+    ctx.proc.applyStatus(ctx.target, "poison", 4, 2);
+    ctx.proc.applyStatus(ctx.target, "disease", 3, 1);
+    emitProc(ctx, "proc:plague", { actor: ctx.source, target: ctx.target });
+  },
+});
+
+registerScript(AFFIX_SOULFIRE, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (!actorMatchesProcRole(ctx, "source")) return;
+    if (!procRoll(world, ctx.source, ctx.target, 0xc0ffee1f, 15)) return;
+    ctx.proc.heal(ctx.source, 2);
+    ctx.proc.applyStatus(ctx.target, "burning", 3, 2);
+    emitProc(ctx, "proc:soulfire", { actor: ctx.source, target: ctx.target });
+  },
+});
+
 const AFFIX_REGISTRY = new Map();
 
 function normalizeRefList(value, fallbackSingle = null) {
@@ -680,6 +781,11 @@ export function unregisterAffixDefinition(id) {
   ["flaming", { name: "Flaming", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_FLAMING] } }],
   ["stunning1", { name: "Stunning", slots: ["weapon"], weight: 0, triggerScripts: { onHit: [AFFIX_STUNNING] } }],
   ["earthshaker", { name: "Earthshaker", slots: ["weapon", "gloves", "feet"], weight: 6, description: "Earthshatter erupts with volcanic fury" }],
+  ["weaken1", { name: "Weakening", slots: ["weapon"], weight: 9, triggerScripts: { onHit: [AFFIX_WEAKEN] } }],
+  ["agony1", { name: "Agony", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_AGONY] } }],
+  ["cripple1", { name: "Crippling", slots: ["weapon"], weight: 7, triggerScripts: { onHit: [AFFIX_CRIPPLE] } }],
+  ["plague1", { name: "Plague", slots: ["weapon"], weight: 6, triggerScripts: { onHit: [AFFIX_PLAGUE] } }],
+  ["soulfire1", { name: "Soulfire", slots: ["weapon"], weight: 7, triggerScripts: { onHit: [AFFIX_SOULFIRE] } }],
 ].forEach(([id, spec]) => {
   registerAffixDefinition(id, spec);
 });

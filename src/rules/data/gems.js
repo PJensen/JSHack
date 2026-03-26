@@ -22,13 +22,13 @@ export const GEM_DEFS = {
   gem_dilithium:   { id: 'gem_dilithium',   name: 'Dilithium Crystal',   appearance: 'White Gem',           value: 4500, weight: 1, hardness: 'soft', prob: 2,   material: 'gemstone' },
   gem_diamond:     { id: 'gem_diamond',     name: 'Diamond',             appearance: 'White Gem',           value: 4000, weight: 1, hardness: 'hard', prob: 3,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:diamond' },
   gem_ruby:        { id: 'gem_ruby',        name: 'Ruby',                appearance: 'Red Gem',             value: 3500, weight: 1, hardness: 'hard', prob: 4,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:ruby' },
-  gem_jacinth:     { id: 'gem_jacinth',     name: 'Jacinth Stone',       appearance: 'Orange Gem',          value: 3250, weight: 1, hardness: 'hard', prob: 3,   material: 'gemstone' },
+  gem_jacinth:     { id: 'gem_jacinth',     name: 'Jacinth Stone',       appearance: 'Orange Gem',          value: 3250, weight: 1, hardness: 'hard', prob: 3,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:jacinth' },
   gem_sapphire:    { id: 'gem_sapphire',    name: 'Sapphire',            appearance: 'Blue Gem',            value: 3000, weight: 1, hardness: 'hard', prob: 4,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:sapphire' },
   gem_black_opal:  { id: 'gem_black_opal',  name: 'Black Opal',          appearance: 'Black Gem',           value: 2500, weight: 1, hardness: 'hard', prob: 3,   material: 'gemstone' },
   gem_emerald:     { id: 'gem_emerald',     name: 'Emerald',             appearance: 'Green Gem',           value: 2500, weight: 1, hardness: 'hard', prob: 5,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:emerald' },
   gem_turquoise:   { id: 'gem_turquoise',   name: 'Turquoise Stone',     appearance: 'Green Gem',           value: 2000, weight: 1, hardness: 'soft', prob: 6,   material: 'gemstone' },
   gem_citrine:     { id: 'gem_citrine',     name: 'Citrine Stone',       appearance: 'Yellow Gem',          value: 1500, weight: 1, hardness: 'soft', prob: 4,   material: 'gemstone' },
-  gem_aquamarine:  { id: 'gem_aquamarine',  name: 'Aquamarine Stone',    appearance: 'Green Gem',           value: 1500, weight: 1, hardness: 'hard', prob: 6,   material: 'gemstone' },
+  gem_aquamarine:  { id: 'gem_aquamarine',  name: 'Aquamarine Stone',    appearance: 'Green Gem',           value: 1500, weight: 1, hardness: 'hard', prob: 6,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:aquamarine' },
   gem_amber:       { id: 'gem_amber',       name: 'Amber Stone',         appearance: 'Yellowish Brown Gem', value: 1000, weight: 1, hardness: 'soft', prob: 8,   material: 'gemstone' },
   gem_topaz:       { id: 'gem_topaz',       name: 'Topaz Stone',         appearance: 'Yellowish Brown Gem', value: 900,  weight: 1, hardness: 'hard', prob: 10,  material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:topaz' },
   gem_jet:         { id: 'gem_jet',         name: 'Jet Stone',           appearance: 'Black Gem',           value: 850,  weight: 1, hardness: 'soft', prob: 6,   material: 'gemstone' },
@@ -68,6 +68,7 @@ export function listGemIds() { return Object.keys(GEM_DEFS); }
 const GEM_SOCKET_DETAIL_LINES = Object.freeze({
   gem_diamond: Object.freeze([
     "Socketed: +2 attack, +2 defense.",
+    "On hit: 20% chance to deal 2-3 bonus damage.",
   ]),
   gem_ruby: Object.freeze([
     "Socketed: +10% fire resist.",
@@ -87,15 +88,27 @@ const GEM_SOCKET_DETAIL_LINES = Object.freeze({
   ]),
   gem_amethyst: Object.freeze([
     "Socketed: +1 mana regeneration.",
+    "On hit: 20% chance to restore 2 mana.",
   ]),
   gem_opal: Object.freeze([
     "Socketed: +1 luck.",
+    "On hit: 15% chance for +5% crit on the next attack.",
   ]),
   gem_obsidian: Object.freeze([
     "Socketed: +2 kinetic damage reduction.",
+    "On hit: 20% chance to weaken the target.",
   ]),
   gem_garnet: Object.freeze([
     "Socketed: +20% fire resist.",
+    "On hit: 25% chance to ignite the target.",
+  ]),
+  gem_jacinth: Object.freeze([
+    "Socketed: +10% acid resist.",
+    "On hit: 20% chance to inflict agony.",
+  ]),
+  gem_aquamarine: Object.freeze([
+    "Socketed: +0.5 mana regeneration.",
+    "On hit: 20% chance to cause bleeding.",
   ]),
 });
 
