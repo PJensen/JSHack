@@ -3861,6 +3861,7 @@ export const ITEM_CATALOG = {
         const identity = String(state?.targetIdentity || "");
         if (!identity) return false;
         if (isIdentified(identity)) return false;
+        if (String(targetInfo?.type || "") === "gem") return true;
         return requiresIdentification(targetInfo);
       },
       on_dip: (ctx, state) => {

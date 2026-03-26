@@ -119,7 +119,10 @@ export function buildItemDisplayData(world, itemId) {
   // Determine if this item is unidentified
   const identity = ni?.identity || '';
   const needsId = requiresIdentification(info);
-  const identified = info.identified === true || !needsId || (identity && isIdentified(identity));
+  const gemType = String(info?.type || "") === "gem";
+  const identified = gemType
+    ? (info.identified === true || (identity && isIdentified(identity)))
+    : (info.identified === true || !needsId || (identity && isIdentified(identity)));
 
   const spellId = identified ? spellIdFromIdentity(identity) : "";
   const linkedSpell = spellId ? getSpell(spellId) : null;
