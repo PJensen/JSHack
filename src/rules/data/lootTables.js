@@ -167,6 +167,7 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "item",      weight: 50, itemId: "scroll_identify" },
+      { type: "item",      weight: 12, itemId: "stone_touchstone" },
       { type: "archetype", weight: 35, archetype: "ScrollOfMapping" },
       { type: "item",      weight: 25, itemId: "scroll_blastwave" },
       { type: "item",      weight: 20, itemId: "scroll_heal" },

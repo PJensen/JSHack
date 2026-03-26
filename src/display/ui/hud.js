@@ -34,6 +34,7 @@ export function popUntilActionableTop(stack, isActionable) {
 export function getQuickChipPrimaryAction(it) {
   const identity = String(it?.identity || it?.details?.identity || '');
   if (identity === 'scroll_identify') return 'apply';
+  if (it?.canApply && Number(it?.applyTargetCount || 0) > 0) return 'apply';
   const t = String(it?.type || '');
   if (t === 'equip' || t === 'ammo' || t === 'wand') return 'equip';
   if (t === 'potion') return 'drink';
@@ -1390,6 +1391,8 @@ function createQuickSlot(opts = {}) {
       glyph: String(item?.glyph || ''),
       glyphColor: String(item?.glyphColor || ''),
       hasScrollOfIdentify: !!item?.hasScrollOfIdentify,
+      canApply: !!item?.canApply,
+      applyTargetCount: Math.max(0, Number(item?.applyTargetCount || 0) | 0),
       details: item?.details || item,
     };
   }

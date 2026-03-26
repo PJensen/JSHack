@@ -2597,7 +2597,10 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
   /** @param {any} it */
   function enterActionLabel(it) {
     const action = getInventoryDefaultAction(it);
-    if (action === 'apply') return 'Apply';
+    if (action === 'apply') {
+      const isSocketGem = String(it?.type || '') === 'gem' && !!it?.canApply;
+      return isSocketGem ? 'Socket' : 'Apply';
+    }
     if (action === 'equip') return it?.equipped ? 'Unequip' : 'Equip';
     if (action === 'use') return 'Use';
     if (action === 'set-spell') return 'Set Spell';
@@ -2608,9 +2611,11 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     const it = items[sel];
     const groundAction = resolveGroundPickupAction();
     const canApplyTool = !!it?.canApply;
+    const socketApply = String(it?.type || '') === 'gem' && canApplyTool;
+    const applyVerb = socketApply ? 'Socket' : 'Apply';
     const hasApplyTargets = !!(canApplyTool && Number(it?.applyTargetCount || 0) > 0);
     const applyHint = canApplyTool
-      ? (hasApplyTargets ? ' · A=Apply' : ' · A=Apply (no targets)')
+      ? (hasApplyTargets ? ` · A=${applyVerb}` : ` · A=${applyVerb} (no targets)`)
       : '';
     hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
     detail.innerHTML = '';
@@ -2653,6 +2658,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
 
     const hasItemId = Number.isInteger(it.id) && it.id > 0;
     const canApplyTool = !!it?.canApply;
+    const socketApply = String(it?.type || '') === 'gem' && canApplyTool;
     const hasApplyTargets = !!(canApplyTool && Number(it.applyTargetCount || 0) > 0);
     const available = [];
     if (isInventoryItemEquippable(it) && hasItemId) {
@@ -2664,7 +2670,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     if (canApplyTool && hasItemId) {
       available.push({
         key: 'apply',
-        label: 'Apply',
+        label: socketApply ? 'Socket' : 'Apply',
         enabled: hasApplyTargets,
         disabledReason: hasApplyTargets ? '' : 'No valid targets in inventory',
       });

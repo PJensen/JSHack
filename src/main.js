@@ -152,6 +152,7 @@ import { listAllMonsterIds, MONSTERS, getMonster } from "./rules/data/monsters.j
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "./rules/components/AggroState.js";
 import { spawnMonsterEntity } from "./rules/utils/spawnMonsterEntity.js";
 import { pickMonster } from "./rules/environment/dungeon/tables.js";
+import { isApplyTool, listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -2157,6 +2158,8 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   if (shouldSuppressRecentPickupChipForEquippedDuplicate(world, ownerId, itemId)) return;
   const hasScrollOfIdentify = findScrollOfIdentifyInPlayerInventory(pe.id) > 0;
   const displayItem = buildItemDisplayData(world, itemId);
+  const canApply = isApplyTool(world, pe.id, itemId);
+  const applyTargetCount = canApply ? listApplyTargetsForTool(world, pe.id, itemId).length : 0;
   if (displayItem?.noQuickChip === true) return;
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
@@ -2174,6 +2177,8 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
           glyph: palette?.[world.get(itemId, NamedIdentity)?.identity]?.glyph || '',
           glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff',
           hasScrollOfIdentify,
+          canApply,
+          applyTargetCount,
         }
       }
     }));
