@@ -44,6 +44,7 @@ import { QuestState } from "../../rules/components/QuestState.js";
 import { Encumbrance } from "../../rules/components/Encumbrance.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
+import { buildPalette } from "../../display/palette/index.js";
 
 const TRAIT_DISPLAY = Object.freeze({
   iron_stomach:  { label: "Iron Stomach",  description: "Halves sickness chance from spoiled food." },
@@ -53,6 +54,7 @@ const TRAIT_DISPLAY = Object.freeze({
 
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
+const _itemPalette = buildPalette();
 
 /**
  * Install event listeners that supply inventory/use/throw/apply/message/death
@@ -80,7 +82,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
   }
 
   function buildItemDisplayData(info, itemId) {
-    return _buildItemDisplayData(world, itemId) || {
+    const base = _buildItemDisplayData(world, itemId) || {
       id: itemId,
       type: info.type || 'item',
       name: resolveItemDisplayName(world, itemId),
@@ -94,6 +96,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       staminaCost: null,
       twoHanded: false,
       coating: null,
+    };
+    const identity = String(base?.identity || world.get(itemId, NamedIdentity)?.identity || "");
+    const p = _itemPalette[identity] || null;
+    return {
+      ...base,
+      glyph: String(base?.glyph || p?.glyph || ""),
+      glyphColor: String(base?.glyphColor || p?.fg || "#cfe8ff"),
     };
   }
 
