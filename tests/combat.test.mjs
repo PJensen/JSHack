@@ -200,7 +200,7 @@ Deno.test("insulated affix mitigates capacitive electric chip", () => {
   assert(hpInsulated === hpPlain + 1, `insulated should absorb 1-point electric chip (plain=${hpPlain}, insulated=${hpInsulated})`);
 });
 
-Deno.test("poison weapon coating procs DOT at 25% and consumes one charge on proc", () => {
+Deno.test("poison weapon coating procs frequently and spends one charge per successful hit", () => {
   function runOne(seed) {
     const world = new World({ seed });
     installAffixTriggers(world);
@@ -243,20 +243,19 @@ Deno.test("poison weapon coating procs DOT at 25% and consumes one charge on pro
   let foundNoProc = false;
   for (let seed = 1; seed <= 256; seed++) {
     const r = runOne(seed);
+    assertEquals(r.chargesAfter, 2, 'every successful hit should consume exactly one coating charge');
     if (r.procced) {
       foundProc = true;
-      assertEquals(r.chargesAfter, 2, 'proc should consume exactly one coating charge');
       assertEquals(r.turnsLeft, 4, 'proc should apply poison for 4 turns');
       assertEquals(r.potency, 2, 'proc should apply poison potency 2');
     } else {
       foundNoProc = true;
-      assertEquals(r.chargesAfter, 3, 'non-proc should not consume coating charge');
     }
     if (foundProc && foundNoProc) break;
   }
 
   assert(foundProc, 'expected at least one deterministic seed to trigger poison coating proc');
-  assert(foundNoProc, 'expected at least one deterministic seed to not trigger poison coating proc');
+  assert(foundNoProc, 'expected at least one deterministic seed to miss poison proc at high-but-not-total chance');
 });
 
 Deno.test("blinded defenders are easier to hit in melee based on blindness strength", () => {

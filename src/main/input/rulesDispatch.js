@@ -8,6 +8,7 @@ import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
 import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js";
 import { SearchIntent } from "../../rules/components/Intents/SearchIntent.js";
+import { Interactable } from "../../rules/components/Interactable.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 import { statusStrength } from "../../rules/utils/statusFacade.js";
 
@@ -246,6 +247,25 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         if (!Number.isInteger(altarId) || altarId <= 0) break;
         if (!Number.isInteger(itemId) || itemId <= 0) break;
         world?.add?.(actorId, InteractIntent, { targetId: altarId, mode: "offer", itemId });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.quickInteract": {
+        const actorPos = world?.get?.(actorId, Position);
+        if (!actorPos) break;
+        const px = actorPos.x | 0;
+        const py = actorPos.y | 0;
+        let doorTargetId = 0;
+        for (const [id, pos, inter] of world.query(Position, Interactable)) {
+          if (!inter || String(inter.action || "") !== "toggleDoor") continue;
+          const dx = Math.abs((pos.x | 0) - px);
+          const dy = Math.abs((pos.y | 0) - py);
+          if ((dx + dy) !== 1) continue;
+          doorTargetId = Number(id || 0) | 0;
+          break;
+        }
+        if (!(doorTargetId > 0)) break;
+        world?.add?.(actorId, InteractIntent, { targetId: doorTargetId });
         world?.tick?.(1);
         break;
       }

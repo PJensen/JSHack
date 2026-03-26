@@ -228,7 +228,8 @@ export function addToInventory(world, ownerId, itemId, opts) {
   const rootId = getOrCreateInventoryRoot(world, ownerId);
   if (!(rootId > 0)) return false;
 
-  if (opts?.mergeCompatible) {
+  const mergeCompatible = opts?.mergeCompatible !== false;
+  if (mergeCompatible) {
     const incomingInfo = world.get(itemId, ItemInfo);
     if (incomingInfo) {
       const incomingCount = Math.max(1, Number(incomingInfo.count || 0) | 0);

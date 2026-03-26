@@ -5,8 +5,8 @@ import { ensureActiveEffects } from '../utils/effects.js';
 
 export const WEAPON_COATING_DEFS = Object.freeze({
   poison: Object.freeze({
-    chancePct: 25,
-    consumeOnProc: true,
+    chancePct: 75,
+    consumeOnHit: true,
     seedSalt: 0xc0470001,
     emitEvent: 'proc:poisoned',
     effect: Object.freeze({ key: 'poison', turnsLeft: 4, potency: 2, stacks: 1 }),
@@ -56,7 +56,7 @@ export function applyWeaponCoatingOnHit(world, ctx) {
   if (def.effect) upsertEffect(world, defender, { ...def.effect });
 
   let chargesAfter = chargesBefore;
-  if (def.consumeOnProc) {
+  if (def.consumeOnHit) {
     chargesAfter = Math.max(0, chargesBefore - 1);
     if (chargesAfter > 0) {
       weaponInfo.coating = { ...coating, charges: chargesAfter };
