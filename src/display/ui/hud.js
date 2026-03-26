@@ -1738,6 +1738,26 @@ function createChannelingOverlay() {
 
 // --- Mobile radial spell selector (bottom-right floating button) ----------
 function createMobileSpellRadial(mobileLayoutMq) {
+  const MICRO_UX_STYLE_ID = 'jshack-mobile-spell-radial-micro-ux';
+  function ensureMicroUxStyles() {
+    if (document.getElementById(MICRO_UX_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = MICRO_UX_STYLE_ID;
+    style.textContent = `
+      @keyframes jshackSpellRadialBump {
+        0% { transform: scale(1.02); }
+        45% { transform: scale(1.16); }
+        100% { transform: scale(1.1); }
+      }
+      @keyframes jshackSpellRadialPulse {
+        0% { box-shadow: 0 0 0 0 rgba(114, 176, 255, 0.36), 0 2px 6px rgba(0,0,0,0.42); }
+        100% { box-shadow: 0 0 0 10px rgba(114, 176, 255, 0), 0 2px 6px rgba(0,0,0,0.42); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  ensureMicroUxStyles();
+
   const el = document.createElement('div');
   Object.assign(el.style, {
     position: 'fixed',
@@ -1785,6 +1805,8 @@ function createMobileSpellRadial(mobileLayoutMq) {
   let _fanOpen = false;
   let _holdTimer = null;
   let _isHold = false;
+  let _hoverSpellId = null;
+  let _fanItems = [];
   const HOLD_THRESHOLD_MS = 350;
 
   // --- Fan-out container ---
@@ -1809,16 +1831,17 @@ function createMobileSpellRadial(mobileLayoutMq) {
   function onPressEnd(e) {
     if (_holdTimer) { clearTimeout(_holdTimer); _holdTimer = null; }
     if (_isHold) {
-      // Hold release — check if finger is over a fan item
-      if (e && e.changedTouches && e.changedTouches.length > 0) {
+      // Hold release — choose currently hovered spell (with fallback hit-test)
+      let selectedSpellId = _hoverSpellId;
+      if (!selectedSpellId && e && e.changedTouches && e.changedTouches.length > 0) {
         const touch = e.changedTouches[0];
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        const item = target?.closest?.('[data-spell-id]');
-        if (item) {
-          window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', {
-            detail: { spellId: item.dataset.spellId }
-          }));
-        }
+        const item = pickClosestSpellAtPoint(touch.clientX, touch.clientY);
+        selectedSpellId = item?.dataset?.spellId || null;
+      }
+      if (selectedSpellId) {
+        window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', {
+          detail: { spellId: selectedSpellId }
+        }));
       }
       closeFan();
     } else {
@@ -1852,6 +1875,7 @@ function createMobileSpellRadial(mobileLayoutMq) {
   // --- Fan open/close ---
   function openFan() {
     _fanOpen = true;
+    _hoverSpellId = _activeSpellId;
     trigger.style.transform = 'scale(1.1)';
     trigger.style.borderColor = '#6b8fbf';
     fan.style.display = 'block';
@@ -1860,15 +1884,72 @@ function createMobileSpellRadial(mobileLayoutMq) {
 
   function closeFan() {
     _fanOpen = false;
+    _hoverSpellId = null;
+    _fanItems = [];
     trigger.style.transform = '';
     trigger.style.borderColor = '#2d3b52';
     fan.style.display = 'none';
     fan.innerHTML = '';
   }
 
+  function setFanItemVisual(item, selected, bump = false) {
+    if (!item) return;
+    if (selected) {
+      item.style.transform = 'scale(1.1)';
+      item.style.border = '2px solid #8fc2ff';
+      item.style.background = '#1b2a44';
+      item.style.zIndex = '5';
+      item.style.boxShadow = '0 0 0 1px rgba(155,210,255,0.45), 0 4px 12px rgba(0,0,0,0.45)';
+      if (bump) {
+        item.style.animation = 'none';
+        // Force restart of the bump animation.
+        void item.offsetWidth;
+        item.style.animation = 'jshackSpellRadialBump 220ms cubic-bezier(0.2, 0.9, 0.2, 1), jshackSpellRadialPulse 360ms ease-out';
+      }
+    } else {
+      item.style.animation = 'none';
+      item.style.transform = 'scale(0.98)';
+      item.style.zIndex = '1';
+      item.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+      item.style.border = item.dataset.baseBorder || '1px solid #2d3b52';
+      item.style.background = item.dataset.baseBg || '#101626';
+    }
+  }
+
+  function pickClosestSpellAtPoint(clientX, clientY) {
+    if (!_fanItems.length) return null;
+    let closest = null;
+    let bestDistSq = Number.POSITIVE_INFINITY;
+    for (const item of _fanItems) {
+      const rect = item.getBoundingClientRect();
+      const cx = rect.left + rect.width * 0.5;
+      const cy = rect.top + rect.height * 0.5;
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        closest = item;
+      }
+    }
+    return closest;
+  }
+
+  function updateHoverFromPoint(clientX, clientY) {
+    if (!_fanOpen || !_isHold) return;
+    const item = pickClosestSpellAtPoint(clientX, clientY);
+    const nextId = item?.dataset?.spellId || null;
+    if (!nextId || nextId === _hoverSpellId) return;
+    _hoverSpellId = nextId;
+    for (const fanItem of _fanItems) {
+      setFanItemVisual(fanItem, fanItem.dataset.spellId === _hoverSpellId, fanItem.dataset.spellId === _hoverSpellId);
+    }
+  }
+
   // --- Fan item rendering ---
   function renderFanItems(spells, activeId) {
     fan.innerHTML = '';
+    _fanItems = [];
     const count = spells.length;
     if (count === 0) return;
 
@@ -1904,9 +1985,12 @@ function createMobileSpellRadial(mobileLayoutMq) {
         cursor: 'pointer',
         pointerEvents: 'auto',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-        transition: 'opacity 0.15s ease',
+        transition: 'opacity 0.14s ease, transform 0.18s cubic-bezier(0.2, 0.9, 0.2, 1), border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease',
         opacity: '0',
+        transform: 'scale(0.86)',
       });
+      item.dataset.baseBorder = isActive ? '2px solid #6b8fbf' : '1px solid #2d3b52';
+      item.dataset.baseBg = isActive ? '#152035' : '#101626';
 
       const sym = document.createElement('span');
       sym.textContent = spell.symbol || '\u2726';
@@ -1952,12 +2036,14 @@ function createMobileSpellRadial(mobileLayoutMq) {
       }
 
       fan.appendChild(item);
+      _fanItems.push(item);
 
       // Stagger fade-in
-      const idx = i;
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (fan.contains(item)) {
+            const selected = (_hoverSpellId || activeId) === spell.id;
+            setFanItemVisual(item, selected, false);
             item.style.opacity = (cdRemaining > 0 && cdMax > 0) ? '0.5' : '1';
           }
         });
@@ -1998,6 +2084,7 @@ function createMobileSpellRadial(mobileLayoutMq) {
     const e = ev;
     const spells = e?.detail?.spells || [];
     const activeId = e?.detail?.activeSpellId || null;
+    _hoverSpellId = activeId;
     renderFanItems(spells, activeId);
   });
 
@@ -2007,6 +2094,17 @@ function createMobileSpellRadial(mobileLayoutMq) {
   // Close fan on outside touch
   document.addEventListener('touchstart', (e) => {
     if (_fanOpen && !el.contains(/** @type {Node} */ (e.target))) closeFan();
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!_fanOpen || !_isHold) return;
+    const touch = e.touches && e.touches[0];
+    if (!touch) return;
+    e.preventDefault();
+    updateHoverFromPoint(touch.clientX, touch.clientY);
+  }, { passive: false });
+  document.addEventListener('mousemove', (e) => {
+    if (!_fanOpen || !_isHold) return;
+    updateHoverFromPoint(e.clientX, e.clientY);
   }, { passive: true });
 
   return { el };
