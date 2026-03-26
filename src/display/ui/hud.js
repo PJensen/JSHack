@@ -64,6 +64,18 @@ export function getQuickChipPrimaryActionLabel(it) {
   return 'Use';
 }
 
+/**
+ * @param {any} it
+ * @returns {boolean}
+ */
+export function isQuickChipActionable(it) {
+  const t = String(it?.type || '');
+  if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
+  if (t === 'tool') return true;
+  if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food' || t === 'gem') return (it?.count || 0) > 0;
+  return false;
+}
+
 export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
   chipPosition: 'relative',
   contentPaddingRight: '66px',
@@ -1409,11 +1421,7 @@ function createQuickSlot(opts = {}) {
   }
 
   function actionable(it) {
-    const t = String(it.type||'');
-    if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
-    if (t === 'tool') return true;
-    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
-    return false;
+    return isQuickChipActionable(it);
   }
 
   let dismissTimer = 0;
@@ -2069,9 +2077,7 @@ function createPinnedItemSlots() {
 
   window.addEventListener('ui:itemUsed', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
-    const e = ev;
     hidePinnedTooltip();
-    removeByPinKeyOrId(e?.detail?.pinKey || e?.detail?.identity || e?.detail?.itemId);
   });
   window.addEventListener('ui:itemEquipped', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
