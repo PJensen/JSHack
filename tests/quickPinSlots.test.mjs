@@ -47,7 +47,7 @@ Deno.test("quick pin slots reconcile grouped inventory entries via entityIds", (
   const pinned = [{ id: 41, name: "Arrows", count: 1 }];
   const bagItems = [{ id: 99, entityIds: [41, 42, 43], count: 7 }];
   const next = reconcilePinnedQuickItemsWithInventory(pinned, bagItems);
-  assertEquals(next.map((it) => [it.id, it.count]), [[41, 7]]);
+  assertEquals(next.map((it) => [it.pinKey, it.id, it.count]), [["id:41", 99, 7]]);
 });
 
 Deno.test("quick pin slots reconcile grouped inventory entries by identity", () => {
