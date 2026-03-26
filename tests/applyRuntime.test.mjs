@@ -54,7 +54,9 @@ Deno.test("apply runtime item-def hook coats weapon and consumes poison potion",
   addToInventory(world, actor, dagger);
 
   const appliedEvents = [];
+  const usedEvents = [];
   world.on("item:applied", (ev) => appliedEvents.push(ev));
+  world.on("item:used", (ev) => usedEvents.push(ev));
 
   const result = executeInteraction(world, {
     verb: "apply",
@@ -76,4 +78,6 @@ Deno.test("apply runtime item-def hook coats weapon and consumes poison potion",
   assert(!world.isAlive(potion), "poison potion should be consumed by runtime");
   assert(!inventoryContains(world, actor, potion), "consumed potion should be removed from inventory");
   assertEquals(appliedEvents.length, 1);
+  assertEquals(usedEvents.length, 1);
+  assertEquals(Number(usedEvents[0]?.itemId || 0), potion);
 });

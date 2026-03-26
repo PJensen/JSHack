@@ -86,10 +86,11 @@ export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
 export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   character: Object.freeze({ col: '1', row: '1' }),
   pet: Object.freeze({ col: '2', row: '1' }),
+  pray: Object.freeze({ col: '3', row: '1' }),
+  shoot: Object.freeze({ col: '1', row: '2' }),
+  quickInteract: Object.freeze({ col: '2', row: '2' }),
+  wait: Object.freeze({ col: '3', row: '2' }),
   pinnedQuickSlots: Object.freeze({ col: '4 / 6', row: '1 / 3' }),
-  pray: Object.freeze({ col: '1', row: '2' }),
-  wait: Object.freeze({ col: '2', row: '2' }),
-  shoot: Object.freeze({ col: '3', row: '2' }),
 });
 
 /**
@@ -383,6 +384,17 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:pray')); } catch (e) { console.debug('[hud] dispatch ui:pray:', e); }
   });
 
+  const quickInteractBtn = document.createElement('button');
+  quickInteractBtn.id = 'btn-quick-interact';
+  Object.assign(quickInteractBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  quickInteractBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:quickInteract')); } catch (e) { console.debug('[hud] dispatch ui:quickInteract:', e); }
+  });
+
   // Search/Wait button
   // Short tap → search action (reveals hidden traps, etc.)
   // Long hold (≥500ms) → continuously emit wait at 222ms intervals while held
@@ -538,6 +550,7 @@ export function initHUD() {
     shoot: '\u{1F3F9}',       // 🏹
     zap: '\u26A1',            // ⚡
     pray: '\u{1F64F}',        // 🙏
+    door: '\u{1F6AA}',        // 🚪
     wait: '\u23F3',           // ⏳ (kept for backward compat; button now uses 'search')
     search: '\u{1F50D}',      // 🔍
     bug: '\u{1F47E}',         // 👾
@@ -665,7 +678,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, bagBtn, petBtn, castBtn, spellSelectBtn, shootBtn, prayBtn, waitBtn];
+  const commandButtons = [charBtn, bagBtn, petBtn, castBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, waitBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -748,6 +761,7 @@ export function initHUD() {
   setDesktopLabel(spellSelectBtn, 'Spells'); setMobileLabel(spellSelectBtn, 'Spells');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
+  setDesktopLabel(quickInteractBtn, 'Door'); setMobileLabel(quickInteractBtn, 'Door');
   setDesktopLabel(waitBtn, 'Search'); setMobileLabel(waitBtn, 'Search');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(bagBtn, ACTION_ICONS.bag); setMobileIcon(bagBtn, ACTION_ICONS.bag);
@@ -756,6 +770,7 @@ export function initHUD() {
   setDesktopIcon(spellSelectBtn, ACTION_ICONS.spells); setMobileIcon(spellSelectBtn, ACTION_ICONS.spells);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
+  setDesktopIcon(quickInteractBtn, ACTION_ICONS.door); setMobileIcon(quickInteractBtn, ACTION_ICONS.door);
   setDesktopIcon(waitBtn, ACTION_ICONS.search); setMobileIcon(waitBtn, ACTION_ICONS.search);
   setBarLabel(charBtn, 'Char');
   setBarLabel(bagBtn, 'Bag');
@@ -764,6 +779,7 @@ export function initHUD() {
   setBarLabel(spellSelectBtn, 'Spells');
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
+  setBarLabel(quickInteractBtn, 'Door');
   setBarLabel(waitBtn, 'Search');
   charBtn.dataset.keyHint = 'c';
   bagBtn.dataset.keyHint = 'i';
@@ -772,6 +788,7 @@ export function initHUD() {
   spellSelectBtn.dataset.keyHint = 'S';
   shootBtn.dataset.keyHint = 'r';
   prayBtn.dataset.keyHint = 'P';
+  quickInteractBtn.dataset.keyHint = 'o';
   waitBtn.dataset.keyHint = '.';
 
   let pinSlots = null;
@@ -821,6 +838,8 @@ export function initHUD() {
       petBtn.style.gridRow = area.pet.row;
       prayBtn.style.gridColumn = area.pray.col;
       prayBtn.style.gridRow = area.pray.row;
+      quickInteractBtn.style.gridColumn = area.quickInteract.col;
+      quickInteractBtn.style.gridRow = area.quickInteract.row;
       waitBtn.style.gridColumn = area.wait.col;
       waitBtn.style.gridRow = area.wait.row;
       shootBtn.style.gridColumn = area.shoot.col;
@@ -1193,6 +1212,7 @@ export function initHUD() {
   bar.appendChild(spellSelectBtn);
   bar.appendChild(shootBtn);
   bar.appendChild(prayBtn);
+  bar.appendChild(quickInteractBtn);
   bar.appendChild(waitBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
@@ -1226,7 +1246,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, charBtn, bagBtn, spellSelectBtn, shootBtn, prayBtn, waitBtn, petBtn };
+  return { castBtn, charBtn, bagBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, waitBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
