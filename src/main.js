@@ -2067,6 +2067,13 @@ world.on('item:used', ({ itemId }) => {
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
 });
 
+// Keep quick-slot and pinned chips in sync when items are thrown.
+world.on('item:thrown', ({ itemId }) => {
+  const detail = buildQuickItemPinDetailFromWorld(itemId);
+  try { window.dispatchEvent(new CustomEvent('ui:itemThrown', { detail })); } catch (e) { console.debug('[main] dispatch ui:itemThrown:', e); }
+  try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
+});
+
 function findScrollOfIdentifyInPlayerInventory(playerId) {
   for (const id of inventoryItems(world, playerId)) {
     const ni = world.get(id, NamedIdentity);
