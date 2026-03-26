@@ -112,6 +112,17 @@ function markScrollable(el) {
 import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
 export { getInventoryDefaultAction };
 
+/**
+ * @param {any} item
+ * @returns {string}
+ */
+function quickPinKeyForItem(item) {
+  const identity = String(item?.identity || item?.details?.identity || '');
+  if (identity) return identity;
+  const id = Number(item?.id || 0) | 0;
+  return id > 0 ? `id:${id}` : '';
+}
+
 export function initOverlays() {
   const root = ensureRoot();
   const inv = ensurePanel('inventory');
@@ -440,11 +451,39 @@ export function initOverlays() {
     const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
     const scrollOfIdentifyId = Number(e?.detail?.scrollOfIdentifyId || 0) | 0;
     const encumbrance = e?.detail?.encumbrance || null;
-    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId, encumbrance);
+    (/** @type {any} */ (inv))._inventoryLastData = {
+      items,
+      ground,
+      slotFilter,
+      scrollOfIdentifyId,
+      encumbrance,
+    };
+    const pinnedKeys = Array.isArray((/** @type {any} */ (inv))._inventoryPinnedKeys)
+      ? (/** @type {any} */ (inv))._inventoryPinnedKeys
+      : [];
+    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId, encumbrance, pinnedKeys);
     if (equip.style.display === 'block') {
       const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
       renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId);
     }
+  });
+  window.addEventListener('ui:pinnedQuickItems', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const pinKeys = Array.isArray(e?.detail?.pinKeys) ? e.detail.pinKeys.map((key) => String(key || '')) : [];
+    (/** @type {any} */ (inv))._inventoryPinnedKeys = pinKeys;
+    if (inv.style.display !== 'block') return;
+    const last = (/** @type {any} */ (inv))._inventoryLastData;
+    if (!last) return;
+    renderInventory(
+      inv,
+      Array.isArray(last.items) ? last.items : [],
+      last.ground || null,
+      String(last.slotFilter || ''),
+      Number(last.scrollOfIdentifyId || 0) | 0,
+      last.encumbrance || null,
+      pinKeys,
+    );
   });
   window.addEventListener('ui:characterData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -2374,7 +2413,7 @@ function show(panel) {
 function hide(panel) { panel.style.display = 'none'; hideItemTooltip(); }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] @param {string} [slotFilter] */
-function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentifyId = 0, encumbrance = null) {
+function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentifyId = 0, encumbrance = null, pinnedKeys = []) {
   const existingDetach = /** @type {any} */ (panel)._inventoryDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] inventory detach failed:', e); }
@@ -2384,6 +2423,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
   appendCharacterMenuTabs(el, 'inventory');
+  const pinnedSet = new Set((Array.isArray(pinnedKeys) ? pinnedKeys : []).map((key) => String(key || '')));
   const title = document.createElement('div');
   const filterText = humanize(slotFilter || '');
   title.textContent = filterText ? `Inventory · ${filterText}` : 'Inventory';
@@ -2479,11 +2519,20 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     }
     row.dataset.itemId = String(it.id);
     row.tabIndex = 0;
+    const pinKey = quickPinKeyForItem(it);
+    const isPinned = pinKey ? pinnedSet.has(pinKey) : false;
 
     const star = document.createElement('span');
     star.textContent = it.equipped ? '*' : ' ';
     star.style.width = '1ch';
     star.style.color = '#ffd27d';
+    star.title = it.equipped ? 'Equipped' : '';
+
+    const pin = document.createElement('span');
+    pin.textContent = isPinned ? '\uD83D\uDCCC' : ' ';
+    pin.style.width = '1ch';
+    pin.style.color = '#5fb3ff';
+    pin.title = isPinned ? 'Pinned to quick slot' : '';
 
     const name = document.createElement('span');
     const rs = rarityStyle(it.rarityName);
@@ -2515,6 +2564,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     }
 
     row.appendChild(star);
+    row.appendChild(pin);
     row.appendChild(name);
     if (it.coating && it.coating.kind) {
       const dot = document.createElement('span');
@@ -2617,7 +2667,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     const applyHint = canApplyTool
       ? (hasApplyTargets ? ` · A=${applyVerb}` : ` · A=${applyVerb} (no targets)`)
       : '';
-    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
+    hint.textContent = `↑/↓ to select · Enter=${enterActionLabel(it)} · U=Use · E=Equip/Unequip · I=Pin · ,=Drop · T=Throw${applyHint}${groundAction ? ' · P=Pickup' : ''} · S=Set Spell · Esc=Close · UNPAID items are stolen`;
     detail.innerHTML = '';
     if (it) {
       renderItemDetails(detail, it);
@@ -2706,6 +2756,16 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     if (hasItemId) {
       available.push({ key: 'drop', label: 'Drop', enabled: true });
     }
+    if (hasItemId) {
+      const pinKey = quickPinKeyForItem(it);
+      const isPinned = pinKey ? pinnedSet.has(pinKey) : false;
+      available.push({
+        key: 'pin',
+        label: isPinned ? 'Pinned' : 'Pin',
+        enabled: !isPinned,
+        disabledReason: isPinned ? 'Already pinned' : '',
+      });
+    }
 
     const defaultKey = getInventoryDefaultAction(it);
     const order = {
@@ -2717,6 +2777,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
       'set-spell': 6,
       throw: 7,
       drop: 8,
+      pin: 9,
     };
     available.sort((a, b) => {
       const ar = a.key === defaultKey ? 0 : (order[a.key] || 90);
@@ -2744,7 +2805,7 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
 
   /**
    * @param {any} it
-   * @param {"apply"|"identify"|"equip"|"use"|"set-spell"|"throw"|"drop"} actionKey
+   * @param {"apply"|"identify"|"equip"|"use"|"set-spell"|"throw"|"drop"|"pin"} actionKey
    */
   function dispatchInventoryAction(it, actionKey) {
     if (!it) return;
@@ -2802,6 +2863,12 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
     if (actionKey === 'drop') {
       if (Number.isInteger(it.id) && it.id > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } }));
+      }
+      return;
+    }
+    if (actionKey === 'pin') {
+      if (Number.isInteger(it.id) && it.id > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestPinQuickItem', { detail: { item: it } }));
       }
     }
   }
@@ -2899,6 +2966,14 @@ function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentify
           window.dispatchEvent(new CustomEvent('ui:toggleInventory'));
           window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
         }
+        e.preventDefault();
+      }
+    }
+    else if (k === 'i' || k === 'I') {
+      const it = items[sel];
+      const pinKey = quickPinKeyForItem(it);
+      if (it && pinKey && !pinnedSet.has(pinKey)) {
+        window.dispatchEvent(new CustomEvent('ui:requestPinQuickItem', { detail: { item: it } }));
         e.preventDefault();
       }
     }
