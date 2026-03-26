@@ -356,13 +356,13 @@ export function initHUD() {
   function attachButtonHoldRing(btn) {
     const NS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 48 48');
+    svg.setAttribute('viewBox', '0 0 100 100');
     Object.assign(svg.style, {
       position: 'absolute',
-      left: '-2px',
-      top: '-2px',
-      width: '48px',
-      height: '48px',
+      left: '0',
+      top: '0',
+      width: '100%',
+      height: '100%',
       pointerEvents: 'none',
       zIndex: '4',
       opacity: '0',
@@ -370,10 +370,10 @@ export function initHUD() {
       filter: 'drop-shadow(0 0 2px rgba(95,179,255,0.35))',
     });
     const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', 'M 9 2 H 39 A 7 7 0 0 1 46 9 V 39 A 7 7 0 0 1 39 46 H 9 A 7 7 0 0 1 2 39 V 9 A 7 7 0 0 1 9 2 Z');
+    path.setAttribute('d', 'M 8 3 H 92 A 8 8 0 0 1 97 8 V 92 A 8 8 0 0 1 92 97 H 8 A 8 8 0 0 1 3 92 V 8 A 8 8 0 0 1 8 3 Z');
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', '#5fb3ff');
-    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-width', '4');
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('stroke-linejoin', 'round');
     const pathLength = path.getTotalLength();
@@ -1716,6 +1716,24 @@ function createPinnedItemSlots() {
     showPinnedTooltip(pool[browseState.index], anchorBtn);
   }
 
+  /**
+   * @param {number} slotIndex
+   */
+  function commitBrowsedTooltipToSlot(slotIndex) {
+    if (!(slotIndex >= 0 && slotIndex < SLOT_COUNT)) return;
+    const pool = tooltipBrowsePool();
+    if (!pool.length) return;
+    const idx = Math.max(0, Math.min(pool.length - 1, Number(browseState.index || 0)));
+    const selected = normalizeTooltipItem(pool[idx]);
+    if (!selected) return;
+    const identity = String(selected?.identity || selected?.details?.identity || '');
+    const id = Number(selected?.id || 0) | 0;
+    const pinKey = identity || (id > 0 ? `id:${id}` : '');
+    if (!pinKey) return;
+    pinned[slotIndex] = { ...selected, pinKey };
+    render();
+  }
+
   function resetHoldRing(index) {
     const ring = holdRings[index];
     if (!ring) return;
@@ -1968,6 +1986,13 @@ function createPinnedItemSlots() {
       const wasLongPress = !!state.longPress;
       cancelHold(i);
       try { btn.releasePointerCapture(e.pointerId); } catch {}
+      if (wasLongPress) {
+        commitBrowsedTooltipToSlot(i);
+      }
+      browseState.active = false;
+      browseState.anchorSlot = -1;
+      browseState.index = -1;
+      hidePinnedTooltip();
       btn.style.borderColor = '#4c647f';
       btn.style.background = '#101b2a';
       if (wasLongPress) {
