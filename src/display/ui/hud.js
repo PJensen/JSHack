@@ -404,12 +404,20 @@ export function initHUD() {
 
   {
     const SEARCH_LONG_PRESS_MS = 500;
-    const WAIT_REPEAT_MS = 222;
+    const WAIT_REPEAT_MS = 140;
     let searchPressTimer = null;
     let searchRepeatTimer = null;
     let searchProgressTimer = null;
     let searchPressStartedAt = 0;
     let searchIsLongPress = false;
+
+    function setSearchButtonHoldVisual(waitMode) {
+      const active = !!waitMode;
+      setDesktopIcon(waitBtn, active ? ACTION_ICONS.wait : ACTION_ICONS.search);
+      setMobileIcon(waitBtn, active ? ACTION_ICONS.wait : ACTION_ICONS.search);
+      setBarLabel(waitBtn, active ? 'Wait' : 'Search');
+      refreshCommandLabels();
+    }
 
     function searchStartPress() {
       searchIsLongPress = false;
@@ -426,6 +434,7 @@ export function initHUD() {
       searchPressTimer = setTimeout(() => {
         searchIsLongPress = true;
         waitHoldRing.setProgress(1);
+        setSearchButtonHoldVisual(true);
         waitBtn.style.background = '#0a1120';
         // Immediately emit one wait, then repeat
         try { window.dispatchEvent(new CustomEvent('ui:wait')); } catch (e) { console.debug('[hud] dispatch ui:wait:', e); }
@@ -440,6 +449,7 @@ export function initHUD() {
       if (searchRepeatTimer) { clearInterval(searchRepeatTimer); searchRepeatTimer = null; }
       if (searchProgressTimer) { cancelAnimationFrame(searchProgressTimer); searchProgressTimer = null; }
       waitHoldRing.reset();
+      setSearchButtonHoldVisual(false);
       waitBtn.style.background = '#101626';
       if (!searchIsLongPress) {
         // Short tap → search
@@ -453,6 +463,7 @@ export function initHUD() {
       if (searchRepeatTimer) { clearInterval(searchRepeatTimer); searchRepeatTimer = null; }
       if (searchProgressTimer) { cancelAnimationFrame(searchProgressTimer); searchProgressTimer = null; }
       waitHoldRing.reset();
+      setSearchButtonHoldVisual(false);
       waitBtn.style.background = '#101626';
       searchIsLongPress = false;
     }
