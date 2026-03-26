@@ -446,193 +446,10 @@
 
 <!-- ═══════════════════════════════════════════════════ ITEMS -->
 <section id="items" class="tab-panel">
-
-  <!-- Equipment -->
   <div class="section">
-    <h2>Equipment</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th><th>Slot</th><th>Material</th><th>Rarity</th>
-            <th>Damage</th><th>Stamina</th><th>Bonuses</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Weapons -->
-          <tr><td>Short Sword</td><td>weapon</td><td>steel</td><td><span class="r-common">Common</span></td><td>1d6</td><td>8</td><td>+2 ATK</td></tr>
-          <tr><td>Dagger</td><td>weapon</td><td>steel</td><td><span class="r-common">Common</span></td><td>1d4</td><td>5</td><td>+1 ATK</td></tr>
-          <tr><td>Iron Pickaxe</td><td>weapon</td><td>iron</td><td><span class="r-common">Common</span></td><td>1d4</td><td>25</td><td>+1 Dig</td></tr>
-          <tr><td>Short Bow</td><td>weapon</td><td>wood</td><td><span class="r-common">Common</span></td><td>1d6</td><td>6</td><td>+1 ATK, range 8</td></tr>
-          <tr><td>Axe</td><td>weapon</td><td>steel</td><td><span class="r-magic">Magic</span></td><td>1d8</td><td>12</td><td>+3 ATK</td></tr>
-          <tr><td>Warhammer</td><td>weapon</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>1d8</td><td>10</td><td>+2 ATK, +0.5 Crit Mult</td></tr>
-          <tr><td>Venomfang Dagger</td><td>weapon</td><td>steel</td><td><span class="r-magic">Magic</span></td><td>1d4</td><td>5</td><td>+1 ATK, +5% Crit Chance</td></tr>
-          <tr><td>Caustic Stiletto</td><td>weapon</td><td>steel</td><td><span class="r-rare">Rare</span></td><td>1d4</td><td>4</td><td>+1 ATK, 10% Acid Resist; <em>caustic</em> affix</td></tr>
-          <tr><td>Stormtouched Mace</td><td>weapon</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>1d6</td><td>8</td><td>+2 ATK; <em>capacitive</em> affix</td></tr>
-          <!-- Armor -->
-          <tr><td>Leather Armor</td><td>armor</td><td>leather</td><td><span class="r-common">Common</span></td><td>—</td><td>—</td><td>+1 DEF</td></tr>
-          <tr><td>Chainmail</td><td>armor</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+2 DEF</td></tr>
-          <tr><td>Leadweave Mantle</td><td>armor</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+1 DEF, 20% Slash Resist, 150Ω Elec, 15% Acid Resist</td></tr>
-          <!-- Shields -->
-          <tr><td>Wooden Shield</td><td>offhand</td><td>wood</td><td><span class="r-common">Common</span></td><td>—</td><td>—</td><td>+1 DEF</td></tr>
-          <tr><td>Iron Shield</td><td>offhand</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+2 DEF</td></tr>
-          <tr><td>Spiked Pavise</td><td>offhand</td><td>iron</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+2 DEF, 20% Pierce Resist, 15% Blunt Resist</td></tr>
-          <tr><td>Fireward Shield</td><td>offhand</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+1 DEF, 20% Fire Resist</td></tr>
-          <tr><td>Grounded Buckler</td><td>offhand</td><td>iron</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+1 DEF; <em>insulated</em> affix</td></tr>
-          <!-- Rings -->
-          <tr><td>Ring of Health</td><td>ring</td><td>gold</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+5 Max HP</td></tr>
-          <tr><td>Ring of Precision</td><td>ring</td><td>silver</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+8% Crit Chance</td></tr>
-          <tr><td>Ring of Fire Resistance</td><td>ring</td><td>gold</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>30% Fire Resist</td></tr>
-          <tr><td>Ring of Poison Resistance</td><td>ring</td><td>silver</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>30% Poison Resist</td></tr>
-          <tr><td>Ring of Endurance</td><td>ring</td><td>gold</td><td><span class="r-magic">Magic</span></td><td>—</td><td>—</td><td>+15 Max Stamina, +0.5 Stamina Regen</td></tr>
-          <tr><td>Ring of Arcana</td><td>ring</td><td>silver</td><td><span class="r-rare">Rare</span></td><td>—</td><td>—</td><td>+0.5 Mana Regen</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Magic & Usable -->
-  <div class="section">
-    <h2>Magic &amp; Usable Items</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th><th>Type</th><th>Material</th><th>Rarity</th><th>Value</th><th>Effect / Use</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Tools -->
-          <tr>
-            <td>Touchstone</td><td>tool</td><td>mineral</td>
-            <td><span class="r-common">Common</span></td><td>45</td>
-            <td>Dip a gem to identify it by streak and hardness.</td>
-          </tr>
-          <!-- Potions -->
-          <tr>
-            <td>Potion of Poison</td><td>potion</td><td>glass</td>
-            <td><span class="r-common">Common</span></td><td>20</td>
-            <td><strong>Dip weapon:</strong> Applies poison coating (+12 charges).</td>
-          </tr>
-          <tr>
-            <td>Potion of Stoneskin</td><td>potion</td><td>glass</td>
-            <td><span class="r-magic">Magic</span></td><td>60</td>
-            <td>
-              <strong>Drink:</strong> Stoneskin buff 10–14 turns, potency 2–3.<br>
-              <strong>Throw:</strong> Shatters and spawns a Taunting Statue.<br>
-              <strong>Dip armor/weapon:</strong> Converts material to stone, +1 DEF.
-            </td>
-          </tr>
-          <!-- Scrolls -->
-          <tr>
-            <td>Scroll of Blast Wave</td><td>scroll</td><td>paper</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>One-shot Blast Wave cast — no spell knowledge required. Consumed on use.</td>
-          </tr>
-          <tr>
-            <td>Scroll of Homecoming</td><td>scroll</td><td>paper</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Instantly returns player to dungeon depth 0 (surface). Consumed on use.</td>
-          </tr>
-          <tr>
-            <td>Scroll of Mapping</td><td>scroll</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>100</td>
-            <td>Reveals the full map of the current floor.</td>
-          </tr>
-          <!-- Wands -->
-          <tr>
-            <td>Wand of Lightning</td><td>wand</td><td>wood</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Fires chain lightning at target. 3 charges, each consumed on use.</td>
-          </tr>
-          <tr>
-            <td>Wand of Meteor</td><td>wand</td><td>wood</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Calls down a meteor at target location. 2 charges.</td>
-          </tr>
-          <tr>
-            <td>Wand of Frost</td><td>wand</td><td>wood</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Encases target in frost, slowing movement. Lighter enemies freeze longer. 3 charges.</td>
-          </tr>
-          <!-- Spellbooks -->
-          <tr>
-            <td>Spellbook of Lightning</td><td>learn</td><td>paper</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Permanently teaches Lightning. Consumed on use.</td>
-          </tr>
-          <tr>
-            <td>Spellbook of Meteor</td><td>learn</td><td>paper</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Permanently teaches Meteor. Consumed on use.</td>
-          </tr>
-          <tr>
-            <td>Spellbook of Blast Wave</td><td>learn</td><td>paper</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Permanently teaches Blast Wave. Consumed on use.</td>
-          </tr>
-          <tr>
-            <td>Spellbook of Blink</td><td>learn</td><td>paper</td>
-            <td><span class="r-rare">Rare</span></td><td>—</td>
-            <td>Permanently teaches Blink. Consumed on use.</td>
-          </tr>
-          <!-- Flavor books -->
-          <tr>
-            <td>Book of the Dead</td><td>book</td><td>paper</td>
-            <td><span class="r-legendary">Legendary</span></td><td>—</td>
-            <td>Opens the death log — a record of every hero who came before. Reusable.</td>
-          </tr>
-          <tr>
-            <td>On the Care of Dungeon Cats</td><td>book</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>—</td>
-            <td>Flavor text: cats follow, fetch, and drop things unprompted. Reusable.</td>
-          </tr>
-          <tr>
-            <td>Snake Nest Husbandry</td><td>book</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>—</td>
-            <td>Flavor text: snake traps, 25% poison chance. Reusable.</td>
-          </tr>
-          <tr>
-            <td>The Spike Trap Quarterly, Vol. III</td><td>book</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>—</td>
-            <td>Flavor text: spike traps deal ~35% max HP. Reusable.</td>
-          </tr>
-          <tr>
-            <td>Touchstone: A Gemcutter's Manual</td><td>book</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>—</td>
-            <td>Flavor text: how to use the touchstone to identify gems. Reusable.</td>
-          </tr>
-          <tr>
-            <td>On Eating Monster Corpses</td><td>book</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>—</td>
-            <td>Hints: rat=disease, snake/spider=poison, floating eye=amnesia. Reusable.</td>
-          </tr>
-          <tr>
-            <td>A Field Guide to Grid Bugs</td><td>book</td><td>paper</td>
-            <td><span class="r-common">Common</span></td><td>—</td>
-            <td>Flavor text: grid bugs only move along cardinal axes. Reusable.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Food -->
-  <div class="section">
-    <h2>Food</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Name</th><th>Rarity</th><th>Weight</th><th>Value</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Ration</td><td><span class="r-common">Common</span></td><td>1.0</td><td>10</td><td>A dry but filling travel ration.</td></tr>
-          <tr><td>Iron Ration</td><td><span class="r-common">Common</span></td><td>1.5</td><td>25</td><td>A well-preserved military ration. Very filling.</td></tr>
-          <tr><td>Wild Berries</td><td><span class="r-common">Common</span></td><td>0.2</td><td>4</td><td>A handful of sweet wild berries.</td></tr>
-          <tr><td>Wild Herbs</td><td><span class="r-common">Common</span></td><td>0.15</td><td>3</td><td>Fresh herbs with a sharp, earthy bite.</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <h2>Item Index</h2>
+    <p>Live item catalog sourced from <code>rules/data/itemCatalog.js</code>. Includes all equipment, magic, and food entries.</p>
+    <div id="items-live"></div>
   </div>
 
 </section>
@@ -643,63 +460,10 @@
 
   <div class="section">
     <h2>Spells</h2>
-    <p>Spells are permanently learned from spellbooks, or fired once via scrolls and wands. Casting costs mana. Lightning additionally requires Intelligence ≥ 8.</p>
+    <p>Live spell index sourced from <code>rules/data/spells.js</code>, with acquisition mapped from item catalog spellbooks, scrolls, and wands.</p>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th><th>Mana Cost</th><th>Min INT</th><th>Range</th><th>Targeting</th><th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Lightning</td><td>7</td><td>8</td><td>—</td><td>Target entity</td>
-          <td>Fires a bolt of chain lightning that arcs between nearby enemies.</td>
-        </tr>
-        <tr>
-          <td>Meteor</td><td>12</td><td>0</td><td>12</td><td>Target location</td>
-          <td>Calls down a meteor at the targeted tile. High area damage.</td>
-        </tr>
-        <tr>
-          <td>Blast Wave</td><td>7</td><td>0</td><td>—</td><td>Self (radial)</td>
-          <td>Releases a shockwave from the caster, pushing back all nearby enemies.</td>
-        </tr>
-        <tr>
-          <td>Blink</td><td>6</td><td>0</td><td>10</td><td>Target location</td>
-          <td>Teleports the caster to the targeted tile within range 10.</td>
-        </tr>
-        <tr>
-          <td>Homecoming</td><td>1</td><td>0</td><td>—</td><td>Self</td>
-          <td>Instantly returns the caster to dungeon depth 0 (the surface).</td>
-        </tr>
-        <tr>
-          <td>Frost</td><td>5</td><td>0</td><td>—</td><td>Target entity</td>
-          <td>Encases an enemy in frost, slowing movement. Lighter enemies freeze for longer.</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="section" style="margin-top:32px;">
-    <h2>Acquisition</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Spell</th><th>Spellbook (permanent)</th><th>Scroll (one-shot)</th><th>Wand (charged)</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Lightning</td><td>Spellbook of Lightning</td><td>—</td><td>Wand of Lightning (3 ch.)</td></tr>
-          <tr><td>Meteor</td><td>Spellbook of Meteor</td><td>—</td><td>Wand of Meteor (2 ch.)</td></tr>
-          <tr><td>Blast Wave</td><td>Spellbook of Blast Wave</td><td>Scroll of Blast Wave</td><td>—</td></tr>
-          <tr><td>Blink</td><td>Spellbook of Blink</td><td>—</td><td>—</td></tr>
-          <tr><td>Homecoming</td><td>—</td><td>Scroll of Homecoming</td><td>—</td></tr>
-          <tr><td>Frost</td><td>—</td><td>—</td><td>Wand of Frost (3 ch.)</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <div id="spells-live"></div>
 
 </section>
 
@@ -829,7 +593,7 @@
 
 <script type="module">
   // ── Effects table — sourced from effectDefs.js ─────────────────────────────
-  import { EFFECT_DEFS } from '../src/rules/data/effectDefs.js';
+  import { EFFECT_DEFS } from '../../src/rules/data/effectDefs.js';
 
   const base = window.location.origin + '/';
 
@@ -865,6 +629,166 @@
         </thead>
         <tbody>${rows}</tbody>
       </table>
+    </div>`;
+</script>
+
+<script type="module">
+  // ── Item + spell indexes — sourced from itemCatalog.js + spells.js ─────────
+  import { listCatalogItems } from '../../src/rules/data/itemCatalog.js';
+  import { listSpells } from '../../src/rules/data/spells.js';
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function fmtNum(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? String(n) : '\u2014';
+  }
+
+  function fmtTargeting(targeting) {
+    const t = String(targeting || "").toLowerCase();
+    if (t === "self") return "Self";
+    if (t === "target") return "Target tile";
+    if (t === "auto") return "Auto target";
+    if (t === "path") return "Path";
+    if (t === "area") return "Area";
+    if (t === "enemy") return "Target enemy";
+    return "\u2014";
+  }
+
+  function fmtRarity(name) {
+    const r = String(name || "").toLowerCase();
+    if (r === "common") return '<span class="r-common">Common</span>';
+    if (r === "magic") return '<span class="r-magic">Magic</span>';
+    if (r === "rare") return '<span class="r-rare">Rare</span>';
+    if (r === "epic") return '<span class="r-legendary">Epic</span>';
+    if (r === "legendary") return '<span class="r-legendary">Legendary</span>';
+    return esc(name || "\u2014");
+  }
+
+  function formatBonuses(bonuses) {
+    if (!bonuses || typeof bonuses !== "object") return "\u2014";
+    const entries = Object.entries(bonuses).filter(([, value]) => Number(value) !== 0);
+    if (entries.length === 0) return "\u2014";
+    return entries.map(([key, value]) => `${esc(key)} ${esc(String(value))}`).join(", ");
+  }
+
+  const items = listCatalogItems().slice().sort((a, b) => {
+    const ka = `${String(a.catalogKind || "")}:${String(a.type || "")}:${String(a.name || "")}`;
+    const kb = `${String(b.catalogKind || "")}:${String(b.type || "")}:${String(b.name || "")}`;
+    return ka.localeCompare(kb);
+  });
+
+  const itemRows = items.map((def) => `
+    <tr>
+      <td>${esc(def.name || def.id)}</td>
+      <td><code>${esc(def.id || "")}</code></td>
+      <td>${esc(def.catalogKind || "\u2014")}</td>
+      <td>${esc(def.type || "\u2014")}</td>
+      <td>${esc(def.slot || "\u2014")}</td>
+      <td>${esc(def.material || "\u2014")}</td>
+      <td>${fmtRarity(def.rarityName)}</td>
+      <td>${fmtNum(def.value)}</td>
+      <td>${esc(def.damageDice || "\u2014")}</td>
+      <td>${fmtNum(def.staminaCost)}</td>
+      <td>${formatBonuses(def.bonuses)}</td>
+      <td>${esc(def.description || "\u2014")}</td>
+    </tr>`).join("");
+
+  document.getElementById("items-live").innerHTML = `
+    <p style="color:var(--text-dim);margin-bottom:10px">${items.length} item definitions</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>ID</th>
+            <th>Catalog</th>
+            <th>Type</th>
+            <th>Slot</th>
+            <th>Material</th>
+            <th>Rarity</th>
+            <th>Value</th>
+            <th>Damage</th>
+            <th>Stamina</th>
+            <th>Bonuses</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>${itemRows}</tbody>
+      </table>
+    </div>`;
+
+  const itemById = new Map(items.map((def) => [String(def.id || ""), def]));
+  const spells = listSpells().slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  const spellRows = spells.map((spell) => `
+    <tr>
+      <td>${esc(spell.name || spell.id)}</td>
+      <td><code>${esc(spell.id || "")}</code></td>
+      <td>${fmtNum(spell.manaCost)}</td>
+      <td>${fmtNum(spell.minIntelligence)}</td>
+      <td>${fmtNum(spell.range)}</td>
+      <td>${fmtNum(spell.castTime)}</td>
+      <td>${Number(spell.channeling) ? "Yes" : "No"}</td>
+      <td>${fmtNum(spell.cooldown)}</td>
+      <td>${fmtTargeting(spell.targeting)}</td>
+      <td>${esc(spell.description || "\u2014")}</td>
+    </tr>`).join("");
+
+  const acquisitionRows = spells.map((spell) => {
+    const id = String(spell.id || "");
+    const book = itemById.get(`book_${id}`);
+    const scroll = itemById.get(`scroll_${id}`);
+    const wand = itemById.get(`wand_${id}`);
+    const wandText = wand
+      ? `${wand.name}${Number.isFinite(Number(wand.charges)) ? ` (${Number(wand.charges)} ch.)` : ""}`
+      : "\u2014";
+    return `
+      <tr>
+        <td>${esc(spell.name || id)}</td>
+        <td>${book ? esc(book.name || book.id) : "\u2014"}</td>
+        <td>${scroll ? esc(scroll.name || scroll.id) : "\u2014"}</td>
+        <td>${esc(wandText)}</td>
+      </tr>`;
+  }).join("");
+
+  document.getElementById("spells-live").innerHTML = `
+    <p style="color:var(--text-dim);margin-bottom:10px">${spells.length} spell definitions</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>ID</th>
+            <th>Mana</th>
+            <th>Min INT</th>
+            <th>Range</th>
+            <th>Cast Time</th>
+            <th>Channeling</th>
+            <th>Cooldown</th>
+            <th>Targeting</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>${spellRows}</tbody>
+      </table>
+    </div>
+    <div class="section" style="margin-top:32px;">
+      <h2>Acquisition</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Spell</th><th>Spellbook (permanent)</th><th>Scroll (one-shot)</th><th>Wand (charged)</th></tr>
+          </thead>
+          <tbody>${acquisitionRows}</tbody>
+        </table>
+      </div>
     </div>`;
 </script>
 
