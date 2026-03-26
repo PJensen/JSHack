@@ -64,6 +64,18 @@ export function getQuickChipPrimaryActionLabel(it) {
   return 'Use';
 }
 
+/**
+ * @param {any} it
+ * @returns {boolean}
+ */
+export function isQuickChipActionable(it) {
+  const t = String(it?.type || '');
+  if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
+  if (t === 'tool') return true;
+  if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food' || t === 'gem') return (it?.count || 0) > 0;
+  return false;
+}
+
 export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
   chipPosition: 'relative',
   contentPaddingRight: '66px',
@@ -145,6 +157,35 @@ export function reconcilePinnedQuickItemsWithInventory(pinned, inventoryItems) {
       identity: String(fresh?.identity || entry?.identity || ''),
       details: fresh?.details || entry?.details,
     });
+  }
+  return out;
+}
+
+/**
+ * @param {Array<any>} pinned
+ * @param {{ pinKey?:string, identity?:string, itemId?:number } | null | undefined} usedDetail
+ * @returns {Array<any>}
+ */
+export function applyPinnedQuickItemUse(pinned, usedDetail) {
+  const source = Array.isArray(pinned) ? pinned : [];
+  const key = String(usedDetail?.pinKey || usedDetail?.identity || '');
+  const hasKey = key.length > 0;
+  const itemId = Number(usedDetail?.itemId || 0) | 0;
+  const hasItemId = itemId > 0;
+  if (!hasKey && !hasItemId) return source.slice();
+  const out = [];
+  for (const entry of source) {
+    const entryId = Number(entry?.id || 0) | 0;
+    const entryIdentity = String(entry?.identity || entry?.details?.identity || '');
+    const entryKey = String(entry?.pinKey || entryIdentity || (entryId > 0 ? `id:${entryId}` : ''));
+    const matches = (hasKey && entryKey === key) || (!hasKey && hasItemId && entryId === itemId);
+    if (!matches) {
+      out.push(entry);
+      continue;
+    }
+    const nextCount = Math.max(0, Number(entry?.count || 0) - 1);
+    if (!(nextCount > 0)) continue;
+    out.push({ ...entry, count: nextCount });
   }
   return out;
 }
@@ -1409,11 +1450,7 @@ function createQuickSlot(opts = {}) {
   }
 
   function actionable(it) {
-    const t = String(it.type||'');
-    if (t === 'equip' || t === 'ammo' || t === 'wand') return true;
-    if (t === 'tool') return true;
-    if (t === 'potion' || t === 'scroll' || t === 'learn' || t === 'book' || t === 'food') return (it.count||0) > 0;
-    return false;
+    return isQuickChipActionable(it);
   }
 
   let dismissTimer = 0;
@@ -2071,7 +2108,19 @@ function createPinnedItemSlots() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     hidePinnedTooltip();
-    removeByPinKeyOrId(e?.detail?.pinKey || e?.detail?.identity || e?.detail?.itemId);
+    const next = applyPinnedQuickItemUse(pinned, e?.detail);
+    if (arePinnedArraysEqual(next, pinned)) return;
+    pinned = next;
+    render();
+  });
+  window.addEventListener('ui:itemThrown', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    hidePinnedTooltip();
+    const next = applyPinnedQuickItemUse(pinned, e?.detail);
+    if (arePinnedArraysEqual(next, pinned)) return;
+    pinned = next;
+    render();
   });
   window.addEventListener('ui:itemEquipped', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
