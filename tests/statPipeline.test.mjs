@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
+import { BaseStats } from "../src/rules/components/BaseStats.js";
 import { Status } from "../src/rules/components/Status.js";
 import { resolveCombatSnapshot } from "../src/rules/utils/resolveCombatSnapshot.js";
 
@@ -143,4 +144,23 @@ Deno.test("resolveCombatSnapshot exposes physical penetration channels", () => {
   assertEquals(snap.bluntPenetration, 2);
   assertEquals(snap.slashPenetration, 3);
   assertEquals(snap.piercePenetration, 4);
+});
+
+Deno.test("resolveCombatSnapshot applies dexterity-derived gear bonus through canonical stats", () => {
+  const world = new World({ seed: 21 });
+  const actor = world.create();
+  world.add(actor, BaseStats, {
+    strength: 10,
+    intelligence: 10,
+    dexterity: 10,
+    vitality: 10,
+  });
+  world.add(actor, Equipment, {
+    dexterityDerived: 4,
+  });
+
+  const snap = resolveCombatSnapshot(world, actor, { mode: "melee" });
+  assertEquals(snap.attackBonus, 3, "base 1 + dex-derived accuracy 2");
+  assertEquals(snap.armorClass, 12, "base 10 + dex-derived evade 2");
+  assertEquals(snap.critChance, 0.02, "dex-derived breakpoint should add physical crit chance");
 });

@@ -176,12 +176,19 @@ Deno.test("equipment system stacks legacy and canonical bonus keys into canonica
     slot: 'neck',
     bonuses: { spellHit: 3 },
   });
+  const dexBoots = makeEquip(world, {
+    name: "Dex Boots",
+    id: "dex_boots",
+    slot: "feet",
+    bonuses: { dexterity: 2 },
+  });
 
   eq.weapon = legacySword;
   eq.ranged = modernBow;
   eq.armor = legacyArmor;
   eq.head = modernHelm;
   eq.neck = focusCharm;
+  eq.feet = dexBoots;
 
   equipmentSystem(world);
 
@@ -190,4 +197,5 @@ Deno.test("equipment system stacks legacy and canonical bonus keys into canonica
   assert(eq.evadeDerived === 3, 'legacy defense should still contribute to evade');
   assert(eq.spellHitDerived === 3, 'canonical spellHit should map into equipment derived stats');
   assert(eq.spellAvoidDerived === 2, 'canonical spellAvoid should map into equipment derived stats');
+  assert(eq.dexterityDerived === 2, "canonical dexterity should map into equipment derived stats");
 });

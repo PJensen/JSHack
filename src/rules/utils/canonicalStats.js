@@ -14,6 +14,13 @@ export function resolveCanonicalStats(world, entityId) {
   const resolved = resolveDerivedStats(world, id);
   const passive = getPassiveBonuses(world, id);
 
+  const baseDexterity = Number(resolved?.dexterity || 0);
+  const dexterityDerived = Number(passive?.dexterityDerived || 0);
+  const totalDexterity = baseDexterity + dexterityDerived;
+  const baseDexBonus = Math.floor(Math.max(0, baseDexterity - 10) / 2);
+  const totalDexBonus = Math.floor(Math.max(0, totalDexterity - 10) / 2);
+  const dexBonusDelta = totalDexBonus - baseDexBonus;
+
   const accuracyDerived = Number(passive?.accuracyDerived || 0);
   const damagePowerDerived = Number(passive?.damagePowerDerived || 0);
   const physicalPenetrationDerived = Number(passive?.physicalPenetrationDerived || 0);
@@ -27,15 +34,16 @@ export function resolveCanonicalStats(world, entityId) {
 
   return Object.freeze({
     ...resolved,
-    accuracy: Number(resolved?.accuracy || 0) + accuracyDerived,
+    dexterity: totalDexterity,
+    accuracy: Number(resolved?.accuracy || 0) + accuracyDerived + dexBonusDelta,
     damagePower: Number(resolved?.damagePower || 0) + damagePowerDerived,
     physicalPenetration: Number(resolved?.physicalPenetration || 0) + physicalPenetrationDerived,
     bluntPenetration: Number(resolved?.bluntPenetration || 0) + bluntPenetrationDerived,
     slashPenetration: Number(resolved?.slashPenetration || 0) + slashPenetrationDerived,
     piercePenetration: Number(resolved?.piercePenetration || 0) + piercePenetrationDerived,
-    evade: Number(resolved?.evade || 0) + evadeDerived,
+    evade: Number(resolved?.evade || 0) + evadeDerived + dexBonusDelta,
     mitigation: Number(resolved?.mitigation || 0) + mitigationDerived,
-    critChancePhysical: Number(resolved?.critChancePhysical || 0) + critChanceDerived,
+    critChancePhysical: Number(resolved?.critChancePhysical || 0) + critChanceDerived + (dexBonusDelta * 0.01),
     critChanceSpell: Number(resolved?.critChanceSpell || 0) + critChanceDerived,
     critMultPhysical: Number(resolved?.critMultPhysical || 0) + critMultDerived,
     critMultSpell: Number(resolved?.critMultSpell || 0) + critMultDerived,

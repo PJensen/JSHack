@@ -37,6 +37,7 @@ export const Equipment = defineComponent('Equipment', {
   ammo: null,
   ranged: null,
   feet: null,
+  dexterityDerived: 0,
   accuracyDerived: 0,
   damagePowerDerived: 0,
   physicalPenetrationDerived: 0,
