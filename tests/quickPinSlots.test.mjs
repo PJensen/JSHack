@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert";
-import { reconcilePinnedQuickItemsWithInventory, upsertPinnedQuickItemLifo } from "../src/display/ui/hud.js";
+import { applyPinnedQuickItemUse, reconcilePinnedQuickItemsWithInventory, upsertPinnedQuickItemLifo } from "../src/display/ui/hud.js";
 
 Deno.test("quick pin slots keep latest entries and evict oldest when full (LIFO replacement)", () => {
   let pinned = [];
@@ -58,4 +58,14 @@ Deno.test("quick pin slots reconcile grouped inventory entries by identity", () 
   ];
   const next = reconcilePinnedQuickItemsWithInventory(pinned, bagItems);
   assertEquals(next.map((it) => [it.pinKey, it.id, it.count]), [["potion_heal_minor", 61, 3]]);
+});
+
+Deno.test("quick pin slots decrement stack count on item use and keep pin until empty", () => {
+  const pinned = [{ id: 70, identity: "potion_heal_minor", pinKey: "potion_heal_minor", count: 3, name: "Potion" }];
+  const oneUse = applyPinnedQuickItemUse(pinned, { pinKey: "potion_heal_minor", itemId: 70 });
+  assertEquals(oneUse.map((it) => [it.pinKey, it.count]), [["potion_heal_minor", 2]]);
+  const twoUses = applyPinnedQuickItemUse(oneUse, { pinKey: "potion_heal_minor", itemId: 70 });
+  assertEquals(twoUses.map((it) => [it.pinKey, it.count]), [["potion_heal_minor", 1]]);
+  const threeUses = applyPinnedQuickItemUse(twoUses, { pinKey: "potion_heal_minor", itemId: 70 });
+  assertEquals(threeUses.length, 0);
 });
