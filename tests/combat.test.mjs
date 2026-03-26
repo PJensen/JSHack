@@ -241,11 +241,13 @@ Deno.test("poison weapon coating procs frequently and spends one charge per succ
 
   let foundProc = false;
   let foundNoProc = false;
+  let procCount = 0;
   for (let seed = 1; seed <= 256; seed++) {
     const r = runOne(seed);
     assertEquals(r.chargesAfter, 2, 'every successful hit should consume exactly one coating charge');
     if (r.procced) {
       foundProc = true;
+      procCount += 1;
       assertEquals(r.turnsLeft, 4, 'proc should apply poison for 4 turns');
       assertEquals(r.potency, 2, 'proc should apply poison potency 2');
     } else {
@@ -256,6 +258,7 @@ Deno.test("poison weapon coating procs frequently and spends one charge per succ
 
   assert(foundProc, 'expected at least one deterministic seed to trigger poison coating proc');
   assert(foundNoProc, 'expected at least one deterministic seed to miss poison proc at high-but-not-total chance');
+  assert(procCount >= 140, `expected poison proc count to reflect high proc chance, got ${procCount}/256`);
 });
 
 Deno.test("blinded defenders are easier to hit in melee based on blindness strength", () => {
