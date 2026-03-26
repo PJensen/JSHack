@@ -1,5 +1,10 @@
 import { assertEquals } from "jsr:@std/assert";
-import { applyPinnedQuickItemUse, reconcilePinnedQuickItemsWithInventory, upsertPinnedQuickItemLifo } from "../src/display/ui/hud.js";
+import {
+  applyPinnedQuickItemUse,
+  buildStartingPinnedQuickItems,
+  reconcilePinnedQuickItemsWithInventory,
+  upsertPinnedQuickItemLifo,
+} from "../src/display/ui/hud.js";
 
 Deno.test("quick pin slots keep latest entries and evict oldest when full (LIFO replacement)", () => {
   let pinned = [];
@@ -76,4 +81,36 @@ Deno.test("quick pin slots decrement stack count on item thrown and remove at ze
   assertEquals(oneThrow.map((it) => [it.pinKey, it.count]), [["potion_heal_minor", 1]]);
   const twoThrows = applyPinnedQuickItemUse(oneThrow, { pinKey: "potion_heal_minor", itemId: 71 });
   assertEquals(twoThrows.length, 0);
+});
+
+Deno.test("quick pin slots build starting pins for hearthstone, mana, healing, then utility", () => {
+  const bagItems = [
+    { id: 1, identity: "hearthstone", count: 1 },
+    { id: 2, identity: "potion_health", count: 2 },
+    { id: 3, identity: "potion_mana", count: 3 },
+    { id: 4, identity: "scroll_identify", count: 4 },
+    { id: 5, identity: "potion_holy_water", count: 1 },
+  ];
+  const picked = buildStartingPinnedQuickItems(bagItems, 4);
+  assertEquals(picked.map((it) => it.identity), [
+    "hearthstone",
+    "potion_mana",
+    "potion_health",
+    "potion_holy_water",
+  ]);
+});
+
+Deno.test("quick pin slots starter utility is optional", () => {
+  const bagItems = [
+    { id: 1, identity: "hearthstone", count: 1 },
+    { id: 2, identity: "potion_health", count: 2 },
+    { id: 3, identity: "potion_mana", count: 3 },
+    { id: 4, identity: "scroll_identify", count: 4 },
+  ];
+  const picked = buildStartingPinnedQuickItems(bagItems, 4);
+  assertEquals(picked.map((it) => it.identity), [
+    "hearthstone",
+    "potion_mana",
+    "potion_health",
+  ]);
 });

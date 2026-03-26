@@ -93,6 +93,85 @@ export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   pinnedQuickSlots: Object.freeze({ col: '4 / 6', row: '1 / 3' }),
 });
 
+const STARTER_PIN_PRIORITY = Object.freeze([
+  Object.freeze(['hearthstone']),
+  Object.freeze(['potion_mana', 'mana_potion']),
+  Object.freeze(['potion_health', 'healing_potion']),
+]);
+
+const STARTER_PIN_SKIP_IDENTITIES = new Set([
+  'scroll_identify',
+  'ammo_arrows',
+  'ammo_fire_arrows',
+  'ammo_piercing_arrows',
+  'ammo_bodkin_arrows',
+  'ammo_blunt_arrows',
+]);
+
+/**
+ * @param {any} item
+ * @returns {string}
+ */
+export function getQuickPinKey(item) {
+  const identity = String(item?.identity || item?.details?.identity || '');
+  if (identity) return identity;
+  const id = Number(item?.id || 0) | 0;
+  return id > 0 ? `id:${id}` : '';
+}
+
+/**
+ * @param {Array<any>} pinned
+ * @param {any} item
+ * @returns {boolean}
+ */
+export function isPinnedQuickItem(pinned, item) {
+  const key = getQuickPinKey(item);
+  if (!key) return false;
+  const source = Array.isArray(pinned) ? pinned : [];
+  return source.some((entry) => getQuickPinKey(entry) === key);
+}
+
+/**
+ * @param {Array<any>} inventoryItems
+ * @param {number} capacity
+ * @returns {Array<any>}
+ */
+export function buildStartingPinnedQuickItems(inventoryItems, capacity = 4) {
+  const max = Math.max(1, Number(capacity || 4) | 0);
+  const bag = Array.isArray(inventoryItems)
+    ? inventoryItems.filter((item) => Math.max(0, Number(item?.count || 0) | 0) > 0)
+    : [];
+  if (!bag.length) return [];
+
+  const selected = [];
+  const usedKeys = new Set();
+  const pushUnique = (item) => {
+    if (!item || selected.length >= max) return;
+    const key = getQuickPinKey(item);
+    if (!key || usedKeys.has(key)) return;
+    usedKeys.add(key);
+    selected.push(item);
+  };
+
+  for (const aliases of STARTER_PIN_PRIORITY) {
+    const pick = bag.find((item) => aliases.includes(String(item?.identity || '').toLowerCase()));
+    if (pick) pushUnique(pick);
+    if (selected.length >= max) return selected;
+  }
+
+  const coreIdentities = new Set(STARTER_PIN_PRIORITY.flat());
+  for (const item of bag) {
+    const identity = String(item?.identity || '').toLowerCase();
+    if (!identity) continue;
+    if (coreIdentities.has(identity)) continue;
+    if (STARTER_PIN_SKIP_IDENTITIES.has(identity)) continue;
+    pushUnique(item);
+    break;
+  }
+
+  return selected;
+}
+
 /**
  * @param {Array<any>} pinned
  * @param {any} item
@@ -105,7 +184,7 @@ export function upsertPinnedQuickItemLifo(pinned, item, capacity = 3) {
   const next = source.slice();
   const id = Number(item?.id || 0) | 0;
   const identity = String(item?.identity || item?.details?.identity || '');
-  const pinKey = identity || (id > 0 ? `id:${id}` : '');
+  const pinKey = getQuickPinKey(item);
   if (!pinKey) return next;
   const idx = next.findIndex((entry) => String(entry?.pinKey || '') === pinKey);
   if (idx >= 0) next.splice(idx, 1);
@@ -1618,6 +1697,7 @@ function createPinnedItemSlots() {
   let pinned = [];
   /** @type {Array<any>} */
   let inventoryItems = [];
+  let didSeedStarterPins = false;
   /** @type {((item:any) => void) | null} */
   let presenter = null;
   /** @type {HTMLButtonElement[]} */
@@ -1660,6 +1740,16 @@ function createPinnedItemSlots() {
     root.appendChild(tip);
     tooltipEl = tip;
     return tip;
+  }
+
+  function emitPinnedQuickItems() {
+    const pinKeys = pinned.map((entry) => getQuickPinKey(entry)).filter(Boolean);
+    window.dispatchEvent(new CustomEvent('ui:pinnedQuickItems', {
+      detail: {
+        pinKeys,
+        pinned: pinned.slice(),
+      },
+    }));
   }
 
   function hidePinnedTooltip() {
@@ -1797,12 +1887,11 @@ function createPinnedItemSlots() {
     const idx = Math.max(0, Math.min(pool.length - 1, Number(browseState.index || 0)));
     const selected = normalizeTooltipItem(pool[idx]);
     if (!selected) return;
-    const identity = String(selected?.identity || selected?.details?.identity || '');
-    const id = Number(selected?.id || 0) | 0;
-    const pinKey = identity || (id > 0 ? `id:${id}` : '');
+    const pinKey = getQuickPinKey(selected);
     if (!pinKey) return;
     pinned[slotIndex] = { ...selected, pinKey };
     render();
+    emitPinnedQuickItems();
   }
 
   function resetHoldRing(index) {
@@ -1960,6 +2049,7 @@ function createPinnedItemSlots() {
   function pinItem(item) {
     pinned = upsertPinnedQuickItemLifo(pinned, item, SLOT_COUNT);
     render();
+    emitPinnedQuickItems();
   }
 
   function removeByPinKeyOrId(pinKeyOrId) {
@@ -1968,11 +2058,14 @@ function createPinnedItemSlots() {
     if (!key && !(id > 0)) return;
     const before = pinned.length;
     pinned = pinned.filter((entry) => {
-      const entryKey = String(entry?.pinKey || '');
+      const entryKey = getQuickPinKey(entry);
       if (entryKey && key && entryKey === key) return false;
       return Number(entry?.id || 0) !== id;
     });
-    if (pinned.length !== before) render();
+    if (pinned.length !== before) {
+      render();
+      emitPinnedQuickItems();
+    }
   }
 
   for (let i = 0; i < SLOT_COUNT; i++) {
@@ -2132,6 +2225,7 @@ function createPinnedItemSlots() {
     if (arePinnedArraysEqual(next, pinned)) return;
     pinned = next;
     render();
+    emitPinnedQuickItems();
   });
   window.addEventListener('ui:itemThrown', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -2141,6 +2235,7 @@ function createPinnedItemSlots() {
     if (arePinnedArraysEqual(next, pinned)) return;
     pinned = next;
     render();
+    emitPinnedQuickItems();
   });
   window.addEventListener('ui:itemEquipped', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -2164,19 +2259,40 @@ function createPinnedItemSlots() {
       details: item,
     };
     render();
+    emitPinnedQuickItems();
+  });
+  window.addEventListener('ui:requestPinQuickItem', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const item = e?.detail?.item;
+    if (!item || !getQuickPinKey(item)) return;
+    pinItem(item);
   });
   window.addEventListener('ui:inventoryData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     inventoryItems = Array.isArray(e?.detail?.bagItems) ? e.detail.bagItems : [];
     const bagItems = Array.isArray(e?.detail?.bagItems) ? e.detail.bagItems : [];
+    if (!didSeedStarterPins && pinned.length === 0 && bagItems.length > 0) {
+      didSeedStarterPins = true;
+      const seeds = buildStartingPinnedQuickItems(bagItems, SLOT_COUNT);
+      for (const item of seeds) {
+        pinned = upsertPinnedQuickItemLifo(pinned, item, SLOT_COUNT);
+      }
+      if (seeds.length > 0) {
+        render();
+        emitPinnedQuickItems();
+      }
+    }
     const next = reconcilePinnedQuickItemsWithInventory(pinned, bagItems);
     if (arePinnedArraysEqual(next, pinned)) return;
     pinned = next;
     render();
+    emitPinnedQuickItems();
   });
 
   render();
+  emitPinnedQuickItems();
   return {
     el,
     pinItem,
