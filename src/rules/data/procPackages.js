@@ -29,6 +29,13 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   FoolsErrand: "procPackage:foolsErrand",
   VenomClock: "procPackage:venomClock",
   HollowTide: "procPackage:hollowTide",
+  DeathAscendant: "procPackage:deathAscendant",
+  ThunderGod: "procPackage:thunderGod",
+  BloodCovenant: "procPackage:bloodCovenant",
+  PredatorMark: "procPackage:predatorMark",
+  SoulAscendant: "procPackage:soulAscendant",
+  EternalHunger: "procPackage:eternalHunger",
+  EclipseHammer: "procPackage:eclipseHammer",
 });
 
 function ensureActiveEffects(world, entityId) {
@@ -397,8 +404,9 @@ registerScript(PROC_PACKAGE_KEYS.FoolsErrand, {
 });
 
 // ── Venom Clock ───────────────────────────────────────────────────────────
-// OnHit: accumulate "venom_clock" stacks on the target (max 3, timer 6).
-// On the 3rd stack: detonate — deal shadow chip, apply virulent poison + disease, clear stacks.
+// OnHit: stack venom_clock on the target (max 3, 6t timer). On the third hit
+// the clock detonates: shadow burst, virulent poison (4t p2), and disease (3t p1).
+// The timer resets if the target goes untouched for 6 turns.
 registerScript(PROC_PACKAGE_KEYS.VenomClock, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
     if (String(ctx?.kind || "") !== "onHit") return;
@@ -412,55 +420,253 @@ registerScript(PROC_PACKAGE_KEYS.VenomClock, {
     const nextStacks = Math.max(1, Number(existing?.stacks || 0) + 1);
     if (existing) {
       existing.turnsLeft = 6;
-      existing.potency = nextStacks;
       existing.stacks = nextStacks;
+      existing.potency = nextStacks;
     } else {
-      ae.effects.push({ key: "venom_clock", turnsLeft: 6, potency: nextStacks, stacks: nextStacks });
+      ae.effects.push({ key: "venom_clock", turnsLeft: 6, stacks: nextStacks, potency: nextStacks });
     }
 
     if (nextStacks >= 3) {
       removeEffect(world, target, "venom_clock");
-      ctx.proc.dealDamage(target, Math.max(3, Math.floor(Number(ctx?.damage?.amount || 0) * 0.6)), "shadow", {
+      ctx.proc.dealDamage(target, Math.max(5, Math.floor(Number(ctx?.damage?.amount || 0) * 0.6)), "shadow", {
         source,
         cause: "procPackage:venomClock",
         noTrigger: true,
       });
-      ctx.proc.applyStatus(target, "poison", 6, 3);
-      ctx.proc.applyStatus(target, "disease", 4, 2);
+      ctx.proc.applyStatus(target, "poison", 4, 2);
+      ctx.proc.applyStatus(target, "disease", 3, 1);
       ctx.proc.message("The venom clock detonates.");
       emit(world, "proc:venomClock:detonate", { actor: source, target });
       return;
     }
-
     emit(world, "proc:venomClock:tick", { actor: source, target, stacks: nextStacks });
   },
 });
 
 // ── Hollow Tide ───────────────────────────────────────────────────────────
-// OnBeforeHit: the lower the attacker's HP, the more damage is added.
-// Below 75%: +1. Below 50%: +3 total. Below 25%: +6 total + weaken the target.
-// The tide rises as the wielder drowns.
+// OnBeforeHit: bonus damage scales with how low the wielder's HP is.
+// Below 75% HP: +1. Below 50%: +3. Below 25%: +6 and weakens the target.
+// The closer to death, the more dangerous.
 registerScript(PROC_PACKAGE_KEYS.HollowTide, {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
     if (String(ctx?.kind || "") !== "onBeforeHit") return;
     const source = Number(ctx?.source || 0) | 0;
     const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const vit = world.get(source, Vitality);
+    if (!vit || !(Number(vit.maxHp) > 0)) return;
+    const hpPct = Number(vit.hp) / Number(vit.maxHp);
+    if (hpPct < 0.25) {
+      ctx.proc.addBonusDamage(6, 6, "physical");
+      ctx.proc.applyStatus(target, "weaken", 3, 1);
+      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 3 });
+    } else if (hpPct < 0.50) {
+      ctx.proc.addBonusDamage(3, 3, "physical");
+      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 2 });
+    } else if (hpPct < 0.75) {
+      ctx.proc.addBonusDamage(1, 1, "physical");
+      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 1 });
+    }
+  },
+});
+
+// ── Death Ascendant ───────────────────────────────────────────────────────
+// OnKill: immediately grant the wielder invulnerability (2t), berserk rage (4t),
+// and a burst of 10 stamina. Killing fuels the ascent.
+registerScript(PROC_PACKAGE_KEYS.DeathAscendant, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onKill") return;
+    const source = Number(ctx?.source || 0) | 0;
+    if (!(source > 0)) return;
+    ctx.proc.applyStatus(source, "invuln", 2, 1);
+    ctx.proc.applyStatus(source, "berserk", 4, 1);
+    ctx.proc.restoreResource(source, "stamina", 10);
+    ctx.proc.message("Death feeds the ascent.");
+    emit(world, "proc:deathAscendant:surge", { actor: source, target: ctx?.target });
+  },
+});
+
+// ── Thunder God ───────────────────────────────────────────────────────────
+// OnHit (crit only): arc 3 electric damage to every hostile in radius 2 of the
+// target and apply shock (2t) to each. The gods answer the critical blow.
+registerScript(PROC_PACKAGE_KEYS.ThunderGod, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onHit") return;
+    if (!ctx?.damage?.crit) return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const pos = world.get(target, Position);
+    if (!pos) return;
+    const srcFac = world.get(source, Faction)?.key || "";
+    let struck = 0;
+    for (const [nearId] of world.query(Position)) {
+      if (!isHostileNear(world, source, pos, nearId, 2)) continue;
+      const nearFac = world.get(nearId, Faction)?.key || "";
+      if (!areFactionsHostile(srcFac, nearFac)) continue;
+      ctx.proc.dealDamage(nearId, 3, "electric", {
+        source,
+        cause: "procPackage:thunderGod",
+        noTrigger: true,
+        nonLethal: nearId !== target,
+      });
+      ctx.proc.applyStatus(nearId, "shock", 2, 1);
+      struck++;
+    }
+    if (struck > 0) {
+      ctx.proc.message("Thunder answers the blow.");
+      emit(world, "proc:thunderGod:strike", { actor: source, target, struck });
+    }
+  },
+});
+
+// ── Blood Covenant ────────────────────────────────────────────────────────
+// OnBeforeHit: spend 8% max HP (minimum 1, never fatal) to add +5 fire bonus
+// damage to the swing. The blade drinks from you first.
+registerScript(PROC_PACKAGE_KEYS.BloodCovenant, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onBeforeHit") return;
+    const source = Number(ctx?.source || 0) | 0;
     if (!(source > 0)) return;
     const vit = world.get(source, Vitality);
     if (!vit || !(Number(vit.maxHp) > 0)) return;
-    const ratio = Number(vit.hp) / Number(vit.maxHp);
+    const cost = Math.max(1, Math.floor(Number(vit.maxHp) * 0.08));
+    if (Number(vit.hp) - cost < 2) return; // refuse if it would drop us to 1 HP
+    ctx.proc.dealDamage(source, cost, "physical", {
+      source,
+      cause: "procPackage:bloodCovenant:tithe",
+      noTrigger: true,
+      nonLethal: true,
+    });
+    ctx.proc.addBonusDamage(5, 5, "fire");
+    emit(world, "proc:bloodCovenant:tithe", { actor: source, cost });
+  },
+});
 
-    if (ratio < 0.25) {
-      ctx.proc.addBonusDamage(6);
-      if (target > 0) ctx.proc.applyStatus(target, "weaken", 3, 1);
-      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 3 });
-    } else if (ratio < 0.50) {
-      ctx.proc.addBonusDamage(3);
-      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 2 });
-    } else if (ratio < 0.75) {
-      ctx.proc.addBonusDamage(1);
-      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 1 });
+// ── Predator Mark ─────────────────────────────────────────────────────────
+// OnHit: accumulate hunt_mark stacks on the target (max 5, timer 4t). Each
+// stack grants +1 bonus damage on every subsequent hit against that target.
+// The longer the hunt, the deadlier each strike.
+registerScript(PROC_PACKAGE_KEYS.PredatorMark, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onHit") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const ae = ensureActiveEffects(world, target);
+    if (!ae) return;
+
+    const existing = getEffect(world, target, "hunt_mark");
+    const nextStacks = Math.min(5, Math.max(1, Number(existing?.stacks || 0) + 1));
+    if (existing) {
+      existing.turnsLeft = 4;
+      existing.potency = nextStacks;
+      existing.stacks = nextStacks;
+    } else {
+      ae.effects.push({ key: "hunt_mark", turnsLeft: 4, potency: nextStacks, stacks: nextStacks });
     }
+
+    if (nextStacks > 1) {
+      ctx.proc.addBonusDamage(nextStacks - 1);
+    }
+    emit(world, "proc:predatorMark:stack", { actor: source, target, stacks: nextStacks });
+  },
+});
+
+// ── Soul Ascendant ────────────────────────────────────────────────────────
+// OnKill: burst-heal 8 HP, apply regen (4t, p2), and stoneskin (3t, p2).
+// Each soul consumed leaves the wielder fuller and harder.
+registerScript(PROC_PACKAGE_KEYS.SoulAscendant, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onKill") return;
+    const source = Number(ctx?.source || 0) | 0;
+    if (!(source > 0)) return;
+    ctx.proc.heal(source, 8);
+    ctx.proc.applyStatus(source, "regen", 4, 2);
+    ctx.proc.applyStatus(source, "stoneskin", 3, 2);
+    ctx.proc.message("The soul mends the wielder.");
+    emit(world, "proc:soulAscendant:harvest", { actor: source, target: ctx?.target });
+  },
+});
+
+// ── Eternal Hunger ────────────────────────────────────────────────────────
+// OnKill: push eternal_hunger stacks (max 10, 12t). Stacks decay 1/turn
+// naturally via the effect timer. OnBeforeHit: spend stacks as flat bonus
+// damage (floor(stacks/2)). The hunger can never be sated.
+registerScript(PROC_PACKAGE_KEYS.EternalHunger, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const kind = String(ctx?.kind || "");
+    const source = Number(ctx?.source || 0) | 0;
+    if (!(source > 0)) return;
+
+    if (kind === "onKill") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const existing = getEffect(world, source, "eternal_hunger");
+      const nextStacks = Math.min(10, Math.max(1, Number(existing?.stacks || 0) + 1));
+      if (existing) {
+        existing.turnsLeft = 12;
+        existing.stacks = nextStacks;
+        existing.potency = nextStacks;
+      } else {
+        ae.effects.push({ key: "eternal_hunger", turnsLeft: 12, stacks: nextStacks, potency: nextStacks });
+      }
+      ctx.proc.message("The hunger grows.");
+      emit(world, "proc:eternalHunger:feed", { actor: source, target: ctx?.target, stacks: nextStacks });
+      return;
+    }
+
+    if (kind === "onBeforeHit") {
+      const stacks = Math.max(0, Number(getEffect(world, source, "eternal_hunger")?.stacks || 0));
+      if (stacks > 0) {
+        ctx.proc.addBonusDamage(Math.floor(stacks / 2));
+      }
+    }
+  },
+});
+
+// ── Eclipse Hammer ────────────────────────────────────────────────────────
+// OnHit: alternates between Sun phase (fire AoE + burning to adjacent foes)
+// and Moon phase (cold AoE + frost to adjacent foes). Light and dark answer in turn.
+registerScript(PROC_PACKAGE_KEYS.EclipseHammer, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onHit") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const ae = ensureActiveEffects(world, source);
+    if (!ae) return;
+    const pos = world.get(target, Position);
+    if (!pos) return;
+
+    const phase = getEffect(world, source, "eclipse_phase");
+    const isSun = !phase || Number(phase?.stacks || 0) === 0;
+    const srcFac = world.get(source, Faction)?.key || "";
+
+    for (const [nearId] of world.query(Position)) {
+      if (!isHostileNear(world, source, pos, nearId, 1)) continue;
+      const nearFac = world.get(nearId, Faction)?.key || "";
+      if (!areFactionsHostile(srcFac, nearFac)) continue;
+      if (isSun) {
+        ctx.proc.dealDamage(nearId, 2, "fire", {
+          source, cause: "procPackage:eclipseHammer", noTrigger: true, nonLethal: nearId !== target,
+        });
+        ctx.proc.applyStatus(nearId, "burning", 2, 1);
+      } else {
+        ctx.proc.dealDamage(nearId, 2, "cold", {
+          source, cause: "procPackage:eclipseHammer", noTrigger: true, nonLethal: nearId !== target,
+        });
+        ctx.proc.applyStatus(nearId, "frost", 2, 1);
+      }
+    }
+
+    emit(world, isSun ? "proc:eclipseHammer:sun" : "proc:eclipseHammer:moon", { actor: source, target });
+    upsertTimedEffect(ae.effects, {
+      key: "eclipse_phase",
+      turnsLeft: 99,
+      stacks: isSun ? 1 : 0,
+      potency: 1,
+    });
   },
 });
 
@@ -582,6 +788,84 @@ const PROC_PACKAGE_SPECS = Object.freeze([
     passiveExpressions: Object.freeze([]),
     procTrees: Object.freeze([
       Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.HollowTide, priority: 5 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "deathAscendant",
+    name: "Death Ascendant",
+    summary: "Each kill grants invulnerability (2t), berserk rage (4t), and 10 stamina. Killing fuels the ascent.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["death-knight swords", "executioner blades", "slaughter relics"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onKill", script: PROC_PACKAGE_KEYS.DeathAscendant, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "thunderGod",
+    name: "Thunder God",
+    summary: "Critical hits arc 3 electric damage + shock to every hostile within radius 2 of the target. The gods answer the critical blow.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["storm hammers", "lightning spears", "thunder relics"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.ThunderGod, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "bloodCovenant",
+    name: "Blood Covenant",
+    summary: "Each attack spends 8% max HP to add +5 fire bonus damage. The blade drinks from you first.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["blood-pact swords", "sacrifice daggers", "covenant blades"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.BloodCovenant, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "predatorMark",
+    name: "Predator Mark",
+    summary: "Each consecutive hit stacks hunt_mark on the target (max 5, 4t). Stacks add flat bonus damage. The longer the hunt, the deadlier each strike.",
+    stateKeys: Object.freeze(["hunt_mark"]),
+    hostIdeas: Object.freeze(["hunter daggers", "stalker blades", "predator rings"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.PredatorMark, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "soulAscendant",
+    name: "Soul Ascendant",
+    summary: "Each kill heals 8 HP, applies regen (4t p2), and stoneskin (3t p2). Each soul consumed leaves the wielder fuller and harder.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["soul-drinking scythes", "harvest staves", "reaper relics"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onKill", script: PROC_PACKAGE_KEYS.SoulAscendant, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "eternalHunger",
+    name: "Eternal Hunger",
+    summary: "Kills stack eternal_hunger (max 10, 12t decay). Stacks convert to flat bonus damage on each hit (floor(stacks/2)). The hunger can never be sated.",
+    stateKeys: Object.freeze(["eternal_hunger"]),
+    hostIdeas: Object.freeze(["hunger blades", "insatiable axes", "void-touched cleavers"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onKill", script: PROC_PACKAGE_KEYS.EternalHunger, priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.EternalHunger, priority: 5 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "eclipseHammer",
+    name: "Eclipse Hammer",
+    summary: "Alternates between Sun phase (fire AoE + burning) and Moon phase (cold AoE + frost) on every hit. Light and dark answer in turn.",
+    stateKeys: Object.freeze(["eclipse_phase"]),
+    hostIdeas: Object.freeze(["eclipse mauls", "celestial hammers", "dual-aspected relics"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.EclipseHammer, priority: 10 }),
     ]),
   }),
 ]);
