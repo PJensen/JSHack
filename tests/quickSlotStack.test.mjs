@@ -1,5 +1,12 @@
 import { assertEquals } from "jsr:@std/assert";
-import { canQuickChipIdentify, peekStackTop, popUntilActionableTop, getQuickChipPrimaryAction, getQuickChipPrimaryActionLabel } from "../src/display/ui/hud.js";
+import {
+  canQuickChipIdentify,
+  peekStackTop,
+  popUntilActionableTop,
+  getQuickChipPrimaryAction,
+  getQuickChipPrimaryActionLabel,
+  isQuickChipActionable,
+} from "../src/display/ui/hud.js";
 
 Deno.test("quick-slot stack peeks newest pickup first", () => {
   const stack = [];
@@ -18,11 +25,7 @@ Deno.test("quick-slot stack pops non-actionable top before peek", () => {
   ];
 
   const actionable = (it) => {
-    const t = String(it?.type || "");
-    if (t === "equip" || t === "ammo" || t === "wand") return true;
-    if (t === "tool") return true;
-    if (t === "potion" || t === "scroll" || t === "learn" || t === "book" || t === "food") return (it?.count || 0) > 0;
-    return false;
+    return isQuickChipActionable(it);
   };
 
   popUntilActionableTop(stack, actionable);
@@ -47,4 +50,9 @@ Deno.test("quick-chip primary action uses apply for scroll of identify", () => {
   const item = { id: 31, type: "scroll", identity: "scroll_identify", details: { identified: true } };
   assertEquals(getQuickChipPrimaryAction(item), "apply");
   assertEquals(getQuickChipPrimaryActionLabel(item), "Apply");
+});
+
+Deno.test("quick-chip treats gems as actionable stack items", () => {
+  assertEquals(isQuickChipActionable({ type: "gem", count: 1 }), true);
+  assertEquals(isQuickChipActionable({ type: "gem", count: 0 }), false);
 });
