@@ -34,7 +34,9 @@ Deno.test("poison potion apply hook coats weapon and consumes the potion", () =>
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
   const appliedEvents = [];
+  const usedEvents = [];
   world.on("item:applied", (ev) => appliedEvents.push(ev));
+  world.on("item:used", (ev) => usedEvents.push(ev));
 
   const potion = createItemById(world, "potion_poison");
   assert(potion != null, "poison potion should be creatable from item catalog");
@@ -67,4 +69,6 @@ Deno.test("poison potion apply hook coats weapon and consumes the potion", () =>
   );
   assert(!world.isAlive(potion), "poison potion should be consumed");
   assert(!inventoryContains(world, actor, potion), "consumed potion should be removed from inventory");
+  assertEquals(usedEvents.length, 1);
+  assertEquals(Number(usedEvents[0]?.itemId || 0), potion);
 });

@@ -183,7 +183,7 @@ Deno.test("facade: inventoryItems returns empty for no items", () => {
   assertEquals(inventoryItems(world, owner).length, 0);
 });
 
-Deno.test("facade: entities persist without merge on add", () => {
+Deno.test("facade: addToInventory merges compatible stacks by default", () => {
   const world = makeWorld();
   const owner = makeOwner(world);
   const a = makeItem(world, { identity: "gold", count: 10 });
@@ -193,24 +193,24 @@ Deno.test("facade: entities persist without merge on add", () => {
   addToInventory(world, owner, b);
 
   assert(world.isAlive(a));
-  assert(world.isAlive(b));
-  assertEquals(inventoryItems(world, owner).length, 2, "two separate entities in inventory");
+  assert(!world.isAlive(b));
+  assertEquals(inventoryItems(world, owner).length, 1, "compatible stacks should coalesce into one entity");
+  assertEquals(world.get(a, ItemInfo)?.count, 15, "counts should merge by default");
   assertEquals(inventoryStackCount(world, owner), 1, "one capacity stack");
 });
 
-Deno.test("facade: addToInventory can merge into compatible identity stack", () => {
+Deno.test("facade: addToInventory respects mergeCompatible=false override", () => {
   const world = makeWorld();
   const owner = makeOwner(world);
   const a = makeItem(world, { identity: "ammo_fire_arrows", count: 3 });
   const b = makeItem(world, { identity: "ammo_fire_arrows", count: 2 });
 
   addToInventory(world, owner, a);
-  addToInventory(world, owner, b, { mergeCompatible: true });
+  addToInventory(world, owner, b, { mergeCompatible: false });
 
-  assert(world.isAlive(a), "existing stack should remain");
-  assert(!world.isAlive(b), "merged entity should be consumed");
-  assertEquals(inventoryItems(world, owner).length, 1, "inventory should keep one entity after merge");
-  assertEquals(world.get(a, ItemInfo)?.count, 5, "counts should combine onto the existing stack");
+  assert(world.isAlive(a));
+  assert(world.isAlive(b));
+  assertEquals(inventoryItems(world, owner).length, 2, "explicit merge disable should keep distinct entities");
 });
 
 Deno.test("facade: getStackView groups by capacity-compatible stack key", () => {

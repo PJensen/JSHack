@@ -1933,6 +1933,14 @@ addEventListener('ui:search', () => {
   rulesHandler({ type: 'rules.search', payload: {} });
 });
 
+addEventListener('ui:quickInteract', () => {
+  if (isSimUiBlocked()) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.quickInteract', payload: {} });
+});
+
 // Pray button → dispatch pray action
 addEventListener('ui:pray', () => {
   if (isSimUiBlocked()) return;

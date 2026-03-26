@@ -96,6 +96,7 @@ export function applyPipeline(ctx) {
     metrics.consumedTool = hookResult.consumedTool;
     if (hookResult.consumedTool) {
       ctx.mutate.consume(toolId, actor);
+      ctx.io.emit("item:used", { actor, itemId: toolId });
     }
 
     return {
