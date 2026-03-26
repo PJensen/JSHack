@@ -602,6 +602,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d6",
     damageType: "blunt",
     staminaCost: 7,
+    maxSockets: 1,
     description: "A sturdy staff of ancient oak. Channels natural energies.",
   },
   longsword: {
@@ -650,6 +651,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d4",
     damageType: "pierce",
     staminaCost: 5,
+    maxSockets: 1,
     description: "A slim steel blade, light enough to strike in a blink.",
   },
   goblin_shiv: {
@@ -748,6 +750,7 @@ export const ITEM_CATALOG = {
     damageDice: "2d6",
     damageType: "blunt",
     staminaCost: 12,
+    maxSockets: 1,
     value: 14,
     description: "A commander's maul that ends arguments in one swing.",
     affixes: ["stunning1"],
@@ -765,6 +768,7 @@ export const ITEM_CATALOG = {
     damageDice: "1d8",
     damageType: "slash",
     staminaCost: 12,
+    maxSockets: 1,
     maxSockets: 1,
     description: "A broad-headed axe that cleaves through armor and timber alike.",
   },

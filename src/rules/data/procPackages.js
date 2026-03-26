@@ -27,6 +27,8 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   CataclysmChain: "procPackage:cataclysmChain",
   BloodTithe: "procPackage:bloodTithe",
   FoolsErrand: "procPackage:foolsErrand",
+  VenomClock: "procPackage:venomClock",
+  HollowTide: "procPackage:hollowTide",
 });
 
 function ensureActiveEffects(world, entityId) {
@@ -394,6 +396,74 @@ registerScript(PROC_PACKAGE_KEYS.FoolsErrand, {
   },
 });
 
+// ── Venom Clock ───────────────────────────────────────────────────────────
+// OnHit: accumulate "venom_clock" stacks on the target (max 3, timer 6).
+// On the 3rd stack: detonate — deal shadow chip, apply virulent poison + disease, clear stacks.
+registerScript(PROC_PACKAGE_KEYS.VenomClock, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onHit") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const ae = ensureActiveEffects(world, target);
+    if (!ae) return;
+
+    const existing = getEffect(world, target, "venom_clock");
+    const nextStacks = Math.max(1, Number(existing?.stacks || 0) + 1);
+    if (existing) {
+      existing.turnsLeft = 6;
+      existing.potency = nextStacks;
+      existing.stacks = nextStacks;
+    } else {
+      ae.effects.push({ key: "venom_clock", turnsLeft: 6, potency: nextStacks, stacks: nextStacks });
+    }
+
+    if (nextStacks >= 3) {
+      removeEffect(world, target, "venom_clock");
+      ctx.proc.dealDamage(target, Math.max(3, Math.floor(Number(ctx?.damage?.amount || 0) * 0.6)), "shadow", {
+        source,
+        cause: "procPackage:venomClock",
+        noTrigger: true,
+      });
+      ctx.proc.applyStatus(target, "poison", 6, 3);
+      ctx.proc.applyStatus(target, "disease", 4, 2);
+      ctx.proc.message("The venom clock detonates.");
+      emit(world, "proc:venomClock:detonate", { actor: source, target });
+      return;
+    }
+
+    emit(world, "proc:venomClock:tick", { actor: source, target, stacks: nextStacks });
+  },
+});
+
+// ── Hollow Tide ───────────────────────────────────────────────────────────
+// OnBeforeHit: the lower the attacker's HP, the more damage is added.
+// Below 75%: +1. Below 50%: +3 total. Below 25%: +6 total + weaken the target.
+// The tide rises as the wielder drowns.
+registerScript(PROC_PACKAGE_KEYS.HollowTide, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onBeforeHit") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0)) return;
+    const vit = world.get(source, Vitality);
+    if (!vit || !(Number(vit.maxHp) > 0)) return;
+    const ratio = Number(vit.hp) / Number(vit.maxHp);
+
+    if (ratio < 0.25) {
+      ctx.proc.addBonusDamage(6);
+      if (target > 0) ctx.proc.applyStatus(target, "weaken", 3, 1);
+      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 3 });
+    } else if (ratio < 0.50) {
+      ctx.proc.addBonusDamage(3);
+      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 2 });
+    } else if (ratio < 0.75) {
+      ctx.proc.addBonusDamage(1);
+      emit(world, "proc:hollowTide:surge", { actor: source, target, tier: 1 });
+    }
+  },
+});
+
 const PROC_PACKAGE_SPECS = Object.freeze([
   Object.freeze({
     id: "echoStrike",
@@ -490,6 +560,28 @@ const PROC_PACKAGE_SPECS = Object.freeze([
         priority: 10,
         gates: Object.freeze([gateChance(0.3)]),
       }),
+    ]),
+  }),
+  Object.freeze({
+    id: "venomClock",
+    name: "Venom Clock",
+    summary: "Three consecutive hits on a target detonate a burst of shadow damage, virulent poison, and disease. The clock resets if the target goes untouched for 6 turns.",
+    stateKeys: Object.freeze(["venom_clock"]),
+    hostIdeas: Object.freeze(["plague daggers", "assassin relics", "corrupted fangs"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.VenomClock, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "hollowTide",
+    name: "Hollow Tide",
+    summary: "Bonus damage scales inversely with the wielder's remaining HP. Below 75% HP: +1. Below 50%: +3. Below 25%: +6 and weakens the target. The closer to death, the more dangerous.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["berserker blades", "death-wish hammers", "last-stand relics"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.HollowTide, priority: 5 }),
     ]),
   }),
 ]);

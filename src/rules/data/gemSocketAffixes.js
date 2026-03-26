@@ -11,6 +11,9 @@ import {
   gateEventKind,
   gateChance,
   effectApplyStatus,
+  effectBonusDamageFlat,
+  effectRestoreResource,
+  effectAddCritChance,
 } from "../utils/statProcAuthoring.js";
 import { GemSocketNode } from "../components/GemSocketNode.js";
 
@@ -24,6 +27,8 @@ const S_AMETHYST = "gem_socket:amethyst:passive";
 const S_OPAL     = "gem_socket:opal:passive";
 const S_OBSIDIAN = "gem_socket:obsidian:passive";
 const S_GARNET   = "gem_socket:garnet:passive";
+const S_JACINTH  = "gem_socket:jacinth:passive";
+const S_AQUAMARINE = "gem_socket:aquamarine:passive";
 
 // ── Register passive scripts ─────────────────────────────────────
 registerScript(S_RUBY,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.10) });
@@ -35,18 +40,22 @@ registerScript(S_AMETHYST, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonu
 registerScript(S_OPAL,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("luck", 1) });
 registerScript(S_OBSIDIAN, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("kineticDR", 2) });
 registerScript(S_GARNET,   { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.20) });
+registerScript(S_JACINTH,  { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("acidResist", 0.10) });
+registerScript(S_AQUAMARINE, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("manaRegen", 0.5) });
 
 // ── Register affix definitions (weight:0 = not randomly generated) ──
 [
-  ["gem_socket:ruby",     { name: "Ruby Socket",     slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_RUBY] }],
-  ["gem_socket:sapphire", { name: "Sapphire Socket", slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_SAPPHIRE] }],
-  ["gem_socket:emerald",  { name: "Emerald Socket",  slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_EMERALD] }],
-  ["gem_socket:diamond",  { name: "Diamond Socket",  slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_DIAMOND] }],
-  ["gem_socket:topaz",    { name: "Topaz Socket",    slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_TOPAZ] }],
-  ["gem_socket:amethyst", { name: "Amethyst Socket", slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_AMETHYST] }],
-  ["gem_socket:opal",     { name: "Opal Socket",     slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_OPAL] }],
-  ["gem_socket:obsidian", { name: "Obsidian Socket", slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_OBSIDIAN] }],
-  ["gem_socket:garnet",   { name: "Garnet Socket",   slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_GARNET] }],
+  ["gem_socket:ruby",       { name: "Ruby Socket",       slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_RUBY] }],
+  ["gem_socket:sapphire",   { name: "Sapphire Socket",   slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_SAPPHIRE] }],
+  ["gem_socket:emerald",    { name: "Emerald Socket",    slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_EMERALD] }],
+  ["gem_socket:diamond",    { name: "Diamond Socket",    slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_DIAMOND] }],
+  ["gem_socket:topaz",      { name: "Topaz Socket",      slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_TOPAZ] }],
+  ["gem_socket:amethyst",   { name: "Amethyst Socket",   slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_AMETHYST] }],
+  ["gem_socket:opal",       { name: "Opal Socket",       slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_OPAL] }],
+  ["gem_socket:obsidian",   { name: "Obsidian Socket",   slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_OBSIDIAN] }],
+  ["gem_socket:garnet",     { name: "Garnet Socket",     slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_GARNET] }],
+  ["gem_socket:jacinth",    { name: "Jacinth Socket",    slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_JACINTH] }],
+  ["gem_socket:aquamarine", { name: "Aquamarine Socket", slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_AQUAMARINE] }],
 ].forEach(([id, spec]) => registerAffixDefinition(id, spec));
 
 // ── Proc builders — gems that trigger on-hit effects ─────────────
@@ -76,6 +85,50 @@ const GEM_PROC_BUILDERS = {
     attachProcNode(world, socketNodeId, {
       gates: [gateEventKind("onHit"), gateChance(0.20)],
       effects: [effectApplyStatus("shock", 2, 1)],
+    });
+  },
+  // Previously passive-only gems now also have on-hit procs
+  gem_diamond(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.20)],
+      effects: [effectBonusDamageFlat(2, 3, "physical")],
+    });
+  },
+  gem_amethyst(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.20)],
+      effects: [effectRestoreResource("mana", 2)],
+    });
+  },
+  gem_opal(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.15)],
+      effects: [effectAddCritChance(0.05)],
+    });
+  },
+  gem_obsidian(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.20)],
+      effects: [effectApplyStatus("weaken", 3, 1)],
+    });
+  },
+  gem_garnet(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.25)],
+      effects: [effectApplyStatus("burning", 3, 2)],
+    });
+  },
+  // New socketable gems
+  gem_jacinth(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.20)],
+      effects: [effectApplyStatus("agony", 3, 2)],
+    });
+  },
+  gem_aquamarine(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.20)],
+      effects: [effectApplyStatus("bleed", 3, 1)],
     });
   },
 };
