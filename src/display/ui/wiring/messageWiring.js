@@ -712,7 +712,7 @@ export function installMessageWiring({
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
 
-  world.on('damaged', ({ target, amount, critical, crit, source, offhand }) => {
+  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause }) => {
     const defName = nameOfEntity(target);
     const critTxt = (critical || crit) ? ' (CRIT!)' : '';
     const handTxt = offhand ? ' (off-hand)' : '';
@@ -720,7 +720,11 @@ export function installMessageWiring({
       const atkName = nameOfEntity(source);
       let weaponLabel = '';
       const eq = compGet(Number(source || 0), Equipment);
-      const wid = offhand ? Number(eq?.offhand || 0) : Number(eq?.weapon || 0);
+      const causeKey = String(cause || '').toLowerCase();
+      const usingRanged = causeKey === 'ranged';
+      const wid = offhand
+        ? Number(eq?.offhand || 0)
+        : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
       if (wid) {
         const wname = compGet(wid, NamedIdentity)?.name;
         if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;

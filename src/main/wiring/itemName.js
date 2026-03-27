@@ -6,11 +6,19 @@
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { FoodDecay } from "../../rules/components/FoodDecay.js";
+import { children } from "../../lib/ecs-js/index.js";
+import { ActivationGate } from "../../rules/components/ActivationGate.js";
+import { AffixTopologyNode } from "../../rules/components/AffixTopologyNode.js";
 import { isIdentified } from "../../rules/data/identification.js";
 import { getUnidentifiedName, requiresIdentification } from "../../rules/data/itemAppearances.js";
 import { getDecayStage } from "../../rules/data/food.js";
 import { getAffixDescription, getAffixName } from "../../rules/data/affixes.js";
 import { Beatitude } from "../../rules/components/Beatitude.js";
+import { GemSocketNode } from "../../rules/components/GemSocketNode.js";
+import { ProcEffect } from "../../rules/components/ProcEffect.js";
+import { ProcNode } from "../../rules/components/ProcNode.js";
+import { ProcPackageNode } from "../../rules/components/ProcPackageNode.js";
+import { ScriptRef } from "../../rules/components/ScriptRef.js";
 import {
   getSpell,
   describeSpellDetailLines,
@@ -101,6 +109,154 @@ function spellIdFromIdentity(identity) {
   return "";
 }
 
+function humanizeToken(token) {
+  const raw = String(token || "").trim();
+  if (!raw) return "";
+  return raw
+    .replace(/^procPackage:/i, "")
+    .replace(/^gem_socket:/i, "")
+    .replace(/^gem_/i, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function formatEventKind(value) {
+  const key = String(value || "").trim();
+  if (!key) return "On Trigger";
+  const map = {
+    onBeforeHit: "On Before Hit",
+    onHit: "On Hit",
+    onMiss: "On Miss",
+    onDamaged: "On Damaged",
+    onTurnStart: "On Turn Start",
+  };
+  return map[key] || `On ${humanizeToken(key)}`;
+}
+
+function formatGate(gate) {
+  const kind = String(gate?.kind || "");
+  if (kind === "eventKind") return { event: formatEventKind(gate?.a), qualifier: "" };
+  if (kind === "chance") {
+    const pct = Math.max(0, Math.min(100, Math.round(Number(gate?.b || 0) * 100)));
+    return { event: "", qualifier: `${pct}%` };
+  }
+  if (kind === "critOnly") return { event: "", qualifier: "Crit Only" };
+  if (kind === "sourceStatAtLeast") return { event: "", qualifier: `${humanizeToken(gate?.a)} ≥ ${Number(gate?.b || 0)}` };
+  if (kind === "targetTag") return { event: "", qualifier: `Target: ${humanizeToken(gate?.a)}` };
+  if (kind === "healthBelowPct") {
+    const subject = String(gate?.c || "target").toLowerCase() === "source" ? "Source" : "Target";
+    const pct = Math.max(0, Math.min(100, Math.round(Number(gate?.b || 0) * 100)));
+    return { event: "", qualifier: `${subject} < ${pct}% HP` };
+  }
+  if (kind === "damageType") return { event: "", qualifier: `Damage: ${humanizeToken(gate?.a)}` };
+  if (kind === "hasActionTag") return { event: "", qualifier: `Tag: ${humanizeToken(gate?.a)}` };
+  if (kind === "oncePerTurn") return { event: "", qualifier: "Once / Turn" };
+  if (kind === "hasCharge") return { event: "", qualifier: `Charges ≥ ${Math.max(1, Number(gate?.b || 1) | 0)}` };
+  return { event: "", qualifier: humanizeToken(kind) || "Gate" };
+}
+
+function formatEffect(effect) {
+  const kind = String(effect?.kind || "");
+  if (kind === "bonusDamageFlat") {
+    const min = Number(effect?.a || 0);
+    const max = Number(effect?.b || min);
+    const dtype = humanizeToken(effect?.c || "physical");
+    return max > min ? `+${min}-${max} ${dtype} Damage` : `+${min} ${dtype} Damage`;
+  }
+  if (kind === "bonusDamageScaleFromSourceStat") {
+    const stat = humanizeToken(effect?.a || "Stat");
+    const factor = Number(effect?.b || 0);
+    const dtype = humanizeToken(effect?.c || "physical");
+    return `+${stat}×${factor} ${dtype} Damage`;
+  }
+  if (kind === "addCritChance") return `+${Number(effect?.a || 0)} Crit Chance`;
+  if (kind === "restoreResource") {
+    const resource = humanizeToken(effect?.a || "resource");
+    const amount = Number(effect?.b || 0);
+    const target = String(effect?.c || "source").toLowerCase() === "target" ? "Target" : "Source";
+    return `Restore ${amount} ${resource} (${target})`;
+  }
+  if (kind === "applyStatus") {
+    const status = humanizeToken(effect?.a || "status");
+    const turns = Math.max(0, Number(effect?.b || 0) | 0);
+    const potency = Number(effect?.c || 1);
+    return `Apply ${status} (${turns}t, p${potency})`;
+  }
+  if (kind === "attachTimedBuff") {
+    const buff = humanizeToken(effect?.a || "buff");
+    const turns = Math.max(0, Number(effect?.b || 0) | 0);
+    const target = String(effect?.c || "source").toLowerCase() === "target" ? "Target" : "Source";
+    return `Buff ${buff} (${turns}t, ${target})`;
+  }
+  if (kind === "spawnEntity") {
+    const who = humanizeToken(effect?.a || "entity");
+    const count = Math.max(1, Number(effect?.b || 1) | 0);
+    const anchor = humanizeToken(effect?.c || "target");
+    return `Spawn ${count} ${who} (${anchor})`;
+  }
+  if (kind === "consumeCharge") return `Consume ${Math.max(1, Number(effect?.a || 1) | 0)} Charge`;
+  return humanizeToken(kind) || "Effect";
+}
+
+function summarizeProcNode(world, procNodeId, sourceLabel) {
+  const gateRows = [];
+  const effectRows = [];
+  let scriptRef = "";
+  for (const childId of children(world, procNodeId)) {
+    const gate = world.get(childId, ActivationGate);
+    if (gate?.enabled !== false) gateRows.push(gate);
+    const effect = world.get(childId, ProcEffect);
+    if (effect?.enabled !== false) effectRows.push(effect);
+  }
+  const script = world.get(procNodeId, ScriptRef);
+  if (script?.ref) scriptRef = String(script.ref);
+
+  let trigger = "On Trigger";
+  const qualifiers = [];
+  for (const gate of gateRows) {
+    const parts = formatGate(gate);
+    if (parts.event) trigger = parts.event;
+    if (parts.qualifier) qualifiers.push(parts.qualifier);
+  }
+
+  const effects = effectRows.map(formatEffect).filter(Boolean);
+  if (scriptRef) effects.push(`Script: ${humanizeToken(scriptRef)}`);
+  if (!effects.length) effects.push("Custom Proc");
+
+  return {
+    source: sourceLabel || "Item",
+    trigger,
+    qualifiers,
+    effects,
+  };
+}
+
+function buildProcNodeSummaries(world, itemId) {
+  const out = [];
+  const stack = [{ id: itemId, source: "Item" }];
+  while (stack.length) {
+    const current = stack.pop();
+    const entityId = Number(current?.id || 0) | 0;
+    if (!(entityId > 0)) continue;
+    let nextSource = current?.source || "Item";
+    const pkg = world.get(entityId, ProcPackageNode);
+    if (pkg?.packageId) nextSource = `Package: ${humanizeToken(pkg.packageId)}`;
+    const gem = world.get(entityId, GemSocketNode);
+    if (gem?.gemId) nextSource = `Gem: ${humanizeToken(gem.gemId)}`;
+    const affix = world.get(entityId, AffixTopologyNode);
+    if (affix?.affixId) nextSource = `Affix: ${humanizeToken(affix.affixId)}`;
+    const proc = world.get(entityId, ProcNode);
+    if (proc && proc.enabled !== false) out.push(summarizeProcNode(world, entityId, nextSource));
+    for (const childId of children(world, entityId)) {
+      stack.push({ id: childId, source: nextSource });
+    }
+  }
+  return out;
+}
+
 /**
  * Build a standardised display-data object for an item entity.
  * Used by inventory, chest, ground-pickup and any other UI that shows item info.
@@ -156,6 +312,7 @@ export function buildItemDisplayData(world, itemId) {
     coating: identified && info.coating && typeof info.coating === 'object' ? { ...info.coating } : null,
     sockets: Array.isArray(info.sockets) ? info.sockets.slice() : [],
     maxSockets: Number(info.maxSockets || 0) | 0,
+    procNodes: identified ? buildProcNodeSummaries(world, itemId) : [],
     spellId: linkedSpell?.id || null,
     detailLines,
     targetEffects,
