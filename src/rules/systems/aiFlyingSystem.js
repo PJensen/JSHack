@@ -5,7 +5,6 @@
 
 import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
 import { Position } from "../components/Position.js";
-import { Player } from "../components/Player.js";
 import { Speed } from "../components/Speed.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Flying } from "../components/Flying.js";
@@ -14,24 +13,18 @@ import { FlyIntent } from "../components/Intents/FlyIntent.js";
 import { getMonster } from "../data/monsters.js";
 import { canMonsterFlyOnFloor } from "../utils/flyingEligibility.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { playerEntity, queryAggroPositioned } from "../utils/queries.js";
 
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function aiFlyingSystem(world) {
-  let playerX = 0;
-  let playerY = 0;
-  let hasPlayer = false;
-  for (const [, _p, pos] of world.query(Player, Position)) {
-    playerX = pos.x;
-    playerY = pos.y;
-    hasPlayer = true;
-    break;
-  }
+  const _player = playerEntity(world);
+  const hasPlayer = _player != null;
+  const playerX = _player?.pos.x ?? 0;
+  const playerY = _player?.pos.y ?? 0;
 
-  for (const [id, aggro, pos] of world.query(AggroState, Position)) {
-    if (world.has(id, Player)) continue;
-
+  for (const [id, aggro, pos] of queryAggroPositioned(world)) {
     const spd = world.get(id, Speed);
     const actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
     if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) continue;

@@ -2,6 +2,7 @@ import { CastSpellIntent } from "../components/Intents/CastSpellIntent.js";
 import { Brain } from "../components/Brain.js";
 import { Mana } from "../components/Mana.js";
 import { Channeling } from "../components/Channeling.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { getSpell } from "../data/spells.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
@@ -13,6 +14,7 @@ import { isSpellOnCooldown, setSpellCooldown } from "../utils/spellCooldowns.js"
 import { Position } from "../components/Position.js";
 import { isTargetHiddenByInvisibility } from "../utils/spellTargeting.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
+import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -42,6 +44,59 @@ function normalizedLearnedSpellIds(brain) {
     out.push(id);
   }
   return out;
+}
+
+function ensureActiveEffects(world, actorId) {
+  let ae = world.get(actorId, ActiveEffects);
+  if (ae && Array.isArray(ae.effects)) return ae;
+  try { world.add(actorId, ActiveEffects, { effects: [] }); } catch {}
+  ae = world.get(actorId, ActiveEffects);
+  return (ae && Array.isArray(ae.effects)) ? ae : null;
+}
+
+function readEchoGrimoireState(world, actorId) {
+  const ae = world.get(actorId, ActiveEffects);
+  const effects = Array.isArray(ae?.effects) ? ae.effects : [];
+  for (let i = 0; i < effects.length; i++) {
+    const effect = effects[i];
+    if (String(effect?.key || "") !== "echo_grimoire_memory") continue;
+    const spellId = String(effect?.meta?.spellId || "");
+    const turnsLeft = Math.max(0, Number(effect?.turnsLeft || 0) | 0);
+    return { effect, spellId, turnsLeft };
+  }
+  return null;
+}
+
+function upsertEchoGrimoireState(world, actorId, spellId) {
+  const ae = ensureActiveEffects(world, actorId);
+  if (!ae) return;
+  const effects = ae.effects;
+  const id = String(spellId || "");
+  let rec = null;
+  for (let i = 0; i < effects.length; i++) {
+    if (String(effects[i]?.key || "") === "echo_grimoire_memory") {
+      rec = effects[i];
+      break;
+    }
+  }
+  if (rec) {
+    rec.turnsLeft = 3;
+    rec.potency = 1;
+    rec.stacks = 1;
+    rec.startedAtTurn = world.step;
+    rec.sourceId = actorId;
+    rec.meta = { ...(rec.meta || {}), spellId: id };
+    return;
+  }
+  effects.push({
+    key: "echo_grimoire_memory",
+    turnsLeft: 3,
+    potency: 1,
+    stacks: 1,
+    startedAtTurn: world.step,
+    sourceId: actorId,
+    meta: { spellId: id },
+  });
 }
 
 /**
@@ -195,10 +250,15 @@ export function castSpellSystem(world) {
 
     const confusion = resolveConfusedCast(world, actor, spell, learned);
     const resolvedSpell = confusion.spell;
+    const hasEchoGrimoire = hasEquippedProcPackageInSlot(world, actor, "offhand", "echoGrimoire");
+    const echoState = hasEchoGrimoire ? readEchoGrimoireState(world, actor) : null;
     const isSustainedChannel = !!resolvedSpell?.channeling;
-    const manaCost = isSustainedChannel
+    const echoRepeat = !!(!isSustainedChannel && echoState && echoState.turnsLeft > 0 && echoState.spellId && echoState.spellId === resolvedSpell.id);
+    const spellPowerScale = echoRepeat ? 0.8 : 1;
+    const baseManaCost = isSustainedChannel
       ? Number(resolvedSpell.manaPerTick ?? resolvedSpell.manaCost ?? 0)
       : Number(resolvedSpell.manaCost || 0);
+    const manaCost = echoRepeat ? 0 : baseManaCost;
     const requiredToStart = isSustainedChannel
       ? Math.max(0, manaCost) * 2
       : manaCost;
@@ -285,7 +345,10 @@ export function castSpellSystem(world) {
     }
 
     // Run scripted behavior (pure rules)
-    try { runSpellScript(world, actor, resolvedSpell, intent); } catch (e) { console.error('[castSpellSystem] runSpellScript failed for "' + (resolvedSpell?.id || '?') + '":', e); }
+    const runtimeSpell = (echoRepeat || spellPowerScale !== 1)
+      ? { ...resolvedSpell, powerScale: spellPowerScale }
+      : resolvedSpell;
+    try { runSpellScript(world, actor, runtimeSpell, intent); } catch (e) { console.error('[castSpellSystem] runSpellScript failed for "' + (resolvedSpell?.id || '?') + '":', e); }
 
     // Start cooldown (player only)
     if (world.has(actor, Player)) {
@@ -301,8 +364,18 @@ export function castSpellSystem(world) {
         targetId: intent.targetId || actor,
         miscast: confusion.kind === "miscast",
         intendedSpellId: confusion.kind === "miscast" ? spell.id : undefined,
+        powerScale: spellPowerScale,
+        echoRepeat,
       });
     } catch (e) { console.debug('[castSpellSystem] emit castSpell failed:', e); }
+    if (hasEchoGrimoire && resolvedSpell.id) {
+      upsertEchoGrimoireState(world, actor, resolvedSpell.id);
+      if (echoRepeat) {
+        try {
+          world.emit?.("proc:echoGrimoire:echo", { actor, spellId: resolvedSpell.id, powerScale: spellPowerScale });
+        } catch {}
+      }
+    }
     world.remove(actor, CastSpellIntent);
   }
 }

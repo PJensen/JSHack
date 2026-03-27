@@ -46,10 +46,21 @@ Deno.test("updateFOV is idempotent within same step", () => {
   updateFOV(5, 0, 0, 3, neverBlocked);
   const wasVisible = isVisible(0, 0);
 
-  // Call again with different position but same step — should not recompute
-  updateFOV(5, 10, 10, 3, neverBlocked);
+  // Call again with same inputs — should not recompute
+  updateFOV(5, 0, 0, 3, neverBlocked);
   assert(wasVisible, 'still centered on first call position');
-  assert(!isVisible(10, 10), 'did not recompute to new position');
+  assert(!isVisible(10, 10), 'same-input call should not recompute to a new position');
+});
+
+Deno.test("updateFOV recomputes within same step when facing changes", () => {
+  clearExplored();
+  updateFOV(9, 0, 0, 5, neverBlocked, { facingDx: 1, facingDy: 0, coneDegrees: 120 });
+  assert(isVisible(2, 0), "front tile visible for east-facing cone");
+  assert(!isVisible(-2, 0), "rear tile hidden for east-facing cone");
+
+  updateFOV(9, 0, 0, 5, neverBlocked, { facingDx: -1, facingDy: 0, coneDegrees: 120 });
+  assert(isVisible(-2, 0), "rear tile should become visible after turning west on same step");
+  assert(!isVisible(2, 0), "former front tile should hide after turning west on same step");
 });
 
 Deno.test("wall blocks vision behind it", () => {
@@ -74,4 +85,13 @@ Deno.test("visible resets each turn, explored persists", () => {
   assert(!isVisible(0, 0), 'origin no longer in visible');
   assert(isExplored(0, 0), 'origin still explored');
   assert(isVisible(50, 50), 'new position is visible');
+});
+
+Deno.test("updateFOV applies facing cone when provided", () => {
+  clearExplored();
+  updateFOV(1, 0, 0, 5, neverBlocked, { facingDx: 1, facingDy: 0, coneDegrees: 120 });
+  assert(isVisible(2, 0), "tile in front should be visible");
+  assert(isVisible(1, 1), "front diagonal inside 120-degree cone should be visible");
+  assert(!isVisible(0, 1), "side tile outside 120-degree cone should be hidden");
+  assert(!isVisible(-1, 0), "tile behind should be hidden");
 });

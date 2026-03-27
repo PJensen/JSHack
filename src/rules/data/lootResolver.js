@@ -85,7 +85,13 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
         break;
 
       case "equip": {
-        const equipId = rng.choice(entry.pool);
+        const basePool = Array.isArray(entry.pool) ? entry.pool : [];
+        const eligiblePool = basePool.filter((equipId) => {
+          const def = getCatalogItem(String(equipId || ""));
+          return passesDropRequirement(def, opts);
+        });
+        const pickPool = eligiblePool.length > 0 ? eligiblePool : basePool;
+        const equipId = rng.choice(pickPool);
         if (!equipId) break;
         
         // Check weapon limit for chests (including when called from a nested table)
@@ -135,8 +141,14 @@ export function resolveLootTable(tableId, rng, depth, nest = 0, opts) {
 function effectiveWeight(entry, opts) {
   const w = entry.weight || 0;
   if (w <= 0) return 0;
+  if (entry.type === "equip") {
+    const pool = Array.isArray(entry.pool) ? entry.pool : [];
+    return hasEligibleEquipPool(pool, opts) ? w : 0;
+  }
   if (entry.type !== "item") return w;
-  const id = entry.itemId || "";
+  const id = String(entry.itemId || "");
+  const def = getCatalogItem(id);
+  if (!passesDropRequirement(def, opts)) return 0;
 
   // Spellbook suppression: books for already-known spells weight → 0
   if (opts?.knownSpells && id.startsWith("book_")) {
@@ -146,17 +158,46 @@ function effectiveWeight(entry, opts) {
 
   // on_loot_roll hook: catalog item may veto its own appearance
   if (opts?.playerItemIds) {
-    const def = getCatalogItem(id);
     const hook = def?.hooks?.on_loot_roll;
     if (typeof hook === "function") {
       try {
-        const result = hook({ playerItemIds: opts.playerItemIds }, { itemId: id });
+        const result = hook({
+          playerItemIds: opts.playerItemIds,
+          knownSpells: opts?.knownSpells || null,
+        }, { itemId: id });
         if (result?.cancel) return 0;
       } catch { /* ignore hook errors */ }
     }
   }
 
   return w;
+}
+
+function passesDropRequirement(def, opts) {
+  if (!def || typeof def !== "object") return true;
+  const requirement = def.dropRequirement;
+  if (typeof requirement === "function") {
+    try {
+      return !!requirement({
+        knownSpells: opts?.knownSpells || null,
+        playerItemIds: opts?.playerItemIds || null,
+      });
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function hasEligibleEquipPool(pool, opts) {
+  if (!Array.isArray(pool) || pool.length <= 0) return false;
+  for (let i = 0; i < pool.length; i++) {
+    const id = String(pool[i] || "");
+    if (!id) continue;
+    const def = getCatalogItem(id);
+    if (passesDropRequirement(def, opts)) return true;
+  }
+  return false;
 }
 
 /**
@@ -345,7 +386,12 @@ function getPlayerKnownSpells(world) {
   for (const [id] of world.query(Player)) {
     const brain = world.get(id, Brain);
     if (brain && Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.length > 0) {
-      return new Set(brain.learnedSpellIds);
+      const known = new Set();
+      for (let i = 0; i < brain.learnedSpellIds.length; i++) {
+        const spellId = String(brain.learnedSpellIds[i] || "").trim().replace(/^spell:/, "");
+        if (spellId) known.add(spellId);
+      }
+      return known;
     }
     return null;
   }

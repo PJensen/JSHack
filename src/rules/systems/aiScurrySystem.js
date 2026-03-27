@@ -25,7 +25,7 @@ import { statusStrength }  from "../utils/statusFacade.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { getTile } from "../environment/dungeon/tileMap.js";
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
-import { Player }      from "../components/Player.js";
+import { playerEntity } from "../utils/queries.js";
 
 // Keep AI work bounded: only process enemies near the player.
 const SCURRY_RADIUS = 20;
@@ -51,12 +51,9 @@ function isPatrolStep(x, y) {
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function aiScurrySystem(world) {
   // Need the player position as the radius anchor.
-  let playerPos = null;
-  for (const [, , pos] of world.query(Player, Position)) {
-    playerPos = { x: pos.x, y: pos.y };
-    break;
-  }
-  if (!playerPos) return;
+  const player = playerEntity(world);
+  if (!player) return;
+  const playerPos = player.pos;
 
   forEachInRadius(world, playerPos.x, playerPos.y, SCURRY_RADIUS, (id, pos) => {
     const fac = world.get(id, Faction);

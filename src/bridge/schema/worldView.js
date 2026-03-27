@@ -41,6 +41,8 @@ import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
+import { listProcPackages } from "../../rules/data/procPackages.js";
+import { getEntityFacingConeDegrees, getNormalizedEntityFacing } from "../../rules/utils/facing.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null }} EntityView */
@@ -95,8 +97,26 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'resist_electric',
 	'resist_acid',
 ]);
-// Proc state effect keys that should be projected onto enemy entity views for glyph fx.
-const ENTITY_PROC_STATE_KEYS = new Set(['doom_clock', 'cataclysm_mark']);
+const PROC_STATE_INFO_BY_KEY = (() => {
+	/** @type {Map<string, {name:string, description:string}>} */
+	const out = new Map();
+	const specs = listProcPackages();
+	for (const spec of specs) {
+		const stateKeys = Array.isArray(spec?.stateKeys) ? spec.stateKeys : [];
+		for (const stateKey of stateKeys) {
+			const key = String(stateKey || "").trim();
+			if (!key || out.has(key)) continue;
+			out.set(key, {
+				name: String(spec?.name || key),
+				description: String(spec?.summary || "").trim(),
+			});
+		}
+	}
+	return out;
+})();
+
+// Proc state effect keys that should be projected onto entity views for proc glyph affordance.
+const ENTITY_PROC_STATE_KEYS = new Set(PROC_STATE_INFO_BY_KEY.keys());
 
 const VENOM_GLOW_ITEM_KINDS = new Set(['nightfang_dagger', 'venomfang_dagger', 'nightfang', 'venomfang']);
 const POTION_GLOW_DISABLED_KINDS = new Set();
@@ -426,8 +446,18 @@ function projectProcStateTags(world, id, rec) {
 		const key = String(e?.key || '');
 		if (!ENTITY_PROC_STATE_KEYS.has(key)) continue;
 		const stacks = Math.max(1, Number(e?.stacks || 1));
+		const turnsLeft = Math.max(0, Number(e?.turnsLeft || 0) | 0);
+		const potency = Number.isFinite(Number(e?.potency)) ? Number(e?.potency) : 1;
+		const info = PROC_STATE_INFO_BY_KEY.get(key);
 		if (!rec.procStates) rec.procStates = [];
-		rec.procStates.push({ key, stacks });
+		rec.procStates.push({
+			key,
+			stacks,
+			turnsLeft,
+			potency,
+			name: String(info?.name || ""),
+			description: String(info?.description || ""),
+		});
 	}
 }
 
@@ -521,6 +551,8 @@ export function buildWorldView(world) {
 	if (_view.player) {
 		const radius = getEffectiveVisionRange(world, _view.player.id);
 		playerVisionRadius = radius;
+		const facing = getNormalizedEntityFacing(world, _view.player.id);
+		const coneDegrees = getEntityFacingConeDegrees(world, _view.player.id);
 		const pad = 2;
 		const bounds = {
 			x0: _view.player.pos.x - radius - pad,
@@ -530,7 +562,11 @@ export function buildWorldView(world) {
 		};
 		const blockedMap = buildBlocksVisionMap(world, bounds);
 		const isBlocked = blockedCallback(blockedMap);
-		updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked);
+		updateFOV(_view.turn, _view.player.pos.x, _view.player.pos.y, radius, isBlocked, {
+			facingDx: facing?.dx || 0,
+			facingDy: facing?.dy || 0,
+			coneDegrees,
+		});
 	}
 
 	_view.isVisible = isVisible;

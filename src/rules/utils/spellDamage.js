@@ -243,9 +243,13 @@ export function buildSpellDamageSpec(world, casterId, targetId, options) {
   });
   const hitChancePct = getSpellHitChancePct(world, casterId, targetId);
   const missed = !rollSpellHit(world, casterId, targetId, options?.spell || {}, Number(options?.salt || 0));
+  const powerScaleRaw = Number(options?.spell?.powerScale ?? 1);
+  const powerScale = Number.isFinite(powerScaleRaw) ? Math.max(0, powerScaleRaw) : 1;
+  const scaled = scaleSpellDamageFromBonus(Number(options?.baseAmount || 0), context.intelligenceBonus);
+  const scaledWithPower = scaled <= 0 ? 0 : Math.max(1, Math.round(scaled * powerScale));
   return buildSpellDamageSpecFromContext(world, targetId, context, {
     ...options,
-    baseAmount: scaleSpellDamageFromBonus(Number(options?.baseAmount || 0), context.intelligenceBonus),
+    baseAmount: scaledWithPower,
     hitChancePct,
     missed,
     spellId: context.spellId,

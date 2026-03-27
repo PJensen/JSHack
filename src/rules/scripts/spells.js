@@ -10,6 +10,7 @@
 const REGISTRY = Object.create(null);
 
 import { Position } from "../components/Position.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
@@ -41,6 +42,10 @@ import { Player } from "../components/Player.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Channeling } from "../components/Channeling.js";
+import { KnockbackPending } from "../components/KnockbackPending.js";
+import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_ALERTED } from "../components/AggroState.js";
+import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
+import { Web } from "../archetypes/RoomFeatures.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -317,6 +322,8 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   const MAX_R = 12; // tiles
   const CHAIN_MAX = 3;
   const CHAIN_RADIUS = 8;
+  const hasConductionLens = hasEquippedProcPackageInSlot(world, actor, "offhand", "conductionLens");
+  const maxChainCount = hasConductionLens ? (CHAIN_MAX + 1) : CHAIN_MAX;
 
   // Helper: distance squared
   const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx*dx + dy*dy; };
@@ -362,7 +369,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   chain.push(first);
 
   // Chain to up to CHAIN_MAX-1 additional targets, nearest to current within CHAIN_RADIUS
-  while (chain.length < CHAIN_MAX) {
+  while (chain.length < maxChainCount) {
     const last = chain[chain.length - 1];
     let best = null; let bestD2 = Infinity;
     for (const c of candidates) {
@@ -391,7 +398,9 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     try { world.emit && world.emit('spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i }); } catch (e) { console.debug('[spells] emit spell:bolt failed:', e); }
 
     // Damage model: base 7 → attenuate per chain
-    const base = Math.max(1, Math.round(7 * Math.pow(0.7, i)));
+    const base = (hasConductionLens && i >= CHAIN_MAX)
+      ? Math.max(1, Math.round(7 * 0.4))
+      : Math.max(1, Math.round(7 * Math.pow(0.7, i)));
     dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
       spell,
       baseAmount: base,
@@ -400,6 +409,11 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
       at: segTo,
       salt: i + 1,
     }));
+  }
+  if (hasConductionLens && chain.length > CHAIN_MAX) {
+    try {
+      world.emit?.("proc:conductionLens", { actor, spellId: spell.id, extraChains: chain.length - CHAIN_MAX });
+    } catch {}
   }
 };
 
@@ -972,6 +986,16 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
       } else {
         ae.effects.push({ key: 'frost', turnsLeft: duration, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
       }
+      if (hasEquippedProcPackageInSlot(world, actor, "offhand", "glacierSigil")) {
+        const stun = ae.effects.find(/** @param {any} e */ (e) => e.key === "stun");
+        if (stun) {
+          stun.turnsLeft = Math.max(Number(stun.turnsLeft || 0), 1);
+          stun.potency = Math.max(Number(stun.potency || 1), 1);
+        } else {
+          ae.effects.push({ key: "stun", turnsLeft: 1, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
+        }
+        try { world.emit?.("proc:glacierSigil", { actor, targetId: target.id }); } catch {}
+      }
     }
   }
 
@@ -1230,6 +1254,585 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
       try { world.emit && world.emit('spell:smite:dazzle'); } catch (e) { console.debug('[spells] smite:dazzle failed:', e); }
     }
   }
+};
+
+// Boar Charge — straight-line rush, impact damage, and light knockback.
+REGISTRY["boar_charge"] = function boarChargeScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const from = { x: apos.x | 0, y: apos.y | 0 };
+
+  const targetId = Number(intent?.targetId || 0) | 0;
+  const targetPos = targetId > 0 ? world.get(targetId, Position) : null;
+  const fallbackPos = (Number.isFinite(intent?.x) && Number.isFinite(intent?.y))
+    ? { x: Number(intent.x) | 0, y: Number(intent.y) | 0 }
+    : null;
+  const focus = targetPos ? { x: targetPos.x | 0, y: targetPos.y | 0 } : fallbackPos;
+  if (!focus) {
+    try { world.emit?.("spell:boar_charge:failed", { actor, reason: "no_target" }); } catch {}
+    return;
+  }
+
+  const range = Math.max(2, Number(spell?.range || 4) | 0);
+  const impactDamage = Math.max(1, Number(spell?.impactDamage || 6) | 0);
+  const stunTurns = Math.max(1, Number(spell?.stunTurns || 1) | 0);
+  const dxRaw = (focus.x | 0) - (from.x | 0);
+  const dyRaw = (focus.y | 0) - (from.y | 0);
+  const dist = Math.max(Math.abs(dxRaw), Math.abs(dyRaw));
+  if (dist < 2) {
+    try { world.emit?.("spell:boar_charge:failed", { actor, reason: "too_close" }); } catch {}
+    return;
+  }
+
+  let dx = 0;
+  let dy = 0;
+  if (Math.abs(dxRaw) >= Math.abs(dyRaw)) dx = Math.sign(dxRaw);
+  else dy = Math.sign(dyRaw);
+  if (dx === 0 && dy === 0) return;
+
+  let curX = from.x | 0;
+  let curY = from.y | 0;
+  for (let step = 0; step < range; step++) {
+    const nx = curX + dx;
+    const ny = curY + dy;
+    if (!isWalkable(nx, ny)) break;
+
+    let blocked = false;
+    for (const [id, pos, col, vit] of world.query(Position, Collider, Vitality)) {
+      if (id === actor) continue;
+      if ((pos.x | 0) !== nx || (pos.y | 0) !== ny) continue;
+      const solid = !!col?.solid;
+      const alive = (vit?.hp | 0) > 0;
+      if (solid || alive) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) break;
+
+    curX = nx;
+    curY = ny;
+    if (Math.max(Math.abs((focus.x | 0) - curX), Math.abs((focus.y | 0) - curY)) <= 1) break;
+  }
+
+  const to = { x: curX | 0, y: curY | 0 };
+  if (to.x === from.x && to.y === from.y) {
+    try { world.emit?.("spell:boar_charge:failed", { actor, reason: "blocked" }); } catch {}
+    return;
+  }
+
+  world.set(actor, Position, to);
+  try { world.emit?.("moved", { id: actor, from, to }); } catch {}
+  try {
+    world.emit?.("item:thrown", {
+      itemId: actor,
+      from: { x: from.x | 0, y: from.y | 0 },
+      to: { x: to.x | 0, y: to.y | 0 },
+      targetId: targetId > 0 ? targetId : 0,
+      source: "monster:charge",
+      mode: "self-throw",
+    });
+  } catch {}
+
+  let struckTarget = 0;
+  let strikeAmount = 0;
+  let missed = false;
+  for (const [id, pos, fac, vit] of world.query(Position, Faction, Vitality)) {
+    if (id === actor) continue;
+    if (!fac || !vit || (vit.hp | 0) <= 0) continue;
+    if (!areFactionsHostile(actorFaction, String(fac.key || ""))) continue;
+    const adjacent = Math.max(Math.abs((pos.x | 0) - to.x), Math.abs((pos.y | 0) - to.y)) <= 1;
+    if (!adjacent) continue;
+    if (targetId > 0 && id !== targetId) continue;
+
+    const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+      spell,
+      baseAmount: impactDamage,
+      type: "physical",
+      cause: "spell:boar_charge",
+      at: { x: pos.x | 0, y: pos.y | 0 },
+      salt: id ^ 0xb04,
+    }));
+    struckTarget = id | 0;
+    strikeAmount = Number(result?.amount || 0) | 0;
+    missed = result?.reason === "missed";
+    if (!result.killed) {
+      try { world.add(id, KnockbackPending, { dx, dy, force: 1 }); } catch {}
+      let ae = /** @type any */ (world.get(id, ActiveEffects));
+      if (!ae || !Array.isArray(ae.effects)) {
+        try { world.add(id, ActiveEffects, { effects: [] }); } catch {}
+        ae = /** @type any */ (world.get(id, ActiveEffects));
+      }
+      if (ae?.effects) {
+        upsertTimedEffect(ae.effects, {
+          key: "stun",
+          turnsLeft: stunTurns,
+          potency: 1,
+          stacks: 1,
+          startedAtTurn: world.step,
+          sourceId: actor,
+        });
+      }
+    }
+    break;
+  }
+
+  try {
+    world.emit?.("spell:boar_charge", {
+      actor,
+      targetId: struckTarget || targetId || 0,
+      from,
+      to,
+      hit: struckTarget > 0 && !missed,
+      amount: strikeAmount,
+      missed,
+    });
+  } catch {}
+};
+
+// Boar Bite — close-range snap that briefly weakens the target.
+REGISTRY["boar_bite"] = function boarBiteScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const targetId = Number(intent?.targetId || 0) | 0;
+  if (!(targetId > 0)) {
+    try { world.emit?.("spell:boar_bite:failed", { actor, reason: "no_target" }); } catch {}
+    return;
+  }
+  const tpos = world.get(targetId, Position);
+  const tvit = world.get(targetId, Vitality);
+  const tfac = world.get(targetId, Faction);
+  if (!tpos || !tvit || (tvit.hp | 0) <= 0 || !tfac || !areFactionsHostile(actorFaction, String(tfac.key || ""))) {
+    try { world.emit?.("spell:boar_bite:failed", { actor, reason: "invalid_target" }); } catch {}
+    return;
+  }
+  const range = Math.max(1, Number(spell?.range || 1) | 0);
+  const dist = Math.max(Math.abs((apos.x | 0) - (tpos.x | 0)), Math.abs((apos.y | 0) - (tpos.y | 0)));
+  if (dist > range) {
+    try { world.emit?.("spell:boar_bite:failed", { actor, reason: "out_of_range" }); } catch {}
+    return;
+  }
+
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
+    spell,
+    baseAmount: 2,
+    type: "physical",
+    cause: "spell:boar_bite",
+    at: { x: tpos.x | 0, y: tpos.y | 0 },
+    salt: targetId ^ 0xb17e,
+  }));
+
+  if (result.applied && !result.killed) {
+    let ae = /** @type any */ (world.get(targetId, ActiveEffects));
+    if (!ae || !Array.isArray(ae.effects)) {
+      try { world.add(targetId, ActiveEffects, { effects: [] }); } catch {}
+      ae = /** @type any */ (world.get(targetId, ActiveEffects));
+    }
+    if (ae?.effects) {
+      upsertTimedEffect(ae.effects, {
+        key: "weakened",
+        turnsLeft: 1,
+        potency: 1,
+        stacks: 1,
+        startedAtTurn: world.step,
+        sourceId: actor,
+      });
+    }
+  }
+
+  try {
+    world.emit?.("spell:boar_bite", {
+      actor,
+      targetId,
+      at: { x: tpos.x | 0, y: tpos.y | 0 },
+      amount: result.amount | 0,
+      hit: result.applied,
+      missed: result.reason === "missed",
+    });
+  } catch {}
+};
+
+// Bat Shriek — short confusion pulse plus nearby aggro wake-up.
+REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const radius = Math.max(1, Number(spell?.radius || 4) | 0);
+  const confuseTurns = Math.max(1, Number(spell?.confuseTurns || 2) | 0);
+
+  let playerPos = null;
+  for (const [id, _player, p] of world.query(Player, Position)) {
+    if (id <= 0 || !p) continue;
+    playerPos = { x: p.x | 0, y: p.y | 0 };
+    break;
+  }
+
+  /** @type {number[]} */
+  const affectedIds = [];
+  /** @type {number[]} */
+  const alertedIds = [];
+  for (const [id, pos, fac, vit] of world.query(Position, Faction, Vitality)) {
+    if (id === actor) continue;
+    if (!fac || !vit || (vit.hp | 0) <= 0) continue;
+    const dist = Math.max(Math.abs((pos.x | 0) - (apos.x | 0)), Math.abs((pos.y | 0) - (apos.y | 0)));
+    if (dist > radius) continue;
+
+    if (areFactionsHostile(actorFaction, String(fac.key || ""))) {
+      let ae = /** @type any */ (world.get(id, ActiveEffects));
+      if (!ae || !Array.isArray(ae.effects)) {
+        try { world.add(id, ActiveEffects, { effects: [] }); } catch {}
+        ae = /** @type any */ (world.get(id, ActiveEffects));
+      }
+      if (ae?.effects) {
+        upsertTimedEffect(ae.effects, {
+          key: "confused",
+          turnsLeft: confuseTurns,
+          potency: 1,
+          stacks: 1,
+          startedAtTurn: world.step,
+          sourceId: actor,
+        });
+        try { world.set(id, ActiveEffects, ae); } catch {}
+      }
+      affectedIds.push(id | 0);
+    }
+
+    if (String(fac.key || "") === actorFaction) {
+      const aggro = world.get(id, AggroState);
+      if (aggro) {
+        aggro.alertLevel = AGGRO_LEVELS.alerted;
+        aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
+        if (playerPos) {
+          aggro.lastKnownX = playerPos.x | 0;
+          aggro.lastKnownY = playerPos.y | 0;
+        }
+        alertedIds.push(id | 0);
+      }
+    }
+  }
+
+  try {
+    world.emit?.("spell:bat_shriek", {
+      actor,
+      at: { x: apos.x | 0, y: apos.y | 0 },
+      radius,
+      affectedIds,
+      alertedIds,
+    });
+  } catch {}
+};
+
+// Web Spit — places a web tile at the chosen target tile.
+REGISTRY["web_spit"] = function webSpitScript(world, actor, spell, intent) {
+  const targetId = Number(intent?.targetId || 0) | 0;
+  const targetPos = targetId > 0 ? world.get(targetId, Position) : null;
+  const tx = targetPos ? (targetPos.x | 0) : (Number.isFinite(intent?.x) ? (Number(intent.x) | 0) : NaN);
+  const ty = targetPos ? (targetPos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
+  if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
+    try { world.emit?.("spell:web_spit:failed", { actor, reason: "no_target" }); } catch {}
+    return;
+  }
+  if (!isWalkable(tx, ty)) {
+    try { world.emit?.("spell:web_spit:failed", { actor, reason: "blocked" }); } catch {}
+    return;
+  }
+
+  let spawned = false;
+  for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
+    if ((pos.x | 0) === tx && (pos.y | 0) === ty && String(ni?.identity || "") === "web") {
+      spawned = true;
+      break;
+    }
+  }
+  if (!spawned) {
+    try {
+      createFrom(world, Web, { x: tx, y: ty });
+      spawned = true;
+    } catch {}
+  }
+
+  try {
+    world.emit?.("spell:web_spit", {
+      actor,
+      targetId,
+      at: { x: tx, y: ty },
+      spawned,
+      radius: Number(spell?.radius || 0) | 0,
+    });
+  } catch {}
+};
+
+// Wolf Howl — alert nearby same-faction allies toward the player.
+REGISTRY["wolf_howl"] = function wolfHowlScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const radius = Math.max(1, Number(spell?.radius || 6) | 0);
+  let playerPos = null;
+  for (const [id, _player, p] of world.query(Player, Position)) {
+    if (!(id > 0) || !p) continue;
+    playerPos = { x: p.x | 0, y: p.y | 0 };
+    break;
+  }
+
+  /** @type {number[]} */
+  const alertedIds = [];
+  for (const [id, pos, fac, vit] of world.query(Position, Faction, Vitality)) {
+    if (id === actor) continue;
+    if (!pos || !fac || !vit || (vit.hp | 0) <= 0) continue;
+    if (String(fac.key || "") !== actorFaction) continue;
+    const dist = Math.max(Math.abs((pos.x | 0) - (apos.x | 0)), Math.abs((pos.y | 0) - (apos.y | 0)));
+    if (dist > radius) continue;
+    const aggro = world.get(id, AggroState);
+    if (!aggro) continue;
+    aggro.alertLevel = AGGRO_LEVELS.hunting;
+    aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
+    if (playerPos) {
+      aggro.lastKnownX = playerPos.x | 0;
+      aggro.lastKnownY = playerPos.y | 0;
+    }
+    alertedIds.push(id | 0);
+  }
+
+  try {
+    world.emit?.("spell:wolf_howl", {
+      actor,
+      at: { x: apos.x | 0, y: apos.y | 0 },
+      radius,
+      alertedIds,
+    });
+  } catch {}
+};
+
+// Shield Bash — adjacent impact with 1-tile knockback and brief stun.
+REGISTRY["shield_bash"] = function shieldBashScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const targetId = Number(intent?.targetId || 0) | 0;
+  if (!(targetId > 0)) {
+    try { world.emit?.("spell:shield_bash:failed", { actor, reason: "no_target" }); } catch {}
+    return;
+  }
+  const tpos = world.get(targetId, Position);
+  const tvit = world.get(targetId, Vitality);
+  const tfac = world.get(targetId, Faction);
+  if (!tpos || !tvit || (tvit.hp | 0) <= 0 || !tfac || !areFactionsHostile(actorFaction, String(tfac.key || ""))) {
+    try { world.emit?.("spell:shield_bash:failed", { actor, reason: "invalid_target" }); } catch {}
+    return;
+  }
+  const dist = Math.max(Math.abs((apos.x | 0) - (tpos.x | 0)), Math.abs((apos.y | 0) - (tpos.y | 0)));
+  if (dist > Math.max(1, Number(spell?.range || 1) | 0)) {
+    try { world.emit?.("spell:shield_bash:failed", { actor, reason: "out_of_range" }); } catch {}
+    return;
+  }
+
+  const dx = Math.sign((tpos.x | 0) - (apos.x | 0));
+  const dy = Math.sign((tpos.y | 0) - (apos.y | 0));
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
+    spell,
+    baseAmount: 3,
+    type: "physical",
+    cause: "spell:shield_bash",
+    at: { x: tpos.x | 0, y: tpos.y | 0 },
+    salt: targetId ^ 0xba51,
+  }));
+  if (result.applied && !result.killed) {
+    try { world.add(targetId, KnockbackPending, { dx, dy, force: 1 }); } catch {}
+    let ae = /** @type any */ (world.get(targetId, ActiveEffects));
+    if (!ae || !Array.isArray(ae.effects)) {
+      try { world.add(targetId, ActiveEffects, { effects: [] }); } catch {}
+      ae = /** @type any */ (world.get(targetId, ActiveEffects));
+    }
+    if (ae?.effects) {
+      upsertTimedEffect(ae.effects, {
+        key: "stun",
+        turnsLeft: 1,
+        potency: 1,
+        stacks: 1,
+        startedAtTurn: world.step,
+        sourceId: actor,
+      });
+    }
+  }
+  try {
+    world.emit?.("spell:shield_bash", {
+      actor,
+      targetId,
+      at: { x: tpos.x | 0, y: tpos.y | 0 },
+      amount: result.amount | 0,
+      hit: result.applied,
+      missed: result.reason === "missed",
+    });
+  } catch {}
+};
+
+// Acid Spit — ranged acid hit + weakened + short acid hazard patch.
+REGISTRY["acid_spit"] = function acidSpitScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const targetId = Number(intent?.targetId || 0) | 0;
+  const targetPos = targetId > 0 ? world.get(targetId, Position) : null;
+  const tx = targetPos ? (targetPos.x | 0) : (Number.isFinite(intent?.x) ? (Number(intent.x) | 0) : NaN);
+  const ty = targetPos ? (targetPos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
+  const range = Math.max(1, Number(spell?.range || 6) | 0);
+  if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
+    try { world.emit?.("spell:acid_spit:failed", { actor, reason: "no_target", range }); } catch {}
+    return;
+  }
+  const dist = Math.max(Math.abs((apos.x | 0) - tx), Math.abs((apos.y | 0) - ty));
+  if (dist > range) {
+    try { world.emit?.("spell:acid_spit:failed", { actor, reason: "out_of_range", range }); } catch {}
+    return;
+  }
+
+  let struckId = 0;
+  let amount = 0;
+  if (targetId > 0 && world.isAlive(targetId)) {
+    const fac = world.get(targetId, Faction);
+    const vit = world.get(targetId, Vitality);
+    if (fac && vit && (vit.hp | 0) > 0 && areFactionsHostile(actorFaction, String(fac.key || ""))) {
+      const result = dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
+        spell,
+        baseAmount: 3,
+        type: "acid",
+        cause: "spell:acid_spit",
+        at: { x: tx | 0, y: ty | 0 },
+        salt: targetId ^ 0xac1d,
+      }));
+      if (result.applied) {
+        struckId = targetId;
+        amount = result.amount | 0;
+      }
+    }
+  }
+  if (!(struckId > 0)) {
+    for (const [id, pos, fac, vit] of world.query(Position, Faction, Vitality)) {
+      if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+      if (!fac || !vit || (vit.hp | 0) <= 0) continue;
+      if (!areFactionsHostile(actorFaction, String(fac.key || ""))) continue;
+      const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+        spell,
+        baseAmount: 3,
+        type: "acid",
+        cause: "spell:acid_spit",
+        at: { x: tx | 0, y: ty | 0 },
+        salt: id ^ 0xac1d,
+      }));
+      if (!result.applied) continue;
+      struckId = id | 0;
+      amount = result.amount | 0;
+      break;
+    }
+  }
+
+  if (struckId > 0) {
+    let ae = /** @type any */ (world.get(struckId, ActiveEffects));
+    if (!ae || !Array.isArray(ae.effects)) {
+      try { world.add(struckId, ActiveEffects, { effects: [] }); } catch {}
+      ae = /** @type any */ (world.get(struckId, ActiveEffects));
+    }
+    if (ae?.effects) {
+      upsertTimedEffect(ae.effects, {
+        key: "weakened",
+        turnsLeft: 2,
+        potency: 1,
+        stacks: 1,
+        startedAtTurn: world.step,
+        sourceId: actor,
+      });
+    }
+  }
+
+  const hazardId = spawnHazard(world, {
+    x: tx | 0,
+    y: ty | 0,
+    kind: "acid",
+    medium: "floor",
+    turnsLeft: 2,
+    radius: 0,
+    tickDamage: 1,
+    damageType: "acid",
+    cause: "spell:acid_spit",
+    sourceId: actor,
+    sourceKind: "acid_spitter",
+    identity: "acid_spit_pool",
+    name: "Acid Pool",
+  });
+
+  try {
+    world.emit?.("spell:acid_spit", {
+      actor,
+      targetId: struckId || targetId || 0,
+      at: { x: tx | 0, y: ty | 0 },
+      amount: amount | 0,
+      hazardId: hazardId | 0,
+      hit: struckId > 0,
+    });
+  } catch {}
+};
+
+// Death Volley — elite archer cone replacement: target tile + orthogonal neighbors.
+REGISTRY["death_volley"] = function deathVolleyScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const targetId = Number(intent?.targetId || 0) | 0;
+  const tpos = targetId > 0 ? world.get(targetId, Position) : null;
+  const tx = tpos ? (tpos.x | 0) : (Number.isFinite(intent?.x) ? (Number(intent.x) | 0) : NaN);
+  const ty = tpos ? (tpos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
+  const range = Math.max(1, Number(spell?.range || 10) | 0);
+  if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
+    try { world.emit?.("spell:death_volley:failed", { actor, reason: "no_target", range }); } catch {}
+    return;
+  }
+  const dist = Math.max(Math.abs((apos.x | 0) - tx), Math.abs((apos.y | 0) - ty));
+  if (dist > range) {
+    try { world.emit?.("spell:death_volley:failed", { actor, reason: "out_of_range", range }); } catch {}
+    return;
+  }
+
+  const hits = [];
+  const impactPoints = [
+    { x: tx, y: ty },
+    { x: tx + 1, y: ty },
+    { x: tx - 1, y: ty },
+    { x: tx, y: ty + 1 },
+    { x: tx, y: ty - 1 },
+  ];
+  for (let i = 0; i < impactPoints.length; i++) {
+    const at = impactPoints[i];
+    for (const [id, pos, fac, vit] of world.query(Position, Faction, Vitality)) {
+      if (id === actor) continue;
+      if (!fac || !vit || (vit.hp | 0) <= 0) continue;
+      if (!areFactionsHostile(actorFaction, String(fac.key || ""))) continue;
+      if ((pos.x | 0) !== (at.x | 0) || (pos.y | 0) !== (at.y | 0)) continue;
+      const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+        spell,
+        baseAmount: 4,
+        type: "pierce",
+        cause: "spell:death_volley",
+        at: { x: at.x | 0, y: at.y | 0 },
+        salt: (id * 131) ^ (i * 911),
+      }));
+      if (!result.applied) continue;
+      hits.push({ id: id | 0, at: { x: at.x | 0, y: at.y | 0 }, amount: result.amount | 0 });
+      break;
+    }
+  }
+
+  try {
+    world.emit?.("spell:death_volley", {
+      actor,
+      targetId,
+      origin: { x: tx | 0, y: ty | 0 },
+      impacts: impactPoints.map((p) => ({ x: p.x | 0, y: p.y | 0 })),
+      hits,
+    });
+  } catch {}
 };
 
 // Summon Skeleton — spawn a friendly skeleton near the caster.

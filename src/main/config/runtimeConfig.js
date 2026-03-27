@@ -39,6 +39,14 @@ function parseNonNegativeInt(raw, fallback = null) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function parseBooleanish(raw, fallback = false) {
+  if (raw == null) return fallback;
+  const value = String(raw).trim().toLowerCase();
+  if (value === "1" || value === "true" || value === "on" || value === "yes") return true;
+  if (value === "0" || value === "false" || value === "off" || value === "no") return false;
+  return fallback;
+}
+
 export function buildPerfConfig(params) {
   const q = (
     params.get("quality") ||
@@ -69,6 +77,10 @@ function parseSeedParam(raw) {
 
 export function readRuntimeConfig() {
   const params = new URLSearchParams(window.location.search || "");
+  const disableFovConeParam = params.get("disableFovCone");
+  const disableFovConeStored = readStoredString("jshack.disableFovCone", "");
+  const facingTurnCostParam = params.get("facingTurnCost");
+  const facingTurnCostStored = readStoredString("jshack.facingTurnCost", "");
   return {
     params,
     perf: buildPerfConfig(params),
@@ -80,6 +92,8 @@ export function readRuntimeConfig() {
     giveParam:    params.get("give")    || "",
     effectsParam: params.get("effects") || "",
     debug:        params.has("debug"),
+    disableFovCone: parseBooleanish(disableFovConeParam, parseBooleanish(disableFovConeStored, false)),
+    facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, true)),
     identifyItems: params.get("identify") !== "off",
     dungeonType:  params.get("dungeonType") || null,
   };

@@ -20,7 +20,7 @@ import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
-import { findNearestValidTileAround } from "../utils/queries.js";
+import { findNearestValidTileAround, playerEntity, queryFactionActors } from "../utils/queries.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { getItemsAt } from "../utils/tileQueryCache.js";
 import { worldRand } from "../utils/rng.js";
@@ -61,14 +61,10 @@ const FELINE_LAVA_MISSTEP_CHANCE = 0.05;
  */
 export function petBehaviorSystem(world) {
   // Find player
-  let playerId = 0;
-  let playerPos = null;
-  for (const [id, _p, pos] of world.query(Player, Position)) {
-    playerId = id;
-    playerPos = { x: pos.x, y: pos.y };
-    break;
-  }
-  if (!playerPos) return;
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const playerId  = _player.id;
+  const playerPos = _player.pos;
 
   const consumedCorpseIds = new Set();
 
@@ -338,9 +334,7 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
 
   let bestId = 0;
   let bestDist = Infinity;
-  for (
-    const [eid, fac, epos, evit] of world.query(Faction, Position, Vitality)
-  ) {
+  for (const [eid, fac, epos, evit] of queryFactionActors(world)) {
     if (!evit || (evit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
     const dx = (epos.x | 0) - (petPos.x | 0);
@@ -563,7 +557,7 @@ function findSafeCorpseForFleeing(world, petId, petPos, playerPos) {
 
 function countHostilesNearTile(world, x, y, petFaction) {
   let threats = 0;
-  for (const [, fac, pos, vit] of world.query(Faction, Position, Vitality)) {
+  for (const [, fac, pos, vit] of queryFactionActors(world)) {
     if (!vit || (vit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
 
@@ -735,7 +729,7 @@ function behaviorAggressive(world, petId, petPos, playerPos, playerId) {
   let closestEnemy = 0;
   let closestDist = AGGRESSIVE_RADIUS + 1;
 
-  for (const [enemyId, fac, enemyPos, evit] of world.query(Faction, Position, Vitality)) {
+  for (const [enemyId, fac, enemyPos, evit] of queryFactionActors(world)) {
     if (!evit || (evit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
 

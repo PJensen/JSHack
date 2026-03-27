@@ -5,7 +5,7 @@ import { PetCommandIntent } from '../components/Intents/PetCommandIntent.js';
 import { Pet } from '../components/Pet.js';
 import { PetState } from '../components/PetState.js';
 import { Position } from '../components/Position.js';
-import { Player } from '../components/Player.js';
+import { playerEntity } from '../utils/queries.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Vitality } from '../components/Vitality.js';
 
@@ -17,11 +17,7 @@ const COMMAND_COOLDOWN = 0; // turns between commands (0 = instant)
  */
 export function petCommandSystem(world) {
   // Find player position for state context
-  let playerPos = null;
-  for (const [id, _p, pos] of world.query(Player, Position)) {
-    playerPos = { x: pos.x, y: pos.y };
-    break;
-  }
+  const playerPos = playerEntity(world)?.pos ?? null;
 
   // Process all pet commands
   for (const [intentId, intent] of world.query(PetCommandIntent)) {

@@ -5,7 +5,7 @@ import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { Speed } from "../components/Speed.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { Player } from "../components/Player.js";
+import { playerEntity } from "../utils/queries.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../components/TownfolkJob.js";
 import { DoorLock } from "../components/DoorLock.js";
@@ -418,10 +418,8 @@ function openOwnedShopDoors(world, actorId) {
 function shopHasCustomer(world, actorId) {
   const room = findOwnedShopRoomByActor(world, actorId);
   if (!room) return false;
-  for (const [, , pos] of world.query(Player, Position)) {
-    if (isInRoom(pos.x, pos.y, room)) return true;
-  }
-  return false;
+  const _player = playerEntity(world);
+  return _player != null && isInRoom(_player.pos.x, _player.pos.y, room);
 }
 
 export function installTownfolkDoorListener(world) {
@@ -1388,12 +1386,9 @@ export function aiTownfolkSystem(world) {
     }
   }
 
-  let playerPos = null;
-  for (const [, , pos] of world.query(Player, Position)) {
-    playerPos = { x: pos.x, y: pos.y };
-    break;
-  }
-  if (!playerPos) return;
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const playerPos = _player.pos;
 
   forEachInRadius(world, playerPos.x, playerPos.y, TOWNFOLK_RADIUS, (id, pos) => {
     const fac = world.get(id, Faction);

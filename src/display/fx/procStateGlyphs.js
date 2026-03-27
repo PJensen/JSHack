@@ -7,7 +7,71 @@ export const PROC_STATE_VIS = {
 	cataclysm_mark:     { glyph: '\u2726',       r: 255, g: 120, b: 30  },  // ✦ star — marked for detonation
 	echo_strike_memory: { glyph: '\u{1F47B}',    r: 80,  g: 150, b: 255 },  // 👻 ghost — spectral echo stored
 	soul_mortgage_debt: { glyph: '\u2696\uFE0F', r: 200, g: 50,  b: 50  },  // ⚖️ scales — debt accruing
+	echo_grimoire_memory: { glyph: '\u{1F4DA}',  r: 110, g: 170, b: 255 },  // 📚 repeat-spell memory
+	kinetic_battery:    { glyph: '\u26A1',       r: 255, g: 235, b: 100 },  // ⚡ charged momentum
+	venom_ledger:       { glyph: '\u2623',       r: 95,  g: 205, b: 95  },  // ☣ poison ledger
+	hunger_surge:       { glyph: '\u{1F356}',    r: 245, g: 120, b: 80  },  // 🍖 hunger stacks
+	warded_retort:      { glyph: '\u{1F6E1}',    r: 125, g: 210, b: 255 },  // 🛡 retort shield
+	bloodsport_combo:   { glyph: '\u{1FA78}',    r: 235, g: 75,  b: 75  },  // 🩸 blood combo
+	shadow_parry:       { glyph: '\u2694',       r: 170, g: 135, b: 245 },  // ⚔ shadow counter
+	moonfire_phase:     { glyph: '\u263D',       r: 250, g: 200, b: 120 },  // ☽ phase tracker
+	kill_tempo:         { glyph: '\u266A',       r: 255, g: 175, b: 95  },  // ♪ kill rhythm
+	miss_momentum:      { glyph: '\u21BB',       r: 140, g: 180, b: 255 },  // ↻ miss momentum
+	debt_harvest:       { glyph: '\u20BF',       r: 210, g: 80,  b: 60  },  // ₿ debt banking
+	cataclysm_guard:    { glyph: '\u26E8',       r: 255, g: 145, b: 75  },  // ⛨ protection mark
+	omen_drive:         { glyph: '\u2727',       r: 255, g: 245, b: 120 },  // ✧ omen charge
+	pack_hunter_mark:   { glyph: '\u{1F43A}',    r: 210, g: 175, b: 120 },  // 🐺 pack mark
+	hunt_mark:          { glyph: '\u{1F3AF}',    r: 250, g: 140, b: 70  },  // 🎯 hunted
+	venom_clock:        { glyph: '\u23F1',       r: 80,  g: 200, b: 90  },  // ⏱ poison countdown
+	eternal_hunger:     { glyph: '\u221E',       r: 245, g: 120, b: 85  },  // ∞ hunger cycle
+	eclipse_phase:      { glyph: '\u25D0',       r: 180, g: 160, b: 230 },  // ◐ eclipse phase
+	arrow_instinct:     { glyph: '\u27B3',       r: 120, g: 210, b: 235 },  // ➳ ready shot
+	tollwarden_count:   { glyph: '\u{1F514}',    r: 250, g: 185, b: 100 },  // 🔔 toll count
 };
+
+const DEFAULT_PROC_VIS = Object.freeze({ glyph: '\u2736', r: 170, g: 185, b: 220 });
+const BADGE_BASE_X = 0.30;
+const BADGE_BASE_Y = -0.54;
+const BADGE_STEP_X = 0.38;
+const BADGE_RADIUS = 0.19;
+
+function stableHash(key) {
+	let h = 2166136261 >>> 0;
+	for (let i = 0; i < key.length; i++) {
+		h ^= key.charCodeAt(i) >>> 0;
+		h = Math.imul(h, 16777619) >>> 0;
+	}
+	return h >>> 0;
+}
+
+/**
+ * @param {string} key
+ * @returns {{glyph:string, r:number, g:number, b:number}}
+ */
+export function getProcStateVisual(key) {
+	const normalized = String(key || '').trim();
+	if (!normalized) return DEFAULT_PROC_VIS;
+	const direct = PROC_STATE_VIS[normalized];
+	if (direct) return direct;
+	const hash = stableHash(normalized);
+	const r = 90 + (hash & 0x3f);
+	const g = 120 + ((hash >>> 6) & 0x5f);
+	const b = 160 + ((hash >>> 12) & 0x5f);
+	return { ...DEFAULT_PROC_VIS, r, g, b };
+}
+
+/**
+ * @param {number} wx
+ * @param {number} wy
+ * @param {number} index
+ */
+export function procBadgeWorldCenter(wx, wy, index) {
+	return {
+		x: wx + BADGE_BASE_X + (index * BADGE_STEP_X),
+		y: wy + BADGE_BASE_Y,
+		radius: BADGE_RADIUS,
+	};
+}
 
 /**
  * Draw proc state badge(s) above a world-space position.
@@ -22,16 +86,15 @@ export const PROC_STATE_VIS = {
  */
 export function drawProcStateBadges(ctx, wx, wy, procStates, fxTime, entityId = 0) {
 	if (!procStates || !procStates.length) return;
-	const bx0 = wx + 0.30;
-	const by  = wy - 0.54;
 	for (let i = 0; i < procStates.length; i++) {
 		const { key, stacks } = procStates[i];
-		const vis = PROC_STATE_VIS[key];
-		if (!vis) continue;
+		const vis = getProcStateVisual(key);
 		const freq  = 2.2 + stacks * 0.9;
 		const pulse = 0.72 + 0.28 * Math.sin(fxTime * freq + entityId * 0.91);
-		const bx = bx0 + i * 0.38;
-		const radius = 0.19;
+		const center = procBadgeWorldCenter(wx, wy, i);
+		const bx = center.x;
+		const by = center.y;
+		const radius = center.radius;
 		ctx.save();
 		ctx.globalCompositeOperation = 'source-over';
 		// Drop shadow

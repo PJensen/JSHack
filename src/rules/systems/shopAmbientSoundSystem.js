@@ -1,7 +1,7 @@
 import { DungeonState } from "../components/DungeonState.js";
 import { Position } from "../components/Position.js";
-import { Player } from "../components/Player.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
+import { playerEntity } from "../utils/queries.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 
 const SHOP_AMBIENT_STATE_KEY = Symbol.for("jshack:shopAmbientSoundSystem:state");
@@ -99,12 +99,9 @@ export function shopAmbientSoundSystem(world) {
     world[SHOP_AMBIENT_STATE_KEY] = state;
   }
 
-  let playerPos = null;
-  for (const [, , pos] of world.query(Player, Position)) {
-    playerPos = pos;
-    break;
-  }
-  if (!playerPos) return;
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const playerPos = _player.pos;
 
   const currentDepth = getCurrentDepth(world);
   const currentTurn = world.step | 0;

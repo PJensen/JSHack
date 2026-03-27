@@ -32,6 +32,7 @@ import { CentipedeSegment } from "../components/CentipedeSegment.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
+import { FACING_TURN_COST_ENABLED_KEY, normalizeFacingVector } from "../utils/facing.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
@@ -223,8 +224,20 @@ export function movementSystem(world) {
       const target = tiles.livingByCell.get(k) || 0;
 
       // Record facing direction on every move attempt (successful or not)
+      const facingBefore = world.has(actor, Facing)
+        ? normalizeFacingVector(world.get(actor, Facing)?.dx, world.get(actor, Facing)?.dy)
+        : null;
       if (world.has(actor, Facing)) {
         world.set(actor, Facing, { dx: mdx, dy: mdy });
+      }
+      const facingAfter = normalizeFacingVector(mdx, mdy);
+      const facingChangedFromKnownDirection = !!(
+        facingBefore
+        && facingAfter
+        && (facingBefore.dx !== facingAfter.dx || facingBefore.dy !== facingAfter.dy)
+      );
+      if (world[FACING_TURN_COST_ENABLED_KEY] === true && facingChangedFromKnownDirection) {
+        continue;
       }
 
       // Flying entities bypass terrain (water, lava, trees, mountains) but not walls/void.

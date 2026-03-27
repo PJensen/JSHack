@@ -15,7 +15,11 @@ export const basePalette = {
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" }, // 🐀
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
   goblin_archer: { glyph: "g", fg: "#5eaa3a", glow: "#3a7020" },
+  bandit:   { glyph: "b", fg: "#c9b08c", glow: "#7b6547" },
+  bandit_archer: { glyph: "b", fg: "#b2c6d9", glow: "#677f97" },
+  boar:     { glyph: "b", fg: "#9c6f3d", glow: "#5f3f20" },
   bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" }, // 🦇
+  flaming_bat: { glyph: "b", fg: "#ff7a38", glow: "#b83f1d" },
   grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
   cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
   cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
@@ -28,6 +32,9 @@ export const basePalette = {
   kobold_shaman: { glyph: "k", fg: "#ffdd44", glow: "#ccaa22" },
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },
+  dire_wolf: { glyph: "d", fg: "#909f76", glow: "#5b6947" },
+  bandit_captain: { glyph: "b", fg: "#d9c57a", glow: "#8e6f2f" },
+  acid_spitter: { glyph: "a", fg: "#b8d95a", glow: "#6f8e2a" },
   orc:      { glyph: "o", fg: "#cc6644", glow: "#993320" },
   orc_shaman: { glyph: "o", fg: "#88bbdd", glow: "#557799" },
   hobgoblin: { glyph: "H", fg: "#cc8844", glow: "#995522" },
@@ -162,6 +169,9 @@ export const basePalette = {
   wand_meteor: { glyph: "/", fg: "#ff704d", glow: "#cc3322" },
   wand_frost: { glyph: "/", fg: "#4da6ff", glow: "#2277cc" },
   wand_heal: { glyph: "/", fg: "#66ff99", glow: "#44bb66" },
+  glacier_sigil: { glyph: "❄", fg: "#9fdcff", glow: "#5b97c8" },
+  conduction_lens: { glyph: "◉", fg: "#e0d88f", glow: "#a08f47" },
+  echo_grimoire: { glyph: "📘", fg: "#b7b0ff", glow: "#7268cc" },
 
   // Ammo
   ammo_arrows: { glyph: "/", fg: "#c4a46c", glow: "#a08050" },

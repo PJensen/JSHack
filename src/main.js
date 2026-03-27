@@ -7,6 +7,7 @@ import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
+import { FACING_TURN_COST_ENABLED_KEY, FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing } from "./rules/utils/facing.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
@@ -46,7 +47,7 @@ import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js
 import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
-import { drawProcStateBadges } from "./display/fx/procStateGlyphs.js";
+import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
@@ -257,6 +258,8 @@ installPluralizationExtensions();
 // ---- App wires rules/ (no display logic here) ------------------------------
 const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? pickRandomSeed();
 const world = new World({ seed: _bootSeed });
+world[FOV_CONE_DISABLED_KEY] = runtimeConfig.disableFovCone === true;
+world[FACING_TURN_COST_ENABLED_KEY] = runtimeConfig.facingTurnCost === true;
 configureWorld(world);
 import { installChannelingController } from "./main/channelingController.js";
 installChannelingController(world, () => (playerEntity(world)?.id || 0));
@@ -3016,6 +3019,68 @@ function bracketizeName(s) {
   return `[${str}]`;
 }
 
+/**
+ * @param {string} key
+ */
+function humanizeProcStateKey(key) {
+  const raw = String(key || "").trim();
+  if (!raw) return "Proc";
+  return raw
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+/**
+ * @param {any} procState
+ */
+function formatProcStateDetail(procState) {
+  const label = String(procState?.name || "").trim() || humanizeProcStateKey(procState?.key);
+  const detail = String(procState?.description || "").trim();
+  const stacks = Math.max(1, Number(procState?.stacks || 1) | 0);
+  const turnsLeft = Math.max(0, Number(procState?.turnsLeft || 0) | 0);
+  const potency = Number.isFinite(Number(procState?.potency)) ? Number(procState?.potency) : 1;
+  const segments = [`x${stacks}`];
+  if (turnsLeft > 0) segments.push(`${turnsLeft}t`);
+  if (Number.isFinite(potency)) segments.push(`p${potency}`);
+  const runtime = segments.join(" · ");
+  return detail
+    ? `${label}: ${detail} (${runtime})`
+    : `${label} (${runtime})`;
+}
+
+/**
+ * @param {number} tapX
+ * @param {number} tapY
+ * @returns {null | { entity:any, procState:any }}
+ */
+function findTappedProcBadge(tapX, tapY) {
+  const view = getCachedView();
+  const entities = Array.isArray(view?.entities) ? view.entities : [];
+  /** @type {null | { entity:any, procState:any, d2:number }} */
+  let best = null;
+  for (let i = 0; i < entities.length; i++) {
+    const entity = entities[i];
+    const procStates = Array.isArray(entity?.procStates) ? entity.procStates : [];
+    if (!procStates.length) continue;
+    for (let j = 0; j < procStates.length; j++) {
+      const procState = procStates[j];
+      const vis = getProcStateVisual(procState?.key);
+      if (!vis) continue;
+      const badge = procBadgeWorldCenter(entity.pos.x, entity.pos.y, j);
+      const dx = tapX - badge.x;
+      const dy = tapY - badge.y;
+      const d2 = dx * dx + dy * dy;
+      const hitR = badge.radius + 0.09; // touch-friendly expansion for mobile
+      if (d2 > hitR * hitR) continue;
+      if (!best || d2 < best.d2) best = { entity, procState, d2 };
+    }
+  }
+  return best ? { entity: best.entity, procState: best.procState } : null;
+}
+
 // When user clicks an inventory item to drink
 addEventListener('ui:requestDrink', (ev) => {
   if (isSimUiBlocked()) return;
@@ -3350,6 +3415,26 @@ canvas.addEventListener('pointerdown', (ev) => {
   });
 }, { capture: true });
 
+// Proc-state badges are touchable: tap a badge to inspect stack/turn/potency details.
+canvas.addEventListener('pointerdown', (ev) => {
+  if (_pendingEnemyTargeting || _pendingSpellTargeting || _pendingThrowTargeting) return;
+  const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
+  const hit = findTappedProcBadge(wx, wy);
+  if (!hit) return;
+  const who = String(hit.entity?.kind || "").toLowerCase() === "player"
+    ? "You"
+    : bracketizeName(String(hit.entity?.name || hit.entity?.kind || "Target"));
+  try {
+    messageLog.log({
+      text: `${who}: ${formatProcStateDetail(hit.procState)}`,
+      type: 'system',
+    });
+  } catch (e) { console.debug('[main] messageLog failed:', e); }
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+}, { capture: true });
+
 function particleWorldToScreen({ x, y, size = 1 }) {
   const sx = (x - cam.x) * cam.scale + canvas.width / (ctx.getTransform().a || 1) * 0.5;
   const sy = (y - cam.y) * cam.scale + canvas.height / (ctx.getTransform().d || 1) * 0.5;
@@ -3391,7 +3476,13 @@ const isVisibleAt = (x, y) => {
       };
       const blockedMap = buildBlocksVisionMap(world, bounds);
       const isBlocked = blockedCallback(blockedMap);
-      updateFOV(step, pe.pos.x, pe.pos.y, radius, isBlocked);
+      const facing = getNormalizedEntityFacing(world, pe.id);
+      const coneDegrees = getEntityFacingConeDegrees(world, pe.id);
+      updateFOV(step, pe.pos.x, pe.pos.y, radius, isBlocked, {
+        facingDx: facing?.dx || 0,
+        facingDy: facing?.dy || 0,
+        coneDegrees,
+      });
     }
   }
   return !!isTileVisible(Number(x) | 0, Number(y) | 0);

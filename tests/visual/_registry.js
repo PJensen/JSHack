@@ -10,4 +10,7 @@ export const SCENARIOS = [
 	{ name: 'Echo Strike',        path: './echoStrike.scenario.js' },
 	{ name: 'Cataclysm Chain',    path: './cataclysmChain.scenario.js' },
 	{ name: 'Soul Mortgage',      path: './soulMortgage.scenario.js' },
+	{ name: 'Glacier Sigil',      path: './glacierSigil.scenario.js' },
+	{ name: 'Conduction Lens',    path: './conductionLens.scenario.js' },
+	{ name: 'Echo Grimoire',      path: './echoGrimoire.scenario.js' },
 ];

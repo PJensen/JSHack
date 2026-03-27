@@ -11,6 +11,7 @@ import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { townSimulationSystem } from "../src/rules/systems/townSimulationSystem.js";
 import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 
 function addStorage(world, name, identity, x, y) {
   const id = world.create();
@@ -24,7 +25,10 @@ function countInventory(world, ownerId, identity) {
   let total = 0;
   for (const itemId of inventoryItems(world, ownerId)) {
     const ni = world.get(itemId, NamedIdentity);
-    if (String(ni?.identity || "") === identity) total++;
+    if (String(ni?.identity || "") === identity) {
+      const info = world.get(itemId, ItemInfo);
+      total += Math.max(1, Number(info?.count || 0) | 0);
+    }
   }
   return total;
 }

@@ -1,7 +1,7 @@
 import { DungeonState } from "../components/DungeonState.js";
-import { Player } from "../components/Player.js";
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { playerEntity } from "../utils/queries.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 
 /** @type {WeakMap<object, { nextTick:number }>} */
@@ -48,9 +48,9 @@ export function overworldAmbientSystem(world) {
   for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; break; }
   if (depth !== 0) return;
 
-  let ppos = null;
-  for (const [, pos] of world.query(Player, Position)) { ppos = pos; break; }
-  if (!ppos) return;
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const ppos = _player.pos;
 
   let nearest = null;
   let nearestPos = null;

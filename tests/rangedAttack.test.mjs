@@ -8,6 +8,7 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Stamina } from '../src/rules/components/Stamina.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
+import { Facing } from '../src/rules/components/Facing.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { Resistances } from '../src/rules/components/Resistences.js';
 import { ProcPackageNode } from '../src/rules/components/ProcPackageNode.js';
@@ -166,6 +167,19 @@ Deno.test("ranged: LOS blocked by wall → ranged:blocked emitted", () => {
   assert(events.some(e => e._event === 'ranged:blocked'), 'ranged:blocked emitted');
   const tv = world.get(target, Vitality);
   assert(tv.hp === 10, 'target undamaged');
+});
+
+Deno.test("ranged: target outside facing cone → ranged:blocked emitted and no ammo spent", () => {
+  const events = [];
+  const { world, archer, target, ammoId } = setup({ seed: 42 });
+  world.add(archer, Facing, { dx: -1, dy: 0 }); // facing west while target is east
+  trackEvents(world, events);
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+  rangedAttackSystem(world);
+  assert(!world.has(archer, RangedAttackIntent), "intent removed");
+  assert(events.some((e) => e._event === "ranged:blocked" && e.reason === "facing"), "facing block event emitted");
+  assertEquals(world.get(target, Vitality)?.hp, 10, "target should remain undamaged");
+  assertEquals(world.get(ammoId, ItemInfo)?.count, 10, "ammo should not be consumed");
 });
 
 Deno.test("ranged: out of range → ranged:out-of-range emitted", () => {

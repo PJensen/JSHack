@@ -19,6 +19,7 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { movementSystem, installSpiderWebListener } from "../src/rules/systems/movementSystem.js";
 import { installBumpInteractListener } from "../src/rules/systems/interactionSystem.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
+import { FACING_TURN_COST_ENABLED_KEY } from "../src/rules/utils/facing.js";
 import { loadChunk, clearAll, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_TREE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 
@@ -104,6 +105,48 @@ Deno.test("movementSystem: sets facing even on blocked move", () => {
     assertEquals(f.dx, 1, "facing should update even when blocked");
     const pos = world.get(id, Position);
     assertEquals(pos.x, 5, "position should not change when blocked");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: facing turn cost consumes turn when direction changes", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    world[FACING_TURN_COST_ENABLED_KEY] = true;
+    const id = world.create();
+    world.add(id, Position, { x: 5, y: 5 });
+    world.add(id, Facing, { dx: 1, dy: 0 });
+    world.add(id, MoveIntent, { dx: 0, dy: 1 });
+
+    movementSystem(world);
+
+    const pos = world.get(id, Position);
+    const f = world.get(id, Facing);
+    assertEquals(pos.x, 5, "position should not change when turning in place");
+    assertEquals(pos.y, 5, "position should not change when turning in place");
+    assertEquals(f.dx, 0, "facing should update to requested direction");
+    assertEquals(f.dy, 1, "facing should update to requested direction");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: facing turn cost disabled keeps move+look in same turn", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    world[FACING_TURN_COST_ENABLED_KEY] = false;
+    const id = world.create();
+    world.add(id, Position, { x: 5, y: 5 });
+    world.add(id, Facing, { dx: 1, dy: 0 });
+    world.add(id, MoveIntent, { dx: 0, dy: 1 });
+
+    movementSystem(world);
+
+    const pos = world.get(id, Position);
+    const f = world.get(id, Facing);
+    assertEquals(pos.x, 5);
+    assertEquals(pos.y, 6);
+    assertEquals(f.dx, 0);
+    assertEquals(f.dy, 1);
   } finally { clearAll(); }
 });
 

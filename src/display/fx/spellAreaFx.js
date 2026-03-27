@@ -939,6 +939,243 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       startShake(cam, 4, 0.14);
     });
 
+    world.on('spell:death_volley', ({ origin, impacts, hits }) => {
+      const points = Array.isArray(impacts) && impacts.length > 0
+        ? impacts
+        : (origin ? [origin] : []);
+      if (points.length <= 0) return;
+      for (let i = 0; i < points.length; i++) {
+        const at = points[i];
+        if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) continue;
+        _smiteFx.push(new RadialFx({ x: Number(at.x), y: Number(at.y), radius: 0.7, ttl: 0.20 }));
+        const burst = 10;
+        for (let j = 0; j < burst; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 0.45 + Math.random() * 0.85;
+          fx.pool.spawn(new Particle({
+            x: Number(at.x) + (Math.random() - 0.5) * 0.10,
+            y: Number(at.y) + (Math.random() - 0.5) * 0.10,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 0.1,
+            ay: 0.18,
+            life: 0.16 + Math.random() * 0.20,
+            size0: 0.07 + Math.random() * 0.05,
+            size1: 0.02,
+            r: 205 + ((Math.random() * 30) | 0),
+            g: 220 + ((Math.random() * 20) | 0),
+            b: 240 + ((Math.random() * 10) | 0),
+            a0: 0.85,
+          }));
+        }
+      }
+      if (Array.isArray(hits)) {
+        for (let i = 0; i < hits.length; i++) {
+          const hit = hits[i];
+          if (!hit?.at) continue;
+          fx.pool.spawn(new Particle({
+            x: Number(hit.at.x),
+            y: Number(hit.at.y),
+            vx: 0,
+            vy: -0.25,
+            ay: 0.08,
+            life: 0.24,
+            size0: 0.14,
+            size1: 0.03,
+            r: 255,
+            g: 180,
+            b: 110,
+            a0: 0.75,
+          }));
+        }
+      }
+      startShake(cam, 3, 0.10);
+    });
+
+    world.on('spell:boar_charge', ({ from, to, hit, missed }) => {
+      if (!to || !Number.isFinite(to.x) || !Number.isFinite(to.y)) return;
+      const impactX = Number(to.x);
+      const impactY = Number(to.y);
+      _blastwaveFx.push(new RadialFx({
+        x: impactX,
+        y: impactY,
+        radius: hit ? 1.15 : 0.85,
+        ttl: hit ? 0.26 : 0.18,
+      }));
+
+      const burstCount = hit ? 20 : 12;
+      for (let i = 0; i < burstCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (hit ? 0.55 : 0.38) + Math.random() * (hit ? 1.05 : 0.7);
+        fx.pool.spawn(new Particle({
+          x: impactX + (Math.random() - 0.5) * 0.10,
+          y: impactY + (Math.random() - 0.5) * 0.10,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.08,
+          ay: 0.12,
+          life: 0.16 + Math.random() * 0.16,
+          size0: 0.06 + Math.random() * 0.06,
+          size1: 0.02,
+          r: 210 + ((Math.random() * 30) | 0),
+          g: 150 + ((Math.random() * 35) | 0),
+          b: 90 + ((Math.random() * 30) | 0),
+          a0: 0.86,
+        }));
+      }
+
+      if (from && Number.isFinite(from.x) && Number.isFinite(from.y)) {
+        const dx = impactX - Number(from.x);
+        const dy = impactY - Number(from.y);
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        const streakCount = Math.max(3, Math.floor(dist * 2));
+        for (let i = 0; i < streakCount; i++) {
+          const t = (i + Math.random() * 0.7) / streakCount;
+          const px = Number(from.x) + dx * t;
+          const py = Number(from.y) + dy * t;
+          fx.pool.spawn(new Particle({
+            x: px + (Math.random() - 0.5) * 0.08,
+            y: py + (Math.random() - 0.5) * 0.08,
+            vx: dirX * (0.25 + Math.random() * 0.3),
+            vy: dirY * (0.25 + Math.random() * 0.3),
+            ay: 0.04,
+            life: 0.08 + Math.random() * 0.08,
+            size0: 0.04 + Math.random() * 0.03,
+            size1: 0.01,
+            r: 230,
+            g: 180,
+            b: 120,
+            a0: 0.6,
+          }));
+        }
+      }
+
+      if (hit) startShake(cam, 5, 0.16);
+      else if (missed) startShake(cam, 3, 0.10);
+      else startShake(cam, 4, 0.12);
+    });
+
+    world.on('spell:boar_bite', ({ at, hit, missed }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smiteFx.push(new RadialFx({
+        x: Number(at.x),
+        y: Number(at.y),
+        radius: hit ? 0.62 : 0.45,
+        ttl: 0.12,
+      }));
+      const burst = hit ? 10 : 6;
+      for (let i = 0; i < burst; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (hit ? 0.24 : 0.16) + Math.random() * 0.35;
+        fx.pool.spawn(new Particle({
+          x: Number(at.x) + (Math.random() - 0.5) * 0.08,
+          y: Number(at.y) + (Math.random() - 0.5) * 0.08,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.02,
+          ay: 0.05,
+          life: 0.08 + Math.random() * 0.12,
+          size0: 0.03 + Math.random() * 0.03,
+          size1: 0.01,
+          r: 225,
+          g: 165 + ((Math.random() * 25) | 0),
+          b: 120 + ((Math.random() * 25) | 0),
+          a0: 0.8,
+        }));
+      }
+      if (hit) startShake(cam, 2, 0.06);
+      else if (missed) startShake(cam, 1, 0.04);
+    });
+
+    world.on('spell:wolf_howl', ({ at, radius }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smiteFx.push(new RadialFx({
+        x: Number(at.x),
+        y: Number(at.y),
+        radius: Math.max(1, Number(radius || 4)),
+        ttl: 0.24,
+      }));
+      for (let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 * i) / 20;
+        const speed = 0.35 + Math.random() * 0.65;
+        fx.pool.spawn(new Particle({
+          x: Number(at.x),
+          y: Number(at.y),
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.04,
+          ay: 0.05,
+          life: 0.18 + Math.random() * 0.18,
+          size0: 0.05 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 200,
+          g: 220,
+          b: 255,
+          a0: 0.72,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    world.on('spell:shield_bash', ({ at, hit, missed }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _blastwaveFx.push(new RadialFx({
+        x: Number(at.x),
+        y: Number(at.y),
+        radius: hit ? 0.95 : 0.7,
+        ttl: hit ? 0.2 : 0.14,
+      }));
+      const burstCount = hit ? 14 : 9;
+      for (let i = 0; i < burstCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (hit ? 0.45 : 0.28) + Math.random() * 0.7;
+        fx.pool.spawn(new Particle({
+          x: Number(at.x) + (Math.random() - 0.5) * 0.12,
+          y: Number(at.y) + (Math.random() - 0.5) * 0.12,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.06,
+          ay: 0.1,
+          life: 0.13 + Math.random() * 0.15,
+          size0: 0.05 + Math.random() * 0.05,
+          size1: 0.015,
+          r: 235,
+          g: 205,
+          b: 150,
+          a0: 0.8,
+        }));
+      }
+      if (hit) startShake(cam, 4, 0.12);
+      else if (missed) startShake(cam, 2, 0.08);
+    });
+
+    world.on('spell:acid_spit', ({ at, hit }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smiteFx.push(new RadialFx({
+        x: Number(at.x),
+        y: Number(at.y),
+        radius: hit ? 0.78 : 0.55,
+        ttl: 0.18,
+      }));
+      const burstCount = hit ? 16 : 11;
+      for (let i = 0; i < burstCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (hit ? 0.33 : 0.24) + Math.random() * 0.62;
+        fx.pool.spawn(new Particle({
+          x: Number(at.x) + (Math.random() - 0.5) * 0.10,
+          y: Number(at.y) + (Math.random() - 0.5) * 0.10,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.03,
+          ay: 0.06,
+          life: 0.14 + Math.random() * 0.16,
+          size0: 0.05 + Math.random() * 0.04,
+          size1: 0.015,
+          r: 200 + ((Math.random() * 30) | 0),
+          g: 240,
+          b: 110 + ((Math.random() * 30) | 0),
+          a0: 0.84,
+        }));
+      }
+      startShake(cam, hit ? 3 : 2, 0.08);
+    });
+
     world.on('spell:phase_strike', ({ from, to, hits, randomized }) => {
       if (!from || !to) return;
       if (!Number.isFinite(from.x) || !Number.isFinite(from.y)) return;

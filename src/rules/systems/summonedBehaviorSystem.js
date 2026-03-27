@@ -9,11 +9,10 @@ import { Vitality } from '../components/Vitality.js';
 import { Speed } from '../components/Speed.js';
 import { MoveIntent } from '../components/Intents/MoveIntent.js';
 import { PetState } from '../components/PetState.js';
-import { Player } from '../components/Player.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { statusStrength } from '../utils/statusFacade.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
-import { findNearestValidTileAround } from '../utils/queries.js';
+import { findNearestValidTileAround, playerEntity, queryFactionActors } from '../utils/queries.js';
 import {
   FOLLOW_DISTANCE,
   TELEPORT_DISTANCE,
@@ -27,15 +26,11 @@ const AGGRESSIVE_RADIUS = 8;
 /** @param {any} world */
 export function summonedBehaviorSystem(world) {
   // Find player (needed for following/teleport)
-  let playerId = 0;
-  let playerPos = null;
-  for (const [id, _p, pos] of world.query(Player, Position)) {
-    playerId = id;
-    playerPos = { x: pos.x, y: pos.y };
-    break;
-  }
+  const _player = playerEntity(world);
+  const playerId  = _player?.id ?? 0;
+  const playerPos = _player?.pos ?? null;
 
-  for (const [id, fac, pos, vit] of world.query(Faction, Position, Vitality)) {
+  for (const [id, fac, pos, vit] of queryFactionActors(world)) {
     if (!fac || fac.key !== 'summoned') continue;
     if (!vit || (vit.hp | 0) <= 0) continue;
 
