@@ -4138,42 +4138,25 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
 }
 
 /**
- * Draw a small directional marker for entity facing.
+ * Draw a small white dot in front of the entity's facing direction.
  * World-space: 1 unit = 1 tile.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ pos:{x:number,y:number}, facing?:{dx:number,dy:number}|null }} entity
  */
-function drawFacingArrow(ctx, entity) {
+function drawFacingDot(ctx, entity) {
   const f = entity?.facing || null;
   const dx = Math.sign(Number(f?.dx || 0));
   const dy = Math.sign(Number(f?.dy || 0));
   if (dx === 0 && dy === 0) return;
 
-  const cx = entity.pos.x;
-  const cy = entity.pos.y;
-  const len = 0.30;
-  const ex = cx + dx * len;
-  const ey = cy + dy * len;
-  const angle = Math.atan2(dy, dx);
-  const headLen = 0.12;
-  const headSpread = 0.50;
+  const dotX = entity.pos.x + dx * 0.22;
+  const dotY = entity.pos.y + dy * 0.22;
 
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = 'rgba(102, 204, 255, 0.92)';
-  ctx.lineWidth = 0.045;
-  ctx.lineCap = 'round';
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = 'rgba(255,255,255,0.97)';
   ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(ex, ey);
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(120, 220, 255, 0.95)';
-  ctx.beginPath();
-  ctx.moveTo(ex, ey);
-  ctx.lineTo(ex - headLen * Math.cos(angle - headSpread), ey - headLen * Math.sin(angle - headSpread));
-  ctx.lineTo(ex - headLen * Math.cos(angle + headSpread), ey - headLen * Math.sin(angle + headSpread));
-  ctx.closePath();
+  ctx.arc(dotX, dotY, 0.055, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -4855,7 +4838,7 @@ function render(worldView) {
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale);
     if ((renderEntity.layer | 0) >= 300) {
-      drawFacingArrow(bctx, renderEntity);
+      drawFacingDot(bctx, renderEntity);
     }
     if (shouldShowHealthBar(renderEntity, _fxTime)) {
       _healthBarsToDraw.push(renderEntity);
