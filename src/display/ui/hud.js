@@ -89,7 +89,7 @@ export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   pray: Object.freeze({ col: '3', row: '1' }),
   shoot: Object.freeze({ col: '1', row: '2' }),
   quickInteract: Object.freeze({ col: '2', row: '2' }),
-  wait: Object.freeze({ col: '3', row: '2' }),
+  wait: Object.freeze({ col: '6', row: '2' }),
   pinnedQuickSlots: Object.freeze({ col: '4 / 6', row: '1 / 3' }),
 });
 
@@ -896,7 +896,7 @@ export function initHUD() {
     if (isMobile) {
       Object.assign(bar.style, {
         display: 'grid',
-        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+        gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
         gridTemplateRows: 'repeat(2, 44px)',
         alignItems: 'stretch',
         justifyContent: 'stretch',
