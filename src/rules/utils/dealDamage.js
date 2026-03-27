@@ -388,6 +388,38 @@ export function dealDamage(world, spec) {
 
   if (killed) {
     try { world.emit?.('died', { id: target, killer: source, cause }); } catch { /* */ }
+
+    if (!spec.noTrigger && source > 0 && world.isAlive(source)) {
+      ensureEquippedAffixTopology(world, source);
+
+      const killCtxBase = {
+        source,
+        target,
+        damage: {
+          amount: finalAmount,
+          type,
+          crit: critical,
+          blocked: false,
+        },
+        tags: new Set(["kill", String(type || "physical")]),
+        scratch: {},
+      };
+
+      const onKillOut = evaluateEquippedAffixProcs(world, source, {
+        ...killCtxBase,
+        kind: "onKill",
+      });
+      applyProcAccumulator(world, onKillOut, { applyDamage: dealDamage });
+
+      if (critical) {
+        const onCritKillOut = evaluateEquippedAffixProcs(world, source, {
+          ...killCtxBase,
+          kind: "onCritKill",
+        });
+        applyProcAccumulator(world, onCritKillOut, { applyDamage: dealDamage });
+      }
+    }
+
     // Battle fury: on-kill heal for the killer
     if (source > 0 && world.isAlive(source)) {
       const furyPot = activeResistBonus(world, source, "battle_fury");

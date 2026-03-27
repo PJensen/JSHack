@@ -3,6 +3,7 @@ export const weapons = {
   dagger_quick:       { glyph:")",  fg:"#f7d794", glow:"#f7d794" },
   axe_heavy:          { glyph:")",  fg:"#e0c070", glow:"#e0c070" },
   bow_short:          { glyph:"}",  fg:"#c4a46c", glow:"#a08050" },
+  bow_recurve:        { glyph:"}",  fg:"#c8b37a", glow:"#8b7245" },
   bow_long:           { glyph:"}",  fg:"#b09060", glow:"#887050" },
   bow_flaming:        { glyph:"}",  fg:"#ff8a3c", glow:"#ff4a1f" },
   bow_composite:      { glyph:"}",  fg:"#d4a8e0", glow:"#a070b8" },

@@ -6,6 +6,7 @@ import { Equipment } from '../components/Equipment.js';
 import { Inventory } from '../components/Inventory.js';
 import { Vitality } from '../components/Vitality.js';
 import { ItemInfo } from '../components/ItemInfo.js';
+import { Stamina } from '../components/Stamina.js';
 import { Faction } from '../components/Faction.js';
 import { Position } from '../components/Position.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
@@ -30,6 +31,7 @@ import {
   getBlindedCritChanceBonusPct,
   getBlindedCritMultBonus,
 } from '../utils/blindnessExposure.js';
+import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -161,6 +163,37 @@ export function rangedAttackSystem(world) {
       world.emit?.('ranged:blocked', { attacker, target: defender, reason: 'invisible' });
       world.remove(attacker, RangedAttackIntent);
       continue;
+    }
+
+    // Stamina gate: ranged attacks consume weapon staminaCost.
+    const staminaCost = Math.max(0, Number(weaponInfo.staminaCost ?? 6));
+    const stamina = world.get(attacker, Stamina);
+    if (stamina) {
+      const have = Number(stamina.stamina ?? 0);
+      if (have < staminaCost) {
+        world.emit?.('attack:insufficient-stamina', {
+          attacker,
+          defender,
+          weaponId,
+          mode: 'ranged',
+          need: staminaCost,
+          have,
+        });
+        world.emit?.('ranged:insufficient-stamina', {
+          attacker,
+          target: defender,
+          weaponId,
+          need: staminaCost,
+          have,
+        });
+        world.remove(attacker, RangedAttackIntent);
+        continue;
+      }
+      world.set(attacker, Stamina, {
+        ...stamina,
+        stamina: have - staminaCost,
+        regenCooldown: STAMINA_REGEN_COOLDOWN,
+      });
     }
 
     // d20 roll

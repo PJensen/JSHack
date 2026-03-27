@@ -11,6 +11,7 @@ export const rings = {
   serpent_ring:       { glyph:"◌", fg:"#7cc46b", glow:"#4d8f41" },
   brawler_band:       { glyph:"◌", fg:"#d0a272", glow:"#9b7246" },
   amulet_guarded:      { glyph:"\"", fg:"#d5d9de", glow:"#9ba4af" },
+  amulet_hearthwire:   { glyph:"\"", fg:"#d89f6d", glow:"#9c6c46" },
   amulet_vigor:        { glyph:"\"", fg:"#f1c36c", glow:"#ba8f3f" },
   amulet_warding:      { glyph:"\"", fg:"#c7d4e3", glow:"#8fa0b2" },
   amulet_focus:        { glyph:"\"", fg:"#9fc7ff", glow:"#6c91c9" },
