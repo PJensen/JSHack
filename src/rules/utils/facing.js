@@ -1,12 +1,12 @@
 import { Facing } from "../components/Facing.js";
 import { BaseStats } from "../components/BaseStats.js";
+import { FacingRules } from "../components/FacingRules.js";
 
 export const FACING_CONE_BASE_DEG = 200;
 export const FACING_CONE_FALLBACK_PERCEPTION = 5;
 export const FACING_CONE_MIN_DEG = 200;
 export const FACING_CONE_MAX_DEG = 200;
 export const FOV_CONE_DISABLED_KEY = Symbol.for("jshack:debug:fovCone:disabled");
-export const FACING_TURN_COST_ENABLED_KEY = Symbol.for("jshack:facing:turnCost:enabled");
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
@@ -76,6 +76,35 @@ export function getEntityFacingConeDegrees(world, entityId, opts = {}) {
   const baseStats = (id > 0) ? world.get(id, BaseStats) : null;
   const perception = Number(baseStats?.perception ?? fallbackPerception);
   return perceptionToFacingConeDegrees(perception, opts);
+}
+
+/**
+ * Canonical facing turn-cost read path.
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ */
+export function isFacingTurnCostEnabled(world) {
+  for (const [, rules] of world.query(FacingRules)) {
+    return rules?.turnCostEnabled === true;
+  }
+  return false;
+}
+
+/**
+ * Canonical facing turn-cost write path.
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {boolean} enabled
+ */
+export function setFacingTurnCostEnabled(world, enabled) {
+  const value = enabled === true;
+  for (const [id, rules] of world.query(FacingRules)) {
+    if (!rules || rules.turnCostEnabled !== value) {
+      world.set(id, FacingRules, { turnCostEnabled: value });
+    }
+    return id;
+  }
+  const id = world.create();
+  world.add(id, FacingRules, { turnCostEnabled: value });
+  return id;
 }
 
 /**
