@@ -15,6 +15,7 @@ import { Wounds } from "../components/Wounds.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Vitality } from "../components/Vitality.js";
 import { Speed } from "../components/Speed.js";
+import { Facing } from "../components/Facing.js";
 import { Interactable } from "../components/Interactable.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
@@ -109,6 +110,7 @@ export const Creature = defineArchetype(
   [ActiveEffects, { effects: [] }],
   [Vitality, (p) => ({ maxHp: p.maxHp ?? 10, hp: p.hp ?? (p.maxHp ?? 10) })],
   [Speed, (p) => ({ actEvery: Math.max(1, 4 - (p.speed ?? 1)) })],
+  [Facing, { dx: 0, dy: 0 }],
   // Awareness: starts unaware; managed by aiChaseSystem + soundPropagationSystem.
   [AggroState, { alertLevel: AGGRO_LEVELS.unaware, lastKnownX: 0, lastKnownY: 0, searchTurnsLeft: 0 }],
   // Sound emission: footstep-level ambient by default; override via ambientNoise param.
