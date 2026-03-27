@@ -2277,6 +2277,49 @@ export function renderItemDetails(container, it) {
     }
   }
 
+  // --- Proc nodes (trigger/effect summaries from item topology) ---
+  const procNodes = Array.isArray(it.procNodes) ? it.procNodes : [];
+  if (procNodes.length) {
+    const title = document.createElement('div');
+    title.textContent = 'Proc Nodes';
+    title.style.color = '#9fd6ff';
+    title.style.fontSize = '11px';
+    title.style.textTransform = 'uppercase';
+    title.style.letterSpacing = '0.06em';
+    title.style.opacity = '0.9';
+    title.style.marginTop = '6px';
+    container.appendChild(title);
+
+    for (const node of procNodes) {
+      const src = document.createElement('div');
+      src.textContent = String(node?.source || 'Item');
+      src.style.color = '#7fb3df';
+      src.style.fontSize = '12px';
+      src.style.marginTop = '2px';
+      container.appendChild(src);
+
+      const trigger = document.createElement('div');
+      const qualifiers = Array.isArray(node?.qualifiers)
+        ? node.qualifiers.map((q) => String(q || '').trim()).filter(Boolean)
+        : [];
+      trigger.textContent = qualifiers.length
+        ? `${String(node?.trigger || 'On Trigger')} · ${qualifiers.join(' · ')}`
+        : String(node?.trigger || 'On Trigger');
+      trigger.style.color = '#d7e9ff';
+      trigger.style.fontSize = '12px';
+      container.appendChild(trigger);
+
+      const effects = Array.isArray(node?.effects) ? node.effects : [];
+      for (const effect of effects) {
+        const line = document.createElement('div');
+        line.textContent = `• ${String(effect || '').trim()}`;
+        line.style.color = '#b6d6f2';
+        line.style.fontSize = '12px';
+        container.appendChild(line);
+      }
+    }
+  }
+
   // --- Socket circles ---
   const maxSockets = Number(it.maxSockets || 0) | 0;
   if (maxSockets > 0) {

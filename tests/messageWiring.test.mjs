@@ -287,3 +287,41 @@ Deno.test("messageWiring scopes spell:oom text by actor", () => {
   assert(texts.some((m) => /Not enough mana to cast/.test(m)), "player should get player-facing oom text");
   assert(texts.some((m) => /lacks mana/.test(m)), "enemy should get enemy-facing oom text");
 });
+
+Deno.test("messageWiring uses ranged slot weapon name for ranged damage logs", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Equipment, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Training Dummy", identity: "dummy" });
+
+  const daggerId = world.create();
+  world.add(daggerId, NamedIdentity, { name: "Dagger", identity: "dagger_quick" });
+  world.add(daggerId, ItemInfo, { type: "equip", slot: "weapon", count: 1, bonuses: {}, affixes: [] });
+
+  const bowId = world.create();
+  world.add(bowId, NamedIdentity, { name: "Short Bow", identity: "bow_short" });
+  world.add(bowId, ItemInfo, { type: "equip", slot: "ranged", subtype: "bow", count: 1, bonuses: {}, affixes: [] });
+
+  world.mutate(playerId, Equipment, (eq) => {
+    eq.weapon = daggerId;
+    eq.ranged = bowId;
+  });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 4,
+    cause: "ranged",
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  const text = String(messageLog.entries[0].text || "");
+  assert(text.includes("[Short Bow]"), "ranged combat log should use ranged weapon name");
+  assert(!text.includes("[Dagger]"), "ranged combat log should not use melee weapon name");
+});
