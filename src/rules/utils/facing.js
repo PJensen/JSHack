@@ -1,11 +1,11 @@
 import { Facing } from "../components/Facing.js";
 import { BaseStats } from "../components/BaseStats.js";
 
-export const FACING_CONE_BASE_DEG = 120;
+export const FACING_CONE_BASE_DEG = 200;
 export const FACING_CONE_PERCEPTION_BASELINE = 5;
-export const FACING_CONE_DEG_PER_PERCEPTION = 10;
+export const FACING_CONE_DEG_PER_PERCEPTION = 0;
 export const FACING_CONE_MIN_DEG = 30;
-export const FACING_CONE_MAX_DEG = 180;
+export const FACING_CONE_MAX_DEG = 360;
 export const FOV_CONE_DISABLED_KEY = Symbol.for("jshack:debug:fovCone:disabled");
 export const FACING_TURN_COST_ENABLED_KEY = Symbol.for("jshack:facing:turnCost:enabled");
 
