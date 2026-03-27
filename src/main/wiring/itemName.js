@@ -19,6 +19,7 @@ import { ProcEffect } from "../../rules/components/ProcEffect.js";
 import { ProcNode } from "../../rules/components/ProcNode.js";
 import { ProcPackageNode } from "../../rules/components/ProcPackageNode.js";
 import { ScriptRef } from "../../rules/components/ScriptRef.js";
+import { getProcPackage } from "../../rules/data/procPackages.js";
 import {
   getSpell,
   describeSpellDetailLines,
@@ -201,6 +202,12 @@ function formatEffect(effect) {
   return humanizeToken(kind) || "Effect";
 }
 
+function packageIdFromScriptRef(ref) {
+  const raw = String(ref || "").trim();
+  if (!raw) return "";
+  return raw.startsWith("procPackage:") ? raw.slice("procPackage:".length) : "";
+}
+
 function summarizeProcNode(world, procNodeId, sourceLabel) {
   const gateRows = [];
   const effectRows = [];
@@ -223,7 +230,16 @@ function summarizeProcNode(world, procNodeId, sourceLabel) {
   }
 
   const effects = effectRows.map(formatEffect).filter(Boolean);
-  if (scriptRef) effects.push(`Script: ${humanizeToken(scriptRef)}`);
+  if (scriptRef) {
+    const packageId = packageIdFromScriptRef(scriptRef);
+    const procPackage = packageId ? getProcPackage(packageId) : null;
+    if (procPackage) {
+      const summary = String(procPackage.summary || "").trim();
+      effects.push(summary ? `${procPackage.name}: ${summary}` : `Script: ${procPackage.name}`);
+    } else {
+      effects.push(`Script: ${humanizeToken(scriptRef)}`);
+    }
+  }
   if (!effects.length) effects.push("Custom Proc");
 
   return {
@@ -257,6 +273,33 @@ function buildProcNodeSummaries(world, itemId) {
   return out;
 }
 
+function buildProcPackageSummaries(world, itemId) {
+  const seen = new Set();
+  const out = [];
+  const stack = [Number(itemId || 0) | 0];
+  while (stack.length) {
+    const entityId = stack.pop();
+    if (!(entityId > 0) || !world.isAlive?.(entityId)) continue;
+
+    const pkgNode = world.get(entityId, ProcPackageNode);
+    if (pkgNode?.packageId) {
+      const packageId = String(pkgNode.packageId || "");
+      if (packageId && !seen.has(packageId)) {
+        seen.add(packageId);
+        const spec = getProcPackage(packageId);
+        if (spec) {
+          out.push({ id: spec.id, name: spec.name, summary: String(spec.summary || "").trim() });
+        } else {
+          out.push({ id: packageId, name: humanizeToken(packageId), summary: "" });
+        }
+      }
+    }
+
+    for (const childId of children(world, entityId)) stack.push(childId);
+  }
+  return out;
+}
+
 /**
  * Build a standardised display-data object for an item entity.
  * Used by inventory, chest, ground-pickup and any other UI that shows item info.
@@ -282,10 +325,16 @@ export function buildItemDisplayData(world, itemId) {
 
   const spellId = identified ? spellIdFromIdentity(identity) : "";
   const linkedSpell = spellId ? getSpell(spellId) : null;
+  const procPackages = identified ? buildProcPackageSummaries(world, itemId) : [];
+  const procPackageDetailLines = procPackages.map((pkg) => {
+    const summary = String(pkg?.summary || "").trim();
+    return summary ? `Proc: ${pkg.name} - ${summary}` : `Proc: ${pkg.name}`;
+  });
   const detailLines = identified
     ? [
         ...(Array.isArray(info.detailLines) ? info.detailLines.map((line) => String(line || "").trim()).filter(Boolean) : []),
         ...(linkedSpell ? describeSpellDetailLines(linkedSpell) : []),
+        ...procPackageDetailLines,
       ]
     : [];
   const targetEffects = linkedSpell ? describeSpellTargetEffects(linkedSpell) : [];

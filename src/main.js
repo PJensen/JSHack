@@ -4154,7 +4154,7 @@ function drawFacingDot(ctx, entity) {
 
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = 'rgba(255,255,255,0.97)';
+  ctx.fillStyle = 'rgba(70,130,190,0.97)';
   ctx.beginPath();
   ctx.arc(dotX, dotY, 0.055, 0, Math.PI * 2);
   ctx.fill();
