@@ -2,6 +2,8 @@ import { children } from "../../lib/ecs-js/index.js";
 import { destroySubtree } from "../../lib/ecs-js/hierarchy.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Faction } from "../components/Faction.js";
+import { ItemInfo } from "../components/ItemInfo.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { ProcPackageNode } from "../components/ProcPackageNode.js";
 import { Vitality } from "../components/Vitality.js";
@@ -72,13 +74,41 @@ function emit(world, name, payload) {
   }
 }
 
+const NEAR_EPSILON = 1e-6;
+
+function isNear(a, b, range = 1, epsilon = NEAR_EPSILON) {
+  if (!a || !b) return false;
+  const r = Math.max(0, Number(range || 0)) + Math.max(0, Number(epsilon || 0));
+  const dx = Math.abs((Number(a.x) || 0) - (Number(b.x) || 0));
+  const dy = Math.abs((Number(a.y) || 0) - (Number(b.y) || 0));
+  return Math.max(dx, dy) <= r;
+}
+
+function hasTag(ctx, tag) {
+  return !!ctx?.tags?.has?.(String(tag || ""));
+}
+
+function isSanctuaryIdentity(identity) {
+  const id = String(identity || "").toLowerCase();
+  return id === "shrine" || id === "altar" || id === "church_altar";
+}
+
+function isNearSanctuary(world, source, radius = 2) {
+  const pos = world.get(source, Position);
+  if (!pos) return false;
+  for (const [id, at, named] of world.query(Position, NamedIdentity)) {
+    if (!(id > 0) || !at || !named) continue;
+    if (!isSanctuaryIdentity(named.identity)) continue;
+    if (isNear(pos, at, radius)) return true;
+  }
+  return false;
+}
+
 function isHostileNear(world, source, origin, nearId, radius = 2) {
   if (!(nearId > 0) || nearId === source || !world.isAlive?.(nearId)) return false;
   const nearPos = world.get(nearId, Position);
   if (!nearPos) return false;
-  const dx = Math.abs((nearPos.x | 0) - (origin.x | 0));
-  const dy = Math.abs((nearPos.y | 0) - (origin.y | 0));
-  return Math.max(dx, dy) <= radius;
+  return isNear(origin, nearPos, radius);
 }
 
 function compareRicochetTargets(a, b) {
@@ -670,6 +700,410 @@ registerScript(PROC_PACKAGE_KEYS.EclipseHammer, {
   },
 });
 
+registerScript("procPackage:arrowInstinct", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const kind = String(ctx?.kind || "");
+    const source = Number(ctx?.source || 0) | 0;
+    if (!(source > 0)) return;
+    if (kind === "onDamaged") {
+      if (!hasTag(ctx, "ranged") && !hasTag(ctx, "projectile")) return;
+      if (getEffect(world, source, "arrow_instinct")) return;
+      if (world.rand() >= 0.5) return;
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      ae.effects.push({ key: "arrow_instinct", turnsLeft: 20, stacks: 1, potency: 1 });
+      emit(world, "proc:arrowInstinct:gain", { actor: source });
+      return;
+    }
+    if (kind === "onBeforeHit" && getEffect(world, source, "arrow_instinct")) {
+      ctx.proc.addCritChance(0.08);
+      ctx.proc.addBonusDamage(1, 2, "pierce");
+    }
+  },
+});
+
+registerScript("procPackage:shrineBreaker", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onBeforeHit") return;
+    const source = Number(ctx?.source || 0) | 0;
+    if (!(source > 0) || !isNearSanctuary(world, source, 2)) return;
+    ctx.proc.addBonusDamage(1, 1, "physical");
+    ctx.proc.addCritChance(0.03);
+    emit(world, "proc:shrineBreaker", { actor: source });
+  },
+});
+
+registerScript("procPackage:tollwarden", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0) || !(target > 0)) return;
+    if (kind === "onBeforeHit") {
+      const toll = getEffect(world, target, "tollwarden_count");
+      if (Number(toll?.stacks || 0) >= 2) ctx.proc.addCritChance(0.05);
+      return;
+    }
+    if (kind !== "onHit") return;
+    const ae = ensureActiveEffects(world, target);
+    if (!ae) return;
+    const existing = getEffect(world, target, "tollwarden_count");
+    const stacks = Math.min(3, Math.max(1, Number(existing?.stacks || 0) + 1));
+    upsertTimedEffect(ae.effects, { key: "tollwarden_count", turnsLeft: 10, stacks, potency: stacks });
+    if (stacks < 3) return;
+    removeEffect(world, target, "tollwarden_count");
+    ctx.proc.dealDamage(target, 4, "shadow", { source, cause: "procPackage:tollwarden", noTrigger: true });
+    ctx.proc.applyStatus(target, "stun", 1, 1);
+    emit(world, "proc:tollwarden:detonate", { actor: source, target });
+  },
+});
+
+registerScript("procPackage:kineticBattery", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onDamaged") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(5, Math.max(1, Number(getEffect(world, source, "kinetic_battery")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "kinetic_battery", turnsLeft: 12, stacks: next, potency: next });
+      return;
+    }
+    if (kind !== "onBeforeHit") return;
+    const battery = getEffect(world, source, "kinetic_battery");
+    const spend = Math.min(2, Math.max(0, Number(battery?.stacks || 0)));
+    if (spend <= 0) return;
+    battery.stacks -= spend;
+    battery.potency = battery.stacks;
+    if (battery.stacks <= 0) removeEffect(world, source, "kinetic_battery");
+    ctx.proc.addBonusDamage(spend * 2, spend * 2, "electric");
+    ctx.proc.restoreResource(source, "mana", spend);
+  },
+});
+
+registerScript("procPackage:venomLedger", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onHit") {
+      if (!(target > 0)) return;
+      if (world.rand() < 0.3) ctx.proc.applyStatus(target, "poison", 3, 1);
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(4, Math.max(1, Number(getEffect(world, source, "venom_ledger")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "venom_ledger", turnsLeft: 10, stacks: next, potency: next });
+      return;
+    }
+    if (kind !== "onKill") return;
+    const stacks = Math.max(0, Number(getEffect(world, source, "venom_ledger")?.stacks || 0));
+    if (stacks <= 0) return;
+    ctx.proc.heal(source, stacks);
+    removeEffect(world, source, "venom_ledger");
+  },
+});
+
+registerScript("procPackage:hungerSurge", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onKill") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(8, Math.max(1, Number(getEffect(world, source, "hunger_surge")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "hunger_surge", turnsLeft: 16, stacks: next, potency: next });
+      return;
+    }
+    if (kind !== "onBeforeHit") return;
+    const hunger = getEffect(world, source, "hunger_surge");
+    const stacks = Math.max(0, Number(hunger?.stacks || 0));
+    if (stacks <= 0) return;
+    ctx.proc.addBonusDamage(Math.floor(stacks / 2));
+    hunger.stacks = Math.max(0, stacks - 1);
+    hunger.potency = hunger.stacks;
+    if (hunger.stacks <= 0) removeEffect(world, source, "hunger_surge");
+  },
+});
+
+registerScript("procPackage:ritualOverdraw", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onBeforeHit") {
+      const vit = world.get(source, Vitality);
+      if (!vit || Number(vit.hp || 0) <= 3) return;
+      ctx.proc.dealDamage(source, 2, "physical", { source, cause: "procPackage:ritualOverdraw", nonLethal: true, noTrigger: true });
+      ctx.proc.addBonusDamage(4, 4, "fire");
+      ctx.proc.restoreResource(source, "mana", 2);
+      return;
+    }
+    if (kind === "onKill") ctx.proc.heal(source, 2);
+  },
+});
+
+registerScript("procPackage:executionRipple", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0) || !(target > 0)) return;
+    if (kind === "onCritKill") {
+      const pos = world.get(target, Position);
+      if (!pos) return;
+      const srcFaction = world.get(source, Faction)?.key || "";
+      for (const [nearId] of world.query(Position)) {
+        if (!isHostileNear(world, source, pos, nearId, 2) || nearId === target) continue;
+        const nearFaction = world.get(nearId, Faction)?.key || "";
+        if (!areFactionsHostile(srcFaction, nearFaction)) continue;
+        ctx.proc.applyStatus(nearId, "cataclysm_mark", 4, 1);
+      }
+      return;
+    }
+    if (kind === "onBeforeHit") {
+      if (!getEffect(world, target, "cataclysm_mark")) return;
+      ctx.proc.addCritChance(0.12);
+      ctx.proc.addBonusDamage(2, 2, "void");
+      removeEffect(world, target, "cataclysm_mark");
+    }
+  },
+});
+
+registerScript("procPackage:wardedRetort", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onDamaged") {
+      if ((target > 0) && world.rand() < 0.35) ctx.proc.applyStatus(target, "weaken", 2, 1);
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      upsertTimedEffect(ae.effects, { key: "warded_retort", turnsLeft: 3, stacks: 1, potency: 1 });
+      return;
+    }
+    if (kind !== "onBeforeHit" || !getEffect(world, source, "warded_retort")) return;
+    ctx.proc.addBonusDamage(2, 2, "acid");
+    removeEffect(world, source, "warded_retort");
+  },
+});
+
+registerScript("procPackage:bloodsport", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onHit") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(5, Math.max(1, Number(getEffect(world, source, "bloodsport_combo")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "bloodsport_combo", turnsLeft: 8, stacks: next, potency: next });
+      return;
+    }
+    const stacks = Math.max(0, Number(getEffect(world, source, "bloodsport_combo")?.stacks || 0));
+    if (stacks <= 0) return;
+    if (kind === "onBeforeHit") ctx.proc.addBonusDamage(Math.floor(stacks / 2));
+    if (kind === "onDamaged") ctx.proc.heal(source, Math.max(1, Math.floor(stacks / 2)));
+  },
+});
+
+registerScript("procPackage:shadowParry", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onMiss") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      upsertTimedEffect(ae.effects, { key: "shadow_parry", turnsLeft: 1, stacks: 1, potency: 1 });
+      return;
+    }
+    if (kind !== "onDamaged" || !(target > 0) || !getEffect(world, source, "shadow_parry")) return;
+    ctx.proc.dealDamage(target, 2, "shadow", { source, cause: "procPackage:shadowParry", noTrigger: true, nonLethal: true });
+    removeEffect(world, source, "shadow_parry");
+  },
+});
+
+registerScript("procPackage:moonfireCycle", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (String(ctx?.kind || "") !== "onHit") return;
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    if (!(source > 0) || !(target > 0)) return;
+    const ae = ensureActiveEffects(world, source);
+    if (!ae) return;
+    const phase = getEffect(world, source, "moonfire_phase");
+    const sun = !phase || Number(phase.stacks || 0) === 0;
+    upsertTimedEffect(ae.effects, { key: "moonfire_phase", turnsLeft: 99, stacks: sun ? 1 : 0, potency: 1 });
+    if (sun) {
+      ctx.proc.dealDamage(target, 2, "fire", { source, cause: "procPackage:moonfireCycle", noTrigger: true, nonLethal: true });
+      ctx.proc.applyStatus(target, "burning", 2, 1);
+      return;
+    }
+    ctx.proc.dealDamage(target, 2, "cold", { source, cause: "procPackage:moonfireCycle", noTrigger: true, nonLethal: true });
+    ctx.proc.applyStatus(target, "frost", 2, 1);
+  },
+});
+
+registerScript("procPackage:killTempo", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onKill") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(3, Math.max(1, Number(getEffect(world, source, "kill_tempo")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "kill_tempo", turnsLeft: 6, stacks: next, potency: next });
+      ctx.proc.restoreResource(source, "stamina", 5);
+      return;
+    }
+    if (kind !== "onBeforeHit") return;
+    const stacks = Math.max(0, Number(getEffect(world, source, "kill_tempo")?.stacks || 0));
+    if (stacks <= 0) return;
+    ctx.proc.addCritChance(stacks * 0.04);
+    ctx.proc.addBonusDamage(stacks, stacks, "physical");
+  },
+});
+
+registerScript("procPackage:missMomentum", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onMiss") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(3, Math.max(1, Number(getEffect(world, source, "miss_momentum")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "miss_momentum", turnsLeft: 5, stacks: next, potency: next });
+      return;
+    }
+    if (kind !== "onBeforeHit") return;
+    const stacks = Math.max(0, Number(getEffect(world, source, "miss_momentum")?.stacks || 0));
+    if (stacks <= 0) return;
+    ctx.proc.addBonusDamage(stacks * 2, stacks * 2, "physical");
+    ctx.proc.addCritChance(stacks * 0.03);
+    removeEffect(world, source, "miss_momentum");
+  },
+});
+
+registerScript("procPackage:debtHarvest", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onHit") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(10, Math.max(1, Number(getEffect(world, source, "debt_harvest")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "debt_harvest", turnsLeft: 99, stacks: next, potency: next });
+      return;
+    }
+    const stacks = Math.max(0, Number(getEffect(world, source, "debt_harvest")?.stacks || 0));
+    if (kind === "onDamaged" && stacks >= 5) {
+      ctx.proc.restoreResource(source, "stamina", 4);
+      ctx.proc.restoreResource(source, "mana", 4);
+      const debt = getEffect(world, source, "debt_harvest");
+      debt.stacks = Math.max(0, stacks - 3);
+      debt.potency = debt.stacks;
+      if (debt.stacks <= 0) removeEffect(world, source, "debt_harvest");
+      return;
+    }
+    if (kind === "onKill" && stacks > 0) {
+      ctx.proc.heal(source, Math.min(8, stacks));
+      removeEffect(world, source, "debt_harvest");
+    }
+  },
+});
+
+registerScript("procPackage:cataclysmGuard", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onDamaged") {
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      upsertTimedEffect(ae.effects, { key: "cataclysm_guard", turnsLeft: 4, stacks: 1, potency: 1 });
+      return;
+    }
+    if (kind === "onBeforeHit" && getEffect(world, source, "cataclysm_guard")) {
+      ctx.proc.addBonusDamage(3, 3, "void");
+      removeEffect(world, source, "cataclysm_guard");
+      return;
+    }
+    if (kind === "onKill" && getEffect(world, source, "cataclysm_guard")) {
+      ctx.proc.applyStatus(source, "invuln", 1, 1);
+    }
+  },
+});
+
+registerScript("procPackage:omenDrive", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0)) return;
+    if (kind === "onDamaged") {
+      if (!hasTag(ctx, "ranged") && !hasTag(ctx, "projectile")) return;
+      const ae = ensureActiveEffects(world, source);
+      if (!ae) return;
+      const next = Math.min(4, Math.max(1, Number(getEffect(world, source, "omen_drive")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "omen_drive", turnsLeft: 12, stacks: next, potency: next });
+      return;
+    }
+    if (kind !== "onBeforeHit") return;
+    const omen = getEffect(world, source, "omen_drive");
+    const stacks = Math.max(0, Number(omen?.stacks || 0));
+    if (stacks <= 0) return;
+    ctx.proc.addBonusDamage(stacks * 2, stacks * 2, "shadow");
+    if ((target > 0) && stacks >= 2) ctx.proc.applyStatus(target, "blind", 1, 1);
+    removeEffect(world, source, "omen_drive");
+  },
+});
+
+registerScript("procPackage:packHunter", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const target = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0) || !(target > 0)) return;
+    if (kind === "onHit") {
+      const ae = ensureActiveEffects(world, target);
+      if (!ae) return;
+      const next = Math.min(4, Math.max(1, Number(getEffect(world, target, "pack_hunter_mark")?.stacks || 0) + 1));
+      upsertTimedEffect(ae.effects, { key: "pack_hunter_mark", turnsLeft: 6, stacks: next, potency: next });
+      return;
+    }
+    if (kind !== "onBeforeHit") return;
+    const marked = getEffect(world, target, "pack_hunter_mark");
+    const stacks = Math.max(0, Number(marked?.stacks || 0));
+    if (stacks <= 0) return;
+    ctx.proc.addBonusDamage(stacks, stacks, "pierce");
+    ctx.proc.addCritChance(stacks * 0.02);
+  },
+});
+
+registerScript("procPackage:graveCurrent", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const source = Number(ctx?.source || 0) | 0;
+    const item = Number(ctx?.item || 0) | 0;
+    const kind = String(ctx?.kind || "");
+    if (!(source > 0) || !(item > 0) || kind !== "onKill") return;
+    const info = world.get(item, ItemInfo);
+    if (!info) return;
+    const maxCharges = Math.max(0, Number(info.maxCharges || 0));
+    const current = Math.max(0, Number(info.charges || 0));
+    if (!(maxCharges > 0) || current >= maxCharges) return;
+    info.charges = Math.min(maxCharges, current + 1);
+    emit(world, "proc:graveCurrent:charge", { actor: source, item, charges: info.charges, maxCharges });
+  },
+});
+
 const PROC_PACKAGE_SPECS = Object.freeze([
   Object.freeze({
     id: "echoStrike",
@@ -866,6 +1300,234 @@ const PROC_PACKAGE_SPECS = Object.freeze([
     passiveExpressions: Object.freeze([]),
     procTrees: Object.freeze([
       Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.EclipseHammer, priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "arrowInstinct",
+    name: "Arrow Instinct",
+    summary: "When struck by a projectile, 50% chance to gain a 20-turn dexterity-like combat focus (non-stacking).",
+    stateKeys: Object.freeze(["arrow_instinct"]),
+    hostIdeas: Object.freeze(["hunter bows", "ranger cowls"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:arrowInstinct", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:arrowInstinct", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "shrineBreaker",
+    name: "Shrine Breaker",
+    summary: "While fighting near shrines or altars, gain a small strength-like strike bonus.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["sacred hunt gear", "pilgrim relics"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:shrineBreaker", priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "tollwarden",
+    name: "Tollwarden",
+    summary: "Hits ring up a 3-count meter on the target, then discharge with shadow damage and stun.",
+    stateKeys: Object.freeze(["tollwarden_count"]),
+    hostIdeas: Object.freeze(["judgment crossbows", "execution pendants"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:tollwarden", priority: 10 }),
+      Object.freeze({ trigger: "onHit", script: "procPackage:tollwarden", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "kineticBattery",
+    name: "Kinetic Battery",
+    summary: "Taking hits stores battery stacks; next attacks spend them for electric damage and mana return.",
+    stateKeys: Object.freeze(["kinetic_battery"]),
+    hostIdeas: Object.freeze(["storm robes", "resonant staves"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:kineticBattery", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:kineticBattery", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "venomLedger",
+    name: "Venom Ledger",
+    summary: "Landed hits build toxin debt; kill while debt is active to cash out healing.",
+    stateKeys: Object.freeze(["venom_ledger"]),
+    hostIdeas: Object.freeze(["plague leathers", "toxin knives"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: "procPackage:venomLedger", priority: 10 }),
+      Object.freeze({ trigger: "onKill", script: "procPackage:venomLedger", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "hungerSurge",
+    name: "Hunger Surge",
+    summary: "Kills stack hunger; attacks consume stacks for immediate extra damage.",
+    stateKeys: Object.freeze(["hunger_surge"]),
+    hostIdeas: Object.freeze(["hunger crowns", "warclubs"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onKill", script: "procPackage:hungerSurge", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:hungerSurge", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "ritualOverdraw",
+    name: "Ritual Overdraw",
+    summary: "Spend a small amount of life before each hit for fire damage and mana, then recover on kill.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["blood rapiers", "blood orbs"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:ritualOverdraw", priority: 10 }),
+      Object.freeze({ trigger: "onKill", script: "procPackage:ritualOverdraw", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "executionRipple",
+    name: "Execution Ripple",
+    summary: "Critical kills propagate marks to nearby hostiles; marked foes are easier to finish.",
+    stateKeys: Object.freeze(["cataclysm_mark"]),
+    hostIdeas: Object.freeze(["warspears", "war greaves"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onCritKill", script: "procPackage:executionRipple", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:executionRipple", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "wardedRetort",
+    name: "Warded Retort",
+    summary: "Being hit arms a short retort window; your next strike carries acid backlash.",
+    stateKeys: Object.freeze(["warded_retort"]),
+    hostIdeas: Object.freeze(["reactive armor", "counter-set gear"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:wardedRetort", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:wardedRetort", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "bloodsport",
+    name: "Bloodsport",
+    summary: "Sustained combat builds combo pressure that amplifies attacks and drip-heals when hit.",
+    stateKeys: Object.freeze(["bloodsport_combo"]),
+    hostIdeas: Object.freeze(["brawling wraps", "berserker plate"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: "procPackage:bloodsport", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:bloodsport", priority: 20 }),
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:bloodsport", priority: 30 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "shadowParry",
+    name: "Shadow Parry",
+    summary: "Misses prime a one-beat shadow counter that lashes back when you are struck.",
+    stateKeys: Object.freeze(["shadow_parry"]),
+    hostIdeas: Object.freeze(["duelist cords", "echo ringmail"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onMiss", script: "procPackage:shadowParry", priority: 10 }),
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:shadowParry", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "moonfireCycle",
+    name: "Moonfire Cycle",
+    summary: "Each hit alternates sun and moon strikes: fire+burning, then cold+frost.",
+    stateKeys: Object.freeze(["moonfire_phase"]),
+    hostIdeas: Object.freeze(["eclipse torcs", "dual-phase gauntlets"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: "procPackage:moonfireCycle", priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "killTempo",
+    name: "Kill Tempo",
+    summary: "Kills build short-lived tempo stacks that boost next attacks and refill stamina.",
+    stateKeys: Object.freeze(["kill_tempo"]),
+    hostIdeas: Object.freeze(["ascendant belts", "tempo kill kits"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onKill", script: "procPackage:killTempo", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:killTempo", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "missMomentum",
+    name: "Miss Momentum",
+    summary: "Misses are banked into momentum and spent in one burst on a later hit.",
+    stateKeys: Object.freeze(["miss_momentum"]),
+    hostIdeas: Object.freeze(["duelist belts", "risk-reward kits"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onMiss", script: "procPackage:missMomentum", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:missMomentum", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "debtHarvest",
+    name: "Debt Harvest",
+    summary: "Hits accrue debt; taking damage cashes partial resources, kills cash full healing.",
+    stateKeys: Object.freeze(["debt_harvest"]),
+    hostIdeas: Object.freeze(["soul-debt gauntlets", "mortgage treads"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: "procPackage:debtHarvest", priority: 10 }),
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:debtHarvest", priority: 20 }),
+      Object.freeze({ trigger: "onKill", script: "procPackage:debtHarvest", priority: 30 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "cataclysmGuard",
+    name: "Cataclysm Guard",
+    summary: "Taking damage primes a void-charged counterstrike; secure a kill while primed for brief invulnerability.",
+    stateKeys: Object.freeze(["cataclysm_guard"]),
+    hostIdeas: Object.freeze(["cataclysm shields", "warboots"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:cataclysmGuard", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:cataclysmGuard", priority: 20 }),
+      Object.freeze({ trigger: "onKill", script: "procPackage:cataclysmGuard", priority: 30 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "omenDrive",
+    name: "Omen Drive",
+    summary: "Projectile hits charge an omen battery that detonates into shadow damage and blinds.",
+    stateKeys: Object.freeze(["omen_drive"]),
+    hostIdeas: Object.freeze(["portent focuses", "counter-ranged kits"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onDamaged", script: "procPackage:omenDrive", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:omenDrive", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "packHunter",
+    name: "Pack Hunter",
+    summary: "Consecutive hits tag prey and amplify follow-ups with precision pressure.",
+    stateKeys: Object.freeze(["pack_hunter_mark"]),
+    hostIdeas: Object.freeze(["predator cowls", "stalker blades"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: "procPackage:packHunter", priority: 10 }),
+      Object.freeze({ trigger: "onBeforeHit", script: "procPackage:packHunter", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "graveCurrent",
+    name: "Grave Current",
+    summary: "Wand-like foci recharge 1 charge on kill, up to their item cap.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["kill-charging wands", "grave foci"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onKill", script: "procPackage:graveCurrent", priority: 10 }),
     ]),
   }),
 ]);

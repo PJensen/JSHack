@@ -34,4 +34,11 @@ export const weapons = {
   ember_knife:        { glyph:")",  fg:"#ff8830", glow:"#ff5500" },
   flametongue:        { glyph:"/",  fg:"#ff6020", glow:"#ff3300" },
   ashen_reaver:       { glyph:"/",  fg:"#cc3000", glow:"#ff4400" },
+  predator_stakebow:  { glyph:"}",  fg:"#9bcf68", glow:"#67943c" },
+  doom_crossbow:      { glyph:"}",  fg:"#7f6aa8", glow:"#524079" },
+  resonant_quarterstaff: { glyph:"/", fg:"#6eb7de", glow:"#3e7f9f" },
+  venom_kris:         { glyph:")",  fg:"#8adf6c", glow:"#56a640" },
+  never_sated_warclub:{ glyph:"T",  fg:"#b08f62", glow:"#7a5f3f" },
+  blood_covenant_rapier: { glyph:"/", fg:"#d06c6c", glow:"#9a3f3f" },
+  cataclysm_warspear: { glyph:"/",  fg:"#c9b27e", glow:"#8e774c" },
 };
