@@ -214,9 +214,9 @@ function summarizeProcNode(world, procNodeId, sourceLabel) {
   let scriptRef = "";
   for (const childId of children(world, procNodeId)) {
     const gate = world.get(childId, ActivationGate);
-    if (gate?.enabled !== false) gateRows.push(gate);
+    if (gate && gate.enabled !== false) gateRows.push(gate);
     const effect = world.get(childId, ProcEffect);
-    if (effect?.enabled !== false) effectRows.push(effect);
+    if (effect && effect.enabled !== false) effectRows.push(effect);
   }
   const script = world.get(procNodeId, ScriptRef);
   if (script?.ref) scriptRef = String(script.ref);
