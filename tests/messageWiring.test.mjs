@@ -325,3 +325,26 @@ Deno.test("messageWiring uses ranged slot weapon name for ranged damage logs", (
   assert(text.includes("[Short Bow]"), "ranged combat log should use ranged weapon name");
   assert(!text.includes("[Dagger]"), "ranged combat log should not use melee weapon name");
 });
+
+Deno.test("messageWiring logs spell-proc gear messages for player events", () => {
+  const world = new World({ seed: 99 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Goblin", identity: "goblin" });
+  world.add(targetId, Position, { x: 4, y: 4 });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId, { isVisibleAt: () => true });
+
+  world.emit("proc:glacierSigil", { actor: playerId, targetId });
+  world.emit("proc:conductionLens", { actor: playerId, extraChains: 1 });
+  world.emit("proc:echoGrimoire:echo", { actor: playerId, spellId: "frost", powerScale: 0.8 });
+
+  assertEquals(messageLog.entries.length, 3);
+  assert(messageLog.entries[0].text.includes("Glacier Sigil"));
+  assert(messageLog.entries[1].text.includes("Conduction Lens"));
+  assert(messageLog.entries[2].text.includes("Echo Grimoire"));
+  assert(messageLog.entries[2].text.includes("80%"));
+});

@@ -62,11 +62,11 @@ Deno.test("inventory: pickup, virtual stacking, capacity denial, and drop", () =
   const invItem = inventoryItems(world, player)[0];
   assert(world.get(invItem, ItemInfo).count === 3, 'count 3 in inventory');
 
-  // pickup b — same identity, both entities persist (virtual stacking), capacity OK
+  // pickup b — same identity, merges into a; capacity OK
   world.add(player, PickupIntent, { targetId: b });
   world.tick(1);
-  assert(inventoryItems(world, player).length === 2, 'both shard entities in inventory');
-  assert(world.isAlive(b), 'second entity persists (no entity destruction)');
+  assert(inventoryItems(world, player).length === 1, 'stacks merge into one entity');
+  assert(!world.isAlive(b), 'merged entity is destroyed');
 
   // capacity denial — different identity, capacity is 1
   const d = makeItem(world, { name: 'Twig', identity: 'twig', weight: 1, count: 1, x: pos.x, y: pos.y });
@@ -77,7 +77,7 @@ Deno.test("inventory: pickup, virtual stacking, capacity denial, and drop", () =
   // drop subset of stack (drop 2 of 3 from invItem a)
   world.add(player, DropIntent, { itemId: invItem, count: 2 });
   world.tick(1);
-  assert(world.get(invItem, ItemInfo).count === 1, 'inventory reduced to 1');
+  assert(world.get(invItem, ItemInfo).count === 3, 'inventory reduced to 3 (merged count 5 minus drop 2)');
   let droppedAtTile = 0; let dropId = 0;
   for (const [eid, p] of world.query(Position)) { if (p.x === pos.x && p.y === pos.y && world.has(eid, ItemInfo)) { droppedAtTile++; dropId = eid; } }
   assert(droppedAtTile >= 1, 'something dropped on ground');
@@ -87,7 +87,7 @@ Deno.test("inventory: pickup, virtual stacking, capacity denial, and drop", () =
   const c = makeItem(world, { name: 'Shard', identity: 'shard', weight: 10, count: 1, x: pos.x + 999, y: pos.y });
   world.add(player, PickupIntent, { targetId: c });
   world.tick(1);
-  assert(inventoryItems(world, player).length === 2, 'mismatch no-op');
+  assert(inventoryItems(world, player).length === 1, 'mismatch no-op');
 });
 
 Deno.test("inventory: dropped item becomes top of ground stack", () => {

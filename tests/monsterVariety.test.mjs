@@ -28,6 +28,7 @@ Deno.test("tier 2 pool has at least 8 non-rare monsters", () => {
 const NEW_MONSTERS = [
   'goblin_archer', 'orc_shaman', 'hobgoblin', 'phase_spider',
   'wight', 'dark_acolyte', 'orc_warchief',
+  'bandit', 'bandit_archer', 'dire_wolf', 'bandit_captain', 'acid_spitter',
 ];
 
 for (const id of NEW_MONSTERS) {
@@ -55,10 +56,18 @@ Deno.test("goblin_archer has ranged loadout options", () => {
   assert(ranged.some((entry) => entry.itemId === "bow_short"), "should include plain bow option");
 });
 
+Deno.test("bandit_archer has direct ranged loadout", () => {
+  const def = getMonster('bandit_archer');
+  assert(Array.isArray(def.equipped), "should define equipped loadout");
+  assert(def.equipped.some((entry) => String(entry?.slot || "") === "ranged" && entry?.itemId === "bow_short"));
+  assert(def.equipped.some((entry) => String(entry?.slot || "") === "ammo" && entry?.itemId === "ammo_arrows"));
+});
+
 Deno.test("goblin uses dedicated shiv loadout instead of direct onHit bleed hook", () => {
   const def = getMonster("goblin");
   assert(def, "goblin should exist");
   assert(Array.isArray(def.wielding) && def.wielding.length >= 2, "goblin should define wielding options");
+  assert(Array.isArray(def.equipped) && def.equipped.length > 0, "goblin should define equipped options");
   assert(def.wielding.includes("goblin_jagged_shiv"), "goblin should include jagged shiv option");
   assert(def.wielding.includes("goblin_shiv"), "goblin should include plain shiv option");
   assert(!def.hooks || !Array.isArray(def.hooks.onHit) || def.hooks.onHit.length === 0, "goblin should not carry a direct onHit bleed hook");
@@ -92,6 +101,48 @@ Deno.test("dark_acolyte has agony and shadow_bolt spells", () => {
   assert(Array.isArray(def.learnedSpellIds), 'should have learnedSpellIds');
   assert(def.learnedSpellIds.includes('agony'), 'should know agony');
   assert(def.learnedSpellIds.includes('shadow_bolt'), 'should know shadow_bolt');
+});
+
+Deno.test("death_archer has telegraphed death_volley elite ability", () => {
+  const def = getMonster("death_archer");
+  assert(Array.isArray(def.learnedSpellIds), "should have learnedSpellIds");
+  assert(def.learnedSpellIds.includes("death_volley"), "should know death_volley");
+  assert(Array.isArray(def?.hooks?.whileLOS) && def.hooks.whileLOS.length > 0, "should have whileLOS hook(s)");
+});
+
+Deno.test("new immersive monsters expose intended role patterns", () => {
+  const bandit = getMonster("bandit");
+  assert(Array.isArray(bandit?.wielding) && bandit.wielding.length > 0, "bandit should wield basic weapons");
+  assert(Array.isArray(bandit?.equipped) && bandit.equipped.length > 0, "bandit should also carry equipped loadout options");
+
+  const direWolf = getMonster("dire_wolf");
+  assert(Array.isArray(direWolf?.learnedSpellIds) && direWolf.learnedSpellIds.includes("wolf_howl"), "dire_wolf should know wolf_howl");
+
+  const captain = getMonster("bandit_captain");
+  assert(Array.isArray(captain?.learnedSpellIds) && captain.learnedSpellIds.includes("shield_bash"), "bandit_captain should know shield_bash");
+
+  const spitter = getMonster("acid_spitter");
+  assert(Array.isArray(spitter?.learnedSpellIds) && spitter.learnedSpellIds.includes("acid_spit"), "acid_spitter should know acid_spit");
+});
+
+Deno.test("boar has close-range bite ability alongside charge", () => {
+  const boar = getMonster("boar");
+  assert(Array.isArray(boar?.learnedSpellIds) && boar.learnedSpellIds.includes("boar_charge"), "boar should keep charge ability");
+  assert(Array.isArray(boar?.learnedSpellIds) && boar.learnedSpellIds.includes("boar_bite"), "boar should have close-range bite ability");
+  assert(Array.isArray(boar?.hooks?.whileLOS) && boar.hooks.whileLOS.length > 0, "boar should drive abilities from LOS AI hooks");
+});
+
+Deno.test("hobgoblin carries both wielding and equipped loadout paths", () => {
+  const hobgoblin = getMonster("hobgoblin");
+  assert(Array.isArray(hobgoblin?.wielding) && hobgoblin.wielding.length > 0, "hobgoblin should have wielding pool");
+  assert(Array.isArray(hobgoblin?.equipped) && hobgoblin.equipped.length > 0, "hobgoblin should have equipped pool");
+});
+
+Deno.test("flaming_bat is visually/ludically distinguished from bat baseline", () => {
+  const def = getMonster("flaming_bat");
+  assert(def, "flaming_bat should exist");
+  assert(Array.isArray(def.tags) && def.tags.includes("burning"), "flaming_bat should project burning tag");
+  assert(Array.isArray(def?.hooks?.onDeath) && def.hooks.onDeath.length > 0, "flaming_bat should have death hooks");
 });
 
 Deno.test("phase_spider has phaseOut and selfThrow hooks", () => {

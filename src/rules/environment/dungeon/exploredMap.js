@@ -4,6 +4,7 @@
 
 import { computeFOV } from '../../../shared/math/fov.js';
 import { CHUNK_SIZE } from './constants.js';
+import { isPointInFacingCone } from '../../utils/facing.js';
 
 /** @type {Map<string, Uint8Array>} tiles the player has ever seen on this depth */
 const _explored = new Map();
@@ -12,8 +13,22 @@ const _visible = new Map();
 /** @type {Uint8Array[]} reusable visible chunk buffers */
 const _visiblePool = [];
 
-/** @type {number} last world.step when FOV was computed */
+/** @type {number} */
 let _lastStep = -1;
+/** @type {number} */
+let _lastPx = 0;
+/** @type {number} */
+let _lastPy = 0;
+/** @type {number} */
+let _lastRadius = -1;
+/** @type {number} */
+let _lastFacingDx = 0;
+/** @type {number} */
+let _lastFacingDy = 0;
+/** @type {number} */
+let _lastConeDegrees = 360;
+/** @type {((x:number,y:number)=>boolean)|null} */
+let _lastIsBlocked = null;
 
 /** @param {number} cx @param {number} cy */
 function _key(cx, cy) { return `${cx},${cy}`; }
@@ -65,12 +80,38 @@ function _clearVisible() {
  * @param {number} py      - player world y
  * @param {number} radius  - vision radius
  * @param {(x:number, y:number) => boolean} isBlocked
+ * @param {{ facingDx?: number, facingDy?: number, coneDegrees?: number }} [opts]
  */
-export function updateFOV(step, px, py, radius, isBlocked) {
-  if (step === _lastStep) return;
-  _lastStep = step;
+export function updateFOV(step, px, py, radius, isBlocked, opts = undefined) {
+  const facingDx = Math.sign(Number(opts?.facingDx || 0));
+  const facingDy = Math.sign(Number(opts?.facingDy || 0));
+  const coneDegrees = Number(opts?.coneDegrees ?? 360);
+  const sameInputs = (
+    step === _lastStep
+    && (px | 0) === _lastPx
+    && (py | 0) === _lastPy
+    && (radius | 0) === _lastRadius
+    && facingDx === _lastFacingDx
+    && facingDy === _lastFacingDy
+    && coneDegrees === _lastConeDegrees
+    && isBlocked === _lastIsBlocked
+  );
+  if (sameInputs) return;
+
+  _lastStep = step | 0;
+  _lastPx = px | 0;
+  _lastPy = py | 0;
+  _lastRadius = radius | 0;
+  _lastFacingDx = facingDx;
+  _lastFacingDy = facingDy;
+  _lastConeDegrees = coneDegrees;
+  _lastIsBlocked = isBlocked;
   _clearVisible();
-  computeFOV(px, py, radius, isBlocked, (x, y) => _set(_visible, x, y));
+  const coneActive = (facingDx !== 0 || facingDy !== 0) && coneDegrees < 360;
+  computeFOV(px, py, radius, isBlocked, (x, y) => {
+    if (coneActive && !isPointInFacingCone(px, py, x, y, facingDx, facingDy, coneDegrees)) return;
+    _set(_visible, x, y);
+  });
   for (const [key, visChunk] of _visible) {
     const exploredChunk = _explored.get(key) || (() => {
       const c = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
@@ -97,6 +138,13 @@ export function clearExplored() {
   _explored.clear();
   _clearVisible();
   _lastStep = -1;
+  _lastPx = 0;
+  _lastPy = 0;
+  _lastRadius = -1;
+  _lastFacingDx = 0;
+  _lastFacingDy = 0;
+  _lastConeDegrees = 360;
+  _lastIsBlocked = null;
 }
 
 /**

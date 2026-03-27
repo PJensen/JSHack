@@ -4,7 +4,54 @@ import { GroundStackOrder } from "../components/GroundStackOrder.js";
 import { Player } from "../components/Player.js";
 import { Collider } from "../components/Collider.js";
 import { Vitality } from "../components/Vitality.js";
+import { Faction } from "../components/Faction.js";
+import { Anatomy } from "../components/Anatomy.js";
+import { AggroState } from "../components/AggroState.js";
+import { HazardArea } from "../components/HazardArea.js";
+import { Not } from "../../lib/ecs-js/core.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
+
+// ── Shared defined-query registry ─────────────────────────────────────────────
+// WeakMap ensures each world instance gets its own set of handles, so tests
+// that create multiple worlds never share stale state across runs.
+
+/** @type {WeakMap<object, ReturnType<typeof _buildHandles>>} */
+const _qCache = new WeakMap();
+
+function _buildHandles(world) {
+  return {
+    playerPos:       world.defineQuery(Player, Position),
+    factionActors:   world.defineQuery(Faction, Position, Vitality),
+    aggroPositioned: world.defineQuery(AggroState, Position, Not(Player)),
+    enemyListeners:  world.defineQuery(Anatomy, AggroState, Faction, Position)
+                       .where((anat, aggro, fac) => fac.key === "enemy"),
+    hazardAreas:     world.defineQuery(Position, HazardArea),
+  };
+}
+
+function _q(world) {
+  if (!_qCache.has(world)) _qCache.set(world, _buildHandles(world));
+  return _qCache.get(world);
+}
+
+// ── Public query iterators ─────────────────────────────────────────────────────
+
+/** All entities with Player + Position. */
+export function queryPlayerPos(world)       { return _q(world).playerPos(); }
+
+/** All entities with Faction + Position + Vitality. */
+export function queryFactionActors(world)   { return _q(world).factionActors(); }
+
+/** All non-player entities with AggroState + Position. */
+export function queryAggroPositioned(world) { return _q(world).aggroPositioned(); }
+
+/** All enemy entities with Anatomy + AggroState + Faction + Position. */
+export function queryEnemyListeners(world)  { return _q(world).enemyListeners(); }
+
+/** All entities with Position + HazardArea. */
+export function queryHazardAreas(world)     { return _q(world).hazardAreas(); }
+
+// ── Utility functions ──────────────────────────────────────────────────────────
 
 export function itemsAt(world, x, y) {
   const rows = [];
@@ -24,8 +71,7 @@ export function itemsAt(world, x, y) {
 }
 
 export function playerEntity(world) {
-  // Query order must match destructuring: ensure Position is the second tuple value
-  for (const [id, _pl, pos] of world.query(Player, Position)) {
+  for (const [id, _pl, pos] of queryPlayerPos(world)) {
     if (pos && Number.isInteger(pos.x) && Number.isInteger(pos.y)) {
       return { id, pos: { x: pos.x, y: pos.y } };
     }

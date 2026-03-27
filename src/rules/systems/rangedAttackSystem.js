@@ -32,6 +32,7 @@ import {
   getBlindedCritMultBonus,
 } from '../utils/blindnessExposure.js';
 import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
+import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -117,6 +118,13 @@ export function rangedAttackSystem(world) {
     const ax = apos.x | 0, ay = apos.y | 0;
     const tx = dpos.x | 0, ty = dpos.y | 0;
     const dist = Math.max(Math.abs(tx - ax), Math.abs(ty - ay));
+    const facing = getNormalizedEntityFacing(world, attacker);
+    const coneDegrees = getEntityFacingConeDegrees(world, attacker);
+    if (facing && !isPointInFacingCone(ax, ay, tx, ty, facing.dx, facing.dy, coneDegrees)) {
+      world.emit?.('ranged:blocked', { attacker, target: defender, reason: 'facing' });
+      world.remove(attacker, RangedAttackIntent);
+      continue;
+    }
 
     // LOS check
     if (!hasLOS(ax, ay, tx, ty, isBlocked)) {

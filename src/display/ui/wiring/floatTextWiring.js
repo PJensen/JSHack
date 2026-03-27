@@ -131,6 +131,14 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  world.on('proc:flaming_bat:hit', ({ target }) => {
+    const tpos = getPosition(Number(target || 0));
+    if (!tpos || !canShowAt(tpos.x, tpos.y)) return;
+    try {
+      ftext.addStatus(tpos.x, tpos.y - 0.28, 'SCORCH', { color: '#ff7a38', life: 0.55 });
+    } catch (e) { console.debug('[floatTextWiring] flaming bat ftext failed:', e); }
+  });
+
   // Proc VFX: fierce bonus damage
   world.on('proc:fierce', ({ actor, target }) => {
     const tpos = getPosition(Number(target || 0));
@@ -181,6 +189,55 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const opts = { style };
     if (kindLower === 'taunt' || kindLower === 'alert') opts.color = '#ffdd00';
     try { ftext.addStatus(pos.x, pos.y, label, opts); } catch (e) { console.debug('[floatTextWiring] ftext failed:', e); }
+  });
+
+  world.on('monster:ability:windup', ({ actor, abilityName, at }) => {
+    const pos = (at && Number.isFinite(at.x) && Number.isFinite(at.y))
+      ? { x: Number(at.x), y: Number(at.y) }
+      : getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const label = String(abilityName || 'ABILITY').trim().toUpperCase();
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.35, `${label}!`, {
+        color: '#ffb347',
+        life: 0.9,
+        scaleStart: 1.2,
+        scaleEnd: 1.0,
+      });
+    } catch (e) { console.debug('[floatTextWiring] ability windup ftext failed:', e); }
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 * i) / 8;
+      const speed = 0.22 + Math.random() * 0.25;
+      try {
+        fx.pool.spawn(new Particle({
+          x: pos.x,
+          y: pos.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.28 + Math.random() * 0.15,
+          size0: 0.12,
+          size1: 0.02,
+          r: 255,
+          g: 190,
+          b: 90,
+          a0: 0.85,
+        }));
+      } catch {}
+    }
+  });
+
+  world.on('monster:ability:cast', ({ actor, abilityName }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const label = String(abilityName || 'ABILITY').trim().toUpperCase();
+    try {
+      ftext.addStatus(pos.x, pos.y - 0.45, `${label}`, {
+        color: '#ff5f5f',
+        life: 0.7,
+        scaleStart: 1.1,
+        scaleEnd: 0.95,
+      });
+    } catch (e) { console.debug('[floatTextWiring] ability cast ftext failed:', e); }
   });
 
   // Ranged combat floating text (messages handled in messageWiring)

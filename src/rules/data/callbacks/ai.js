@@ -24,6 +24,7 @@ import { chebyshev } from "../../utils/distance.js";
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
 const SPELL_CAST_COOLDOWN_KEY = Symbol.for("jshack:ai:castSpellOnLOS:cooldown");
+const ABILITY_WINDUP_KEY = Symbol.for("jshack:ai:abilityWindup:state");
 
 function manhattan(a, b) {
   return Math.abs((a.x | 0) - (b.x | 0)) + Math.abs((a.y | 0) - (b.y | 0));
@@ -186,6 +187,27 @@ function spellCastOnCooldown(world, actor, spellId, cooldownTurns) {
 function markSpellCastUsed(world, actor, spellId) {
   const store = ensureSpellCastCooldownState(world);
   store.set(spellCastCooldownSlot(actor, spellId), Number(world.step || 0) | 0);
+}
+
+/**
+ * @param {import("../../../lib/ecs-js/index.js").World} world
+ * @returns {Map<string, { readyStep:number, targetId:number, targetX:number, targetY:number }>}
+ */
+function ensureAbilityWindupState(world) {
+  const rec = world[ABILITY_WINDUP_KEY];
+  if (rec instanceof Map) return rec;
+  const created = new Map();
+  world[ABILITY_WINDUP_KEY] = created;
+  return created;
+}
+
+/**
+ * @param {number} actor
+ * @param {string} abilityId
+ * @returns {string}
+ */
+function abilityWindupSlot(actor, abilityId) {
+  return `${actor | 0}:${String(abilityId || "")}`;
 }
 
 // -- SeenCallbackContext --
@@ -612,24 +634,30 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
  *
  * @param {{
  *   spellId: string,
+ *   abilityId?: string,
+ *   abilityName?: string,
  *   targeting?: "enemy"|"self",
  *   minRange?: number,
  *   maxRange?: number,
  *   cooldownTurns?: number,
  *   chance?: number,
  *   consumeTurn?: boolean,
+ *   telegraphTurns?: number,
  *   maxAlliesInRadius?: number,
  *   allyRadius?: number,
  * }} opts
  */
 export function castSpellOnLOS(opts) {
   const spellId = String(opts?.spellId || "").trim();
+  const abilityId = String(opts?.abilityId || spellId || "").trim();
+  const abilityName = String(opts?.abilityName || abilityId || spellId || "").trim();
   const targeting = String(opts?.targeting || "enemy") === "self" ? "self" : "enemy";
   const minRange = Math.max(0, Number.isFinite(opts?.minRange) ? (Number(opts.minRange) | 0) : 0);
   const maxRangeOpt = Number.isFinite(opts?.maxRange) ? (Number(opts.maxRange) | 0) : -1;
   const cooldownTurns = Math.max(0, Number.isFinite(opts?.cooldownTurns) ? (Number(opts.cooldownTurns) | 0) : 8);
   const chance = Number.isFinite(opts?.chance) ? Math.max(0, Math.min(1, Number(opts.chance))) : 1;
   const consumeTurn = opts?.consumeTurn !== false;
+  const telegraphTurns = Math.max(0, Number.isFinite(opts?.telegraphTurns) ? (Number(opts.telegraphTurns) | 0) : 0);
   const maxAlliesInRadius = Number.isFinite(opts?.maxAlliesInRadius) ? (Number(opts.maxAlliesInRadius) | 0) : -1;
   const allyRadius = Math.max(1, Number.isFinite(opts?.allyRadius) ? (Number(opts.allyRadius) | 0) : 6);
 
@@ -637,7 +665,13 @@ export function castSpellOnLOS(opts) {
     if (!ctx || ctx.cancelled) return;
     if (!spellId) return;
     if (!ctx.canActThisTurn || ctx.hasQueuedMove) return;
-    if (!worldChance(ctx.world, chance)) return;
+    const now = Number(ctx.world.step || 0) | 0;
+    const windupStore = ensureAbilityWindupState(ctx.world);
+    const windupKey = abilityWindupSlot(ctx.actor, abilityId);
+    const pendingWindup = windupStore.get(windupKey) || null;
+    const windupReady = !!(pendingWindup && now >= (Number(pendingWindup.readyStep || 0) | 0));
+
+    if (!windupReady && !worldChance(ctx.world, chance)) return;
     if (ctx.world.has(ctx.actor, CastSpellIntent) || ctx.world.has(ctx.actor, Channeling)) return;
 
     const spell = getSpell(spellId);
@@ -650,7 +684,7 @@ export function castSpellOnLOS(opts) {
       ? Math.max(minRange, maxRangeOpt)
       : Math.max(minRange, Number(spell.range || 8) | 0);
 
-    if (targeting !== "self") {
+    if (!windupReady && targeting !== "self") {
       if (!actorPos || !targetPos) return;
       const dist = chebyshev(actorPos, targetPos);
       if (dist < minRange || dist > maxRange) return;
@@ -674,9 +708,36 @@ export function castSpellOnLOS(opts) {
     const needMana = Number(spell.manaCost || 0);
     if (mana && Number(mana.mana || 0) < needMana) return;
 
+    if (telegraphTurns > 0 && !windupReady) {
+      const readyStep = now + telegraphTurns;
+      windupStore.set(windupKey, {
+        readyStep,
+        targetId: (ctx.target | 0) > 0 ? (ctx.target | 0) : 0,
+        targetX: actorPos ? (targetPos?.x ?? actorPos.x) | 0 : 0,
+        targetY: actorPos ? (targetPos?.y ?? actorPos.y) | 0 : 0,
+      });
+      ctx.emit("monster:ability:windup", {
+        actor: ctx.actor,
+        targetId: (ctx.target | 0) > 0 ? (ctx.target | 0) : 0,
+        abilityId,
+        abilityName,
+        spellId,
+        turns: telegraphTurns,
+        at: actorPos ? { x: actorPos.x | 0, y: actorPos.y | 0 } : undefined,
+      });
+      if (consumeTurn) ctx.setHandled(true);
+      return;
+    }
+
     const castIntent = { spellId };
-    if (targeting !== "self" && (ctx.target | 0) > 0) {
-      castIntent.targetId = ctx.target | 0;
+    if (targeting !== "self") {
+      const pendingTargetId = Number(pendingWindup?.targetId || 0) | 0;
+      const chosenTarget = pendingTargetId > 0 ? pendingTargetId : (ctx.target | 0);
+      if (chosenTarget > 0) castIntent.targetId = chosenTarget;
+      if (Number.isFinite(pendingWindup?.targetX) && Number.isFinite(pendingWindup?.targetY)) {
+        castIntent.x = Number(pendingWindup.targetX) | 0;
+        castIntent.y = Number(pendingWindup.targetY) | 0;
+      }
     }
 
     try {
@@ -686,10 +747,19 @@ export function castSpellOnLOS(opts) {
     }
 
     markSpellCastUsed(ctx.world, ctx.actor, spellId);
+    if (pendingWindup) windupStore.delete(windupKey);
     ctx.emit("monster:castSpellIntent", {
       actor: ctx.actor,
       spellId,
       targetId: Number(castIntent.targetId || 0) | 0,
+    });
+    ctx.emit("monster:ability:cast", {
+      actor: ctx.actor,
+      targetId: Number(castIntent.targetId || 0) | 0,
+      abilityId,
+      abilityName,
+      spellId,
+      telegraphed: !!pendingWindup,
     });
     if (consumeTurn) ctx.setHandled(true);
   };

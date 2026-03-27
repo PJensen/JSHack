@@ -38,6 +38,9 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   SoulAscendant: "procPackage:soulAscendant",
   EternalHunger: "procPackage:eternalHunger",
   EclipseHammer: "procPackage:eclipseHammer",
+  GlacierSigil: "procPackage:glacierSigil",
+  ConductionLens: "procPackage:conductionLens",
+  EchoGrimoire: "procPackage:echoGrimoire",
 });
 
 function ensureActiveEffects(world, entityId) {
@@ -698,6 +701,20 @@ registerScript(PROC_PACKAGE_KEYS.EclipseHammer, {
       potency: 1,
     });
   },
+});
+
+// Spell-proc gear hooks are evaluated in the spell pipeline itself.
+// These registrations keep package script references valid for topology tools.
+registerScript(PROC_PACKAGE_KEYS.GlacierSigil, {
+  [ScriptVerb.ProcEvaluate]: () => {},
+});
+
+registerScript(PROC_PACKAGE_KEYS.ConductionLens, {
+  [ScriptVerb.ProcEvaluate]: () => {},
+});
+
+registerScript(PROC_PACKAGE_KEYS.EchoGrimoire, {
+  [ScriptVerb.ProcEvaluate]: () => {},
 });
 
 registerScript("procPackage:arrowInstinct", {
@@ -1528,6 +1545,39 @@ const PROC_PACKAGE_SPECS = Object.freeze([
     passiveExpressions: Object.freeze([]),
     procTrees: Object.freeze([
       Object.freeze({ trigger: "onKill", script: "procPackage:graveCurrent", priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "glacierSigil",
+    name: "Glacier Sigil",
+    summary: "Frost casts lock struck enemies in place for a turn.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["cryomancer offhands", "control-heavy caster kits"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onSpellHit", script: "procPackage:glacierSigil", priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "conductionLens",
+    name: "Conduction Lens",
+    summary: "Lightning jumps to one extra foe, with reduced spill damage.",
+    stateKeys: Object.freeze([]),
+    hostIdeas: Object.freeze(["storm foci", "chain-lightning supports"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onSpellCast", script: "procPackage:conductionLens", priority: 10 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "echoGrimoire",
+    name: "Echo Grimoire",
+    summary: "Repeat a spell within 3 turns to cast it free at reduced power.",
+    stateKeys: Object.freeze(["echo_grimoire_memory"]),
+    hostIdeas: Object.freeze(["cadence casting", "mana-compression loadouts"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onSpellCast", script: "procPackage:echoGrimoire", priority: 10 }),
     ]),
   }),
 ]);

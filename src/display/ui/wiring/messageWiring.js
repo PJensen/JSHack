@@ -174,6 +174,14 @@ export function installMessageWiring({
     return label ? bracketizeName(label) : `item ${n}`;
   }
 
+  function spellLabel(spellId) {
+    const id = String(spellId || "").trim();
+    if (!id) return "spell";
+    const spell = typeof getSpell === "function" ? getSpell(id) : null;
+    if (spell?.name) return String(spell.name);
+    return id.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  }
+
   const ingredientLabels = Object.freeze({
     berries: "berries",
     herbs: "herbs",
@@ -698,9 +706,105 @@ export function installMessageWiring({
   installStormFailureMessage('spell:blizzard:failed', 'Blizzard');
   installStormFailureMessage('spell:firestorm:failed', 'Firestorm');
 
+  world.on('monster:ability:windup', ({ actor, targetId, abilityName }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    const label = String(abilityName || "ability");
+    if (tgt === 'You') {
+      log(`${who} winds up ${label.toLowerCase()}!`, 'danger');
+      return;
+    }
+    log(`${who} prepares ${label.toLowerCase()}.`, 'combat');
+  });
+
+  world.on('monster:ability:cast', ({ actor, targetId, abilityName }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    const label = String(abilityName || "ability");
+    if (tgt === 'You') {
+      log(`${who} uses ${label.toLowerCase()} on you!`, 'danger');
+      return;
+    }
+    log(`${who} uses ${label.toLowerCase()}.`, 'combat');
+  });
+
   world.on('monster:firebreath', ({ actor, target }) => {
     if (nameOfEntity(target) !== 'You') return;
     log(`${nameOfEntity(actor)} exhales a line of fire!`, 'combat');
+  });
+
+  world.on('spell:death_volley', ({ actor, hits }) => {
+    const who = nameOfEntity(actor);
+    const hitYou = Array.isArray(hits) && hits.some((hit) => nameOfEntity(hit?.id) === 'You');
+    if (hitYou) {
+      log(`${who}'s volley rains arrows across your position!`, 'danger');
+      return;
+    }
+    const count = Array.isArray(hits) ? hits.length : 0;
+    if (count > 0) log(`${who}'s volley peppers ${count} target${count === 1 ? '' : 's'}.`, 'combat');
+  });
+
+  world.on('spell:boar_charge', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) {
+        log(`${who} slams into you with a charge!`, 'danger');
+      } else if (missed) {
+        log(`${who} barrels past, but still knocks you back!`, 'danger');
+      } else {
+        log(`${who} rushes you with a charge!`, 'danger');
+      }
+      return;
+    }
+    if (hit) log(`${who} crashes into ${tgt}.`, 'combat');
+  });
+
+  world.on('spell:boar_bite', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) log(`${who} bites deep, leaving you weakened!`, 'danger');
+      else if (missed) log(`${who} snaps at you, but misses.`, 'danger');
+      return;
+    }
+    if (hit) log(`${who} bites ${tgt}.`, 'combat');
+  });
+
+  world.on('spell:wolf_howl', ({ actor, alertedIds }) => {
+    const who = nameOfEntity(actor);
+    const count = Array.isArray(alertedIds) ? alertedIds.length : 0;
+    if (count > 0) {
+      log(`${who} howls, rallying ${count} ${count === 1 ? 'ally' : 'allies'}!`, 'danger');
+      return;
+    }
+    log(`${who} lets out a hunting howl.`, 'combat');
+  });
+
+  world.on('spell:shield_bash', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) log(`${who} shield-bashes you and staggers your footing!`, 'danger');
+      else if (missed) log(`${who} slams a shield at you, but misses.`, 'danger');
+      return;
+    }
+    if (hit) log(`${who} bashes ${tgt} aside.`, 'combat');
+  });
+
+  world.on('spell:acid_spit', ({ actor, targetId, hit }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      log(hit ? `${who} spits acid over you!` : `${who} spits acid that hisses at your feet!`, 'danger');
+      return;
+    }
+    log(`${who} spits a glob of acid.`, 'combat');
+  });
+
+  world.on('monster:death:fire_puff', ({ at }) => {
+    if (!at || !canSeeAt(at.x, at.y)) return;
+    log('The corpse flashes into cinders.', 'combat');
   });
 
   // === Combat events ===
@@ -1664,6 +1768,26 @@ export function installMessageWiring({
   world.on('proc:corroded', ({ itemName, stacks }) => {
     const severity = (stacks | 0) >= 3 ? 'badly corroded' : 'corroded';
     log(`The Rust Monster's touch has ${severity} your ${bracketizeName(String(itemName || 'equipment'))}!`, 'danger');
+  });
+  world.on('proc:glacierSigil', ({ actor, targetId }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const tid = Number(targetId || 0) | 0;
+    const tpos = compGet(tid, Position);
+    if (tpos && !canSeeAt(tpos.x, tpos.y)) return;
+    log(`${bracketizeName("Glacier Sigil")} locks ${nameOfEntity(tid)} in ice!`, 'system');
+  });
+  world.on('proc:conductionLens', ({ actor, extraChains }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const links = Math.max(1, Number(extraChains || 1) | 0);
+    log(`${bracketizeName("Conduction Lens")} forks your lightning to ${links} extra ${links === 1 ? "target" : "targets"}.`, 'system');
+  });
+  world.on('proc:echoGrimoire:echo', ({ actor, spellId, powerScale }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const pct = Math.max(1, Math.round(Math.max(0, Number(powerScale || 1)) * 100));
+    log(`${bracketizeName("Echo Grimoire")} echoes ${bracketizeName(spellLabel(spellId))} for free (${pct}% power).`, 'system');
   });
 
   // === Centipede events ===

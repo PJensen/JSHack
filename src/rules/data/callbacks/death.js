@@ -8,6 +8,7 @@ import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "../../comp
 import { SoundEmitter } from "../../components/SoundEmitter.js";
 import { Wounds } from "../../components/Wounds.js";
 import { Position } from "../../components/Position.js";
+import { spawnHazard } from "../../utils/hazardSpawn.js";
 
 /**
  * Context passed to monster death hook callbacks.
@@ -86,6 +87,48 @@ export function spawnPlasmaCloudOnDeath(params = {}) {
   return (ctx) => {
     if (!ctx || typeof ctx.spawnPlasmaCloud !== "function") return;
     ctx.spawnPlasmaCloud(config);
+  };
+}
+
+/**
+ * Spawn a small floor-fire puff at death location.
+ * Intended for low-yield deaths like burning vermin.
+ *
+ * @param {{
+ *   turnsLeft?: number,
+ *   tickDamage?: number,
+ *   radius?: number,
+ *   identity?: string,
+ *   name?: string,
+ }} [params]
+ */
+export function spawnFirePuffOnDeath(params = {}) {
+  const cfg = (params && typeof params === "object") ? { ...params } : {};
+  return (ctx) => {
+    if (!ctx?.pos) return;
+    const x = ctx.pos.x | 0;
+    const y = ctx.pos.y | 0;
+    spawnHazard(ctx.world, {
+      x,
+      y,
+      kind: "fire",
+      medium: "floor",
+      turnsLeft: Math.max(1, Number(cfg.turnsLeft ?? 2) | 0),
+      radius: Math.max(0, Number(cfg.radius ?? 0) | 0),
+      tickDamage: Math.max(0, Number(cfg.tickDamage ?? 1) | 0),
+      damageType: "fire",
+      cause: "monster:death:fire_puff",
+      sourceId: ctx.deadId | 0,
+      sourceKind: String(ctx.identity || "flaming_bat"),
+      identity: String(cfg.identity || "flame_puff"),
+      name: String(cfg.name || "Flame Puff"),
+    });
+    try {
+      ctx.world.emit?.("monster:death:fire_puff", {
+        id: ctx.deadId | 0,
+        at: { x, y },
+      });
+    } catch {}
   };
 }
 

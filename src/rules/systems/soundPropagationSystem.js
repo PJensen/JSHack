@@ -4,6 +4,7 @@ import { Anatomy, HEARING_HL_THRESHOLD } from "../components/Anatomy.js";
 import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { Player } from "../components/Player.js";
+import { queryEnemyListeners } from "../utils/queries.js";
 
 // Maximum tile radius any hearing system can reach (caps computation cost).
 const MAX_HEAR_RADIUS = 30;
@@ -64,11 +65,10 @@ export function soundPropagationSystem(world) {
   if (sources.length === 0) return;
 
   // Check each entity that has hearing + aggro capability.
+  // queryEnemyListeners already filters to faction.key === "enemy".
   for (const [listenerId, anatomy, aggroState, faction, listenPos] of
-       world.query(Anatomy, AggroState, Faction, Position)) {
+       queryEnemyListeners(world)) {
 
-    // Only enemies react to sounds from the player (or other hostile sources).
-    if (faction.key !== "enemy") continue;
     // Already hunting — the aiChaseSystem handles this entity; don't interfere.
     if (aggroState.alertLevel === AGGRO_LEVELS.hunting) continue;
 

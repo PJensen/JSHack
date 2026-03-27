@@ -13,7 +13,7 @@ import { ItemInfo }      from "../components/ItemInfo.js";
 import { Consumable }    from "../components/Consumable.js";
 import { FoodDecay }     from "../components/FoodDecay.js";
 import { MoveIntent }    from "../components/Intents/MoveIntent.js";
-import { Player }        from "../components/Player.js";
+import { playerEntity }  from "../utils/queries.js";
 import { Pet }           from "../components/Pet.js";
 import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
 import { getMonster }    from "../data/monsters.js";
@@ -86,12 +86,9 @@ function applyDevour(world, id, vit, nutrition) {
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function aiCorpseEatSystem(world) {
-  let playerPos = null;
-  for (const [, , pos] of world.query(Player, Position)) {
-    playerPos = pos;
-    break;
-  }
-  if (!playerPos) return;
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const playerPos = _player.pos;
 
   /** Track corpses consumed this tick so two monsters can't eat the same one. */
   const consumed = new Set();

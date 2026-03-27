@@ -49,14 +49,6 @@ export function applyWeaponCoatingOnHit(world, ctx) {
     return { attempted: true, procced: false, kind, chargesBefore, chargesAfter: chargesBefore };
   }
 
-  const procRng = mulberry32(combatSeed(world.seed, world.step, attacker, defender, Number(def.seedSalt || 0) | 0));
-  const didProc = rngInt(procRng, 1, 100) <= chancePct;
-  if (!didProc) {
-    return { attempted: true, procced: false, kind, chargesBefore, chargesAfter: chargesBefore };
-  }
-
-  if (def.effect) upsertEffect(world, defender, { ...def.effect });
-
   let chargesAfter = chargesBefore;
   if (def.consumeOnHit) {
     chargesAfter = Math.max(0, chargesBefore - 1);
@@ -66,6 +58,14 @@ export function applyWeaponCoatingOnHit(world, ctx) {
       delete weaponInfo.coating;
     }
   }
+
+  const procRng = mulberry32(combatSeed(world.seed, world.step, attacker, defender, Number(def.seedSalt || 0) | 0));
+  const didProc = rngInt(procRng, 1, 100) <= chancePct;
+  if (!didProc) {
+    return { attempted: true, procced: false, kind, chargesBefore, chargesAfter };
+  }
+
+  if (def.effect) upsertEffect(world, defender, { ...def.effect });
 
   if (def.emitEvent) {
     world.emit?.(String(def.emitEvent), { actor: attacker, target: defender });

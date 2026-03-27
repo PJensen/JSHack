@@ -133,6 +133,8 @@ function formatEventKind(value) {
     onMiss: "On Miss",
     onDamaged: "On Damaged",
     onTurnStart: "On Turn Start",
+    onSpellCast: "On Spell Cast",
+    onSpellHit: "On Spell Hit",
   };
   return map[key] || `On ${humanizeToken(key)}`;
 }
@@ -199,7 +201,13 @@ function formatEffect(effect) {
     return `Spawn ${count} ${who} (${anchor})`;
   }
   if (kind === "consumeCharge") return `Consume ${Math.max(1, Number(effect?.a || 1) | 0)} Charge`;
-  return humanizeToken(kind) || "Effect";
+  const fallbackKind = humanizeToken(kind);
+  if (fallbackKind) return fallbackKind;
+  const a = String(effect?.a ?? "").trim();
+  const b = String(effect?.b ?? "").trim();
+  const c = String(effect?.c ?? "").trim();
+  const params = [a, b, c].filter(Boolean).join(", ");
+  return params ? `Custom Effect (${params})` : "Custom Effect";
 }
 
 function packageIdFromScriptRef(ref) {

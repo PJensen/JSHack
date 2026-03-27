@@ -38,6 +38,7 @@ import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { getMonster }        from "../data/monsters.js";
 import { SeenCallbackContext } from "../data/callbacks/ai.js";
 import { runCallbackList }   from "../interaction/dispatch.js";
+import { playerEntity }      from "../utils/queries.js";
 import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import { forEachInRadius }   from "../utils/spatialIndex.js";
 import { statusStrength }    from "../utils/statusFacade.js";
@@ -194,14 +195,10 @@ export function installAggroFromStealthOffenseListener(world) {
 /** @param {any} world */
 export function aiChaseSystem(world) {
   // Locate the player.
-  let playerId  = 0;
-  let playerPos = null;
-  for (const [id, _p, pos] of world.query(Player, Position)) {
-    playerId  = id;
-    playerPos = { x: pos.x, y: pos.y };
-    break;
-  }
-  if (!playerPos) return;
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const playerId  = _player.id;
+  const playerPos = _player.pos;
 
   // Lazily built blocking map for LOS checks (built once, shared this tick).
   let _isBlocked = null;

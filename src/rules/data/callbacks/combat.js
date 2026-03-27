@@ -18,6 +18,7 @@ import { createStatusFacade } from "../../utils/statusFacade.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
+import { dealDamage } from "../../utils/dealDamage.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
 
@@ -285,6 +286,46 @@ export function retaliateOnDamaged(amount, emitEvent) {
   return (ctx) => {
     ctx.retaliate(amount);
     ctx.emit(emitEvent, { actor: ctx.defender });
+  };
+}
+
+/**
+ * Deal additional typed damage to defender after a successful hit.
+ * Uses canonical damage pipeline and suppresses trigger recursion.
+ *
+ * @param {number} amount
+ * @param {{
+ *   type?: string,
+ *   cause?: string,
+ *   emitEvent?: string,
+ * }} [opts]
+ */
+export function typedDamageOnHit(amount, opts = {}) {
+  const dmg = Math.max(0, Number(amount || 0) | 0);
+  const type = String(opts.type || "physical");
+  const cause = String(opts.cause || `proc:${type}:hit`);
+  const emitEvent = String(opts.emitEvent || "");
+  return (ctx) => {
+    if (!(dmg > 0)) return;
+    const pos = ctx.world.get(ctx.defender, Position);
+    const result = dealDamage(ctx.world, {
+      target: ctx.defender,
+      amount: dmg,
+      source: ctx.attacker,
+      type,
+      cause,
+      at: pos ? { x: pos.x | 0, y: pos.y | 0 } : undefined,
+      noTrigger: true,
+    });
+    if (!result.applied) return;
+    if (emitEvent) {
+      ctx.emit(emitEvent, {
+        actor: ctx.attacker,
+        target: ctx.defender,
+        amount: result.amount | 0,
+        type,
+      });
+    }
   };
 }
 

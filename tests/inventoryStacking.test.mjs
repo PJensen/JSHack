@@ -33,7 +33,7 @@ Deno.test("inventory stacking helper coalesces existing duplicates while adding 
 
   assert(res, "add should succeed");
   const items = inventoryItems(world, actor);
-  assertEquals(items.length, 3);
+  assertEquals(items.length, 1);
   let totalCount = 0;
   for (const id of items) totalCount += world.get(id, ItemInfo).count;
   assertEquals(totalCount, 15);

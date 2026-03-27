@@ -98,3 +98,36 @@ Deno.test("sub:potions can naturally drop potion_water", () => {
   }
   assert(seen > 0, "expected to see potion_water in potion drops");
 });
+
+Deno.test("spell-proc offhands are suppressed when required spells are unknown", () => {
+  const blocked = new Set(["glacier_sigil", "conduction_lens", "echo_grimoire"]);
+  const opts = { knownSpells: new Set() };
+  let seenBlocked = 0;
+  for (let seed = 1; seed <= 700; seed++) {
+    const rareDrops = resolveLootTable("sub:equip_rare", createRng(seed), 4, 0, opts);
+    const epicDrops = resolveLootTable("sub:equip_epic", createRng(seed + 1000), 5, 0, opts);
+    for (const drop of [...rareDrops, ...epicDrops]) {
+      if (drop.kind !== "equip") continue;
+      if (blocked.has(String(drop.params?.equipId || ""))) seenBlocked++;
+    }
+  }
+  assertEquals(seenBlocked, 0, "spell-proc offhands should not drop with no known spells");
+});
+
+Deno.test("spell-proc offhands become eligible when matching spells are known", () => {
+  const seen = new Set();
+  const opts = { knownSpells: new Set(["frost", "lightning"]) };
+  for (let seed = 1; seed <= 1400; seed++) {
+    const rareDrops = resolveLootTable("sub:equip_rare", createRng(seed), 4, 0, opts);
+    const epicDrops = resolveLootTable("sub:equip_epic", createRng(seed + 5000), 5, 0, opts);
+    for (const drop of [...rareDrops, ...epicDrops]) {
+      if (drop.kind !== "equip") continue;
+      const id = String(drop.params?.equipId || "");
+      if (id === "glacier_sigil" || id === "conduction_lens" || id === "echo_grimoire") seen.add(id);
+    }
+    if (seen.size === 3) break;
+  }
+  assert(seen.has("glacier_sigil"), "glacier_sigil should become eligible when frost is known");
+  assert(seen.has("conduction_lens"), "conduction_lens should become eligible when lightning is known");
+  assert(seen.has("echo_grimoire"), "echo_grimoire should become eligible once any spell is known");
+});

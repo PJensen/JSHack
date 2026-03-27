@@ -31,6 +31,7 @@ import {
     getBlindedCritChanceBonusPct,
     getBlindedCritMultBonus,
 } from '../utils/blindnessExposure.js';
+import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -224,6 +225,11 @@ export function resolveMeleeAttack(world, attacker, defender) {
     const apos = world.get(source, Position);
     const dpos = world.get(target, Position);
     if (!apos || !dpos || (Math.abs((apos.x|0) - (dpos.x|0)) + Math.abs((apos.y|0) - (dpos.y|0))) !== 1) return false;
+    const facing = getNormalizedEntityFacing(world, source);
+    if (facing) {
+        const coneDegrees = getEntityFacingConeDegrees(world, source);
+        if (!isPointInFacingCone(apos.x, apos.y, dpos.x, dpos.y, facing.dx, facing.dy, coneDegrees)) return false;
+    }
 
     // Faction hostility gate
     const af = world.get(source, Faction)?.key || '';

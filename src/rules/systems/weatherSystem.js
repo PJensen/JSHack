@@ -1,12 +1,12 @@
 import { WeatherState } from "../components/WeatherState.js";
 import { DungeonState } from "../components/DungeonState.js";
-import { Player } from "../components/Player.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { GrowthStage } from "../components/GrowthStage.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 import { Burned } from "../components/Burned.js";
 import { HazardArea } from "../components/HazardArea.js";
 import { Position } from "../components/Position.js";
+import { playerEntity, queryHazardAreas } from "../utils/queries.js";
 import { Vitality } from "../components/Vitality.js";
 import {
   getDestroyedTileLedger, destroyedTileKey, getDungeonStateRecord,
@@ -123,7 +123,7 @@ export function weatherSystem(world) {
  */
 function _extinguishFloorFireHazards(world) {
   const toDestroy = [];
-  for (const [hazardId, , hazard] of world.query(Position, HazardArea)) {
+  for (const [hazardId, , hazard] of queryHazardAreas(world)) {
     if (!hazard) continue;
     if (String(hazard.kind || "").toLowerCase() !== "fire") continue;
     if (String(hazard.medium || "air").toLowerCase() !== "floor") continue;
@@ -141,14 +141,14 @@ function _extinguishFloorFireHazards(world) {
  * Remove burning status from the player.
  */
 function _extinguishPlayer(world) {
-  for (const [id] of world.query(Player, ActiveEffects)) {
-    const ae = world.get(id, ActiveEffects);
-    if (!ae || !Array.isArray(ae.effects)) continue;
-    const before = ae.effects.length;
-    ae.effects = ae.effects.filter(e => e.key !== "burn");
-    if (ae.effects.length < before) {
-      world.emit?.("weather:extinguish", { target: id, kind: "player" });
-    }
+  const _player = playerEntity(world);
+  if (!_player) return;
+  const ae = world.get(_player.id, ActiveEffects);
+  if (!ae || !Array.isArray(ae.effects)) return;
+  const before = ae.effects.length;
+  ae.effects = ae.effects.filter(e => e.key !== "burn");
+  if (ae.effects.length < before) {
+    world.emit?.("weather:extinguish", { target: _player.id, kind: "player" });
   }
 }
 
@@ -210,10 +210,9 @@ function _rollLightning(world) {
   if (world.rand() >= LIGHTNING_CHANCE) return;
 
   // Find the player position
-  let px = 0, py = 0;
-  for (const [, , pos] of world.query(Player, Position)) {
-    px = pos.x; py = pos.y; break;
-  }
+  const _player = playerEntity(world);
+  const px = _player?.pos.x ?? 0;
+  const py = _player?.pos.y ?? 0;
 
   // Pick a random strike position near the player
   const ox = Math.floor(world.rand() * (LIGHTNING_RADIUS * 2 + 1)) - LIGHTNING_RADIUS;
@@ -256,10 +255,8 @@ function _rollLightning(world) {
   }
 
   // Check if the player was among the hit entities
-  let hitPlayer = false;
-  for (const [pid] of world.query(Player, Position)) {
-    if (hitEntities.includes(pid)) { hitPlayer = true; break; }
-  }
+  const _hitPlayer = playerEntity(world);
+  const hitPlayer = _hitPlayer != null && hitEntities.includes(_hitPlayer.id);
 
   // Emit visual event
   world.emit?.("weather:lightning", {
