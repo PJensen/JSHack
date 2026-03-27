@@ -32,7 +32,7 @@ import { CentipedeSegment } from "../components/CentipedeSegment.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
-import { FACING_TURN_COST_ENABLED_KEY, normalizeFacingVector } from "../utils/facing.js";
+import { isFacingTurnCostEnabled, normalizeFacingVector } from "../utils/facing.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
@@ -236,7 +236,7 @@ export function movementSystem(world) {
         && facingAfter
         && (facingBefore.dx !== facingAfter.dx || facingBefore.dy !== facingAfter.dy)
       );
-      if (world[FACING_TURN_COST_ENABLED_KEY] === true && facingChangedFromKnownDirection) {
+      if (isFacingTurnCostEnabled(world) && facingChangedFromKnownDirection) {
         continue;
       }
 

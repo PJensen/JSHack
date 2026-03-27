@@ -5,7 +5,7 @@ import { Facing } from "../src/rules/components/Facing.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { Position } from "../src/rules/components/Position.js";
 import { movementSystem } from "../src/rules/systems/movementSystem.js";
-import { FACING_TURN_COST_ENABLED_KEY } from "../src/rules/utils/facing.js";
+import { setFacingTurnCostEnabled } from "../src/rules/utils/facing.js";
 import { loadChunk, clearAll } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 
@@ -55,7 +55,7 @@ Deno.test("movementSystem: monsters spend a turn to reorient when facing turn co
   loadFloorChunk();
   try {
     const world = new World({ seed: 0xBEEF });
-    world[FACING_TURN_COST_ENABLED_KEY] = true;
+    setFacingTurnCostEnabled(world, true);
     const id = spawnMonsterEntity(world, { identity: "goblin", x: 7, y: 7 });
     world.add(id, Facing, { dx: 1, dy: 0 });
     world.add(id, MoveIntent, { dx: -1, dy: 0 });
