@@ -39,10 +39,11 @@ import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { DistrictProfile } from "../../rules/components/DistrictProfile.js";
 import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
+import { Facing } from "../../rules/components/Facing.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
@@ -431,6 +432,23 @@ function projectProcStateTags(world, id, rec) {
 }
 
 /**
+ * Project actor-facing for display-only overlays (directional marker, etc.).
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} id
+ * @param {EntityView} rec
+ */
+function projectFacing(world, id, rec) {
+	const f = /** @type any */ (world.get(id, Facing));
+	if (!f) {
+		rec.facing = null;
+		return;
+	}
+	const dx = Math.sign(Number(f.dx || 0));
+	const dy = Math.sign(Number(f.dy || 0));
+	rec.facing = (dx === 0 && dy === 0) ? null : { dx, dy };
+}
+
+/**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @returns {WorldView}
  */
@@ -569,7 +587,7 @@ export function buildWorldView(world) {
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -578,6 +596,7 @@ export function buildWorldView(world) {
 				rec.tags.length = 0;
 				rec.procStates = null;
 				rec.stackSeq = stackSeq;
+				rec.facing = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -587,6 +606,7 @@ export function buildWorldView(world) {
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, playerFactionKey);
 			projectProcStateTags(world, id, rec);
+			projectFacing(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
@@ -644,7 +664,7 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2 };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -653,6 +673,7 @@ export function buildWorldView(world) {
 				rec.tags.length = 0;
 				rec.procStates = null;
 				rec.stackSeq = stackSeq2;
+				rec.facing = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -662,6 +683,7 @@ export function buildWorldView(world) {
 			projectItemAffixDisplayTags(kind, itemInfo, rec);
 			projectCombatUi(world, id, rec, '');
 			projectProcStateTags(world, id, rec);
+			projectFacing(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
