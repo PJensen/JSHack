@@ -128,7 +128,7 @@ import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName, buildItemDisplayData, resolveAffixes } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
-import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored } from "./rules/environment/dungeon/exploredMap.js";
+import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored, setFovDisabled } from "./rules/environment/dungeon/exploredMap.js";
 import { getTile, isWalkable, isOpaque, isFlyable, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
 import { resetIdentification, identify, restoreIdentification, setIdentificationEnabled } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
@@ -258,6 +258,7 @@ installPluralizationExtensions();
 // ---- App wires rules/ (no display logic here) ------------------------------
 const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? pickRandomSeed();
 const world = new World({ seed: _bootSeed });
+setFovDisabled(runtimeConfig.disableFov === true);
 world[FOV_CONE_DISABLED_KEY] = runtimeConfig.disableFovCone === true;
 world[FACING_TURN_COST_ENABLED_KEY] = runtimeConfig.facingTurnCost === true;
 configureWorld(world);
@@ -3708,6 +3709,7 @@ bootAdvance("Prepared render resources");
 let _bgGradH = 0; let _bgGrad = null;
 let _fxTime = 0; // display-side time accumulator for simple glyph FX
 let _dtSec = 0;  // frame delta for render-internal use
+let _renderPlayerBlinded = false;
 
 // Reusable render buffers — hoisted out of hot functions to avoid per-frame GC
 const _stackMeta = new Map();
@@ -3726,6 +3728,7 @@ const _roofParticleStamp = new Map();
 const _roofSmokeParticleStamp = new Map();
 /** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
 const _healthBarsToDraw = [];
+const _memoryGlyphByKind = new Map();
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
 const HP_BAR_SHOW_SECONDS = 2.25;
 const PET_HP_BAR_SHOW_SECONDS = 3.5;
@@ -4170,6 +4173,39 @@ function resolveRenderableKind(glyphAtlas, e) {
   return kind;
 }
 
+function resolveMemoryGlyph(kind) {
+  const key = (typeof kind === "string" && kind.length) ? kind : "default";
+  if (_memoryGlyphByKind.has(key)) return _memoryGlyphByKind.get(key);
+  const look = palette[key] || palette.default || {};
+  let glyph = "?";
+  if (Array.isArray(look.layers) && look.layers.length) {
+    for (let i = look.layers.length - 1; i >= 0; i--) {
+      const g = look.layers[i]?.glyph;
+      if (typeof g === "string" && g.length) {
+        glyph = g;
+        break;
+      }
+    }
+  } else if (typeof look.glyph === "string" && look.glyph.length) {
+    glyph = look.glyph;
+  }
+  _memoryGlyphByKind.set(key, glyph);
+  return glyph;
+}
+
+function drawMemoryGlyph(ctx, kind, x, y, alpha = 0.7) {
+  const glyph = resolveMemoryGlyph(kind);
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha *= Math.max(0, Math.min(1, Number(alpha) || 0));
+  ctx.fillStyle = "#9a9a9a";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "900 0.92px monospace";
+  ctx.fillText(glyph, x, y + 0.01);
+  ctx.restore();
+}
+
 /**
  * Draw a glyph atlas entry with a display-only scale transform.
  * @param {Map<string, { canvas: HTMLCanvasElement }>} atlas
@@ -4205,14 +4241,42 @@ function hasAnyTag(entity, tags) {
 }
 
 function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
+  if (hasTag(entity, 'thermal_sensed')) return;
   const kind = resolveRenderableKind(atlas, entity);
   const invisible = hasTag(entity, 'invisible');
   const shadowCloak = hasTag(entity, 'shadow_cloak');
   const phaseShift = hasTag(entity, 'phase_shift');
-  if (!invisible && !shadowCloak && !phaseShift) {
+  const memoryRecent = hasTag(entity, 'memory_recent');
+  const memoryTampered = hasTag(entity, 'memory_tampered');
+  const espSensed = hasTag(entity, 'esp_sensed');
+  if (!invisible && !shadowCloak && !phaseShift && !memoryRecent && !espSensed) {
     drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
     return;
   }
+  // Memory/ESP can affect many entities at once; avoid costly canvas filter path.
+  if (memoryRecent || espSensed) {
+    const jx = memoryTampered ? Math.sin(_fxTime * 14 + (entity.id | 0) * 0.73) * 0.045 : 0;
+    const jy = memoryTampered ? Math.cos(_fxTime * 13 + (entity.id | 0) * 0.51) * 0.045 : 0;
+    ctx.save();
+    if (memoryRecent) {
+      drawMemoryGlyph(
+        ctx,
+        kind,
+        entity.pos.x + jx,
+        entity.pos.y + jy,
+        _renderPlayerBlinded
+          ? (memoryTampered ? 0.62 : 0.74)
+          : (memoryTampered ? 0.58 : 0.70),
+      );
+    } else {
+      ctx.globalAlpha *= 0.52;
+      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+    }
+    ctx.restore();
+    return;
+  }
+  const jx = memoryTampered ? Math.sin(_fxTime * 14 + (entity.id | 0) * 0.73) * 0.045 : 0;
+  const jy = memoryTampered ? Math.cos(_fxTime * 13 + (entity.id | 0) * 0.51) * 0.045 : 0;
   ctx.save();
   if (invisible) {
     ctx.filter = 'brightness(0.50) saturate(0.70)';
@@ -4224,7 +4288,51 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
     ctx.filter = 'brightness(0.86) saturate(0.95)';
     ctx.globalAlpha *= 0.94;
   }
-  drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+  drawKindScaled(atlas, ctx, kind, entity.pos.x + jx, entity.pos.y + jy, scale);
+  ctx.restore();
+}
+
+function drawThermalSensePing(ctx, entity, fxTime) {
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 5.2 + (entity.id | 0) * 0.91);
+  const cx = entity.pos.x;
+  const cy = entity.pos.y;
+  const rOuter = 0.16 + 0.03 * pulse;
+  const rInner = 0.06 + 0.02 * pulse;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const outer = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+  outer.addColorStop(0, `rgba(255,90,60,${(0.42 + 0.20 * pulse).toFixed(3)})`);
+  outer.addColorStop(1, 'rgba(220,25,15,0)');
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,68,42,${(0.75 + 0.20 * pulse).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEspSenseHalo(ctx, entity, fxTime) {
+  const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.3 + (entity.id | 0) * 0.57);
+  const cx = entity.pos.x;
+  const cy = entity.pos.y;
+  const ringR = 0.41 + 0.05 * pulse;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = 0.038;
+  ctx.strokeStyle = `rgba(90,225,255,${(0.34 + 0.20 * pulse).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+  ctx.stroke();
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 0.23);
+  core.addColorStop(0, `rgba(140,235,255,${(0.16 + 0.08 * pulse).toFixed(3)})`);
+  core.addColorStop(1, 'rgba(90,190,255,0)');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 0.23, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -4747,6 +4855,17 @@ function render(worldView) {
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
   const effectiveWeather = worldView.playerSheltered ? "clear" : (worldView.weather || "clear");
+  const playerId = Number(worldView?.player?.id || 0) | 0;
+  let playerBlinded = false;
+  if (playerId > 0 && Array.isArray(worldView?.entities)) {
+    for (let i = 0; i < worldView.entities.length; i++) {
+      const e = worldView.entities[i];
+      if ((Number(e?.id || 0) | 0) !== playerId) continue;
+      playerBlinded = Array.isArray(e.tags) && e.tags.includes("blinded");
+      break;
+    }
+  }
+  _renderPlayerBlinded = playerBlinded;
 
   // Background (cache gradient by height to avoid per-frame allocations)
   bctx.save();
@@ -4771,6 +4890,13 @@ function render(worldView) {
   const vx1 = cam.x + viewHalfW + 1;
   const vy1 = cam.y + viewHalfH + 1;
 
+  if (playerBlinded) {
+    bctx.save();
+    bctx.fillStyle = "#000";
+    bctx.fillRect(vx0 - 1, vy0 - 1, (vx1 - vx0) + 2, (vy1 - vy0) + 2);
+    bctx.restore();
+  }
+
   // Pass 1: tiles from TileMap grid (3-state fog-of-war)
   // Single viewport scan: draw visible tiles immediately, buffer explored-not-visible
   // tiles into a flat array, then flush at reduced alpha. This halves the
@@ -4793,12 +4919,26 @@ function render(worldView) {
     });
     // Flush explored-not-visible buffer at a single reduced alpha (no per-tile state changes)
     if (_exploredTileBuffer.length > 0) {
-      bctx.globalAlpha = 0.35;
-      for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
-        const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
-        if (kind) drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
+      if (playerBlinded) {
+        for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
+          const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
+          if (!kind) continue;
+          drawMemoryGlyph(
+            bctx,
+            kind,
+            _exploredTileBuffer[i + 1] ?? 0,
+            _exploredTileBuffer[i + 2] ?? 0,
+            0.72,
+          );
+        }
+      } else {
+        bctx.globalAlpha = 0.35;
+        for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
+          const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
+          if (kind) drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
+        }
+        bctx.globalAlpha = 1.0;
       }
-      bctx.globalAlpha = 1.0;
     }
   }
 
@@ -4926,9 +5066,17 @@ function render(worldView) {
       ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
       : e;
 
+    if (hasTag(renderEntity, 'thermal_sensed')) {
+      drawThermalSensePing(bctx, renderEntity, _fxTime);
+      continue;
+    }
+
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale);
-    if ((renderEntity.layer | 0) >= 300) {
+    if (hasTag(renderEntity, 'esp_sensed')) {
+      drawEspSenseHalo(bctx, renderEntity, _fxTime);
+    }
+    if ((renderEntity.layer | 0) >= 300 && !hasTag(renderEntity, 'memory_recent') && !hasTag(renderEntity, 'esp_sensed')) {
       drawFacingDot(bctx, renderEntity);
     }
     if (shouldShowHealthBar(renderEntity, _fxTime)) {

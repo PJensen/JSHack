@@ -250,6 +250,12 @@ export const EFFECT_DEFS = [
     statuses: ["thermal_sense"],
   },
   {
+    id: "esp_sense",
+    keys: ["esp_sense", "third_eye"],
+    operation: "none",
+    statuses: ["esp_sense"],
+  },
+  {
     id: "bear_vigor",
     keys: ["bear_vigor"],
     operation: "heal",

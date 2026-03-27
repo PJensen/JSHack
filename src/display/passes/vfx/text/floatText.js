@@ -31,10 +31,10 @@ export class FloatText {
     this._last = 0;
     // Defaults per flavor
     this.defaults = {
-      damage: { life: 0.9, color: '#ffd966', scaleBase: 1.0 },
-      gold:   { life: 0.8, color: '#ffcd45', scaleBase: 1.0 },
-      heal:   { life: 0.9, color: '#7BFF7B', scaleBase: 1.0 },
-      status: { life: 0.7, color: '#c0c8d0', scaleBase: 1.0 }
+      damage: { life: 0.9, color: '#ffd966', scaleBase: 0.8 },
+      gold:   { life: 0.8, color: '#ffcd45', scaleBase: 0.8 },
+      heal:   { life: 0.9, color: '#7BFF7B', scaleBase: 0.8 },
+      status: { life: 0.7, color: '#c0c8d0', scaleBase: 0.8 }
     };
   }
 
@@ -182,7 +182,7 @@ export class FloatText {
     // Canvas font uses CSS px pre-transform; with camera scale applied, 1px of font == 1 world unit on screen.
     // Therefore we choose a small fontPx in CSS to achieve ~0.8 world-units height (no extra tilePx factor!).
     const m = (typeof ctx.getTransform === 'function') ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
-    const worldFontPx = 0.9; // ~0.9 world units tall
+    const worldFontPx = 0.68; // smaller, denser float text
     for (const p of this.fct){
       if (p.delay > 0) continue; // still waiting
       const t = Math.max(0, Math.min(1, 1 - p.ttl / Math.max(1e-6, p.life)));

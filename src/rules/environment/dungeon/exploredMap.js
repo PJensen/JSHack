@@ -12,6 +12,8 @@ const _explored = new Map();
 const _visible = new Map();
 /** @type {Uint8Array[]} reusable visible chunk buffers */
 const _visiblePool = [];
+/** @type {boolean} globally disable FOV visibility gating when true */
+let _fovDisabled = false;
 
 /** @type {number} */
 let _lastStep = -1;
@@ -83,6 +85,7 @@ function _clearVisible() {
  * @param {{ facingDx?: number, facingDy?: number, coneDegrees?: number }} [opts]
  */
 export function updateFOV(step, px, py, radius, isBlocked, opts = undefined) {
+  if (_fovDisabled) return;
   const facingDx = Math.sign(Number(opts?.facingDx || 0));
   const facingDy = Math.sign(Number(opts?.facingDy || 0));
   const coneDegrees = Number(opts?.coneDegrees ?? 360);
@@ -125,7 +128,10 @@ export function updateFOV(step, px, py, radius, isBlocked, opts = undefined) {
 }
 
 /** @returns {(x:number, y:number) => boolean} */
-export function isVisible(x, y) { return _has(_visible, x, y); }
+export function isVisible(x, y) {
+  if (_fovDisabled) return true;
+  return _has(_visible, x, y);
+}
 
 /** @returns {(x:number, y:number) => boolean} */
 export function isExplored(x, y) { return _has(_explored, x, y); }
@@ -185,4 +191,10 @@ export function restoreExplored(snap) {
   for (const [key, chunk] of snap) {
     _explored.set(key, new Uint8Array(chunk));
   }
+}
+
+/** Globally disable or enable FOV visibility checks. */
+export function setFovDisabled(disabled) {
+  _fovDisabled = !!disabled;
+  if (_fovDisabled) _clearVisible();
 }
