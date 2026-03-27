@@ -38,6 +38,7 @@ import { StairDown, StairUp } from '../../archetypes/Stairs.js';
 import { CHUNK_SIZE, TILE_VOID, TILE_WALL, TILE_FLOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
 import { loadChunk as tileMapLoad, clearAll as clearTileMap } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
+import { clearPerceptionMemory } from './perceptionMemory.js';
 import { ensureCalendarState } from '../../utils/calendarState.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { generateOverworldChunks } from './overworld.js';
@@ -333,6 +334,7 @@ export function initDungeon(world, opts = {}) {
 
   clearTileMap();
   clearExplored();
+  clearPerceptionMemory();
   clearSpatialIndex(world);
 
   const { spawnX, spawnY, entityIds, downStairPositions, profileType } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress, null, { dungeonType: opts.dungeonType ?? null });

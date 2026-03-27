@@ -47,6 +47,19 @@ function parseBooleanish(raw, fallback = false) {
   return fallback;
 }
 
+function defaultFacingTurnCostByDevice() {
+  if (typeof window === "undefined") return false;
+  try {
+    const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    const narrow = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
+    const touchPoints = Number(window.navigator?.maxTouchPoints || 0);
+    // Mobile/touch-first default: facing changes consume a turn.
+    return coarse || narrow || touchPoints > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function buildPerfConfig(params) {
   const q = (
     params.get("quality") ||
@@ -79,8 +92,11 @@ export function readRuntimeConfig() {
   const params = new URLSearchParams(window.location.search || "");
   const disableFovConeParam = params.get("disableFovCone");
   const disableFovConeStored = readStoredString("jshack.disableFovCone", "");
+  const disableFovParam = params.get("disableFov");
+  const disableFovStored = readStoredString("jshack.disableFov", "");
   const facingTurnCostParam = params.get("facingTurnCost");
   const facingTurnCostStored = readStoredString("jshack.facingTurnCost", "");
+  const facingTurnCostDeviceDefault = defaultFacingTurnCostByDevice();
   return {
     params,
     perf: buildPerfConfig(params),
@@ -92,8 +108,9 @@ export function readRuntimeConfig() {
     giveParam:    params.get("give")    || "",
     effectsParam: params.get("effects") || "",
     debug:        params.has("debug"),
+    disableFov: parseBooleanish(disableFovParam, parseBooleanish(disableFovStored, false)),
     disableFovCone: parseBooleanish(disableFovConeParam, parseBooleanish(disableFovConeStored, false)),
-    facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, true)),
+    facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, facingTurnCostDeviceDefault)),
     identifyItems: params.get("identify") !== "off",
     dungeonType:  params.get("dungeonType") || null,
   };

@@ -87,6 +87,7 @@ import "../rules/dialogues/townfolkDialogs.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 import { installElectrocuteOnDamage } from "../rules/utils/electrocute.js";
 import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
+import { installPerceptionMemoryListeners, perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
 
 /**
  * @param {World} world
@@ -140,6 +141,7 @@ export function configureWorld(world) {
   installDrainLifeDamageInterruptListener(world);
   // Centipede body segments cascade position when the head moves.
   installCentipedeBodyCascade(world);
+  installPerceptionMemoryListeners(world);
 
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)
@@ -237,6 +239,7 @@ export function configureWorld(world) {
   registerSystem(deitySystem, 'effects');
   // Shop ambient sound cues resolve in effects.
   registerSystem(shopAmbientSoundSystem, 'effects');
+  registerSystem(perceptionMemorySystem, 'effects');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');
