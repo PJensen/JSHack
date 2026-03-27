@@ -85,8 +85,14 @@ export function createStatusEmitterController({ world, fx }) {
   function step(dtSec, view, fxTime) {
     origins.length = 0;
     seenEmitterKeys.clear();
+    const isVisibleAt = (typeof view?.isVisible === "function") ? view.isVisible : null;
     for (let i = 0; i < view.entities.length; i++) {
       const e = view.entities[i];
+      if (isVisibleAt && !isVisibleAt(e.pos.x, e.pos.y)) continue;
+      if (
+        Array.isArray(e.tags)
+        && (e.tags.includes("memory_recent") || e.tags.includes("esp_sensed") || e.tags.includes("thermal_sensed"))
+      ) continue;
       if (Array.isArray(e.tags)) {
         for (let t = 0; t < e.tags.length; t++) {
           const tag = e.tags[t];
