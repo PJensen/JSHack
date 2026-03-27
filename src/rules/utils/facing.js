@@ -2,10 +2,9 @@ import { Facing } from "../components/Facing.js";
 import { BaseStats } from "../components/BaseStats.js";
 
 export const FACING_CONE_BASE_DEG = 200;
-export const FACING_CONE_PERCEPTION_BASELINE = 5;
-export const FACING_CONE_DEG_PER_PERCEPTION = 0;
-export const FACING_CONE_MIN_DEG = 30;
-export const FACING_CONE_MAX_DEG = 360;
+export const FACING_CONE_FALLBACK_PERCEPTION = 5;
+export const FACING_CONE_MIN_DEG = 200;
+export const FACING_CONE_MAX_DEG = 200;
 export const FOV_CONE_DISABLED_KEY = Symbol.for("jshack:debug:fovCone:disabled");
 export const FACING_TURN_COST_ENABLED_KEY = Symbol.for("jshack:facing:turnCost:enabled");
 
@@ -49,13 +48,12 @@ export function getNormalizedEntityFacing(world, entityId) {
  * }} [opts]
  */
 export function perceptionToFacingConeDegrees(perception, opts = {}) {
+  // Kept for API stability; dynamic perception scaling will return in a future change.
+  void perception;
   const baseDeg = Number(opts.baseDeg ?? FACING_CONE_BASE_DEG);
-  const baseline = Number(opts.baseline ?? FACING_CONE_PERCEPTION_BASELINE);
-  const degPerPoint = Number(opts.degPerPoint ?? FACING_CONE_DEG_PER_PERCEPTION);
   const minDeg = Number(opts.minDeg ?? FACING_CONE_MIN_DEG);
   const maxDeg = Number(opts.maxDeg ?? FACING_CONE_MAX_DEG);
-  const p = Number(perception ?? baseline);
-  const cone = baseDeg + ((p - baseline) * degPerPoint);
+  const cone = baseDeg;
   return clamp(cone, minDeg, maxDeg);
 }
 
@@ -74,7 +72,7 @@ export function perceptionToFacingConeDegrees(perception, opts = {}) {
 export function getEntityFacingConeDegrees(world, entityId, opts = {}) {
   if (world?.[FOV_CONE_DISABLED_KEY]) return 360;
   const id = Number(entityId || 0) | 0;
-  const fallbackPerception = Number(opts.fallbackPerception ?? FACING_CONE_PERCEPTION_BASELINE);
+  const fallbackPerception = Number(opts.fallbackPerception ?? FACING_CONE_FALLBACK_PERCEPTION);
   const baseStats = (id > 0) ? world.get(id, BaseStats) : null;
   const perception = Number(baseStats?.perception ?? fallbackPerception);
   return perceptionToFacingConeDegrees(perception, opts);
