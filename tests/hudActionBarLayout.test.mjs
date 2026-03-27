@@ -7,6 +7,6 @@ Deno.test("mobile action bar grid areas place quick slots on right 2x2 and shoot
   assertEquals(MOBILE_ACTION_BAR_GRID_AREAS.pray, { col: "3", row: "1" });
   assertEquals(MOBILE_ACTION_BAR_GRID_AREAS.shoot, { col: "1", row: "2" });
   assertEquals(MOBILE_ACTION_BAR_GRID_AREAS.quickInteract, { col: "2", row: "2" });
-  assertEquals(MOBILE_ACTION_BAR_GRID_AREAS.wait, { col: "3", row: "2" });
+  assertEquals(MOBILE_ACTION_BAR_GRID_AREAS.wait, { col: "6", row: "2" });
   assertEquals(MOBILE_ACTION_BAR_GRID_AREAS.pinnedQuickSlots, { col: "4 / 6", row: "1 / 3" });
 });
