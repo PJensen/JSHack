@@ -2842,7 +2842,7 @@ export const ITEM_CATALOG = {
     range: 9,
     staminaCost: 7,
     description: "Each arrow brands the quarry with a hunter's mark (stacks to 5, fades in 4 turns). Each mark past the first adds flat bonus damage to every subsequent hit on that target. Five marks and the prey is a kill waiting to happen.",
-    procPackages: ["predatorMark"],
+    procPackages: ["arrowInstinct"],
   },
   doom_crossbow: {
     id: "doom_crossbow",
@@ -2859,7 +2859,7 @@ export const ITEM_CATALOG = {
     range: 10,
     staminaCost: 8,
     description: "Each bolt carves a notch into the target's fate. Three hits ring the toll — shadow damage detonates and the target seizes for a turn.",
-    procPackages: ["doomClock"],
+    procPackages: ["tollwarden"],
   },
 
   // ── Proc-package weapons (staff, kris, club, rapier variants) ────────────
@@ -2877,7 +2877,7 @@ export const ITEM_CATALOG = {
     twoHanded: true,
     staminaCost: 8,
     description: "A staff topped with a resonance crystal that pulses once per hit, storing the blow's force. The next swing releases that stored impact as spectral damage alongside the strike.",
-    procPackages: ["echoStrike"],
+    procPackages: ["kineticBattery"],
   },
   venom_kris: {
     id: "venom_kris",
@@ -2893,7 +2893,7 @@ export const ITEM_CATALOG = {
     damageType: "pierce",
     staminaCost: 5,
     description: "A wavy-bladed dagger designed for rapid repeated stabs. Three consecutive hits on the same target trigger detonation: shadow burst, virulent poison for 4 turns, disease for 3.",
-    procPackages: ["venomClock"],
+    procPackages: ["venomLedger"],
   },
   never_sated_warclub: {
     id: "never_sated_warclub",
@@ -2910,7 +2910,7 @@ export const ITEM_CATALOG = {
     damageType: "blunt",
     staminaCost: 12,
     description: "A crude bludgeon that grows more dangerous with every kill. Each kill stacks the hunger (max 10, fading over 12 turns). While hungry, each hit deals floor(stacks÷2) extra flat damage.",
-    procPackages: ["eternalHunger"],
+    procPackages: ["hungerSurge"],
   },
   blood_covenant_rapier: {
     id: "blood_covenant_rapier",
@@ -2926,7 +2926,7 @@ export const ITEM_CATALOG = {
     damageType: "pierce",
     staminaCost: 8,
     description: "A slender blade in a blackened guard. Each thrust costs 8% of your max HP (never fatal) and adds +5 fire damage to that swing. It demands blood before every blow. The rapier decides the price.",
-    procPackages: ["bloodCovenant"],
+    procPackages: ["ritualOverdraw"],
   },
   cataclysm_warspear: {
     id: "cataclysm_warspear",
@@ -2943,7 +2943,7 @@ export const ITEM_CATALOG = {
     damageType: "pierce",
     staminaCost: 12,
     description: "Critical kills don't end the fight — they extend it. A hazard erupts on the corpse, a shockwave marks all adjacent hostiles, and marked foes detonate on the next hit.",
-    procPackages: ["cataclysmChain"],
+    procPackages: ["executionRipple"],
   },
 
   // ── Proc-package armor (robe, leathers, berserker plate) ─────────────────
@@ -2958,7 +2958,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 2, poisonResist: 0.1 },
     description: "Supple darkened hide stitched with compound-soaked knuckle-guards. Three consecutive hits on the same target trigger the clock: shadow burst, virulent poison for 4 turns, disease for 3.",
-    procPackages: ["venomClock"],
+    procPackages: ["wardedRetort"],
   },
   storm_channeler_robe: {
     id: "storm_channeler_robe",
@@ -2971,7 +2971,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 1, maxMana: 20, manaRegen: 0.6, critChance: 0.04 },
     description: "Silken robes threaded with copper filament that arcs ceaselessly. Every critical hit sends 3 electric damage and shock through all hostiles within 2 tiles. The robe routes the bolt through you, not into you.",
-    procPackages: ["thunderGod"],
+    procPackages: ["kineticBattery"],
   },
   hollow_berserker_plate: {
     id: "hollow_berserker_plate",
@@ -2984,7 +2984,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 3, maxHp: 12 },
     description: "Tidal runes carved inside each plate press against the wearer's skin. Below 75% HP, hits gain +1. Below 50%, +3. Below 25%, +6 and targets weaken. It was built for someone who intended to bleed.",
-    procPackages: ["hollowTide"],
+    procPackages: ["bloodsport"],
   },
   echo_ringmail: {
     id: "echo_ringmail",
@@ -2997,7 +2997,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 3, attack: 1 },
     description: "Hundreds of small rings, each one carved with a resonance rune. The mail stores the weight of the last hit landed. The next swing releases that stored force as spectral damage alongside the blow.",
-    procPackages: ["echoStrike"],
+    procPackages: ["shadowParry"],
   },
 
   // ── Proc-package helms (cowl, circlet, greathelm) ────────────────────────
@@ -3012,7 +3012,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 1, critChance: 0.04, attack: 1 },
     description: "Dark leather with eye-slits only. Each hit stacks a hunting mark on the target (max 5, resets in 4 turns). Each mark past the first adds flat bonus damage to every subsequent hit on that same target.",
-    procPackages: ["predatorMark"],
+    procPackages: ["shrineBreaker"],
   },
   blood_circlet: {
     id: "blood_circlet",
@@ -3025,7 +3025,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 1, maxMana: 12, manaRegen: 0.4 },
     description: "A thin iron band set with a single deep-red stone. Each attack costs 8% of your max HP (never fatal) in exchange for +5 fire damage on that swing. The circlet taps the vein automatically — you don't get a vote.",
-    procPackages: ["bloodCovenant"],
+    procPackages: ["ritualOverdraw"],
   },
   eternal_hunger_crown: {
     id: "eternal_hunger_crown",
@@ -3038,7 +3038,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 1, attack: 2 },
     description: "Each kill adds a hunger stack (max 10, fades over 12 turns). While hungry, every swing deals floor(stacks÷2) extra flat damage. The crown never lets the hunger fully cool.",
-    procPackages: ["eternalHunger"],
+    procPackages: ["hungerSurge"],
   },
 
   // ── Proc-package amulets (pendulum, choker, torc) ────────────────────────
@@ -3053,7 +3053,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { attack: 1 },
     description: "A three-notch pendulum that advances with each hit you land on the same target. On the third toll, shadow damage detonates into them and they seize for a turn. The timer resets after 9 turns without a hit.",
-    procPackages: ["doomClock"],
+    procPackages: ["tollwarden"],
   },
   tithekeeper_choker: {
     id: "tithekeeper_choker",
@@ -3066,7 +3066,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 1, maxHp: 8 },
     description: "A flat iron band worn tight at the throat. Every wound you deal banks 10% of the damage as tithe. When you take a hit, all of that banked tithe repays as healing at once. Hit more than you're hit and you'll never need rest.",
-    procPackages: ["bloodTithe"],
+    procPackages: ["bloodsport"],
   },
   eclipse_torc: {
     id: "eclipse_torc",
@@ -3079,7 +3079,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 1, fireResist: 0.1, poisonResist: 0.1 },
     description: "Cast in two halves — fire-gold and frost-silver, fused at the clasp. Hits alternate: sun phase scatters 2 fire damage and burning to all adjacent enemies; moon phase scatters 2 cold damage and frost. Every swing advances the cycle automatically.",
-    procPackages: ["eclipseHammer"],
+    procPackages: ["moonfireCycle"],
   },
 
   // ── Proc-package belts ───────────────────────────────────────────────────
@@ -3094,7 +3094,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { maxStamina: 15, staminaRegen: 0.5, attack: 1 },
     description: "Each kill detonates while wearing this belt: 2 turns of invulnerability, 4 turns of berserk fury, and 10 stamina restored. Death is the fuel. This girdle is the engine.",
-    procPackages: ["deathAscendant"],
+    procPackages: ["killTempo"],
   },
   echo_duelist_cord: {
     id: "echo_duelist_cord",
@@ -3107,7 +3107,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { attack: 1, maxStamina: 10, staminaRegen: 0.3 },
     description: "A braided cord with a resonance crystal at the clasp. Each hit stores the impact. The next swing releases all that stored force as spectral damage alongside the blow. Memory made weapon.",
-    procPackages: ["echoStrike"],
+    procPackages: ["missMomentum"],
   },
 
   // ── Proc-package gloves ───────────────────────────────────────────────────
@@ -3122,7 +3122,7 @@ export const ITEM_CATALOG = {
     rarityName: "rare",
     bonuses: { attack: 1 },
     description: "Strips of cloth soaked in old blood and wound tight. Every wound you deal banks 10% as tithe. Take a single hit and every banked point repays as healing all at once.",
-    procPackages: ["bloodTithe"],
+    procPackages: ["bloodsport"],
   },
   soul_debt_gauntlets: {
     id: "soul_debt_gauntlets",
@@ -3135,7 +3135,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { attack: 1 },
     description: "Obsidian-backed iron gauntlets etched with debt-runes on the inside of each knuckle. Crit chance, crit multiplier, and base damage are all obscenely boosted while worn. Each hit silently adds to a soul debt. Something is counting.",
-    procPackages: ["soulMortgage"],
+    procPackages: ["debtHarvest"],
   },
   eclipse_gauntlets: {
     id: "eclipse_gauntlets",
@@ -3148,7 +3148,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 1, attack: 2 },
     description: "One gauntlet runs warm, the other cold. Hits alternate: sun phase scatters 2 fire damage and burning to all adjacent enemies; moon phase scatters 2 cold damage and frost to the same radius. The palms decide which half of the sky speaks.",
-    procPackages: ["eclipseHammer"],
+    procPackages: ["moonfireCycle"],
   },
 
   // ── Proc-package legs ────────────────────────────────────────────────────
@@ -3163,7 +3163,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 2, poisonResist: 0.1 },
     description: "Close-fitting leather with venom vials stitched into each knee-pad. Three consecutive hits on one target trigger the clock: shadow burst, virulent poison for 4 turns, disease for 3. The third hit is never just a third hit.",
-    procPackages: ["venomClock"],
+    procPackages: ["venomLedger"],
   },
   hungering_chainskirt: {
     id: "hungering_chainskirt",
@@ -3176,7 +3176,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 2, maxStamina: 10 },
     description: "Heavy iron rings that clink with each new kill stacked. Kills feed the hunger (max 10 stacks, 12 turns). While hungry, each swing deals floor(stacks÷2) extra flat damage. Wear this into a mob and let it count.",
-    procPackages: ["eternalHunger"],
+    procPackages: ["hungerSurge"],
   },
   cataclysm_greaves_war: {
     id: "cataclysm_greaves_war",
@@ -3189,7 +3189,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 3, critChance: 0.03, maxHp: 10 },
     description: "Each critical kill erupts outward: a hazard spawns on the corpse, a shockwave brands all nearby enemies with a mark, and branded enemies detonate on the next strike. The kill is just the opening act.",
-    procPackages: ["cataclysmChain"],
+    procPackages: ["executionRipple"],
   },
 
   // ── Proc-package boots ───────────────────────────────────────────────────
@@ -3204,7 +3204,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 1, attack: 1 },
     description: "The soles are stitched with debt-runes that accrue with every step and every hit. Crit chance, crit multiplier, and base damage are all boosted beyond reason. The debt accrues in silence. Something is coming to collect.",
-    procPackages: ["soulMortgage"],
+    procPackages: ["debtHarvest"],
   },
   warboots_of_cataclysm: {
     id: "warboots_of_cataclysm",
@@ -3217,7 +3217,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 2, critChance: 0.04 },
     description: "Critical kills cascade through these boots: a hazard erupts on the corpse, a shockwave marks all adjacent hostiles, and those marked will detonate on the next hit. Nothing dies quietly in these boots.",
-    procPackages: ["cataclysmChain"],
+    procPackages: ["cataclysmGuard"],
   },
   hollow_tide_boots: {
     id: "hollow_tide_boots",
@@ -3230,7 +3230,7 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 1, maxHp: 8 },
     description: "Tidal runes circle the ankle straps. Below 75% HP, hits gain +1. Below 50%, +3. Below 25%, +6 and targets weaken. They were made for a fighter who never planned to be at full health.",
-    procPackages: ["hollowTide"],
+    procPackages: ["bloodsport"],
   },
 
   // ── Proc-package offhand (focus, aegis, targe) ───────────────────────────
@@ -3245,7 +3245,9 @@ export const ITEM_CATALOG = {
     rarityName: "epic",
     bonuses: { defense: 1, maxMana: 10, manaRegen: 0.3 },
     description: "A cracked orb with three concentric rings inside. Each hit you land advances one ring. On the third, shadow detonates into the target and seizes them. Hold it in the off-hand and count the toll.",
-    procPackages: ["doomClock"],
+    maxCharges: 8,
+    charges: 0,
+    procPackages: ["omenDrive", "graveCurrent"],
   },
   cataclysm_aegis: {
     id: "cataclysm_aegis",
@@ -3258,7 +3260,7 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 3, kineticDR: 2 },
     description: "Critical kills cascade through this shield: a hazard erupts, a shockwave marks all adjacents, and those marked explode on the next hit. It was forged for someone who treats each death as the beginning of a chain.",
-    procPackages: ["cataclysmChain"],
+    procPackages: ["cataclysmGuard"],
   },
   bloodpact_orb: {
     id: "bloodpact_orb",
@@ -3271,7 +3273,9 @@ export const ITEM_CATALOG = {
     rarityName: "legendary",
     bonuses: { defense: 1, maxMana: 15, manaRegen: 0.5 },
     description: "A sphere of crystallised blood that pulses red with each swing. Each attack costs 8% of your max HP (never fatal) and adds +5 fire damage to that hit. The orb takes what it needs — with or without permission.",
-    procPackages: ["bloodCovenant"],
+    maxCharges: 6,
+    charges: 0,
+    procPackages: ["ritualOverdraw", "graveCurrent"],
   },
 
   // Magic / Usable

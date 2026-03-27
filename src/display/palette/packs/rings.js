@@ -34,4 +34,7 @@ export const rings = {
   // Cursed amulets
   amulet_strangulation: { glyph:"\"", fg:"#aa4444", glow:"#772222" },
   amulet_aggravation:   { glyph:"\"", fg:"#dd6644", glow:"#aa3322" },
+  pendulum_of_three_tolls: { glyph:"\"", fg:"#8a72b6", glow:"#5f4a85" },
+  tithekeeper_choker:      { glyph:"\"", fg:"#c98a6b", glow:"#8d5b41" },
+  eclipse_torc:            { glyph:"\"", fg:"#cfba7a", glow:"#8f7a45" },
 };
