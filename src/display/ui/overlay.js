@@ -2332,7 +2332,7 @@ export function renderItemDetails(container, it) {
     for (let s = 0; s < maxSockets; s++) {
       circles += s < sockets.length ? '\u25C8' : '\u25CB'; // ◈ filled, ○ empty
     }
-    sockRow.textContent = circles;
+    sockRow.textContent = `Sockets: ${circles}`;
     sockRow.style.color = '#c8a860';
     container.appendChild(sockRow);
   }
