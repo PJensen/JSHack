@@ -2,13 +2,16 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { children, World } from "../src/lib/ecs-js/index.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { DerivedExpression } from "../src/rules/components/DerivedExpression.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
 import { Faction } from "../src/rules/components/Faction.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ProcNode } from "../src/rules/components/ProcNode.js";
 import { ProcPackageNode } from "../src/rules/components/ProcPackageNode.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
+import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import {
   attachProcPackage,
   detachProcPackages,
@@ -245,4 +248,62 @@ Deno.test("cataclysm chain package marks nearby hostiles and cashes a marked fol
   });
   runScript(PROC_PACKAGE_KEYS.CataclysmChain, ScriptVerb.ProcEvaluate, world, onBeforeHit);
   assert(onBeforeHit.bonusCritChance > 0, "expected marked follow-up to gain forced crit pressure");
+});
+
+Deno.test("dealDamage dispatches onKill procs through equipped package topology", () => {
+  const world = new World({ seed: 29 });
+  const attacker = world.create();
+  const defender = world.create();
+  const hostItem = world.create();
+
+  world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
+  world.add(defender, Vitality, { maxHp: 6, hp: 6 });
+  world.add(attacker, ActiveEffects, { effects: [] });
+  world.add(attacker, Equipment, { offhand: hostItem });
+  world.add(hostItem, ItemInfo, { type: "equip", slot: "offhand", affixes: [] });
+  attachProcPackage(world, hostItem, "hungerSurge");
+
+  const result = dealDamage(world, {
+    source: attacker,
+    target: defender,
+    amount: 10,
+    type: "physical",
+    critical: false,
+  });
+
+  assert(result.killed, "expected defender to be killed");
+  const hunger = world.get(attacker, ActiveEffects)?.effects?.find((e) => e?.key === "hunger_surge");
+  assert(hunger, "expected onKill package to apply hunger_surge");
+});
+
+Deno.test("grave current package grants item charges on kill", () => {
+  const world = new World({ seed: 31 });
+  const attacker = world.create();
+  const defender = world.create();
+  const focus = world.create();
+
+  world.add(attacker, Vitality, { maxHp: 24, hp: 24 });
+  world.add(defender, Vitality, { maxHp: 5, hp: 5 });
+  world.add(attacker, Equipment, { offhand: focus });
+  world.add(focus, ItemInfo, {
+    type: "equip",
+    slot: "offhand",
+    affixes: [],
+    charges: 0,
+    maxCharges: 3,
+  });
+  attachProcPackage(world, focus, "graveCurrent");
+
+  let info = world.get(focus, ItemInfo);
+  assertEquals(info.charges, 0);
+
+  dealDamage(world, {
+    source: attacker,
+    target: defender,
+    amount: 9,
+    type: "physical",
+    critical: true,
+  });
+  info = world.get(focus, ItemInfo);
+  assertEquals(info.charges, 1, "expected charge gain on kill");
 });

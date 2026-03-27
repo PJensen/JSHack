@@ -5,6 +5,7 @@ import { Vitality } from '../src/rules/components/Vitality.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
+import { Stamina } from '../src/rules/components/Stamina.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
@@ -17,6 +18,7 @@ import { rangedAttackSystem } from '../src/rules/systems/rangedAttackSystem.js';
 import { inventoryContains, addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 import { loadChunk, clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
+import { STAMINA_REGEN_COOLDOWN } from '../src/rules/data/regenConstants.js';
 import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
 
 function makeBow(world) {
@@ -101,7 +103,7 @@ function setup(opts = {}) {
 
 function trackEvents(world, events) {
   events.length = 0;
-  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'damaged', 'died', 'proc:burning', 'proc:stunned']) {
+  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'ranged:insufficient-stamina', 'attack:insufficient-stamina', 'damaged', 'died', 'proc:burning', 'proc:stunned']) {
     world.on(ev, (data) => events.push({ _event: ev, ...data }));
   }
 }
@@ -184,6 +186,35 @@ Deno.test("ranged: ammo count decrements", () => {
   rangedAttackSystem(world);
   const ammoInfo = world.get(ammoId, ItemInfo);
   assert(ammoInfo && ammoInfo.count === 9, `ammo decremented (count=${ammoInfo?.count})`);
+});
+
+Deno.test("ranged: spends stamina and applies regen cooldown on attack", () => {
+  const events = [];
+  const { world, archer, target } = setup({ seed: 42 });
+  world.add(archer, Stamina, { maxStamina: 20, stamina: 20, staminaRegen: 1, regenCooldown: 0 });
+  trackEvents(world, events);
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+  rangedAttackSystem(world);
+  const stamina = world.get(archer, Stamina);
+  assertEquals(stamina?.stamina, 14, "short bow should spend 6 stamina");
+  assertEquals(stamina?.regenCooldown, STAMINA_REGEN_COOLDOWN, "spending stamina should set regen cooldown");
+  assert(events.some((e) => e._event === 'ranged:shot'), "attack should proceed when stamina is sufficient");
+});
+
+Deno.test("ranged: insufficient stamina cancels attack before ammo consumption", () => {
+  const events = [];
+  const { world, archer, target, ammoId } = setup({ seed: 42, ammoCount: 3 });
+  world.add(archer, Stamina, { maxStamina: 5, stamina: 5, staminaRegen: 1, regenCooldown: 0 });
+  trackEvents(world, events);
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+  rangedAttackSystem(world);
+
+  assert(!world.has(archer, RangedAttackIntent), "intent should be removed on insufficient stamina");
+  assert(events.some((e) => e._event === 'attack:insufficient-stamina'), "generic insufficient stamina event expected");
+  assert(events.some((e) => e._event === 'ranged:insufficient-stamina'), "ranged-specific insufficient stamina event expected");
+  assert(!events.some((e) => e._event === 'ranged:shot'), "no shot should be fired");
+  assertEquals(world.get(target, Vitality)?.hp, 10, "target should remain undamaged");
+  assertEquals(world.get(ammoId, ItemInfo)?.count, 3, "ammo should not be consumed");
 });
 
 Deno.test("ranged: last ammo → entity destroyed", () => {
