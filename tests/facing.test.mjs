@@ -9,6 +9,12 @@ Deno.test("perceptionToFacingConeDegrees: fixed 200-degree baseline independent 
   assertEquals(perceptionToFacingConeDegrees(20), 200);
 });
 
+Deno.test("perceptionToFacingConeDegrees: override hooks still work", () => {
+  assertEquals(perceptionToFacingConeDegrees(5, { baseDeg: 220 }), 200, "base clamps to max 200 by default");
+  assertEquals(perceptionToFacingConeDegrees(5, { baseDeg: 160, minDeg: 150, maxDeg: 170 }), 160);
+  assertEquals(perceptionToFacingConeDegrees(5, { baseDeg: 120, minDeg: 130, maxDeg: 170 }), 130);
+});
+
 Deno.test("getEntityFacingConeDegrees: debug toggle disables cone", () => {
   const world = { [FOV_CONE_DISABLED_KEY]: true, get: () => null };
   assertEquals(getEntityFacingConeDegrees(world, 1), 360);

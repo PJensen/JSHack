@@ -38,7 +38,7 @@ export function getNormalizedEntityFacing(world, entityId) {
 }
 
 /**
- * @param {number} perception
+ * @param {number} _perception - Reserved for future perception-based scaling.
  * @param {{
  *   baseDeg?: number,
  *   baseline?: number,
@@ -47,14 +47,13 @@ export function getNormalizedEntityFacing(world, entityId) {
  *   maxDeg?: number,
  * }} [opts]
  */
-export function perceptionToFacingConeDegrees(perception, opts = {}) {
-  // Kept for API stability; dynamic perception scaling will return in a future change.
-  void perception;
+export function perceptionToFacingConeDegrees(_perception, opts = {}) {
+  const hasOverrides = opts.baseDeg != null || opts.minDeg != null || opts.maxDeg != null;
+  if (!hasOverrides) return FACING_CONE_BASE_DEG;
   const baseDeg = Number(opts.baseDeg ?? FACING_CONE_BASE_DEG);
   const minDeg = Number(opts.minDeg ?? FACING_CONE_MIN_DEG);
   const maxDeg = Number(opts.maxDeg ?? FACING_CONE_MAX_DEG);
-  const cone = baseDeg;
-  return clamp(cone, minDeg, maxDeg);
+  return clamp(baseDeg, minDeg, maxDeg);
 }
 
 /**
@@ -96,15 +95,23 @@ export function isFacingTurnCostEnabled(world) {
  */
 export function setFacingTurnCostEnabled(world, enabled) {
   const value = enabled === true;
-  for (const [id, rules] of world.query(FacingRules)) {
-    if (!rules || rules.turnCostEnabled !== value) {
-      world.set(id, FacingRules, { turnCostEnabled: value });
-    }
-    return id;
+  /** @type {number[]} */
+  const ids = [];
+  for (const [id] of world.query(FacingRules)) ids.push(id);
+  if (ids.length === 0) {
+    const created = world.create();
+    world.add(created, FacingRules, { turnCostEnabled: value });
+    return created;
   }
-  const id = world.create();
-  world.add(id, FacingRules, { turnCostEnabled: value });
-  return id;
+  const firstId = ids[0];
+  const firstRules = world.get(firstId, FacingRules);
+  if (!firstRules || firstRules.turnCostEnabled !== value) {
+    world.set(firstId, FacingRules, { turnCostEnabled: value });
+  }
+  for (let i = 1; i < ids.length; i++) {
+    world.remove(ids[i], FacingRules);
+  }
+  return firstId;
 }
 
 /**
