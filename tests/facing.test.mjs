@@ -1,6 +1,7 @@
 import { assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Brain } from "../src/rules/components/Brain.js";
+import { createPlayer } from "../src/rules/archetypes/Player.js";
 import {
   FACING_CONE_BASE_DEG,
   FOV_CONE_DISABLED_KEY,
@@ -40,4 +41,10 @@ Deno.test("getEntityFovConeDegrees: falls back to default facing cone without ov
   const actor = world.create();
   world.add(actor, Brain, {});
   assertEquals(getEntityFovConeDegrees(world, actor), FACING_CONE_BASE_DEG);
+});
+
+Deno.test("createPlayer: defaults player FOV cone override to 240 degrees", () => {
+  const world = new World({ seed: 1 });
+  const playerId = createPlayer(world, { x: 0, y: 0, name: "Hero" });
+  assertEquals(getEntityFovConeDegrees(world, playerId), 240);
 });
