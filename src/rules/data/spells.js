@@ -277,6 +277,70 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'weakened', duration: '1 turn on hit' },
     ],
   },
+  rat_gnaw: {
+    id: 'rat_gnaw',
+    name: 'Rat Gnaw',
+    symbol: '\u02D2', // ˒
+    schools: ['bestial'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'rat_gnaw',
+    targeting: 'enemy',
+    description: 'A filthy gnaw that tears skin and opens a shallow bleed.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: 'Light close-range bite damage' },
+      { kind: 'status', status: 'bleeding', duration: '2 turns on hit' },
+    ],
+  },
+  goblin_dirty_trick: {
+    id: 'goblin_dirty_trick',
+    name: 'Dirty Trick',
+    symbol: '\u2731', // ✱
+    schools: ['martial'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'goblin_dirty_trick',
+    targeting: 'enemy',
+    description: 'A low cheap-shot slash aimed to blur your vision for a moment.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: 'Light close-range slash damage' },
+      { kind: 'status', status: 'blinded', duration: '1 turn on hit' },
+    ],
+  },
+  snake_fang: {
+    id: 'snake_fang',
+    name: 'Snake Fang',
+    symbol: '\u2307', // ⌇
+    schools: ['bestial', 'chemical'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'snake_fang',
+    targeting: 'enemy',
+    description: 'A committed fang strike that drives venom deep into the wound.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: 'Close-range bite damage' },
+      { kind: 'status', status: 'poisoned', duration: '4 turns on hit' },
+    ],
+  },
+  spider_lunge: {
+    id: 'spider_lunge',
+    name: 'Spider Lunge',
+    symbol: '\u27A4', // ➤
+    schools: ['bestial'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'spider_lunge',
+    targeting: 'enemy',
+    description: 'A sudden body-check and bite that leaves the target staggered.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: 'Close-range lunge damage' },
+      { kind: 'status', status: 'staggered', duration: '1 turn on hit' },
+    ],
+  },
   bat_shriek: {
     id: 'bat_shriek',
     name: 'Bat Shriek',

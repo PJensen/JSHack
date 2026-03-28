@@ -41,10 +41,22 @@ export const MONSTERS = [
     massKg: 2,
     resistances: { kinetic: { DR: 0 } },
     speed: 2,
+    learnedSpellIds: ['rat_gnaw'],
     hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'rat_gnaw',
+          abilityId: 'rat_gnaw',
+          abilityName: 'Gnaw',
+          minRange: 1,
+          maxRange: 1,
+          cooldownTurns: 6,
+          chance: 0.4,
+        }),
+      ],
       onHit: [statusEffectOnHit(25, 0xdead0001, { key: "disease", turnsLeft: 20, potency: 1 }, "proc:diseased")],
     },
-    specials: ["Disease 25%"],
+    specials: ["Disease 25%", "Gnaw (bleed)"],
     description: 'A mangy rodent with beady eyes.',
     corpseEat: { behavior: "scavenge", hpThreshold: 0.60, cooldownTurns: 5 },
   },
@@ -75,8 +87,22 @@ export const MONSTERS = [
       { slot: "armor", itemId: "leather_armor" },
       { slot: "head", itemId: "scout_hood" },
     ],
-    hooks: null,
-    specials: ["Wields a shiv (often jagged)", "May spawn lightly armored"],
+    learnedSpellIds: ['goblin_dirty_trick'],
+    hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'goblin_dirty_trick',
+          abilityId: 'goblin_dirty_trick',
+          abilityName: 'Dirty Trick',
+          minRange: 1,
+          maxRange: 1,
+          cooldownTurns: 7,
+          telegraphTurns: 1,
+          chance: 0.35,
+        }),
+      ],
+    },
+    specials: ["Wields a shiv (often jagged)", "Dirty Trick (blind)", "May spawn lightly armored"],
     description: 'A sneering green-skinned runt armed with a rusty dagger.',
     lootTable: 'drop:goblin',
     corpseEat: { behavior: "scavenge", hpThreshold: 0.70, cooldownTurns: 5 },
@@ -339,10 +365,19 @@ export const MONSTERS = [
     massKg: 8,
     resistances: { kinetic: { DR: 0 } },
     speed: 2,
-    learnedSpellIds: ['web_spit'],
+    learnedSpellIds: ['web_spit', 'spider_lunge'],
     hooks: {
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
       whileLOS: [
+        castSpellOnLOS({
+          spellId: 'spider_lunge',
+          abilityId: 'spider_lunge',
+          abilityName: 'Lunge',
+          minRange: 1,
+          maxRange: 1,
+          cooldownTurns: 5,
+          chance: 0.4,
+        }),
         castSpellOnLOS({
           spellId: 'web_spit',
           abilityId: 'web_spit',
@@ -354,7 +389,7 @@ export const MONSTERS = [
         }),
       ],
     },
-    specials: ["Throws web (25%)", "Web spit"],
+    specials: ["Throws web (25%)", "Web spit", "Lunge (stagger)"],
     description: 'A skittish arachnid. It spins webs but lacks venom.',
   },
 
@@ -374,10 +409,22 @@ export const MONSTERS = [
     massKg: 3,
     resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
     speed: 3,
+    learnedSpellIds: ['snake_fang'],
     hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'snake_fang',
+          abilityId: 'snake_fang',
+          abilityName: 'Fang Strike',
+          minRange: 1,
+          maxRange: 1,
+          cooldownTurns: 6,
+          chance: 0.45,
+        }),
+      ],
       onHit: [statusEffectOnHit(25, 0xdead000f, { key: "poison", turnsLeft: 5, potency: 1 }, "proc:poisoned")],
     },
-    specials: ["Poison 25%"],
+    specials: ["Poison 25%", "Fang Strike"],
     description: 'A hissing serpent with venomous fangs.',
   },
 

@@ -27,6 +27,7 @@ import { findNearestValidTileAround } from "../utils/queries.js";
 import { combatSeed, hashString32, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { chebyshev } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
@@ -1391,50 +1392,74 @@ REGISTRY["boar_charge"] = function boarChargeScript(world, actor, spell, intent)
   } catch {}
 };
 
-// Boar Bite — close-range snap that briefly weakens the target.
-REGISTRY["boar_bite"] = function boarBiteScript(world, actor, spell, intent) {
+/**
+ * Canonical close-range hostile strike for monster abilities that pair
+ * immediate damage with a timed status.
+ *
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ [k:string]: any }} spell
+ * @param {{ [k:string]: any }} intent
+ * @param {{
+ *   eventName: string,
+ *   baseAmount: number,
+ *   damageType?: string,
+ *   cause?: string,
+ *   salt?: number,
+ *   statusKey?: string,
+ *   statusTurns?: number,
+ *   statusPotency?: number,
+ * }} tuning
+ */
+function runMeleeStatusStrike(world, actor, spell, intent, tuning) {
+  const eventName = String(tuning?.eventName || "").trim();
+  if (!eventName) return;
+
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
   const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
   const targetId = Number(intent?.targetId || 0) | 0;
   if (!(targetId > 0)) {
-    try { world.emit?.("spell:boar_bite:failed", { actor, reason: "no_target" }); } catch {}
+    try { world.emit?.(`${eventName}:failed`, { actor, reason: "no_target" }); } catch {}
     return;
   }
+
   const tpos = world.get(targetId, Position);
   const tvit = world.get(targetId, Vitality);
   const tfac = world.get(targetId, Faction);
   if (!tpos || !tvit || (tvit.hp | 0) <= 0 || !tfac || !areFactionsHostile(actorFaction, String(tfac.key || ""))) {
-    try { world.emit?.("spell:boar_bite:failed", { actor, reason: "invalid_target" }); } catch {}
+    try { world.emit?.(`${eventName}:failed`, { actor, reason: "invalid_target" }); } catch {}
     return;
   }
+
   const range = Math.max(1, Number(spell?.range || 1) | 0);
   const dist = Math.max(Math.abs((apos.x | 0) - (tpos.x | 0)), Math.abs((apos.y | 0) - (tpos.y | 0)));
   if (dist > range) {
-    try { world.emit?.("spell:boar_bite:failed", { actor, reason: "out_of_range" }); } catch {}
+    try { world.emit?.(`${eventName}:failed`, { actor, reason: "out_of_range" }); } catch {}
     return;
   }
 
+  const cause = String(tuning?.cause || eventName);
+  const baseAmount = Math.max(0, Number(tuning?.baseAmount || 0) | 0);
+  const damageType = String(tuning?.damageType || "physical");
+  const saltBase = Number(tuning?.salt || 0) | 0;
   const result = dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
     spell,
-    baseAmount: 2,
-    type: "physical",
-    cause: "spell:boar_bite",
+    baseAmount,
+    type: damageType,
+    cause,
     at: { x: tpos.x | 0, y: tpos.y | 0 },
-    salt: targetId ^ 0xb17e,
+    salt: targetId ^ saltBase,
   }));
 
-  if (result.applied && !result.killed) {
-    let ae = /** @type any */ (world.get(targetId, ActiveEffects));
-    if (!ae || !Array.isArray(ae.effects)) {
-      try { world.add(targetId, ActiveEffects, { effects: [] }); } catch {}
-      ae = /** @type any */ (world.get(targetId, ActiveEffects));
-    }
+  const statusKey = String(tuning?.statusKey || "").trim();
+  if (result.applied && !result.killed && statusKey) {
+    const ae = ensureActiveEffects(world, targetId);
     if (ae?.effects) {
       upsertTimedEffect(ae.effects, {
-        key: "weakened",
-        turnsLeft: 1,
-        potency: 1,
+        key: statusKey,
+        turnsLeft: Math.max(1, Number(tuning?.statusTurns || 1) | 0),
+        potency: Math.max(1, Number(tuning?.statusPotency || 1) | 0),
         stacks: 1,
         startedAtTurn: world.step,
         sourceId: actor,
@@ -1443,7 +1468,7 @@ REGISTRY["boar_bite"] = function boarBiteScript(world, actor, spell, intent) {
   }
 
   try {
-    world.emit?.("spell:boar_bite", {
+    world.emit?.(eventName, {
       actor,
       targetId,
       at: { x: tpos.x | 0, y: tpos.y | 0 },
@@ -1452,6 +1477,76 @@ REGISTRY["boar_bite"] = function boarBiteScript(world, actor, spell, intent) {
       missed: result.reason === "missed",
     });
   } catch {}
+}
+
+// Boar Bite — close-range snap that briefly weakens the target.
+REGISTRY["boar_bite"] = function boarBiteScript(world, actor, spell, intent) {
+  runMeleeStatusStrike(world, actor, spell, intent, {
+    eventName: "spell:boar_bite",
+    baseAmount: 2,
+    damageType: "physical",
+    cause: "spell:boar_bite",
+    salt: 0xb17e,
+    statusKey: "weakened",
+    statusTurns: 1,
+    statusPotency: 1,
+  });
+};
+
+// Rat Gnaw — close-range tearing bite with brief bleed pressure.
+REGISTRY["rat_gnaw"] = function ratGnawScript(world, actor, spell, intent) {
+  runMeleeStatusStrike(world, actor, spell, intent, {
+    eventName: "spell:rat_gnaw",
+    baseAmount: 1,
+    damageType: "physical",
+    cause: "spell:rat_gnaw",
+    salt: 0x0a71,
+    statusKey: "bleed",
+    statusTurns: 2,
+    statusPotency: 1,
+  });
+};
+
+// Dirty Trick — goblin melee cheap-shot that briefly blinds.
+REGISTRY["goblin_dirty_trick"] = function goblinDirtyTrickScript(world, actor, spell, intent) {
+  runMeleeStatusStrike(world, actor, spell, intent, {
+    eventName: "spell:goblin_dirty_trick",
+    baseAmount: 2,
+    damageType: "physical",
+    cause: "spell:goblin_dirty_trick",
+    salt: 0xd1e7,
+    statusKey: "blinded",
+    statusTurns: 1,
+    statusPotency: 1,
+  });
+};
+
+// Snake Fang — close-range venom strike with a short poison payload.
+REGISTRY["snake_fang"] = function snakeFangScript(world, actor, spell, intent) {
+  runMeleeStatusStrike(world, actor, spell, intent, {
+    eventName: "spell:snake_fang",
+    baseAmount: 2,
+    damageType: "physical",
+    cause: "spell:snake_fang",
+    salt: 0x5a9e,
+    statusKey: "poison",
+    statusTurns: 4,
+    statusPotency: 1,
+  });
+};
+
+// Spider Lunge — close-range body-check that leaves targets staggered.
+REGISTRY["spider_lunge"] = function spiderLungeScript(world, actor, spell, intent) {
+  runMeleeStatusStrike(world, actor, spell, intent, {
+    eventName: "spell:spider_lunge",
+    baseAmount: 2,
+    damageType: "physical",
+    cause: "spell:spider_lunge",
+    salt: 0x5a1d,
+    statusKey: "stagger",
+    statusTurns: 1,
+    statusPotency: 1,
+  });
 };
 
 // Bat Shriek — short confusion pulse plus nearby aggro wake-up.
