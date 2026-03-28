@@ -124,6 +124,26 @@ Deno.test("ranged: hit with bow, ammo, LOS clear, in range", () => {
   assert((hit?.projectileDelay || 0) > 0, 'ranged hits should carry projectileDelay');
 });
 
+Deno.test("ranged: hits do not apply implicit bleed without explicit proc source", () => {
+  let validated = false;
+  for (let seed = 1; seed <= 64; seed++) {
+    const { world, archer, target } = setup({ seed, targetHp: 30 });
+    world.mutate(archer, Equipment, (eq) => {
+      eq.accuracyDerived = 20;
+      eq.damagePowerDerived = 8;
+    });
+    world.add(archer, RangedAttackIntent, { targetId: target, toX: 5, toY: 0 });
+    rangedAttackSystem(world);
+    const damage = 30 - (world.get(target, Vitality)?.hp || 30);
+    if (damage <= 0) continue;
+    const effects = world.get(target, ActiveEffects)?.effects || [];
+    assert(!effects.some((e) => String(e?.key || "") === "bleed"), "ranged hit should not auto-apply bleed");
+    validated = true;
+    break;
+  }
+  assert(validated, "expected at least one deterministic landed ranged hit");
+});
+
 Deno.test("ranged: no bow (sword equipped) → silent no-op", () => {
   const events = [];
   const { world, archer, target } = setup();
