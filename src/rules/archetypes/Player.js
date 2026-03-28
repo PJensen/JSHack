@@ -20,6 +20,8 @@ import { SoundEmitter } from "../components/SoundEmitter.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { HEARING_SOURCE_DB } from "../components/Anatomy.js";
 
+const PLAYER_FOV_CONE_DEGREES = 220;
+
 export const PlayerArchetype = defineArchetype(
   "PlayerArchetype",
   [Player],
@@ -42,7 +44,11 @@ export const PlayerArchetype = defineArchetype(
   [Equipment, {}],
   [Mana, {}],
   [Stamina, (p) => ({ maxStamina: p.maxStamina ?? 100, stamina: p.stamina ?? (p.maxStamina ?? 100), staminaRegen: p.staminaRegen ?? 3.0 })],
-  [Brain, {}],
+  [Brain, (p) => ({
+    fovConeDegrees: Number.isFinite(p.fovConeDegrees)
+      ? Number(p.fovConeDegrees)
+      : PLAYER_FOV_CONE_DEGREES,
+  })],
   [Facing, { dx: 0, dy: 0 }],
   [Score, {}],
   [Faction, { key: "player" }],
@@ -71,6 +77,11 @@ export function createPlayer(world, params = {}) {
     world.add(id, Settings, { autoPickup: params.autoPickup ?? true, autoPickupKinds: params.autoPickupKinds ?? ['currency'] });
     world.add(id, Mana, { maxMana: 50, mana: 50, regenRate: 1 });
     world.add(id, Stamina, { maxStamina: params.maxStamina ?? 100, stamina: params.stamina ?? (params.maxStamina ?? 100), staminaRegen: params.staminaRegen ?? 3.0 });
+    world.add(id, Brain, {
+      fovConeDegrees: Number.isFinite(params.fovConeDegrees)
+        ? Number(params.fovConeDegrees)
+        : PLAYER_FOV_CONE_DEGREES,
+    });
     world.add(id, Score, {});
     world.add(id, Faction, { key: "player" });
     world.add(id, SoundEmitter, { ambient: HEARING_SOURCE_DB.footsteps, lastActionNoise: 0 });
