@@ -295,7 +295,9 @@ export function movementSystem(world) {
         blocking.add(k);
       }
     } catch (e) { console.error("[movementSystem] movement resolution failed:", e); }
-    // Consume the intent regardless
-    try { world.remove(actor, MoveIntent); } catch {}
+    finally {
+      // Consume the intent regardless (even if we early-continue for facing turns).
+      try { world.remove(actor, MoveIntent); } catch {}
+    }
   }
 }
