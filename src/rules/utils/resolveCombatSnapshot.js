@@ -3,6 +3,7 @@ import { resolveResistance } from "./dealDamage.js";
 import { resolveCanonicalStats } from "./canonicalStats.js";
 import { statusStrength } from "./statusFacade.js";
 import { getBlindedDefensePenalty } from "./blindnessExposure.js";
+import { COMBAT_POSTURES, CombatPosture } from "../components/CombatPosture.js";
 
 const MODE_RULES = Object.freeze({
   melee: Object.freeze({
@@ -95,7 +96,13 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     battle_fury: statusStrength(world, id, "battle_fury"),
     fey_grace: statusStrength(world, id, "fey_grace"),
     blinded: statusStrength(world, id, "blinded"),
+    staggered: statusStrength(world, id, "staggered"),
   };
+
+  const posture = world.get(id, CombatPosture);
+  const stance = posture?.stance === COMBAT_POSTURES.aggressive
+    ? COMBAT_POSTURES.aggressive
+    : (posture?.stance === COMBAT_POSTURES.guarded ? COMBAT_POSTURES.guarded : COMBAT_POSTURES.balanced);
 
   /** @type {Array<{stat:'attack'|'defense', source:string, value:number, reason:string}>} */
   const modifiers = [];
@@ -117,6 +124,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "attack", "status:war_fed", statusTotals.war_fed * 2, "war-fed-bonus");
     pushModifier(modifiers, "attack", "status:dark_sight", statusTotals.dark_sight * 2, "dark-sight-bonus");
     pushModifier(modifiers, "attack", "status:battle_fury", statusTotals.battle_fury * 2, "battle-fury-bonus");
+    pushModifier(modifiers, "attack", "status:staggered", -statusTotals.staggered, "staggered-penalty");
 
     attackBonus += (
       -statusTotals.disease
@@ -131,7 +139,16 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
       +(statusTotals.war_fed * 2)
       +(statusTotals.dark_sight * 2)
       +(statusTotals.battle_fury * 2)
+      -statusTotals.staggered
     );
+  }
+
+  if (stance === COMBAT_POSTURES.aggressive) {
+    pushModifier(modifiers, "attack", "posture:aggressive", 2, "aggressive-bonus");
+    attackBonus += 2;
+  } else if (stance === COMBAT_POSTURES.guarded) {
+    pushModifier(modifiers, "attack", "posture:guarded", -1, "guarded-penalty");
+    attackBonus -= 1;
   }
 
   if (rules.clampAttackAtZero && attackBonus < 0) {
@@ -154,6 +171,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "defense", "status:phase_shift", statusTotals.phase_shift * 4, "phase-shift-bonus");
     pushModifier(modifiers, "defense", "status:fey_grace", statusTotals.fey_grace * 3, "fey-grace-bonus");
     pushModifier(modifiers, "defense", "status:spider_sense", statusTotals.spider_sense * 2, "spider-sense-bonus");
+    pushModifier(modifiers, "defense", "status:staggered", -(statusTotals.staggered * 2), "staggered-penalty");
 
     defenseContribution += (
       -statusTotals.disease
@@ -165,6 +183,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
       +(statusTotals.phase_shift * 4)
       +(statusTotals.fey_grace * 3)
       +(statusTotals.spider_sense * 2)
+      -(statusTotals.staggered * 2)
     );
   }
 
@@ -178,6 +197,14 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
   if (blindedDefensePenalty > 0) {
     pushModifier(modifiers, "defense", "status:blinded", -blindedDefensePenalty, "blinded-exposure-penalty");
     defenseContribution -= blindedDefensePenalty;
+  }
+
+  if (stance === COMBAT_POSTURES.aggressive) {
+    pushModifier(modifiers, "defense", "posture:aggressive", -2, "aggressive-risk");
+    defenseContribution -= 2;
+  } else if (stance === COMBAT_POSTURES.guarded) {
+    pushModifier(modifiers, "defense", "posture:guarded", 3, "guarded-bonus");
+    defenseContribution += 3;
   }
 
   if (rules.clampDefenseAtZero && defenseContribution < 0) {
@@ -194,7 +221,10 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     attackBonus,
     armorClass: 10 + defenseContribution,
     damageFlatBonus: Math.max(0, Math.floor(damagePower / 2)) + (statusTotals.war_fed > 0 ? statusTotals.war_fed * 2 : 0),
-    damageMult: (statusTotals.berserk > 0 ? 1.5 : 1) * (statusTotals.blood_rage > 0 ? 1.25 : 1) * shadowAmbushDamageMult,
+    damageMult: (statusTotals.berserk > 0 ? 1.5 : 1)
+      * (statusTotals.blood_rage > 0 ? 1.25 : 1)
+      * shadowAmbushDamageMult
+      * (stance === COMBAT_POSTURES.aggressive ? 1.2 : (stance === COMBAT_POSTURES.guarded ? 0.9 : 1)),
     accuracy,
     damagePower,
     physicalPenetration,
@@ -207,6 +237,11 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     critChance: critChance + (shadowAmbushActive ? 0.15 * statusTotals.shadow_cloak : 0),
     critMult: critMult + (shadowAmbushActive ? 0.5 * statusTotals.shadow_cloak : 0),
     status: Object.freeze({ ...statusTotals }),
+    posture: Object.freeze({
+      stance,
+      lastChangedStep: Number(posture?.lastChangedStep || 0) | 0,
+      lastMoveStep: Number(posture?.lastMoveStep ?? -1) | 0,
+    }),
     modifiers: Object.freeze(modifiers),
   };
 }

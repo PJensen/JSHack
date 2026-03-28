@@ -19,6 +19,8 @@ export const PROC_STATE_VIS = {
 	miss_momentum:      { glyph: '\u21BB',       r: 140, g: 180, b: 255 },  // ↻ miss momentum
 	debt_harvest:       { glyph: '\u20BF',       r: 210, g: 80,  b: 60  },  // ₿ debt banking
 	cataclysm_guard:    { glyph: '\u26E8',       r: 255, g: 145, b: 75  },  // ⛨ protection mark
+	shield_guard:       { glyph: '\u{1F6E1}',    r: 120, g: 205, b: 245 },  // 🛡 active shield guard
+	shield_broken:      { glyph: '\u26A0',       r: 255, g: 150, b: 85  },  // ⚠ guard broken
 	omen_drive:         { glyph: '\u2727',       r: 255, g: 245, b: 120 },  // ✧ omen charge
 	pack_hunter_mark:   { glyph: '\u{1F43A}',    r: 210, g: 175, b: 120 },  // 🐺 pack mark
 	hunt_mark:          { glyph: '\u{1F3AF}',    r: 250, g: 140, b: 70  },  // 🎯 hunted

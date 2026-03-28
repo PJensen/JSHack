@@ -11,6 +11,8 @@ import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { Position } from '../components/Position.js';
 import { Stamina } from '../components/Stamina.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
+import { ActiveEffects } from '../components/ActiveEffects.js';
+import { COMBAT_POSTURES } from '../components/CombatPosture.js';
 import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
@@ -32,6 +34,9 @@ import {
     getBlindedCritMultBonus,
 } from '../utils/blindnessExposure.js';
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
+import { getPositionalAttackBonus, POSITION_RELATIONS } from '../utils/combatPositioning.js';
+import { setCombatPosture } from '../utils/posture.js';
+import { upsertTimedEffect } from '../utils/effectSemantics.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -50,6 +55,46 @@ function makeCombatFrame(world, base) {
             });
         },
     });
+}
+
+function ensureEffects(world, entityId) {
+    let ae = world.get(entityId, ActiveEffects);
+    if (ae && Array.isArray(ae.effects)) return ae;
+    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
+    ae = world.get(entityId, ActiveEffects);
+    return (ae && Array.isArray(ae.effects)) ? ae : null;
+}
+
+function applyDamageTextureEffects(world, {
+    attacker, defender, damageType, appliedDamage, critical, relation,
+}) {
+    if (!(appliedDamage > 0) || !world.isAlive(defender)) return;
+    const ae = ensureEffects(world, defender);
+    if (!ae) return;
+
+    if ((damageType === 'slash' || damageType === 'pierce') && (critical || relation === POSITION_RELATIONS.rear)) {
+        upsertTimedEffect(ae.effects, {
+            key: 'bleed',
+            turnsLeft: critical ? 4 : 3,
+            potency: critical ? 2 : 1,
+            stacks: 1,
+            sourceId: attacker,
+            startedAtTurn: world.step,
+        });
+        try { world.emit?.('combat:status:bleed', { attacker, defender, critical: !!critical }); } catch {}
+    }
+
+    if (damageType === 'blunt' && appliedDamage >= 4) {
+        upsertTimedEffect(ae.effects, {
+            key: 'stagger',
+            turnsLeft: critical ? 2 : 1,
+            potency: 1,
+            stacks: 1,
+            sourceId: attacker,
+            startedAtTurn: world.step,
+        });
+        try { world.emit?.('combat:status:stagger', { attacker, defender, critical: !!critical }); } catch {}
+    }
 }
 
 /**
@@ -104,7 +149,9 @@ function resolveHitRoll(world, {
     const defSnapshot = resolveCombatSnapshot(world, target, { mode: 'melee' });
     const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
     breakStealthOnOffense(world, source, { reason: 'attack', mode: 'melee', targetId: target });
-    const attackBonus = atkSnapshot.attackBonus + hitPenalty;
+    const positional = getPositionalAttackBonus(world, source, target);
+    const actionTags = Array.isArray(tags) ? [...tags, `relation:${positional.relation}`] : [`relation:${positional.relation}`];
+    let attackBonus = atkSnapshot.attackBonus + hitPenalty + positional.attackBonus;
     const armorClass = defSnapshot.armorClass;
 
     const seed = combatSeed(world.seed, world.step, source, target, seedSalt);
@@ -118,7 +165,7 @@ function resolveHitRoll(world, {
         world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
         applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
             source, target, item: weaponId || 0, damage: 0,
-            damageType: 'physical', crit: false, tags, scratch: {}, offhand,
+            damageType: 'physical', crit: false, tags: actionTags, scratch: {}, offhand,
         }), () => r());
         return true;
     }
@@ -141,6 +188,10 @@ function resolveHitRoll(world, {
     const damageRoll = rollDice(baseDice, r);
     const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(0, Math.floor((damageRoll + flatBonus) * baseDamageMult));
+    dmg = Math.max(0, Math.floor(dmg * positional.damageMult));
+    if ((Number(atkSnapshot?.posture?.lastMoveStep ?? -1) | 0) === (Number(world.step || 0) | 0)) {
+        dmg += 1; // momentum chip from same-turn movement commitment
+    }
     let armorPenetration = Math.max(0, Number(atkSnapshot.physicalPenetration || 0));
     if (damageType === 'blunt') armorPenetration += Math.max(0, Number(atkSnapshot.bluntPenetration || 0));
     if (damageType === 'slash') armorPenetration += Math.max(0, Number(atkSnapshot.slashPenetration || 0));
@@ -164,7 +215,7 @@ function resolveHitRoll(world, {
     let finalDmg = Math.max(0, Math.floor(ctx.damage));
     finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onBeforeHit', {
         source, target, item: weaponId || 0, damage: finalDmg,
-        damageType, crit: isCrit, tags, scratch: procScratch, offhand,
+        damageType, crit: isCrit, tags: actionTags, scratch: procScratch, offhand,
     }), () => r());
     ctx.damage = finalDmg;
     runLegacyMonsterHook(world, source, 'onBeforeHit', ctx);
@@ -175,7 +226,7 @@ function resolveHitRoll(world, {
     finalDmg = Math.max(0, Math.floor(hitCtx.damage));
     finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onHit', {
         source, target, item: ctx.weaponId || 0, damage: finalDmg,
-        damageType, crit: isCrit, tags, scratch: procScratch, offhand,
+        damageType, crit: isCrit, tags: actionTags, scratch: procScratch, offhand,
     }), () => r());
     hitCtx.damage = finalDmg;
 
@@ -187,7 +238,7 @@ function resolveHitRoll(world, {
     runLegacyMonsterHook(world, source, 'onHit', hitCtx);
     applyReactionProcPhase(world, target, buildProcContext('onHit', {
         source, target, item: ctx.weaponId || 0, damage: finalDmg,
-        damageType, crit: isCrit, tags, scratch: procScratch, offhand,
+        damageType, crit: isCrit, tags: actionTags, scratch: procScratch, offhand,
     }), { excludeSlots: ['weapon'] });
 
     if (finalDmg > 0) {
@@ -198,6 +249,16 @@ function resolveHitRoll(world, {
             armorPenetration,
             ...(offhand ? { offhand: true } : {}),
         });
+        if (result.applied) {
+            applyDamageTextureEffects(world, {
+                attacker: source,
+                defender: target,
+                damageType,
+                appliedDamage: result.amount,
+                critical: isCrit,
+                relation: positional.relation,
+            });
+        }
         if (!result.applied && result.reason !== 'invulnerable' && result.reason !== 'resisted') {
             world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
         }
@@ -258,6 +319,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
         }
         world.set(source, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
     }
+    setCombatPosture(world, source, COMBAT_POSTURES.aggressive, { reason: 'attack:melee' });
 
     return resolveHitRoll(world, {
         source, target, weaponId, atkEq,

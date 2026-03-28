@@ -15,6 +15,8 @@ import { createLegacyCombatFrame, runLegacyMonsterHook } from "./legacyAffixDisp
 import { ensureEquippedAffixTopology, evaluateEquippedAffixProcs } from "./affixTopology.js";
 import { applyProcAccumulator } from "./procApplication.js";
 import { clamp } from "../../shared/math/math.js";
+import { getShieldArcMultiplier } from "./combatPositioning.js";
+import { consumeShieldGuardStack, refreshShieldGuard } from "./shieldGuard.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -286,9 +288,34 @@ export function dealDamage(world, spec) {
   }
 
   // Step 3: Resistance resolution
-  const finalAmount = spec.bypassResist
+  let finalAmount = spec.bypassResist
     ? rawAmount
     : resolveResistance(world, target, rawAmount, type, armorPenetration);
+
+  // Front-arc shield mitigation (only when an actual offhand shield is equipped
+  // and the guard state is currently active).
+  if (finalAmount > 0 && source > 0 && world.isAlive(source)) {
+    refreshShieldGuard(world, target);
+    const shieldArcMult = getShieldArcMultiplier(world, source, target, type);
+    if (shieldArcMult < 1) {
+      const guard = consumeShieldGuardStack(world, target, {
+        source,
+        at: spec.at || undefined,
+      });
+      if (guard.guarded) {
+        finalAmount = Math.max(1, Math.floor(finalAmount * shieldArcMult));
+        try {
+          world.emit?.("shield:guarded", {
+            id: target,
+            source,
+            stacks: Number(guard.stacks || 0) | 0,
+            at: spec.at || undefined,
+            broken: !!guard.broken,
+          });
+        } catch {}
+      }
+    }
+  }
 
   if (finalAmount <= 0) {
     try {

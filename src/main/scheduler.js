@@ -13,9 +13,11 @@ import { throwSystem } from "../rules/systems/throwSystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
+import { shieldGuardSystem } from "../rules/systems/shieldGuardSystem.js";
 import { stealthAmbushSystem } from "../rules/systems/stealthAmbushSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
 import { searchSystem } from "../rules/systems/searchSystem.js";
+import { postureIntentSystem } from "../rules/systems/postureIntentSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
@@ -167,6 +169,7 @@ export function configureWorld(world) {
   registerSystem(flyIntentSystem, 'intents');
   registerSystem(waitSystem, 'intents');
   registerSystem(searchSystem, 'intents');
+  registerSystem(postureIntentSystem, 'intents');
   registerSystem(praySystem, 'intents');
   registerSystem(drinkSystem, 'intents');
   registerSystem(useItemSystem, 'intents');
@@ -213,6 +216,8 @@ export function configureWorld(world) {
   // complete cleanly and restore opener while invisibility remains active.
   registerSystem(stealthAmbushSystem, 'effects');
   registerSystem(effectSystem, 'effects');
+  // Keep shield guard/break icon state synced to equipped offhand shields.
+  registerSystem(shieldGuardSystem, 'effects');
   registerSystem(materialReactionSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
   // Food decay ticks after hunger (rot inventory food each turn)

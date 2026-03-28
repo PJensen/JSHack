@@ -425,6 +425,14 @@ export function aiChaseSystem(world) {
         const maxRange   = weaponInfo?.range || 8;
         const dist       = Math.max(Math.abs(dxt), Math.abs(dyt));
         if (dist > 1 && dist <= maxRange) {
+          try {
+            world.emit?.('combat:telegraph', {
+              actor: id,
+              target: playerId,
+              mode: 'ranged',
+              turns: 0,
+            });
+          } catch {}
           try { world.add(id, RangedAttackIntent, { targetId: playerId }); } catch {}
           return;
         }

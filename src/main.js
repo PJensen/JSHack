@@ -1937,6 +1937,15 @@ addEventListener('ui:search', () => {
   rulesHandler({ type: 'rules.search', payload: {} });
 });
 
+// Posture button → cycle combat posture as a turn action
+addEventListener('ui:cyclePosture', () => {
+  if (isSimUiBlocked()) return;
+  const pe = playerEntity(world);
+  if (!pe) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.cyclePosture', payload: {} });
+});
+
 addEventListener('ui:quickInteract', () => {
   if (isSimUiBlocked()) return;
   const pe = playerEntity(world);

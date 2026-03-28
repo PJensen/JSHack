@@ -57,6 +57,12 @@ export const EFFECT_DEFS = [
     statuses: ["stunned"],
   },
   {
+    id: "stagger",
+    keys: ["stagger", "staggered"],
+    operation: "none",
+    statuses: ["staggered"],
+  },
+  {
     id: "shock",
     keys: ["shock", "shocked"],
     operation: "damage",
@@ -193,6 +199,18 @@ export const EFFECT_DEFS = [
     keys: ["resist_acid"],
     operation: "none",
     statuses: ["resist_acid"],
+  },
+  {
+    id: "shield_guard",
+    keys: ["shield_guard"],
+    operation: "none",
+    statuses: ["shield_guard"],
+  },
+  {
+    id: "shield_broken",
+    keys: ["shield_broken"],
+    operation: "none",
+    statuses: ["shield_broken"],
   },
   {
     id: "lucky",

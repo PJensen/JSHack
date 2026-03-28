@@ -33,6 +33,7 @@ import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { isFacingTurnCostEnabled, normalizeFacingVector } from "../utils/facing.js";
+import { markMovedThisTurn } from "../utils/posture.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
@@ -288,6 +289,7 @@ export function movementSystem(world) {
         // Successful move
         const from = { x: pos.x, y: pos.y };
         world.set(actor, Position, { x: nx, y: ny });
+        markMovedThisTurn(world, actor);
         world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
         // Reserve the destination so subsequent movers can't step into the same tile
         blocking.add(k);
