@@ -348,3 +348,22 @@ Deno.test("messageWiring logs spell-proc gear messages for player events", () =>
   assert(messageLog.entries[2].text.includes("Echo Grimoire"));
   assert(messageLog.entries[2].text.includes("80%"));
 });
+
+Deno.test("messageWiring logs explicit bleeding proc sources", () => {
+  const world = new World({ seed: 55 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const enemyId = world.create();
+  world.add(enemyId, NamedIdentity, { name: "Wolf", identity: "wolf" });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId, { isVisibleAt: () => true });
+
+  world.emit("proc:bleeding", { actor: enemyId, target: playerId });
+  world.emit("proc:hemorrhage", { actor: playerId, target: enemyId });
+
+  assertEquals(messageLog.entries.length, 2);
+  assert(messageLog.entries[0].text.includes("bleeding wound"), "bleeding proc should explain why bleed occurred");
+  assert(messageLog.entries[1].text.includes("Hemorrhage"), "hemorrhage proc should be named in the log");
+});

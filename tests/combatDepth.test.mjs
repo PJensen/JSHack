@@ -116,3 +116,33 @@ Deno.test("heavy blunt hits apply stagger", () => {
   }
   assert(validated, "expected at least one deterministic landed blunt hit");
 });
+
+Deno.test("slash hits do not apply implicit bleed without explicit proc source", () => {
+  let validated = false;
+  for (let seed = 1; seed <= 64; seed++) {
+    const world = new World({ seed });
+    const weapon = makeWeapon(world, {
+      damageType: "slash",
+      damageDice: "1d10",
+      bonuses: { accuracy: 18, damagePower: 12 },
+    });
+    const attacker = makeActor(world, {
+      x: 5, y: 4, faction: "player",
+      facing: { dx: 0, dy: 1 },
+      equipment: { weapon },
+    });
+    const defender = makeActor(world, {
+      x: 5, y: 5, hp: 40, faction: "enemy", facing: { dx: 0, dy: -1 },
+      equipment: { evadeDerived: 0 },
+    });
+    world.add(attacker, AttackIntent, { targetId: defender });
+    combatSystem(world);
+    const dmg = 40 - world.get(defender, Vitality).hp;
+    if (dmg <= 0) continue;
+    const effects = world.get(defender, ActiveEffects)?.effects || [];
+    assert(!effects.some((e) => String(e?.key || "") === "bleed"), "slash hit should not auto-apply bleed");
+    validated = true;
+    break;
+  }
+  assert(validated, "expected at least one deterministic landed slash hit");
+});

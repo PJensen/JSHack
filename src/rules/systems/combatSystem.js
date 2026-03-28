@@ -34,7 +34,7 @@ import {
     getBlindedCritMultBonus,
 } from '../utils/blindnessExposure.js';
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
-import { getPositionalAttackBonus, POSITION_RELATIONS } from '../utils/combatPositioning.js';
+import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 
@@ -66,23 +66,11 @@ function ensureEffects(world, entityId) {
 }
 
 function applyDamageTextureEffects(world, {
-    attacker, defender, damageType, appliedDamage, critical, relation,
+    attacker, defender, damageType, appliedDamage, critical,
 }) {
     if (!(appliedDamage > 0) || !world.isAlive(defender)) return;
     const ae = ensureEffects(world, defender);
     if (!ae) return;
-
-    if ((damageType === 'slash' || damageType === 'pierce') && (critical || relation === POSITION_RELATIONS.rear)) {
-        upsertTimedEffect(ae.effects, {
-            key: 'bleed',
-            turnsLeft: critical ? 4 : 3,
-            potency: critical ? 2 : 1,
-            stacks: 1,
-            sourceId: attacker,
-            startedAtTurn: world.step,
-        });
-        try { world.emit?.('combat:status:bleed', { attacker, defender, critical: !!critical }); } catch {}
-    }
 
     if (damageType === 'blunt' && appliedDamage >= 4) {
         upsertTimedEffect(ae.effects, {
@@ -256,7 +244,6 @@ function resolveHitRoll(world, {
                 damageType,
                 appliedDamage: result.amount,
                 critical: isCrit,
-                relation: positional.relation,
             });
         }
         if (!result.applied && result.reason !== 'invulnerable' && result.reason !== 'resisted') {

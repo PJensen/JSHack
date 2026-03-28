@@ -771,6 +771,34 @@ export function installMessageWiring({
     if (hit) log(`${who} bites ${tgt}.`, 'combat');
   });
 
+  world.on('proc:bleeding', ({ actor, target }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') {
+      log(`${who} opens a bleeding wound!`, 'danger');
+      return;
+    }
+    if (who === 'You') {
+      log(`You leave ${tgt} bleeding.`, 'combat');
+      return;
+    }
+    log(`${who} leaves ${tgt} bleeding.`, 'combat');
+  });
+
+  world.on('proc:hemorrhage', ({ actor, target }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') {
+      log(`${who}'s ${bracketizeName('Hemorrhage')} tears you open!`, 'danger');
+      return;
+    }
+    if (who === 'You') {
+      log(`${bracketizeName('Hemorrhage')} tears ${tgt} open.`, 'combat');
+      return;
+    }
+    log(`${who}'s ${bracketizeName('Hemorrhage')} tears ${tgt} open.`, 'combat');
+  });
+
   world.on('spell:wolf_howl', ({ actor, alertedIds }) => {
     const who = nameOfEntity(actor);
     const count = Array.isArray(alertedIds) ? alertedIds.length : 0;
