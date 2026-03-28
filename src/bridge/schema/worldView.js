@@ -42,7 +42,12 @@ import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { listProcPackages } from "../../rules/data/procPackages.js";
-import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone, perceptionToFacingConeDegrees } from "../../rules/utils/facing.js";
+import {
+	getEntityFovConeDegrees,
+	getNormalizedEntityFacing,
+	isPointInFacingCone,
+	FACING_CONE_GRID_BIAS_DEG,
+} from "../../rules/utils/facing.js";
 import { readPlayerPerceptionState } from "../../rules/utils/perceptionState.js";
 import { chebyshevDistance, hasMindForEsp, isFixedDecorationEntity, isPerceptionMonster } from "../../rules/utils/perceptionChannels.js";
 import { PERCEPTION_TUNING } from "../../rules/environment/dungeon/perceptionTuning.js";
@@ -600,7 +605,7 @@ export function buildWorldView(world) {
 		const radius = getEffectiveVisionRange(world, _view.player.id);
 		playerVisionRadius = radius;
 		const facing = getNormalizedEntityFacing(world, _view.player.id);
-		const coneDegrees = getEntityFacingConeDegrees(world, _view.player.id);
+		const coneDegrees = getEntityFovConeDegrees(world, _view.player.id);
 		const pad = 2;
 		const bounds = {
 			x0: _view.player.pos.x - radius - pad,
@@ -614,6 +619,7 @@ export function buildWorldView(world) {
 			facingDx: facing?.dx || 0,
 			facingDy: facing?.dy || 0,
 			coneDegrees,
+			coneBiasDeg: FACING_CONE_GRID_BIAS_DEG,
 		});
 	}
 
@@ -631,8 +637,7 @@ export function buildWorldView(world) {
 		: null;
 	const awarenessConeDegrees = _view.player
 		? (() => {
-			const stats = world.get(_view.player.id, BaseStats);
-			return perceptionToFacingConeDegrees(Number(stats?.perception ?? 5));
+			return getEntityFovConeDegrees(world, _view.player.id);
 		})()
 		: 360;
 
@@ -893,7 +898,7 @@ export function buildWorldView(world) {
 					rec.pos.y,
 					playerFacingForAwareness.dx,
 					playerFacingForAwareness.dy,
-					awarenessConeDegrees,
+					awarenessConeDegrees + FACING_CONE_GRID_BIAS_DEG,
 				)
 			) {
 				directVisible = false;

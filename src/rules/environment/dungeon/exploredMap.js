@@ -29,6 +29,8 @@ let _lastFacingDx = 0;
 let _lastFacingDy = 0;
 /** @type {number} */
 let _lastConeDegrees = 360;
+/** @type {number} */
+let _lastConeBiasDeg = 0;
 /** @type {((x:number,y:number)=>boolean)|null} */
 let _lastIsBlocked = null;
 
@@ -82,13 +84,14 @@ function _clearVisible() {
  * @param {number} py      - player world y
  * @param {number} radius  - vision radius
  * @param {(x:number, y:number) => boolean} isBlocked
- * @param {{ facingDx?: number, facingDy?: number, coneDegrees?: number }} [opts]
+ * @param {{ facingDx?: number, facingDy?: number, coneDegrees?: number, coneBiasDeg?: number }} [opts]
  */
 export function updateFOV(step, px, py, radius, isBlocked, opts = undefined) {
   if (_fovDisabled) return;
   const facingDx = Math.sign(Number(opts?.facingDx || 0));
   const facingDy = Math.sign(Number(opts?.facingDy || 0));
   const coneDegrees = Number(opts?.coneDegrees ?? 360);
+  const coneBiasDeg = Number(opts?.coneBiasDeg ?? 0);
   const sameInputs = (
     step === _lastStep
     && (px | 0) === _lastPx
@@ -97,6 +100,7 @@ export function updateFOV(step, px, py, radius, isBlocked, opts = undefined) {
     && facingDx === _lastFacingDx
     && facingDy === _lastFacingDy
     && coneDegrees === _lastConeDegrees
+    && coneBiasDeg === _lastConeBiasDeg
     && isBlocked === _lastIsBlocked
   );
   if (sameInputs) return;
@@ -108,11 +112,13 @@ export function updateFOV(step, px, py, radius, isBlocked, opts = undefined) {
   _lastFacingDx = facingDx;
   _lastFacingDy = facingDy;
   _lastConeDegrees = coneDegrees;
+  _lastConeBiasDeg = coneBiasDeg;
   _lastIsBlocked = isBlocked;
   _clearVisible();
-  const coneActive = (facingDx !== 0 || facingDy !== 0) && coneDegrees < 360;
+  const effectiveCone = coneDegrees + coneBiasDeg;
+  const coneActive = (facingDx !== 0 || facingDy !== 0) && effectiveCone < 360;
   computeFOV(px, py, radius, isBlocked, (x, y) => {
-    if (coneActive && !isPointInFacingCone(px, py, x, y, facingDx, facingDy, coneDegrees)) return;
+    if (coneActive && !isPointInFacingCone(px, py, x, y, facingDx, facingDy, effectiveCone)) return;
     _set(_visible, x, y);
   });
   for (const [key, visChunk] of _visible) {
@@ -150,6 +156,7 @@ export function clearExplored() {
   _lastFacingDx = 0;
   _lastFacingDy = 0;
   _lastConeDegrees = 360;
+  _lastConeBiasDeg = 0;
   _lastIsBlocked = null;
 }
 
