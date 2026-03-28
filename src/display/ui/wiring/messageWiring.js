@@ -771,6 +771,50 @@ export function installMessageWiring({
     if (hit) log(`${who} bites ${tgt}.`, 'combat');
   });
 
+  world.on('spell:rat_gnaw', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) log(`${who} gnaws at your legs, opening a bleed!`, 'danger');
+      else if (missed) log(`${who} lunges for a gnaw, but misses.`, 'danger');
+      return;
+    }
+    if (hit) log(`${who} gnaws ${tgt}.`, 'combat');
+  });
+
+  world.on('spell:goblin_dirty_trick', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) log(`${who} pulls a dirty trick and blinds you!`, 'danger');
+      else if (missed) log(`${who} tries a dirty trick, but whiffs.`, 'danger');
+      return;
+    }
+    if (hit) log(`${who} blinds ${tgt} with a dirty trick.`, 'combat');
+  });
+
+  world.on('spell:snake_fang', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) log(`${who} sinks venomous fangs into you!`, 'danger');
+      else if (missed) log(`${who} strikes with its fangs, but misses.`, 'danger');
+      return;
+    }
+    if (hit) log(`${who} bites ${tgt} with venomous fangs.`, 'combat');
+  });
+
+  world.on('spell:spider_lunge', ({ actor, targetId, hit, missed }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(targetId);
+    if (tgt === 'You') {
+      if (hit) log(`${who} lunges and staggers you!`, 'danger');
+      else if (missed) log(`${who} lunges at you, but misses.`, 'danger');
+      return;
+    }
+    if (hit) log(`${who} lunges into ${tgt}.`, 'combat');
+  });
+
   world.on('proc:bleeding', ({ actor, target }) => {
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(target);

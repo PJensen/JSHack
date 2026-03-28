@@ -133,6 +133,114 @@ Deno.test("boar_bite is an active close-range ability that weakens on hit", () =
   }
 });
 
+Deno.test("rat_gnaw is an active close-range ability that applies bleed", () => {
+  loadFlatFloor();
+  try {
+    const world = new World({ seed: 0x7a7 });
+    const rat = world.create();
+    world.add(rat, Position, { x: 4, y: 4 });
+    world.add(rat, Faction, { key: "enemy" });
+    world.add(rat, Vitality, { hp: 6, maxHp: 6 });
+
+    const target = world.create();
+    world.add(target, Position, { x: 5, y: 4 });
+    world.add(target, Faction, { key: "player" });
+    world.add(target, Vitality, { hp: 20, maxHp: 20 });
+
+    runSpellScript(world, rat, getSpell("rat_gnaw"), { targetId: target });
+
+    assert(world.get(target, Vitality).hp < 20, "rat_gnaw should deal damage");
+    const effects = world.get(target, ActiveEffects)?.effects || [];
+    assert(effects.some((e) => String(e?.key || "") === "bleed"), "rat_gnaw should apply bleed");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("goblin_dirty_trick is an active close-range ability that blinds on hit", () => {
+  loadFlatFloor();
+  try {
+    const world = new World({ seed: 0x60b11 });
+    const goblin = world.create();
+    world.add(goblin, Position, { x: 4, y: 4 });
+    world.add(goblin, Faction, { key: "enemy" });
+    world.add(goblin, Vitality, { hp: 8, maxHp: 8 });
+
+    const target = world.create();
+    world.add(target, Position, { x: 5, y: 4 });
+    world.add(target, Faction, { key: "player" });
+    world.add(target, Vitality, { hp: 20, maxHp: 20 });
+
+    runSpellScript(world, goblin, getSpell("goblin_dirty_trick"), { targetId: target });
+
+    assert(world.get(target, Vitality).hp < 20, "goblin_dirty_trick should deal damage");
+    const effects = world.get(target, ActiveEffects)?.effects || [];
+    assert(effects.some((e) => String(e?.key || "") === "blinded"), "goblin_dirty_trick should apply blinded");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("snake_fang is an active close-range ability that applies poison", () => {
+  loadFlatFloor();
+  try {
+    const world = new World({ seed: 0x5a9e });
+    const snake = world.create();
+    world.add(snake, Position, { x: 4, y: 4 });
+    world.add(snake, Faction, { key: "enemy" });
+    world.add(snake, Vitality, { hp: 6, maxHp: 6 });
+
+    const target = world.create();
+    world.add(target, Position, { x: 5, y: 4 });
+    world.add(target, Faction, { key: "player" });
+    world.add(target, Vitality, { hp: 20, maxHp: 20 });
+
+    runSpellScript(world, snake, getSpell("snake_fang"), { targetId: target });
+
+    assert(world.get(target, Vitality).hp < 20, "snake_fang should deal damage");
+    const effects = world.get(target, ActiveEffects)?.effects || [];
+    assert(effects.some((e) => String(e?.key || "") === "poison"), "snake_fang should apply poison");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("spider_lunge is an active close-range ability that applies stagger", () => {
+  loadFlatFloor();
+  try {
+    const world = new World({ seed: 0x5a1d });
+    const spider = world.create();
+    world.add(spider, Position, { x: 4, y: 4 });
+    world.add(spider, Faction, { key: "enemy" });
+    world.add(spider, Vitality, { hp: 6, maxHp: 6 });
+
+    const target = world.create();
+    world.add(target, Position, { x: 5, y: 4 });
+    world.add(target, Faction, { key: "player" });
+    world.add(target, Vitality, { hp: 20, maxHp: 20 });
+
+    runSpellScript(world, spider, getSpell("spider_lunge"), { targetId: target });
+
+    assert(world.get(target, Vitality).hp < 20, "spider_lunge should deal damage");
+    const effects = world.get(target, ActiveEffects)?.effects || [];
+    assert(effects.some((e) => String(e?.key || "") === "stagger"), "spider_lunge should apply stagger");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("early tier-0 enemies expose active ability kits", () => {
+  const rat = getMonster("rat");
+  const goblin = getMonster("goblin");
+  const snake = getMonster("snake");
+  const spider = getMonster("cave_spider");
+
+  assert(Array.isArray(rat?.learnedSpellIds) && rat.learnedSpellIds.includes("rat_gnaw"), "rat should know rat_gnaw");
+  assert(Array.isArray(goblin?.learnedSpellIds) && goblin.learnedSpellIds.includes("goblin_dirty_trick"), "goblin should know goblin_dirty_trick");
+  assert(Array.isArray(snake?.learnedSpellIds) && snake.learnedSpellIds.includes("snake_fang"), "snake should know snake_fang");
+  assert(Array.isArray(spider?.learnedSpellIds) && spider.learnedSpellIds.includes("spider_lunge"), "cave_spider should know spider_lunge");
+});
+
 Deno.test("bat_shriek confuses nearby hostiles and alerts nearby allies", () => {
   loadFlatFloor();
   try {
