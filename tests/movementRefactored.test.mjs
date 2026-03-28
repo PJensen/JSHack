@@ -126,6 +126,31 @@ Deno.test("movementSystem: facing turn cost consumes turn when direction changes
     assertEquals(pos.y, 5, "position should not change when turning in place");
     assertEquals(f.dx, 0, "facing should update to requested direction");
     assertEquals(f.dy, 1, "facing should update to requested direction");
+    assertEquals(world.has(id, MoveIntent), false, "turn-in-place should consume MoveIntent");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: facing turn does not leak movement into later turns", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    setFacingTurnCostEnabled(world, true);
+    const id = world.create();
+    world.add(id, Position, { x: 5, y: 5 });
+    world.add(id, Facing, { dx: 1, dy: 0 });
+    world.add(id, MoveIntent, { dx: 0, dy: 1 });
+
+    movementSystem(world);
+    let pos = world.get(id, Position);
+    assertEquals(pos.x, 5);
+    assertEquals(pos.y, 5);
+    assertEquals(world.has(id, MoveIntent), false, "turn-in-place should clear MoveIntent immediately");
+
+    // Next tick without a new move intent must not move the actor.
+    movementSystem(world);
+    pos = world.get(id, Position);
+    assertEquals(pos.x, 5);
+    assertEquals(pos.y, 5);
   } finally { clearAll(); }
 });
 
