@@ -7,7 +7,7 @@ import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
-import { FACING_TURN_COST_ENABLED_KEY, FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing } from "./rules/utils/facing.js";
+import { FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing, setFacingTurnCostEnabled } from "./rules/utils/facing.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
@@ -260,7 +260,7 @@ const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSee
 const world = new World({ seed: _bootSeed });
 setFovDisabled(runtimeConfig.disableFov === true);
 world[FOV_CONE_DISABLED_KEY] = runtimeConfig.disableFovCone === true;
-world[FACING_TURN_COST_ENABLED_KEY] = runtimeConfig.facingTurnCost === true;
+setFacingTurnCostEnabled(world, runtimeConfig.facingTurnCost === true);
 configureWorld(world);
 import { installChannelingController } from "./main/channelingController.js";
 installChannelingController(world, () => (playerEntity(world)?.id || 0));
