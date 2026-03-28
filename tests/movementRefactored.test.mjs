@@ -19,7 +19,7 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { movementSystem, installSpiderWebListener } from "../src/rules/systems/movementSystem.js";
 import { installBumpInteractListener } from "../src/rules/systems/interactionSystem.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
-import { FACING_TURN_COST_ENABLED_KEY } from "../src/rules/utils/facing.js";
+import { setFacingTurnCostEnabled } from "../src/rules/utils/facing.js";
 import { loadChunk, clearAll, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_TREE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 
@@ -112,7 +112,7 @@ Deno.test("movementSystem: facing turn cost consumes turn when direction changes
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
-    world[FACING_TURN_COST_ENABLED_KEY] = true;
+    setFacingTurnCostEnabled(world, true);
     const id = world.create();
     world.add(id, Position, { x: 5, y: 5 });
     world.add(id, Facing, { dx: 1, dy: 0 });
@@ -133,7 +133,7 @@ Deno.test("movementSystem: facing turn cost disabled keeps move+look in same tur
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
-    world[FACING_TURN_COST_ENABLED_KEY] = false;
+    setFacingTurnCostEnabled(world, false);
     const id = world.create();
     world.add(id, Position, { x: 5, y: 5 });
     world.add(id, Facing, { dx: 1, dy: 0 });

@@ -1,13 +1,12 @@
 import { Facing } from "../components/Facing.js";
 import { BaseStats } from "../components/BaseStats.js";
+import { FacingRules } from "../components/FacingRules.js";
 
-export const FACING_CONE_BASE_DEG = 120;
-export const FACING_CONE_PERCEPTION_BASELINE = 5;
-export const FACING_CONE_DEG_PER_PERCEPTION = 10;
-export const FACING_CONE_MIN_DEG = 30;
-export const FACING_CONE_MAX_DEG = 180;
+export const FACING_CONE_BASE_DEG = 200;
+export const FACING_CONE_FALLBACK_PERCEPTION = 5;
+export const FACING_CONE_MIN_DEG = 200;
+export const FACING_CONE_MAX_DEG = 200;
 export const FOV_CONE_DISABLED_KEY = Symbol.for("jshack:debug:fovCone:disabled");
-export const FACING_TURN_COST_ENABLED_KEY = Symbol.for("jshack:facing:turnCost:enabled");
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
@@ -39,7 +38,7 @@ export function getNormalizedEntityFacing(world, entityId) {
 }
 
 /**
- * @param {number} perception
+ * @param {number} _perception - Reserved for future perception-based scaling.
  * @param {{
  *   baseDeg?: number,
  *   baseline?: number,
@@ -48,15 +47,13 @@ export function getNormalizedEntityFacing(world, entityId) {
  *   maxDeg?: number,
  * }} [opts]
  */
-export function perceptionToFacingConeDegrees(perception, opts = {}) {
+export function perceptionToFacingConeDegrees(_perception, opts = {}) {
+  const hasOverrides = opts.baseDeg != null || opts.minDeg != null || opts.maxDeg != null;
+  if (!hasOverrides) return FACING_CONE_BASE_DEG;
   const baseDeg = Number(opts.baseDeg ?? FACING_CONE_BASE_DEG);
-  const baseline = Number(opts.baseline ?? FACING_CONE_PERCEPTION_BASELINE);
-  const degPerPoint = Number(opts.degPerPoint ?? FACING_CONE_DEG_PER_PERCEPTION);
   const minDeg = Number(opts.minDeg ?? FACING_CONE_MIN_DEG);
   const maxDeg = Number(opts.maxDeg ?? FACING_CONE_MAX_DEG);
-  const p = Number(perception ?? baseline);
-  const cone = baseDeg + ((p - baseline) * degPerPoint);
-  return clamp(cone, minDeg, maxDeg);
+  return clamp(baseDeg, minDeg, maxDeg);
 }
 
 /**
@@ -74,10 +71,47 @@ export function perceptionToFacingConeDegrees(perception, opts = {}) {
 export function getEntityFacingConeDegrees(world, entityId, opts = {}) {
   if (world?.[FOV_CONE_DISABLED_KEY]) return 360;
   const id = Number(entityId || 0) | 0;
-  const fallbackPerception = Number(opts.fallbackPerception ?? FACING_CONE_PERCEPTION_BASELINE);
+  const fallbackPerception = Number(opts.fallbackPerception ?? FACING_CONE_FALLBACK_PERCEPTION);
   const baseStats = (id > 0) ? world.get(id, BaseStats) : null;
   const perception = Number(baseStats?.perception ?? fallbackPerception);
   return perceptionToFacingConeDegrees(perception, opts);
+}
+
+/**
+ * Canonical facing turn-cost read path.
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ */
+export function isFacingTurnCostEnabled(world) {
+  for (const [, rules] of world.query(FacingRules)) {
+    return rules?.turnCostEnabled === true;
+  }
+  return false;
+}
+
+/**
+ * Canonical facing turn-cost write path.
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {boolean} enabled
+ */
+export function setFacingTurnCostEnabled(world, enabled) {
+  const value = enabled === true;
+  /** @type {number[]} */
+  const ids = [];
+  for (const [id] of world.query(FacingRules)) ids.push(id);
+  if (ids.length === 0) {
+    const created = world.create();
+    world.add(created, FacingRules, { turnCostEnabled: value });
+    return created;
+  }
+  const firstId = ids[0];
+  const firstRules = world.get(firstId, FacingRules);
+  if (!firstRules || firstRules.turnCostEnabled !== value) {
+    world.set(firstId, FacingRules, { turnCostEnabled: value });
+  }
+  for (let i = 1; i < ids.length; i++) {
+    world.remove(ids[i], FacingRules);
+  }
+  return firstId;
 }
 
 /**
