@@ -115,6 +115,12 @@ const hostileMelee = {
   },
   resolve(world, actor, ctx) {
     if (world.has(actor, AttackIntent)) return;
+    emitSafe(world, "combat:telegraph", {
+      actor,
+      target: ctx.target,
+      mode: "melee",
+      turns: 0,
+    });
     // Emit out-of-reach when target is flying and attacker is grounded
     if (world.has(ctx.target, Flying) && !world.has(actor, Flying)) {
       emitSafe(world, "combat:target-flying", { attacker: actor, target: ctx.target });

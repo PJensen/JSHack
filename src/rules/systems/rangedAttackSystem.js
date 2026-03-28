@@ -11,6 +11,8 @@ import { Faction } from '../components/Faction.js';
 import { Position } from '../components/Position.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Player } from '../components/Player.js';
+import { ActiveEffects } from '../components/ActiveEffects.js';
+import { COMBAT_POSTURES } from '../components/CombatPosture.js';
 import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
@@ -33,6 +35,9 @@ import {
 } from '../utils/blindnessExposure.js';
 import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
+import { getPositionalAttackBonus, POSITION_RELATIONS } from '../utils/combatPositioning.js';
+import { setCombatPosture } from '../utils/posture.js';
+import { upsertTimedEffect } from '../utils/effectSemantics.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -40,6 +45,14 @@ const RANGED_PROJECTILE_MAX_DURATION = 0.4;
 const EMBEDDED_ARROW_RECOVERY_CHANCE = 0.22;
 const BLUNT_ARROW_SPEED_MULT = 0.9;
 const PIERCING_ARROW_SPEED_MULT = 1.1;
+
+function ensureEffects(world, entityId) {
+  let ae = world.get(entityId, ActiveEffects);
+  if (ae && Array.isArray(ae.effects)) return ae;
+  try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
+  ae = world.get(entityId, ActiveEffects);
+  return (ae && Array.isArray(ae.effects)) ? ae : null;
+}
 
 function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
   const dx = Number(to?.x || 0) - Number(from?.x || 0);
@@ -203,13 +216,15 @@ export function rangedAttackSystem(world) {
         regenCooldown: STAMINA_REGEN_COOLDOWN,
       });
     }
+    setCombatPosture(world, attacker, COMBAT_POSTURES.aggressive, { reason: 'attack:ranged' });
 
     // d20 roll
     const atkSnapshot = resolveCombatSnapshot(world, attacker, { mode: 'ranged' });
     const defSnapshot = resolveCombatSnapshot(world, defender, { mode: 'ranged' });
+    const positional = getPositionalAttackBonus(world, attacker, defender);
     const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
     breakStealthOnOffense(world, attacker, { reason: 'attack', mode: 'ranged', targetId: defender });
-    const attackBonus = atkSnapshot.attackBonus;
+    const attackBonus = atkSnapshot.attackBonus + positional.attackBonus;
     const armorClass = defSnapshot.armorClass;
     const rangePenalty = Math.floor(dist / 3);
     let armorPenetration = Math.max(0, Number(atkSnapshot.physicalPenetration || 0))
@@ -252,6 +267,10 @@ export function rangedAttackSystem(world) {
     const damageRoll = rollDice(baseDice, r);
     const flatBonus = atkSnapshot.damageFlatBonus;
     let dmg = Math.max(1, damageRoll + flatBonus);
+    dmg = Math.max(1, Math.floor(dmg * positional.damageMult));
+    if ((Number(atkSnapshot?.posture?.lastMoveStep ?? -1) | 0) === (Number(world.step || 0) | 0)) {
+      dmg += 1; // movement commitment momentum
+    }
 
     // Secondary crit check: critChanceDerived (decimal) + luck (integer %)
     if (!isCrit) {
@@ -273,7 +292,7 @@ export function rangedAttackSystem(world) {
       damageType,
       crit: isCrit,
       scratch: procScratch,
-      tags: ['ranged', 'projectile'],
+      tags: ['ranged', 'projectile', `relation:${positional.relation}`],
     }), () => r(), { excludeSlots: ['weapon', 'offhand'] });
 
     const actorImpactCtx = runAmmoScripts(world, ammoIdentity, 'onProjectileActorImpact', {
@@ -307,7 +326,7 @@ export function rangedAttackSystem(world) {
       damageType,
       crit: isCrit,
       scratch: procScratch,
-      tags: ['ranged', 'projectile'],
+      tags: ['ranged', 'projectile', `relation:${positional.relation}`],
     }), () => r(), { excludeSlots: ['weapon', 'offhand'] });
     applyReactionProcPhase(world, defender, buildProcContext('onHit', {
       source: attacker,
@@ -317,7 +336,7 @@ export function rangedAttackSystem(world) {
       damageType,
       crit: isCrit,
       scratch: procScratch,
-      tags: ['ranged', 'projectile'],
+      tags: ['ranged', 'projectile', `relation:${positional.relation}`],
     }), { excludeSlots: ['weapon'] });
 
     // Apply damage through canonical pipeline
@@ -337,6 +356,21 @@ export function rangedAttackSystem(world) {
         RANGED_PROJECTILE_MAX_DURATION,
       ),
     });
+    if (result.applied && (damageType === 'pierce' || damageType === 'slash')
+      && (isCrit || positional.relation === POSITION_RELATIONS.rear)) {
+      const ae = ensureEffects(world, defender);
+      if (ae) {
+        upsertTimedEffect(ae.effects, {
+          key: 'bleed',
+          turnsLeft: isCrit ? 4 : 3,
+          potency: isCrit ? 2 : 1,
+          stacks: 1,
+          sourceId: attacker,
+          startedAtTurn: world.step,
+        });
+        try { world.emit?.('combat:status:bleed', { attacker, defender, critical: !!isCrit }); } catch {}
+      }
+    }
 
     if (actorImpactCtx) {
       actorImpactCtx.resolveDamageResult(result);

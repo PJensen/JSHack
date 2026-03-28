@@ -44,6 +44,7 @@ export function createHudFeeds(world, deps) {
     affixSig: "",
     ammo: -1,
     coatingSig: "",
+    posture: "",
   };
   let lastDepth = -1;
   let lastTurn = -1;
@@ -108,6 +109,7 @@ export function createHudFeeds(world, deps) {
     const luck = Number(combat?.luck ?? canonical?.luck ?? 0);
     const armorClass = Number(combat?.armorClass ?? (10 + def));
     const critPct = (Number(combat?.critChance ?? canonical?.critChancePhysical ?? 0) * 100) + luck;
+    const posture = String(combat?.posture?.stance || "balanced");
     const mitigation = Number(canonical?.mitigation ?? 0);
     const wInfo = wid ? world.get(wid, ItemInfo) : null;
     const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
@@ -189,8 +191,8 @@ export function createHudFeeds(world, deps) {
     if (lastCombatHud.weaponId !== wid || lastCombatHud.rangedId !== rangedId || lastCombatHud.rangedCount !== rangedCount ||
       lastCombatHud.atk !== atk || lastCombatHud.def !== def || lastCombatHud.luck !== luck ||
       lastCombatHud.ac !== armorClass || lastCombatHud.critPct !== critPct ||
-      lastCombatHud.statusSig !== statusSig || lastCombatHud.affixSig !== affixSig || lastCombatHud.ammo !== ammo || lastCombatHud.coatingSig !== coatingSig) {
-      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, luck, ac: armorClass, critPct, statusSig, affixSig, ammo, coatingSig };
+      lastCombatHud.statusSig !== statusSig || lastCombatHud.affixSig !== affixSig || lastCombatHud.ammo !== ammo || lastCombatHud.coatingSig !== coatingSig || lastCombatHud.posture !== posture) {
+      lastCombatHud = { weaponId: wid, rangedId, rangedCount, atk, def, luck, ac: armorClass, critPct, statusSig, affixSig, ammo, coatingSig, posture };
       try {
         window.dispatchEvent(new CustomEvent("ui:updateCombatHUD", { detail: {
           attack: atk,
@@ -201,6 +203,7 @@ export function createHudFeeds(world, deps) {
           luck,
           armorClass,
           critChancePercent: critPct,
+          posture,
           statuses,
           affixes: affixNames,
           ammo,

@@ -89,6 +89,7 @@ export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   pray: Object.freeze({ col: '3', row: '1' }),
   shoot: Object.freeze({ col: '1', row: '2' }),
   quickInteract: Object.freeze({ col: '2', row: '2' }),
+  posture: Object.freeze({ col: '3', row: '2' }),
   wait: Object.freeze({ col: '6', row: '2' }),
   pinnedQuickSlots: Object.freeze({ col: '4 / 6', row: '1 / 3' }),
 });
@@ -474,6 +475,18 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:quickInteract')); } catch (e) { console.debug('[hud] dispatch ui:quickInteract:', e); }
   });
 
+  const postureBtn = document.createElement('button');
+  postureBtn.id = 'btn-posture';
+  postureBtn.textContent = 'Posture';
+  Object.assign(postureBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  postureBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:cyclePosture')); } catch (e) { console.debug('[hud] dispatch ui:cyclePosture:', e); }
+  });
+
   // Search/Wait button
   // Short tap → search action (reveals hidden traps, etc.)
   // Long hold (≥500ms) → continuously emit wait at 222ms intervals while held
@@ -630,6 +643,9 @@ export function initHUD() {
     zap: '\u26A1',            // ⚡
     pray: '\u{1F64F}',        // 🙏
     door: '\u{1F6AA}',        // 🚪
+    postureBalanced: '\u2696',   // ⚖
+    postureAggressive: '\u2694', // ⚔
+    postureGuarded: '\u{1F6E1}', // 🛡
     wait: '\u23F3',           // ⏳ (kept for backward compat; button now uses 'search')
     search: '\u{1F50D}',      // 🔍
     bug: '\u{1F47E}',         // 👾
@@ -757,7 +773,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, bagBtn, petBtn, castBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, waitBtn];
+  const commandButtons = [charBtn, bagBtn, petBtn, castBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, postureBtn, waitBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -841,6 +857,7 @@ export function initHUD() {
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopLabel(quickInteractBtn, 'Door'); setMobileLabel(quickInteractBtn, 'Door');
+  setDesktopLabel(postureBtn, 'Posture: Balanced'); setMobileLabel(postureBtn, 'Posture');
   setDesktopLabel(waitBtn, 'Search'); setMobileLabel(waitBtn, 'Search');
   setDesktopIcon(charBtn, ACTION_ICONS.character); setMobileIcon(charBtn, ACTION_ICONS.character);
   setDesktopIcon(bagBtn, ACTION_ICONS.bag); setMobileIcon(bagBtn, ACTION_ICONS.bag);
@@ -850,6 +867,7 @@ export function initHUD() {
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
   setDesktopIcon(quickInteractBtn, ACTION_ICONS.door); setMobileIcon(quickInteractBtn, ACTION_ICONS.door);
+  setDesktopIcon(postureBtn, ACTION_ICONS.postureBalanced); setMobileIcon(postureBtn, ACTION_ICONS.postureBalanced);
   setDesktopIcon(waitBtn, ACTION_ICONS.search); setMobileIcon(waitBtn, ACTION_ICONS.search);
   setBarLabel(charBtn, 'Char');
   setBarLabel(bagBtn, 'Bag');
@@ -859,6 +877,7 @@ export function initHUD() {
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
   setBarLabel(quickInteractBtn, 'Door');
+  setBarLabel(postureBtn, 'Posture');
   setBarLabel(waitBtn, 'Search');
   charBtn.dataset.keyHint = 'c';
   bagBtn.dataset.keyHint = 'i';
@@ -868,6 +887,7 @@ export function initHUD() {
   shootBtn.dataset.keyHint = 'r';
   prayBtn.dataset.keyHint = 'P';
   quickInteractBtn.dataset.keyHint = 'o';
+  postureBtn.dataset.keyHint = 'v';
   waitBtn.dataset.keyHint = '.';
 
   let pinSlots = null;
@@ -919,6 +939,8 @@ export function initHUD() {
       prayBtn.style.gridRow = area.pray.row;
       quickInteractBtn.style.gridColumn = area.quickInteract.col;
       quickInteractBtn.style.gridRow = area.quickInteract.row;
+      postureBtn.style.gridColumn = area.posture.col;
+      postureBtn.style.gridRow = area.posture.row;
       waitBtn.style.gridColumn = area.wait.col;
       waitBtn.style.gridRow = area.wait.row;
       shootBtn.style.gridColumn = area.shoot.col;
@@ -1073,6 +1095,7 @@ export function initHUD() {
     const ranged = e?.detail?.ranged || null;
     const statuses = Array.isArray(e?.detail?.statuses) ? e.detail.statuses : [];
     const affixes = Array.isArray(e?.detail?.affixes) ? e.detail.affixes : [];
+    const posture = String(e?.detail?.posture || 'balanced').toLowerCase();
 
     const rangedCount = Math.max(0, Number(ranged?.count || 0) | 0);
     const ammoCount = Math.max(0, Number(e?.detail?.ammo ?? 0) | 0);
@@ -1089,6 +1112,29 @@ export function initHUD() {
     setMobileLabel(shootBtn, rangedLabel);
     setDesktopIcon(shootBtn, rangedIcon);
     setMobileIcon(shootBtn, rangedIcon);
+
+    if (posture === 'aggressive') {
+      setDesktopLabel(postureBtn, 'Posture: Aggressive');
+      setMobileLabel(postureBtn, 'Aggressive');
+      setDesktopIcon(postureBtn, ACTION_ICONS.postureAggressive);
+      setMobileIcon(postureBtn, ACTION_ICONS.postureAggressive);
+      setBarLabel(postureBtn, 'Aggro');
+      postureBtn.style.borderColor = '#69412a';
+    } else if (posture === 'guarded') {
+      setDesktopLabel(postureBtn, 'Posture: Guarded');
+      setMobileLabel(postureBtn, 'Guarded');
+      setDesktopIcon(postureBtn, ACTION_ICONS.postureGuarded);
+      setMobileIcon(postureBtn, ACTION_ICONS.postureGuarded);
+      setBarLabel(postureBtn, 'Guard');
+      postureBtn.style.borderColor = '#2a4f69';
+    } else {
+      setDesktopLabel(postureBtn, 'Posture: Balanced');
+      setMobileLabel(postureBtn, 'Balanced');
+      setDesktopIcon(postureBtn, ACTION_ICONS.postureBalanced);
+      setMobileIcon(postureBtn, ACTION_ICONS.postureBalanced);
+      setBarLabel(postureBtn, 'Balance');
+      postureBtn.style.borderColor = '#2d3b52';
+    }
     refreshCommandLabels();
 
     // Effects stack (badges + pie timers)
@@ -1292,6 +1338,7 @@ export function initHUD() {
   bar.appendChild(shootBtn);
   bar.appendChild(prayBtn);
   bar.appendChild(quickInteractBtn);
+  bar.appendChild(postureBtn);
   bar.appendChild(waitBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
@@ -1325,7 +1372,7 @@ export function initHUD() {
     obs.observe(bar);
   }
 
-  return { castBtn, charBtn, bagBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, waitBtn, petBtn };
+  return { castBtn, charBtn, bagBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, postureBtn, waitBtn, petBtn };
 }
 
 // --- Effects Stack (status badges with pie timers) -------------------------
