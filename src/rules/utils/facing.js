@@ -1,11 +1,13 @@
 import { Facing } from "../components/Facing.js";
 import { BaseStats } from "../components/BaseStats.js";
 import { FacingRules } from "../components/FacingRules.js";
+import { Brain } from "../components/Brain.js";
 
 export const FACING_CONE_BASE_DEG = 200;
 export const FACING_CONE_FALLBACK_PERCEPTION = 5;
 export const FACING_CONE_MIN_DEG = 200;
 export const FACING_CONE_MAX_DEG = 200;
+export const FACING_CONE_GRID_BIAS_DEG = 8;
 export const FOV_CONE_DISABLED_KEY = Symbol.for("jshack:debug:fovCone:disabled");
 
 function clamp(n, lo, hi) {
@@ -75,6 +77,31 @@ export function getEntityFacingConeDegrees(world, entityId, opts = {}) {
   const baseStats = (id > 0) ? world.get(id, BaseStats) : null;
   const perception = Number(baseStats?.perception ?? fallbackPerception);
   return perceptionToFacingConeDegrees(perception, opts);
+}
+
+/**
+ * Canonical FOV cone read path.
+ * Supports per-entity override via Brain.fovConeDegrees.
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} entityId
+ * @param {{
+ *   fallbackPerception?: number,
+ *   baseDeg?: number,
+ *   baseline?: number,
+ *   degPerPoint?: number,
+ *   minDeg?: number,
+ *   maxDeg?: number,
+ * }} [opts]
+ */
+export function getEntityFovConeDegrees(world, entityId, opts = {}) {
+  if (world?.[FOV_CONE_DISABLED_KEY]) return 360;
+  const id = Number(entityId || 0) | 0;
+  if (id > 0) {
+    const brain = world.get(id, Brain);
+    const override = Number(brain?.fovConeDegrees);
+    if (Number.isFinite(override) && override > 0) return clamp(override, 0, 360);
+  }
+  return getEntityFacingConeDegrees(world, id, opts);
 }
 
 /**

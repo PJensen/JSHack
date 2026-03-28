@@ -8,6 +8,7 @@ export const Brain = defineComponent(
         seenTiles: new Uint8Array(),
         intelligence: 10,
         visionRange: 8,
+        fovConeDegrees: null,
     },
     {
         validate(rec) {
