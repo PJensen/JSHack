@@ -411,6 +411,9 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'potion' && !POTION_GLOW_DISABLED_KINDS.has(String(kind || ''))) {
 		if (!rec.tags.includes('potion_glow')) rec.tags.push('potion_glow');
 	}
+	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'currency') {
+		if (!rec.tags.includes('gold_glow')) rec.tags.push('gold_glow');
+	}
 	if (!itemInfo || !Array.isArray(itemInfo.affixes)) return;
 	const affixes = itemInfo.affixes;
 	const hasAffix = (key) => affixes.includes(key) || affixes.includes(`affix:${key}`);
@@ -957,6 +960,10 @@ export function buildWorldView(world) {
 		}
 		if (!_view.player) continue;
 		if (isFixedDecorationEntity(world, rec.id) && isExplored(rec.pos.x, rec.pos.y)) {
+			_view.entities.push(makePerceptionEcho(rec, ["memory_recent", "memory_fixed"], rec.pos));
+			continue;
+		}
+		if (world.has(rec.id, ItemInfo) && isExplored(rec.pos.x, rec.pos.y)) {
 			_view.entities.push(makePerceptionEcho(rec, ["memory_recent", "memory_fixed"], rec.pos));
 			continue;
 		}
