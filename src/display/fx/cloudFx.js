@@ -1127,5 +1127,19 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
   }
 
-  return { tick, drawFire, drawPoison, drawPlasma, drawQuake, drawBurnPlumes, installListeners };
+  /** Return active light sources for the lighting engine. */
+  function getActiveLights() {
+    const out = [];
+    // Fire clouds emit flickering orange light
+    for (const [, cloud] of _fireCloudFx) {
+      out.push({ x: cloud.x, y: cloud.y, radius: (cloud.radius || 1) * 2 + 2, color: [255, 120, 40] });
+    }
+    // Plasma clouds emit blue-white light
+    for (const [, cloud] of _plasmaCloudFx) {
+      out.push({ x: cloud.x, y: cloud.y, radius: (cloud.radius || 1) * 2 + 2, color: [140, 180, 255] });
+    }
+    return out;
+  }
+
+  return { tick, drawFire, drawPoison, drawPlasma, drawQuake, drawBurnPlumes, getActiveLights, installListeners };
 }

@@ -68,7 +68,7 @@ import {
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0 };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -543,6 +543,7 @@ export function buildWorldView(world) {
 	_view.engravings.length = 0;
 	_view.weather = "clear";
 	_view.playerSheltered = false;
+	_view.isOverworld = false;
 	_allEntities.length = 0;
 	const collectedIds = new Set();
 
@@ -554,6 +555,7 @@ export function buildWorldView(world) {
 		_isOverworld = (ds.currentDepth === 0 || ds.profileType === "overworld");
 		break;
 	}
+	_view.isOverworld = _isOverworld;
 	for (const [, ws] of world.query(WeatherState)) {
 		_view.weather = ws.current || "clear";
 		break;

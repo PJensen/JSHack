@@ -48,7 +48,7 @@ import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/qu
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
-import { collectLightSources, collectFxLights } from "./display/lighting/sources/index.js";
+import { collectLightSources, collectFxLights, computeAmbient } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
@@ -5475,7 +5475,8 @@ function render(worldView) {
   if (PERF.quality !== 'low') {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime });
     collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx }, _fxTime);
-    lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1);
+    const _ambient = computeAmbient(worldView);
+    lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1, _ambient);
   }
 
   drawWorldEffects({
@@ -5559,34 +5560,33 @@ function render(worldView) {
   // Heavy rain dark tint overlay (also suppressed indoors)
   weatherFx.drawScreenTint(ctx, W, H, effectiveWeather);
 
-  // Night darkness tint (overworld only, smooth dawn/dusk transitions)
-  if (worldView.nightAlpha > 0.01) {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = `rgba(8, 12, 28, ${(worldView.nightAlpha * 0.38).toFixed(3)})`;
-    // Use physical canvas dimensions so the tint covers the full canvas on
-    // high-DPR (mobile) screens where canvas.width = cssW * dpr > W.
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  }
-  // Dawn warm tint — golden-amber, bell-curve peak at mid-dawn
-  if (worldView.dawnAlpha > 0.01) {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = `rgba(255, 150, 40, ${(worldView.dawnAlpha * 0.16).toFixed(3)})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  }
-  // Dusk warm tint — orange-red, bell-curve peak at mid-dusk
-  if (worldView.duskAlpha > 0.01) {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = `rgba(210, 70, 20, ${(worldView.duskAlpha * 0.16).toFixed(3)})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
+  // Night / dawn / dusk tints replaced by lighting engine ambient (sun/moon).
+  // Falls back to CSS tints on quality=low where the engine is disabled.
+  if (PERF.quality === 'low') {
+    if (worldView.nightAlpha > 0.01) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = `rgba(8, 12, 28, ${(worldView.nightAlpha * 0.38).toFixed(3)})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+    if (worldView.dawnAlpha > 0.01) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = `rgba(255, 150, 40, ${(worldView.dawnAlpha * 0.16).toFixed(3)})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+    if (worldView.duskAlpha > 0.01) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = `rgba(210, 70, 20, ${(worldView.duskAlpha * 0.16).toFixed(3)})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
   }
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.

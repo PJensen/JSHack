@@ -808,5 +808,64 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
   }
 
-  return { tick, draw, installListeners };
+  /** Return active light sources for the lighting engine. */
+  function getActiveLights() {
+    const out = [];
+    // Shadow bolts — purple glow
+    for (let i = 0; i < _sboltFx.length; i++) {
+      const sb = _sboltFx[i];
+      const u = sb.progress;
+      out.push({
+        x: sb.from.x + (sb.to.x - sb.from.x) * u,
+        y: sb.from.y + (sb.to.y - sb.from.y) * u,
+        radius: 4, color: [160, 80, 220],
+      });
+    }
+    // Fireballs — orange glow
+    for (let i = 0; i < _fireballFx.length; i++) {
+      const fb = _fireballFx[i];
+      const u = fb.progress;
+      out.push({
+        x: fb.from.x + (fb.to.x - fb.from.x) * u,
+        y: fb.from.y + (fb.to.y - fb.from.y) * u,
+        radius: 5, color: [255, 140, 50],
+      });
+    }
+    // Frost bolts — cool blue glow
+    for (let i = 0; i < _frostboltFx.length; i++) {
+      const fb = _frostboltFx[i];
+      const u = fb.progress;
+      out.push({
+        x: fb.from.x + (fb.to.x - fb.from.x) * u,
+        y: fb.from.y + (fb.to.y - fb.from.y) * u,
+        radius: 4, color: [140, 200, 255],
+      });
+    }
+    // Ricochet — holy gold
+    for (let i = 0; i < _ricochetFx.length; i++) {
+      const r = _ricochetFx[i];
+      const u = r.progress;
+      out.push({
+        x: r.from.x + (r.to.x - r.from.x) * u,
+        y: r.from.y + (r.to.y - r.from.y) * u,
+        radius: 4, color: [255, 240, 180],
+      });
+    }
+    // Impacts
+    for (let i = 0; i < _sboltImpact.length; i++) {
+      const imp = _sboltImpact[i];
+      out.push({ x: imp.x, y: imp.y, radius: 3 * imp.alpha, color: [160, 80, 220] });
+    }
+    for (let i = 0; i < _fireballImpact.length; i++) {
+      const imp = _fireballImpact[i];
+      out.push({ x: imp.x, y: imp.y, radius: 4 * imp.alpha, color: [255, 140, 50] });
+    }
+    for (let i = 0; i < _frostboltImpact.length; i++) {
+      const imp = _frostboltImpact[i];
+      out.push({ x: imp.x, y: imp.y, radius: 3 * imp.alpha, color: [140, 200, 255] });
+    }
+    return out;
+  }
+
+  return { tick, draw, getActiveLights, installListeners };
 }
