@@ -4,12 +4,35 @@
 
 /** @typedef {import('../engine.js').LightDef} LightDef */
 
+import { basePalette } from '../palette/base.js';
+
 // Mirror of rules/data/calendar.TURNS_PER_DAY — display layer cannot import
 // rules directly.  The bridge (worldView) normalises time into turnInDay so
 // this constant is only needed for the sun/moon arc boundaries below.
 const TURNS_PER_DAY = 720;
 
+// ---- Palette glow lookup ------------------------------------------------
+
+/** Convert "#rrggbb" or "#rgb" hex to [R, G, B] (0-255). */
+function hexToRGB(hex) {
+  if (!hex) return null;
+  const h = hex.replace('#', '');
+  if (h.length === 3) return [parseInt(h[0]+h[0],16), parseInt(h[1]+h[1],16), parseInt(h[2]+h[2],16)];
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+/** Cache palette glow colours as RGB arrays. */
+const _glowCache = new Map();
+function paletteGlow(kind) {
+  if (_glowCache.has(kind)) return _glowCache.get(kind);
+  const entry = basePalette[kind];
+  const rgb = entry?.glow ? hexToRGB(entry.glow) : null;
+  _glowCache.set(kind, rgb);
+  return rgb;
+}
+
 // ---- Colour palettes for light sources ----------------------------------
+// Explicit constants for effects that don't map 1:1 to a palette entry.
 const EYE_LIGHT    = [50, 50, 65];      // dim neutral sight (player vision range)
 const WARM_ORANGE  = [255, 190, 120];   // player torch / generic torch
 const LANTERN_GOLD = [255, 210, 140];   // lantern — slightly brighter, warmer
@@ -21,14 +44,6 @@ const VENOM_GREEN  = [120, 255, 80];    // venom / poison glow
 const HOLY_GOLD    = [255, 240, 180];   // invulnerable / divine
 const CAUSTIC_LIME = [180, 255, 60];    // caustic effects
 const SHADOW_PURPLE = [160, 80, 220];   // shadow / agony magic
-const EPIC_VIOLET  = [200, 100, 255];   // epic rarity
-const RARE_BLUE    = [100, 160, 255];   // rare rarity
-const POTION_TEAL  = [120, 220, 200];   // potion shimmer
-const FOUNTAIN_BLUE = [100, 180, 230];  // water / fountain
-const ALTAR_PURPLE = [200, 150, 255];   // altar / shrine divine
-const SHRINE_GOLD  = [255, 220, 100];   // shrine warm glow
-const MUSHROOM_CYAN = [80, 200, 160];   // bioluminescent fungi
-const STAIR_GREY   = [160, 170, 190];   // mysterious passage
 
 /**
  * Torch flicker — deterministic per-entity wobble + random jitter.
@@ -90,6 +105,10 @@ export function collectLightSources(view, opts = {}) {
       const e = view.entities[i];
       if ((Number(e.id || 0) | 0) === playerId) continue; // player handled above
       const tags = Array.isArray(e.tags) ? e.tags : null;
+      // Memory echoes (explored but not currently visible) must not emit light.
+      // The player remembers the decoration is there, but it shouldn't illuminate.
+      if (tags && (tags.includes('memory_fixed') || tags.includes('memory_recent')
+                || tags.includes('memory_esp') || tags.includes('memory_thermal'))) continue;
       const ex = e.pos.x, ey = e.pos.y;
       const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
       const kind = (typeof e.kind === 'string') ? e.kind.toLowerCase() : '';
@@ -110,15 +129,15 @@ export function collectLightSources(view, opts = {}) {
 
       // Dungeon furniture — subtle atmospheric lighting
       if (kind === 'fountain') {
-        out.push({ x: ex, y: ey, radius: 3, color: FOUNTAIN_BLUE });
+        out.push({ x: ex, y: ey, radius: 2.5, color: FOUNTAIN_BLUE });
         continue;
       }
       if (kind === 'altar') {
-        out.push({ x: ex, y: ey, radius: 3, color: ALTAR_PURPLE });
+        out.push({ x: ex, y: ey, radius: 2, color: ALTAR_PURPLE });
         continue;
       }
       if (kind === 'shrine') {
-        out.push({ x: ex, y: ey, radius: 3, color: SHRINE_GOLD });
+        out.push({ x: ex, y: ey, radius: 2, color: SHRINE_GOLD });
         continue;
       }
       if (kind === 'mushrooms') {
