@@ -1690,7 +1690,7 @@ addEventListener('ui:shootRanged', () => {
   });
 
   if (!bestId) {
-    log('No target in range.');
+    try { messageLog.log({ text: 'No target in range.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
     return;
   }
 
