@@ -1522,5 +1522,36 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     });
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, installListeners };
+  /** Return active light sources for the lighting engine. */
+  function getActiveLights() {
+    const out = [];
+    for (let i = 0; i < _meteorFx.length; i++) {
+      const m = _meteorFx[i];
+      out.push({ x: m.x, y: m.y, radius: (m.radius || 2) * 3 * m.alpha, color: [255, 140, 40] });
+    }
+    for (let i = 0; i < _blastwaveFx.length; i++) {
+      const b = _blastwaveFx[i];
+      out.push({ x: b.x, y: b.y, radius: (b.radius || 2) * 2 * b.alpha, color: [255, 200, 100] });
+    }
+    for (let i = 0; i < _flashHealFx.length; i++) {
+      const f = _flashHealFx[i];
+      out.push({ x: f.x, y: f.y, radius: 4 * f.alpha, color: [255, 240, 180] });
+    }
+    for (let i = 0; i < _smiteFx.length; i++) {
+      const s = _smiteFx[i];
+      out.push({ x: s.x, y: s.y, radius: 5 * s.alpha, color: [255, 240, 180] });
+    }
+    for (let i = 0; i < _searchPulseFx.length; i++) {
+      const s = _searchPulseFx[i];
+      out.push({ x: s.x, y: s.y, radius: 6 * s.alpha, color: [180, 220, 255] });
+    }
+    for (const [, ch] of _drainLifeChannels) {
+      if (ch.from && ch.to) {
+        out.push({ x: ch.to.x, y: ch.to.y, radius: 3, color: [255, 50, 50] });
+      }
+    }
+    return out;
+  }
+
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, getActiveLights, installListeners };
 }

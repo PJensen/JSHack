@@ -136,12 +136,24 @@ export function createLightingEngine() {
    * buffers.  Works entirely in sub-cell space for the inner loop.
    *
    * @param {LightDef[]} lights
+   * @param {[number,number,number]|null} ambient — RGB 0-1, added to every open cell
    */
-  function accumulateLights(lights) {
+  function accumulateLights(lights, ambient) {
     const w = lmW, h = lmH;
-    lightR.fill(0);
-    lightG.fill(0);
-    lightB.fill(0);
+    const n = w * h;
+
+    // Seed with ambient (sunlight / moonlight) if provided
+    if (ambient && (ambient[0] > 0 || ambient[1] > 0 || ambient[2] > 0)) {
+      const ar = ambient[0], ag = ambient[1], ab = ambient[2];
+      for (let i = 0; i < n; i++) {
+        if (sdf[i] > 0) { lightR[i] = ar; lightG[i] = ag; lightB[i] = ab; }
+        else            { lightR[i] = 0;  lightG[i] = 0;  lightB[i] = 0;  }
+      }
+    } else {
+      lightR.fill(0);
+      lightG.fill(0);
+      lightB.fill(0);
+    }
 
     for (let li = 0; li < lights.length; li++) {
       const light = lights[li];
@@ -214,8 +226,11 @@ export function createLightingEngine() {
    * @param {(x:number,y:number)=>boolean} isOpaque
    * @param {number} vx0  @param {number} vy0
    * @param {number} vx1  @param {number} vy1
+   * @param {[number,number,number]|null} [ambient] — RGB 0-1 base light for every open cell
+   * @param {number} [maxDark=140] — max darkness alpha (0=no overlay, 255=pure black)
    */
-  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1) {
+  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark) {
+    const DARK = (maxDark != null) ? maxDark : 140;
     const tx0 = Math.floor(vx0) - 1;
     const ty0 = Math.floor(vy0) - 1;
     const tx1 = Math.ceil(vx1)  + 1;
@@ -228,7 +243,7 @@ export function createLightingEngine() {
     _tx0 = tx0; _ty0 = ty0;
 
     buildSDF(isOpaque, tx0, ty0, tw, th);
-    accumulateLights(lights);
+    accumulateLights(lights, ambient || null);
 
     const n = lmW * lmH;
 
@@ -239,10 +254,10 @@ export function createLightingEngine() {
       pixels[pi + 1] = 0;
       pixels[pi + 2] = 0;
       if (sdf[i] <= 0) {
-        pixels[pi + 3] = 210;            // walls are dark
+        pixels[pi + 3] = DARK;
       } else {
         const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.5);
-        pixels[pi + 3] = Math.max(0, (210 - brightness * 220) | 0);
+        pixels[pi + 3] = Math.max(0, (DARK - brightness * (DARK + 20)) | 0);
       }
     }
     lmCtx.putImageData(imgData, 0, 0);

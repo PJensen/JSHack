@@ -724,6 +724,34 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     return _screenFlash.length > 0 || _screenBolts.length > 0;
   }
 
+  /** Return active light sources for the lighting engine. */
+  function getActiveLights() {
+    const out = [];
+    for (let i = 0; i < _boltFx.length; i++) {
+      const b = _boltFx[i];
+      const u = b.progress;
+      out.push({
+        x: b.from.x + (b.to.x - b.from.x) * u,
+        y: b.from.y + (b.to.y - b.from.y) * u,
+        radius: 8 * b.alpha,
+        color: [200, 210, 255],
+      });
+      out.push({ x: b.to.x, y: b.to.y, radius: 5 * b.alpha, color: [200, 210, 255] });
+    }
+    for (let i = 0; i < _lightPulses.length; i++) {
+      const p = _lightPulses[i];
+      out.push({ x: p.x, y: p.y, radius: 6 * p.alpha, color: [220, 230, 255] });
+    }
+    for (let i = 0; i < _fireBreathFx.length; i++) {
+      const fb = _fireBreathFx[i];
+      const u = fb.beam ? fb.beam.progress : 1;
+      const hx = fb.from.x + (fb.to.x - fb.from.x) * u;
+      const hy = fb.from.y + (fb.to.y - fb.from.y) * u;
+      out.push({ x: hx, y: hy, radius: 6, color: [255, 120, 40] });
+    }
+    return out;
+  }
+
   return {
     isBlocking,
     tick,
@@ -732,6 +760,7 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     drawScreenFlash,
     drawScreenBolts,
     hasScreenEffects,
+    getActiveLights,
     installListeners,
   };
 }

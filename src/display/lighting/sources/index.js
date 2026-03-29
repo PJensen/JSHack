@@ -46,31 +46,19 @@ export function collectLightSources(view, opts = {}) {
   const out   = [];
   const playerId = Number(view.player?.id || 0) | 0;
 
-  // ---- Player light (always present) ------------------------------------
-  if (view.player) {
+  // ---- Player light (only when carrying a torch in offhand) ---------------
+  // The "torch" tag is projected onto the player entity by worldView when
+  // Equipment.offhand holds a torch item.  No torch → no player light.
+  if (view.player && Array.isArray(view.entities)) {
     const px = view.player.pos.x, py = view.player.pos.y;
-    // Check if player entity has a torch or lantern tag
-    let playerHasTorch   = false;
-    let playerHasLantern = false;
-    if (Array.isArray(view.entities)) {
-      for (let i = 0; i < view.entities.length; i++) {
-        const e = view.entities[i];
-        if ((Number(e.id || 0) | 0) !== playerId) continue;
-        if (Array.isArray(e.tags)) {
-          playerHasTorch   = e.tags.includes('torch');
-          // Lantern doesn't project a tag today; just check for visionRange bonus presence
-          // via a larger base radius when not holding torch.
-        }
-        break;
+    for (let i = 0; i < view.entities.length; i++) {
+      const e = view.entities[i];
+      if ((Number(e.id || 0) | 0) !== playerId) continue;
+      if (Array.isArray(e.tags) && e.tags.includes('torch')) {
+        const f = torchFlicker(t, playerId);
+        out.push({ x: px, y: py, radius: base * f, color: WARM_ORANGE, flicker: f });
       }
-    }
-
-    if (playerHasTorch) {
-      const f = torchFlicker(t, playerId);
-      out.push({ x: px, y: py, radius: base * f, color: WARM_ORANGE, flicker: f });
-    } else {
-      // Ambient player glow (lantern / innate sight) — steady, slightly smaller
-      out.push({ x: px, y: py, radius: base * 0.85, color: LANTERN_GOLD, flicker: 1 });
+      break;
     }
   }
 
@@ -79,9 +67,26 @@ export function collectLightSources(view, opts = {}) {
     for (let i = 0; i < view.entities.length; i++) {
       const e = view.entities[i];
       if ((Number(e.id || 0) | 0) === playerId) continue; // player handled above
-      const tags = e.tags;
-      if (!Array.isArray(tags)) continue;
+      const tags = Array.isArray(e.tags) ? e.tags : null;
       const ex = e.pos.x, ey = e.pos.y;
+      const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
+      const kind = (typeof e.kind === 'string') ? e.kind.toLowerCase() : '';
+
+      // Ground torches (items on map) — flickering warm light
+      if (layer === 250 && kind === 'torch') {
+        const f = torchFlicker(t, e.id);
+        out.push({ x: ex, y: ey, radius: 6 * f, color: WARM_ORANGE, flicker: f });
+        continue;
+      }
+
+      // Lit lantern posts (placed world objects)
+      if (kind === 'lantern_post') {
+        const f = torchFlicker(t, e.id);
+        out.push({ x: ex, y: ey, radius: 7 * f, color: LANTERN_GOLD, flicker: f });
+        continue;
+      }
+
+      if (!tags) continue;
 
       // Torch-bearing NPCs/monsters
       if (tags.includes('torch')) {
@@ -97,11 +102,9 @@ export function collectLightSources(view, opts = {}) {
         continue;
       }
 
-      // Tag-driven emissive lights
+      // Tag-driven emissive lights (frost deliberately excluded — cold ≠ light)
       if (tags.includes('invulnerable')) {
         out.push({ x: ex, y: ey, radius: 5, color: HOLY_GOLD });
-      } else if (tags.includes('frost_glowing')) {
-        out.push({ x: ex, y: ey, radius: 4, color: FROST_BLUE });
       } else if (tags.includes('storm_glowing')) {
         out.push({ x: ex, y: ey, radius: 4, color: STORM_WHITE });
       } else if (tags.includes('soul_glowing')) {
@@ -132,48 +135,54 @@ export function collectLightSources(view, opts = {}) {
  * @param {number} fxTime
  */
 export function collectFxLights(out, fxSources, fxTime) {
-  // Bolt FX — lightning strikes emit bright white-blue flash
-  if (fxSources.boltFx) {
-    const bolts = fxSources.boltFx;
-    if (typeof bolts.getActiveBolts === 'function') {
-      const active = bolts.getActiveBolts();
-      for (let i = 0; i < active.length; i++) {
-        const b = active[i];
-        out.push({ x: b.x, y: b.y, radius: 8, color: STORM_WHITE, flicker: 0.6 + 0.4 * Math.random() });
-      }
-    }
-  }
-
-  // Spell area FX — meteor, blastwave, etc.
-  if (fxSources.spellAreaFx) {
-    const fx = fxSources.spellAreaFx;
-    if (typeof fx.getActiveLights === 'function') {
+  // Query each FX controller for active light sources
+  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx];
+  for (let c = 0; c < controllers.length; c++) {
+    const fx = controllers[c];
+    if (fx && typeof fx.getActiveLights === 'function') {
       const active = fx.getActiveLights();
-      for (let i = 0; i < active.length; i++) {
-        out.push(active[i]);
-      }
+      for (let i = 0; i < active.length; i++) out.push(active[i]);
     }
   }
+}
 
-  // Projectile FX — frost bolts, fireballs in flight
-  if (fxSources.projectileFx) {
-    const fx = fxSources.projectileFx;
-    if (typeof fx.getActiveLights === 'function') {
-      const active = fx.getActiveLights();
-      for (let i = 0; i < active.length; i++) {
-        out.push(active[i]);
-      }
-    }
-  }
+// ---- Overworld ambient (sun / moon) -------------------------------------
 
-  // Cloud FX — fire, poison, plasma clouds
-  if (fxSources.cloudFx) {
-    const fx = fxSources.cloudFx;
-    if (typeof fx.getActiveLights === 'function') {
-      const active = fx.getActiveLights();
-      for (let i = 0; i < active.length; i++) {
-        out.push(active[i]);
-      }
-    }
-  }
+// Palette anchors (linear RGB, 0-1)
+const SUN_DAY   = [0.95, 0.92, 0.85];   // bright warm white
+const SUN_DAWN  = [1.00, 0.60, 0.25];   // golden-amber
+const SUN_DUSK  = [0.85, 0.35, 0.12];   // orange-red
+const MOON_NIGHT = [0.10, 0.12, 0.22];  // dim cool blue
+
+/** Lerp two RGB triplets. */
+function lerpRGB(a, b, t) {
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+}
+
+/**
+ * Compute the overworld ambient light colour from worldView time-of-day
+ * fields.  Returns `null` when underground (no ambient).
+ *
+ * @param {import('../../../bridge/schema/worldView.js').WorldView} view
+ * @returns {[number,number,number]|null}
+ */
+export function computeAmbient(view) {
+  // Underground — no ambient sky light
+  if (!view.isOverworld) return null;
+
+  const night = view.nightAlpha || 0;
+  const dawn  = view.dawnAlpha  || 0;
+  const dusk  = view.duskAlpha  || 0;
+
+  // Start from the day/night base
+  const base = lerpRGB(SUN_DAY, MOON_NIGHT, night);
+
+  // Blend in dawn / dusk warmth on top (they peak as bell curves)
+  if (dawn > 0.01) return lerpRGB(base, SUN_DAWN, dawn * 0.6);
+  if (dusk > 0.01) return lerpRGB(base, SUN_DUSK, dusk * 0.6);
+  return base;
 }
