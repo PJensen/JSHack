@@ -5,6 +5,7 @@
 /** @typedef {import('../engine.js').LightDef} LightDef */
 
 // ---- Colour palettes for light sources ----------------------------------
+const EYE_LIGHT    = [50, 50, 65];      // dim neutral sight (player vision range)
 const WARM_ORANGE  = [255, 190, 120];   // player torch / generic torch
 const LANTERN_GOLD = [255, 210, 140];   // lantern — slightly brighter, warmer
 const FIRE_RED     = [255, 120, 40];    // burning entities / fire hazards
@@ -45,19 +46,28 @@ export function collectLightSources(view, opts = {}) {
   const out   = [];
   const playerId = Number(view.player?.id || 0) | 0;
 
-  // ---- Player light (only when carrying a torch in offhand) ---------------
-  // The "torch" tag is projected onto the player entity by worldView when
-  // Equipment.offhand holds a torch item.  No torch → no player light.
-  if (view.player && Array.isArray(view.entities)) {
+  // ---- Player eye-light (dim sight from vision range) ---------------------
+  // Even without a torch the player can see dimly within their vision range.
+  // This is natural eyesight — neutral, cool, low-intensity.  Equipment that
+  // boosts visionRange (lantern +3) widens this circle automatically.
+  if (view.player) {
     const px = view.player.pos.x, py = view.player.pos.y;
-    for (let i = 0; i < view.entities.length; i++) {
-      const e = view.entities[i];
-      if ((Number(e.id || 0) | 0) !== playerId) continue;
-      if (Array.isArray(e.tags) && e.tags.includes('torch')) {
-        const f = torchFlicker(t, playerId);
-        out.push({ x: px, y: py, radius: base * f, color: WARM_ORANGE, flicker: f });
+    const vr = view.playerVisionRadius || 0;
+    if (vr > 0) {
+      out.push({ x: px, y: py, radius: vr, color: EYE_LIGHT });
+    }
+
+    // ---- Torch light (warm, flickering, layered on top of eye-light) -----
+    if (Array.isArray(view.entities)) {
+      for (let i = 0; i < view.entities.length; i++) {
+        const e = view.entities[i];
+        if ((Number(e.id || 0) | 0) !== playerId) continue;
+        if (Array.isArray(e.tags) && e.tags.includes('torch')) {
+          const f = torchFlicker(t, playerId);
+          out.push({ x: px, y: py, radius: base * f, color: WARM_ORANGE, flicker: f });
+        }
+        break;
       }
-      break;
     }
   }
 

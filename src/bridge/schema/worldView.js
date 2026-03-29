@@ -68,7 +68,7 @@ import {
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -642,6 +642,12 @@ export function buildWorldView(world) {
 			return getEntityFovConeDegrees(world, _view.player.id);
 		})()
 		: 360;
+
+	// Expose vision/perception data for the lighting engine
+	_view.playerVisionRadius = playerVisionRadius;
+	_view.playerFacing = playerFacingForAwareness;
+	_view.playerConeDegrees = awarenessConeDegrees;
+	_view.perceptionState = perceptionState;
 
 	// Collect entity records near the player (or all if no player).
 	if (_view.player) {
