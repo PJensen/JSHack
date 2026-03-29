@@ -5473,7 +5473,7 @@ function render(worldView) {
   // Placed before spell FX so bolts/meteors/projectiles appear bright on top
   // of the darkness, while tiles + entities are properly darkened.
   if (PERF.quality !== 'low') {
-    const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime });
+    const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime, dt: _dtSec });
     collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx });
     const _ambient = computeAmbient(worldView);
     const _roofMask = worldView.isOverworld ? isRoofed : null;
