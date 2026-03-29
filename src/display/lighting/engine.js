@@ -124,6 +124,51 @@ export function createLightingEngine() {
     }
   }
 
+  // ---- SDF ray-march (sphere tracing) for shadow occlusion --------------
+
+  /**
+   * March a ray from (ox, oy) toward (tx, ty) in sub-cell space.
+   * Returns true if the path is unoccluded (visible), false if a wall blocks it.
+   *
+   * Uses sphere-tracing: at each step, advance by the SDF distance at the
+   * current sample point.  If the SDF drops below the hit threshold, the ray
+   * has struck a wall.  Typical iteration count is 4-12 in corridors, 2-4 in
+   * open rooms — driven by how large the SDF values are in open space.
+   */
+  function rayVisible(ox, oy, tx, ty, w) {
+    const dx = tx - ox;
+    const dy = ty - oy;
+    const totalDist = Math.sqrt(dx * dx + dy * dy);
+    if (totalDist < 1.5) return true;       // adjacent cells — always visible
+
+    const invDist = 1 / totalDist;
+    const rdx = dx * invDist;               // unit direction
+    const rdy = dy * invDist;
+
+    const HIT    = 0.45;   // SDF below this = inside wall
+    const MIN_STEP = 0.7;  // don't crawl — ensure forward progress
+    const MAX_STEPS = 24;  // hard cap (generous; typical is 4-12)
+
+    let t = 1.0;  // start slightly away from light centre
+    for (let step = 0; step < MAX_STEPS; step++) {
+      const cx = ox + rdx * t;
+      const cy = oy + rdy * t;
+
+      // Sample SDF via nearest-neighbour (fast integer lookup)
+      const si = (cx + 0.5) | 0;
+      const sj = (cy + 0.5) | 0;
+      if (si < 0 || si >= w || sj < 0 || sj >= lmH) return false;  // off-grid = blocked
+
+      const d = sdf[sj * w + si];
+      if (d < HIT) return false;             // hit a wall
+
+      t += Math.max(d, MIN_STEP);
+      if (t >= totalDist - 0.5) return true; // reached the target
+    }
+
+    return true;  // ran out of steps — assume visible (rare, open space)
+  }
+
   // ---- Light accumulation ----------------------------------------------
 
   /**
@@ -201,6 +246,9 @@ export function createLightingEngine() {
           const dwx = sx - lsx;
           const dist2 = dwx * dwx + dwy2;
           if (dist2 > lrSub2) continue;
+
+          // SDF ray-march: skip cell if a wall blocks line-of-sight from light
+          if (!rayVisible(lsx, lsy, sx, sy, w)) continue;
 
           const dist = Math.sqrt(dist2);
           const atten = 1.0 - dist * invLrSub;
