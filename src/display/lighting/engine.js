@@ -205,8 +205,8 @@ export function createLightingEngine() {
           v = v * v * (3 - 2 * v);  // smoothstep
         }
 
-        // Cone attenuation
-        if (hasCone && dist > 2 * SUB) {  // skip cone check very close to player
+        // Cone attenuation — applied everywhere except the player's own tile
+        if (hasCone && dist > SUB * 0.5) {
           const angle = Math.atan2(dy, dx);
           const facingAngle = Math.atan2(fy, fx);
           let diff = angle - facingAngle;
