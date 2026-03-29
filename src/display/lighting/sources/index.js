@@ -21,6 +21,14 @@ const VENOM_GREEN  = [120, 255, 80];    // venom / poison glow
 const HOLY_GOLD    = [255, 240, 180];   // invulnerable / divine
 const CAUSTIC_LIME = [180, 255, 60];    // caustic effects
 const SHADOW_PURPLE = [160, 80, 220];   // shadow / agony magic
+const EPIC_VIOLET  = [200, 100, 255];   // epic rarity
+const RARE_BLUE    = [100, 160, 255];   // rare rarity
+const POTION_TEAL  = [120, 220, 200];   // potion shimmer
+const FOUNTAIN_BLUE = [100, 180, 230];  // water / fountain
+const ALTAR_PURPLE = [200, 150, 255];   // altar / shrine divine
+const SHRINE_GOLD  = [255, 220, 100];   // shrine warm glow
+const MUSHROOM_CYAN = [80, 200, 160];   // bioluminescent fungi
+const STAIR_GREY   = [160, 170, 190];   // mysterious passage
 
 /**
  * Torch flicker — deterministic per-entity wobble + random jitter.
@@ -100,6 +108,38 @@ export function collectLightSources(view, opts = {}) {
         continue;
       }
 
+      // Dungeon furniture — subtle atmospheric lighting
+      if (kind === 'fountain') {
+        out.push({ x: ex, y: ey, radius: 3, color: FOUNTAIN_BLUE });
+        continue;
+      }
+      if (kind === 'altar') {
+        out.push({ x: ex, y: ey, radius: 3, color: ALTAR_PURPLE });
+        continue;
+      }
+      if (kind === 'shrine') {
+        out.push({ x: ex, y: ey, radius: 3, color: SHRINE_GOLD });
+        continue;
+      }
+      if (kind === 'mushrooms') {
+        out.push({ x: ex, y: ey, radius: 2, color: MUSHROOM_CYAN });
+        continue;
+      }
+      if (kind === 'stair_down' || kind === 'stair_up') {
+        out.push({ x: ex, y: ey, radius: 2, color: STAIR_GREY });
+        continue;
+      }
+      if (kind === 'cooking_fire') {
+        const f = torchFlicker(t, e.id);
+        out.push({ x: ex, y: ey, radius: 4 * f, color: FIRE_RED, flicker: f });
+        continue;
+      }
+      if (kind === 'furnace') {
+        const f = torchFlicker(t, e.id);
+        out.push({ x: ex, y: ey, radius: 3 * f, color: FIRE_RED, flicker: f });
+        continue;
+      }
+
       if (!tags) continue;
 
       // Torch-bearing NPCs/monsters
@@ -133,6 +173,14 @@ export function collectLightSources(view, opts = {}) {
         out.push({ x: ex, y: ey, radius: 3, color: SHADOW_PURPLE });
       } else if (tags.includes('glowing') || tags.includes('legendary_glowing')) {
         out.push({ x: ex, y: ey, radius: 3, color: LANTERN_GOLD });
+      } else if (tags.includes('epic_glowing')) {
+        out.push({ x: ex, y: ey, radius: 2.5, color: EPIC_VIOLET });
+      } else if (tags.includes('rare_glowing')) {
+        out.push({ x: ex, y: ey, radius: 1.5, color: RARE_BLUE });
+      }
+      // Potion glow — very subtle shimmer on ground potions
+      if (tags.includes('potion_glow')) {
+        out.push({ x: ex, y: ey, radius: 1.5, color: POTION_TEAL });
       }
     }
   }
