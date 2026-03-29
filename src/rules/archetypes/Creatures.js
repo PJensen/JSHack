@@ -62,7 +62,7 @@ function resolveBrainDefaults(p) {
     itemKnowledgeIdentities: Array.isArray(input.itemKnowledgeIdentities) ? [...input.itemKnowledgeIdentities] : [],
     seenTiles: input.seenTiles instanceof Uint8Array ? input.seenTiles.slice() : new Uint8Array(),
     intelligence: Number.isFinite(input.intelligence) ? Number(input.intelligence) : Number(def?.intelligence ?? 10),
-    visionRange: Number.isFinite(input.visionRange) ? Number(input.visionRange) : Number(def?.visionRange ?? 8),
+    visionRange: Number.isFinite(input.visionRange) ? Number(input.visionRange) : Number(def?.visionRange ?? 6),
     fovConeDegrees: Number.isFinite(input.fovConeDegrees)
       ? Number(input.fovConeDegrees)
       : (Number.isFinite(def?.fovConeDegrees) ? Number(def.fovConeDegrees) : null),

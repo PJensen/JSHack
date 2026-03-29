@@ -131,7 +131,7 @@ import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName, buildItemDisplayData, resolveAffixes } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored, setFovDisabled } from "./rules/environment/dungeon/exploredMap.js";
-import { getTile, isWalkable, isOpaque, isFlyable, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
+import { getTile, isWalkable, isOpaque, isFlyable, isRoofed, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
 import { resetIdentification, identify, restoreIdentification, setIdentificationEnabled } from "./rules/data/identification.js";
 import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
 import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
@@ -5476,7 +5476,8 @@ function render(worldView) {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime });
     collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx });
     const _ambient = computeAmbient(worldView);
-    lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1, _ambient);
+    const _roofMask = worldView.isOverworld ? isRoofed : null;
+    lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1, _ambient, undefined, _roofMask);
   }
 
   drawWorldEffects({

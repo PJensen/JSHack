@@ -15,7 +15,7 @@ export const CLASS_DEFS = {
       staminaRegen: 3.75,
       intelligence: 6,
       dexterity: 12,
-      visionRange: 8,
+      visionRange: 6,
     },
     equipment: {
       weapon: 'axe_heavy',
@@ -45,7 +45,7 @@ export const CLASS_DEFS = {
       staminaRegen: 2.25,
       intelligence: 12,
       dexterity: 14,
-      visionRange: 8,
+      visionRange: 6,
     },
     equipment: {
       weapon: 'staff_oak',
@@ -75,7 +75,7 @@ export const CLASS_DEFS = {
       staminaRegen: 3.3,
       intelligence: 10,
       dexterity: 16,
-      visionRange: 8,
+      visionRange: 6,
       perception: 7,
     },
     equipment: {
@@ -113,7 +113,7 @@ export const CLASS_DEFS = {
       staminaRegen: 3.0,
       intelligence: 11,
       dexterity: 16,
-      visionRange: 8,
+      visionRange: 6,
     },
     equipment: {
       weapon: 'iron_pickaxe',
@@ -146,7 +146,7 @@ export const CLASS_DEFS = {
       staminaRegen: 2.0,
       intelligence: 13,
       dexterity: 12,
-      visionRange: 8,
+      visionRange: 6,
     },
     equipment: {
       weapon: 'staff_oak',
@@ -177,7 +177,7 @@ export const CLASS_DEFS = {
       staminaRegen: 2.7,
       intelligence: 10,
       dexterity: 12,
-      visionRange: 8,
+      visionRange: 6,
     },
     equipment: {
       weapon: 'iron_mace',

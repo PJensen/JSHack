@@ -28,7 +28,7 @@ import { getMonsterTags } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
-import { TURNS_PER_DAY, PHASE_BOUNDS } from "../../rules/data/calendar.js";
+import { TURNS_PER_DAY, PHASE_BOUNDS, DAYS_PER_MONTH, getMoonPhase } from "../../rules/data/calendar.js";
 import { QuestBindings } from "../../rules/components/QuestBindings.js";
 import { QuestState } from "../../rules/components/QuestState.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
@@ -68,7 +68,7 @@ import {
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -566,8 +566,11 @@ export function buildWorldView(world) {
 	_view.nightAlpha = 0;
 	_view.dawnAlpha  = 0;
 	_view.duskAlpha  = 0;
+	_view.turnInDay  = 0;
+	_view.moonBrightness = 0;
 	if (_isOverworld) {
 		const turnInDay = world.step % TURNS_PER_DAY;
+		_view.turnInDay = turnInDay;
 		const breakfast = PHASE_BOUNDS[1]; // dawn transition
 		const pub       = PHASE_BOUNDS[3]; // dusk transition
 		if (turnInDay < breakfast.start || turnInDay >= pub.end) {
@@ -585,6 +588,14 @@ export function buildWorldView(world) {
 			const t = (turnInDay - pub.start) / (pub.end - pub.start);
 			_view.duskAlpha = Math.sin(Math.PI * t);
 		}
+
+		// Moon brightness from lunar phase (full=1.0, new=0.15)
+		const dayTotal = Math.floor(Math.max(0, world.step) / TURNS_PER_DAY);
+		const dayOfMonth = dayTotal % DAYS_PER_MONTH;
+		const moon = getMoonPhase(dayOfMonth);
+		// Map phase key to brightness: full brightest, new dimmest
+		const MOON_BRIGHT = { new: 0.15, waxing_crescent: 0.30, first_quarter: 0.50, waxing_gibbous: 0.75, full: 1.0, waning_gibbous: 0.75, last_quarter: 0.50, waning_crescent: 0.30 };
+		_view.moonBrightness = MOON_BRIGHT[moon.key] ?? 0.15;
 	}
 
 	// Collect active quest giver entity IDs for display tag projection.

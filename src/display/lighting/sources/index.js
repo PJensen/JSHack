@@ -2,6 +2,8 @@
 // Collect display-side light sources from a WorldView snapshot.
 // Returns LightDef[] compatible with the lighting engine.
 
+import { TURNS_PER_DAY } from '../../../rules/data/calendar.js';
+
 /** @typedef {import('../engine.js').LightDef} LightDef */
 
 // ---- Colour palettes for light sources ----------------------------------
@@ -153,13 +155,30 @@ export function collectFxLights(out, fxSources) {
   }
 }
 
-// ---- Overworld ambient (sun / moon) -------------------------------------
+// ---- Overworld positional sky lights (sun / moon) -----------------------
+//
+// Both bodies are modelled as infinitely distant directional lights whose
+// elevation above the horizon is a sine arc driven by turnInDay.
+//
+// Sun arc:  rises at SUNRISE (turn 150 / 5 AM), peaks at solar noon,
+//           sets at SUNSET (turn 580 / ~7:20 PM).
+// Moon arc: rises at SUNSET, peaks at midnight (turn 0 / 720),
+//           sets at SUNRISE.  Intensity scaled by lunar phase.
+//
+// Elevation drives both intensity (sin of elevation angle) and colour
+// (low elevation = warm horizon tint, high = neutral white / cool blue).
 
-// Palette anchors (linear RGB, 0-1)
-const SUN_DAY   = [0.95, 0.92, 0.85];   // bright warm white
-const SUN_DAWN  = [1.00, 0.60, 0.25];   // golden-amber
-const SUN_DUSK  = [0.85, 0.35, 0.12];   // orange-red
-const MOON_NIGHT = [0.10, 0.12, 0.22];  // dim cool blue
+// Sun / moon arc boundaries (turns within a day)
+const SUNRISE = 150;   // 5 AM   — sun clears horizon
+const SUNSET  = 580;   // 7:20 PM — sun dips below horizon
+const SUN_ARC = SUNSET - SUNRISE;                          // 430 turns of daylight
+const MOON_ARC = TURNS_PER_DAY - SUNSET + SUNRISE;         // 290 turns of moonlight
+
+// Colour palettes (linear RGB, 0-1)
+const SUN_ZENITH  = [0.95, 0.92, 0.85];   // overhead — bright warm white
+const SUN_HORIZON = [1.00, 0.55, 0.20];   // low sun  — golden-amber
+const MOON_ZENITH = [0.18, 0.20, 0.35];   // overhead — cool blue-white
+const MOON_HORIZON = [0.08, 0.08, 0.18];  // low moon — dim indigo
 
 /** Lerp two RGB triplets. */
 function lerpRGB(a, b, t) {
@@ -171,8 +190,33 @@ function lerpRGB(a, b, t) {
 }
 
 /**
- * Compute the overworld ambient light colour from worldView time-of-day
- * fields.  Returns `null` when underground (no ambient).
+ * Compute elevation (0-1) of a celestial body given a sine arc.
+ * Returns 0 when below the horizon.
+ */
+function arcElevation(turnInDay, arcStart, arcLen) {
+  // Normalise turnInDay into the arc's local phase (0 → 1)
+  let t;
+  if (arcStart + arcLen <= TURNS_PER_DAY) {
+    // Arc doesn't wrap midnight
+    if (turnInDay < arcStart || turnInDay >= arcStart + arcLen) return 0;
+    t = (turnInDay - arcStart) / arcLen;
+  } else {
+    // Arc wraps midnight (moon)
+    const end = (arcStart + arcLen) % TURNS_PER_DAY;
+    if (turnInDay >= arcStart) {
+      t = (turnInDay - arcStart) / arcLen;
+    } else if (turnInDay < end) {
+      t = (turnInDay + TURNS_PER_DAY - arcStart) / arcLen;
+    } else {
+      return 0;
+    }
+  }
+  return Math.sin(t * Math.PI);   // 0 at horizon, 1 at zenith
+}
+
+/**
+ * Compute the overworld ambient sky-light colour from positional sun/moon.
+ * Returns `null` when underground (no ambient).
  *
  * @param {import('../../../bridge/schema/worldView.js').WorldView} view
  * @returns {[number,number,number]|null}
@@ -181,15 +225,30 @@ export function computeAmbient(view) {
   // Underground — no ambient sky light
   if (!view.isOverworld) return null;
 
-  const night = view.nightAlpha || 0;
-  const dawn  = view.dawnAlpha  || 0;
-  const dusk  = view.duskAlpha  || 0;
+  const tid = view.turnInDay || 0;
 
-  // Start from the day/night base
-  const base = lerpRGB(SUN_DAY, MOON_NIGHT, night);
+  // ---- Sun contribution ------------------------------------------------
+  const sunElev = arcElevation(tid, SUNRISE, SUN_ARC);
+  let sr = 0, sg = 0, sb = 0;
+  if (sunElev > 0) {
+    // Blend from horizon colour at low elevation to zenith colour at high
+    const col = lerpRGB(SUN_HORIZON, SUN_ZENITH, sunElev);
+    sr = col[0] * sunElev;
+    sg = col[1] * sunElev;
+    sb = col[2] * sunElev;
+  }
 
-  // Blend in dawn / dusk warmth on top (they peak as bell curves)
-  if (dawn > 0.01) return lerpRGB(base, SUN_DAWN, dawn * 0.6);
-  if (dusk > 0.01) return lerpRGB(base, SUN_DUSK, dusk * 0.6);
-  return base;
+  // ---- Moon contribution -----------------------------------------------
+  const moonElev = arcElevation(tid, SUNSET, MOON_ARC);
+  let mr = 0, mg = 0, mb = 0;
+  if (moonElev > 0) {
+    const brightness = view.moonBrightness || 0.15;
+    const col = lerpRGB(MOON_HORIZON, MOON_ZENITH, moonElev);
+    mr = col[0] * moonElev * brightness;
+    mg = col[1] * moonElev * brightness;
+    mb = col[2] * moonElev * brightness;
+  }
+
+  // Additive blend — during twilight both may contribute briefly
+  return [sr + mr, sg + mg, sb + mb];
 }
