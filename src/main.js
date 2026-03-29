@@ -48,7 +48,7 @@ import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/qu
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
-import { collectLightSources, collectFxLights, computeAmbient } from "./display/lighting/sources/index.js";
+import { collectLightSources, collectFxLights, computeAmbient, getSmoothedEyeRadius } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
@@ -4921,10 +4921,33 @@ function render(worldView) {
     const tx1 = Math.ceil(vx1),  ty1 = Math.ceil(vy1);
     /** @type {Record<number, string>} */ const tileKinds = /** @type {any} */ (_tileKindMap);
     _exploredTileBuffer.length = 0;
+    // Smooth vision-edge fade: tiles near the boundary of the interpolated
+    // eye-light radius are drawn at reduced alpha so the FOV circle doesn't
+    // pop in as blocky squares during blind recovery.
+    const _eyeR = getSmoothedEyeRadius();
+    const _eyeFade = _eyeR > 0 && _eyeR < (worldView.playerVisionRadius || 999) + 0.5;
+    const _ppx = worldView.player ? worldView.player.pos.x : 0;
+    const _ppy = worldView.player ? worldView.player.pos.y : 0;
+
     worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
       if (isVisible && isVisible(x, y)) {
         const kind = tileKinds[tile];
-        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+        if (!kind) return;
+        // During vision transitions, fade tiles near the eye-light boundary
+        if (_eyeFade) {
+          const dx = x - _ppx, dy = y - _ppy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > _eyeR - 1.5) {
+            const fade = Math.max(0, Math.min(1, (_eyeR + 0.5 - dist) / 2.0));
+            if (fade < 0.99) {
+              bctx.globalAlpha = fade;
+              drawKind(glyphAtlas, bctx, kind, x, y);
+              bctx.globalAlpha = 1.0;
+              return;
+            }
+          }
+        }
+        drawKind(glyphAtlas, bctx, kind, x, y);
       } else if (isExplored && isExplored(x, y)) {
         _exploredTileBuffer.push(tile, x, y);
       }
