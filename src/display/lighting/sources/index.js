@@ -74,6 +74,10 @@ let _eyeRadiusCurrent = -1;   // < 0 = uninitialised
 let _eyeRadiusTarget  = 0;
 const EYE_LERP_SPEED  = 3.0;  // tiles/sec — fast enough to track, slow enough to read
 
+/** Current smooth eye-light radius (tiles). Used by the tile renderer to
+ *  fade glyph alpha near the vision boundary during blind recovery. */
+export function getSmoothedEyeRadius() { return _eyeRadiusCurrent < 0 ? 0 : _eyeRadiusCurrent; }
+
 export function collectLightSources(view, opts = {}) {
   const q     = (opts.quality || 'auto').toLowerCase();
   const base  = q === 'low' ? 6 : (q === 'high' ? 10 : 8);
