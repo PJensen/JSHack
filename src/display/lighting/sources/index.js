@@ -66,10 +66,19 @@ function torchFlicker(t, id) {
  * @param {{quality?: string, fxTime?: number}} opts
  * @returns {LightDef[]}
  */
+// ---- Smooth eye-light radius (frame-interpolated between turns) ----------
+// The rules layer updates visionRange once per turn (integer ticks), so blind
+// recovery produces a staircase: 2 → 3 → 4 → ...  We lerp toward the target
+// each frame so the lighting circle grows/shrinks smoothly in sub-tile space.
+let _eyeRadiusCurrent = -1;   // < 0 = uninitialised
+let _eyeRadiusTarget  = 0;
+const EYE_LERP_SPEED  = 3.0;  // tiles/sec — fast enough to track, slow enough to read
+
 export function collectLightSources(view, opts = {}) {
   const q     = (opts.quality || 'auto').toLowerCase();
   const base  = q === 'low' ? 6 : (q === 'high' ? 10 : 8);
   const t     = opts.fxTime || 0;
+  const dt    = opts.dt || 0.016;   // frame delta (seconds)
   /** @type {LightDef[]} */
   const out   = [];
   const playerId = Number(view.player?.id || 0) | 0;
@@ -84,8 +93,19 @@ export function collectLightSources(view, opts = {}) {
   if (view.player) {
     const px = view.player.pos.x + 0.5, py = view.player.pos.y + 0.5;
     const vr = view.playerVisionRadius || 0;
-    if (vr > 0) {
-      out.push({ x: px, y: py, radius: vr + 0.5, color: EYE_LIGHT });
+
+    // Smooth the eye-light radius between frames
+    _eyeRadiusTarget = vr;
+    if (_eyeRadiusCurrent < 0) _eyeRadiusCurrent = vr; // first frame — snap
+    const diff = _eyeRadiusTarget - _eyeRadiusCurrent;
+    if (Math.abs(diff) < 0.01) {
+      _eyeRadiusCurrent = _eyeRadiusTarget;
+    } else {
+      _eyeRadiusCurrent += Math.sign(diff) * Math.min(Math.abs(diff), EYE_LERP_SPEED * dt);
+    }
+
+    if (_eyeRadiusCurrent > 0) {
+      out.push({ x: px, y: py, radius: _eyeRadiusCurrent + 0.5, color: EYE_LIGHT });
     }
 
     // ---- Torch light (warm, flickering, layered on top of eye-light) -----
