@@ -132,17 +132,34 @@ export function createLightingEngine() {
    *
    * @param {LightDef[]} lights
    * @param {[number,number,number]|null} ambient — RGB 0-1, added to every open cell
+   * @param {((x:number,y:number)=>boolean)|null} [isRoofed] — if provided, roofed cells receive no ambient (sky blocked by roof)
    */
-  function accumulateLights(lights, ambient) {
+  function accumulateLights(lights, ambient, isRoofed) {
     const w = lmW, h = lmH;
     const n = w * h;
 
-    // Seed with ambient (sunlight / moonlight) if provided
+    // Seed with ambient (sunlight / moonlight) if provided.
+    // Roofed cells are excluded — the sky can't reach under a roof.
     if (ambient && (ambient[0] > 0 || ambient[1] > 0 || ambient[2] > 0)) {
       const ar = ambient[0], ag = ambient[1], ab = ambient[2];
-      for (let i = 0; i < n; i++) {
-        if (sdf[i] > 0) { lightR[i] = ar; lightG[i] = ag; lightB[i] = ab; }
-        else            { lightR[i] = 0;  lightG[i] = 0;  lightB[i] = 0;  }
+      if (isRoofed) {
+        for (let sy = 0; sy < h; sy++) {
+          const ty = _ty0 + ((sy * INV_SUB) | 0);
+          const rowOff = sy * w;
+          for (let sx = 0; sx < w; sx++) {
+            const i = rowOff + sx;
+            if (sdf[i] > 0 && !isRoofed(_tx0 + ((sx * INV_SUB) | 0), ty)) {
+              lightR[i] = ar; lightG[i] = ag; lightB[i] = ab;
+            } else {
+              lightR[i] = 0; lightG[i] = 0; lightB[i] = 0;
+            }
+          }
+        }
+      } else {
+        for (let i = 0; i < n; i++) {
+          if (sdf[i] > 0) { lightR[i] = ar; lightG[i] = ag; lightB[i] = ab; }
+          else            { lightR[i] = 0;  lightG[i] = 0;  lightB[i] = 0;  }
+        }
       }
     } else {
       lightR.fill(0);
@@ -223,8 +240,9 @@ export function createLightingEngine() {
    * @param {number} vx1  @param {number} vy1
    * @param {[number,number,number]|null} [ambient] — RGB 0-1 base light for every open cell
    * @param {number} [maxDark=140] — max darkness alpha (0=no overlay, 255=pure black)
+   * @param {((x:number,y:number)=>boolean)|null} [isRoofed] — roofed cells get no ambient
    */
-  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark) {
+  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed) {
     const DARK = (maxDark != null) ? maxDark : 140;
     const tx0 = Math.floor(vx0) - 1;
     const ty0 = Math.floor(vy0) - 1;
@@ -238,7 +256,7 @@ export function createLightingEngine() {
     _tx0 = tx0; _ty0 = ty0;
 
     buildSDF(isOpaque, tx0, ty0, tw, th);
-    accumulateLights(lights, ambient || null);
+    accumulateLights(lights, ambient || null, isRoofed || null);
 
     const n = lmW * lmH;
 
