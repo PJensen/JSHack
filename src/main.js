@@ -4921,35 +4921,51 @@ function render(worldView) {
     const tx1 = Math.ceil(vx1),  ty1 = Math.ceil(vy1);
     /** @type {Record<number, string>} */ const tileKinds = /** @type {any} */ (_tileKindMap);
     _exploredTileBuffer.length = 0;
-    worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
-      if (isVisible && isVisible(x, y)) {
-        const kind = tileKinds[tile];
-        if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
-      } else if (isExplored && isExplored(x, y)) {
-        _exploredTileBuffer.push(tile, x, y);
-      }
-    });
-    // Flush explored-not-visible buffer at a single reduced alpha (no per-tile state changes)
-    if (_exploredTileBuffer.length > 0) {
-      if (playerBlinded) {
-        for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
-          const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
-          if (!kind) continue;
-          drawMemoryGlyph(
-            bctx,
-            kind,
-            _exploredTileBuffer[i + 1] ?? 0,
-            _exploredTileBuffer[i + 2] ?? 0,
-            0.72,
-          );
+    // When the lighting engine is active, draw ALL explored tiles at full
+    // alpha and let the vision mask handle visibility visually.  This
+    // eliminates the blocky tile-level FOV boundary entirely — the smooth
+    // sub-tile vision mask is the only visual boundary.
+    // On quality=low (no lighting engine), fall back to the old two-pass
+    // visible/explored split.
+    const _lightingActive = PERF.quality !== 'low';
+
+    if (_lightingActive) {
+      worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
+        if ((isVisible && isVisible(x, y)) || (isExplored && isExplored(x, y))) {
+          const kind = tileKinds[tile];
+          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
         }
-      } else {
-        bctx.globalAlpha = 0.35;
-        for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
-          const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
-          if (kind) drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
+      });
+    } else {
+      worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
+        if (isVisible && isVisible(x, y)) {
+          const kind = tileKinds[tile];
+          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+        } else if (isExplored && isExplored(x, y)) {
+          _exploredTileBuffer.push(tile, x, y);
         }
-        bctx.globalAlpha = 1.0;
+      });
+      if (_exploredTileBuffer.length > 0) {
+        if (playerBlinded) {
+          for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
+            const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
+            if (!kind) continue;
+            drawMemoryGlyph(
+              bctx,
+              kind,
+              _exploredTileBuffer[i + 1] ?? 0,
+              _exploredTileBuffer[i + 2] ?? 0,
+              0.72,
+            );
+          }
+        } else {
+          bctx.globalAlpha = 0.35;
+          for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
+            const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
+            if (kind) drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
+          }
+          bctx.globalAlpha = 1.0;
+        }
       }
     }
   }
