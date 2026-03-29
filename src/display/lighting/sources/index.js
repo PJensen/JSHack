@@ -127,36 +127,31 @@ export function collectLightSources(view, opts = {}) {
         continue;
       }
 
-      // Dungeon furniture — subtle atmospheric lighting
-      if (kind === 'fountain') {
-        out.push({ x: ex, y: ey, radius: 2.5, color: FOUNTAIN_BLUE });
-        continue;
-      }
-      if (kind === 'altar') {
-        out.push({ x: ex, y: ey, radius: 2, color: ALTAR_PURPLE });
-        continue;
-      }
-      if (kind === 'shrine') {
-        out.push({ x: ex, y: ey, radius: 2, color: SHRINE_GOLD });
-        continue;
-      }
-      if (kind === 'mushrooms') {
-        out.push({ x: ex, y: ey, radius: 2, color: MUSHROOM_CYAN });
-        continue;
-      }
-      if (kind === 'stair_down' || kind === 'stair_up') {
-        out.push({ x: ex, y: ey, radius: 2, color: STAIR_GREY });
-        continue;
-      }
-      if (kind === 'cooking_fire') {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 4 * f, color: FIRE_RED, flicker: f });
-        continue;
-      }
-      if (kind === 'furnace') {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 3 * f, color: FIRE_RED, flicker: f });
-        continue;
+      // Dungeon furniture — palette-driven atmospheric lighting.
+      // Radius is hand-tuned per kind; colour comes from the glyph palette glow.
+      {
+        const FURNITURE_LIGHT = {
+          fountain:    { radius: 2.5 },
+          altar:       { radius: 2 },
+          shrine:      { radius: 2 },
+          mushrooms:   { radius: 2 },
+          stair_down:  { radius: 2 },
+          stair_up:    { radius: 2 },
+        };
+        const fl = FURNITURE_LIGHT[kind];
+        if (fl) {
+          const col = paletteGlow(kind) || [160, 170, 190];
+          out.push({ x: ex, y: ey, radius: fl.radius, color: col });
+          continue;
+        }
+        // Fire-based furniture — flickering, palette-coloured
+        if (kind === 'cooking_fire' || kind === 'furnace') {
+          const r = kind === 'cooking_fire' ? 4 : 3;
+          const f = torchFlicker(t, e.id);
+          const col = paletteGlow(kind) || FIRE_RED;
+          out.push({ x: ex, y: ey, radius: r * f, color: col, flicker: f });
+          continue;
+        }
       }
 
       if (!tags) continue;
@@ -190,16 +185,19 @@ export function collectLightSources(view, opts = {}) {
         out.push({ x: ex, y: ey, radius: 3, color: CAUSTIC_LIME });
       } else if (tags.includes('agony')) {
         out.push({ x: ex, y: ey, radius: 3, color: SHADOW_PURPLE });
-      } else if (tags.includes('glowing') || tags.includes('legendary_glowing')) {
+      } else if (tags.includes('legendary_glowing')) {
+        out.push({ x: ex, y: ey, radius: 3, color: paletteGlow('legendary_chest') || LANTERN_GOLD });
+      } else if (tags.includes('glowing')) {
         out.push({ x: ex, y: ey, radius: 3, color: LANTERN_GOLD });
       } else if (tags.includes('epic_glowing')) {
-        out.push({ x: ex, y: ey, radius: 2.5, color: EPIC_VIOLET });
+        out.push({ x: ex, y: ey, radius: 2.5, color: paletteGlow('epic_chest') || [200, 100, 255] });
       } else if (tags.includes('rare_glowing')) {
-        out.push({ x: ex, y: ey, radius: 1.5, color: RARE_BLUE });
+        out.push({ x: ex, y: ey, radius: 1.5, color: paletteGlow('magic_chest') || [100, 160, 255] });
       }
-      // Potion glow — very subtle shimmer on ground potions
+      // Potion glow — very subtle shimmer, colour from the specific potion palette entry
       if (tags.includes('potion_glow')) {
-        out.push({ x: ex, y: ey, radius: 1.5, color: POTION_TEAL });
+        const col = paletteGlow(kind) || paletteGlow('potion') || [120, 220, 200];
+        out.push({ x: ex, y: ey, radius: 1.5, color: col });
       }
     }
   }
