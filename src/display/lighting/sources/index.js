@@ -33,7 +33,7 @@ function paletteGlow(kind) {
 
 // ---- Colour palettes for light sources ----------------------------------
 // Explicit constants for effects that don't map 1:1 to a palette entry.
-const EYE_LIGHT    = [50, 50, 65];      // dim neutral sight (player vision range)
+// EYE_LIGHT removed — eyesight is a vision mask, not a light source.
 const WARM_ORANGE  = [255, 190, 120];   // player torch / generic torch
 const LANTERN_GOLD = [255, 210, 140];   // lantern — slightly brighter, warmer
 const FIRE_RED     = [255, 120, 40];    // burning entities / fire hazards
@@ -78,6 +78,12 @@ const EYE_LERP_SPEED  = 3.0;  // tiles/sec — fast enough to track, slow enough
  *  fade glyph alpha near the vision boundary during blind recovery. */
 export function getSmoothedEyeRadius() { return _eyeRadiusCurrent < 0 ? 0 : _eyeRadiusCurrent; }
 
+/** @type {import('../engine.js').VisionDef|null} */
+let _lastVisionDef = null;
+
+/** Return the current vision mask definition (built during collectLightSources). */
+export function getVisionDef() { return _lastVisionDef; }
+
 export function collectLightSources(view, opts = {}) {
   const q     = (opts.quality || 'auto').toLowerCase();
   const base  = q === 'low' ? 6 : (q === 'high' ? 10 : 8);
@@ -87,20 +93,14 @@ export function collectLightSources(view, opts = {}) {
   const out   = [];
   const playerId = Number(view.player?.id || 0) | 0;
 
-  // ---- Player eye-light (dim sight from vision range) ---------------------
-  // Even without a torch the player can see dimly within their vision range.
-  // This is natural eyesight — neutral, cool, low-intensity.  Equipment that
-  // boosts visionRange (lantern +3) widens this circle automatically.
-  // We place the light at tile-center (+0.5) and extend the radius by 0.5
-  // so the quadratic falloff fades smoothly across boundary tiles instead of
-  // cutting hard on integer tile edges.
+  // ---- Player vision (NOT a light — handled separately as vision mask) ----
+  // Smooth the eye radius between frames for blind recovery transitions.
   if (view.player) {
     const px = view.player.pos.x + 0.5, py = view.player.pos.y + 0.5;
     const vr = view.playerVisionRadius || 0;
 
-    // Smooth the eye-light radius between frames
     _eyeRadiusTarget = vr;
-    if (_eyeRadiusCurrent < 0) _eyeRadiusCurrent = vr; // first frame — snap
+    if (_eyeRadiusCurrent < 0) _eyeRadiusCurrent = vr;
     const diff = _eyeRadiusTarget - _eyeRadiusCurrent;
     if (Math.abs(diff) < 0.01) {
       _eyeRadiusCurrent = _eyeRadiusTarget;
@@ -108,11 +108,23 @@ export function collectLightSources(view, opts = {}) {
       _eyeRadiusCurrent += Math.sign(diff) * Math.min(Math.abs(diff), EYE_LERP_SPEED * dt);
     }
 
+    // Build vision def for the engine (exported via getVisionDef)
     if (_eyeRadiusCurrent > 0) {
-      out.push({ x: px, y: py, radius: _eyeRadiusCurrent + 0.5, color: EYE_LIGHT });
+      const facing = view.playerFacing;
+      const coneDeg = view.playerConeDegrees || 360;
+      _lastVisionDef = {
+        x: px, y: py,
+        radius: _eyeRadiusCurrent + 0.5,
+        facingX: facing ? facing.x : 0,
+        facingY: facing ? facing.y : 0,
+        coneDeg: coneDeg,
+        penumbraDeg: 25,
+      };
+    } else {
+      _lastVisionDef = null;
     }
 
-    // ---- Torch light (warm, flickering, layered on top of eye-light) -----
+    // ---- Torch light (warm, flickering) ----------------------------------
     if (Array.isArray(view.entities)) {
       for (let i = 0; i < view.entities.length; i++) {
         const e = view.entities[i];

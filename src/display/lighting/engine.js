@@ -19,6 +19,20 @@ const SQRT2 = 1.4142;
  */
 
 /**
+ * Vision mask — NOT a light.  Controls what the player can perceive (lifts
+ * darkness) without emitting colour or creating halos.
+ * @typedef {{
+ *   x: number,           // tile-space X (fractional, tile-center)
+ *   y: number,           // tile-space Y
+ *   radius: number,      // max sight distance in tiles (smoothed)
+ *   facingX?: number,    // unit-direction X (null/0 = omnidirectional)
+ *   facingY?: number,    // unit-direction Y
+ *   coneDeg?: number,    // total cone width in degrees (360 = full circle)
+ *   penumbraDeg?: number // soft edge width in degrees (default 25)
+ * }} VisionDef
+ */
+
+/**
  * Create a self-contained lighting engine instance.
  * Manages its own off-screen canvas and typed-array buffers.
  */
@@ -31,6 +45,7 @@ export function createLightingEngine() {
   /** @type {Float32Array} */ let lightR = null;
   /** @type {Float32Array} */ let lightG = null;
   /** @type {Float32Array} */ let lightB = null;
+  /** @type {Float32Array} */ let vision = null;  // 0 = unseen, 1 = full sight
 
   const lmCanvas = document.createElement('canvas');
   const lmCtx    = lmCanvas.getContext('2d');
@@ -53,6 +68,7 @@ export function createLightingEngine() {
     lightR = new Float32Array(n);
     lightG = new Float32Array(n);
     lightB = new Float32Array(n);
+    vision = new Float32Array(n);
     lmCanvas.width  = w;
     lmCanvas.height = h;
     imgData = lmCtx.createImageData(w, h);
@@ -120,6 +136,95 @@ export function createLightingEngine() {
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
         normX[i] = dx / len;
         normY[i] = dy / len;
+      }
+    }
+  }
+
+  // ---- Vision mask construction -----------------------------------------
+
+  /**
+   * Build the vision mask: a smooth 0-1 buffer indicating how well the player
+   * can perceive each sub-cell.  This is NOT illumination — it only controls
+   * whether the darkness overlay is lifted so the player can see what's there.
+   *
+   * Supports both omnidirectional (360°) and directional cone vision with
+   * smooth penumbra edges.  Wall occlusion is handled via SDF ray-march.
+   *
+   * @param {VisionDef|null} visionDef
+   */
+  function buildVision(visionDef) {
+    const w = lmW, h = lmH;
+    vision.fill(0);
+    if (!visionDef || visionDef.radius <= 0) return;
+
+    const vr = visionDef.radius;
+    const vrSub = vr * SUB;
+    const vrSub2 = vrSub * vrSub;
+    const invVrSub = 1 / vrSub;
+
+    // Player position in sub-cell space
+    const psx = (visionDef.x - _tx0) * SUB;
+    const psy = (visionDef.y - _ty0) * SUB;
+
+    // Cone parameters
+    const coneDeg = visionDef.coneDeg || 360;
+    const hasCone = coneDeg < 359;
+    const penumbraDeg = visionDef.penumbraDeg || 25;
+    const halfConeRad = (coneDeg * 0.5) * (Math.PI / 180);
+    const penumbraRad = penumbraDeg * (Math.PI / 180);
+    const fx = visionDef.facingX || 0;
+    const fy = visionDef.facingY || 0;
+
+    // Bounding rect
+    const sx0 = Math.max(1,     (psx - vrSub) | 0);
+    const sy0 = Math.max(1,     (psy - vrSub) | 0);
+    const sx1 = Math.min(w - 2, (psx + vrSub) | 0);
+    const sy1 = Math.min(h - 2, (psy + vrSub) | 0);
+
+    for (let sy = sy0; sy <= sy1; sy++) {
+      const dy = sy - psy;
+      const dy2 = dy * dy;
+      const rowOff = sy * w;
+      for (let sx = sx0; sx <= sx1; sx++) {
+        const i = rowOff + sx;
+        if (sdf[i] <= 0) continue;  // inside wall
+
+        const dx = sx - psx;
+        const dist2 = dx * dx + dy2;
+        if (dist2 > vrSub2) continue;
+
+        // Wall occlusion
+        if (!rayVisible(psx, psy, sx, sy, w)) continue;
+
+        // Distance falloff — smooth fade over last 1.5 tiles
+        const dist = Math.sqrt(dist2);
+        const edgeFade = 1.5 * SUB;  // fade zone width in sub-cells
+        let v = 1.0;
+        if (dist > vrSub - edgeFade) {
+          v = Math.max(0, (vrSub - dist) / edgeFade);
+          v = v * v * (3 - 2 * v);  // smoothstep
+        }
+
+        // Cone attenuation
+        if (hasCone && dist > 2 * SUB) {  // skip cone check very close to player
+          const angle = Math.atan2(dy, dx);
+          const facingAngle = Math.atan2(fy, fx);
+          let diff = angle - facingAngle;
+          // Normalize to [-PI, PI]
+          if (diff > Math.PI) diff -= 2 * Math.PI;
+          if (diff < -Math.PI) diff += 2 * Math.PI;
+          const absDiff = Math.abs(diff);
+
+          if (absDiff > halfConeRad + penumbraRad) {
+            continue;  // fully outside cone + penumbra
+          } else if (absDiff > halfConeRad) {
+            // In penumbra — smooth falloff
+            const penT = 1.0 - (absDiff - halfConeRad) / penumbraRad;
+            v *= penT * penT * (3 - 2 * penT);  // smoothstep
+          }
+        }
+
+        vision[i] = v;
       }
     }
   }
@@ -289,8 +394,9 @@ export function createLightingEngine() {
    * @param {[number,number,number]|null} [ambient] — RGB 0-1 base light for every open cell
    * @param {number} [maxDark=140] — max darkness alpha (0=no overlay, 255=pure black)
    * @param {((x:number,y:number)=>boolean)|null} [isRoofed] — roofed cells get no ambient
+   * @param {VisionDef|null} [visionDef] — player vision mask (not a light)
    */
-  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed) {
+  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef) {
     const DARK = (maxDark != null) ? maxDark : 140;
     const tx0 = Math.floor(vx0) - 1;
     const ty0 = Math.floor(vy0) - 1;
@@ -304,11 +410,14 @@ export function createLightingEngine() {
     _tx0 = tx0; _ty0 = ty0;
 
     buildSDF(isOpaque, tx0, ty0, tw, th);
+    buildVision(visionDef || null);
     accumulateLights(lights, ambient || null, isRoofed || null);
 
     const n = lmW * lmH;
 
     // ---- Pass 1: darkness overlay (source-over, black + alpha) ----------
+    // Vision mask lifts darkness (lets you see) without adding colour.
+    // Lights also lift darkness AND add colour in pass 2.
     for (let i = 0; i < n; i++) {
       const pi = i << 2;
       pixels[pi]     = 0;
@@ -318,7 +427,12 @@ export function createLightingEngine() {
         pixels[pi + 3] = DARK;
       } else {
         const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.5);
-        pixels[pi + 3] = Math.max(0, (DARK - brightness * (DARK + 20)) | 0);
+        const sight = vision[i];  // 0-1 vision mask
+        // Vision lifts darkness to reveal what's there; light lifts further
+        const visLift = sight * 0.85;  // vision alone doesn't fully clear darkness
+        const lightLift = brightness;
+        const totalLift = Math.min(1, visLift + lightLift);
+        pixels[pi + 3] = Math.max(0, (DARK * (1 - totalLift)) | 0);
       }
     }
     lmCtx.putImageData(imgData, 0, 0);
