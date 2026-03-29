@@ -115,8 +115,8 @@ export function collectLightSources(view, opts = {}) {
       _lastVisionDef = {
         x: px, y: py,
         radius: _eyeRadiusCurrent + 0.5,
-        facingX: facing ? facing.x : 0,
-        facingY: facing ? facing.y : 0,
+        facingX: facing ? facing.dx : 0,
+        facingY: facing ? facing.dy : 0,
         coneDeg: coneDeg,
         penumbraDeg: 25,
       };
@@ -237,6 +237,10 @@ export function collectLightSources(view, opts = {}) {
       if (tags.includes('potion_glow')) {
         const col = paletteGlow(kind) || paletteGlow('potion') || [120, 220, 200];
         out.push({ x: ex, y: ey, radius: 1.5, color: col });
+      }
+      // Gold glow — compact golden gleam
+      if (tags.includes('gold_glow')) {
+        out.push({ x: ex, y: ey, radius: 1.2, color: [255, 210, 80] });
       }
     }
   }
