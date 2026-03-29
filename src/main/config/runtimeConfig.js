@@ -109,8 +109,8 @@ export function readRuntimeConfig() {
     effectsParam: params.get("effects") || "",
     debug:        params.has("debug"),
     disableFov: parseBooleanish(disableFovParam, parseBooleanish(disableFovStored, false)),
-    disableFovCone: parseBooleanish(disableFovConeParam, parseBooleanish(disableFovConeStored, false)),
-    facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, facingTurnCostDeviceDefault)),
+    disableFovCone: parseBooleanish(disableFovConeParam, parseBooleanish(disableFovConeStored, true)),
+    facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, false)),
     identifyItems: params.get("identify") !== "off",
     dungeonType:  params.get("dungeonType") || null,
   };
