@@ -5474,7 +5474,7 @@ function render(worldView) {
   // of the darkness, while tiles + entities are properly darkened.
   if (PERF.quality !== 'low') {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime });
-    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx }, _fxTime);
+    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx });
     const _ambient = computeAmbient(worldView);
     lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1, _ambient);
   }

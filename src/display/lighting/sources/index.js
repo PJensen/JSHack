@@ -8,7 +8,6 @@
 const WARM_ORANGE  = [255, 190, 120];   // player torch / generic torch
 const LANTERN_GOLD = [255, 210, 140];   // lantern — slightly brighter, warmer
 const FIRE_RED     = [255, 120, 40];    // burning entities / fire hazards
-const FROST_BLUE   = [140, 200, 255];   // frost effects
 const STORM_WHITE  = [200, 210, 255];   // lightning / storm effects
 const SOUL_GREEN   = [80, 255, 120];    // soul / nature magic
 const BLOOD_RED    = [255, 50, 50];     // blood magic
@@ -128,13 +127,11 @@ export function collectLightSources(view, opts = {}) {
 
 /**
  * Append transient lights from active spell / FX controllers.
- * Called separately so main.js can feed in whatever FX systems it wants.
  *
  * @param {LightDef[]} out — array to push into (mutated)
- * @param {object} fxSources — keyed FX controllers
- * @param {number} fxTime
+ * @param {object} fxSources — keyed FX controllers with getActiveLights()
  */
-export function collectFxLights(out, fxSources, fxTime) {
+export function collectFxLights(out, fxSources) {
   // Query each FX controller for active light sources
   const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx];
   for (let c = 0; c < controllers.length; c++) {
