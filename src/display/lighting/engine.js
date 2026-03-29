@@ -3,11 +3,6 @@
 // 8×8 lighting cells per game tile — smooth quadratic falloff, wall-face
 // catch-lights via SDF normals.  Ported from js-hack-arena's torchPass and
 // adapted to JSHack's discrete tile grid.
-//
-// Usage:
-//   const lighting = createLightingEngine();
-//   // inside render(), after entities but before float-text:
-//   lighting.render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1);
 
 const SUB = 8;             // sub-cells per tile edge  (64 cells/tile)
 const INV_SUB = 1 / SUB;   // tile-units per sub-cell
