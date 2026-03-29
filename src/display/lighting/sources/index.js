@@ -2,9 +2,12 @@
 // Collect display-side light sources from a WorldView snapshot.
 // Returns LightDef[] compatible with the lighting engine.
 
-import { TURNS_PER_DAY } from '../../../rules/data/calendar.js';
-
 /** @typedef {import('../engine.js').LightDef} LightDef */
+
+// Mirror of rules/data/calendar.TURNS_PER_DAY — display layer cannot import
+// rules directly.  The bridge (worldView) normalises time into turnInDay so
+// this constant is only needed for the sun/moon arc boundaries below.
+const TURNS_PER_DAY = 720;
 
 // ---- Colour palettes for light sources ----------------------------------
 const EYE_LIGHT    = [50, 50, 65];      // dim neutral sight (player vision range)
@@ -27,10 +30,10 @@ const SHADOW_PURPLE = [160, 80, 220];   // shadow / agony magic
  */
 function torchFlicker(t, id) {
   return 1.0
-    + 0.12 * Math.sin(t * 5.7  + id)
-    + 0.08 * Math.sin(t * 13.3 + id)
-    + 0.06 * Math.sin(t * 23.1)
-    + 0.10 * (Math.random() - 0.5);
+    + 0.10 * Math.sin(t * 1.4  + id)       // slow sway
+    + 0.06 * Math.sin(t * 3.1  + id * 0.7) // medium wobble
+    + 0.04 * Math.sin(t * 5.9)              // subtle shimmer
+    + 0.04 * (Math.random() - 0.5);         // gentle jitter
 }
 
 /**
@@ -83,8 +86,8 @@ export function collectLightSources(view, opts = {}) {
       const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
       const kind = (typeof e.kind === 'string') ? e.kind.toLowerCase() : '';
 
-      // Ground torches (items on map) — flickering warm light
-      if (layer === 250 && kind === 'torch') {
+      // Placed torches — room features (layer 300) or ground items (layer 250)
+      if (kind === 'torch') {
         const f = torchFlicker(t, e.id);
         out.push({ x: ex, y: ey, radius: 6 * f, color: WARM_ORANGE, flicker: f });
         continue;
