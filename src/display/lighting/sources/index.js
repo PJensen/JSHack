@@ -175,8 +175,8 @@ const SUN_ARC = SUNSET - SUNRISE;                          // 430 turns of dayli
 const MOON_ARC = TURNS_PER_DAY - SUNSET + SUNRISE;         // 290 turns of moonlight
 
 // Colour palettes (linear RGB, 0-1)
-const SUN_ZENITH  = [0.95, 0.92, 0.85];   // overhead — bright warm white
-const SUN_HORIZON = [1.00, 0.55, 0.20];   // low sun  — golden-amber
+const SUN_ZENITH  = [0.95, 0.93, 0.88];   // overhead — near-white with slight warmth
+const SUN_HORIZON = [1.00, 0.55, 0.20];   // low sun  — golden-amber (dawn/dusk only)
 const MOON_ZENITH = [0.18, 0.20, 0.35];   // overhead — cool blue-white
 const MOON_HORIZON = [0.08, 0.08, 0.18];  // low moon — dim indigo
 
@@ -231,8 +231,10 @@ export function computeAmbient(view) {
   const sunElev = arcElevation(tid, SUNRISE, SUN_ARC);
   let sr = 0, sg = 0, sb = 0;
   if (sunElev > 0) {
-    // Blend from horizon colour at low elevation to zenith colour at high
-    const col = lerpRGB(SUN_HORIZON, SUN_ZENITH, sunElev);
+    // Horizon tint compressed to low elevations via power curve.
+    // At elev 0.3 the blend is already ~90% zenith; midday is pure white.
+    const horizonBlend = Math.pow(1 - sunElev, 3);
+    const col = lerpRGB(SUN_ZENITH, SUN_HORIZON, horizonBlend);
     sr = col[0] * sunElev;
     sg = col[1] * sunElev;
     sb = col[2] * sunElev;
@@ -243,7 +245,8 @@ export function computeAmbient(view) {
   let mr = 0, mg = 0, mb = 0;
   if (moonElev > 0) {
     const brightness = view.moonBrightness || 0.15;
-    const col = lerpRGB(MOON_HORIZON, MOON_ZENITH, moonElev);
+    const horizonBlend = Math.pow(1 - moonElev, 3);
+    const col = lerpRGB(MOON_ZENITH, MOON_HORIZON, horizonBlend);
     mr = col[0] * moonElev * brightness;
     mg = col[1] * moonElev * brightness;
     mb = col[2] * moonElev * brightness;
