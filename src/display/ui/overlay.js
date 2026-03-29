@@ -3100,6 +3100,14 @@ function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp) {
     window.dispatchEvent(new CustomEvent('ui:setIdentification', { detail: { enabled: on } }));
   }));
 
+  content.appendChild(makeCheckbox('FOV cone', !data.fovConeDisabled, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setFovConeDisabled', { detail: { disabled: !on } }));
+  }));
+
+  content.appendChild(makeCheckbox('Facing turn cost', !!data.facingTurnCostEnabled, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setFacingTurnCost', { detail: { enabled: on } }));
+  }));
+
   // --- Input section ---
   const inputHead = document.createElement('div');
   inputHead.textContent = 'Input';
