@@ -47,6 +47,7 @@ import { KnockbackPending } from "../components/KnockbackPending.js";
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_ALERTED } from "../components/AggroState.js";
 import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
 import { Web } from "../archetypes/RoomFeatures.js";
+import { spawnWeb } from "../utils/spawnWeb.js";
 
 const BLINK_DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -1635,18 +1636,9 @@ REGISTRY["web_spit"] = function webSpitScript(world, actor, spell, intent) {
   }
 
   let spawned = false;
-  for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
-    if ((pos.x | 0) === tx && (pos.y | 0) === ty && String(ni?.identity || "") === "web") {
-      spawned = true;
-      break;
-    }
-  }
-  if (!spawned) {
-    try {
-      createFrom(world, Web, { x: tx, y: ty });
-      spawned = true;
-    } catch {}
-  }
+  try {
+    spawned = spawnWeb(world, tx, ty) > 0;
+  } catch {}
 
   try {
     world.emit?.("spell:web_spit", {

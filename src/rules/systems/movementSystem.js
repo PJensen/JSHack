@@ -25,10 +25,8 @@ import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { addToInventory, hasCapacityForItem } from "../utils/inventoryFacade.js";
 import { resolveBump } from "../data/bumpResolvers.js";
-import { Web } from "../archetypes/RoomFeatures.js";
-import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { DoorState } from "../components/DoorState.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
+import { spawnWeb } from "../utils/spawnWeb.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
@@ -46,23 +44,7 @@ function hasIdentity(world, id, identity) {
   return String(ni?.identity || "").toLowerCase() === identity;
 }
 
-/** @param {any} world @param {number} x @param {number} y */
-function hasWebAt(world, x, y) {
-  for (const [, ni, pos] of world.query(NamedIdentity, Position)) {
-    if (ni?.identity === "web" && pos?.x === x && pos?.y === y) return true;
-  }
-  return false;
-}
 
-/** @param {any} world @param {number} entityId */
-function attachToCurrentFloor(world, entityId) {
-  if (!(entityId > 0)) return;
-  for (const [, ds] of world.query(DungeonState)) {
-    if (!ds || !Array.isArray(ds.floorEntityIds)) break;
-    if (!ds.floorEntityIds.includes(entityId)) ds.floorEntityIds.push(entityId);
-    break;
-  }
-}
 
 /** @param {any} world @param {import('../utils/tileQueryCache.js').TileQueryState} tiles @param {number} x @param {number} y */
 function isBlockedOnlyByWebs(world, tiles, x, y) {
@@ -105,16 +87,7 @@ export function installSpiderWebListener(world) {
     try {
       const ni = world.get(id, NamedIdentity);
       if (ni?.identity === "spider") {
-        const snap = getTileQuerySnapshot(world);
-        const ids = snap.byCell.get(key(from.x, from.y));
-        let hasDoor = false;
-        if (ids) for (const eid of ids) {
-          if (world.has(eid, DoorState)) { hasDoor = true; break; }
-        }
-        if (hasDoor) return;
-        if (hasWebAt(world, from.x, from.y)) return;
-        const webId = createFrom(world, Web, { x: from.x, y: from.y });
-        attachToCurrentFloor(world, webId);
+        spawnWeb(world, from.x, from.y);
       }
     } catch (e) {
       console.debug("[movementSystem] spider web spawn failed:", e);
