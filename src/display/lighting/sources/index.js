@@ -4,7 +4,7 @@
 
 /** @typedef {import('../engine.js').LightDef} LightDef */
 
-import { basePalette } from '../palette/base.js';
+import { basePalette } from '../../palette/base.js';
 
 // Mirror of rules/data/calendar.TURNS_PER_DAY — display layer cannot import
 // rules directly.  The bridge (worldView) normalises time into turnInDay so
@@ -78,11 +78,14 @@ export function collectLightSources(view, opts = {}) {
   // Even without a torch the player can see dimly within their vision range.
   // This is natural eyesight — neutral, cool, low-intensity.  Equipment that
   // boosts visionRange (lantern +3) widens this circle automatically.
+  // We place the light at tile-center (+0.5) and extend the radius by 0.5
+  // so the quadratic falloff fades smoothly across boundary tiles instead of
+  // cutting hard on integer tile edges.
   if (view.player) {
-    const px = view.player.pos.x, py = view.player.pos.y;
+    const px = view.player.pos.x + 0.5, py = view.player.pos.y + 0.5;
     const vr = view.playerVisionRadius || 0;
     if (vr > 0) {
-      out.push({ x: px, y: py, radius: vr, color: EYE_LIGHT });
+      out.push({ x: px, y: py, radius: vr + 0.5, color: EYE_LIGHT });
     }
 
     // ---- Torch light (warm, flickering, layered on top of eye-light) -----
@@ -92,7 +95,7 @@ export function collectLightSources(view, opts = {}) {
         if ((Number(e.id || 0) | 0) !== playerId) continue;
         if (Array.isArray(e.tags) && e.tags.includes('torch')) {
           const f = torchFlicker(t, playerId);
-          out.push({ x: px, y: py, radius: base * f, color: WARM_ORANGE, flicker: f });
+          out.push({ x: px, y: py, radius: base * f + 0.5, color: WARM_ORANGE, flicker: f });
         }
         break;
       }
@@ -109,7 +112,7 @@ export function collectLightSources(view, opts = {}) {
       // The player remembers the decoration is there, but it shouldn't illuminate.
       if (tags && (tags.includes('memory_fixed') || tags.includes('memory_recent')
                 || tags.includes('memory_esp') || tags.includes('memory_thermal'))) continue;
-      const ex = e.pos.x, ey = e.pos.y;
+      const ex = e.pos.x + 0.5, ey = e.pos.y + 0.5;
       const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
       const kind = (typeof e.kind === 'string') ? e.kind.toLowerCase() : '';
 
