@@ -34,6 +34,7 @@ import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { listAllMonsterIds } from "../../rules/data/monsters.js";
 import { Pet } from "../../rules/components/Pet.js";
+import { FOV_CONE_DISABLED_KEY, isFacingTurnCostEnabled, setFacingTurnCostEnabled } from "../../rules/utils/facing.js";
 import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
 import { groupDisplayItems } from "./itemGrouping.js";
 import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
@@ -714,6 +715,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         identificationEnabled: isIdentificationEnabled(),
         hungerEnabled: set ? set.hungerEnabled !== false : true,
         deityDebugPinned: set ? set.deityDebugPinned === true : false,
+        fovConeDisabled: world[FOV_CONE_DISABLED_KEY] === true,
+        facingTurnCostEnabled: isFacingTurnCostEnabled(world),
         allItemIds: listAllItemIds(),
         allMonsterIds: listAllMonsterIds(),
         hasPet,
@@ -744,6 +747,18 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const cur = world.get(p.id, Settings);
     if (!cur) return;
     cur.deityDebugPinned = enabled;
+  });
+
+  addEventListener('ui:setFovConeDisabled', (ev) => {
+    const disabled = !!ev?.detail?.disabled;
+    world[FOV_CONE_DISABLED_KEY] = disabled;
+    try { localStorage.setItem('jshack.disableFovCone', String(disabled)); } catch {}
+  });
+
+  addEventListener('ui:setFacingTurnCost', (ev) => {
+    const enabled = !!ev?.detail?.enabled;
+    setFacingTurnCostEnabled(world, enabled);
+    try { localStorage.setItem('jshack.facingTurnCost', String(enabled)); } catch {}
   });
 
   addEventListener('ui:debugGiveItem', (ev) => {
