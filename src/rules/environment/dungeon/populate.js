@@ -617,43 +617,64 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       }
     }
 
-    // Wall torches: place 1-2 torches against walls in medium+ rooms.
-    // Torches go on floor tiles adjacent to a wall — provides ambient dungeon
-    // lighting that is FOV-gated (only visible rooms illuminate).
+    // Wall torches: prefer room corners, fall back to wall-adjacent cells.
+    // FOV-gated — only visible rooms illuminate.
     if (room.w >= 3 && room.h >= 3) {
       const torchBudget = room.w >= 5 && room.h >= 5 ? 2 : 1;
-      const wallAdjacentCells = [];
-      for (let ty = room.y; ty < room.y + room.h; ty++) {
-        for (let tx = room.x; tx < room.x + room.w; tx++) {
-          if (isSolid(tx, ty)) continue;
-          const lx = tx - chunk.chunkX * CHUNK_SIZE;
-          const ly = ty - chunk.chunkY * CHUNK_SIZE;
-          if (lx < 0 || ly < 0 || lx >= CHUNK_SIZE || ly >= CHUNK_SIZE) continue;
-          if (chunk.tiles[ly * CHUNK_SIZE + lx] !== TILE_FLOOR) continue;
-          // Must be adjacent to at least one wall tile
-          let nearWall = false;
-          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-            const nx = lx + dx, ny = ly + dy;
-            if (nx < 0 || ny < 0 || nx >= CHUNK_SIZE || ny >= CHUNK_SIZE) { nearWall = true; break; }
-            if (chunk.tiles[ny * CHUNK_SIZE + nx] === TILE_WALL) { nearWall = true; break; }
-          }
-          if (nearWall) wallAdjacentCells.push({ x: tx, y: ty });
-        }
-      }
-      // Shuffle and place up to torchBudget
-      for (let i = wallAdjacentCells.length - 1; i > 0; i--) {
+      // Corners first (most natural sconce positions)
+      const corners = [
+        { x: room.x,              y: room.y },
+        { x: room.x + room.w - 1, y: room.y },
+        { x: room.x,              y: room.y + room.h - 1 },
+        { x: room.x + room.w - 1, y: room.y + room.h - 1 },
+      ];
+      // Shuffle corners deterministically
+      for (let i = corners.length - 1; i > 0; i--) {
         const j = rng.int(0, i);
-        const tmp = wallAdjacentCells[i];
-        wallAdjacentCells[i] = wallAdjacentCells[j];
-        wallAdjacentCells[j] = tmp;
+        const tmp = corners[i]; corners[i] = corners[j]; corners[j] = tmp;
       }
       let placed = 0;
-      for (const c of wallAdjacentCells) {
+      for (const c of corners) {
         if (placed >= torchBudget) break;
         if (isSolid(c.x, c.y)) continue;
+        const lx = c.x - chunk.chunkX * CHUNK_SIZE;
+        const ly = c.y - chunk.chunkY * CHUNK_SIZE;
+        if (lx < 0 || ly < 0 || lx >= CHUNK_SIZE || ly >= CHUNK_SIZE) continue;
+        if (chunk.tiles[ly * CHUNK_SIZE + lx] !== TILE_FLOOR) continue;
         spawns.push({ x: c.x, y: c.y, kind: 'torch', params: {} });
         markSolid(c.x, c.y);
         placed++;
+      }
+      // Fall back to any wall-adjacent floor cell if corners were blocked
+      if (placed < torchBudget) {
+        const wallCells = [];
+        for (let ty = room.y; ty < room.y + room.h; ty++) {
+          for (let tx = room.x; tx < room.x + room.w; tx++) {
+            if (isSolid(tx, ty)) continue;
+            const lx = tx - chunk.chunkX * CHUNK_SIZE;
+            const ly = ty - chunk.chunkY * CHUNK_SIZE;
+            if (lx < 0 || ly < 0 || lx >= CHUNK_SIZE || ly >= CHUNK_SIZE) continue;
+            if (chunk.tiles[ly * CHUNK_SIZE + lx] !== TILE_FLOOR) continue;
+            let nearWall = false;
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+              const nx = lx + dx, ny = ly + dy;
+              if (nx < 0 || ny < 0 || nx >= CHUNK_SIZE || ny >= CHUNK_SIZE) { nearWall = true; break; }
+              if (chunk.tiles[ny * CHUNK_SIZE + nx] === TILE_WALL) { nearWall = true; break; }
+            }
+            if (nearWall) wallCells.push({ x: tx, y: ty });
+          }
+        }
+        for (let i = wallCells.length - 1; i > 0; i--) {
+          const j = rng.int(0, i);
+          const tmp = wallCells[i]; wallCells[i] = wallCells[j]; wallCells[j] = tmp;
+        }
+        for (const c of wallCells) {
+          if (placed >= torchBudget) break;
+          if (isSolid(c.x, c.y)) continue;
+          spawns.push({ x: c.x, y: c.y, kind: 'torch', params: {} });
+          markSolid(c.x, c.y);
+          placed++;
+        }
       }
     }
 
