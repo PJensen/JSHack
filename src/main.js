@@ -47,6 +47,8 @@ import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js
 import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
+import { createLightingEngine } from "./display/lighting/engine.js";
+import { collectLightSources, collectFxLights } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
@@ -637,6 +639,7 @@ const throwFx = createThrowFxController({
 });
 
 const weatherFx = createWeatherFxController();
+const lightingEngine = createLightingEngine();
 
 function getTargetedSpellConfig(spellId) {
   return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;
@@ -5465,6 +5468,15 @@ function render(worldView) {
     drawEntityHealthBar(bctx, _healthBarsToDraw[i]);
   }
   pruneHealthBarState();
+
+  // ---- Lighting engine pass (SDF sub-tile overlay) --------------------------
+  // Placed before spell FX so bolts/meteors/projectiles appear bright on top
+  // of the darkness, while tiles + entities are properly darkened.
+  if (PERF.quality !== 'low') {
+    const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime });
+    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx }, _fxTime);
+    lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1);
+  }
 
   drawWorldEffects({
     bctx,
