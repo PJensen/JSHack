@@ -17,6 +17,8 @@ import { applyProcAccumulator } from "./procApplication.js";
 import { clamp } from "../../shared/math/math.js";
 import { getShieldArcMultiplier } from "./combatPositioning.js";
 import { consumeShieldGuardStack, refreshShieldGuard } from "./shieldGuard.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
+import { getMonster } from "../data/monsters.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -353,6 +355,8 @@ export function dealDamage(world, spec) {
       noTrigger: !!spec.noTrigger,
       offhand: !!spec.offhand,
       projectileDelay: spec.projectileDelay || 0,
+      targetKind: String(world.get(target, NamedIdentity)?.identity || ''),
+      goreType: String(getMonster(String(world.get(target, NamedIdentity)?.identity || ''))?.goreType || 'blood'),
     });
   } catch { /* */ }
 

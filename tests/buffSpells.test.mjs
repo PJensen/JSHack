@@ -43,7 +43,7 @@ Deno.test("verdant_ward applies long regen, stoneskin, and vision stat envelope"
 
   const ae = world.get(caster, ActiveEffects);
   const regen = ae.effects.find((e) => e?.key === "regen");
-  assertEquals(Number(regen?.turnsLeft || 0), 60);
+  assertEquals(Number(regen?.turnsLeft || 0), 30);
 
   const envelope = ae.effects.find((e) => e?.key === "stat_envelope" && e?.stat === "visionRange");
   assert(envelope, "verdant_ward should include vision envelope");

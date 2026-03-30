@@ -310,6 +310,7 @@ export const MONSTERS = [
     id: 'grid_bug',
     name: 'Grid Bug',
     tags: ['beast', 'vermin', 'electric'],
+    goreType: 'spark',
     tier: 0,
     intelligence: 1,   // mindless; instinct only
     baseHp: 3,
@@ -517,6 +518,7 @@ export const MONSTERS = [
     id: 'skeleton_archer',
     name: 'Skeleton Archer',
     tags: ['undead', 'skeletal'],
+    goreType: 'none',
     tier: 0,
     intelligence: 5,   // humanoid dim — follows orders
     packSense: true, packRadius: 8,
@@ -542,6 +544,7 @@ export const MONSTERS = [
     id: 'skeletal_shadow_caster',
     name: 'Skeletal Shadow Caster',
     tags: ['undead', 'skeletal', 'caster'],
+    goreType: 'none',
     tier: 1,
     intelligence: 9,
     visionRange: 9,
@@ -580,6 +583,7 @@ export const MONSTERS = [
     id: 'floating_eye',
     name: 'Floating Eye',
     tags: ['aberration', 'psychic'],
+    goreType: 'ichor',
     tier: 0,
     intelligence: 2,   // dumb (≤3 triggers scurry: wanders randomly when unaware)
     visionRange: 6,
@@ -644,6 +648,7 @@ export const MONSTERS = [
     id: 'bone_bowman',
     name: 'Bone Bowman',
     tags: ['undead', 'skeletal'],
+    goreType: 'none',
     tier: 1,
     intelligence: 5,   // humanoid dim
     packSense: true, packRadius: 8,
@@ -780,6 +785,7 @@ export const MONSTERS = [
     id: 'skeletal_agony_warlock',
     name: 'Skeletal Agony Warlock',
     tags: ['undead', 'skeletal', 'caster', 'warlock'],
+    goreType: 'none',
     tier: 0,
     intelligence: 10,
     visionRange: 9,
@@ -855,6 +861,7 @@ export const MONSTERS = [
     id: 'skeleton',
     name: 'Skeleton',
     tags: ['undead', 'skeletal'],
+    goreType: 'none',
     tier: 1,
     intelligence: 4,   // pack animal — horde behavior
     packSense: true, packRadius: 8,
@@ -1063,8 +1070,8 @@ export const MONSTERS = [
           abilityId: 'druid_verdant_ward',
           abilityName: 'Verdant Ward',
           targeting: 'self',
-          cooldownTurns: 25,
-          chance: 0.40,
+          cooldownTurns: 70,
+          chance: 0.25,
         }),
         castSpellOnLOS({
           spellId: 'entangle',
@@ -1096,6 +1103,7 @@ export const MONSTERS = [
     id: 'skeletal_marksman',
     name: 'Skeletal Marksman',
     tags: ['undead', 'skeletal'],
+    goreType: 'none',
     tier: 2,
     intelligence: 5,   // humanoid dim
     packSense: true, packRadius: 8,
@@ -1122,6 +1130,7 @@ export const MONSTERS = [
     id: 'skeleton_sharpshooter',
     name: 'Skeleton Sharpshooter',
     tags: ['undead', 'skeletal'],
+    goreType: 'none',
     tier: 2,
     intelligence: 5,   // humanoid dim
     packSense: true, packRadius: 8,
@@ -1171,6 +1180,7 @@ export const MONSTERS = [
     id: 'wraith',
     name: 'Wraith',
     tags: ['undead', 'spectral'],
+    goreType: 'none',
     tier: 2,
     intelligence: 7,   // tactical mind — fights and flees
     retreatHpPct: 0.25,
@@ -1217,6 +1227,7 @@ export const MONSTERS = [
     id: 'carrion_shade',
     name: 'Carrion Shade',
     tags: ['undead', 'spectral'],
+    goreType: 'none',
     tier: 2,
     intelligence: 7,   // tactical — lurks then retreats when cornered
     ambush: true,      // lurks until player is within 2 tiles
@@ -1320,6 +1331,7 @@ export const MONSTERS = [
     id: 'death_archer',
     name: 'Death Archer',
     tags: ['undead', 'skeletal'],
+    goreType: 'none',
     tier: 3,
     intelligence: 6,   // cunning hunter
     packSense: true, packRadius: 10,
@@ -1413,6 +1425,7 @@ export const MONSTERS = [
     id: 'lich',
     name: 'Lich',
     tags: ['undead', 'caster', 'humanoid'],
+    goreType: 'none',
     tier: 3,
     intelligence: 10,  // sapient sorcerer — picks up better weapons
     retreatHpPct: 0.25,
@@ -1441,6 +1454,7 @@ export const MONSTERS = [
     id: 'mimic',
     name: 'Mimic',
     tags: ['aberration', 'mimic'],
+    goreType: 'ichor',
     tier: 99,
     intelligence: 6,   // cunning ambusher — waits for victims
     ambush: true,
@@ -1464,6 +1478,7 @@ export const MONSTERS = [
     id: 'stone_taunter',
     name: 'Taunting Statue',
     tags: ['construct'],
+    goreType: 'spark',
     tier: 99,
     intelligence: 2,   // construct with scripted taunting behavior
     ambush: true,      // doesn't move; waits for targets to come close
@@ -1490,6 +1505,7 @@ export const MONSTERS = [
     id: 'lichen',
     name: 'Lichen',
     tags: ['plant'],
+    goreType: 'ichor',
     corpseDropChance: 0.9,
     tier: 0,
     intelligence: 1,   // mindless growth — scurries randomly
