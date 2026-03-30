@@ -5507,7 +5507,8 @@ function render(worldView) {
     const _ambient = computeAmbient(worldView);
     const _roofMask = worldView.isOverworld ? isRoofed : null;
     const _visionDef = getVisionDef();
-    lightingEngine.render(bctx, _lights, isOpaque, vx0, vy0, vx1, vy1, _ambient, undefined, _roofMask, _visionDef);
+    const _lightOpaque = worldView.isBlockedVision || isOpaque;
+    lightingEngine.render(bctx, _lights, _lightOpaque, vx0, vy0, vx1, vy1, _ambient, undefined, _roofMask, _visionDef);
   }
 
   drawWorldEffects({

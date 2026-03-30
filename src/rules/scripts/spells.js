@@ -2529,7 +2529,7 @@ REGISTRY['verdant_ward'] = function verdantWardScript(world, actor, _spell, _int
   const ae = ensureActiveEffectList(world, actor);
   if (!ae) return;
 
-  const DURATION = 60;
+  const DURATION = 30;
   upsertTimedEffect(ae.effects, {
     key: 'regen',
     turnsLeft: DURATION,
@@ -2551,8 +2551,8 @@ REGISTRY['verdant_ward'] = function verdantWardScript(world, actor, _spell, _int
     toValue: startVision + 2,
     endValue: startVision,
     rampIn: 3,
-    hold: 48,
-    rampOut: 9,
+    hold: 20,
+    rampOut: 7,
     turnsLeft: DURATION,
   });
 

@@ -166,12 +166,8 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   });
 
   // ── Melee gore VFX helpers ──────────────────────────────────────────
-  // Tags that indicate non-fleshy creatures (skip blood gore).
-  const GORE_SKIP_KINDS = new Set([
-    'skeleton', 'skeletal_marksman', 'skeletal_shadow_caster', 'skeletal_agony_warlock',
-    'skeleton_sharpshooter', 'bone_bowman',
-    'grid_bug', 'floating_eye',
-  ]);
+  // Gore type is passed through the damaged event from monster data.
+  // 'blood' = default fleshy, 'none' = skeletal/spectral, 'ichor' = aberrations, 'spark' = electric/construct.
   const GORE_BLOOD = { r: 140, g: 18, b: 18 };          // deep arterial red
   const GORE_BLOOD_DARK = { r: 90, g: 10, b: 10 };      // drying blood (pools)
   const GORE_GIB = { r: 160, g: 30, b: 30 };             // flesh chunk
@@ -235,7 +231,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   }
 
   // Floating text hooks: damage (messages handled in messageWiring)
-  world.on('damaged', ({ target, source, amount, rawAmount, cause, critical, crit, at, offhand, projectileDelay }) => {
+  world.on('damaged', ({ target, source, amount, rawAmount, cause, critical, crit, at, offhand, projectileDelay, targetKind, goreType }) => {
     const t = Number(target || 0) || 0;
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(t);
     const hitIsPlayer = isPlayer(t);
@@ -246,10 +242,12 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
     }
 
-    // Melee gore VFX — blood splatter, gibs, and pools
+    // Melee gore VFX — blood splatter, gibs, and pools (fleshy creatures only)
     const causeStr = String(cause || '');
+    const _goreType = String(goreType || 'blood');
     if (pos && fx?.pool && amount > 0
-        && (causeStr === 'melee' || causeStr === 'retaliation' || causeStr === 'offhand')) {
+        && (causeStr === 'melee' || causeStr === 'retaliation' || causeStr === 'offhand')
+        && _goreType === 'blood') {
       const srcPos = getPosition(Number(source || 0));
       let dx = 0, dy = 0;
       if (srcPos) {
