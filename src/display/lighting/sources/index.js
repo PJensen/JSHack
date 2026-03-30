@@ -174,8 +174,6 @@ export function collectLightSources(view, opts = {}) {
           altar:       { radius: 2 },
           shrine:      { radius: 2 },
           mushrooms:   { radius: 2 },
-          stair_down:  { radius: 2 },
-          stair_up:    { radius: 2 },
         };
         const fl = FURNITURE_LIGHT[kind];
         if (fl) {
@@ -246,6 +244,15 @@ export function collectLightSources(view, opts = {}) {
       if (tags.includes('gem_glowing')) {
         const col = paletteGlow(kind) || [200, 150, 255];
         out.push({ x: ex, y: ey, radius: 1.8, color: col });
+      }
+      // Flaming weapon glow — subtle flickering fire around wielder
+      if (tags.includes('fire_weapon_glow')) {
+        const f = torchFlicker(t, e.id);
+        out.push({ x: ex, y: ey, radius: 3.5 * f, color: FIRE_RED, flicker: f });
+      }
+      // Pet/familiar ready-to-fire glow — soft warm pulse
+      if (tags.includes('pet_ready_glow')) {
+        out.push({ x: ex, y: ey, radius: 2.5, color: [255, 160, 80] });
       }
     }
   }

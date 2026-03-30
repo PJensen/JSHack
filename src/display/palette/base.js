@@ -38,6 +38,7 @@ export const basePalette = {
   orc:      { glyph: "o", fg: "#cc6644", glow: "#993320" },
   orc_shaman: { glyph: "o", fg: "#88bbdd", glow: "#557799" },
   hobgoblin: { glyph: "H", fg: "#cc8844", glow: "#995522" },
+  druid:    { glyph: "d", fg: "#66cc44", glow: "#339922" },
   phase_spider: { glyph: "x", fg: "#aa66dd", glow: "#7733aa" },
   wight:    { glyph: "w", fg: "#88aacc", glow: "#557799" },
   skeleton: { glyph: "s", fg: "#ddd8c8", glow: "#aaa590" }, // 💀

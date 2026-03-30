@@ -22,6 +22,7 @@ import { Trap } from "../../rules/components/Trap.js";
 import { Vitality } from '../../rules/components/Vitality.js';
 import { Faction } from '../../rules/components/Faction.js';
 import { Pet } from '../../rules/components/Pet.js';
+import { PetState } from '../../rules/components/PetState.js';
 import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 import { effectiveMaxHp } from '../../rules/utils/passiveBonuses.js';
 import { getMonsterTags } from '../../rules/data/monsters.js';
@@ -382,10 +383,25 @@ function projectEquipmentDisplayTags(world, id, rec) {
 	/** @type {any} */ const eq = /** @type any */ (world.get(id, Equipment));
 	if (!eq) return;
 	const offhandId = Number(eq.offhand || 0) | 0;
-	if (!(offhandId > 0)) return;
-	const offhandIdentity = String(world.get(offhandId, NamedIdentity)?.identity || "").toLowerCase();
-	if (offhandIdentity === "torch" && !rec.tags.includes("torch")) {
-		rec.tags.push("torch");
+	if (offhandId > 0) {
+		const offhandIdentity = String(world.get(offhandId, NamedIdentity)?.identity || "").toLowerCase();
+		if (offhandIdentity === "torch" && !rec.tags.includes("torch")) {
+			rec.tags.push("torch");
+		}
+	}
+	// Flaming weapon glow — check main weapon for fire affixes/identity
+	const weaponId = Number(eq.weapon || 0) | 0;
+	if (weaponId > 0) {
+		const wInfo = /** @type {any} */ (world.get(weaponId, ItemInfo));
+		const wIdentity = String(world.get(weaponId, NamedIdentity)?.identity || "").toLowerCase();
+		const affixes = Array.isArray(wInfo?.affixes) ? wInfo.affixes : [];
+		const hasFire = affixes.includes('flaming') || affixes.includes('affix:flaming')
+			|| affixes.includes('firestorm1') || affixes.includes('affix:firestorm1')
+			|| wIdentity === 'flametongue' || wIdentity === 'ember_knife'
+			|| wIdentity === 'smoldering_club' || wIdentity === 'witchfire_sword';
+		if (hasFire && !rec.tags.includes('fire_weapon_glow')) {
+			rec.tags.push('fire_weapon_glow');
+		}
 	}
 }
 
@@ -874,6 +890,11 @@ export function buildWorldView(world) {
 			projectFacing(world, id, rec);
 			if (world.has(id, Flying) && !rec.tags.includes("flying")) rec.tags.push("flying");
 			if (_questGiverIds.has(id) && !rec.tags.includes("quest_giver")) rec.tags.push("quest_giver");
+			// Familiar ready-to-fire glow
+			const petState = /** @type {any} */ (world.get(id, PetState));
+			if (petState && petState.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
+				rec.tags.push("pet_ready_glow");
+			}
 
 			_allEntities.push(rec);
 			collectedIds.add(id);

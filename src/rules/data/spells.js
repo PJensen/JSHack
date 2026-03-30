@@ -645,6 +645,38 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'scorched', duration: '15 turns, target takes 30% more fire damage' },
     ],
   },
+  entangle: {
+    id: 'entangle',
+    name: 'Entangle',
+    symbol: '\u{1FAB4}',    // 🪴
+    schools: ['nature', 'alteration'],
+    manaCost: 10,
+    minIntelligence: 6,
+    range: 7,
+    script: 'entangle',
+    targeting: 'auto',
+    description: 'Grasping vines erupt from the earth and bind the target in place.',
+    effects: [
+      { kind: 'status', status: 'stunned', duration: '3 turns' },
+      { kind: 'damage', element: 'nature', amount: '2 per turn while entangled' },
+    ],
+  },
+  thorn_burst: {
+    id: 'thorn_burst',
+    name: 'Thorn Burst',
+    symbol: '\u{1F339}',    // 🌹
+    schools: ['destruction', 'nature'],
+    manaCost: 7,
+    minIntelligence: 5,
+    range: 8,
+    script: 'thorn_burst',
+    targeting: 'auto',
+    description: 'Launch a volley of razor thorns that shred flesh and leave lingering venom.',
+    effects: [
+      { kind: 'damage', element: 'nature', amount: '6 base, INT-scaled' },
+      { kind: 'status', status: 'poisoned', duration: '4 turns (30% chance)' },
+    ],
+  },
 };
 
 /**
