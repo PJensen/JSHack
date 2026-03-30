@@ -6,7 +6,6 @@
 
 import { Position }      from "../components/Position.js";
 import { Faction }       from "../components/Faction.js";
-import { Speed }         from "../components/Speed.js";
 import { Vitality }      from "../components/Vitality.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { ItemInfo }      from "../components/ItemInfo.js";
@@ -19,8 +18,9 @@ import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
 import { getMonster }    from "../data/monsters.js";
 import { getDecayStage } from "../data/food.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
-import { statusStrength }  from "../utils/statusFacade.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { canActThisTurn } from "../utils/speedGate.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 const ACTIVE_RADIUS = 24;
 const COOLDOWN_DEFAULT = 5;
@@ -69,7 +69,7 @@ function applyScavenge(world, id, vit, nutrition) {
   const heal = Math.max(1, Math.floor(nutrition / 100));
   const actual = Math.min((vit.maxHp | 0) - (vit.hp | 0), heal);
   if (actual > 0) vit.hp += actual;
-  try { world.emit?.("healed", { id, amount: actual }); } catch {}
+  emitSafe(world, "healed", { id, amount: actual });
   return { healAmount: actual };
 }
 
@@ -78,7 +78,7 @@ function applyDevour(world, id, vit, nutrition) {
   const cap = Math.floor((vit.maxHp | 0) * 1.5);
   const actual = Math.min(cap - (vit.hp | 0), gain);
   if (actual > 0) vit.hp += actual;
-  try { world.emit?.("healed", { id, amount: actual }); } catch {}
+  emitSafe(world, "healed", { id, amount: actual });
   return { healAmount: actual };
 }
 
@@ -106,11 +106,7 @@ export function aiCorpseEatSystem(world) {
     if (!behavior) return;
 
     // Speed gate
-    const spd = world.get(id, Speed);
-    let actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
-    const frostStacks = Math.min(3, statusStrength(world, id, "frozen"));
-    if (frostStacks > 0) actEvery = actEvery * (1 + frostStacks);
-    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
+    if (!canActThisTurn(world, id)) return;
 
     // Skip if another AI system already queued an action
     if (world.has(id, MoveIntent)) return;
@@ -160,15 +156,13 @@ export function aiCorpseEatSystem(world) {
     try { world.destroy(corpseId); } catch {}
     markUsed(world, id);
 
-    try {
-      world.emit?.("monster:corpse-eat", {
-        monsterId: id,
-        monsterName: def.name,
-        behavior,
-        corpseName,
-        at: { x: pos.x | 0, y: pos.y | 0 },
-        healAmount: result.healAmount || 0,
-      });
-    } catch {}
+    emitSafe(world, "monster:corpse-eat", {
+      monsterId: id,
+      monsterName: def.name,
+      behavior,
+      corpseName,
+      at: { x: pos.x | 0, y: pos.y | 0 },
+      healAmount: result.healAmount || 0,
+    });
   });
 }

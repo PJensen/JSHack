@@ -13,6 +13,7 @@ import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { HarvestNode } from "../components/HarvestNode.js";
+import { emitSafe } from "../utils/emitSafe.js";
 import { GrowthStage } from "../components/GrowthStage.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Inventory } from "../components/Inventory.js";
@@ -23,6 +24,7 @@ import { WeatherState } from "../components/WeatherState.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { createItemById } from "../utils/itemFactory.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
+import { manhattanScalar } from "../utils/distance.js";
 import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import {
   createInventoryItem,
@@ -47,18 +49,12 @@ import {
 import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
+import { CARDINAL_DIRS } from "../utils/directions.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
 const TOWNFOLK_DOOR_INSTALLED = Symbol.for("jshack:townfolkDoors:installed");
-
-const DIRS = [
-  { dx: 0, dy: -1 },
-  { dx: 0, dy: 1 },
-  { dx: 1, dy: 0 },
-  { dx: -1, dy: 0 },
-];
 
 const CROP_KINDS = new Set(["wheat", "carrot", "corn"]);
 const CROP_ITEM_IDS = Object.freeze({
@@ -97,10 +93,6 @@ const ROLE_TO_TOOL_ID = Object.freeze({
   woodcutter: "tool_hatchet",
   miner: "iron_pickaxe",
 });
-
-function emitSafe(world, event, payload) {
-  try { world.emit?.(event, payload); } catch {}
-}
 
 function ensureCarryInventory(world, id) {
   const inv = world.get(id, Inventory);
@@ -290,7 +282,7 @@ function findReadyNode(world, cx, cy, radius, kindFilter) {
     const node = world.get(eid, HarvestNode);
     if (!node || !node.ready) return;
     if (kindFilter && !kindFilter(node)) return;
-    const d = Math.abs(epos.x - cx) + Math.abs(epos.y - cy);
+    const d = manhattanScalar(epos.x, epos.y, cx, cy);
     if (d < bestDist) { bestDist = d; best = { id: eid, x: epos.x, y: epos.y }; }
   });
   return best;
@@ -304,7 +296,7 @@ function findNeedsPlantingNode(world, cx, cy, radius) {
     const node = world.get(eid, HarvestNode);
     if (!node || !node.needsPlanting) return;
     if (!CROP_KINDS.has(node.kind)) return;
-    const d = Math.abs(epos.x - cx) + Math.abs(epos.y - cy);
+    const d = manhattanScalar(epos.x, epos.y, cx, cy);
     if (d < bestDist) { bestDist = d; best = { id: eid, x: epos.x, y: epos.y }; }
   });
   return best;
@@ -451,7 +443,7 @@ function maybeOpenDoor(world, actorId, x, y) {
 }
 
 function findAdjacentWalkable(x, y) {
-  for (const d of DIRS) {
+  for (const d of CARDINAL_DIRS) {
     const nx = x + d.dx;
     const ny = y + d.dy;
     if (!isWalkable(nx, ny)) continue;
@@ -597,7 +589,7 @@ function handleIdle(world, id, pos, job) {
       let best = null;
       let bestDist = Infinity;
       for (const rec of entries) {
-        const d = Math.abs(rec.x - pos.x) + Math.abs(rec.y - pos.y);
+        const d = manhattanScalar(rec.x, rec.y, pos.x, pos.y);
         if (d < bestDist) {
           bestDist = d;
           best = rec;
@@ -1154,7 +1146,7 @@ function getRoleWorkTarget(world, job) {
       let best = null;
       let bestDist = Infinity;
       for (const rec of ledger) {
-        const d = Math.abs(rec.x - job.homeX) + Math.abs(rec.y - job.homeY);
+        const d = manhattanScalar(rec.x, rec.y, job.homeX, job.homeY);
         if (d < bestDist) {
           bestDist = d;
           best = rec;

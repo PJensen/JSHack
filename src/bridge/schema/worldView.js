@@ -53,6 +53,7 @@ import { readPlayerPerceptionState } from "../../rules/utils/perceptionState.js"
 import { chebyshevDistance, hasMindForEsp, isFixedDecorationEntity, isPerceptionMonster } from "../../rules/utils/perceptionChannels.js";
 import { PERCEPTION_TUNING } from "../../rules/environment/dungeon/perceptionTuning.js";
 import { BaseStats } from "../../rules/components/BaseStats.js";
+import { resolveEquippedWeaponVfx } from "./weaponVfxResolver.js";
 import {
 	clearPerceptionMemory,
 	listPerceptionKinds,
@@ -61,15 +62,15 @@ import {
 } from "../../rules/environment/dungeon/perceptionMemory.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, weaponVfx:any[]|null }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null }} WorldView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -185,6 +186,7 @@ function makePerceptionEcho(src, extraTags, at, kindOverride = undefined) {
 		isPet: false,
 		showHealthBar: false,
 		facing: null,
+		weaponVfx: null,
 	};
 }
 
@@ -380,6 +382,7 @@ function projectDisplayTags(world, id, rec) {
  * @param {EntityView} rec
  */
 function projectEquipmentDisplayTags(world, id, rec) {
+	rec.weaponVfx = null;
 	/** @type {any} */ const eq = /** @type any */ (world.get(id, Equipment));
 	if (!eq) return;
 	const offhandId = Number(eq.offhand || 0) | 0;
@@ -389,20 +392,8 @@ function projectEquipmentDisplayTags(world, id, rec) {
 			rec.tags.push("torch");
 		}
 	}
-	// Flaming weapon glow — check main weapon for fire affixes/identity
-	const weaponId = Number(eq.weapon || 0) | 0;
-	if (weaponId > 0) {
-		const wInfo = /** @type {any} */ (world.get(weaponId, ItemInfo));
-		const wIdentity = String(world.get(weaponId, NamedIdentity)?.identity || "").toLowerCase();
-		const affixes = Array.isArray(wInfo?.affixes) ? wInfo.affixes : [];
-		const hasFire = affixes.includes('flaming') || affixes.includes('affix:flaming')
-			|| affixes.includes('firestorm1') || affixes.includes('affix:firestorm1')
-			|| wIdentity === 'flametongue' || wIdentity === 'ember_knife'
-			|| wIdentity === 'smoldering_club' || wIdentity === 'witchfire_sword';
-		if (hasFire && !rec.tags.includes('fire_weapon_glow')) {
-			rec.tags.push('fire_weapon_glow');
-		}
-	}
+	const resolved = resolveEquippedWeaponVfx(world, id, { slots: ["weapon", "offhand"] });
+	if (resolved.length > 0) rec.weaponVfx = resolved;
 }
 
 /**
@@ -578,6 +569,7 @@ export function buildWorldView(world) {
 		break;
 	}
 	_view.isOverworld = _isOverworld;
+	_view.currentDepth = currentDepth;
 	for (const [, ws] of world.query(WeatherState)) {
 		_view.weather = ws.current || "clear";
 		break;
@@ -741,7 +733,7 @@ export function buildWorldView(world) {
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -751,6 +743,7 @@ export function buildWorldView(world) {
 				rec.procStates = null;
 				rec.stackSeq = stackSeq;
 				rec.facing = null;
+				rec.weaponVfx = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -761,6 +754,11 @@ export function buildWorldView(world) {
 			projectCombatUi(world, id, rec, playerFactionKey);
 			projectProcStateTags(world, id, rec);
 			projectFacing(world, id, rec);
+			const petState = /** @type {any} */ (world.get(id, PetState));
+			const isFamiliar = String(rec.kind || "").toLowerCase() === "familiar";
+			if (isFamiliar && petState && petState.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
+				rec.tags.push("pet_ready_glow");
+			}
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
@@ -819,7 +817,7 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -829,6 +827,7 @@ export function buildWorldView(world) {
 				rec.procStates = null;
 				rec.stackSeq = stackSeq2;
 				rec.facing = null;
+				rec.weaponVfx = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -839,6 +838,11 @@ export function buildWorldView(world) {
 			projectCombatUi(world, id, rec, '');
 			projectProcStateTags(world, id, rec);
 			projectFacing(world, id, rec);
+			const petState2 = /** @type {any} */ (world.get(id, PetState));
+			const isFamiliar2 = String(rec.kind || "").toLowerCase() === "familiar";
+			if (isFamiliar2 && petState2 && petState2.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
+				rec.tags.push("pet_ready_glow");
+			}
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
@@ -873,7 +877,7 @@ export function buildWorldView(world) {
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -883,6 +887,7 @@ export function buildWorldView(world) {
 				rec.procStates = null;
 				rec.stackSeq = stackSeq;
 				rec.facing = null;
+				rec.weaponVfx = null;
 			}
 
 			projectDisplayTags(world, id, rec);
@@ -895,7 +900,8 @@ export function buildWorldView(world) {
 			if (_questGiverIds.has(id) && !rec.tags.includes("quest_giver")) rec.tags.push("quest_giver");
 			// Familiar ready-to-fire glow
 			const petState = /** @type {any} */ (world.get(id, PetState));
-			if (petState && petState.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
+			const isFamiliar = String(rec.kind || "").toLowerCase() === "familiar";
+			if (isFamiliar && petState && petState.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
 				rec.tags.push("pet_ready_glow");
 			}
 

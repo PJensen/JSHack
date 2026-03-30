@@ -5,6 +5,7 @@ import { zoomTo, jumpTo, easeTo } from "../../display/camera/utils.js";
 import { startShake } from "../../display/camera/shake.js";
 import { hasSavegame, clearSavegamePayload } from "../wiring/savegameLoad.js";
 import { playerEntity } from "../../rules/utils/queries.js";
+import { manhattanScalar } from "../../rules/utils/distance.js";
 import { Position } from "../../rules/components/Position.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 
@@ -52,7 +53,7 @@ export function installSceneControls({ world, cam, TILE_PX, defaultZoomScale = T
         const py = pp ? world.get(pp.id, Position)?.y ?? 0 : 0;
         for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
           if (ni.identity === 'stair_down') {
-            const d = Math.abs(pos.x - px) + Math.abs(pos.y - py);
+            const d = manhattanScalar(pos.x, pos.y, px, py);
             if (d < bestDist) { bestDist = d; best = pos; }
           }
         }

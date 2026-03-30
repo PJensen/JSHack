@@ -20,15 +20,46 @@ export function createStatusEmitterController({ world, fx }) {
   const cookFireEmitters = new Set();
   const torchEmitters = new Set();
   const familiarEmitters = new Set();
+  const weaponProfileEmitterKeys = new Set();
   const familiarCooldowns = new Set();
   const dryFountains = new Set();
   const seenEmitterKeys = new Set();
   const origins = [];
+  const lightProbes = [];
+  let _fxTime = 0;
+
+  function computeCarryOrigin(entity, slot, carryAnchor) {
+    const dx = Math.sign(Number(entity?.facing?.dx || 0));
+    const dy = Math.sign(Number(entity?.facing?.dy || 0));
+    const hasFacing = dx !== 0 || dy !== 0;
+    const fxv = hasFacing ? dx : 0;
+    const fyv = hasFacing ? dy : -1;
+    const lx = -fyv;
+    const ly = fxv;
+    const handSign = String(slot || "weapon").toLowerCase() === "offhand" ? -1 : 1;
+    const forward = Number.isFinite(Number(carryAnchor?.forward)) ? Number(carryAnchor.forward) : 0.40;
+    const lateral = Number.isFinite(Number(carryAnchor?.lateral)) ? Number(carryAnchor.lateral) : 0.17;
+    const vertical = Number.isFinite(Number(carryAnchor?.vertical)) ? Number(carryAnchor.vertical) : -0.02;
+    return {
+      x: Number(entity?.pos?.x || 0) + (fxv * forward) + (lx * lateral * handSign),
+      y: Number(entity?.pos?.y || 0) + (fyv * forward) + (ly * lateral * handSign) + vertical,
+    };
+  }
+
+  function computeProfileLightFlicker(light, id, fxTime) {
+    const flicker = light?.flicker;
+    if (!flicker || flicker.mode !== "sin") return 1.0;
+    const base = Number.isFinite(Number(flicker.base)) ? Number(flicker.base) : 1.0;
+    const amp = Number.isFinite(Number(flicker.amp)) ? Number(flicker.amp) : 0.0;
+    const speed = Number.isFinite(Number(flicker.speed)) ? Number(flicker.speed) : 1.0;
+    const phase = Number.isFinite(Number(flicker.phase)) ? Number(flicker.phase) : 0.5;
+    return Math.max(0.35, base + amp * Math.sin(Number(fxTime || 0) * speed + (Number(id || 0) * phase)));
+  }
 
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
   const TAG_EMITTER_CFG = {
     burning: { tracker: burningEmitters, prefix: "burn", cfg: { rate: 24, angle: -Math.PI / 2, spread: Math.PI / 7, speed: 0.95, speedJitter: 0.32, ax: 0, ay: -0.72, life: 0.95, lifeJitter: 0.28, size: 0.36, sizeEnd: 0.08, color: "#ffb347", alpha0: 0.98, alpha1: 0.0, offsetX: 0, offsetY: -0.18 } },
-    bleeding: { tracker: bleedEmitters, prefix: "bleed", cfg: { rate: 14, angle: Math.PI / 2, spread: Math.PI / 8, speed: 0.55, speedJitter: 0.3, ax: 0, ay: 1.2, life: 0.9, lifeJitter: 0.3, size: 0.14, sizeEnd: 0.05, color: "#bb1111", alpha0: 0.9, alpha1: 0.0 } },
+    bleeding: { tracker: bleedEmitters, prefix: "bleed", cfg: { rate: 34, angle: Math.PI / 2, spread: Math.PI / 5, speed: 0.85, speedJitter: 0.45, ax: 0, ay: 1.4, life: 1.0, lifeJitter: 0.34, size: 0.17, sizeEnd: 0.05, color: "#d21a1a", alpha0: 0.95, alpha1: 0.0 } },
     poisoned: { tracker: poisonEmitters, prefix: "poison", cfg: { rate: 4, angle: 0, spread: Math.PI * 2, speed: 0.15, speedJitter: 0.1, ax: 0, ay: -0.04, life: 1.6, lifeJitter: 0.5, size: 0.08, sizeEnd: 0.03, color: "#33ff55", alpha0: 0.35, alpha1: 0.0 } },
     regen: { tracker: regenEmitters, prefix: "regen", cfg: { rate: 12, angle: -Math.PI / 2, spread: Math.PI / 4, speed: 0.4, speedJitter: 0.15, ax: 0, ay: -0.1, life: 1.0, lifeJitter: 0.4, size: 0.15, sizeEnd: 0.04, color: "#f6faff", alpha0: 0.8, alpha1: 0.0 } },
     shocked: { tracker: shockEmitters, prefix: "shock", cfg: { rate: 30, angle: 0, spread: Math.PI * 2, speed: 1.2, speedJitter: 0.8, ax: 0, ay: 0, life: 0.2, lifeJitter: 0.1, size: 0.1, sizeEnd: 0.02, color: "#00ccff", alpha0: 1.0, alpha1: 0.0 } },
@@ -83,7 +114,9 @@ export function createStatusEmitterController({ world, fx }) {
   }
 
   function step(dtSec, view, fxTime) {
+    _fxTime = Number(fxTime || 0);
     origins.length = 0;
+    lightProbes.length = 0;
     seenEmitterKeys.clear();
     const isVisibleAt = (typeof view?.isVisible === "function") ? view.isVisible : null;
     for (let i = 0; i < view.entities.length; i++) {
@@ -104,6 +137,7 @@ export function createStatusEmitterController({ world, fx }) {
             fx.ensureEmitter(key, { continuous: true, ...sc.cfg });
             sc.tracker.add(e.id);
           }
+          const origin = { x: e.pos.x, y: e.pos.y };
           if (tag === "regen") {
             const phase = (fxTime * 3.2) + (e.id * 0.61803398875);
             const orbitX = Math.cos(phase) * 0.32;
@@ -113,10 +147,45 @@ export function createStatusEmitterController({ world, fx }) {
               origins.push({ key, x: e.pos.x + orbitX, y: e.pos.y + 0.24 + orbitY + bobY });
             }
           } else {
-            origins.push({ key, x: e.pos.x, y: e.pos.y });
+            origins.push({ key, x: origin.x, y: origin.y });
+          }
+          if (tag === "burning") {
+            lightProbes.push({ kind: "burning", id: e.id, x: origin.x, y: origin.y });
           }
         }
       }
+
+      if (Array.isArray(e.weaponVfx)) {
+        for (let w = 0; w < e.weaponVfx.length; w++) {
+          const profile = e.weaponVfx[w];
+          if (!profile) continue;
+          const slot = String(profile?.slot || "weapon").toLowerCase();
+          const profileId = String(profile?.id || "profile").toLowerCase();
+          const origin = computeCarryOrigin(e, slot, profile?.carryAnchor || null);
+          const emitterCfg = profile?.carryEmitter;
+          if (emitterCfg && typeof emitterCfg === "object") {
+            const key = `wpvfx:${profileId}:${slot}:${e.id}`;
+            seenEmitterKeys.add(key);
+            if (!weaponProfileEmitterKeys.has(key)) {
+              fx.ensureEmitter(key, { continuous: true, ...emitterCfg });
+              weaponProfileEmitterKeys.add(key);
+            }
+            origins.push({ key, x: origin.x, y: origin.y });
+          }
+          const lightCfg = profile?.carryLight;
+          const lightColor = Array.isArray(lightCfg?.color) ? lightCfg.color : null;
+          if (lightColor && Number.isFinite(Number(lightCfg?.radius)) && Number(lightCfg.radius) > 0) {
+            lightProbes.push({
+              kind: "weapon_profile",
+              id: e.id,
+              x: origin.x,
+              y: origin.y,
+              light: lightCfg,
+            });
+          }
+        }
+      }
+
       const kc = KIND_EMITTER_CFG[e.kind];
       if (kc) {
         if (e.kind === "fountain" && dryFountains.has(e.id)) continue;
@@ -128,8 +197,12 @@ export function createStatusEmitterController({ world, fx }) {
           kc.tracker.add(e.id);
         }
         origins.push({ key, x: e.pos.x, y: e.pos.y });
+        if (e.kind === "familiar") {
+          lightProbes.push({ kind: "familiar_ready", id: e.id, x: e.pos.x, y: e.pos.y });
+        }
       }
     }
+
     for (const tag in TAG_EMITTER_CFG) {
       const sc = TAG_EMITTER_CFG[tag];
       if (!sc) continue;
@@ -150,8 +223,42 @@ export function createStatusEmitterController({ world, fx }) {
         }
       }
     }
+    for (const key of weaponProfileEmitterKeys) {
+      if (seenEmitterKeys.has(key)) continue;
+      fx.removeEmitter(key);
+      weaponProfileEmitterKeys.delete(key);
+    }
     fx.step(dtSec, origins);
   }
 
-  return { installListeners, step };
+  function getActiveLights() {
+    const out = [];
+    for (let i = 0; i < lightProbes.length; i++) {
+      const p = lightProbes[i];
+      if (p.kind === "burning") {
+        const f = 1.0;
+        out.push({ x: p.x + 0.5, y: p.y + 0.5, radius: 1.9 * f, color: [255, 120, 40], flicker: f });
+      } else if (p.kind === "weapon_profile") {
+        const light = p.light || null;
+        if (!light) continue;
+        const f = computeProfileLightFlicker(light, p.id, _fxTime);
+        const color = Array.isArray(light.color) ? light.color : [255, 160, 80];
+        const radius = Number(light.radius || 1);
+        out.push({
+          x: p.x + 0.5,
+          y: p.y + 0.5,
+          radius: radius * f,
+          color: [Number(color[0]) || 255, Number(color[1]) || 160, Number(color[2]) || 80],
+          flicker: f,
+        });
+      } else if (p.kind === "familiar_ready") {
+        const id = Number(p.id || 0) | 0;
+        const f = 0.90 + 0.10 * Math.sin(_fxTime * 6.4 + id * 0.43);
+        out.push({ x: p.x + 0.5, y: p.y + 0.5, radius: 1.7 * f, color: [255, 160, 80], flicker: f });
+      }
+    }
+    return out;
+  }
+
+  return { installListeners, step, getActiveLights };
 }

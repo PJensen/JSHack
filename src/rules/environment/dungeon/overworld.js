@@ -31,6 +31,7 @@ import {
   TILE_COBBLESTONE,
 } from "./constants.js";
 import { setRoofed } from "./tileMap.js";
+import { chebyshevScalar } from "../../utils/distance.js";
 
 export const OVERWORLD_EXTENT = Object.freeze({
   minCX: -2,
@@ -894,14 +895,14 @@ export function generateOverworldChunks(worldSeed) {
     if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addOutdoorSpawn(chunks, p, "harvest_thorn_bramble", (x, y) => {
       if (poisonGarden.has(`${x},${y}`)) return true;
-      return Math.max(Math.abs(x - homeX), Math.abs(y - homeY)) >= 20;
+      return chebyshevScalar(x, y, homeX, homeY) >= 20;
     });
   }
   for (const p of venomSpots) {
     if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addOutdoorSpawn(chunks, p, "harvest_venom_fern", (x, y) => {
       if (poisonGarden.has(`${x},${y}`)) return true;
-      return Math.max(Math.abs(x - homeX), Math.abs(y - homeY)) >= 20;
+      return chebyshevScalar(x, y, homeX, homeY) >= 20;
     });
   }
   for (const p of moonleafSpots) {
@@ -911,7 +912,7 @@ export function generateOverworldChunks(worldSeed) {
   for (const p of emberRootSpots) {
     if (_impassable(getWorldTile(chunks, p.x, p.y))) setWorldTile(chunks, p.x, p.y, TILE_GRASS);
     addOutdoorSpawn(chunks, p, "harvest_ember_root", (x, y) => {
-      return Math.max(Math.abs(x - homeX), Math.abs(y - homeY)) >= 14;
+      return chebyshevScalar(x, y, homeX, homeY) >= 14;
     });
   }
 

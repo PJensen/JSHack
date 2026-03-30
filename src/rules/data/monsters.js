@@ -324,7 +324,7 @@ export const MONSTERS = [
     speed: 1,
     hooks: {
       onHit: [statusEffectOnHit(30, 0xdead0010, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
-      onDeath: [spawnPlasmaCloudOnDeath({ turnsLeft: 3, radius: 1, damage: 2 })],
+      onDeath: [spawnPlasmaCloudOnDeath({ turnsLeft: 6, radius: 1, damage: 2 })],
     },
     specials: ["Shock 30%"],
     description: 'A tiny crackling insect that moves only along the grid axes.',

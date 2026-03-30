@@ -2,6 +2,7 @@ import { KnockbackPending } from "../components/KnockbackPending.js";
 import { Position } from "../components/Position.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * Resolves pending knockback vectors into grid movement.
@@ -49,17 +50,15 @@ export function knockbackSystem(world) {
       const from = { x: startX, y: startY };
       const to   = { x: curX,   y: curY   };
       world.set(id, Position, to);
-      try { world.emit?.("moved", { id, from, to }); } catch { /* */ }
+      emitSafe(world, "moved", { id, from, to });
     }
 
     if (hitBlocker) {
-      try {
-        world.emit?.("knockback:stopped", {
-          id,
-          at: { x: curX, y: curY },
-          blockedAt: { x: curX + dx, y: curY + dy },
-        });
-      } catch { /* */ }
+      emitSafe(world, "knockback:stopped", {
+        id,
+        at: { x: curX, y: curY },
+        blockedAt: { x: curX + dx, y: curY + dy },
+      });
     }
 
     try { world.remove(id, KnockbackPending); } catch { /* */ }

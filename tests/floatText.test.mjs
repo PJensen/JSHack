@@ -1,5 +1,7 @@
 import { assertEquals } from "jsr:@std/assert";
+import { World } from "../src/lib/ecs-js/index.js";
 import { FloatText } from "../src/display/passes/vfx/text/floatText.js";
+import { installFloatTextWiring } from "../src/display/ui/wiring/floatTextWiring.js";
 
 Deno.test("floatText addStatus respects caller overrides", () => {
   const ftext = new FloatText();
@@ -14,4 +16,52 @@ Deno.test("floatText addStatus respects caller overrides", () => {
   assertEquals(rec.life, 1.25);
   assertEquals(rec.scaleStart, 1.4);
   assertEquals(rec.scaleEnd, 0.9);
+});
+
+Deno.test("floatText wiring restores damage number emission with crit and delay", () => {
+  const world = new World({ seed: 7 });
+  const target = world.create();
+  const source = world.create();
+  const calls = [];
+  const ftext = {
+    addStatus() {},
+    addHeal() {},
+    addDamage(x, y, amount, opts) { calls.push({ x, y, amount, opts }); },
+  };
+  const fx = { pool: { spawn() {} } };
+  const getPosition = (id) => {
+    if (id === target) return { x: 3, y: 4 };
+    if (id === source) return { x: 1, y: 4 };
+    return null;
+  };
+
+  installFloatTextWiring({
+    world,
+    ftext,
+    fx,
+    getPosition,
+    isPet: () => false,
+    isPlayer: (id) => id === target,
+  });
+
+  world.emit("damaged", {
+    target,
+    source,
+    amount: 12,
+    rawAmount: 14,
+    type: "pierce",
+    cause: "ranged",
+    critical: true,
+    projectileDelay: 0.25,
+    goreType: "blood",
+    targetKind: "player",
+  });
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].x, 3);
+  assertEquals(calls[0].y, 4);
+  assertEquals(calls[0].amount, 12);
+  assertEquals(calls[0].opts?.crit, true);
+  assertEquals(calls[0].opts?.delay, 0.25);
+  assertEquals(calls[0].opts?.color, "#ff6060");
 });

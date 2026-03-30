@@ -19,6 +19,7 @@ import { getShieldArcMultiplier } from "./combatPositioning.js";
 import { consumeShieldGuardStack, refreshShieldGuard } from "./shieldGuard.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getMonster } from "../data/monsters.js";
+import { emitSafe } from "./emitSafe.js";
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -220,6 +221,9 @@ export function resolveResistance(world, targetId, rawAmount, type, armorPenetra
  * @property {boolean} [offhand=false]     - Mark as off-hand hit (for display layer)
  * @property {number}  [projectileDelay=0] - Seconds before float text appears (projectile travel time)
  * @property {number}  [armorPenetration=0]- Reduces effective kinetic DR for this hit
+ * @property {{dx:number,dy:number}} [impactVector] - Normalized travel direction for impact VFX
+ * @property {string} [projectileKind=""]  - Optional projectile classifier for display VFX (e.g. 'arrow')
+ * @property {{weaponClass?:string,attackKind?:string,offhand?:boolean}} [impactProfile] - Optional melee impact profile for display VFX
  */
 
 /**
@@ -262,30 +266,24 @@ export function dealDamage(world, spec) {
   const critical = !!spec.critical;
 
   if (spec.missed) {
-    try {
-      world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
-    } catch { /* */ }
+    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'miss', source }));
     if (String(spec.spellId || cause).startsWith('spell') || String(cause).startsWith('spell:')) {
-      try {
-        world.emit?.('spell:miss', {
-          actor: source,
-          source,
-          targetId: target,
-          spellId: String(spec.spellId || ''),
-          cause,
-          at: spec.at || undefined,
-          hitChancePct: Number(spec.hitChancePct || 0),
-        });
-      } catch { /* */ }
+      emitSafe(world, 'spell:miss', {
+        actor: source,
+        source,
+        targetId: target,
+        spellId: String(spec.spellId || ''),
+        cause,
+        at: spec.at || undefined,
+        hitChancePct: Number(spec.hitChancePct || 0),
+      });
     }
     return { ...ZERO_RESULT, rawAmount, reason: 'missed' };
   }
 
   // Step 2: Invulnerability gate
   if (!spec.bypassInvuln && isEntityInvulnerable(world, target)) {
-    try {
-      world.emit?.('status', createStatusEvent({ id: target, kind: 'immune', source }));
-    } catch { /* */ }
+    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'immune', source }));
     return { ...ZERO_RESULT, rawAmount, reason: 'invulnerable' };
   }
 
@@ -306,23 +304,19 @@ export function dealDamage(world, spec) {
       });
       if (guard.guarded) {
         finalAmount = Math.max(1, Math.floor(finalAmount * shieldArcMult));
-        try {
-          world.emit?.("shield:guarded", {
-            id: target,
-            source,
-            stacks: Number(guard.stacks || 0) | 0,
-            at: spec.at || undefined,
-            broken: !!guard.broken,
-          });
-        } catch {}
+        emitSafe(world, "shield:guarded", {
+          id: target,
+          source,
+          stacks: Number(guard.stacks || 0) | 0,
+          at: spec.at || undefined,
+          broken: !!guard.broken,
+        });
       }
     }
   }
 
   if (finalAmount <= 0) {
-    try {
-      world.emit?.('status', createStatusEvent({ id: target, kind: 'resist', source }));
-    } catch { /* */ }
+    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'resist', source }));
     return { ...ZERO_RESULT, rawAmount, reason: 'resisted' };
   }
 
@@ -342,23 +336,24 @@ export function dealDamage(world, spec) {
   }
 
   // Step 5: Emit 'damaged'
-  try {
-    world.emit?.('damaged', {
-      target,
-      amount: finalAmount,
-      rawAmount,
-      type,
-      source,
-      cause,
-      critical,
-      at: spec.at || undefined,
-      noTrigger: !!spec.noTrigger,
-      offhand: !!spec.offhand,
-      projectileDelay: spec.projectileDelay || 0,
-      targetKind: String(world.get(target, NamedIdentity)?.identity || ''),
-      goreType: String(getMonster(String(world.get(target, NamedIdentity)?.identity || ''))?.goreType || 'blood'),
-    });
-  } catch { /* */ }
+  emitSafe(world, 'damaged', {
+    target,
+    amount: finalAmount,
+    rawAmount,
+    type,
+    source,
+    cause,
+    critical,
+    at: spec.at || undefined,
+    noTrigger: !!spec.noTrigger,
+    offhand: !!spec.offhand,
+    projectileDelay: spec.projectileDelay || 0,
+    impactVector: spec.impactVector || undefined,
+    projectileKind: String(spec.projectileKind || ''),
+    impactProfile: spec.impactProfile || undefined,
+    targetKind: String(world.get(target, NamedIdentity)?.identity || ''),
+    goreType: String(getMonster(String(world.get(target, NamedIdentity)?.identity || ''))?.goreType || 'blood'),
+  });
 
   if (!spec.noTrigger) {
     ensureEquippedAffixTopology(world, target);
@@ -413,12 +408,12 @@ export function dealDamage(world, spec) {
       if (lichAe && Array.isArray(lichAe.effects)) {
         lichAe.effects = lichAe.effects.filter(e => e.key !== "lichdom_echo");
       }
-      try { world.emit?.('lichdom_echo:saved', { id: target, source }); } catch { /* */ }
+      emitSafe(world, 'lichdom_echo:saved', { id: target, source });
     }
   }
 
   if (killed) {
-    try { world.emit?.('died', { id: target, killer: source, cause }); } catch { /* */ }
+    emitSafe(world, 'died', { id: target, killer: source, cause });
 
     if (!spec.noTrigger && source > 0 && world.isAlive(source)) {
       ensureEquippedAffixTopology(world, source);
@@ -460,7 +455,7 @@ export function dealDamage(world, spec) {
           const healAmt = 5 * furyPot;
           const before = sourceVit.hp | 0;
           sourceVit.hp = Math.min(sourceVit.maxHp | 0, before + healAmt);
-          try { world.emit?.('battle_fury:heal', { id: source, amount: sourceVit.hp - before }); } catch { /* */ }
+          emitSafe(world, 'battle_fury:heal', { id: source, amount: sourceVit.hp - before });
         }
       }
     }

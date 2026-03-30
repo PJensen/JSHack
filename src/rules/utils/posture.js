@@ -1,4 +1,5 @@
 import { CombatPosture, COMBAT_POSTURES } from "../components/CombatPosture.js";
+import { emitSafe } from "./emitSafe.js";
 
 function normalizePosture(stance) {
   const value = String(stance || COMBAT_POSTURES.balanced).toLowerCase();
@@ -46,7 +47,7 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
       });
     } catch {}
     if (emit) {
-      try { world.emit?.("combat:posture", { id, stance: next, reason }); } catch {}
+      emitSafe(world, "combat:posture", { id, stance: next, reason });
     }
     return world.get(id, CombatPosture) || null;
   }
@@ -55,7 +56,7 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
   cur.stance = next;
   if (prev !== next) cur.lastChangedStep = Number(world.step || 0) | 0;
   if (emit && prev !== next) {
-    try { world.emit?.("combat:posture", { id, stance: next, previous: prev, reason }); } catch {}
+    emitSafe(world, "combat:posture", { id, stance: next, previous: prev, reason });
   }
   return cur;
 }

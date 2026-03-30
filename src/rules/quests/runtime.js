@@ -8,6 +8,7 @@ import { QuestLog } from "../components/QuestLog.js";
 import { QuestState } from "../components/QuestState.js";
 import { QuestVars } from "../components/QuestVars.js";
 import { compileQuest, listQuestEventNames } from "./registry.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 const QUEST_RUNTIME_KEY = Symbol.for("jshack:quests:runtime:installed");
 const QUEST_EVENT_ROUTES_KEY = Symbol.for("jshack:quests:runtime:eventRoutes");
@@ -230,7 +231,7 @@ export function isPlayerNearIdentity(world, playerId, identity, radius = 1) {
   const want = String(identity || "");
   for (const [, otherPos, ni] of world.query(Position, NamedIdentity)) {
     if (String(ni.identity || "") !== want) continue;
-    const dist = Math.max(Math.abs(otherPos.x - pos.x), Math.abs(otherPos.y - pos.y));
+    const dist = chebyshevScalar(otherPos.x, otherPos.y, pos.x, pos.y);
     if (dist <= radius) return true;
   }
   return false;

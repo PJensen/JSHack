@@ -6,19 +6,15 @@ import { CentipedeSegment } from "../components/CentipedeSegment.js";
 import { getTile, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 
-const DIRS = Object.freeze([
-  { dx: 0, dy: -1 },
-  { dx: 1, dy: 0 },
-  { dx: 0, dy: 1 },
-  { dx: -1, dy: 0 },
-]);
+import { CARDINAL_DIRS } from "./directions.js";
+import { manhattanScalar } from "./distance.js";
 
 function key(x, y) {
   return `${x},${y}`;
 }
 
 function heuristic(x, y, tx, ty) {
-  return Math.abs(tx - x) + Math.abs(ty - y);
+  return manhattanScalar(x, y, tx, ty);
 }
 
 function buildBlockedSet(world, actorId, targetX, targetY, options = {}) {
@@ -106,11 +102,11 @@ export function findNextCardinalStep(world, startX, startY, targetX, targetY, ac
     const cx = Number(cxStr);
     const cy = Number(cyStr);
 
-    if (Math.abs(cx - targetX) + Math.abs(cy - targetY) <= goalRadius) {
+    if (manhattanScalar(cx, cy, targetX, targetY) <= goalRadius) {
       return reconstructFirstStep(cameFrom, startKey, currentKey, startX, startY);
     }
 
-    for (const dir of DIRS) {
+    for (const dir of CARDINAL_DIRS) {
       const nx = cx + dir.dx;
       const ny = cy + dir.dy;
       if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;

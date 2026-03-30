@@ -3,6 +3,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { drinkPipeline } from "../interaction/verbs/drinkPipeline.js";
 import { getItemHooksByIdentity } from "../content/items/itemHooks.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * drinkSystem — canonical intent consumer for the `drink` verb.
@@ -49,7 +50,7 @@ export function drinkSystem(world) {
       };
     }
 
-    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[drinkSystem] emit interaction:result failed:', e); }
+    emitSafe(world, "interaction:result", result);
     try { world.remove(actor, DrinkIntent); } catch {} // ECS: may not exist
   }
 }

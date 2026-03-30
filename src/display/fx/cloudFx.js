@@ -318,68 +318,15 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     }
   }
 
-  // --- Draw: Fire hazards ---
-  /** @param {CanvasRenderingContext2D} ctx */
-  function drawFire(ctx) {
-    if (!_fireCloudFx.size) return;
-    ctx.save();
-    const TAU = Math.PI * 2;
-    const _fxTime = getFxTime();
-
-    for (const cloud of _fireCloudFx.values()) {
-      const cx = cloud.x;
-      const cy = cloud.y;
-      const r = Math.max(0, cloud.radius | 0);
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 9.5 + cloud.phase);
-      const flicker = 0.5 + 0.5 * Math.sin(_fxTime * 16.0 + cloud.phase * 0.7);
-      const lifeFactor = Math.max(0.30, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
-      const fadeFactor = cloud.fading
-        ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
-        : 1;
-      const flashBoost = cloud.pulseFlash > 0 ? (cloud.pulseFlash / 0.18) : 0;
-      const alphaScale = lifeFactor * fadeFactor;
-
-      ctx.globalCompositeOperation = 'lighter';
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          if (dist > r) continue;
-
-          const tx = cx + dx;
-          const ty = cy + dy;
-          const bedR = 0.42 + 0.06 * pulse;
-          const glow = ctx.createRadialGradient(tx, ty + 0.06, 0.02, tx, ty + 0.06, bedR + 0.20);
-          glow.addColorStop(0, `rgba(255,230,160,${((0.18 + pulse * 0.10 + flashBoost * 0.12) * alphaScale).toFixed(3)})`);
-          glow.addColorStop(0.55, `rgba(255,112,24,${((0.12 + flicker * 0.10 + flashBoost * 0.10) * alphaScale).toFixed(3)})`);
-          glow.addColorStop(1, 'rgba(110,18,0,0)');
-          ctx.fillStyle = glow;
-          ctx.beginPath();
-          ctx.arc(tx, ty + 0.06, bedR + 0.20, 0, TAU);
-          ctx.fill();
-
-          const tongues = 2 + (Math.random() < 0.35 ? 1 : 0);
-          for (let i = 0; i < tongues; i++) {
-            const ox = (i - (tongues - 1) * 0.5) * 0.10;
-            const sway = Math.sin(_fxTime * (10.0 + i * 1.4) + cloud.phase + dx * 0.6 + dy * 0.45) * 0.04;
-            const height = 0.22 + 0.08 * flicker + (i === 1 ? 0.06 : 0);
-            const width = 0.09 + 0.02 * pulse;
-            ctx.fillStyle = `rgba(255,135,30,${((0.18 + 0.18 * flicker) * alphaScale).toFixed(3)})`;
-            ctx.beginPath();
-            ctx.ellipse(tx + ox + sway, ty + 0.08, width, height, 0, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = `rgba(255,235,180,${((0.11 + 0.10 * pulse) * alphaScale).toFixed(3)})`;
-            ctx.beginPath();
-            ctx.ellipse(tx + ox * 0.75 + sway * 0.6, ty + 0.02, width * 0.55, height * 0.52, 0, 0, TAU);
-            ctx.fill();
-          }
-        }
-      }
-    }
-
-    ctx.restore();
+  // --- Draw: Fire hazards (area rendering moved to SDF light field) ---
+  /** @param {CanvasRenderingContext2D} _ctx */
+  function drawFire(_ctx) {
+    return;
   }
 
-  // --- Draw: Poison clouds ---
+  // --- Draw: Poison clouds — Bezier perimeter + flat fill + bubble pops ---
+  // Light field provides the atmospheric green tint underneath; this pass adds
+  // a well-defined "spilled liquid" boundary on top.
   /** @param {CanvasRenderingContext2D} ctx */
   function drawPoison(ctx) {
     if (!_poisonCloudFx.size && !_poisonBubblePops.length) return;
@@ -387,44 +334,20 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     const TAU = Math.PI * 2;
     const _fxTime = getFxTime();
 
+    // Bezier perimeter + flat fill for each active poison cloud
     for (const cloud of _poisonCloudFx.values()) {
       const cx = cloud.x;
       const cy = cloud.y;
       const r = Math.max(0, cloud.radius | 0);
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 4.7 + cloud.phase);
       const wobble = 0.5 + 0.5 * Math.sin(_fxTime * 2.1 + cloud.phase * 0.8);
       const lifeFactor = Math.max(0.32, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
       const fadeFactor = cloud.fading
         ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
         : 1;
-      const pulseBoost = cloud.pulseFlash > 0 ? (cloud.pulseFlash / 0.24) : 0;
       const alphaScale = lifeFactor * fadeFactor;
+      if (alphaScale < 0.01) continue;
 
-      // A poisonous fog should read as murky and viscous, not crackling.
-      ctx.globalCompositeOperation = 'source-over';
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          if (dist > r) continue;
-
-          const tx = cx + dx;
-          const ty = cy + dy;
-          const ring = 1 - (dist / (r + 1));
-          const alpha = (0.08 + ring * 0.10 + wobble * 0.04 + pulseBoost * 0.06) * alphaScale;
-
-          ctx.fillStyle = `rgba(78,155,56,${alpha.toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.66 + 0.05 * wobble, 0, TAU);
-          ctx.fill();
-
-          ctx.fillStyle = `rgba(145,212,102,${(alpha * 0.35).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.36 + 0.03 * pulse, 0, TAU);
-          ctx.fill();
-        }
-      }
-
-      // Slowly undulating perimeter, biased toward dense floor-slick pooling.
+      // Build undulating Bezier contour
       const points = [];
       const pointCount = Math.max(10, 12 + r * 6);
       const baseR = r + 0.88;
@@ -442,6 +365,7 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
           y: cy + driftY + Math.sin(a) * (rr * 0.92),
         });
       }
+
       if (points.length >= 3) {
         const p0 = points[0];
         const p1 = points[1];
@@ -456,24 +380,21 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         }
         ctx.closePath();
 
-        const fillA = (0.10 + wobble * 0.06 + pulseBoost * 0.08) * alphaScale;
-        ctx.fillStyle = `rgba(84,150,62,${fillA.toFixed(3)})`;
+        // Flat semi-transparent fill — defined area like spilled liquid
+        ctx.globalCompositeOperation = 'source-over';
+        const fillA = (0.09 + wobble * 0.04) * alphaScale;
+        ctx.fillStyle = `rgba(62,130,48,${fillA.toFixed(3)})`;
         ctx.fill();
 
-        const edgeA = (0.16 + wobble * 0.05 + pulseBoost * 0.08) * alphaScale;
-        ctx.strokeStyle = `rgba(168,228,132,${edgeA.toFixed(3)})`;
-        ctx.lineWidth = 0.06;
+        // Crisp perimeter stroke
+        const edgeA = (0.18 + wobble * 0.06) * alphaScale;
+        ctx.strokeStyle = `rgba(140,210,110,${edgeA.toFixed(3)})`;
+        ctx.lineWidth = 0.055;
         ctx.stroke();
       }
-
-      // Faint toxic core, intentionally less luminous than plasma.
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = `rgba(196,248,128,${((0.05 + pulse * 0.05 + pulseBoost * 0.07) * alphaScale).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 0.24 + pulse * 0.06, 0, TAU);
-      ctx.fill();
     }
 
+    // Bubble pop ring VFX on top
     if (_poisonBubblePops.length) {
       ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < _poisonBubblePops.length; i++) {
@@ -572,104 +493,13 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     ctx.restore();
   }
 
-  // --- Draw: Plasma clouds ---
-  /** @param {CanvasRenderingContext2D} ctx */
-  function drawPlasma(ctx) {
-    if (!_plasmaCloudFx.size) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const TAU = Math.PI * 2;
-    const _fxTime = getFxTime();
-
-    for (const cloud of _plasmaCloudFx.values()) {
-      const cx = cloud.x;
-      const cy = cloud.y;
-      const r = Math.max(0, cloud.radius | 0);
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
-      const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
-      const fadeFactor = cloud.fading
-        ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
-        : 1;
-      const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
-      const alphaScale = lifeFactor * fadeFactor;
-
-      // Mark every hazardous tile with overlapping circular plasma pools (no grid boxes).
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          if (dist > r) continue;
-
-          const tx = cx + dx;
-          const ty = cy + dy;
-          const ring = 1 - (dist / (r + 1));
-          const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * alphaScale;
-
-          ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.62 + 0.04 * pulse, 0, TAU);
-          ctx.fill();
-
-          ctx.fillStyle = `rgba(180,250,255,${(alpha * 0.45).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.34 + 0.03 * pulse, 0, TAU);
-          ctx.fill();
-        }
-      }
-
-      // Wobbling closed quadratic-Bezier contour around the hazardous footprint.
-      const points = [];
-      const pointCount = Math.max(12, 14 + r * 8);
-      const baseR = r + 0.92;
-      const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
-      const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
-      for (let i = 0; i < pointCount; i++) {
-        const t = i / pointCount;
-        const a = t * TAU;
-        const wobble =
-          0.14 * Math.sin(_fxTime * 3.9 + a * 3.0 + cloud.phase) +
-          0.09 * Math.sin(_fxTime * 5.3 + a * 5.0 - cloud.phase * 0.6);
-        const rrX = baseR + wobble + 0.06 * pulse;
-        const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
-        points.push({
-          x: cx + driftX + Math.cos(a) * rrX,
-          y: cy + driftY + Math.sin(a) * rrY,
-        });
-      }
-      if (points.length >= 3) {
-        const p0 = points[0];
-        const p1 = points[1];
-        const firstMid = { x: (p0.x + p1.x) * 0.5, y: (p0.y + p1.y) * 0.5 };
-        ctx.beginPath();
-        ctx.moveTo(firstMid.x, firstMid.y);
-        for (let i = 1; i <= points.length; i++) {
-          const p = points[i % points.length];
-          const n = points[(i + 1) % points.length];
-          const mid = { x: (p.x + n.x) * 0.5, y: (p.y + n.y) * 0.5 };
-          ctx.quadraticCurveTo(p.x, p.y, mid.x, mid.y);
-        }
-        ctx.closePath();
-
-        const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * alphaScale;
-        ctx.fillStyle = `rgba(95,230,255,${blobA.toFixed(3)})`;
-        ctx.fill();
-
-        const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * alphaScale;
-        ctx.strokeStyle = `rgba(190,250,255,${edgeA.toFixed(3)})`;
-        ctx.lineWidth = 0.08;
-        ctx.stroke();
-      }
-
-      // Core energetic haze.
-      ctx.fillStyle = `rgba(210,255,255,${((0.12 + pulse * 0.10 + flashBoost * 0.18) * alphaScale).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, TAU);
-      ctx.fill();
-    }
-
-    ctx.restore();
+  // --- Draw: Plasma clouds (area rendering moved to SDF light field) ---
+  /** @param {CanvasRenderingContext2D} _ctx */
+  function drawPlasma(_ctx) {
+    return;
   }
 
-  // --- Draw: Quake (earthquake cracks) ---
+  // --- Draw: Quake — emissive crack lines only (ground tint via light field) ---
   /** @param {CanvasRenderingContext2D} ctx */
   function drawQuake(ctx) {
     if (!_quakeCloudFx.size) return;
@@ -690,26 +520,12 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       const alphaScale = lifeFactor * fadeFactor;
       const tremor = Math.sin(_fxTime * 18.0 + cloud.phase) * 0.015 * alphaScale;
 
-      // Per-tile darkened ground + crack lines.
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          if (dist > r) continue;
-
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
           const tx = cx + dx + tremor;
           const ty = cy + dy;
 
-          // Darkened ground tint.
-          ctx.globalCompositeOperation = 'source-over';
-          const groundA = (enhanced ? 0.14 : 0.10) * alphaScale;
-          ctx.fillStyle = enhanced
-            ? `rgba(60,20,5,${groundA.toFixed(3)})`
-            : `rgba(50,35,20,${groundA.toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.55, 0, TAU);
-          ctx.fill();
-
-          // Crack lines radiating outward from tile center.
           ctx.globalCompositeOperation = enhanced ? 'lighter' : 'source-over';
           const crackA = (enhanced ? (0.40 + flashBoost * 0.20) : (0.30 + flashBoost * 0.12)) * alphaScale;
           ctx.strokeStyle = enhanced
@@ -717,7 +533,6 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
             : `rgba(139,115,85,${crackA.toFixed(3)})`;
           ctx.lineWidth = enhanced ? 0.05 : 0.04;
 
-          // Deterministic crack pattern per tile.
           const seed = (dx + 5) * 17 + (dy + 5) * 31;
           const crackCount = 3 + (seed & 1);
           for (let c = 0; c < crackCount; c++) {
@@ -727,7 +542,6 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
             const len = 0.22 + (((seed + c * 7) % 13) / 13) * 0.20;
             const midAngle = angle + Math.sin(seed * 1.7 + c * 3.1) * 0.6;
             const midLen = len * 0.55;
-
             ctx.beginPath();
             ctx.moveTo(tx, ty);
             ctx.quadraticCurveTo(
@@ -739,7 +553,6 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
             ctx.stroke();
           }
 
-          // Enhanced: magma glow through cracks.
           if (enhanced) {
             const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 6.0 + cloud.phase + dx * 0.9 + dy * 0.7);
             const glowA = (0.10 + pulse * 0.08 + flashBoost * 0.10) * alphaScale;
@@ -1127,17 +940,77 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     });
   }
 
-  /** Return active light sources for the lighting engine. */
+  /** Return active light sources for the lighting engine.
+   *  One LightDef per tile within each cloud's Chebyshev footprint —
+   *  small radii for minimal glow (legibility, not drama). */
   function getActiveLights() {
     const out = [];
-    // Fire clouds emit flickering orange light
+    const _fxTime = getFxTime();
+
+    // -- Fire: compact warm hotspot, gentle breathing flicker --
     for (const [, cloud] of _fireCloudFx) {
-      out.push({ x: cloud.x, y: cloud.y, radius: (cloud.radius || 1) * 2 + 2, color: [255, 120, 40] });
+      const r = Math.max(0, cloud.radius | 0);
+      const life = Math.max(0.30, Math.min(1, cloud.maxTurns > 0 ? cloud.turnsLeft / cloud.maxTurns : 1));
+      const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
+      const a = life * fade;
+      if (a < 0.01) continue;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          const flk = 0.80 + 0.14 * Math.sin(_fxTime * 3.1 + cloud.phase + dx * 0.7 + dy * 0.5);
+          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.9, color: [214, 104, 36], flicker: a * flk });
+        }
+      }
     }
-    // Plasma clouds emit blue-white light
+
+    // -- Plasma: subdued cyan, no time-varying flicker --
     for (const [, cloud] of _plasmaCloudFx) {
-      out.push({ x: cloud.x, y: cloud.y, radius: (cloud.radius || 1) * 2 + 2, color: [140, 180, 255] });
+      const r = Math.max(0, cloud.radius | 0);
+      const life = Math.max(0.35, Math.min(1, cloud.maxTurns > 0 ? cloud.turnsLeft / cloud.maxTurns : 1));
+      const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
+      const a = life * fade;
+      if (a < 0.01) continue;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.5, color: [60, 140, 200], flicker: a });
+        }
+      }
     }
+
+    // -- Poison: dim green, high-freq dual-sin bubbling --
+    for (const [, cloud] of _poisonCloudFx) {
+      const r = Math.max(0, cloud.radius | 0);
+      const life = Math.max(0.32, Math.min(1, cloud.maxTurns > 0 ? cloud.turnsLeft / cloud.maxTurns : 1));
+      const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
+      const a = life * fade;
+      if (a < 0.01) continue;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          const bubble = 0.65 + 0.35 * Math.sin(_fxTime * 7.3 + cloud.phase + dx * 1.9 + dy * 2.3)
+                                     * Math.sin(_fxTime * 11.1 + cloud.phase * 0.7 + dx * 0.8);
+          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.8, color: [65, 145, 50], flicker: a * Math.max(0.4, bubble) });
+        }
+      }
+    }
+
+    // -- Quake: very dim brown (enhanced: warmer, slightly brighter) --
+    for (const [, cloud] of _quakeCloudFx) {
+      const r = Math.max(0, cloud.radius | 0);
+      const life = Math.max(0.25, Math.min(1, cloud.maxTurns > 0 ? cloud.turnsLeft / cloud.maxTurns : 1));
+      const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
+      const a = life * fade;
+      if (a < 0.01) continue;
+      const enh = !!cloud.enhanced;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.3, color: enh ? [140, 60, 20] : [100, 80, 55], flicker: a * (enh ? 0.7 : 0.4) });
+        }
+      }
+    }
+
     return out;
   }
 

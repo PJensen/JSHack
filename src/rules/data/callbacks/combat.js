@@ -19,6 +19,7 @@ import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
 import { dealDamage } from "../../utils/dealDamage.js";
+import { emitSafe } from "../../utils/emitSafe.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export class CombatCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    try { this.world.emit && this.world.emit(eventName, payload); } catch (e) { console.debug('[combat] emit ' + eventName + ' failed:', e); }
+    emitSafe(this.world, eventName, payload);
   }
 
   /**

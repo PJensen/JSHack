@@ -15,6 +15,7 @@ import { Position } from "../components/Position.js";
 import { isTargetHiddenByInvisibility } from "../utils/spellTargeting.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
+import { emitSafe } from "../utils/emitSafe.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -155,20 +156,18 @@ export function castSpellSystem(world) {
     }
     const spell = getSpell(spellId);
     if (!spell) {
-      try { world.emit && world.emit('spell:unknown', { actor, spellId }); } catch (e) { console.debug('[castSpellSystem] emit spell:unknown failed:', e); }
+      emitSafe(world, 'spell:unknown', { actor, spellId });
       world.remove(actor, CastSpellIntent);
       continue;
     }
 
     const interruption = getChannelInterruptionReason(world, actor);
     if (interruption) {
-      try {
-        world.emit?.("spell:fizzle", {
-          actor,
-          spellId: spell.id,
-          reason: interruption,
-        });
-      } catch (e) { console.debug('[castSpellSystem] emit spell:fizzle(interruption) failed:', e); }
+      emitSafe(world, "spell:fizzle", {
+        actor,
+        spellId: spell.id,
+        reason: interruption,
+      });
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -185,14 +184,12 @@ export function castSpellSystem(world) {
         allowAdjacentInvisibleTarget: true,
         hostileOnly: true,
       })) {
-        try {
-          world.emit?.("spell:fizzle", {
-            actor,
-            spellId: spell.id,
-            reason: "target_invisible",
-            targetId,
-          });
-        } catch (e) { console.debug('[castSpellSystem] emit spell:fizzle(target_invisible) failed:', e); }
+        emitSafe(world, "spell:fizzle", {
+          actor,
+          spellId: spell.id,
+          reason: "target_invisible",
+          targetId,
+        });
         world.remove(actor, CastSpellIntent);
         continue;
       }
@@ -203,7 +200,7 @@ export function castSpellSystem(world) {
     const learned = normalizedLearnedSpellIds(brain);
     const fromChanneling = !!intent._fromChanneling;
     if (!fromChanneling && (!brain || !learned.includes(spell.id))) {
-      try { world.emit && world.emit('spell:not-known', { actor, spellId: spell.id }); } catch (e) { console.debug('[castSpellSystem] emit spell:not-known failed:', e); }
+      emitSafe(world, 'spell:not-known', { actor, spellId: spell.id });
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -222,14 +219,12 @@ export function castSpellSystem(world) {
         Number(brain?.intelligence || 0),
       );
       if (currentIntelligence < minIntelligence) {
-        try {
-          world.emit && world.emit("spell:int-too-low", {
-            actor,
-            spellId: spell.id,
-            need: minIntelligence,
-            have: currentIntelligence,
-          });
-        } catch (e) { console.debug('[castSpellSystem] emit spell:int-too-low failed:', e); }
+        emitSafe(world, "spell:int-too-low", {
+          actor,
+          spellId: spell.id,
+          need: minIntelligence,
+          have: currentIntelligence,
+        });
         world.remove(actor, CastSpellIntent);
         continue;
       }
@@ -239,7 +234,7 @@ export function castSpellSystem(world) {
     if (!fromChanneling && world.has(actor, Player)) {
       const cdTurns = Number(spell.cooldown || 0) | 0;
       if (cdTurns > 0 && isSpellOnCooldown(world, spell.id)) {
-        try { world.emit?.('spell:on-cooldown', { actor, spellId: spell.id }); } catch (e) { console.debug('[castSpellSystem] emit spell:on-cooldown:', e); }
+        emitSafe(world, 'spell:on-cooldown', { actor, spellId: spell.id });
         world.remove(actor, CastSpellIntent);
         continue;
       }
@@ -268,7 +263,7 @@ export function castSpellSystem(world) {
     if (!fromChanneling) {
       const have = Number(mana?.mana ?? 0);
       if (have < requiredToStart) {
-        try { world.emit && world.emit('spell:oom', { actor, spellId: resolvedSpell.id, need: requiredToStart, have }); } catch (e) { console.debug('[castSpellSystem] emit spell:oom failed:', e); }
+        emitSafe(world, 'spell:oom', { actor, spellId: resolvedSpell.id, need: requiredToStart, have });
         world.remove(actor, CastSpellIntent);
         continue;
       }
@@ -281,20 +276,18 @@ export function castSpellSystem(world) {
     }
 
     if (confusion.kind === "fizzle") {
-      try { world.emit && world.emit("spell:fizzle", { actor, spellId: spell.id, confused: true }); } catch (e) { console.debug('[castSpellSystem] emit spell:fizzle failed:', e); }
+      emitSafe(world, "spell:fizzle", { actor, spellId: spell.id, confused: true });
       world.remove(actor, CastSpellIntent);
       continue;
     }
 
     if (confusion.kind === "miscast") {
-      try {
-        world.emit && world.emit("spell:miscast", {
-          actor,
-          fromSpellId: spell.id,
-          toSpellId: resolvedSpell.id,
-          confused: true,
-        });
-      } catch (e) { console.debug('[castSpellSystem] emit spell:miscast failed:', e); }
+      emitSafe(world, "spell:miscast", {
+        actor,
+        fromSpellId: spell.id,
+        toSpellId: resolvedSpell.id,
+        confused: true,
+      });
     }
 
     // Cast time: begin channeling instead of immediate cast
@@ -312,9 +305,7 @@ export function castSpellSystem(world) {
           y: intent.y ?? null,
         });
       } catch {}
-      try {
-        world.emit?.('channeling:start', { actor, spellId: resolvedSpell.id, castTime });
-      } catch {}
+      emitSafe(world, 'channeling:start', { actor, spellId: resolvedSpell.id, castTime });
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -332,14 +323,12 @@ export function castSpellSystem(world) {
           y: intent.y ?? null,
         });
       } catch {}
-      try {
-        world.emit?.("channeling:start", {
-          actor,
-          spellId: resolvedSpell.id,
-          mode: "sustain",
-          manaPerTick: manaCost,
-        });
-      } catch {}
+      emitSafe(world, "channeling:start", {
+        actor,
+        spellId: resolvedSpell.id,
+        mode: "sustain",
+        manaPerTick: manaCost,
+      });
       world.remove(actor, CastSpellIntent);
       continue;
     }
@@ -357,23 +346,19 @@ export function castSpellSystem(world) {
     }
 
     // Emit semantic cast event that bridge/display can turn into effects
-    try {
-      world.emit && world.emit('castSpell', {
-        actor,
-        spellId: resolvedSpell.id,
-        targetId: intent.targetId || actor,
-        miscast: confusion.kind === "miscast",
-        intendedSpellId: confusion.kind === "miscast" ? spell.id : undefined,
-        powerScale: spellPowerScale,
-        echoRepeat,
-      });
-    } catch (e) { console.debug('[castSpellSystem] emit castSpell failed:', e); }
+    emitSafe(world, 'castSpell', {
+      actor,
+      spellId: resolvedSpell.id,
+      targetId: intent.targetId || actor,
+      miscast: confusion.kind === "miscast",
+      intendedSpellId: confusion.kind === "miscast" ? spell.id : undefined,
+      powerScale: spellPowerScale,
+      echoRepeat,
+    });
     if (hasEchoGrimoire && resolvedSpell.id) {
       upsertEchoGrimoireState(world, actor, resolvedSpell.id);
       if (echoRepeat) {
-        try {
-          world.emit?.("proc:echoGrimoire:echo", { actor, spellId: resolvedSpell.id, powerScale: spellPowerScale });
-        } catch {}
+        emitSafe(world, "proc:echoGrimoire:echo", { actor, spellId: resolvedSpell.id, powerScale: spellPowerScale });
       }
     }
     world.remove(actor, CastSpellIntent);

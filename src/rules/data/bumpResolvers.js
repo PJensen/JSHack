@@ -30,6 +30,7 @@ import { findTileReaction } from "./tileReactions.js";
 import { getTile, setTile, isLoaded, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_VOID } from "../environment/dungeon/constants.js";
 import { STAMINA_REGEN_COOLDOWN } from "./regenConstants.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * @typedef {{
@@ -54,12 +55,6 @@ import { STAMINA_REGEN_COOLDOWN } from "./regenConstants.js";
 
 function isManhattan1(mdx, mdy) {
   return Math.abs(mdx) + Math.abs(mdy) === 1;
-}
-
-function emitSafe(world, event, payload) {
-  try { world.emit?.(event, payload); } catch (e) {
-    console.debug(`[bumpResolvers] emit ${event} failed:`, e);
-  }
 }
 
 function targetIsAtBumpTile(targetId, nx, ny, tiles) {

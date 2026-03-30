@@ -9,13 +9,7 @@ import { Brain } from "../components/Brain.js";
 import { SoundEmitter } from "../components/SoundEmitter.js";
 import { Wounds } from "../components/Wounds.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
-
-const DIRS = [
-  { dx: 1, dy: 0 },
-  { dx: -1, dy: 0 },
-  { dx: 0, dy: 1 },
-  { dx: 0, dy: -1 },
-];
+import { CARDINAL_DIRS } from "./directions.js";
 
 /**
  * Spawn a full centipede chain starting at (headX, headY).
@@ -33,7 +27,7 @@ export function spawnCentipede(world, params, headX, headY, length, rng) {
   const chainId = ((world.step * 0x9e3779b9) ^ (headX * 0x45d9f3b) ^ (headY * 0x119de1f3)) >>> 0;
 
   // Shuffle directions deterministically
-  const dirOrder = [...DIRS];
+  const dirOrder = [...CARDINAL_DIRS];
   for (let i = dirOrder.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1));
     [dirOrder[i], dirOrder[j]] = [dirOrder[j], dirOrder[i]];

@@ -2,6 +2,7 @@
 // Built-in commands for the debug console.
 
 import { playerEntity } from "../../rules/utils/queries.js";
+import { manhattanScalar } from "../../rules/utils/distance.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Position } from "../../rules/components/Position.js";
@@ -24,6 +25,35 @@ import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { CorpseAdaptation } from "../../rules/components/CorpseAdaptation.js";
 import { ProcPackageNode } from "../../rules/components/ProcPackageNode.js";
 import { getParent } from "../../lib/ecs-js/hierarchy.js";
+import { setTile, getTile } from "../../rules/environment/dungeon/tileMap.js";
+import {
+  TILE_FLOOR,
+  TILE_WALL,
+  TILE_LAVA,
+  TILE_SHALLOW_WATER,
+  TILE_WATER,
+  TILE_WATER_DEEP,
+  TILE_GRASS,
+  TILE_ICE,
+  TILE_COBBLESTONE,
+} from "../../rules/environment/dungeon/constants.js";
+
+const TILE_KIND_TO_ID = Object.freeze({
+  floor: TILE_FLOOR,
+  wall: TILE_WALL,
+  lava: TILE_LAVA,
+  shallow: TILE_SHALLOW_WATER,
+  shallow_water: TILE_SHALLOW_WATER,
+  water: TILE_WATER,
+  deep: TILE_WATER_DEEP,
+  deep_water: TILE_WATER_DEEP,
+  grass: TILE_GRASS,
+  ice: TILE_ICE,
+  cobble: TILE_COBBLESTONE,
+  cobblestone: TILE_COBBLESTONE,
+});
+
+const TILE_ID_TO_KIND = new Map(Object.entries(TILE_KIND_TO_ID).map(([k, v]) => [v, k]));
 
 function describeItem(world, itemId) {
   const info = world.get(itemId, ItemInfo);
@@ -37,9 +67,9 @@ function describeItem(world, itemId) {
 /**
  * Register all built-in debug commands.
  * @param {{ registerCommand(name: string, helpText: string, handler: function): void }} console
- * @param {{ world: object, messageLog: { log(msg: object): void } }} deps
+ * @param {{ world: object, messageLog: { log(msg: object): void }, lightingEngine?: any }} deps
  */
-export function registerBuiltinCommands(console, { world, messageLog }) {
+export function registerBuiltinCommands(console, { world, messageLog, lightingEngine }) {
 
   // ---- give <item_id> [count] ----
   console.registerCommand('give', 'give <item_id> [count] — spawn item in inventory', (argsStr) => {
@@ -101,6 +131,141 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
     return `Teleported to (${x}, ${y})`;
   });
 
+  function resolveTileTarget(parts) {
+    if (parts.length >= 3) {
+      const x = Number.parseInt(parts[1], 10);
+      const y = Number.parseInt(parts[2], 10);
+      if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+      return null;
+    }
+    const pe = playerEntity(world);
+    if (!pe) return null;
+    const pos = world.get(pe.id, Position);
+    if (!pos) return null;
+    return { x: pos.x | 0, y: pos.y | 0 };
+  }
+
+  function applyTileReliefPreset(kind, x, y) {
+    if (!lightingEngine || typeof lightingEngine.setFloorTileDelta !== 'function') return null;
+    if (kind === 'lava') return lightingEngine.setFloorTileDelta(x, y, -0.5);
+    if (kind === 'floor') return lightingEngine.setFloorTileDelta(x, y, 0);
+    return null;
+  }
+
+  // ---- settile <kind> [x y] ----
+  console.registerCommand('settile', 'settile <kind> [x y] — set terrain tile (lava/water/floor/...)', (argsStr) => {
+    const parts = String(argsStr || '').split(/\s+/).filter(Boolean);
+    if (!parts.length) return `Usage: settile <${Object.keys(TILE_KIND_TO_ID).join('|')}> [x y]`;
+    const kind = String(parts[0] || '').toLowerCase();
+    const tile = TILE_KIND_TO_ID[kind];
+    if (!Number.isInteger(tile)) return `Unknown tile kind "${kind}".`;
+    const target = resolveTileTarget(parts);
+    if (!target) return 'No player/position found.';
+    const prev = getTile(target.x, target.y);
+    const ok = setTile(target.x, target.y, tile);
+    if (!ok) return `Failed to set tile at (${target.x}, ${target.y}).`;
+    const relief = applyTileReliefPreset(kind, target.x, target.y);
+    const prevKind = TILE_ID_TO_KIND.get(prev) || `tile:${prev}`;
+    if (relief == null) return `Tile (${target.x}, ${target.y}) ${prevKind} -> ${kind}`;
+    return `Tile (${target.x}, ${target.y}) ${prevKind} -> ${kind}; relief=${relief.toFixed(3)}`;
+  });
+
+  function setTileAlias(kind, argsStr) {
+    const parts = [kind, ...String(argsStr || "").split(/\s+/).filter(Boolean)];
+    const tile = TILE_KIND_TO_ID[kind];
+    const target = resolveTileTarget(parts);
+    if (!target) return 'No player/position found.';
+    const prev = getTile(target.x, target.y);
+    const ok = setTile(target.x, target.y, tile);
+    if (!ok) return `Failed to set tile at (${target.x}, ${target.y}).`;
+    const relief = applyTileReliefPreset(kind, target.x, target.y);
+    const prevKind = TILE_ID_TO_KIND.get(prev) || `tile:${prev}`;
+    if (relief == null) return `Tile (${target.x}, ${target.y}) ${prevKind} -> ${kind}`;
+    return `Tile (${target.x}, ${target.y}) ${prevKind} -> ${kind}; relief=${relief.toFixed(3)}`;
+  }
+
+  // Easy aliases for common substance edits.
+  console.registerCommand('setlava', 'setlava [x y] — set tile to lava + relief -0.5', (argsStr) => setTileAlias('lava', argsStr));
+  console.registerCommand('setwater', 'setwater [x y] — set tile to water', (argsStr) => setTileAlias('water', argsStr));
+  console.registerCommand('setshallow', 'setshallow [x y] — set tile to shallow water', (argsStr) => setTileAlias('shallow', argsStr));
+  console.registerCommand('setdeepwater', 'setdeepwater [x y] — set tile to deep water', (argsStr) => setTileAlias('deep_water', argsStr));
+  console.registerCommand('setfloor', 'setfloor [x y] — set tile to floor + relief 0', (argsStr) => setTileAlias('floor', argsStr));
+
+  // ---- dig <amount> ----
+  console.registerCommand('dig', 'dig <amount> — lower current tile in floor relief field', (argsStr) => {
+    if (!lightingEngine || (typeof lightingEngine.addFloorTileDelta !== 'function' && typeof lightingEngine.addFloorRadialDelta !== 'function')) {
+      return 'Floor relief debug is unavailable.';
+    }
+    const amount = Number((argsStr || '').trim() || '0.5');
+    if (!Number.isFinite(amount) || amount <= 0) return 'Usage: dig <amount>';
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+    const pos = world.get(pe.id, Position);
+    if (!pos) return 'Player has no Position.';
+    if (typeof lightingEngine.addFloorRadialDelta === 'function') {
+      const count = lightingEngine.addFloorRadialDelta(
+        pos.x + 0.5,
+        pos.y + 0.5,
+        -amount,
+        0.62,
+        { falloff: 1.3, roughness: 0.22, depthNoise: 0.10 },
+      );
+      return `Dig @ (${pos.x}, ${pos.y}) by ${amount.toFixed(3)} -> radial stamps ${count}`;
+    }
+    const next = lightingEngine.addFloorTileDelta(pos.x, pos.y, -amount);
+    return `Dig @ (${pos.x}, ${pos.y}) by ${amount.toFixed(3)} -> tile relief ${next.toFixed(3)}`;
+  });
+
+  // ---- pile <amount> ----
+  console.registerCommand('pile', 'pile <amount> — raise current tile in floor relief field', (argsStr) => {
+    if (!lightingEngine || (typeof lightingEngine.addFloorTileDelta !== 'function' && typeof lightingEngine.addFloorRadialDelta !== 'function')) {
+      return 'Floor relief debug is unavailable.';
+    }
+    const amount = Number((argsStr || '').trim() || '0.5');
+    if (!Number.isFinite(amount) || amount <= 0) return 'Usage: pile <amount>';
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+    const pos = world.get(pe.id, Position);
+    if (!pos) return 'Player has no Position.';
+    if (typeof lightingEngine.addFloorRadialDelta === 'function') {
+      const count = lightingEngine.addFloorRadialDelta(
+        pos.x + 0.5,
+        pos.y + 0.5,
+        amount,
+        0.62,
+        { falloff: 1.25, roughness: 0.16, depthNoise: 0.08 },
+      );
+      return `Pile @ (${pos.x}, ${pos.y}) by ${amount.toFixed(3)} -> radial stamps ${count}`;
+    }
+    const next = lightingEngine.addFloorTileDelta(pos.x, pos.y, amount);
+    return `Pile @ (${pos.x}, ${pos.y}) by ${amount.toFixed(3)} -> tile relief ${next.toFixed(3)}`;
+  });
+
+  // ---- reliefnoise <amp> [freq] ----
+  console.registerCommand('reliefnoise', 'reliefnoise <amp> [freq] — set smooth floor noise baseline', (argsStr) => {
+    if (!lightingEngine || typeof lightingEngine.setFloorNoise !== 'function') {
+      return 'Floor relief debug is unavailable.';
+    }
+    const parts = argsStr.split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'Usage: reliefnoise <amp> [freq]';
+    const amp = Number(parts[0]);
+    const freq = parts.length > 1 ? Number(parts[1]) : undefined;
+    if (!Number.isFinite(amp)) return 'Usage: reliefnoise <amp> [freq]';
+    const next = lightingEngine.setFloorNoise(amp, freq);
+    const state = lightingEngine.getFloorReliefState?.();
+    return `Relief noise amp=${next.toFixed(3)} freq=${Number(state?.noiseFreq || 0).toFixed(3)}`;
+  });
+
+  // ---- reliefclear ----
+  console.registerCommand('reliefclear', 'reliefclear [all] — reset floor relief on current depth or all depths', (argsStr) => {
+    if (!lightingEngine || typeof lightingEngine.clearFloorRelief !== 'function') {
+      return 'Floor relief debug is unavailable.';
+    }
+    const mode = String(argsStr || '').trim().toLowerCase();
+    lightingEngine.clearFloorRelief(mode === 'all' ? 'all' : undefined);
+    return mode === 'all' ? 'Floor relief reset for all depths.' : 'Floor relief reset for current depth.';
+  });
+
   // ---- god ----
   const GOD_SYM = Symbol.for("jshack:debug:godMode");
   function toggleGodMode() {
@@ -153,7 +318,7 @@ export function registerBuiltinCommands(console, { world, messageLog }) {
       const name = named?.name || named?.identity || `entity ${id}`;
       const identity = named?.identity || 'unknown';
       const hp = `${Number(vit?.hp ?? 0)}/${Number(vit?.maxHp ?? 0)}`;
-      const dist = playerPos ? Math.abs(pos.x - playerPos.x) + Math.abs(pos.y - playerPos.y) : null;
+      const dist = playerPos ? manhattanScalar(pos.x, pos.y, playerPos.x, playerPos.y) : null;
       rows.push({
         id,
         x: pos.x,

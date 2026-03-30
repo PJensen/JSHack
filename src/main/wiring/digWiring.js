@@ -2,6 +2,7 @@ import { createRng } from "../../lib/ecs-js/rng.js";
 import { pickGem } from "../../rules/data/gems.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
 import { Position } from "../../rules/components/Position.js";
+import { emitSafe } from "../../rules/utils/emitSafe.js";
 
 const INSTALLED = Symbol.for("jshack:main:digWiring:installed");
 
@@ -34,6 +35,6 @@ export function installDigWiring({ world }) {
     if (gemId == null) return;
 
     world.add(gemId, Position, { x, y });
-    try { world.emit?.('item:dropped', { itemId: gemId, count: 1, at: { x, y } }); } catch (e) { console.debug('[digWiring] emit item:dropped failed:', e); }
+    emitSafe(world, 'item:dropped', { itemId: gemId, count: 1, at: { x, y } });
   });
 }

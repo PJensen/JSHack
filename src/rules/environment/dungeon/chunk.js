@@ -9,6 +9,7 @@ import {
   CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR,
 } from './constants.js';
 import { loadPrefabRoom, stampPrefabInChunk } from './prefabRooms.js';
+import { manhattanScalar } from '../../utils/distance.js';
 
 /**
  * @typedef {Object} ChunkData
@@ -245,7 +246,7 @@ export function findDoorPositions(tiles, stride, rng, doorChance) {
     let tooClose = false;
     for (const c of group) {
       for (const d of doors) {
-        if (Math.abs(c.x - d.x) + Math.abs(c.y - d.y) < MIN_DOOR_SPACING) {
+        if (manhattanScalar(c.x, c.y, d.x, d.y) < MIN_DOOR_SPACING) {
           tooClose = true;
           break;
         }
@@ -358,7 +359,7 @@ function _carveEdgeGates(tiles, worldSeed, depth, cx, cy, localRooms, rng, floor
     for (const room of localRooms) {
       const rcx = room.x + Math.floor(room.w / 2);
       const rcy = room.y + Math.floor(room.h / 2);
-      const d = Math.abs(rcx - gx) + Math.abs(rcy - gy);
+      const d = manhattanScalar(rcx, rcy, gx, gy);
       if (d < bestDist) { bestDist = d; bestRoom = room; }
     }
 
@@ -414,7 +415,7 @@ function _ensureConnectedWalkable(tiles, worldSeed, depth, chunkX, chunkY) {
     for (const component of components.slice(1)) {
       for (const a of main) {
         for (const b of component) {
-          const distance = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+          const distance = manhattanScalar(a.x, a.y, b.x, b.y);
           if (distance < bestDistance) {
             bestDistance = distance;
             bestPair = { from: a, to: b };

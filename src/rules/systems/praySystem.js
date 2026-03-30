@@ -16,6 +16,7 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
 import { ensureActiveEffects } from "../utils/effects.js";
 import { effectiveMaxHp, effectiveMaxMana } from "../utils/passiveBonuses.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 const PRAYER_STREAK_KEY = Symbol.for('jshack:prayer:boonStreak');
 const PRAYER_LAST_BOON_KEY = Symbol.for('jshack:prayer:lastBoonTurn');
@@ -47,15 +48,11 @@ function pushEffect(world, actorId, effect) {
 }
 
 function emitIntervention(world, payload) {
-  try {
-    world.emit && world.emit('deity:intervention', payload);
-  } catch (e) { console.debug('[praySystem] emit deity:intervention failed:', e); }
+  emitSafe(world, 'deity:intervention', payload);
 }
 
 function emitBoon(world, payload) {
-  try {
-    world.emit && world.emit('deity:boon', payload);
-  } catch (e) { console.debug('[praySystem] emit deity:boon failed:', e); }
+  emitSafe(world, 'deity:boon', payload);
   emitIntervention(world, {
     playerId: payload?.actor,
     deityId: payload?.deityId,
@@ -132,7 +129,7 @@ function applyPrayerBoon(world, actorId, context) {
     vit.hp = Math.min(renewalCap, vit.hp + heal);
     const applied = Math.max(0, vit.hp - before);
     if (applied > 0) {
-      try { world.emit && world.emit('healed', { id: actorId, amount: applied, source: 'divine' }); } catch {}
+      emitSafe(world, 'healed', { id: actorId, amount: applied, source: 'divine' });
       emitBoon(world, {
         actor: actorId,
         deityId,
@@ -288,22 +285,20 @@ export function praySystem(world) {
                   if (beat && beat.state === 'cursed') {
                     beat.state = 'uncursed';
                     const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
-                    try {
-                      world.emit && world.emit('prayer:curse-removed', {
-                        actor: id,
-                        itemId,
-                        name: itemName,
-                        deityId,
-                      });
-                      world.emit && world.emit('deity:intervention', {
-                        playerId: id,
-                        deityId,
-                        deityName: deity.name,
-                        kind: 'prayer_uncurse',
-                        itemId,
-                        itemName,
-                      });
-                    } catch (e) { console.debug('[praySystem] emit prayer:curse-removed failed:', e); }
+                    emitSafe(world, 'prayer:curse-removed', {
+                      actor: id,
+                      itemId,
+                      name: itemName,
+                      deityId,
+                    });
+                    emitSafe(world, 'deity:intervention', {
+                      playerId: id,
+                      deityId,
+                      deityName: deity.name,
+                      kind: 'prayer_uncurse',
+                      itemId,
+                      itemName,
+                    });
                     break; // one item per prayer
                   }
                 }
@@ -312,23 +307,21 @@ export function praySystem(world) {
           }
 
           // Emit event for logging/UI feedback
-          try {
-            world.emit && world.emit('prayer', {
-              actor: id,
-              deityId,
-              distress
-            });
-            world.emit && world.emit('prayer:insight', {
-              actor: id,
-              deityId,
-              deityName: deity.name,
-              pantheon: devotion?.pantheon === true,
-              severity: Number(distress.severity || 0),
-              desperate: !!distress.desperate,
-              troubled: !!distress.troubled,
-              needs: Array.isArray(distress.needs) ? distress.needs : [],
-            });
-          } catch (e) { console.debug('[praySystem] emit prayer failed:', e); }
+          emitSafe(world, 'prayer', {
+            actor: id,
+            deityId,
+            distress
+          });
+          emitSafe(world, 'prayer:insight', {
+            actor: id,
+            deityId,
+            deityName: deity.name,
+            pantheon: devotion?.pantheon === true,
+            severity: Number(distress.severity || 0),
+            desperate: !!distress.desperate,
+            troubled: !!distress.troubled,
+            needs: Array.isArray(distress.needs) ? distress.needs : [],
+          });
 
           // Fast prayer-boon resolver (on top of classic miracle system)
           const streak = Math.max(0, Number(unanswered.get(id) || 0));

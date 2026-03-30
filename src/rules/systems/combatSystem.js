@@ -37,8 +37,74 @@ import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingC
 import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
+import { emitSafe } from '../utils/emitSafe.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
+
+function computeImpactVector(from, to) {
+    const dx = Number(to?.x || 0) - Number(from?.x || 0);
+    const dy = Number(to?.y || 0) - Number(from?.y || 0);
+    const mag = Math.hypot(dx, dy);
+    if (!(mag > 0)) return { dx: 0, dy: 1 };
+    return { dx: dx / mag, dy: dy / mag };
+}
+
+function resolveWeaponClass(world, weaponId, damageType) {
+    if (!(weaponId > 0) || !world.isAlive(weaponId)) return 'unarmed';
+    const info = world.get(weaponId, ItemInfo);
+    const identity = String(
+        world.get(weaponId, NamedIdentity)?.identity
+        || info?.subtype
+        || world.get(weaponId, NamedIdentity)?.name
+        || ''
+    ).toLowerCase();
+    if (identity.includes('morningstar')) return 'morningstar';
+    if (identity.includes('dagger') || identity.includes('shiv') || identity.includes('athame') || identity.includes('knife')) return 'dagger';
+    if (identity.includes('sword') || identity.includes('blade') || identity.includes('sabre') || identity.includes('rapier') || identity.includes('katana')) return 'sword';
+    if (identity.includes('mace') || identity.includes('maul') || identity.includes('club') || identity.includes('hammer') || identity.includes('flail')) return 'mace';
+    if (identity.includes('axe') || identity.includes('hatchet')) return 'axe';
+    if (damageType === 'blunt') return 'mace';
+    if (damageType === 'slash') return 'sword';
+    if (damageType === 'pierce') return 'dagger';
+    return 'weapon';
+}
+
+function buildDamageSignature(info, damageType) {
+    const bonuses = info?.bonuses || {};
+    let blunt = Math.max(0, Number(bonuses.bluntPenetration || 0));
+    let pierce = Math.max(0, Number(bonuses.piercePenetration || 0));
+    let slash = Math.max(0, Number(bonuses.slashPenetration || 0));
+    if (damageType === 'blunt') blunt += 2;
+    else if (damageType === 'pierce') pierce += 2;
+    else if (damageType === 'slash') slash += 2;
+    else {
+        blunt += 1;
+        pierce += 1;
+        slash += 1;
+    }
+    const total = blunt + pierce + slash;
+    if (!(total > 0)) return { blunt: 0.34, pierce: 0.33, slash: 0.33 };
+    return {
+        blunt: blunt / total,
+        pierce: pierce / total,
+        slash: slash / total,
+    };
+}
+
+function buildMeleeImpactProfile(world, weaponId, damageType, offhand, facingVector) {
+    const info = (weaponId > 0 && world.isAlive(weaponId)) ? world.get(weaponId, ItemInfo) : null;
+    const weaponClass = resolveWeaponClass(world, weaponId, damageType);
+    const attackKind = damageType === 'pierce'
+        ? 'stab'
+        : (damageType === 'slash' ? 'slash' : (damageType === 'blunt' ? 'blunt' : 'strike'));
+    return {
+        weaponClass,
+        attackKind,
+        offhand: !!offhand,
+        signature: buildDamageSignature(info, damageType),
+        facingVector: facingVector || undefined,
+    };
+}
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
 function makeCombatFrame(world, base) {
@@ -81,7 +147,7 @@ function applyDamageTextureEffects(world, {
             sourceId: attacker,
             startedAtTurn: world.step,
         });
-        try { world.emit?.('combat:status:stagger', { attacker, defender, critical: !!critical }); } catch {}
+        emitSafe(world, 'combat:status:stagger', { attacker, defender, critical: !!critical });
     }
 }
 
@@ -230,11 +296,24 @@ function resolveHitRoll(world, {
     }), { excludeSlots: ['weapon'] });
 
     if (finalDmg > 0) {
+        const srcPos = world.get(source, Position);
+        const dstPos = world.get(target, Position);
+        const facing = getNormalizedEntityFacing(world, source);
         const result = dealDamage(world, {
             target, amount: finalDmg, source,
             type: damageType, cause: 'melee',
             critical: isCrit,
             armorPenetration,
+            impactVector: computeImpactVector(srcPos, dstPos),
+            impactProfile: buildMeleeImpactProfile(
+                world,
+                weaponId,
+                damageType,
+                offhand,
+                (facing && Number.isFinite(facing.dx) && Number.isFinite(facing.dy))
+                    ? { dx: Number(facing.dx), dy: Number(facing.dy) }
+                    : null,
+            ),
             ...(offhand ? { offhand: true } : {}),
         });
         if (result.applied) {

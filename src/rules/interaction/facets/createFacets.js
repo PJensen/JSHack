@@ -13,6 +13,7 @@ import { createStatusFacade } from "../../utils/statusFacade.js";
 import { getEffectiveVisionRange } from "../../utils/blind.js";
 import { isIdentified } from "../../data/identification.js";
 import { inventoryContains } from "../../utils/inventoryFacade.js";
+import { emitSafe } from "../../utils/emitSafe.js";
 
 /**
  * @param {string} text
@@ -385,7 +386,7 @@ export function createFacets(init) {
             y: safeIntent.y != null ? (Number(safeIntent.y) | 0) : null,
           });
         } catch {}
-        try { world.emit?.('channeling:start', { actor: actorId | 0, spellId: spell.id, castTime }); } catch {}
+        emitSafe(world, 'channeling:start', { actor: actorId | 0, spellId: spell.id, castTime });
         return true;
       }
       runSpellScript(

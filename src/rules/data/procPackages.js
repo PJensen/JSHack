@@ -11,6 +11,7 @@ import { isOpaque } from "../environment/dungeon/tileMap.js";
 import { registerScript, getScriptHandlers, ScriptVerb } from "../scripting.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
+import { chebyshevScalar } from "../utils/distance.js";
 import {
   addAttachedComponent,
   attachDerivedExpression,
@@ -146,7 +147,7 @@ function scoreRicochetCandidate(direction, origin, candidatePos) {
   return {
     forward,
     lateral,
-    distance: Math.max(Math.abs(rx), Math.abs(ry)),
+    distance: chebyshevScalar(candidatePos.x | 0, candidatePos.y | 0, origin.x | 0, origin.y | 0),
   };
 }
 

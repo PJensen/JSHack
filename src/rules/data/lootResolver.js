@@ -17,6 +17,7 @@ import { Player } from '../components/Player.js';
 import { Inventory } from '../components/Inventory.js';
 import { inventoryItems } from '../utils/inventoryFacade.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
+import { emitSafe } from '../utils/emitSafe.js';
 
 const MAX_NESTING = 5;
 const TOUCHSTONE_IDENTITY = 'stone_touchstone';
@@ -421,7 +422,7 @@ export function dropLoot(world, tableId, rng, depth, pos) {
     const eid = materializeDrop(world, drop, pos);
     if (eid != null) {
       ids.push(eid);
-      try { world.emit && world.emit('item:dropped', { itemId: eid, count: 1, at: { x: pos.x, y: pos.y } }); } catch { /* */ }
+      emitSafe(world, 'item:dropped', { itemId: eid, count: 1, at: { x: pos.x, y: pos.y } });
     }
   }
   return ids;

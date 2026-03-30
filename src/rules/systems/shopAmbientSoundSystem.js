@@ -3,6 +3,7 @@ import { Position } from "../components/Position.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { playerEntity } from "../utils/queries.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 const SHOP_AMBIENT_STATE_KEY = Symbol.for("jshack:shopAmbientSoundSystem:state");
 const COOLDOWN_TURNS = 10;
@@ -134,7 +135,7 @@ export function shopAmbientSoundSystem(world) {
 
     const centerX = metadata.x + Math.floor(metadata.w / 2);
     const centerY = metadata.y + Math.floor(metadata.h / 2);
-    const distance = Math.max(Math.abs(playerPos.x - centerX), Math.abs(playerPos.y - centerY));
+    const distance = chebyshevScalar(playerPos.x, playerPos.y, centerX, centerY);
     if (distance > 12) continue;
 
     const canNotify = roomState.lastSoundTurn == null || (currentTurn - roomState.lastSoundTurn) >= COOLDOWN_TURNS;

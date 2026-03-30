@@ -9,6 +9,7 @@ import {
   addToInventory,
   removeFromInventory,
 } from "../utils/inventoryFacade.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * equipItemSystem — resolves EquipIntent:
@@ -44,26 +45,22 @@ export function equipItemSystem(world) {
       // Cursed items cannot be unequipped — they are welded to the player.
       const beat = world.get(itemId, Beatitude);
       if (beat && beat.state === 'cursed') {
-        try {
-          world.emit && world.emit('item:welded', {
-            actor,
-            itemId,
-            slot: equippedSlot,
-            name: world.get(itemId, NamedIdentity)?.name,
-          });
-        } catch (e) { console.debug('[equipItemSystem] emit item:welded failed:', e); }
-        world.remove(actor, EquipIntent);
-        continue;
-      }
-      eq[equippedSlot] = null;
-      try {
-        world.emit && world.emit('item:unequipped', {
+        emitSafe(world, 'item:welded', {
           actor,
           itemId,
           slot: equippedSlot,
           name: world.get(itemId, NamedIdentity)?.name,
         });
-      } catch (e) { console.debug('[equipItemSystem] emit item:unequipped failed:', e); }
+        world.remove(actor, EquipIntent);
+        continue;
+      }
+      eq[equippedSlot] = null;
+      emitSafe(world, 'item:unequipped', {
+        actor,
+        itemId,
+        slot: equippedSlot,
+        name: world.get(itemId, NamedIdentity)?.name,
+      });
       world.remove(actor, EquipIntent);
       continue;
     }
@@ -154,7 +151,7 @@ export function equipItemSystem(world) {
     }
 
     // Emit events for UI/logging
-    try { world.emit && world.emit('item:equipped', { actor, itemId, slot: appliedSlot || slot, name: world.get(itemId, NamedIdentity)?.name }); } catch (e) { console.debug('[equipItemSystem] emit item:equipped failed:', e); }
+    emitSafe(world, 'item:equipped', { actor, itemId, slot: appliedSlot || slot, name: world.get(itemId, NamedIdentity)?.name });
 
     // Clear intent
     world.remove(actor, EquipIntent);

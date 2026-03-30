@@ -8,9 +8,8 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getMonsterTags } from "../data/monsters.js";
 import { areFactionsHostile } from "./factionHostility.js";
 
-export function chebyshevDistance(a, b) {
-  return Math.max(Math.abs((a?.x | 0) - (b?.x | 0)), Math.abs((a?.y | 0) - (b?.y | 0)));
-}
+import { chebyshev as chebyshevDistance } from "./distance.js";
+export { chebyshevDistance };
 
 /**
  * Hostile/living actors are canonical perception targets.

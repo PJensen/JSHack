@@ -3,6 +3,7 @@ import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { playerEntity } from "../utils/queries.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 /** @type {WeakMap<object, { nextTick:number }>} */
 const _stateByWorld = new WeakMap();
@@ -57,7 +58,7 @@ export function overworldAmbientSystem(world) {
   let nearestDist = Infinity;
   for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
     if (!HOME_IDENTITIES.has(String(ni.identity || ""))) continue;
-    const dist = Math.max(Math.abs(pos.x - ppos.x), Math.abs(pos.y - ppos.y));
+    const dist = chebyshevScalar(pos.x, pos.y, ppos.x, ppos.y);
     if (dist < nearestDist) {
       nearestDist = dist;
       nearest = id;

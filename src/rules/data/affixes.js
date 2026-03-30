@@ -9,6 +9,7 @@ import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import { registerScript, ScriptVerb } from "../scripting.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { emitSafe } from "../utils/emitSafe.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
@@ -116,7 +117,7 @@ registerScript(AFFIX_THORNS, {
       const roll = rngInt(r, 1, 100);
       if (roll <= 20) {
         ctx.retaliate(2);
-        try { world.emit && world.emit('proc:thorns', { actor: ctx.defender, target: ctx.attacker }); } catch (e) { console.debug('[affixes] emit proc:thorns failed:', e); }
+        emitSafe(world, 'proc:thorns', { actor: ctx.defender, target: ctx.attacker });
         try {
           const ae = world.get(defender, ActiveEffects);
           if (ae && Array.isArray(ae.effects)) {
@@ -136,14 +137,14 @@ registerScript(AFFIX_VAMP, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     const amt = Math.max(1, Math.floor(ctx.damage / 3));
     ctx.healAttacker(amt);
-    try { world.emit && world.emit('proc:vampiric', { actor: ctx.attacker, target: ctx.defender, amount: amt }); } catch (e) { console.debug('[affixes] emit proc:vampiric failed:', e); }
+    emitSafe(world, 'proc:vampiric', { actor: ctx.attacker, target: ctx.defender, amount: amt });
   },
 });
 
 registerScript(AFFIX_FIERCE, {
   [ScriptVerb.AffixOnBeforeHit]: (world, ctx) => {
     ctx.damage += 1;
-    try { world.emit && world.emit('proc:fierce', { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug('[affixes] emit proc:fierce failed:', e); }
+    emitSafe(world, 'proc:fierce', { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -187,7 +188,7 @@ registerScript(AFFIX_CAUSTIC, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     const dealt = applyNonLethalTypedChip(world, ctx, "acid", 1, "affix:caustic");
     if (dealt > 0) {
-      try { world.emit && world.emit("proc:caustic", { actor: ctx.attacker, target: ctx.defender, amount: dealt }); } catch (e) { console.debug('[affixes] emit proc:caustic failed:', e); }
+      emitSafe(world, "proc:caustic", { actor: ctx.attacker, target: ctx.defender, amount: dealt });
     }
   },
 });
@@ -196,11 +197,11 @@ registerScript(AFFIX_CAPACITIVE, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     const dealt = applyNonLethalTypedChip(world, ctx, "electric", 1, "affix:capacitive");
     if (dealt > 0) {
-      try { world.emit && world.emit("proc:capacitive", { actor: ctx.attacker, target: ctx.defender, amount: dealt }); } catch (e) { console.debug('[affixes] emit proc:capacitive failed:', e); }
+      emitSafe(world, "proc:capacitive", { actor: ctx.attacker, target: ctx.defender, amount: dealt });
     }
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee03, 35)) return;
     upsertEffect(world, ctx.defender, { key: "shock", turnsLeft: 2, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:shocked", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug('[affixes] emit proc:shocked failed:', e); }
+    emitSafe(world, "proc:shocked", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -220,7 +221,7 @@ registerScript(AFFIX_VENOMOUS, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee04, 40)) return;
     upsertEffect(world, ctx.defender, { key: "poison", turnsLeft: 4, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:poisoned", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug('[affixes] emit proc:poisoned failed:', e); }
+    emitSafe(world, "proc:poisoned", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -243,7 +244,7 @@ registerScript(AFFIX_CHAIN_LIGHTNING, {
       dealDamage(world, { target: nearId, amount: 1, source: ctx.attacker, type: "electric", cause: "affix:chainLightning", noTrigger: true });
       chained = true;
     });
-    try { world.emit && world.emit("proc:chainLightning", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:chainLightning failed:", e); }
+    emitSafe(world, "proc:chainLightning", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -252,7 +253,7 @@ registerScript(AFFIX_FIRESTORM, {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee11, 12)) return;
     applyNonLethalTypedChip(world, ctx, "fire", 1, "affix:firestorm");
     upsertEffect(world, ctx.defender, { key: "burning", turnsLeft: 3, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:firestorm", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:firestorm failed:", e); }
+    emitSafe(world, "proc:firestorm", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -261,7 +262,7 @@ registerScript(AFFIX_SOUL_DRAIN, {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee12, 18)) return;
     const amt = Math.max(1, Math.floor(ctx.damage / 2));
     ctx.healAttacker(amt);
-    try { world.emit && world.emit("proc:soulDrain", { actor: ctx.attacker, target: ctx.defender, amount: amt }); } catch (e) { console.debug("[affixes] emit proc:soulDrain failed:", e); }
+    emitSafe(world, "proc:soulDrain", { actor: ctx.attacker, target: ctx.defender, amount: amt });
   },
 });
 
@@ -269,7 +270,7 @@ registerScript(AFFIX_BERSERK, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee13, 10)) return;
     upsertEffect(world, ctx.attacker, { key: "berserk", turnsLeft: 5, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:berserking", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:berserking failed:", e); }
+    emitSafe(world, "proc:berserking", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -277,7 +278,7 @@ registerScript(AFFIX_SHIELD_WALL, {
   [ScriptVerb.AffixOnDamaged]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee14, 15)) return;
     upsertEffect(world, ctx.defender, { key: "stoneskin", turnsLeft: 4, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:shieldWall", { actor: ctx.defender, target: ctx.attacker }); } catch (e) { console.debug("[affixes] emit proc:shieldWall failed:", e); }
+    emitSafe(world, "proc:shieldWall", { actor: ctx.defender, target: ctx.attacker });
   },
 });
 
@@ -288,7 +289,7 @@ registerScript(AFFIX_MANA_SURGE, {
     if (!mana) return;
     const maxMana = effectiveMaxMana(world, ctx.attacker, mana);
     mana.mana = Math.min(maxMana, (Number(mana.mana) || 0) + 3);
-    try { world.emit && world.emit("proc:manaSurge", { actor: ctx.attacker, amount: 3 }); } catch (e) { console.debug("[affixes] emit proc:manaSurge failed:", e); }
+    emitSafe(world, "proc:manaSurge", { actor: ctx.attacker, amount: 3 });
   },
 });
 
@@ -298,7 +299,7 @@ registerScript(AFFIX_EXECUTIONER, {
     if (!vit) return;
     if (vit.hp / vit.maxHp >= 0.3) return;
     ctx.damage += 3;
-    try { world.emit && world.emit("proc:executioner", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:executioner failed:", e); }
+    emitSafe(world, "proc:executioner", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -306,7 +307,7 @@ registerScript(AFFIX_FROSTBITE, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee16, 20)) return;
     upsertEffect(world, ctx.defender, { key: "frost", turnsLeft: 3, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:frostbite", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:frostbite failed:", e); }
+    emitSafe(world, "proc:frostbite", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -314,7 +315,7 @@ registerScript(AFFIX_HEMORRHAGE, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee17, 25)) return;
     upsertEffect(world, ctx.defender, { key: "bleed", turnsLeft: 4, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:hemorrhage", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:hemorrhage failed:", e); }
+    emitSafe(world, "proc:hemorrhage", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -322,7 +323,7 @@ registerScript(AFFIX_FLAMING, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee19, 50)) return;
     upsertEffect(world, ctx.defender, { key: "burning", turnsLeft: 3, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:flaming", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:flaming failed:", e); }
+    emitSafe(world, "proc:flaming", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -330,7 +331,7 @@ registerScript(AFFIX_STUNNING, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1a, 25)) return;
     upsertEffect(world, ctx.defender, { key: "stun", turnsLeft: 1, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:stunned", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:stunned failed:", e); }
+    emitSafe(world, "proc:stunned", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -343,7 +344,7 @@ registerScript(AFFIX_SECOND_WIND, {
       const maxStam = effectiveMaxStamina(world, ctx.defender, stam);
       stam.stamina = Math.min(maxStam, (Number(stam.stamina) || 0) + 5);
     }
-    try { world.emit && world.emit("proc:secondWind", { actor: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:secondWind failed:", e); }
+    emitSafe(world, "proc:secondWind", { actor: ctx.defender });
   },
 });
 
@@ -351,7 +352,7 @@ registerScript(AFFIX_WEAKEN, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1b, 20)) return;
     upsertEffect(world, ctx.defender, { key: "weaken", turnsLeft: 3, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:weaken", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:weaken failed:", e); }
+    emitSafe(world, "proc:weaken", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -359,7 +360,7 @@ registerScript(AFFIX_AGONY, {
   [ScriptVerb.AffixOnHit]: (world, ctx) => {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1c, 25)) return;
     upsertEffect(world, ctx.defender, { key: "agony", turnsLeft: 4, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:agony", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:agony failed:", e); }
+    emitSafe(world, "proc:agony", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -368,7 +369,7 @@ registerScript(AFFIX_CRIPPLE, {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1d, 20)) return;
     applyNonLethalTypedChip(world, ctx, "pierce", 1, "affix:cripple");
     upsertEffect(world, ctx.defender, { key: "frost", turnsLeft: 2, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:cripple", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:cripple failed:", e); }
+    emitSafe(world, "proc:cripple", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -377,7 +378,7 @@ registerScript(AFFIX_PLAGUE, {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1e, 20)) return;
     upsertEffect(world, ctx.defender, { key: "poison", turnsLeft: 4, potency: 2, stacks: 1 });
     upsertEffect(world, ctx.defender, { key: "disease", turnsLeft: 3, potency: 1, stacks: 1 });
-    try { world.emit && world.emit("proc:plague", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:plague failed:", e); }
+    emitSafe(world, "proc:plague", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 
@@ -386,7 +387,7 @@ registerScript(AFFIX_SOULFIRE, {
     if (!procRoll(world, ctx.attacker, ctx.defender, 0xc0ffee1f, 15)) return;
     ctx.healAttacker(2);
     upsertEffect(world, ctx.defender, { key: "burning", turnsLeft: 3, potency: 2, stacks: 1 });
-    try { world.emit && world.emit("proc:soulfire", { actor: ctx.attacker, target: ctx.defender }); } catch (e) { console.debug("[affixes] emit proc:soulfire failed:", e); }
+    emitSafe(world, "proc:soulfire", { actor: ctx.attacker, target: ctx.defender });
   },
 });
 

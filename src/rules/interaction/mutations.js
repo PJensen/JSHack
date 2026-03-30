@@ -35,6 +35,7 @@ import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { Traits } from "../components/Traits.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * @param {any} world
@@ -273,13 +274,11 @@ export function applyMutation(world, op, resolvers = {}) {
       }
 
       if (op.emitEvent !== false) {
-        try {
-          world.emit?.("spawned", {
-            id: created,
-            kind: "item",
-            at: { x: spawnX, y: spawnY },
-          });
-        } catch (e) { console.debug('[mutations] emit spawned failed:', e); }
+        emitSafe(world, "spawned", {
+          id: created,
+          kind: "item",
+          at: { x: spawnX, y: spawnY },
+        });
       }
       break;
     }
@@ -338,18 +337,16 @@ export function applyMutation(world, op, resolvers = {}) {
       });
 
       if (op.emitEvent !== false) {
-        try {
-          world.emit?.("spawned", {
-            id: spawned,
-            kind: "monster",
-            at: { x: spawnX, y: spawnY },
-          });
-        } catch (e) { console.debug('[mutations] emit spawned failed:', e); }
+        emitSafe(world, "spawned", {
+          id: spawned,
+          kind: "monster",
+          at: { x: spawnX, y: spawnY },
+        });
       }
 
       const tauntMessage = String(op.tauntMessage || "");
       if (tauntMessage) {
-        try { world.emit?.("message", { text: tauntMessage, type: "warning" }); } catch (e) { console.debug('[mutations] emit message failed:', e); }
+        emitSafe(world, "message", { text: tauntMessage, type: "warning" });
       }
       break;
     }
@@ -402,14 +399,12 @@ export function applyMutation(world, op, resolvers = {}) {
       if (op.emitEvent !== false) {
         const info = /** @type any */ (world.get(op.entityId, ItemInfo));
         const count = Math.max(1, Number(info?.count || 1) | 0);
-        try {
-          world.emit?.("item:dropped", {
-            actor: op.inventoryOwnerId | 0,
-            itemId: op.entityId | 0,
-            count,
-            at: { x, y },
-          });
-        } catch (e) { console.debug('[mutations] emit item:dropped failed:', e); }
+        emitSafe(world, "item:dropped", {
+          actor: op.inventoryOwnerId | 0,
+          itemId: op.entityId | 0,
+          count,
+          at: { x, y },
+        });
       }
       break;
     }

@@ -4,6 +4,7 @@
 import { startShake } from "../camera/shake.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { ArrowFx, ArrowSparkFx, RadialFx } from "./fxEntries.js";
+import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResolver.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
@@ -43,6 +44,57 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     // Arrows
     for (let i = _arrowFx.length - 1; i >= 0; i--) {
       const a = _arrowFx[i];
+      if (fx?.pool && a.progress < 1 && (a.style === "venom" || a.style === "storm" || a.style === "frost")) {
+        const hx = a.from.x + (a.to.x - a.from.x) * a.progress;
+        const hy = a.from.y + (a.to.y - a.from.y) * a.progress;
+        const rate = a.style === "storm" ? 42 : 28;
+        const count = Math.max(1, Math.ceil(dt * rate));
+        for (let j = 0; j < count; j++) {
+          if (a.style === "storm") {
+            fx.pool.spawn(new Particle({
+              x: hx + (Math.random() - 0.5) * 0.06,
+              y: hy + (Math.random() - 0.5) * 0.06,
+              vx: -a.dx * 1.8 + (Math.random() - 0.5) * 1.1,
+              vy: -a.dy * 1.8 + (Math.random() - 0.5) * 1.1,
+              life: 0.10 + Math.random() * 0.12,
+              size0: 0.05 + Math.random() * 0.03,
+              size1: 0.01,
+              r: 145 + (Math.random() * 60 | 0),
+              g: 205 + (Math.random() * 45 | 0),
+              b: 255,
+              a0: 0.8,
+            }));
+          } else if (a.style === "frost") {
+            fx.pool.spawn(new Particle({
+              x: hx + (Math.random() - 0.5) * 0.07,
+              y: hy + (Math.random() - 0.5) * 0.07,
+              vx: -a.dx * 1.0 + (Math.random() - 0.5) * 0.8,
+              vy: -a.dy * 1.0 + (Math.random() - 0.5) * 0.8 + 0.08,
+              life: 0.14 + Math.random() * 0.16,
+              size0: 0.05 + Math.random() * 0.03,
+              size1: 0.01,
+              r: 165 + (Math.random() * 45 | 0),
+              g: 220 + (Math.random() * 30 | 0),
+              b: 255,
+              a0: 0.74,
+            }));
+          } else {
+            fx.pool.spawn(new Particle({
+              x: hx + (Math.random() - 0.5) * 0.08,
+              y: hy + (Math.random() - 0.5) * 0.08,
+              vx: -a.dx * 0.9 + (Math.random() - 0.5) * 0.6,
+              vy: -a.dy * 0.9 + (Math.random() - 0.5) * 0.6 - 0.02,
+              life: 0.12 + Math.random() * 0.15,
+              size0: 0.05 + Math.random() * 0.04,
+              size1: 0.01,
+              r: 95 + (Math.random() * 45 | 0),
+              g: 225 + (Math.random() * 30 | 0),
+              b: 95 + (Math.random() * 35 | 0),
+              a0: 0.7,
+            }));
+          }
+        }
+      }
       a.tick(dt);
       if (a.arrived) {
         // Arrow arrived — spawn impact spark
@@ -393,6 +445,9 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const progress = a.progress;
       const isFire = a.style === 'fire';
       const isBlunt = a.style === 'blunt';
+      const isVenom = a.style === 'venom';
+      const isStorm = a.style === 'storm';
+      const isFrost = a.style === 'frost';
       // Current head position (lerp from→to)
       const hx = a.from.x + (a.to.x - a.from.x) * progress;
       const hy = a.from.y + (a.to.y - a.from.y) * progress;
@@ -426,6 +481,48 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
         ctx.fillStyle = 'rgba(215,215,225,0.98)';
         ctx.beginPath(); ctx.arc(hx, hy, 0.09, 0, Math.PI * 2); ctx.fill();
+      } else if (isVenom) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(70,220,80,0.28)';
+        ctx.lineWidth = 0.16;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(110,245,120,0.92)';
+        ctx.lineWidth = 0.07;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.fillStyle = 'rgba(190,255,200,0.96)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.075, 0, Math.PI * 2); ctx.fill();
+      } else if (isStorm) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(110,180,255,0.35)';
+        ctx.lineWidth = 0.19;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(185,225,255,0.95)';
+        ctx.lineWidth = 0.065;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.fillStyle = 'rgba(240,250,255,1.0)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.08, 0, Math.PI * 2); ctx.fill();
+      } else if (isFrost) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(130,210,255,0.28)';
+        ctx.lineWidth = 0.17;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(165,235,255,0.94)';
+        ctx.lineWidth = 0.065;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.fillStyle = 'rgba(230,250,255,0.98)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.08, 0, Math.PI * 2); ctx.fill();
       } else {
         // Normal arrow: warm wood shaft
         ctx.strokeStyle = 'rgba(210,180,110,0.9)';
@@ -443,6 +540,9 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const alpha = s.alpha;
       const isFire = s.style === 'fire';
       const isBlunt = s.style === 'blunt';
+      const isVenom = s.style === 'venom';
+      const isStorm = s.style === 'storm';
+      const isFrost = s.style === 'frost';
       if (isFire) {
         // Fire impact: orange-red burst
         ctx.save();
@@ -460,6 +560,30 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         ctx.beginPath(); ctx.arc(s.x, s.y, 0.34 * alpha, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = `rgba(220,200,170,${0.48 * alpha})`;
         ctx.beginPath(); ctx.arc(s.x, s.y, 0.54 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (isVenom) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(80,230,95,${0.46 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.24 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(160,255,170,${0.32 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.12 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (isStorm) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(140,205,255,${0.52 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.26 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(235,250,255,${0.30 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.13 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (isFrost) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(145,225,255,${0.48 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.24 * alpha, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(225,245,255,${0.30 * alpha})`;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 0.12 * alpha, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       } else {
         // Normal impact: small warm flash
@@ -721,7 +845,10 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const apos = getPosition(Number(attacker || 0));
       const dpos = getPosition(Number(target || 0));
       if (!apos || !dpos) return;
-      const s = String(style || 'plain');
+      const baseStyle = String(style || 'plain').toLowerCase();
+      const profile = resolveDominantProjectileVfx(world, Number(attacker || 0));
+      const profileStyle = String(profile?.projectileStyle || "").toLowerCase();
+      const s = (baseStyle === "plain" && profileStyle) ? profileStyle : baseStyle;
       const speed = Number(projectileSpeed || 18);
       spawnTransientProjectile({
         from: apos,
@@ -733,8 +860,16 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       });
       startShake(
         cam,
-        s === 'fire' ? 3 : (s === 'blunt' ? 4 : 2),
-        s === 'fire' ? 0.10 : (s === 'blunt' ? 0.12 : 0.08),
+        s === 'fire'
+          ? 3
+          : (s === 'blunt'
+            ? 4
+            : (s === 'storm' ? 3 : 2)),
+        s === 'fire'
+          ? 0.10
+          : (s === 'blunt'
+            ? 0.12
+            : (s === 'storm' ? 0.10 : 0.08)),
       );
       // Fire arrow: spawn trailing embers
       if (s === 'fire' && fx?.pool) {
@@ -851,15 +986,24 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         radius: 4, color: [255, 240, 180],
       });
     }
-    // Fire arrows — tight flaming glow
+    // Elemental arrows — compact moving glow
     for (let i = 0; i < _arrowFx.length; i++) {
       const a = _arrowFx[i];
-      if (a.style !== 'fire') continue;
+      if (a.style !== 'fire' && a.style !== 'venom' && a.style !== 'storm' && a.style !== 'frost') continue;
       const u = a.progress;
+      const color = a.style === "venom"
+        ? [120, 255, 80]
+        : (a.style === "storm"
+          ? [145, 205, 255]
+          : (a.style === "frost" ? [160, 220, 255] : [255, 100, 30]));
+      const radius = a.style === "storm"
+        ? 3.2
+        : (a.style === "frost" ? 2.8 : (a.style === "venom" ? 2.7 : 3));
       out.push({
         x: a.from.x + (a.to.x - a.from.x) * u,
         y: a.from.y + (a.to.y - a.from.y) * u,
-        radius: 3, color: [255, 100, 30],
+        radius,
+        color,
       });
     }
     // Impacts
@@ -875,11 +1019,16 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const imp = _frostboltImpact[i];
       out.push({ x: imp.x, y: imp.y, radius: 3 * imp.alpha, color: [140, 200, 255] });
     }
-    // Fire arrow impacts — brief flare
+    // Elemental arrow impacts — brief flare
     for (let i = 0; i < _arrowSparks.length; i++) {
       const s = _arrowSparks[i];
-      if (s.style !== 'fire') continue;
-      out.push({ x: s.x, y: s.y, radius: 2.5 * s.alpha, color: [255, 120, 40] });
+      if (s.style !== "fire" && s.style !== "venom" && s.style !== "storm" && s.style !== "frost") continue;
+      const color = s.style === "venom"
+        ? [120, 255, 90]
+        : (s.style === "storm"
+          ? [155, 215, 255]
+          : (s.style === "frost" ? [170, 230, 255] : [255, 120, 40]));
+      out.push({ x: s.x, y: s.y, radius: 2.5 * s.alpha, color });
     }
     return out;
   }

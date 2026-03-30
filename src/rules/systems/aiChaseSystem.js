@@ -16,7 +16,6 @@
 import { Position }     from "../components/Position.js";
 import { Collider } from "../components/Collider.js";
 import { Faction }      from "../components/Faction.js";
-import { Speed }        from "../components/Speed.js";
 import { Player }       from "../components/Player.js";
 import { Equipment }    from "../components/Equipment.js";
 import { ItemInfo }     from "../components/ItemInfo.js";
@@ -42,6 +41,7 @@ import { playerEntity }      from "../utils/queries.js";
 import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import { forEachInRadius }   from "../utils/spatialIndex.js";
 import { statusStrength }    from "../utils/statusFacade.js";
+import { canActThisTurn as speedGateCheck } from "../utils/speedGate.js";
 import { hasLOS }            from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { hasOverworldAerialLOS } from "../utils/flyingEligibility.js";
@@ -219,14 +219,7 @@ export function aiChaseSystem(world) {
     const def = ni ? getMonster(String(ni.identity || "")) : null;
     const brain = world.get(id, Brain);
 
-    // Speed gate: only act on ticks that match this entity's cadence.
-    const spd = world.get(id, Speed);
-    let actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
-
-    // Frost slow stacks double the cadence per stack.
-    const frostStacks = Math.min(3, statusStrength(world, id, "frozen"));
-    if (frostStacks > 0) actEvery = actEvery * (1 + frostStacks);
-    const canActThisTurn = !(actEvery > 1 && ((world.step + id) % actEvery) !== 0);
+    const canActThisTurn = speedGateCheck(world, id);
     const hasQueuedAction = world.has(id, MoveIntent) || world.has(id, FlyIntent);
 
     // Perception is driven by Brain data rather than action cadence.
@@ -423,7 +416,7 @@ export function aiChaseSystem(world) {
       if (eq && eq.ranged && eq.ammo && world.isAlive(eq.ammo)) {
         const weaponInfo = eq.ranged ? world.get(eq.ranged, ItemInfo) : null;
         const maxRange   = weaponInfo?.range || 8;
-        const dist       = Math.max(Math.abs(dxt), Math.abs(dyt));
+        const dist       = chebyshevScalar(pos.x | 0, pos.y | 0, targetX, targetY);
         if (dist > 1 && dist <= maxRange) {
           try {
             world.emit?.('combat:telegraph', {

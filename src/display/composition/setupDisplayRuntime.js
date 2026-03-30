@@ -31,6 +31,9 @@ export function setupDisplayRuntime({
   resolveItemDisplayName,
   dispatchRulesAction,
   classifySurfaceTile,
+  sculptFloor,
+  sculptFloorBrush,
+  getActiveReliefKey,
 }) {
   const statusEmitterFx = createStatusEmitterController({ world, fx });
   statusEmitterFx.installListeners();
@@ -51,12 +54,12 @@ export function setupDisplayRuntime({
     /** @type any */ (window).float_text = (x, y, text, opts) => ftext.add(x, y, text, opts || {});
   } catch (e) { console.debug("[setupDisplayRuntime] float_text global setup failed:", e); }
 
-  const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, getPosition, ftext });
+  const spellAreaFx = createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, getPosition, ftext, sculptFloor, sculptFloorBrush, getActiveReliefKey });
   spellAreaFx.installListeners();
 
   const cloudFx = createCloudFxController({ world, cam, fx, getFxTime, getPosition });
   cloudFx.installListeners();
-  const surfaceAreaFx = createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, PERF });
+  const surfaceAreaFx = createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, fx, PERF });
 
   installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer });
   installEventUiWiring({

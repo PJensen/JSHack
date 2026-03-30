@@ -6,6 +6,7 @@ import { runScript, ScriptVerb } from "../scripting.js";
 import { resolveCanonicalStats } from "../utils/canonicalStats.js";
 import { mulberry32, rngInt, combatSeed, pct } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function trapSystem(world) {
@@ -44,7 +45,7 @@ export function trapSystem(world) {
     if (avoided) {
       // Reveal trap but leave it armed — you dodged, didn't disable
       try { world.set(tid, Trap, { ...t, revealed: true }); } catch {}
-      try { world.emit('trap:avoided', { victimId, trapId: tid, type: t.type }); } catch {}
+      emitSafe(world, 'trap:avoided', { victimId, trapId: tid, type: t.type });
       continue;
     }
 
@@ -66,7 +67,7 @@ export function trapSystem(world) {
     }
 
     // Notify display layer
-    try { world.emit('trap:triggered', { trapId: tid, victimId, type: t.type }); } catch {}
+    emitSafe(world, 'trap:triggered', { trapId: tid, victimId, type: t.type });
 
     // Run scripted behavior
     const fallbackScripts = {

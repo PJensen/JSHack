@@ -19,16 +19,13 @@ import { ensureActiveEffects } from "../../utils/effects.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
-import { chebyshev } from "../../utils/distance.js";
+import { chebyshev, manhattan } from "../../utils/distance.js";
+import { emitSafe } from "../../utils/emitSafe.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
 const SPELL_CAST_COOLDOWN_KEY = Symbol.for("jshack:ai:castSpellOnLOS:cooldown");
 const ABILITY_WINDUP_KEY = Symbol.for("jshack:ai:abilityWindup:state");
-
-function manhattan(a, b) {
-  return Math.abs((a.x | 0) - (b.x | 0)) + Math.abs((a.y | 0) - (b.y | 0));
-}
 
 /**
  * @param {import("../../../lib/ecs-js/index.js").World} world
@@ -274,7 +271,7 @@ export class SeenCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    try { this.world.emit?.(eventName, payload); } catch (e) { console.debug("[ai] emit " + eventName + " failed:", e); }
+    emitSafe(this.world, eventName, payload);
   }
 }
 
@@ -454,23 +451,21 @@ export function fireBreathLineOnLOS(opts = {}) {
           hazard.cause = "monster:firebreath";
           hazard.sourceId = ctx.actor | 0;
           hazard.sourceKind = actorIdentity;
-          try {
-            ctx.world.emit?.("hazard:spawned", {
-              hazardId: existing,
-              kind: "fire",
-              medium: String(hazard.medium || "floor").toLowerCase() === "floor" ? "floor" : "air",
-              at: { x: tile.x | 0, y: tile.y | 0 },
-              turnsLeft: hazard.turnsLeft | 0,
-              radius: hazard.radius | 0,
-              tickDamage: hazard.tickDamage | 0,
-              damageType: hazard.damageType,
-              cause: hazard.cause,
-              sourceId: hazard.sourceId | 0,
-              sourceKind: hazard.sourceKind || "",
-              identity: "dragon_fire",
-              name: "Dragon Fire",
-            });
-          } catch {}
+          emitSafe(ctx.world, "hazard:spawned", {
+            hazardId: existing,
+            kind: "fire",
+            medium: String(hazard.medium || "floor").toLowerCase() === "floor" ? "floor" : "air",
+            at: { x: tile.x | 0, y: tile.y | 0 },
+            turnsLeft: hazard.turnsLeft | 0,
+            radius: hazard.radius | 0,
+            tickDamage: hazard.tickDamage | 0,
+            damageType: hazard.damageType,
+            cause: hazard.cause,
+            sourceId: hazard.sourceId | 0,
+            sourceKind: hazard.sourceKind || "",
+            identity: "dragon_fire",
+            name: "Dragon Fire",
+          });
         }
         hazardIds.push(existing);
         continue;

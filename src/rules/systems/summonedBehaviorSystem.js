@@ -6,12 +6,12 @@
 import { Position } from '../components/Position.js';
 import { Faction } from '../components/Faction.js';
 import { Vitality } from '../components/Vitality.js';
-import { Speed } from '../components/Speed.js';
 import { MoveIntent } from '../components/Intents/MoveIntent.js';
 import { PetState } from '../components/PetState.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
-import { statusStrength } from '../utils/statusFacade.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
+import { canActThisTurn } from '../utils/speedGate.js';
+import { manhattanScalar } from '../utils/distance.js';
 import { findNearestValidTileAround, playerEntity, queryFactionActors } from '../utils/queries.js';
 import {
   FOLLOW_DISTANCE,
@@ -35,11 +35,7 @@ export function summonedBehaviorSystem(world) {
     if (!vit || (vit.hp | 0) <= 0) continue;
 
     // Speed gate
-    const spd = world.get(id, Speed);
-    let actEvery = (spd && spd.actEvery > 1) ? spd.actEvery : 1;
-    const frostStacks = Math.min(3, statusStrength(world, id, "frozen"));
-    if (frostStacks > 0) actEvery = actEvery * (1 + frostStacks);
-    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) continue;
+    if (!canActThisTurn(world, id)) continue;
 
     if (world.has(id, MoveIntent)) continue;
 
@@ -90,9 +86,7 @@ function checkSummonAutoTransitions(world, id, petState, pos, vit, playerPos) {
 
   // Teleport to player if too far (except staying/guarding)
   if (petState.state !== 'staying' && petState.state !== 'guarding') {
-    const dx = playerPos.x - pos.x;
-    const dy = playerPos.y - pos.y;
-    const dist = Math.abs(dx) + Math.abs(dy);
+    const dist = manhattanScalar(pos.x, pos.y, playerPos.x, playerPos.y);
     if (dist > TELEPORT_DISTANCE) {
       const tile = findNearestValidTileAround(world, playerPos, {
         maxDistance: 2,
@@ -151,7 +145,7 @@ function summonAggressive(world, id, fac, pos, playerPos) {
     if (!eFac || !areFactionsHostile(fac.key, eFac.key)) return;
     const eVit = world.get(eid, Vitality);
     if (!eVit || (eVit.hp | 0) <= 0) return;
-    const dist = Math.abs((epos.x | 0) - (pos.x | 0)) + Math.abs((epos.y | 0) - (pos.y | 0));
+    const dist = manhattanScalar(epos.x, epos.y, pos.x, pos.y);
     if (dist < bestDist) {
       bestTarget = eid;
       bestDist = dist;
@@ -173,9 +167,7 @@ function summonAggressive(world, id, fac, pos, playerPos) {
 // ---------------------------------------------------------------------------
 
 function summonFollowing(world, id, pos, playerPos) {
-  const dx = playerPos.x - pos.x;
-  const dy = playerPos.y - pos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(pos.x, pos.y, playerPos.x, playerPos.y);
   if (dist <= FOLLOW_DISTANCE) return;
   moveTowardSimple(world, id, playerPos.x, playerPos.y);
 }
@@ -192,9 +184,7 @@ function summonGuarding(world, id, petState, fac, pos) {
   }
 
   // Return to guard position if too far
-  const dx = petState.targetX - pos.x;
-  const dy = petState.targetY - pos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(pos.x, pos.y, petState.targetX, petState.targetY);
   if (dist > 1) {
     moveTowardSimple(world, id, petState.targetX, petState.targetY);
     return;
@@ -210,7 +200,7 @@ function summonGuarding(world, id, petState, fac, pos) {
     if (!eFac || !areFactionsHostile(fac.key, eFac.key)) return;
     const eVit = world.get(eid, Vitality);
     if (!eVit || (eVit.hp | 0) <= 0) return;
-    const edist = Math.abs((epos.x | 0) - (pos.x | 0)) + Math.abs((epos.y | 0) - (pos.y | 0));
+    const edist = manhattanScalar(epos.x, epos.y, pos.x, pos.y);
     if (edist < closestDist) {
       closestEnemy = eid;
       closestDist = edist;
@@ -230,9 +220,7 @@ function summonGuarding(world, id, petState, fac, pos) {
 // ---------------------------------------------------------------------------
 
 function summonFleeing(world, id, pos, playerPos) {
-  const dx = playerPos.x - pos.x;
-  const dy = playerPos.y - pos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(pos.x, pos.y, playerPos.x, playerPos.y);
   if (dist <= 1) return;
   moveTowardSimple(world, id, playerPos.x, playerPos.y);
 }
@@ -252,7 +240,7 @@ function chaseNearestHostile(world, id, fac, pos) {
     if (!eFac || !areFactionsHostile(fac.key, eFac.key)) return;
     const eVit = world.get(eid, Vitality);
     if (!eVit || (eVit.hp | 0) <= 0) return;
-    const dist = Math.abs((epos.x | 0) - (pos.x | 0)) + Math.abs((epos.y | 0) - (pos.y | 0));
+    const dist = manhattanScalar(epos.x, epos.y, pos.x, pos.y);
     if (dist < bestDist) {
       bestTarget = eid;
       bestDist = dist;

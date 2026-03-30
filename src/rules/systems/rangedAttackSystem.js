@@ -36,6 +36,7 @@ import { STAMINA_REGEN_COOLDOWN } from '../data/regenConstants.js';
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
 import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
+import { chebyshevScalar } from '../utils/distance.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -51,6 +52,14 @@ function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
   if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
   const raw = dist / speed;
   return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
+}
+
+function computeImpactVector(fromX, fromY, toX, toY) {
+  const dx = Number(toX || 0) - Number(fromX || 0);
+  const dy = Number(toY || 0) - Number(fromY || 0);
+  const dist = Math.hypot(dx, dy);
+  if (!(dist > 0)) return { dx: 0, dy: 1 };
+  return { dx: dx / dist, dy: dy / dist };
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
@@ -120,7 +129,7 @@ export function rangedAttackSystem(world) {
 
     const ax = apos.x | 0, ay = apos.y | 0;
     const tx = dpos.x | 0, ty = dpos.y | 0;
-    const dist = Math.max(Math.abs(tx - ax), Math.abs(ty - ay));
+    const dist = chebyshevScalar(ax, ay, tx, ty);
     const facing = getNormalizedEntityFacing(world, attacker);
     const coneDegrees = getEntityFacingConeDegrees(world, attacker);
     if (facing && !isPointInFacingCone(ax, ay, tx, ty, facing.dx, facing.dy, coneDegrees)) {
@@ -345,6 +354,8 @@ export function rangedAttackSystem(world) {
         RANGED_PROJECTILE_MIN_DURATION,
         RANGED_PROJECTILE_MAX_DURATION,
       ),
+      impactVector: computeImpactVector(ax, ay, tx, ty),
+      projectileKind: 'arrow',
     });
     if (actorImpactCtx) {
       actorImpactCtx.resolveDamageResult(result);

@@ -49,6 +49,24 @@ function makeEquip(world, { id, name, slot, bonuses, affixes = [], damageType = 
   return eid;
 }
 
+function firstMeleeDamageEventForWeapon(weaponSpec) {
+  for (let seed = 1; seed <= 128; seed++) {
+    const world = new World({ seed });
+    const weapon = makeEquip(world, weaponSpec);
+    const attacker = makeActor(world, 'Attacker', { weapon }, 20);
+    const defender = makeActor(world, 'Defender', {}, 30);
+    world.add(attacker, Position, { x: 1, y: 1 });
+    world.add(defender, Position, { x: 1, y: 2 });
+    equipmentSystem(world);
+    const events = [];
+    world.on('damaged', (e) => events.push(e));
+    world.add(attacker, AttackIntent, { targetId: defender });
+    combatSystem(world);
+    if (events.length > 0) return events[0];
+  }
+  return null;
+}
+
 Deno.test("combatSystem: melee requires target to be inside facing cone", () => {
   const world = new World({ seed: 11 });
   const hero = makeActor(world, "Hero", {}, 12);
@@ -61,6 +79,63 @@ Deno.test("combatSystem: melee requires target to be inside facing cone", () => 
   combatSystem(world);
 
   assertEquals(world.get(foe, Vitality)?.hp, 12, "target behind attacker should not be hit");
+});
+
+Deno.test("combatSystem: melee emits blended impact profiles by weapon signature", () => {
+  const maceHit = firstMeleeDamageEventForWeapon({
+    id: 'iron_mace',
+    name: 'Iron Mace',
+    slot: 'weapon',
+    bonuses: { accuracy: 40, damagePower: 4, bluntPenetration: 3 },
+    damageType: 'blunt',
+  });
+  const daggerHit = firstMeleeDamageEventForWeapon({
+    id: 'dagger_quick',
+    name: 'Dagger',
+    slot: 'weapon',
+    bonuses: { accuracy: 40, damagePower: 4, piercePenetration: 3 },
+    damageType: 'pierce',
+  });
+  const swordHit = firstMeleeDamageEventForWeapon({
+    id: 'longsword',
+    name: 'Longsword',
+    slot: 'weapon',
+    bonuses: { accuracy: 40, damagePower: 4, slashPenetration: 3 },
+    damageType: 'slash',
+  });
+  const morningstarHit = firstMeleeDamageEventForWeapon({
+    id: 'morningstar',
+    name: 'Morningstar',
+    slot: 'weapon',
+    bonuses: { accuracy: 40, damagePower: 4, bluntPenetration: 2, piercePenetration: 1 },
+    damageType: 'blunt',
+  });
+
+  assert(maceHit, 'expected a landed mace hit');
+  assert(daggerHit, 'expected a landed dagger hit');
+  assert(swordHit, 'expected a landed sword hit');
+  assert(morningstarHit, 'expected a landed morningstar hit');
+
+  assertEquals(String(maceHit?.cause || ''), 'melee');
+  assertEquals(String(maceHit?.impactProfile?.weaponClass || ''), 'mace');
+  assertEquals(String(maceHit?.impactProfile?.attackKind || ''), 'blunt');
+  assert((Number(maceHit?.impactProfile?.signature?.blunt || 0)) > Number(maceHit?.impactProfile?.signature?.slash || 0), 'mace should bias blunt signature');
+
+  assertEquals(String(daggerHit?.impactProfile?.weaponClass || ''), 'dagger');
+  assertEquals(String(daggerHit?.impactProfile?.attackKind || ''), 'stab');
+  assert((Number(daggerHit?.impactProfile?.signature?.pierce || 0)) > Number(daggerHit?.impactProfile?.signature?.blunt || 0), 'dagger should bias pierce signature');
+
+  assertEquals(String(swordHit?.impactProfile?.weaponClass || ''), 'sword');
+  assertEquals(String(swordHit?.impactProfile?.attackKind || ''), 'slash');
+  assert((Number(swordHit?.impactProfile?.signature?.slash || 0)) > Number(swordHit?.impactProfile?.signature?.pierce || 0), 'sword should bias slash signature');
+
+  assertEquals(String(morningstarHit?.impactProfile?.weaponClass || ''), 'morningstar');
+  assert((Number(morningstarHit?.impactProfile?.signature?.blunt || 0)) > Number(morningstarHit?.impactProfile?.signature?.slash || 0), 'morningstar should keep blunt-heavy signature');
+  assert((Number(morningstarHit?.impactProfile?.signature?.pierce || 0)) > 0, 'morningstar should carry a pierce component');
+
+  const vec = morningstarHit?.impactVector;
+  const mag = Math.hypot(Number(vec?.dx || 0), Number(vec?.dy || 0));
+  assert(mag > 0.99 && mag < 1.01, `impact vector should be normalized (mag=${mag})`);
 });
 
 Deno.test("d20 combat with affix triggers: fierce, vamp, thorns", () => {
