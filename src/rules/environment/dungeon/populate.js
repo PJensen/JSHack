@@ -803,11 +803,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       if (!isSolid(chx, chy)) {
         markSolid(chx, chy);
         const d = floorPlan.depth;
-        const cr = rng.next();
-        const tableId = (d >= 14 || cr < 0.02) ? 'chest:legendary'
-                      : (d >= 10 || cr < 0.08) ? 'chest:epic'
-                      : (d >= 8  || cr < 0.15) ? 'chest:magic'
-                      : 'chest:basic';
+        const tableId = pickChestLootTable(d, rng);
         spawns.push({ x: chx, y: chy, kind: 'chest', params: { lootTable: tableId, depth: d } });
       }
     }
@@ -1282,6 +1278,15 @@ function isSameRoom(a, b) {
     && a.h === b.h;
 }
 
+/** Pick chest loot table using depth + RNG roll (shared by room and dead-end themes). */
+function pickChestLootTable(depth, rng) {
+  const cr = rng.next();
+  return (depth >= 14 || cr < 0.02) ? 'chest:legendary'
+       : (depth >= 10 || cr < 0.08) ? 'chest:epic'
+       : (depth >= 8  || cr < 0.15) ? 'chest:magic'
+       : 'chest:basic';
+}
+
 function removeRoomSpawns(spawns, room, predicate) {
   for (let i = spawns.length - 1; i >= 0; i--) {
     const spawn = spawns[i];
@@ -1325,7 +1330,7 @@ function applyDeadEndTheme(ctx) {
           x: chestPos.x,
           y: chestPos.y,
           kind: 'chest',
-          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 8 ? 'chest:magic' : 'chest:basic' },
+          params: { depth: floorPlan.depth, lootTable: pickChestLootTable(floorPlan.depth, rng) },
         });
       }
       const goldPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
@@ -1347,7 +1352,7 @@ function applyDeadEndTheme(ctx) {
           x: chestPos.x,
           y: chestPos.y,
           kind: 'chest',
-          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 6 ? 'chest:magic' : 'chest:basic' },
+          params: { depth: floorPlan.depth, lootTable: pickChestLootTable(floorPlan.depth, rng) },
         });
       }
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
@@ -1398,7 +1403,7 @@ function applyDeadEndTheme(ctx) {
           x: chestPos.x,
           y: chestPos.y,
           kind: 'chest',
-          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 8 ? 'chest:magic' : 'chest:basic' },
+          params: { depth: floorPlan.depth, lootTable: pickChestLootTable(floorPlan.depth, rng) },
         });
       }
       const monsterPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
@@ -1528,7 +1533,7 @@ function applyDeadEndTheme(ctx) {
         markSolid(chestPos.x, chestPos.y);
         spawns.push({
           x: chestPos.x, y: chestPos.y, kind: 'chest',
-          params: { depth: floorPlan.depth, lootTable: floorPlan.depth >= 8 ? 'chest:magic' : 'chest:basic' },
+          params: { depth: floorPlan.depth, lootTable: pickChestLootTable(floorPlan.depth, rng) },
         });
       }
       break;

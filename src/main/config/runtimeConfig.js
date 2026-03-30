@@ -100,7 +100,7 @@ export function readRuntimeConfig() {
   return {
     params,
     perf: buildPerfConfig(params),
-    startDepth: parseNonNegativeInt(params.get("floor"), 0) ?? 0,
+    startDepth: parseNonNegativeInt(params.get("floor"), 1) ?? 1,
     dungeonScale: parsePositiveFloat(params.get("dungeonScale"), null),
     sparsity: parseUnitFloat(params.get("sparsity"), null),
     chosenDeityId: params.get("deity") || "molkhar",
