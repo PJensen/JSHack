@@ -242,6 +242,11 @@ export function collectLightSources(view, opts = {}) {
       if (tags.includes('gold_glow')) {
         out.push({ x: ex, y: ey, radius: 1.2, color: [255, 210, 80] });
       }
+      // Gem glow — color driven by palette entry for specific gem kind
+      if (tags.includes('gem_glowing')) {
+        const col = paletteGlow(kind) || [200, 150, 255];
+        out.push({ x: ex, y: ey, radius: 1.8, color: col });
+      }
     }
   }
 

@@ -414,6 +414,9 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'currency') {
 		if (!rec.tags.includes('gold_glow')) rec.tags.push('gold_glow');
 	}
+	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'gem') {
+		if (!rec.tags.includes('gem_glowing')) rec.tags.push('gem_glowing');
+	}
 	if (!itemInfo || !Array.isArray(itemInfo.affixes)) return;
 	const affixes = itemInfo.affixes;
 	const hasAffix = (key) => affixes.includes(key) || affixes.includes(`affix:${key}`);

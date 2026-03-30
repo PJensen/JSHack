@@ -851,6 +851,17 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         radius: 4, color: [255, 240, 180],
       });
     }
+    // Fire arrows — tight flaming glow
+    for (let i = 0; i < _arrowFx.length; i++) {
+      const a = _arrowFx[i];
+      if (a.style !== 'fire') continue;
+      const u = a.progress;
+      out.push({
+        x: a.from.x + (a.to.x - a.from.x) * u,
+        y: a.from.y + (a.to.y - a.from.y) * u,
+        radius: 3, color: [255, 100, 30],
+      });
+    }
     // Impacts
     for (let i = 0; i < _sboltImpact.length; i++) {
       const imp = _sboltImpact[i];
@@ -863,6 +874,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (let i = 0; i < _frostboltImpact.length; i++) {
       const imp = _frostboltImpact[i];
       out.push({ x: imp.x, y: imp.y, radius: 3 * imp.alpha, color: [140, 200, 255] });
+    }
+    // Fire arrow impacts — brief flare
+    for (let i = 0; i < _arrowSparks.length; i++) {
+      const s = _arrowSparks[i];
+      if (s.style !== 'fire') continue;
+      out.push({ x: s.x, y: s.y, radius: 2.5 * s.alpha, color: [255, 120, 40] });
     }
     return out;
   }

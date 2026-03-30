@@ -871,6 +871,19 @@ if (_pendingSavegame) {
 function _finalizeNewGame(classData) {
   const classDef = classData ? getClass(classData.classId) : null;
 
+  // Apply difficulty settings from character creation
+  if (classData && classData.difficulty === 'hard') {
+    world[FOV_CONE_DISABLED_KEY] = false;
+    setFacingTurnCostEnabled(world, true);
+    try { localStorage.setItem('jshack.disableFovCone', 'false'); } catch {}
+    try { localStorage.setItem('jshack.facingTurnCost', 'true'); } catch {}
+  } else if (classData && classData.difficulty === 'easy') {
+    world[FOV_CONE_DISABLED_KEY] = true;
+    setFacingTurnCostEnabled(world, false);
+    try { localStorage.setItem('jshack.disableFovCone', 'true'); } catch {}
+    try { localStorage.setItem('jshack.facingTurnCost', 'false'); } catch {}
+  }
+
   // If the player chose a different seed, regenerate the world
   if (classData && typeof classData.seed === 'number') {
     const chosenSeed = classData.seed >>> 0;

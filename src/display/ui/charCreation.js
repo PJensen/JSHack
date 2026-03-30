@@ -375,10 +375,13 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       detailDesc.textContent = cls.description;
       detailDeity.textContent = `${cls.deityName} (${cls.deityAlignment})`;
       detailPanel.style.opacity = '1';
-      confirmBtn.disabled = false;
-      confirmBtn.style.opacity = '1';
-      confirmBtn.style.cursor = 'pointer';
-      confirmBtn.textContent = `Begin as a ${cls.name}`;
+      for (const btn of [easyBtn, hardBtn]) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      }
+      easyBtn.textContent = `Begin as ${cls.name}`;
+      hardBtn.textContent = `${cls.name} on Hard`;
     });
 
     grid.appendChild(card);
@@ -411,29 +414,47 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   box.appendChild(detailPanel);
 
-  // ---- confirm button ----
-  const confirmBtn = document.createElement('button');
-  confirmBtn.textContent = 'Choose a class';
-  confirmBtn.disabled = true;
-  Object.assign(confirmBtn.style, {
-    display: 'block', width: '100%',
-    minHeight: '52px', padding: '12px',
-    fontSize: '18px', fontWeight: 'bold', fontFamily: 'monospace',
-    background: '#1a2a44', color: '#7ab8ff',
-    border: '1px solid #4a6a9a', borderRadius: '8px',
-    cursor: 'default', opacity: '0.4',
-    transition: 'opacity 120ms, background 120ms',
+  // ---- confirm buttons (Easy / Hard) ----
+  const confirmRow = document.createElement('div');
+  Object.assign(confirmRow.style, {
+    display: 'flex', gap: '10px',
   });
-  confirmBtn.addEventListener('pointerdown', (e) => {
-    e.stopPropagation();
-    if (confirmBtn.disabled) return;
-    const name = (nameInput.value || '').trim() || fallbackName;
-    const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
-    writeSavedName(name);
-    onConfirm({ name, classId: selectedClassId, seed });
-    dispose();
-  });
-  box.appendChild(confirmBtn);
+
+  function makeConfirmBtn(difficulty) {
+    const btn = document.createElement('button');
+    btn.disabled = true;
+    const isHard = difficulty === 'hard';
+    Object.assign(btn.style, {
+      flex: '1', minHeight: '52px', padding: '12px',
+      fontSize: '16px', fontWeight: 'bold', fontFamily: 'monospace',
+      background: isHard ? '#2a1a1a' : '#1a2a44',
+      color: isHard ? '#ff9a7a' : '#7ab8ff',
+      border: `1px solid ${isHard ? '#6a3a3a' : '#4a6a9a'}`,
+      borderRadius: '8px',
+      cursor: 'default', opacity: '0.4',
+      transition: 'opacity 120ms, background 120ms',
+    });
+    btn.textContent = isHard ? 'Choose a class' : 'Choose a class';
+    btn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (btn.disabled) return;
+      const name = (nameInput.value || '').trim() || fallbackName;
+      const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
+      writeSavedName(name);
+      onConfirm({ name, classId: selectedClassId, seed, difficulty });
+      dispose();
+    });
+    return btn;
+  }
+
+  const easyBtn = makeConfirmBtn('easy');
+  const hardBtn = makeConfirmBtn('hard');
+  confirmRow.appendChild(easyBtn);
+  confirmRow.appendChild(hardBtn);
+  box.appendChild(confirmRow);
+
+  // Alias for keyboard Enter (uses easy by default)
+  const confirmBtn = easyBtn;
 
   // ---- "Did you know?" hint strip ----
   {
@@ -537,7 +558,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       const name = (nameInput.value || '').trim() || fallbackName;
       const seed = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
       writeSavedName(name);
-      onConfirm({ name, classId: selectedClassId, seed });
+      onConfirm({ name, classId: selectedClassId, seed, difficulty: 'easy' });
       dispose();
     }
   });
