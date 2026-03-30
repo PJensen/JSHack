@@ -165,8 +165,77 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // ── Melee gore VFX helpers ──────────────────────────────────────────
+  // Tags that indicate non-fleshy creatures (skip blood gore).
+  const GORE_SKIP_KINDS = new Set([
+    'skeleton', 'skeletal_marksman', 'skeletal_shadow_caster', 'skeletal_agony_warlock',
+    'skeleton_sharpshooter', 'bone_bowman',
+    'grid_bug', 'floating_eye',
+  ]);
+  const GORE_BLOOD = { r: 140, g: 18, b: 18 };          // deep arterial red
+  const GORE_BLOOD_DARK = { r: 90, g: 10, b: 10 };      // drying blood (pools)
+  const GORE_GIB = { r: 160, g: 30, b: 30 };             // flesh chunk
+
+  function spawnGore(pool, wx, wy, dx, dy, dmg, isCrit) {
+    // Blood splatter — directional spray away from attacker
+    const splatCount = Math.min(14, 4 + (dmg | 0));
+    for (let i = 0; i < splatCount; i++) {
+      const spread = (Math.random() - 0.5) * 1.8;
+      const speed = 0.8 + Math.random() * 1.5;
+      pool.spawn(new Particle({
+        x: wx + 0.5, y: wy + 0.5,
+        vx: dx * speed + spread * 0.6,
+        vy: dy * speed + spread * 0.6,
+        ax: 0, ay: 1.2,                // gravity
+        life: 0.25 + Math.random() * 0.3,
+        size0: 0.08 + Math.random() * 0.06,
+        size1: 0.02,
+        r: GORE_BLOOD.r + ((Math.random() * 40) | 0),
+        g: GORE_BLOOD.g + ((Math.random() * 12) | 0),
+        b: GORE_BLOOD.b,
+        a0: 0.85, a1: 0,
+      }));
+    }
+
+    // Gibs on high damage or crits — chunky arcing pieces
+    if (isCrit || dmg >= 8) {
+      const gibCount = isCrit ? 4 + ((Math.random() * 3) | 0) : 2;
+      for (let i = 0; i < gibCount; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 0.6 + Math.random() * 1.2;
+        pool.spawn(new Particle({
+          x: wx + 0.5, y: wy + 0.5,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 0.5,
+          ax: 0, ay: 2.0,
+          life: 0.4 + Math.random() * 0.4,
+          size0: 0.10 + Math.random() * 0.08,
+          size1: 0.04,
+          r: GORE_GIB.r, g: GORE_GIB.g, b: GORE_GIB.b,
+          a0: 0.9, a1: 0.1,
+          rotVel: (Math.random() - 0.5) * 8,
+        }));
+      }
+    }
+
+    // Blood pool — slow-fading ground stain
+    const poolCount = dmg >= 5 ? 3 : 1;
+    for (let i = 0; i < poolCount; i++) {
+      pool.spawn(new Particle({
+        x: wx + 0.3 + Math.random() * 0.4,
+        y: wy + 0.5 + Math.random() * 0.3,
+        vx: 0, vy: 0,
+        life: 2.0 + Math.random() * 2.0,
+        size0: 0.04 + Math.random() * 0.06,
+        size1: 0.12 + Math.random() * 0.08,
+        r: GORE_BLOOD_DARK.r, g: GORE_BLOOD_DARK.g, b: GORE_BLOOD_DARK.b,
+        a0: 0.5, a1: 0,
+      }));
+    }
+  }
+
   // Floating text hooks: damage (messages handled in messageWiring)
-  world.on('damaged', ({ target, amount, rawAmount, critical, crit, at, offhand, projectileDelay }) => {
+  world.on('damaged', ({ target, source, amount, rawAmount, cause, critical, crit, at, offhand, projectileDelay }) => {
     const t = Number(target || 0) || 0;
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(t);
     const hitIsPlayer = isPlayer(t);
@@ -175,6 +244,23 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       const col = hitIsPlayer ? '#ff6060' : (resisted ? '#b0a060' : '#ffd966');
       const delay = Number(projectileDelay) || (offhand ? 0.15 : 0);
       ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
+    }
+
+    // Melee gore VFX — blood splatter, gibs, and pools
+    const causeStr = String(cause || '');
+    if (pos && fx?.pool && amount > 0
+        && (causeStr === 'melee' || causeStr === 'retaliation' || causeStr === 'offhand')) {
+      const srcPos = getPosition(Number(source || 0));
+      let dx = 0, dy = 0;
+      if (srcPos) {
+        dx = pos.x - srcPos.x; dy = pos.y - srcPos.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        dx /= len; dy /= len;
+      } else {
+        const a = Math.random() * Math.PI * 2;
+        dx = Math.cos(a); dy = Math.sin(a);
+      }
+      spawnGore(fx.pool, pos.x, pos.y, dx, dy, amount, !!(critical || crit));
     }
   });
 

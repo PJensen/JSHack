@@ -168,7 +168,7 @@ const ROOM_FEATURES = [
   { kind: 'statue',      weight: 10 },
   { kind: 'sarcophagus', weight: 7 },
   { kind: 'pillar',      weight: 10 },
-  { kind: 'weapon_rack', weight: 6 },
+  { kind: 'weapon_rack', weight: 12 },
   { kind: 'mushrooms',   weight: 8 },
   { kind: 'torch',       weight: 0 }, // handled by dedicated wall-torch pass
   { kind: 'urn',         weight: 7 },

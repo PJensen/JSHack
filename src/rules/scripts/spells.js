@@ -2798,6 +2798,107 @@ REGISTRY['earthshatter'] = function earthshatterScript(world, actor, spell, inte
   } catch (e) { console.debug('[spells] emit spell:earthshatter failed:', e); }
 };
 
+// ─── Druid spells ────────────────────────────────────────────────────────────
+
+REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Number(spell?.range || 7) | 0;
+
+  // Auto-target nearest hostile in range + LOS
+  let bestId = 0, bestD2 = Infinity;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    // Skip already stunned
+    if (statusStrength(world, id, "stunned") > 0) continue;
+    const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
+    const d2 = dx * dx + dy * dy;
+    if (d2 > range * range) continue;
+    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
+    if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+  }
+  if (!bestId) return;
+
+  const tpos = /** @type any */ (world.get(bestId, Position));
+  const ae = ensureActiveEffectList(world, bestId);
+  if (!ae) return;
+
+  const STUN_TURNS = 3;
+  const DOT_TURNS = 3;
+  upsertTimedEffect(ae.effects, {
+    key: 'stun', turnsLeft: STUN_TURNS + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'poison', turnsLeft: DOT_TURNS, potency: 2, stacks: 1, sourceId: actor,
+  });
+
+  try {
+    world.emit?.('spell:entangle', {
+      actor, targetId: bestId,
+      at: { x: tpos.x, y: tpos.y },
+    });
+  } catch (e) { console.debug('[spells] emit spell:entangle failed:', e); }
+};
+
+REGISTRY['thorn_burst'] = function thornBurstScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Number(spell?.range || 8) | 0;
+
+  // Auto-target nearest hostile
+  let bestId = 0, bestD2 = Infinity;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
+    const d2 = dx * dx + dy * dy;
+    if (d2 > range * range) continue;
+    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
+    if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+  }
+  if (!bestId) {
+    emitSpellMiss(world, actor, spell);
+    return;
+  }
+
+  const tpos = /** @type any */ (world.get(bestId, Position));
+  dealDamage(world, buildSpellDamageSpec(world, actor, bestId, {
+    spell,
+    baseAmount: 6,
+    type: 'nature',
+    cause: 'spell:thorn_burst',
+    at: { x: tpos.x, y: tpos.y },
+  }));
+
+  // 30% poison proc
+  const rng = mulberry32(combatSeed(world, actor, bestId, 0xBEEF));
+  if (rng() < 0.30) {
+    const ae = ensureActiveEffectList(world, bestId);
+    if (ae) {
+      upsertTimedEffect(ae.effects, {
+        key: 'poison', turnsLeft: 4, potency: 1, stacks: 1, sourceId: actor,
+      });
+    }
+  }
+
+  try {
+    world.emit?.('spell:thorn_burst', {
+      actor, targetId: bestId,
+      from: { x: apos.x, y: apos.y },
+      to: { x: tpos.x, y: tpos.y },
+    });
+  } catch (e) { console.debug('[spells] emit spell:thorn_burst failed:', e); }
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world

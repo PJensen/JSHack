@@ -240,12 +240,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const groupedItems = groupDisplayItems(nonCurrencyItems);
     const totalCount = groupedItems.reduce((sum, item) => sum + Math.max(1, Number(item?.count || 0) | 0), 0);
 
-    const floorStackItems = [];
+    const rawFloorItems = [];
     for (const itemId of groundIds) {
       const info = world.get(itemId, ItemInfo);
       if (!info || info.type === 'currency') continue;
-      floorStackItems.push(buildItemDisplayData(info, itemId));
+      rawFloorItems.push(buildItemDisplayData(info, itemId));
     }
+    const floorStackItems = groupDisplayItems(rawFloorItems);
 
     if (!groupedItems.length && !chestId) return null;
 

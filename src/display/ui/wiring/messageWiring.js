@@ -651,6 +651,26 @@ export function installMessageWiring({
     }
   });
 
+  world.on('spell:entangle', ({ actor, targetId }) => {
+    const who = nameOfEntity(actor);
+    const whom = nameOfEntity(targetId);
+    if (who === 'You') {
+      log(`Grasping vines bind ${whom} in place!`, 'combat');
+    } else if (whom === 'You') {
+      log(`${who} entangles you in thorny vines!`, 'danger');
+    }
+  });
+
+  world.on('spell:thorn_burst', ({ actor, targetId }) => {
+    const who = nameOfEntity(actor);
+    const whom = nameOfEntity(targetId);
+    if (who === 'You') {
+      log(`Razor thorns shred ${whom}!`, 'combat');
+    } else if (whom === 'You') {
+      log(`${who} hurls a burst of thorns at you!`, 'danger');
+    }
+  });
+
   world.on('spell:scorch', ({ actor, fizzle, missed, critical }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (fizzle) { log('Scorch finds no target.', 'system'); return; }
