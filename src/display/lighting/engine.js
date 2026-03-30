@@ -46,6 +46,15 @@ export function createLightingEngine() {
   /** @type {Float32Array} */ let lightG = null;
   /** @type {Float32Array} */ let lightB = null;
   /** @type {Float32Array} */ let vision = null;  // 0 = unseen, 1 = full sight
+  /** @type {Float32Array} */ let floorH = null;  // debug floor relief height (tile-ish units)
+  /** @type {Float32Array} */ let floorGX = null; // relief gradient x
+  /** @type {Float32Array} */ let floorGY = null; // relief gradient y
+  /** @type {Float32Array} */ let surfSdf   = null;  // distance from hull edge (sub-cell units)
+  /** @type {Float32Array} */ let surfNormX = null;  // inward-facing surface normals (toward center)
+  /** @type {Float32Array} */ let surfNormY = null;
+  /** @type {Uint8Array}   */ let surfType  = null;  // 0=none, 1=water, 2=lava
+  /** @type {Uint8Array}   */ let lavaMask = null;   // 1=inside lava region
+  /** @type {Float32Array} */ let lavaEdgeDist = null; // distance to lava hull boundary (both sides)
 
   const lmCanvas = document.createElement('canvas');
   const lmCtx    = lmCanvas.getContext('2d');
@@ -55,6 +64,86 @@ export function createLightingEngine() {
   // Viewport origin (tile ints) — kept for coordinate math in render().
   let _tx0 = 0, _ty0 = 0;
 
+  // ---- Debug floor relief (generic terrain heightfield) -----------------
+  // This is intentionally tag-agnostic: lava/water are just surface tags.
+  // Relief lives in the same sub-cell field and can represent cuts/piles.
+  /** @typedef {{ x:number, y:number, delta:number }} FloorTileMod */
+  /** @typedef {{ x:number, y:number, radius:number, delta:number, falloff:number, roughness:number, depthNoise:number, seed:number }} FloorRadialMod */
+  /** @typedef {{ tileMods:Map<string, FloorTileMod>, radialMods:FloorRadialMod[], noiseAmp:number, noiseFreq:number }} FloorReliefState */
+  /** @type {Map<string, FloorReliefState>} */
+  const floorReliefByKey = new Map();
+  let activeReliefKey = "depth:0";
+  const floorNoiseSeed = 0x9e3779b9;
+  const MAX_RADIAL_MODS_PER_KEY = 320;
+
+  function normalizeReliefKey(key) {
+    if (typeof key === "number" && Number.isFinite(key)) return `depth:${Math.floor(key)}`;
+    const s = String(key ?? "").trim();
+    if (!s) return "depth:0";
+    return s.startsWith("depth:") ? s : `depth:${s}`;
+  }
+
+  /** @param {string} key */
+  function getReliefStateForKey(key) {
+    const k = normalizeReliefKey(key);
+    let state = floorReliefByKey.get(k);
+    if (!state) {
+      state = { tileMods: new Map(), radialMods: [], noiseAmp: 0, noiseFreq: 0.06 };
+      floorReliefByKey.set(k, state);
+    }
+    return state;
+  }
+
+  function getActiveReliefState() {
+    return getReliefStateForKey(activeReliefKey);
+  }
+
+  function smoothstep01(t) {
+    const x = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return x * x * (3 - 2 * x);
+  }
+
+  function hash2i(xi, yi, seed) {
+    let h = (xi | 0) * 374761393 + (yi | 0) * 668265263 + (seed | 0) * 1442695041;
+    h = (h ^ (h >>> 13)) | 0;
+    h = Math.imul(h, 1274126177);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967295;
+  }
+
+  function valueNoise2(x, y, seed) {
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const x1 = x0 + 1;
+    const y1 = y0 + 1;
+    const tx = x - x0;
+    const ty = y - y0;
+    const sx = smoothstep01(tx);
+    const sy = smoothstep01(ty);
+    const n00 = hash2i(x0, y0, seed);
+    const n10 = hash2i(x1, y0, seed);
+    const n01 = hash2i(x0, y1, seed);
+    const n11 = hash2i(x1, y1, seed);
+    const nx0 = n00 + (n10 - n00) * sx;
+    const nx1 = n01 + (n11 - n01) * sx;
+    return nx0 + (nx1 - nx0) * sy;
+  }
+
+  function fbm2(x, y, seed) {
+    let sum = 0;
+    let amp = 0.55;
+    let freq = 1.0;
+    let norm = 0;
+    for (let o = 0; o < 3; o++) {
+      const v = valueNoise2(x * freq, y * freq, seed + o * 1013);
+      sum += ((v * 2) - 1) * amp;
+      norm += amp;
+      amp *= 0.5;
+      freq *= 2;
+    }
+    return norm > 0 ? (sum / norm) : 0;
+  }
+
   /** Ensure buffers match the required sub-cell dimensions. */
   function ensureSize(tw, th) {
     const w = tw * SUB;
@@ -62,13 +151,22 @@ export function createLightingEngine() {
     if (w === lmW && h === lmH) return;
     lmW = w; lmH = h;
     const n = w * h;
-    sdf    = new Float32Array(n);
-    normX  = new Float32Array(n);
-    normY  = new Float32Array(n);
-    lightR = new Float32Array(n);
-    lightG = new Float32Array(n);
-    lightB = new Float32Array(n);
-    vision = new Float32Array(n);
+    sdf      = new Float32Array(n);
+    normX    = new Float32Array(n);
+    normY    = new Float32Array(n);
+    lightR   = new Float32Array(n);
+    lightG   = new Float32Array(n);
+    lightB   = new Float32Array(n);
+    vision   = new Float32Array(n);
+    floorH   = new Float32Array(n);
+    floorGX  = new Float32Array(n);
+    floorGY  = new Float32Array(n);
+    surfSdf   = new Float32Array(n);
+    surfNormX = new Float32Array(n);
+    surfNormY = new Float32Array(n);
+    surfType  = new Uint8Array(n);
+    lavaMask = new Uint8Array(n);
+    lavaEdgeDist = new Float32Array(n);
     lmCanvas.width  = w;
     lmCanvas.height = h;
     imgData = lmCtx.createImageData(w, h);
@@ -136,6 +234,339 @@ export function createLightingEngine() {
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
         normX[i] = dx / len;
         normY[i] = dy / len;
+      }
+    }
+  }
+
+  // ---- Surface SDF construction -----------------------------------------
+
+  // Surface depth thresholds (sub-cell units)
+  const MAX_SURF_DEPTH = 3.5;   // depth at which tint is fully saturated
+  const SURF_EDGE_THRESH = 2.8; // bright rim fades over this many sub-cells
+
+  /**
+   * Build a surface SDF by rasterizing hull contours onto the sub-cell grid,
+   * then running the same Chamfer distance transform.  Result: smooth distance
+   * from the hull boundary for each surface sub-cell ("depth into the pool").
+   *
+   * @param {Array<{family:string, loops:Array<Array<{x:number,y:number}>>}>} regions
+   * @param {number} tx0  @param {number} ty0
+   * @param {number} tw   @param {number} th
+   */
+  function buildSurfaceSDF(regions, tx0, ty0, tw, th) {
+    const w = tw * SUB, h = th * SUB;
+    surfSdf.fill(0);
+    surfType.fill(0);
+    lavaMask.fill(0);
+    lavaEdgeDist.fill(9999);
+    if (!regions || !regions.length) return;
+
+    // Offset: drawImage maps sub-cell (0,0) to world (tx0-0.5, ty0-0.5),
+    // so world→sub-cell is: sx = (wx - tx0 + 0.5) * SUB
+    const ox = (-tx0 + 0.5) * SUB;
+    const oy = (-ty0 + 0.5) * SUB;
+
+    // Rasterize each region's Bezier hull contour via scanline fill
+    for (let ri = 0; ri < regions.length; ri++) {
+      const region = regions[ri];
+      const st = region.family === 'lava' ? 2 : 1;  // 1=water, 2=lava
+      const loops = region.loops;
+      if (!loops || !loops.length) continue;
+
+      for (let li = 0; li < loops.length; li++) {
+        const loop = loops[li];
+        if (loop.length < 4) continue;
+
+        // Strip closing duplicate (loops close by repeating first point)
+        const raw = loop[0].x === loop[loop.length - 1].x &&
+                    loop[0].y === loop[loop.length - 1].y
+          ? loop.slice(0, -1) : loop;
+        if (raw.length < 3) continue;
+
+        // Sample the quadratic Bezier hull path into a dense polygon.
+        // Same curve logic as traceSurfaceHullPath: midpoint start/end,
+        // each corner vertex is a Bezier control point.
+        const SEGS = 10;  // samples per curve segment (denser preserves Bezier wall curvature)
+        const sampled = [];  // flat [x0,y0, x1,y1, ...]
+        let prevMid = {
+          x: (raw[raw.length - 1].x + raw[0].x) * 0.5,
+          y: (raw[raw.length - 1].y + raw[0].y) * 0.5,
+        };
+        for (let j = 0; j < raw.length; j++) {
+          const ctrl = raw[j];
+          const next = raw[(j + 1) % raw.length];
+          const endMid = { x: (ctrl.x + next.x) * 0.5, y: (ctrl.y + next.y) * 0.5 };
+          for (let s = 0; s < SEGS; s++) {
+            const t = s / SEGS;
+            const u = 1 - t;
+            sampled.push(
+              (u * u * prevMid.x + 2 * u * t * ctrl.x + t * t * endMid.x) + ox,
+              (u * u * prevMid.y + 2 * u * t * ctrl.y + t * t * endMid.y) + oy,
+            );
+          }
+          prevMid = endMid;
+        }
+
+        const nPts = sampled.length >> 1;
+        if (nPts < 3) continue;
+
+        let minSY = h, maxSY = 0;
+        for (let p = 0; p < nPts; p++) {
+          const py = sampled[p * 2 + 1];
+          if (py < minSY) minSY = py;
+          if (py > maxSY) maxSY = py;
+        }
+        const y0 = Math.max(0, Math.floor(minSY));
+        const y1 = Math.min(h - 1, Math.ceil(maxSY));
+
+        // Scanline fill (even-odd rule)
+        for (let sy = y0; sy <= y1; sy++) {
+          const scanY = sy + 0.5;
+          let xCount = 0;
+          const xBuf = [];
+          for (let j = 0; j < nPts; j++) {
+            const ax = sampled[j * 2], ay = sampled[j * 2 + 1];
+            const nj = (j + 1) % nPts;
+            const bx = sampled[nj * 2], by = sampled[nj * 2 + 1];
+            if ((ay <= scanY && by > scanY) || (by <= scanY && ay > scanY)) {
+              const t = (scanY - ay) / (by - ay);
+              xBuf[xCount++] = ax + t * (bx - ax);
+            }
+          }
+          if (xCount < 2) continue;
+          for (let a = 1; a < xCount; a++) {
+            const v = xBuf[a];
+            let b = a - 1;
+            while (b >= 0 && xBuf[b] > v) { xBuf[b + 1] = xBuf[b]; b--; }
+            xBuf[b + 1] = v;
+          }
+          for (let j = 0; j < xCount - 1; j += 2) {
+            const x0 = Math.max(0, Math.ceil(xBuf[j]));
+            const x1 = Math.min(w - 1, Math.floor(xBuf[j + 1]));
+            const rowOff = sy * w;
+            for (let sx = x0; sx <= x1; sx++) {
+              const idx = rowOff + sx;
+              surfType[idx] = st;
+              surfSdf[idx] = 9999;
+              if (st === 2) lavaMask[idx] = 1;
+            }
+          }
+        }
+      }
+    }
+
+    // Chamfer distance transform — identical to wall SDF but for surface boundary.
+    // Forward pass
+    for (let sy = 1; sy < h; sy++) {
+      for (let sx = 1; sx < w - 1; sx++) {
+        const i = sy * w + sx;
+        if (surfSdf[i] === 0) continue;
+        let m = surfSdf[i];
+        const a = surfSdf[i - 1]     + 1;      if (a < m) m = a;
+        const b = surfSdf[i - w]     + 1;      if (b < m) m = b;
+        const c = surfSdf[i - w - 1] + SQRT2;  if (c < m) m = c;
+        const d = surfSdf[i - w + 1] + SQRT2;  if (d < m) m = d;
+        surfSdf[i] = m;
+      }
+    }
+    // Backward pass
+    for (let sy = h - 2; sy >= 0; sy--) {
+      for (let sx = w - 2; sx >= 1; sx--) {
+        const i = sy * w + sx;
+        if (surfSdf[i] === 0) continue;
+        let m = surfSdf[i];
+        const a = surfSdf[i + 1]     + 1;      if (a < m) m = a;
+        const b = surfSdf[i + w]     + 1;      if (b < m) m = b;
+        const c = surfSdf[i + w + 1] + SQRT2;  if (c < m) m = c;
+        const d = surfSdf[i + w - 1] + SQRT2;  if (d < m) m = d;
+        surfSdf[i] = m;
+      }
+    }
+
+    // Surface normals from gradient (central differences) — point inward from hull edge.
+    // These describe the inner wall face direction of the below-grade cut.
+    surfNormX.fill(0);
+    surfNormY.fill(0);
+    for (let sy = 1; sy < h - 1; sy++) {
+      for (let sx = 1; sx < w - 1; sx++) {
+        const i = sy * w + sx;
+        if (surfSdf[i] === 0) continue;
+        const dx = surfSdf[i + 1] - surfSdf[i - 1];
+        const dy = surfSdf[i + w] - surfSdf[i - w];
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        surfNormX[i] = dx / len;
+        surfNormY[i] = dy / len;
+      }
+    }
+
+    // Lava signed-boundary distance support:
+    // distance to lava hull on both sides (inside and outside) in sub-cells.
+    for (let sy = 0; sy < h; sy++) {
+      const rowOff = sy * w;
+      for (let sx = 0; sx < w; sx++) {
+        const i = rowOff + sx;
+        const inLava = lavaMask[i] === 1;
+        const nL = sx > 0     ? (lavaMask[i - 1] === 1) : false;
+        const nR = sx < w - 1 ? (lavaMask[i + 1] === 1) : false;
+        const nU = sy > 0     ? (lavaMask[i - w] === 1) : false;
+        const nD = sy < h - 1 ? (lavaMask[i + w] === 1) : false;
+        if (inLava !== nL || inLava !== nR || inLava !== nU || inLava !== nD) {
+          lavaEdgeDist[i] = 0;
+        }
+      }
+    }
+    // Full-grid chamfer transform from lava boundary seeds.
+    for (let sy = 1; sy < h; sy++) {
+      for (let sx = 1; sx < w - 1; sx++) {
+        const i = sy * w + sx;
+        if (lavaEdgeDist[i] === 0) continue;
+        let m = lavaEdgeDist[i];
+        const a = lavaEdgeDist[i - 1]     + 1;      if (a < m) m = a;
+        const b = lavaEdgeDist[i - w]     + 1;      if (b < m) m = b;
+        const c = lavaEdgeDist[i - w - 1] + SQRT2;  if (c < m) m = c;
+        const d = lavaEdgeDist[i - w + 1] + SQRT2;  if (d < m) m = d;
+        lavaEdgeDist[i] = m;
+      }
+    }
+    for (let sy = h - 2; sy >= 0; sy--) {
+      for (let sx = w - 2; sx >= 1; sx--) {
+        const i = sy * w + sx;
+        if (lavaEdgeDist[i] === 0) continue;
+        let m = lavaEdgeDist[i];
+        const a = lavaEdgeDist[i + 1]     + 1;      if (a < m) m = a;
+        const b = lavaEdgeDist[i + w]     + 1;      if (b < m) m = b;
+        const c = lavaEdgeDist[i + w + 1] + SQRT2;  if (c < m) m = c;
+        const d = lavaEdgeDist[i + w - 1] + SQRT2;  if (d < m) m = d;
+        lavaEdgeDist[i] = m;
+      }
+    }
+  }
+
+  /**
+   * Build debug floor relief field (height + gradient) at sub-cell resolution.
+   * Height is tile-agnostic and intended for generic dig/pile experiments.
+   *
+   * @param {number} tx0
+   * @param {number} ty0
+   * @param {number} tw
+   * @param {number} th
+   * @param {FloorReliefState} relief
+   */
+  function buildFloorRelief(tx0, ty0, tw, th, relief) {
+    const w = tw * SUB;
+    const h = th * SUB;
+    const hasNoise = Math.abs(relief.noiseAmp) > 1e-6;
+    const hasMods = relief.tileMods.size > 0;
+    const hasRadials = Array.isArray(relief.radialMods) && relief.radialMods.length > 0;
+
+    if (!hasNoise && !hasMods && !hasRadials) {
+      floorH.fill(0);
+      floorGX.fill(0);
+      floorGY.fill(0);
+      return;
+    }
+
+    if (hasNoise) {
+      const freq = Math.max(1e-5, relief.noiseFreq);
+      const amp = relief.noiseAmp;
+      for (let sy = 0; sy < h; sy++) {
+        const wy = ty0 - 0.5 + (sy + 0.5) * INV_SUB;
+        const rowOff = sy * w;
+        for (let sx = 0; sx < w; sx++) {
+          const wx = tx0 - 0.5 + (sx + 0.5) * INV_SUB;
+          floorH[rowOff + sx] = fbm2(wx * freq, wy * freq, floorNoiseSeed) * amp;
+        }
+      }
+    } else {
+      floorH.fill(0);
+    }
+
+    if (hasMods) {
+      for (const rec of relief.tileMods.values()) {
+        const sx0 = (rec.x - tx0) * SUB;
+        const sy0 = (rec.y - ty0) * SUB;
+        const sx1 = sx0 + SUB - 1;
+        const sy1 = sy0 + SUB - 1;
+        if (sx1 < 0 || sy1 < 0 || sx0 >= w || sy0 >= h) continue;
+        const mx0 = Math.max(0, sx0);
+        const my0 = Math.max(0, sy0);
+        const mx1 = Math.min(w - 1, sx1);
+        const my1 = Math.min(h - 1, sy1);
+        for (let sy = my0; sy <= my1; sy++) {
+          const rowOff = sy * w;
+          for (let sx = mx0; sx <= mx1; sx++) {
+            floorH[rowOff + sx] += rec.delta;
+          }
+        }
+      }
+    }
+
+    if (hasRadials) {
+      const twoPi = Math.PI * 2;
+      for (let ri = 0; ri < relief.radialMods.length; ri++) {
+        const mod = relief.radialMods[ri];
+        const r = Math.max(0.01, Number(mod.radius) || 0);
+        const delta = Number(mod.delta) || 0;
+        if (!Number.isFinite(delta) || delta === 0) continue;
+        const cx = Number(mod.x) || 0;
+        const cy = Number(mod.y) || 0;
+        const falloff = Math.max(0.25, Math.min(5, Number(mod.falloff) || 1.4));
+        const roughness = Math.max(0, Math.min(0.9, Number(mod.roughness) || 0));
+        const depthNoise = Math.max(0, Math.min(0.9, Number(mod.depthNoise) || 0));
+        const seed = Number.isFinite(mod.seed) ? (mod.seed | 0) : 0;
+        const maxR = r * (1 + roughness * 0.95);
+
+        const sx0 = Math.floor((cx - maxR - tx0 + 0.5) * SUB);
+        const sy0 = Math.floor((cy - maxR - ty0 + 0.5) * SUB);
+        const sx1 = Math.ceil((cx + maxR - tx0 + 0.5) * SUB);
+        const sy1 = Math.ceil((cy + maxR - ty0 + 0.5) * SUB);
+        if (sx1 < 0 || sy1 < 0 || sx0 >= w || sy0 >= h) continue;
+        const mx0 = Math.max(0, sx0);
+        const my0 = Math.max(0, sy0);
+        const mx1 = Math.min(w - 1, sx1);
+        const my1 = Math.min(h - 1, sy1);
+
+        for (let sy = my0; sy <= my1; sy++) {
+          const wy = ty0 - 0.5 + (sy + 0.5) * INV_SUB;
+          const rowOff = sy * w;
+          for (let sx = mx0; sx <= mx1; sx++) {
+            const wx = tx0 - 0.5 + (sx + 0.5) * INV_SUB;
+            const dx = wx - cx;
+            const dy = wy - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (!Number.isFinite(dist)) continue;
+            const ang = Math.atan2(dy, dx);
+            let effR = r;
+            if (roughness > 1e-6) {
+              const sector = Math.floor(((ang + Math.PI) / twoPi) * 24);
+              const h0 = hash2i(sector, seed, 0x7f4a7c15 ^ seed);
+              const wobble = Math.sin(ang * 3.0 + seed * 0.013) * 0.55
+                + Math.sin(ang * 5.0 + seed * 0.021) * 0.45;
+              const n = ((h0 * 2) - 1) * 0.75 + wobble * 0.25;
+              effR *= (1 + roughness * n);
+              effR = Math.max(r * 0.25, effR);
+            }
+            if (dist > effR) continue;
+            const t = Math.max(0, 1 - dist / effR);
+            let k = Math.pow(t, falloff);
+            if (depthNoise > 1e-6) {
+              const n = valueNoise2(wx * 2.1, wy * 2.1, 0x5bd1e995 ^ seed);
+              k *= (1 + depthNoise * ((n * 2) - 1));
+            }
+            floorH[rowOff + sx] += delta * k;
+          }
+        }
+      }
+    }
+
+    floorGX.fill(0);
+    floorGY.fill(0);
+    for (let sy = 1; sy < h - 1; sy++) {
+      const rowOff = sy * w;
+      for (let sx = 1; sx < w - 1; sx++) {
+        const i = rowOff + sx;
+        floorGX[i] = (floorH[i + 1] - floorH[i - 1]) * 0.5;
+        floorGY[i] = (floorH[i + w] - floorH[i - w]) * 0.5;
       }
     }
   }
@@ -317,6 +748,16 @@ export function createLightingEngine() {
       lightB.fill(0);
     }
 
+    // Ambient sky light barely reaches below-grade lava basins.
+    for (let i = 0; i < n; i++) {
+      if (lavaMask[i] !== 1) continue;
+      const sd = lavaEdgeDist[i];
+      const block = Math.min(1, sd / 1.65) * 0.92;
+      lightR[i] *= (1 - block);
+      lightG[i] *= (1 - block);
+      lightB[i] *= (1 - block);
+    }
+
     for (let li = 0; li < lights.length; li++) {
       const light = lights[li];
       const col = light.color || [255, 200, 140];
@@ -332,6 +773,19 @@ export function createLightingEngine() {
       // Light position in sub-cell coords (relative to lightmap origin)
       const lsx = (light.x - _tx0) * SUB;
       const lsy = (light.y - _ty0) * SUB;
+      const lsi = Math.min(w - 2, Math.max(1, (lsx + 0.5) | 0));
+      const lsj = Math.min(h - 2, Math.max(1, (lsy + 0.5) | 0));
+      // Robust source classification: use a small neighborhood so half-tile
+      // offsets near the hull don't misclassify in-pit lights as floor lights.
+      let sourceLavaVotes = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        const row = (lsj + oy) * w;
+        for (let ox = -1; ox <= 1; ox++) {
+          const j = row + lsi + ox;
+          if (lavaMask[j] === 1) sourceLavaVotes++;
+        }
+      }
+      const sourceInLava = sourceLavaVotes >= 3;
 
       // Bounding rect in sub-cells
       const sx0 = Math.max(1,     (lsx - lrSub) | 0);
@@ -373,6 +827,47 @@ export function createLightingEngine() {
             intensity = 0.9 * atten2;
           }
 
+          const targetInLava = lavaMask[i] === 1;
+          if (sourceInLava !== targetInLava) continue;
+          if (targetInLava) {
+            const sd = lavaEdgeDist[i];
+            // In-pit lights cast against inner walls of the cut.
+            const invDist = 1 / (dist || 1);
+            const ldx = -dwx * invDist;
+            const ldy = -dwy * invDist;
+            const surfDiffuse = Math.max(0, surfNormX[i] * ldx + surfNormY[i] * ldy);
+            const wallBand = Math.max(0, 1 - Math.abs(sd - 2.15) / 1.05);
+            const deepBand = Math.max(0, Math.min(1, (sd - 2.35) / 1.0));
+            const catchBoost = 1 + wallBand * (0.90 * surfDiffuse + 0.30) + deepBand * 0.25;
+            intensity *= catchBoost;
+          } else if (surfType[i] === 0) {
+            // Debug floor relief occlusion approximation: higher relief between
+            // target and light attenuates intensity (partial "pile shadow").
+            const invDist = 1 / (dist || 1);
+            const toLightX = -dwx * invDist;
+            const toLightY = -dwy * invDist;
+            const stepX = toLightX > 0.35 ? 1 : (toLightX < -0.35 ? -1 : 0);
+            const stepY = toLightY > 0.35 ? 1 : (toLightY < -0.35 ? -1 : 0);
+            if (stepX !== 0 || stepY !== 0) {
+              const h0 = floorH[i];
+              let ridge = 0;
+              let cx = sx;
+              let cy = sy;
+              for (let tap = 0; tap < 3; tap++) {
+                cx += stepX;
+                cy += stepY;
+                if (cx < 0 || cx >= w || cy < 0 || cy >= h) break;
+                const j = cy * w + cx;
+                const dh = floorH[j] - h0;
+                if (dh > ridge) ridge = dh;
+              }
+              if (ridge > 0) {
+                const shadow = Math.min(0.92, ridge * 0.85);
+                intensity *= (1 - shadow);
+              }
+            }
+          }
+
           lightR[i] += cr * intensity;
           lightG[i] += cg * intensity;
           lightB[i] += cb * intensity;
@@ -395,8 +890,11 @@ export function createLightingEngine() {
    * @param {number} [maxDark=140] — max darkness alpha (0=no overlay, 255=pure black)
    * @param {((x:number,y:number)=>boolean)|null} [isRoofed] — roofed cells get no ambient
    * @param {VisionDef|null} [visionDef] — player vision mask (not a light)
+   * @param {Array<{family:string, loops:Array<Array<{x:number,y:number}>>}>} [surfaceRegions]
+   * @param {number} [fxTime]
+   * @param {string|number} [reliefKey] — debug floor-relief scope key (e.g. depth)
    */
-  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef) {
+  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef, surfaceRegions, fxTime, reliefKey) {
     const DARK = (maxDark != null) ? maxDark : 140;
     const tx0 = Math.floor(vx0) - 1;
     const ty0 = Math.floor(vy0) - 1;
@@ -408,12 +906,32 @@ export function createLightingEngine() {
 
     ensureSize(tw, th);
     _tx0 = tx0; _ty0 = ty0;
+    activeReliefKey = normalizeReliefKey(reliefKey);
+    const relief = getActiveReliefState();
 
     buildSDF(isOpaque, tx0, ty0, tw, th);
+    buildSurfaceSDF(surfaceRegions || [], tx0, ty0, tw, th);
+    buildFloorRelief(tx0, ty0, tw, th, relief);
     buildVision(visionDef || null);
     accumulateLights(lights, ambient || null, isRoofed || null);
-
     const n = lmW * lmH;
+    // Lava self-emission (inside basin only): this is the "light in the pit".
+    // Kept fully contained to lavaMask cells so it reads as below-grade glow.
+    for (let i = 0; i < n; i++) {
+      if (lavaMask[i] !== 1) continue;
+      const sd = lavaEdgeDist[i];
+      const wallBand = Math.max(0, 1 - Math.abs(sd - 2.0) / 1.15); // inner wall
+      const deepBand = Math.max(0, Math.min(1, (sd - 2.2) / 1.2)); // molten core
+      const emit = 0.46 + wallBand * 1.28 + deepBand * 1.91;
+      if (emit <= 0) continue;
+      const t = fxTime || 0;
+      const pulse = 0.84 + 0.16 * Math.sin(t * 2.4 + sd * 0.34);
+      const shimmer = 0.84 + 0.16 * Math.sin(t * 7.0 + (i % lmW) * 0.09 + ((i / lmW) | 0) * 0.05);
+      const e = emit * pulse * shimmer;
+      lightR[i] += 1.91 * e;
+      lightG[i] += 0.82 * e;
+      lightB[i] += 0.20 * e;
+    }
 
     // ---- Pass 1: darkness overlay (source-over, black + alpha) ----------
     // Vision mask lifts darkness (lets you see) without adding colour.
@@ -428,11 +946,47 @@ export function createLightingEngine() {
       } else {
         const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.5);
         const sight = vision[i];  // 0-1 vision mask
-        // Vision lifts darkness to reveal what's there; light lifts further
-        const visLift = sight * 0.85;  // vision alone doesn't fully clear darkness
+        // Vision lifts darkness to reveal what's there; light lifts further.
+        // For below-grade surfaces we intentionally reduce this lift so the
+        // depression profile can remain visible instead of flattening out.
+        const inLava = lavaMask[i] === 1;
+        const visLift = sight * (inLava ? 0.48 : 0.85);
         const lightLift = brightness;
-        const totalLift = Math.min(1, visLift + lightLift);
-        pixels[pi + 3] = Math.max(0, (DARK * (1 - totalLift)) | 0);
+        let totalLift = Math.min(1, visLift + lightLift);
+        let extraDark = 0;
+
+        // Generic floor relief shading (debug): digs/piles should be legible
+        // as terrain, independent of surface tags.
+        if (!inLava && surfType[i] === 0) {
+          const hRel = floorH[i];
+          const gx = floorGX[i];
+          const gy = floorGY[i];
+          const slope = Math.min(1, Math.hypot(gx, gy) * 3.2);
+          const shade = Math.max(-1, Math.min(1, (-gx * 0.82) + (-gy * 0.58)));
+          const digDark = Math.max(0, -hRel) * 0.95 + slope * (0.28 + 0.38 * Math.max(0, -shade));
+          const pileLift = Math.max(0, hRel) * 0.58 + slope * 0.22 * Math.max(0, shade);
+          totalLift = Math.max(0, Math.min(1, totalLift - digDark + pileLift));
+          extraDark += digDark * 118;
+        }
+        // Lava below-grade basin: dark lip → lit inner wall → emissive interior.
+        // Important: this applies both additive emissive lift and subtractive cut shadow
+        // so the basin reads as carved below the surrounding floor.
+        if (inLava) {
+          const sd = lavaEdgeDist[i];
+          const lipBand = Math.max(0, 1 - (sd - 0.85) / 1.45); // steep drop edge
+          const wallBand = Math.max(0, 1 - Math.abs(sd - 2.0) / 1.15);
+          const deepBand = Math.max(0, Math.min(1, (sd - 2.2) / 1.2));
+          const cutShadow = lipBand * 0.82 + wallBand * 0.20;
+          const emissiveLift = 0.30 + wallBand * 0.42 + deepBand * 1.08;
+          totalLift = Math.max(0, Math.min(1, totalLift - cutShadow + emissiveLift));
+          // Negative-wall read: allow the lip to go darker than global DARK cap.
+          extraDark += lipBand * 92 + wallBand * 15;
+        } else {
+          // Slight outside rim darkening helps the cut boundary read as "below grade".
+          const rimD = lavaEdgeDist[i];
+          if (rimD < 1.4) extraDark += 28 * (1 - rimD / 1.4);
+        }
+        pixels[pi + 3] = Math.min(255, Math.max(0, (DARK * (1 - totalLift) + extraDark) | 0));
       }
     }
     lmCtx.putImageData(imgData, 0, 0);
@@ -453,11 +1007,64 @@ export function createLightingEngine() {
         pixels[pi] = 0; pixels[pi + 1] = 0; pixels[pi + 2] = 0; pixels[pi + 3] = 0;
         continue;
       }
-      const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.4);
-      pixels[pi]     = Math.min(255, (lightR[i] * 255) | 0);
-      pixels[pi + 1] = Math.min(255, (lightG[i] * 180) | 0);
-      pixels[pi + 2] = Math.min(255, (lightB[i] * 60)  | 0);
-      pixels[pi + 3] = (brightness * 120) | 0;
+      const st = surfType[i];
+      if (st > 0 && surfSdf[i] > 0) {
+        // Surface sub-cell: neutral tone + depth-based color
+        const sd = surfSdf[i];
+        const depth = Math.min(1, sd / MAX_SURF_DEPTH);
+        const edgeF = sd < SURF_EDGE_THRESH ? 1 - sd / SURF_EDGE_THRESH : 0;
+        let sr, sg, sb, sa;
+        if (st === 1) { // water — cool blue depression
+          sr = (15 + 50 * edgeF) * depth;
+          sg = (50 + 80 * edgeF) * depth;
+          sb = (85 + 110 * edgeF) * depth;
+          sa = 0.45 * depth + 0.5 * edgeF;
+        } else { // lava — below-grade cut: dark lip, hot wall, emissive core
+          const sd = lavaEdgeDist[i];
+          const flk = 0.84 + 0.16 * Math.sin((fxTime || 0) * 3.8 + sd * 0.42);
+          const lipBand = Math.max(0, 1 - (sd - 0.85) / 1.45);
+          const wallBand = Math.max(0, 1 - Math.abs(sd - 2.0) / 1.15);
+          const deepBand = Math.max(0, Math.min(1, (sd - 2.2) / 1.2));
+          const rimBand = Math.max(0, 1 - Math.abs(sd - 1.0) / 1.25); // Bezier-following rim line
+          const core = Math.max(0, depth - lipBand * 0.98 - 0.20);
+          sr = (8 * lipBand + 182 * wallBand + 182 * deepBand + 50 * core + 114 * rimBand) * flk;
+          sg = (2 * lipBand + 108 * wallBand + 108 * deepBand + 20 * core + 56 * rimBand) * flk;
+          sb = (0 * lipBand + 22 * wallBand + 20 * deepBand + 12 * rimBand) * flk;
+          sa = Math.min(1, lipBand * 0.03 + wallBand * 0.70 + deepBand * 0.79 + rimBand * 0.40);
+        }
+        // Blend: surface color + accumulated light (neutral, no warm bias)
+        pixels[pi]     = Math.min(255, (lightR[i] * 255 + sr) | 0);
+        pixels[pi + 1] = Math.min(255, (lightG[i] * 255 + sg) | 0);
+        pixels[pi + 2] = Math.min(255, (lightB[i] * 255 + sb) | 0);
+        const lightBri = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.4);
+        pixels[pi + 3] = Math.min(255, (lightBri * 170 + sa * 210) | 0);
+      } else {
+        // Standard warm-biased tint for non-surface cells
+        const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.4);
+        let r = (lightR[i] * 255) | 0;
+        let g = (lightG[i] * 180) | 0;
+        let b = (lightB[i] * 60)  | 0;
+        let a = (brightness * 120) | 0;
+        if (surfType[i] === 0) {
+          const hRel = floorH[i];
+          const gx = floorGX[i];
+          const gy = floorGY[i];
+          const slope = Math.min(1, Math.hypot(gx, gy) * 3.0);
+          const shade = Math.max(-1, Math.min(1, (-gx * 0.82) + (-gy * 0.58)));
+          const pos = Math.max(0, shade);
+          const neg = Math.max(0, -shade);
+          const contour = Math.min(1, Math.abs(hRel) * 1.4 + slope * 0.9);
+          r += (22 * pos * contour - 15 * neg * contour) | 0;
+          g += (16 * pos * contour - 12 * neg * contour) | 0;
+          b += (9 * pos * contour - 8 * neg * contour) | 0;
+          a += (26 * contour) | 0;
+
+        }
+        pixels[pi] = Math.max(0, Math.min(255, r));
+        pixels[pi + 1] = Math.max(0, Math.min(255, g));
+        pixels[pi + 2] = Math.max(0, Math.min(255, b));
+        pixels[pi + 3] = Math.max(0, Math.min(255, a));
+      }
     }
     lmCtx.putImageData(imgData, 0, 0);
 
@@ -470,5 +1077,99 @@ export function createLightingEngine() {
     ctx.restore();
   }
 
-  return { render };
+  function addFloorTileDelta(x, y, delta, reliefKeyOverride) {
+    const relief = reliefKeyOverride == null
+      ? getActiveReliefState()
+      : getReliefStateForKey(reliefKeyOverride);
+    const tx = Number.isFinite(Number(x)) ? (Math.round(Number(x)) | 0) : 0;
+    const ty = Number.isFinite(Number(y)) ? (Math.round(Number(y)) | 0) : 0;
+    const dd = Number(delta);
+    if (!Number.isFinite(dd) || dd === 0) return 0;
+    const key = `${tx},${ty}`;
+    const prev = relief.tileMods.get(key)?.delta || 0;
+    const next = Math.max(-4, Math.min(4, prev + dd));
+    if (Math.abs(next) < 1e-5) relief.tileMods.delete(key);
+    else relief.tileMods.set(key, { x: tx, y: ty, delta: next });
+    return next;
+  }
+
+  function addFloorRadialDelta(x, y, delta, radius, opts, reliefKeyOverride) {
+    const relief = reliefKeyOverride == null
+      ? getActiveReliefState()
+      : getReliefStateForKey(reliefKeyOverride);
+    const cx = Number(x);
+    const cy = Number(y);
+    const dd = Number(delta);
+    const rr = Number(radius);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return 0;
+    if (!Number.isFinite(dd) || dd === 0) return 0;
+    if (!Number.isFinite(rr) || rr <= 0) return 0;
+
+    const o = opts && typeof opts === "object" ? opts : {};
+    relief.radialMods.push({
+      x: cx,
+      y: cy,
+      radius: Math.max(0.1, Math.min(8, rr)),
+      delta: Math.max(-4, Math.min(4, dd)),
+      falloff: Math.max(0.25, Math.min(5, Number(o.falloff) || 1.4)),
+      roughness: Math.max(0, Math.min(0.9, Number(o.roughness) || 0)),
+      depthNoise: Math.max(0, Math.min(0.9, Number(o.depthNoise) || 0)),
+      seed: Number.isFinite(Number(o.seed)) ? (Number(o.seed) | 0) : (((cx * 73856093) ^ (cy * 19349663) ^ (dd * 83492791)) | 0),
+    });
+    if (relief.radialMods.length > MAX_RADIAL_MODS_PER_KEY) {
+      relief.radialMods.splice(0, relief.radialMods.length - MAX_RADIAL_MODS_PER_KEY);
+    }
+    return relief.radialMods.length;
+  }
+
+  function setFloorTileDelta(x, y, delta, reliefKeyOverride) {
+    const relief = reliefKeyOverride == null
+      ? getActiveReliefState()
+      : getReliefStateForKey(reliefKeyOverride);
+    const tx = Number.isFinite(Number(x)) ? (Math.round(Number(x)) | 0) : 0;
+    const ty = Number.isFinite(Number(y)) ? (Math.round(Number(y)) | 0) : 0;
+    const value = Number(delta);
+    if (!Number.isFinite(value)) return 0;
+    const next = Math.max(-4, Math.min(4, value));
+    const key = `${tx},${ty}`;
+    if (Math.abs(next) < 1e-5) relief.tileMods.delete(key);
+    else relief.tileMods.set(key, { x: tx, y: ty, delta: next });
+    return next;
+  }
+
+  function setFloorNoise(amplitude, frequency) {
+    const relief = getActiveReliefState();
+    const a = Number(amplitude);
+    if (!Number.isFinite(a)) return relief.noiseAmp;
+    relief.noiseAmp = Math.max(-2, Math.min(2, a));
+    if (frequency != null) {
+      const f = Number(frequency);
+      if (Number.isFinite(f) && f > 0) relief.noiseFreq = Math.max(0.001, Math.min(2, f));
+    }
+    return relief.noiseAmp;
+  }
+
+  function clearFloorRelief(scope) {
+    if (String(scope || "").toLowerCase() === "all") {
+      floorReliefByKey.clear();
+      return;
+    }
+    const relief = getActiveReliefState();
+    relief.tileMods.clear();
+    relief.radialMods.length = 0;
+    relief.noiseAmp = 0;
+  }
+
+  function getFloorReliefState() {
+    const relief = getActiveReliefState();
+    return {
+      reliefKey: activeReliefKey,
+      tileMods: relief.tileMods.size,
+      radialMods: relief.radialMods.length,
+      noiseAmp: relief.noiseAmp,
+      noiseFreq: relief.noiseFreq,
+    };
+  }
+
+  return { render, addFloorTileDelta, addFloorRadialDelta, setFloorTileDelta, setFloorNoise, clearFloorRelief, getFloorReliefState };
 }

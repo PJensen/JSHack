@@ -122,6 +122,9 @@ Deno.test("ranged: hit with bow, ammo, LOS clear, in range", () => {
   assert(events.some(e => e._event === 'damaged'), 'damaged emitted');
   const hit = events.find(e => e._event === 'damaged');
   assert((hit?.projectileDelay || 0) > 0, 'ranged hits should carry projectileDelay');
+  assertEquals(String(hit?.projectileKind || ''), 'arrow');
+  assert(Math.abs(Number(hit?.impactVector?.dx || 0) - 1) < 1e-6, `impactVector.dx should face target, got ${Number(hit?.impactVector?.dx || 0)}`);
+  assert(Math.abs(Number(hit?.impactVector?.dy || 0)) < 1e-6, `impactVector.dy should be 0 for horizontal shot, got ${Number(hit?.impactVector?.dy || 0)}`);
 });
 
 Deno.test("ranged: hits do not apply implicit bleed without explicit proc source", () => {

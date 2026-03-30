@@ -6,6 +6,7 @@
 import { World } from "./lib/ecs-js/index.js";            // ECS World
 import { configureWorld } from "./main/scheduler.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
+import { emitSafe } from "./rules/utils/emitSafe.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
 import { FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing, setFacingTurnCostEnabled } from "./rules/utils/facing.js";
 
@@ -114,6 +115,7 @@ import { installProofWiring } from "./main/proof/proofWiring.js";
 import { postVerifiedScore } from "./shared/tombstoneApi.js";
 import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
+import { chebyshevScalar, manhattanScalar } from "./rules/utils/distance.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
@@ -675,7 +677,7 @@ function clampTargetToRange(fromX, fromY, toX, toY, maxRange) {
 
   const dx = tx - ox;
   const dy = ty - oy;
-  const dist = Math.max(Math.abs(dx), Math.abs(dy));
+  const dist = chebyshevScalar(ox, oy, tx, ty);
   if (dist <= range || range <= 0) return { x: tx, y: ty };
 
   const scale = range / Math.max(1, dist);
@@ -1105,7 +1107,7 @@ function _finalizeNewGame(classData) {
   installSceneControls({ world, cam, TILE_PX, defaultZoomScale: CAMERA_START_SCALE, messageLog, runtimeConfig });
 
   const debugConsole = initDebugConsole({ world, messageLog });
-  registerBuiltinCommands(debugConsole, { world, messageLog });
+  registerBuiltinCommands(debugConsole, { world, messageLog, lightingEngine });
 }
 
 function findNearestTraversalTarget(world, x, y) {
@@ -1113,7 +1115,7 @@ function findNearestTraversalTarget(world, x, y) {
   let nearestDist = Infinity;
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
     if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal') continue;
-    const dist = Math.max(Math.abs(pos.x - x), Math.abs(pos.y - y));
+    const dist = chebyshevScalar(pos.x, pos.y, x, y);
     if (dist > 0) continue;
     const prefer = dist < nearestDist
       || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal');
@@ -1405,8 +1407,8 @@ addEventListener('ui:castActiveSpell', () => {
 
     // Sort by Chebyshev distance (nearest first)
     enemies.sort((a, b) => {
-      const da = Math.max(Math.abs(a.x - px), Math.abs(a.y - py));
-      const db = Math.max(Math.abs(b.x - px), Math.abs(b.y - py));
+      const da = chebyshevScalar(a.x, a.y, px, py);
+      const db = chebyshevScalar(b.x, b.y, px, py);
       return da - db;
     });
 
@@ -1566,7 +1568,7 @@ addEventListener('keydown', (ev) => {
       const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
       const finalTx = clamped.x | 0;
       const finalTy = clamped.y | 0;
-      const dist = Math.max(Math.abs(finalTx - px), Math.abs(finalTy - py));
+      const dist = chebyshevScalar(finalTx, finalTy, px, py);
       if (!(dist > 0)) {
         try { messageLog.log({ text: `${pending.spellName} needs another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
         return;
@@ -1596,7 +1598,7 @@ addEventListener('keydown', (ev) => {
       const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
       const finalTx = clamped.x | 0;
       const finalTy = clamped.y | 0;
-      const dist = Math.max(Math.abs(finalTx - px), Math.abs(finalTy - py));
+      const dist = chebyshevScalar(finalTx, finalTy, px, py);
       if (!(dist > 0)) {
         try { messageLog.log({ text: `${bracketizeName(pending.itemName)} must target another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
         return;
@@ -1646,7 +1648,7 @@ addEventListener('ui:requestPickup', (e) => {
         if (!inventoryContains(world, cid, id)) continue;
         transferItem(world, id, cid, pe.id);
         const count = world.get(id, ItemInfo)?.count || 1;
-        try { world.emit?.('item:pickup', { actor: pe.id, itemId: id, count }); } catch (e) { console.debug('[main] emit item:pickup failed:', e); }
+        emitSafe(world, 'item:pickup', { actor: pe.id, itemId: id, count });
         break;
       }
     } else {
@@ -1698,7 +1700,7 @@ addEventListener('ui:shootRanged', () => {
     const tx = pos.x | 0, ty = pos.y | 0;
     if (!hasLOS(px, py, tx, ty, isBlocked)) return;
     if (!isTileVisible(tx, ty)) return;
-    const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+    const dist = chebyshevScalar(tx, ty, px, py);
     if (dist < bestDist) { bestDist = dist; bestId = id; }
   });
 
@@ -1772,8 +1774,8 @@ world.on('scroll:polymorph', ({ actor }) => {
   }
 
   enemies.sort((a, b) => {
-    const da = Math.max(Math.abs(a.x - px), Math.abs(a.y - py));
-    const db = Math.max(Math.abs(b.x - px), Math.abs(b.y - py));
+    const da = chebyshevScalar(a.x, a.y, px, py);
+    const db = chebyshevScalar(b.x, b.y, px, py);
     return da - db;
   });
 
@@ -1873,7 +1875,7 @@ world.on('scroll:teleportation', ({ actor }) => {
   const candidates = [];
   forEachLoadedTile((x, y) => {
     if (!isWalkable(x, y)) return;
-    const dist = Math.max(Math.abs(x - from.x), Math.abs(y - from.y));
+    const dist = chebyshevScalar(x, y, from.x, from.y);
     if (dist < 6) return;
     candidates.push({ x, y });
   });
@@ -1883,7 +1885,7 @@ world.on('scroll:teleportation', ({ actor }) => {
   }
   const to = candidates[Math.floor(world.rand() * candidates.length)];
   world.set(actor, Position, { x: to.x, y: to.y });
-  try { world.emit?.('moved', { id: actor, from, to }); } catch {}
+  emitSafe(world, 'moved', { id: actor, from, to });
 });
 
 // Scroll of Summoning → spawn hostile monsters near player
@@ -2955,7 +2957,7 @@ world.on('moved', ({ id, to }) => {
   // Check for adjacent shopkeeper
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
     if (ni.identity !== 'shopkeeper') continue;
-    const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
+    const dist = chebyshevScalar(pos.x, pos.y, to.x, to.y);
     if (dist === 1) {
       world.emit?.('message', { text: 'A shopkeeper is nearby. Bump to trade.', type: 'system' });
       break;
@@ -2965,7 +2967,7 @@ world.on('moved', ({ id, to }) => {
   // Check for adjacent weapon rack
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
     if (ni.identity !== 'weapon_rack') continue;
-    const dist = Math.max(Math.abs(pos.x - to.x), Math.abs(pos.y - to.y));
+    const dist = chebyshevScalar(pos.x, pos.y, to.x, to.y);
     if (dist === 1) {
       world.emit?.('message', { text: 'A weapon rack is here. Bump to browse.', type: 'system' });
       break;
@@ -3295,7 +3297,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   let bestDist = Infinity;
   for (let i = 0; i < targeting.enemies.length; i++) {
     const e = targeting.enemies[i];
-    const d = Math.abs(e.x - tapX) + Math.abs(e.y - tapY);
+    const d = manhattanScalar(e.x, e.y, tapX, tapY);
     if (d < bestDist) { bestIdx = i; bestDist = d; }
   }
   if (bestIdx < 0) return;
@@ -3356,7 +3358,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     const clamped = clampTargetToRange(px, py, rawTx, rawTy, pendingSpell.range);
     const tx = clamped.x | 0;
     const ty = clamped.y | 0;
-    const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+    const dist = chebyshevScalar(tx, ty, px, py);
     if (!(dist > 0)) {
       try {
         messageLog.log({
@@ -3417,7 +3419,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   const clamped = clampTargetToRange(px, py, rawTx, rawTy, pendingThrow.range);
   const tx = clamped.x | 0;
   const ty = clamped.y | 0;
-  const dist = Math.max(Math.abs(tx - px), Math.abs(ty - py));
+  const dist = chebyshevScalar(tx, ty, px, py);
   if (!(dist > 0)) {
     try {
       messageLog.log({
@@ -3710,6 +3712,18 @@ const displayRuntime = setupDisplayRuntime({
   resolveItemDisplayName: resolveDisplayName,
   dispatchRulesAction,
   classifySurfaceTile,
+  sculptFloor: (x, y, delta, reliefKey) => {
+    if (!lightingEngine || typeof lightingEngine.addFloorTileDelta !== "function") return;
+    lightingEngine.addFloorTileDelta(x, y, delta, reliefKey);
+  },
+  sculptFloorBrush: (x, y, delta, radius, opts, reliefKey) => {
+    if (!lightingEngine || typeof lightingEngine.addFloorRadialDelta !== "function") return;
+    lightingEngine.addFloorRadialDelta(x, y, delta, radius, opts, reliefKey);
+  },
+  getActiveReliefKey: () => {
+    if (!lightingEngine || typeof lightingEngine.getFloorReliefState !== "function") return "__default__";
+    return lightingEngine.getFloorReliefState()?.reliefKey ?? "__default__";
+  },
 });
 const {
   statusEmitterFx,
@@ -5503,12 +5517,27 @@ function render(worldView) {
   // of the darkness, while tiles + entities are properly darkened.
   if (PERF.quality !== 'low') {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime, dt: _dtSec });
-    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx });
+    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx });
     const _ambient = computeAmbient(worldView);
     const _roofMask = worldView.isOverworld ? isRoofed : null;
     const _visionDef = getVisionDef();
     const _lightOpaque = worldView.isBlockedVision || isOpaque;
-    lightingEngine.render(bctx, _lights, _lightOpaque, vx0, vy0, vx1, vy1, _ambient, undefined, _roofMask, _visionDef);
+    lightingEngine.render(
+      bctx,
+      _lights,
+      _lightOpaque,
+      vx0,
+      vy0,
+      vx1,
+      vy1,
+      _ambient,
+      undefined,
+      _roofMask,
+      _visionDef,
+      surfaceAreaFx.getSurfaceRegions(),
+      _fxTime,
+      worldView.currentDepth ?? 0,
+    );
   }
 
   drawWorldEffects({

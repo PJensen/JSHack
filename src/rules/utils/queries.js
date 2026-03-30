@@ -10,6 +10,7 @@ import { AggroState } from "../components/AggroState.js";
 import { HazardArea } from "../components/HazardArea.js";
 import { Not } from "../../lib/ecs-js/core.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
+import { manhattanScalar } from "./distance.js";
 
 // ── Shared defined-query registry ─────────────────────────────────────────────
 // WeakMap ensures each world instance gets its own set of handles, so tests
@@ -108,7 +109,7 @@ export function findNearestValidTileAround(world, source, opts = {}) {
     for (let dx = -maxDistance; dx <= maxDistance; dx++) {
       const x = source.x + dx;
       const y = source.y + dy;
-      const dist = Math.abs(dx) + Math.abs(dy);
+      const dist = manhattanScalar(source.x, source.y, x, y);
       candidates.push({ x, y, dist, axisBias: (dx === 0 || dy === 0) ? 0 : 1 });
     }
   }

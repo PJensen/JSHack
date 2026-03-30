@@ -7,6 +7,7 @@ import { getMonster, resolveMonsterMaxHp } from "../data/monsters.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 import { addToInventory, destroyInventoryRoot, inventoryItems } from "../utils/inventoryFacade.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 const POLYMORPH_LISTENER_INSTALLED = Symbol.for("jshack:polymorph:listener:installed");
 
@@ -110,7 +111,7 @@ export function resolvePolymorph(world, req = {}) {
   };
 
   runPolymorphHooks("before", ctx);
-  try { world.emit?.("polymorph:before", ctx); } catch {}
+  emitSafe(world, "polymorph:before", ctx);
 
   const spawnedId = spawnMonsterEntity(world, {
     x: pos.x,
@@ -132,10 +133,10 @@ export function resolvePolymorph(world, req = {}) {
     toIdentity: String(world.get(spawnedId, NamedIdentity)?.identity || targetIdentity),
   };
 
-  try { world.emit?.("spawned", { id: spawnedId, at: { x: pos.x, y: pos.y }, kind: "monster" }); } catch {}
-  try { world.emit?.("polymorph:after", doneCtx); } catch {}
+  emitSafe(world, "spawned", { id: spawnedId, at: { x: pos.x, y: pos.y }, kind: "monster" });
+  emitSafe(world, "polymorph:after", doneCtx);
   if (doneCtx.toIdentity === "mimic") {
-    try { world.emit?.("mimic:revealed", doneCtx); } catch {}
+    emitSafe(world, "mimic:revealed", doneCtx);
   }
   runPolymorphHooks("after", doneCtx);
 

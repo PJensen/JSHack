@@ -7,9 +7,9 @@ import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx } from "./fxEntries.js";
 
 /**
- * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function } }} deps
+ * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function }, sculptFloor?: ((x:number,y:number,delta:number,reliefKey?: string|number)=>void), sculptFloorBrush?: ((x:number,y:number,delta:number,radius:number,opts?:object,reliefKey?:string|number)=>void), getActiveReliefKey?: (() => (string|number|null|undefined)) }} deps
  */
-export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, getPosition, ftext }) {
+export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, getPosition, ftext, sculptFloor, sculptFloorBrush, getActiveReliefKey }) {
   // --- Blink state ---
   /** @type {BlinkFx[]} */
   const _blinkFx = [];
@@ -42,6 +42,131 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   // --- Meteor state ---
   /** @type {RadialFx[]} */
   const _meteorFx = [];
+  /** @type {Map<string, { x:number, y:number, reliefKey:string, startStep:number, endStep:number, base:number, radius:number, color:[number,number,number], phase:number }>} */
+  const _impactWarmTiles = new Map();
+  /** @type {Array<{ x:number, y:number, vx:number, vy:number, ay:number, ttl:number, max:number, radius:number, phase:number }>} */
+  const _impactFlameLights = [];
+  const MAX_IMPACT_WARM_TILES = 560;
+
+  function hash2i(xi, yi, seed = 0) {
+    let h = (Math.imul(xi | 0, 374761393) ^ Math.imul(yi | 0, 668265263) ^ Math.imul(seed | 0, 1442695041)) | 0;
+    h = (h ^ (h >>> 13)) | 0;
+    h = Math.imul(h, 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  }
+
+  function carveMeteorCrater(origin, radius, reliefKey) {
+    if (!origin) return;
+    const cx = Number(origin.x) + 0.5;
+    const cy = Number(origin.y) + 0.5;
+    const ox = Math.floor(cx);
+    const oy = Math.floor(cy);
+    const r = Math.max(1.2, Number(radius) || 2);
+    const outer = r + 1.1;
+    const ir = Math.ceil(outer);
+    const keySeed = (typeof reliefKey === "number" ? (reliefKey | 0) : ((String(reliefKey || "").length * 131) | 0));
+    const centerSeed = ((ox & 0xffff) << 16) ^ (oy & 0xffff) ^ keySeed;
+
+    if (typeof sculptFloorBrush === "function") {
+      // Central deep bowl.
+      sculptFloorBrush(
+        cx, cy, -0.90, r * 0.94,
+        { falloff: 1.32, roughness: 0.28, depthNoise: 0.26, seed: centerSeed ^ 0x9e3779b9 },
+        reliefKey,
+      );
+      // Uneven lobes to break perfect radial symmetry.
+      const lobeCount = 4 + (centerSeed & 1);
+      for (let i = 0; i < lobeCount; i++) {
+        const a = (Math.PI * 2 * i / lobeCount) + (hash2i(i, centerSeed, 11) - 0.5) * 0.48;
+        const dist = r * (0.38 + hash2i(i, centerSeed, 13) * 0.36);
+        const lx = cx + Math.cos(a) * dist;
+        const ly = cy + Math.sin(a) * dist;
+        const lr = r * (0.36 + hash2i(i, centerSeed, 17) * 0.20);
+        const ld = -0.40 - hash2i(i, centerSeed, 19) * 0.28;
+        sculptFloorBrush(
+          lx, ly, ld, lr,
+          { falloff: 1.45, roughness: 0.34, depthNoise: 0.30, seed: centerSeed ^ (i * 2654435761) },
+          reliefKey,
+        );
+      }
+      return;
+    }
+
+    if (typeof sculptFloor !== "function") return;
+
+    const sampleOffsets = [-0.33, 0, 0.33];
+    const edgeSeedA = (centerSeed ^ 0x6c8e9cf5) | 0;
+    const edgeSeedB = (centerSeed ^ 0x27d4eb2f) | 0;
+    const phaseA = (centerSeed & 255) * 0.023;
+    const phaseB = ((centerSeed >>> 8) & 255) * 0.019;
+    for (let dy = -ir; dy <= ir; dy++) {
+      for (let dx = -ir; dx <= ir; dx++) {
+        const tx = ox + dx;
+        const ty = oy + dy;
+        let hit = 0;
+        let innerAccum = 0;
+        let sampleCount = 0;
+        for (let sy = 0; sy < sampleOffsets.length; sy++) {
+          for (let sx = 0; sx < sampleOffsets.length; sx++) {
+            sampleCount++;
+            const px = tx + 0.5 + sampleOffsets[sx];
+            const py = ty + 0.5 + sampleOffsets[sy];
+            const ddx = px - cx;
+            const ddy = py - cy;
+            const ang = Math.atan2(ddy, ddx);
+            const ring = Math.sqrt(ddx * ddx + ddy * ddy);
+            const sector = Math.floor(((ang + Math.PI) / (Math.PI * 2)) * 24);
+            const edgeNoiseA = 0.82 + hash2i(sector, 17, edgeSeedA) * 0.36;
+            const edgeNoiseB = 0.84 + hash2i(sector, 43, edgeSeedB) * 0.28;
+            const lobe = 1
+              + 0.16 * Math.sin(ang * 3.0 + phaseA)
+              + 0.10 * Math.sin(ang * 5.0 + phaseB);
+            const edgeR = outer * edgeNoiseA * edgeNoiseB * lobe;
+            if (ring > edgeR) continue;
+            hit++;
+            innerAccum += Math.max(0, 1 - ring / edgeR);
+          }
+        }
+        if (hit <= 0) continue;
+        const coverage = hit / sampleCount;
+        const innerT = innerAccum / hit;
+        if (innerT <= 0) continue;
+        const n = hash2i(tx, ty, centerSeed);
+        const irregular = 0.72 + n * 0.66;
+        const depthNoise = 0.78 + hash2i(tx * 3, ty * 5, centerSeed ^ 0x3c6ef35f) * 0.48;
+        let delta = -0.74 * Math.pow(innerT, 1.36) * irregular * depthNoise * coverage;
+        if (coverage < 0.45) delta *= 0.68;
+        if (Math.abs(delta) < 0.015) continue;
+        sculptFloor(tx, ty, delta, reliefKey);
+      }
+    }
+  }
+
+  function carveStormPockmark(impact, reliefKey, seedSalt = 0) {
+    if (typeof sculptFloorBrush !== "function" || !impact) return;
+    const x = Number(impact.x) + 0.5;
+    const y = Number(impact.y) + 0.5;
+    const baseSeed = (((Math.floor(x) & 0xffff) << 16) ^ (Math.floor(y) & 0xffff) ^ (seedSalt | 0)) | 0;
+    const baseR = 0.46 + hash2i(baseSeed, 3, 7) * 0.22;
+    const baseD = -0.22 - hash2i(baseSeed, 5, 11) * 0.14;
+    sculptFloorBrush(
+      x, y, baseD, baseR,
+      { falloff: 1.2, roughness: 0.38, depthNoise: 0.24, seed: baseSeed ^ 0x517cc1b7 },
+      reliefKey,
+    );
+    if (hash2i(baseSeed, 13, 17) > 0.45) {
+      const a = hash2i(baseSeed, 19, 23) * Math.PI * 2;
+      const d = baseR * (0.34 + hash2i(baseSeed, 29, 31) * 0.26);
+      sculptFloorBrush(
+        x + Math.cos(a) * d,
+        y + Math.sin(a) * d,
+        baseD * (0.52 + hash2i(baseSeed, 37, 41) * 0.24),
+        baseR * (0.42 + hash2i(baseSeed, 43, 47) * 0.23),
+        { falloff: 1.42, roughness: 0.44, depthNoise: 0.32, seed: baseSeed ^ 0x85ebca6b },
+        reliefKey,
+      );
+    }
+  }
 
   // --- Blastwave state ---
   /** @type {RadialFx[]} */
@@ -128,6 +253,85 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     return Math.min(0.72, base);
   }
 
+  function currentStep() {
+    return Number.isFinite(Number(world?.step)) ? (Number(world.step) | 0) : 0;
+  }
+
+  function normReliefKey(reliefKey) {
+    if (typeof reliefKey === "number" && Number.isFinite(reliefKey)) {
+      return `depth:${Math.floor(reliefKey)}`;
+    }
+    const s = String(reliefKey ?? "").trim();
+    if (!s) return "depth:0";
+    return s.startsWith("depth:") ? s : `depth:${s}`;
+  }
+
+  function warmTileKey(reliefKey, tx, ty) {
+    return `${reliefKey}|${tx},${ty}`;
+  }
+
+  function stampWarmTile(tx, ty, strength, turns, radius, color, reliefKey) {
+    const s = Math.max(0, Number(strength) || 0);
+    if (s <= 0) return;
+    const t = Math.max(2, Math.round(Number(turns) || 0));
+    const r = Math.max(0.32, Number(radius) || 0.32);
+    const rk = normReliefKey(reliefKey);
+    const key = warmTileKey(rk, tx, ty);
+    const now = currentStep();
+    const nextEnd = now + t;
+    const c = Array.isArray(color) ? color : [255, 120, 45];
+    const found = _impactWarmTiles.get(key);
+    if (found) {
+      found.reliefKey = rk;
+      found.startStep = now;
+      found.endStep = Math.max(found.endStep, nextEnd);
+      found.base = Math.min(1.45, found.base * 0.55 + s);
+      found.radius = Math.max(found.radius, r);
+      found.color = [
+        Math.max(found.color[0], c[0] | 0),
+        Math.max(found.color[1], c[1] | 0),
+        Math.max(found.color[2], c[2] | 0),
+      ];
+      return;
+    }
+    _impactWarmTiles.set(key, {
+      x: tx + 0.5,
+      y: ty + 0.5,
+      reliefKey: rk,
+      startStep: now,
+      endStep: nextEnd,
+      base: Math.min(1.45, s),
+      radius: r,
+      color: [c[0] | 0, c[1] | 0, c[2] | 0],
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  function stampWarmSpot(at, radius, strength, turns, color, reliefKey) {
+    if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+    const cx = Number(at.x) + 0.5;
+    const cy = Number(at.y) + 0.5;
+    const rr = Math.max(0.36, Number(radius) || 0.36);
+    const tx0 = Math.floor(cx - rr);
+    const ty0 = Math.floor(cy - rr);
+    const tx1 = Math.ceil(cx + rr);
+    const ty1 = Math.ceil(cy + rr);
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const dx = (tx + 0.5) - cx;
+        const dy = (ty + 0.5) - cy;
+        const d = Math.hypot(dx, dy);
+        if (d > rr) continue;
+        const edge = Math.max(0, 1 - (d / rr));
+        const tileStrength = strength * Math.pow(edge, 0.78);
+        if (tileStrength < 0.045) continue;
+        const tileTurns = Math.max(2, Math.round(turns * (0.58 + edge * 0.42)));
+        const tileRadius = 0.40 + tileStrength * 0.95;
+        stampWarmTile(tx, ty, tileStrength, tileTurns, tileRadius, color, reliefKey);
+      }
+    }
+  }
+
   // --- Tick ---
   /** @param {number} dt */
   function tick(dt) {
@@ -162,6 +366,27 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     for (let i = _searchPulseFx.length - 1; i >= 0; i--) {
       _searchPulseFx[i].tick(dt);
       if (_searchPulseFx[i].expired) _searchPulseFx.splice(i, 1);
+    }
+    const step = currentStep();
+    for (const [k, h] of _impactWarmTiles) {
+      if (step >= h.endStep) _impactWarmTiles.delete(k);
+    }
+    for (let i = _impactFlameLights.length - 1; i >= 0; i--) {
+      const f = _impactFlameLights[i];
+      f.ttl -= dt;
+      if (f.ttl <= 0) { _impactFlameLights.splice(i, 1); continue; }
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      f.vy += f.ay * dt;
+    }
+    if (_impactWarmTiles.size > MAX_IMPACT_WARM_TILES) {
+      const entries = [..._impactWarmTiles.entries()];
+      entries.sort((a, b) => a[1].endStep - b[1].endStep);
+      const overflow = _impactWarmTiles.size - MAX_IMPACT_WARM_TILES;
+      for (let i = 0; i < overflow; i++) _impactWarmTiles.delete(entries[i][0]);
+    }
+    if (_impactFlameLights.length > 180) {
+      _impactFlameLights.splice(0, _impactFlameLights.length - 180);
     }
     for (const [actorId, channel] of _drainLifeChannels) {
       channel.tickFlash = Math.max(0, Number(channel.tickFlash || 0) - dt);
@@ -716,8 +941,29 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       startShake(cam, randomized ? 4 : 3, randomized ? 0.14 : 0.12);
     });
 
-    world.on('spell:meteor', ({ actor, from, origin, radius }) => {
+    world.on('spell:meteor', ({ actor, from, origin, radius, depth }) => {
       if (origin && Number.isFinite(origin.x)) {
+        const reliefKey = depth ?? (typeof getActiveReliefKey === "function" ? getActiveReliefKey() : null);
+        carveMeteorCrater(origin, radius || 2, reliefKey);
+        const r = Math.max(1.2, Number(radius || 2));
+        stampWarmSpot(origin, 0.90, 1.20, 26, [255, 132, 52], reliefKey);
+        stampWarmSpot(origin, r * 0.96, 0.70, 19, [242, 112, 38], reliefKey);
+        for (let k = 0; k < 7; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          const spd = 0.16 + Math.random() * 0.30;
+          const life = 0.28 + Math.random() * 0.36;
+          _impactFlameLights.push({
+            x: Number(origin.x) + 0.5 + (Math.random() - 0.5) * 0.25,
+            y: Number(origin.y) + 0.5 + (Math.random() - 0.5) * 0.25,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - (0.14 + Math.random() * 0.20),
+            ay: 0.72,
+            ttl: life,
+            max: life,
+            radius: 0.26 + Math.random() * 0.16,
+            phase: Math.random() * Math.PI * 2,
+          });
+        }
         spawnMeteorProjectile(origin);
         _meteorFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.45 }));
         startShake(cam, 7, 0.30);
@@ -778,12 +1024,39 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       startShake(cam, 2, 0.08);
     });
 
-    world.on('spell:firestorm', ({ impacts }) => {
+    world.on('spell:firestorm', ({ impacts, depth }) => {
       if (!Array.isArray(impacts) || impacts.length <= 0) return;
+      const reliefKey = depth ?? (typeof getActiveReliefKey === "function" ? getActiveReliefKey() : null);
       const volleySway = (Math.random() - 0.5) * 2 * STORM_VOLLEY_SWAY_MAX_RAD;
       for (let i = 0; i < impacts.length; i++) {
         const impact = impacts[i];
         if (!impact || !Number.isFinite(impact.x) || !Number.isFinite(impact.y)) continue;
+        carveStormPockmark(impact, reliefKey, i + impacts.length * 31);
+        stampWarmSpot(
+          impact,
+          0.74 + Math.random() * 0.20,
+          0.78 + Math.random() * 0.22,
+          12 + ((Math.random() * 6) | 0),
+          [242, 106, 36],
+          reliefKey,
+        );
+        const smallCount = 2 + ((Math.random() * 2) | 0);
+        for (let k = 0; k < smallCount; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          const spd = 0.08 + Math.random() * 0.22;
+          const life = 0.20 + Math.random() * 0.22;
+          _impactFlameLights.push({
+            x: Number(impact.x) + 0.5 + (Math.random() - 0.5) * 0.16,
+            y: Number(impact.y) + 0.5 + (Math.random() - 0.5) * 0.16,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - (0.10 + Math.random() * 0.16),
+            ay: 0.70,
+            ttl: life,
+            max: life,
+            radius: 0.17 + Math.random() * 0.11,
+            phase: Math.random() * Math.PI * 2,
+          });
+        }
         spawnStormProjectile(impact, 'fireball', (i % 3) - 1, volleySway);
         _meteorFx.push(new RadialFx({
           x: Number(impact.x),
@@ -1525,6 +1798,43 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   /** Return active light sources for the lighting engine. */
   function getActiveLights() {
     const out = [];
+    const fxTime = Number(getFxTime?.() || 0);
+    const step = currentStep();
+    const activeReliefKey = (typeof getActiveReliefKey === "function")
+      ? normReliefKey(getActiveReliefKey())
+      : null;
+    for (const [, h] of _impactWarmTiles) {
+      if (activeReliefKey != null && h.reliefKey !== activeReliefKey) continue;
+      const span = Math.max(1, h.endStep - h.startStep);
+      const turnsLeft = h.endStep - step;
+      if (turnsLeft <= 0) continue;
+      const progress = 1 - Math.max(0, Math.min(1, turnsLeft / span)); // 0..1
+      const plateau = progress < 0.42
+        ? 1
+        : Math.max(0, 1 - ((progress - 0.42) / 0.58));
+      const heat = h.base * (0.74 + plateau * 0.26);
+      const settle = 0.985 + 0.015 * Math.sin(fxTime * 1.25 + h.phase);
+      const flicker = Math.max(0.10, Math.min(1.52, heat * settle));
+      out.push({
+        x: h.x,
+        y: h.y,
+        radius: h.radius * (0.84 + plateau * 0.34),
+        color: h.color,
+        flicker,
+      });
+    }
+    for (let i = 0; i < _impactFlameLights.length; i++) {
+      const f = _impactFlameLights[i];
+      const life = f.max > 0 ? Math.max(0, Math.min(1, f.ttl / f.max)) : 0;
+      if (life <= 0) continue;
+      out.push({
+        x: f.x,
+        y: f.y,
+        radius: f.radius * (0.66 + life * 0.44),
+        color: [255, 142, 58],
+        flicker: 0.40 + life * 0.64 + 0.10 * Math.sin(fxTime * 7.6 + f.phase),
+      });
+    }
     for (let i = 0; i < _meteorFx.length; i++) {
       const m = _meteorFx[i];
       out.push({ x: m.x, y: m.y, radius: (m.radius || 2) * 3 * m.alpha, color: [255, 140, 40] });

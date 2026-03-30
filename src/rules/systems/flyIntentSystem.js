@@ -3,6 +3,7 @@ import { Flying } from "../components/Flying.js";
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getMonster } from "../data/monsters.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * Resolve FlyIntent as a full action: taking off or landing consumes the turn.
@@ -19,10 +20,10 @@ export function flyIntentSystem(world) {
 
     if (airborne && !isFlying) {
       world.add(id, Flying, {});
-      try { world.emit?.("proc:fly:takeoff", { id, x: pos?.x ?? 0, y: pos?.y ?? 0, name }); } catch {}
+      emitSafe(world, "proc:fly:takeoff", { id, x: pos?.x ?? 0, y: pos?.y ?? 0, name });
     } else if (!airborne && isFlying) {
       world.remove(id, Flying);
-      try { world.emit?.("proc:fly:land", { id, x: pos?.x ?? 0, y: pos?.y ?? 0, name }); } catch {}
+      emitSafe(world, "proc:fly:land", { id, x: pos?.x ?? 0, y: pos?.y ?? 0, name });
     }
 
     try { world.remove(id, FlyIntent); } catch {}

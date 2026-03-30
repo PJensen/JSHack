@@ -17,6 +17,7 @@ import { computeEnvelopeValue } from '../utils/blind.js';
 import { chebyshev } from '../utils/distance.js';
 import { hasSpellLineOfSight } from '../utils/spellTargeting.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
+import { emitSafe } from '../utils/emitSafe.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -80,7 +81,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         const before = vit.hp;
         vit.hp = Math.min(effectiveMaxHp(world, id, vit), vit.hp + amount);
         const delta = vit.hp - before;
-        if (delta > 0) { try { world.emit && world.emit('healed', { id, amount: delta }); } catch {} }
+        if (delta > 0) { emitSafe(world, 'healed', { id, amount: delta }); }
         return;
     }
 
@@ -93,7 +94,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         const before = stam.stamina;
         stam.stamina = Math.min(cap, stam.stamina + amount);
         const delta = stam.stamina - before;
-        if (delta > 0) { try { world.emit && world.emit('stamina_restored', { id, amount: delta }); } catch {} }
+        if (delta > 0) { emitSafe(world, 'stamina_restored', { id, amount: delta }); }
     }
 
     if (operation === 'mana_restore') {
@@ -105,7 +106,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         const before = mana.mana;
         mana.mana = Math.min(cap, mana.mana + amount);
         const delta = mana.mana - before;
-        if (delta > 0) { try { world.emit && world.emit('mana_restored', { id, amount: delta }); } catch {} }
+        if (delta > 0) { emitSafe(world, 'mana_restored', { id, amount: delta }); }
     }
 }
 
@@ -169,27 +170,23 @@ function tickDrainLifeChannel(world, casterId, effect) {
         const anchorX = Number(channel.anchorX) | 0;
         const anchorY = Number(channel.anchorY) | 0;
         if ((casterPos.x | 0) !== anchorX || (casterPos.y | 0) !== anchorY) {
-            try {
-                world.emit?.('spell:drain_life:break', {
-                    actor: casterId,
-                    targetId,
-                    spellId: effect?.spellId,
-                    reason: 'caster_moved',
-                });
-            } catch {}
+            emitSafe(world, 'spell:drain_life:break', {
+                actor: casterId,
+                targetId,
+                spellId: effect?.spellId,
+                reason: 'caster_moved',
+            });
             return 'remove';
         }
     }
 
     if (channel.breakOnOutOfRange && chebyshev(casterPos, targetPos) > range) {
-        try {
-            world.emit?.('spell:drain_life:break', {
-                actor: casterId,
-                targetId,
-                spellId: effect?.spellId,
-                reason: 'out_of_range',
-            });
-        } catch {}
+        emitSafe(world, 'spell:drain_life:break', {
+            actor: casterId,
+            targetId,
+            spellId: effect?.spellId,
+            reason: 'out_of_range',
+        });
         return 'remove';
     }
 
@@ -201,14 +198,12 @@ function tickDrainLifeChannel(world, casterId, effect) {
         range,
         isBlocked,
     })) {
-        try {
-            world.emit?.('spell:drain_life:break', {
-                actor: casterId,
-                targetId,
-                spellId: effect?.spellId,
-                reason: 'blocked_los',
-            });
-        } catch {}
+        emitSafe(world, 'spell:drain_life:break', {
+            actor: casterId,
+            targetId,
+            spellId: effect?.spellId,
+            reason: 'blocked_los',
+        });
         return 'remove';
     }
 
@@ -242,28 +237,24 @@ function tickDrainLifeChannel(world, casterId, effect) {
         casterVit.hp = Math.min(maxHp, (casterVit.hp | 0) + healAmount);
         const appliedHeal = Math.max(0, (casterVit.hp | 0) - before);
 
-        try {
-            world.emit?.('spell:drain_life:tick', {
-                actor: casterId,
-                targetId,
-                spellId: effect?.spellId,
-                amount: drained,
-                heal: appliedHeal,
-                from: { x: casterPos.x | 0, y: casterPos.y | 0 },
-                to: { x: targetPos.x | 0, y: targetPos.y | 0 },
-            });
-        } catch {}
+        emitSafe(world, 'spell:drain_life:tick', {
+            actor: casterId,
+            targetId,
+            spellId: effect?.spellId,
+            amount: drained,
+            heal: appliedHeal,
+            from: { x: casterPos.x | 0, y: casterPos.y | 0 },
+            to: { x: targetPos.x | 0, y: targetPos.y | 0 },
+        });
     }
 
     if (!result?.applied) {
-        try {
-            world.emit?.('spell:drain_life:break', {
-                actor: casterId,
-                targetId,
-                spellId: effect?.spellId,
-                reason: String(result?.reason || 'no_damage'),
-            });
-        } catch {}
+        emitSafe(world, 'spell:drain_life:break', {
+            actor: casterId,
+            targetId,
+            spellId: effect?.spellId,
+            reason: String(result?.reason || 'no_damage'),
+        });
         return 'remove';
     }
 
@@ -281,20 +272,18 @@ function stopDrainLifeChannel(world, casterId, effect, reason = 'ended') {
     const ch = world.get(casterId, Channeling);
     if (String(ch?.spellId || '') !== String(effect?.spellId || 'drain_life')) return;
     try { world.remove(casterId, Channeling); } catch {}
-    try {
-        if (reason === 'duration_complete') {
-            world.emit?.('channeling:complete', {
-                actor: casterId,
-                spellId: String(effect?.spellId || 'drain_life'),
-            });
-        } else {
-            world.emit?.('channeling:cancelled', {
-                actor: casterId,
-                spellId: String(effect?.spellId || 'drain_life'),
-                reason,
-            });
-        }
-    } catch {}
+    if (reason === 'duration_complete') {
+        emitSafe(world, 'channeling:complete', {
+            actor: casterId,
+            spellId: String(effect?.spellId || 'drain_life'),
+        });
+    } else {
+        emitSafe(world, 'channeling:cancelled', {
+            actor: casterId,
+            spellId: String(effect?.spellId || 'drain_life'),
+            reason,
+        });
+    }
 }
 
 /**

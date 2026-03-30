@@ -10,6 +10,7 @@ import {
   inventoryContains,
   splitItemStack,
 } from "../utils/inventoryFacade.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 const GROUND_STACK_SEQ_KEY = Symbol.for('jshack:groundStack:seq');
 
@@ -57,7 +58,7 @@ export function itemDropSystem(world) {
       if (isEquipped) clearEquippedSlotIfNeeded(world, actor, itemId);
       const placed = placeOnGround(world, itemId, pos.x, pos.y, { mergeCompatibleAmmo: true });
       if (placed.itemId > 0) stampGroundTop(world, placed.itemId);
-      try { world.emit && world.emit('item:dropped', { actor, itemId: placed.itemId || itemId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
+      emitSafe(world, 'item:dropped', { actor, itemId: placed.itemId || itemId, count: dropCount, at:{ x: pos.x, y: pos.y } });
     } else {
       // split stack: keep the remainder in inventory, drop a cloned split-off item
       const newId = splitItemStack(world, itemId, dropCount);
@@ -67,7 +68,7 @@ export function itemDropSystem(world) {
       }
       const placed = placeOnGround(world, newId, pos.x, pos.y, { mergeCompatibleAmmo: true });
       if (placed.itemId > 0) stampGroundTop(world, placed.itemId);
-      try { world.emit && world.emit('item:dropped', { actor, itemId: placed.itemId || newId, count: dropCount, at:{ x: pos.x, y: pos.y } }); } catch (e) { console.debug('[itemDropSystem] emit item:dropped failed:', e); }
+      emitSafe(world, 'item:dropped', { actor, itemId: placed.itemId || newId, count: dropCount, at:{ x: pos.x, y: pos.y } });
     }
 
     world.remove(actor, DropIntent);

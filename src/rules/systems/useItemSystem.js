@@ -1,6 +1,7 @@
 import { UseIntent } from "../components/Intents/UseIntent.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { usePipeline } from "../interaction/verbs/usePipeline.js";
+import { emitSafe } from "../utils/emitSafe.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -46,18 +47,16 @@ export function useItemSystem(world) {
 
     if (result?.canceled && typeof result.reason === "string" && !result.reason.startsWith("USE_GATE_")) {
       const detail = result?.detail && typeof result.detail === "object" ? result.detail : {};
-      try {
-        world.emit?.("item:use-cancelled", {
-          actor,
-          itemId,
-          code: detail?.code || result.reason,
-          message: detail?.message,
-          consumesTurn: detail?.consumesTurn,
-        });
-      } catch (e) { console.debug('[useItemSystem] emit item:use-cancelled failed:', e); }
+      emitSafe(world, "item:use-cancelled", {
+        actor,
+        itemId,
+        code: detail?.code || result.reason,
+        message: detail?.message,
+        consumesTurn: detail?.consumesTurn,
+      });
     }
 
-    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[useItemSystem] emit interaction:result failed:', e); }
+    emitSafe(world, "interaction:result", result);
     try { world.remove(actor, UseIntent); } catch {} // ECS: may not exist
   }
 }

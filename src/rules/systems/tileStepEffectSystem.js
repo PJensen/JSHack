@@ -18,6 +18,7 @@ import { dealDamage } from "../utils/dealDamage.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { ensureActiveEffects } from "../utils/effects.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 const INSTALLED = Symbol.for("jshack:tileStepEffect:installed");
 const MAX_SLIDE = 50;
@@ -94,7 +95,7 @@ function _extinguish(world, id, effect) {
   const before = ae.effects.length;
   ae.effects = ae.effects.filter(e => e.key !== "burn");
   if (ae.effects.length < before) {
-    try { world.emit?.("tile:waded", { actor: id }); } catch {}
+    emitSafe(world, "tile:waded", { actor: id });
   }
 }
 
@@ -116,7 +117,7 @@ function _scorch(world, id, effect) {
     }
   }
 
-  try { world.emit?.("tile:scorched", { actor: id }); } catch {}
+  emitSafe(world, "tile:scorched", { actor: id });
 }
 
 /** Ice: instant chain slide in the movement direction. */
@@ -146,7 +147,7 @@ function _slide(world, id, from, to, effect) {
       world.set(id, Position, slideTo);
       // Emit "moved" for each step --- triggers scorch/extinguish if
       // the actor slides off ice onto lava/water, but not nested slides
-      try { world.emit?.("moved", { id, from: slideFrom, to: slideTo }); } catch {}
+      emitSafe(world, "moved", { id, from: slideFrom, to: slideTo });
       steps++;
       cx = nx;
       cy = ny;
@@ -160,13 +161,11 @@ function _slide(world, id, from, to, effect) {
   }
 
   if (steps > 0) {
-    try {
-      world.emit?.("tile:slid", {
-        actor: id,
-        from: { x: to.x, y: to.y },
-        to: { x: cx, y: cy },
-        steps,
-      });
-    } catch {}
+    emitSafe(world, "tile:slid", {
+      actor: id,
+      from: { x: to.x, y: to.y },
+      to: { x: cx, y: cy },
+      steps,
+    });
   }
 }

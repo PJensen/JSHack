@@ -32,6 +32,8 @@ import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { isFacingTurnCostEnabled, normalizeFacingVector } from "../utils/facing.js";
 import { markMovedThisTurn } from "../utils/posture.js";
+import { ALL_DIRS } from "../utils/directions.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
@@ -64,11 +66,7 @@ function isBlockedOnlyByWebs(world, tiles, x, y) {
   return foundBlocking;
 }
 
-const MISSTEP_DIRS = Object.freeze([
-  [-1, -1], [0, -1], [1, -1],
-  [-1, 0],            [1, 0],
-  [-1, 1],  [0, 1],   [1, 1],
-]);
+const MISSTEP_DIRS = ALL_DIRS;
 
 // ── Spider web departure listener ───────────────────────────────────
 
@@ -129,7 +127,7 @@ export function installMoveAutoPickupListener(world) {
         if (ignoreCapacity || hasCapacityForItem(world, actor, itemId)) {
           addToInventory(world, actor, itemId);
         }
-        try { world.emit?.("item:pickup", { actor, itemId, count }); } catch {}
+        emitSafe(world, "item:pickup", { actor, itemId, count });
       });
     } catch (e) {
       console.debug("[movementSystem] auto-pickup failed:", e);
@@ -168,19 +166,17 @@ export function movementSystem(world) {
       // Confusion: movement inputs become a deterministic random misstep.
       const confusePower = statusStrength(world, actor, "confused");
       if (confusePower > 0 && (intendedDx !== 0 || intendedDy !== 0)) {
-        const options = MISSTEP_DIRS.filter(([dx, dy]) => !(dx === intendedDx && dy === intendedDy));
+        const options = MISSTEP_DIRS.filter(d => !(d.dx === intendedDx && d.dy === intendedDy));
         if (options.length > 0) {
           const posSalt = (((pos.x | 0) & 0xffff) << 16) ^ ((pos.y | 0) & 0xffff);
           const r = mulberry32(combatSeed(world.seed, world.step, actor, posSalt, 0xC0F00D11));
           const idx = (r() * options.length) | 0;
-          [mdx, mdy] = options[idx];
-          try {
-            world.emit?.("status:confused-misstep", {
-              actor,
-              from: { dx: intendedDx, dy: intendedDy },
-              to: { dx: mdx, dy: mdy },
-            });
-          } catch (e) { console.debug("[movementSystem] emit status:confused-misstep failed:", e); }
+          ({ dx: mdx, dy: mdy } = options[idx]);
+          emitSafe(world, "status:confused-misstep", {
+            actor,
+            from: { dx: intendedDx, dy: intendedDy },
+            to: { dx: mdx, dy: mdy },
+          });
         }
       }
 

@@ -5,6 +5,7 @@ import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { Player } from "../components/Player.js";
 import { queryEnemyListeners } from "../utils/queries.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 // Maximum tile radius any hearing system can reach (caps computation cost).
 const MAX_HEAR_RADIUS = 30;
@@ -22,12 +23,6 @@ function detectRadius(sourceDb, hearingTier) {
   return Math.min(MAX_HEAR_RADIUS, Math.floor((sourceDb - threshold) / DB_PER_TILE));
 }
 
-/**
- * Chebyshev (grid) distance between two points.
- */
-function cheby(ax, ay, bx, by) {
-  return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
-}
 
 /**
  * soundPropagationSystem — checks SoundEmitter entities against nearby
@@ -83,7 +78,7 @@ export function soundPropagationSystem(world) {
       const radius = detectRadius(src.db, hearingTier);
       if (radius <= 0) continue;
 
-      const dist = cheby(lx, ly, src.x, src.y);
+      const dist = chebyshevScalar(lx, ly, src.x, src.y);
       if (dist > radius) continue;
 
       // Sound detected — escalate AggroState.

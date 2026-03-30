@@ -10,6 +10,7 @@ import {
     hasCapacityForItem,
     splitItemStack,
 } from "../utils/inventoryFacade.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 
 export function itemPickupSystem(world) {
@@ -27,7 +28,7 @@ export function itemPickupSystem(world) {
         const dy = Math.abs((itemPos.y|0) - (pos.y|0));
         const dist = dx + dy; // Manhattan distance on grid
         if (dist > maxRange) {
-            try { world.emit && world.emit('item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup-denied failed:', e); }
+            emitSafe(world, 'item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } });
             world.remove(actor, PickupIntent);
             continue;
         }
@@ -36,7 +37,7 @@ export function itemPickupSystem(world) {
 
         // capacity gate (counts unique identity stacks)
         if (!hasCapacityForItem(world, actor, itemId)) {
-            try { world.emit && world.emit('item:pickup-denied', { actor, itemId, reason: 'capacity' }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup-denied failed:', e); }
+            emitSafe(world, 'item:pickup-denied', { actor, itemId, reason: 'capacity' });
             world.remove(actor, PickupIntent);
             continue;
         }
@@ -50,11 +51,11 @@ export function itemPickupSystem(world) {
                 continue;
             }
             addToInventory(world, actor, copy);
-            try { world.emit && world.emit('item:pickup', { actor, itemId: copy, count: takeCount }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup failed:', e); }
+            emitSafe(world, 'item:pickup', { actor, itemId: copy, count: takeCount });
         } else {
             // whole stack — just attach to inventory (entity persists as-is)
             addToInventory(world, actor, itemId);
-            try { world.emit && world.emit('item:pickup', { actor, itemId, count: takeCount }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup failed:', e); }
+            emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount });
         }
 
         world.remove(actor, PickupIntent);
@@ -76,7 +77,7 @@ export function autoPickupPostMoveSystem(world) {
             if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
             addToInventory(world, id, itemId);
-            try { world.emit && world.emit('item:pickup', { actor: id, itemId, count: takeCount }); } catch (e) { console.debug('[itemPickupSystem] emit item:pickup failed:', e); }
+            emitSafe(world, 'item:pickup', { actor: id, itemId, count: takeCount });
         });
     }
 }

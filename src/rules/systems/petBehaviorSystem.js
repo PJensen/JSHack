@@ -40,6 +40,7 @@ import {
   GUARD_RADIUS,
   TELEPORT_DISTANCE,
 } from "./petConstants.js";
+import { chebyshevScalar, manhattanScalar } from "../utils/distance.js";
 
 const AGGRESSIVE_RADIUS = 8;
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
@@ -337,9 +338,7 @@ function tryFamiliarFireBolt(world, petId, petPos, petState) {
   for (const [eid, fac, epos, evit] of queryFactionActors(world)) {
     if (!evit || (evit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
-    const dx = (epos.x | 0) - (petPos.x | 0);
-    const dy = (epos.y | 0) - (petPos.y | 0);
-    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+    const dist = chebyshevScalar(epos.x, epos.y, petPos.x, petPos.y);
     if (dist < 1 || dist > FAMILIAR_FIRE_RANGE) continue;
     if (dist < bestDist && visible.has(`${epos.x | 0},${epos.y | 0}`)) {
       bestId = eid;
@@ -454,9 +453,7 @@ function checkAutoTransitions(world, petId, petState, petPos, playerPos) {
     petState.state !== "guarding";
 
   if (shouldTeleport) {
-    const dx = playerPos.x - petPos.x;
-    const dy = playerPos.y - petPos.y;
-    const dist = Math.abs(dx) + Math.abs(dy);
+    const dist = manhattanScalar(petPos.x, petPos.y, playerPos.x, playerPos.y);
     if (dist > TELEPORT_DISTANCE) {
       const teleportTile = findNearestValidTileAround(world, playerPos, {
         maxDistance: 1,
@@ -535,16 +532,14 @@ function findSafeCorpseForFleeing(world, petId, petPos, playerPos) {
     if (!info || String(info.type || "").toLowerCase() !== "food") continue;
     if (!isCorpseItemOnFloor(world, itemId)) continue;
 
-    const distFromPet = Math.abs((itemPos.x | 0) - (petPos.x | 0)) +
-      Math.abs((itemPos.y | 0) - (petPos.y | 0));
+    const distFromPet = manhattanScalar(itemPos.x, itemPos.y, petPos.x, petPos.y);
     if (distFromPet > FLEE_CORPSE_SEARCH_RADIUS) continue;
 
     if (
       countHostilesNearTile(world, itemPos.x | 0, itemPos.y | 0, petFaction) > 0
     ) continue;
 
-    const distFromPlayer = Math.abs((itemPos.x | 0) - (playerPos.x | 0)) +
-      Math.abs((itemPos.y | 0) - (playerPos.y | 0));
+    const distFromPlayer = manhattanScalar(itemPos.x, itemPos.y, playerPos.x, playerPos.y);
     const score = distFromPet + distFromPlayer;
     if (score < bestScore) {
       bestScore = score;
@@ -561,7 +556,7 @@ function countHostilesNearTile(world, x, y, petFaction) {
     if (!vit || (vit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
 
-    const dist = Math.max(Math.abs((pos.x | 0) - x), Math.abs((pos.y | 0) - y));
+    const dist = chebyshevScalar(pos.x, pos.y, x, y);
     if (dist <= FLEE_CORPSE_THREAT_RADIUS) threats += 1;
     if (threats > 0) return threats;
   }
@@ -572,9 +567,7 @@ function countHostilesNearTile(world, x, y, petFaction) {
  * Following behavior: standard pet follow logic
  */
 function behaviorFollowing(world, petId, petPos, playerPos, playerId) {
-  const dx = playerPos.x - petPos.x;
-  const dy = playerPos.y - petPos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(petPos.x, petPos.y, playerPos.x, playerPos.y);
 
   // When adjacent, drop carried items at player's feet
   if (dist <= 1) {
@@ -608,9 +601,7 @@ function behaviorFetching(world, petId, petState, petPos, playerPos) {
     return;
   }
 
-  const dx = petState.targetX - petPos.x;
-  const dy = petState.targetY - petPos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(petPos.x, petPos.y, petState.targetX, petState.targetY);
 
   // At target - try to pick up
   if (dist === 0) {
@@ -642,9 +633,7 @@ function behaviorReturning(
   playerPos,
   playerId,
 ) {
-  const dx = playerPos.x - petPos.x;
-  const dy = playerPos.y - petPos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(petPos.x, petPos.y, playerPos.x, playerPos.y);
 
   // Adjacent to player - deliver items
   if (dist <= 1) {
@@ -681,9 +670,7 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
     return;
   }
 
-  const dx = petState.targetX - petPos.x;
-  const dy = petState.targetY - petPos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(petPos.x, petPos.y, petState.targetX, petState.targetY);
 
   // Too far from guard position - return
   if (dist > 1) {
@@ -699,9 +686,7 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
   for (const [enemyId, fac, enemyPos] of world.query(Faction, Position)) {
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
 
-    const edx = enemyPos.x - petPos.x;
-    const edy = enemyPos.y - petPos.y;
-    const edist = Math.abs(edx) + Math.abs(edy);
+    const edist = manhattanScalar(petPos.x, petPos.y, enemyPos.x, enemyPos.y);
 
     if (edist <= GUARD_RADIUS && edist < closestDist) {
       closestEnemy = enemyId;
@@ -733,9 +718,7 @@ function behaviorAggressive(world, petId, petPos, playerPos, playerId) {
     if (!evit || (evit.hp | 0) <= 0) continue;
     if (!areFactionsHostile(petFaction, fac?.key)) continue;
 
-    const edx = (enemyPos.x | 0) - (petPos.x | 0);
-    const edy = (enemyPos.y | 0) - (petPos.y | 0);
-    const edist = Math.abs(edx) + Math.abs(edy);
+    const edist = manhattanScalar(enemyPos.x, enemyPos.y, petPos.x, petPos.y);
 
     if (edist < closestDist) {
       closestEnemy = enemyId;
@@ -780,9 +763,7 @@ function behaviorFleeing(world, petId, petPos, playerPos) {
     return;
   }
 
-  const dx = playerPos.x - petPos.x;
-  const dy = playerPos.y - petPos.y;
-  const dist = Math.abs(dx) + Math.abs(dy);
+  const dist = manhattanScalar(petPos.x, petPos.y, playerPos.x, playerPos.y);
 
   // Already adjacent - stop fleeing
   if (dist <= 1) return;

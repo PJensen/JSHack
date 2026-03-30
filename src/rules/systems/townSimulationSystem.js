@@ -14,6 +14,7 @@ import {
 } from "../utils/townEconomy.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 import { clamp } from "../../shared/math/math.js";
+import { chebyshevScalar } from "../utils/distance.js";
 
 const PULSE_BASE = 12;
 const LOW_FOOD_THRESHOLD = 4;
@@ -55,7 +56,7 @@ function hostileThreatNearTown(world, anchor) {
   for (const [, pos, fac] of world.query(Position, Faction)) {
     const key = String(fac.key || "");
     if (!key || key === "townfolk" || key === "shopkeeper" || key === "neutral" || key === "player") continue;
-    const dist = Math.max(Math.abs(pos.x - anchor.x), Math.abs(pos.y - anchor.y));
+    const dist = chebyshevScalar(pos.x, pos.y, anchor.x, anchor.y);
     if (dist <= 18) threat++;
   }
   return threat;

@@ -14,6 +14,7 @@ import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { Trap } from "../components/Trap.js";
+import { emitSafe } from "../utils/emitSafe.js";
 
 /**
  * Trap search resolver — reveals hidden/armed traps within the search radius.
@@ -44,7 +45,7 @@ function trapResolver(world, actorId, pos, radius) {
     const name = trapNames[trap.type] || 'trap';
     messages.push(`*** a hidden ${name} is revealed! ***`);
 
-    try { world.emit?.('search:revealed', { actorId, entityId: tid, kind: 'trap', at: { x: trapPos.x, y: trapPos.y } }); } catch {}
+    emitSafe(world, 'search:revealed', { actorId, entityId: tid, kind: 'trap', at: { x: trapPos.x, y: trapPos.y } });
   }
 
   return { found, messages };
@@ -86,12 +87,10 @@ export function searchSystem(world) {
     const radius = brain ? (brain.visionRange | 0) : 6;
 
     // Emit the radial pulse VFX event (display layer listens)
-    try {
-      world.emit?.('search:pulse', { actorId, at: { x: pos.x, y: pos.y }, radius });
-    } catch {}
+    emitSafe(world, 'search:pulse', { actorId, at: { x: pos.x, y: pos.y }, radius });
 
     // Announce the search
-    try { world.emit?.('message', { text: '*** you search the area ***', type: 'system' }); } catch {}
+    emitSafe(world, 'message', { text: '*** you search the area ***', type: 'system' });
 
     // Run each resolver and collect results
     let anyFound = false;
@@ -108,12 +107,12 @@ export function searchSystem(world) {
 
     // Emit reveal messages
     for (const msg of revealMessages) {
-      try { world.emit?.('message', { text: msg, type: 'system' }); } catch {}
+      emitSafe(world, 'message', { text: msg, type: 'system' });
     }
 
     // If nothing was found, say so
     if (!anyFound) {
-      try { world.emit?.('message', { text: '*** you find nothing ***', type: 'system' }); } catch {}
+      emitSafe(world, 'message', { text: '*** you find nothing ***', type: 'system' });
     }
   }
 }

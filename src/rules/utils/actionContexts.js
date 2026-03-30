@@ -10,6 +10,7 @@ import { createEntityProxy } from "../interaction/entityProxy.js";
 import { ActionTransaction } from "../interaction/mutations.js";
 import { runSpellScript } from "../scripts/spells.js";
 import { inventoryContains } from "./inventoryFacade.js";
+import { emitSafe } from "./emitSafe.js";
 
 /**
  * Base helpers shared by first-class action contexts.
@@ -122,7 +123,7 @@ export class RuleActionContext {
    * @param {Record<string, any>} payload
    */
   emit(eventName, payload) {
-    try { this.world.emit && this.world.emit(eventName, payload); } catch (e) { console.debug('[actionContexts] emit ' + eventName + ' failed:', e); }
+    emitSafe(this.world, eventName, payload);
   }
 
   /**

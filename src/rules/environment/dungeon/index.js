@@ -41,6 +41,7 @@ import { clearExplored } from './exploredMap.js';
 import { clearPerceptionMemory } from './perceptionMemory.js';
 import { ensureCalendarState } from '../../utils/calendarState.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
+import { manhattanScalar } from '../../utils/distance.js';
 import { generateOverworldChunks } from './overworld.js';
 import { WeatherState } from '../../components/WeatherState.js';
 import { getCachedHighscores } from '../../../shared/tombstoneApi.js';
@@ -243,7 +244,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
               for (const r of chunkData.rooms) {
                 const rcx = r.x - cx * CHUNK_SIZE + Math.floor(r.w / 2);
                 const rcy = r.y - cy * CHUNK_SIZE + Math.floor(r.h / 2);
-                const d = Math.abs(rcx - lx) + Math.abs(rcy - ly);
+                const d = manhattanScalar(rcx, rcy, lx, ly);
                 if (d < nearDist) { nearDist = d; nearRoom = r; }
               }
               const rcx = nearRoom.x - cx * CHUNK_SIZE + Math.floor(nearRoom.w / 2);

@@ -200,13 +200,6 @@ export function collectLightSources(view, opts = {}) {
         continue; // torch dominates — skip weaker tags
       }
 
-      // Burning entities — flickering fire
-      if (tags.includes('burning')) {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 4 * f, color: FIRE_RED, flicker: f });
-        continue;
-      }
-
       // Tag-driven emissive lights (frost deliberately excluded — cold ≠ light)
       if (tags.includes('invulnerable')) {
         out.push({ x: ex, y: ey, radius: 5, color: HOLY_GOLD });
@@ -245,15 +238,6 @@ export function collectLightSources(view, opts = {}) {
         const col = paletteGlow(kind) || [200, 150, 255];
         out.push({ x: ex, y: ey, radius: 1.8, color: col });
       }
-      // Flaming weapon glow — subtle flickering fire around wielder
-      if (tags.includes('fire_weapon_glow')) {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 3.5 * f, color: FIRE_RED, flicker: f });
-      }
-      // Pet/familiar ready-to-fire glow — soft warm pulse
-      if (tags.includes('pet_ready_glow')) {
-        out.push({ x: ex, y: ey, radius: 2.5, color: [255, 160, 80] });
-      }
     }
   }
 
@@ -268,7 +252,7 @@ export function collectLightSources(view, opts = {}) {
  */
 export function collectFxLights(out, fxSources) {
   // Query each FX controller for active light sources
-  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx];
+  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx, fxSources.surfaceAreaFx, fxSources.statusEmitterFx];
   for (let c = 0; c < controllers.length; c++) {
     const fx = controllers[c];
     if (fx && typeof fx.getActiveLights === 'function') {

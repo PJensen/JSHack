@@ -11,6 +11,7 @@ import {
   transferItem,
 } from "./inventoryFacade.js";
 import { createItemById } from "./itemFactory.js";
+import { manhattanScalar } from "./distance.js";
 
 export const TOWN_STORAGE = Object.freeze({
   mill: "Mill Chest",
@@ -48,7 +49,7 @@ export function findTownContainers(world) {
         bestId = chestId;
         break;
       }
-      const dist = Math.abs(pos.x - anchorPos.x) + Math.abs(pos.y - anchorPos.y);
+      const dist = manhattanScalar(pos.x, pos.y, anchorPos.x, anchorPos.y);
       if (dist < bestDist) {
         bestDist = dist;
         bestId = chestId;

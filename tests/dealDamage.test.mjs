@@ -182,7 +182,17 @@ Deno.test("dealDamage: emits 'damaged' with correct payload", () => {
   const source = world.create();
   const events = [];
   world.on('damaged', (e) => events.push(e));
-  dealDamage(world, { target: id, amount: 7, source, type: 'fire', cause: 'spell:meteor', critical: true });
+  dealDamage(world, {
+    target: id,
+    amount: 7,
+    source,
+    type: 'fire',
+    cause: 'spell:meteor',
+    critical: true,
+    projectileKind: 'arrow',
+    impactVector: { dx: 1, dy: 0 },
+    impactProfile: { weaponClass: 'sword', attackKind: 'slash', signature: { blunt: 0.1, pierce: 0.2, slash: 0.7 } },
+  });
   assertEquals(events.length, 1);
   assertEquals(events[0].target, id);
   assertEquals(events[0].amount, 7);
@@ -190,6 +200,12 @@ Deno.test("dealDamage: emits 'damaged' with correct payload", () => {
   assertEquals(events[0].source, source);
   assertEquals(events[0].cause, 'spell:meteor');
   assertEquals(events[0].critical, true);
+  assertEquals(events[0].projectileKind, 'arrow');
+  assertEquals(events[0].impactVector?.dx, 1);
+  assertEquals(events[0].impactVector?.dy, 0);
+  assertEquals(events[0].impactProfile?.weaponClass, 'sword');
+  assertEquals(events[0].impactProfile?.attackKind, 'slash');
+  assertEquals(events[0].impactProfile?.signature?.slash, 0.7);
 });
 
 Deno.test("dealDamage: noTrigger flag forwarded in damaged event", () => {

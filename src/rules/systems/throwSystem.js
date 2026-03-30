@@ -4,6 +4,8 @@ import { Position } from "../components/Position.js";
 import { ThrowIntent } from "../components/Intents/ThrowIntent.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { throwPipeline } from "../interaction/verbs/throwPipeline.js";
+import { emitSafe } from "../utils/emitSafe.js";
+import { chebyshevScalar } from "../utils/distance.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -118,9 +120,7 @@ function resolveThrowSpec(world, actor, itemId, intent) {
   };
 
   if (targetPoint) {
-    const rawDx = (targetPoint.x | 0) - (from.x | 0);
-    const rawDy = (targetPoint.y | 0) - (from.y | 0);
-    const dist = Math.max(Math.abs(rawDx), Math.abs(rawDy));
+    const dist = chebyshevScalar(from.x | 0, from.y | 0, targetPoint.x | 0, targetPoint.y | 0);
     if (dist > 0) {
       const cappedRange = Math.min(maxRange, dist);
       const projected = projectTowardTarget(
@@ -134,7 +134,7 @@ function resolveThrowSpec(world, actor, itemId, intent) {
       const stepY = (projected.y | 0) - (from.y | 0);
       dx = Math.sign(stepX);
       dy = Math.sign(stepY);
-      range = Math.max(1, Math.max(Math.abs(stepX), Math.abs(stepY)));
+      range = Math.max(1, chebyshevScalar(0, 0, stepX, stepY));
       to = { x: projected.x | 0, y: projected.y | 0 };
     }
   }
@@ -192,19 +192,17 @@ export function throwSystem(world) {
 
     if (result?.canceled && typeof result.reason === "string" && !result.reason.startsWith("THROW_GATE_")) {
       const detail = result?.detail && typeof result.detail === "object" ? result.detail : {};
-      try {
-        world.emit?.("item:throw-cancelled", {
-          actor,
-          itemId,
-          targetId,
-          code: detail?.code || result.reason,
-          message: detail?.message,
-          consumesTurn: detail?.consumesTurn,
-        });
-      } catch (e) { console.debug('[throwSystem] emit item:throw-cancelled failed:', e); }
+      emitSafe(world, "item:throw-cancelled", {
+        actor,
+        itemId,
+        targetId,
+        code: detail?.code || result.reason,
+        message: detail?.message,
+        consumesTurn: detail?.consumesTurn,
+      });
     }
 
-    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[throwSystem] emit interaction:result failed:', e); }
+    emitSafe(world, "interaction:result", result);
     try { world.remove(actor, ThrowIntent); } catch {} // ECS: may not exist
   }
 }

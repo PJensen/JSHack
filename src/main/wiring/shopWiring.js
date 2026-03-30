@@ -13,6 +13,7 @@ import {
 } from "../../rules/utils/inventoryFacade.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
+import { chebyshevScalar } from "../../rules/utils/distance.js";
 import { identify, isIdentified } from "../../rules/data/identification.js";
 import { requiresIdentification, getUnidentifiedName } from "../../rules/data/itemAppearances.js";
 import { groupDisplayItems } from "../ui/itemGrouping.js";
@@ -178,7 +179,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const pPos = world.get(pe.id, Position);
     const tPos = world.get(entityId, Position);
     if (!pPos || !tPos) return false;
-    const dist = Math.max(Math.abs(pPos.x - tPos.x), Math.abs(pPos.y - tPos.y));
+    const dist = chebyshevScalar(pPos.x, pPos.y, tPos.x, tPos.y);
     return dist <= 1;
   }
 

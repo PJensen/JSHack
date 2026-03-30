@@ -1,6 +1,7 @@
 import { ApplyIntent } from "../components/Intents/ApplyIntent.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { applyPipeline } from "../interaction/verbs/applyPipeline.js";
+import { emitSafe } from "../utils/emitSafe.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -44,19 +45,17 @@ export function applySystem(world) {
 
     if (result?.canceled && typeof result.reason === "string" && !result.reason.startsWith("APPLY_GATE_")) {
       const detail = result?.detail && typeof result.detail === "object" ? result.detail : {};
-      try {
-        world.emit?.("item:apply-cancelled", {
-          actor,
-          toolId,
-          targetId,
-          code: detail?.code || result.reason,
-          message: detail?.message,
-          consumesTurn: detail?.consumesTurn,
-        });
-      } catch (e) { console.debug('[applySystem] emit item:apply-cancelled failed:', e); }
+      emitSafe(world, "item:apply-cancelled", {
+        actor,
+        toolId,
+        targetId,
+        code: detail?.code || result.reason,
+        message: detail?.message,
+        consumesTurn: detail?.consumesTurn,
+      });
     }
 
-    try { world.emit?.("interaction:result", result); } catch (e) { console.debug('[applySystem] emit interaction:result failed:', e); }
+    emitSafe(world, "interaction:result", result);
     try { world.remove(actor, ApplyIntent); } catch {} // ECS: may not exist
   }
 }

@@ -8,6 +8,7 @@ import { Position } from '../components/Position.js';
 import { playerEntity } from '../utils/queries.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Vitality } from '../components/Vitality.js';
+import { emitSafe } from '../utils/emitSafe.js';
 
 const COMMAND_COOLDOWN = 0; // turns between commands (0 = instant)
 
@@ -52,9 +53,7 @@ export function petCommandSystem(world) {
 
     // Check cooldown
     if (petState.commandCooldown > 0) {
-      try {
-        world.emit?.('pet:command:cooldown', { petId, cooldown: petState.commandCooldown });
-      } catch (e) { console.debug('[petCommandSystem] emit pet:command:cooldown failed:', e); }
+      emitSafe(world, 'pet:command:cooldown', { petId, cooldown: petState.commandCooldown });
       world.remove(intentId, PetCommandIntent);
       continue;
     }
@@ -106,10 +105,10 @@ export function petCommandSystem(world) {
             petState.targetItemId = itemId;
           } else {
             // Invalid fetch target
-            try { world.emit?.('pet:command:invalid', { petId, reason: 'item_not_on_ground' }); } catch (e) { console.debug('[petCommandSystem] emit pet:command:invalid failed:', e); }
+            emitSafe(world, 'pet:command:invalid', { petId, reason: 'item_not_on_ground' });
           }
         } else {
-          try { world.emit?.('pet:command:invalid', { petId, reason: 'item_not_found' }); } catch (e) { console.debug('[petCommandSystem] emit pet:command:invalid failed:', e); }
+          emitSafe(world, 'pet:command:invalid', { petId, reason: 'item_not_found' });
         }
         break;
 
@@ -132,14 +131,12 @@ export function petCommandSystem(world) {
     if (prevState !== petState.state) {
       petState.stateEnteredTurn = world.step;
       petState.commandCooldown = COMMAND_COOLDOWN;
-      try {
-        world.emit?.('pet:state:changed', {
-          petId,
-          prevState,
-          newState: petState.state,
-          command: intent.command
-        });
-      } catch (e) { console.debug('[petCommandSystem] emit pet:state:changed failed:', e); }
+      emitSafe(world, 'pet:state:changed', {
+        petId,
+        prevState,
+        newState: petState.state,
+        command: intent.command
+      });
     }
 
     // Remove intent
