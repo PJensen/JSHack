@@ -196,7 +196,7 @@ export function collectLightSources(view, opts = {}) {
       // Torch-bearing NPCs/monsters
       if (tags.includes('torch')) {
         const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 5 * f, color: WARM_ORANGE, flicker: f });
+        out.push({ x: ex, y: ey, radius: 3 * f, color: WARM_ORANGE, flicker: f });
         continue; // torch dominates — skip weaker tags
       }
 
@@ -229,9 +229,9 @@ export function collectLightSources(view, opts = {}) {
         const col = paletteGlow(kind) || paletteGlow('potion') || [120, 220, 200];
         out.push({ x: ex, y: ey, radius: 1.5, color: col });
       }
-      // Gold glow — compact golden gleam
+      // Gold glow — very compact golden gleam
       if (tags.includes('gold_glow')) {
-        out.push({ x: ex, y: ey, radius: 1.2, color: [255, 210, 80] });
+        out.push({ x: ex, y: ey, radius: 0.75, color: [255, 210, 80] });
       }
       // Gem glow — color driven by palette entry for specific gem kind
       if (tags.includes('gem_glowing')) {
