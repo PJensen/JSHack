@@ -221,6 +221,21 @@ Deno.test("populateChunk generates spawns in rooms", () => {
   }
 });
 
+Deno.test("populateChunk keeps wall torches sparse across rooms", () => {
+  const chunk = generateChunk(1337, 1, 0, 0);
+  const rng = createRng(2337);
+  const floorPlan = { depth: 1, difficultyMult: 1.0 };
+  const spawns = populateChunk(chunk, floorPlan, rng);
+
+  const roomCount = chunk.rooms.length;
+  const torchCount = spawns.filter((s) => s.kind === "torch").length;
+  const cap = Math.ceil(roomCount * 0.5);
+  assert(
+    torchCount <= cap,
+    `expected sparse torches (<= ${cap} for ${roomCount} rooms), got ${torchCount}`,
+  );
+});
+
 Deno.test("populateChunk scales monster count with depth", () => {
   const chunk = generateChunk(42, 1, 0, 0);
   // Use independent seeds so conditional rng branches in one run don't corrupt the other.
