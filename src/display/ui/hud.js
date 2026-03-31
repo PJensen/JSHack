@@ -1584,7 +1584,7 @@ function createQuickSlot(opts = {}) {
 
   /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, interacted?:boolean, addedAt:number}>} */
   const stack = [];
-  const AUTO_DISMISS_MS = 3000;
+  const AUTO_DISMISS_MS = 4000;
 
   function normalizeQuickItem(item) {
     const id = Number(item?.id || 0) | 0;
