@@ -568,6 +568,28 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "drop:loot_goblin": {
+    rolls: { min: 3, max: 5 },
+    entries: [
+      { type: "gold",      weight: 60, count: { base: 18, perDepth: 6 } },
+      { type: "table",     weight: 20, tableId: "sub:equip_rare" },
+      { type: "table",     weight: 12, tableId: "sub:equip_epic" },
+      { type: "table",     weight: 7,  tableId: "sub:equip_legendary" },
+      { type: "table",     weight: 10, tableId: "sub:scrolls" },
+      { type: "table",     weight: 8,  tableId: "sub:spellbooks" },
+    ],
+  },
+
+  "hit:loot_goblin": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "gold",      weight: 78, count: { base: 6, perDepth: 2 } },
+      { type: "table",     weight: 14, tableId: "sub:equip_rare" },
+      { type: "table",     weight: 6,  tableId: "sub:equip_epic" },
+      { type: "table",     weight: 2,  tableId: "sub:equip_legendary" },
+    ],
+  },
+
   "drop:dragon_whelp": {
     rolls: { min: 1, max: 2 },
     entries: [

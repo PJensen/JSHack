@@ -68,6 +68,19 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     dispatchChestData(chestId);
   });
 
+  world.on("chest:burst", ({ targetId, drops }) => {
+    const chestId = Number(targetId || 0) | 0;
+    if (!(chestId > 0)) return;
+    const ni = world.get(chestId, NamedIdentity);
+    const name = (ni && ni.name) || "Chest";
+    const count = Array.isArray(drops) ? drops.length : 0;
+    if (count > 0) log(`The ${name.toLowerCase()} bursts open.`);
+    refreshInventoryUi();
+    try {
+      window.dispatchEvent(new CustomEvent("ui:chestBurst", { detail: { chestId, count } }));
+    } catch (e) { console.debug('[chestWiring] dispatch ui:chestBurst:', e); }
+  });
+
   addEventListener("ui:requestChestTake", (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;

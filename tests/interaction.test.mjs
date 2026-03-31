@@ -23,6 +23,12 @@ import { Devotion } from "../src/rules/components/Devotion.js";
 import { Owner } from "../src/rules/components/Owner.js";
 import { Pet } from "../src/rules/components/Pet.js";
 import { createFrom } from "../src/lib/ecs-js/archetype.js";
+import { clearAll, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
+import {
+  CHUNK_SIZE,
+  TILE_FLOOR,
+  TILE_WALL,
+} from "../src/rules/environment/dungeon/constants.js";
 import {
   EmberRoot,
   Moonleaf,
@@ -101,13 +107,14 @@ Deno.test("locked door stays closed and emits locked event", () => {
   );
 });
 
-Deno.test("open chest emits chest:open event", () => {
+Deno.test("open chest spills items and emits chest:burst event", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
   const chest = world.create();
   world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
+  world.add(chest, Position, { x: 10, y: 7 });
   const ci1 = world.create();
   world.add(ci1, ItemInfo, { type: "equip", count: 1 });
   const ci2 = world.create();
@@ -117,12 +124,21 @@ Deno.test("open chest emits chest:open event", () => {
 
   world.add(actor, InteractIntent, { targetId: chest });
   const chestEvents = [];
-  world.on("chest:open", (e) => chestEvents.push(e));
+  world.on("chest:burst", (e) => chestEvents.push(e));
   interactionSystem(world);
 
   assert(chestEvents.length === 1, "should emit chest:open event");
   assert(chestEvents[0].targetId === chest, "event should reference the chest");
-  assert(chestEvents[0].chestItems.length === 2, "should include chest items");
+  assert(chestEvents[0].drops.length === 2, "should include spilled drops");
+  assertEquals(inventoryItems(world, chest).length, 0, "chest should be emptied");
+  for (const drop of chestEvents[0].drops) {
+    const pos = world.get(drop.itemId, Position);
+    assert(pos, "drop should have a ground position");
+    assert(
+      Math.abs((pos.x | 0) - 10) <= 2 && Math.abs((pos.y | 0) - 7) <= 2,
+      "drop should land near chest origin",
+    );
+  }
 });
 
 Deno.test("chest remains interactable after opening", () => {
@@ -132,8 +148,13 @@ Deno.test("chest remains interactable after opening", () => {
   const chest = world.create();
   world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
+  world.add(chest, Position, { x: 4, y: 9 });
 
   // Open chest twice
+  let emptyCount = 0;
+  world.on("chest:empty", () => {
+    emptyCount += 1;
+  });
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);
   world.add(actor, InteractIntent, { targetId: chest });
@@ -143,15 +164,17 @@ Deno.test("chest remains interactable after opening", () => {
     world.has(chest, Interactable),
     "chest should still be interactable after multiple opens",
   );
+  assertEquals(emptyCount, 2, "empty chest should report empty on interaction");
 });
 
-Deno.test("chest:open event includes copy of items", () => {
+Deno.test("chest:burst event includes dropped ids and chest inventory empties", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
   const chest = world.create();
   world.add(chest, Interactable, { action: "openChest", params: {} });
   world.add(chest, Inventory, { capacity: 20 });
+  world.add(chest, Position, { x: 3, y: 3 });
   const ci1 = world.create();
   world.add(ci1, ItemInfo, { type: "equip", count: 1 });
   const ci2 = world.create();
@@ -163,20 +186,58 @@ Deno.test("chest:open event includes copy of items", () => {
   addToInventory(world, chest, ci3);
 
   const events = [];
-  world.on("chest:open", (e) => events.push(e));
+  world.on("chest:burst", (e) => events.push(e));
 
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);
 
   assert(events.length === 1);
-  assert(Array.isArray(events[0].chestItems));
-  assert(events[0].chestItems.length === 3);
-  // Ensure it's a copy, not a reference
-  events[0].chestItems.push(999);
-  assert(
-    inventoryItems(world, chest).length === 3,
-    "original inventory should be unchanged",
-  );
+  assert(Array.isArray(events[0].drops));
+  assertEquals(events[0].drops.length, 3);
+  assertEquals(inventoryItems(world, chest).length, 0);
+  for (const d of events[0].drops) {
+    assert(world.isAlive(d.itemId), "dropped item should remain alive");
+    assert(world.get(d.itemId, Position), "dropped item should be on the ground");
+  }
+});
+
+Deno.test("chest burst avoids wall tiles when reachable floor alternatives exist", () => {
+  clearAll();
+  try {
+    const world = new World({ seed: 11 });
+    const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+    loadChunk(0, 0, tiles);
+
+    const actor = world.create();
+    const chest = world.create();
+    world.add(chest, Interactable, { action: "openChest", params: {} });
+    world.add(chest, Inventory, { capacity: 20 });
+    world.add(chest, Position, { x: 5, y: 5 });
+
+    // Block one nearby landing tile with a wall.
+    setTile(6, 5, TILE_WALL);
+
+    const ci1 = world.create();
+    const ci2 = world.create();
+    world.add(ci1, ItemInfo, { type: "equip", count: 1 });
+    world.add(ci2, ItemInfo, { type: "equip", count: 1 });
+    addToInventory(world, chest, ci1);
+    addToInventory(world, chest, ci2);
+
+    const events = [];
+    world.on("chest:burst", (e) => events.push(e));
+    world.add(actor, InteractIntent, { targetId: chest });
+    interactionSystem(world);
+
+    assertEquals(events.length, 1);
+    for (const d of events[0].drops) {
+      const p = world.get(d.itemId, Position);
+      assert(p, "drop should be on ground");
+      assertEquals(!(p.x === 6 && p.y === 5), true);
+    }
+  } finally {
+    clearAll();
+  }
 });
 
 Deno.test("read text emits event with textId", () => {
@@ -216,7 +277,7 @@ Deno.test("interactionSystem ignores off-floor targets", () => {
   });
 
   const chestEvents = [];
-  world.on("chest:open", (e) => chestEvents.push(e));
+  world.on("chest:burst", (e) => chestEvents.push(e));
 
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);

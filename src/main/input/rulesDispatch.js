@@ -2,7 +2,7 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, DisarmIntent, SetPostureIntent, Position, ItemInfo } from "../../rules/components/index.js";
+import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, DisarmIntent, SetPostureIntent, Position, ItemInfo, Settings } from "../../rules/components/index.js";
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
@@ -10,6 +10,7 @@ import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js
 import { SearchIntent } from "../../rules/components/Intents/SearchIntent.js";
 import { Interactable } from "../../rules/components/Interactable.js";
 import { itemsAt } from "../../rules/utils/queries.js";
+import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { statusStrength } from "../../rules/utils/statusFacade.js";
 
 /**
@@ -271,6 +272,62 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         }
         if (!(doorTargetId > 0)) break;
         world?.add?.(actorId, InteractIntent, { targetId: doorTargetId });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.worldTap": {
+        const { x = null, y = null } = action.payload || {};
+        if (!Number.isFinite(x) || !Number.isFinite(y)) break;
+        const tx = Math.floor(Number(x));
+        const ty = Math.floor(Number(y));
+        const actorPos = world?.get?.(actorId, Position);
+        if (!actorPos) break;
+        const px = actorPos.x | 0;
+        const py = actorPos.y | 0;
+
+        let interactTargetId = 0;
+        let interactDist = Infinity;
+        let interactAction = "";
+        for (const [id, pos, inter] of world.query(Position, Interactable)) {
+          if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+          const dist = Math.abs((pos.x | 0) - px) + Math.abs((pos.y | 0) - py);
+          if (dist < interactDist) {
+            interactDist = dist;
+            interactTargetId = Number(id || 0) | 0;
+            interactAction = String(inter?.action || "");
+          }
+        }
+        const canReachInteract = interactTargetId > 0 && interactDist <= 1;
+        if (canReachInteract && interactAction === "openChest" && inventoryItems(world, interactTargetId).length > 0) {
+          world?.add?.(actorId, InteractIntent, { targetId: interactTargetId });
+          world?.tick?.(1);
+          break;
+        }
+
+        const tappedItems = itemsAt(world, tx, ty);
+        if (Array.isArray(tappedItems) && tappedItems.length > 0) {
+          const set = world?.get?.(actorId, Settings);
+          const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
+          const dist = Math.abs(tx - px) + Math.abs(ty - py);
+          if (dist <= pickupRange) {
+            world?.add?.(actorId, PickupIntent, { targetId: tappedItems[0] });
+            world?.tick?.(1);
+            break;
+          }
+        }
+        if (canReachInteract) {
+          world?.add?.(actorId, InteractIntent, { targetId: interactTargetId });
+          world?.tick?.(1);
+          break;
+        }
+
+        const dxRaw = tx - px;
+        const dyRaw = ty - py;
+        if (dxRaw === 0 && dyRaw === 0) break;
+        const move = (Math.abs(dxRaw) >= Math.abs(dyRaw))
+          ? { dx: Math.sign(dxRaw), dy: 0 }
+          : { dx: 0, dy: Math.sign(dyRaw) };
+        world?.add?.(actorId, MoveIntent, move);
         world?.tick?.(1);
         break;
       }
