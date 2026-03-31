@@ -294,6 +294,16 @@ function normalizePositiveCount(value) {
   return Math.max(1, Number(value || 1) | 0);
 }
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function bracketizeLabel(text) {
+  const s = String(text || "");
+  if (s.startsWith("[") && s.endsWith("]")) return s;
+  return `[${s}]`;
+}
+
 export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
@@ -1574,7 +1584,7 @@ function createQuickSlot(opts = {}) {
 
   /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, addedAt:number}>} */
   const stack = [];
-  const AUTO_DISMISS_MS = 12000;
+  const AUTO_DISMISS_MS = 3000;
 
   function normalizeQuickItem(item) {
     const id = Number(item?.id || 0) | 0;
@@ -1600,9 +1610,19 @@ function createQuickSlot(opts = {}) {
   }
 
   let dismissTimer = 0;
+  let fadeTimer = 0;
   function resetDismissTimer() {
     if (dismissTimer) clearTimeout(dismissTimer);
+    if (fadeTimer) clearTimeout(fadeTimer);
     if (stack.length === 0) return;
+    const topChip = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : null;
+    if (topChip) {
+      topChip.style.opacity = '1';
+      topChip.style.transition = `opacity ${AUTO_DISMISS_MS}ms linear`;
+      fadeTimer = setTimeout(() => {
+        topChip.style.opacity = '0';
+      }, 16);
+    }
     dismissTimer = setTimeout(() => {
       stack.pop();
       renderStack();
@@ -1612,7 +1632,6 @@ function createQuickSlot(opts = {}) {
 
   function renderStack() {
     el.innerHTML = '';
-    popUntilActionableTop(stack, actionable);
     const it = peekStackTop(stack);
     if (!it) return;
     const chip = renderQuickChip(it, {
@@ -2847,6 +2866,7 @@ function createMobileSpellRadial(mobileLayoutMq) {
 
 /** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null,onDrop?:Function|null,onPin?:Function|null}} h */
 function renderQuickChip(it, h) {
+  const actionable = isQuickChipActionable(it);
   const chip = document.createElement('div');
   Object.assign(chip.style, {
     display: 'flex',
@@ -2897,7 +2917,7 @@ function renderQuickChip(it, h) {
     flex: '1 1 auto',
   });
   const line1 = document.createElement('span');
-  line1.textContent = bracketize(String(it.name || 'item'));
+  line1.textContent = bracketizeLabel(String(it.name || 'item'));
   Object.assign(line1.style, {
     fontSize: '12px',
     fontWeight: '600',
@@ -2906,7 +2926,9 @@ function renderQuickChip(it, h) {
     textOverflow: 'ellipsis',
   });
   const line2 = document.createElement('span');
-  line2.textContent = `x${normalizePositiveCount(it.count)} • tap for details`;
+  line2.textContent = actionable
+    ? `x${normalizePositiveCount(it.count)} • tap for details`
+    : `x${normalizePositiveCount(it.count)} • picked up`;
   Object.assign(line2.style, {
     fontSize: '10px',
     opacity: '0.8',
@@ -2960,6 +2982,8 @@ function renderQuickChip(it, h) {
         glyphColor: it.glyphColor,
       };
   renderItemDetails(detailPanel, detailItem);
+  // Quick-chip header already shows item identity; hide duplicated title row in expanded details.
+  if (detailPanel.firstElementChild) detailPanel.firstElementChild.remove();
   expandedWrap.appendChild(detailPanel);
 
   const btn = document.createElement('button');
@@ -3043,11 +3067,11 @@ function renderQuickChip(it, h) {
     justifyContent: 'flex-end',
     gap: '6px',
   });
-  actions.appendChild(btn);
+  if (actionable) actions.appendChild(btn);
   if (identifyBtn) actions.appendChild(identifyBtn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
-  expandedWrap.appendChild(actions);
+  if (actions.childElementCount > 0) expandedWrap.appendChild(actions);
 
   let expanded = false;
   const setExpanded = (next) => {
@@ -3056,7 +3080,9 @@ function renderQuickChip(it, h) {
     chevron.textContent = expanded ? '▴' : '▾';
     line2.textContent = expanded
       ? `x${normalizePositiveCount(it.count)} • details open`
-      : `x${normalizePositiveCount(it.count)} • tap for details`;
+      : (actionable
+          ? `x${normalizePositiveCount(it.count)} • tap for details`
+          : `x${normalizePositiveCount(it.count)} • picked up`);
   };
   header.addEventListener('click', () => setExpanded(!expanded));
 
